@@ -32,7 +32,9 @@ from ..telemetry.snapshot import SessionType, TelemetrySnapshot
 # Bump when the *writer* adds/changes channels. Readers tolerate older versions
 # because columns are matched by name via the stored ``fields`` list.
 # v5: lap-level clean flag + track conditions (air/road temp, grip, compound).
-SCHEMA_VERSION = 5
+# v6: per-wheel physical slip_ratio + tyre_pressure (reliable lock/spin & hot
+#     pressures offline — the raw wheel_slip channel is car-dependent).
+SCHEMA_VERSION = 6
 
 # Fixed serialization order for a LapSample, written into every file. Per-wheel
 # channels are flattened with [fl, fr, rl, rr] suffixes.
@@ -54,6 +56,8 @@ SAMPLE_FIELDS = (
     "tyre_fl", "tyre_fr", "tyre_rl", "tyre_rr",   # tyre core temp, deg C
     "car_x", "car_z",   # world ground-plane position, for the track map (v3)
     "current_sector",   # 0-based sim sector, for real sector splits (v4); -1 unknown
+    "sr_fl", "sr_fr", "sr_rl", "sr_rr",           # physical slip ratio per wheel (v6)
+    "press_fl", "press_fr", "press_rl", "press_rr",  # tyre pressure psi per wheel (v6)
 )
 
 # Defaults for channels absent from an older file, keyed by field name.
@@ -82,6 +86,8 @@ class LapSample:
     car_x: float = 0.0
     car_z: float = 0.0
     current_sector: int = -1
+    slip_ratio: tuple[float, float, float, float] = _Z4
+    tyre_pressure: tuple[float, float, float, float] = _Z4
 
     @staticmethod
     def from_snapshot(s: TelemetrySnapshot) -> "LapSample":
@@ -104,6 +110,8 @@ class LapSample:
             car_x=s.car_x,
             car_z=s.car_z,
             current_sector=s.current_sector,
+            slip_ratio=s.slip_ratio,
+            tyre_pressure=s.tyre_pressure,
         )
 
     def as_row(self) -> list:
@@ -127,6 +135,10 @@ class LapSample:
             round(self.tyre_core_temp[2], 1), round(self.tyre_core_temp[3], 1),
             round(self.car_x, 2), round(self.car_z, 2),
             self.current_sector,
+            round(self.slip_ratio[0], 3), round(self.slip_ratio[1], 3),
+            round(self.slip_ratio[2], 3), round(self.slip_ratio[3], 3),
+            round(self.tyre_pressure[0], 2), round(self.tyre_pressure[1], 2),
+            round(self.tyre_pressure[2], 2), round(self.tyre_pressure[3], 2),
         ]
 
     @staticmethod
@@ -157,6 +169,8 @@ class LapSample:
             car_x=f("car_x"),
             car_z=f("car_z"),
             current_sector=int(m["current_sector"]) if m.get("current_sector") is not None else -1,
+            slip_ratio=(f("sr_fl"), f("sr_fr"), f("sr_rl"), f("sr_rr")),
+            tyre_pressure=(f("press_fl"), f("press_fr"), f("press_rl"), f("press_rr")),
         )
 
 

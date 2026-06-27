@@ -11,10 +11,10 @@ applied per corner-phase instead of live, so a symptom is attributed to a phase
 and a speed band and counted across distinct corners — exactly the gate the
 engine uses to tell a *setup* problem (≥3 corners) from a *driving* one.
 
-Note: ``pressures_hot`` and lock/spin segments are left unset here — tyre
-pressure and the physical slip ratio aren't persisted in a lap yet (see the
-engineer handoff), so the engine simply skips those (pressure phase auto-passes).
-The symptom diagnosis that drives aero/mechanical work is fully computed.
+Lock/spin segments and ``pressures_hot`` are computed from the v6 per-wheel
+channels (physical ``slip_ratio`` and ``tyre_pressure``); on an older lap that
+predates v6 those read zero/None and the engine simply skips them (the pressure
+phase auto-passes). The symptom diagnosis (aero/mechanical) is always computed.
 """
 
 from __future__ import annotations
@@ -30,6 +30,7 @@ from .balance import (
     _YAW_LOOSE,
     _YAW_SIGN,
 )
+from .events import _BRAKE_MIN, _LOCK_RATIO, _SPIN_RATIO, _THROTTLE_MIN
 
 # Apex band half-width (normalized track position) around the speed minimum.
 _APEX_HALF = 0.02
@@ -39,6 +40,7 @@ _SPEED_SPLIT_KMH = 120.0   # low/high corner speed band (per the taxonomy)
 # A phase must reach this aggregate intensity to count the symptom present there.
 _PRESENCE = 0.15
 _WARM_C = 50.0             # mean tyre core temp above this = warmed up
+_SEG_N = 20               # track segments for counting distinct lock/spin spots
 
 
 def _phase_of(pos: float, s: LapSample, c: Corner) -> Phase | None:
@@ -89,6 +91,36 @@ def _warmed_up(samples: list[LapSample]) -> bool:
     return (sum(temps) / len(temps)) >= _WARM_C
 
 
+def _seg(pos: float) -> int:
+    return min(_SEG_N - 1, max(0, int(pos * _SEG_N)))
+
+
+def _lock_spin_segments(samples: list[LapSample]) -> tuple[int, int]:
+    """Distinct track segments with a lock-up / wheelspin (physical slip ratio).
+
+    Same thresholds as the live EventDetector; needs the v6 ``slip_ratio`` channel
+    (older laps have it zero → counts as 0, the safe default).
+    """
+    locks: set[int] = set()
+    spins: set[int] = set()
+    for s in samples:
+        if s.brake >= _BRAKE_MIN and min(s.slip_ratio[0], s.slip_ratio[1]) <= _LOCK_RATIO:
+            locks.add(_seg(s.pos))
+        if (s.throttle >= _THROTTLE_MIN and s.gear not in ("R", "N")
+                and max(s.slip_ratio[2], s.slip_ratio[3]) >= _SPIN_RATIO):
+            spins.add(_seg(s.pos))
+    return len(locks), len(spins)
+
+
+def _pressures_hot(samples: list[LapSample]) -> dict | None:
+    """Mean hot pressure per axle (front = FL/FR, rear = RL/RR), or None if absent."""
+    fronts = [p for s in samples for p in s.tyre_pressure[:2] if p > 0.0]
+    rears = [p for s in samples for p in s.tyre_pressure[2:] if p > 0.0]
+    if not fronts or not rears:
+        return None
+    return {"front": sum(fronts) / len(fronts), "rear": sum(rears) / len(rears)}
+
+
 def build_lap_stats(lap: Lap, corners: list[Corner] | None = None) -> LapStats:
     """Diagnose one recorded lap into a :class:`LapStats` for the engineer."""
     if corners is None:
@@ -129,6 +161,7 @@ def build_lap_stats(lap: Lap, corners: list[Corner] | None = None) -> LapStats:
                 scores[sym] = max(scores.get(sym, 0.0), intensity)
                 corner_counts[sym] = corner_counts.get(sym, 0) + 1
 
+    lock_segments, spin_segments = _lock_spin_segments(lap.samples)
     return LapStats(
         lap_time_ms=lap.lap_time_ms,
         # `valid` means complete; `clean` (from the reference-integrity work) means
@@ -138,7 +171,7 @@ def build_lap_stats(lap: Lap, corners: list[Corner] | None = None) -> LapStats:
         warmed_up=_warmed_up(lap.samples),
         symptom_scores=scores,
         symptom_corners=corner_counts,
-        pressures_hot=None,        # tyre pressure not persisted in laps yet
-        lock_segments=0,
-        spin_segments=0,
+        pressures_hot=_pressures_hot(lap.samples),
+        lock_segments=lock_segments,
+        spin_segments=spin_segments,
     )

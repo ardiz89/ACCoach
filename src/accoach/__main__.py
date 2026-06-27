@@ -32,6 +32,7 @@ Review & tools:
   verify-yaw                 validate the yaw-rate sign (oversteer detection)
   verify-aids                validate the ACC aid-level mapping (live)
   verify-sectors             validate the sim's real sector data (live)
+  verify-diag [car] [track]  offline FP-rate check of the lap diagnosis
   logs                       open the folder with logs and crash reports
 """
 
@@ -90,6 +91,9 @@ def main() -> None:
     elif cmd in ("verify-sectors", "sectors"):
         from .diagnostics import run_sectors
         run_sectors()
+    elif cmd in ("verify-diag", "diag"):
+        from .diagnostics import run_diag
+        run_diag(rest)
     elif cmd == "selftest":
         from .diagnostics import run_selftest
         run_selftest()

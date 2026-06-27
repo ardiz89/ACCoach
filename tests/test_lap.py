@@ -130,6 +130,29 @@ def test_clean_false_roundtrip():
     assert back.clean is False
 
 
+def test_v6_slip_ratio_and_pressure_roundtrip():
+    s = synth.snap(pos=0.5, current_lap_ms=1000,
+                   slip_ratio=(-0.3, -0.2, 0.1, 0.15),
+                   tyre_pressure=(27.0, 27.1, 27.4, 27.5))
+    smp = LapSample.from_snapshot(s)
+    assert smp.slip_ratio == (-0.3, -0.2, 0.1, 0.15)
+    back = LapSample.from_named(list(SAMPLE_FIELDS), smp.as_row())
+    assert back.slip_ratio == (-0.3, -0.2, 0.1, 0.15)
+    assert back.tyre_pressure == (27.0, 27.1, 27.4, 27.5)
+
+
+def test_v5_lap_without_v6_channels_loads_with_zero():
+    # A v5 row (through current_sector, no slip_ratio/tyre_pressure) must load,
+    # the new per-wheel channels defaulting to zero.
+    fields = list(SAMPLE_FIELDS[:24])   # up to current_sector
+    row = [0, 0.5, 100.0, 1.0, 0.0, 0.0, "4", 6000, 0.0, 0.0,
+           0, 0, 0, 0, 0, 0, 0, 80, 80, 80, 80, 12.3, -4.5, 1]
+    smp = LapSample.from_named(fields, row)
+    assert smp.slip_ratio == (0.0, 0.0, 0.0, 0.0)
+    assert smp.tyre_pressure == (0.0, 0.0, 0.0, 0.0)
+    assert smp.current_sector == 1
+
+
 def test_legacy_lap_without_clean_is_unknown_not_dirty():
     # A pre-v5 file has no "clean" key: it must load as None (unknown), never
     # False — so it stays eligible as a reference instead of being discarded.

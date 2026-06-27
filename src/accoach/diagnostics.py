@@ -415,6 +415,63 @@ def _sectors_verdict(state: dict) -> None:
     print("=" * 60)
 
 
+def run_diag(argv: list[str] | None = None) -> None:
+    """Offline diagnosis check (no game): run the per-lap diagnosis on a CLEAN
+    reference lap and report which symptoms it flags.
+
+        python -m accoach verify-diag [car] [track]
+
+    A clean reference *should* show no handling symptoms — anything flagged here
+    is a false positive, the number to drive the balance/threshold tuning before
+    trusting the engineer's setup proposals. Also prints the v6 channels the
+    engineer relies on (lock/spin segments, hot pressures)."""
+    _utf8()
+    argv = sys.argv[1:] if argv is None else argv
+    from .coaching.diagnosis import build_lap_stats
+    from .recording import DEFAULT_LAPS_DIR, find_reference_lap, list_lap_files, load_lap
+    from .track import detect_corners
+
+    car = argv[0] if len(argv) > 0 else None
+    track = argv[1] if len(argv) > 1 else None
+    if not (car and track):
+        files = list_lap_files(DEFAULT_LAPS_DIR)
+        if not files:
+            print(f"Nessun giro registrato in {DEFAULT_LAPS_DIR}.")
+            return
+        last = load_lap(files[-1])
+        car, track = last.car_model, last.track
+
+    ref = find_reference_lap(car, track, DEFAULT_LAPS_DIR)
+    if ref is None:
+        print(f"Nessun giro pulito di riferimento per {car} / {track}.")
+        return
+    corners = detect_corners(ref.samples)
+    stats = build_lap_stats(ref, corners)
+
+    print("=" * 60)
+    print("DIAGNOSI SU GIRO PULITO (FP-rate)")
+    print("=" * 60)
+    print(f"\n{car} / {track}  —  {format_lap_time(ref.lap_time_ms)}, {len(corners)} curve")
+    print(f"stable={stats.stable}  warmed_up={stats.warmed_up}  "
+          f"lock_seg={stats.lock_segments}  spin_seg={stats.spin_segments}")
+    print(f"pressioni a caldo: {stats.pressures_hot}")
+    if ref.schema_version < 6:
+        print("(giro pre-v6: slip_ratio/tyre_pressure assenti → lock/spin/press a 0/None)")
+
+    if not stats.symptom_scores:
+        print("\n✓ nessun sintomo sul giro pulito — FP-rate 0 su questo giro.")
+        print("=" * 60)
+        return
+    flagged = sum(stats.symptom_corners.values())
+    print(f"\n⚠ {len(stats.symptom_scores)} sintomi su {flagged} curve flaggate. "
+          "Su un giro PULITO sono falsi positivi: tarare le soglie prima di")
+    print("  fidarsi delle proposte di setup (vedi balance.py / diagnosis.py).")
+    for sym, score in sorted(stats.symptom_scores.items(), key=lambda kv: -kv[1]):
+        print(f"    - {sym}: score {score:.2f} in "
+              f"{stats.symptom_corners.get(sym, 0)} curve")
+    print("=" * 60)
+
+
 def run_dryrun(seconds: float | None = None) -> None:
     """Dry-run the live technique detectors and print every cue they'd raise, with
     the channel values that triggered it — the instrument for tuning thresholds

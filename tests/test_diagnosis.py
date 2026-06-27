@@ -9,7 +9,8 @@ countersteer of oversteer.
 from accoach.coaching.diagnosis import build_lap_stats
 from accoach.engine import CoachEngine
 from accoach.engineer import Balance
-from accoach.telemetry.snapshot import TelemetrySnapshot
+from accoach.recording.lap import Lap, LapSample
+from accoach.telemetry.snapshot import SessionType, TelemetrySnapshot
 
 import synth
 
@@ -54,6 +55,30 @@ def test_oversteer_lap_is_diagnosed():
 def test_dirty_lap_is_not_stable():
     lap = _with_yaw(synth.build_lap(n=200, clean=False), ratio=0.3)
     assert build_lap_stats(lap).stable is False         # clean is False -> not stable
+
+
+def test_fp_rate_zero_on_neutral_lap():
+    lap = _with_yaw(synth.build_lap(n=300, clean=True), ratio=1.9)
+    stats = build_lap_stats(lap)
+    assert sum(stats.symptom_corners.values()) == 0     # no false positives
+
+
+def test_lock_spin_and_pressures_from_v6_channels():
+    press = (27.0, 27.0, 27.5, 27.5)
+    lock = LapSample(0, 0.10, 200.0, 0.0, 0.9, 0.0, "4", 7000, 0.0, -1.0,
+                     slip_ratio=(-0.3, -0.3, 0.0, 0.0), tyre_pressure=press)
+    spin = LapSample(1000, 0.60, 120.0, 1.0, 0.0, 0.0, "3", 7000, 0.0, 0.5,
+                     slip_ratio=(0.0, 0.0, 0.25, 0.25), tyre_pressure=press)
+    clean = LapSample(2000, 0.90, 250.0, 1.0, 0.0, 0.0, "5", 7000, 0.0, 0.0,
+                      slip_ratio=(0.0, 0.0, 0.0, 0.0), tyre_pressure=press)
+    lap = Lap("ferrari_488_gt3", "monza", SessionType.PRACTICE, 100000, True,
+              samples=[lock, spin, clean], clean=True)
+    stats = build_lap_stats(lap)
+    assert stats.lock_segments >= 1
+    assert stats.spin_segments >= 1
+    assert stats.pressures_hot is not None
+    assert round(stats.pressures_hot["front"], 1) == 27.0
+    assert round(stats.pressures_hot["rear"], 1) == 27.5
 
 
 # --- engine wiring: the engineer decision appears in the payload --------------
