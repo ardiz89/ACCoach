@@ -469,30 +469,33 @@ def main(argv: list[str] | None = None) -> None:
 
     import uvicorn
 
+    from .config import load_config
     from .logging_setup import setup_logging
     setup_logging()
+    cfg = load_config()
+    host, port = HOST, cfg.web.port
 
     argv = sys.argv[1:] if argv is None else argv
     # The engineer page and the analysis page are served by the same app; the
     # launcher passes --engineer to land directly on the setup editor.
     path = "/engineer" if "--engineer" in argv else "/"
-    url = f"http://{HOST}:{PORT}{path}"
+    url = f"http://{host}:{port}{path}"
 
     # If a server is already up (e.g. the user opened Analysis earlier), don't try
     # to bind a second one — just open the browser at the requested page.
-    if _port_in_use(HOST, PORT):
+    if _port_in_use(host, port):
         print(f"ACCoach già attivo: apro {url}")
         webbrowser.open(url)
         return
 
-    laps_dir = _seed_demo() if "--demo" in argv else DEFAULT_LAPS_DIR
+    laps_dir = _seed_demo() if "--demo" in argv else cfg.laps_path()
     if "--demo" in argv:
         print("ACCoach analysis in DEMO mode (synthetic laps)")
 
     print(f"ACCoach analysis on {url}  (Ctrl+C to stop)")
     # Open the browser once the server has had a moment to come up.
     threading.Timer(1.5, lambda: webbrowser.open(url)).start()
-    uvicorn.run(create_api(laps_dir), host=HOST, port=PORT, log_level="warning")
+    uvicorn.run(create_api(laps_dir), host=host, port=port, log_level="warning")
 
 
 if __name__ == "__main__":

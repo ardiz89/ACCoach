@@ -33,12 +33,31 @@ def _coerce_level(level: int | str) -> int:
     return logging.getLevelName(str(level).upper())  # name -> int
 
 
-def setup_logging(level: int | str = logging.INFO, *, console: bool = True) -> logging.Logger:
-    """Configure the ``accoach`` logger tree. Returns the root ACCoach logger."""
+def setup_logging(level: int | str | None = None, *, console: bool | None = None) -> logging.Logger:
+    """Configure the ``accoach`` logger tree. Returns the root ACCoach logger.
+
+    When ``level``/``console`` are left as ``None`` they are read from
+    ``config.toml`` ([logging] level/console), falling back to INFO/console-on.
+    """
     global _configured
     root = logging.getLogger(_ROOT_NAME)
     if _configured:
         return root
+
+    if level is None or console is None:
+        try:
+            from .config import load_config
+            cfg = load_config()
+            if level is None:
+                level = cfg.logging.level
+            if console is None:
+                console = cfg.logging.console
+        except Exception:   # noqa: BLE001 - config must not block logging setup
+            pass
+    if level is None:
+        level = logging.INFO
+    if console is None:
+        console = True
 
     root.setLevel(logging.DEBUG)   # handlers decide what actually gets emitted
     root.propagate = False

@@ -20,6 +20,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 
+from . import __version__
 from .engine import CoachEngine
 from .logging_setup import get_logger
 from .serialize import state_to_dict
@@ -30,11 +31,25 @@ PORT = 8777
 _log = get_logger("server")
 
 
+def _cpu_percent() -> float | None:
+    """Best-effort process CPU%, only if psutil is available (optional dep)."""
+    try:
+        import psutil   # type: ignore
+        return psutil.Process().cpu_percent(interval=None)
+    except Exception:
+        return None
+
+
 def create_app(engine: CoachEngine | None = None, hz: float = 15.0) -> FastAPI:
     clients: set[WebSocket] = set()
-    # tick_errors/last_tick_ts are exposed via /health so a silently failing tick
-    # (healthy /health but no broadcasts) is observable instead of invisible.
-    holder: dict = {"engine": engine, "task": None, "tick_errors": 0, "last_tick_ts": 0.0}
+    # These fields are exposed via /health so a silently failing tick (healthy
+    # /health but no broadcasts) is observable instead of invisible.
+    holder: dict = {
+        "engine": engine, "task": None,
+        "tick_errors": 0, "last_tick_ts": 0.0,
+        "started": time.monotonic(), "prev_tick": 0.0,
+        "tick_hz": None, "last_state": None,
+    }
     interval = 1.0 / hz
 
     async def broadcast_loop() -> None:
@@ -43,8 +58,15 @@ def create_app(engine: CoachEngine | None = None, hz: float = 15.0) -> FastAPI:
             now = time.monotonic()
             try:
                 st = await loop.run_in_executor(None, holder["engine"].tick, now)
-                payload = json.dumps(state_to_dict(st))
+                state = state_to_dict(st)
+                payload = json.dumps(state)
+                holder["last_state"] = state
                 holder["last_tick_ts"] = time.time()
+                if holder["prev_tick"]:
+                    dt = now - holder["prev_tick"]
+                    if dt > 0:
+                        holder["tick_hz"] = round(1.0 / dt, 1)
+                holder["prev_tick"] = now
             except Exception:
                 holder["tick_errors"] += 1
                 # Log the first failure and then every 100th, so a persistent bug
@@ -79,7 +101,23 @@ def create_app(engine: CoachEngine | None = None, hz: float = 15.0) -> FastAPI:
 
     @app.get("/health")
     async def health() -> dict:
-        return {"ok": True, "clients": len(clients)}
+        last = holder.get("last_state") or {}
+        last_tick = holder.get("last_tick_ts") or 0.0
+        return {
+            "ok": True,
+            "version": __version__,
+            "uptime_s": round(time.monotonic() - holder["started"], 1),
+            "clients": len(clients),
+            "tick_errors": holder["tick_errors"],
+            "tick_hz": holder.get("tick_hz"),
+            "last_tick_age_s": round(time.time() - last_tick, 2) if last_tick else None,
+            "connected": last.get("connected"),
+            "game": last.get("status"),
+            "car": last.get("car"),
+            "track": last.get("track"),
+            "saved_laps": last.get("saved_laps"),
+            "cpu_percent": _cpu_percent(),
+        }
 
     @app.websocket("/ws")
     async def ws_endpoint(ws: WebSocket) -> None:
@@ -101,8 +139,10 @@ def main(argv: list[str] | None = None) -> None:
 
     import uvicorn
 
+    from .config import load_config
     from .logging_setup import setup_logging
     setup_logging()
+    cfg = load_config()
 
     argv = sys.argv[1:] if argv is None else argv
     engine = None
@@ -112,8 +152,10 @@ def main(argv: list[str] | None = None) -> None:
         engine = make_demo_engine()
         print("ACCoach backend in DEMO mode (synthetic lap, no game needed)")
 
-    print(f"ACCoach backend on ws://{HOST}:{PORT}/ws  (Ctrl+C to stop)")
-    uvicorn.run(create_app(engine=engine), host=HOST, port=PORT, log_level="warning")
+    host, port = cfg.server.host, cfg.server.port
+    print(f"ACCoach backend on ws://{host}:{port}/ws  (Ctrl+C to stop)")
+    uvicorn.run(create_app(engine=engine, hz=cfg.server.hz),
+                host=host, port=port, log_level="warning")
 
 
 if __name__ == "__main__":

@@ -31,7 +31,12 @@ def test_health_endpoint():
     with TestClient(create_app(engine=eng, hz=50)) as client:
         r = client.get("/health")
         assert r.status_code == 200
-        assert r.json()["ok"] is True
+        body = r.json()
+        assert body["ok"] is True
+        # Enriched health: version + observability fields are present.
+        assert body["version"]
+        assert "tick_errors" in body
+        assert "uptime_s" in body
 
 
 def test_websocket_broadcasts_state():
