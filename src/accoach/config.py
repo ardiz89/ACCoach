@@ -28,6 +28,13 @@ class WebCfg:
 
 
 @dataclass
+class AcquireCfg:
+    # Background telemetry sampling rate (Hz). Drives recording fidelity and
+    # braking-point resolution, independent of the UI/overlay refresh rate.
+    hz: float = 60.0
+
+
+@dataclass
 class VoiceCfg:
     enabled: bool = True
     language: str = "it"
@@ -57,6 +64,7 @@ class DataCfg:
 class Config:
     server: ServerCfg = field(default_factory=ServerCfg)
     web: WebCfg = field(default_factory=WebCfg)
+    acquire: AcquireCfg = field(default_factory=AcquireCfg)
     voice: VoiceCfg = field(default_factory=VoiceCfg)
     overlay: OverlayCfg = field(default_factory=OverlayCfg)
     logging: LoggingCfg = field(default_factory=LoggingCfg)
@@ -76,6 +84,9 @@ hz = 15.0            # frequenza di broadcast verso overlay/clients
 
 [web]
 port = 8778          # porta della web app di analisi/ingegnere
+
+[acquire]
+hz = 60.0            # frequenza di acquisizione telemetria (fedeltà registrazione)
 
 [voice]
 enabled = true       # voce del coach attiva

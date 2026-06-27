@@ -87,7 +87,8 @@ def create_app(engine: CoachEngine | None = None, hz: float = 15.0) -> FastAPI:
     @asynccontextmanager
     async def lifespan(_app: FastAPI):
         if holder["engine"] is None:
-            holder["engine"] = CoachEngine()
+            from .config import load_config
+            holder["engine"] = CoachEngine(acquire_hz=load_config().acquire.hz)
         holder["task"] = asyncio.create_task(broadcast_loop())
         try:
             yield
@@ -103,6 +104,8 @@ def create_app(engine: CoachEngine | None = None, hz: float = 15.0) -> FastAPI:
     async def health() -> dict:
         last = holder.get("last_state") or {}
         last_tick = holder.get("last_tick_ts") or 0.0
+        eng = holder.get("engine")
+        acquire_hz = eng.acquisition_hz() if hasattr(eng, "acquisition_hz") else None
         return {
             "ok": True,
             "version": __version__,
@@ -110,6 +113,7 @@ def create_app(engine: CoachEngine | None = None, hz: float = 15.0) -> FastAPI:
             "clients": len(clients),
             "tick_errors": holder["tick_errors"],
             "tick_hz": holder.get("tick_hz"),
+            "acquire_hz": acquire_hz,
             "last_tick_age_s": round(time.time() - last_tick, 2) if last_tick else None,
             "connected": last.get("connected"),
             "game": last.get("status"),

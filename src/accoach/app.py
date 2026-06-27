@@ -50,7 +50,9 @@ def main(argv: list[str] | None = None) -> None:
         if not silent:
             engine.voice = Voice(enabled=True)
     else:
-        engine = CoachEngine(voice=Voice(enabled=not silent))
+        from .config import load_config
+        engine = CoachEngine(voice=Voice(enabled=not silent),
+                             acquire_hz=load_config().acquire.hz)
 
     app = QApplication(sys.argv)
     signal.signal(signal.SIGINT, lambda *_: app.quit())

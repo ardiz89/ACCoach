@@ -38,6 +38,7 @@ from .coaching.cue import CueTier
 from .comparison import DeltaState, LapComparator, Reference
 from .recording import DEFAULT_LAPS_DIR, LapRecorder, find_reference_lap, save_lap
 from .telemetry import SharedMemoryReader, TelemetrySnapshot
+from .telemetry.feed import TelemetryFeed
 from .track import detect_corners
 
 # When you're not on a representative flying lap — delta has ballooned because
@@ -77,11 +78,28 @@ class CoachEngine:
         voice: Voice | None = None,
         num_segments: int = 24,
         laps_dir: Path | str = DEFAULT_LAPS_DIR,
+        feed: TelemetryFeed | None = None,
+        acquire_hz: float | None = None,
     ) -> None:
         self.reader = reader if reader is not None else SharedMemoryReader()
         self.voice = voice
         self.laps_dir = laps_dir
-        self.recorder = LapRecorder()
+        self.recorder = LapRecorder()   # used only on the legacy inline path
+
+        # High-fidelity acquisition: a background thread reads + records at a
+        # fixed rate, decoupled from this engine's tick rate. ``feed`` may be
+        # injected (tests drive it manually); ``acquire_hz`` makes the engine
+        # own one and run it. With neither, tick() reads+records inline (legacy).
+        if feed is not None:
+            self._feed: TelemetryFeed | None = feed
+            self._owns_feed = False
+        elif acquire_hz:
+            self._feed = TelemetryFeed(self.reader, hz=acquire_hz, laps_dir=laps_dir)
+            self._feed.start()
+            self._owns_feed = True
+        else:
+            self._feed = None
+            self._owns_feed = False
         self.analyzer = CoachAnalyzer(num_segments=num_segments)
         self.events = EventDetector()
         self.balance = BalanceDetector()
@@ -111,18 +129,33 @@ class CoachEngine:
         self.fuel.reset()
         self.scheduler.reset()
 
+    def acquisition_hz(self) -> float | None:
+        """Measured acquisition rate when a background feed is running, else None."""
+        return self._feed.measured_hz if self._feed is not None else None
+
     def tick(self, now: float) -> EngineState:
-        snap = self.reader.read()
+        if self._feed is not None:
+            # Acquisition + recording happen on the feed thread; here we just
+            # read the latest frame and learn which laps it saved.
+            snap = self._feed.latest()
+            saved = self._feed.drain_saved()
+        else:
+            snap = self.reader.read()
+            saved = []
 
         if snap.connected and (snap.car_model, snap.track) != self._key:
             self._key = (snap.car_model, snap.track)
             self._rebuild_reference(snap.car_model, snap.track)
 
-        lap = self.recorder.update(snap)
-        if lap is not None and lap.valid:
-            save_lap(lap, self.laps_dir)
-            self.saved_laps += 1
-            self._rebuild_reference(snap.car_model, snap.track)  # chase the new best
+        if self._feed is None:
+            lap = self.recorder.update(snap)
+            if lap is not None and lap.valid:
+                save_lap(lap, self.laps_dir)
+                self.saved_laps += 1
+                self._rebuild_reference(snap.car_model, snap.track)  # chase the new best
+        elif saved:
+            self.saved_laps += len(saved)
+            self._rebuild_reference(snap.car_model, snap.track)      # chase the new best
 
         delta = self._comparator.compare(snap) if self._comparator else None
         # On an abnormal lap (no comparison, or delta blown out) gate everything
@@ -169,4 +202,7 @@ class CoachEngine:
     def close(self) -> None:
         if self.voice is not None:
             self.voice.close()
+        # Stop the feed before closing the reader it polls.
+        if self._feed is not None and self._owns_feed:
+            self._feed.stop()
         self.reader.close()

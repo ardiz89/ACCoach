@@ -91,6 +91,8 @@ def _render(s, delta, history, saved, audio) -> Group:
 
 
 def main(argv: list[str] | None = None) -> None:
+    from .logging_setup import setup_logging
+    setup_logging()
     argv = sys.argv[1:] if argv is None else argv
     silent = "--silent" in argv or "-s" in argv
 
@@ -101,7 +103,8 @@ def main(argv: list[str] | None = None) -> None:
 
     interval = 1.0 / REFRESH_HZ
     voice = Voice(enabled=not silent)
-    engine = CoachEngine(voice=voice)
+    from .config import load_config
+    engine = CoachEngine(voice=voice, acquire_hz=load_config().acquire.hz)
 
     try:
         with Live(_render(TelemetrySnapshot.disconnected(), None, [], 0, voice.is_audio),
