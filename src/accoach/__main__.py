@@ -33,6 +33,7 @@ Review & tools:
   verify-aids                validate the ACC aid-level mapping (live)
   verify-sectors             validate the sim's real sector data (live)
   verify-diag [car] [track]  offline FP-rate check of the lap diagnosis
+  import-reference <file>    import a lap as a clean reference (cold-start seed)
   logs                       open the folder with logs and crash reports
 """
 
@@ -94,6 +95,9 @@ def main() -> None:
     elif cmd in ("verify-diag", "diag"):
         from .diagnostics import run_diag
         run_diag(rest)
+    elif cmd in ("import-reference", "import-ref"):
+        from .diagnostics import run_import_reference
+        run_import_reference(rest)
     elif cmd == "selftest":
         from .diagnostics import run_selftest
         run_selftest()

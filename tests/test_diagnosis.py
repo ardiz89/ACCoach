@@ -154,6 +154,19 @@ def test_metres_between_uses_world_coords():
     assert abs(_metres_between(lap, 0.0, 1.0) - 50.0) < 1e-6            # 3-4-5 triangle
 
 
+def test_import_reference_seeds_a_clean_reference(tmp_path):
+    from accoach.diagnostics import run_import_reference
+    from accoach.recording.storage import find_reference_lap, save_lap
+
+    src_dir = tmp_path / "src"
+    src_dir.mkdir()
+    src = save_lap(synth.build_lap(n=40), src_dir)          # clean=None by default
+    laps = tmp_path / "laps"
+    run_import_reference([str(src)], laps_dir=laps)
+    ref = find_reference_lap("ferrari_488_gt3", "monza", laps)
+    assert ref is not None and ref.clean is True            # imported = trusted clean
+
+
 def test_engine_surfaces_engineer_block(tmp_path):
     frames = _full_lap_frames()
     eng = CoachEngine(reader=_ScriptedReader(frames), laps_dir=tmp_path)
