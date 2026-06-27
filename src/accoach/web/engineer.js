@@ -316,6 +316,12 @@ async function confirmWrite() {
     $("modal").hidden = true;
     state.pending = {};
     state.lastWritten = res.name;       // drives the "ricarica ai box" reminder
+    // Tell the live backend the proposed setup was written, so the engineer
+    // advances its convergence re-test. Best-effort: the backend may be off.
+    try {
+      fetch(`http://${location.hostname}:${WS_PORT}/engineer/applied`,
+            { method: "POST" });
+    } catch (e) { /* backend not running — diagnosis just keeps proposing */ }
     await onComboChange();              // refresh setup list (new file appears)
     showToast("✓ " + res.reload_hint);
   } catch (e) {

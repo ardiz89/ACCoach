@@ -19,6 +19,7 @@ import time
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
 
 from . import __version__
 from .engine import CoachEngine
@@ -99,6 +100,20 @@ def create_app(engine: CoachEngine | None = None, hz: float = 15.0) -> FastAPI:
                 holder["engine"].close()
 
     app = FastAPI(title="ACCoach backend", lifespan=lifespan)
+    # The engineer UI is served from the analysis app (a different local port),
+    # so it talks to this backend cross-origin. It's a local-only tool.
+    app.add_middleware(
+        CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"],
+    )
+
+    @app.post("/engineer/applied")
+    async def engineer_applied() -> dict:
+        """The driver wrote the proposed setup: advance the engineer's re-test."""
+        eng = holder.get("engine")
+        if eng is not None and hasattr(eng, "mark_setup_applied"):
+            eng.mark_setup_applied()
+            return {"ok": True}
+        return {"ok": False}
 
     @app.get("/health")
     async def health() -> dict:
