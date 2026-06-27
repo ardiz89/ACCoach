@@ -1,0 +1,141 @@
+"""Live handling-balance coaching — understeer and oversteer.
+
+The event detector calls out lock-ups and wheelspin; this is its cornering
+sibling. It reads how the car is *rotating* relative to how much the driver is
+asking with the wheel, and names the two faults that cost the most mid-corner:
+
+* **Understeer (push)** — lots of steering lock and real cornering speed, but the
+  car isn't rotating: ``yaw_rate`` stays low while ``steer_angle`` is large. The
+  nose is washing out; you carried too much speed in or you're on the power too
+  early.
+* **Oversteer (loose)** — the rear is coming round faster than you steered for.
+  The giveaway is **opposite lock**: the front wheels point one way while the car
+  yaws the other (``steer_angle`` and ``yaw_rate`` have opposite signs). That's
+  the driver already catching a slide, so it's a high-credibility signal.
+
+Like :class:`~accoach.coaching.events.EventDetector` this needs **no reference
+lap** — understeer and oversteer are wrong in absolute terms — so it works from
+the first corner of the first lap. Same debounce/one-shot/dedup machinery.
+
+⚠ Calibration (do this once, live, like the g-axis and lock-up checks)
+---------------------------------------------------------------------
+The oversteer test assumes ``steer_angle`` (+left) and ``yaw_rate`` share a sign
+convention: a steady left-hand corner should give *same-sign* steer and yaw, so
+the opposite-sign test only trips on genuine countersteer. If a clean corner ever
+fires OVERSTEER constantly, the yaw sign is inverted on this title — flip
+``_YAW_SIGN`` to -1. The magnitude thresholds (``_STEER_*``, ``_YAW_*``) are
+deliberately conservative first guesses; tighten them against a real session.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+from ..telemetry.snapshot import ACStatus, TelemetrySnapshot
+from .cue import Cue, CueCategory
+
+# Calibrated against live AC (2026-06-26): in clean corners steer*yaw_rate was
+# ~70% NEGATIVE, i.e. the game's yaw_rate is signed opposite to steer_angle, so
+# we negate it to restore the "clean corner => same sign" convention the logic
+# below expects (otherwise clean corners false-fire as oversteer).
+_YAW_SIGN = -1.0
+
+# Only judge balance when actually cornering at speed; slow manoeuvring and
+# straight-line running have meaningless steer/yaw ratios.
+_MIN_SPEED_KMH = 60.0
+
+# Understeer: the car rotating far less than the steering asks for. Measured as
+# the yaw/steer ratio — on AC1 GT3 (Imola) clean fast corners sat at a median
+# ratio of ~1.9 (yaw rad/s per steer rad); a push drops it well below that.
+_STEER_HARD = 0.15         # rad of steering — genuinely cornering, not noise
+_UNDERSTEER_RATIO = 0.9    # yaw/steer below this (vs ~1.9 normal) = pushing
+
+# Oversteer: meaningful rotation while the driver is applying opposite lock.
+_STEER_CATCH = 0.04        # rad of (opposite) lock that counts as a correction
+_YAW_LOOSE = 0.30          # rad/s of rotation that counts as the rear stepping out
+
+_MIN_HOLD_S = 0.15         # sustain time before a balance fault fires
+_EVENT_SEGMENTS = 20       # granularity for de-duplicating by location
+_PRIORITY_BASE = 280.0     # just below lock-up/wheelspin, above segment time-loss
+
+
+@dataclass(slots=True)
+class _Episode:
+    active: bool = False
+    since: float = 0.0
+    fired: bool = False
+
+
+class BalanceDetector:
+    """Stateful: fed (snapshot, now) each frame, yields understeer/oversteer cues."""
+
+    def __init__(self) -> None:
+        self._push = _Episode()
+        self._loose = _Episode()
+
+    def reset(self) -> None:
+        self._push = _Episode()
+        self._loose = _Episode()
+
+    def update(self, s: TelemetrySnapshot, now: float) -> list[Cue]:
+        if not (s.connected and s.status == ACStatus.LIVE) or s.in_pit:
+            self.reset()
+            return []
+
+        cues: list[Cue] = []
+        # Oversteer takes precedence: if the rear is genuinely loose, that's the
+        # story, not a push, and the two conditions are mutually exclusive anyway.
+        loose = self._is_oversteer(s)
+        push = self._is_understeer(s) and not loose
+        if self._step(self._loose, loose, now):
+            cues.append(self._make(s, CueCategory.OVERSTEER,
+                                   "Sovrasterzo, sii più dolce col gas in uscita"))
+        if self._step(self._push, push, now):
+            cues.append(self._make(s, CueCategory.UNDERSTEER,
+                                   "L'anteriore scivola, entra più piano"))
+        return cues
+
+    # --- conditions -------------------------------------------------------
+    @staticmethod
+    def _is_understeer(s: TelemetrySnapshot) -> bool:
+        if s.speed_kmh < _MIN_SPEED_KMH:
+            return False
+        steer = abs(s.steer_angle)
+        if steer < _STEER_HARD:
+            return False
+        # Rotating far less than the steering asks: yaw/steer well below normal.
+        # (Magnitude only — the sign convention doesn't matter for a ratio.)
+        return (abs(s.yaw_rate) / steer) < _UNDERSTEER_RATIO
+
+    @staticmethod
+    def _is_oversteer(s: TelemetrySnapshot) -> bool:
+        if s.speed_kmh < _MIN_SPEED_KMH:
+            return False
+        yaw = s.yaw_rate * _YAW_SIGN
+        # Car is rotating hard AND the driver is on opposite lock to catch it:
+        # steer and yaw point opposite ways (negative product).
+        applying_opposite_lock = (
+            abs(s.steer_angle) >= _STEER_CATCH and s.steer_angle * yaw < 0.0
+        )
+        return abs(yaw) >= _YAW_LOOSE and applying_opposite_lock
+
+    # --- debounce (identical contract to EventDetector) -------------------
+    @staticmethod
+    def _step(ep: _Episode, cond: bool, now: float) -> bool:
+        if cond:
+            if not ep.active:
+                ep.active = True
+                ep.since = now
+                ep.fired = False
+            elif not ep.fired and now - ep.since >= _MIN_HOLD_S:
+                ep.fired = True
+                return True
+        else:
+            ep.active = False
+        return False
+
+    @staticmethod
+    def _make(s: TelemetrySnapshot, category: CueCategory, message: str) -> Cue:
+        seg = min(_EVENT_SEGMENTS - 1, max(0, int(s.lap_position * _EVENT_SEGMENTS)))
+        return Cue(category=category, message=message,
+                   priority=_PRIORITY_BASE, segment=seg, pos=s.lap_position)

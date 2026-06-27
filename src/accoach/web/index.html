@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ACCoach · Analisi</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header>
+    <h1>ACCoach <span>· Analisi</span></h1>
+    <div class="controls">
+      <label>Auto / Pista
+        <select id="combo"></select>
+      </label>
+      <label>Giro da rivedere
+        <select id="lap"></select>
+      </label>
+      <label>Confronta con
+        <select id="baseline"></select>
+      </label>
+      <div class="export">
+        <span>Export</span>
+        <button id="exp-csv" type="button">⬇ CSV</button>
+        <button id="exp-json" type="button">⬇ JSON</button>
+      </div>
+    </div>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab active" data-view="compare">Confronto</button>
+    <button class="tab" data-view="map">Mappa</button>
+    <button class="tab" data-view="sectors">Settori</button>
+    <button class="tab" data-view="progress">Andamento</button>
+  </nav>
+
+  <div id="view-compare">
+    <section id="summary" class="summary"></section>
+
+    <div id="readout" class="readout">Passa il mouse sui grafici per i valori punto-per-punto…</div>
+
+    <main id="charts">
+      <div class="chart">
+        <h3>Delta sul giro <small>(s · rosso = più lento, verde = più veloce)</small></h3>
+        <canvas id="c-delta"></canvas>
+      </div>
+      <div class="chart">
+        <h3>Velocità <small>(km/h · bianco = giro rivisto, ciano = confronto)</small></h3>
+        <canvas id="c-speed"></canvas>
+      </div>
+      <div class="chart">
+        <h3>Gas / Freno <small>(verde = gas, rosso = freno · tratteggio = riferimento)</small></h3>
+        <canvas id="c-inputs"></canvas>
+      </div>
+    </main>
+
+    <section id="debrief" class="debrief"></section>
+  </div>
+
+  <div id="view-map" class="hidden">
+    <div id="map-readout" class="readout">Linea di gara · colore = delta (rosso più lento, verde più veloce) · ▽ punti di frenata</div>
+    <main>
+      <div class="chart map">
+        <h3>Mappa pista <small>(bianco tratteggio = riferimento · linea piena = giro rivisto)</small></h3>
+        <canvas id="c-map"></canvas>
+      </div>
+    </main>
+    <div id="map-missing" class="empty hidden">Questo giro non ha coordinate (registrato prima dell'aggiornamento mappa). Guida e registra un giro nuovo per vederlo qui.</div>
+  </div>
+
+  <div id="view-sectors" class="hidden">
+    <section id="sec-summary" class="summary"></section>
+    <div class="sec-head"><span>Settore</span><span>Tempo <small>(rif)</small></span><span>Δ vs riferimento <small>(verde più veloce, rosso più lento)</small></span></div>
+    <div id="sectors" class="sectors"></div>
+    <section id="ideal" class="ideal"></section>
+  </div>
+
+  <div id="view-progress" class="hidden">
+    <section id="prog-summary" class="summary"></section>
+    <main>
+      <div class="chart">
+        <h3>Tempi sul giro nel tempo <small>(ogni punto = un giro · linea verde = best progressivo)</small></h3>
+        <canvas id="c-progress" class="tall"></canvas>
+      </div>
+    </main>
+    <section class="debrief">
+      <h3>Errori ricorrenti</h3>
+      <div id="recurring"></div>
+    </section>
+  </div>
+
+  <div id="empty" class="empty">Nessun giro registrato. Guida e registra qualche giro, poi torna qui.</div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

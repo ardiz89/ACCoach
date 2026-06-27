@@ -1,0 +1,85 @@
+"""LapCatalog: the SQLite index over lap files."""
+from accoach.recording.catalog import LapCatalog
+from accoach.recording.storage import _catalog_path, list_lap_files, save_lap
+
+import synth
+
+
+def _seed(tmp_path):
+    """Two valid laps (fast + slow) and one invalid one on disk.
+
+    ``save_lap`` best-effort indexes into the catalog as a side effect; drop that
+    db so each test rebuilds the index from the files (the catalog is a cache).
+    """
+    # Distinct timestamps so files don't collide on name (fast & invalid share a
+    # lap time of 100000 and would otherwise overwrite each other).
+    laps = [
+        (synth.build_lap(n=30), "2026-06-20T18:00:00+00:00"),                # fast
+        (synth.build_lap(slow_corner=0, amt=30, n=30), "2026-06-20T18:00:01+00:00"),
+        (synth.build_lap(n=30, valid=False), "2026-06-20T18:00:02+00:00"),   # invalid
+    ]
+    for lap, utc in laps:
+        lap.recorded_utc = utc
+        save_lap(lap, tmp_path)
+    db = _catalog_path(tmp_path)
+    if db.exists():
+        db.unlink()
+
+
+def test_sync_indexes_all_files(tmp_path):
+    _seed(tmp_path)
+    with LapCatalog(_catalog_path(tmp_path)) as cat:
+        added = cat.sync(list_lap_files(tmp_path))
+        assert added == 3
+        assert cat.count() == 3
+        # Re-syncing the same files adds nothing.
+        assert cat.sync(list_lap_files(tmp_path)) == 0
+
+
+def test_fastest_valid_path_skips_invalid_and_slow(tmp_path):
+    _seed(tmp_path)
+    with LapCatalog(_catalog_path(tmp_path)) as cat:
+        cat.sync(list_lap_files(tmp_path))
+        path = cat.fastest_valid_path("ferrari_488_gt3", "monza")
+        assert path is not None
+        # The winner is the 100000 ms lap (token "1m40s000" in the filename).
+        assert "1m40s000" in path
+
+
+def test_fastest_valid_none_for_unknown_combo(tmp_path):
+    _seed(tmp_path)
+    with LapCatalog(_catalog_path(tmp_path)) as cat:
+        cat.sync(list_lap_files(tmp_path))
+        assert cat.fastest_valid_path("nope", "nowhere") is None
+
+
+def test_laps_for_returns_all_including_invalid(tmp_path):
+    _seed(tmp_path)
+    with LapCatalog(_catalog_path(tmp_path)) as cat:
+        cat.sync(list_lap_files(tmp_path))
+        rows = cat.laps_for("ferrari_488_gt3", "monza")
+        assert len(rows) == 3
+        assert all("path" in r and "lap_time_ms" in r for r in rows)
+
+
+def test_sync_drops_files_removed_from_disk(tmp_path):
+    _seed(tmp_path)
+    db = _catalog_path(tmp_path)
+    with LapCatalog(db) as cat:
+        cat.sync(list_lap_files(tmp_path))
+        assert cat.count() == 3
+    # Delete one file, re-sync: catalog drops the stale row.
+    files = list_lap_files(tmp_path)
+    files[0].unlink()
+    with LapCatalog(db) as cat:
+        cat.sync(list_lap_files(tmp_path))
+        assert cat.count() == 2
+
+
+def test_upsert_is_idempotent(tmp_path):
+    save_lap(synth.build_lap(n=10), tmp_path)
+    path = list_lap_files(tmp_path)[0]
+    with LapCatalog(_catalog_path(tmp_path)) as cat:
+        assert cat.upsert(path) is True
+        assert cat.upsert(path) is True       # ON CONFLICT update, no duplicate
+        assert cat.count() == 1

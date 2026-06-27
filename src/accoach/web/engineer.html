@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ACCoach · Ingegnere</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/engineer.css">
+</head>
+<body>
+  <header>
+    <h1>ACCoach <span>· Ingegnere di pista</span>
+      <span id="class-chip" class="class-chip" hidden></span></h1>
+    <div class="controls">
+      <label>Auto / Pista
+        <select id="combo"></select>
+      </label>
+      <label>Setup di partenza
+        <select id="setup"></select>
+      </label>
+      <button id="btn-undo" type="button" class="ghost undo-btn"
+              title="Ripristina questo setup dall'ultimo backup">↶ Ripristina</button>
+      <div class="live-badge" id="live-badge" data-state="off">
+        <span class="dot"></span><span id="live-text">telemetria offline</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="eng-layout">
+    <!-- LEFT: live diagnosis -->
+    <section class="eng-live">
+      <h2>Diagnosi live</h2>
+      <div id="live-car" class="live-car muted">In attesa della telemetria…</div>
+
+      <div class="gauges" id="gauges">
+        <div class="gauge"><span class="k">Velocità</span><span class="v" id="g-speed">–</span></div>
+        <div class="gauge"><span class="k">Marcia</span><span class="v" id="g-gear">–</span></div>
+        <div class="gauge"><span class="k">TC</span><span class="v" id="g-tc">–</span></div>
+        <div class="gauge"><span class="k">ABS</span><span class="v" id="g-abs">–</span></div>
+        <div class="gauge"><span class="k">Mappa</span><span class="v" id="g-map">–</span></div>
+      </div>
+
+      <div class="av-now" id="av-now" hidden>
+        <div class="es-label">⚡ Ora, in macchina</div>
+        <div class="av-msg" id="av-msg"></div>
+      </div>
+
+      <div class="engineer-says" id="engineer-says">
+        <div class="es-head">
+          <span class="es-label">🔧 L'ingegnere propone <span class="es-sub">(al prossimo box)</span></span>
+          <span class="conf" id="es-conf" hidden></span>
+        </div>
+        <div class="es-msg" id="es-msg">—</div>
+        <div class="es-cat" id="es-cat"></div>
+        <button id="es-prepare" class="primary small" type="button" hidden>
+          Prepara modifica nell'editor →</button>
+      </div>
+
+      <div class="pit-reminder" id="pit-reminder" hidden></div>
+
+      <div class="eng-profile" id="eng-profile" hidden>
+        <div class="es-label">Profilo ingegnere</div>
+        <div class="prof-name" id="prof-name"></div>
+        <div class="prof-row"><span class="muted">Fasi:</span>
+          <span id="prof-phases"></span></div>
+        <div class="prof-row"><span class="muted">Al volo:</span>
+          <span id="prof-alvolo"></span></div>
+      </div>
+
+      <p class="hint">
+        La diagnosi arriva dal coach in tempo reale (avvia <b>Coach Live</b> o il
+        <b>backend</b>). Le modifiche qui a destra si applicano al file di setup:
+        vanno <b>caricate ai box</b>, non cambiano l'auto mentre guidi.
+      </p>
+    </section>
+
+    <!-- RIGHT: setup editor -->
+    <section class="eng-setup">
+      <div class="eng-setup-head">
+        <h2>Setup <span id="setup-car" class="muted"></span></h2>
+        <div class="legend2">
+          <span><b>click</b> = passo del gioco</span>
+          <span class="muted">psi/% = stima</span>
+        </div>
+      </div>
+      <div id="setup-body" class="setup-body">
+        <div class="empty2">Scegli auto/pista e un setup di partenza.</div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Pending changes tray -->
+  <footer class="tray" id="tray" hidden>
+    <div class="tray-head">
+      <b>Modifiche in sospeso</b>
+      <span id="tray-count" class="muted"></span>
+    </div>
+    <div id="tray-list" class="tray-list"></div>
+    <div class="tray-actions">
+      <button id="btn-reset" type="button" class="ghost">Annulla tutto</button>
+      <button id="btn-write" type="button" class="primary">Scrivi setup…</button>
+    </div>
+  </footer>
+
+  <!-- Confirm modal -->
+  <div class="modal-bg" id="modal" hidden>
+    <div class="modal">
+      <h3>Conferma scrittura setup</h3>
+      <div id="modal-diff" class="modal-diff"></div>
+      <label class="modal-name">Nome file di destinazione
+        <input id="modal-name" type="text" autocomplete="off">
+      </label>
+      <p class="modal-hint">
+        Verrà creato un <b>nuovo file</b> (l'originale resta intatto). Dopo la
+        scrittura: rientra ai box → schermata Setup → carica il nuovo setup.
+      </p>
+      <div id="modal-error" class="modal-error" hidden></div>
+      <div class="modal-actions">
+        <button id="modal-cancel" type="button" class="ghost">Annulla</button>
+        <button id="modal-ok" type="button" class="primary">Scrivi</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" hidden></div>
+
+  <script src="/static/engineer.js"></script>
+</body>
+</html>

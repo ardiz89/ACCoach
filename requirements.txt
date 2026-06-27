@@ -1,0 +1,16 @@
+# Core
+rich>=13.7        # terminal dashboard / live data visualization
+pyttsx3>=2.90     # offline TTS for voice coaching (optional; text fallback if absent)
+
+# Backend (headless engine + websocket state broadcast)
+fastapi>=0.110    # backend app + websocket endpoint
+uvicorn>=0.29     # ASGI server
+websockets>=12.0  # websocket transport
+
+PySide6>=6.6      # on-screen overlay + GUI launcher (frontend)
+
+# Build-only (not needed to run from source)
+# pyinstaller     # to build ACCoach.exe (see build_exe.bat)
+
+# (added in later phases)
+# numpy           # telemetry analysis

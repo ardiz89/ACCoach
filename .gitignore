@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+.Python
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Test / tooling caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# PyInstaller build artifacts
+build/
+dist/
+
+# Local recorded laps / user data (lives in ~/Documents/ACCoach at runtime;
+# this folder is stale dev data, not source)
+laps/
+
+# Logs and crash reports (written to ~/Documents/ACCoach/logs at runtime)
+logs/
+*.log
+
+# Vendored Piper TTS (downloaded binary + neural voice model, ~98MB).
+# Not source — fetch separately (see tools/render_cues.py / docs). Keep the script.
+tools/piper/
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
