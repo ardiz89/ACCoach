@@ -121,6 +121,47 @@ def _pressures_hot(samples: list[LapSample]) -> dict | None:
     return {"front": sum(fronts) / len(fronts), "rear": sum(rears) / len(rears)}
 
 
+def corner_symptoms(samples: list[LapSample], c: Corner) -> dict[Symptom, float]:
+    """Handling symptoms for ONE corner: {Symptom: intensity≥_PRESENCE}.
+
+    Shared by :func:`build_lap_stats` (aggregate, for the engineer) and the
+    debrief (per-corner, for the "why" of each time loss).
+    """
+    by_phase: dict[Phase, list[LapSample]] = {}
+    corner_speeds: list[float] = []
+    for s in samples:
+        if not (c.entry_pos <= s.pos <= c.exit_pos):
+            continue
+        corner_speeds.append(s.speed_kmh)
+        ph = _phase_of(s.pos, s, c)
+        if ph is not None:
+            by_phase.setdefault(ph, []).append(s)
+    if not corner_speeds:
+        return {}
+    speed = _speed_band(corner_speeds)
+
+    out: dict[Symptom, float] = {}
+    for phase, frames in by_phase.items():
+        if not frames:
+            continue
+        # Oversteer takes precedence per frame (it's the rear genuinely loose).
+        over = [_oversteer_mag(s) for s in frames]
+        under = [u if o == 0.0 else 0.0
+                 for u, o in ((_understeer_mag(s), om) for s, om in zip(frames, over))]
+        u_int = sum(under) / len(frames)
+        o_int = sum(over) / len(frames)
+        for balance, intensity in ((Balance.UNDERSTEER, u_int),
+                                   (Balance.OVERSTEER, o_int)):
+            if intensity >= _PRESENCE:
+                out[Symptom(balance, phase, speed)] = intensity
+    return out
+
+
+def dominant_symptom(scores: dict[Symptom, float]) -> Symptom | None:
+    """The strongest symptom in a score dict, or None if empty."""
+    return max(scores, key=scores.get) if scores else None
+
+
 def build_lap_stats(lap: Lap, corners: list[Corner] | None = None) -> LapStats:
     """Diagnose one recorded lap into a :class:`LapStats` for the engineer."""
     if corners is None:
@@ -128,38 +169,10 @@ def build_lap_stats(lap: Lap, corners: list[Corner] | None = None) -> LapStats:
 
     scores: dict[Symptom, float] = {}
     corner_counts: dict[Symptom, int] = {}
-
     for c in corners:
-        # Bucket this corner's samples by phase.
-        by_phase: dict[Phase, list[LapSample]] = {}
-        corner_speeds: list[float] = []
-        for s in lap.samples:
-            if not (c.entry_pos <= s.pos <= c.exit_pos):
-                continue
-            corner_speeds.append(s.speed_kmh)
-            ph = _phase_of(s.pos, s, c)
-            if ph is not None:
-                by_phase.setdefault(ph, []).append(s)
-        if not corner_speeds:
-            continue
-        speed = _speed_band(corner_speeds)
-
-        for phase, frames in by_phase.items():
-            if not frames:
-                continue
-            # Oversteer takes precedence per frame (it's the rear genuinely loose).
-            over = [_oversteer_mag(s) for s in frames]
-            under = [u if o == 0.0 else 0.0
-                     for u, o in ((_understeer_mag(s), om) for s, om in zip(frames, over))]
-            u_int = sum(under) / len(frames)
-            o_int = sum(over) / len(frames)
-            for balance, intensity in ((Balance.UNDERSTEER, u_int),
-                                       (Balance.OVERSTEER, o_int)):
-                if intensity < _PRESENCE:
-                    continue
-                sym = Symptom(balance, phase, speed)
-                scores[sym] = max(scores.get(sym, 0.0), intensity)
-                corner_counts[sym] = corner_counts.get(sym, 0) + 1
+        for sym, intensity in corner_symptoms(lap.samples, c).items():
+            scores[sym] = max(scores.get(sym, 0.0), intensity)
+            corner_counts[sym] = corner_counts.get(sym, 0) + 1
 
     lock_segments, spin_segments = _lock_spin_segments(lap.samples)
     return LapStats(

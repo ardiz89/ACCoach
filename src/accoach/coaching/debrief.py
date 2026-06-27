@@ -18,11 +18,25 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from ..comparison.reference import Reference
+from ..engineer import Balance, Phase, Speed, Symptom
 from ..recording.lap import Lap
 from ..telemetry.snapshot import format_lap_time
 from ..track import Corner
 from .analyzer import _BRAKE_ON, _LOSS_MS, CornerStats, classify_corner
 from .cue import CueCategory
+from .diagnosis import corner_symptoms, dominant_symptom
+
+_CAUSE_BALANCE = {Balance.UNDERSTEER: "l'auto sottosterza",
+                  Balance.OVERSTEER: "l'auto sovrasterza"}
+_CAUSE_PHASE = {Phase.ENTRY: "in ingresso", Phase.APEX: "all'apex", Phase.EXIT: "in uscita"}
+_CAUSE_SPEED = {Speed.LOW: "curva lenta", Speed.HIGH: "curva veloce"}
+
+
+def explain_cause(sym: Symptom) -> str:
+    """The handling reason for a corner's loss, in Italian — the 'why' the live
+    coach can't spell out mid-corner: e.g. 'L'auto sovrasterza in uscita (curva lenta).'"""
+    return (f"{_CAUSE_BALANCE[sym.balance].capitalize()} "
+            f"{_CAUSE_PHASE[sym.phase]} ({_CAUSE_SPEED[sym.speed]}).")
 
 
 def explain_loss(category: CueCategory, st: CornerStats) -> tuple[str, str]:
@@ -65,6 +79,7 @@ class CornerLoss:
     message: str
     detail: str = ""           # the numbers that prove the cause
     fix: str = ""              # the actionable correction
+    cause: str = ""            # handling "why": understeer/oversteer × phase × speed
     min_speed_live: float = 0.0
     min_speed_ref: float = 0.0
     name: str = ""             # friendly corner name (set by the API layer)
@@ -137,11 +152,21 @@ def build_lap_debrief(lap: Lap, reference: Reference, corners: list[Corner]) -> 
         if cue is None or cue.category == CueCategory.GOOD:
             continue  # corner not a meaningful loss
         detail, fix = explain_loss(cue.category, stats)
+
+        # The handling "why": if the car was clearly under/oversteering somewhere
+        # in this corner, lead the detail with it — the causal explanation the
+        # live coach can't give mid-corner ("dice il cosa, non il perché").
+        cause = ""
+        dom = dominant_symptom(corner_symptoms(lap.samples, c))
+        if dom is not None:
+            cause = explain_cause(dom)
+            detail = f"{cause} {detail}"
+
         losses.append(CornerLoss(
             index=c.index, entry_pos=c.entry_pos, apex_pos=c.apex_pos,
             exit_pos=c.exit_pos, lost_ms=lost,
             category=cue.category, message=cue.message,
-            detail=detail, fix=fix,
+            detail=detail, fix=fix, cause=cause,
             min_speed_live=vmin_live, min_speed_ref=vmin_ref,
         ))
 
@@ -182,9 +207,10 @@ def format_debrief(d: LapDebrief, top: int = 3, consistency: dict | None = None)
     if d.losses:
         lines.append(f"  Curve peggiori (su {len(d.losses)}):")
         for loss in d.losses[:top]:
-            lines.append(
-                f"    {loss.label:9} −{loss.lost_ms / 1000.0:.3f}s  {loss.message}"
-            )
+            line = f"    {loss.label:9} −{loss.lost_ms / 1000.0:.3f}s  {loss.message}"
+            if loss.cause:
+                line += f"  · {loss.cause}"   # the handling "why"
+            lines.append(line)
     elif not d.is_reference:
         lines.append("  Nessuna perdita di tempo significativa per curva — giro pulito.")
 

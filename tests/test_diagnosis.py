@@ -6,11 +6,14 @@ neutral corner has raw yaw = -(ratio)*steer with ratio ~1.9. Lowering the ratio
 below ~0.9 makes the car "push" (understeer); a same-sign raw yaw simulates the
 countersteer of oversteer.
 """
+from accoach.coaching.debrief import build_lap_debrief
 from accoach.coaching.diagnosis import build_lap_stats
+from accoach.comparison.reference import Reference
 from accoach.engine import CoachEngine
 from accoach.engineer import Balance
 from accoach.recording.lap import Lap, LapSample
 from accoach.telemetry.snapshot import SessionType, TelemetrySnapshot
+from accoach.track import detect_corners
 
 import synth
 
@@ -108,6 +111,17 @@ def _full_lap_frames():
                 current_lap_ms=i * 100, last_lap_ms=89000, speed_kmh=150.0,
             ))
     return frames
+
+
+def test_debrief_includes_handling_cause():
+    fast = synth.build_lap(n=300, clean=True)                       # reference
+    slow = _with_yaw(synth.build_lap(slow_corner=0, amt=30, n=300, clean=True),
+                     ratio=0.3)                                     # loses time + pushes
+    debrief = build_lap_debrief(slow, Reference(fast), detect_corners(fast.samples))
+    assert debrief.losses
+    # The handling "why" appears both as a field and woven into the detail text.
+    assert any("sottosterza" in loss.cause.lower() for loss in debrief.losses)
+    assert any("sottosterza" in loss.detail.lower() for loss in debrief.losses)
 
 
 def test_engine_surfaces_engineer_block(tmp_path):
