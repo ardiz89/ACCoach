@@ -18,14 +18,12 @@ import re
 from datetime import datetime, timezone
 from pathlib import Path
 
+from ..logging_setup import get_logger
+from ..paths import laps_dir as _default_laps_dir
 from ..telemetry.snapshot import format_lap_time
 from .lap import Lap
 
-def _default_laps_dir() -> Path:
-    # A stable, user-writable store used identically from source and from the
-    # packaged exe (a path relative to __file__ is meaningless once frozen, and
-    # may be read-only). Lives where the user can find it.
-    return Path.home() / "Documents" / "ACCoach" / "laps"
+_log = get_logger("storage")
 
 
 DEFAULT_LAPS_DIR = _default_laps_dir()
@@ -79,7 +77,9 @@ def save_lap(lap: Lap, laps_dir: Path | str = DEFAULT_LAPS_DIR) -> Path:
         with LapCatalog(_catalog_path(laps_dir)) as cat:
             cat.upsert(path)
     except Exception:
-        pass
+        # The catalog is a rebuildable cache; a failure here must not lose the
+        # lap we just wrote, but we want to know it happened.
+        _log.warning("catalog upsert failed for %s", path.name, exc_info=True)
     return path
 
 
@@ -124,7 +124,8 @@ def find_reference_lap(
                     and _slug(lap.track) == _slug(track)):
                 return lap
     except Exception:
-        pass  # fall through to the scan
+        # Catalog unusable (locked/corrupt/older schema) — fall back to the scan.
+        _log.debug("catalog lookup failed; scanning instead", exc_info=True)
 
     return _find_reference_by_scan(car_model, track, laps_dir)
 

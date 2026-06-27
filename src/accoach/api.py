@@ -469,6 +469,9 @@ def main(argv: list[str] | None = None) -> None:
 
     import uvicorn
 
+    from .logging_setup import setup_logging
+    setup_logging()
+
     argv = sys.argv[1:] if argv is None else argv
     # The engineer page and the analysis page are served by the same app; the
     # launcher passes --engineer to land directly on the setup editor.

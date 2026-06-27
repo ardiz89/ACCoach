@@ -21,15 +21,20 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 
 from .engine import CoachEngine
+from .logging_setup import get_logger
 from .serialize import state_to_dict
 
 HOST = "127.0.0.1"
 PORT = 8777
 
+_log = get_logger("server")
+
 
 def create_app(engine: CoachEngine | None = None, hz: float = 15.0) -> FastAPI:
     clients: set[WebSocket] = set()
-    holder: dict = {"engine": engine, "task": None}
+    # tick_errors/last_tick_ts are exposed via /health so a silently failing tick
+    # (healthy /health but no broadcasts) is observable instead of invisible.
+    holder: dict = {"engine": engine, "task": None, "tick_errors": 0, "last_tick_ts": 0.0}
     interval = 1.0 / hz
 
     async def broadcast_loop() -> None:
@@ -39,7 +44,15 @@ def create_app(engine: CoachEngine | None = None, hz: float = 15.0) -> FastAPI:
             try:
                 st = await loop.run_in_executor(None, holder["engine"].tick, now)
                 payload = json.dumps(state_to_dict(st))
+                holder["last_tick_ts"] = time.time()
             except Exception:
+                holder["tick_errors"] += 1
+                # Log the first failure and then every 100th, so a persistent bug
+                # is visible without flooding the log at the broadcast rate.
+                if holder["tick_errors"] == 1 or holder["tick_errors"] % 100 == 0:
+                    _log.error(
+                        "engine tick failed (count=%d)", holder["tick_errors"], exc_info=True
+                    )
                 await asyncio.sleep(interval)
                 continue
             for ws in list(clients):
@@ -87,6 +100,9 @@ def main(argv: list[str] | None = None) -> None:
     import sys
 
     import uvicorn
+
+    from .logging_setup import setup_logging
+    setup_logging()
 
     argv = sys.argv[1:] if argv is None else argv
     engine = None

@@ -32,6 +32,7 @@ Review & tools:
   verify-yaw                 validate the yaw-rate sign (oversteer detection)
   verify-aids                validate the ACC aid-level mapping (live)
   verify-sectors             validate the sim's real sector data (live)
+  logs                       open the folder with logs and crash reports
 """
 
 
@@ -43,6 +44,9 @@ def main() -> None:
     if cmd in ("", "-h", "--help", "help"):
         print(_HELP)
         return
+
+    from .logging_setup import setup_logging
+    setup_logging()
 
     if cmd == "live":
         from .app import main as run
@@ -89,6 +93,16 @@ def main() -> None:
     elif cmd == "selftest":
         from .diagnostics import run_selftest
         run_selftest()
+    elif cmd == "logs":
+        import os
+        from .paths import logs_dir
+        d = logs_dir()
+        d.mkdir(parents=True, exist_ok=True)
+        print(f"Logs: {d}")
+        try:
+            os.startfile(d)   # noqa: S606 - Windows: open in Explorer
+        except Exception:
+            pass
     else:
         print(f"Unknown command: {cmd!r}\n")
         print(_HELP)

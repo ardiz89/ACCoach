@@ -167,3 +167,40 @@ Formula +0.15), NON un globale. `_LOCK_RATIO = -0.15` invece regge globale.
 ### Fix applicato in questa sessione (lane engineer — mia)
 `engineer/classmap.py`: aggiunti marker `gp_2025/2024/2023` → la griglia F1
 moderna prende il profilo Formula.
+
+---
+
+## RISULTATI — sessione 2026-06-28 · BMW M3 E92 · Suzuka · AC
+
+Terza classe validata (profilo **Stradale**). Id `bmw_m3_e92` → classificato
+Stradale senza fix. TP senza aiuti, basso carico. Completa il giro sui 3 profili.
+
+| Calibrazione | Verdetto | Evidenza + giudizio pilota |
+|---|---|---|
+| `_YAW_SIGN = -1.0` | ✅ **FIDATO** | 325 frame, **100% opposto**. 3ª classe → yaw blindato su GT3+Formula+Stradale. |
+| lock `_LOCK_RATIO = -0.15` | ✅ **FIDATO** | **zero falsi** in dryrun nonostante margine stretto (tipico -0.096, lock più profondo solo -0.171). |
+| `_UNDERSTEER_RATIO = 0.9` | ✅ **VALIDATO** | pilota: "anteriore scivolato" → il cue understeer (ratio 0.81) era VERO. La soglia 0.9 aggancia sottosterzo reale su stradale/GT3 (mediana ~1.8). |
+| spin `_SPIN_RATIO = +0.10` | 🟡 **→ +0.12** | 1 solo falso (pilota: "pulita") a Rsp 0.11. Road clean p99=0.086 ma picco pulito 0.11. |
+| **trail_brake** (`coaching/braking.py`) | 🔴 **TROPPO AGGRESSIVO** | 6 falsi (pilota: "detector troppo aggressivo"). Penalizza la frenata in rettilineo, corretta su stradale. |
+
+### Quadro per-classe CONSOLIDATO (3 classi)
+`_SPIN_RATIO` globale +0.10 è troppo basso per tutte → per-classe:
+
+| Classe | Auto | Uscita pulita fino a | Spin vero | Soglia |
+|---|---|---|---|---|
+| Stradale | M3 E92 (Suzuka) | 0.11 | 0.24 | **+0.12** |
+| GT3 | M4 (Monza) | 0.12 | 0.16 | **+0.13** |
+| Formula | SF25 (Nürburgring) | 0.13 | 0.24 | **+0.15** |
+
+`_UNDERSTEER_RATIO = 0.9`: ✅ validato su Stradale/GT3 (aggancia sottosterzo vero);
+⚠️ poco sensibile SOLO su Formula (mediana 2.54) → relativo-al-baseline lì.
+`_LOCK_RATIO = -0.15`: ✅ globale su tutte e 3 le classi.
+
+### Nuovo finding (lane `coaching/braking.py`): trail_brake class-aware
+Il detector (`_trail_fault`, braking.py:99) spara su "frenata forte → inserimento
+col freno già rilasciato" entro 0.8s. Su stradali a basso carico la frenata in
+rettilineo + rilascio prima dell'inserimento è TECNICA CORRETTA → 6 falsi sulla
+M3. Direzioni: renderlo **class-aware** (trail-braking premia le alto-carico;
+rilassare/sopprimere su profilo Road) e/o richiedere un **gap reale freno→sterzo**,
+non solo "freno basso all'inserimento". L'autore stesso lo marca "heuristic"
+(braking.py:18).

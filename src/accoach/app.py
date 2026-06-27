@@ -27,6 +27,8 @@ TICK_MS = 50  # 20 Hz engine tick
 
 
 def main(argv: list[str] | None = None) -> None:
+    from .logging_setup import setup_logging
+    setup_logging()
     argv = sys.argv[1:] if argv is None else argv
     silent = "--silent" in argv or "-s" in argv
     demo = "--demo" in argv

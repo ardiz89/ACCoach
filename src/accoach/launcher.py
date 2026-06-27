@@ -217,6 +217,8 @@ class Launcher(QWidget):
 
 
 def main(argv: list[str] | None = None) -> None:
+    from .logging_setup import setup_logging
+    setup_logging()
     app = QApplication(sys.argv)
     win = Launcher()
     win.show()
