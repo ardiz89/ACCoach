@@ -68,7 +68,8 @@ def test_pump_records_and_saves_a_full_lap(tmp_path):
     for _ in range(90):
         feed._pump()
     saved = feed.drain_saved()
-    assert saved and saved[0] == ("ferrari_488_gt3", "monza")
+    assert saved and saved[0].car_model == "ferrari_488_gt3"
+    assert saved[0].track == "monza" and saved[0].valid
     assert feed.drain_saved() == []          # draining clears it
     assert len(list_lap_files(tmp_path)) >= 1  # a lap file was written off-thread
 

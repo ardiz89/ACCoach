@@ -81,4 +81,5 @@ def state_to_dict(st: EngineState) -> dict:
         "saved_laps": st.saved_laps,
         "reference_ms": st.reference_ms,
         "history": st.history,
+        "engineer": st.engineer,
     }

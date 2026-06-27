@@ -30,6 +30,7 @@ from pathlib import Path
 
 from ..logging_setup import get_logger
 from ..recording import DEFAULT_LAPS_DIR, LapRecorder, save_lap
+from ..recording.lap import Lap
 from .reader import SharedMemoryReader
 from .snapshot import TelemetrySnapshot
 
@@ -52,7 +53,7 @@ class TelemetryFeed:
         self._recorder = LapRecorder()
 
         self._latest: TelemetrySnapshot = TelemetrySnapshot.disconnected()
-        self._saved: list[tuple[str, str]] = []   # (car, track) of laps just saved
+        self._saved: list[Lap] = []          # laps saved since the engine last drained
         self._lock = threading.Lock()
 
         self._thread: threading.Thread | None = None
@@ -65,7 +66,7 @@ class TelemetryFeed:
         """The most recent snapshot. Atomic reference read; never blocks."""
         return self._latest
 
-    def drain_saved(self) -> list[tuple[str, str]]:
+    def drain_saved(self) -> list[Lap]:
         """Return (and clear) the laps saved since the last call."""
         with self._lock:
             if not self._saved:
@@ -92,7 +93,7 @@ class TelemetryFeed:
             if lap is not None and lap.valid:
                 save_lap(lap, self._laps_dir)
                 with self._lock:
-                    self._saved.append((snap.car_model, snap.track))
+                    self._saved.append(lap)
         except Exception:
             _log.error("recording failed", exc_info=True)
 

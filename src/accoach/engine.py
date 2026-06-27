@@ -35,11 +35,13 @@ from .coaching import (
     Voice,
 )
 from .coaching.cue import CueTier
+from .coaching.diagnosis import build_lap_stats
 from .comparison import DeltaState, LapComparator, Reference
-from .recording import DEFAULT_LAPS_DIR, LapRecorder, find_reference_lap, save_lap
+from .engineer import RaceEngineer, engineer_for
+from .recording import DEFAULT_LAPS_DIR, Lap, LapRecorder, find_reference_lap, save_lap
 from .telemetry import SharedMemoryReader, TelemetrySnapshot
 from .telemetry.feed import TelemetryFeed
-from .track import detect_corners
+from .track import Corner, detect_corners
 
 # When you're not on a representative flying lap — delta has ballooned because
 # you're crawling, recovering from an off, or parked — only acute safety cues
@@ -59,6 +61,7 @@ class EngineState:
     saved_laps: int
     reference_ms: int            # reference lap time, 0 if none
     history: list[str]           # recent spoken cue messages, newest last
+    engineer: dict | None = None  # latest race-engineer decision (setup advice)
 
 
 def _load_reference(car: str, track: str, laps_dir: Path | str) -> Reference | None:
@@ -113,14 +116,21 @@ class CoachEngine:
 
         self._comparator: LapComparator | None = None
         self._reference: Reference | None = None
+        self._corners: list[Corner] = []
         self._key: tuple[str, str] = ("", "")
         self.saved_laps = 0
         self.history: list[str] = []
+
+        # Race engineer: rebuilt per car/track; fed a per-lap diagnosis (LapStats)
+        # at each completed lap, surfaces its latest decision in the payload.
+        self._engineer: RaceEngineer | None = None
+        self._engineer_decision = None
 
     def _rebuild_reference(self, car: str, track: str) -> None:
         self._reference = _load_reference(car, track, self.laps_dir)
         self._comparator = LapComparator(self._reference) if self._reference else None
         corners = detect_corners(self._reference.lap.samples) if self._reference else []
+        self._corners = corners
         self.analyzer.set_corners(corners)
         self.analyzer.reset()
         self.advisor.reset()
@@ -132,6 +142,32 @@ class CoachEngine:
     def acquisition_hz(self) -> float | None:
         """Measured acquisition rate when a background feed is running, else None."""
         return self._feed.measured_hz if self._feed is not None else None
+
+    def _observe_lap(self, lap: Lap) -> None:
+        """Diagnose a completed lap and feed it to the race engineer."""
+        if self._engineer is None:
+            return
+        stats = build_lap_stats(lap, self._corners or None)
+        self._engineer_decision = self._engineer.observe(stats)
+
+    def _engineer_block(self) -> dict | None:
+        """The latest engineer decision, in the shape the setup UI consumes."""
+        d = self._engineer_decision
+        if d is None:
+            return None
+        return {
+            "kind": d.kind.value,
+            "message": d.message,
+            "change": d.change.as_setup_payload() if d.change else None,
+            "rationale": d.change.rationale if d.change else None,
+            "tag": d.change.tag if d.change else None,
+            "confidence": d.confidence,
+        }
+
+    def mark_setup_applied(self) -> None:
+        """Tell the engineer the proposed setup change was written (start re-test)."""
+        if self._engineer is not None:
+            self._engineer.mark_applied()
 
     def tick(self, now: float) -> EngineState:
         if self._feed is not None:
@@ -146,15 +182,19 @@ class CoachEngine:
         if snap.connected and (snap.car_model, snap.track) != self._key:
             self._key = (snap.car_model, snap.track)
             self._rebuild_reference(snap.car_model, snap.track)
+            # A new car/track is a new setup problem: start a fresh engineer.
+            self._engineer = engineer_for(snap.car_model, snap.track)
+            self._engineer_decision = None
 
         if self._feed is None:
             lap = self.recorder.update(snap)
             if lap is not None and lap.valid:
                 save_lap(lap, self.laps_dir)
-                self.saved_laps += 1
-                self._rebuild_reference(snap.car_model, snap.track)  # chase the new best
-        elif saved:
-            self.saved_laps += len(saved)
+                saved = [lap]
+
+        for lap in saved:
+            self.saved_laps += 1
+            self._observe_lap(lap)
             self._rebuild_reference(snap.car_model, snap.track)      # chase the new best
 
         delta = self._comparator.compare(snap) if self._comparator else None
@@ -197,6 +237,7 @@ class CoachEngine:
             saved_laps=self.saved_laps,
             reference_ms=self._reference.lap_time_ms if self._reference else 0,
             history=list(self.history),
+            engineer=self._engineer_block(),
         )
 
     def close(self) -> None:
