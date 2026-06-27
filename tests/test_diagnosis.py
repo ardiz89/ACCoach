@@ -6,14 +6,20 @@ neutral corner has raw yaw = -(ratio)*steer with ratio ~1.9. Lowering the ratio
 below ~0.9 makes the car "push" (understeer); a same-sign raw yaw simulates the
 countersteer of oversteer.
 """
-from accoach.coaching.debrief import build_lap_debrief
+from accoach.coaching.analyzer import _BRAKE_ON
+from accoach.coaching.debrief import (
+    _metres_between,
+    _next_entry,
+    _onset,
+    build_lap_debrief,
+)
 from accoach.coaching.diagnosis import build_lap_stats
 from accoach.comparison.reference import Reference
 from accoach.engine import CoachEngine
 from accoach.engineer import Balance
 from accoach.recording.lap import Lap, LapSample
 from accoach.telemetry.snapshot import SessionType, TelemetrySnapshot
-from accoach.track import detect_corners
+from accoach.track import Corner, detect_corners
 
 import synth
 
@@ -122,6 +128,30 @@ def test_debrief_includes_handling_cause():
     # The handling "why" appears both as a field and woven into the detail text.
     assert any("sottosterza" in loss.cause.lower() for loss in debrief.losses)
     assert any("sottosterza" in loss.detail.lower() for loss in debrief.losses)
+
+
+def test_next_entry_credits_following_straight():
+    c0 = Corner(0, 0.10, 0.20, 0.30)
+    c1 = Corner(1, 0.60, 0.70, 0.80)
+    assert _next_entry(c0, [c0, c1]) == 0.60    # window runs into the next corner
+    assert _next_entry(c1, [c0, c1]) == 1.01    # last corner -> lap end
+
+
+def test_onset_interpolates_brake_crossing():
+    a = LapSample(0, 0.10, 200.0, 0.0, 0.0, 0.0, "4", 7000, 0.0, 0.0)   # brake 0
+    b = LapSample(0, 0.20, 200.0, 0.0, 1.0, 0.0, "4", 7000, 0.0, 0.0)   # brake 1
+    onset = _onset([a, b], lambda s: s.brake)
+    expected = 0.10 + (_BRAKE_ON / 1.0) * 0.10                          # linear crossing
+    assert abs(onset - expected) < 1e-6
+
+
+def test_metres_between_uses_world_coords():
+    s0 = LapSample(0, 0.0, 100.0, 1.0, 0.0, 0.0, "4", 7000, 0.0, 0.0,
+                   car_x=0.0, car_z=0.0)
+    s1 = LapSample(0, 1.0, 100.0, 1.0, 0.0, 0.0, "4", 7000, 0.0, 0.0,
+                   car_x=30.0, car_z=40.0)
+    lap = Lap("c", "t", SessionType.PRACTICE, 1000, True, samples=[s0, s1])
+    assert abs(_metres_between(lap, 0.0, 1.0) - 50.0) < 1e-6            # 3-4-5 triangle
 
 
 def test_engine_surfaces_engineer_block(tmp_path):

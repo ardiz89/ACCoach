@@ -15,6 +15,7 @@ is — the other thing a coach harps on.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 
 from ..comparison.reference import Reference
@@ -112,6 +113,76 @@ def _mean(xs: list[float]) -> float:
     return sum(xs) / len(xs) if xs else 0.0
 
 
+def _next_entry(c: Corner, corners: list[Corner]) -> float:
+    """Entry of the next corner after ``c`` — the loss window's end, so the
+    straight that follows ``c`` is credited to ``c`` (where the exit speed that
+    sets the straight was won or lost). 1.01 (lap end) if ``c`` is the last."""
+    later = sorted(x.entry_pos for x in corners if x.entry_pos > c.exit_pos)
+    return later[0] if later else 1.01
+
+
+def _onset(samples, getval) -> float | None:
+    """Interpolated normalized position where ``getval`` first crosses _BRAKE_ON."""
+    prev = None
+    for s in samples:
+        v = getval(s)
+        if v >= _BRAKE_ON:
+            if prev is None:
+                return s.pos
+            pv = getval(prev)
+            if pv < _BRAKE_ON and v != pv:        # sub-sample crossing
+                frac = (_BRAKE_ON - pv) / (v - pv)
+                return prev.pos + frac * (s.pos - prev.pos)
+            return s.pos
+        prev = s
+    return None
+
+
+def _coords_at(lap: Lap, pos: float) -> tuple[float, float] | None:
+    s = lap.samples
+    if not s:
+        return None
+    if pos <= s[0].pos:
+        return (s[0].car_x, s[0].car_z)
+    for i in range(1, len(s)):
+        if s[i].pos >= pos:
+            a, b = s[i - 1], s[i]
+            span = b.pos - a.pos
+            f = 0.0 if span <= 0 else (pos - a.pos) / span
+            return (a.car_x + f * (b.car_x - a.car_x), a.car_z + f * (b.car_z - a.car_z))
+    return (s[-1].car_x, s[-1].car_z)
+
+
+def _metres_between(lap: Lap, a: float, b: float) -> float:
+    """Chord distance (m) between two track positions via world coords (0 if no
+    coords on this lap — pre-v3)."""
+    pa, pb = _coords_at(lap, a), _coords_at(lap, b)
+    if pa is None or pb is None:
+        return 0.0
+    return math.hypot(pa[0] - pb[0], pa[1] - pb[1])
+
+
+def _braking_detail(lap: Lap, reference: Reference, inside: list,
+                    refs: list, category: CueCategory) -> str:
+    """Decompose the braking phase: how much earlier you brake (m, interpolated)
+    and whether you reach the reference's peak pressure."""
+    extra = ""
+    if category == CueCategory.BRAKE_LATER:
+        live = _onset(inside, lambda s: s.brake)
+        ref = _onset(inside, lambda s: reference.point_at(s.pos).brake)
+        if live is not None and ref is not None and live < ref:
+            m = _metres_between(lap, live, ref)
+            if m >= 2.0:
+                extra += f" Anticipi la staccata di ~{m:.0f} m."
+    if category in (CueCategory.BRAKE_LATER, CueCategory.LESS_BRAKE):
+        peak_live = max((s.brake for s in inside), default=0.0)
+        peak_ref = max((r.brake for r in refs), default=0.0)
+        if peak_ref - peak_live >= 0.05:
+            extra += (f" Picco freno {peak_live * 100:.0f}% contro "
+                      f"{peak_ref * 100:.0f}%: premi più deciso.")
+    return extra
+
+
 def build_lap_debrief(lap: Lap, reference: Reference, corners: list[Corner]) -> LapDebrief:
     """Break ``lap`` down against ``reference`` over the given ``corners``."""
     losses: list[CornerLoss] = []
@@ -121,8 +192,13 @@ def build_lap_debrief(lap: Lap, reference: Reference, corners: list[Corner]) -> 
         if len(inside) < 2:
             continue
 
-        # Time lost across the corner = how the gap to the reference grew through it.
-        first, last = inside[0], inside[-1]
+        # Loss is measured from this corner's entry to the NEXT corner's entry, so
+        # the following straight is credited here — a poor exit shows up as time
+        # bled down the straight, attributed to the corner that caused it. The
+        # input/balance analysis below still uses only the corner region (inside).
+        end = _next_entry(c, corners)
+        window = [s for s in lap.samples if c.entry_pos <= s.pos < end] or inside
+        first, last = window[0], window[-1]
         delta_entry = first.t_ms - reference.time_at(first.pos)
         delta_exit = last.t_ms - reference.time_at(last.pos)
         lost = delta_exit - delta_entry
@@ -161,6 +237,9 @@ def build_lap_debrief(lap: Lap, reference: Reference, corners: list[Corner]) -> 
         if dom is not None:
             cause = explain_cause(dom)
             detail = f"{cause} {detail}"
+
+        # Braking decomposition (earliness in metres + peak pressure).
+        detail += _braking_detail(lap, reference, inside, refs, cue.category)
 
         losses.append(CornerLoss(
             index=c.index, entry_pos=c.entry_pos, apex_pos=c.apex_pos,
