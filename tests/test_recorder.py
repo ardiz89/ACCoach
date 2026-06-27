@@ -67,6 +67,37 @@ def test_disconnected_emits_nothing():
     assert rec.update(TelemetrySnapshot.disconnected()) is None
 
 
+def test_full_lap_with_no_offtrack_is_clean():
+    rec = LapRecorder()
+    _drive_lap(rec, completed=0)            # partial
+    _drive_lap(rec, completed=1)            # opens the full-lap buffer
+    full = _drive_lap(rec, completed=2)     # emits the full lap
+    assert full is not None and full.valid is True
+    assert full.clean is True               # tyres_out stayed 0 all lap
+
+
+def test_full_lap_with_offtrack_is_dirty():
+    rec = LapRecorder()
+    _drive_lap(rec, completed=0)
+    # Fill the full-lap buffer (completed=1) with a 4-wheels-off excursion.
+    for i in range(30):
+        rec.update(synth.snap(
+            pos=i / 30, completed_laps=1, current_lap_ms=i * 100,
+            last_lap_ms=89000, tyres_out=(4 if i == 15 else 0),
+        ))
+    full = _drive_lap(rec, completed=2)
+    assert full is not None and full.valid is True
+    assert full.clean is False              # the off-track marked it dirty
+
+
+def test_partial_lap_clean_is_unknown():
+    rec = LapRecorder()
+    partial = _drive_lap(rec, completed=0) or _drive_lap(rec, completed=1)
+    # The first emitted lap is partial; cleanliness wasn't watched from the line.
+    assert partial is not None and partial.valid is False
+    assert partial.clean is None
+
+
 def test_decimation_thins_dense_samples():
     rec = LapRecorder()
     # Many frames at the same position and time should not all be stored.

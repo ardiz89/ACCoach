@@ -41,12 +41,18 @@ _MIN_POS_DELTA = 0.002
 _MIN_DT_MS = 100
 
 
+# A lap is dirty once this many wheels leave the track (a real excursion). 1-2
+# wheels clipping a kerb is legal; 3+ off is the track-limits / cut threshold.
+_TYRES_OUT_DIRTY = 3
+
+
 @dataclass(slots=True)
 class _Buffer:
     samples: list[LapSample]
     is_full: bool          # True if it started at a start/finish crossing
     last_pos: float
     last_t_ms: int
+    max_tyres_out: int = 0  # worst off-track excursion seen during the lap
 
 
 class LapRecorder:
@@ -97,6 +103,11 @@ class LapRecorder:
                 samples=[], is_full=crossed, last_pos=-1.0, last_t_ms=-_MIN_DT_MS,
             )
 
+        # Track the worst excursion on EVERY frame (not just decimated samples),
+        # so a brief off between stored samples still marks the lap dirty.
+        if s.tyres_out > self._buf.max_tyres_out:
+            self._buf.max_tyres_out = s.tyres_out
+
         self._maybe_append(self._buf, s)
         return finished
 
@@ -112,6 +123,10 @@ class LapRecorder:
 
     def _finalize(self, buf: _Buffer, s: TelemetrySnapshot) -> Lap:
         # At the crossing, last_lap_ms holds the time of the lap we just closed.
+        # `clean` is known only for a full lap (we watched it from the line); a
+        # partial lap stays unknown (None). Conditions are ~constant over a lap,
+        # so the crossing frame is a fine snapshot of them.
+        clean = (buf.max_tyres_out < _TYRES_OUT_DIRTY) if buf.is_full else None
         return Lap(
             car_model=self._car,
             track=self._track,
@@ -119,4 +134,9 @@ class LapRecorder:
             lap_time_ms=int(s.last_lap_ms),
             valid=buf.is_full,
             samples=buf.samples,
+            clean=clean,
+            air_temp=s.air_temp,
+            road_temp=s.road_temp,
+            grip=s.surface_grip,
+            tyre_compound=s.tyre_compound,
         )

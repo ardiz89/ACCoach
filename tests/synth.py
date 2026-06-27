@@ -66,8 +66,12 @@ def _profile(pos: float):
 
 def build_lap(slow_corner: int | None = None, amt: int = 0,
               car: str = "ferrari_488_gt3", track: str = "monza",
-              n: int = 401, valid: bool = True) -> Lap:
-    """A 2-corner lap. ``slow_corner`` (0/1) loses ~``amt`` km/h + time there."""
+              n: int = 401, valid: bool = True,
+              clean: bool | None = None, compound: str = "") -> Lap:
+    """A 2-corner lap. ``slow_corner`` (0/1) loses ~``amt`` km/h + time there.
+
+    ``clean`` defaults to None (unknown), matching how a legacy lap deserializes.
+    """
     samples, off = [], 0
     for i in range(n):
         pos = i / (n - 1)
@@ -84,4 +88,5 @@ def build_lap(slow_corner: int | None = None, amt: int = 0,
         samples.append(LapSample(int(pos * 100000) + off, pos, spd, thr, brake,
                                  steer, "4", 8000, 0.0, 0.0, car_x=cx, car_z=cz,
                                  current_sector=_sector_of(pos)))
-    return Lap(car, track, SessionType.PRACTICE, 100000 + off, valid, samples=samples)
+    return Lap(car, track, SessionType.PRACTICE, 100000 + off, valid,
+               samples=samples, clean=clean, tyre_compound=compound)

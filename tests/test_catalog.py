@@ -76,6 +76,59 @@ def test_sync_drops_files_removed_from_disk(tmp_path):
         assert cat.count() == 2
 
 
+def test_best_reference_excludes_dirty_and_prefers_clean(tmp_path):
+    dirty = synth.build_lap(n=30, clean=False)                      # fast, dirty
+    dirty.recorded_utc = "2026-06-20T18:00:00+00:00"
+    clean = synth.build_lap(slow_corner=0, amt=30, n=30, clean=True)  # slower, clean
+    clean.recorded_utc = "2026-06-20T18:00:01+00:00"
+    save_lap(dirty, tmp_path)
+    cpath = save_lap(clean, tmp_path)
+    _catalog_path(tmp_path).unlink(missing_ok=True)
+    with LapCatalog(_catalog_path(tmp_path)) as cat:
+        cat.sync(list_lap_files(tmp_path))
+        best = cat.best_reference_path("ferrari_488_gt3", "monza")
+        # The clean lap wins even though it's slower; the fast dirty one is out.
+        assert best == str(cpath)
+
+
+def test_best_reference_prefers_clean_over_unknown(tmp_path):
+    unknown = synth.build_lap(n=30)                                 # fast, clean=None
+    unknown.recorded_utc = "2026-06-20T18:00:00+00:00"
+    clean = synth.build_lap(slow_corner=0, amt=30, n=30, clean=True)  # slower, clean
+    clean.recorded_utc = "2026-06-20T18:00:01+00:00"
+    save_lap(unknown, tmp_path)
+    cpath = save_lap(clean, tmp_path)
+    _catalog_path(tmp_path).unlink(missing_ok=True)
+    with LapCatalog(_catalog_path(tmp_path)) as cat:
+        cat.sync(list_lap_files(tmp_path))
+        assert cat.best_reference_path("ferrari_488_gt3", "monza") == str(cpath)
+
+
+def test_best_reference_none_when_all_dirty(tmp_path):
+    save_lap(synth.build_lap(n=30, clean=False), tmp_path)
+    _catalog_path(tmp_path).unlink(missing_ok=True)
+    with LapCatalog(_catalog_path(tmp_path)) as cat:
+        cat.sync(list_lap_files(tmp_path))
+        assert cat.best_reference_path("ferrari_488_gt3", "monza") is None
+
+
+def test_migration_from_old_version_rebuilds(tmp_path):
+    import sqlite3
+    db = _catalog_path(tmp_path)
+    with LapCatalog(db):
+        pass
+    # Stamp an older db_version; reopening must migrate (drop+rebuild) to current.
+    con = sqlite3.connect(str(db))
+    con.execute("UPDATE meta SET value='1' WHERE key='db_version'")
+    con.commit()
+    con.close()
+    with LapCatalog(db) as cat:
+        row = cat._conn.execute(
+            "SELECT value FROM meta WHERE key='db_version'"
+        ).fetchone()
+        assert row["value"] == "2"
+
+
 def test_upsert_is_idempotent(tmp_path):
     save_lap(synth.build_lap(n=10), tmp_path)
     path = list_lap_files(tmp_path)[0]

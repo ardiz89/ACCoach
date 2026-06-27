@@ -114,3 +114,30 @@ def test_from_dict_tolerates_bad_session():
 def test_duration_s():
     lap = replace(synth.build_lap(n=2), lap_time_ms=83456)
     assert lap.duration_s == 83.456
+
+
+def test_clean_and_conditions_roundtrip():
+    lap = replace(synth.build_lap(n=5, clean=True, compound="dry_compound"),
+                  air_temp=24.5, road_temp=33.2, grip=0.98)
+    back = Lap.from_dict(lap.to_dict())
+    assert back.clean is True
+    assert back.tyre_compound == "dry_compound"
+    assert back.air_temp == 24.5 and back.road_temp == 33.2 and back.grip == 0.98
+
+
+def test_clean_false_roundtrip():
+    back = Lap.from_dict(synth.build_lap(n=5, clean=False).to_dict())
+    assert back.clean is False
+
+
+def test_legacy_lap_without_clean_is_unknown_not_dirty():
+    # A pre-v5 file has no "clean" key: it must load as None (unknown), never
+    # False — so it stays eligible as a reference instead of being discarded.
+    legacy = {
+        "car_model": "x", "track": "y", "session": 0,
+        "lap_time_ms": 90000, "valid": True,
+        "samples": [[0, 0.0, 100.0, 1.0, 0.0, 0.0, "3", 6000, 0.0, 0.0]],
+    }
+    lap = Lap.from_dict(legacy)
+    assert lap.clean is None
+    assert lap.air_temp == 0.0 and lap.tyre_compound == ""

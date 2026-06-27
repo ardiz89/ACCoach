@@ -31,7 +31,8 @@ from ..telemetry.snapshot import SessionType, TelemetrySnapshot
 
 # Bump when the *writer* adds/changes channels. Readers tolerate older versions
 # because columns are matched by name via the stored ``fields`` list.
-SCHEMA_VERSION = 4
+# v5: lap-level clean flag + track conditions (air/road temp, grip, compound).
+SCHEMA_VERSION = 5
 
 # Fixed serialization order for a LapSample, written into every file. Per-wheel
 # channels are flattened with [fl, fr, rl, rr] suffixes.
@@ -167,10 +168,18 @@ class Lap:
     track: str
     session: SessionType
     lap_time_ms: int
-    valid: bool
+    valid: bool                     # "complete" — started at a start/finish crossing
     recorded_utc: str = ""          # ISO-8601, set by the recorder/storage layer
     schema_version: int = SCHEMA_VERSION
     samples: list[LapSample] = field(default_factory=list)
+    # --- v5: trustworthiness + conditions (separate from `valid`/complete) ---
+    # clean is None when unknown (legacy files, or a sim that doesn't expose the
+    # track-limits signal). A reference lap must be valid AND not clean==False.
+    clean: bool | None = None
+    air_temp: float = 0.0           # deg C
+    road_temp: float = 0.0          # deg C
+    grip: float = 0.0               # 0..1 surface grip
+    tyre_compound: str = ""
 
     @property
     def duration_s(self) -> float:
@@ -184,6 +193,11 @@ class Lap:
             "session": int(self.session),
             "lap_time_ms": self.lap_time_ms,
             "valid": self.valid,
+            "clean": self.clean,        # True / False / null (unknown)
+            "air_temp": round(self.air_temp, 1),
+            "road_temp": round(self.road_temp, 1),
+            "grip": round(self.grip, 4),
+            "tyre_compound": self.tyre_compound,
             "recorded_utc": self.recorded_utc,
             "fields": list(SAMPLE_FIELDS),
             "samples": [s.as_row() for s in self.samples],
@@ -198,6 +212,10 @@ class Lap:
         # Older files predate the self-describing ``fields`` list; fall back to
         # the v1 channel order so they still load.
         fields = d.get("fields") or list(SAMPLE_FIELDS[:10])
+        # clean: absent OR null -> None (unknown); never coerce a missing flag to
+        # False, so a legacy lap stays "unknown" (still eligible) rather than dirty.
+        raw_clean = d.get("clean")
+        clean = None if raw_clean is None else bool(raw_clean)
         return Lap(
             car_model=str(d.get("car_model", "")),
             track=str(d.get("track", "")),
@@ -207,4 +225,9 @@ class Lap:
             recorded_utc=str(d.get("recorded_utc", "")),
             schema_version=int(d.get("schema", 1)),
             samples=[LapSample.from_named(fields, r) for r in d.get("samples", [])],
+            clean=clean,
+            air_temp=float(d.get("air_temp", 0.0) or 0.0),
+            road_temp=float(d.get("road_temp", 0.0) or 0.0),
+            grip=float(d.get("grip", 0.0) or 0.0),
+            tyre_compound=str(d.get("tyre_compound", "")),
         )

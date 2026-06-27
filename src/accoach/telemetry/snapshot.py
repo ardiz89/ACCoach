@@ -107,6 +107,15 @@ class TelemetrySnapshot:
     current_sector: int = -1
     sector_count: int = 0
 
+    # --- track-limits / conditions (for clean-lap detection & reference matching) ---
+    # All from the AC+ACC common prefix, so they work on both games.
+    tyres_out: int = 0           # wheels currently off-track (numberOfTyresOut)
+    air_temp: float = 0.0        # deg C
+    road_temp: float = 0.0       # deg C
+    surface_grip: float = 0.0    # 0..1 track grip
+    tyre_compound: str = ""      # e.g. "dry_compound" / "wet_compound"
+    penalty: int = 0             # current penalty enum (0 = none)
+
     @staticmethod
     def disconnected() -> "TelemetrySnapshot":
         """A neutral snapshot used when the game isn't running."""

@@ -114,12 +114,13 @@ def find_reference_lap(
 
         with LapCatalog(_catalog_path(laps_dir)) as cat:
             cat.sync(list_lap_files(laps_dir))   # pick up any new/removed files
-            path = cat.fastest_valid_path(car_model, track)
+            path = cat.best_reference_path(car_model, track)
             if path is None:
                 return None
             lap = load_lap(path)
-            # Confirm against the file in case it was renamed/edited out of band.
-            if (lap.valid and lap.lap_time_ms > 0
+            # Confirm against the file in case it was renamed/edited out of band;
+            # a dirty lap (clean is False) is never a reference.
+            if (lap.valid and lap.lap_time_ms > 0 and lap.clean is not False
                     and _slug(lap.car_model) == _slug(car_model)
                     and _slug(lap.track) == _slug(track)):
                 return lap
@@ -133,9 +134,14 @@ def find_reference_lap(
 def _find_reference_by_scan(
     car_model: str, track: str, laps_dir: Path,
 ) -> Lap | None:
-    """Reference lookup without the catalog: scan + confirm every candidate."""
+    """Reference lookup without the catalog: scan + confirm every candidate.
+
+    Same policy as the catalog query: drop dirty laps (clean is False) and prefer
+    a confirmed-clean lap over an unknown/legacy one, ties broken on lap time.
+    """
     want_car, want_track = _slug(car_model), _slug(track)
-    best: Lap | None = None
+    best_clean: Lap | None = None      # clean is True
+    best_unknown: Lap | None = None    # clean is None (legacy/AC)
     for path in list_lap_files(laps_dir):
         if not path.name.startswith(f"{want_track}__{want_car}__"):
             continue
@@ -143,13 +149,16 @@ def _find_reference_by_scan(
             lap = load_lap(path)
         except (OSError, ValueError, json.JSONDecodeError):
             continue
-        if not lap.valid or lap.lap_time_ms <= 0:
+        if not lap.valid or lap.lap_time_ms <= 0 or lap.clean is False:
             continue
         if _slug(lap.car_model) != want_car or _slug(lap.track) != want_track:
             continue
-        if best is None or lap.lap_time_ms < best.lap_time_ms:
-            best = lap
-    return best
+        if lap.clean is True:
+            if best_clean is None or lap.lap_time_ms < best_clean.lap_time_ms:
+                best_clean = lap
+        elif best_unknown is None or lap.lap_time_ms < best_unknown.lap_time_ms:
+            best_unknown = lap
+    return best_clean or best_unknown
 
 
 def describe_lap(lap: Lap) -> str:

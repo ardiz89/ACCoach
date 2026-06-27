@@ -60,6 +60,35 @@ def test_find_reference_none_for_empty_dir(tmp_path):
     assert find_reference_lap("x", "y", tmp_path) is None
 
 
+def test_find_reference_excludes_dirty_lap(tmp_path):
+    # A fast but dirty lap must never beat a slower clean one as the reference.
+    dirty = synth.build_lap(n=40, clean=False)                       # fast, dirty
+    dirty.recorded_utc = "2026-06-20T18:00:00+00:00"
+    clean = synth.build_lap(slow_corner=0, amt=30, n=40, clean=True)   # slower, clean
+    clean.recorded_utc = "2026-06-20T18:00:01+00:00"
+    save_lap(dirty, tmp_path)
+    save_lap(clean, tmp_path)
+    ref = find_reference_lap("ferrari_488_gt3", "monza", tmp_path)
+    assert ref is not None and ref.clean is True
+
+
+def test_find_reference_none_when_only_dirty(tmp_path):
+    save_lap(synth.build_lap(n=40, clean=False), tmp_path)
+    assert find_reference_lap("ferrari_488_gt3", "monza", tmp_path) is None
+
+
+def test_scan_fallback_excludes_dirty_and_prefers_clean(tmp_path):
+    from accoach.recording.storage import _find_reference_by_scan
+    dirty = synth.build_lap(n=40, clean=False)
+    dirty.recorded_utc = "2026-06-20T18:00:00+00:00"
+    clean = synth.build_lap(slow_corner=0, amt=30, n=40, clean=True)
+    clean.recorded_utc = "2026-06-20T18:00:01+00:00"
+    save_lap(dirty, tmp_path)
+    save_lap(clean, tmp_path)
+    ref = _find_reference_by_scan("ferrari_488_gt3", "monza", tmp_path)
+    assert ref is not None and ref.clean is True
+
+
 def test_slug_handles_empty_and_specials():
     assert storage._slug("") == "unknown"
     assert storage._slug("Ferrari 488 GT3!") == "ferrari-488-gt3"

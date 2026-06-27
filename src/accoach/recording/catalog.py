@@ -21,7 +21,9 @@ import json
 import sqlite3
 from pathlib import Path
 
-_DB_VERSION = 1
+# v2: added clean (-1 unknown / 0 dirty / 1 clean) + track-condition columns,
+# so the reference query can exclude dirty laps and prefer confirmed-clean ones.
+_DB_VERSION = 2
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS lap (
@@ -34,16 +36,28 @@ CREATE TABLE IF NOT EXISTS lap (
     session        INTEGER NOT NULL,
     lap_time_ms    INTEGER NOT NULL,
     valid          INTEGER NOT NULL,
+    clean          INTEGER NOT NULL DEFAULT -1,
+    air_temp       REAL,
+    road_temp      REAL,
+    grip           REAL,
+    tyre_compound  TEXT,
     recorded_utc   TEXT,
     sample_count   INTEGER NOT NULL,
     schema_version INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS ix_lap_ref
-    ON lap (car_key, track_key, valid, lap_time_ms);
+    ON lap (car_key, track_key, valid, clean, lap_time_ms);
 CREATE INDEX IF NOT EXISTS ix_lap_recent
     ON lap (car_key, track_key, recorded_utc);
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT);
 """
+
+
+def _clean_to_int(value: object) -> int:
+    """Lap JSON ``clean`` (true/false/null/absent) -> -1 unknown / 0 dirty / 1 clean."""
+    if value is None:
+        return -1
+    return 1 if value else 0
 
 
 def _read_meta(path: Path) -> dict | None:
@@ -59,6 +73,11 @@ def _read_meta(path: Path) -> dict | None:
         "session": int(d.get("session", -1)),
         "lap_time_ms": int(d.get("lap_time_ms", 0)),
         "valid": 1 if d.get("valid") else 0,
+        "clean": _clean_to_int(d.get("clean")),
+        "air_temp": float(d.get("air_temp", 0.0) or 0.0),
+        "road_temp": float(d.get("road_temp", 0.0) or 0.0),
+        "grip": float(d.get("grip", 0.0) or 0.0),
+        "tyre_compound": str(d.get("tyre_compound", "")),
         "recorded_utc": str(d.get("recorded_utc", "")),
         "sample_count": len(d.get("samples", [])),
         "schema_version": int(d.get("schema", 1)),
@@ -79,11 +98,24 @@ class LapCatalog:
         self._conn.row_factory = sqlite3.Row
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.executescript(_SCHEMA)
+        self._migrate()
+        self._conn.commit()
+
+    def _migrate(self) -> None:
+        """The catalog is a rebuildable cache: on an older schema, drop the lap
+        table and recreate it (``sync`` re-indexes from the files). Cheap and
+        avoids fragile ALTER TABLE chains."""
+        row = self._conn.execute(
+            "SELECT value FROM meta WHERE key = 'db_version'"
+        ).fetchone()
+        version = int(row["value"]) if row else None
+        if version is not None and version < _DB_VERSION:
+            self._conn.execute("DROP TABLE IF EXISTS lap")
+            self._conn.executescript(_SCHEMA)   # recreate lap + indexes
         self._conn.execute(
-            "INSERT OR IGNORE INTO meta(key, value) VALUES('db_version', ?)",
+            "INSERT OR REPLACE INTO meta(key, value) VALUES('db_version', ?)",
             (str(_DB_VERSION),),
         )
-        self._conn.commit()
 
     def upsert(self, path: Path | str, meta: dict | None = None) -> bool:
         """Index a single lap file (reads its header if ``meta`` not given)."""
@@ -94,19 +126,26 @@ class LapCatalog:
         self._conn.execute(
             """INSERT INTO lap
                  (path, car_key, track_key, car_model, track, session,
-                  lap_time_ms, valid, recorded_utc, sample_count, schema_version)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?)
+                  lap_time_ms, valid, clean, air_temp, road_temp, grip,
+                  tyre_compound, recorded_utc, sample_count, schema_version)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                ON CONFLICT(path) DO UPDATE SET
                   car_key=excluded.car_key, track_key=excluded.track_key,
                   car_model=excluded.car_model, track=excluded.track,
                   session=excluded.session, lap_time_ms=excluded.lap_time_ms,
-                  valid=excluded.valid, recorded_utc=excluded.recorded_utc,
+                  valid=excluded.valid, clean=excluded.clean,
+                  air_temp=excluded.air_temp, road_temp=excluded.road_temp,
+                  grip=excluded.grip, tyre_compound=excluded.tyre_compound,
+                  recorded_utc=excluded.recorded_utc,
                   sample_count=excluded.sample_count,
                   schema_version=excluded.schema_version""",
             (
                 str(path), self._slug(meta["car_model"]),
                 self._slug(meta["track"]), meta["car_model"], meta["track"],
                 meta["session"], meta["lap_time_ms"], meta["valid"],
+                meta.get("clean", -1), meta.get("air_temp", 0.0),
+                meta.get("road_temp", 0.0), meta.get("grip", 0.0),
+                meta.get("tyre_compound", ""),
                 meta["recorded_utc"], meta["sample_count"], meta["schema_version"],
             ),
         )
@@ -135,11 +174,32 @@ class LapCatalog:
         return added
 
     def fastest_valid_path(self, car_model: str, track: str) -> str | None:
-        """Path of the fastest valid lap for this car+track, or ``None``."""
+        """Path of the fastest valid lap for this car+track, or ``None``.
+
+        NOTE: ignores cleanliness — kept for callers that just want the fastest
+        complete lap. For coaching use :meth:`best_reference_path`.
+        """
         row = self._conn.execute(
             """SELECT path FROM lap
                WHERE car_key = ? AND track_key = ? AND valid = 1 AND lap_time_ms > 0
                ORDER BY lap_time_ms ASC LIMIT 1""",
+            (self._slug(car_model), self._slug(track)),
+        ).fetchone()
+        return row["path"] if row else None
+
+    def best_reference_path(self, car_model: str, track: str) -> str | None:
+        """Path of the best *trustworthy* reference lap for this car+track.
+
+        Excludes dirty laps (clean = 0) entirely, and prefers a confirmed-clean
+        lap (clean = 1) over an unknown/legacy one (clean = -1); ties break on
+        lap time. Returns ``None`` if there is no usable lap — the caller then
+        honestly reports "no reference" instead of coaching against a cut lap.
+        """
+        row = self._conn.execute(
+            """SELECT path FROM lap
+               WHERE car_key = ? AND track_key = ? AND valid = 1
+                     AND lap_time_ms > 0 AND clean <> 0
+               ORDER BY (clean = 1) DESC, lap_time_ms ASC LIMIT 1""",
             (self._slug(car_model), self._slug(track)),
         ).fetchone()
         return row["path"] if row else None

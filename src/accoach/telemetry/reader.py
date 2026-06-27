@@ -204,6 +204,12 @@ class SharedMemoryReader:
             in_pit=bool(g.isInPit),
             current_sector=SharedMemoryReader._sector_index(g.currentSectorIndex),
             sector_count=s.sectorCount if 0 < s.sectorCount <= 30 else 0,
+            tyres_out=p.numberOfTyresOut if 0 <= p.numberOfTyresOut <= 4 else 0,
+            air_temp=p.airTemp,
+            road_temp=p.roadTemp,
+            surface_grip=g.surfaceGrip,
+            tyre_compound=str(g.tyreCompound),
+            penalty=g.penalty,
             **SharedMemoryReader._car_xz(g),
         )
 
