@@ -108,6 +108,48 @@ main { padding: 16px 24px; display: grid; gap: 18px; }
 
 .debrief { padding: 8px 24px 32px; }
 .debrief h3 { font-size: 13px; }
+.debrief h3 small { color: var(--muted); font-weight: 400; font-size: 11px; }
+
+/* Benchmark ladder (Andamento → Livelli) */
+.levels { padding: 8px 24px 0; }
+.levels h3 { font-size: 13px; margin: 0 0 8px; }
+.levels h3 small { color: var(--muted); font-weight: 400; font-size: 11px; }
+.ladder { display: flex; flex-direction: column; gap: 8px; }
+.lvl {
+  display: flex; align-items: baseline; gap: 14px;
+  padding: 10px 14px; background: var(--panel);
+  border: 1px solid var(--line); border-left: 4px solid var(--line);
+  border-radius: 8px;
+}
+.lvl[data-key="best"] { border-left-color: var(--cyan); }
+.lvl[data-key="ideal"] { border-left-color: var(--amber); }
+.lvl[data-key="pro"] { border-left-color: var(--green); }
+.lvl .lvl-label { min-width: 160px; font-weight: 600; }
+.lvl .lvl-time { font-variant-numeric: tabular-nums; font-size: 16px; min-width: 96px; }
+.lvl .lvl-gap { font-variant-numeric: tabular-nums; font-weight: 700; }
+.lvl .lvl-gap.faster { color: var(--green); }
+.lvl .lvl-gap.done { color: var(--cyan); }
+.lvl .lvl-gap.base { color: var(--muted); font-weight: 400; }
+.lvl .lvl-hint { color: var(--muted); font-size: 12px; }
+
+/* Per-corner weaknesses (Andamento → Punti deboli) */
+.weak {
+  display: flex; flex-direction: column; gap: 4px;
+  padding: 10px 14px; margin: 8px 0;
+  background: var(--panel); border: 1px solid var(--line);
+  border-left: 4px solid var(--line); border-radius: 8px;
+}
+.weak.sys { border-left-color: var(--amber); }
+.weak-head { display: flex; align-items: baseline; gap: 12px; }
+.weak .corner { font-weight: 700; font-size: 15px; }
+.weak .lost { margin-left: auto; color: var(--red); font-variant-numeric: tabular-nums; }
+.weak .detail { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.wk-badge {
+  font-size: 11px; font-weight: 700; padding: 1px 8px; border-radius: 999px;
+  border: 1px solid var(--line);
+}
+.wk-badge.on { color: var(--amber); border-color: var(--amber); background: #1a160e; }
+.wk-badge.off { color: var(--muted); }
 
 .legend {
   display: flex; flex-wrap: wrap; gap: 6px 14px;

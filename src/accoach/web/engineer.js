@@ -383,6 +383,7 @@ function applyLive(st) {
   $("g-map").textContent = AID(st.aids && st.aids.engine_map);
 
   renderEngineer(st);
+  renderFocus(st);
   renderPitReminder(st);
 
   // Auto-pick the matching combo once, if the user hasn't chosen yet.
@@ -427,6 +428,46 @@ function renderEngineer(st) {
     $("es-msg").textContent = "—"; $("es-cat").textContent = "";
     conf.hidden = true; prep.hidden = true;
     says.classList.remove("active");
+  }
+}
+
+// Render the Focus/Lesson block (st.focus) — the driving coach working one
+// weakness at a time. Twin of the engineer box, but about the driver, not the car.
+const FOCUS_KIND = {
+  assess:   { icon: "…", state: "idle" },
+  brief:    { icon: "🎯", state: "warn" },
+  drill:    { icon: "🎯", state: "warn" },
+  improved: { icon: "✅", state: "good" },
+  stuck:    { icon: "⏸", state: "idle" },
+  clean:    { icon: "✨", state: "good" },
+};
+
+function renderFocus(st) {
+  const f = st.focus;
+  const box = $("focus-says");
+  const drill = $("focus-drill"), target = $("focus-target");
+  if (!f) {
+    box.dataset.kind = "";
+    $("focus-icon").textContent = "…";
+    $("focus-msg").textContent = "Scaldando… guida qualche giro pulito.";
+    drill.hidden = true; target.hidden = true;
+    return;
+  }
+  const meta = FOCUS_KIND[f.kind] || FOCUS_KIND.assess;
+  box.dataset.kind = meta.state;
+  $("focus-icon").textContent = meta.icon;
+  $("focus-msg").textContent = f.message || "—";
+
+  if (f.drill) { drill.hidden = false; drill.textContent = f.drill; }
+  else { drill.hidden = true; }
+
+  if (f.focus) {
+    const t = f.focus;
+    const base = t.baseline_ms ? ` · <span class="t-gap">−${(t.baseline_ms / 1000).toFixed(3)}s</span>` : "";
+    target.hidden = false;
+    target.innerHTML = `<b>${t.name}</b> · ${t.theme}${base}`;
+  } else {
+    target.hidden = true;
   }
 }
 

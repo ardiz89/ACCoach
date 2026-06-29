@@ -76,6 +76,8 @@ async function loadProgress(combo) {
     : item("—", "nessun giro valido");
 
   drawProgress(p);
+  renderLevels(p.levels);
+  renderTrends(p.trends);
 
   const el = $("recurring");
   if (!p.recurring.length) {
@@ -86,6 +88,58 @@ async function loadProgress(combo) {
       `<span class="msg">${r.message}</span>` +
       `<span class="where">Curve: ${r.corners.join(", ")}</span></div>`).join("");
   }
+}
+
+// Benchmark ladder: best -> ideal (consistency) -> PRO (skill ceiling).
+function renderLevels(levels) {
+  const el = $("levels");
+  if (!el) return;
+  if (!levels || !levels.length) { el.innerHTML = ""; return; }
+  let rows = "";
+  for (const lv of levels) {
+    let gap;
+    if (lv.key === "best") {
+      gap = `<span class="lvl-gap base">il tuo riferimento</span>`;
+    } else if (lv.gain_s > 0) {
+      const hint = lv.key === "ideal" ? "costanza da recuperare" : "margine sul PRO";
+      gap = `<span class="lvl-gap faster">−${lv.gain_s.toFixed(3)}s</span>` +
+            `<span class="lvl-hint">${hint}</span>`;
+    } else {
+      const ahead = Math.abs(lv.gain_s).toFixed(3);
+      gap = `<span class="lvl-gap done">✓ già battuto</span>` +
+            `<span class="lvl-hint">+${ahead}s sul PRO</span>`;
+    }
+    rows += `<div class="lvl" data-key="${lv.key}">` +
+      `<span class="lvl-label">${lv.label}</span>` +
+      `<span class="lvl-time">${lv.lap_time}</span>` +
+      gap + `</div>`;
+  }
+  el.innerHTML = `<h3>Livelli <small>(best → ideale → PRO · gap = tempo disponibile)</small></h3>` +
+    `<div class="ladder">${rows}</div>`;
+}
+
+// Per-corner weaknesses: systematic (train it) vs sporadic (one-off).
+function renderTrends(trends) {
+  const el = $("trends");
+  if (!el) return;
+  if (!trends || !trends.length) {
+    el.innerHTML = `<div class="clean">Nessun punto debole ricorrente — bella costanza!</div>`;
+    return;
+  }
+  el.innerHTML = trends.map((t) => {
+    const sys = t.systematic;
+    const badge = sys
+      ? `<span class="wk-badge on">Sistematico</span>`
+      : `<span class="wk-badge off">Sporadico</span>`;
+    const tag = sys ? "da allenare" : "episodico";
+    return `<div class="weak ${sys ? "sys" : ""}">` +
+      `<div class="weak-head">` +
+      `<span class="corner">${t.name}</span>${badge}` +
+      `<span class="lost">−${t.total_s.toFixed(3)}s</span></div>` +
+      `<div class="detail">${tag} · ` +
+      `mediana −${t.median_s.toFixed(3)}s · ${t.occurrences}/${t.laps} giri</div>` +
+      `</div>`;
+  }).join("");
 }
 
 function drawProgress(p) {

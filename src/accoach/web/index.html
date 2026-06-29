@@ -77,12 +77,17 @@
 
   <div id="view-progress" class="hidden">
     <section id="prog-summary" class="summary"></section>
+    <section id="levels" class="levels"></section>
     <main>
       <div class="chart">
         <h3>Tempi sul giro nel tempo <small>(ogni punto = un giro · linea verde = best progressivo)</small></h3>
         <canvas id="c-progress" class="tall"></canvas>
       </div>
     </main>
+    <section class="debrief">
+      <h3>Punti deboli <small>(curva per curva · sistematico = da allenare)</small></h3>
+      <div id="trends"></div>
+    </section>
     <section class="debrief">
       <h3>Errori ricorrenti</h3>
       <div id="recurring"></div>
