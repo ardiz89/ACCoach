@@ -79,6 +79,27 @@ def test_comparator_skips_the_lap_wrap_frame():
     assert cmp.compare(normal) is not None
 
 
+def test_local_delta_tracks_recent_gain_or_loss():
+    # The local delta is the cumulative delta now minus ~one window of track back:
+    # it says whether you're gaining or losing *right now*, not over the whole lap.
+    from accoach.comparison.delta import LapComparator
+
+    ref = Reference(synth.build_lap())                   # lap_time_ms = 100000
+    cmp = LapComparator(ref)
+    # Walk the lap losing a growing amount of time vs the reference.
+    last = None
+    for i in range(1, 40):
+        pos = i / 50.0
+        extra = i * 30                                   # falling further behind
+        last = cmp.compare(synth.snap(pos=pos, current_lap_ms=int(ref.time_at(pos)) + extra))
+    assert last is not None
+    assert last.local_delta_ms > 0.0                     # losing time right now
+    assert last.local_losing is True
+    # A new lap resets the rolling window (no stale carry-over).
+    fresh = cmp.compare(synth.snap(pos=0.02, current_lap_ms=int(ref.time_at(0.02))))
+    assert fresh.local_delta_ms == 0.0
+
+
 def test_point_at_on_real_lap_tracks_speed_dip():
     ref = Reference(synth.build_lap())
     apex = ref.point_at(0.31)

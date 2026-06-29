@@ -191,10 +191,21 @@ class Overlay(QWidget):
 
         # Big delta number. The text already carries the sign (+slower / -faster),
         # which is the colour-blind-safe redundancy alongside the red/green.
-        self._set_font(p, 30, bold=True)
+        self._set_font(p, 28, bold=True)
         p.setPen(colour)
-        p.drawText(0, y + bar_h + 4, w, 44, Qt.AlignHCenter,
+        p.drawText(0, y + bar_h + 2, w, 34, Qt.AlignHCenter,
                    f"{delta.get('text', '0.000')}")
+
+        # Local delta: gaining/losing RIGHT NOW (this micro-sector) — the
+        # predictive signal a cumulative number can't give. Small, under it.
+        local = delta.get("local_s", 0.0)
+        if abs(local) >= 0.01:
+            losing = delta.get("local_losing", local > 0)
+            self._set_font(p, 11, bold=True)
+            p.setPen(_RED if losing else _GREEN)
+            arrow = "▲" if losing else "▼"
+            p.drawText(0, y + bar_h + 38, w, 16, Qt.AlignHCenter,
+                       f"now {arrow} {local:+.2f}")
 
     def _draw_cue(self, p: QPainter, w: int) -> None:
         if self._cue is None:
@@ -209,7 +220,7 @@ class Overlay(QWidget):
         accent = QColor(_RED if cat in ("locked", "wheelspin") else _CYAN)
         accent.setAlpha(alpha)
 
-        x, y, h = 20, 120, 38
+        x, y, h = 20, 126, 36
         bg = QColor(_DARK)
         bg.setAlpha(min(_DARK.alpha(), alpha))
         p.setPen(Qt.NoPen)

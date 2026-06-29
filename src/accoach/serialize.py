@@ -60,6 +60,9 @@ def delta_to_dict(d: DeltaState | None) -> dict | None:
         "s": round(d.delta_ms / 1000.0, 3),
         "text": format_delta(d.delta_ms),
         "ahead": d.ahead,
+        "local_ms": round(d.local_delta_ms, 1),     # gaining(-)/losing(+) right now
+        "local_s": round(d.local_delta_ms / 1000.0, 3),
+        "local_losing": d.local_losing,
         "predicted_ms": int(d.predicted_lap_ms),
         "predicted": format_lap_time(int(d.predicted_lap_ms)),
         "reference_ms": d.reference_lap_ms,
