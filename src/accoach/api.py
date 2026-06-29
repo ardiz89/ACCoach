@@ -26,6 +26,7 @@ from .coaching import (
     lap_time_consistency,
 )
 from .comparison import Reference
+from .i18n import current_language
 from .recording import DEFAULT_LAPS_DIR, load_lap
 from .recording.catalog import LapCatalog
 from .recording.lap import SAMPLE_FIELDS
@@ -149,7 +150,9 @@ def create_api(
         track: str = Query(...),
         lap: str | None = Query(None),       # the lap to review (default: most recent)
         baseline: str | None = Query(None),  # the lap to compare against (default: fastest)
+        lang: str | None = Query(None),      # render the debrief in this language
     ) -> dict:
+        lg = lang or current_language()
         with _catalog() as cat:
             all_laps = cat.laps_for(car, track)
         valid = [r for r in all_laps if r["valid"] and r["lap_time_ms"] > 0]
@@ -172,8 +175,8 @@ def create_api(
 
         try:
             corners = detect_corners(baseline_lap.samples)
-            names = {c.index: n for c, n in zip(corners, name_corners(track, corners))}
-            debrief = build_lap_debrief(review, reference, corners)
+            names = {c.index: n for c, n in zip(corners, name_corners(track, corners, lg))}
+            debrief = build_lap_debrief(review, reference, corners, lg)
             consistency = lap_time_consistency([r["lap_time_ms"] for r in valid])
         except Exception:  # noqa: BLE001 - a degenerate lap shouldn't 500 the UI
             raise HTTPException(422, "lap could not be analysed")
@@ -307,8 +310,10 @@ def create_api(
         return out
 
     @app.get("/api/progress")
-    def progress(car: str = Query(...), track: str = Query(...)) -> dict:
+    def progress(car: str = Query(...), track: str = Query(...),
+                 lang: str | None = Query(None)) -> dict:
         """Lap-time trend, consistency, benchmark levels and recurring mistakes."""
+        lg = lang or current_language()
         with _catalog() as cat:
             all_laps = cat.laps_for(car, track)
             pro_path = cat.fastest_pro_path(car, track)
@@ -341,13 +346,13 @@ def create_api(
             ref_lap = load_lap(fastest)
             reference = Reference(ref_lap)
             corners = detect_corners(ref_lap.samples)
-            cnames = {c.index: n for c, n in zip(corners, name_corners(track, corners))}
+            cnames = {c.index: n for c, n in zip(corners, name_corners(track, corners, lg))}
             debriefs = []
             tally: dict[str, dict] = {}
             for r in chrono[-15:]:
                 if r["path"] == fastest:
                     continue
-                deb = build_lap_debrief(load_lap(r["path"]), reference, corners)
+                deb = build_lap_debrief(load_lap(r["path"]), reference, corners, lg)
                 debriefs.append(deb)
                 for loss in deb.losses:
                     t = tally.setdefault(loss.category.value,
@@ -392,7 +397,7 @@ def create_api(
             "key": lv.key, "label": lv.label,
             "lap_time_ms": lv.lap_time_ms, "lap_time": format_lap_time(lv.lap_time_ms),
             "gain_ms": lv.gain_ms, "gain_s": round(lv.gain_ms / 1000.0, 3),
-        } for lv in benchmark_levels(best_ms, ideal_ms=ideal_ms, pro_ms=pro_ms)]
+        } for lv in benchmark_levels(best_ms, ideal_ms=ideal_ms, pro_ms=pro_ms, lang=lg)]
 
         return {
             "car": car, "track": track,

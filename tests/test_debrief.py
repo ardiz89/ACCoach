@@ -3,14 +3,29 @@ from accoach.coaching.analyzer import CornerStats
 from accoach.coaching.cue import CueCategory
 from accoach.coaching.debrief import (
     build_lap_debrief,
+    explain_cause,
     explain_loss,
     format_debrief,
     lap_time_consistency,
 )
 from accoach.comparison import Reference
+from accoach.engineer import Balance, Phase, Speed, Symptom
 from accoach.track import detect_corners
 
 import synth
+
+
+def test_debrief_content_translates_to_italian():
+    sym = Symptom(Balance.UNDERSTEER, Phase.ENTRY, Speed.LOW)
+    assert explain_cause(sym, "en") == "The car understeers on entry (slow corner)."
+    assert explain_cause(sym, "it") == "L'auto sottosterza in ingresso (curva lenta)."
+    st = CornerStats(lost_ms=300, throttle_live=0.5, throttle_ref=0.5,
+                     brake_live=0.0, brake_ref=0.0, min_speed_live=120.0,
+                     min_speed_ref=128.0, braking_early=False)
+    detail_it, _ = explain_loss(CueCategory.CARRY_SPEED, st, "it")
+    assert "Minima all'apex" in detail_it
+    detail_en, _ = explain_loss(CueCategory.CARRY_SPEED, st, "en")
+    assert "Minimum speed at apex" in detail_en
 
 
 def _debrief(slow_corner=0, amt=30):

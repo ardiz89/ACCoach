@@ -90,3 +90,10 @@ def test_levels_pro_slower_than_you_is_negative_gain():
 
 def test_levels_empty_without_best():
     assert benchmark_levels(0) == []
+
+
+def test_level_labels_translate():
+    en = {lv.key: lv.label for lv in benchmark_levels(90000, ideal_ms=89000, lang="en")}
+    it = {lv.key: lv.label for lv in benchmark_levels(90000, ideal_ms=89000, lang="it")}
+    assert en["best"] == "Your best lap" and it["best"] == "Tuo miglior giro"
+    assert it["ideal"] == "Ideale teorico"

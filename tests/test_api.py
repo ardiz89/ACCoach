@@ -51,6 +51,15 @@ def test_analysis_default_baseline_is_fastest(tmp_path):
     assert all("name" in cc for cc in data["corners"])
 
 
+def test_analysis_lang_it_translates_levels_and_debrief(tmp_path):
+    c = _client(tmp_path)
+    en = c.get("/api/progress", params={"car": CAR, "track": TRACK, "lang": "en"}).json()
+    it = c.get("/api/progress", params={"car": CAR, "track": TRACK, "lang": "it"}).json()
+    en_best = next(lv for lv in en["levels"] if lv["key"] == "best")["label"]
+    it_best = next(lv for lv in it["levels"] if lv["key"] == "best")["label"]
+    assert en_best == "Your best lap" and it_best == "Tuo miglior giro"
+
+
 def test_analysis_has_corner_speeds(tmp_path):
     c = _client(tmp_path)
     data = c.get("/api/analysis", params={"car": CAR, "track": TRACK}).json()

@@ -45,19 +45,22 @@ _CORNERS: dict[str, list[tuple[str, float]]] = {
 }
 
 
-def corner_name(track: str, index: int, apex_pos: float) -> str:
-    """Name for a detected corner, by nearest curated apex, else ``Curva N``."""
+def corner_name(track: str, index: int, apex_pos: float, lang: str | None = None) -> str:
+    """Name for a detected corner, by nearest curated apex, else ``Corner N`` /
+    ``Curva N`` per language (curated names are proper nouns, kept as-is)."""
     table = _CORNERS.get(_slug(track))
     if table:
         name, pos = min(table, key=lambda t: abs(t[1] - apex_pos))
         if abs(pos - apex_pos) <= _NAME_TOL:
             return name
-    return f"Corner {index + 1}"
+    from .i18n import current_language
+    word = "Curva" if (lang or current_language()) == "it" else "Corner"
+    return f"{word} {index + 1}"
 
 
-def name_corners(track: str, corners) -> list[str]:
+def name_corners(track: str, corners, lang: str | None = None) -> list[str]:
     """Names for a list of detected corners (objects with ``index``/``apex_pos``)."""
-    return [corner_name(track, c.index, c.apex_pos) for c in corners]
+    return [corner_name(track, c.index, c.apex_pos, lang) for c in corners]
 
 
 def has_names(track: str) -> bool:

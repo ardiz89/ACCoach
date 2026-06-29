@@ -109,9 +109,8 @@ class BenchmarkLevel:
 
 
 _LEVEL_LABEL = {
-    "best": "Your best lap",
-    "ideal": "Theoretical ideal",
-    "pro": "PRO reference",
+    "en": {"best": "Your best lap", "ideal": "Theoretical ideal", "pro": "PRO reference"},
+    "it": {"best": "Tuo miglior giro", "ideal": "Ideale teorico", "pro": "Riferimento PRO"},
 }
 
 
@@ -120,17 +119,20 @@ def benchmark_levels(
     *,
     ideal_ms: int | None = None,
     pro_ms: int | None = None,
+    lang: str | None = None,
 ) -> list[BenchmarkLevel]:
     """The benchmark ladder for a car+track. ``best_ms`` is your rolling best;
     the ideal/PRO rungs are added only when available. ``gain_ms`` is how much
     faster each rung is than your best (negative = you're already ahead of it)."""
     if best_ms <= 0:
         return []
-    levels = [BenchmarkLevel("best", _LEVEL_LABEL["best"], best_ms, 0)]
+    from ..i18n import current_language
+    lab = _LEVEL_LABEL.get(lang or current_language(), _LEVEL_LABEL["en"])
+    levels = [BenchmarkLevel("best", lab["best"], best_ms, 0)]
     if ideal_ms and ideal_ms > 0:
-        levels.append(BenchmarkLevel("ideal", _LEVEL_LABEL["ideal"], ideal_ms,
+        levels.append(BenchmarkLevel("ideal", lab["ideal"], ideal_ms,
                                      best_ms - ideal_ms))
     if pro_ms and pro_ms > 0:
-        levels.append(BenchmarkLevel("pro", _LEVEL_LABEL["pro"], pro_ms,
+        levels.append(BenchmarkLevel("pro", lab["pro"], pro_ms,
                                      best_ms - pro_ms))
     return levels
