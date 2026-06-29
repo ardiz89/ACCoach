@@ -189,7 +189,8 @@ function renderSlot(p, s, i) {
   const cur = state.base[key] + delta;
 
   const el = document.createElement("div");
-  el.className = "slot" + (delta ? " changed" : "");
+  const suggested = state.suggested && state.suggested.has(key);
+  el.className = "slot" + (delta ? " changed" : "") + (suggested ? " suggested" : "");
   el.dataset.key = key;          // lets refocusSlot find this node after rerender
 
   // The slot itself is the keyboard control (a spinbutton): one tab stop, the
@@ -583,9 +584,27 @@ function applyLive(st) {
   renderEngineer(st);
   renderFocus(st);
   renderPitReminder(st);
+  updateSuggested(st.engineer);   // highlight the proposed levers in the editor
 
   // Auto-pick the matching combo once, if the user hasn't chosen yet.
   maybeAutoSelect(st.car, st.track);
+}
+
+// Highlight, in cyan, the slots the engineer is currently proposing to change —
+// distinct from the amber "you changed it" state. Updated in place (the live
+// feed ticks ~15 Hz, so a full rerender would churn and fight an open edit) and
+// only when the proposed set actually changes.
+function updateSuggested(eng) {
+  const next = new Set();
+  if (eng && eng.change && (eng.tag === "BOX" || eng.tag === "AV")) {
+    for (const c of eng.change) next.add(slotKey(c.param, c.slot == null ? 0 : c.slot));
+  }
+  const prev = state.suggested || new Set();
+  if (next.size === prev.size && [...next].every((k) => prev.has(k))) return;
+  state.suggested = next;
+  document.querySelectorAll(".slot").forEach((el) => {
+    el.classList.toggle("suggested", next.has(el.dataset.key));
+  });
 }
 
 // Render the structured engineer block (st.engineer) — proposal + at-the-wheel

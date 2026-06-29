@@ -146,6 +146,10 @@ button.small { padding: 7px 12px; font-size: 13px; margin-top: 8px; }
 }
 .slots { display: flex; flex-wrap: wrap; gap: 8px; }
 .slot { display: flex; align-items: center; gap: 6px; background: var(--inset); border: 1px solid var(--line); border-radius: 12px; padding: 3px 4px; outline: none; }
+/* The engineer proposes this lever (cyan) — distinct from amber "you changed it".
+   Listed before .changed so that, when both apply, the amber border wins (you've
+   acted) while the cyan tint stays as a reminder it was suggested. */
+.slot.suggested { border-color: var(--cyan); background: rgba(34, 211, 206, 0.10); }
 .slot.changed { border-color: var(--amber); }
 /* Keyboard focus: the whole slot is the spinbutton (tabindex=0). */
 .slot:focus-visible, .slot.focused { border-color: var(--cyan); box-shadow: 0 0 0 2px var(--cyan); }
