@@ -246,10 +246,12 @@ function drawSectors(s) {
 
 // --- track map ------------------------------------------------------------
 function deltaColor(d, m) {
-  // slower (d>0) -> red, faster (d<0) -> green, near-zero -> pale.
+  // slower (d>0) -> Delta Red, faster (d<0) -> Delta Green, near-zero -> pale.
+  // Colour is doubled up with segment width (see drawMap) so the read survives
+  // red/green colour-blindness — the line gets THICKER the more time is lost.
   const t = Math.max(-1, Math.min(1, d / (m || 1)));
-  if (t >= 0) return `rgb(255,${Math.round(210 - 175 * t)},${Math.round(205 - 175 * t)})`;
-  return `rgb(${Math.round(210 + 0 * t)},${255},${Math.round(210 + 45 * t)})`;
+  if (t >= 0) return `rgb(255,${Math.round(220 - 143 * t)},${Math.round(225 - 131 * t)})`; // pale -> #FF4D5E
+  return `rgb(${Math.round(232 + 180 * t)},${224},${Math.round(228 + 90 * t)})`;            // pale -> #34E08A
 }
 
 function drawMap(a, cx) {
@@ -293,21 +295,25 @@ function drawMap(a, cx) {
   ctx.stroke();
   ctx.restore();
 
-  // Your line: colour each segment by the delta at that point.
+  // Your line: colour each segment by the delta AND scale its width by |delta|,
+  // so the read survives red/green colour-blindness (thicker = more time lost).
   let mx = 0.05;
   for (const v of d.delta_s) mx = Math.max(mx, Math.abs(v));
-  ctx.lineWidth = 3; ctx.lineCap = "round";
+  ctx.lineCap = "round"; ctx.lineJoin = "round";
   for (let i = 1; i < rv.x.length; i++) {
+    const dv = d.delta_s[i] || 0;
+    const t = Math.min(1, Math.abs(dv) / (mx || 1));
+    ctx.lineWidth = 2 + 5 * t;   // 2px at parity -> 7px at biggest swing
     ctx.beginPath();
     ctx.moveTo(X(rv.x[i - 1]), Y(rv.z[i - 1]));
     ctx.lineTo(X(rv.x[i]), Y(rv.z[i]));
-    ctx.strokeStyle = deltaColor(d.delta_s[i], mx);
+    ctx.strokeStyle = deltaColor(dv, mx);
     ctx.stroke();
   }
 
   // Braking points: where your brake first crosses onset.
   const br = rv.brake;
-  ctx.fillStyle = "#ffd23f";
+  ctx.fillStyle = "#FFB020";
   for (let i = 1; i < br.length; i++) {
     if (br[i] >= 0.3 && br[i - 1] < 0.3) {
       const px = X(rv.x[i]), py = Y(rv.z[i]);
@@ -325,7 +331,7 @@ function drawMap(a, cx) {
   }
 
   // Start/finish.
-  ctx.fillStyle = "#3fd0e0";
+  ctx.fillStyle = "#22D3CE";
   ctx.beginPath(); ctx.arc(X(rv.x[0]), Y(rv.z[0]), 4, 0, 6.283); ctx.fill();
 
   // Hover marker.
