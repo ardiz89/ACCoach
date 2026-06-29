@@ -26,10 +26,13 @@ try:
         QCheckBox,
         QComboBox,
         QDialog,
+        QDoubleSpinBox,
+        QFormLayout,
         QFrame,
         QHBoxLayout,
         QLabel,
         QPushButton,
+        QSpinBox,
         QVBoxLayout,
         QWidget,
     )
@@ -37,7 +40,7 @@ except ImportError:  # pragma: no cover - optional dependency
     print("The launcher needs PySide6.  Install it with:  pip install PySide6")
     raise SystemExit(1)
 
-from .config import load_config, set_language
+from .config import load_config, save_config, set_language
 from .i18n import LANGUAGES, language_name, t
 from .paths import base_dir
 
@@ -47,6 +50,7 @@ _SRC = Path(__file__).resolve().parents[1]   # .../src
 _GUIDE = "__guide__"
 _STOP_LIVE = "__stop_live__"
 _WIZARD = "__wizard__"
+_SETTINGS = "__settings__"
 
 
 # --- first-run "getting started" wizard ------------------------------------
@@ -73,7 +77,8 @@ _VOICE_CMDS = {"live", "coach"}
 # While Coach Live is running these buttons stay clickable; all others are
 # disabled so you can't stack a second coach/telemetry reader on top of it.
 # Keys: command buttons by their args tuple, special buttons by their sentinel.
-_LIVE_SAFE_KEYS = {_STOP_LIVE, _GUIDE, _WIZARD, ("web",), ("web", "--engineer")}
+_LIVE_SAFE_KEYS = {_STOP_LIVE, _GUIDE, _WIZARD, _SETTINGS,
+                   ("web",), ("web", "--engineer")}
 
 # (label key, command args / sentinel, opens-its-own-console). The label key is
 # resolved through i18n at build time so the launcher follows the chosen language.
@@ -90,6 +95,7 @@ _BUTTONS = [
     ("btn.verify_g", ["verify-g"], True),
     ("—", None, False),
     ("btn.get_started", _WIZARD, False),
+    ("btn.settings", _SETTINGS, False),
     ("btn.guide", _GUIDE, False),
 ]
 
@@ -193,6 +199,55 @@ def _open_guide() -> None:
         print(f"Cannot open the guide ({path}): {exc}")
 
 
+class Settings(QDialog):
+    """Voice + overlay preferences, persisted to config.toml (no hand-editing)."""
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle(t("ui.settings"))
+        self.setModal(True)
+        cfg = load_config()
+        form = QFormLayout(self)
+
+        self._voice = QCheckBox()
+        self._voice.setChecked(cfg.voice.enabled)
+        form.addRow(t("set.voice"), self._voice)
+
+        self._rate = QSpinBox()
+        self._rate.setRange(80, 300)
+        self._rate.setValue(cfg.voice.rate)
+        form.addRow(t("set.rate"), self._rate)
+
+        self._scale = QDoubleSpinBox()
+        self._scale.setRange(0.5, 2.5)
+        self._scale.setSingleStep(0.1)
+        self._scale.setValue(cfg.overlay.scale or 1.0)
+        form.addRow(t("set.scale"), self._scale)
+
+        hint = QLabel(t("set.scale_hint"))
+        hint.setStyleSheet("color: #888; font-size: 11px;")
+        form.addRow(hint)
+
+        row = QHBoxLayout()
+        cancel = QPushButton(t("btn.cancel"))
+        cancel.clicked.connect(self.reject)
+        save = QPushButton(t("btn.save"))
+        save.setDefault(True)
+        save.clicked.connect(self._save)
+        row.addStretch(1)
+        row.addWidget(cancel)
+        row.addWidget(save)
+        form.addRow(row)
+
+    def _save(self) -> None:
+        cfg = load_config()
+        cfg.voice.enabled = self._voice.isChecked()
+        cfg.voice.rate = self._rate.value()
+        cfg.overlay.scale = round(self._scale.value(), 2)
+        save_config(cfg)
+        self.accept()
+
+
 class Launcher(QWidget):
     def __init__(self) -> None:
         super().__init__()
@@ -245,6 +300,8 @@ class Launcher(QWidget):
                 btn.clicked.connect(_open_guide)
             elif args == _WIZARD:
                 btn.clicked.connect(self._show_wizard)
+            elif args == _SETTINGS:
+                btn.clicked.connect(self._show_settings)
             elif args == _STOP_LIVE:
                 btn.clicked.connect(self._stop_live)
             else:
@@ -331,6 +388,10 @@ class Launcher(QWidget):
     def _show_wizard(self) -> None:
         """Open the getting-started wizard (also auto-shown on first run)."""
         GettingStarted(self).exec()
+
+    def _show_settings(self) -> None:
+        """Open the settings dialog (voice + overlay), persisted to config.toml."""
+        Settings(self).exec()
 
     def _stop_live(self) -> None:
         """Stop any running Coach Live / Live-Demo process."""

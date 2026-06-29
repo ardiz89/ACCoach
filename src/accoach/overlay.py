@@ -42,6 +42,7 @@ DEFAULT_URL = "ws://127.0.0.1:8777/ws"
 RECONNECT_MS = 2000
 CUE_HOLD_S = 1.8          # how long a cue stays on screen before fading out
 DELTA_CLAMP_S = 1.0       # bar is full at ±1.0 s
+_BASE_W, _BASE_H = 560, 210   # design size; the window is this × the config scale
 
 # HONE palette (see accoach.brand). QColor wants ints, so they're spelled here.
 _CYAN = QColor(0x22, 0xD3, 0xCE)     # brand mark / cue accent
@@ -69,8 +70,17 @@ class Overlay(QWidget):
         if not interactive:
             self.setAttribute(Qt.WA_TransparentForMouseEvents, True)
 
-        self.resize(560, 210)
-        self._place_top_center()
+        # Honor the configured scale + position (drag-to-move persists them).
+        from .config import load_config
+        ov = load_config().overlay
+        self._scale = ov.scale if (ov.scale and ov.scale > 0) else 1.0
+        self._interactive = interactive
+        self._drag_off = None
+        self.resize(int(_BASE_W * self._scale), int(_BASE_H * self._scale))
+        if ov.x >= 0 and ov.y >= 0:
+            self.move(ov.x, ov.y)
+        else:
+            self._place_top_center()
 
         # WebSocket client on the Qt event loop — only when a URL is given.
         # In-process callers feed it via apply_state() instead.
@@ -122,8 +132,10 @@ class Overlay(QWidget):
     def paintEvent(self, _event) -> None:
         p = QPainter(self)
         p.setRenderHint(QPainter.Antialiasing, True)
+        if self._scale != 1.0:
+            p.scale(self._scale, self._scale)   # everything below uses base coords
         st = self._state
-        w = self.width()
+        w = _BASE_W
 
         if not st or not st.get("connected"):
             self._draw_mark(p, 22, 22, 18)
@@ -250,6 +262,9 @@ class Overlay(QWidget):
         """A slim, persistent reminder of the one weakness being coached. Low
         priority by design: small and quiet so it never fights the delta or an
         acute cue, but always there to answer 'what am I working on?'."""
+        # Declutter: don't compete with an acute cue while it's on screen.
+        if self._cue is not None and (time.monotonic() - self._cue_at) < CUE_HOLD_S:
+            return
         focus = self._state.get("focus")
         if not focus:
             return
@@ -280,7 +295,7 @@ class Overlay(QWidget):
     def _draw_pill(self, p: QPainter, text: str, colour: QColor,
                    y: int, alpha: int = 255) -> None:
         self._set_font(p, 15, bold=True)
-        w = self.width()
+        w = _BASE_W
         back = QColor(_DARK)
         back.setAlpha(min(_DARK.alpha(), alpha))
         p.setPen(Qt.NoPen)
@@ -288,6 +303,27 @@ class Overlay(QWidget):
         p.drawRoundedRect(20, y - 4, w - 40, 30, 8, 8)
         p.setPen(colour)
         p.drawText(20, y - 4, w - 40, 30, Qt.AlignCenter, text)
+
+    # --- drag to reposition (only in --interactive); persists to config --------
+    def mousePressEvent(self, e) -> None:  # noqa: N802 (Qt naming)
+        if self._interactive and e.button() == Qt.LeftButton:
+            self._drag_off = e.globalPosition().toPoint() - self.frameGeometry().topLeft()
+
+    def mouseMoveEvent(self, e) -> None:  # noqa: N802
+        if self._interactive and self._drag_off is not None:
+            self.move(e.globalPosition().toPoint() - self._drag_off)
+
+    def mouseReleaseEvent(self, e) -> None:  # noqa: N802
+        if not (self._interactive and self._drag_off is not None):
+            return
+        self._drag_off = None
+        try:
+            from .config import load_config, save_config
+            cfg = load_config()
+            cfg.overlay.x, cfg.overlay.y = self.x(), self.y()
+            save_config(cfg)
+        except Exception:  # pragma: no cover - best-effort persistence
+            pass
 
 
 def main(argv: list[str] | None = None) -> None:

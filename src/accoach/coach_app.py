@@ -128,7 +128,8 @@ def main(argv: list[str] | None = None) -> None:
     interval = 1.0 / REFRESH_HZ
     from .config import load_config
     cfg = load_config()
-    voice = Voice(enabled=not silent, language=cfg.language)
+    voice = Voice(enabled=(not silent) and cfg.voice.enabled,
+                  rate=cfg.voice.rate, language=cfg.language)
     engine = CoachEngine(voice=voice, acquire_hz=cfg.acquire.hz)
 
     try:

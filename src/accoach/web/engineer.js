@@ -167,9 +167,21 @@ function renderSlot(p, s, i) {
 
   const el = document.createElement("div");
   el.className = "slot" + (delta ? " changed" : "");
+  el.dataset.key = key;          // lets refocusSlot find this node after rerender
+
+  // The slot itself is the keyboard control (a spinbutton): one tab stop, the
+  // -/+ buttons are mouse affordances kept out of the tab order (see below).
+  el.tabIndex = 0;
+  el.setAttribute("role", "spinbutton");
+  el.setAttribute("aria-valuenow", String(cur));
+  const where = s.slot ? ` ${s.slot}` : "";
+  el.setAttribute("aria-label", `${p.label}${where}: ${cur}`);
+  el.onkeydown = (ev) => onSlotKey(ev, p.key, i);
 
   const minus = document.createElement("button");
+  minus.type = "button"; minus.tabIndex = -1;
   minus.textContent = "−"; minus.title = "−1 click";
+  minus.setAttribute("aria-hidden", "true");
   minus.onclick = () => bump(p.key, i, -1);
 
   const val = document.createElement("div");
@@ -178,7 +190,9 @@ function renderSlot(p, s, i) {
   val.innerHTML = `${cur}${physTxt}`;
 
   const plus = document.createElement("button");
+  plus.type = "button"; plus.tabIndex = -1;
   plus.textContent = "+"; plus.title = "+1 click";
+  plus.setAttribute("aria-hidden", "true");
   plus.onclick = () => bump(p.key, i, +1);
 
   if (s.slot) {
@@ -193,6 +207,35 @@ function renderSlot(p, s, i) {
     el.appendChild(d);
   }
   return el;
+}
+
+// Keyboard handling for a focused slot. A rerender() rebuilds the DOM, so after
+// a bump we restore focus to the slot at the same param/index position.
+function onSlotKey(ev, param, i) {
+  let step = 0;
+  switch (ev.key) {
+    case "ArrowUp": case "ArrowRight": case "+": case "=": step = 1; break;
+    case "ArrowDown": case "ArrowLeft": case "-": case "−": step = -1; break;
+    case "PageUp": step = 5; break;
+    case "PageDown": step = -5; break;
+    default: return;            // leave Tab and everything else to the browser
+  }
+  ev.preventDefault();
+  bump(param, i, step);
+  refocusSlot(param, i);
+}
+
+// rerender() replaces the slots' DOM nodes, so find the freshly-built slot for
+// this param/index and re-focus it. Defensive: do nothing if it's gone.
+function refocusSlot(param, i) {
+  const sel = `.slot[data-key="${cssEscape(slotKey(param, i))}"]`;
+  const el = document.querySelector(sel);
+  if (el && typeof el.focus === "function") el.focus();
+}
+
+function cssEscape(v) {
+  if (window.CSS && typeof window.CSS.escape === "function") return window.CSS.escape(v);
+  return String(v).replace(/["\\]/g, "\\$&");   // enough for our "param#slot" keys
 }
 
 function bump(param, slot, step) {

@@ -44,16 +44,19 @@ def main(argv: list[str] | None = None) -> None:
     from .overlay import Overlay
 
     from .config import load_config
-    lang = load_config().language
+    cfg = load_config()
+    lang = cfg.language
+    voice_on = (not silent) and cfg.voice.enabled
     if demo:
         from .demo import make_demo_engine
 
         engine = make_demo_engine()
-        if not silent:
-            engine.voice = Voice(enabled=True, language=lang)
+        if voice_on:
+            engine.voice = Voice(enabled=True, rate=cfg.voice.rate, language=lang)
     else:
-        engine = CoachEngine(voice=Voice(enabled=not silent, language=lang),
-                             acquire_hz=load_config().acquire.hz)
+        engine = CoachEngine(
+            voice=Voice(enabled=voice_on, rate=cfg.voice.rate, language=lang),
+            acquire_hz=cfg.acquire.hz)
 
     app = QApplication(sys.argv)
     signal.signal(signal.SIGINT, lambda *_: app.quit())

@@ -62,6 +62,21 @@ def test_current_language_defaults_to_en(tmp_path, monkeypatch):
     assert i18n.current_language() == "en"
 
 
+def test_save_config_roundtrip(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "config_path", lambda: tmp_path / "config.toml")
+    cfg = config.load_config(reload=True)
+    cfg.voice.enabled = False
+    cfg.voice.rate = 200
+    cfg.overlay.scale = 1.3
+    cfg.overlay.x, cfg.overlay.y = 120, 80
+    config.save_config(cfg)
+    fresh = config.load_config(reload=True)
+    assert fresh.voice.enabled is False
+    assert fresh.voice.rate == 200
+    assert fresh.overlay.scale == 1.3
+    assert fresh.overlay.x == 120 and fresh.overlay.y == 80
+
+
 def test_set_language_persists_and_switches(tmp_path, monkeypatch):
     cfgfile = tmp_path / "config.toml"
     monkeypatch.setattr(config, "config_path", lambda: cfgfile)

@@ -92,7 +92,17 @@ _UI: dict[str, dict[str, str]] = {
                        "it": "🎙  Coach vocale (terminale)"},
     "btn.verify_g": {"en": "🔧  Verify G axes", "it": "🔧  Verifica assi G"},
     "btn.get_started": {"en": "✨  Get started", "it": "✨  Come iniziare"},
+    "btn.settings": {"en": "⚙  Settings", "it": "⚙  Impostazioni"},
     "btn.guide": {"en": "❓  Guide — how to use", "it": "❓  Guida — come si usa"},
+    # settings dialog
+    "ui.settings": {"en": "Settings", "it": "Impostazioni"},
+    "set.voice": {"en": "Coach voice", "it": "Voce del coach"},
+    "set.rate": {"en": "Reading speed (wpm)", "it": "Velocità lettura (ppm)"},
+    "set.scale": {"en": "Overlay scale", "it": "Scala overlay"},
+    "set.scale_hint": {"en": "Applies on the next Coach Live start.",
+                       "it": "Attivo al prossimo avvio di Coach Live."},
+    "btn.save": {"en": "Save", "it": "Salva"},
+    "btn.cancel": {"en": "Cancel", "it": "Annulla"},
 }
 
 

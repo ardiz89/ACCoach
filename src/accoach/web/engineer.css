@@ -138,17 +138,20 @@ button.small { padding: 7px 12px; font-size: 13px; margin-top: 8px; }
 .param-label { font-size: 13px; }
 .param-label .note { display: block; color: var(--muted); font-size: 10px; }
 .slots { display: flex; flex-wrap: wrap; gap: 8px; }
-.slot { display: flex; align-items: center; gap: 4px; background: var(--inset); border: 1px solid var(--line); border-radius: 12px; padding: 3px 4px; }
+.slot { display: flex; align-items: center; gap: 6px; background: var(--inset); border: 1px solid var(--line); border-radius: 12px; padding: 3px 4px; outline: none; }
 .slot.changed { border-color: var(--amber); }
+/* Keyboard focus: the whole slot is the spinbutton (tabindex=0). */
+.slot:focus-visible, .slot.focused { border-color: var(--cyan); box-shadow: 0 0 0 2px var(--cyan); }
 .slot .sl { color: var(--muted); font-size: 10px; min-width: 38px; text-align: right; }
 .slot .val { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-weight: 700; min-width: 78px; text-align: center; font-size: 12px; }
 .slot .val .phys { color: var(--muted); font-weight: 400; font-size: 10px; display: block; }
 .slot button {
-  width: 24px; height: 24px; border-radius: 6px; cursor: pointer;
+  width: 33px; height: 33px; border-radius: 8px; cursor: pointer;
   background: var(--panel); color: var(--text); border: 1px solid var(--line);
-  font-size: 15px; line-height: 1; display: flex; align-items: center; justify-content: center;
+  font-size: 19px; font-weight: 700; line-height: 1; display: flex; align-items: center; justify-content: center;
 }
 .slot button:hover { border-color: var(--cyan); color: var(--cyan); }
+.slot button:focus-visible { border-color: var(--cyan); color: var(--cyan); box-shadow: 0 0 0 2px var(--cyan); }
 .slot .delta { color: var(--amber); font-size: 11px; min-width: 30px; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 
 /* Tray */

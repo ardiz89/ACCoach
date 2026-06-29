@@ -43,8 +43,8 @@ class VoiceCfg:
 
 @dataclass
 class OverlayCfg:
-    x: int = 40
-    y: int = 40
+    x: int = -1          # -1 = auto (top-centre); set by dragging in --interactive
+    y: int = -1
     scale: float = 1.0
 
 
@@ -97,8 +97,8 @@ enabled = true       # coach voice on/off
 rate = 165           # reading speed (words/min approx.)
 
 [overlay]
-x = 40               # overlay X position (px from the edge)
-y = 40               # overlay Y position (px from the edge)
+x = -1               # overlay X (px); -1 = auto top-centre (drag it in --interactive)
+y = -1               # overlay Y (px); -1 = auto
 scale = 1.0          # overlay scale factor
 
 [logging]
@@ -140,24 +140,59 @@ def _write_default(path: Path) -> None:
         pass
 
 
-def set_language(lang: str) -> None:
-    """Switch the app language now (updates the cache) and persist it to
-    config.toml, preserving the rest of the file."""
-    import re
+def _to_toml(cfg: Config) -> str:
+    """Serialize the config back to TOML (with comments), deterministically."""
+    b = lambda v: "true" if v else "false"  # noqa: E731
+    return f'''# HONE — user configuration
+# Edit values and restart the app. Missing keys fall back to defaults.
 
-    cfg = load_config()
-    cfg.language = lang
-    path = config_path()
+language = "{cfg.language}"      # app language: "en" | "it" (coach voice + interface)
+
+[server]
+host = "{cfg.server.host}"
+port = {cfg.server.port}
+hz = {cfg.server.hz}
+
+[web]
+port = {cfg.web.port}
+
+[acquire]
+hz = {cfg.acquire.hz}            # telemetry sampling rate (recording fidelity)
+
+[voice]
+enabled = {b(cfg.voice.enabled)}       # coach voice on/off
+rate = {cfg.voice.rate}           # reading speed (words/min approx.)
+
+[overlay]
+x = {cfg.overlay.x}               # overlay X (px); -1 = auto top-centre
+y = {cfg.overlay.y}               # overlay Y (px); -1 = auto
+scale = {cfg.overlay.scale}          # overlay scale factor
+
+[logging]
+level = "{cfg.logging.level}"
+console = {b(cfg.logging.console)}
+
+[data]
+laps_dir = "{cfg.data.laps_dir}"
+'''
+
+
+def save_config(cfg: Config | None = None) -> None:
+    """Persist the (cached) config to config.toml. Best-effort, never fatal."""
+    cfg = cfg or load_config()
     try:
-        text = path.read_text(encoding="utf-8") if path.exists() else _DEFAULT_TOML
-        if re.search(r'(?m)^\s*language\s*=', text):
-            text = re.sub(r'(?m)^\s*language\s*=.*$', f'language = "{lang}"', text, count=1)
-        else:
-            text = f'language = "{lang}"\n' + text
+        path = config_path()
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(text, encoding="utf-8")
+        path.write_text(_to_toml(cfg), encoding="utf-8")
     except OSError:  # pragma: no cover - best-effort persistence
         pass
+
+
+def set_language(lang: str) -> None:
+    """Switch the app language now (updates the cache) and persist it."""
+    cfg = load_config()
+    cfg.language = lang
+    save_config(cfg)
 
 
 def load_config(*, reload: bool = False) -> Config:
