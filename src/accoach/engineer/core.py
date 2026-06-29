@@ -149,7 +149,7 @@ class Decision:
     kind: DecisionKind
     message: str
     change: ProposedChange | None = None
-    confidence: str = ""         # "alta" / "media" on a PROPOSE, else ""
+    confidence: str = ""         # "high" / "medium" on a PROPOSE, else ""
 
 
 # --- the profile contract --------------------------------------------------
@@ -328,7 +328,7 @@ class RaceEngineer:
             if change is not None:
                 self._pending = change
                 self._pending_is_revert = False
-                return Decision(DecisionKind.PROPOSE, change.rationale, change, "alta")
+                return Decision(DecisionKind.PROPOSE, change.rationale, change, "high")
             # Nothing actionable here; treat the phase as done to avoid a stall.
             self.phase_idx += 1
             return Decision(DecisionKind.PHASE_DONE,
@@ -411,8 +411,8 @@ class RaceEngineer:
                    if s.symptom_scores.get(sym, 0.0) >= _SYMPTOM_THRESH)
 
     def _confidence(self, sym: Symptom) -> str:
-        return ("alta" if self._corners(sym) >= 4
-                and _median_score(self.window, sym) >= 0.5 else "media")
+        return ("high" if self._corners(sym) >= 4
+                and _median_score(self.window, sym) >= 0.5 else "medium")
 
     def _dominant_symptom(self, phase: WorkPhase) -> Symptom | None:
         seen: set[Symptom] = set()

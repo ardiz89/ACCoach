@@ -555,7 +555,7 @@ def main(argv: list[str] | None = None) -> None:
     # If a server is already up (e.g. the user opened Analysis earlier), don't try
     # to bind a second one — just open the browser at the requested page.
     if _port_in_use(host, port):
-        print(f"HONE già attivo: apro {url}")
+        print(f"HONE already running: opening {url}")
         webbrowser.open(url)
         return
 

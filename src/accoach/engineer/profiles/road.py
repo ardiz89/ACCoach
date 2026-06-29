@@ -99,7 +99,7 @@ class _BrakeBiasPhase(WorkPhase):
 
 
 ROAD_PROFILE = Profile(
-    name="Stradale",
+    name="Road",
     phases=[
         PressurePhase(30.0, 1.5),                       # wider window, street rubber
         _MechanicalPhase("mechanical", "Mechanical grip", "BOX"),

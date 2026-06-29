@@ -189,7 +189,7 @@ def _open_guide() -> None:
         else:
             subprocess.Popen(["xdg-open", str(path)])
     except Exception as exc:  # pragma: no cover - best-effort
-        print(f"Impossibile aprire la guida ({path}): {exc}")
+        print(f"Cannot open the guide ({path}): {exc}")
 
 
 class Launcher(QWidget):

@@ -82,32 +82,31 @@ _DEFAULT_TOML = """# HONE — user configuration
 language = "en"      # app language: "en" | "it" (coach voice + interface)
 
 [server]
-host = "127.0.0.1"   # interfaccia del backend (lascia 127.0.0.1 per uso locale)
-port = 8777          # porta del WebSocket del coach live
-hz = 15.0            # frequenza di broadcast verso overlay/clients
+host = "127.0.0.1"   # backend interface (keep 127.0.0.1 for local use)
+port = 8777          # live-coach WebSocket port
+hz = 15.0            # broadcast rate to overlay/clients
 
 [web]
-port = 8778          # porta della web app di analisi/ingegnere
+port = 8778          # analysis/engineer web-app port
 
 [acquire]
-hz = 60.0            # frequenza di acquisizione telemetria (fedeltà registrazione)
+hz = 60.0            # telemetry sampling rate (recording fidelity)
 
 [voice]
-enabled = true       # voce del coach attiva
-language = "it"      # lingua preferita della voce (es. "it", "en")
-rate = 165           # velocità di lettura (parole/min circa)
+enabled = true       # coach voice on/off
+rate = 165           # reading speed (words/min approx.)
 
 [overlay]
-x = 40               # posizione X dell'overlay (px dal bordo)
-y = 40               # posizione Y dell'overlay (px dal bordo)
-scale = 1.0          # fattore di scala dell'overlay
+x = 40               # overlay X position (px from the edge)
+y = 40               # overlay Y position (px from the edge)
+scale = 1.0          # overlay scale factor
 
 [logging]
-level = "INFO"       # livello su console: DEBUG | INFO | WARNING | ERROR
-console = true       # mostra i log anche a console (il file è sempre completo)
+level = "INFO"       # console level: DEBUG | INFO | WARNING | ERROR
+console = true       # also show logs on the console (the file is always complete)
 
 [data]
-laps_dir = ""        # cartella dei giri; vuoto = ~/Documents/ACCoach/laps
+laps_dir = ""        # laps folder; empty = ~/Documents/ACCoach/laps
 """
 
 _cache: Config | None = None
@@ -179,7 +178,7 @@ def load_config(*, reload: bool = False) -> Config:
         except Exception:   # noqa: BLE001 - bad TOML must not crash the app
             from .logging_setup import get_logger
             get_logger("config").warning(
-                "config.toml illeggibile, uso i default", exc_info=True
+                "config.toml unreadable, using defaults", exc_info=True
             )
     _cache = cfg
     return cfg

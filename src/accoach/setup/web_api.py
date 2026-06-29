@@ -58,7 +58,7 @@ def _safe(path: str | Path, roots: list[Path]) -> Path:
             return p
         except ValueError:
             continue
-    raise HTTPException(403, "percorso fuori dalle cartelle setup")
+    raise HTTPException(403, "path outside the setup folders")
 
 
 def _resolve_slot(setup, spec, slot) -> tuple[int, str | None]:
@@ -85,10 +85,10 @@ def _apply_changes(setup, changes: list[SetupChange]) -> list[str]:
     for ch in changes:
         spec = setup.spec_by_key(ch.param)
         if spec is None:
-            errors.append(f"parametro sconosciuto: {ch.param}")
+            errors.append(f"unknown parameter: {ch.param}")
             continue
         if not setup.present(spec):
-            errors.append(f"'{ch.param}' non presente in questo setup")
+            errors.append(f"'{ch.param}' not present in this setup")
             continue
         slot, err = _resolve_slot(setup, spec, ch.slot)
         if err:
@@ -140,7 +140,7 @@ def _load(path: Path):
     try:
         return load_any(path)
     except (OSError, ValueError) as e:
-        raise HTTPException(404, f"setup illeggibile: {e}")
+        raise HTTPException(404, f"setup unreadable: {e}")
 
 
 # --- registration ----------------------------------------------------------
@@ -203,7 +203,7 @@ def register_setup_routes(app: FastAPI, root=DEFAULT_ROOTS) -> None:
     @app.post("/api/setup/apply")
     def setup_apply(body: ApplyBody) -> dict:
         if not body.confirm:
-            raise HTTPException(400, "conferma richiesta (confirm=true)")
+            raise HTTPException(400, "confirmation required (confirm=true)")
         p = _safe(body.path, roots)
         before = _load(p)
         after = before.copy()
@@ -225,7 +225,7 @@ def register_setup_routes(app: FastAPI, root=DEFAULT_ROOTS) -> None:
     def setup_undo(body: UndoBody) -> dict:
         p = _safe(body.path, roots)
         if latest_backup(p) is None:
-            raise HTTPException(404, "nessun backup disponibile")
+            raise HTTPException(404, "no backup available")
         from .store import undo as _undo
         _undo(p)
         return {"ok": True, "path": str(p)}

@@ -100,7 +100,7 @@ def save(
     if dest.exists():
         if not overwrite:
             raise FileExistsError(
-                f"{dest.name} esiste già (usa overwrite=True o un nome nuovo)"
+                f"{dest.name} already exists (use overwrite=True or a new name)"
             )
         backup(dest)
     write_atomic(dest, setup.to_text())
@@ -112,7 +112,7 @@ def undo(path: Path | str) -> Path:
     path = Path(path)
     bak = latest_backup(path)
     if bak is None:
-        raise FileNotFoundError(f"nessun backup per {path.name}")
+        raise FileNotFoundError(f"no backup for {path.name}")
     write_atomic(path, bak.read_text(encoding="utf-8"))
     return path
 

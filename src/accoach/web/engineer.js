@@ -38,7 +38,7 @@ async function loadCombos() {
     return;
   }
   // Group the (potentially many) cars by engineer class for a usable dropdown.
-  const groups = { GT3: [], Formula: [], Stradale: [] };
+  const groups = { GT3: [], Formula: [], Road: [] };
   for (const c of combos) groups[classOf(c.car)].push(c);
   for (const [cls, items] of Object.entries(groups)) {
     if (!items.length) continue;
@@ -63,7 +63,7 @@ function classOf(car) {
                    "rss_formula", "lotus_98t", "lotus_exos"];
   if (formula.some((m) => k.includes(m))) return "Formula";
   if (["gt3", "gt4", "gt2", "gte", "gt_"].some((m) => k.includes(m))) return "GT3";
-  return "Stradale";
+  return "Road";
 }
 
 async function onComboChange() {
@@ -333,7 +333,7 @@ async function confirmWrite() {
     await onComboChange();              // refresh setup list (new file appears)
     showToast("✓ " + res.reload_hint);
   } catch (e) {
-    showModalError(e.message.includes("esiste già")
+    showModalError(e.message.includes("already exists")
       ? "A setup with this name already exists — choose another."
       : "Write error: " + e.message);
   }
@@ -472,8 +472,8 @@ function renderEngineer(st) {
     const cz = Array.isArray(eng.corners) && eng.corners.length
       ? "Corners " + eng.corners.join(", ") : "";
     $("es-cat").textContent = cz;
-    conf.hidden = false; conf.textContent = eng.confidence || "media";
-    conf.dataset.c = eng.confidence || "media";
+    conf.hidden = false; conf.textContent = eng.confidence || "medium";
+    conf.dataset.c = eng.confidence || "medium";
     prep.hidden = false;
     prep.onclick = () => prepareChange(eng.change);
     says.classList.add("active");

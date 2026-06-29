@@ -18,7 +18,7 @@ from .profiles import FORMULA_PROFILE, GT3_PROFILE, ROAD_PROFILE
 class CarClass(Enum):
     GT3 = "GT3"
     FORMULA = "Formula"
-    ROAD = "Stradale"
+    ROAD = "Road"
 
 
 # Substring markers (matched against the lowercased model id), most specific

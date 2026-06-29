@@ -24,6 +24,24 @@ def test_cue_text_translates_numeric_templates():
     assert i18n.cue_text("Benzina per circa 2 giri.", "en") == "Fuel for about 2 laps."
 
 
+def test_cue_text_translates_advisor_aids():
+    assert i18n.cue_text(
+        "Pattini in uscita in più punti del giro: prova ad alzare il TC (dal 4 al 5).",
+        "en") == "Spinning up on exit in several places: try raising the TC (from 4 to 5)."
+    assert i18n.cue_text(
+        "Blocchi l'anteriore in più curve: prova ad alzare l'ABS.", "en") == \
+        "Locking the fronts in several corners: try raising the ABS."
+
+
+def test_cue_text_translates_pressure_and_temp():
+    assert i18n.cue_text(
+        "Gomme anteriori a 29.5 psi, troppo alte: cala circa 2.0 psi a freddo.",
+        "en") == "Front tyres at 29.5 psi, too high: drop about 2.0 psi cold."
+    assert i18n.cue_text(
+        "Gomme fredde (60°C): puoi spingere di più per portarle in temperatura.",
+        "en") == "Tyres cold (60°C): push harder to bring them up to temperature."
+
+
 def test_cue_text_unknown_passes_through():
     assert i18n.cue_text("frase sconosciuta", "en") == "frase sconosciuta"
 

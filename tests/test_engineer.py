@@ -199,7 +199,7 @@ def test_single_corner_symptom_is_not_setup():
 def test_proposal_carries_confidence():
     eng = _eng()
     d = _drive_to_aero(eng, Symptom(U, AP, HI), 0.6)   # corners=4, score 0.6
-    assert d.confidence == "alta"
+    assert d.confidence == "high"
 
 
 def test_plateau_reverts_instead_of_drifting():

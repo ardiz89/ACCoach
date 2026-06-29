@@ -52,7 +52,7 @@ def corner_name(track: str, index: int, apex_pos: float) -> str:
         name, pos = min(table, key=lambda t: abs(t[1] - apex_pos))
         if abs(pos - apex_pos) <= _NAME_TOL:
             return name
-    return f"Curva {index + 1}"
+    return f"Corner {index + 1}"
 
 
 def name_corners(track: str, corners) -> list[str]:

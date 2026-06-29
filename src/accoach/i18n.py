@@ -56,6 +56,11 @@ _CUE_EN: dict[str, str] = {
     "Sei sul limitatore, cambia prima": "On the limiter — shift earlier",
     "Marcia troppo lunga, scala per avere più spinta":
         "Gear too tall — drop one for more drive",
+    # advisor.py (brake-bias, static)
+    "Blocchi l'anteriore in più curve e l'ABS è già alto: "
+    "prova a spostare il bilanciamento freni verso il posteriore.":
+        "Locking the fronts in several corners and ABS is already high: "
+        "try moving brake bias rearward.",
     # analyzer.py (corner cues)
     "Bel tratto, continua così": "Good through there, keep it up",
     "Puoi frenare più tardi": "You can brake later",
@@ -66,10 +71,41 @@ _CUE_EN: dict[str, str] = {
     "Ultimo giro di benzina, rientra ai box!": "Last lap of fuel — box now!",
 }
 
-# Numeric cue templates (f-strings in the detectors) → English, by regex.
-_CUE_EN_PATTERNS: list[tuple[re.Pattern, str]] = [
+def _axle_en(it: str) -> str:
+    return "Front" if it == "anteriori" else "Rear"
+
+
+# Templated cues (f-strings in the detectors) → English. ``repl`` is either a
+# regex replacement string or a callable(match) -> str for cases that remap words.
+_CUE_EN_PATTERNS: list[tuple[re.Pattern, object]] = [
+    # analyzer.py / fuel.py
     (re.compile(r"^Stai perdendo (\d+) decimi qui$"), r"Losing \1 tenths here"),
     (re.compile(r"^Benzina per circa (\d+) giri\.$"), r"Fuel for about \1 laps."),
+    # advisor.py — ABS / TC, with or without the "(dal N al N+1)" detail
+    (re.compile(r"^Blocchi l'anteriore in più curve: prova ad alzare l'ABS"
+                r"(?: \(dal (\d+) al (\d+)\))?\.$"),
+     lambda m: ("Locking the fronts in several corners: try raising the ABS"
+                + (f" (from {m.group(1)} to {m.group(2)})." if m.group(1) else "."))),
+    (re.compile(r"^Pattini in uscita in più punti del giro: prova ad alzare il TC"
+                r"(?: \(dal (\d+) al (\d+)\))?\.$"),
+     lambda m: ("Spinning up on exit in several places: try raising the TC"
+                + (f" (from {m.group(1)} to {m.group(2)})." if m.group(1) else "."))),
+    # pressure.py
+    (re.compile(r"^Gomme (anteriori|posteriori) a ([\d.]+) psi, troppo alte: "
+                r"cala circa ([\d.]+) psi a freddo\.$"),
+     lambda m: f"{_axle_en(m.group(1))} tyres at {m.group(2)} psi, too high: "
+               f"drop about {m.group(3)} psi cold."),
+    (re.compile(r"^Gomme (anteriori|posteriori) a ([\d.]+) psi, troppo basse: "
+                r"alza circa ([\d.]+) psi a freddo\.$"),
+     lambda m: f"{_axle_en(m.group(1))} tyres at {m.group(2)} psi, too low: "
+               f"add about {m.group(3)} psi cold."),
+    # tyretemp.py
+    (re.compile(r"^Gomme troppo calde \((\d+)°C\): stai forzando, "
+                r"cerca di essere più fluido\.$"),
+     lambda m: f"Tyres too hot ({m.group(1)}°C): you're overdriving — be smoother."),
+    (re.compile(r"^Gomme fredde \((\d+)°C\): puoi spingere di più "
+                r"per portarle in temperatura\.$"),
+     lambda m: f"Tyres cold ({m.group(1)}°C): push harder to bring them up to temperature."),
 ]
 
 
@@ -86,5 +122,5 @@ def cue_text(italian: str, lang: str | None = None) -> str:
     for pat, repl in _CUE_EN_PATTERNS:
         m = pat.match(italian)
         if m:
-            return pat.sub(repl, italian)
+            return repl(m) if callable(repl) else pat.sub(repl, italian)
     return italian

@@ -23,7 +23,7 @@
   background: var(--inset); border: 1px solid var(--cyan); color: var(--cyan);
 }
 .class-chip[data-cls="Formula"] { border-color: var(--amber); color: var(--amber); }
-.class-chip[data-cls="Stradale"] { border-color: var(--green); color: var(--green); }
+.class-chip[data-cls="Road"] { border-color: var(--green); color: var(--green); }
 
 .eng-profile {
   border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px;
@@ -64,9 +64,9 @@
 .es-msg { font-size: 17px; font-weight: 600; margin: 4px 0; }
 .es-cat { color: var(--cyan); font-size: 12px; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 .conf { font-size: 11px; font-weight: 700; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
-.conf[data-c="alta"] { color: var(--green); border-color: var(--green); }
-.conf[data-c="media"] { color: var(--amber); border-color: var(--amber); }
-.conf[data-c="bassa"] { color: var(--red); border-color: var(--red); }
+.conf[data-c="high"] { color: var(--green); border-color: var(--green); }
+.conf[data-c="medium"] { color: var(--amber); border-color: var(--amber); }
+.conf[data-c="low"] { color: var(--red); border-color: var(--red); }
 button.small { padding: 7px 12px; font-size: 13px; margin-top: 8px; }
 
 /* Tyres panel — 2×2 grid in wheel order (FL FR / RL RR). */
