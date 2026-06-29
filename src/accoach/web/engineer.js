@@ -79,7 +79,7 @@ async function onComboChange() {
   const opt = $("combo").selectedOptions[0];
   if (!opt || !opt.dataset.car) return;
   state.car = opt.dataset.car; state.track = opt.dataset.track;
-  loadClass(state.car);
+  await loadClass(state.car);   // sets state.alVolo before the setup renders
   const list = await api(`/api/setup/list?car=${encodeURIComponent(state.car)}` +
                          `&track=${encodeURIComponent(state.track)}`);
   const sel = $("setup");
@@ -104,6 +104,9 @@ async function loadClass(car) {
   $("prof-phases").textContent = info.profile.phases.join(" → ");
   $("prof-alvolo").textContent = info.profile.al_volo.join(", ");
   $("eng-profile").hidden = false;
+  // Remember which adjustments are tweakable on track (vs pit-only) so the
+  // editor can badge them — the rest only take effect when you reload at the box.
+  state.alVolo = (info.profile.al_volo || []).map((s) => s.toLowerCase());
 }
 
 // Shown when a car/track has no setup files at all — explain where HONE looks
@@ -145,12 +148,32 @@ function renderSetup(data) {
   }
 }
 
+// A parameter is "al volo" (adjustable on track, no pit stop) when its group or
+// label is in the active profile's al-volo set — typically brake bias, TC, ABS,
+// engine map. Everything else only takes effect after reloading the setup at the
+// box, so the badge tells the driver which levers they can also pull live.
+function isAlVolo(p) {
+  const av = state.alVolo || [];
+  const g = (p.group || "").toLowerCase(), l = (p.label || "").toLowerCase();
+  return av.some((a) =>
+    a === g || a === l ||
+    // short electronic codes ("tc") should also catch their numbered slots ("tc1", "tc2")
+    (l.startsWith(a) && /^\d/.test(l.slice(a.length))));
+}
+
 function renderParam(p) {
   const row = document.createElement("div");
   row.className = "param";
   const label = document.createElement("div");
   label.className = "param-label";
   label.innerHTML = `${p.label}${p.note ? `<span class="note">${p.note}</span>` : ""}`;
+  if (isAlVolo(p)) {
+    const tag = document.createElement("span");
+    tag.className = "av-tag";
+    tag.textContent = t("eng.alvoloTag");
+    tag.title = t("eng.alvoloHint");
+    label.appendChild(tag);
+  }
   row.appendChild(label);
 
   const slots = document.createElement("div");

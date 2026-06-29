@@ -243,6 +243,9 @@
                            it: `Il parametro proposto non è in questo setup.` },
 
     "eng.click":       { en: `click`, it: `click` },
+    "eng.alvoloTag":   { en: `live`, it: `al volo` },
+    "eng.alvoloHint":  { en: `Adjustable on track without pitting (the rest take effect after reloading the setup at the box).`,
+                         it: `Regolabile in pista senza rientrare ai box (gli altri hanno effetto ricaricando il setup ai box).` },
     "eng.previewErr":  { en: `Preview error: `, it: `Errore anteprima: ` },
     "eng.enterName":   { en: `Enter a file name.`, it: `Inserisci un nome file.` },
     "eng.exists":      { en: `A setup with this name already exists — choose another.`,

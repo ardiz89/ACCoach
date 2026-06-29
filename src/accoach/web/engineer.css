@@ -137,6 +137,13 @@ button.small { padding: 7px 12px; font-size: 13px; margin-top: 8px; }
 .param:last-child { border-bottom: none; }
 .param-label { font-size: 13px; }
 .param-label .note { display: block; color: var(--muted); font-size: 10px; }
+/* "al volo" badge: this lever is adjustable on track (brake bias, TC, ABS, map). */
+.av-tag {
+  display: inline-block; margin-left: 6px; vertical-align: middle;
+  font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+  color: var(--green); border: 1px solid var(--green); border-radius: 999px;
+  padding: 0 6px; cursor: help;
+}
 .slots { display: flex; flex-wrap: wrap; gap: 8px; }
 .slot { display: flex; align-items: center; gap: 6px; background: var(--inset); border: 1px solid var(--line); border-radius: 12px; padding: 3px 4px; outline: none; }
 .slot.changed { border-color: var(--amber); }
