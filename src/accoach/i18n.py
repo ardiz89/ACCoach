@@ -120,6 +120,8 @@ _UI: dict[str, dict[str, str]] = {
     # settings dialog
     "ui.settings": {"en": "Settings", "it": "Impostazioni"},
     "set.voice": {"en": "Coach voice", "it": "Voce del coach"},
+    "set.engineer_voice": {"en": "Speak engineer proposals",
+                           "it": "Annuncia proposte ingegnere"},
     "set.rate": {"en": "Reading speed (wpm)", "it": "Velocità lettura (ppm)"},
     "set.scale": {"en": "Overlay scale", "it": "Scala overlay"},
     "set.scale_hint": {"en": "Applies on the next Coach Live start.",

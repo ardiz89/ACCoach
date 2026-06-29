@@ -130,7 +130,8 @@ def main(argv: list[str] | None = None) -> None:
     cfg = load_config()
     voice = Voice(enabled=(not silent) and cfg.voice.enabled,
                   rate=cfg.voice.rate, language=cfg.language)
-    engine = CoachEngine(voice=voice, acquire_hz=cfg.acquire.hz)
+    engine = CoachEngine(voice=voice, acquire_hz=cfg.acquire.hz,
+                         engineer_voice=cfg.voice.engineer)
 
     try:
         with Live(_render(TelemetrySnapshot.disconnected(), None, [], 0, voice.is_audio),

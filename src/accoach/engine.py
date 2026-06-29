@@ -39,7 +39,7 @@ from .coaching.cue import CueCategory
 from .coaching.debrief import build_lap_debrief
 from .coaching.diagnosis import build_lap_stats
 from .coaching.focus import FocusCoach, FocusReport
-from .i18n import cue_text
+from .i18n import cue_text, current_language
 from .comparison import DeltaState, LapComparator, Reference
 from .engineer import RaceEngineer, engineer_for
 from .recording import DEFAULT_LAPS_DIR, Lap, LapRecorder, find_reference_lap, save_lap
@@ -61,6 +61,35 @@ _GATE_DELTA_MS = 3000.0
 _SAFETY_CATEGORIES = {
     CueCategory.LOCKED, CueCategory.WHEELSPIN, CueCategory.FUEL,
 }
+
+# A spoken alert prefix for an engineer proposal, by confidence-tone × tag ×
+# language. The proposal's rationale (already localized) follows it; the prefix
+# tells the driver *whether* it needs the garage (BOX) or can be dialled at the
+# wheel (AV). A medium-confidence proposal gets a tentative wording so the tone
+# itself signals how much to trust it — the advice still reaches the ear, the
+# screen still shows the click count, but the voice doesn't oversell a guess.
+_ENG_VOICE_PREFIX = {
+    "firm": {
+        "BOX": {"it": "Ingegnere: rientra ai box.",
+                "en": "Engineer: box this lap."},
+        "AV": {"it": "Ingegnere: puoi farlo al volo.",
+               "en": "Engineer: you can do this at the wheel."},
+    },
+    "tentative": {
+        "BOX": {"it": "Ingegnere, da valutare ai box:",
+                "en": "Engineer, worth trying in the box:"},
+        "AV": {"it": "Ingegnere, da valutare al volo:",
+               "en": "Engineer, worth trying at the wheel:"},
+    },
+}
+
+
+def _voice_clean(text: str) -> str:
+    """Trim a rationale for speech: drop the trailing click parenthetical (e.g.
+    ' (−1)') that SAPI5 reads awkwardly — the direction word ('più morbida',
+    'meno') already conveys it; the exact click count stays on screen."""
+    import re  # noqa: PLC0415 (local: keeps the hot-path import list lean)
+    return re.sub(r"\s*\([+\-−–]?\d+\)\s*$", "", text).strip()
 
 
 @dataclass(slots=True)
@@ -96,9 +125,13 @@ class CoachEngine:
         laps_dir: Path | str = DEFAULT_LAPS_DIR,
         feed: TelemetryFeed | None = None,
         acquire_hz: float | None = None,
+        engineer_voice: bool = True,
     ) -> None:
         self.reader = reader if reader is not None else SharedMemoryReader()
         self.voice = voice
+        # Whether to speak the race engineer's proposals (the per-cue coaching
+        # voice is governed by ``voice`` itself; this gates only the engineer).
+        self.engineer_voice = engineer_voice
         self.laps_dir = laps_dir
         self.recorder = LapRecorder()   # used only on the legacy inline path
 
@@ -138,6 +171,10 @@ class CoachEngine:
         # at each completed lap, surfaces its latest decision in the payload.
         self._engineer: RaceEngineer | None = None
         self._engineer_decision = None
+        # Signature of the last proposal spoken aloud, so a proposal that the
+        # engine re-emits every lap (until the driver applies it) is announced
+        # once, not on a loop. Reset when the engineer is rebuilt.
+        self._engineer_spoken_sig: tuple | None = None
 
         # Focus/Lesson coach: the driver's twin of the engineer. Fed a per-lap
         # debrief (vs the reference), it picks one recurring weakness at a time and
@@ -176,12 +213,40 @@ class CoachEngine:
         if self._engineer is not None:
             stats = build_lap_stats(lap, self._corners or None)
             self._engineer_decision = self._engineer.observe(stats)
+            self._announce_engineer(self._engineer_decision)
 
         # The Focus coach needs a reference to know where time was lost.
         if self._focus is not None and self._reference is not None and self._corners:
             debrief = build_lap_debrief(lap, self._reference, self._corners)
             stable = lap.valid and lap.clean is not False
             self._focus_report = self._focus.observe(debrief, stable=stable)
+
+    def _announce_engineer(self, decision) -> None:
+        """Speak a brief alert when the engineer wants a setup change.
+
+        Fires on any decision that carries a change to write — a new PROPOSE or a
+        REVERTED (restore). Only proposals are spoken (COLLECT / EVALUATING /
+        ACCEPTED / PHASE_DONE / DONE carry no change), and each distinct proposal
+        is announced once: the engine re-emits the same PROPOSE every lap until the
+        driver applies it, but :attr:`_engineer_spoken_sig` suppresses the repeat.
+        The detailed parameter + click count stays on the Engineer page; the voice
+        gives just the headline so it doesn't step on live driving cues."""
+        if (not self.engineer_voice or self.voice is None
+                or decision is None or decision.change is None):
+            return
+        rationale = decision.change.rationale or ""
+        sig = (decision.kind.value, rationale)
+        if sig == self._engineer_spoken_sig:
+            return
+        self._engineer_spoken_sig = sig
+        lang = current_language()
+        # Medium-confidence proposals are voiced tentatively; a high-confidence
+        # proposal or a revert (confidence "") gets the firm wording.
+        tone = "tentative" if decision.confidence == "medium" else "firm"
+        by_tag = _ENG_VOICE_PREFIX[tone]
+        prefixes = by_tag.get(decision.change.tag) or by_tag["BOX"]
+        prefix = prefixes.get(lang) or prefixes["en"]
+        self.voice.say(f"{prefix} {_voice_clean(rationale)}")
 
     def _engineer_block(self) -> dict | None:
         """The latest engineer decision, in the shape the setup UI consumes."""
@@ -245,6 +310,7 @@ class CoachEngine:
             # A new car/track is a new setup problem: start a fresh engineer.
             self._engineer = engineer_for(snap.car_model, snap.track)
             self._engineer_decision = None
+            self._engineer_spoken_sig = None
             # …and a fresh lesson plan for the driver.
             self._focus = FocusCoach()
             self._focus_report = None

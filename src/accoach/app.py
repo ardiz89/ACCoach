@@ -56,7 +56,7 @@ def main(argv: list[str] | None = None) -> None:
     else:
         engine = CoachEngine(
             voice=Voice(enabled=voice_on, rate=cfg.voice.rate, language=lang),
-            acquire_hz=cfg.acquire.hz)
+            acquire_hz=cfg.acquire.hz, engineer_voice=cfg.voice.engineer)
 
     app = QApplication(sys.argv)
     signal.signal(signal.SIGINT, lambda *_: app.quit())
