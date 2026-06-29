@@ -154,6 +154,39 @@ def test_no_pro_lap_returns_none(tmp_path):
         assert cat.fastest_pro_path("ferrari_488_gt3", "monza") is None
 
 
+def test_busy_timeout_is_set(tmp_path):
+    # C3: a busy_timeout must be set so two writers (feed + reader) wait instead of
+    # failing immediately with "database is locked".
+    with LapCatalog(_catalog_path(tmp_path)) as cat:
+        bt = cat._conn.execute("PRAGMA busy_timeout").fetchone()[0]
+        assert bt >= 1000
+
+
+def test_migration_rebuilds_unversioned_legacy_table(tmp_path):
+    # C4: a legacy catalog with a lap table but no db_version must be rebuilt, or
+    # every upsert fails forever on the missing newer columns (source/clean).
+    import sqlite3
+    save_lap(synth.build_lap(n=10), tmp_path)            # a real lap to index
+    db = _catalog_path(tmp_path)
+    for suffix in ("", "-wal", "-shm"):
+        p = db.parent / (db.name + suffix)
+        p.unlink(missing_ok=True)
+    con = sqlite3.connect(str(db))                       # forge a legacy catalog
+    con.execute(
+        "CREATE TABLE lap (lap_id INTEGER PRIMARY KEY, path TEXT UNIQUE, "
+        "car_key TEXT, track_key TEXT, car_model TEXT, track TEXT, session INTEGER, "
+        "lap_time_ms INTEGER, valid INTEGER, recorded_utc TEXT, "
+        "sample_count INTEGER, schema_version INTEGER)")
+    con.execute("CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT)")
+    con.commit()
+    con.close()
+    with LapCatalog(db) as cat:
+        cols = {r["name"] for r in cat._conn.execute("PRAGMA table_info(lap)")}
+        assert {"source", "clean"}.issubset(cols)        # table was rebuilt
+        cat.sync(list_lap_files(tmp_path))               # upsert now succeeds
+        assert cat.fastest_valid_path("ferrari_488_gt3", "monza") is not None
+
+
 def test_upsert_is_idempotent(tmp_path):
     save_lap(synth.build_lap(n=10), tmp_path)
     path = list_lap_files(tmp_path)[0]

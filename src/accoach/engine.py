@@ -17,6 +17,7 @@ with scripted snapshots and no audio.
 
 from __future__ import annotations
 
+import threading
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -135,6 +136,13 @@ class CoachEngine:
         self._focus: FocusCoach | None = None
         self._focus_report: FocusReport | None = None
 
+        # Commands from other threads (e.g. the server's POST /engineer/applied,
+        # which runs on the asyncio loop while tick() runs in an executor) are
+        # queued here and drained on the tick thread — never applied inline — so
+        # they can't race _observe_lap, which also mutates the engineer.
+        self._cmd_lock = threading.Lock()
+        self._applied_pending = False
+
     def _rebuild_reference(self, car: str, track: str) -> None:
         self._reference = _load_reference(car, track, self.laps_dir)
         self._comparator = LapComparator(self._reference) if self._reference else None
@@ -201,9 +209,12 @@ class CoachEngine:
         }
 
     def mark_setup_applied(self) -> None:
-        """Tell the engineer the proposed setup change was written (start re-test)."""
-        if self._engineer is not None:
-            self._engineer.mark_applied()
+        """Request that the engineer mark its proposal applied. Thread-safe: only
+        sets a flag here; the actual mutation runs on the tick thread (drained in
+        :meth:`tick`), so it can't race :meth:`_observe_lap`, which also touches
+        the engineer."""
+        with self._cmd_lock:
+            self._applied_pending = True
 
     def tick(self, now: float) -> EngineState:
         if self._feed is not None:
@@ -224,6 +235,13 @@ class CoachEngine:
             # …and a fresh lesson plan for the driver.
             self._focus = FocusCoach()
             self._focus_report = None
+
+        # Drain cross-thread commands on this (the engine's) thread.
+        with self._cmd_lock:
+            apply_setup = self._applied_pending
+            self._applied_pending = False
+        if apply_setup and self._engineer is not None:
+            self._engineer.mark_applied()
 
         if self._feed is None:
             lap = self.recorder.update(snap)

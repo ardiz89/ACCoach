@@ -238,6 +238,7 @@ class RaceEngineer:
         self.history: list[ProposedChange] = []      # accepted changes
         self.applied_clicks: dict[str, int] = {}     # net clicks per parameter
         self._pending: ProposedChange | None = None  # proposed, awaiting mark_applied
+        self._pending_is_revert = False              # the pending change is a restore
 
     # -- public API --------------------------------------------------------
     @property
@@ -263,8 +264,18 @@ class RaceEngineer:
         return self._advance()
 
     def mark_applied(self) -> None:
-        """Tell the engine the last PROPOSE was written to the setup."""
+        """Tell the engine the last PROPOSE (or revert) was written to the setup."""
         if self._pending is None:
+            return
+        if self._pending_is_revert:
+            # The driver restored the previous setup. Don't evaluate the revert or
+            # bank it: the bad change was never recorded, so undoing it must not
+            # touch the click budget. Just resume collecting fresh laps so the next
+            # remedy's baseline is measured on the restored setup, not the bad one.
+            self.active = None
+            self.window = []
+            self._pending = None
+            self._pending_is_revert = False
             return
         sym = self._pending.symptom
         self.active = _Active(
@@ -277,6 +288,20 @@ class RaceEngineer:
         # verdict is measured only on post-change laps.
         self.window = []
         self._pending = None
+
+    def _revert(self, change: ProposedChange, message: str) -> Decision:
+        """Reject a change: propose its reversal AND hold it as a *pending revert*.
+
+        Resets the window so the engine returns to COLLECT — it won't propose the
+        next remedy until the driver has applied the restore and driven fresh laps,
+        and the next baseline is measured on the restored setup, not on the
+        rejected one. :meth:`mark_applied` recognises the revert and just
+        acknowledges it (no re-test cycle, no click-budget change)."""
+        rev = change.reversed()
+        self._pending = rev
+        self._pending_is_revert = True
+        self.window = []
+        return Decision(DecisionKind.REVERTED, message, rev)
 
     # -- internals ---------------------------------------------------------
     def _advance(self) -> Decision:
@@ -299,6 +324,7 @@ class RaceEngineer:
             change = self._pressure_remedy(phase)
             if change is not None:
                 self._pending = change
+                self._pending_is_revert = False
                 return Decision(DecisionKind.PROPOSE, change.rationale, change, "alta")
             # Nothing actionable here; treat the phase as done to avoid a stall.
             self.phase_idx += 1
@@ -312,6 +338,7 @@ class RaceEngineer:
                             f"'{symptom}': rimedi di setup esauriti — probabile "
                             f"questione di guida.")
         self._pending = change
+        self._pending_is_revert = False
         return Decision(DecisionKind.PROPOSE, change.rationale, change,
                         self._confidence(symptom))
 
@@ -335,9 +362,8 @@ class RaceEngineer:
         # lap time alone and let the phase gate re-check the real target.
         if a.symptom is None:
             if not band_ok:
-                return Decision(DecisionKind.REVERTED,
-                                "La modifica ha peggiorato il tempo: ripristino.",
-                                a.change.reversed())
+                return self._revert(a.change,
+                                    "La modifica ha peggiorato il tempo: ripristino.")
             self._record(a.change)
             return Decision(DecisionKind.ACCEPTED, "Modifica applicata, proseguo.")
 
@@ -359,9 +385,9 @@ class RaceEngineer:
         self.remedy_idx[a.symptom] = self.remedy_idx.get(a.symptom, 0) + 1
         reason = ("Modifica peggiorativa" if not band_ok or d_score > _EPS_SCORE
                   else "Nessun effetto misurabile")
-        return Decision(DecisionKind.REVERTED,
-                        f"{reason}: ripristino e provo un'altra leva per "
-                        f"'{a.symptom}'.", a.change.reversed())
+        return self._revert(a.change,
+                            f"{reason}: ripristino e provo un'altra leva per "
+                            f"'{a.symptom}'.")
 
     # -- symptom selection with safety gates -------------------------------
     def _corners(self, sym: Symptom) -> int:

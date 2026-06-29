@@ -168,6 +168,36 @@ def test_import_reference_seeds_a_clean_reference(tmp_path):
     assert ref.source == "pro"                              # …and a PRO benchmark
 
 
+def test_mark_setup_applied_is_deferred_to_tick(tmp_path):
+    # C2: mark_setup_applied (called from another thread) must NOT mutate the
+    # engineer inline; it's drained on the tick thread instead.
+    class _RecEngineer:
+        def __init__(self):
+            self.applied = 0
+
+        def observe(self, stats):
+            return None
+
+        def mark_applied(self):
+            self.applied += 1
+
+    class _DeadReader:
+        def read(self):
+            return TelemetrySnapshot.disconnected()
+
+        def close(self):
+            pass
+
+    eng = CoachEngine(reader=_DeadReader(), laps_dir=tmp_path)
+    rec = _RecEngineer()
+    eng._engineer = rec
+    eng.mark_setup_applied()              # from "another thread"
+    assert rec.applied == 0               # not applied inline
+    eng.tick(0.0)                         # drained on the tick thread
+    assert rec.applied == 1
+    eng.close()
+
+
 def test_engine_surfaces_engineer_block(tmp_path):
     frames = _full_lap_frames()
     eng = CoachEngine(reader=_ScriptedReader(frames), laps_dir=tmp_path)

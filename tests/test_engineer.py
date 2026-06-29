@@ -108,6 +108,41 @@ def test_rejects_change_that_worsens_lap_time():
     assert eng.remedy_idx[sym] == 1
 
 
+def test_revert_is_pending_and_mark_applied_resets():
+    # C1: a rejected change must be held as a pending revert so mark_applied isn't
+    # a no-op, and applying it resets the window without touching the click budget.
+    eng = _eng()
+    sym = Symptom(O, EX, HI)
+    _drive_to_aero(eng, sym, 0.6)
+    eng.mark_applied()
+    d = None
+    for _ in range(3):
+        d = eng.observe(_lap(time_ms=101000, symptom=sym, score=0.6))
+    assert d.kind is DecisionKind.REVERTED
+    assert eng._pending is not None            # the restore is pending, not lost
+    clicks_before = dict(eng.applied_clicks)
+    eng.mark_applied()                          # driver restores the setup
+    assert eng.active is None
+    assert eng._pending is None
+    assert eng.window == []                     # fresh baseline for the next remedy
+    assert eng.applied_clicks == clicks_before  # a revert must not move the budget
+    assert not eng.history                      # nothing banked on a rejected change
+
+
+def test_no_premature_proposal_after_revert():
+    # C1: after a revert the engine must COLLECT fresh laps, not jump straight to a
+    # new proposal measured on the rejected-setup laps.
+    eng = _eng()
+    sym = Symptom(O, EX, HI)
+    _drive_to_aero(eng, sym, 0.6)
+    eng.mark_applied()
+    for _ in range(3):
+        eng.observe(_lap(time_ms=101000, symptom=sym, score=0.6))   # -> REVERTED
+    eng.mark_applied()                          # restore applied
+    d = eng.observe(_lap(symptom=sym, score=0.6))
+    assert d.kind is DecisionKind.COLLECT       # window was reset
+
+
 def test_converges_to_done_when_clean():
     eng = _eng()
     last = None

@@ -98,23 +98,43 @@ class LapCatalog:
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._conn = sqlite3.connect(str(self.db_path))
-        self._conn.row_factory = sqlite3.Row
-        self._conn.execute("PRAGMA journal_mode=WAL")
-        self._conn.executescript(_SCHEMA)
-        self._migrate()
-        self._conn.commit()
+        try:
+            self._conn.row_factory = sqlite3.Row
+            self._conn.execute("PRAGMA journal_mode=WAL")
+            # WAL allows one writer at a time; the feed thread (save_lap→upsert) and
+            # a reader thread (find_reference→sync) can collide. Wait instead of
+            # failing immediately with "database is locked".
+            self._conn.execute("PRAGMA busy_timeout=3000")
+            # Migrate BEFORE creating the schema: a stale/legacy lap table must be
+            # dropped first, otherwise the indexes in _SCHEMA fail referencing
+            # columns the old table lacks (e.g. clean/source).
+            self._migrate()
+            self._conn.executescript(_SCHEMA)
+            self._conn.commit()
+        except Exception:
+            # Don't leak the connection (and its -wal/-shm locks on Windows) if
+            # setup fails before __enter__ — the caller's `with` never runs __exit__.
+            self._conn.close()
+            raise
 
     def _migrate(self) -> None:
-        """The catalog is a rebuildable cache: on an older schema, drop the lap
-        table and recreate it (``sync`` re-indexes from the files). Cheap and
-        avoids fragile ALTER TABLE chains."""
+        """The catalog is a rebuildable cache: drop a stale/legacy lap table so the
+        schema can be (re)created cleanly. Runs BEFORE _SCHEMA, so indexes that
+        reference newer columns never hit an old table. ``sync`` re-indexes the
+        files afterwards. Cheap and avoids fragile ALTER TABLE chains."""
+        self._conn.execute(
+            "CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT)")
         row = self._conn.execute(
             "SELECT value FROM meta WHERE key = 'db_version'"
         ).fetchone()
         version = int(row["value"]) if row else None
-        if version is not None and version < _DB_VERSION:
+        # A legacy lap table that exists but is missing newer columns (no
+        # db_version recorded) must be rebuilt too — otherwise every upsert fails
+        # forever. A brand-new DB has no lap table yet (cols empty → not stale).
+        cols = {r["name"] for r in self._conn.execute("PRAGMA table_info(lap)")}
+        stale = bool(cols) and not {"source", "clean"}.issubset(cols)
+        if (version is not None and version < _DB_VERSION) or stale:
             self._conn.execute("DROP TABLE IF EXISTS lap")
-            self._conn.executescript(_SCHEMA)   # recreate lap + indexes
         self._conn.execute(
             "INSERT OR REPLACE INTO meta(key, value) VALUES('db_version', ?)",
             (str(_DB_VERSION),),
