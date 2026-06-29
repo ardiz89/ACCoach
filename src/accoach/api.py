@@ -138,6 +138,7 @@ def create_api(
             "lap_time_ms": r["lap_time_ms"],
             "lap_time": format_lap_time(r["lap_time_ms"]),
             "valid": bool(r["valid"]),
+            "source": r.get("source", "own"),
             "recorded_utc": r["recorded_utc"],
             "samples": r["sample_count"],
         } for r in rows]
@@ -229,7 +230,8 @@ def create_api(
             "consistency": consistency,
             "laps": [{
                 "path": r["path"], "lap_time": format_lap_time(r["lap_time_ms"]),
-                "valid": bool(r["valid"]),
+                "lap_time_ms": r["lap_time_ms"],
+                "valid": bool(r["valid"]), "source": r.get("source", "own"),
             } for r in all_laps],
         }
 
