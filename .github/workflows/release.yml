@@ -1,0 +1,78 @@
+name: Release
+
+# Tag a version to build and publish the Windows app:
+#   git tag v0.1.0 && git push origin v0.1.0
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write          # needed to create the GitHub Release
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pyinstaller
+
+      - name: Build HONE.exe
+        run: >
+          python -m PyInstaller --noconfirm --windowed --name HONE
+          --icon hone.ico --paths src
+          --add-data "src/accoach/web;accoach/web"
+          --add-data "src/accoach/voice_cues;accoach/voice_cues"
+          --add-data "GUIDA.md;."
+          --collect-submodules uvicorn
+          --hidden-import pyttsx3.drivers
+          --hidden-import pyttsx3.drivers.sapi5
+          --collect-all comtypes
+          accoach_main.py
+
+      - name: Package + checksum
+        id: pack
+        shell: pwsh
+        run: |
+          $zip = "HONE-${{ github.ref_name }}-windows.zip"
+          Compress-Archive -Path dist/HONE/* -DestinationPath $zip
+          $sha = (Get-FileHash $zip -Algorithm SHA256).Hash
+          "zip=$zip"   | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "sha=$sha"   | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          Write-Host "SHA256  $sha  $zip"
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ steps.pack.outputs.zip }}
+          name: HONE ${{ github.ref_name }}
+          body: |
+            **HONE ${{ github.ref_name }}** — driving coach for Assetto Corsa / ACC.
+
+            ### Install
+            1. Download `${{ steps.pack.outputs.zip }}` below and unzip it.
+            2. Run `HONE.exe`. On first launch Windows SmartScreen may warn (the
+               app isn't signed with a paid certificate) — click **More info →
+               Run anyway**.
+
+            ### Verify the download (optional)
+            ```powershell
+            Get-FileHash .\${{ steps.pack.outputs.zip }} -Algorithm SHA256
+            ```
+            Expected **SHA-256**:
+            ```
+            ${{ steps.pack.outputs.sha }}
+            ```
+
+            See the [FAQ](https://github.com/${{ github.repository }}/blob/main/docs/FAQ.md)
+            for SmartScreen, privacy and troubleshooting.

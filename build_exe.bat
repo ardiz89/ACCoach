@@ -1,9 +1,9 @@
 @echo off
-rem Build ACCoach.exe with PyInstaller (one-dir, windowed).
+rem Build HONE.exe with PyInstaller (one-dir, windowed).
 rem Requires: pip install pyinstaller
 cd /d "%~dp0"
-python -m PyInstaller --noconfirm --windowed --name ACCoach ^
-  --icon accoach.ico ^
+python -m PyInstaller --noconfirm --windowed --name HONE ^
+  --icon hone.ico ^
   --paths src ^
   --add-data "src/accoach/web;accoach/web" ^
   --add-data "src/accoach/voice_cues;accoach/voice_cues" ^
@@ -14,5 +14,5 @@ python -m PyInstaller --noconfirm --windowed --name ACCoach ^
   --collect-all comtypes ^
   accoach_main.py
 echo.
-echo Done.  ->  dist\ACCoach\ACCoach.exe
+echo Done.  ->  dist\HONE\HONE.exe
 pause

@@ -1,6 +1,10 @@
 <h1 align="center">HONE</h1>
 <p align="center"><b>Know why you're slow.</b></p>
 <p align="center">The real-time driving coach for Assetto Corsa and ACC — it tells you <i>why</i> you lose time, not just where. Offline. No subscription.</p>
+<p align="center">
+  <a href="https://github.com/ardiz89/ACCoach/actions/workflows/ci.yml"><img src="https://github.com/ardiz89/ACCoach/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/ardiz89/ACCoach/releases"><img src="https://img.shields.io/github/v/release/ardiz89/ACCoach?label=download" alt="Latest release"></a>
+</p>
 
 ---
 
@@ -57,12 +61,18 @@ on you at once.
 
 ## Quick start
 
-**With the executable (recommended):** download `HONE.exe` from the
-[Releases](https://github.com/ardiz89/ACCoach/releases) page, run it, pick a mode.
-No Python needed. (See the [FAQ](docs/FAQ.md) for the first-run SmartScreen notice
-and how to verify the file hash.)
+**1 — Download (recommended, no Python):** grab the latest `HONE-*-windows.zip`
+from the [Releases](https://github.com/ardiz89/ACCoach/releases) page, unzip it and
+run `HONE.exe`. First launch may show a SmartScreen notice (the app isn't signed
+with a paid certificate) → **More info → Run anyway**. Each release publishes the
+file's SHA-256 so you can verify the download (see the [FAQ](docs/FAQ.md)).
 
-**From source:**
+**2 — From source, one click:** clone/download the repo and double-click
+**`HONE.bat`**. On first run it creates a local environment, installs the
+dependencies, then opens the launcher — no command line needed (requires
+[Python 3.11+](https://www.python.org/downloads/) with *Add to PATH*).
+
+**3 — From source, command line:**
 
 ```powershell
 pip install -r requirements.txt   # first time (PySide6 for overlay/GUI)
@@ -72,7 +82,18 @@ python -m accoach                 # list every command
 ```
 
 Set the game to **Borderless** so the overlay draws over it. `--silent` turns off
-the voice.
+the voice. New here? The launcher shows a short **Get started** wizard on first
+run, and the web pages have a guided **tour** (the `?` button).
+
+## Build the executable yourself
+
+```powershell
+pip install pyinstaller
+build_exe.bat            # -> dist\HONE\HONE.exe
+```
+
+A tagged push (`git tag v0.1.0 && git push origin v0.1.0`) builds and publishes the
+Windows zip automatically via GitHub Actions (`.github/workflows/release.yml`).
 
 ## Requirements
 
