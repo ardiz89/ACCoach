@@ -72,6 +72,39 @@ def test_fp_rate_zero_on_neutral_lap():
     assert sum(stats.symptom_corners.values()) == 0     # no false positives
 
 
+def test_lock_spin_detected_via_aids_when_slip_is_low():
+    # On an ACC GT3 the aids hold slip near zero *because they're working*; the
+    # diagnosis must still register lock/spin from abs_active/tc_active, like the
+    # live detector — else the engineer never sees the problem.
+    press = (27.0, 27.0, 27.5, 27.5)
+    z4 = (0.0, 0.0, 0.0, 0.0)
+    lock = LapSample(0, 0.10, 200.0, 0.0, 0.9, 0.0, "4", 7000, 0.0, -1.0,
+                     abs_active=0.6, slip_ratio=z4, tyre_pressure=press)
+    spin = LapSample(1000, 0.60, 120.0, 1.0, 0.0, 0.0, "3", 7000, 0.0, 0.5,
+                     tc_active=0.6, slip_ratio=z4, tyre_pressure=press)
+    lap = Lap("ferrari_488_gt3", "monza", SessionType.PRACTICE, 100000, True,
+              samples=[lock, spin], clean=True)
+    stats = build_lap_stats(lap)
+    assert stats.lock_segments >= 1            # from ABS, not slip
+    assert stats.spin_segments >= 1            # from TC, not slip
+
+
+def test_cold_frames_excluded_from_hot_pressures():
+    # A cold slick reads low pressure; those frames must not drag the hot-pressure
+    # mean down, or the engineer adds pressure that over-inflates at temperature.
+    cold = LapSample(0, 0.10, 200.0, 0.0, 0.0, 0.0, "4", 7000, 0.0, 0.0,
+                     tyre_core_temp=(40.0, 40.0, 40.0, 40.0),
+                     tyre_pressure=(20.0, 20.0, 20.0, 20.0))
+    hot = LapSample(1000, 0.50, 200.0, 1.0, 0.0, 0.0, "4", 7000, 0.0, 0.0,
+                    tyre_core_temp=(90.0, 90.0, 90.0, 90.0),
+                    tyre_pressure=(27.0, 27.0, 27.0, 27.0))
+    lap = Lap("ferrari_488_gt3", "monza", SessionType.PRACTICE, 100000, True,
+              samples=[cold, hot], clean=True)
+    stats = build_lap_stats(lap)
+    assert stats.pressures_hot is not None
+    assert round(stats.pressures_hot["front"], 1) == 27.0   # 20psi cold frame dropped
+
+
 def test_lock_spin_and_pressures_from_v6_channels():
     press = (27.0, 27.0, 27.5, 27.5)
     lock = LapSample(0, 0.10, 200.0, 0.0, 0.9, 0.0, "4", 7000, 0.0, -1.0,

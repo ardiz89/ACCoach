@@ -68,6 +68,19 @@ def test_picks_worst_recurring_not_a_one_off():
     assert report.focus.corner_index == 0                   # recurring beats one-off
 
 
+def test_baseline_uses_full_window_denominator():
+    # A corner that's a loss in only some laps must get a baseline measured over
+    # the WHOLE window (good laps = 0), the same denominator the drill uses — else
+    # IMPROVED would fire without real progress.
+    coach = FocusCoach()
+    coach.observe(_debrief())                      # good
+    coach.observe(_debrief())                      # good
+    coach.observe(_debrief(_loss(0, 300)))         # loss, not yet recurring
+    r = coach.observe(_debrief(_loss(0, 300)))     # 2/4 -> systematic -> BRIEF
+    assert r.kind is FocusKind.BRIEF
+    assert r.focus.baseline_ms == 150.0            # median([0,0,300,300]), not 300
+
+
 def test_no_focus_when_losses_insignificant():
     coach = FocusCoach()
     report = _feed(coach, _debrief(_loss(0, 50)), 3)         # below the threshold

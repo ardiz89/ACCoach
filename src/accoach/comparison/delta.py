@@ -49,6 +49,17 @@ class LapComparator:
         if not (s.connected and s.status == ACStatus.LIVE) or s.in_pit:
             return None
 
+        # At the start/finish line the sim resets the position and the lap timer on
+        # slightly different frames; for that one frame they disagree and the delta
+        # would spike by ~a full lap (and with it predicted_lap_ms). Skip it.
+        ref_lap = self.reference.lap_time_ms
+        if ref_lap > 0:
+            half = ref_lap * 0.5
+            wrapped = ((s.lap_position < 0.05 and s.current_lap_ms > half) or
+                       (s.lap_position > 0.95 and s.current_lap_ms < half))
+            if wrapped:
+                return None
+
         ref_t = self.reference.time_at(s.lap_position)
         delta = float(s.current_lap_ms) - ref_t
         return DeltaState(

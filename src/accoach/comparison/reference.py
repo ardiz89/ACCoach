@@ -83,6 +83,32 @@ class Reference:
             self._tc.append(s.tc_active)
             self._yaw.append(s.yaw_rate)
 
+        self._anchor_endpoints()
+
+    def _anchor_endpoints(self) -> None:
+        """Anchor the index at pos=0 (t=0) and pos=1 (t=lap_time).
+
+        Recorded samples start a hair after the line (pos≈0.003) and end before it
+        (pos≈0.98) with t<lap_time. Without endpoints, ``time_at`` clamps to the
+        last sample's time for the whole run-in to the line while the live clock
+        keeps rising — inflating the delta by a growing bias near the finish.
+        Endpoints reuse the nearest sample's channels; only pos and t are set."""
+        chans = [self._speed, self._throttle, self._brake, self._glong, self._glat,
+                 self._steer, self._gear, self._slip, self._abs, self._tc, self._yaw]
+        if len(self._pos) < 2:
+            return                       # too few real samples to be a reference
+
+        if self._pos[0] > 0.0 and self._t[0] > 0.0:
+            self._pos.insert(0, 0.0)
+            self._t.insert(0, 0.0)
+            for c in chans:
+                c.insert(0, c[0])
+        if self._pos[-1] < 1.0 and self.lap_time_ms > self._t[-1]:
+            self._pos.append(1.0)
+            self._t.append(float(self.lap_time_ms))
+            for c in chans:
+                c.append(c[-1])
+
     @property
     def usable(self) -> bool:
         # Need at least two points to interpolate a delta.

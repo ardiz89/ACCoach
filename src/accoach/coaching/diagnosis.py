@@ -30,7 +30,14 @@ from .balance import (
     _YAW_LOOSE,
     _YAW_SIGN,
 )
-from .events import _BRAKE_MIN, _LOCK_RATIO, _SPIN_RATIO, _THROTTLE_MIN
+from .events import (
+    _ABS_LEVEL,
+    _BRAKE_MIN,
+    _LOCK_RATIO,
+    _SPIN_RATIO,
+    _TC_LEVEL,
+    _THROTTLE_MIN,
+)
 
 # Apex band half-width (normalized track position) around the speed minimum.
 _APEX_HALF = 0.02
@@ -39,7 +46,10 @@ _THROTTLE_ON = 0.20        # exit = on the power after the apex
 _SPEED_SPLIT_KMH = 120.0   # low/high corner speed band (per the taxonomy)
 # A phase must reach this aggregate intensity to count the symptom present there.
 _PRESENCE = 0.15
-_WARM_C = 50.0             # mean tyre core temp above this = warmed up
+# Mean tyre core temp above this = warmed up. Slicks read low pressure when cold,
+# so this also gates which frames count toward hot pressures — matched to the live
+# PressureAdvisor's window so the engineer never tunes pressure on a cold tyre.
+_WARM_C = 75.0
 _SEG_N = 20               # track segments for counting distinct lock/spin spots
 
 
@@ -104,18 +114,36 @@ def _lock_spin_segments(samples: list[LapSample]) -> tuple[int, int]:
     locks: set[int] = set()
     spins: set[int] = set()
     for s in samples:
-        if s.brake >= _BRAKE_MIN and min(s.slip_ratio[0], s.slip_ratio[1]) <= _LOCK_RATIO:
+        # Mirror the live EventDetector exactly: the aid intervention (abs/tc) is
+        # the primary signal and the physical slip ratio the fallback. On an ACC
+        # GT3 the aids hold slip low *because they're working*, so a slip-only
+        # check would miss every lock/spin and the engineer would never see them.
+        if s.brake >= _BRAKE_MIN and (
+                s.abs_active >= _ABS_LEVEL
+                or min(s.slip_ratio[0], s.slip_ratio[1]) <= _LOCK_RATIO):
             locks.add(_seg(s.pos))
-        if (s.throttle >= _THROTTLE_MIN and s.gear not in ("R", "N")
-                and max(s.slip_ratio[2], s.slip_ratio[3]) >= _SPIN_RATIO):
+        if (s.throttle >= _THROTTLE_MIN and s.gear not in ("R", "N") and (
+                s.tc_active >= _TC_LEVEL
+                or max(s.slip_ratio[2], s.slip_ratio[3]) >= _SPIN_RATIO)):
             spins.add(_seg(s.pos))
     return len(locks), len(spins)
 
 
 def _pressures_hot(samples: list[LapSample]) -> dict | None:
-    """Mean hot pressure per axle (front = FL/FR, rear = RL/RR), or None if absent."""
-    fronts = [p for s in samples for p in s.tyre_pressure[:2] if p > 0.0]
-    rears = [p for s in samples for p in s.tyre_pressure[2:] if p > 0.0]
+    """Mean hot pressure per axle (front = FL/FR, rear = RL/RR), or None if absent.
+
+    Only frames at temperature count: a cold slick reads several psi low, so
+    averaging the warm-up laps would tell the engineer to add pressure that then
+    over-inflates once the tyre comes in. Frames without temp data are kept (we
+    can't tell, so don't drop them)."""
+    fronts: list[float] = []
+    rears: list[float] = []
+    for s in samples:
+        temps = [t for t in s.tyre_core_temp if t > 0.0]
+        if temps and (sum(temps) / len(temps)) < _WARM_C:
+            continue                          # tyre not at temperature yet
+        fronts += [p for p in s.tyre_pressure[:2] if p > 0.0]
+        rears += [p for p in s.tyre_pressure[2:] if p > 0.0]
     if not fronts or not rears:
         return None
     return {"front": sum(fronts) / len(fronts), "rear": sum(rears) / len(rears)}

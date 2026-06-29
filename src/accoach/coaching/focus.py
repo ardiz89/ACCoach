@@ -30,13 +30,15 @@ from enum import Enum
 
 from .cue import CueCategory
 from .debrief import CornerLoss, LapDebrief
+from .thresholds import RECUR_FRAC as _RECUR_FRAC
+from .thresholds import SIGNIF_LOSS_MS as _SIGNIF_MS
 
 # --- tuning constants ------------------------------------------------------
 
 _MIN_LAPS = 3            # clean laps needed to pick a focus / to judge a verdict
 _WINDOW = 6              # rolling debrief buffer used to spot a recurring loss
-_RECUR_FRAC = 0.5        # a weakness must appear in ≥ half the window's laps
-_SIGNIF_MS = 120.0       # a loss below this (1.2 tenths) isn't worth a focus
+# _RECUR_FRAC / _SIGNIF_MS are shared with trends.py (see coaching/thresholds.py)
+# so the live coach and the analysis tab can't disagree on what's recurring.
 _IMPROVED_FRAC = 0.5     # focus loss must fall to ≤ 50% of baseline…
 _SOLVED_MS = 80.0        # …and below this absolute, to count as solved
 _PATIENCE = 6            # laps spent on a focus with no win → park it, move on
@@ -237,12 +239,17 @@ class FocusCoach:
 
         median, idx, a = best
         rep = a.rep
+        # Measure the baseline with the SAME denominator the drill uses: the median
+        # of the loss at this corner over the WHOLE window, counting good laps as
+        # 0.0. (`a.median` is over loss-only laps, so it would read higher than the
+        # drill's `current` and make IMPROVED fire without real progress.)
+        baseline = statistics.median([_loss_at(d, idx) for d in self.window])
         return Focus(
             corner_index=idx,
             name=rep.label,
             theme=_theme(rep.category),
             category=rep.category,
-            baseline_ms=median,
+            baseline_ms=baseline,
             drill=rep.fix or "Pulisci la traiettoria e cerca costanza.",
             cause=rep.cause,
         )

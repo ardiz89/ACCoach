@@ -27,11 +27,13 @@ from dataclasses import dataclass
 
 from .cue import CueCategory
 from .debrief import LapDebrief
+from .thresholds import RECUR_FRAC as _RECUR_FRAC
+from .thresholds import SIGNIF_LOSS_MS as _SIGNIF_MS
 
-# A corner is "systematic" when it shows a significant loss in at least this
-# fraction of the laps considered (and the median loss clears the floor).
-_RECUR_FRAC = 0.5
-_SIGNIF_MS = 120.0      # a median loss below this (1.2 tenths) isn't worth training
+# _RECUR_FRAC / _SIGNIF_MS are shared with focus.py (coaching/thresholds.py): the
+# Focus coach (live, rolling window) and this tab (whole session) must agree on
+# what counts as a recurring, significant weakness. The window size differs by
+# design — live vs full-history — but the thresholds do not.
 
 
 @dataclass(slots=True)

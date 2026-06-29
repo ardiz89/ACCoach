@@ -251,8 +251,13 @@ class CoachEngine:
 
         for lap in saved:
             self.saved_laps += 1
+            # Use the LAP's own car/track, not snap's: between completing the lap
+            # and this tick the game may have disconnected (snap blank) or switched
+            # car/track, which would diagnose the lap against the wrong reference.
+            if lap.car_model and (lap.car_model, lap.track) != self._key:
+                continue                                            # not this session
             self._observe_lap(lap)
-            self._rebuild_reference(snap.car_model, snap.track)      # chase the new best
+            self._rebuild_reference(lap.car_model, lap.track)        # chase the new best
 
         delta = self._comparator.compare(snap) if self._comparator else None
         # On an abnormal lap (no comparison, or delta blown out) gate everything
