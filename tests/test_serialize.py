@@ -27,6 +27,14 @@ def test_snapshot_to_dict_shape_and_rounding():
     assert d["lap"]["current"] == "1:01.234"
 
 
+def test_snapshot_to_dict_exposes_tyres():
+    s = synth.snap(pos=0.5, tyre_core_temp=(88.4, 89.6, 91.1, 90.0),
+                   tyre_pressure=(27.49, 27.6, 27.8, 27.9))
+    d = snapshot_to_dict(s)
+    assert d["tyres"]["temp"] == [88.4, 89.6, 91.1, 90.0]
+    assert d["tyres"]["pressure"] == [27.5, 27.6, 27.8, 27.9]
+
+
 def test_delta_to_dict_none_passthrough():
     assert delta_to_dict(None) is None
 

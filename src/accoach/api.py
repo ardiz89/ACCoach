@@ -177,6 +177,24 @@ def create_api(
         except Exception:  # noqa: BLE001 - a degenerate lap shouldn't 500 the UI
             raise HTTPException(422, "lap could not be analysed")
 
+        # Minimum speed per corner (you vs the reference, lined up by position) —
+        # the metric a driver reads first to see where they're scrubbing speed.
+        corner_speeds = []
+        for c in corners:
+            inside = [s for s in review.samples if c.entry_pos <= s.pos <= c.exit_pos]
+            if not inside:
+                continue
+            vmin_live = min(s.speed_kmh for s in inside)
+            vmin_ref = min(reference.point_at(s.pos).speed_kmh for s in inside)
+            corner_speeds.append({
+                "index": c.index,
+                "name": names.get(c.index, f"Corner {c.index + 1}"),
+                "apex": round(c.apex_pos, 4),
+                "vmin_live": round(vmin_live, 0),
+                "vmin_ref": round(vmin_ref, 0),
+                "delta": round(vmin_live - vmin_ref, 0),
+            })
+
         return {
             "car": car, "track": track,
             "has_map": _has_map(review) and _has_map(baseline_lap),
@@ -196,10 +214,11 @@ def create_api(
             "corners": [{
                 "index": c.index, "entry": c.entry_pos,
                 "apex": c.apex_pos, "exit": c.exit_pos,
-                "name": names.get(c.index, f"Curva {c.index + 1}"),
+                "name": names.get(c.index, f"Corner {c.index + 1}"),
             } for c in corners],
+            "corner_speeds": corner_speeds,
             "losses": [{
-                "label": names.get(x.index, f"Curva {x.index + 1}"),
+                "label": names.get(x.index, f"Corner {x.index + 1}"),
                 "lost_s": round(x.lost_ms / 1000, 3),
                 "category": x.category.value, "message": x.message,
                 "detail": x.detail, "fix": x.fix,
@@ -332,7 +351,7 @@ def create_api(
                     t = tally.setdefault(loss.category.value,
                                          {"message": loss.message, "count": 0, "corners": set()})
                     t["count"] += 1
-                    t["corners"].add(cnames.get(loss.index, f"Curva {loss.index + 1}"))
+                    t["corners"].add(cnames.get(loss.index, f"Corner {loss.index + 1}"))
             recurring = sorted(
                 ({"category": k, "message": v["message"], "count": v["count"],
                   "corners": sorted(v["corners"])} for k, v in tally.items()),

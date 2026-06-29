@@ -51,6 +51,16 @@ def test_analysis_default_baseline_is_fastest(tmp_path):
     assert all("name" in cc for cc in data["corners"])
 
 
+def test_analysis_has_corner_speeds(tmp_path):
+    c = _client(tmp_path)
+    data = c.get("/api/analysis", params={"car": CAR, "track": TRACK}).json()
+    cs = data["corner_speeds"]
+    assert cs, "expected per-corner minimum speeds"
+    row = cs[0]
+    assert {"index", "name", "vmin_live", "vmin_ref", "delta"} <= set(row)
+    assert row["delta"] == round(row["vmin_live"] - row["vmin_ref"], 0)
+
+
 def test_analysis_losses_have_minilesson_fields(tmp_path):
     c = _client(tmp_path)
     data = c.get("/api/analysis", params={"car": CAR, "track": TRACK}).json()

@@ -34,6 +34,12 @@ def snapshot_to_dict(s: TelemetrySnapshot) -> dict:
             "abs": s.abs_level,
             "engine_map": s.engine_map,
         },
+        # Per-wheel [FL, FR, RL, RR]. The pilot's #1 live readout: tyre temps and
+        # pressures decide whether a "push" is setup or just a cold/over-pressure tyre.
+        "tyres": {
+            "temp": [round(t, 1) for t in s.tyre_core_temp],
+            "pressure": [round(p, 1) for p in s.tyre_pressure],
+        },
         "lap": {
             "current_ms": s.current_lap_ms,
             "last_ms": s.last_lap_ms,
