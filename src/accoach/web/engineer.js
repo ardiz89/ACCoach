@@ -467,7 +467,11 @@ function renderEngineer(st) {
 
   if (boxProposal) {
     $("es-msg").textContent = eng.rationale || eng.message;
-    $("es-cat").textContent = "";
+    // Anchor the proposal to the corners it's based on — the evidence a driver
+    // needs before writing a setup ("Corners 7, 9").
+    const cz = Array.isArray(eng.corners) && eng.corners.length
+      ? "Corners " + eng.corners.join(", ") : "";
+    $("es-cat").textContent = cz;
     conf.hidden = false; conf.textContent = eng.confidence || "media";
     conf.dataset.c = eng.confidence || "media";
     prep.hidden = false;

@@ -63,6 +63,7 @@ def delta_to_dict(d: DeltaState | None) -> dict | None:
         "local_ms": round(d.local_delta_ms, 1),     # gaining(-)/losing(+) right now
         "local_s": round(d.local_delta_ms / 1000.0, 3),
         "local_losing": d.local_losing,
+        "brake_in_m": d.brake_in_m,                  # metres to ref's next braking point
         "predicted_ms": int(d.predicted_lap_ms),
         "predicted": format_lap_time(int(d.predicted_lap_ms)),
         "reference_ms": d.reference_lap_ms,

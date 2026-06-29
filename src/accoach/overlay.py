@@ -163,10 +163,18 @@ class Overlay(QWidget):
         p.setPen(_WHITE)
         p.drawText(50, 12, 220, 22, Qt.AlignVCenter, "HONE")
         delta = self._state.get("delta") or {}
-        pb = delta.get("reference") or "--:--.---"
-        self._set_font(p, 12, bold=True)
-        p.setPen(_GREY)
-        p.drawText(w - 240, 12, 220, 22, Qt.AlignRight | Qt.AlignVCenter, f"PB {pb}")
+        # When a braking point is coming up, the countdown takes the header's right
+        # slot (it's time-critical); otherwise show the reference lap time (PB).
+        brake_m = delta.get("brake_in_m")
+        self._set_font(p, 13, bold=True)
+        if brake_m is not None:
+            p.setPen(_AMBER)
+            p.drawText(w - 240, 12, 220, 22, Qt.AlignRight | Qt.AlignVCenter,
+                       f"▼ BRAKE  {brake_m} m")
+        else:
+            p.setPen(_GREY)
+            pb = delta.get("reference") or "--:--.---"
+            p.drawText(w - 240, 12, 220, 22, Qt.AlignRight | Qt.AlignVCenter, f"PB {pb}")
 
     def _draw_delta(self, p: QPainter, delta: dict, w: int) -> None:
         ahead = delta.get("ahead", False)

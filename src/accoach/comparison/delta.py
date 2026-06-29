@@ -14,6 +14,7 @@ the reference's differ — that's the whole point of keying samples by position.
 
 from __future__ import annotations
 
+import math
 from collections import deque
 from dataclasses import dataclass
 
@@ -23,6 +24,12 @@ from .reference import Reference, ReferencePoint
 # "Right now" window for the local delta: how much of the lap back to look when
 # answering "am I gaining or losing in THIS corner?" (~4% of the track).
 _LOCAL_WINDOW_POS = 0.04
+
+# Braking-point marker: where the reference gets on the brakes, and how far ahead
+# to start warning the driver.
+_BRAKE_ONSET = 0.5         # ref brake crossing this (rising) = a braking point
+_BRAKE_LOOKAHEAD_POS = 0.15  # only look this far ahead (track fraction)
+_BRAKE_LOOKAHEAD_M = 160.0   # …and only show the marker within this distance
 
 
 @dataclass(slots=True)
@@ -37,6 +44,7 @@ class DeltaState:
     reference_point: ReferencePoint
     local_delta_ms: float = 0.0  # gained(+)/lost(-)… see local_losing: time made up
     #                              or given away over the last _LOCAL_WINDOW_POS
+    brake_in_m: int | None = None  # metres to the reference's next braking point
 
     @property
     def ahead(self) -> bool:
@@ -57,6 +65,50 @@ class LapComparator:
         # long lap can't grow it without limit; cleared at each lap wrap.
         self._hist: deque[tuple[float, float]] = deque(maxlen=600)
         self._last_pos = -1.0
+        # Precompute the reference's braking points + a (pos, x, z) path for the
+        # "brake in N m" marker. Empty if the reference has no world coords.
+        self._brake_onsets, self._path = self._index_braking()
+
+    def _index_braking(self) -> tuple[list[float], list[tuple[float, float, float]]]:
+        path: list[tuple[float, float, float]] = []
+        onsets: list[float] = []
+        prev_brake, last_pos = 0.0, -1.0
+        for s in self.reference.lap.samples:
+            if s.pos <= last_pos:
+                continue
+            last_pos = s.pos
+            path.append((s.pos, s.car_x, s.car_z))
+            if prev_brake < _BRAKE_ONSET <= s.brake:
+                onsets.append(s.pos)
+            prev_brake = s.brake
+        has_coords = any(x or z for _, x, z in path)
+        return (onsets if has_coords else [], path)
+
+    def _xy_at(self, pos: float) -> tuple[float, float] | None:
+        p = self._path
+        if not p:
+            return None
+        if pos <= p[0][0]:
+            return (p[0][1], p[0][2])
+        for i in range(1, len(p)):
+            if p[i][0] >= pos:
+                a, b = p[i - 1], p[i]
+                span = b[0] - a[0]
+                f = 0.0 if span <= 0 else (pos - a[0]) / span
+                return (a[1] + f * (b[1] - a[1]), a[2] + f * (b[2] - a[2]))
+        return (p[-1][1], p[-1][2])
+
+    def _brake_in(self, pos: float) -> int | None:
+        """Metres to the reference's next braking point ahead, or None if none is
+        within the lookahead (chord distance on the reference's world path)."""
+        nxt = next((o for o in self._brake_onsets if o > pos + 0.005), None)
+        if nxt is None or nxt - pos > _BRAKE_LOOKAHEAD_POS:
+            return None
+        a, b = self._xy_at(pos), self._xy_at(nxt)
+        if a is None or b is None:
+            return None
+        m = math.hypot(a[0] - b[0], a[1] - b[1])
+        return int(m) if m <= _BRAKE_LOOKAHEAD_M else None
 
     def compare(self, s: TelemetrySnapshot) -> DeltaState | None:
         """Return the live delta, or ``None`` when no meaningful comparison exists."""
@@ -94,6 +146,7 @@ class LapComparator:
             live_speed_kmh=s.speed_kmh,
             reference_point=self.reference.point_at(pos),
             local_delta_ms=local,
+            brake_in_m=self._brake_in(pos),
         )
 
     def _local_delta(self, pos: float, delta: float) -> float:

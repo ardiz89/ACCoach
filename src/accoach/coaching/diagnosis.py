@@ -200,10 +200,12 @@ def build_lap_stats(lap: Lap, corners: list[Corner] | None = None) -> LapStats:
 
     scores: dict[Symptom, float] = {}
     corner_counts: dict[Symptom, int] = {}
+    corner_idx: dict[Symptom, list[int]] = {}
     for c in corners:
         for sym, intensity in corner_symptoms(lap.samples, c).items():
             scores[sym] = max(scores.get(sym, 0.0), intensity)
             corner_counts[sym] = corner_counts.get(sym, 0) + 1
+            corner_idx.setdefault(sym, []).append(c.index)
 
     lock_segments, spin_segments = _lock_spin_segments(lap.samples)
     return LapStats(
@@ -215,6 +217,7 @@ def build_lap_stats(lap: Lap, corners: list[Corner] | None = None) -> LapStats:
         warmed_up=_warmed_up(lap.samples),
         symptom_scores=scores,
         symptom_corners=corner_counts,
+        symptom_corner_idx=corner_idx,
         pressures_hot=_pressures_hot(lap.samples),
         lock_segments=lock_segments,
         spin_segments=spin_segments,

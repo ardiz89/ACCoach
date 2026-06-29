@@ -100,6 +100,20 @@ def test_local_delta_tracks_recent_gain_or_loss():
     assert fresh.local_delta_ms == 0.0
 
 
+def test_braking_marker_counts_down_to_reference_brake_point():
+    # synth.build_lap brakes into corner 0 (~pos 0.18-0.31). Approaching it, the
+    # comparator should report a finite "brake in N m"; far from any braking it's None.
+    from accoach.comparison.delta import LapComparator
+
+    ref = Reference(synth.build_lap())
+    cmp = LapComparator(ref)
+    approach = cmp.compare(synth.snap(pos=0.12, current_lap_ms=int(ref.time_at(0.12))))
+    assert approach.brake_in_m is not None and approach.brake_in_m > 0
+    # Mid-straight far from the next braking point → no marker.
+    far = cmp.compare(synth.snap(pos=0.45, current_lap_ms=int(ref.time_at(0.45))))
+    assert far.brake_in_m is None
+
+
 def test_point_at_on_real_lap_tracks_speed_dip():
     ref = Reference(synth.build_lap())
     apex = ref.point_at(0.31)

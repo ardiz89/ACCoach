@@ -187,6 +187,8 @@ class CoachEngine:
         d = self._engineer_decision
         if d is None:
             return None
+        sym = d.change.symptom if d.change else None
+        corners = self._engineer.corners_for(sym) if self._engineer else []
         return {
             "kind": d.kind.value,
             "message": d.message,
@@ -194,6 +196,8 @@ class CoachEngine:
             "rationale": d.change.rationale if d.change else None,
             "tag": d.change.tag if d.change else None,
             "confidence": d.confidence,
+            # 1-based corner labels the proposal is anchored to ("Corners 7, 9").
+            "corners": [i + 1 for i in corners],
         }
 
     def _focus_block(self) -> dict | None:

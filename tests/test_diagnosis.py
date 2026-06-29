@@ -43,6 +43,7 @@ def test_understeer_lap_is_diagnosed():
     assert under                                       # the push is named
     assert max(stats.symptom_scores[s] for s in under) >= 0.30
     assert any(stats.symptom_corners[s] >= 1 for s in under)
+    assert any(stats.symptom_corner_idx.get(s) for s in under)   # anchored to corners
     assert stats.stable is True                        # clean lap
 
 

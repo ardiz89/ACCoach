@@ -143,6 +143,19 @@ def test_no_premature_proposal_after_revert():
     assert d.kind is DecisionKind.COLLECT       # window was reset
 
 
+def test_corners_for_unions_window_indices():
+    # P3: a proposal is anchored to the corners the symptom showed in, unioned
+    # across the rolling window.
+    eng = _eng()
+    sym = Symptom(U, AP, HI)
+    eng.window = [
+        LapStats(100000, symptom_corner_idx={sym: [2, 4]}),
+        LapStats(100000, symptom_corner_idx={sym: [4, 6]}),
+    ]
+    assert eng.corners_for(sym) == [2, 4, 6]
+    assert eng.corners_for(None) == []
+
+
 def test_converges_to_done_when_clean():
     eng = _eng()
     last = None

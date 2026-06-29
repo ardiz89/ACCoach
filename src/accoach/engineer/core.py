@@ -89,6 +89,9 @@ class LapStats:
     warmed_up: bool = True
     symptom_scores: dict = field(default_factory=dict)
     symptom_corners: dict = field(default_factory=dict)
+    # Symptom -> list of corner indices where it showed (so a proposal can be
+    # anchored to "Corners 7, 9" instead of a faceless symptom).
+    symptom_corner_idx: dict = field(default_factory=dict)
     pressures_hot: dict | None = None
     lock_segments: int = 0
     spin_segments: int = 0
@@ -392,6 +395,16 @@ class RaceEngineer:
     # -- symptom selection with safety gates -------------------------------
     def _corners(self, sym: Symptom) -> int:
         return max((s.symptom_corners.get(sym, 0) for s in self.window), default=0)
+
+    def corners_for(self, sym: Symptom | None) -> list[int]:
+        """Distinct corner indices where ``sym`` showed across the window — the
+        evidence to anchor a proposal to (e.g. 'Corners 7, 9')."""
+        if sym is None:
+            return []
+        out: set[int] = set()
+        for s in self.window:
+            out.update(s.symptom_corner_idx.get(sym, []))
+        return sorted(out)
 
     def _persistence(self, sym: Symptom) -> int:
         return sum(1 for s in self.window
