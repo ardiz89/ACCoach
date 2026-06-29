@@ -6,6 +6,7 @@ pyttsx3>=2.90     # offline TTS for voice coaching (optional; text fallback if a
 fastapi>=0.110    # backend app + websocket endpoint
 uvicorn>=0.29     # ASGI server
 websockets>=12.0  # websocket transport
+httpx>=0.27       # required by fastapi TestClient (used in tests)
 
 PySide6>=6.6      # on-screen overlay + GUI launcher (frontend)
 
