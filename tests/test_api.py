@@ -122,6 +122,43 @@ def test_analysis_404_for_unknown_combo(tmp_path):
     assert r.status_code == 404
 
 
+# --- path-traversal guard: a lap/baseline must be a catalog-known path --------
+# These endpoints can be exposed on the LAN, so a crafted `lap`/`baseline` must
+# never read an arbitrary file off disk; it falls through to 404 instead.
+_EVIL = ["C:/Windows/win.ini", "../../../../etc/passwd", "/etc/passwd"]
+
+
+def test_analysis_rejects_unknown_lap_path(tmp_path):
+    c = _client(tmp_path)
+    for p in _EVIL:
+        assert c.get("/api/analysis", params={"car": CAR, "track": TRACK, "lap": p}
+                     ).status_code == 404
+        assert c.get("/api/analysis", params={"car": CAR, "track": TRACK, "baseline": p}
+                     ).status_code == 404
+
+
+def test_sectors_rejects_unknown_lap_path(tmp_path):
+    c = _client(tmp_path)
+    assert c.get("/api/sectors", params={"car": CAR, "track": TRACK, "lap": _EVIL[0]}
+                 ).status_code == 404
+
+
+def test_export_rejects_unknown_lap_path(tmp_path):
+    c = _client(tmp_path)
+    assert c.get("/api/export", params={"car": CAR, "track": TRACK, "lap": _EVIL[0]}
+                 ).status_code == 404
+
+
+def test_analysis_accepts_known_lap_path(tmp_path):
+    """The guard must not reject a legitimate catalog path the UI sends back."""
+    c = _client(tmp_path)
+    rows = c.get("/api/laps", params={"car": CAR, "track": TRACK}).json()
+    path = rows[0]["path"]
+    r = c.get("/api/analysis",
+              params={"car": CAR, "track": TRACK, "lap": path, "baseline": path})
+    assert r.status_code == 200
+
+
 def test_progress_returns_trend_and_consistency(tmp_path):
     c = _client(tmp_path)
     data = c.get("/api/progress", params={"car": CAR, "track": TRACK}).json()

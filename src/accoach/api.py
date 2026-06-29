@@ -36,7 +36,6 @@ from .telemetry.snapshot import format_lap_time
 from .track import detect_corners
 from .trackdata import name_corners
 
-HOST = "127.0.0.1"
 PORT = 8778
 _MAX_POINTS = 600   # downsample traces for the browser
 
@@ -87,6 +86,20 @@ def _delta_trace(lap, reference: Reference) -> dict:
         pos.append(round(x.pos, 4))
         dms.append(round((x.t_ms - reference.time_at(x.pos)) / 1000.0, 3))
     return {"pos": pos, "delta_s": dms}
+
+
+def _pick_known(requested: str | None, fallback: str | None, known: set[str]) -> str | None:
+    """Resolve a user-supplied lap path against the catalog's known paths.
+
+    Closes path traversal on the (potentially LAN-exposed) analysis endpoints:
+    a ``lap``/``baseline`` query param is honoured only if it matches a path the
+    catalog actually indexed for this car+track. Anything else falls through to
+    the fallback or ``None`` (→ 404) instead of reading an arbitrary file off
+    disk.
+    """
+    if requested is None:
+        return fallback
+    return requested if requested in known else None
 
 
 def create_api(
@@ -158,8 +171,9 @@ def create_api(
         valid = [r for r in all_laps if r["valid"] and r["lap_time_ms"] > 0]
         fastest = min(valid, key=lambda r: r["lap_time_ms"])["path"] if valid else None
 
-        baseline_path = baseline or fastest
-        review_path = lap or next((r["path"] for r in all_laps if r["valid"]), None)
+        known = {r["path"] for r in all_laps}
+        baseline_path = _pick_known(baseline, fastest, known)
+        review_path = _pick_known(lap, next((r["path"] for r in all_laps if r["valid"]), None), known)
         if baseline_path is None or review_path is None:
             raise HTTPException(404, "no valid lap for this car+track")
 
@@ -252,8 +266,11 @@ def create_api(
         if not valid:
             raise HTTPException(404, "no valid lap for this car+track")
         fastest = min(valid, key=lambda r: r["lap_time_ms"])["path"]
-        baseline_path = baseline or fastest
-        review_path = lap or next((r["path"] for r in all_laps if r["valid"]), None)
+        known = {r["path"] for r in all_laps}
+        baseline_path = _pick_known(baseline, fastest, known)
+        review_path = _pick_known(lap, next((r["path"] for r in all_laps if r["valid"]), None), known)
+        if baseline_path is None or review_path is None:
+            raise HTTPException(404, "no valid lap for this car+track")
         try:
             review = load_lap(review_path)
             base = load_lap(baseline_path)
@@ -418,7 +435,8 @@ def create_api(
         """Download a lap's full-resolution telemetry as CSV or JSON."""
         with _catalog() as cat:
             all_laps = cat.laps_for(car, track)
-        path = lap or next((r["path"] for r in all_laps if r["valid"]), None)
+        known = {r["path"] for r in all_laps}
+        path = _pick_known(lap, next((r["path"] for r in all_laps if r["valid"]), None), known)
         if path is None:
             raise HTTPException(404, "no lap to export")
         try:
@@ -549,17 +567,23 @@ def main(argv: list[str] | None = None) -> None:
     from .logging_setup import setup_logging
     setup_logging()
     cfg = load_config()
-    host, port = HOST, cfg.web.port
-
     argv = sys.argv[1:] if argv is None else argv
+
+    port = cfg.web.port
+    # Bind host vs local host: in LAN mode uvicorn listens on 0.0.0.0 so other
+    # devices can reach it, but the PC's own URL / port-check / browser still use
+    # 127.0.0.1. `--lan` forces it on for this run without touching the config.
+    bind = "0.0.0.0" if (cfg.lan or "--lan" in argv) else "127.0.0.1"
+    local = "127.0.0.1"
+
     # The engineer page and the analysis page are served by the same app; the
     # launcher passes --engineer to land directly on the setup editor.
     path = "/engineer" if "--engineer" in argv else "/"
-    url = f"http://{host}:{port}{path}"
+    url = f"http://{local}:{port}{path}"
 
     # If a server is already up (e.g. the user opened Analysis earlier), don't try
     # to bind a second one — just open the browser at the requested page.
-    if _port_in_use(host, port):
+    if _port_in_use(local, port):
         print(f"HONE already running: opening {url}")
         webbrowser.open(url)
         return
@@ -569,9 +593,11 @@ def main(argv: list[str] | None = None) -> None:
         print("HONE analysis in DEMO mode (synthetic laps)")
 
     print(f"HONE analysis on {url}  (Ctrl+C to stop)")
+    if bind != local:
+        print("LAN access ON — other devices on your network can reach this app.")
     # Open the browser once the server has had a moment to come up.
     threading.Timer(1.5, lambda: webbrowser.open(url)).start()
-    uvicorn.run(create_api(laps_dir), host=host, port=port, log_level="warning")
+    uvicorn.run(create_api(laps_dir), host=bind, port=port, log_level="warning")
 
 
 if __name__ == "__main__":

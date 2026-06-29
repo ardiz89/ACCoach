@@ -64,6 +64,10 @@ class DataCfg:
 class Config:
     # App language: drives the coach VOICE and (progressively) the UI. "en" | "it".
     language: str = "en"
+    # LAN access: when true, the web + live servers bind 0.0.0.0 so a phone/tablet
+    # on the same network can open the report/engineer pages (see launcher QR).
+    # Off by default — local-only is the safe baseline.
+    lan: bool = False
     server: ServerCfg = field(default_factory=ServerCfg)
     web: WebCfg = field(default_factory=WebCfg)
     acquire: AcquireCfg = field(default_factory=AcquireCfg)
@@ -75,11 +79,16 @@ class Config:
     def laps_path(self) -> Path:
         return Path(self.data.laps_dir) if self.data.laps_dir else laps_dir()
 
+    def bind_host(self) -> str:
+        """Interface the servers bind to: all interfaces in LAN mode, else local."""
+        return "0.0.0.0" if self.lan else "127.0.0.1"
+
 
 _DEFAULT_TOML = """# HONE — user configuration
 # Edit values and restart the app. Missing keys fall back to defaults.
 
 language = "en"      # app language: "en" | "it" (coach voice + interface)
+lan = false          # allow phones/tablets on your network to open the pages (binds 0.0.0.0)
 
 [server]
 host = "127.0.0.1"   # backend interface (keep 127.0.0.1 for local use)
@@ -147,6 +156,7 @@ def _to_toml(cfg: Config) -> str:
 # Edit values and restart the app. Missing keys fall back to defaults.
 
 language = "{cfg.language}"      # app language: "en" | "it" (coach voice + interface)
+lan = {b(cfg.lan)}          # allow phones/tablets on your network to open the pages (binds 0.0.0.0)
 
 [server]
 host = "{cfg.server.host}"

@@ -93,7 +93,28 @@ _UI: dict[str, dict[str, str]] = {
     "btn.verify_g": {"en": "🔧  Verify G axes", "it": "🔧  Verifica assi G"},
     "btn.get_started": {"en": "✨  Get started", "it": "✨  Come iniziare"},
     "btn.settings": {"en": "⚙  Settings", "it": "⚙  Impostazioni"},
+    "btn.mobile": {"en": "📱  Phone / tablet", "it": "📱  Telefono / tablet"},
     "btn.guide": {"en": "❓  Guide — how to use", "it": "❓  Guida — come si usa"},
+    # phone / tablet (LAN) dialog
+    "mob.title": {"en": "Open on phone / tablet", "it": "Apri su telefono / tablet"},
+    "mob.lan": {"en": "Allow access from other devices on my network",
+                "it": "Consenti l'accesso dagli altri dispositivi in rete"},
+    "mob.report": {"en": "Report", "it": "Report"},
+    "mob.engineer": {"en": "Engineer", "it": "Ingegnere"},
+    "mob.scan": {"en": "Scan with your phone's camera, or type the address.",
+                 "it": "Inquadra col telefono, oppure digita l'indirizzo."},
+    "mob.off": {"en": "Turn on the option above to open these pages from your phone.",
+                "it": "Attiva l'opzione qui sopra per aprire le pagine dal telefono."},
+    "mob.no_ip": {"en": "No network address found — connect this PC to Wi-Fi or LAN.",
+                  "it": "Nessun indirizzo di rete — collega il PC a Wi-Fi o LAN."},
+    "mob.same_net": {"en": "Your phone must be on the same Wi-Fi / network as this PC.",
+                     "it": "Il telefono dev'essere sulla stessa Wi-Fi / rete del PC."},
+    "mob.firewall": {"en": "If Windows asks, allow access on Private networks.",
+                     "it": "Se Windows lo chiede, consenti l'accesso su reti private."},
+    "mob.restart": {"en": "After changing this, (re)start Coach Live or Analysis.",
+                    "it": "Dopo la modifica, (ri)avvia Coach Live o Analisi."},
+    "mob.no_qr": {"en": "(QR unavailable — install 'segno')",
+                  "it": "(QR non disponibile — installa 'segno')"},
     # settings dialog
     "ui.settings": {"en": "Settings", "it": "Impostazioni"},
     "set.voice": {"en": "Coach voice", "it": "Voce del coach"},
@@ -103,6 +124,7 @@ _UI: dict[str, dict[str, str]] = {
                        "it": "Attivo al prossimo avvio di Coach Live."},
     "btn.save": {"en": "Save", "it": "Salva"},
     "btn.cancel": {"en": "Cancel", "it": "Annulla"},
+    "btn.close": {"en": "Close", "it": "Chiudi"},
 }
 
 

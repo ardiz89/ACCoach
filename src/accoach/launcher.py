@@ -21,6 +21,7 @@ from pathlib import Path
 
 try:
     from PySide6.QtCore import Qt, QTimer
+    from PySide6.QtGui import QPixmap
     from PySide6.QtWidgets import (
         QApplication,
         QCheckBox,
@@ -42,6 +43,7 @@ except ImportError:  # pragma: no cover - optional dependency
 
 from .config import load_config, save_config, set_language
 from .i18n import LANGUAGES, language_name, t
+from .netinfo import device_urls, qr_png
 from .paths import base_dir
 
 _SRC = Path(__file__).resolve().parents[1]   # .../src
@@ -51,6 +53,7 @@ _GUIDE = "__guide__"
 _STOP_LIVE = "__stop_live__"
 _WIZARD = "__wizard__"
 _SETTINGS = "__settings__"
+_MOBILE = "__mobile__"
 
 
 # --- first-run "getting started" wizard ------------------------------------
@@ -77,7 +80,7 @@ _VOICE_CMDS = {"live", "coach"}
 # While Coach Live is running these buttons stay clickable; all others are
 # disabled so you can't stack a second coach/telemetry reader on top of it.
 # Keys: command buttons by their args tuple, special buttons by their sentinel.
-_LIVE_SAFE_KEYS = {_STOP_LIVE, _GUIDE, _WIZARD, _SETTINGS,
+_LIVE_SAFE_KEYS = {_STOP_LIVE, _GUIDE, _WIZARD, _SETTINGS, _MOBILE,
                    ("web",), ("web", "--engineer")}
 
 # (label key, command args / sentinel, opens-its-own-console). The label key is
@@ -95,6 +98,7 @@ _BUTTONS = [
     ("btn.verify_g", ["verify-g"], True),
     ("—", None, False),
     ("btn.get_started", _WIZARD, False),
+    ("btn.mobile", _MOBILE, False),
     ("btn.settings", _SETTINGS, False),
     ("btn.guide", _GUIDE, False),
 ]
@@ -248,6 +252,118 @@ class Settings(QDialog):
         self.accept()
 
 
+class MobileAccess(QDialog):
+    """Open the report/engineer pages on a phone or tablet over the LAN.
+
+    Toggling LAN access binds the servers to ``0.0.0.0`` (persisted to config);
+    it only takes effect when the web/live servers (re)start, so the dialog says
+    so. When LAN is on and a network address is available it shows a scannable QR
+    plus the typed URL for each page.
+    """
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle(t("mob.title"))
+        self.setModal(True)
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(20, 18, 20, 16)
+        lay.setSpacing(10)
+
+        self._lan = QCheckBox(t("mob.lan"))
+        self._lan.setChecked(load_config().lan)
+        self._lan.toggled.connect(self._on_toggle)
+        lay.addWidget(self._lan)
+
+        restart = QLabel(t("mob.restart"))
+        restart.setStyleSheet("color: #888; font-size: 11px;")
+        restart.setWordWrap(True)
+        lay.addWidget(restart)
+
+        # Swappable body: the QR pair when LAN is on, else an explanatory line.
+        self._body = QVBoxLayout()
+        self._body.setSpacing(8)
+        lay.addLayout(self._body)
+
+        row = QHBoxLayout()
+        close = QPushButton(t("btn.close"))
+        close.setDefault(True)
+        close.clicked.connect(self.accept)
+        row.addStretch(1)
+        row.addWidget(close)
+        lay.addLayout(row)
+
+        self._render()
+
+    def _on_toggle(self, checked: bool) -> None:
+        cfg = load_config()
+        cfg.lan = checked
+        save_config(cfg)
+        self._render()
+
+    def _render(self) -> None:
+        """Rebuild the body to match the current LAN state."""
+        while self._body.count():
+            item = self._body.takeAt(0)
+            w = item.widget()
+            if w is not None:
+                w.deleteLater()
+
+        cfg = load_config()
+        if not cfg.lan:
+            self._body.addWidget(self._note(t("mob.off")))
+        else:
+            urls = device_urls(cfg.web.port)
+            if not urls:
+                self._body.addWidget(self._note(t("mob.no_ip")))
+            else:
+                pair = QWidget()
+                cols = QHBoxLayout(pair)
+                cols.setContentsMargins(0, 0, 0, 0)
+                cols.setSpacing(16)
+                cols.addWidget(self._qr_col(t("mob.report"), urls["report"]))
+                cols.addWidget(self._qr_col(t("mob.engineer"), urls["engineer"]))
+                self._body.addWidget(pair)
+                self._body.addWidget(self._note(t("mob.scan")))
+                self._body.addWidget(self._note(t("mob.same_net")))
+                self._body.addWidget(self._note(t("mob.firewall")))
+        self.adjustSize()
+
+    def _qr_col(self, title: str, url: str) -> QWidget:
+        w = QWidget()
+        v = QVBoxLayout(w)
+        v.setContentsMargins(0, 0, 0, 0)
+        v.setSpacing(4)
+        head = QLabel(title)
+        head.setStyleSheet("font-weight: bold;")
+        head.setAlignment(Qt.AlignHCenter)
+        v.addWidget(head)
+        img = QLabel()
+        img.setAlignment(Qt.AlignHCenter)
+        png = qr_png(url, scale=5)
+        if png:
+            pix = QPixmap()
+            pix.loadFromData(png, "PNG")
+            img.setPixmap(pix)
+        else:
+            img.setText(t("mob.no_qr"))
+            img.setStyleSheet("color: #888; font-size: 11px;")
+        v.addWidget(img)
+        link = QLabel(url)
+        link.setAlignment(Qt.AlignHCenter)
+        link.setStyleSheet("color: #22D3CE; font-size: 11px;")
+        link.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        link.setWordWrap(True)
+        v.addWidget(link)
+        return w
+
+    @staticmethod
+    def _note(text: str) -> QLabel:
+        lbl = QLabel(text)
+        lbl.setStyleSheet("color: #888; font-size: 11px;")
+        lbl.setWordWrap(True)
+        return lbl
+
+
 class Launcher(QWidget):
     def __init__(self) -> None:
         super().__init__()
@@ -302,6 +418,8 @@ class Launcher(QWidget):
                 btn.clicked.connect(self._show_wizard)
             elif args == _SETTINGS:
                 btn.clicked.connect(self._show_settings)
+            elif args == _MOBILE:
+                btn.clicked.connect(self._show_mobile)
             elif args == _STOP_LIVE:
                 btn.clicked.connect(self._stop_live)
             else:
@@ -392,6 +510,10 @@ class Launcher(QWidget):
     def _show_settings(self) -> None:
         """Open the settings dialog (voice + overlay), persisted to config.toml."""
         Settings(self).exec()
+
+    def _show_mobile(self) -> None:
+        """Open the phone/tablet dialog: LAN toggle + QR codes for the pages."""
+        MobileAccess(self).exec()
 
     def _stop_live(self) -> None:
         """Stop any running Coach Live / Live-Demo process."""

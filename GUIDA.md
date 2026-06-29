@@ -128,6 +128,24 @@ Cosa trovi:
 
 > Vuoi solo provarlo senza gioco? `python -m accoach web --demo` carica dati finti.
 
+### Aprire su telefono / tablet (stessa rete)
+
+Comodo se giochi in triple monitor e vuoi il **Report** o l'**Ingegnere** su un
+dispositivo a fianco:
+
+1. Nel Launcher premi **📱 Telefono / tablet** e spunta **"Consenti l'accesso
+   dagli altri dispositivi in rete"** (si ricorda nel config).
+2. Compaiono due **QR code** — **Report** e **Ingegnere** — con sotto l'indirizzo
+   (es. `http://192.168.1.23:8778`). **Inquadra il QR** col telefono, oppure
+   digita l'indirizzo nel browser.
+
+Note pratiche:
+- Il telefono dev'essere sulla **stessa Wi-Fi / rete** del PC.
+- Se **Windows** chiede il permesso al primo avvio, **consenti su reti private**.
+- Il **Report** (giri salvati) basta avere aperto `web`. L'**Ingegnere in tempo
+  reale** richiede anche il backend `server` attivo (lo scenario "secondo schermo").
+- Lasciato spento, tutto resta solo-locale (`127.0.0.1`) come prima.
+
 ---
 
 ## 6. Debrief post-sessione (testo)

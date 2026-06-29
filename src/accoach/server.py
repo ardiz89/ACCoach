@@ -171,7 +171,10 @@ def main(argv: list[str] | None = None) -> None:
         engine = make_demo_engine()
         print("HONE backend in DEMO mode (synthetic lap, no game needed)")
 
-    host, port = cfg.server.host, cfg.server.port
+    # LAN mode (config or --lan) binds 0.0.0.0 so a phone/tablet can reach the
+    # live engineer feed; otherwise honour the configured interface.
+    host = "0.0.0.0" if (cfg.lan or "--lan" in argv) else cfg.server.host
+    port = cfg.server.port
     print(f"HONE backend on ws://{host}:{port}/ws  (Ctrl+C to stop)")
     uvicorn.run(create_app(engine=engine, hz=cfg.server.hz),
                 host=host, port=port, log_level="warning")
