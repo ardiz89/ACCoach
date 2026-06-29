@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>HONE · Engineer</title>
+  <title data-i18n="title.engineer">HONE · Engineer</title>
   <link rel="icon" href="/static/hone_icon.png">
   <link rel="stylesheet" href="/static/style.css">
   <link rel="stylesheet" href="/static/engineer.css">
@@ -15,21 +15,22 @@
         <path d="M7 5 L21 16 L7 27" fill="none" stroke="#22D3CE" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
         <circle cx="15" cy="16" r="4" fill="#34E08A"/>
       </svg>
-      <span class="name">HONE</span> <span>· Race engineer</span>
+      <span class="name">HONE</span> <span data-i18n="eng.subtitle">· Race engineer</span>
       <span id="class-chip" class="class-chip" hidden></span>
-      <button class="tour-help" type="button" title="Guided tour" aria-label="Guided tour">?</button>
+      <button class="tour-help" type="button" data-i18n-title="tour.help" data-i18n-aria="tour.help" title="Guided tour" aria-label="Guided tour">?</button>
     </h1>
     <div class="controls">
-      <label>Car / Track
+      <label><span data-i18n="ctl.combo">Car / Track</span>
         <select id="combo"></select>
       </label>
-      <label>Starting setup
+      <label><span data-i18n="ctl.setup">Starting setup</span>
         <select id="setup"></select>
       </label>
       <button id="btn-undo" type="button" class="ghost undo-btn"
+              data-i18n="btn.undo" data-i18n-title="btn.undo.title"
               title="Restore this setup from the last backup">↶ Restore</button>
       <div class="live-badge" id="live-badge" data-state="off">
-        <span class="dot"></span><span id="live-text">telemetry offline</span>
+        <span class="dot"></span><span id="live-text" data-i18n="live.offline">telemetry offline</span>
       </div>
     </div>
   </header>
@@ -37,19 +38,19 @@
   <main class="eng-layout">
     <!-- LEFT: live diagnosis -->
     <section class="eng-live">
-      <h2>Live diagnosis</h2>
-      <div id="live-car" class="live-car muted">Waiting for telemetry…</div>
+      <h2 data-i18n="eng.liveDiag">Live diagnosis</h2>
+      <div id="live-car" class="live-car muted" data-i18n="eng.waiting">Waiting for telemetry…</div>
 
       <div class="gauges" id="gauges">
-        <div class="gauge"><span class="k">Speed</span><span class="v" id="g-speed">–</span></div>
-        <div class="gauge"><span class="k">Gear</span><span class="v" id="g-gear">–</span></div>
-        <div class="gauge"><span class="k">TC</span><span class="v" id="g-tc">–</span></div>
-        <div class="gauge"><span class="k">ABS</span><span class="v" id="g-abs">–</span></div>
-        <div class="gauge"><span class="k">Map</span><span class="v" id="g-map">–</span></div>
+        <div class="gauge"><span class="k" data-i18n="g.speed">Speed</span><span class="v" id="g-speed">–</span></div>
+        <div class="gauge"><span class="k" data-i18n="g.gear">Gear</span><span class="v" id="g-gear">–</span></div>
+        <div class="gauge"><span class="k" data-i18n="g.tc">TC</span><span class="v" id="g-tc">–</span></div>
+        <div class="gauge"><span class="k" data-i18n="g.abs">ABS</span><span class="v" id="g-abs">–</span></div>
+        <div class="gauge"><span class="k" data-i18n="g.map">Map</span><span class="v" id="g-map">–</span></div>
       </div>
 
       <div class="tyres" id="tyres">
-        <div class="tyres-label">Tyres <span class="es-sub">(temp °C · pressure psi)</span></div>
+        <div class="tyres-label" data-i18n-html="eng.tyres">Tyres <span class="es-sub">(temp °C · pressure psi)</span></div>
         <div class="tyre-grid">
           <div class="tyre" id="tyre-fl"><span class="tw">FL</span><span class="tt">–</span><span class="tp">–</span></div>
           <div class="tyre" id="tyre-fr"><span class="tw">FR</span><span class="tt">–</span><span class="tp">–</span></div>
@@ -59,27 +60,27 @@
       </div>
 
       <div class="av-now" id="av-now" hidden>
-        <div class="es-label">⚡ Right now, in the car</div>
+        <div class="es-label" data-i18n="eng.avNow">⚡ Right now, in the car</div>
         <div class="av-msg" id="av-msg"></div>
       </div>
 
       <div class="engineer-says" id="engineer-says">
         <div class="es-head">
-          <span class="es-label">🔧 The engineer suggests <span class="es-sub">(at the next pit stop)</span></span>
+          <span class="es-label" data-i18n-html="eng.suggests">🔧 The engineer suggests <span class="es-sub">(at the next pit stop)</span></span>
           <span class="conf" id="es-conf" hidden></span>
         </div>
         <div class="es-msg" id="es-msg">—</div>
         <div class="es-cat" id="es-cat"></div>
-        <button id="es-prepare" class="primary small" type="button" hidden>
-          Prepare change in the editor →</button>
+        <button id="es-prepare" class="primary small" type="button" hidden
+          data-i18n="eng.prepare">Prepare change in the editor →</button>
       </div>
 
       <div class="focus-says" id="focus-says" data-kind="">
         <div class="es-head">
-          <span class="es-label"><span id="focus-icon">…</span> Focus · lesson
-            <span class="es-sub">(your driving, one weakness at a time)</span></span>
+          <span class="es-label"><span id="focus-icon">…</span> <span data-i18n="eng.focusTitle">Focus · lesson</span>
+            <span class="es-sub" data-i18n="eng.focusSub">(your driving, one weakness at a time)</span></span>
         </div>
-        <div class="es-msg" id="focus-msg">Warming up… drive a few clean laps.</div>
+        <div class="es-msg" id="focus-msg" data-i18n="focus.warmup">Warming up… drive a few clean laps.</div>
         <div class="focus-drill" id="focus-drill" hidden></div>
         <div class="focus-target" id="focus-target" hidden></div>
       </div>
@@ -87,15 +88,15 @@
       <div class="pit-reminder" id="pit-reminder" hidden></div>
 
       <div class="eng-profile" id="eng-profile" hidden>
-        <div class="es-label">Engineer profile</div>
+        <div class="es-label" data-i18n="eng.profile">Engineer profile</div>
         <div class="prof-name" id="prof-name"></div>
-        <div class="prof-row"><span class="muted">Phases:</span>
+        <div class="prof-row"><span class="muted" data-i18n="eng.phases">Phases:</span>
           <span id="prof-phases"></span></div>
-        <div class="prof-row"><span class="muted">On the fly:</span>
+        <div class="prof-row"><span class="muted" data-i18n="eng.onfly">On the fly:</span>
           <span id="prof-alvolo"></span></div>
       </div>
 
-      <p class="hint">
+      <p class="hint" data-i18n-html="eng.hint">
         The diagnosis comes from the coach in real time (start <b>Coach Live</b> or the
         <b>backend</b>). The changes on the right apply to the setup file:
         they must be <b>loaded in the pits</b>, they don't change the car while you drive.
@@ -105,14 +106,14 @@
     <!-- RIGHT: setup editor -->
     <section class="eng-setup">
       <div class="eng-setup-head">
-        <h2>Setup <span id="setup-car" class="muted"></span></h2>
+        <h2><span data-i18n="setup.title">Setup</span> <span id="setup-car" class="muted"></span></h2>
         <div class="legend2">
-          <span><b>click</b> = game step</span>
-          <span class="muted">psi/% = estimate</span>
+          <span data-i18n-html="legend2.click"><b>click</b> = game step</span>
+          <span class="muted" data-i18n="legend2.est">psi/% = estimate</span>
         </div>
       </div>
       <div id="setup-body" class="setup-body">
-        <div class="empty2">Pick a car/track above. HONE reads setups from
+        <div class="empty2" data-i18n-html="setup.pick">Pick a car/track above. HONE reads setups from
           <code>Documents/Assetto Corsa Competizione/Setups/&lt;car&gt;/&lt;track&gt;/</code> (ACC)
           and <code>Documents/Assetto Corsa/setups/</code> (AC).</div>
       </div>
@@ -122,38 +123,39 @@
   <!-- Pending changes tray -->
   <footer class="tray" id="tray" hidden>
     <div class="tray-head">
-      <b>Pending changes</b>
+      <b data-i18n="tray.pending">Pending changes</b>
       <span id="tray-count" class="muted"></span>
     </div>
     <div id="tray-list" class="tray-list"></div>
     <div class="tray-actions">
-      <button id="btn-reset" type="button" class="ghost">Reset all</button>
-      <button id="btn-write" type="button" class="primary">Write setup…</button>
+      <button id="btn-reset" type="button" class="ghost" data-i18n="tray.reset">Reset all</button>
+      <button id="btn-write" type="button" class="primary" data-i18n="tray.write">Write setup…</button>
     </div>
   </footer>
 
   <!-- Confirm modal -->
   <div class="modal-bg" id="modal" hidden>
     <div class="modal">
-      <h3>Confirm setup write</h3>
+      <h3 data-i18n="modal.title">Confirm setup write</h3>
       <div id="modal-diff" class="modal-diff"></div>
-      <label class="modal-name">Destination file name
+      <label class="modal-name"><span data-i18n="modal.name">Destination file name</span>
         <input id="modal-name" type="text" autocomplete="off">
       </label>
-      <p class="modal-hint">
+      <p class="modal-hint" data-i18n-html="modal.hint">
         A <b>new file</b> will be created (the original stays intact). After
         writing: return to the pits → Setup screen → load the new setup.
       </p>
       <div id="modal-error" class="modal-error" hidden></div>
       <div class="modal-actions">
-        <button id="modal-cancel" type="button" class="ghost">Cancel</button>
-        <button id="modal-ok" type="button" class="primary">Write</button>
+        <button id="modal-cancel" type="button" class="ghost" data-i18n="modal.cancel">Cancel</button>
+        <button id="modal-ok" type="button" class="primary" data-i18n="modal.write">Write</button>
       </div>
     </div>
   </div>
 
   <div id="toast" class="toast" hidden></div>
 
+  <script src="/static/i18n.js"></script>
   <script src="/static/tour.js"></script>
   <script src="/static/engineer.js"></script>
 </body>

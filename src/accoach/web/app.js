@@ -2,14 +2,18 @@
 
 const $ = (id) => document.getElementById(id);
 const fmt = (s) => (s >= 0 ? "+" : "") + s.toFixed(3);
+// i18n: translate a chrome string (defensive if i18n.js failed to load).
+const t = (k) => (window.HoneI18n ? window.HoneI18n.t(k) : k);
+const LANG = () => (window.HoneI18n ? window.HoneI18n.lang : "en");
 
 let CURRENT = null;   // current combo {car, track}
 let DATA = null;      // last /api/analysis payload
+let COMBOS = [];      // last /api/combos payload (kept for re-labelling on lang switch)
+let LAST_HOVER = null; // last hover position, so a re-render keeps the readout
 let VIEW = "compare"; // "compare" | "progress"
 let HOVER_WIRED = false;
 let MAP_HIT = null;   // {rv, X, Y} screen transform captured by drawMap, for map hover
-const MAP_READOUT_DEFAULT =
-  "Racing line · colour = delta (red slower, green faster) · ▽ your braking · ○ reference braking";
+const MAP_READOUT_DEFAULT = () => t("map.readout");
 
 function fmtMs(ms) {
   if (!ms || ms <= 0) return "--:--.---";
@@ -26,7 +30,10 @@ function setPanelLoading(id, msg) {
 }
 
 async function getJSON(url) {
-  const r = await fetch(url);
+  // Pass the active language so backend-generated content arrives localised
+  // (the backend ignores &lang until it handles it — harmless today).
+  const u = url + (url.indexOf("?") === -1 ? "?" : "&") + "lang=" + encodeURIComponent(LANG());
+  const r = await fetch(u);
   if (!r.ok) throw new Error(await r.text());
   return r.json();
 }
@@ -35,14 +42,9 @@ async function init() {
   let combos;
   try { combos = await getJSON("/api/combos"); } catch (e) { combos = []; }
   if (!combos.length) { document.body.classList.add("no-data"); return; }
+  COMBOS = combos;
+  fillCombos();
   const sel = $("combo");
-  sel.innerHTML = "";
-  for (const c of combos) {
-    const o = document.createElement("option");
-    o.value = JSON.stringify({ car: c.car, track: c.track });
-    o.textContent = `${c.car} · ${c.track}  (${c.laps} laps, best ${c.best})`;
-    sel.appendChild(o);
-  }
   sel.onchange = () => {
     const combo = JSON.parse(sel.value);
     loadCombo(combo);
@@ -55,30 +57,43 @@ async function init() {
   wireTabs();
   await loadCombo(JSON.parse(sel.value));
   // First visit: pop the tour once data is on screen (so #vmin/#debrief exist).
-  if (window.HoneTour) window.HoneTour.auto(TOUR_STEPS, "hone_tour_analysis");
+  if (window.HoneTour) window.HoneTour.auto(tourSteps(), "hone_tour_analysis");
+}
+
+// Build the combo dropdown from COMBOS, preserving the current selection so a
+// language switch can relabel "laps"/"best" without losing the user's place.
+function fillCombos() {
+  const sel = $("combo");
+  if (!sel) return;
+  const prev = sel.value;
+  sel.innerHTML = "";
+  for (const c of COMBOS) {
+    const o = document.createElement("option");
+    o.value = JSON.stringify({ car: c.car, track: c.track });
+    o.textContent = `${c.car} · ${c.track}  (${c.laps} ${t("combo.laps")}, ${t("combo.best")} ${c.best})`;
+    sel.appendChild(o);
+  }
+  if (prev) sel.value = prev;
 }
 
 // Guided tour (vanilla coachmarks — see tour.js). Selectors are real elements
 // in index.html; missing/hidden ones are skipped by the tour engine.
-const TOUR_STEPS = [
-  { sel: "#combo", title: "Pick a lap",
-    text: "Choose the car and track. HONE compares your laps for this combo." },
-  { sel: ".tabs", title: "Four views",
-    text: "Compare two laps, see them on the Map, split by Sectors, or follow Trends over time." },
-  { sel: "#c-delta", title: "Delta",
-    text: "Where you're gaining or losing vs your reference, across the lap. Green (below the line) is faster." },
-  { sel: "#vmin", title: "Min speed per corner",
-    text: "Apex speed in every corner vs the reference — green means you carried more speed." },
-  { sel: "#debrief", title: "Where to improve",
-    text: "Your biggest time losses, corner by corner, with the likely cause and a fix." },
-  { sel: ".export", title: "Take it with you",
-    text: "Export the lap as CSV or JSON for deeper analysis." },
-];
+// Built lazily so each step's text follows the active language at start time.
+function tourSteps() {
+  return [
+    { sel: "#combo", title: t("tour.a1.t"), text: t("tour.a1.x") },
+    { sel: ".tabs", title: t("tour.a2.t"), text: t("tour.a2.x") },
+    { sel: "#c-delta", title: t("tour.a3.t"), text: t("tour.a3.x") },
+    { sel: "#vmin", title: t("tour.a4.t"), text: t("tour.a4.x") },
+    { sel: "#debrief", title: t("tour.a5.t"), text: t("tour.a5.x") },
+    { sel: ".export", title: t("tour.a6.t"), text: t("tour.a6.x") },
+  ];
+}
 
 function wireTour() {
   const btn = document.querySelector(".tour-help");
   if (btn && window.HoneTour) {
-    btn.onclick = () => window.HoneTour.start(TOUR_STEPS, "hone_tour_analysis");
+    btn.onclick = () => window.HoneTour.start(tourSteps(), "hone_tour_analysis");
   }
 }
 
@@ -99,24 +114,24 @@ function wireTabs() {
 }
 
 async function loadProgress(combo) {
-  setPanelLoading("prog-summary", "Loading trends…");
+  setPanelLoading("prog-summary", t("load.trends"));
   let p;
   try { p = await getJSON("/api/progress?" + new URLSearchParams({ car: combo.car, track: combo.track })); }
   catch (e) {
     $("prog-summary").innerHTML = "";
     $("levels").innerHTML = ""; $("trends").innerHTML = "";
     $("recurring").innerHTML =
-      `<div class="clean">Couldn't load progress — is the analysis backend running?</div>`;
+      `<div class="clean">${t("err.progress")}</div>`;
     return;
   }
 
   const c = p.consistency || {};
   const item = (k, v) => `<div class="item"><div class="k">${k}</div><div class="v">${v}</div></div>`;
   $("prog-summary").innerHTML = c.n
-    ? item("Valid laps", c.n) + item("Best", fmtMs(c.best_ms)) +
-      item("Average", fmtMs(c.mean_ms)) + item("Spread", (c.spread_ms / 1000).toFixed(3) + "s") +
-      item("σ", (c.std_ms / 1000).toFixed(3) + "s")
-    : item("—", "no valid lap");
+    ? item(t("prog.validLaps"), c.n) + item(t("prog.best"), fmtMs(c.best_ms)) +
+      item(t("prog.average"), fmtMs(c.mean_ms)) + item(t("prog.spread"), (c.spread_ms / 1000).toFixed(3) + "s") +
+      item(t("prog.sigma"), (c.std_ms / 1000).toFixed(3) + "s")
+    : item(t("prog.dash"), t("prog.noValid"));
 
   drawProgress(p);
   renderLevels(p.levels);
@@ -124,12 +139,12 @@ async function loadProgress(combo) {
 
   const el = $("recurring");
   if (!p.recurring.length) {
-    el.innerHTML = `<div class="clean">No recurring mistakes — nice consistency!</div>`;
+    el.innerHTML = `<div class="clean">${t("recur.none")}</div>`;
   } else {
     el.innerHTML = p.recurring.map((r) =>
       `<div class="recur"><span class="count">${r.count}×</span>` +
       `<span class="msg">${r.message}</span>` +
-      `<span class="where">Corners: ${r.corners.join(", ")}</span></div>`).join("");
+      `<span class="where">${t("recur.corners")}${r.corners.join(", ")}</span></div>`).join("");
   }
 }
 
@@ -142,22 +157,22 @@ function renderLevels(levels) {
   for (const lv of levels) {
     let gap;
     if (lv.key === "best") {
-      gap = `<span class="lvl-gap base">your reference</span>`;
+      gap = `<span class="lvl-gap base">${t("lvl.yourRef")}</span>`;
     } else if (lv.gain_s > 0) {
-      const hint = lv.key === "ideal" ? "consistency on the table" : "gap to PRO";
+      const hint = lv.key === "ideal" ? t("lvl.consistency") : t("lvl.gapPro");
       gap = `<span class="lvl-gap faster">−${lv.gain_s.toFixed(3)}s</span>` +
             `<span class="lvl-hint">${hint}</span>`;
     } else {
       const ahead = Math.abs(lv.gain_s).toFixed(3);
-      gap = `<span class="lvl-gap done">✓ already beaten</span>` +
-            `<span class="lvl-hint">+${ahead}s vs PRO</span>`;
+      gap = `<span class="lvl-gap done">${t("lvl.beaten")}</span>` +
+            `<span class="lvl-hint">+${ahead}s ${t("lvl.vsPro")}</span>`;
     }
     rows += `<div class="lvl" data-key="${lv.key}">` +
       `<span class="lvl-label">${lv.label}</span>` +
       `<span class="lvl-time">${lv.lap_time}</span>` +
       gap + `</div>`;
   }
-  el.innerHTML = `<h3>Levels <small>(best → ideal → PRO · gap = time available)</small></h3>` +
+  el.innerHTML = `<h3>${t("lvl.header")}</h3>` +
     `<div class="ladder">${rows}</div>`;
 }
 
@@ -166,21 +181,22 @@ function renderTrends(trends) {
   const el = $("trends");
   if (!el) return;
   if (!trends || !trends.length) {
-    el.innerHTML = `<div class="clean">No recurring weak points — nice consistency!</div>`;
+    el.innerHTML = `<div class="clean">${t("trends.none")}</div>`;
     return;
   }
-  el.innerHTML = trends.map((t) => {
-    const sys = t.systematic;
+  // NB: local var renamed to `w` so it doesn't shadow the global `t` (translate).
+  el.innerHTML = trends.map((w) => {
+    const sys = w.systematic;
     const badge = sys
-      ? `<span class="wk-badge on">Systematic</span>`
-      : `<span class="wk-badge off">Sporadic</span>`;
-    const tag = sys ? "to train" : "one-off";
+      ? `<span class="wk-badge on">${t("badge.systematic")}</span>`
+      : `<span class="wk-badge off">${t("badge.sporadic")}</span>`;
+    const tag = sys ? t("trends.toTrain") : t("trends.oneOff");
     return `<div class="weak ${sys ? "sys" : ""}">` +
       `<div class="weak-head">` +
-      `<span class="corner">${t.name}</span>${badge}` +
-      `<span class="lost">−${t.total_s.toFixed(3)}s</span></div>` +
+      `<span class="corner">${w.name}</span>${badge}` +
+      `<span class="lost">−${w.total_s.toFixed(3)}s</span></div>` +
       `<div class="detail">${tag} · ` +
-      `median −${t.median_s.toFixed(3)}s · ${t.occurrences}/${t.laps} laps</div>` +
+      `${t("trends.median")} −${w.median_s.toFixed(3)}s · ${w.occurrences}/${w.laps} ${t("lbl.laps")}</div>` +
       `</div>`;
   }).join("");
 }
@@ -227,7 +243,7 @@ async function loadSectors() {
   const lap = $("lap").value, base = $("baseline").value;
   if (lap) q.set("lap", lap);
   if (base) q.set("baseline", base);
-  setPanelLoading("sec-summary", "Loading sectors…");
+  setPanelLoading("sec-summary", t("load.sectors"));
   let s;
   try { s = await getJSON("/api/sectors?" + q.toString()); }
   catch (e) {
@@ -243,10 +259,10 @@ function drawSectors(s) {
   const item = (k, v, cls) =>
     `<div class="item"><div class="k">${k}</div><div class="v ${cls || ""}">${v}</div></div>`;
   $("sec-summary").innerHTML =
-    item("Comparison", s.baseline.lap_time) +
-    item("Lap", s.review.lap_time) +
-    item("Gap", fmt(gap) + "s", gap > 0 ? "slower" : "faster") +
-    item("Sectors", s.real ? "real track sectors" : "thirds (position)");
+    item(t("lbl.comparison"), s.baseline.lap_time) +
+    item(t("lbl.lap"), s.review.lap_time) +
+    item(t("lbl.gap"), fmt(gap) + "s", gap > 0 ? "slower" : "faster") +
+    item(t("lbl.sectors"), s.real ? t("sec.real") : t("sec.thirds"));
 
   // Diverging delta bars, scaled to the worst sector (min 0.05s).
   let mx = 0.05;
@@ -278,11 +294,11 @@ function drawSectors(s) {
     const from = s.ideal.best_from
       .map((p, i) => `S${i + 1} ← <b>${lapTime(p)}</b>`).join(" · ");
     $("ideal").innerHTML =
-      `<h3>Ideal lap</h3>` +
+      `<h3>${t("ideal.title")}</h3>` +
       `<div class="ideal-time">${s.ideal.ideal}` +
-      (gain > 0 ? ` <span class="faster">potential −${gain.toFixed(3)}s</span>` : "") +
+      (gain > 0 ? ` <span class="faster">${t("ideal.potential")} −${gain.toFixed(3)}s</span>` : "") +
       `</div><div class="ideal-from">${from}</div>` +
-      `<div class="muted small">Your best sectors so far, stitched together.</div>`;
+      `<div class="muted small">${t("ideal.from")}</div>`;
   } else {
     $("ideal").innerHTML = "";
   }
@@ -410,7 +426,7 @@ function reloadSelection() {
 
 function exportData(fmt) {
   if (!CURRENT) return;
-  const q = new URLSearchParams({ car: CURRENT.car, track: CURRENT.track, fmt });
+  const q = new URLSearchParams({ car: CURRENT.car, track: CURRENT.track, fmt, lang: LANG() });
   const lap = $("lap").value;
   if (lap) q.set("lap", lap);
   window.location = "/api/export?" + q.toString();
@@ -421,14 +437,14 @@ async function loadCombo(combo, lapPath, baselinePath) {
   const q = new URLSearchParams({ car: combo.car, track: combo.track });
   if (lapPath) q.set("lap", lapPath);
   if (baselinePath) q.set("baseline", baselinePath);
-  setPanelLoading("summary", "Loading lap…");
-  $("readout").innerHTML = "Loading lap…";
-  if (VIEW === "map") $("map-readout").innerHTML = "Loading lap…";
+  setPanelLoading("summary", t("load.lap"));
+  $("readout").innerHTML = t("load.lap");
+  if (VIEW === "map") $("map-readout").innerHTML = t("load.lap");
   let a;
   try { a = await getJSON("/api/analysis?" + q.toString()); }
   catch (e) {
     $("summary").innerHTML =
-      `<div class="item"><div class="v">—</div><div class="k">Couldn't load this lap.</div></div>`;
+      `<div class="item"><div class="v">—</div><div class="k">${t("err.lap")}</div></div>`;
     return;
   }
   DATA = a;
@@ -437,15 +453,19 @@ async function loadCombo(combo, lapPath, baselinePath) {
   drawCornerSpeeds(a);
   drawDebrief(a);
   redraw(null);
-  if (VIEW === "map") { $("map-readout").innerHTML = MAP_READOUT_DEFAULT; drawMap(a, null); }
+  if (VIEW === "map") { $("map-readout").innerHTML = MAP_READOUT_DEFAULT(); drawMap(a, null); }
   if (VIEW === "sectors") loadSectors();
   wireHover();
 }
 
-function fillLaps(a) {
+function fillLaps(a, force) {
   const key = a.car + a.track;
-  if ($("lap").dataset.for === key) return;  // keep selections within a combo
+  // Skip if already filled for this combo — unless forced (e.g. language switch
+  // needs to relabel "(invalid)" while keeping the current selection).
+  if (!force && $("lap").dataset.for === key) return;
   $("lap").dataset.for = key;
+  const keepLap = force ? $("lap").value : null;
+  const keepBase = force ? $("baseline").value : null;
 
   // Find the fastest valid lap so we can star it in the dropdowns.
   let bestPath = null, bestMs = Infinity;
@@ -463,13 +483,13 @@ function fillLaps(a) {
       o.value = l.path;
       const star = l.path === bestPath ? "★ " : "";
       const pro = l.source === "pro" ? " [PRO]" : "";
-      o.textContent = `${star}${l.lap_time}${l.valid ? "" : " (invalid)"}${pro}`;
+      o.textContent = `${star}${l.lap_time}${l.valid ? "" : " " + t("lap.invalid")}${pro}`;
       if (l.path === selectedPath) o.selected = true;
       sel.appendChild(o);
     }
   };
-  fill("lap", a.review.path);
-  fill("baseline", a.reference.path);
+  fill("lap", keepLap || a.review.path);
+  fill("baseline", keepBase || a.reference.path);
 }
 
 function drawSummary(a) {
@@ -478,10 +498,10 @@ function drawSummary(a) {
   const item = (k, v, cls) =>
     `<div class="item"><div class="k">${k}</div><div class="v ${cls || ""}">${v}</div></div>`;
   $("summary").innerHTML =
-    item("Comparison", a.reference.lap_time) +
-    item("Lap", a.review.lap_time) +
-    item("Gap", fmt(gap) + "s", gap > 0 ? "slower" : "faster") +
-    (c.n >= 2 ? item("Consistency", `σ ${(c.std_ms / 1000).toFixed(3)}s · ${c.n} laps`) : "");
+    item(t("lbl.comparison"), a.reference.lap_time) +
+    item(t("lbl.lap"), a.review.lap_time) +
+    item(t("lbl.gap"), fmt(gap) + "s", gap > 0 ? "slower" : "faster") +
+    (c.n >= 2 ? item(t("sum.consistency"), `σ ${(c.std_ms / 1000).toFixed(3)}s · ${c.n} ${t("lbl.laps")}`) : "");
 }
 
 // Min-speed-per-corner table: how fast you carry through each apex vs the
@@ -505,9 +525,9 @@ function drawCornerSpeeds(a) {
       `<td class="vn ${cls}">${dTxt}</td></tr>`;
   }
   el.innerHTML =
-    `<h3>Min speed per corner <small>(km/h · green = faster than reference)</small></h3>` +
+    `<h3>${t("vmin.header")}</h3>` +
     `<table class="vmin-table"><thead><tr>` +
-    `<th>Corner</th><th>You</th><th>Ref</th><th>Δ</th>` +
+    `<th>${t("vmin.corner")}</th><th>${t("vmin.you")}</th><th>${t("vmin.ref")}</th><th>${t("vmin.delta")}</th>` +
     `</tr></thead><tbody>${body}</tbody></table>`;
 }
 
@@ -521,11 +541,11 @@ function drawDebrief(a) {
   const el = $("debrief");
   const legend = cornerLegend(a);
   if (!a.losses.length) {
-    el.innerHTML = `<h3>Where to improve</h3>${legend}` +
-      `<div class="clean">Clean lap — no significant time lost per corner.</div>`;
+    el.innerHTML = `<h3>${t("debrief.title")}</h3>${legend}` +
+      `<div class="clean">${t("debrief.clean")}</div>`;
     return;
   }
-  let html = `<h3>Where to improve</h3>${legend}`;
+  let html = `<h3>${t("debrief.title")}</h3>${legend}`;
   for (const l of a.losses) {
     const major = l.lost_s >= 0.2 ? "major" : "";
     html += `<div class="loss ${major}">` +
@@ -685,16 +705,17 @@ function readoutHTML(a, p) {
   const corner = (a.corners || []).find((c) => p >= c.entry && p <= c.exit);
   const where = corner ? `<b class="muted">${corner.name}</b> &nbsp;·&nbsp; ` : "";
   return where +
-    `<b>Pos ${Math.round(p * 100)}%</b> &nbsp;·&nbsp; ` +
-    `Speed <b>${yv.toFixed(0)}</b> <span class="muted">(ref ${rfv.toFixed(0)}, ${dv >= 0 ? "+" : ""}${dv.toFixed(0)})</span> &nbsp;·&nbsp; ` +
+    `<b>${t("ro.pos")} ${Math.round(p * 100)}%</b> &nbsp;·&nbsp; ` +
+    `${t("ro.speed")} <b>${yv.toFixed(0)}</b> <span class="muted">(${t("ro.ref")} ${rfv.toFixed(0)}, ${dv >= 0 ? "+" : ""}${dv.toFixed(0)})</span> &nbsp;·&nbsp; ` +
     `Δ <b class="${dl > 0 ? "slower" : "faster"}">${dl >= 0 ? "+" : ""}${dl.toFixed(3)}s</b> &nbsp;·&nbsp; ` +
-    `Throttle <b>${Math.round(rv.throttle[iv] * 100)}%</b>  Brake <b>${Math.round(rv.brake[iv] * 100)}%</b> &nbsp;·&nbsp; ` +
-    `Gear <b>${rv.gear[iv]}</b>`;
+    `${t("ro.throttle")} <b>${Math.round(rv.throttle[iv] * 100)}%</b>  ${t("ro.brake")} <b>${Math.round(rv.brake[iv] * 100)}%</b> &nbsp;·&nbsp; ` +
+    `${t("ro.gear")} <b>${rv.gear[iv]}</b>`;
 }
 
 function updateReadout(a, p) {
+  LAST_HOVER = p;
   const el = $("readout");
-  if (p == null) { el.innerHTML = "Hover over the charts for point-by-point values…"; return; }
+  if (p == null) { el.innerHTML = t("readout.hint"); return; }
   el.innerHTML = readoutHTML(a, p);
 }
 
@@ -736,7 +757,7 @@ function wireHover() {
       $("map-readout").innerHTML = readoutHTML(DATA, p);
     });
     map.addEventListener("mouseleave", () => {
-      $("map-readout").innerHTML = MAP_READOUT_DEFAULT;
+      $("map-readout").innerHTML = MAP_READOUT_DEFAULT();
       if (DATA) drawMap(DATA, null);
     });
   }
@@ -756,5 +777,27 @@ window.addEventListener("resize", () => {
     else redraw(null);                 // compare: redraw from DATA
   }, 150);
 });
+// Live language switch: i18n.js already re-applied the static chrome; here we
+// re-render the dynamic, JS-built parts in the new language without a reload,
+// keeping the current combo/lap selection and hover position.
+window.HoneI18nRerender = function () {
+  fillCombos();
+  if (DATA) fillLaps(DATA, true);
+  if (VIEW === "compare") {
+    if (DATA) {
+      drawSummary(DATA);
+      drawCornerSpeeds(DATA);
+      drawDebrief(DATA);
+      redraw(LAST_HOVER);
+    }
+  } else if (VIEW === "map") {
+    if (DATA) { $("map-readout").innerHTML = MAP_READOUT_DEFAULT(); drawMap(DATA, null); }
+  } else if (VIEW === "sectors") {
+    if (CURRENT) loadSectors();
+  } else if (VIEW === "progress") {
+    if (CURRENT) loadProgress(CURRENT);
+  }
+};
+
 wireTour();
 init();

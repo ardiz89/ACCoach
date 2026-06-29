@@ -4,6 +4,9 @@
 
 const WS_PORT = 8777;            // the live backend; the page itself is on 8778
 const $ = (id) => document.getElementById(id);
+// i18n: translate a chrome string (defensive if i18n.js failed to load).
+const t = (k) => (window.HoneI18n ? window.HoneI18n.t(k) : k);
+const LANG = () => (window.HoneI18n ? window.HoneI18n.lang : "en");
 
 const state = {
   car: null, track: null,
@@ -13,11 +16,17 @@ const state = {
   pending: {},                   // key "param#slot" -> delta (clicks)
   autoSelected: false,
   lastWritten: null,             // file name written this session (box reminder)
+  lastLive: null,                // last live payload, for re-render on lang switch
 };
 
 const slotKey = (param, i) => `${param}#${i}`;
 
 async function api(url, opts) {
+  // Pass the active language so backend-generated content arrives localised
+  // (the backend ignores &lang until it handles it — harmless today).
+  if (url.indexOf("/api/") === 0) {
+    url += (url.indexOf("?") === -1 ? "?" : "&") + "lang=" + encodeURIComponent(LANG());
+  }
   const r = await fetch(url, opts);
   if (!r.ok) {
     let detail = r.statusText;
@@ -34,7 +43,7 @@ async function loadCombos() {
   const sel = $("combo");
   sel.innerHTML = "";
   if (!combos.length) {
-    sel.innerHTML = '<option value="">(no setup found)</option>';
+    sel.innerHTML = `<option value="">${t("eng.noSetupOpt")}</option>`;
     return;
   }
   // Group the (potentially many) cars by engineer class for a usable dropdown.
@@ -91,7 +100,7 @@ async function loadClass(car) {
   chip.textContent = info.class;
   chip.dataset.cls = info.class;
   chip.hidden = false;
-  $("prof-name").textContent = `Engineer ${info.profile.name}`;
+  $("prof-name").textContent = `${t("eng.engPrefix")}${info.profile.name}`;
   $("prof-phases").textContent = info.profile.phases.join(" → ");
   $("prof-alvolo").textContent = info.profile.al_volo.join(", ");
   $("eng-profile").hidden = false;
@@ -99,16 +108,11 @@ async function loadClass(car) {
 
 // Shown when a car/track has no setup files at all — explain where HONE looks
 // so the contradiction ("choose a setup" with an empty dropdown) is resolved.
-const NO_SETUP_HTML =
-  '<div class="empty2">No setup files found for this car/track.<br>' +
-  'HONE reads setups from:<br>' +
-  '<code>Documents/Assetto Corsa Competizione/Setups/&lt;car&gt;/&lt;track&gt;/</code> (ACC)<br>' +
-  '<code>Documents/Assetto Corsa/setups/&lt;car&gt;/&lt;track&gt;/</code> (AC)<br>' +
-  'Save a setup in the game, then reload this page.</div>';
+const noSetupHTML = () => `<div class="empty2">${t("eng.noSetupBody")}</div>`;
 
 async function onSetupChange() {
   const opt = $("setup").selectedOptions[0];
-  if (!opt || !opt.dataset.path) { $("setup-body").innerHTML = NO_SETUP_HTML; return; }
+  if (!opt || !opt.dataset.path) { $("setup-body").innerHTML = noSetupHTML(); return; }
   state.setupPath = opt.dataset.path;
   const data = await api(`/api/setup/current?path=${encodeURIComponent(state.setupPath)}`);
   state.setupName = data.name;
@@ -223,11 +227,9 @@ function prepareChange(changes) {
   rerender();
   if (applied) {
     $("setup-body").scrollIntoView({ behavior: "smooth", block: "start" });
-    showToast(missing
-      ? "Change prepared (some parameters are not in this setup)."
-      : "Change prepared in the editor — review it and press “Write setup”.");
+    showToast(missing ? t("eng.prepared.some") : t("eng.prepared.ok"));
   } else {
-    showToast("The proposed parameter is not in this setup.", true);
+    showToast(t("eng.prepared.none"), true);
   }
 }
 
@@ -265,7 +267,7 @@ function renderTray() {
     span.className = "ch";
     const where = c.slotLabel ? ` [${c.slotLabel}]` : "";
     span.innerHTML = `<b>${c.label}${where}</b> ` +
-      `<span class="d">${c.delta > 0 ? "+" : ""}${c.delta} click</span>`;
+      `<span class="d">${c.delta > 0 ? "+" : ""}${c.delta} ${t("eng.click")}</span>`;
     list.appendChild(span);
   }
 }
@@ -286,7 +288,7 @@ async function openWriteModal() {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ path: state.setupPath, changes }),
     });
-  } catch (e) { return showToast("Preview error: " + e.message, true); }
+  } catch (e) { return showToast(t("eng.previewErr") + e.message, true); }
 
   const box = $("modal-diff");
   if (!res.ok) {
@@ -313,7 +315,7 @@ async function openWriteModal() {
 
 async function confirmWrite() {
   const name = $("modal-name").value.trim();
-  if (!name) { showModalError("Enter a file name."); return; }
+  if (!name) { showModalError(t("eng.enterName")); return; }
   const body = { path: state.setupPath, as_name: name, confirm: true,
                  changes: changesPayload() };
   try {
@@ -334,8 +336,8 @@ async function confirmWrite() {
     showToast("✓ " + res.reload_hint);
   } catch (e) {
     showModalError(e.message.includes("already exists")
-      ? "A setup with this name already exists — choose another."
-      : "Write error: " + e.message);
+      ? t("eng.exists")
+      : t("eng.writeErr") + e.message);
   }
 }
 
@@ -351,11 +353,11 @@ async function undoSetup() {
       body: JSON.stringify({ path: state.setupPath }),
     });
     await onSetupChange();              // reload the restored values
-    showToast("✓ Setup restored from the last backup");
+    showToast(t("eng.restored"));
   } catch (e) {
     showToast(e.message.includes("backup")
-      ? "No backup to restore for this setup."
-      : "Restore error: " + e.message, true);
+      ? t("eng.noBackup")
+      : t("eng.restoreErr") + e.message, true);
   }
 }
 
@@ -415,10 +417,11 @@ function resetTyres() {
 }
 
 function applyLive(st) {
+  state.lastLive = st;             // remembered so a language switch can re-render
   const badge = $("live-badge");
   if (!st.connected) {
-    badge.dataset.state = "off"; $("live-text").textContent = "telemetry offline";
-    $("live-car").textContent = "Waiting for telemetry…";
+    badge.dataset.state = "off"; $("live-text").textContent = t("live.offline");
+    $("live-car").textContent = t("eng.waiting");
     // Don't leave the gauges, proposal, focus and pit reminder frozen with the
     // last live values (you could "Prepare change" on a stale proposal). Reset.
     for (const id of ["g-speed", "g-gear", "g-tc", "g-abs", "g-map"]) {
@@ -431,7 +434,7 @@ function applyLive(st) {
     return;
   }
   badge.dataset.state = st.in_pit ? "pit" : "on";
-  $("live-text").textContent = st.in_pit ? "in pit" : "on track";
+  $("live-text").textContent = st.in_pit ? t("live.inpit") : t("live.ontrack");
   $("live-car").textContent = `${st.car || "?"} · ${st.track || "?"}`;
   $("live-car").classList.remove("muted");
   $("g-speed").textContent = Math.round(st.speed_kmh);
@@ -470,7 +473,7 @@ function renderEngineer(st) {
     // Anchor the proposal to the corners it's based on — the evidence a driver
     // needs before writing a setup ("Corners 7, 9").
     const cz = Array.isArray(eng.corners) && eng.corners.length
-      ? "Corners " + eng.corners.join(", ") : "";
+      ? t("eng.corners") + eng.corners.join(", ") : "";
     $("es-cat").textContent = cz;
     conf.hidden = false; conf.textContent = eng.confidence || "medium";
     conf.dataset.c = eng.confidence || "medium";
@@ -488,7 +491,7 @@ function renderEngineer(st) {
     conf.hidden = true; prep.hidden = true;
     says.classList.add("active");
   } else {
-    $("es-msg").textContent = "—"; $("es-cat").textContent = "";
+    $("es-msg").textContent = t("eng.dash"); $("es-cat").textContent = "";
     conf.hidden = true; prep.hidden = true;
     says.classList.remove("active");
   }
@@ -512,14 +515,14 @@ function renderFocus(st) {
   if (!f) {
     box.dataset.kind = "";
     $("focus-icon").textContent = "…";
-    $("focus-msg").textContent = "Warming up… drive a few clean laps.";
+    $("focus-msg").textContent = t("focus.warmup");
     drill.hidden = true; target.hidden = true;
     return;
   }
   const meta = FOCUS_KIND[f.kind] || FOCUS_KIND.assess;
   box.dataset.kind = meta.state;
   $("focus-icon").textContent = meta.icon;
-  $("focus-msg").textContent = f.message || "—";
+  $("focus-msg").textContent = f.message || t("eng.dash");
 
   if (f.drill) { drill.hidden = false; drill.textContent = f.drill; }
   else { drill.hidden = true; }
@@ -538,8 +541,7 @@ function renderPitReminder(st) {
   const el = $("pit-reminder");
   if (state.lastWritten && st.in_pit) {
     el.hidden = false;
-    el.innerHTML = `🅿️ You're in the pits: MFD → <b>Setup</b> → load ` +
-      `<b>${state.lastWritten}</b> → leave the pits to apply it.`;
+    el.innerHTML = t("eng.pit1") + state.lastWritten + t("eng.pit2");
   } else {
     el.hidden = true;
   }
@@ -585,25 +587,36 @@ $("modal-ok").onclick = confirmWrite;
 // ---- guided tour ---------------------------------------------------------
 // Coachmarks (vanilla — see tour.js). These panels exist statically in
 // engineer.html, so they're visible on load even before telemetry/setup arrive.
-const TOUR_STEPS = [
-  { sel: "#gauges", title: "Live diagnosis",
-    text: "Speed, gear and aids straight from the car when the coach is running live." },
-  { sel: "#tyres", title: "Tyres",
-    text: "Temperatures and pressures, colour-coded — keep them in the green window." },
-  { sel: "#engineer-says", title: "The engineer",
-    text: "A setup change proposed from your telemetry. Hit “Prepare change” to load it into the editor." },
-  { sel: "#focus-says", title: "Focus · lesson",
-    text: "Your driving coach, working one weakness at a time while you lap." },
-  { sel: ".eng-setup", title: "Setup editor",
-    text: "Adjust by game clicks, then “Write setup” saves a new file to load in the pits." },
-];
+// Built lazily so each step's text follows the active language at start time.
+function tourSteps() {
+  return [
+    { sel: "#gauges", title: t("tour.e1.t"), text: t("tour.e1.x") },
+    { sel: "#tyres", title: t("tour.e2.t"), text: t("tour.e2.x") },
+    { sel: "#engineer-says", title: t("tour.e3.t"), text: t("tour.e3.x") },
+    { sel: "#focus-says", title: t("tour.e4.t"), text: t("tour.e4.x") },
+    { sel: ".eng-setup", title: t("tour.e5.t"), text: t("tour.e5.x") },
+  ];
+}
 
 const tourBtn = document.querySelector(".tour-help");
 if (tourBtn && window.HoneTour) {
-  tourBtn.onclick = () => window.HoneTour.start(TOUR_STEPS, "hone_tour_engineer");
+  tourBtn.onclick = () => window.HoneTour.start(tourSteps(), "hone_tour_engineer");
 }
 
+// Live language switch: re-render the dynamic, JS-built parts in the new
+// language (i18n.js has already re-applied the static chrome).
+window.HoneI18nRerender = function () {
+  if (state.setupPath) {
+    renderSetup({ groups: groupsOf(state.params), params: state.params });
+    renderTray();
+  } else {
+    $("setup-body").innerHTML = noSetupHTML();
+  }
+  // Re-render the live block from the last payload (or the offline state).
+  applyLive(state.lastLive || { connected: false });
+};
+
 loadCombos()
-  .then(() => { if (window.HoneTour) window.HoneTour.auto(TOUR_STEPS, "hone_tour_engineer"); })
-  .catch((e) => showToast("Setup loading error: " + e.message, true));
+  .then(() => { if (window.HoneTour) window.HoneTour.auto(tourSteps(), "hone_tour_engineer"); })
+  .catch((e) => showToast(t("eng.loadErr") + e.message, true));
 connectWS();

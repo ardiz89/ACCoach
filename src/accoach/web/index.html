@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>HONE · Analysis</title>
+  <title data-i18n="title.analysis">HONE · Analysis</title>
   <link rel="icon" href="/static/hone_icon.png">
   <link rel="stylesheet" href="/static/style.css">
 </head>
@@ -14,21 +14,21 @@
         <path d="M7 5 L21 16 L7 27" fill="none" stroke="#22D3CE" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
         <circle cx="15" cy="16" r="4" fill="#34E08A"/>
       </svg>
-      <span class="name">HONE</span> <span>· Analysis</span>
-      <button class="tour-help" type="button" title="Guided tour" aria-label="Guided tour">?</button>
+      <span class="name">HONE</span> <span data-i18n="app.subtitle">· Analysis</span>
+      <button class="tour-help" type="button" data-i18n-title="tour.help" data-i18n-aria="tour.help" title="Guided tour" aria-label="Guided tour">?</button>
     </h1>
     <div class="controls">
-      <label>Car / Track
+      <label><span data-i18n="ctl.combo">Car / Track</span>
         <select id="combo"></select>
       </label>
-      <label>Lap to review
+      <label><span data-i18n="ctl.lap">Lap to review</span>
         <select id="lap"></select>
       </label>
-      <label>Compare with
+      <label><span data-i18n="ctl.baseline">Compare with</span>
         <select id="baseline"></select>
       </label>
       <div class="export">
-        <span>Export</span>
+        <span data-i18n="ctl.export">Export</span>
         <button id="exp-csv" type="button">⬇ CSV</button>
         <button id="exp-json" type="button">⬇ JSON</button>
       </div>
@@ -36,32 +36,32 @@
   </header>
 
   <nav class="tabs">
-    <button class="tab active" data-view="compare">Compare</button>
-    <button class="tab" data-view="map">Map</button>
-    <button class="tab" data-view="sectors">Sectors</button>
-    <button class="tab" data-view="progress">Trends</button>
+    <button class="tab active" data-view="compare" data-i18n="tab.compare">Compare</button>
+    <button class="tab" data-view="map" data-i18n="tab.map">Map</button>
+    <button class="tab" data-view="sectors" data-i18n="tab.sectors">Sectors</button>
+    <button class="tab" data-view="progress" data-i18n="tab.trends">Trends</button>
   </nav>
 
   <div id="view-compare">
     <section id="summary" class="summary"></section>
 
-    <div id="readout" class="readout">Hover over the charts for point-by-point values…</div>
+    <div id="readout" class="readout" data-i18n="readout.hint">Hover over the charts for point-by-point values…</div>
 
     <main id="charts">
       <div class="chart">
-        <h3>Lap delta <small>(s · red = slower, green = faster)</small></h3>
+        <h3 data-i18n-html="chart.delta">Lap delta <small>(s · red = slower, green = faster)</small></h3>
         <canvas id="c-delta"></canvas>
       </div>
       <div class="chart">
-        <h3>Speed <small>(km/h · white = reviewed lap, cyan = comparison)</small></h3>
+        <h3 data-i18n-html="chart.speed">Speed <small>(km/h · white = reviewed lap, cyan = comparison)</small></h3>
         <canvas id="c-speed"></canvas>
       </div>
       <div class="chart">
-        <h3>Throttle / Brake <small>(green = throttle, red = brake · dashed = reference)</small></h3>
+        <h3 data-i18n-html="chart.inputs">Throttle / Brake <small>(green = throttle, red = brake · dashed = reference)</small></h3>
         <canvas id="c-inputs"></canvas>
       </div>
       <div class="chart">
-        <h3>Steering <small>(white = reviewed lap, cyan = comparison · left up / right down)</small></h3>
+        <h3 data-i18n-html="chart.steer">Steering <small>(white = reviewed lap, cyan = comparison · left up / right down)</small></h3>
         <canvas id="c-steer"></canvas>
       </div>
     </main>
@@ -72,25 +72,25 @@
   </div>
 
   <div id="view-map" class="hidden">
-    <div id="map-readout" class="readout">Racing line · colour = delta (red slower, green faster) · ▽ your braking · ○ reference braking</div>
+    <div id="map-readout" class="readout" data-i18n="map.readout">Racing line · colour = delta (red slower, green faster) · ▽ your braking · ○ reference braking</div>
     <main>
       <div class="chart map">
-        <h3>Track map <small>(white dashed = reference · solid line = reviewed lap)</small></h3>
+        <h3 data-i18n-html="chart.map">Track map <small>(white dashed = reference · solid line = reviewed lap)</small></h3>
         <canvas id="c-map"></canvas>
         <div class="map-legend">
-          <span class="swatch"><span class="bar slow"></span> slower <small>(thicker line = more time lost)</small></span>
-          <span class="swatch"><span class="bar fast"></span> faster <small>(thinner line = on par)</small></span>
-          <span class="swatch"><span class="marker">▽</span> your braking</span>
-          <span class="swatch"><span class="marker ring">○</span> reference braking</span>
+          <span class="swatch"><span class="bar slow"></span> <span data-i18n-html="map.leg.slower">slower <small>(thicker line = more time lost)</small></span></span>
+          <span class="swatch"><span class="bar fast"></span> <span data-i18n-html="map.leg.faster">faster <small>(thinner line = on par)</small></span></span>
+          <span class="swatch"><span class="marker">▽</span> <span data-i18n="map.leg.you">your braking</span></span>
+          <span class="swatch"><span class="marker ring">○</span> <span data-i18n="map.leg.ref">reference braking</span></span>
         </div>
       </div>
     </main>
-    <div id="map-missing" class="empty hidden">This lap has no coordinates (recorded before the map update). Drive and record a new lap to see it here.</div>
+    <div id="map-missing" class="empty hidden" data-i18n="map.missing">This lap has no coordinates (recorded before the map update). Drive and record a new lap to see it here.</div>
   </div>
 
   <div id="view-sectors" class="hidden">
     <section id="sec-summary" class="summary"></section>
-    <div class="sec-head"><span>Sector</span><span>Time <small>(ref)</small></span><span>Δ vs reference <small>(green faster, red slower)</small></span></div>
+    <div class="sec-head"><span data-i18n="sec.col.sector">Sector</span><span data-i18n-html="sec.col.time">Time <small>(ref)</small></span><span data-i18n-html="sec.col.delta">Δ vs reference <small>(green faster, red slower)</small></span></div>
     <div id="sectors" class="sectors"></div>
     <section id="ideal" class="ideal"></section>
   </div>
@@ -100,30 +100,31 @@
     <section id="levels" class="levels"></section>
     <main>
       <div class="chart">
-        <h3>Lap times over time <small>(each point = a lap · green line = running best)</small></h3>
+        <h3 data-i18n-html="prog.chart">Lap times over time <small>(each point = a lap · green line = running best)</small></h3>
         <canvas id="c-progress" class="tall"></canvas>
       </div>
     </main>
     <section class="debrief">
-      <h3>Weak points <small>(corner by corner · systematic = to train)</small></h3>
+      <h3 data-i18n-html="prog.weak">Weak points <small>(corner by corner · systematic = to train)</small></h3>
       <div id="trends"></div>
     </section>
     <section class="debrief">
-      <h3>Recurring mistakes</h3>
+      <h3 data-i18n="prog.recurring">Recurring mistakes</h3>
       <div id="recurring"></div>
     </section>
   </div>
 
   <div id="empty" class="empty">
-    <h2 class="empty-title">No laps yet</h2>
+    <h2 class="empty-title" data-i18n="empty.title">No laps yet</h2>
     <ol class="empty-steps">
-      <li>Start the coach: run <code>python -m accoach live</code> (or use the launcher).</li>
-      <li>Drive a full, <b>valid</b> lap in AC or ACC.</li>
-      <li>Reload this page — your lap shows up here for analysis.</li>
+      <li data-i18n-html="empty.step1">Start the coach: run <code>python -m accoach live</code> (or use the launcher).</li>
+      <li data-i18n-html="empty.step2">Drive a full, <b>valid</b> lap in AC or ACC.</li>
+      <li data-i18n-html="empty.step3">Reload this page — your lap shows up here for analysis.</li>
     </ol>
-    <p class="empty-hint">Just want a tour? Launch with <code>python -m accoach web --demo</code> for sample laps.</p>
+    <p class="empty-hint" data-i18n-html="empty.hint">Just want a tour? Launch with <code>python -m accoach web --demo</code> for sample laps.</p>
   </div>
 
+  <script src="/static/i18n.js"></script>
   <script src="/static/tour.js"></script>
   <script src="/static/app.js"></script>
 </body>
