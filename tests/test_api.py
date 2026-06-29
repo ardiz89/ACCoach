@@ -111,6 +111,29 @@ def test_progress_returns_trend_and_consistency(tmp_path):
     assert data["pb_trend"], "expected a per-day best trend"
 
 
+def test_progress_levels_and_trends(tmp_path):
+    c = _client(tmp_path)
+    data = c.get("/api/progress", params={"car": CAR, "track": TRACK}).json()
+    # Benchmark ladder: at least your best + the theoretical ideal.
+    keys = {lv["key"] for lv in data["levels"]}
+    assert "best" in keys and "ideal" in keys
+    best = next(lv for lv in data["levels"] if lv["key"] == "best")
+    assert best["gain_ms"] == 0
+    # The slow laps lose time in corner 0 every time → a systematic trend.
+    assert any(t["systematic"] for t in data["trends"])
+
+
+def test_progress_pro_level_appears_after_import(tmp_path):
+    from dataclasses import replace
+    _seed(tmp_path)
+    pro = replace(synth.build_lap(), source="pro")           # an imported PRO lap
+    pro.recorded_utc = "2026-06-19T18:00:00+00:00"
+    save_lap(pro, tmp_path)
+    data = TestClient(create_api(tmp_path)).get(
+        "/api/progress", params={"car": CAR, "track": TRACK}).json()
+    assert "pro" in {lv["key"] for lv in data["levels"]}
+
+
 def test_export_csv_has_header_and_rows(tmp_path):
     c = _client(tmp_path)
     r = c.get("/api/export", params={"car": CAR, "track": TRACK, "fmt": "csv"})

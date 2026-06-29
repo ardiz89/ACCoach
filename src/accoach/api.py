@@ -19,7 +19,12 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from .coaching import build_lap_debrief, lap_time_consistency
+from .coaching import (
+    benchmark_levels,
+    build_lap_debrief,
+    classify_losses,
+    lap_time_consistency,
+)
 from .comparison import Reference
 from .recording import DEFAULT_LAPS_DIR, load_lap
 from .recording.catalog import LapCatalog
@@ -279,13 +284,15 @@ def create_api(
 
     @app.get("/api/progress")
     def progress(car: str = Query(...), track: str = Query(...)) -> dict:
-        """Lap-time trend, consistency, and recurring mistakes for a car+track."""
+        """Lap-time trend, consistency, benchmark levels and recurring mistakes."""
         with _catalog() as cat:
             all_laps = cat.laps_for(car, track)
+            pro_path = cat.fastest_pro_path(car, track)
         valid = [r for r in all_laps if r["valid"] and r["lap_time_ms"] > 0]
         if not valid:
             return {"car": car, "track": track, "laps": [], "pb_trend": [],
-                    "consistency": lap_time_consistency([]), "recurring": []}
+                    "consistency": lap_time_consistency([]), "levels": [],
+                    "trends": [], "recurring": []}
 
         # Chronological (oldest first) for the trend.
         chrono = sorted(valid, key=lambda r: r["recorded_utc"] or "")
@@ -301,18 +308,23 @@ def create_api(
                     for d, ms in sorted(per_day.items())]
 
         # Recurring mistakes: aggregate the debrief over the recent valid laps.
-        fastest = min(valid, key=lambda r: r["lap_time_ms"])["path"]
+        fastest_row = min(valid, key=lambda r: r["lap_time_ms"])
+        fastest = fastest_row["path"]
+        best_ms = fastest_row["lap_time_ms"]
         recurring: list[dict] = []
+        trends: list[dict] = []
         try:
             ref_lap = load_lap(fastest)
             reference = Reference(ref_lap)
             corners = detect_corners(ref_lap.samples)
             cnames = {c.index: n for c, n in zip(corners, name_corners(track, corners))}
+            debriefs = []
             tally: dict[str, dict] = {}
             for r in chrono[-15:]:
                 if r["path"] == fastest:
                     continue
                 deb = build_lap_debrief(load_lap(r["path"]), reference, corners)
+                debriefs.append(deb)
                 for loss in deb.losses:
                     t = tally.setdefault(loss.category.value,
                                          {"message": loss.message, "count": 0, "corners": set()})
@@ -322,13 +334,48 @@ def create_api(
                 ({"category": k, "message": v["message"], "count": v["count"],
                   "corners": sorted(v["corners"])} for k, v in tally.items()),
                 key=lambda x: x["count"], reverse=True)
+            # Systematic (a weakness to train) vs sporadic (a one-off), per corner.
+            trends = [{
+                "corner_index": t.corner_index,
+                "name": cnames.get(t.corner_index, t.name),
+                "category": t.category.value,
+                "kind": t.kind,
+                "systematic": t.systematic,
+                "occurrences": t.occurrences,
+                "laps": t.laps,
+                "median_s": round(t.median_ms / 1000.0, 3),
+                "total_s": round(t.total_ms / 1000.0, 3),
+            } for t in classify_losses(debriefs)]
         except (OSError, ValueError):
             recurring = []
+            trends = []
+
+        # Benchmark ladder: rolling best → ideal (consistency) → PRO (skill ceiling).
+        ideal_ms = pro_ms = None
+        try:
+            objs = [load_lap(r["path"]) for r in valid]
+            spans, _ = sector_spans(load_lap(fastest))
+            il = ideal_lap(objs, [r["path"] for r in valid], spans)
+            ideal_ms = il.ideal_ms if il else None
+        except (OSError, ValueError):
+            ideal_ms = None
+        if pro_path:
+            try:
+                pro_ms = load_lap(pro_path).lap_time_ms
+            except (OSError, ValueError):
+                pro_ms = None
+        levels = [{
+            "key": lv.key, "label": lv.label,
+            "lap_time_ms": lv.lap_time_ms, "lap_time": format_lap_time(lv.lap_time_ms),
+            "gain_ms": lv.gain_ms, "gain_s": round(lv.gain_ms / 1000.0, 3),
+        } for lv in benchmark_levels(best_ms, ideal_ms=ideal_ms, pro_ms=pro_ms)]
 
         return {
             "car": car, "track": track,
             "laps": laps, "pb_trend": pb_trend,
             "consistency": lap_time_consistency([r["lap_time_ms"] for r in valid]),
+            "levels": levels,
+            "trends": trends,
             "recurring": recurring,
         }
 

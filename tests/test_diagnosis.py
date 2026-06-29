@@ -165,6 +165,7 @@ def test_import_reference_seeds_a_clean_reference(tmp_path):
     run_import_reference([str(src)], laps_dir=laps)
     ref = find_reference_lap("ferrari_488_gt3", "monza", laps)
     assert ref is not None and ref.clean is True            # imported = trusted clean
+    assert ref.source == "pro"                              # …and a PRO benchmark
 
 
 def test_engine_surfaces_engineer_block(tmp_path):

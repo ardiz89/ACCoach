@@ -130,6 +130,23 @@ def test_clean_false_roundtrip():
     assert back.clean is False
 
 
+def test_source_roundtrips_and_defaults_to_own():
+    from dataclasses import replace
+    own = Lap.from_dict(synth.build_lap(n=5).to_dict())
+    assert own.source == "own"                              # default
+    pro = Lap.from_dict(replace(synth.build_lap(n=5), source="pro").to_dict())
+    assert pro.source == "pro"
+
+
+def test_legacy_lap_without_source_is_own():
+    legacy = {
+        "car_model": "x", "track": "y", "session": 0,
+        "lap_time_ms": 90000, "valid": True,
+        "samples": [[0, 0.0, 100.0, 1.0, 0.0, 0.0, "3", 6000, 0.0, 0.0]],
+    }
+    assert Lap.from_dict(legacy).source == "own"
+
+
 def test_v6_slip_ratio_and_pressure_roundtrip():
     s = synth.snap(pos=0.5, current_lap_ms=1000,
                    slip_ratio=(-0.3, -0.2, 0.1, 0.15),

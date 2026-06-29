@@ -507,6 +507,7 @@ def run_import_reference(argv: list[str] | None = None, laps_dir=None) -> None:
 
     lap.valid = True        # a reference must be a complete lap
     lap.clean = True         # imported as a trusted clean reference
+    lap.source = "pro"       # a first-class benchmark level, not the driver's lap
     lap.recorded_utc = ""    # let save_lap stamp it fresh
     dest = save_lap(lap, laps_dir)
     print(f"✓ Reference importato: {lap.car_model} / {lap.track} "

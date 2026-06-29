@@ -23,7 +23,8 @@ from pathlib import Path
 
 # v2: added clean (-1 unknown / 0 dirty / 1 clean) + track-condition columns,
 # so the reference query can exclude dirty laps and prefer confirmed-clean ones.
-_DB_VERSION = 2
+# v3: added `source` ("own"/"pro") so a PRO benchmark lap can be found cheaply.
+_DB_VERSION = 3
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS lap (
@@ -41,6 +42,7 @@ CREATE TABLE IF NOT EXISTS lap (
     road_temp      REAL,
     grip           REAL,
     tyre_compound  TEXT,
+    source         TEXT NOT NULL DEFAULT 'own',
     recorded_utc   TEXT,
     sample_count   INTEGER NOT NULL,
     schema_version INTEGER NOT NULL
@@ -78,6 +80,7 @@ def _read_meta(path: Path) -> dict | None:
         "road_temp": float(d.get("road_temp", 0.0) or 0.0),
         "grip": float(d.get("grip", 0.0) or 0.0),
         "tyre_compound": str(d.get("tyre_compound", "")),
+        "source": str(d.get("source") or "own"),
         "recorded_utc": str(d.get("recorded_utc", "")),
         "sample_count": len(d.get("samples", [])),
         "schema_version": int(d.get("schema", 1)),
@@ -127,8 +130,8 @@ class LapCatalog:
             """INSERT INTO lap
                  (path, car_key, track_key, car_model, track, session,
                   lap_time_ms, valid, clean, air_temp, road_temp, grip,
-                  tyre_compound, recorded_utc, sample_count, schema_version)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                  tyre_compound, source, recorded_utc, sample_count, schema_version)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                ON CONFLICT(path) DO UPDATE SET
                   car_key=excluded.car_key, track_key=excluded.track_key,
                   car_model=excluded.car_model, track=excluded.track,
@@ -136,7 +139,7 @@ class LapCatalog:
                   valid=excluded.valid, clean=excluded.clean,
                   air_temp=excluded.air_temp, road_temp=excluded.road_temp,
                   grip=excluded.grip, tyre_compound=excluded.tyre_compound,
-                  recorded_utc=excluded.recorded_utc,
+                  source=excluded.source, recorded_utc=excluded.recorded_utc,
                   sample_count=excluded.sample_count,
                   schema_version=excluded.schema_version""",
             (
@@ -145,7 +148,7 @@ class LapCatalog:
                 meta["session"], meta["lap_time_ms"], meta["valid"],
                 meta.get("clean", -1), meta.get("air_temp", 0.0),
                 meta.get("road_temp", 0.0), meta.get("grip", 0.0),
-                meta.get("tyre_compound", ""),
+                meta.get("tyre_compound", ""), meta.get("source", "own"),
                 meta["recorded_utc"], meta["sample_count"], meta["schema_version"],
             ),
         )
@@ -204,10 +207,21 @@ class LapCatalog:
         ).fetchone()
         return row["path"] if row else None
 
+    def fastest_pro_path(self, car_model: str, track: str) -> str | None:
+        """Path of the fastest imported PRO benchmark lap, or ``None`` if none."""
+        row = self._conn.execute(
+            """SELECT path FROM lap
+               WHERE car_key = ? AND track_key = ? AND valid = 1
+                     AND lap_time_ms > 0 AND source = 'pro'
+               ORDER BY lap_time_ms ASC LIMIT 1""",
+            (self._slug(car_model), self._slug(track)),
+        ).fetchone()
+        return row["path"] if row else None
+
     def laps_for(self, car_model: str, track: str) -> list[dict]:
         """All indexed laps for a car+track, most recently recorded first."""
         rows = self._conn.execute(
-            """SELECT path, lap_time_ms, valid, recorded_utc, sample_count
+            """SELECT path, lap_time_ms, valid, source, recorded_utc, sample_count
                FROM lap WHERE car_key = ? AND track_key = ?
                ORDER BY recorded_utc DESC""",
             (self._slug(car_model), self._slug(track)),

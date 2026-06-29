@@ -34,7 +34,9 @@ from ..telemetry.snapshot import SessionType, TelemetrySnapshot
 # v5: lap-level clean flag + track conditions (air/road temp, grip, compound).
 # v6: per-wheel physical slip_ratio + tyre_pressure (reliable lock/spin & hot
 #     pressures offline — the raw wheel_slip channel is car-dependent).
-SCHEMA_VERSION = 6
+# v7: lap-level `source` ("own" / "pro") so an imported PRO reference is a
+#     first-class benchmark level, distinct from the driver's own laps.
+SCHEMA_VERSION = 7
 
 # Fixed serialization order for a LapSample, written into every file. Per-wheel
 # channels are flattened with [fl, fr, rl, rr] suffixes.
@@ -194,6 +196,8 @@ class Lap:
     road_temp: float = 0.0          # deg C
     grip: float = 0.0               # 0..1 surface grip
     tyre_compound: str = ""
+    # --- v7: provenance — "own" (driver's lap) or "pro" (imported benchmark) ---
+    source: str = "own"
 
     @property
     def duration_s(self) -> float:
@@ -212,6 +216,7 @@ class Lap:
             "road_temp": round(self.road_temp, 1),
             "grip": round(self.grip, 4),
             "tyre_compound": self.tyre_compound,
+            "source": self.source,
             "recorded_utc": self.recorded_utc,
             "fields": list(SAMPLE_FIELDS),
             "samples": [s.as_row() for s in self.samples],
@@ -244,4 +249,7 @@ class Lap:
             road_temp=float(d.get("road_temp", 0.0) or 0.0),
             grip=float(d.get("grip", 0.0) or 0.0),
             tyre_compound=str(d.get("tyre_compound", "")),
+            # Absent on pre-v7 files → "own" (the safe default; only an explicit
+            # import marks a lap "pro").
+            source=str(d.get("source") or "own"),
         )

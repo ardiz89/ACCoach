@@ -123,10 +123,35 @@ def test_migration_from_old_version_rebuilds(tmp_path):
     con.commit()
     con.close()
     with LapCatalog(db) as cat:
+        from accoach.recording.catalog import _DB_VERSION
         row = cat._conn.execute(
             "SELECT value FROM meta WHERE key='db_version'"
         ).fetchone()
-        assert row["value"] == "2"
+        assert row["value"] == str(_DB_VERSION)
+
+
+def test_fastest_pro_path_finds_imported_benchmark(tmp_path):
+    from dataclasses import replace
+    # Your own laps, plus one imported PRO lap (slower here, but a PRO benchmark).
+    save_lap(synth.build_lap(n=30), tmp_path)
+    pro = replace(synth.build_lap(slow_corner=0, amt=10, n=30), source="pro")
+    pro.recorded_utc = "2026-06-21T00:00:00+00:00"
+    save_lap(pro, tmp_path)
+    _catalog_path(tmp_path).unlink(missing_ok=True)
+    with LapCatalog(_catalog_path(tmp_path)) as cat:
+        cat.sync(list_lap_files(tmp_path))
+        path = cat.fastest_pro_path("ferrari_488_gt3", "monza")
+        assert path is not None
+        from accoach.recording.storage import load_lap
+        assert load_lap(path).source == "pro"               # the PRO one, not yours
+
+
+def test_no_pro_lap_returns_none(tmp_path):
+    save_lap(synth.build_lap(n=30), tmp_path)               # only your own
+    _catalog_path(tmp_path).unlink(missing_ok=True)
+    with LapCatalog(_catalog_path(tmp_path)) as cat:
+        cat.sync(list_lap_files(tmp_path))
+        assert cat.fastest_pro_path("ferrari_488_gt3", "monza") is None
 
 
 def test_upsert_is_idempotent(tmp_path):

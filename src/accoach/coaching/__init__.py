@@ -20,6 +20,12 @@ from .fuel import FuelEngineer
 from .gears import GearDetector
 from .pressure import PressureAdvisor
 from .scheduler import CueScheduler
+from .trends import (
+    BenchmarkLevel,
+    LossTrend,
+    benchmark_levels,
+    classify_losses,
+)
 from .tyretemp import TyreTempAdvisor
 from .voice import Voice
 
@@ -46,5 +52,9 @@ __all__ = [
     "PressureAdvisor",
     "TyreTempAdvisor",
     "CueScheduler",
+    "BenchmarkLevel",
+    "LossTrend",
+    "benchmark_levels",
+    "classify_losses",
     "Voice",
 ]
