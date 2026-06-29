@@ -217,8 +217,8 @@ def test_click_budget_caps_a_parameter():
             score = max(0.0, score - 0.15)        # improving so it keeps the lever
             if score < 0.30:
                 break
-    # rearWing net clicks never exceed the budget
-    assert abs(eng.applied_clicks.get("rearWing", 0)) <= 6
+    # rearWing net clicks never exceed the budget (keyed per (param, slot))
+    assert abs(eng.applied_clicks.get(("rearWing", None), 0)) <= 6
 
 
 def test_exhausting_remedies_flags_driving_issue():

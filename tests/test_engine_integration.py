@@ -38,7 +38,9 @@ def _build_frames():
             frames.append(_frame(pos, steer_angle=0.25, yaw_rate=0.05, speed_kmh=120))
         elif 0.40 <= pos < 0.45:
             frames.append(_frame(pos, throttle=0.0, brake=0.0, speed_kmh=150))
-        elif 0.60 <= pos < 0.63:
+        elif 0.60 <= pos < 0.70:
+            # A sustained lock-up: an ACUTE safety cue that fires even with no
+            # reference yet (the only kind spoken on a non-flying lap).
             frames.append(_frame(pos, brake=0.9, abs_active=0.6, speed_kmh=110))
         else:
             frames.append(_frame(pos, throttle=0.8, speed_kmh=180))

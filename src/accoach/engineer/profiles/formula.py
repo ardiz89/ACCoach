@@ -33,9 +33,11 @@ from ._common import (
 REMEDY_TABLE: dict[Symptom, list] = {
     # ---- Understeer ----
     Symptom(U, EN, LO): [
-        remedy("brakeBias", None, -1, "Understeer on entry: brake bias slightly rearward (−1)", "AV"),
+        # On a formula with no ABS, moving the bias rearward to rotate on entry is
+        # the most lock-prone lever — try front bar/geometry first, bias last.
         remedy("aRBFront", None, -1, "Understeer on entry: softer front anti-roll bar (−1)"),
         remedy("toe", "front", +1, "Understeer on entry: more front toe-out (+1)"),
+        remedy("brakeBias", None, -1, "Understeer on entry: brake bias slightly rearward (−1)", "AV"),
     ],
     Symptom(U, EN, HI): [
         remedy("frontWing", None, +1, "Understeer on fast entry: more front wing (+1)"),

@@ -436,17 +436,20 @@ class RaceEngineer:
         return None
 
     def _over_budget(self, change: ProposedChange) -> bool:
-        param = change.param
-        projected = self.applied_clicks.get(param, 0) + change.changes[0].delta_clicks
-        return abs(projected) > _CLICK_BUDGET
+        # Budget per (param, slot): toe-front and toe-rear (or front/rear pressure)
+        # are different physical levers and must not share — or cancel — one budget.
+        for c in change.changes:
+            projected = self.applied_clicks.get((c.param, c.slot), 0) + c.delta_clicks
+            if abs(projected) > _CLICK_BUDGET:
+                return True
+        return False
 
     def _record(self, change: ProposedChange) -> None:
-        """Bank an accepted change: history + per-parameter click budget."""
+        """Bank an accepted change: history + per-(param, slot) click budget."""
         self.history.append(change)
-        if change.changes:
-            param = change.param
-            self.applied_clicks[param] = (
-                self.applied_clicks.get(param, 0) + change.changes[0].delta_clicks)
+        for c in change.changes:
+            key = (c.param, c.slot)
+            self.applied_clicks[key] = self.applied_clicks.get(key, 0) + c.delta_clicks
 
     def _pressure_remedy(self, phase: WorkPhase) -> ProposedChange | None:
         """If this phase gates on tyre pressure, nudge the off-target axle."""

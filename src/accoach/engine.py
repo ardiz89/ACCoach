@@ -35,7 +35,7 @@ from .coaching import (
     TyreTempAdvisor,
     Voice,
 )
-from .coaching.cue import CueTier
+from .coaching.cue import CueCategory
 from .coaching.debrief import build_lap_debrief
 from .coaching.diagnosis import build_lap_stats
 from .coaching.focus import FocusCoach, FocusReport
@@ -52,6 +52,14 @@ from .track import Corner, detect_corners
 # advice on a throw-away lap is noise (live validation 2026-06-26: the coach
 # machine-gunned coasting/trail cues and even praised a +12 s disaster lap).
 _GATE_DELTA_MS = 3000.0
+
+# Only these are spoken on an abnormal lap. Note: under/oversteer cues are ACUTE
+# (real-time faults) but NOT here — on a cold/recovery lap the car slides
+# everywhere and naming it is the exact spam the gate exists to remove; a genuine
+# lock-up or wheelspin still gets called.
+_SAFETY_CATEGORIES = {
+    CueCategory.LOCKED, CueCategory.WHEELSPIN, CueCategory.FUEL,
+}
 
 
 @dataclass(slots=True)
@@ -266,7 +274,8 @@ class CoachEngine:
         flying = delta is not None and abs(delta.delta_ms) <= _GATE_DELTA_MS
 
         def _submit(cues: list[Cue]) -> None:
-            kept = cues if flying else [c for c in cues if c.tier == CueTier.ACUTE]
+            kept = cues if flying else [c for c in cues
+                                        if c.category in _SAFETY_CATEGORIES]
             self.scheduler.submit_all(kept, now)
 
         # Corner advice (needs a reference) + acute events (don't) + the aid

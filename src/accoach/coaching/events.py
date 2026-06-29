@@ -60,6 +60,11 @@ _SPIN_RATIO = 0.10         # rear slip ratio: wheel ≥10% faster than ground
 #     deliberate wheelspin reached +0.138. The old +0.15 missed it → lowered to
 #     +0.10 (clear of the +0.071 traction ceiling).
 
+# Below this the slip-ratio fallback is unreliable: the ratio is (ω·r − v)/v, so a
+# small v blows the denominator up and noise reads as a lock/spin. The abs/tc
+# primary (reliable at any speed) is NOT gated; only the ratio branch is.
+_RATIO_MIN_SPEED = 40.0    # km/h
+
 _MIN_HOLD_S = 0.12         # sustain time before an event fires
 _EVENT_SEGMENTS = 20       # granularity for de-duplicating by location
 _PRIORITY_BASE = 300.0     # ranks above most segment time-loss cues
@@ -102,17 +107,20 @@ class EventDetector:
     def _is_lockup(s: TelemetrySnapshot) -> bool:
         if s.brake < _BRAKE_MIN:
             return False
-        # Most-negative front wheel (the one biting into a lock).
-        front_ratio = min(s.slip_ratio[0], s.slip_ratio[1])
-        return s.abs_active >= _ABS_LEVEL or front_ratio <= _LOCK_RATIO
+        if s.abs_active >= _ABS_LEVEL:               # primary: reliable at any speed
+            return True
+        # Slip-ratio fallback, but only above a speed where the ratio is trustworthy.
+        front_ratio = min(s.slip_ratio[0], s.slip_ratio[1])  # most-negative front wheel
+        return s.speed_kmh >= _RATIO_MIN_SPEED and front_ratio <= _LOCK_RATIO
 
     @staticmethod
     def _is_wheelspin(s: TelemetrySnapshot) -> bool:
         if s.throttle < _THROTTLE_MIN or s.gear in ("R", "N"):
             return False
-        # Fastest-spinning rear wheel.
-        rear_ratio = max(s.slip_ratio[2], s.slip_ratio[3])
-        return s.tc_active >= _TC_LEVEL or rear_ratio >= _SPIN_RATIO
+        if s.tc_active >= _TC_LEVEL:                 # primary: reliable at any speed
+            return True
+        rear_ratio = max(s.slip_ratio[2], s.slip_ratio[3])   # fastest-spinning rear
+        return s.speed_kmh >= _RATIO_MIN_SPEED and rear_ratio >= _SPIN_RATIO
 
     # --- debounce ---------------------------------------------------------
     @staticmethod

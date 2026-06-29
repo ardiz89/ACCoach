@@ -34,6 +34,7 @@ from .events import (
     _ABS_LEVEL,
     _BRAKE_MIN,
     _LOCK_RATIO,
+    _RATIO_MIN_SPEED,
     _SPIN_RATIO,
     _TC_LEVEL,
     _THROTTLE_MIN,
@@ -120,11 +121,13 @@ def _lock_spin_segments(samples: list[LapSample]) -> tuple[int, int]:
         # check would miss every lock/spin and the engineer would never see them.
         if s.brake >= _BRAKE_MIN and (
                 s.abs_active >= _ABS_LEVEL
-                or min(s.slip_ratio[0], s.slip_ratio[1]) <= _LOCK_RATIO):
+                or (s.speed_kmh >= _RATIO_MIN_SPEED
+                    and min(s.slip_ratio[0], s.slip_ratio[1]) <= _LOCK_RATIO)):
             locks.add(_seg(s.pos))
         if (s.throttle >= _THROTTLE_MIN and s.gear not in ("R", "N") and (
                 s.tc_active >= _TC_LEVEL
-                or max(s.slip_ratio[2], s.slip_ratio[3]) >= _SPIN_RATIO)):
+                or (s.speed_kmh >= _RATIO_MIN_SPEED
+                    and max(s.slip_ratio[2], s.slip_ratio[3]) >= _SPIN_RATIO))):
             spins.add(_seg(s.pos))
     return len(locks), len(spins)
 

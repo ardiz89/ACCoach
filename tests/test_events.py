@@ -70,6 +70,21 @@ def test_slip_ratio_triggers_without_aids():
     assert any(c.category == CueCategory.LOCKED for c in cues)
 
 
+def test_slip_ratio_fallback_gated_at_low_speed():
+    # M12: the slip-ratio fallback is unreliable at crawl speed (its denominator is
+    # tiny). Below the gate it must NOT fire on slip alone…
+    det = EventDetector()
+    slow = synth.snap(pos=0.3, brake=0.8, abs_active=0.0, speed_kmh=20.0,
+                      slip_ratio=(-0.4, -0.4, 0.0, 0.0))
+    cues, _ = _hold(det, slow, frames=6)
+    assert all(c.category != CueCategory.LOCKED for c in cues)
+    # …but the ABS primary still fires at any speed.
+    det2 = EventDetector()
+    abs_low = synth.snap(pos=0.3, brake=0.9, abs_active=0.6, speed_kmh=20.0)
+    cues2, _ = _hold(det2, abs_low, frames=6)
+    assert any(c.category == CueCategory.LOCKED for c in cues2)
+
+
 def test_reset_on_pit_rearms():
     det = EventDetector()
     _hold(det, _lock_frame(), frames=6)            # fires + leaves episode fired

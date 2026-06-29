@@ -137,8 +137,11 @@ GT3_PROFILE = Profile(
     name="GT3",
     phases=[
         PressurePhase(27.5, 0.7),
-        _AeroPhase("aero", "Aero / rake", "BOX"),
+        # Mechanical grip BEFORE aero on a GT3: the car lives on mechanical grip,
+        # so fix springs/bars/diff first; masking a mechanical issue with rake/wing
+        # is backwards (aero-first is the Formula order, not GT3).
         _MechanicalPhase("mechanical", "Mechanical grip", "BOX"),
+        _AeroPhase("aero", "Aero / rake", "BOX"),
         _BrakeBiasPhase("brake_bias", "Brake bias", "AV"),
         _ElectronicsPhase("electronics", "Electronics", "AV"),
     ],
