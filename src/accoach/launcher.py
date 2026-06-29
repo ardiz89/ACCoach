@@ -23,7 +23,10 @@ try:
     from PySide6.QtCore import Qt, QTimer
     from PySide6.QtWidgets import (
         QApplication,
+        QCheckBox,
+        QDialog,
         QFrame,
+        QHBoxLayout,
         QLabel,
         QPushButton,
         QVBoxLayout,
@@ -33,11 +36,32 @@ except ImportError:  # pragma: no cover - optional dependency
     print("The launcher needs PySide6.  Install it with:  pip install PySide6")
     raise SystemExit(1)
 
+from .paths import base_dir
+
 _SRC = Path(__file__).resolve().parents[1]   # .../src
 
 # Sentinels: buttons that do something other than spawn an accoach command.
 _GUIDE = "__guide__"
 _STOP_LIVE = "__stop_live__"
+_WIZARD = "__wizard__"
+
+
+# --- first-run "getting started" wizard ------------------------------------
+# A marker file (not config) keeps it dead simple: present == already seen.
+def _wizard_marker() -> Path:
+    return base_dir() / ".getting_started_seen"
+
+
+def wizard_seen() -> bool:
+    return _wizard_marker().exists()
+
+
+def mark_wizard_seen() -> None:
+    try:
+        base_dir().mkdir(parents=True, exist_ok=True)
+        _wizard_marker().write_text("1", encoding="utf-8")
+    except OSError:  # pragma: no cover - best-effort
+        pass
 
 # Commands that run a speaking coach. Only one may run at a time — two voice
 # engines talking together sound like an echo — so starting one stops the other.
@@ -46,23 +70,93 @@ _VOICE_CMDS = {"live", "coach"}
 # While Coach Live is running these buttons stay clickable; all others are
 # disabled so you can't stack a second coach/telemetry reader on top of it.
 # Keys: command buttons by their args tuple, special buttons by their sentinel.
-_LIVE_SAFE_KEYS = {_STOP_LIVE, _GUIDE, ("web",), ("web", "--engineer")}
+_LIVE_SAFE_KEYS = {_STOP_LIVE, _GUIDE, _WIZARD, ("web",), ("web", "--engineer")}
 
 # (label, command args / sentinel, opens-its-own-console)
 _BUTTONS = [
-    ("▶  Coach Live  (overlay + voce)", ["live"], False),
-    ("▶  Coach Live — DEMO (senza gioco)", ["live", "--demo"], False),
-    ("⏹  Ferma Coach Live", _STOP_LIVE, False),
+    ("▶  Coach Live  (overlay + voice)", ["live"], False),
+    ("▶  Coach Live — DEMO (no game)", ["live", "--demo"], False),
+    ("⏹  Stop Coach Live", _STOP_LIVE, False),
     ("—", None, False),
-    ("📊  Analisi & Report (browser)", ["web"], False),
-    ("🔧  Ingegnere di pista (browser)", ["web", "--engineer"], False),
-    ("📈  Debrief ultimo giro", ["debrief"], True),
-    ("📈  Monitor telemetria", ["monitor"], True),
-    ("🎙  Coach vocale (terminale)", ["coach"], True),
-    ("🔧  Verifica assi G", ["verify-g"], True),
+    ("📊  Analysis & Report (browser)", ["web"], False),
+    ("🔧  Race engineer (browser)", ["web", "--engineer"], False),
+    ("📈  Last-lap debrief", ["debrief"], True),
+    ("📈  Telemetry monitor", ["monitor"], True),
+    ("🎙  Voice coach (terminal)", ["coach"], True),
+    ("🔧  Verify G axes", ["verify-g"], True),
     ("—", None, False),
-    ("❓  Guida — come si usa", _GUIDE, False),
+    ("✨  Get started", _WIZARD, False),
+    ("❓  Guide — how to use", _GUIDE, False),
 ]
+
+
+_WIZARD_STEPS = [
+    "Set your game (AC / ACC) to <b>Borderless</b> so the overlay can draw over it.",
+    "Click <b>Coach Live</b> — you get the voice coach and the on-screen overlay "
+    "while you drive.",
+    "Drive one clean lap: it becomes your <b>reference</b>. Beat it and the next "
+    "lap becomes the new one.",
+    "After a session, open <b>Analysis &amp; Report</b> for the corner-by-corner "
+    "debrief, and <b>Race engineer</b> for setup advice.",
+    "No game handy? Try <b>Coach Live — DEMO</b> to see it work on a synthetic lap.",
+]
+
+
+class GettingStarted(QDialog):
+    """A small first-run wizard: what HONE is and the 4 steps to get going."""
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("Welcome to HONE")
+        self.setModal(True)
+        self.resize(460, 460)
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(24, 24, 24, 20)
+        lay.setSpacing(12)
+
+        title = QLabel("Welcome to HONE")
+        title.setStyleSheet("font-size: 22px; font-weight: bold;")
+        sub = QLabel("Know why you're slow. Here's how to get going:")
+        sub.setStyleSheet("color: #888;")
+        sub.setWordWrap(True)
+        lay.addWidget(title)
+        lay.addWidget(sub)
+
+        steps = "".join(
+            f"<p style='margin:0 0 12px 0;'><b>{i}.</b> {t}</p>"
+            for i, t in enumerate(_WIZARD_STEPS, 1)
+        )
+        body = QLabel(steps)
+        body.setTextFormat(Qt.RichText)
+        body.setWordWrap(True)
+        body.setStyleSheet("font-size: 13px;")
+        lay.addWidget(body)
+        lay.addStretch(1)
+
+        self._dont_show = QCheckBox("Don't show this again")
+        self._dont_show.setChecked(True)
+        lay.addWidget(self._dont_show)
+
+        row = QHBoxLayout()
+        guide = QPushButton("Open full guide")
+        guide.clicked.connect(_open_guide)
+        ok = QPushButton("Get started")
+        ok.setDefault(True)
+        ok.clicked.connect(self.accept)
+        row.addWidget(guide)
+        row.addStretch(1)
+        row.addWidget(ok)
+        lay.addLayout(row)
+
+    def closeEvent(self, event) -> None:  # noqa: N802 (Qt naming)
+        if self._dont_show.isChecked():
+            mark_wizard_seen()
+        super().closeEvent(event)
+
+    def accept(self) -> None:  # noqa: D102
+        if self._dont_show.isChecked():
+            mark_wizard_seen()
+        super().accept()
 
 
 def _guide_path() -> Path:
@@ -128,6 +222,8 @@ class Launcher(QWidget):
             btn.setStyleSheet("text-align: left; padding-left: 12px; font-size: 14px;")
             if args == _GUIDE:
                 btn.clicked.connect(_open_guide)
+            elif args == _WIZARD:
+                btn.clicked.connect(self._show_wizard)
             elif args == _STOP_LIVE:
                 btn.clicked.connect(self._stop_live)
             else:
@@ -137,8 +233,7 @@ class Launcher(QWidget):
             layout.addWidget(btn)
 
         layout.addStretch(1)
-        hint = QLabel("Suggerimento: imposta il gioco in modalità Borderless\n"
-                      "perché l'overlay si disegni sopra.")
+        hint = QLabel("Tip: set the game to Borderless so the overlay draws over it.")
         hint.setStyleSheet("color: #888; font-size: 11px;")
         hint.setWordWrap(True)
         layout.addWidget(hint)
@@ -200,6 +295,10 @@ class Launcher(QWidget):
         except Exception:  # pragma: no cover - best-effort
             pass
 
+    def _show_wizard(self) -> None:
+        """Open the getting-started wizard (also auto-shown on first run)."""
+        GettingStarted(self).exec()
+
     def _stop_live(self) -> None:
         """Stop any running Coach Live / Live-Demo process."""
         for proc, args in list(self._children):
@@ -222,6 +321,8 @@ def main(argv: list[str] | None = None) -> None:
     app = QApplication(sys.argv)
     win = Launcher()
     win.show()
+    if not wizard_seen():            # first run: greet with the getting-started wizard
+        win._show_wizard()
     sys.exit(app.exec())
 
 
