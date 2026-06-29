@@ -109,9 +109,9 @@ class BenchmarkLevel:
 
 
 _LEVEL_LABEL = {
-    "best": "Tuo miglior giro",
-    "ideal": "Ideale teorico",
-    "pro": "Riferimento PRO",
+    "best": "Your best lap",
+    "ideal": "Theoretical ideal",
+    "pro": "PRO reference",
 }
 
 

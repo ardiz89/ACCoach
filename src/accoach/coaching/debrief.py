@@ -27,15 +27,27 @@ from .analyzer import _BRAKE_ON, _LOSS_MS, CornerStats, classify_corner
 from .cue import CueCategory
 from .diagnosis import corner_symptoms, dominant_symptom
 
-_CAUSE_BALANCE = {Balance.UNDERSTEER: "l'auto sottosterza",
-                  Balance.OVERSTEER: "l'auto sovrasterza"}
-_CAUSE_PHASE = {Phase.ENTRY: "in ingresso", Phase.APEX: "all'apex", Phase.EXIT: "in uscita"}
-_CAUSE_SPEED = {Speed.LOW: "curva lenta", Speed.HIGH: "curva veloce"}
+_CAUSE_BALANCE = {Balance.UNDERSTEER: "the car understeers",
+                  Balance.OVERSTEER: "the car oversteers"}
+_CAUSE_PHASE = {Phase.ENTRY: "on entry", Phase.APEX: "at the apex", Phase.EXIT: "on exit"}
+_CAUSE_SPEED = {Speed.LOW: "slow corner", Speed.HIGH: "fast corner"}
+
+# English titles shown in the debrief per loss category. The live cue's own
+# message stays in Italian (it's the voice); the debrief is fully English, so we
+# title each corner loss by category instead of reusing the cue text.
+_CATEGORY_TITLE = {
+    CueCategory.BRAKE_LATER: "Brake later",
+    CueCategory.BRAKE_EARLIER: "Brake earlier",
+    CueCategory.MORE_THROTTLE: "More throttle on exit",
+    CueCategory.LESS_BRAKE: "Trail off the brake",
+    CueCategory.CARRY_SPEED: "Carry more entry speed",
+    CueCategory.TIME_LOSS: "Time lost here",
+}
 
 
 def explain_cause(sym: Symptom) -> str:
-    """The handling reason for a corner's loss, in Italian — the 'why' the live
-    coach can't spell out mid-corner: e.g. 'L'auto sovrasterza in uscita (curva lenta).'"""
+    """The handling reason for a corner's loss — the 'why' the live coach can't
+    spell out mid-corner: e.g. 'The car oversteers on exit (slow corner).'"""
     return (f"{_CAUSE_BALANCE[sym.balance].capitalize()} "
             f"{_CAUSE_PHASE[sym.phase]} ({_CAUSE_SPEED[sym.speed]}).")
 
@@ -44,27 +56,27 @@ def explain_loss(category: CueCategory, st: CornerStats) -> tuple[str, str]:
     """Turn a corner's cause into (detail, fix): the numbers that prove it and a
     concrete, actionable correction — the 'mini-lesson' a race engineer gives."""
     if category == CueCategory.BRAKE_LATER:
-        return ("Inizi a frenare prima del riferimento.",
-                "Ritarda la staccata: porta il punto di frenata più avanti, "
-                "così entri con più velocità.")
+        return ("You start braking before the reference.",
+                "Delay your braking: move the braking point later, "
+                "so you carry more speed into the corner.")
     if category == CueCategory.MORE_THROTTLE:
-        return (f"Gas medio {st.throttle_live * 100:.0f}% contro "
-                f"{st.throttle_ref * 100:.0f}% del riferimento.",
-                "Riapri il gas prima e più deciso in uscita, senza pattinare.")
+        return (f"Average throttle {st.throttle_live * 100:.0f}% vs "
+                f"{st.throttle_ref * 100:.0f}% of the reference.",
+                "Get back on the throttle earlier and harder on exit, without spinning up.")
     if category == CueCategory.LESS_BRAKE:
-        return (f"Freno medio {st.brake_live * 100:.0f}% contro "
-                f"{st.brake_ref * 100:.0f}% del riferimento.",
-                "Stai frenando troppo a lungo: rilascia prima e lascia scorrere "
-                "la vettura verso l'apex.")
+        return (f"Average brake {st.brake_live * 100:.0f}% vs "
+                f"{st.brake_ref * 100:.0f}% of the reference.",
+                "You're braking too long: release earlier and let the car "
+                "flow toward the apex.")
     if category == CueCategory.CARRY_SPEED:
         diff = st.min_speed_ref - st.min_speed_live
-        return (f"Minima all'apex {st.min_speed_live:.0f} km/h contro "
+        return (f"Minimum speed at apex {st.min_speed_live:.0f} km/h vs "
                 f"{st.min_speed_ref:.0f} km/h ({diff:+.0f}).",
-                "Porta più velocità in ingresso: meno freno e una traiettoria "
-                "più larga e fluida.")
+                "Carry more entry speed: less brake and a wider, "
+                "smoother line.")
     # TIME_LOSS / anything else
-    return (f"Perdi ~{st.lost_ms / 100:.0f} decimi senza una causa dominante.",
-            "Pulisci la traiettoria e cerca costanza: rivedi linea e tempi di pedale.")
+    return (f"You lose ~{st.lost_ms / 100:.0f} tenths with no dominant cause.",
+            "Clean up your line and aim for consistency: review your line and pedal timing.")
 
 
 @dataclass(slots=True)
@@ -87,7 +99,7 @@ class CornerLoss:
 
     @property
     def label(self) -> str:
-        return self.name or f"Curva {self.index + 1}"
+        return self.name or f"Corner {self.index + 1}"
 
 
 @dataclass(slots=True)
@@ -173,13 +185,13 @@ def _braking_detail(lap: Lap, reference: Reference, inside: list,
         if live is not None and ref is not None and live < ref:
             m = _metres_between(lap, live, ref)
             if m >= 2.0:
-                extra += f" Anticipi la staccata di ~{m:.0f} m."
+                extra += f" You brake ~{m:.0f} m too early."
     if category in (CueCategory.BRAKE_LATER, CueCategory.LESS_BRAKE):
         peak_live = max((s.brake for s in inside), default=0.0)
         peak_ref = max((r.brake for r in refs), default=0.0)
         if peak_ref - peak_live >= 0.05:
-            extra += (f" Picco freno {peak_live * 100:.0f}% contro "
-                      f"{peak_ref * 100:.0f}%: premi più deciso.")
+            extra += (f" Peak brake {peak_live * 100:.0f}% vs "
+                      f"{peak_ref * 100:.0f}%: press harder.")
     return extra
 
 
@@ -244,7 +256,8 @@ def build_lap_debrief(lap: Lap, reference: Reference, corners: list[Corner]) -> 
         losses.append(CornerLoss(
             index=c.index, entry_pos=c.entry_pos, apex_pos=c.apex_pos,
             exit_pos=c.exit_pos, lost_ms=lost,
-            category=cue.category, message=cue.message,
+            category=cue.category,
+            message=_CATEGORY_TITLE.get(cue.category, cue.message),
             detail=detail, fix=fix, cause=cause,
             min_speed_live=vmin_live, min_speed_ref=vmin_ref,
         ))
@@ -275,28 +288,28 @@ def format_debrief(d: LapDebrief, top: int = 3, consistency: dict | None = None)
     """Render a debrief as a human-readable block (terminal / log)."""
     lines = [
         f"Debrief — {d.car_model or '?'} @ {d.track or '?'}",
-        f"  Giro:       {format_lap_time(d.lap_time_ms)}",
-        f"  Riferimento:{format_lap_time(d.reference_lap_ms)}",
+        f"  Lap:        {format_lap_time(d.lap_time_ms)}",
+        f"  Reference:  {format_lap_time(d.reference_lap_ms)}",
     ]
     if d.is_reference:
-        lines.append("  Questo è il tuo giro di riferimento (nessuno più veloce da confrontare).")
+        lines.append("  This is your reference lap (no faster lap to compare against).")
     else:
-        lines.append(f"  Distacco:   +{d.total_gap_ms / 1000.0:.3f}s")
+        lines.append(f"  Gap:        +{d.total_gap_ms / 1000.0:.3f}s")
 
     if d.losses:
-        lines.append(f"  Curve peggiori (su {len(d.losses)}):")
+        lines.append(f"  Worst corners (of {len(d.losses)}):")
         for loss in d.losses[:top]:
             line = f"    {loss.label:9} −{loss.lost_ms / 1000.0:.3f}s  {loss.message}"
             if loss.cause:
                 line += f"  · {loss.cause}"   # the handling "why"
             lines.append(line)
     elif not d.is_reference:
-        lines.append("  Nessuna perdita di tempo significativa per curva — giro pulito.")
+        lines.append("  No significant time loss per corner — clean lap.")
 
     if consistency and consistency.get("n", 0) >= 2:
         c = consistency
         lines.append(
-            f"  Costanza ({c['n']} giri): migliore {format_lap_time(c['best_ms'])}, "
+            f"  Consistency ({c['n']} laps): best {format_lap_time(c['best_ms'])}, "
             f"spread {c['spread_ms'] / 1000.0:.3f}s, σ {c['std_ms'] / 1000.0:.3f}s"
         )
     return "\n".join(lines)

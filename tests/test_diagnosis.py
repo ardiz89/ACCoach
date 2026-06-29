@@ -159,8 +159,8 @@ def test_debrief_includes_handling_cause():
     debrief = build_lap_debrief(slow, Reference(fast), detect_corners(fast.samples))
     assert debrief.losses
     # The handling "why" appears both as a field and woven into the detail text.
-    assert any("sottosterza" in loss.cause.lower() for loss in debrief.losses)
-    assert any("sottosterza" in loss.detail.lower() for loss in debrief.losses)
+    assert any("understeer" in loss.cause.lower() for loss in debrief.losses)
+    assert any("understeer" in loss.detail.lower() for loss in debrief.losses)
 
 
 def test_next_entry_credits_following_straight():

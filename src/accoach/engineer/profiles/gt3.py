@@ -33,60 +33,60 @@ from ._common import (
 REMEDY_TABLE: dict[Symptom, list] = {
     # ---- Understeer ----
     Symptom(U, EN, LO): [
-        remedy("aRBFront", None, -1, "Sottosterzo in entrata lenta: barra anteriore più morbida (−1)"),
-        remedy("toe", "front", +1, "Sottosterzo in entrata: più toe-out anteriore (+1)"),
-        remedy("brakeBias", None, -1, "Sottosterzo in entrata: bias freni un filo indietro (−1)", "AV"),
+        remedy("aRBFront", None, -1, "Understeer on slow entry: softer front anti-roll bar (−1)"),
+        remedy("toe", "front", +1, "Understeer on entry: more front toe-out (+1)"),
+        remedy("brakeBias", None, -1, "Understeer on entry: brake bias slightly rearward (−1)", "AV"),
     ],
     Symptom(U, EN, HI): [
-        remedy("rideHeight", "rear", +2, "Sottosterzo in entrata veloce: alza il posteriore, più rake (+2)"),
-        remedy("splitter", None, +1, "Sottosterzo in entrata veloce: più splitter anteriore (+1)"),
-        remedy("aRBFront", None, -1, "Sottosterzo in entrata veloce: barra anteriore più morbida (−1)"),
+        remedy("rideHeight", "rear", +2, "Understeer on fast entry: raise the rear, more rake (+2)"),
+        remedy("splitter", None, +1, "Understeer on fast entry: more front splitter (+1)"),
+        remedy("aRBFront", None, -1, "Understeer on fast entry: softer front anti-roll bar (−1)"),
     ],
     Symptom(U, AP, LO): [
-        remedy("preload", None, -1, "Sottosterzo all'apex lento: meno precarico differenziale (−1)"),
-        remedy("aRBFront", None, -1, "Sottosterzo all'apex: barra anteriore più morbida (−1)"),
-        remedy("wheelRate", "front", -1, "Sottosterzo all'apex: molle anteriori più morbide (−1)"),
+        remedy("preload", None, -1, "Understeer at slow apex: less differential preload (−1)"),
+        remedy("aRBFront", None, -1, "Understeer at apex: softer front anti-roll bar (−1)"),
+        remedy("wheelRate", "front", -1, "Understeer at apex: softer front springs (−1)"),
     ],
     Symptom(U, AP, HI): [
-        remedy("rearWing", None, -1, "Sottosterzo all'apex veloce: meno ala posteriore (−1)"),
-        remedy("splitter", None, +1, "Sottosterzo all'apex veloce: più splitter anteriore (+1)"),
-        remedy("rideHeight", "rear", +1, "Sottosterzo all'apex veloce: più rake (+1)"),
+        remedy("rearWing", None, -1, "Understeer at fast apex: less rear wing (−1)"),
+        remedy("splitter", None, +1, "Understeer at fast apex: more front splitter (+1)"),
+        remedy("rideHeight", "rear", +1, "Understeer at fast apex: more rake (+1)"),
     ],
     Symptom(U, EX, LO): [
-        remedy("preload", None, -1, "Sottosterzo in uscita lenta (trazione): meno precarico diff (−1)"),
-        remedy("aRBRear", None, -1, "Sottosterzo in uscita: barra posteriore più morbida (−1)"),
+        remedy("preload", None, -1, "Understeer on slow exit (traction): less diff preload (−1)"),
+        remedy("aRBRear", None, -1, "Understeer on exit: softer rear anti-roll bar (−1)"),
     ],
     Symptom(U, EX, HI): [
-        remedy("rearWing", None, -1, "Sottosterzo in uscita veloce: meno ala posteriore (−1)"),
-        remedy("splitter", None, +1, "Sottosterzo in uscita veloce: più splitter (+1)"),
+        remedy("rearWing", None, -1, "Understeer on fast exit: less rear wing (−1)"),
+        remedy("splitter", None, +1, "Understeer on fast exit: more splitter (+1)"),
     ],
     # ---- Oversteer ----
     Symptom(O, EN, LO): [
-        remedy("brakeBias", None, +1, "Sovrasterzo in entrata lenta: bias freni più avanti (+1)", "AV"),
-        remedy("aRBRear", None, -1, "Sovrasterzo in entrata: barra posteriore più morbida (−1)"),
-        remedy("toe", "rear", +1, "Sovrasterzo in entrata: più toe-in posteriore (+1)"),
+        remedy("brakeBias", None, +1, "Oversteer on slow entry: brake bias more forward (+1)", "AV"),
+        remedy("aRBRear", None, -1, "Oversteer on entry: softer rear anti-roll bar (−1)"),
+        remedy("toe", "rear", +1, "Oversteer on entry: more rear toe-in (+1)"),
     ],
     Symptom(O, EN, HI): [
-        remedy("rearWing", None, +1, "Sovrasterzo in entrata veloce: più ala posteriore (+1)"),
-        remedy("rideHeight", "rear", -2, "Sovrasterzo in entrata veloce: abbassa il posteriore (−2)"),
-        remedy("aRBRear", None, -1, "Sovrasterzo in entrata veloce: barra posteriore più morbida (−1)"),
+        remedy("rearWing", None, +1, "Oversteer on fast entry: more rear wing (+1)"),
+        remedy("rideHeight", "rear", -2, "Oversteer on fast entry: lower the rear (−2)"),
+        remedy("aRBRear", None, -1, "Oversteer on fast entry: softer rear anti-roll bar (−1)"),
     ],
     Symptom(O, AP, LO): [
-        remedy("aRBRear", None, -1, "Sovrasterzo all'apex lento: barra posteriore più morbida (−1)"),
-        remedy("preload", None, +1, "Sovrasterzo all'apex: più precarico differenziale (+1)"),
+        remedy("aRBRear", None, -1, "Oversteer at slow apex: softer rear anti-roll bar (−1)"),
+        remedy("preload", None, +1, "Oversteer at apex: more differential preload (+1)"),
     ],
     Symptom(O, AP, HI): [
-        remedy("rearWing", None, +1, "Sovrasterzo all'apex veloce: più ala posteriore (+1)"),
-        remedy("aRBRear", None, -1, "Sovrasterzo all'apex veloce: barra posteriore più morbida (−1)"),
+        remedy("rearWing", None, +1, "Oversteer at fast apex: more rear wing (+1)"),
+        remedy("aRBRear", None, -1, "Oversteer at fast apex: softer rear anti-roll bar (−1)"),
     ],
     Symptom(O, EX, LO): [
-        remedy("tC1", None, +1, "Sovrasterzo in uscita (trazione): più controllo di trazione (+1)", "AV"),
-        remedy("aRBRear", None, -1, "Sovrasterzo in uscita: barra posteriore più morbida (−1)"),
-        remedy("wheelRate", "rear", -1, "Sovrasterzo in uscita: molle posteriori più morbide (−1)"),
+        remedy("tC1", None, +1, "Oversteer on exit (traction): more traction control (+1)", "AV"),
+        remedy("aRBRear", None, -1, "Oversteer on exit: softer rear anti-roll bar (−1)"),
+        remedy("wheelRate", "rear", -1, "Oversteer on exit: softer rear springs (−1)"),
     ],
     Symptom(O, EX, HI): [
-        remedy("rearWing", None, +1, "Sovrasterzo in uscita veloce: più ala posteriore (+1)"),
-        remedy("tC1", None, +1, "Sovrasterzo in uscita veloce: più controllo di trazione (+1)", "AV"),
+        remedy("rearWing", None, +1, "Oversteer on fast exit: more rear wing (+1)"),
+        remedy("tC1", None, +1, "Oversteer on fast exit: more traction control (+1)", "AV"),
     ],
 }
 
@@ -138,10 +138,10 @@ GT3_PROFILE = Profile(
     phases=[
         PressurePhase(27.5, 0.7),
         _AeroPhase("aero", "Aero / rake", "BOX"),
-        _MechanicalPhase("mechanical", "Grip meccanico", "BOX"),
-        _BrakeBiasPhase("brake_bias", "Bilanciamento freni", "AV"),
-        _ElectronicsPhase("electronics", "Elettronica", "AV"),
+        _MechanicalPhase("mechanical", "Mechanical grip", "BOX"),
+        _BrakeBiasPhase("brake_bias", "Brake bias", "AV"),
+        _ElectronicsPhase("electronics", "Electronics", "AV"),
     ],
     remedy_table=REMEDY_TABLE,
-    al_volo=["Bilanciamento freni", "TC", "ABS", "Mappa motore"],
+    al_volo=["Brake bias", "TC", "ABS", "Engine map"],
 )

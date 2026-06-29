@@ -128,13 +128,13 @@ class Overlay(QWidget):
             self._set_font(p, 14, bold=True)
             p.setPen(_GREY)
             p.drawText(52, 14, 200, 24, Qt.AlignVCenter, "HONE")
-            self._draw_pill(p, "in attesa del gioco…", _GREY, y=78)
+            self._draw_pill(p, "waiting for the game…", _GREY, y=78)
             return
 
         self._draw_brand_header(p, w)
         delta = st.get("delta")
         if delta is None:
-            self._draw_pill(p, "REC ● sto imparando il giro di riferimento…",
+            self._draw_pill(p, "REC ● learning the reference lap…",
                             _AMBER, y=78)
         else:
             self._draw_delta(p, delta, w)

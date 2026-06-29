@@ -155,20 +155,20 @@ def test_class_endpoint(tmp_path):
     data = c.get("/api/setup/class", params={"car": CAR}).json()
     assert data["class"] == "GT3"
     assert data["profile"]["name"] == "GT3"
-    assert data["profile"]["phases"][0] == "Pressioni"
-    assert "Bilanciamento freni" in data["profile"]["al_volo"]
+    assert data["profile"]["phases"][0] == "Pressures"
+    assert "Brake bias" in data["profile"]["al_volo"]
     # a formula car gets the Formula engineer
     f = c.get("/api/setup/class", params={"car": "f1_1990_mclaren"}).json()
     assert f["class"] == "Formula"
     assert f["profile"]["phases"].index("Aero / rake") < \
-           f["profile"]["phases"].index("Grip meccanico")
+           f["profile"]["phases"].index("Mechanical grip")
 
 
 def test_engineer_page_is_served(tmp_path):
     c, _ = _client(tmp_path)
     r = c.get("/engineer")
     assert r.status_code == 200
-    assert "Ingegnere" in r.text
+    assert "Race engineer" in r.text
     # its static assets are reachable too
     assert c.get("/static/engineer.js").status_code == 200
     assert c.get("/static/engineer.css").status_code == 200

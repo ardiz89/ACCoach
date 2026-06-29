@@ -71,7 +71,7 @@ def test_clean_lap_vs_itself_has_no_losses():
 
 def test_corner_loss_label_is_one_based():
     deb, _ = _debrief()
-    assert deb.losses[0].label == "Curva 1"
+    assert deb.losses[0].label == "Corner 1"
 
 
 def test_consistency_summary():
@@ -93,6 +93,6 @@ def test_format_debrief_mentions_gap_and_worst_corner():
     deb, _ = _debrief()
     text = format_debrief(deb, consistency=lap_time_consistency([100500, 100600]))
     assert "Debrief" in text
-    assert "Distacco" in text
-    assert "Curva 1" in text
-    assert "Costanza" in text
+    assert "Gap" in text
+    assert "Corner 1" in text
+    assert "Consistency" in text

@@ -47,17 +47,17 @@ _PATIENCE = 6            # laps spent on a focus with no win → park it, move o
 # A short, driver-facing label for what to work on, by loss category. The live
 # coach already says the "what"; this names the *theme* so a session has a spine.
 _THEME = {
-    CueCategory.BRAKE_LATER: "frenata",
-    CueCategory.BRAKE_EARLIER: "frenata",
-    CueCategory.LESS_BRAKE: "frenata",
-    CueCategory.MORE_THROTTLE: "trazione",
-    CueCategory.CARRY_SPEED: "percorrenza",
-    CueCategory.TIME_LOSS: "linea",
+    CueCategory.BRAKE_LATER: "braking",
+    CueCategory.BRAKE_EARLIER: "braking",
+    CueCategory.LESS_BRAKE: "braking",
+    CueCategory.MORE_THROTTLE: "traction",
+    CueCategory.CARRY_SPEED: "cornering",
+    CueCategory.TIME_LOSS: "line",
 }
 
 
 def _theme(cat: CueCategory) -> str:
-    return _THEME.get(cat, "guida")
+    return _THEME.get(cat, "driving")
 
 
 def _secs(ms: float) -> str:
@@ -135,7 +135,7 @@ class FocusCoach:
         self.mastered: set[int] = set()          # corners coached to the ground
         self.parked: set[int] = set()            # corners that wouldn't improve
         self._last = FocusReport(FocusKind.ASSESS,
-                                 f"Valuto i punti deboli… (0/{min_laps} giri puliti).")
+                                 f"Assessing your weak points… (0/{min_laps} clean laps).")
 
     # -- public API --------------------------------------------------------
     def observe(self, debrief: LapDebrief, *, stable: bool = True) -> FocusReport:
@@ -165,22 +165,22 @@ class FocusCoach:
         if len(self.window) < self.min_laps:
             return FocusReport(
                 FocusKind.ASSESS,
-                f"Valuto i punti deboli… ({len(self.window)}/{self.min_laps} "
-                f"giri puliti).")
+                f"Assessing your weak points… ({len(self.window)}/{self.min_laps} "
+                f"clean laps).")
 
         focus = self._choose()
         if focus is None:
             return FocusReport(
                 FocusKind.CLEAN,
-                "Nessun punto debole ricorrente: guida costante. Si lima il dettaglio.")
+                "No recurring weak point: steady driving. Just fine-tuning left.")
 
         self.focus = focus
         self._focus_losses = []
         cause = f" {focus.cause}" if focus.cause else ""
         return FocusReport(
             FocusKind.BRIEF,
-            f"Nuovo focus — {focus.name}: lavoriamo la {focus.theme}. "
-            f"Qui perdi ~{_secs(focus.baseline_ms)} di media.{cause} {focus.drill}",
+            f"New focus — {focus.name}: let's work on {focus.theme}. "
+            f"You lose ~{_secs(focus.baseline_ms)} here on average.{cause} {focus.drill}",
             focus=focus, drill=focus.drill, progress_ms=focus.baseline_ms)
 
     def _drill(self, debrief: LapDebrief) -> FocusReport:
@@ -193,7 +193,7 @@ class FocusCoach:
         if len(self._focus_losses) < self.min_laps:
             return FocusReport(
                 FocusKind.DRILL,
-                f"{focus.name}: lavora la {focus.theme}. {focus.drill}",
+                f"{focus.name}: work on {focus.theme}. {focus.drill}",
                 focus=focus, drill=focus.drill, progress_ms=current)
 
         if current <= focus.baseline_ms * _IMPROVED_FRAC and current <= _SOLVED_MS:
@@ -201,24 +201,24 @@ class FocusCoach:
             self.focus = None
             return FocusReport(
                 FocusKind.IMPROVED,
-                f"{focus.name} migliorata: da {_secs(focus.baseline_ms)} a "
-                f"{_secs(current)}. Bel lavoro — nuovo focus a breve.",
+                f"{focus.name} improved: from {_secs(focus.baseline_ms)} to "
+                f"{_secs(current)}. Nice work — a new focus shortly.",
                 progress_ms=current)
 
         if len(self._focus_losses) >= _PATIENCE:
             self.parked.add(focus.corner_index)
             self.focus = None
-            setup = f" Possibile causa setup: {focus.cause}" if focus.cause else ""
+            setup = f" Possible setup cause: {focus.cause}" if focus.cause else ""
             return FocusReport(
                 FocusKind.STUCK,
-                f"{focus.name}: la {focus.theme} non scende ({_secs(current)} vs "
-                f"{_secs(focus.baseline_ms)}).{setup} La parcheggio e passo oltre.",
+                f"{focus.name}: {focus.theme} isn't dropping ({_secs(current)} vs "
+                f"{_secs(focus.baseline_ms)}).{setup} Parking it and moving on.",
                 progress_ms=current)
 
         return FocusReport(
             FocusKind.DRILL,
-            f"{focus.name}: continua sulla {focus.theme}. Ora ~{_secs(current)} "
-            f"(partenza {_secs(focus.baseline_ms)}).",
+            f"{focus.name}: keep working {focus.theme}. Now ~{_secs(current)} "
+            f"(started at {_secs(focus.baseline_ms)}).",
             focus=focus, drill=focus.drill, progress_ms=current)
 
     def _choose(self) -> Focus | None:
@@ -250,7 +250,7 @@ class FocusCoach:
             theme=_theme(rep.category),
             category=rep.category,
             baseline_ms=baseline,
-            drill=rep.fix or "Pulisci la traiettoria e cerca costanza.",
+            drill=rep.fix or "Clean up the line and build consistency.",
             cause=rep.cause,
         )
 

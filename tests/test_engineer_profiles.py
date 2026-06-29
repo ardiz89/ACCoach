@@ -113,7 +113,7 @@ def test_road_never_proposes_tc():
 def test_all_profiles_have_al_volo():
     for prof in (GT3_PROFILE, FORMULA_PROFILE, ROAD_PROFILE):
         assert prof.al_volo
-        assert "Bilanciamento freni" in prof.al_volo
+        assert "Brake bias" in prof.al_volo
 
 
 def test_engineer_for_sets_class_and_pressure_window():

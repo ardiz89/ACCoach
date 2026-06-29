@@ -53,7 +53,7 @@ def test_brief_on_recurring_loss():
     report = _feed(coach, _debrief(_loss(0, 300)), 3)
     assert report.kind is FocusKind.BRIEF
     assert report.focus.corner_index == 0
-    assert report.focus.theme == "frenata"             # BRAKE_LATER → frenata
+    assert report.focus.theme == "braking"             # BRAKE_LATER → braking
     assert report.drill                                # a concrete instruction
     assert "0.30s" in report.message                   # measured baseline
 

@@ -32,33 +32,33 @@ from ._common import (
 # Keyed by (balance, phase) — speed doesn't change the lever on a road car.
 _BASE: dict[tuple, list] = {
     (U, EN): [
-        remedy("tyrePressure", "front", -2, "Sottosterzo in entrata: meno pressione anteriore (−2)"),
-        remedy("aRBFront", None, -1, "Sottosterzo in entrata: barra anteriore più morbida (−1)"),
-        remedy("toe", "front", +1, "Sottosterzo in entrata: più toe-out anteriore (+1)"),
+        remedy("tyrePressure", "front", -2, "Understeer on entry: less front pressure (−2)"),
+        remedy("aRBFront", None, -1, "Understeer on entry: softer front anti-roll bar (−1)"),
+        remedy("toe", "front", +1, "Understeer on entry: more front toe-out (+1)"),
     ],
     (U, AP): [
-        remedy("aRBFront", None, -1, "Sottosterzo all'apex: barra anteriore più morbida (−1)"),
-        remedy("camber", "front", -1, "Sottosterzo all'apex: più camber negativo anteriore (−1)"),
-        remedy("wheelRate", "front", -1, "Sottosterzo all'apex: molle anteriori più morbide (−1)"),
+        remedy("aRBFront", None, -1, "Understeer at apex: softer front anti-roll bar (−1)"),
+        remedy("camber", "front", -1, "Understeer at apex: more front negative camber (−1)"),
+        remedy("wheelRate", "front", -1, "Understeer at apex: softer front springs (−1)"),
     ],
     (U, EX): [
-        remedy("diffPower", None, -1, "Sottosterzo in uscita: differenziale meno bloccato in power (−1)"),
-        remedy("aRBRear", None, -1, "Sottosterzo in uscita: barra posteriore più morbida (−1)"),
+        remedy("diffPower", None, -1, "Understeer on exit: less locked differential on power (−1)"),
+        remedy("aRBRear", None, -1, "Understeer on exit: softer rear anti-roll bar (−1)"),
     ],
     (O, EN): [   # the lift-off / release oversteer signature
-        remedy("toe", "rear", +1, "Sovrasterzo in rilascio: più toe-in posteriore (+1)"),
-        remedy("reboundSlow", "rear", -1, "Sovrasterzo in rilascio: estensione posteriore più morbida (−1)"),
-        remedy("aRBRear", None, -1, "Sovrasterzo in rilascio: barra posteriore più morbida (−1)"),
-        remedy("brakeBias", None, +1, "Sovrasterzo in rilascio: bias freni più avanti (+1)", "AV"),
+        remedy("toe", "rear", +1, "Lift-off oversteer: more rear toe-in (+1)"),
+        remedy("reboundSlow", "rear", -1, "Lift-off oversteer: softer rear rebound (−1)"),
+        remedy("aRBRear", None, -1, "Lift-off oversteer: softer rear anti-roll bar (−1)"),
+        remedy("brakeBias", None, +1, "Lift-off oversteer: brake bias more forward (+1)", "AV"),
     ],
     (O, AP): [
-        remedy("aRBRear", None, -1, "Sovrasterzo all'apex: barra posteriore più morbida (−1)"),
-        remedy("toe", "rear", +1, "Sovrasterzo all'apex: più toe-in posteriore (+1)"),
+        remedy("aRBRear", None, -1, "Oversteer at apex: softer rear anti-roll bar (−1)"),
+        remedy("toe", "rear", +1, "Oversteer at apex: more rear toe-in (+1)"),
     ],
     (O, EX): [
-        remedy("diffPower", None, -1, "Sovrasterzo in uscita (trazione): differenziale più dolce in power (−1)"),
-        remedy("wheelRate", "rear", -1, "Sovrasterzo in uscita: molle posteriori più morbide (−1)"),
-        remedy("aRBRear", None, -1, "Sovrasterzo in uscita: barra posteriore più morbida (−1)"),
+        remedy("diffPower", None, -1, "Oversteer on exit (traction): softer differential on power (−1)"),
+        remedy("wheelRate", "rear", -1, "Oversteer on exit: softer rear springs (−1)"),
+        remedy("aRBRear", None, -1, "Oversteer on exit: softer rear anti-roll bar (−1)"),
     ],
 }
 
@@ -102,10 +102,10 @@ ROAD_PROFILE = Profile(
     name="Stradale",
     phases=[
         PressurePhase(30.0, 1.5),                       # wider window, street rubber
-        _MechanicalPhase("mechanical", "Grip meccanico", "BOX"),
-        _TractionPhase("traction", "Trazione", "BOX"),
-        _BrakeBiasPhase("brake_bias", "Bilanciamento freni", "AV"),
+        _MechanicalPhase("mechanical", "Mechanical grip", "BOX"),
+        _TractionPhase("traction", "Traction", "BOX"),
+        _BrakeBiasPhase("brake_bias", "Brake bias", "AV"),
     ],
     remedy_table=REMEDY_TABLE,
-    al_volo=["Bilanciamento freni"],                    # spesso l'unica leva al volo
+    al_volo=["Brake bias"],                             # often the only on-the-fly lever
 )

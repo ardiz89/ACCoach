@@ -122,7 +122,7 @@ class ProposedChange:
         return ProposedChange(
             changes=tuple(AtomicChange(c.param, c.slot, -c.delta_clicks)
                           for c in self.changes),
-            rationale="Ripristino: " + self.rationale,
+            rationale="Revert: " + self.rationale,
             phase_label=self.phase_label, tag=self.tag, symptom=self.symptom)
 
     def as_setup_payload(self) -> list[dict]:
@@ -259,8 +259,8 @@ class RaceEngineer:
 
         if len(self.window) < self.min_stable:
             return Decision(DecisionKind.COLLECT,
-                            f"Servono {self.min_stable} giri puliti per una base "
-                            f"(ne ho {len(self.window)}).")
+                            f"Need {self.min_stable} clean laps for a baseline "
+                            f"(have {len(self.window)}).")
         return self._advance()
 
     def mark_applied(self) -> None:
@@ -309,13 +309,13 @@ class RaceEngineer:
         phase = self.phase
         if phase is None:
             return Decision(DecisionKind.DONE,
-                            "Setup a posto: nessun guadagno residuo. Buona base.")
+                            "Setup is solid: no further gains. Good baseline.")
         if phase.gate(self.window):
             self.phase_idx += 1
             nxt = self.phase
-            tail = f" → passo a: {nxt.label}" if nxt else " → setup completo"
+            tail = f" → moving to: {nxt.label}" if nxt else " → setup complete"
             return Decision(DecisionKind.PHASE_DONE,
-                            f"Fase '{phase.label}' completata{tail}.")
+                            f"Phase '{phase.label}' complete{tail}.")
 
         symptom = self._dominant_symptom(phase)
         if symptom is None:
@@ -329,14 +329,14 @@ class RaceEngineer:
             # Nothing actionable here; treat the phase as done to avoid a stall.
             self.phase_idx += 1
             return Decision(DecisionKind.PHASE_DONE,
-                            f"Fase '{phase.label}': nulla da correggere.")
+                            f"Phase '{phase.label}': nothing to correct.")
 
         change = self._remedy_for(symptom, phase)
         if change is None:
             self.exhausted.add(symptom)
             return Decision(DecisionKind.PHASE_DONE,
-                            f"'{symptom}': rimedi di setup esauriti — probabile "
-                            f"questione di guida.")
+                            f"'{symptom}': setup remedies exhausted — likely "
+                            f"a driving issue.")
         self._pending = change
         self._pending_is_revert = False
         return Decision(DecisionKind.PROPOSE, change.rationale, change,
@@ -347,7 +347,7 @@ class RaceEngineer:
         if a.laps_seen < self.min_stable:
             need = self.min_stable - a.laps_seen
             return Decision(DecisionKind.EVALUATING,
-                            f"Valuto la modifica: {need} giri puliti ancora.")
+                            f"Evaluating the change: {need} more clean laps.")
 
         new_time = _median_time(self.window)
         new_score = _median_score(self.window, a.symptom)
@@ -363,9 +363,9 @@ class RaceEngineer:
         if a.symptom is None:
             if not band_ok:
                 return self._revert(a.change,
-                                    "La modifica ha peggiorato il tempo: ripristino.")
+                                    "The change worsened the lap time: reverting.")
             self._record(a.change)
-            return Decision(DecisionKind.ACCEPTED, "Modifica applicata, proseguo.")
+            return Decision(DecisionKind.ACCEPTED, "Change applied, moving on.")
 
         improved = d_score <= -_EPS_SCORE and band_ok
 
@@ -373,20 +373,20 @@ class RaceEngineer:
             self._record(a.change)
             if new_score < _SYMPTOM_THRESH:
                 return Decision(DecisionKind.ACCEPTED,
-                                f"Tenuta: '{a.symptom}' risolto "
+                                f"Handling: '{a.symptom}' resolved "
                                 f"({a.base_score:.2f}→{new_score:.2f}).")
             return Decision(DecisionKind.ACCEPTED,
-                            f"Tenuta: '{a.symptom}' migliora, continuo "
+                            f"Handling: '{a.symptom}' improving, continuing "
                             f"({a.base_score:.2f}→{new_score:.2f}).")
 
         # Not an improvement (worse OR plateau): revert and try the next lever.
         # Reverting on a plateau too is deliberate — keeping changes a blind meter
         # reads as "harmless" is exactly how setup drift creeps in.
         self.remedy_idx[a.symptom] = self.remedy_idx.get(a.symptom, 0) + 1
-        reason = ("Modifica peggiorativa" if not band_ok or d_score > _EPS_SCORE
-                  else "Nessun effetto misurabile")
+        reason = ("Change made it worse" if not band_ok or d_score > _EPS_SCORE
+                  else "No measurable effect")
         return self._revert(a.change,
-                            f"{reason}: ripristino e provo un'altra leva per "
+                            f"{reason}: reverting and trying another lever for "
                             f"'{a.symptom}'.")
 
     # -- symptom selection with safety gates -------------------------------

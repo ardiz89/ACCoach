@@ -74,7 +74,7 @@ def test_high_speed_understeer_proposes_rear_wing_in_aero_phase():
     assert eng.phase.key == "aero"
     assert d.change.changes[0].param == "rearWing"
     assert d.change.changes[0].delta_clicks == -1
-    assert "ala posteriore" in d.change.rationale.lower()
+    assert "rear wing" in d.change.rationale.lower()
 
 
 def test_accepts_change_that_resolves_the_symptom():
@@ -163,7 +163,7 @@ def test_phases_run_in_order():
         if d.kind is DecisionKind.DONE:
             break
     # pressures is the first gate crossed
-    assert "Pressioni" in seen[0].message
+    assert "Pressures" in seen[0].message
 
 
 def test_proposed_change_setup_payload_shape():
@@ -232,6 +232,6 @@ def test_exhausting_remedies_flags_driving_issue():
             eng.mark_applied()
         elif d.kind is DecisionKind.REVERTED:
             reverts += 1
-        elif d.kind is DecisionKind.PHASE_DONE and "esaurit" in d.message:
+        elif d.kind is DecisionKind.PHASE_DONE and "exhausted" in d.message:
             break
     assert sym in eng.exhausted

@@ -30,7 +30,7 @@ async function init() {
   for (const c of combos) {
     const o = document.createElement("option");
     o.value = JSON.stringify({ car: c.car, track: c.track });
-    o.textContent = `${c.car} · ${c.track}  (${c.laps} giri, best ${c.best})`;
+    o.textContent = `${c.car} · ${c.track}  (${c.laps} laps, best ${c.best})`;
     sel.appendChild(o);
   }
   sel.onchange = () => {
@@ -70,10 +70,10 @@ async function loadProgress(combo) {
   const c = p.consistency || {};
   const item = (k, v) => `<div class="item"><div class="k">${k}</div><div class="v">${v}</div></div>`;
   $("prog-summary").innerHTML = c.n
-    ? item("Giri validi", c.n) + item("Migliore", fmtMs(c.best_ms)) +
-      item("Media", fmtMs(c.mean_ms)) + item("Spread", (c.spread_ms / 1000).toFixed(3) + "s") +
+    ? item("Valid laps", c.n) + item("Best", fmtMs(c.best_ms)) +
+      item("Average", fmtMs(c.mean_ms)) + item("Spread", (c.spread_ms / 1000).toFixed(3) + "s") +
       item("σ", (c.std_ms / 1000).toFixed(3) + "s")
-    : item("—", "nessun giro valido");
+    : item("—", "no valid lap");
 
   drawProgress(p);
   renderLevels(p.levels);
@@ -81,12 +81,12 @@ async function loadProgress(combo) {
 
   const el = $("recurring");
   if (!p.recurring.length) {
-    el.innerHTML = `<div class="clean">Nessun errore ricorrente — bella costanza!</div>`;
+    el.innerHTML = `<div class="clean">No recurring mistakes — nice consistency!</div>`;
   } else {
     el.innerHTML = p.recurring.map((r) =>
       `<div class="recur"><span class="count">${r.count}×</span>` +
       `<span class="msg">${r.message}</span>` +
-      `<span class="where">Curve: ${r.corners.join(", ")}</span></div>`).join("");
+      `<span class="where">Corners: ${r.corners.join(", ")}</span></div>`).join("");
   }
 }
 
@@ -99,22 +99,22 @@ function renderLevels(levels) {
   for (const lv of levels) {
     let gap;
     if (lv.key === "best") {
-      gap = `<span class="lvl-gap base">il tuo riferimento</span>`;
+      gap = `<span class="lvl-gap base">your reference</span>`;
     } else if (lv.gain_s > 0) {
-      const hint = lv.key === "ideal" ? "costanza da recuperare" : "margine sul PRO";
+      const hint = lv.key === "ideal" ? "consistency on the table" : "gap to PRO";
       gap = `<span class="lvl-gap faster">−${lv.gain_s.toFixed(3)}s</span>` +
             `<span class="lvl-hint">${hint}</span>`;
     } else {
       const ahead = Math.abs(lv.gain_s).toFixed(3);
-      gap = `<span class="lvl-gap done">✓ già battuto</span>` +
-            `<span class="lvl-hint">+${ahead}s sul PRO</span>`;
+      gap = `<span class="lvl-gap done">✓ already beaten</span>` +
+            `<span class="lvl-hint">+${ahead}s vs PRO</span>`;
     }
     rows += `<div class="lvl" data-key="${lv.key}">` +
       `<span class="lvl-label">${lv.label}</span>` +
       `<span class="lvl-time">${lv.lap_time}</span>` +
       gap + `</div>`;
   }
-  el.innerHTML = `<h3>Livelli <small>(best → ideale → PRO · gap = tempo disponibile)</small></h3>` +
+  el.innerHTML = `<h3>Levels <small>(best → ideal → PRO · gap = time available)</small></h3>` +
     `<div class="ladder">${rows}</div>`;
 }
 
@@ -123,21 +123,21 @@ function renderTrends(trends) {
   const el = $("trends");
   if (!el) return;
   if (!trends || !trends.length) {
-    el.innerHTML = `<div class="clean">Nessun punto debole ricorrente — bella costanza!</div>`;
+    el.innerHTML = `<div class="clean">No recurring weak points — nice consistency!</div>`;
     return;
   }
   el.innerHTML = trends.map((t) => {
     const sys = t.systematic;
     const badge = sys
-      ? `<span class="wk-badge on">Sistematico</span>`
-      : `<span class="wk-badge off">Sporadico</span>`;
-    const tag = sys ? "da allenare" : "episodico";
+      ? `<span class="wk-badge on">Systematic</span>`
+      : `<span class="wk-badge off">Sporadic</span>`;
+    const tag = sys ? "to train" : "one-off";
     return `<div class="weak ${sys ? "sys" : ""}">` +
       `<div class="weak-head">` +
       `<span class="corner">${t.name}</span>${badge}` +
       `<span class="lost">−${t.total_s.toFixed(3)}s</span></div>` +
       `<div class="detail">${tag} · ` +
-      `mediana −${t.median_s.toFixed(3)}s · ${t.occurrences}/${t.laps} giri</div>` +
+      `median −${t.median_s.toFixed(3)}s · ${t.occurrences}/${t.laps} laps</div>` +
       `</div>`;
   }).join("");
 }
@@ -199,10 +199,10 @@ function drawSectors(s) {
   const item = (k, v, cls) =>
     `<div class="item"><div class="k">${k}</div><div class="v ${cls || ""}">${v}</div></div>`;
   $("sec-summary").innerHTML =
-    item("Confronto", s.baseline.lap_time) +
-    item("Giro", s.review.lap_time) +
-    item("Distacco", fmt(gap) + "s", gap > 0 ? "slower" : "faster") +
-    item("Settori", s.real ? "reali della pista" : "terzi (posizione)");
+    item("Comparison", s.baseline.lap_time) +
+    item("Lap", s.review.lap_time) +
+    item("Gap", fmt(gap) + "s", gap > 0 ? "slower" : "faster") +
+    item("Sectors", s.real ? "real track sectors" : "thirds (position)");
 
   // Diverging delta bars, scaled to the worst sector (min 0.05s).
   let mx = 0.05;
@@ -234,11 +234,11 @@ function drawSectors(s) {
     const from = s.ideal.best_from
       .map((p, i) => `S${i + 1} ← <b>${lapTime(p)}</b>`).join(" · ");
     $("ideal").innerHTML =
-      `<h3>Giro ideale</h3>` +
+      `<h3>Ideal lap</h3>` +
       `<div class="ideal-time">${s.ideal.ideal}` +
-      (gain > 0 ? ` <span class="faster">potenziale −${gain.toFixed(3)}s</span>` : "") +
+      (gain > 0 ? ` <span class="faster">potential −${gain.toFixed(3)}s</span>` : "") +
       `</div><div class="ideal-from">${from}</div>` +
-      `<div class="muted small">I migliori settori che hai già fatto, cuciti insieme.</div>`;
+      `<div class="muted small">Your best sectors so far, stitched together.</div>`;
   } else {
     $("ideal").innerHTML = "";
   }
@@ -385,7 +385,7 @@ function fillLaps(a) {
     for (const l of a.laps) {
       const o = document.createElement("option");
       o.value = l.path;
-      o.textContent = `${l.lap_time}${l.valid ? "" : " (invalido)"}`;
+      o.textContent = `${l.lap_time}${l.valid ? "" : " (invalid)"}`;
       if (l.path === selectedPath) o.selected = true;
       sel.appendChild(o);
     }
@@ -400,10 +400,10 @@ function drawSummary(a) {
   const item = (k, v, cls) =>
     `<div class="item"><div class="k">${k}</div><div class="v ${cls || ""}">${v}</div></div>`;
   $("summary").innerHTML =
-    item("Confronto", a.reference.lap_time) +
-    item("Giro", a.review.lap_time) +
-    item("Distacco", fmt(gap) + "s", gap > 0 ? "slower" : "faster") +
-    (c.n >= 2 ? item("Costanza", `σ ${(c.std_ms / 1000).toFixed(3)}s · ${c.n} giri`) : "");
+    item("Comparison", a.reference.lap_time) +
+    item("Lap", a.review.lap_time) +
+    item("Gap", fmt(gap) + "s", gap > 0 ? "slower" : "faster") +
+    (c.n >= 2 ? item("Consistency", `σ ${(c.std_ms / 1000).toFixed(3)}s · ${c.n} laps`) : "");
 }
 
 function cornerLegend(a) {
@@ -416,11 +416,11 @@ function drawDebrief(a) {
   const el = $("debrief");
   const legend = cornerLegend(a);
   if (!a.losses.length) {
-    el.innerHTML = `<h3>Dove migliorare</h3>${legend}` +
-      `<div class="clean">Giro pulito — nessuna perdita di tempo significativa per curva.</div>`;
+    el.innerHTML = `<h3>Where to improve</h3>${legend}` +
+      `<div class="clean">Clean lap — no significant time lost per corner.</div>`;
     return;
   }
-  let html = `<h3>Dove migliorare</h3>${legend}`;
+  let html = `<h3>Where to improve</h3>${legend}`;
   for (const l of a.losses) {
     const major = l.lost_s >= 0.2 ? "major" : "";
     html += `<div class="loss ${major}">` +
@@ -538,7 +538,7 @@ function nearest(posArr, p) {
 
 function updateReadout(a, p) {
   const el = $("readout");
-  if (p == null) { el.innerHTML = "Passa il mouse sui grafici per i valori punto-per-punto…"; return; }
+  if (p == null) { el.innerHTML = "Hover over the charts for point-by-point values…"; return; }
   const rv = a.review.channels, rf = a.reference.channels, d = a.review.delta;
   const iv = nearest(rv.pos, p), ir = nearest(rf.pos, p), id = nearest(d.pos, p);
   const yv = rv.speed[iv], rfv = rf.speed[ir], dv = yv - rfv, dl = d.delta_s[id];
@@ -546,10 +546,10 @@ function updateReadout(a, p) {
   const where = corner ? `<b class="muted">${corner.name}</b> &nbsp;·&nbsp; ` : "";
   el.innerHTML = where +
     `<b>Pos ${Math.round(p * 100)}%</b> &nbsp;·&nbsp; ` +
-    `Vel <b>${yv.toFixed(0)}</b> <span class="muted">(rif ${rfv.toFixed(0)}, ${dv >= 0 ? "+" : ""}${dv.toFixed(0)})</span> &nbsp;·&nbsp; ` +
+    `Speed <b>${yv.toFixed(0)}</b> <span class="muted">(ref ${rfv.toFixed(0)}, ${dv >= 0 ? "+" : ""}${dv.toFixed(0)})</span> &nbsp;·&nbsp; ` +
     `Δ <b class="${dl > 0 ? "slower" : "faster"}">${dl >= 0 ? "+" : ""}${dl.toFixed(3)}s</b> &nbsp;·&nbsp; ` +
-    `Gas <b>${Math.round(rv.throttle[iv] * 100)}%</b>  Freno <b>${Math.round(rv.brake[iv] * 100)}%</b> &nbsp;·&nbsp; ` +
-    `Marcia <b>${rv.gear[iv]}</b>`;
+    `Throttle <b>${Math.round(rv.throttle[iv] * 100)}%</b>  Brake <b>${Math.round(rv.brake[iv] * 100)}%</b> &nbsp;·&nbsp; ` +
+    `Gear <b>${rv.gear[iv]}</b>`;
 }
 
 function wireHover() {

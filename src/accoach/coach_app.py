@@ -82,7 +82,7 @@ def _focus_panel(focus: dict | None) -> Panel:
     if f:
         table.add_row(Text(f"{f['name']} · {f['theme']} · "
                            f"−{f['baseline_ms'] / 1000.0:.2f}s", style="cyan"))
-    return Panel(table, title="Focus · lezione", border_style="yellow")
+    return Panel(table, title="Focus · lesson", border_style="yellow")
 
 
 def _status_panel(s: TelemetrySnapshot, saved: int) -> Panel:

@@ -34,7 +34,7 @@ async function loadCombos() {
   const sel = $("combo");
   sel.innerHTML = "";
   if (!combos.length) {
-    sel.innerHTML = '<option value="">(nessun setup trovato)</option>';
+    sel.innerHTML = '<option value="">(no setup found)</option>';
     return;
   }
   // Group the (potentially many) cars by engineer class for a usable dropdown.
@@ -91,7 +91,7 @@ async function loadClass(car) {
   chip.textContent = info.class;
   chip.dataset.cls = info.class;
   chip.hidden = false;
-  $("prof-name").textContent = `Ingegnere ${info.profile.name}`;
+  $("prof-name").textContent = `Engineer ${info.profile.name}`;
   $("prof-phases").textContent = info.profile.phases.join(" → ");
   $("prof-alvolo").textContent = info.profile.al_volo.join(", ");
   $("eng-profile").hidden = false;
@@ -100,7 +100,7 @@ async function loadClass(car) {
 async function onSetupChange() {
   const opt = $("setup").selectedOptions[0];
   if (!opt || !opt.dataset.path) { $("setup-body").innerHTML =
-    '<div class="empty2">Nessun setup.</div>'; return; }
+    '<div class="empty2">No setup.</div>'; return; }
   state.setupPath = opt.dataset.path;
   const data = await api(`/api/setup/current?path=${encodeURIComponent(state.setupPath)}`);
   state.setupName = data.name;
@@ -216,10 +216,10 @@ function prepareChange(changes) {
   if (applied) {
     $("setup-body").scrollIntoView({ behavior: "smooth", block: "start" });
     showToast(missing
-      ? "Modifica preparata (alcuni parametri non sono in questo setup)."
-      : "Modifica preparata nell'editor — controlla e premi “Scrivi setup”.");
+      ? "Change prepared (some parameters are not in this setup)."
+      : "Change prepared in the editor — review it and press “Write setup”.");
   } else {
-    showToast("Il parametro proposto non è in questo setup.", true);
+    showToast("The proposed parameter is not in this setup.", true);
   }
 }
 
@@ -278,7 +278,7 @@ async function openWriteModal() {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ path: state.setupPath, changes }),
     });
-  } catch (e) { return showToast("Errore anteprima: " + e.message, true); }
+  } catch (e) { return showToast("Preview error: " + e.message, true); }
 
   const box = $("modal-diff");
   if (!res.ok) {
@@ -305,7 +305,7 @@ async function openWriteModal() {
 
 async function confirmWrite() {
   const name = $("modal-name").value.trim();
-  if (!name) { showModalError("Inserisci un nome file."); return; }
+  if (!name) { showModalError("Enter a file name."); return; }
   const body = { path: state.setupPath, as_name: name, confirm: true,
                  changes: changesPayload() };
   try {
@@ -326,8 +326,8 @@ async function confirmWrite() {
     showToast("✓ " + res.reload_hint);
   } catch (e) {
     showModalError(e.message.includes("esiste già")
-      ? "Esiste già un setup con questo nome — scegline un altro."
-      : "Errore scrittura: " + e.message);
+      ? "A setup with this name already exists — choose another."
+      : "Write error: " + e.message);
   }
 }
 
@@ -343,11 +343,11 @@ async function undoSetup() {
       body: JSON.stringify({ path: state.setupPath }),
     });
     await onSetupChange();              // reload the restored values
-    showToast("✓ Setup ripristinato dall'ultimo backup");
+    showToast("✓ Setup restored from the last backup");
   } catch (e) {
     showToast(e.message.includes("backup")
-      ? "Nessun backup da ripristinare per questo setup."
-      : "Errore ripristino: " + e.message, true);
+      ? "No backup to restore for this setup."
+      : "Restore error: " + e.message, true);
   }
 }
 
@@ -368,12 +368,12 @@ const AID = (v) => (v == null || v < 0 ? "–" : String(v));
 function applyLive(st) {
   const badge = $("live-badge");
   if (!st.connected) {
-    badge.dataset.state = "off"; $("live-text").textContent = "telemetria offline";
-    $("live-car").textContent = "In attesa della telemetria…";
+    badge.dataset.state = "off"; $("live-text").textContent = "telemetry offline";
+    $("live-car").textContent = "Waiting for telemetry…";
     return;
   }
   badge.dataset.state = st.in_pit ? "pit" : "on";
-  $("live-text").textContent = st.in_pit ? "ai box" : "in pista";
+  $("live-text").textContent = st.in_pit ? "in pit" : "on track";
   $("live-car").textContent = `${st.car || "?"} · ${st.track || "?"}`;
   $("live-car").classList.remove("muted");
   $("g-speed").textContent = Math.round(st.speed_kmh);
@@ -449,7 +449,7 @@ function renderFocus(st) {
   if (!f) {
     box.dataset.kind = "";
     $("focus-icon").textContent = "…";
-    $("focus-msg").textContent = "Scaldando… guida qualche giro pulito.";
+    $("focus-msg").textContent = "Warming up… drive a few clean laps.";
     drill.hidden = true; target.hidden = true;
     return;
   }
@@ -475,8 +475,8 @@ function renderPitReminder(st) {
   const el = $("pit-reminder");
   if (state.lastWritten && st.in_pit) {
     el.hidden = false;
-    el.innerHTML = `🅿️ Sei ai box: MFD → <b>Setup</b> → carica ` +
-      `<b>${state.lastWritten}</b> → esci dai box per applicarlo.`;
+    el.innerHTML = `🅿️ You're in the pits: MFD → <b>Setup</b> → load ` +
+      `<b>${state.lastWritten}</b> → leave the pits to apply it.`;
   } else {
     el.hidden = true;
   }
@@ -502,7 +502,7 @@ function connectWS() {
   ws.onmessage = (ev) => { try { applyLive(JSON.parse(ev.data)); } catch (e) {} };
   ws.onclose = () => {
     $("live-badge").dataset.state = "off";
-    $("live-text").textContent = "telemetria offline";
+    $("live-text").textContent = "telemetry offline";
     setTimeout(connectWS, 3000);
   };
   ws.onerror = () => { try { ws.close(); } catch (e) {} };
@@ -519,5 +519,5 @@ $("btn-undo").onclick = undoSetup;
 $("modal-cancel").onclick = () => { $("modal").hidden = true; };
 $("modal-ok").onclick = confirmWrite;
 
-loadCombos().catch((e) => showToast("Errore caricamento setup: " + e.message, true));
+loadCombos().catch((e) => showToast("Setup loading error: " + e.message, true));
 connectWS();

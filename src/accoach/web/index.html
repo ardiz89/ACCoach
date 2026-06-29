@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="it">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>HONE · Analisi</title>
+  <title>HONE · Analysis</title>
   <link rel="icon" href="/static/hone_icon.png">
   <link rel="stylesheet" href="/static/style.css">
 </head>
@@ -14,16 +14,16 @@
         <path d="M7 5 L21 16 L7 27" fill="none" stroke="#22D3CE" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
         <circle cx="15" cy="16" r="4" fill="#34E08A"/>
       </svg>
-      <span class="name">HONE</span> <span>· Analisi</span>
+      <span class="name">HONE</span> <span>· Analysis</span>
     </h1>
     <div class="controls">
-      <label>Auto / Pista
+      <label>Car / Track
         <select id="combo"></select>
       </label>
-      <label>Giro da rivedere
+      <label>Lap to review
         <select id="lap"></select>
       </label>
-      <label>Confronta con
+      <label>Compare with
         <select id="baseline"></select>
       </label>
       <div class="export">
@@ -35,28 +35,28 @@
   </header>
 
   <nav class="tabs">
-    <button class="tab active" data-view="compare">Confronto</button>
-    <button class="tab" data-view="map">Mappa</button>
-    <button class="tab" data-view="sectors">Settori</button>
-    <button class="tab" data-view="progress">Andamento</button>
+    <button class="tab active" data-view="compare">Compare</button>
+    <button class="tab" data-view="map">Map</button>
+    <button class="tab" data-view="sectors">Sectors</button>
+    <button class="tab" data-view="progress">Trends</button>
   </nav>
 
   <div id="view-compare">
     <section id="summary" class="summary"></section>
 
-    <div id="readout" class="readout">Passa il mouse sui grafici per i valori punto-per-punto…</div>
+    <div id="readout" class="readout">Hover over the charts for point-by-point values…</div>
 
     <main id="charts">
       <div class="chart">
-        <h3>Delta sul giro <small>(s · rosso = più lento, verde = più veloce)</small></h3>
+        <h3>Lap delta <small>(s · red = slower, green = faster)</small></h3>
         <canvas id="c-delta"></canvas>
       </div>
       <div class="chart">
-        <h3>Velocità <small>(km/h · bianco = giro rivisto, ciano = confronto)</small></h3>
+        <h3>Speed <small>(km/h · white = reviewed lap, cyan = comparison)</small></h3>
         <canvas id="c-speed"></canvas>
       </div>
       <div class="chart">
-        <h3>Gas / Freno <small>(verde = gas, rosso = freno · tratteggio = riferimento)</small></h3>
+        <h3>Throttle / Brake <small>(green = throttle, red = brake · dashed = reference)</small></h3>
         <canvas id="c-inputs"></canvas>
       </div>
     </main>
@@ -65,24 +65,24 @@
   </div>
 
   <div id="view-map" class="hidden">
-    <div id="map-readout" class="readout">Linea di gara · colore = delta (rosso più lento, verde più veloce) · ▽ punti di frenata</div>
+    <div id="map-readout" class="readout">Racing line · colour = delta (red slower, green faster) · ▽ braking points</div>
     <main>
       <div class="chart map">
-        <h3>Mappa pista <small>(bianco tratteggio = riferimento · linea piena = giro rivisto)</small></h3>
+        <h3>Track map <small>(white dashed = reference · solid line = reviewed lap)</small></h3>
         <canvas id="c-map"></canvas>
         <div class="map-legend">
-          <span class="swatch"><span class="bar slow"></span> più lento <small>(linea spessa = più tempo perso)</small></span>
-          <span class="swatch"><span class="bar fast"></span> più veloce <small>(linea sottile = pari)</small></span>
-          <span class="swatch"><span class="marker">▽</span> punto di frenata</span>
+          <span class="swatch"><span class="bar slow"></span> slower <small>(thicker line = more time lost)</small></span>
+          <span class="swatch"><span class="bar fast"></span> faster <small>(thinner line = on par)</small></span>
+          <span class="swatch"><span class="marker">▽</span> braking point</span>
         </div>
       </div>
     </main>
-    <div id="map-missing" class="empty hidden">Questo giro non ha coordinate (registrato prima dell'aggiornamento mappa). Guida e registra un giro nuovo per vederlo qui.</div>
+    <div id="map-missing" class="empty hidden">This lap has no coordinates (recorded before the map update). Drive and record a new lap to see it here.</div>
   </div>
 
   <div id="view-sectors" class="hidden">
     <section id="sec-summary" class="summary"></section>
-    <div class="sec-head"><span>Settore</span><span>Tempo <small>(rif)</small></span><span>Δ vs riferimento <small>(verde più veloce, rosso più lento)</small></span></div>
+    <div class="sec-head"><span>Sector</span><span>Time <small>(ref)</small></span><span>Δ vs reference <small>(green faster, red slower)</small></span></div>
     <div id="sectors" class="sectors"></div>
     <section id="ideal" class="ideal"></section>
   </div>
@@ -92,21 +92,21 @@
     <section id="levels" class="levels"></section>
     <main>
       <div class="chart">
-        <h3>Tempi sul giro nel tempo <small>(ogni punto = un giro · linea verde = best progressivo)</small></h3>
+        <h3>Lap times over time <small>(each point = a lap · green line = running best)</small></h3>
         <canvas id="c-progress" class="tall"></canvas>
       </div>
     </main>
     <section class="debrief">
-      <h3>Punti deboli <small>(curva per curva · sistematico = da allenare)</small></h3>
+      <h3>Weak points <small>(corner by corner · systematic = to train)</small></h3>
       <div id="trends"></div>
     </section>
     <section class="debrief">
-      <h3>Errori ricorrenti</h3>
+      <h3>Recurring mistakes</h3>
       <div id="recurring"></div>
     </section>
   </div>
 
-  <div id="empty" class="empty">Nessun giro registrato. Guida e registra qualche giro, poi torna qui.</div>
+  <div id="empty" class="empty">No laps recorded. Drive and record a few laps, then come back here.</div>
 
   <script src="/static/app.js"></script>
 </body>

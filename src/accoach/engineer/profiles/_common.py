@@ -65,7 +65,7 @@ class PressurePhase(WorkPhase):
     """
 
     def __init__(self, target_psi: float, tol: float,
-                 key: str = "pressures", label: str = "Pressioni",
+                 key: str = "pressures", label: str = "Pressures",
                  tag: str = "BOX") -> None:
         super().__init__(key, label, tag)
         self.target = target_psi
@@ -98,7 +98,8 @@ class PressurePhase(WorkPhase):
             clicks = round((self.target - cur) / _PSI_PER_CLICK)
             clicks = max(-8, min(8, clicks)) or (1 if cur < self.target else -1)
             atomics = tuple(AtomicChange("tyrePressure", s, clicks) for s in slots)
-            why = (f"Pressione {ax} fuori finestra ({cur:.1f}→~{self.target} psi): "
-                   f"{'+' if clicks > 0 else ''}{clicks} click")
+            why = (f"{ax.capitalize()} pressure out of window "
+                   f"({cur:.1f}→~{self.target} psi): "
+                   f"{'+' if clicks > 0 else ''}{clicks} clicks")
             return ProposedChange(atomics, why, self.label, "BOX")
         return None
