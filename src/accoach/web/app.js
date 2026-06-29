@@ -43,7 +43,33 @@ async function init() {
   $("exp-csv").onclick = () => exportData("csv");
   $("exp-json").onclick = () => exportData("json");
   wireTabs();
-  loadCombo(JSON.parse(sel.value));
+  await loadCombo(JSON.parse(sel.value));
+  // First visit: pop the tour once data is on screen (so #vmin/#debrief exist).
+  if (window.HoneTour) window.HoneTour.auto(TOUR_STEPS, "hone_tour_analysis");
+}
+
+// Guided tour (vanilla coachmarks — see tour.js). Selectors are real elements
+// in index.html; missing/hidden ones are skipped by the tour engine.
+const TOUR_STEPS = [
+  { sel: "#combo", title: "Pick a lap",
+    text: "Choose the car and track. HONE compares your laps for this combo." },
+  { sel: ".tabs", title: "Four views",
+    text: "Compare two laps, see them on the Map, split by Sectors, or follow Trends over time." },
+  { sel: "#c-delta", title: "Delta",
+    text: "Where you're gaining or losing vs your reference, across the lap. Green (below the line) is faster." },
+  { sel: "#vmin", title: "Min speed per corner",
+    text: "Apex speed in every corner vs the reference — green means you carried more speed." },
+  { sel: "#debrief", title: "Where to improve",
+    text: "Your biggest time losses, corner by corner, with the likely cause and a fix." },
+  { sel: ".export", title: "Take it with you",
+    text: "Export the lap as CSV or JSON for deeper analysis." },
+];
+
+function wireTour() {
+  const btn = document.querySelector(".tour-help");
+  if (btn && window.HoneTour) {
+    btn.onclick = () => window.HoneTour.start(TOUR_STEPS, "hone_tour_analysis");
+  }
 }
 
 function wireTabs() {
@@ -628,4 +654,5 @@ window.addEventListener("resize", () => {
     else redraw(null);                 // compare: redraw from DATA
   }, 150);
 });
+wireTour();
 init();

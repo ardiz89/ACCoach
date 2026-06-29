@@ -578,5 +578,28 @@ $("btn-undo").onclick = undoSetup;
 $("modal-cancel").onclick = () => { $("modal").hidden = true; };
 $("modal-ok").onclick = confirmWrite;
 
-loadCombos().catch((e) => showToast("Setup loading error: " + e.message, true));
+// ---- guided tour ---------------------------------------------------------
+// Coachmarks (vanilla — see tour.js). These panels exist statically in
+// engineer.html, so they're visible on load even before telemetry/setup arrive.
+const TOUR_STEPS = [
+  { sel: "#gauges", title: "Live diagnosis",
+    text: "Speed, gear and aids straight from the car when the coach is running live." },
+  { sel: "#tyres", title: "Tyres",
+    text: "Temperatures and pressures, colour-coded — keep them in the green window." },
+  { sel: "#engineer-says", title: "The engineer",
+    text: "A setup change proposed from your telemetry. Hit “Prepare change” to load it into the editor." },
+  { sel: "#focus-says", title: "Focus · lesson",
+    text: "Your driving coach, working one weakness at a time while you lap." },
+  { sel: ".eng-setup", title: "Setup editor",
+    text: "Adjust by game clicks, then “Write setup” saves a new file to load in the pits." },
+];
+
+const tourBtn = document.querySelector(".tour-help");
+if (tourBtn && window.HoneTour) {
+  tourBtn.onclick = () => window.HoneTour.start(TOUR_STEPS, "hone_tour_engineer");
+}
+
+loadCombos()
+  .then(() => { if (window.HoneTour) window.HoneTour.auto(TOUR_STEPS, "hone_tour_engineer"); })
+  .catch((e) => showToast("Setup loading error: " + e.message, true));
 connectWS();

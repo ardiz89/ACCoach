@@ -44,6 +44,17 @@ h1 span { color: var(--muted); font-weight: 400; }
 .brand svg { display: block; flex: none; }
 .brand .name { font-family: var(--font-display); }
 
+/* "?" header button — (re)opens the guided tour */
+.tour-help {
+  width: 26px; height: 26px; border-radius: 50%;
+  background: var(--inset); color: var(--muted);
+  border: 1px solid var(--line); cursor: pointer;
+  font-family: var(--font-display); font-size: 14px; font-weight: 600; line-height: 1;
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 0;
+}
+.tour-help:hover { border-color: var(--cyan); color: var(--cyan); }
+
 h2, h3 { font-family: var(--font-display); }
 
 .controls { display: flex; gap: 16px; flex-wrap: wrap; }
