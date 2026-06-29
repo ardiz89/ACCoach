@@ -150,6 +150,7 @@ main { padding: 16px 24px; display: grid; gap: 18px; }
 .map-legend .bar.thick { height: 6px; }
 .map-legend .bar.thin { height: 2px; }
 .map-legend .marker { color: var(--amber); font-weight: 700; }
+.map-legend .marker.ring { color: var(--cyan); }
 
 /* Min speed per corner table (Compare view) */
 .vmin { padding: 8px 24px 0; }

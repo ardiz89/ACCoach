@@ -7,12 +7,22 @@ let CURRENT = null;   // current combo {car, track}
 let DATA = null;      // last /api/analysis payload
 let VIEW = "compare"; // "compare" | "progress"
 let HOVER_WIRED = false;
+let MAP_HIT = null;   // {rv, X, Y} screen transform captured by drawMap, for map hover
+const MAP_READOUT_DEFAULT =
+  "Racing line · colour = delta (red slower, green faster) · ▽ your braking · ○ reference braking";
 
 function fmtMs(ms) {
   if (!ms || ms <= 0) return "--:--.---";
   const m = Math.floor(ms / 60000);
   const s = ((ms % 60000) / 1000).toFixed(3).padStart(6, "0");
   return `${m}:${s}`;
+}
+
+// Drop a "Loading…" placeholder into a .summary panel while a fetch is in
+// flight; the success/error handler overwrites it when the response lands.
+function setPanelLoading(id, msg) {
+  const el = $(id);
+  if (el) el.innerHTML = `<div class="item"><div class="v">…</div><div class="k">${msg}</div></div>`;
 }
 
 async function getJSON(url) {
@@ -89,6 +99,7 @@ function wireTabs() {
 }
 
 async function loadProgress(combo) {
+  setPanelLoading("prog-summary", "Loading trends…");
   let p;
   try { p = await getJSON("/api/progress?" + new URLSearchParams({ car: combo.car, track: combo.track })); }
   catch (e) {
@@ -216,6 +227,7 @@ async function loadSectors() {
   const lap = $("lap").value, base = $("baseline").value;
   if (lap) q.set("lap", lap);
   if (base) q.set("baseline", base);
+  setPanelLoading("sec-summary", "Loading sectors…");
   let s;
   try { s = await getJSON("/api/sectors?" + q.toString()); }
   catch (e) {
@@ -343,15 +355,30 @@ function drawMap(a, cx) {
     ctx.stroke();
   }
 
-  // Braking points: where your brake first crosses onset.
+  // Braking points: where the brake first crosses onset (rising edge).
+  // Yours = amber down-triangle on your line; reference = cyan hollow ring on
+  // the reference line, so you can read at a glance how much earlier/later the
+  // reference brakes geometrically. Defensive: channels may be missing.
   const br = rv.brake;
-  ctx.fillStyle = "#FFB020";
-  for (let i = 1; i < br.length; i++) {
-    if (br[i] >= 0.3 && br[i - 1] < 0.3) {
-      const px = X(rv.x[i]), py = Y(rv.z[i]);
-      ctx.beginPath();
-      ctx.moveTo(px, py - 6); ctx.lineTo(px - 5, py - 14); ctx.lineTo(px + 5, py - 14);
-      ctx.closePath(); ctx.fill();
+  if (Array.isArray(br)) {
+    ctx.fillStyle = "#FFB020";
+    for (let i = 1; i < br.length; i++) {
+      if (br[i] >= 0.3 && br[i - 1] < 0.3) {
+        const px = X(rv.x[i]), py = Y(rv.z[i]);
+        ctx.beginPath();
+        ctx.moveTo(px, py - 6); ctx.lineTo(px - 5, py - 14); ctx.lineTo(px + 5, py - 14);
+        ctx.closePath(); ctx.fill();
+      }
+    }
+  }
+  const rbk = rf.brake;
+  if (Array.isArray(rbk) && Array.isArray(rf.x) && Array.isArray(rf.z)) {
+    ctx.strokeStyle = "#22D3CE"; ctx.lineWidth = 2;
+    for (let i = 1; i < rbk.length; i++) {
+      if (rbk[i] >= 0.5 && rbk[i - 1] < 0.5) {
+        const px = X(rf.x[i]), py = Y(rf.z[i]);
+        ctx.beginPath(); ctx.arc(px, py, 4.5, 0, 6.283); ctx.stroke();
+      }
     }
   }
 
@@ -372,6 +399,9 @@ function drawMap(a, cx) {
     ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.arc(X(rv.x[i]), Y(rv.z[i]), 6, 0, 6.283); ctx.stroke();
   }
+
+  // Expose the screen transform so the map hover can find the nearest sample.
+  MAP_HIT = { rv, X, Y };
 }
 
 function reloadSelection() {
@@ -391,6 +421,9 @@ async function loadCombo(combo, lapPath, baselinePath) {
   const q = new URLSearchParams({ car: combo.car, track: combo.track });
   if (lapPath) q.set("lap", lapPath);
   if (baselinePath) q.set("baseline", baselinePath);
+  setPanelLoading("summary", "Loading lap…");
+  $("readout").innerHTML = "Loading lap…";
+  if (VIEW === "map") $("map-readout").innerHTML = "Loading lap…";
   let a;
   try { a = await getJSON("/api/analysis?" + q.toString()); }
   catch (e) {
@@ -404,7 +437,7 @@ async function loadCombo(combo, lapPath, baselinePath) {
   drawCornerSpeeds(a);
   drawDebrief(a);
   redraw(null);
-  if (VIEW === "map") drawMap(a, null);
+  if (VIEW === "map") { $("map-readout").innerHTML = MAP_READOUT_DEFAULT; drawMap(a, null); }
   if (VIEW === "sectors") loadSectors();
   wireHover();
 }
@@ -552,6 +585,7 @@ function redraw(cx) {
   drawDelta(DATA, cx);
   drawSpeed(DATA, cx);
   drawInputs(DATA, cx);
+  drawSteer(DATA, cx);
   updateReadout(DATA, cx);
 }
 
@@ -600,6 +634,40 @@ function drawInputs(a, cx) {
   crosshair(ctx, w, h, cx);
 }
 
+// Steering trace, symmetric around zero (left = up, right = down). Scale is
+// ±max|steer| across both laps so the two traces share an axis. Defensive:
+// the channel may be absent on older laps.
+function drawSteer(a, cx) {
+  const cv = $("c-steer");
+  if (!cv) return;
+  const { ctx, w, h } = setup(cv);
+  const rv = a.review.channels, rf = a.reference.channels;
+  const sv = rv && rv.steer, sf = rf && rf.steer;
+  if (!Array.isArray(sv) || !sv.length) {
+    ctx.fillStyle = "rgba(255,255,255,0.35)"; ctx.font = "11px Segoe UI";
+    ctx.fillText("No steering data for this lap.", 10, h / 2);
+    return;
+  }
+  let m = 0.1;
+  for (const v of sv) m = Math.max(m, Math.abs(v));
+  if (Array.isArray(sf)) for (const v of sf) m = Math.max(m, Math.abs(v));
+  cornerBands(ctx, w, h, a.corners);
+  // Zero line.
+  ctx.strokeStyle = "rgba(255,255,255,0.25)";
+  ctx.beginPath(); ctx.moveTo(0, h / 2); ctx.lineTo(w, h / 2); ctx.stroke();
+  // Reference steering (cyan, faint dashed).
+  if (Array.isArray(sf) && sf.length) {
+    ctx.save();
+    ctx.setLineDash([4, 3]); ctx.globalAlpha = 0.6;
+    line(ctx, w, h, rf.pos, sf, -m, m, "#22D3CE", 1.2);
+    ctx.restore();
+  }
+  // Your steering (white, solid).
+  line(ctx, w, h, rv.pos, sv, -m, m, "#ffffff", 1.5);
+  axisLabel(ctx, w, "left", "right");
+  crosshair(ctx, w, h, cx);
+}
+
 // --- hover / readout ------------------------------------------------------
 function nearest(posArr, p) {
   let lo = 0, hi = posArr.length - 1;
@@ -608,15 +676,15 @@ function nearest(posArr, p) {
   return lo;
 }
 
-function updateReadout(a, p) {
-  const el = $("readout");
-  if (p == null) { el.innerHTML = "Hover over the charts for point-by-point values…"; return; }
+// Point-by-point readout markup at lap position p (0..1). Shared by the Compare
+// charts and the Map hover so both reuse the same nearest() lookup.
+function readoutHTML(a, p) {
   const rv = a.review.channels, rf = a.reference.channels, d = a.review.delta;
   const iv = nearest(rv.pos, p), ir = nearest(rf.pos, p), id = nearest(d.pos, p);
   const yv = rv.speed[iv], rfv = rf.speed[ir], dv = yv - rfv, dl = d.delta_s[id];
   const corner = (a.corners || []).find((c) => p >= c.entry && p <= c.exit);
   const where = corner ? `<b class="muted">${corner.name}</b> &nbsp;·&nbsp; ` : "";
-  el.innerHTML = where +
+  return where +
     `<b>Pos ${Math.round(p * 100)}%</b> &nbsp;·&nbsp; ` +
     `Speed <b>${yv.toFixed(0)}</b> <span class="muted">(ref ${rfv.toFixed(0)}, ${dv >= 0 ? "+" : ""}${dv.toFixed(0)})</span> &nbsp;·&nbsp; ` +
     `Δ <b class="${dl > 0 ? "slower" : "faster"}">${dl >= 0 ? "+" : ""}${dl.toFixed(3)}s</b> &nbsp;·&nbsp; ` +
@@ -624,10 +692,16 @@ function updateReadout(a, p) {
     `Gear <b>${rv.gear[iv]}</b>`;
 }
 
+function updateReadout(a, p) {
+  const el = $("readout");
+  if (p == null) { el.innerHTML = "Hover over the charts for point-by-point values…"; return; }
+  el.innerHTML = readoutHTML(a, p);
+}
+
 function wireHover() {
   if (HOVER_WIRED) return;
   HOVER_WIRED = true;
-  const canvases = ["c-delta", "c-speed", "c-inputs"].map($);
+  const canvases = ["c-delta", "c-speed", "c-inputs", "c-steer"].map($);
   const onMove = (e) => {
     const rect = canvases[0].getBoundingClientRect();
     const p = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
@@ -635,8 +709,36 @@ function wireHover() {
   };
   const onLeave = () => redraw(null);
   for (const cv of canvases) {
+    if (!cv) continue;
     cv.addEventListener("mousemove", onMove);
     cv.addEventListener("mouseleave", onLeave);
+  }
+
+  // Map hover: the x-axis isn't position, so find the nearest track sample in
+  // screen space (transform captured by drawMap) and reuse its pos to drive the
+  // shared crosshair + readout.
+  const map = $("c-map");
+  if (map) {
+    map.addEventListener("mousemove", (e) => {
+      if (!DATA || !MAP_HIT) return;
+      const rect = map.getBoundingClientRect();
+      const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+      const rv = MAP_HIT.rv;
+      let best = -1, bd = Infinity;
+      for (let i = 0; i < rv.x.length; i++) {
+        const dx = MAP_HIT.X(rv.x[i]) - mx, dy = MAP_HIT.Y(rv.z[i]) - my;
+        const dd = dx * dx + dy * dy;
+        if (dd < bd) { bd = dd; best = i; }
+      }
+      if (best < 0) return;
+      const p = rv.pos[best];
+      drawMap(DATA, p);
+      $("map-readout").innerHTML = readoutHTML(DATA, p);
+    });
+    map.addEventListener("mouseleave", () => {
+      $("map-readout").innerHTML = MAP_READOUT_DEFAULT;
+      if (DATA) drawMap(DATA, null);
+    });
   }
 }
 

@@ -60,6 +60,10 @@
         <h3>Throttle / Brake <small>(green = throttle, red = brake · dashed = reference)</small></h3>
         <canvas id="c-inputs"></canvas>
       </div>
+      <div class="chart">
+        <h3>Steering <small>(white = reviewed lap, cyan = comparison · left up / right down)</small></h3>
+        <canvas id="c-steer"></canvas>
+      </div>
     </main>
 
     <section id="vmin" class="vmin"></section>
@@ -68,7 +72,7 @@
   </div>
 
   <div id="view-map" class="hidden">
-    <div id="map-readout" class="readout">Racing line · colour = delta (red slower, green faster) · ▽ braking points</div>
+    <div id="map-readout" class="readout">Racing line · colour = delta (red slower, green faster) · ▽ your braking · ○ reference braking</div>
     <main>
       <div class="chart map">
         <h3>Track map <small>(white dashed = reference · solid line = reviewed lap)</small></h3>
@@ -76,7 +80,8 @@
         <div class="map-legend">
           <span class="swatch"><span class="bar slow"></span> slower <small>(thicker line = more time lost)</small></span>
           <span class="swatch"><span class="bar fast"></span> faster <small>(thinner line = on par)</small></span>
-          <span class="swatch"><span class="marker">▽</span> braking point</span>
+          <span class="swatch"><span class="marker">▽</span> your braking</span>
+          <span class="swatch"><span class="marker ring">○</span> reference braking</span>
         </div>
       </div>
     </main>
