@@ -62,6 +62,29 @@ def _coach_panel(history: list[str], audio: bool) -> Panel:
     return Panel(table, title=f"Coach · {mode}", border_style="cyan")
 
 
+_FOCUS_STYLE = {
+    "brief": ("🎯", "bold yellow"), "drill": ("🎯", "yellow"),
+    "improved": ("✅", "bold green"), "stuck": ("⏸", "grey62"),
+    "clean": ("✨", "bold green"), "assess": ("…", "grey50"),
+}
+
+
+def _focus_panel(focus: dict | None) -> Panel:
+    """The lesson plan: the one weakness being coached right now."""
+    if not focus:
+        return Panel(Text("warming up… drive a few clean laps", style="grey50"),
+                     title="Focus", border_style="grey50")
+    icon, style = _FOCUS_STYLE.get(focus.get("kind", ""), ("•", "white"))
+    table = Table.grid(padding=(0, 1))
+    table.add_column()
+    table.add_row(Text(f"{icon} {focus['message']}", style=style))
+    f = focus.get("focus")
+    if f:
+        table.add_row(Text(f"{f['name']} · {f['theme']} · "
+                           f"−{f['baseline_ms'] / 1000.0:.2f}s", style="cyan"))
+    return Panel(table, title="Focus · lezione", border_style="yellow")
+
+
 def _status_panel(s: TelemetrySnapshot, saved: int) -> Panel:
     table = Table.grid(padding=(0, 1))
     table.add_column(justify="right", style="bold")
@@ -82,12 +105,12 @@ def _status_panel(s: TelemetrySnapshot, saved: int) -> Panel:
     return Panel(table, title="ACCoach · voice coach", border_style="bright_blue")
 
 
-def _render(s, delta, history, saved, audio) -> Group:
+def _render(s, delta, history, saved, audio, focus=None) -> Group:
     top = Table.grid(expand=True)
     top.add_column(ratio=1)
     top.add_column(ratio=1)
     top.add_row(_status_panel(s, saved), _delta_panel(delta))
-    return Group(top, _coach_panel(history, audio))
+    return Group(top, _coach_panel(history, audio), _focus_panel(focus))
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -112,7 +135,7 @@ def main(argv: list[str] | None = None) -> None:
             while True:
                 st = engine.tick(time.monotonic())
                 live.update(_render(st.snapshot, st.delta, st.history,
-                                    st.saved_laps, voice.is_audio))
+                                    st.saved_laps, voice.is_audio, st.focus))
                 time.sleep(interval)
     except KeyboardInterrupt:
         pass

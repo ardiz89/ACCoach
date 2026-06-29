@@ -35,7 +35,9 @@ from .coaching import (
     Voice,
 )
 from .coaching.cue import CueTier
+from .coaching.debrief import build_lap_debrief
 from .coaching.diagnosis import build_lap_stats
+from .coaching.focus import FocusCoach, FocusReport
 from .comparison import DeltaState, LapComparator, Reference
 from .engineer import RaceEngineer, engineer_for
 from .recording import DEFAULT_LAPS_DIR, Lap, LapRecorder, find_reference_lap, save_lap
@@ -62,6 +64,7 @@ class EngineState:
     reference_ms: int            # reference lap time, 0 if none
     history: list[str]           # recent spoken cue messages, newest last
     engineer: dict | None = None  # latest race-engineer decision (setup advice)
+    focus: dict | None = None     # latest Focus/Lesson report (driver coaching)
 
 
 def _load_reference(car: str, track: str, laps_dir: Path | str) -> Reference | None:
@@ -126,6 +129,12 @@ class CoachEngine:
         self._engineer: RaceEngineer | None = None
         self._engineer_decision = None
 
+        # Focus/Lesson coach: the driver's twin of the engineer. Fed a per-lap
+        # debrief (vs the reference), it picks one recurring weakness at a time and
+        # coaches it. Rebuilt per car/track; needs a reference to produce debriefs.
+        self._focus: FocusCoach | None = None
+        self._focus_report: FocusReport | None = None
+
     def _rebuild_reference(self, car: str, track: str) -> None:
         self._reference = _load_reference(car, track, self.laps_dir)
         self._comparator = LapComparator(self._reference) if self._reference else None
@@ -144,11 +153,18 @@ class CoachEngine:
         return self._feed.measured_hz if self._feed is not None else None
 
     def _observe_lap(self, lap: Lap) -> None:
-        """Diagnose a completed lap and feed it to the race engineer."""
-        if self._engineer is None:
-            return
-        stats = build_lap_stats(lap, self._corners or None)
-        self._engineer_decision = self._engineer.observe(stats)
+        """Diagnose a completed lap: feed the engineer (setup) and the Focus
+        coach (driving). Both run on the reference that was the target *during*
+        this lap — the rebuild to chase a new best happens after, in tick()."""
+        if self._engineer is not None:
+            stats = build_lap_stats(lap, self._corners or None)
+            self._engineer_decision = self._engineer.observe(stats)
+
+        # The Focus coach needs a reference to know where time was lost.
+        if self._focus is not None and self._reference is not None and self._corners:
+            debrief = build_lap_debrief(lap, self._reference, self._corners)
+            stable = lap.valid and lap.clean is not False
+            self._focus_report = self._focus.observe(debrief, stable=stable)
 
     def _engineer_block(self) -> dict | None:
         """The latest engineer decision, in the shape the setup UI consumes."""
@@ -162,6 +178,26 @@ class CoachEngine:
             "rationale": d.change.rationale if d.change else None,
             "tag": d.change.tag if d.change else None,
             "confidence": d.confidence,
+        }
+
+    def _focus_block(self) -> dict | None:
+        """The latest Focus/Lesson report, in the shape a frontend consumes."""
+        r = self._focus_report
+        if r is None:
+            return None
+        f = r.focus
+        return {
+            "kind": r.kind.value,
+            "message": r.message,
+            "drill": r.drill,
+            "progress_ms": round(r.progress_ms, 1),
+            "focus": None if f is None else {
+                "corner_index": f.corner_index,
+                "name": f.name,
+                "theme": f.theme,
+                "category": f.category.value,
+                "baseline_ms": round(f.baseline_ms, 1),
+            },
         }
 
     def mark_setup_applied(self) -> None:
@@ -185,6 +221,9 @@ class CoachEngine:
             # A new car/track is a new setup problem: start a fresh engineer.
             self._engineer = engineer_for(snap.car_model, snap.track)
             self._engineer_decision = None
+            # …and a fresh lesson plan for the driver.
+            self._focus = FocusCoach()
+            self._focus_report = None
 
         if self._feed is None:
             lap = self.recorder.update(snap)
@@ -238,6 +277,7 @@ class CoachEngine:
             reference_ms=self._reference.lap_time_ms if self._reference else 0,
             history=list(self.history),
             engineer=self._engineer_block(),
+            focus=self._focus_block(),
         )
 
     def close(self) -> None:
