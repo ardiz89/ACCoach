@@ -34,6 +34,8 @@ import statistics
 from dataclasses import dataclass, field
 from enum import Enum
 
+from ..i18n import current_language
+
 
 # --- diagnosis vocabulary (the discilli taxonomy) --------------------------
 
@@ -122,10 +124,12 @@ class ProposedChange:
 
     def reversed(self) -> "ProposedChange":
         """The change that undoes this one (used to revert a rejected remedy)."""
+        lang = current_language()
+        prefix = _REVERT_PREFIX.get(lang) or _REVERT_PREFIX["en"]
         return ProposedChange(
             changes=tuple(AtomicChange(c.param, c.slot, -c.delta_clicks)
                           for c in self.changes),
-            rationale="Revert: " + self.rationale,
+            rationale=prefix + self.rationale,
             phase_label=self.phase_label, tag=self.tag, symptom=self.symptom)
 
     def as_setup_payload(self) -> list[dict]:
@@ -199,6 +203,82 @@ _REMEDY_CAP = 5                  # max remedies tried per symptom before giving 
 _CLICK_BUDGET = 6                # max net clicks a single parameter may accumulate
 
 
+# Decision messages, per language; resolved with the active app language at the
+# moment a Decision is built (the engine runs in the engine = config.language).
+# The Symptom string ({sym}) is a technical identifier and stays as-is; the phase
+# label is translated via the profiles' EN→IT map (see profiles/_common.tr).
+_DECISION_MSG = {
+    "collect": {
+        "en": "Need {n} clean laps for a baseline (have {have}).",
+        "it": "Servono {n} giri puliti per una base (ne ho {have}).",
+    },
+    "done": {
+        "en": "Setup is solid: no further gains. Good baseline.",
+        "it": "Setup a posto: nessun guadagno residuo. Buona base.",
+    },
+    "phase_done": {
+        "en": "Phase '{label}' complete{tail}.",
+        "it": "Fase '{label}' completata{tail}.",
+    },
+    "phase_tail_next": {
+        "en": " → moving to: {nxt}",
+        "it": " → passo a: {nxt}",
+    },
+    "phase_tail_complete": {
+        "en": " → setup complete",
+        "it": " → setup completo",
+    },
+    "phase_nothing": {
+        "en": "Phase '{label}': nothing to correct.",
+        "it": "Fase '{label}': nulla da correggere.",
+    },
+    "remedies_exhausted": {
+        "en": "'{sym}': setup remedies exhausted — likely a driving issue.",
+        "it": "'{sym}': rimedi di setup esauriti — probabile questione di guida.",
+    },
+    "evaluating": {
+        "en": "Evaluating the change: {need} more clean laps.",
+        "it": "Valuto la modifica: {need} giri puliti ancora.",
+    },
+    "accepted_structural": {
+        "en": "Change applied, moving on.",
+        "it": "Modifica applicata, proseguo.",
+    },
+    "revert_structural": {
+        "en": "The change worsened the lap time: reverting.",
+        "it": "La modifica ha peggiorato il tempo: ripristino.",
+    },
+    "accepted_resolved": {
+        "en": "Handling: '{sym}' resolved ({a:.2f}→{b:.2f}).",
+        "it": "Tenuta: '{sym}' risolto ({a:.2f}→{b:.2f}).",
+    },
+    "accepted_improving": {
+        "en": "Handling: '{sym}' improving, continuing ({a:.2f}→{b:.2f}).",
+        "it": "Tenuta: '{sym}' migliora, continuo ({a:.2f}→{b:.2f}).",
+    },
+    "revert_reason": {
+        "en": "{reason}: reverting and trying another lever for '{sym}'.",
+        "it": "{reason}: ripristino e provo un'altra leva per '{sym}'.",
+    },
+    "reason_worse": {
+        "en": "Change made it worse",
+        "it": "Modifica peggiorativa",
+    },
+    "reason_noeffect": {
+        "en": "No measurable effect",
+        "it": "Nessun effetto misurabile",
+    },
+}
+
+_REVERT_PREFIX = {"en": "Revert: ", "it": "Ripristino: "}
+
+
+def _msg(key: str, lang: str | None = None, **kw) -> str:
+    lang = lang or current_language()
+    entry = _DECISION_MSG[key]
+    return (entry.get(lang) or entry["en"]).format(**kw)
+
+
 def _median_time(window: list[LapStats]) -> float:
     return statistics.median([s.lap_time_ms for s in window]) if window else 0.0
 
@@ -262,8 +342,8 @@ class RaceEngineer:
 
         if len(self.window) < self.min_stable:
             return Decision(DecisionKind.COLLECT,
-                            f"Need {self.min_stable} clean laps for a baseline "
-                            f"(have {len(self.window)}).")
+                            _msg("collect", n=self.min_stable,
+                                 have=len(self.window)))
         return self._advance()
 
     def mark_applied(self) -> None:
@@ -309,16 +389,20 @@ class RaceEngineer:
     # -- internals ---------------------------------------------------------
     def _advance(self) -> Decision:
         """No active change: check the gate, else propose the next remedy."""
+        # Lazy import avoids a module-level cycle (profiles import from core).
+        from .profiles._common import tr
+        lang = current_language()
         phase = self.phase
         if phase is None:
-            return Decision(DecisionKind.DONE,
-                            "Setup is solid: no further gains. Good baseline.")
+            return Decision(DecisionKind.DONE, _msg("done", lang))
         if phase.gate(self.window):
             self.phase_idx += 1
             nxt = self.phase
-            tail = f" → moving to: {nxt.label}" if nxt else " → setup complete"
+            tail = (_msg("phase_tail_next", lang, nxt=tr(nxt.label)) if nxt
+                    else _msg("phase_tail_complete", lang))
             return Decision(DecisionKind.PHASE_DONE,
-                            f"Phase '{phase.label}' complete{tail}.")
+                            _msg("phase_done", lang, label=tr(phase.label),
+                                 tail=tail))
 
         symptom = self._dominant_symptom(phase)
         if symptom is None:
@@ -332,14 +416,13 @@ class RaceEngineer:
             # Nothing actionable here; treat the phase as done to avoid a stall.
             self.phase_idx += 1
             return Decision(DecisionKind.PHASE_DONE,
-                            f"Phase '{phase.label}': nothing to correct.")
+                            _msg("phase_nothing", lang, label=tr(phase.label)))
 
         change = self._remedy_for(symptom, phase)
         if change is None:
             self.exhausted.add(symptom)
             return Decision(DecisionKind.PHASE_DONE,
-                            f"'{symptom}': setup remedies exhausted — likely "
-                            f"a driving issue.")
+                            _msg("remedies_exhausted", lang, sym=str(symptom)))
         self._pending = change
         self._pending_is_revert = False
         return Decision(DecisionKind.PROPOSE, change.rationale, change,
@@ -347,10 +430,11 @@ class RaceEngineer:
 
     def _evaluate_active(self) -> Decision:
         a = self.active
+        lang = current_language()
         if a.laps_seen < self.min_stable:
             need = self.min_stable - a.laps_seen
             return Decision(DecisionKind.EVALUATING,
-                            f"Evaluating the change: {need} more clean laps.")
+                            _msg("evaluating", lang, need=need))
 
         new_time = _median_time(self.window)
         new_score = _median_score(self.window, a.symptom)
@@ -365,10 +449,10 @@ class RaceEngineer:
         # lap time alone and let the phase gate re-check the real target.
         if a.symptom is None:
             if not band_ok:
-                return self._revert(a.change,
-                                    "The change worsened the lap time: reverting.")
+                return self._revert(a.change, _msg("revert_structural", lang))
             self._record(a.change)
-            return Decision(DecisionKind.ACCEPTED, "Change applied, moving on.")
+            return Decision(DecisionKind.ACCEPTED,
+                            _msg("accepted_structural", lang))
 
         improved = d_score <= -_EPS_SCORE and band_ok
 
@@ -376,21 +460,21 @@ class RaceEngineer:
             self._record(a.change)
             if new_score < _SYMPTOM_THRESH:
                 return Decision(DecisionKind.ACCEPTED,
-                                f"Handling: '{a.symptom}' resolved "
-                                f"({a.base_score:.2f}→{new_score:.2f}).")
+                                _msg("accepted_resolved", lang, sym=str(a.symptom),
+                                     a=a.base_score, b=new_score))
             return Decision(DecisionKind.ACCEPTED,
-                            f"Handling: '{a.symptom}' improving, continuing "
-                            f"({a.base_score:.2f}→{new_score:.2f}).")
+                            _msg("accepted_improving", lang, sym=str(a.symptom),
+                                 a=a.base_score, b=new_score))
 
         # Not an improvement (worse OR plateau): revert and try the next lever.
         # Reverting on a plateau too is deliberate — keeping changes a blind meter
         # reads as "harmless" is exactly how setup drift creeps in.
         self.remedy_idx[a.symptom] = self.remedy_idx.get(a.symptom, 0) + 1
-        reason = ("Change made it worse" if not band_ok or d_score > _EPS_SCORE
-                  else "No measurable effect")
+        reason = (_msg("reason_worse", lang) if not band_ok or d_score > _EPS_SCORE
+                  else _msg("reason_noeffect", lang))
         return self._revert(a.change,
-                            f"{reason}: reverting and trying another lever for "
-                            f"'{a.symptom}'.")
+                            _msg("revert_reason", lang, reason=reason,
+                                 sym=str(a.symptom)))
 
     # -- symptom selection with safety gates -------------------------------
     def _corners(self, sym: Symptom) -> int:

@@ -1,4 +1,7 @@
 """engineer: the GT3 convergence state machine (diagnosis -> setup change)."""
+import pytest
+
+from accoach import config
 from accoach.engineer import (
     Balance,
     Decision,
@@ -10,6 +13,17 @@ from accoach.engineer import (
     Symptom,
 )
 from accoach.engineer.profiles import GT3_PROFILE
+
+
+@pytest.fixture
+def it_lang(tmp_path, monkeypatch):
+    """Switch the app language to Italian for the duration of a test (and reset
+    the config cache afterwards so other tests see the default English)."""
+    monkeypatch.setattr(config, "config_path", lambda: tmp_path / "config.toml")
+    config.load_config(reload=True)
+    config.set_language("it")
+    yield
+    config._cache = None
 
 U, O = Balance.UNDERSTEER, Balance.OVERSTEER
 EN, AP, EX = Phase.ENTRY, Phase.APEX, Phase.EXIT
@@ -232,6 +246,37 @@ def test_click_budget_caps_a_parameter():
                 break
     # rearWing net clicks never exceed the budget (keyed per (param, slot))
     assert abs(eng.applied_clicks.get(("rearWing", None), 0)) <= 6
+
+
+# --- i18n: messages follow config.language ---------------------------------
+
+def test_collect_message_is_italian(it_lang):
+    eng = _eng()
+    d = eng.observe(_lap())
+    assert d.kind is DecisionKind.COLLECT
+    assert "Servono" in d.message and "giri puliti" in d.message
+
+
+def test_phase_done_label_is_italian(it_lang):
+    eng = _eng()
+    seen = []
+    for _ in range(30):
+        d = eng.observe(_lap())
+        if d.kind is DecisionKind.PHASE_DONE:
+            seen.append(d)
+        if d.kind is DecisionKind.DONE:
+            break
+    # the first gate crossed is pressures → "Pressioni" (label localised)
+    assert "Pressioni" in seen[0].message
+    assert "completata" in seen[0].message
+
+
+def test_rationale_is_italian(it_lang):
+    eng = _eng()
+    d = _drive_to_aero(eng, Symptom(U, AP, HI), 0.6)   # rearWing −1
+    assert d.change.rationale == "Sottosterzo all'apex veloce: meno ala posteriore (−1)"
+    # the reverted change keeps the Italian restore prefix
+    assert d.change.reversed().rationale.startswith("Ripristino: ")
 
 
 def test_exhausting_remedies_flags_driving_issue():

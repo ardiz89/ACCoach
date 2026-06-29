@@ -5,6 +5,9 @@ single recurring weakness and coaches it: assess → brief → drill → improve
 These tests drive it with hand-built debriefs (cheap, exact) and then check the
 engine wires a real debrief→focus path into the payload.
 """
+import pytest
+
+from accoach import config
 from accoach.coaching.cue import CueCategory
 from accoach.coaching.debrief import CornerLoss, LapDebrief
 from accoach.coaching.focus import (
@@ -18,6 +21,16 @@ from accoach.comparison.reference import Reference
 from accoach.track import detect_corners
 
 import synth
+
+
+@pytest.fixture
+def it_lang(tmp_path, monkeypatch):
+    """Switch the app language to Italian, resetting the config cache after."""
+    monkeypatch.setattr(config, "config_path", lambda: tmp_path / "config.toml")
+    config.load_config(reload=True)
+    config.set_language("it")
+    yield
+    config._cache = None
 
 
 def _loss(index: int, ms: float, category: CueCategory = CueCategory.BRAKE_LATER,
@@ -130,6 +143,24 @@ def test_unstable_lap_does_not_move_the_plan():
     report = coach.observe(_debrief(_loss(0, 9000)), stable=False)   # an off
     assert report.kind is FocusKind.ASSESS                  # last report stands
     assert len(coach.window) == before                      # excursion ignored
+
+
+def test_brief_theme_and_message_are_italian(it_lang):
+    coach = FocusCoach()
+    report = _feed(coach, _debrief(_loss(0, 300)), 3)
+    assert report.kind is FocusKind.BRIEF
+    assert report.focus.theme == "frenata"             # BRAKE_LATER → frenata (IT)
+    assert "Nuovo focus" in report.message
+    assert "lavoriamo la frenata" in report.message
+
+
+def test_stuck_message_is_italian(it_lang):
+    coach = FocusCoach()
+    _feed(coach, _debrief(_loss(0, 300, cause="L'auto sottosterza in ingresso.")), 3)
+    report = _feed(coach, _debrief(_loss(0, 300)), 6)
+    assert report.kind is FocusKind.STUCK
+    assert "parcheggio" in report.message.lower()
+    assert "causa setup" in report.message.lower()
 
 
 def test_format_focus_is_a_line():

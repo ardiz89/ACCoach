@@ -178,12 +178,15 @@ def register_setup_routes(app: FastAPI, root=DEFAULT_ROOTS) -> None:
     def setup_class(car: str = Query(...)) -> dict:
         """Which engineer (GT3 / Formula / Road) a car gets, and its profile."""
         from ..engineer.classmap import classify, profile_for
+        from ..engineer.profiles._common import tr
         cls = classify(car)
         prof = profile_for(cls)
+        # name (GT3 / Formula / Road) is a class identifier and stays as-is; the
+        # phase labels and al-volo lever names follow the active app language.
         return {"car": car, "class": cls.value,
                 "profile": {"name": prof.name,
-                            "phases": [p.label for p in prof.phases],
-                            "al_volo": prof.al_volo}}
+                            "phases": [tr(p.label) for p in prof.phases],
+                            "al_volo": [tr(x) for x in prof.al_volo]}}
 
     @app.get("/api/setup/current")
     def setup_current(path: str = Query(...)) -> dict:

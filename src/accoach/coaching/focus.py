@@ -28,6 +28,7 @@ import statistics
 from dataclasses import dataclass, field
 from enum import Enum
 
+from ..i18n import current_language
 from .cue import CueCategory
 from .debrief import CornerLoss, LapDebrief
 from .thresholds import RECUR_FRAC as _RECUR_FRAC
@@ -46,18 +47,73 @@ _PATIENCE = 6            # laps spent on a focus with no win → park it, move o
 
 # A short, driver-facing label for what to work on, by loss category. The live
 # coach already says the "what"; this names the *theme* so a session has a spine.
+# Per-language; the theme is shown in the message AND in the payload (overlay /
+# engineer page), so it follows the active app language.
 _THEME = {
-    CueCategory.BRAKE_LATER: "braking",
-    CueCategory.BRAKE_EARLIER: "braking",
-    CueCategory.LESS_BRAKE: "braking",
-    CueCategory.MORE_THROTTLE: "traction",
-    CueCategory.CARRY_SPEED: "cornering",
-    CueCategory.TIME_LOSS: "line",
+    CueCategory.BRAKE_LATER: {"en": "braking", "it": "frenata"},
+    CueCategory.BRAKE_EARLIER: {"en": "braking", "it": "frenata"},
+    CueCategory.LESS_BRAKE: {"en": "braking", "it": "frenata"},
+    CueCategory.MORE_THROTTLE: {"en": "traction", "it": "trazione"},
+    CueCategory.CARRY_SPEED: {"en": "cornering", "it": "percorrenza"},
+    CueCategory.TIME_LOSS: {"en": "line", "it": "linea"},
+}
+_THEME_DEFAULT = {"en": "driving", "it": "guida"}
+
+
+def _theme(cat: CueCategory, lang: str) -> str:
+    entry = _THEME.get(cat, _THEME_DEFAULT)
+    return entry.get(lang) or entry["en"]
+
+
+# Per-lap report messages, per language; resolved with the active language at the
+# moment the report is built (FocusCoach runs in the engine = config.language).
+_MSG = {
+    "assess": {
+        "en": "Assessing your weak points… ({n}/{total} clean laps).",
+        "it": "Valuto i punti deboli… ({n}/{total} giri puliti).",
+    },
+    "clean": {
+        "en": "No recurring weak point: steady driving. Just fine-tuning left.",
+        "it": "Nessun punto debole ricorrente: guida costante. Si lima il dettaglio.",
+    },
+    "brief": {
+        "en": "New focus — {name}: let's work on {theme}. "
+              "You lose ~{base} here on average.{cause} {drill}",
+        "it": "Nuovo focus — {name}: lavoriamo la {theme}. "
+              "Qui perdi ~{base} di media.{cause} {drill}",
+    },
+    "drill_start": {
+        "en": "{name}: work on {theme}. {drill}",
+        "it": "{name}: lavora la {theme}. {drill}",
+    },
+    "improved": {
+        "en": "{name} improved: from {base} to {cur}. Nice work — a new focus shortly.",
+        "it": "{name} migliorata: da {base} a {cur}. Bel lavoro — nuovo focus a breve.",
+    },
+    "stuck": {
+        "en": "{name}: {theme} isn't dropping ({cur} vs {base}).{setup} "
+              "Parking it and moving on.",
+        "it": "{name}: la {theme} non scende ({cur} vs {base}).{setup} "
+              "La parcheggio e passo oltre.",
+    },
+    "stuck_setup": {
+        "en": " Possible setup cause: {cause}",
+        "it": " Possibile causa setup: {cause}",
+    },
+    "drill_progress": {
+        "en": "{name}: keep working {theme}. Now ~{cur} (started at {base}).",
+        "it": "{name}: continua sulla {theme}. Ora ~{cur} (partenza {base}).",
+    },
+    "default_drill": {
+        "en": "Clean up the line and build consistency.",
+        "it": "Pulisci la traiettoria e cerca costanza.",
+    },
 }
 
 
-def _theme(cat: CueCategory) -> str:
-    return _THEME.get(cat, "driving")
+def _m(key: str, lang: str, **kw) -> str:
+    entry = _MSG[key]
+    return (entry.get(lang) or entry["en"]).format(**kw)
 
 
 def _secs(ms: float) -> str:
@@ -134,8 +190,9 @@ class FocusCoach:
         self._focus_losses: list[float] = []     # losses at the focus since BRIEF
         self.mastered: set[int] = set()          # corners coached to the ground
         self.parked: set[int] = set()            # corners that wouldn't improve
-        self._last = FocusReport(FocusKind.ASSESS,
-                                 f"Assessing your weak points… (0/{min_laps} clean laps).")
+        self._last = FocusReport(
+            FocusKind.ASSESS,
+            _m("assess", current_language(), n=0, total=min_laps))
 
     # -- public API --------------------------------------------------------
     def observe(self, debrief: LapDebrief, *, stable: bool = True) -> FocusReport:
@@ -162,29 +219,29 @@ class FocusCoach:
         return self._drill(debrief)
 
     def _pick_or_wait(self) -> FocusReport:
+        lang = current_language()
         if len(self.window) < self.min_laps:
             return FocusReport(
                 FocusKind.ASSESS,
-                f"Assessing your weak points… ({len(self.window)}/{self.min_laps} "
-                f"clean laps).")
+                _m("assess", lang, n=len(self.window), total=self.min_laps))
 
         focus = self._choose()
         if focus is None:
-            return FocusReport(
-                FocusKind.CLEAN,
-                "No recurring weak point: steady driving. Just fine-tuning left.")
+            return FocusReport(FocusKind.CLEAN, _m("clean", lang))
 
         self.focus = focus
         self._focus_losses = []
         cause = f" {focus.cause}" if focus.cause else ""
         return FocusReport(
             FocusKind.BRIEF,
-            f"New focus — {focus.name}: let's work on {focus.theme}. "
-            f"You lose ~{_secs(focus.baseline_ms)} here on average.{cause} {focus.drill}",
+            _m("brief", lang, name=focus.name, theme=focus.theme,
+               base=_secs(focus.baseline_ms), cause=cause, drill=focus.drill),
             focus=focus, drill=focus.drill, progress_ms=focus.baseline_ms)
 
     def _drill(self, debrief: LapDebrief) -> FocusReport:
         focus = self.focus
+        lang = current_language()
+        theme = _theme(focus.category, lang)
         self._focus_losses.append(_loss_at(debrief, focus.corner_index))
         recent = self._focus_losses[-self.min_laps:]
         current = statistics.median(recent)
@@ -193,7 +250,8 @@ class FocusCoach:
         if len(self._focus_losses) < self.min_laps:
             return FocusReport(
                 FocusKind.DRILL,
-                f"{focus.name}: work on {focus.theme}. {focus.drill}",
+                _m("drill_start", lang, name=focus.name, theme=theme,
+                   drill=focus.drill),
                 focus=focus, drill=focus.drill, progress_ms=current)
 
         if current <= focus.baseline_ms * _IMPROVED_FRAC and current <= _SOLVED_MS:
@@ -201,28 +259,30 @@ class FocusCoach:
             self.focus = None
             return FocusReport(
                 FocusKind.IMPROVED,
-                f"{focus.name} improved: from {_secs(focus.baseline_ms)} to "
-                f"{_secs(current)}. Nice work — a new focus shortly.",
+                _m("improved", lang, name=focus.name,
+                   base=_secs(focus.baseline_ms), cur=_secs(current)),
                 progress_ms=current)
 
         if len(self._focus_losses) >= _PATIENCE:
             self.parked.add(focus.corner_index)
             self.focus = None
-            setup = f" Possible setup cause: {focus.cause}" if focus.cause else ""
+            setup = (_m("stuck_setup", lang, cause=focus.cause)
+                     if focus.cause else "")
             return FocusReport(
                 FocusKind.STUCK,
-                f"{focus.name}: {focus.theme} isn't dropping ({_secs(current)} vs "
-                f"{_secs(focus.baseline_ms)}).{setup} Parking it and moving on.",
+                _m("stuck", lang, name=focus.name, theme=theme,
+                   cur=_secs(current), base=_secs(focus.baseline_ms), setup=setup),
                 progress_ms=current)
 
         return FocusReport(
             FocusKind.DRILL,
-            f"{focus.name}: keep working {focus.theme}. Now ~{_secs(current)} "
-            f"(started at {_secs(focus.baseline_ms)}).",
+            _m("drill_progress", lang, name=focus.name, theme=theme,
+               cur=_secs(current), base=_secs(focus.baseline_ms)),
             focus=focus, drill=focus.drill, progress_ms=current)
 
     def _choose(self) -> Focus | None:
         """Pick the worst recurring, significant corner not already handled."""
+        lang = current_language()
         agg = self._aggregate()
         recur_min = max(2, round(_RECUR_FRAC * len(self.window)))
 
@@ -247,10 +307,10 @@ class FocusCoach:
         return Focus(
             corner_index=idx,
             name=rep.label,
-            theme=_theme(rep.category),
+            theme=_theme(rep.category, lang),
             category=rep.category,
             baseline_ms=baseline,
-            drill=rep.fix or "Clean up the line and build consistency.",
+            drill=rep.fix or _m("default_drill", lang),
             cause=rep.cause,
         )
 
