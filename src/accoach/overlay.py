@@ -64,7 +64,7 @@ class Overlay(QWidget):
         if not interactive:
             self.setAttribute(Qt.WA_TransparentForMouseEvents, True)
 
-        self.resize(560, 205)
+        self.resize(560, 232)
         self._place_top_center()
 
         # WebSocket client on the Qt event loop — only when a URL is given.
@@ -128,6 +128,7 @@ class Overlay(QWidget):
             self._draw_delta(p, delta, w)
 
         self._draw_cue(p, w)
+        self._draw_focus(p, w)
 
     def _draw_delta(self, p: QPainter, delta: dict, w: int) -> None:
         ahead = delta.get("ahead", False)
@@ -175,6 +176,25 @@ class Overlay(QWidget):
         colour = QColor(_RED if cat in ("locked", "brake_later") else _AMBER)
         colour.setAlpha(max(0, alpha))
         self._draw_pill(p, self._cue.get("message", ""), colour, y=178, alpha=alpha)
+
+    def _draw_focus(self, p: QPainter, w: int) -> None:
+        """A slim, persistent reminder of the one weakness being coached. Low
+        priority by design: drawn small and grey so it never fights the delta or
+        an acute cue, but always there to answer 'what am I working on?'."""
+        focus = self._state.get("focus")
+        if not focus:
+            return
+        target = focus.get("focus")
+        if not target:                       # no active focus (assessing/clean)
+            return
+        name = target.get("name", "")
+        theme = target.get("theme", "")
+        base = target.get("baseline_ms", 0) or 0
+        gap = f"  −{base / 1000.0:.2f}s" if base else ""
+        self._set_font(p, 12, bold=True)
+        p.setPen(_AMBER)
+        p.drawText(0, 206, w, 20, Qt.AlignHCenter,
+                   f"◎ Focus · {name} · {theme}{gap}")
 
     # --- helpers -----------------------------------------------------------
     def _set_font(self, p: QPainter, size: int, bold: bool = False) -> None:
