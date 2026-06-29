@@ -152,13 +152,6 @@ main { padding: 16px 24px; display: grid; gap: 18px; }
 .map-legend .swatch {
   display: inline-flex; align-items: center; gap: 7px;
 }
-.map-legend .bar {
-  display: inline-block; width: 30px; border-radius: 999px;
-}
-.map-legend .bar.slow { height: 6px; background: var(--red); }
-.map-legend .bar.fast { height: 2px; background: var(--green); }
-.map-legend .bar.thick { height: 6px; }
-.map-legend .bar.thin { height: 2px; }
 .map-legend .marker { color: var(--amber); font-weight: 700; }
 .map-legend .marker.ring { color: var(--cyan); }
 
@@ -296,3 +289,55 @@ body.no-data .empty { display: block; }
 .ideal-from { color: var(--muted); font-size: 13px; margin: 6px 0; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 .ideal .small { font-size: 11px; }
 .faster { color: var(--green); }
+
+/* Graded delta legend (track map) — a continuous green→pale→red bar that
+   mirrors deltaColor() in app.js, so the legend reads like the line itself. */
+.map-grad { display: flex; align-items: center; gap: 8px 14px; flex-wrap: wrap; }
+.map-grad .scale { display: inline-flex; align-items: center; gap: 8px; }
+.map-grad .grad {
+  width: 150px; height: 8px; border-radius: 999px;
+  background: linear-gradient(90deg, var(--green) 0%, #E6E0E4 50%, var(--red) 100%);
+}
+.map-grad .cap.fast { color: var(--green); }
+.map-grad .cap.slow { color: var(--red); }
+
+/* --- Responsive: tablet & phone -------------------------------------------
+   The page chrome is laid out on a fixed 24px gutter and 220px selects; on
+   narrow viewports we tighten the gutter in one place and let the controls,
+   tabs and sector rows reflow instead of overflowing. Canvases are width:100%
+   already and redraw on resize, so they need no per-size rules. */
+@media (max-width: 760px) {
+  header { padding: 12px 16px; }
+  .controls { width: 100%; gap: 10px; }
+  .controls label { width: 100%; }
+  select { min-width: 0; width: 100%; }
+  .export { width: 100%; }
+  .summary { gap: 14px 22px; }
+  .summary, .readout, main, .tabs, .vmin, .debrief, .levels,
+  .sectors, .sec-head, .ideal, #map-readout { padding-left: 16px; padding-right: 16px; }
+}
+
+@media (max-width: 520px) {
+  h1 { font-size: 18px; }
+  .summary, .readout, main, .tabs, .vmin, .debrief, .levels,
+  .sectors, .sec-head, .ideal, #map-readout { padding-left: 12px; padding-right: 12px; }
+  .tabs { gap: 0; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .tab { padding: 8px 12px; white-space: nowrap; }
+  .summary { gap: 12px 18px; }
+  .chart.map canvas { height: 56vh; min-height: 300px; }
+  /* sector rows: drop the bar onto its own line so the label+times stay legible */
+  .sec-head { grid-template-columns: 56px 1fr; }
+  .sec-head span:last-child { display: none; }
+  .secrow {
+    grid-template-columns: 56px 1fr;
+    grid-template-areas: "label times" "bar bar";
+    row-gap: 8px; column-gap: 12px;
+  }
+  .secrow .seclabel { grid-area: label; }
+  .secrow .sectimes { grid-area: times; }
+  .secrow .secbar { grid-area: bar; }
+  /* benchmark ladder: wrap instead of overflowing on a phone */
+  .lvl { flex-wrap: wrap; }
+  .lvl .lvl-label { min-width: 0; }
+  .map-grad .grad { width: 120px; }
+}

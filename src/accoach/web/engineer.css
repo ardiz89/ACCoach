@@ -185,3 +185,13 @@ button.ghost:hover { color: var(--text); border-color: var(--muted); }
 .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 12px; }
 
 .toast { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); z-index: 60; background: var(--panel); border: 1px solid var(--green); border-left: 4px solid var(--green); border-radius: 12px; padding: 12px 18px; max-width: 80vw; font-size: 14px; box-shadow: 0 6px 20px rgba(0,0,0,.4); }
+
+/* --- Responsive: phone ----------------------------------------------------
+   Must live at the END of the file: these overrides share specificity with the
+   base rules above, so source order is what makes them win inside the query. */
+@media (max-width: 560px) {
+  .eng-layout { padding: 14px 14px; gap: 14px; }
+  .gauges { grid-template-columns: repeat(3, 1fr); }
+  .param { grid-template-columns: 1fr; gap: 4px; }
+  .tray { padding: 12px 14px; }
+}

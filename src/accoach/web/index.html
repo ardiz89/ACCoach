@@ -78,8 +78,14 @@
         <h3 data-i18n-html="chart.map">Track map <small>(white dashed = reference · solid line = reviewed lap)</small></h3>
         <canvas id="c-map"></canvas>
         <div class="map-legend">
-          <span class="swatch"><span class="bar slow"></span> <span data-i18n-html="map.leg.slower">slower <small>(thicker line = more time lost)</small></span></span>
-          <span class="swatch"><span class="bar fast"></span> <span data-i18n-html="map.leg.faster">faster <small>(thinner line = on par)</small></span></span>
+          <span class="map-grad">
+            <span class="scale">
+              <span class="cap fast" data-i18n="map.grad.fast">faster</span>
+              <span class="grad" aria-hidden="true"></span>
+              <span class="cap slow" data-i18n="map.grad.slow">slower</span>
+            </span>
+            <small data-i18n="map.grad.note">line thickens with time lost</small>
+          </span>
           <span class="swatch"><span class="marker">▽</span> <span data-i18n="map.leg.you">your braking</span></span>
           <span class="swatch"><span class="marker ring">○</span> <span data-i18n="map.leg.ref">reference braking</span></span>
         </div>
