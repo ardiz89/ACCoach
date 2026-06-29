@@ -43,15 +43,16 @@ def main(argv: list[str] | None = None) -> None:
 
     from .overlay import Overlay
 
+    from .config import load_config
+    lang = load_config().language
     if demo:
         from .demo import make_demo_engine
 
         engine = make_demo_engine()
         if not silent:
-            engine.voice = Voice(enabled=True)
+            engine.voice = Voice(enabled=True, language=lang)
     else:
-        from .config import load_config
-        engine = CoachEngine(voice=Voice(enabled=not silent),
+        engine = CoachEngine(voice=Voice(enabled=not silent, language=lang),
                              acquire_hz=load_config().acquire.hz)
 
     app = QApplication(sys.argv)

@@ -24,6 +24,7 @@ try:
     from PySide6.QtWidgets import (
         QApplication,
         QCheckBox,
+        QComboBox,
         QDialog,
         QFrame,
         QHBoxLayout,
@@ -36,6 +37,8 @@ except ImportError:  # pragma: no cover - optional dependency
     print("The launcher needs PySide6.  Install it with:  pip install PySide6")
     raise SystemExit(1)
 
+from .config import load_config, set_language
+from .i18n import LANGUAGES, language_name
 from .paths import base_dir
 
 _SRC = Path(__file__).resolve().parents[1]   # .../src
@@ -210,6 +213,23 @@ class Launcher(QWidget):
         layout.addWidget(title)
         layout.addWidget(subtitle)
 
+        # Language selector — switches the interface + coach voice. Applies on the
+        # next Coach Live start (the voice picks its language at startup).
+        lang_row = QHBoxLayout()
+        lang_lbl = QLabel("Language")
+        lang_lbl.setStyleSheet("color: #888;")
+        self._lang = QComboBox()
+        for code in LANGUAGES:
+            self._lang.addItem(language_name(code), code)
+        cur = load_config().language
+        i = self._lang.findData(cur)
+        if i >= 0:
+            self._lang.setCurrentIndex(i)
+        self._lang.currentIndexChanged.connect(self._on_language)
+        lang_row.addWidget(lang_lbl)
+        lang_row.addWidget(self._lang, 1)
+        layout.addLayout(lang_row)
+
         for label, args, console in _BUTTONS:
             if args is None:
                 line = QFrame()
@@ -294,6 +314,10 @@ class Launcher(QWidget):
                 proc.terminate()
         except Exception:  # pragma: no cover - best-effort
             pass
+
+    def _on_language(self) -> None:
+        """Persist the chosen language (takes effect on the next Coach Live start)."""
+        set_language(self._lang.currentData())
 
     def _show_wizard(self) -> None:
         """Open the getting-started wizard (also auto-shown on first run)."""

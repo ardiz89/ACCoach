@@ -39,6 +39,7 @@ from .coaching.cue import CueCategory
 from .coaching.debrief import build_lap_debrief
 from .coaching.diagnosis import build_lap_stats
 from .coaching.focus import FocusCoach, FocusReport
+from .i18n import cue_text
 from .comparison import DeltaState, LapComparator, Reference
 from .engineer import RaceEngineer, engineer_for
 from .recording import DEFAULT_LAPS_DIR, Lap, LapRecorder, find_reference_lap, save_lap
@@ -300,6 +301,9 @@ class CoachEngine:
         _submit(self.fuel.update(snap, now))
         spoken = self.scheduler.poll(now)
         if spoken is not None:
+            # Cues are authored in Italian (so the neural WAVs match); render them
+            # in the active language for both the voice and the on-screen text.
+            spoken.message = cue_text(spoken.message)
             if self.voice is not None:
                 self.voice.say(spoken.message)
             self.history.append(spoken.message)

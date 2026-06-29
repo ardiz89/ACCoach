@@ -57,7 +57,7 @@ class Voice:
         enabled: bool = True,
         rate: int = 180,
         volume: float = 1.0,
-        italian: bool = True,
+        language: str = "it",
     ) -> None:
         self._q: "queue.Queue[object]" = queue.Queue()
         self._engine = None
@@ -75,8 +75,7 @@ class Voice:
             self._engine = pyttsx3.init()
             self._engine.setProperty("rate", rate)
             self._engine.setProperty("volume", volume)
-            if italian:
-                self._select_italian_voice()
+            self._select_voice(language)
         except Exception:  # pragma: no cover - depends on host audio stack
             self._engine = None
 
@@ -84,7 +83,11 @@ class Voice:
             self._thread = threading.Thread(target=self._worker, daemon=True)
             self._thread.start()
 
-    def _select_italian_voice(self) -> None:
+    def _select_voice(self, language: str) -> None:
+        """Pick an installed SAPI5 voice matching ``language`` (e.g. it / en)."""
+        target = (language or "it").lower()[:2]
+        words = {"it": "ital", "en": "engl", "es": "span", "de": "germ", "fr": "fren"}
+        word = words.get(target, "")
         try:
             for v in self._engine.getProperty("voices"):
                 blob = f"{getattr(v, 'id', '')} {getattr(v, 'name', '')}".lower()
@@ -94,7 +97,8 @@ class Voice:
                     (x.decode("latin1", "ignore") if isinstance(x, bytes) else str(x))
                     for x in raw
                 ).lower()
-                if "ital" in blob or langs.startswith("it") or "it-it" in langs:
+                if (word and word in blob) or langs.startswith(target) \
+                        or f"{target}-" in langs:
                     self._engine.setProperty("voice", v.id)
                     return
         except Exception:  # pragma: no cover

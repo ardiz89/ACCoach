@@ -125,9 +125,10 @@ def main(argv: list[str] | None = None) -> None:
         pass
 
     interval = 1.0 / REFRESH_HZ
-    voice = Voice(enabled=not silent)
     from .config import load_config
-    engine = CoachEngine(voice=voice, acquire_hz=load_config().acquire.hz)
+    cfg = load_config()
+    voice = Voice(enabled=not silent, language=cfg.language)
+    engine = CoachEngine(voice=voice, acquire_hz=cfg.acquire.hz)
 
     try:
         with Live(_render(TelemetrySnapshot.disconnected(), None, [], 0, voice.is_audio),

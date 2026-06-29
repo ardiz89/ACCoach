@@ -62,6 +62,8 @@ class DataCfg:
 
 @dataclass
 class Config:
+    # App language: drives the coach VOICE and (progressively) the UI. "en" | "it".
+    language: str = "en"
     server: ServerCfg = field(default_factory=ServerCfg)
     web: WebCfg = field(default_factory=WebCfg)
     acquire: AcquireCfg = field(default_factory=AcquireCfg)
@@ -74,8 +76,10 @@ class Config:
         return Path(self.data.laps_dir) if self.data.laps_dir else laps_dir()
 
 
-_DEFAULT_TOML = """# ACCoach — configurazione utente
-# Modifica i valori e riavvia l'app. Le chiavi mancanti usano i default.
+_DEFAULT_TOML = """# HONE — user configuration
+# Edit values and restart the app. Missing keys fall back to defaults.
+
+language = "en"      # app language: "en" | "it" (coach voice + interface)
 
 [server]
 host = "127.0.0.1"   # interfaccia del backend (lascia 127.0.0.1 per uso locale)
@@ -134,6 +138,26 @@ def _write_default(path: Path) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(_DEFAULT_TOML, encoding="utf-8")
     except Exception:   # noqa: BLE001 - first-run convenience, never fatal
+        pass
+
+
+def set_language(lang: str) -> None:
+    """Switch the app language now (updates the cache) and persist it to
+    config.toml, preserving the rest of the file."""
+    import re
+
+    cfg = load_config()
+    cfg.language = lang
+    path = config_path()
+    try:
+        text = path.read_text(encoding="utf-8") if path.exists() else _DEFAULT_TOML
+        if re.search(r'(?m)^\s*language\s*=', text):
+            text = re.sub(r'(?m)^\s*language\s*=.*$', f'language = "{lang}"', text, count=1)
+        else:
+            text = f'language = "{lang}"\n' + text
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding="utf-8")
+    except OSError:  # pragma: no cover - best-effort persistence
         pass
 
 
