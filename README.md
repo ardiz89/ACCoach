@@ -1,124 +1,124 @@
-# ACCoach
-
-**Il coach di guida in tempo reale per Assetto Corsa e ACC — in italiano, 100% offline.**
-
-ACCoach legge la telemetria mentre guidi, capisce *dove* perdi tempo e soprattutto
-*perché*, te lo dice a voce e con un overlay a schermo, poi a fine sessione ti
-spiega ogni curva e — quando vuoi — ti riscrive il setup dell'auto, giro dopo giro.
-
-> 🏁 Gratis e completo. Gira tutto sul tuo PC: nessun account, nessun cloud,
-> nessun dato che lascia la tua macchina.
-
-<!-- TODO: GIF "wow" qui — overlay + voce durante un giro, poi il debrief col "perché". -->
-<!-- ![ACCoach in azione](docs/assets/demo.gif) -->
+<h1 align="center">HONE</h1>
+<p align="center"><b>Know why you're slow.</b></p>
+<p align="center">The real-time driving coach for Assetto Corsa and ACC — it tells you <i>why</i> you lose time, not just where. Offline. No subscription.</p>
 
 ---
 
-## Perché ACCoach è diverso
+HONE reads your live telemetry while you drive, works out **where** you lose time
+and — the part nobody else does — **why**, says it out loud and on a glanceable
+overlay, then breaks the lap down corner by corner afterwards and, when you want,
+rewrites your car setup lap after lap.
 
-Esistono ottimi strumenti per il sim racing (overlay, spotter, analisi cloud).
-ACCoach non compete su quelli: punta su tre cose che gli altri non fanno insieme.
+> 🏁 Free and complete today. Everything runs on your PC: no account, no cloud,
+> nothing leaves your machine.
 
-1. **Ti dice il *perché*, non solo il *cosa*.** Non "freni tardi" e basta, ma
-   *"l'auto sottosterza all'apex in curva lenta: porta più velocità in ingresso"*.
-   Diagnosi causale del comportamento (sotto/sovrasterzo × ingresso/apex/uscita ×
-   velocità), frenata scomposta (di quanti metri anticipi, picco freno), e perdita
-   sul rettilineo attribuita alla curva che l'ha causata.
+<!-- TODO: "wow" GIF here — overlay + voice through a lap, then the debrief's "why". -->
+<!-- ![HONE in action](docs/assets/demo.gif) -->
 
-2. **Un vero ingegnere di pista, anche sulle stradali.** Chiude il loop
-   *telemetria → diagnosi → consiglio di setup → modifica → ri-test*: propone una
-   modifica alla volta, la rivaluti in pista, la tiene solo se migliora davvero.
-   Tre profili (Formula, GT3, stradali) — non solo ACC.
+## Why HONE is different
 
-3. **Italiano e completamente offline.** Voce neurale in italiano, tutto sul tuo
-   PC, gratis. Niente abbonamenti, niente connessione, niente telemetria spedita
-   a un server.
+There are great tools for sim racing (overlays, spotters, cloud analysis). HONE
+doesn't compete on those — it does three things the others don't do together.
 
-E ti fa allenare con un **piano**: una debolezza ricorrente alla volta
-(briefing → drill → progresso misurato → lode), invece di rovesciarti addosso
-ogni errore insieme.
+1. **It tells you the *why*, not just the *what*.** Not "you braked too early",
+   but *"the car understeers at the apex in slow corners — carry more entry
+   speed."* Causal handling diagnosis (under/oversteer × entry/apex/exit ×
+   speed), braking broken down (how many metres early you brake, peak pressure),
+   and time lost down a straight attributed to the corner that caused it.
 
-## Cosa fa
+2. **A real race engineer — even for road cars.** It closes the loop
+   *telemetry → diagnosis → setup change → apply → re-test*: one change at a time,
+   you re-drive, it's kept only if it actually helps. Three profiles (Formula,
+   GT3, road cars) — not just ACC.
 
-- 🎙️ **Coach a voce in tempo reale** — il suggerimento più utile, al momento
-  giusto, senza parlarti sopra. Bloccaggi e pattinamenti chiamati all'istante.
-- 📺 **Overlay a schermo** — barra del delta, tempo previsto, cue del momento e
-  il focus su cui stai lavorando, sopra il gioco (modalità Borderless).
-- 🔧 **Ingegnere di pista** — consigli di setup concreti, una leva alla volta,
-  con loop di convergenza e gestione gomme/pressioni/elettronica.
-- 🧠 **Focus/Lesson** — un punto debole alla volta, allenato con lode misurata
-  ("Curva 4: da 0.30s a 0.07s").
-- 📊 **App di analisi nel browser** — traccia, settori, mappa, debrief col perché,
-  andamento nel tempo, confronto multi-livello (tuo best → ideale teorico → PRO)
-  e punti deboli **sistematici** vs **sporadici**.
-- 🗣️ **Debrief post-sessione** — le curve peggiori, la causa di ognuna, la tua
-  costanza.
+3. **Offline and free, and it can speak your language.** Everything runs locally,
+   no subscription. A neural coach voice — currently **Italian**, the first of
+   more languages — so coaching feels native, not machine-translated.
 
-## Avvio rapido
+And it trains you with a **plan**: one recurring weakness at a time
+(briefing → drill → measured progress → praise), instead of dumping every mistake
+on you at once.
 
-**Con l'eseguibile (consigliato):** scarica `ACCoach.exe` dalla pagina
-[Releases](https://github.com/ardiz89/ACCoach/releases), avvialo, scegli la
-modalità. Nessun Python necessario. (Vedi le [FAQ](docs/FAQ.md) per l'avviso
-SmartScreen al primo avvio e la verifica dell'hash.)
+## What it does
 
-**Da sorgente:**
+- 🎙️ **Live voice coach** — the single most useful call at the right moment, never
+  talking over itself. Lock-ups and wheelspin flagged instantly.
+- 📺 **On-screen overlay** — delta bar, predicted time, the current cue and the
+  focus you're working on, over the game (Borderless mode).
+- 🔧 **Race engineer** — concrete setup advice, one lever at a time, with a
+  convergence loop and tyre/pressure/electronics management.
+- 🧠 **Focus / Lesson** — one weakness at a time, trained with measured praise
+  ("Turn 4: from 0.30s to 0.07s").
+- 📊 **Analysis web app** — traces, sectors, track map, the "why" debrief, trend
+  over time, multi-level benchmarking (your best → theoretical ideal → PRO) and
+  **systematic** vs **sporadic** weaknesses.
+- 🗣️ **Post-session debrief** — your worst corners, the cause of each, your
+  consistency.
+
+## Quick start
+
+**With the executable (recommended):** download `HONE.exe` from the
+[Releases](https://github.com/ardiz89/ACCoach/releases) page, run it, pick a mode.
+No Python needed. (See the [FAQ](docs/FAQ.md) for the first-run SmartScreen notice
+and how to verify the file hash.)
+
+**From source:**
 
 ```powershell
-pip install -r requirements.txt   # la prima volta (PySide6 per overlay/GUI)
-python -m accoach live            # coach + overlay in un'unica finestra
-python -m accoach live --demo     # provalo con un giro sintetico, senza gioco
-python -m accoach                 # elenca tutti i comandi
+pip install -r requirements.txt   # first time (PySide6 for overlay/GUI)
+python -m accoach live            # coach + overlay in one window
+python -m accoach live --demo     # try it on a synthetic lap, no game
+python -m accoach                 # list every command
 ```
 
-Imposta il gioco in **Borderless** perché l'overlay ci si disegni sopra.
-`--silent` disattiva la voce.
+Set the game to **Borderless** so the overlay draws over it. `--silent` turns off
+the voice.
 
-## Requisiti
+## Requirements
 
-- **Windows** (la shared memory di AC/ACC è solo Windows).
-- **Assetto Corsa** o **Assetto Corsa Competizione**, in modalità **Borderless**
-  per l'overlay.
-- Solo da sorgente: **Python 3.11+**.
+- **Windows** (the AC/ACC shared memory is Windows-only).
+- **Assetto Corsa** or **Assetto Corsa Competizione**, in **Borderless** for the
+  overlay.
+- From source only: **Python 3.11+**.
 
 ## Privacy
 
-ACCoach è **100% offline**. Tutto — telemetria, giri registrati, analisi, voce —
-resta sul tuo PC. Niente account, niente connessione di rete, niente dati inviati
-a terzi. I giri sono salvati in `Documenti\ACCoach\`. Dettagli nelle
-[FAQ](docs/FAQ.md#privacy).
+HONE is **100% offline**. Telemetry, recorded laps, analysis and voice all stay on
+your PC. No account, no network calls, nothing sent to third parties. Laps live in
+`Documents\ACCoach\`. Details in the [FAQ](docs/FAQ.md#privacy).
 
 ## Free vs Pro
 
-ACCoach segue (a regime) un modello **freemium one-time** — nessun abbonamento.
-Oggi è tutto disponibile gratis mentre il prodotto matura con la community.
+HONE follows a **one-time freemium** model — no subscription. Everything is free
+today while the product matures with the community.
 
-| | Free | Pro (in arrivo) |
+| | Free | Pro (coming) |
 |---|---|---|
-| Coach a voce + overlay | ✅ | ✅ |
-| Debrief col "perché" + analisi web | ✅ | ✅ |
-| Ingegnere di pista (setup AI) | | ✅ |
-| Focus/Lesson (piano di allenamento) | | ✅ |
-| Reference PRO importabili | | ✅ |
+| Voice coach + overlay | ✅ | ✅ |
+| "Why" debrief + analysis web app | ✅ | ✅ |
+| Race engineer (setup AI) | | ✅ |
+| Focus / Lesson (training plan) | | ✅ |
+| Importable PRO references | | ✅ |
 
-> Il Pro sarà un acquisto una tantum, non un abbonamento. Il modello potrà
-> cambiare prima del lancio: i feedback della community contano.
+> Pro will be a one-time purchase, not a subscription. The model may change before
+> launch — community feedback counts.
 
-## Licenza
+## License
 
-**Source-available** sotto [PolyForm Noncommercial 1.0.0](LICENSE): libero per
-uso personale e non commerciale; l'uso commerciale (rivendita, prodotti/servizi a
-pagamento) richiede una licenza dall'autore. Il codice è visibile per trasparenza
-e studio.
+**Source-available** under [PolyForm Noncommercial 1.0.0](LICENSE): free for
+personal, non-commercial use; commercial use (reselling, paid products/services)
+needs a license from the author. The code is visible for transparency and study.
 
-## Per sviluppatori
+## For developers
 
-Documentazione tecnica nel repo:
+Technical docs in the repo (the package is still named `accoach`, the repo
+codename):
 
-- [`GUIDA.md`](GUIDA.md) — guida d'uso completa.
-- [`ENGINEER.md`](ENGINEER.md) — architettura dell'ingegnere di pista.
-- [`TESTING.md`](TESTING.md) — come girano i test (`python -m pytest -q`).
-- [`PIANO-CALIBRAZIONI.md`](PIANO-CALIBRAZIONI.md) — taratura delle soglie.
+- [`GUIDA.md`](GUIDA.md) — full usage guide (Italian).
+- [`ENGINEER.md`](ENGINEER.md) — race-engineer architecture.
+- [`TESTING.md`](TESTING.md) — how the tests run (`python -m pytest -q`).
+- [`REVIEW-2026-06-29.md`](REVIEW-2026-06-29.md) — latest engineering review.
 
-Struttura: il codice è in `src/accoach/` (telemetria → recording → comparison →
-coaching → engine → server/overlay/web). `python -m accoach` è l'unico punto
-d'ingresso; `build_exe.bat` produce l'eseguibile.
+Layout: code in `src/accoach/` (telemetry → recording → comparison → coaching →
+engine → server/overlay/web). `python -m accoach` is the single entry point;
+`build_exe.bat` produces the executable.

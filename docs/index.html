@@ -1,86 +1,93 @@
 <!DOCTYPE html>
-<html lang="it">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ACCoach — il coach di guida per Assetto Corsa e ACC, in italiano e offline</title>
-<meta name="description" content="ACCoach legge la telemetria mentre guidi, ti dice dove perdi tempo e perché, a voce e con un overlay, poi ti riscrive il setup. In italiano, 100% offline, gratis.">
-<meta property="og:title" content="ACCoach — coach di guida per Assetto Corsa / ACC">
-<meta property="og:description" content="Ti dice il PERCHÉ, non solo il cosa. Ingegnere di setup AI anche sulle stradali. Italiano e offline.">
+<title>HONE — Know why you're slow. | AI driving coach for Assetto Corsa & ACC</title>
+<meta name="description" content="HONE reads your telemetry as you drive and tells you WHY you're losing time — not just where. A real race engineer for your setup, too. Offline, no subscription.">
+<meta property="og:title" content="HONE — Know why you're slow.">
+<meta property="og:description" content="The AI driving coach that explains the WHY. Causal diagnosis, setup engineer for AC & road cars, offline.">
 <meta property="og:type" content="website">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;600&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
 <style>
   :root{
-    --bg:#0d0f12; --panel:#15181d; --panel2:#1b1f26; --line:#262b33;
-    --text:#e9edf2; --muted:#9aa4b0; --accent:#ff3b30; --good:#22dd66;
-    --amber:#ffb020; --cyan:#39c0d8;
+    --ink:#0B0E12; --slate:#151A21; --line:#232B35;
+    --cyan:#22D3CE; --green:#34E08A; --red:#FF4D5E; --amber:#FFB020;
+    --text:#E8EDF2; --muted:#8A95A3;
+    --display:"Space Grotesk",system-ui,Segoe UI,sans-serif;
+    --ui:"Inter",system-ui,Segoe UI,sans-serif;
+    --mono:"JetBrains Mono",ui-monospace,Consolas,monospace;
   }
   *{box-sizing:border-box}
   html{scroll-behavior:smooth}
-  body{margin:0;font:16px/1.6 "Segoe UI",system-ui,-apple-system,sans-serif;
-    background:var(--bg);color:var(--text)}
+  body{margin:0;font:16px/1.65 var(--ui);background:var(--ink);color:var(--text)}
   a{color:var(--cyan);text-decoration:none}
   a:hover{text-decoration:underline}
   .wrap{max-width:980px;margin:0 auto;padding:0 20px}
-  header{padding:18px 0;border-bottom:1px solid var(--line);position:sticky;top:0;
-    background:rgba(13,15,18,.86);backdrop-filter:blur(8px);z-index:10}
+  h1,h2,h3,.brand{font-family:var(--display)}
+  .mono{font-family:var(--mono)}
+  header{position:sticky;top:0;z-index:10;padding:16px 0;border-bottom:1px solid var(--line);
+    background:rgba(11,14,18,.86);backdrop-filter:blur(8px)}
   header .wrap{display:flex;align-items:center;justify-content:space-between;gap:16px}
-  .brand{font-weight:800;letter-spacing:.5px;font-size:20px}
-  .brand b{color:var(--accent)}
+  .brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:20px;letter-spacing:1px}
   nav a{color:var(--muted);margin-left:18px;font-size:14px}
-  .btn{display:inline-block;background:var(--accent);color:#fff;font-weight:700;
-    padding:12px 22px;border-radius:9px;border:0}
+  .btn{display:inline-block;background:var(--cyan);color:#04201f;font-weight:700;
+    padding:12px 22px;border-radius:10px;border:0;font-family:var(--ui)}
   .btn:hover{text-decoration:none;filter:brightness(1.08)}
   .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--text)}
-  .hero{padding:72px 0 48px;text-align:center}
-  .hero h1{font-size:42px;line-height:1.15;margin:.2em 0;font-weight:800}
-  .hero .tag{color:var(--amber);font-weight:700;text-transform:uppercase;
-    letter-spacing:2px;font-size:13px}
+  .hero{padding:78px 0 50px;text-align:center}
+  .hero .tag{color:var(--amber);font-weight:700;text-transform:uppercase;letter-spacing:3px;font-size:12px}
+  .hero h1{font-size:46px;line-height:1.12;margin:.25em 0;font-weight:700}
+  .hero h1 .accent{color:var(--cyan)}
   .hero p.sub{color:var(--muted);font-size:19px;max-width:680px;margin:18px auto 28px}
   .cta{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
-  .pill{display:inline-block;font-size:13px;color:var(--muted);
-    border:1px solid var(--line);border-radius:999px;padding:5px 12px;margin:4px}
   .pills{margin-top:26px}
+  .pill{display:inline-block;font-size:13px;color:var(--muted);border:1px solid var(--line);
+    border-radius:999px;padding:5px 12px;margin:4px}
   section{padding:46px 0;border-top:1px solid var(--line)}
   h2{font-size:28px;margin:0 0 6px}
   .lead{color:var(--muted);margin:0 0 26px}
   .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
-  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;
-    padding:22px}
+  .card{background:var(--slate);border:1px solid var(--line);border-radius:14px;padding:22px}
   .card h3{margin:.1em 0 .4em;font-size:18px}
   .card p{color:var(--muted);margin:0;font-size:15px}
-  .num{font-weight:800;color:var(--accent);font-size:14px;letter-spacing:1px}
-  .quote{background:var(--panel2);border-left:3px solid var(--accent);
-    padding:16px 20px;border-radius:8px;color:#cfd6de;font-style:italic;margin:18px 0}
-  table{width:100%;border-collapse:collapse;background:var(--panel);
-    border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  .num{font-family:var(--mono);font-weight:700;color:var(--cyan);font-size:14px;letter-spacing:1px}
+  .quote{background:var(--slate);border-left:3px solid var(--cyan);padding:16px 20px;border-radius:10px;
+    color:#cfd6de;margin:18px 0}
+  table{width:100%;border-collapse:collapse;background:var(--slate);border:1px solid var(--line);
+    border-radius:14px;overflow:hidden}
   th,td{padding:13px 16px;text-align:left;border-bottom:1px solid var(--line)}
   th{font-size:13px;text-transform:uppercase;letter-spacing:1px;color:var(--muted)}
-  td.c,th.c{text-align:center;width:130px}
-  .yes{color:var(--good);font-weight:700}
+  td.c,th.c{text-align:center;width:140px}
+  .yes{color:var(--green);font-weight:700}
   .no{color:#566}
-  .faq{margin-top:8px}
-  .faq details{background:var(--panel);border:1px solid var(--line);
-    border-radius:10px;padding:4px 18px;margin-bottom:10px}
+  .faq details{background:var(--slate);border:1px solid var(--line);border-radius:12px;padding:4px 18px;margin-bottom:10px}
   .faq summary{cursor:pointer;font-weight:600;padding:12px 0;list-style:none}
   .faq summary::-webkit-details-marker{display:none}
-  .faq summary::before{content:"+ ";color:var(--accent);font-weight:800}
+  .faq summary::before{content:"+ ";color:var(--cyan);font-weight:800}
   .faq details[open] summary::before{content:"– "}
   .faq p{color:var(--muted);margin:0 0 14px}
-  code{background:#0a0c0f;border:1px solid var(--line);border-radius:5px;
-    padding:1px 6px;font-size:14px}
-  footer{padding:34px 0;border-top:1px solid var(--line);color:var(--muted);
-    font-size:14px;text-align:center}
-  @media(max-width:760px){.grid{grid-template-columns:1fr}.hero h1{font-size:32px}
-    nav{display:none}}
+  code{font-family:var(--mono);background:#070a0d;border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:14px}
+  footer{padding:34px 0;border-top:1px solid var(--line);color:var(--muted);font-size:14px;text-align:center}
+  @media(max-width:760px){.grid{grid-template-columns:1fr}.hero h1{font-size:33px}nav{display:none}}
 </style>
 </head>
 <body>
+
+<!-- The HONE mark: a cyan chevron with a green apex dot. -->
+<svg width="0" height="0" style="position:absolute"><symbol id="mark" viewBox="0 0 40 32">
+  <path d="M7 5 L21 16 L7 27" fill="none" stroke="#22D3CE" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="15" cy="16" r="4" fill="#34E08A"/>
+</symbol></svg>
+
 <header><div class="wrap">
-  <div class="brand">AC<b>Coach</b></div>
+  <div class="brand"><svg width="26" height="22"><use href="#mark"/></svg> HONE</div>
   <nav>
-    <a href="#perche">Perché</a>
-    <a href="#cosa">Funzioni</a>
-    <a href="#prezzo">Free / Pro</a>
+    <a href="#why">Why</a>
+    <a href="#features">Features</a>
+    <a href="#pricing">Free / Pro</a>
     <a href="#faq">FAQ</a>
     <a href="https://github.com/ardiz89/ACCoach">GitHub</a>
   </nav>
@@ -88,118 +95,116 @@
 
 <div class="hero"><div class="wrap">
   <div class="tag">Assetto Corsa · ACC</div>
-  <h1>Ti dice <span style="color:var(--accent)">perché</span> perdi tempo.<br>Non solo dove.</h1>
-  <p class="sub">Il coach di guida in tempo reale per Assetto Corsa e ACC: legge la
-    telemetria mentre guidi, te lo spiega a voce e con un overlay, poi ti riscrive
-    il setup. In italiano, 100% offline, gratis.</p>
+  <h1>Know <span class="accent">why</span> you're slow.<br>Not just where.</h1>
+  <p class="sub">The real-time driving coach for Assetto Corsa and ACC: it reads
+    your telemetry as you drive, tells you out loud and on an overlay, then
+    rewrites your setup. Offline. No subscription.</p>
   <div class="cta">
-    <a class="btn" href="https://github.com/ardiz89/ACCoach/releases">Scarica per Windows</a>
-    <a class="btn ghost" href="https://github.com/ardiz89/ACCoach">Codice su GitHub</a>
+    <a class="btn" href="https://github.com/ardiz89/ACCoach/releases">Download for Windows</a>
+    <a class="btn ghost" href="https://github.com/ardiz89/ACCoach">View source on GitHub</a>
   </div>
   <div class="pills">
-    <span class="pill">🇮🇹 In italiano</span>
     <span class="pill">🔒 100% offline</span>
-    <span class="pill">🎙️ Voce neurale</span>
-    <span class="pill">🔧 Ingegnere di setup</span>
-    <span class="pill">💸 Niente abbonamenti</span>
+    <span class="pill">🎙️ Neural voice</span>
+    <span class="pill">🔧 Setup engineer</span>
+    <span class="pill">🌍 Speaks your language</span>
+    <span class="pill">💸 No subscription</span>
   </div>
 </div></div>
 
-<section id="perche"><div class="wrap">
-  <h2>Perché è diverso</h2>
-  <p class="lead">Esistono ottimi overlay, spotter e analisi cloud. ACCoach punta
-    su tre cose che gli altri non fanno insieme.</p>
+<section id="why"><div class="wrap">
+  <h2>Why HONE is different</h2>
+  <p class="lead">There are great overlays, spotters and cloud-analysis tools.
+    HONE does three things the others don't do together.</p>
   <div class="grid">
     <div class="card">
       <div class="num">01</div>
-      <h3>Il perché, non solo il cosa</h3>
-      <p>Diagnosi causale: sotto/sovrasterzo × ingresso/apex/uscita × velocità,
-        frenata scomposta (di quanti metri anticipi, picco freno), perdita sul
-        rettilineo attribuita alla curva che l'ha causata.</p>
+      <h3>The why, not just the what</h3>
+      <p>Causal diagnosis: under/oversteer × entry/apex/exit × speed, braking
+        broken down (how many metres early, peak pressure), and time lost down a
+        straight attributed to the corner that caused it.</p>
     </div>
     <div class="card">
       <div class="num">02</div>
-      <h3>Un ingegnere, anche sulle stradali</h3>
-      <p>Telemetria → diagnosi → consiglio di setup → modifica → ri-test. Una leva
-        alla volta, tenuta solo se migliora davvero. Profili Formula, GT3 e
-        stradali — non solo ACC.</p>
+      <h3>An engineer — even for road cars</h3>
+      <p>Telemetry → diagnosis → setup change → apply → re-test. One lever at a
+        time, kept only if it actually helps. Formula, GT3 and road-car profiles —
+        not just ACC.</p>
     </div>
     <div class="card">
       <div class="num">03</div>
-      <h3>Italiano e offline</h3>
-      <p>Voce neurale in italiano, tutto sul tuo PC, gratis. Niente account,
-        niente connessione, niente telemetria spedita a un server.</p>
+      <h3>Offline, free, in your language</h3>
+      <p>Everything runs on your PC, no subscription. A neural coach voice
+        (Italian today, more to come) so coaching feels native.</p>
     </div>
   </div>
-  <div class="quote">«L'auto sottosterza all'apex in curva lenta: porta più
-    velocità in ingresso, meno freno e una traiettoria più larga.» — un debrief,
-    non un manuale.</div>
+  <div class="quote">“The car understeers at the apex in slow corners — carry more
+    entry speed, less brake, a wider line.” — a debrief, not a manual.</div>
 </div></section>
 
-<section id="cosa"><div class="wrap">
-  <h2>Cosa fa</h2>
-  <p class="lead">Dal primo giro al setup, un coach che ha un piano.</p>
+<section id="features"><div class="wrap">
+  <h2>What it does</h2>
+  <p class="lead">From your first lap to your setup, a coach with a plan.</p>
   <div class="grid">
-    <div class="card"><h3>🎙️ Coach a voce</h3><p>Il suggerimento più utile al
-      momento giusto, senza parlarti sopra. Bloccaggi e pattinamenti all'istante.</p></div>
-    <div class="card"><h3>📺 Overlay</h3><p>Delta, tempo previsto, cue del momento
-      e il focus su cui lavori, sopra il gioco.</p></div>
-    <div class="card"><h3>🔧 Ingegnere di pista</h3><p>Setup concreto, una modifica
-      alla volta, con gestione gomme, pressioni ed elettronica.</p></div>
-    <div class="card"><h3>🧠 Focus/Lesson</h3><p>Un punto debole alla volta,
-      allenato con lode misurata: «Curva 4: da 0.30s a 0.07s».</p></div>
-    <div class="card"><h3>📊 Analisi nel browser</h3><p>Traccia, settori, mappa,
-      andamento, confronto multi-livello e punti deboli sistematici vs sporadici.</p></div>
-    <div class="card"><h3>🗣️ Debrief</h3><p>Le curve peggiori, la causa di ognuna,
-      la tua costanza — a fine sessione.</p></div>
+    <div class="card"><h3>🎙️ Voice coach</h3><p>The single most useful call at the
+      right moment, never talking over itself. Lock-ups and wheelspin, instantly.</p></div>
+    <div class="card"><h3>📺 Overlay</h3><p>Delta, predicted time, the current cue
+      and the focus you're working on — over the game.</p></div>
+    <div class="card"><h3>🔧 Race engineer</h3><p>Concrete setup advice, one change
+      at a time, with tyre, pressure and electronics management.</p></div>
+    <div class="card"><h3>🧠 Focus / Lesson</h3><p>One weakness at a time, trained
+      with measured praise: “Turn 4: from 0.30s to 0.07s.”</p></div>
+    <div class="card"><h3>📊 Analysis app</h3><p>Traces, sectors, map, trend,
+      multi-level benchmarking and systematic vs sporadic weaknesses.</p></div>
+    <div class="card"><h3>🗣️ Debrief</h3><p>Your worst corners, the cause of each,
+      your consistency — after every session.</p></div>
   </div>
 </div></section>
 
-<section id="prezzo"><div class="wrap">
-  <h2>Free e Pro</h2>
-  <p class="lead">Modello freemium <b>one-time</b>, nessun abbonamento. Oggi è
-    tutto gratis mentre il prodotto cresce con la community.</p>
+<section id="pricing"><div class="wrap">
+  <h2>Free and Pro</h2>
+  <p class="lead">A <b>one-time</b> freemium model, no subscription. Everything is
+    free today while the product grows with the community.</p>
   <table>
-    <tr><th>Funzione</th><th class="c">Free</th><th class="c">Pro <small>(in arrivo)</small></th></tr>
-    <tr><td>Coach a voce + overlay</td><td class="c yes">✓</td><td class="c yes">✓</td></tr>
-    <tr><td>Debrief col "perché" + analisi web</td><td class="c yes">✓</td><td class="c yes">✓</td></tr>
-    <tr><td>Ingegnere di pista (setup AI)</td><td class="c no">—</td><td class="c yes">✓</td></tr>
-    <tr><td>Focus/Lesson (piano di allenamento)</td><td class="c no">—</td><td class="c yes">✓</td></tr>
-    <tr><td>Reference PRO importabili</td><td class="c no">—</td><td class="c yes">✓</td></tr>
+    <tr><th>Feature</th><th class="c">Free</th><th class="c">Pro <small>(coming)</small></th></tr>
+    <tr><td>Voice coach + overlay</td><td class="c yes">✓</td><td class="c yes">✓</td></tr>
+    <tr><td>“Why” debrief + analysis app</td><td class="c yes">✓</td><td class="c yes">✓</td></tr>
+    <tr><td>Race engineer (setup AI)</td><td class="c no">—</td><td class="c yes">✓</td></tr>
+    <tr><td>Focus / Lesson (training plan)</td><td class="c no">—</td><td class="c yes">✓</td></tr>
+    <tr><td>Importable PRO references</td><td class="c no">—</td><td class="c yes">✓</td></tr>
   </table>
-  <p class="lead" style="margin-top:16px">Il Pro sarà un acquisto una tantum. Il
-    modello potrà cambiare prima del lancio — i feedback contano.</p>
+  <p class="lead" style="margin-top:16px">Pro will be a one-time purchase. The model
+    may change before launch — feedback counts.</p>
 </div></section>
 
 <section id="faq"><div class="wrap">
-  <h2>Domande frequenti</h2>
+  <h2>FAQ</h2>
   <div class="faq">
-    <details><summary>Mi servono account o connessione?</summary>
-      <p>No. ACCoach è 100% offline: tutto resta sul tuo PC, nessun dato viene
-        inviato a terzi. I giri sono salvati in <code>Documenti\ACCoach\</code>.</p></details>
-    <details><summary>Windows mi avvisa con "SmartScreen" — è sicuro?</summary>
-      <p>Sì. L'eseguibile non è ancora firmato con un certificato a pagamento, così
-        Windows mostra un avviso al primo avvio. Clicca «Ulteriori informazioni →
-        Esegui comunque». Puoi verificare l'integrità del file confrontando il suo
-        SHA-256 con quello pubblicato nella release. Istruzioni complete nelle
-        <a href="https://github.com/ardiz89/ACCoach/blob/main/docs/FAQ.md">FAQ del repo</a>.</p></details>
-    <details><summary>Funziona con Assetto Corsa "classico" o solo ACC?</summary>
-      <p>Entrambi. ACCoach legge la shared memory comune ad AC e ACC. L'ingegnere
-        di setup ha profili anche per le stradali a basso downforce, non solo GT3.</p></details>
-    <details><summary>L'overlay non si vede sopra il gioco</summary>
-      <p>Imposta il gioco in modalità <b>Borderless</b> (finestra senza bordi):
-        un overlay trasparente non può disegnare sopra il fullscreen esclusivo.
-        È lo stesso vincolo di SimHub e Crew Chief.</p></details>
-    <details><summary>Quanto costa?</summary>
-      <p>Oggi è gratis e completo. A regime sarà freemium one-time: il Free resta
-        gratuito per sempre, il Pro sarà un acquisto una tantum (niente abbonamento).</p></details>
+    <details><summary>Do I need an account or a connection?</summary>
+      <p>No. HONE is 100% offline: everything stays on your PC, nothing is sent to
+        third parties. Laps are saved under <code>Documents\ACCoach\</code>.</p></details>
+    <details><summary>Windows warns me with “SmartScreen” — is it safe?</summary>
+      <p>Yes. The executable isn't signed with a paid certificate yet, so Windows
+        shows a notice on first run. Click “More info → Run anyway”. You can verify
+        the file by comparing its SHA-256 with the one published in the release.
+        Full steps in the <a href="https://github.com/ardiz89/ACCoach/blob/main/docs/FAQ.md">FAQ</a>.</p></details>
+    <details><summary>Does it work with plain Assetto Corsa, or only ACC?</summary>
+      <p>Both. HONE reads the shared memory common to AC and ACC. The setup engineer
+        has profiles for low-downforce road cars too, not just GT3.</p></details>
+    <details><summary>The overlay doesn't show over the game</summary>
+      <p>Set the game to <b>Borderless</b> (windowed-fullscreen): a transparent
+        overlay can't draw over exclusive fullscreen. Same constraint as SimHub
+        and Crew Chief.</p></details>
+    <details><summary>How much does it cost?</summary>
+      <p>It's free and complete today. The model is one-time freemium: Free stays
+        free forever, Pro will be a one-time purchase (no subscription).</p></details>
   </div>
 </div></section>
 
 <footer><div class="wrap">
-  ACCoach — source-available sotto
+  HONE — source-available under
   <a href="https://github.com/ardiz89/ACCoach/blob/main/LICENSE">PolyForm Noncommercial 1.0.0</a>.
-  Non affiliato a Kunos Simulazioni. ·
+  Not affiliated with Kunos Simulazioni. ·
   <a href="https://github.com/ardiz89/ACCoach">GitHub</a>
 </div></footer>
 </body>

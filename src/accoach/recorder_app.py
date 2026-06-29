@@ -57,7 +57,7 @@ def _status_panel(s: TelemetrySnapshot, saved: int, last_msg: str,
     table.add_row("Laps saved", Text(str(saved), style="bold green"))
     table.add_row("Reference", Text(reference, style="magenta"))
     table.add_row("Last event", Text(last_msg or "—", style="grey70"))
-    return Panel(table, title="ACCoach · lap recorder", border_style="bright_blue")
+    return Panel(table, title="HONE · lap recorder", border_style="bright_blue")
 
 
 def _reference_text(car: str, track: str) -> str:

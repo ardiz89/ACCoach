@@ -100,7 +100,7 @@ def _status_panel(s: TelemetrySnapshot, saved: int, last_msg: str) -> Panel:
     table.add_row("Best", Text(format_lap_time(s.best_lap_ms), style="bold green"))
     table.add_row("Laps saved", Text(str(saved), style="bold green"))
     table.add_row("Last event", Text(last_msg or "—", style="grey70"))
-    return Panel(table, title="ACCoach · live delta coach", border_style="bright_blue")
+    return Panel(table, title="HONE · live delta coach", border_style="bright_blue")
 
 
 def _render(s: TelemetrySnapshot, delta: DeltaState | None,

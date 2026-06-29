@@ -93,7 +93,7 @@ def create_api(
     setups_root: Path | str | None = None,
 ) -> FastAPI:
     laps_dir = Path(laps_dir)
-    app = FastAPI(title="ACCoach analysis")
+    app = FastAPI(title="HONE analysis")
 
     # Race-engineer setup read/write routes (/api/setup/*). Kept in their own
     # module so this file stays about lap analysis.
@@ -487,7 +487,7 @@ def _seed_demo() -> str:
             s.append(LapSample(int(pos * 100000) + off, pos, spd, thr, brake,
                                steer, "4", 8000, 0.0, 0.0, car_x=cx, car_z=cz,
                                current_sector=sector))
-        return Lap("ACCoach Demo", "Demo Circuit", SessionType.PRACTICE,
+        return Lap("HONE Demo", "Demo Circuit", SessionType.PRACTICE,
                    100000 + off, True, samples=s)
 
     d = tempfile.mkdtemp(prefix="accoach_webdemo_")
@@ -531,15 +531,15 @@ def main(argv: list[str] | None = None) -> None:
     # If a server is already up (e.g. the user opened Analysis earlier), don't try
     # to bind a second one — just open the browser at the requested page.
     if _port_in_use(host, port):
-        print(f"ACCoach già attivo: apro {url}")
+        print(f"HONE già attivo: apro {url}")
         webbrowser.open(url)
         return
 
     laps_dir = _seed_demo() if "--demo" in argv else cfg.laps_path()
     if "--demo" in argv:
-        print("ACCoach analysis in DEMO mode (synthetic laps)")
+        print("HONE analysis in DEMO mode (synthetic laps)")
 
-    print(f"ACCoach analysis on {url}  (Ctrl+C to stop)")
+    print(f"HONE analysis on {url}  (Ctrl+C to stop)")
     # Open the browser once the server has had a moment to come up.
     threading.Timer(1.5, lambda: webbrowser.open(url)).start()
     uvicorn.run(create_api(laps_dir), host=host, port=port, log_level="warning")

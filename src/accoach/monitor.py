@@ -122,7 +122,7 @@ def _header(s: TelemetrySnapshot) -> Panel:
             ("  session=", "grey50"),
             (s.session.name, "cyan"),
         )
-    return Panel(body, title="ACCoach · live telemetry", border_style="bright_blue")
+    return Panel(body, title="HONE · live telemetry", border_style="bright_blue")
 
 
 def _render(s: TelemetrySnapshot) -> Group:

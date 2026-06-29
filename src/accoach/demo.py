@@ -15,7 +15,7 @@ from .recording.lap import Lap, LapSample
 from .recording.storage import save_lap
 from .telemetry.snapshot import ACStatus, SessionType, TelemetrySnapshot
 
-CAR = "ACCoach Demo"
+CAR = "HONE Demo"
 TRACK = "Demo Circuit"
 _N = 300
 _LAP_MS = 100_000

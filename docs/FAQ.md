@@ -1,124 +1,122 @@
-# ACCoach — Domande frequenti
+# HONE — Frequently Asked Questions
 
-Indice rapido: [Requisiti](#requisiti) · [Installazione](#installazione) ·
-[SmartScreen e verifica SHA-256](#smartscreen-e-sicurezza) · [Privacy](#privacy) ·
-[Overlay](#overlay) · [Free vs Pro](#free-vs-pro) · [Problemi comuni](#problemi-comuni)
+Quick links: [Requirements](#requirements) · [Install](#install) ·
+[SmartScreen & SHA-256](#smartscreen--security) · [Privacy](#privacy) ·
+[Overlay](#overlay) · [Free vs Pro](#free-vs-pro) · [Troubleshooting](#troubleshooting)
 
 ---
 
-## Requisiti
+## Requirements
 
-- **Windows.** AC e ACC pubblicano la telemetria via shared memory, che esiste
-  solo su Windows.
-- **Assetto Corsa** oppure **Assetto Corsa Competizione**.
-- Per l'overlay: gioco in modalità **Borderless** (finestra senza bordi).
-- Solo se esegui **da sorgente**: Python 3.11+ e `pip install -r requirements.txt`.
-  Con l'eseguibile non serve nulla.
+- **Windows.** AC and ACC expose telemetry via shared memory, which is
+  Windows-only.
+- **Assetto Corsa** or **Assetto Corsa Competizione**.
+- For the overlay: the game in **Borderless** (windowed-fullscreen) mode.
+- From source only: Python 3.11+ and `pip install -r requirements.txt`. With the
+  executable you need nothing.
 
-## Installazione
+## Install
 
-### Eseguibile (consigliato)
+### Executable (recommended)
 
-1. Scarica `ACCoach.exe` (o lo zip) dalla pagina
-   [Releases](https://github.com/ardiz89/ACCoach/releases).
-2. Avvialo. Al primo avvio Windows può mostrare un avviso SmartScreen
-   (vedi sotto).
-3. Scegli la modalità dal launcher, oppure da terminale:
-   `ACCoach.exe live`, `ACCoach.exe web`, ecc.
+1. Download `HONE.exe` (or the zip) from the
+   [Releases](https://github.com/ardiz89/ACCoach/releases) page.
+2. Run it. On first run Windows may show a SmartScreen notice (see below).
+3. Pick a mode from the launcher, or from a terminal: `HONE.exe live`,
+   `HONE.exe web`, etc.
 
-### Da sorgente
+### From source
 
 ```powershell
 git clone https://github.com/ardiz89/ACCoach.git
 cd ACCoach
 pip install -r requirements.txt
 python -m accoach live        # coach + overlay
-python -m accoach             # elenca tutti i comandi
+python -m accoach             # list every command
 ```
 
-## SmartScreen e sicurezza
+## SmartScreen & security
 
-Al primo avvio Windows può dire *"Windows ha protetto il PC"* (Microsoft
-Defender SmartScreen). **È normale e non significa che il file sia infetto.**
+On first run Windows may say *"Windows protected your PC"* (Microsoft Defender
+SmartScreen). **This is normal and does not mean the file is infected.**
 
-Succede perché l'eseguibile non è firmato con un certificato di code-signing a
-pagamento (centinaia di euro l'anno): senza "reputazione" accumulata, SmartScreen
-avvisa per qualsiasi app nuova di un autore indipendente.
+It happens because the executable isn't signed with a paid code-signing
+certificate (hundreds of euros a year): without accumulated "reputation",
+SmartScreen warns about any new app from an independent author.
 
-Per avviarlo: clicca **"Ulteriori informazioni"** → **"Esegui comunque"**.
+To run it: click **"More info"** → **"Run anyway"**.
 
-### Verificare l'integrità del file (SHA-256)
+### Verify the file (SHA-256)
 
-Ogni release pubblica l'hash SHA-256 dell'eseguibile. Confrontalo con quello del
-file che hai scaricato: se coincidono, il file è esattamente quello pubblicato.
+Every release publishes the SHA-256 of the executable. Compare it with the file
+you downloaded: if they match, the file is exactly what was published.
 
 In PowerShell:
 
 ```powershell
-Get-FileHash .\ACCoach.exe -Algorithm SHA256
+Get-FileHash .\HONE.exe -Algorithm SHA256
 ```
 
-Confronta la stringa con quella indicata nella release. Se sono diverse, **non
-eseguire il file** e riscarica dalla pagina ufficiale delle Releases.
+Compare the string with the one in the release notes. If they differ, **do not
+run the file** and re-download from the official Releases page.
 
 ## Privacy
 
-ACCoach è **100% offline**. Concretamente:
+HONE is **100% offline**. Concretely:
 
-- Nessun account, nessun login.
-- Nessuna connessione di rete in uscita: la telemetria, i giri e le analisi non
-  lasciano mai il tuo PC.
-- I dati sono salvati localmente in `Documenti\ACCoach\` (giri in `laps\`,
-  log in `logs\`, configurazione in `config.toml`).
-- I server locali (`web` su `127.0.0.1:8778`, backend su `127.0.0.1:8777`) sono
-  in ascolto solo su `localhost` — la tua macchina — e servono a far parlare le
-  varie parti dell'app tra loro, non a Internet.
+- No account, no login.
+- No outbound network calls: telemetry, laps and analysis never leave your PC.
+- Data is stored locally under `Documents\ACCoach\` (laps in `laps\`, logs in
+  `logs\`, settings in `config.toml`).
+- The local servers (`web` on `127.0.0.1:8778`, backend on `127.0.0.1:8777`)
+  listen only on `localhost` — your machine — to let HONE's parts talk to each
+  other, not to the internet.
 
-Puoi cancellare tutto in qualsiasi momento svuotando la cartella `Documenti\ACCoach\`.
+You can wipe everything at any time by emptying the `Documents\ACCoach\` folder.
 
 ## Overlay
 
-L'overlay è trasparente, sempre in primo piano e *click-through* (non ruba i clic
-al gioco).
+The overlay is transparent, always-on-top and *click-through* (it never steals
+clicks from the game).
 
-- **Non si vede sopra il gioco?** Imposta il gioco in **Borderless**. Un overlay
-  trasparente non può disegnare sopra il *fullscreen esclusivo* — stesso vincolo
-  di SimHub e Crew Chief.
-- **Spostarlo o chiuderlo:** avvialo con `--interactive`, oppure chiudi il
-  terminale che l'ha lanciato (`Ctrl+C`).
+- **Not showing over the game?** Set the game to **Borderless**. A transparent
+  overlay can't draw over *exclusive fullscreen* — same constraint as SimHub and
+  Crew Chief.
+- **Move or close it:** start it with `--interactive`, or close the terminal that
+  launched it (`Ctrl+C`).
 
 ## Free vs Pro
 
-Modello **freemium one-time** (nessun abbonamento). Oggi è tutto disponibile
-gratis mentre il prodotto cresce con la community.
+A **one-time freemium** model (no subscription). Everything is free today while
+the product grows with the community.
 
-| Funzione | Free | Pro (in arrivo) |
+| Feature | Free | Pro (coming) |
 |---|:---:|:---:|
-| Coach a voce + overlay | ✅ | ✅ |
-| Debrief col "perché" + analisi web | ✅ | ✅ |
-| Ingegnere di pista (setup AI) | — | ✅ |
-| Focus/Lesson (piano di allenamento) | — | ✅ |
-| Reference PRO importabili | — | ✅ |
+| Voice coach + overlay | ✅ | ✅ |
+| "Why" debrief + analysis app | ✅ | ✅ |
+| Race engineer (setup AI) | — | ✅ |
+| Focus / Lesson (training plan) | — | ✅ |
+| Importable PRO references | — | ✅ |
 
-Il Pro sarà un acquisto una tantum. Il modello potrà cambiare prima del lancio.
+Pro will be a one-time purchase. The model may change before launch.
 
-## Problemi comuni
+## Troubleshooting
 
-**"In attesa del gioco…" e non si connette.**
-Avvia AC/ACC ed entra in una sessione (prova/hotlap/gara). ACCoach si collega
-appena il gioco inizia a pubblicare la telemetria.
+**"Waiting for the game…" and it won't connect.**
+Start AC/ACC and enter a session (practice/hotlap/race). HONE connects as soon as
+the game starts publishing telemetry.
 
-**Non ho un giro di riferimento.**
-Guida almeno un giro valido: diventa il riferimento. Oppure importa un giro PRO
-come seme: `python -m accoach import-reference <file.lap.json.gz>`.
+**I have no reference lap.**
+Drive at least one valid lap: it becomes the reference. Or seed a PRO lap:
+`python -m accoach import-reference <file.lap.json.gz>`.
 
-**La voce non parla.**
-Avvia con la voce attiva (default) anziché `--silent`. Le frasi fisse usano una
-voce neurale pre-renderizzata; quelle numeriche ripiegano sulla voce di sistema.
+**The voice isn't speaking.**
+Run with the voice on (default) rather than `--silent`. Fixed phrases use a
+pre-rendered neural voice; numeric phrases fall back to the system voice.
 
-**Dove sono i log se qualcosa va storto?**
-`python -m accoach logs` apre la cartella con log e crash report.
+**Where are the logs if something breaks?**
+`python -m accoach logs` opens the folder with logs and crash reports.
 
 ---
 
-Altre domande? Apri una [issue su GitHub](https://github.com/ardiz89/ACCoach/issues).
+More questions? Open an [issue on GitHub](https://github.com/ardiz89/ACCoach/issues).

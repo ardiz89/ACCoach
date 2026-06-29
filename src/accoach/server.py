@@ -99,7 +99,7 @@ def create_app(engine: CoachEngine | None = None, hz: float = 15.0) -> FastAPI:
             if holder["engine"] is not None:
                 holder["engine"].close()
 
-    app = FastAPI(title="ACCoach backend", lifespan=lifespan)
+    app = FastAPI(title="HONE backend", lifespan=lifespan)
     # The engineer UI is served from the analysis app (a different local port),
     # so it talks to this backend cross-origin. It's a local-only tool.
     app.add_middleware(
@@ -169,10 +169,10 @@ def main(argv: list[str] | None = None) -> None:
         from .demo import make_demo_engine
 
         engine = make_demo_engine()
-        print("ACCoach backend in DEMO mode (synthetic lap, no game needed)")
+        print("HONE backend in DEMO mode (synthetic lap, no game needed)")
 
     host, port = cfg.server.host, cfg.server.port
-    print(f"ACCoach backend on ws://{host}:{port}/ws  (Ctrl+C to stop)")
+    print(f"HONE backend on ws://{host}:{port}/ws  (Ctrl+C to stop)")
     uvicorn.run(create_app(engine=engine, hz=cfg.server.hz),
                 host=host, port=port, log_level="warning")
 

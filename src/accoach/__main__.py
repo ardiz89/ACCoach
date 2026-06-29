@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import sys
 
-_HELP = """ACCoach — real-time driving coach for Assetto Corsa / ACC
+_HELP = """HONE — know why you're slow. Real-time driving coach for Assetto Corsa / ACC
 
 Usage:  python -m accoach <command> [options]
 

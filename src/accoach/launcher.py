@@ -98,7 +98,7 @@ def _open_guide() -> None:
 class Launcher(QWidget):
     def __init__(self) -> None:
         super().__init__()
-        self.setWindowTitle("ACCoach")
+        self.setWindowTitle("HONE")
         self.resize(380, 560)
         # Every process we spawn, so we can stop them on demand / on close.
         self._children: list[tuple[subprocess.Popen, list[str]]] = []
@@ -109,9 +109,9 @@ class Launcher(QWidget):
         layout.setContentsMargins(20, 20, 20, 20)
         layout.setSpacing(10)
 
-        title = QLabel("ACCoach")
+        title = QLabel("HONE")
         title.setStyleSheet("font-size: 22px; font-weight: bold;")
-        subtitle = QLabel("Real-time driving coach · AC / ACC")
+        subtitle = QLabel("Know why you're slow. · AC / ACC")
         subtitle.setStyleSheet("color: #888;")
         layout.addWidget(title)
         layout.addWidget(subtitle)

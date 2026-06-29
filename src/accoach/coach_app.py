@@ -102,7 +102,7 @@ def _status_panel(s: TelemetrySnapshot, saved: int) -> Panel:
     table.add_row("Last", Text(format_lap_time(s.last_lap_ms), style="cyan"))
     table.add_row("Best", Text(format_lap_time(s.best_lap_ms), style="bold green"))
     table.add_row("Laps saved", Text(str(saved), style="bold green"))
-    return Panel(table, title="ACCoach · voice coach", border_style="bright_blue")
+    return Panel(table, title="HONE · voice coach", border_style="bright_blue")
 
 
 def _render(s, delta, history, saved, audio, focus=None) -> Group:

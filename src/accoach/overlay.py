@@ -1,8 +1,8 @@
 """On-screen overlay — a glanceable HUD drawn over the game.
 
-A thin WebSocket client of :mod:`accoach.server`: it draws a delta bar, the
-predicted/reference lap times and the current coaching cue, and nothing else.
-While braking at 200 km/h you read it as colour and motion, not text.
+A thin WebSocket client of :mod:`accoach.server`: it draws the HONE mark, a delta
+bar, the predicted/reference lap times and the current coaching cue, and the focus
+you're working on. While braking at 200 km/h you read it as colour and motion.
 
     python -m accoach.overlay                 # connects to ws://127.0.0.1:8777/ws
 
@@ -29,7 +29,7 @@ import time
 
 try:
     from PySide6.QtCore import Qt, QTimer, QUrl
-    from PySide6.QtGui import QColor, QFont, QPainter
+    from PySide6.QtGui import QColor, QFont, QPainter, QPen
     from PySide6.QtWebSockets import QWebSocket
     from PySide6.QtWidgets import QApplication, QWidget
 except ImportError:  # pragma: no cover - optional dependency
@@ -41,12 +41,15 @@ RECONNECT_MS = 2000
 CUE_HOLD_S = 1.8          # how long a cue stays on screen before fading out
 DELTA_CLAMP_S = 1.0       # bar is full at ±1.0 s
 
-_GREEN = QColor(0x22, 0xDD, 0x66)
-_RED = QColor(0xFF, 0x3B, 0x30)
-_AMBER = QColor(0xFF, 0xB0, 0x20)
-_WHITE = QColor(0xF0, 0xF0, 0xF0)
-_GREY = QColor(0xAA, 0xAA, 0xAA)
-_DARK = QColor(0, 0, 0, 130)         # semi-transparent backing pill
+# HONE palette (see accoach.brand). QColor wants ints, so they're spelled here.
+_CYAN = QColor(0x22, 0xD3, 0xCE)     # brand mark / cue accent
+_GREEN = QColor(0x34, 0xE0, 0x8A)    # delta: faster
+_RED = QColor(0xFF, 0x4D, 0x5E)      # delta: slower / acute lock
+_AMBER = QColor(0xFF, 0xB0, 0x20)    # focus / advisory
+_WHITE = QColor(0xE8, 0xED, 0xF2)    # text
+_GREY = QColor(0x8A, 0x95, 0xA3)     # muted text
+_LINE = QColor(0x23, 0x2B, 0x35)     # bar track / hairlines
+_DARK = QColor(0x0B, 0x0E, 0x12, 165)  # Ink, semi-transparent backing pill
 
 
 class Overlay(QWidget):
@@ -64,7 +67,7 @@ class Overlay(QWidget):
         if not interactive:
             self.setAttribute(Qt.WA_TransparentForMouseEvents, True)
 
-        self.resize(560, 232)
+        self.resize(560, 210)
         self._place_top_center()
 
         # WebSocket client on the Qt event loop — only when a URL is given.
@@ -73,7 +76,7 @@ class Overlay(QWidget):
         if url:
             self._ws = QWebSocket()
             self._ws.textMessageReceived.connect(self._on_message)
-            self._ws.disconnected.connect(self._schedule_reconnect)
+            self._ws.disconnected.connect(self._on_disconnect)
             self._url = QUrl(url)
             self._connect()
 
@@ -99,7 +102,11 @@ class Overlay(QWidget):
     def _connect(self) -> None:
         self._ws.open(self._url)
 
-    def _schedule_reconnect(self) -> None:
+    def _on_disconnect(self) -> None:
+        # Clear the state so a dead backend falls back to the "waiting" pill
+        # instead of freezing the last delta/cue on screen as if it were live.
+        self._state = {}
+        self._cue = None
         QTimer.singleShot(RECONNECT_MS, self._connect)
 
     def _on_message(self, text: str) -> None:
@@ -117,52 +124,77 @@ class Overlay(QWidget):
         w = self.width()
 
         if not st or not st.get("connected"):
-            self._draw_pill(p, "ACCoach · in attesa del gioco…", _GREY, y=40)
+            self._draw_mark(p, 22, 22, 18)
+            self._set_font(p, 14, bold=True)
+            p.setPen(_GREY)
+            p.drawText(52, 14, 200, 24, Qt.AlignVCenter, "HONE")
+            self._draw_pill(p, "in attesa del gioco…", _GREY, y=78)
             return
 
+        self._draw_brand_header(p, w)
         delta = st.get("delta")
         if delta is None:
             self._draw_pill(p, "REC ● sto imparando il giro di riferimento…",
-                            _AMBER, y=40)
+                            _AMBER, y=78)
         else:
             self._draw_delta(p, delta, w)
-
         self._draw_cue(p, w)
         self._draw_focus(p, w)
+
+    # --- the HONE mark: a cyan chevron with a green apex dot ----------------
+    def _draw_mark(self, p: QPainter, x: int, y: int, h: int) -> None:
+        pen = QPen(_CYAN)
+        pen.setWidth(max(3, h // 4))
+        pen.setCapStyle(Qt.RoundCap)
+        pen.setJoinStyle(Qt.RoundJoin)
+        p.setPen(pen)
+        tip_x = x + h * 0.9
+        mid_y = y + h / 2
+        p.drawLine(int(x), int(y), int(tip_x), int(mid_y))
+        p.drawLine(int(x), int(y + h), int(tip_x), int(mid_y))
+        r = max(2, h // 5)
+        p.setPen(Qt.NoPen)
+        p.setBrush(_GREEN)
+        p.drawEllipse(int(x + h * 0.45 - r), int(mid_y - r), 2 * r, 2 * r)
+
+    def _draw_brand_header(self, p: QPainter, w: int) -> None:
+        self._draw_mark(p, 22, 18, 16)
+        self._set_font(p, 13, bold=True)
+        p.setPen(_WHITE)
+        p.drawText(50, 12, 220, 22, Qt.AlignVCenter, "HONE")
+        delta = self._state.get("delta") or {}
+        pb = delta.get("reference") or "--:--.---"
+        self._set_font(p, 12, bold=True)
+        p.setPen(_GREY)
+        p.drawText(w - 240, 12, 220, 22, Qt.AlignRight | Qt.AlignVCenter, f"PB {pb}")
 
     def _draw_delta(self, p: QPainter, delta: dict, w: int) -> None:
         ahead = delta.get("ahead", False)
         colour = _GREEN if ahead else _RED
 
-        # Header: reference + predicted lap.
-        self._set_font(p, 12)
-        p.setPen(_GREY)
-        header = f"PB {delta.get('reference', '--')}    PRED ▸ {delta.get('predicted', '--')}"
-        p.drawText(0, 18, w, 18, Qt.AlignHCenter, header)
-
-        # Delta bar, centred on zero.
-        bar_w, bar_h, y = 380, 18, 60
+        bar_w, bar_h, y = 380, 14, 50
         x0 = (w - bar_w) // 2
         cx = x0 + bar_w // 2
         p.setPen(Qt.NoPen)
-        p.setBrush(QColor(60, 60, 60, 160))
-        p.drawRoundedRect(x0, y, bar_w, bar_h, 4, 4)
+        p.setBrush(_LINE)
+        p.drawRoundedRect(x0, y, bar_w, bar_h, 7, 7)
 
         frac = max(-1.0, min(1.0, delta.get("s", 0.0) / DELTA_CLAMP_S))
         fill = int(abs(frac) * (bar_w // 2))
         p.setBrush(colour)
         if frac >= 0:  # slower -> fill right
-            p.drawRoundedRect(cx, y, fill, bar_h, 4, 4)
+            p.drawRoundedRect(cx, y, fill, bar_h, 7, 7)
         else:          # faster -> fill left
-            p.drawRoundedRect(cx - fill, y, fill, bar_h, 4, 4)
-        p.setPen(_WHITE)
-        p.drawLine(cx, y - 3, cx, y + bar_h + 3)
+            p.drawRoundedRect(cx - fill, y, fill, bar_h, 7, 7)
+        p.setPen(_GREY)
+        p.drawLine(cx, y - 2, cx, y + bar_h + 2)
 
-        # Big delta number, with room so it never clips into the cue pill.
-        self._set_font(p, 34, bold=True)
+        # Big delta number. The text already carries the sign (+slower / -faster),
+        # which is the colour-blind-safe redundancy alongside the red/green.
+        self._set_font(p, 30, bold=True)
         p.setPen(colour)
-        p.drawText(0, y + bar_h + 12, w, 56, Qt.AlignHCenter,
-                   f"{delta.get('text', '0.000')} s")
+        p.drawText(0, y + bar_h + 4, w, 44, Qt.AlignHCenter,
+                   f"{delta.get('text', '0.000')}")
 
     def _draw_cue(self, p: QPainter, w: int) -> None:
         if self._cue is None:
@@ -172,33 +204,56 @@ class Overlay(QWidget):
             return
         # Fade out over the last 0.6 s.
         alpha = 255 if age < CUE_HOLD_S - 0.6 else int(255 * (CUE_HOLD_S - age) / 0.6)
+        alpha = max(0, alpha)
         cat = self._cue.get("category", "")
-        colour = QColor(_RED if cat in ("locked", "brake_later") else _AMBER)
-        colour.setAlpha(max(0, alpha))
-        self._draw_pill(p, self._cue.get("message", ""), colour, y=178, alpha=alpha)
+        accent = QColor(_RED if cat in ("locked", "wheelspin") else _CYAN)
+        accent.setAlpha(alpha)
+
+        x, y, h = 20, 120, 38
+        bg = QColor(_DARK)
+        bg.setAlpha(min(_DARK.alpha(), alpha))
+        p.setPen(Qt.NoPen)
+        p.setBrush(bg)
+        p.drawRoundedRect(x, y, w - 2 * x, h, 8, 8)
+        # cyan (or red) left accent bar
+        p.setBrush(accent)
+        p.drawRoundedRect(x, y, 4, h, 2, 2)
+
+        text = QColor(_WHITE)
+        text.setAlpha(alpha)
+        p.setPen(text)
+        self._set_font(p, 14, bold=True)
+        p.drawText(x + 16, y, w - 2 * x - 28, h, Qt.AlignVCenter,
+                   self._cue.get("message", ""))
 
     def _draw_focus(self, p: QPainter, w: int) -> None:
         """A slim, persistent reminder of the one weakness being coached. Low
-        priority by design: drawn small and grey so it never fights the delta or
-        an acute cue, but always there to answer 'what am I working on?'."""
+        priority by design: small and quiet so it never fights the delta or an
+        acute cue, but always there to answer 'what am I working on?'."""
         focus = self._state.get("focus")
         if not focus:
             return
         target = focus.get("focus")
-        if not target:                       # no active focus (assessing/clean)
+        if not target:                       # no active focus (assessing / clean)
             return
-        name = target.get("name", "")
-        theme = target.get("theme", "")
+        name = (target.get("name") or "").upper()
+        theme = (target.get("theme") or "").upper()
         base = target.get("baseline_ms", 0) or 0
         gap = f"  −{base / 1000.0:.2f}s" if base else ""
-        self._set_font(p, 12, bold=True)
-        p.setPen(_AMBER)
-        p.drawText(0, 206, w, 20, Qt.AlignHCenter,
-                   f"◎ Focus · {name} · {theme}{gap}")
+        y = 170
+        p.setPen(Qt.NoPen)
+        p.setBrush(_AMBER)
+        p.drawEllipse(26, y + 6, 7, 7)       # amber focus dot
+        self._set_font(p, 11, bold=True)
+        p.setPen(_GREY)
+        p.drawText(42, y, w - 60, 20, Qt.AlignVCenter,
+                   f"FOCUS · {theme} · {name}{gap}")
 
     # --- helpers -----------------------------------------------------------
     def _set_font(self, p: QPainter, size: int, bold: bool = False) -> None:
-        f = QFont("Segoe UI", size)
+        # Space Grotesk is the brand display face; fall back to Segoe UI offline.
+        f = QFont("Space Grotesk", size)
+        f.setStyleHint(QFont.SansSerif)
         f.setBold(bold)
         p.setFont(f)
 
