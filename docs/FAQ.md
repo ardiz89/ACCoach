@@ -2,7 +2,8 @@
 
 Quick links: [Requirements](#requirements) · [Install](#install) ·
 [SmartScreen & SHA-256](#smartscreen--security) · [Privacy](#privacy) ·
-[Overlay](#overlay) · [Free vs Pro](#free-vs-pro) · [Troubleshooting](#troubleshooting)
+[Overlay](#overlay) · [Recording](#how-lap-recording-works-and-starting-from-the-pits) ·
+[Free vs Pro](#free-vs-pro) · [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -99,6 +100,25 @@ the product grows with the community.
 | Importable PRO references | — | ✅ |
 
 Pro will be a one-time purchase. The model may change before launch.
+
+## How lap recording works (and starting from the pits)
+
+You don't have to do anything special: start the session (Practice, Hotlap, Race)
+and drive.
+
+- A lap is closed when you **cross the start/finish line** — HONE reads the game's
+  lap counter (not the jittery position signal), and uses the game's official lap
+  time.
+- The **first lap is almost always partial** (you start mid-track), so it's
+  discarded automatically. Only **complete, line-to-line laps** are saved.
+- **Starting from the pits:** recording is paused while you're in the pits; your
+  **out-lap** (pit exit → line) is partial and discarded; your **first flying lap**
+  is the first one saved. Your **in-lap** (returning to the pits) isn't saved
+  either, and changing car/track resets everything — a lap never spans two
+  sessions.
+- Two independent qualities: a lap is **complete** (started at the line — required
+  to be saved) and **clean** (no real excursion: fewer than 3 wheels off). A dirty
+  lap is still saved but **never used as the reference**.
 
 ## Troubleshooting
 

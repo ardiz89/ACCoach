@@ -78,6 +78,24 @@ Tra un giro e l'altro, quando un sintomo si ripete, ti suggerisce una regolazion
 (pressioni gomme, livelli TC/ABS dove regolabili, bilanciamento freni). Le
 pressioni vengono giudicate solo a gomme in temperatura, sul target GT3 (~27.5 psi).
 
+### d) Come vengono registrati i giri (e se parti dai box)
+Non devi fare nulla di speciale: avvia la sessione (Pratica, Hotlap, Gara) e guida.
+
+- Il giro viene chiuso quando **passi sul traguardo** (lo capisce dal contatore
+  giri del gioco, non dalla posizione che traballa). Il tempo salvato è quello
+  ufficiale del gioco.
+- Il **primo giro è quasi sempre parziale** (hai iniziato a metà pista): viene
+  scartato automaticamente. I giri salvati sono solo quelli **completi,
+  traguardo→traguardo**.
+- **Se parti dai box:** nei box la registrazione è in pausa; l'**out-lap**
+  (uscita box → traguardo) è parziale e viene scartata; il **primo giro lanciato**
+  vero è il primo che viene salvato. Anche quando **rientri ai box** quel giro non
+  viene salvato, e cambiare auto/pista azzera tutto (un giro non scavalca mai due
+  sessioni).
+- Due qualità indipendenti del giro: **completo** (partito dalla linea → requisito
+  per essere salvato) e **pulito** (niente escursioni serie: <3 ruote fuori). Un
+  giro sporco viene salvato ma **non usato come riferimento**.
+
 ---
 
 ## 4. Leggere l'overlay
