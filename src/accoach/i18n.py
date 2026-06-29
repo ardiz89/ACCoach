@@ -36,6 +36,77 @@ def current_language() -> str:
     return lang if lang in LANGUAGES else DEFAULT_LANGUAGE
 
 
+# --- UI chrome catalogue (keyed; both languages equal) -----------------------
+# Fixed interface strings for the Python surfaces (overlay, terminal, launcher),
+# so they follow the selected language like the voice and cues do.
+_UI: dict[str, dict[str, str]] = {
+    # overlay
+    "overlay.waiting": {"en": "waiting for the game…", "it": "in attesa del gioco…"},
+    "overlay.rec": {"en": "REC ● learning the reference lap…",
+                    "it": "REC ● sto imparando il giro di riferimento…"},
+    "overlay.brake": {"en": "BRAKE", "it": "FRENA"},
+    "overlay.focus": {"en": "FOCUS", "it": "FOCUS"},
+    # terminal coach
+    "coach.title": {"en": "voice coach", "it": "coach vocale"},
+    "coach.no_ref": {"en": "no reference yet — drive a clean lap",
+                     "it": "nessun riferimento — fai un giro pulito"},
+    "coach.listening": {"en": "listening… drive and I'll coach you",
+                        "it": "in ascolto… guida e ti seguo"},
+    "coach.waiting": {"en": "waiting for game…", "it": "in attesa del gioco…"},
+    "coach.warming": {"en": "warming up… drive a few clean laps",
+                      "it": "scaldando… fai qualche giro pulito"},
+    "coach.delta_title": {"en": "Delta vs reference", "it": "Delta vs riferimento"},
+    "coach.delta_none": {"en": "no reference yet — drive a clean lap",
+                         "it": "nessun riferimento — fai un giro pulito"},
+    "coach.focus_title": {"en": "Focus · lesson", "it": "Focus · lezione"},
+    "coach.coach_panel": {"en": "Coach", "it": "Coach"},
+    "lbl.delta": {"en": "Delta", "it": "Delta"},
+    "lbl.predicted": {"en": "Predicted", "it": "Previsto"},
+    "lbl.reference": {"en": "Reference", "it": "Riferimento"},
+    "lbl.state": {"en": "State", "it": "Stato"},
+    "lbl.car_track": {"en": "Car @ Track", "it": "Auto @ Pista"},
+    "lbl.current": {"en": "Current", "it": "Attuale"},
+    "lbl.last": {"en": "Last", "it": "Ultimo"},
+    "lbl.best": {"en": "Best", "it": "Migliore"},
+    "lbl.laps_saved": {"en": "Laps saved", "it": "Giri salvati"},
+    "state.waiting_game": {"en": "waiting for game…", "it": "in attesa del gioco…"},
+    "voice.on": {"en": "voice", "it": "voce"},
+    "voice.off": {"en": "text", "it": "testo"},
+    # launcher
+    "ui.language": {"en": "Language", "it": "Lingua"},
+    "ui.tip_borderless": {
+        "en": "Tip: set the game to Borderless so the overlay draws over it.",
+        "it": "Suggerimento: imposta il gioco in Borderless così l'overlay ci si disegna sopra."},
+    "btn.coach_live": {"en": "▶  Coach Live  (overlay + voice)",
+                       "it": "▶  Coach Live  (overlay + voce)"},
+    "btn.coach_live_demo": {"en": "▶  Coach Live — DEMO (no game)",
+                            "it": "▶  Coach Live — DEMO (senza gioco)"},
+    "btn.stop_live": {"en": "⏹  Stop Coach Live", "it": "⏹  Ferma Coach Live"},
+    "btn.analysis": {"en": "📊  Analysis & Report (browser)",
+                     "it": "📊  Analisi & Report (browser)"},
+    "btn.engineer": {"en": "🔧  Race engineer (browser)",
+                     "it": "🔧  Ingegnere di pista (browser)"},
+    "btn.debrief": {"en": "📈  Last-lap debrief", "it": "📈  Debrief ultimo giro"},
+    "btn.monitor": {"en": "📈  Telemetry monitor", "it": "📈  Monitor telemetria"},
+    "btn.coach_term": {"en": "🎙  Voice coach (terminal)",
+                       "it": "🎙  Coach vocale (terminale)"},
+    "btn.verify_g": {"en": "🔧  Verify G axes", "it": "🔧  Verifica assi G"},
+    "btn.get_started": {"en": "✨  Get started", "it": "✨  Come iniziare"},
+    "btn.guide": {"en": "❓  Guide — how to use", "it": "❓  Guida — come si usa"},
+}
+
+
+def t(key: str, lang: str | None = None, **fmt) -> str:
+    """Translate a UI key into the active (or given) language; format with ``fmt``.
+
+    Falls back to English, then to the key itself, so a missing entry is visible
+    rather than crashing."""
+    lang = lang or current_language()
+    entry = _UI.get(key, {})
+    text = entry.get(lang) or entry.get("en") or key
+    return text.format(**fmt) if fmt else text
+
+
 # --- spoken/displayed coaching cues: Italian (canonical) -> English ----------
 # Keys MUST match the exact strings the detectors emit (they also key the Italian
 # neural WAVs). Keep them verbatim.

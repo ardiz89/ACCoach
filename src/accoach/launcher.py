@@ -38,7 +38,7 @@ except ImportError:  # pragma: no cover - optional dependency
     raise SystemExit(1)
 
 from .config import load_config, set_language
-from .i18n import LANGUAGES, language_name
+from .i18n import LANGUAGES, language_name, t
 from .paths import base_dir
 
 _SRC = Path(__file__).resolve().parents[1]   # .../src
@@ -75,21 +75,22 @@ _VOICE_CMDS = {"live", "coach"}
 # Keys: command buttons by their args tuple, special buttons by their sentinel.
 _LIVE_SAFE_KEYS = {_STOP_LIVE, _GUIDE, _WIZARD, ("web",), ("web", "--engineer")}
 
-# (label, command args / sentinel, opens-its-own-console)
+# (label key, command args / sentinel, opens-its-own-console). The label key is
+# resolved through i18n at build time so the launcher follows the chosen language.
 _BUTTONS = [
-    ("▶  Coach Live  (overlay + voice)", ["live"], False),
-    ("▶  Coach Live — DEMO (no game)", ["live", "--demo"], False),
-    ("⏹  Stop Coach Live", _STOP_LIVE, False),
+    ("btn.coach_live", ["live"], False),
+    ("btn.coach_live_demo", ["live", "--demo"], False),
+    ("btn.stop_live", _STOP_LIVE, False),
     ("—", None, False),
-    ("📊  Analysis & Report (browser)", ["web"], False),
-    ("🔧  Race engineer (browser)", ["web", "--engineer"], False),
-    ("📈  Last-lap debrief", ["debrief"], True),
-    ("📈  Telemetry monitor", ["monitor"], True),
-    ("🎙  Voice coach (terminal)", ["coach"], True),
-    ("🔧  Verify G axes", ["verify-g"], True),
+    ("btn.analysis", ["web"], False),
+    ("btn.engineer", ["web", "--engineer"], False),
+    ("btn.debrief", ["debrief"], True),
+    ("btn.monitor", ["monitor"], True),
+    ("btn.coach_term", ["coach"], True),
+    ("btn.verify_g", ["verify-g"], True),
     ("—", None, False),
-    ("✨  Get started", _WIZARD, False),
-    ("❓  Guide — how to use", _GUIDE, False),
+    ("btn.get_started", _WIZARD, False),
+    ("btn.guide", _GUIDE, False),
 ]
 
 
@@ -216,7 +217,7 @@ class Launcher(QWidget):
         # Language selector — switches the interface + coach voice. Applies on the
         # next Coach Live start (the voice picks its language at startup).
         lang_row = QHBoxLayout()
-        lang_lbl = QLabel("Language")
+        lang_lbl = QLabel(t("ui.language"))
         lang_lbl.setStyleSheet("color: #888;")
         self._lang = QComboBox()
         for code in LANGUAGES:
@@ -237,7 +238,7 @@ class Launcher(QWidget):
                 line.setStyleSheet("color: #444;")
                 layout.addWidget(line)
                 continue
-            btn = QPushButton(label)
+            btn = QPushButton(t(label))
             btn.setMinimumHeight(40)
             btn.setStyleSheet("text-align: left; padding-left: 12px; font-size: 14px;")
             if args == _GUIDE:
@@ -253,7 +254,7 @@ class Launcher(QWidget):
             layout.addWidget(btn)
 
         layout.addStretch(1)
-        hint = QLabel("Tip: set the game to Borderless so the overlay draws over it.")
+        hint = QLabel(t("ui.tip_borderless"))
         hint.setStyleSheet("color: #888; font-size: 11px;")
         hint.setWordWrap(True)
         layout.addWidget(hint)
@@ -316,8 +317,16 @@ class Launcher(QWidget):
             pass
 
     def _on_language(self) -> None:
-        """Persist the chosen language (takes effect on the next Coach Live start)."""
+        """Persist the chosen language and re-label the launcher right away (the
+        coach voice picks it up on the next Coach Live start)."""
         set_language(self._lang.currentData())
+        for label_key, args, _console in _BUTTONS:
+            if args is None:
+                continue
+            key = tuple(args) if isinstance(args, list) else args
+            btn = self._buttons.get(key)
+            if btn is not None:
+                btn.setText(t(label_key))
 
     def _show_wizard(self) -> None:
         """Open the getting-started wizard (also auto-shown on first run)."""

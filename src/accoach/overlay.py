@@ -27,6 +27,8 @@ import signal
 import sys
 import time
 
+from .i18n import t
+
 try:
     from PySide6.QtCore import Qt, QTimer, QUrl
     from PySide6.QtGui import QColor, QFont, QPainter, QPen
@@ -128,14 +130,13 @@ class Overlay(QWidget):
             self._set_font(p, 14, bold=True)
             p.setPen(_GREY)
             p.drawText(52, 14, 200, 24, Qt.AlignVCenter, "HONE")
-            self._draw_pill(p, "waiting for the game…", _GREY, y=78)
+            self._draw_pill(p, t("overlay.waiting"), _GREY, y=78)
             return
 
         self._draw_brand_header(p, w)
         delta = st.get("delta")
         if delta is None:
-            self._draw_pill(p, "REC ● learning the reference lap…",
-                            _AMBER, y=78)
+            self._draw_pill(p, t("overlay.rec"), _AMBER, y=78)
         else:
             self._draw_delta(p, delta, w)
         self._draw_cue(p, w)
@@ -170,7 +171,7 @@ class Overlay(QWidget):
         if brake_m is not None:
             p.setPen(_AMBER)
             p.drawText(w - 240, 12, 220, 22, Qt.AlignRight | Qt.AlignVCenter,
-                       f"▼ BRAKE  {brake_m} m")
+                       f"▼ {t('overlay.brake')}  {brake_m} m")
         else:
             p.setPen(_GREY)
             pb = delta.get("reference") or "--:--.---"
@@ -266,7 +267,7 @@ class Overlay(QWidget):
         self._set_font(p, 11, bold=True)
         p.setPen(_GREY)
         p.drawText(42, y, w - 60, 20, Qt.AlignVCenter,
-                   f"FOCUS · {theme} · {name}{gap}")
+                   f"{t('overlay.focus')} · {theme} · {name}{gap}")
 
     # --- helpers -----------------------------------------------------------
     def _set_font(self, p: QPainter, size: int, bold: bool = False) -> None:

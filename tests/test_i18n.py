@@ -46,6 +46,16 @@ def test_cue_text_unknown_passes_through():
     assert i18n.cue_text("frase sconosciuta", "en") == "frase sconosciuta"
 
 
+def test_t_translates_ui_chrome():
+    assert i18n.t("overlay.waiting", "en") == "waiting for the game…"
+    assert i18n.t("overlay.waiting", "it") == "in attesa del gioco…"
+    assert i18n.t("lbl.best", "it") == "Migliore"
+
+
+def test_t_unknown_key_falls_back_to_key():
+    assert i18n.t("nope.nope", "en") == "nope.nope"
+
+
 def test_current_language_defaults_to_en(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "config_path", lambda: tmp_path / "config.toml")
     config.load_config(reload=True)

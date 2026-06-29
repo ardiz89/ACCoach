@@ -25,6 +25,7 @@ from rich.text import Text
 from .coaching import Voice
 from .comparison import DeltaState, format_delta
 from .engine import CoachEngine
+from .i18n import t
 from .telemetry import TelemetrySnapshot, format_lap_time
 from .telemetry.snapshot import ACStatus
 
@@ -33,20 +34,20 @@ REFRESH_HZ = 20
 
 def _delta_panel(delta: DeltaState | None) -> Panel:
     if delta is None:
-        return Panel(Text("no reference yet — drive a clean lap",
+        return Panel(Text(t("coach.delta_none"),
                           style="bold yellow", justify="center"),
-                     title="Delta", border_style="grey50")
+                     title=t("lbl.delta"), border_style="grey50")
     color = "green" if delta.ahead else "red"
     big = Text(f"{format_delta(delta.delta_ms)} s", style=f"bold {color}")
     table = Table.grid(padding=(0, 1))
     table.add_column(justify="right", style="bold")
     table.add_column()
-    table.add_row("Delta", big)
-    table.add_row("Predicted", Text(format_lap_time(int(delta.predicted_lap_ms)),
-                                     style="white"))
-    table.add_row("Reference", Text(format_lap_time(delta.reference_lap_ms),
-                                    style="magenta"))
-    return Panel(table, title="Delta vs reference",
+    table.add_row(t("lbl.delta"), big)
+    table.add_row(t("lbl.predicted"), Text(format_lap_time(int(delta.predicted_lap_ms)),
+                                           style="white"))
+    table.add_row(t("lbl.reference"), Text(format_lap_time(delta.reference_lap_ms),
+                                           style="magenta"))
+    return Panel(table, title=t("coach.delta_title"),
                  border_style="green" if delta.ahead else "red")
 
 
@@ -57,9 +58,9 @@ def _coach_panel(history: list[str], audio: bool) -> Panel:
         for line in history[-6:]:
             table.add_row(Text(line, style="bold white"))
     else:
-        table.add_row(Text("listening… drive and I'll coach you", style="grey62"))
-    mode = "🔊 voice" if audio else "📝 text"
-    return Panel(table, title=f"Coach · {mode}", border_style="cyan")
+        table.add_row(Text(t("coach.listening"), style="grey62"))
+    mode = ("🔊 " + t("voice.on")) if audio else ("📝 " + t("voice.off"))
+    return Panel(table, title=f"{t('coach.coach_panel')} · {mode}", border_style="cyan")
 
 
 _FOCUS_STYLE = {
@@ -72,8 +73,8 @@ _FOCUS_STYLE = {
 def _focus_panel(focus: dict | None) -> Panel:
     """The lesson plan: the one weakness being coached right now."""
     if not focus:
-        return Panel(Text("warming up… drive a few clean laps", style="grey50"),
-                     title="Focus", border_style="grey50")
+        return Panel(Text(t("coach.warming"), style="grey50"),
+                     title=t("coach.focus_title"), border_style="grey50")
     icon, style = _FOCUS_STYLE.get(focus.get("kind", ""), ("•", "white"))
     table = Table.grid(padding=(0, 1))
     table.add_column()
@@ -82,7 +83,7 @@ def _focus_panel(focus: dict | None) -> Panel:
     if f:
         table.add_row(Text(f"{f['name']} · {f['theme']} · "
                            f"−{f['baseline_ms'] / 1000.0:.2f}s", style="cyan"))
-    return Panel(table, title="Focus · lesson", border_style="yellow")
+    return Panel(table, title=t("coach.focus_title"), border_style="yellow")
 
 
 def _status_panel(s: TelemetrySnapshot, saved: int) -> Panel:
@@ -90,19 +91,19 @@ def _status_panel(s: TelemetrySnapshot, saved: int) -> Panel:
     table.add_column(justify="right", style="bold")
     table.add_column()
     if not s.connected:
-        conn = Text("waiting for game…", style="bold yellow")
+        conn = Text(t("state.waiting_game"), style="bold yellow")
     elif s.status == ACStatus.LIVE:
         conn = Text("● LIVE", style="bold green")
     else:
         conn = Text(f"○ {s.status.name}", style="grey50")
-    table.add_row("State", conn)
-    table.add_row("Car @ Track",
+    table.add_row(t("lbl.state"), conn)
+    table.add_row(t("lbl.car_track"),
                   Text(f"{s.car_model or '?'} @ {s.track or '?'}", style="white"))
-    table.add_row("Current", Text(format_lap_time(s.current_lap_ms), style="white"))
-    table.add_row("Last", Text(format_lap_time(s.last_lap_ms), style="cyan"))
-    table.add_row("Best", Text(format_lap_time(s.best_lap_ms), style="bold green"))
-    table.add_row("Laps saved", Text(str(saved), style="bold green"))
-    return Panel(table, title="HONE · voice coach", border_style="bright_blue")
+    table.add_row(t("lbl.current"), Text(format_lap_time(s.current_lap_ms), style="white"))
+    table.add_row(t("lbl.last"), Text(format_lap_time(s.last_lap_ms), style="cyan"))
+    table.add_row(t("lbl.best"), Text(format_lap_time(s.best_lap_ms), style="bold green"))
+    table.add_row(t("lbl.laps_saved"), Text(str(saved), style="bold green"))
+    return Panel(table, title=f"HONE · {t('coach.title')}", border_style="bright_blue")
 
 
 def _render(s, delta, history, saved, audio, focus=None) -> Group:
