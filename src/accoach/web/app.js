@@ -65,7 +65,13 @@ function wireTabs() {
 async function loadProgress(combo) {
   let p;
   try { p = await getJSON("/api/progress?" + new URLSearchParams({ car: combo.car, track: combo.track })); }
-  catch (e) { $("recurring").innerHTML = e.message; return; }
+  catch (e) {
+    $("prog-summary").innerHTML = "";
+    $("levels").innerHTML = ""; $("trends").innerHTML = "";
+    $("recurring").innerHTML =
+      `<div class="clean">Couldn't load progress — is the analysis backend running?</div>`;
+    return;
+  }
 
   const c = p.consistency || {};
   const item = (k, v) => `<div class="item"><div class="k">${k}</div><div class="v">${v}</div></div>`;
@@ -362,7 +368,8 @@ async function loadCombo(combo, lapPath, baselinePath) {
   let a;
   try { a = await getJSON("/api/analysis?" + q.toString()); }
   catch (e) {
-    $("summary").innerHTML = `<div class="item"><div class="v">—</div><div class="k">${e.message}</div></div>`;
+    $("summary").innerHTML =
+      `<div class="item"><div class="v">—</div><div class="k">Couldn't load this lap.</div></div>`;
     return;
   }
   DATA = a;
@@ -568,9 +575,18 @@ function wireHover() {
   }
 }
 
+// Debounced so a resize drag fires once at rest, not per pixel. Compare/Map
+// just redraw from the in-memory payload (no refetch, no flicker or response
+// race); Sectors/Progress re-run their loader once at the end.
+let _resizeTimer = null;
 window.addEventListener("resize", () => {
   if (!CURRENT) return;
-  if (VIEW === "progress") loadProgress(CURRENT);
-  else loadCombo(CURRENT, $("lap").value, $("baseline").value);
+  clearTimeout(_resizeTimer);
+  _resizeTimer = setTimeout(() => {
+    if (VIEW === "map") { if (DATA) drawMap(DATA, null); }
+    else if (VIEW === "sectors") loadSectors();
+    else if (VIEW === "progress") loadProgress(CURRENT);
+    else redraw(null);                 // compare: redraw from DATA
+  }, 150);
 });
 init();

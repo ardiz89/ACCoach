@@ -51,6 +51,19 @@ def _full_lap_frames():
     return frames
 
 
+def test_saved_buffer_is_capped_if_never_drained(tmp_path, monkeypatch):
+    # M18: if the engine stops draining, saved laps must not pile up unbounded.
+    from accoach.telemetry import feed as feedmod
+
+    feed = TelemetryFeed(_ScriptedReader([synth.snap(pos=0.5)]), laps_dir=tmp_path)
+    lap = synth.build_lap(n=5)
+    feed._recorder = type("_Rec", (), {"update": lambda self, s: lap})()
+    monkeypatch.setattr(feedmod, "save_lap", lambda lp, d: tmp_path / "x")
+    for _ in range(feedmod._MAX_PENDING + 5):
+        feed._pump()
+    assert len(feed.drain_saved()) == feedmod._MAX_PENDING
+
+
 def test_latest_starts_disconnected(tmp_path):
     feed = TelemetryFeed(_ScriptedReader([]), hz=60, laps_dir=tmp_path)
     assert feed.latest().connected is False

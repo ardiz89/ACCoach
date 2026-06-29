@@ -318,10 +318,10 @@ async function confirmWrite() {
     state.lastWritten = res.name;       // drives the "ricarica ai box" reminder
     // Tell the live backend the proposed setup was written, so the engineer
     // advances its convergence re-test. Best-effort: the backend may be off.
-    try {
-      fetch(`http://${location.hostname}:${WS_PORT}/engineer/applied`,
-            { method: "POST" });
-    } catch (e) { /* backend not running — diagnosis just keeps proposing */ }
+    // Best-effort; .catch handles the async rejection (a sync try/catch wouldn't),
+    // so a backend that's off doesn't raise an Uncaught (in promise).
+    fetch(`http://${location.hostname}:${WS_PORT}/engineer/applied`,
+          { method: "POST" }).catch(() => { /* backend off — keeps proposing */ });
     await onComboChange();              // refresh setup list (new file appears)
     showToast("✓ " + res.reload_hint);
   } catch (e) {
@@ -370,6 +370,14 @@ function applyLive(st) {
   if (!st.connected) {
     badge.dataset.state = "off"; $("live-text").textContent = "telemetry offline";
     $("live-car").textContent = "Waiting for telemetry…";
+    // Don't leave the gauges, proposal, focus and pit reminder frozen with the
+    // last live values (you could "Prepare change" on a stale proposal). Reset.
+    for (const id of ["g-speed", "g-gear", "g-tc", "g-abs", "g-map"]) {
+      $(id).textContent = "–";
+    }
+    renderEngineer({});
+    renderFocus({});
+    renderPitReminder({});
     return;
   }
   badge.dataset.state = st.in_pit ? "pit" : "on";

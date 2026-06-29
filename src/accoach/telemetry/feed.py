@@ -37,6 +37,12 @@ from .snapshot import TelemetrySnapshot
 _log = get_logger("feed")
 
 
+# Backstop: if the engine stops draining (a stuck tick), don't let saved laps —
+# each holding a full sample list — pile up unbounded in RAM. Far above any normal
+# backlog (tick drains every frame), so it only fires on a real stall.
+_MAX_PENDING = 20
+
+
 class TelemetryFeed:
     """Polls a reader at a fixed rate on its own thread and records laps."""
 
@@ -94,6 +100,12 @@ class TelemetryFeed:
                 save_lap(lap, self._laps_dir)
                 with self._lock:
                     self._saved.append(lap)
+                    if len(self._saved) > _MAX_PENDING:
+                        drop = len(self._saved) - _MAX_PENDING
+                        del self._saved[:drop]
+                        _log.warning(
+                            "feed: dropped %d undrained lap(s) — is the engine ticking?",
+                            drop)
         except Exception:
             _log.error("recording failed", exc_info=True)
 

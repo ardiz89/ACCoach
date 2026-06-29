@@ -169,10 +169,13 @@ def create_api(
         if not reference.usable:
             raise HTTPException(422, "comparison lap has too few samples")
 
-        corners = detect_corners(baseline_lap.samples)
-        names = {c.index: n for c, n in zip(corners, name_corners(track, corners))}
-        debrief = build_lap_debrief(review, reference, corners)
-        consistency = lap_time_consistency([r["lap_time_ms"] for r in valid])
+        try:
+            corners = detect_corners(baseline_lap.samples)
+            names = {c.index: n for c, n in zip(corners, name_corners(track, corners))}
+            debrief = build_lap_debrief(review, reference, corners)
+            consistency = lap_time_consistency([r["lap_time_ms"] for r in valid])
+        except Exception:  # noqa: BLE001 - a degenerate lap shouldn't 500 the UI
+            raise HTTPException(422, "lap could not be analysed")
 
         return {
             "car": car, "track": track,
