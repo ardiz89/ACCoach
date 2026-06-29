@@ -97,10 +97,18 @@ async function loadClass(car) {
   $("eng-profile").hidden = false;
 }
 
+// Shown when a car/track has no setup files at all — explain where HONE looks
+// so the contradiction ("choose a setup" with an empty dropdown) is resolved.
+const NO_SETUP_HTML =
+  '<div class="empty2">No setup files found for this car/track.<br>' +
+  'HONE reads setups from:<br>' +
+  '<code>Documents/Assetto Corsa Competizione/Setups/&lt;car&gt;/&lt;track&gt;/</code> (ACC)<br>' +
+  '<code>Documents/Assetto Corsa/setups/&lt;car&gt;/&lt;track&gt;/</code> (AC)<br>' +
+  'Save a setup in the game, then reload this page.</div>';
+
 async function onSetupChange() {
   const opt = $("setup").selectedOptions[0];
-  if (!opt || !opt.dataset.path) { $("setup-body").innerHTML =
-    '<div class="empty2">No setup.</div>'; return; }
+  if (!opt || !opt.dataset.path) { $("setup-body").innerHTML = NO_SETUP_HTML; return; }
   state.setupPath = opt.dataset.path;
   const data = await api(`/api/setup/current?path=${encodeURIComponent(state.setupPath)}`);
   state.setupName = data.name;
@@ -365,6 +373,47 @@ function showToast(msg, isError) {
 
 const AID = (v) => (v == null || v < 0 ? "–" : String(v));
 
+// Tyres: optimal windows for generic GT3 slicks (good enough across classes).
+const TYRE_IDS = ["tyre-fl", "tyre-fr", "tyre-rl", "tyre-rr"];
+
+function tyreTempClass(t) {
+  if (t == null || !isFinite(t)) return "";
+  if (t < 80) return "t-cold";          // cold  → cyan
+  if (t <= 100) return "t-ok";          // ok    → green
+  return "t-hot";                       // hot   → red
+}
+function tyrePsiClass(p) {
+  if (p == null || !isFinite(p)) return "";
+  if (p < 26.5) return "p-low";         // low   → amber
+  if (p <= 28.5) return "p-ok";         // ok    → green
+  return "p-high";                      // high  → amber
+}
+
+function updateTyres(tyres) {
+  const temps = (tyres && Array.isArray(tyres.temp)) ? tyres.temp : [];
+  const press = (tyres && Array.isArray(tyres.pressure)) ? tyres.pressure : [];
+  TYRE_IDS.forEach((id, i) => {
+    const cell = $(id);
+    if (!cell) return;
+    const tEl = cell.querySelector(".tt"), pEl = cell.querySelector(".tp");
+    const t = temps[i], p = press[i];
+    tEl.textContent = (t == null || !isFinite(t)) ? "–" : Math.round(t) + "°";
+    pEl.textContent = (p == null || !isFinite(p)) ? "–" : p.toFixed(1);
+    tEl.className = "tt " + tyreTempClass(t);
+    pEl.className = "tp " + tyrePsiClass(p);
+  });
+}
+
+function resetTyres() {
+  TYRE_IDS.forEach((id) => {
+    const cell = $(id);
+    if (!cell) return;
+    const tEl = cell.querySelector(".tt"), pEl = cell.querySelector(".tp");
+    tEl.textContent = "–"; tEl.className = "tt";
+    pEl.textContent = "–"; pEl.className = "tp";
+  });
+}
+
 function applyLive(st) {
   const badge = $("live-badge");
   if (!st.connected) {
@@ -375,6 +424,7 @@ function applyLive(st) {
     for (const id of ["g-speed", "g-gear", "g-tc", "g-abs", "g-map"]) {
       $(id).textContent = "–";
     }
+    resetTyres();
     renderEngineer({});
     renderFocus({});
     renderPitReminder({});
@@ -389,6 +439,7 @@ function applyLive(st) {
   $("g-tc").textContent = AID(st.aids && st.aids.tc);
   $("g-abs").textContent = AID(st.aids && st.aids.abs);
   $("g-map").textContent = AID(st.aids && st.aids.engine_map);
+  updateTyres(st.tyres);
 
   renderEngineer(st);
   renderFocus(st);

@@ -61,6 +61,8 @@
       </div>
     </main>
 
+    <section id="vmin" class="vmin"></section>
+
     <section id="debrief" class="debrief"></section>
   </div>
 
@@ -106,7 +108,15 @@
     </section>
   </div>
 
-  <div id="empty" class="empty">No laps recorded. Drive and record a few laps, then come back here.</div>
+  <div id="empty" class="empty">
+    <h2 class="empty-title">No laps yet</h2>
+    <ol class="empty-steps">
+      <li>Start the coach: run <code>python -m accoach live</code> (or use the launcher).</li>
+      <li>Drive a full, <b>valid</b> lap in AC or ACC.</li>
+      <li>Reload this page — your lap shows up here for analysis.</li>
+    </ol>
+    <p class="empty-hint">Just want a tour? Launch with <code>python -m accoach web --demo</code> for sample laps.</p>
+  </div>
 
   <script src="/static/app.js"></script>
 </body>

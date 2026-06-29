@@ -375,6 +375,7 @@ async function loadCombo(combo, lapPath, baselinePath) {
   DATA = a;
   fillLaps(a);
   drawSummary(a);
+  drawCornerSpeeds(a);
   drawDebrief(a);
   redraw(null);
   if (VIEW === "map") drawMap(a, null);
@@ -386,13 +387,24 @@ function fillLaps(a) {
   const key = a.car + a.track;
   if ($("lap").dataset.for === key) return;  // keep selections within a combo
   $("lap").dataset.for = key;
+
+  // Find the fastest valid lap so we can star it in the dropdowns.
+  let bestPath = null, bestMs = Infinity;
+  for (const l of a.laps) {
+    if (l.valid && l.lap_time_ms > 0 && l.lap_time_ms < bestMs) {
+      bestMs = l.lap_time_ms; bestPath = l.path;
+    }
+  }
+
   const fill = (id, selectedPath) => {
     const sel = $(id);
     sel.innerHTML = "";
     for (const l of a.laps) {
       const o = document.createElement("option");
       o.value = l.path;
-      o.textContent = `${l.lap_time}${l.valid ? "" : " (invalid)"}`;
+      const star = l.path === bestPath ? "★ " : "";
+      const pro = l.source === "pro" ? " [PRO]" : "";
+      o.textContent = `${star}${l.lap_time}${l.valid ? "" : " (invalid)"}${pro}`;
       if (l.path === selectedPath) o.selected = true;
       sel.appendChild(o);
     }
@@ -411,6 +423,33 @@ function drawSummary(a) {
     item("Lap", a.review.lap_time) +
     item("Gap", fmt(gap) + "s", gap > 0 ? "slower" : "faster") +
     (c.n >= 2 ? item("Consistency", `σ ${(c.std_ms / 1000).toFixed(3)}s · ${c.n} laps`) : "");
+}
+
+// Min-speed-per-corner table: how fast you carry through each apex vs the
+// reference. Δ>0 = you're faster (green), Δ<0 = slower (red). Defensive: the
+// field may be absent (older backend) or empty.
+function drawCornerSpeeds(a) {
+  const el = $("vmin");
+  if (!el) return;
+  const rows = (a && Array.isArray(a.corner_speeds)) ? a.corner_speeds : [];
+  if (!rows.length) { el.innerHTML = ""; return; }
+  const num = (v) => (v == null || !isFinite(v)) ? "–" : Math.round(v);
+  let body = "";
+  for (const c of rows) {
+    const d = (c.delta == null || !isFinite(c.delta)) ? null : c.delta;
+    const cls = d == null || d === 0 ? "" : (d > 0 ? "faster" : "slower");
+    const dTxt = d == null ? "–" : (d > 0 ? "+" : "") + Math.round(d);
+    const name = c.name || ("T" + ((c.index ?? 0) + 1));
+    body += `<tr><td class="vc">${name}</td>` +
+      `<td class="vn">${num(c.vmin_live)}</td>` +
+      `<td class="vn ref">${num(c.vmin_ref)}</td>` +
+      `<td class="vn ${cls}">${dTxt}</td></tr>`;
+  }
+  el.innerHTML =
+    `<h3>Min speed per corner <small>(km/h · green = faster than reference)</small></h3>` +
+    `<table class="vmin-table"><thead><tr>` +
+    `<th>Corner</th><th>You</th><th>Ref</th><th>Δ</th>` +
+    `</tr></thead><tbody>${body}</tbody></table>`;
 }
 
 function cornerLegend(a) {

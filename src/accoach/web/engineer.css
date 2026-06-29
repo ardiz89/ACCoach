@@ -63,10 +63,38 @@
 .es-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .es-msg { font-size: 17px; font-weight: 600; margin: 4px 0; }
 .es-cat { color: var(--cyan); font-size: 12px; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
-.conf { font-size: 11px; font-weight: 700; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--line); }
+.conf { font-size: 11px; font-weight: 700; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
 .conf[data-c="alta"] { color: var(--green); border-color: var(--green); }
 .conf[data-c="media"] { color: var(--amber); border-color: var(--amber); }
+.conf[data-c="bassa"] { color: var(--red); border-color: var(--red); }
 button.small { padding: 7px 12px; font-size: 13px; margin-top: 8px; }
+
+/* Tyres panel — 2×2 grid in wheel order (FL FR / RL RR). */
+.tyres {
+  border: 1px solid var(--line); border-radius: 12px;
+  background: var(--inset); padding: 10px 12px; margin-bottom: 12px;
+}
+.tyres-label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 8px; }
+.tyre-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.tyre {
+  position: relative; display: grid; gap: 1px; justify-items: center;
+  padding: 8px 4px 6px; background: var(--panel);
+  border: 1px solid var(--line); border-radius: 10px;
+}
+.tyre .tw { position: absolute; top: 5px; left: 8px; color: var(--muted); font-size: 10px; font-weight: 700; letter-spacing: .04em; }
+.tyre .tt { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 22px; font-weight: 700; color: var(--text); }
+.tyre .tp { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 12px; color: var(--muted); }
+.tyre .tt.t-cold { color: var(--cyan); }
+.tyre .tt.t-ok { color: var(--green); }
+.tyre .tt.t-hot { color: var(--red); }
+.tyre .tp.p-low { color: var(--amber); }
+.tyre .tp.p-ok { color: var(--green); }
+.tyre .tp.p-high { color: var(--amber); }
+
+.empty2 code {
+  font-family: var(--font-mono); font-size: 11px; color: var(--cyan);
+  background: var(--inset); padding: 1px 4px; border-radius: 4px;
+}
 
 /* Focus/Lesson box — twin of .engineer-says, about the driver's craft. */
 .focus-says {

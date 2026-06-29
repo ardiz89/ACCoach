@@ -47,6 +47,16 @@
         <div class="gauge"><span class="k">Map</span><span class="v" id="g-map">–</span></div>
       </div>
 
+      <div class="tyres" id="tyres">
+        <div class="tyres-label">Tyres <span class="es-sub">(temp °C · pressure psi)</span></div>
+        <div class="tyre-grid">
+          <div class="tyre" id="tyre-fl"><span class="tw">FL</span><span class="tt">–</span><span class="tp">–</span></div>
+          <div class="tyre" id="tyre-fr"><span class="tw">FR</span><span class="tt">–</span><span class="tp">–</span></div>
+          <div class="tyre" id="tyre-rl"><span class="tw">RL</span><span class="tt">–</span><span class="tp">–</span></div>
+          <div class="tyre" id="tyre-rr"><span class="tw">RR</span><span class="tt">–</span><span class="tp">–</span></div>
+        </div>
+      </div>
+
       <div class="av-now" id="av-now" hidden>
         <div class="es-label">⚡ Right now, in the car</div>
         <div class="av-msg" id="av-msg"></div>
@@ -101,7 +111,9 @@
         </div>
       </div>
       <div id="setup-body" class="setup-body">
-        <div class="empty2">Choose car/track and a starting setup.</div>
+        <div class="empty2">Pick a car/track above. HONE reads setups from
+          <code>Documents/Assetto Corsa Competizione/Setups/&lt;car&gt;/&lt;track&gt;/</code> (ACC)
+          and <code>Documents/Assetto Corsa/setups/</code> (AC).</div>
       </div>
     </section>
   </main>
