@@ -86,6 +86,8 @@ _UI: dict[str, dict[str, str]] = {
                      "it": "📊  Analisi & Report (browser)"},
     "btn.engineer": {"en": "🔧  Race engineer (browser)",
                      "it": "🔧  Ingegnere di pista (browser)"},
+    "btn.server": {"en": "📡  Live backend (second screen)",
+                   "it": "📡  Backend live (secondo schermo)"},
     "btn.debrief": {"en": "📈  Last-lap debrief", "it": "📈  Debrief ultimo giro"},
     "btn.monitor": {"en": "📈  Telemetry monitor", "it": "📈  Monitor telemetria"},
     "btn.coach_term": {"en": "🎙  Voice coach (terminal)",

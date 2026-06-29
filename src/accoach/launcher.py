@@ -81,7 +81,7 @@ _VOICE_CMDS = {"live", "coach"}
 # disabled so you can't stack a second coach/telemetry reader on top of it.
 # Keys: command buttons by their args tuple, special buttons by their sentinel.
 _LIVE_SAFE_KEYS = {_STOP_LIVE, _GUIDE, _WIZARD, _SETTINGS, _MOBILE,
-                   ("web",), ("web", "--engineer")}
+                   ("web",), ("web", "--engineer"), ("server",)}
 
 # (label key, command args / sentinel, opens-its-own-console). The label key is
 # resolved through i18n at build time so the launcher follows the chosen language.
@@ -92,6 +92,7 @@ _BUTTONS = [
     ("—", None, False),
     ("btn.analysis", ["web"], False),
     ("btn.engineer", ["web", "--engineer"], False),
+    ("btn.server", ["server"], True),
     ("btn.debrief", ["debrief"], True),
     ("btn.monitor", ["monitor"], True),
     ("btn.coach_term", ["coach"], True),
