@@ -180,9 +180,9 @@ function renderSlot(p, s, i) {
 
   const minus = document.createElement("button");
   minus.type = "button"; minus.tabIndex = -1;
-  minus.textContent = "−"; minus.title = "−1 click";
+  minus.textContent = "−"; minus.title = "−1 click (hold to go faster)";
   minus.setAttribute("aria-hidden", "true");
-  minus.onclick = () => bump(p.key, i, -1);
+  wireHold(minus, p.key, i, -1);
 
   const val = document.createElement("div");
   val.className = "val";
@@ -191,9 +191,9 @@ function renderSlot(p, s, i) {
 
   const plus = document.createElement("button");
   plus.type = "button"; plus.tabIndex = -1;
-  plus.textContent = "+"; plus.title = "+1 click";
+  plus.textContent = "+"; plus.title = "+1 click (hold to go faster)";
   plus.setAttribute("aria-hidden", "true");
-  plus.onclick = () => bump(p.key, i, +1);
+  wireHold(plus, p.key, i, +1);
 
   if (s.slot) {
     const sl = document.createElement("div");
@@ -212,16 +212,20 @@ function renderSlot(p, s, i) {
 // Keyboard handling for a focused slot. A rerender() rebuilds the DOM, so after
 // a bump we restore focus to the slot at the same param/index position.
 function onSlotKey(ev, param, i) {
-  let step = 0;
+  let dir = 0, page = false;
   switch (ev.key) {
-    case "ArrowUp": case "ArrowRight": case "+": case "=": step = 1; break;
-    case "ArrowDown": case "ArrowLeft": case "-": case "−": step = -1; break;
-    case "PageUp": step = 5; break;
-    case "PageDown": step = -5; break;
+    case "ArrowUp": case "ArrowRight": case "+": case "=": dir = 1; break;
+    case "ArrowDown": case "ArrowLeft": case "-": case "−": dir = -1; break;
+    case "PageUp": dir = 1; page = true; break;
+    case "PageDown": dir = -1; page = true; break;
     default: return;            // leave Tab and everything else to the browser
   }
   ev.preventDefault();
-  bump(param, i, step);
+  if (page) { bump(param, i, dir * 5); refocusSlot(param, i); return; }
+  // Holding the key auto-repeats: accelerate just like holding a +/- button. A
+  // fresh press (ev.repeat false) resets the ramp; no keyup handler needed.
+  _kbCount = ev.repeat ? _kbCount + 1 : 0;
+  bump(param, i, dir * rampStep(_kbCount));
   refocusSlot(param, i);
 }
 
@@ -252,6 +256,72 @@ function addDelta(param, slot, step) {
   if (delta === 0) delete state.pending[key];
   else state.pending[key] = delta;
   return true;
+}
+
+// --- press-and-hold to accelerate -----------------------------------------
+// Holding a +/- button (mouse/touch) or an arrow key ramps the step up the
+// longer you hold, so a big setup swing doesn't need dozens of taps. A quick
+// tap is still exactly one click. During a hold we update just the held slot in
+// place (a full rerender() would replace the very button you're holding); one
+// rerender() on release syncs the tray and badges.
+const _STEP_RAMP = [1, 1, 1, 2, 2, 3, 5];   // step by tick #, saturates at the end
+const rampStep = (n) => _STEP_RAMP[Math.min(n, _STEP_RAMP.length - 1)];
+
+const _hold = { timer: null, interval: null, count: 0, param: null, i: null, dir: 0 };
+let _kbCount = 0;   // consecutive auto-repeat keydowns, for keyboard acceleration
+
+function _holdTick() {
+  const ok = addDelta(_hold.param, _hold.i, _hold.dir * rampStep(_hold.count));
+  _hold.count++;
+  updateSlotView(_hold.param, _hold.i);
+  if (!ok) stopHold();            // hit the floor (clicks can't go below 0)
+}
+
+function startHold(param, i, dir) {
+  stopHold();
+  Object.assign(_hold, { param, i, dir, count: 0 });
+  _holdTick();                    // first step is immediate (so a tap = 1 click)
+  _hold.timer = setTimeout(() => { _hold.interval = setInterval(_holdTick, 90); }, 350);
+}
+
+function stopHold() {
+  if (_hold.timer) clearTimeout(_hold.timer);
+  if (_hold.interval) clearInterval(_hold.interval);
+  const active = _hold.param !== null;
+  _hold.timer = _hold.interval = null;
+  _hold.param = null;
+  if (active) rerender();         // one rebuild to sync tray / delta badges
+}
+
+function wireHold(btn, param, i, dir) {
+  btn.onpointerdown = (ev) => {
+    ev.preventDefault();
+    try { btn.setPointerCapture(ev.pointerId); } catch (e) { /* older browsers */ }
+    startHold(param, i, dir);
+  };
+  btn.onpointerup = stopHold;
+  btn.onpointercancel = stopHold;
+}
+
+// In-place refresh of one slot's value / aria / delta badge during a hold,
+// without the full rerender() that would tear down the held button.
+function updateSlotView(param, i) {
+  const key = slotKey(param, i);
+  const el = document.querySelector(`.slot[data-key="${cssEscape(key)}"]`);
+  if (!el) return;
+  const delta = state.pending[key] || 0;
+  const cur = state.base[key] + delta;
+  el.classList.toggle("changed", !!delta);
+  el.setAttribute("aria-valuenow", String(cur));
+  const val = el.querySelector(".val");
+  if (val) val.textContent = String(cur);   // phys hint is dropped while changed
+  let badge = el.querySelector(".delta");
+  if (delta) {
+    if (!badge) { badge = document.createElement("div"); badge.className = "delta"; el.appendChild(badge); }
+    badge.textContent = (delta > 0 ? "+" : "") + delta;
+  } else if (badge) {
+    badge.remove();
+  }
 }
 
 function rerender() {

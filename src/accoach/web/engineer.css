@@ -149,6 +149,8 @@ button.small { padding: 7px 12px; font-size: 13px; margin-top: 8px; }
   width: 33px; height: 33px; border-radius: 8px; cursor: pointer;
   background: var(--panel); color: var(--text); border: 1px solid var(--line);
   font-size: 19px; font-weight: 700; line-height: 1; display: flex; align-items: center; justify-content: center;
+  /* press-and-hold to accelerate: don't let touch turn the hold into a scroll/zoom */
+  touch-action: none; user-select: none; -webkit-user-select: none;
 }
 .slot button:hover { border-color: var(--cyan); color: var(--cyan); }
 .slot button:focus-visible { border-color: var(--cyan); color: var(--cyan); box-shadow: 0 0 0 2px var(--cyan); }
