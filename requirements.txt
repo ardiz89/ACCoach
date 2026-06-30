@@ -9,6 +9,7 @@ websockets>=12.0  # websocket transport
 httpx>=0.27       # required by fastapi TestClient (used in tests)
 
 PySide6>=6.6      # on-screen overlay + GUI launcher (frontend)
+segno>=1.6        # QR codes for opening the pages on a phone/tablet (LAN access)
 
 # Build-only (not needed to run from source)
 # pyinstaller     # to build ACCoach.exe (see build_exe.bat)

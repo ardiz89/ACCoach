@@ -69,12 +69,15 @@ def test_save_config_roundtrip(tmp_path, monkeypatch):
     cfg.voice.rate = 200
     cfg.overlay.scale = 1.3
     cfg.overlay.x, cfg.overlay.y = 120, 80
+    cfg.lan = True
     config.save_config(cfg)
     fresh = config.load_config(reload=True)
     assert fresh.voice.enabled is False
     assert fresh.voice.rate == 200
     assert fresh.overlay.scale == 1.3
     assert fresh.overlay.x == 120 and fresh.overlay.y == 80
+    assert fresh.lan is True
+    assert fresh.bind_host() == "0.0.0.0"
 
 
 def test_set_language_persists_and_switches(tmp_path, monkeypatch):

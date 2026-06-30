@@ -137,8 +137,19 @@ button.small { padding: 7px 12px; font-size: 13px; margin-top: 8px; }
 .param:last-child { border-bottom: none; }
 .param-label { font-size: 13px; }
 .param-label .note { display: block; color: var(--muted); font-size: 10px; }
+/* "al volo" badge: this lever is adjustable on track (brake bias, TC, ABS, map). */
+.av-tag {
+  display: inline-block; margin-left: 6px; vertical-align: middle;
+  font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+  color: var(--green); border: 1px solid var(--green); border-radius: 999px;
+  padding: 0 6px; cursor: help;
+}
 .slots { display: flex; flex-wrap: wrap; gap: 8px; }
 .slot { display: flex; align-items: center; gap: 6px; background: var(--inset); border: 1px solid var(--line); border-radius: 12px; padding: 3px 4px; outline: none; }
+/* The engineer proposes this lever (cyan) — distinct from amber "you changed it".
+   Listed before .changed so that, when both apply, the amber border wins (you've
+   acted) while the cyan tint stays as a reminder it was suggested. */
+.slot.suggested { border-color: var(--cyan); background: rgba(34, 211, 206, 0.10); }
 .slot.changed { border-color: var(--amber); }
 /* Keyboard focus: the whole slot is the spinbutton (tabindex=0). */
 .slot:focus-visible, .slot.focused { border-color: var(--cyan); box-shadow: 0 0 0 2px var(--cyan); }
@@ -149,6 +160,8 @@ button.small { padding: 7px 12px; font-size: 13px; margin-top: 8px; }
   width: 33px; height: 33px; border-radius: 8px; cursor: pointer;
   background: var(--panel); color: var(--text); border: 1px solid var(--line);
   font-size: 19px; font-weight: 700; line-height: 1; display: flex; align-items: center; justify-content: center;
+  /* press-and-hold to accelerate: don't let touch turn the hold into a scroll/zoom */
+  touch-action: none; user-select: none; -webkit-user-select: none;
 }
 .slot button:hover { border-color: var(--cyan); color: var(--cyan); }
 .slot button:focus-visible { border-color: var(--cyan); color: var(--cyan); box-shadow: 0 0 0 2px var(--cyan); }
@@ -185,3 +198,13 @@ button.ghost:hover { color: var(--text); border-color: var(--muted); }
 .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 12px; }
 
 .toast { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); z-index: 60; background: var(--panel); border: 1px solid var(--green); border-left: 4px solid var(--green); border-radius: 12px; padding: 12px 18px; max-width: 80vw; font-size: 14px; box-shadow: 0 6px 20px rgba(0,0,0,.4); }
+
+/* --- Responsive: phone ----------------------------------------------------
+   Must live at the END of the file: these overrides share specificity with the
+   base rules above, so source order is what makes them win inside the query. */
+@media (max-width: 560px) {
+  .eng-layout { padding: 14px 14px; gap: 14px; }
+  .gauges { grid-template-columns: repeat(3, 1fr); }
+  .param { grid-template-columns: 1fr; gap: 4px; }
+  .tray { padding: 12px 14px; }
+}

@@ -79,7 +79,7 @@ async function onComboChange() {
   const opt = $("combo").selectedOptions[0];
   if (!opt || !opt.dataset.car) return;
   state.car = opt.dataset.car; state.track = opt.dataset.track;
-  loadClass(state.car);
+  await loadClass(state.car);   // sets state.alVolo before the setup renders
   const list = await api(`/api/setup/list?car=${encodeURIComponent(state.car)}` +
                          `&track=${encodeURIComponent(state.track)}`);
   const sel = $("setup");
@@ -104,6 +104,9 @@ async function loadClass(car) {
   $("prof-phases").textContent = info.profile.phases.join(" → ");
   $("prof-alvolo").textContent = info.profile.al_volo.join(", ");
   $("eng-profile").hidden = false;
+  // Remember which adjustments are tweakable on track (vs pit-only) so the
+  // editor can badge them — the rest only take effect when you reload at the box.
+  state.alVolo = (info.profile.al_volo || []).map((s) => s.toLowerCase());
 }
 
 // Shown when a car/track has no setup files at all — explain where HONE looks
@@ -145,12 +148,32 @@ function renderSetup(data) {
   }
 }
 
+// A parameter is "al volo" (adjustable on track, no pit stop) when its group or
+// label is in the active profile's al-volo set — typically brake bias, TC, ABS,
+// engine map. Everything else only takes effect after reloading the setup at the
+// box, so the badge tells the driver which levers they can also pull live.
+function isAlVolo(p) {
+  const av = state.alVolo || [];
+  const g = (p.group || "").toLowerCase(), l = (p.label || "").toLowerCase();
+  return av.some((a) =>
+    a === g || a === l ||
+    // short electronic codes ("tc") should also catch their numbered slots ("tc1", "tc2")
+    (l.startsWith(a) && /^\d/.test(l.slice(a.length))));
+}
+
 function renderParam(p) {
   const row = document.createElement("div");
   row.className = "param";
   const label = document.createElement("div");
   label.className = "param-label";
   label.innerHTML = `${p.label}${p.note ? `<span class="note">${p.note}</span>` : ""}`;
+  if (isAlVolo(p)) {
+    const tag = document.createElement("span");
+    tag.className = "av-tag";
+    tag.textContent = t("eng.alvoloTag");
+    tag.title = t("eng.alvoloHint");
+    label.appendChild(tag);
+  }
   row.appendChild(label);
 
   const slots = document.createElement("div");
@@ -166,7 +189,8 @@ function renderSlot(p, s, i) {
   const cur = state.base[key] + delta;
 
   const el = document.createElement("div");
-  el.className = "slot" + (delta ? " changed" : "");
+  const suggested = state.suggested && state.suggested.has(key);
+  el.className = "slot" + (delta ? " changed" : "") + (suggested ? " suggested" : "");
   el.dataset.key = key;          // lets refocusSlot find this node after rerender
 
   // The slot itself is the keyboard control (a spinbutton): one tab stop, the
@@ -180,9 +204,9 @@ function renderSlot(p, s, i) {
 
   const minus = document.createElement("button");
   minus.type = "button"; minus.tabIndex = -1;
-  minus.textContent = "−"; minus.title = "−1 click";
+  minus.textContent = "−"; minus.title = "−1 click (hold to go faster)";
   minus.setAttribute("aria-hidden", "true");
-  minus.onclick = () => bump(p.key, i, -1);
+  wireHold(minus, p.key, i, -1);
 
   const val = document.createElement("div");
   val.className = "val";
@@ -191,9 +215,9 @@ function renderSlot(p, s, i) {
 
   const plus = document.createElement("button");
   plus.type = "button"; plus.tabIndex = -1;
-  plus.textContent = "+"; plus.title = "+1 click";
+  plus.textContent = "+"; plus.title = "+1 click (hold to go faster)";
   plus.setAttribute("aria-hidden", "true");
-  plus.onclick = () => bump(p.key, i, +1);
+  wireHold(plus, p.key, i, +1);
 
   if (s.slot) {
     const sl = document.createElement("div");
@@ -212,16 +236,20 @@ function renderSlot(p, s, i) {
 // Keyboard handling for a focused slot. A rerender() rebuilds the DOM, so after
 // a bump we restore focus to the slot at the same param/index position.
 function onSlotKey(ev, param, i) {
-  let step = 0;
+  let dir = 0, page = false;
   switch (ev.key) {
-    case "ArrowUp": case "ArrowRight": case "+": case "=": step = 1; break;
-    case "ArrowDown": case "ArrowLeft": case "-": case "−": step = -1; break;
-    case "PageUp": step = 5; break;
-    case "PageDown": step = -5; break;
+    case "ArrowUp": case "ArrowRight": case "+": case "=": dir = 1; break;
+    case "ArrowDown": case "ArrowLeft": case "-": case "−": dir = -1; break;
+    case "PageUp": dir = 1; page = true; break;
+    case "PageDown": dir = -1; page = true; break;
     default: return;            // leave Tab and everything else to the browser
   }
   ev.preventDefault();
-  bump(param, i, step);
+  if (page) { bump(param, i, dir * 5); refocusSlot(param, i); return; }
+  // Holding the key auto-repeats: accelerate just like holding a +/- button. A
+  // fresh press (ev.repeat false) resets the ramp; no keyup handler needed.
+  _kbCount = ev.repeat ? _kbCount + 1 : 0;
+  bump(param, i, dir * rampStep(_kbCount));
   refocusSlot(param, i);
 }
 
@@ -252,6 +280,72 @@ function addDelta(param, slot, step) {
   if (delta === 0) delete state.pending[key];
   else state.pending[key] = delta;
   return true;
+}
+
+// --- press-and-hold to accelerate -----------------------------------------
+// Holding a +/- button (mouse/touch) or an arrow key ramps the step up the
+// longer you hold, so a big setup swing doesn't need dozens of taps. A quick
+// tap is still exactly one click. During a hold we update just the held slot in
+// place (a full rerender() would replace the very button you're holding); one
+// rerender() on release syncs the tray and badges.
+const _STEP_RAMP = [1, 1, 1, 2, 2, 3, 5];   // step by tick #, saturates at the end
+const rampStep = (n) => _STEP_RAMP[Math.min(n, _STEP_RAMP.length - 1)];
+
+const _hold = { timer: null, interval: null, count: 0, param: null, i: null, dir: 0 };
+let _kbCount = 0;   // consecutive auto-repeat keydowns, for keyboard acceleration
+
+function _holdTick() {
+  const ok = addDelta(_hold.param, _hold.i, _hold.dir * rampStep(_hold.count));
+  _hold.count++;
+  updateSlotView(_hold.param, _hold.i);
+  if (!ok) stopHold();            // hit the floor (clicks can't go below 0)
+}
+
+function startHold(param, i, dir) {
+  stopHold();
+  Object.assign(_hold, { param, i, dir, count: 0 });
+  _holdTick();                    // first step is immediate (so a tap = 1 click)
+  _hold.timer = setTimeout(() => { _hold.interval = setInterval(_holdTick, 90); }, 350);
+}
+
+function stopHold() {
+  if (_hold.timer) clearTimeout(_hold.timer);
+  if (_hold.interval) clearInterval(_hold.interval);
+  const active = _hold.param !== null;
+  _hold.timer = _hold.interval = null;
+  _hold.param = null;
+  if (active) rerender();         // one rebuild to sync tray / delta badges
+}
+
+function wireHold(btn, param, i, dir) {
+  btn.onpointerdown = (ev) => {
+    ev.preventDefault();
+    try { btn.setPointerCapture(ev.pointerId); } catch (e) { /* older browsers */ }
+    startHold(param, i, dir);
+  };
+  btn.onpointerup = stopHold;
+  btn.onpointercancel = stopHold;
+}
+
+// In-place refresh of one slot's value / aria / delta badge during a hold,
+// without the full rerender() that would tear down the held button.
+function updateSlotView(param, i) {
+  const key = slotKey(param, i);
+  const el = document.querySelector(`.slot[data-key="${cssEscape(key)}"]`);
+  if (!el) return;
+  const delta = state.pending[key] || 0;
+  const cur = state.base[key] + delta;
+  el.classList.toggle("changed", !!delta);
+  el.setAttribute("aria-valuenow", String(cur));
+  const val = el.querySelector(".val");
+  if (val) val.textContent = String(cur);   // phys hint is dropped while changed
+  let badge = el.querySelector(".delta");
+  if (delta) {
+    if (!badge) { badge = document.createElement("div"); badge.className = "delta"; el.appendChild(badge); }
+    badge.textContent = (delta > 0 ? "+" : "") + delta;
+  } else if (badge) {
+    badge.remove();
+  }
 }
 
 function rerender() {
@@ -490,9 +584,27 @@ function applyLive(st) {
   renderEngineer(st);
   renderFocus(st);
   renderPitReminder(st);
+  updateSuggested(st.engineer);   // highlight the proposed levers in the editor
 
   // Auto-pick the matching combo once, if the user hasn't chosen yet.
   maybeAutoSelect(st.car, st.track);
+}
+
+// Highlight, in cyan, the slots the engineer is currently proposing to change —
+// distinct from the amber "you changed it" state. Updated in place (the live
+// feed ticks ~15 Hz, so a full rerender would churn and fight an open edit) and
+// only when the proposed set actually changes.
+function updateSuggested(eng) {
+  const next = new Set();
+  if (eng && eng.change && (eng.tag === "BOX" || eng.tag === "AV")) {
+    for (const c of eng.change) next.add(slotKey(c.param, c.slot == null ? 0 : c.slot));
+  }
+  const prev = state.suggested || new Set();
+  if (next.size === prev.size && [...next].every((k) => prev.has(k))) return;
+  state.suggested = next;
+  document.querySelectorAll(".slot").forEach((el) => {
+    el.classList.toggle("suggested", next.has(el.dataset.key));
+  });
 }
 
 // Render the structured engineer block (st.engineer) — proposal + at-the-wheel

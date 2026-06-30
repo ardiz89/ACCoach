@@ -340,7 +340,11 @@ function drawMap(a, cx) {
   const m = 24, spanX = maxX - minX || 1, spanZ = maxZ - minZ || 1;
   const s = Math.min((w - 2 * m) / spanX, (h - 2 * m) / spanZ);
   const offX = (w - spanX * s) / 2, offZ = (h - spanZ * s) / 2;
-  const X = (x) => (x - minX) * s + offX;
+  // AC/ACC world coordinates are left-handed, so a raw top-down (x, -z) view
+  // comes out mirrored left-right (Suzuka T1 would bend the wrong way). Flip X
+  // too so the map matches what you see from the cockpit. Braking points, start
+  // and the hover marker all go through X()/Y(), so they stay in register.
+  const X = (x) => (maxX - x) * s + offX;
   const Y = (z) => h - ((z - minZ) * s + offZ);   // flip so +z is up
 
   // Reference racing line: faint dashed.
@@ -405,9 +409,29 @@ function drawMap(a, cx) {
     ctx.fillText("T" + (c.index + 1), X(rv.x[i]) + 6, Y(rv.z[i]) - 4);
   }
 
-  // Start/finish.
-  ctx.fillStyle = "#22D3CE";
-  ctx.beginPath(); ctx.arc(X(rv.x[0]), Y(rv.z[0]), 4, 0, 6.283); ctx.fill();
+  // Start/finish + direction of travel. A white dot with an "S/F" label (kept
+  // distinct from the cyan reference-braking rings) and a short arrow along the
+  // first few samples, so the lap's orientation and which way it runs are
+  // unambiguous at a glance.
+  const sx = X(rv.x[0]), sy = Y(rv.z[0]);
+  const k = Math.min(8, rv.x.length - 1);
+  let ux = X(rv.x[k]) - sx, uy = Y(rv.z[k]) - sy;
+  const ulen = Math.hypot(ux, uy) || 1; ux /= ulen; uy /= ulen;
+  // direction arrow (begins just ahead of the dot)
+  ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 2;
+  const tipX = sx + ux * 26, tipY = sy + uy * 26;
+  ctx.beginPath(); ctx.moveTo(sx + ux * 8, sy + uy * 8); ctx.lineTo(tipX, tipY); ctx.stroke();
+  const ah = 6, px = -uy, py = ux;   // perpendicular for the arrowhead
+  ctx.fillStyle = "#ffffff";
+  ctx.beginPath();
+  ctx.moveTo(tipX, tipY);
+  ctx.lineTo(tipX - ux * ah + px * ah * 0.6, tipY - uy * ah + py * ah * 0.6);
+  ctx.lineTo(tipX - ux * ah - px * ah * 0.6, tipY - uy * ah - py * ah * 0.6);
+  ctx.closePath(); ctx.fill();
+  // start/finish dot + label
+  ctx.beginPath(); ctx.arc(sx, sy, 5, 0, 6.283); ctx.fill();
+  ctx.font = "bold 11px Segoe UI";
+  ctx.fillText("S/F", sx - ux * 14 - 6, sy - uy * 14 + 4);
 
   // Hover marker.
   if (cx != null) {
