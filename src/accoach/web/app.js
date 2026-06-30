@@ -13,6 +13,7 @@ let LAST_HOVER = null; // last hover position, so a re-render keeps the readout
 let VIEW = "compare"; // "compare" | "progress"
 let HOVER_WIRED = false;
 let MAP_HIT = null;   // {rv, X, Y} screen transform captured by drawMap, for map hover
+let MINI_HIT = null;  // same, for the Compare-view mini map
 const MAP_READOUT_DEFAULT = () => t("map.readout");
 
 // Delta palette, read from the CSS --red/--green vars so the colour-blind toggle
@@ -376,14 +377,36 @@ function deltaColor(d, m) {
   return `rgb(${mix(c[0])},${mix(c[1])},${mix(c[2])})`;
 }
 
+// Full track map (its own tab). Wrapper around drawMapTo that also publishes the
+// screen transform for the map's own hover.
 function drawMap(a, cx) {
-  const missing = $("map-missing"), canvas = $("c-map");
+  const hit = drawMapTo($("c-map"), $("map-missing"), a, cx);
+  if (hit) MAP_HIT = hit;
+}
+
+// Mini map shown inside the Compare view, driven by the shared crosshair so it
+// highlights wherever you're hovering on the traces (and vice versa).
+function drawMiniMap(a, cx) {
+  const wrap = $("minimap-wrap");
+  if (!wrap) return;
+  if (!a || !a.has_map) { wrap.classList.add("hidden"); return; }
+  wrap.classList.remove("hidden");
+  const hit = drawMapTo($("c-minimap"), null, a, cx);
+  if (hit) MINI_HIT = hit;
+}
+
+// Render the delta-coloured racing line + braking points to ``canvas``; returns
+// the screen transform {rv, X, Y} so a hover can map cursor → nearest sample,
+// or null when there's no map. ``missing`` (optional) is a placeholder element
+// to toggle when the lap has no coordinates.
+function drawMapTo(canvas, missing, a, cx) {
+  if (!canvas) return null;
   if (!a.has_map) {
-    missing.classList.remove("hidden");
+    if (missing) missing.classList.remove("hidden");
     canvas.style.display = "none";
-    return;
+    return null;
   }
-  missing.classList.add("hidden");
+  if (missing) missing.classList.add("hidden");
   canvas.style.display = "";
 
   const { ctx, w, h } = setup(canvas);
@@ -502,8 +525,8 @@ function drawMap(a, cx) {
     ctx.beginPath(); ctx.arc(X(rv.x[i]), Y(rv.z[i]), 6, 0, 6.283); ctx.stroke();
   }
 
-  // Expose the screen transform so the map hover can find the nearest sample.
-  MAP_HIT = { rv, X, Y };
+  // Hand back the screen transform so a hover can find the nearest sample.
+  return { rv, X, Y };
 }
 
 function reloadSelection() {
@@ -692,6 +715,7 @@ function redraw(cx) {
   drawSpeed(DATA, cx);
   drawInputs(DATA, cx);
   drawSteer(DATA, cx);
+  drawMiniMap(DATA, cx);
   updateReadout(DATA, cx);
 }
 
@@ -822,24 +846,29 @@ function wireHover() {
     cv.addEventListener("mouseleave", onLeave);
   }
 
-  // Map hover: the x-axis isn't position, so find the nearest track sample in
-  // screen space (transform captured by drawMap) and reuse its pos to drive the
-  // shared crosshair + readout.
+  // Map / mini-map hover: the x-axis isn't position, so find the nearest track
+  // sample in screen space (transform captured when the map was drawn) and reuse
+  // its pos to drive the shared crosshair + readout.
+  function nearestPos(hit, canvas, e) {
+    if (!hit) return null;
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+    const rv = hit.rv;
+    let best = -1, bd = Infinity;
+    for (let i = 0; i < rv.x.length; i++) {
+      const dx = hit.X(rv.x[i]) - mx, dy = hit.Y(rv.z[i]) - my;
+      const dd = dx * dx + dy * dy;
+      if (dd < bd) { bd = dd; best = i; }
+    }
+    return best >= 0 ? rv.pos[best] : null;
+  }
+
   const map = $("c-map");
   if (map) {
     map.addEventListener("mousemove", (e) => {
-      if (!DATA || !MAP_HIT) return;
-      const rect = map.getBoundingClientRect();
-      const mx = e.clientX - rect.left, my = e.clientY - rect.top;
-      const rv = MAP_HIT.rv;
-      let best = -1, bd = Infinity;
-      for (let i = 0; i < rv.x.length; i++) {
-        const dx = MAP_HIT.X(rv.x[i]) - mx, dy = MAP_HIT.Y(rv.z[i]) - my;
-        const dd = dx * dx + dy * dy;
-        if (dd < bd) { bd = dd; best = i; }
-      }
-      if (best < 0) return;
-      const p = rv.pos[best];
+      if (!DATA) return;
+      const p = nearestPos(MAP_HIT, map, e);
+      if (p == null) return;
       drawMap(DATA, p);
       $("map-readout").innerHTML = readoutHTML(DATA, p);
     });
@@ -847,6 +876,18 @@ function wireHover() {
       $("map-readout").innerHTML = MAP_READOUT_DEFAULT();
       if (DATA) drawMap(DATA, null);
     });
+  }
+
+  // Mini-map (Compare view) hover drives the chart crosshairs + readout too, so
+  // it's bidirectional with the traces.
+  const mini = $("c-minimap");
+  if (mini) {
+    mini.addEventListener("mousemove", (e) => {
+      if (!DATA) return;
+      const p = nearestPos(MINI_HIT, mini, e);
+      if (p != null) redraw(p);
+    });
+    mini.addEventListener("mouseleave", () => redraw(null));
   }
 }
 
