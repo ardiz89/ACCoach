@@ -67,6 +67,10 @@
 .conf[data-c="high"] { color: var(--green); border-color: var(--green); }
 .conf[data-c="medium"] { color: var(--amber); border-color: var(--amber); }
 .conf[data-c="low"] { color: var(--red); border-color: var(--red); }
+/* Low-confidence proposal: flag the whole box (not just the pill) and show a
+   cautionary note, so a tentative call gets a second look before writing. */
+.engineer-says[data-conf="low"] { border-left-color: var(--red); border-left-style: dashed; }
+.es-hint { color: var(--amber); font-size: 12px; margin: 2px 0 4px; }
 button.small { padding: 7px 12px; font-size: 13px; margin-top: 8px; }
 
 /* Tyres panel — 2×2 grid in wheel order (FL FR / RL RR). */

@@ -258,6 +258,8 @@
                          it: `Nessun backup da ripristinare per questo setup.` },
     "eng.restoreErr":  { en: `Restore error: `, it: `Errore ripristino: ` },
     "eng.corners":     { en: `Corners `, it: `Curve ` },
+    "eng.lowConf":     { en: `Low confidence — based on little data. Gather a few more clean laps before applying.`,
+                         it: `Confidenza bassa — pochi dati. Raccogli qualche altro giro pulito prima di applicare.` },
     "eng.dash":        { en: `—`, it: `—` },
     "eng.pit1":        { en: `🅿️ You're in the pits: MFD → <b>Setup</b> → load <b>`,
                          it: `🅿️ Sei ai box: MFD → <b>Setup</b> → carica <b>` },

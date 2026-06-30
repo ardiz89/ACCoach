@@ -620,8 +620,12 @@ function renderEngineer(st) {
   }
 
   const says = $("engineer-says");
-  const conf = $("es-conf"), prep = $("es-prepare");
+  const conf = $("es-conf"), prep = $("es-prepare"), hint = $("es-hint");
   const boxProposal = eng && eng.kind === "propose" && eng.tag === "BOX" && eng.change;
+
+  // Default: no low-confidence caution; the proposal branch re-arms it.
+  hint.hidden = true;
+  says.removeAttribute("data-conf");
 
   if (boxProposal) {
     $("es-msg").textContent = eng.rationale || eng.message;
@@ -630,8 +634,14 @@ function renderEngineer(st) {
     const cz = Array.isArray(eng.corners) && eng.corners.length
       ? t("eng.corners") + eng.corners.join(", ") : "";
     $("es-cat").textContent = cz;
-    conf.hidden = false; conf.textContent = eng.confidence || "medium";
-    conf.dataset.c = eng.confidence || "medium";
+    const confidence = eng.confidence || "medium";
+    conf.hidden = false; conf.textContent = confidence;
+    conf.dataset.c = confidence;
+    // Low confidence: warn the driver not to over-trust it (few laps / weak
+    // signal) and flag the whole box, so a tentative call gets a second look
+    // before they write the setup.
+    says.dataset.conf = confidence;
+    if (confidence === "low") { hint.hidden = false; hint.textContent = t("eng.lowConf"); }
     prep.hidden = false;
     prep.onclick = () => prepareChange(eng.change);
     says.classList.add("active");
