@@ -105,6 +105,7 @@ def _pick_known(requested: str | None, fallback: str | None, known: set[str]) ->
 def create_api(
     laps_dir: Path | str = DEFAULT_LAPS_DIR,
     setups_root: Path | str | None = None,
+    demo: bool = False,
 ) -> FastAPI:
     laps_dir = Path(laps_dir)
     app = FastAPI(title="HONE analysis")
@@ -464,14 +465,27 @@ def create_api(
             buf.getvalue(), media_type="text/csv",
             headers={"Content-Disposition": f'attachment; filename="{stem}.csv"'})
 
+    def _serve(page: str) -> Response:
+        """Serve a web page; in demo mode inject a DEMO banner so synthetic laps
+        can never be mistaken for real ones (the launcher will happily open a
+        demo server already bound to the analysis port)."""
+        path = _WEB_DIR / page
+        if not demo:
+            return FileResponse(str(path))
+        html = path.read_text(encoding="utf-8")
+        banner = ('<div class="demo-banner" data-i18n="demo.banner">'
+                  'DEMO — synthetic laps, not your real data</div>')
+        html = html.replace("<body>", '<body class="demo-mode">\n' + banner, 1)
+        return Response(content=html, media_type="text/html")
+
     @app.get("/")
-    def index() -> FileResponse:
-        return FileResponse(str(_WEB_DIR / "index.html"))
+    def index() -> Response:
+        return _serve("index.html")
 
     @app.get("/engineer")
-    def engineer() -> FileResponse:
+    def engineer() -> Response:
         """The race-engineer setup page (live diagnosis + setup editor)."""
-        return FileResponse(str(_WEB_DIR / "engineer.html"))
+        return _serve("engineer.html")
 
     if _WEB_DIR.is_dir():
         app.mount("/static", StaticFiles(directory=str(_WEB_DIR)), name="static")
@@ -597,7 +611,8 @@ def main(argv: list[str] | None = None) -> None:
         print("LAN access ON — other devices on your network can reach this app.")
     # Open the browser once the server has had a moment to come up.
     threading.Timer(1.5, lambda: webbrowser.open(url)).start()
-    uvicorn.run(create_api(laps_dir), host=bind, port=port, log_level="warning")
+    uvicorn.run(create_api(laps_dir, demo="--demo" in argv),
+                host=bind, port=port, log_level="warning")
 
 
 if __name__ == "__main__":

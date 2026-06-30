@@ -23,6 +23,7 @@
     "lang.label":      { en: `Language`, it: `Lingua` },
     "tour.help":       { en: `Guided tour`, it: `Visita guidata` },
     "cb.label":        { en: `Colour-blind palette (blue/orange)`, it: `Palette daltonici (blu/arancio)` },
+    "demo.banner":     { en: `DEMO — synthetic laps, not your real data`, it: `DEMO — giri sintetici, non i tuoi dati reali` },
 
     // ---- analysis page (index.html) ----
     "title.analysis":  { en: `HONE · Analysis`, it: `HONE · Analisi` },

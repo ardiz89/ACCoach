@@ -206,3 +206,15 @@ def test_export_json(tmp_path):
     assert r.status_code == 200
     body = r.json()
     assert "samples" in body and "fields" in body
+
+
+def test_demo_banner_only_in_demo_mode(tmp_path):
+    # A demo server bound to the analysis port must announce itself so synthetic
+    # laps can't be mistaken for real data; a normal server must not.
+    _seed(tmp_path)
+    demo = TestClient(create_api(tmp_path, demo=True))
+    real = TestClient(create_api(tmp_path, demo=False))
+    for page in ("/", "/engineer"):
+        d = demo.get(page).text
+        assert 'class="demo-banner"' in d and 'class="demo-mode"' in d
+        assert "demo-banner" not in real.get(page).text
