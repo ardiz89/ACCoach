@@ -15,6 +15,25 @@ let HOVER_WIRED = false;
 let MAP_HIT = null;   // {rv, X, Y} screen transform captured by drawMap, for map hover
 const MAP_READOUT_DEFAULT = () => t("map.readout");
 
+// Delta palette, read from the CSS --red/--green vars so the colour-blind toggle
+// (header ◑) reaches the canvas-drawn map line and delta-chart tints too, not
+// just the CSS surfaces. Refreshed on load and whenever the toggle flips.
+let PAL = { slow: [255, 77, 94], fast: [52, 224, 138] };
+function _hexRgb(s) {
+  const m = (s || "").trim().match(/^#?([0-9a-fA-F]{6})$/);
+  if (!m) return null;
+  const n = parseInt(m[1], 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+function refreshPalette() {
+  const cs = getComputedStyle(document.body);
+  PAL.slow = _hexRgb(cs.getPropertyValue("--red")) || PAL.slow;
+  PAL.fast = _hexRgb(cs.getPropertyValue("--green")) || PAL.fast;
+}
+// Apply the saved preference before first paint, then load the active palette.
+document.body.classList.toggle("cb-safe", localStorage.getItem("hone_cb") === "1");
+refreshPalette();
+
 function fmtMs(ms) {
   if (!ms || ms <= 0) return "--:--.---";
   const m = Math.floor(ms / 60000);
@@ -95,6 +114,42 @@ function wireTour() {
   if (btn && window.HoneTour) {
     btn.onclick = () => window.HoneTour.start(tourSteps(), "hone_tour_analysis");
   }
+}
+
+// Redraw whatever view is on screen from the in-memory payload (no refetch for
+// compare/map; sectors/progress re-run their loader). Shared by resize + the
+// colour-blind toggle.
+function redrawCurrentView() {
+  if (VIEW === "map") { if (DATA) drawMap(DATA, null); }
+  else if (VIEW === "sectors") { if (CURRENT) loadSectors(); }
+  else if (VIEW === "progress") { if (CURRENT) loadProgress(CURRENT); }
+  else if (DATA) redraw(LAST_HOVER);   // compare
+}
+
+// Colour-blind palette toggle, dropped next to the tour "?" button. Persisted in
+// localStorage and applied before first paint (see top of file); clicking flips
+// the body class, reloads the palette and repaints the canvases.
+function wireCbToggle() {
+  const help = document.querySelector(".tour-help");
+  if (!help || !help.parentNode) return;
+  if (document.querySelector(".cb-toggle")) return;
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "cb-toggle";
+  btn.textContent = "◑";
+  const label = () => (window.HoneI18n ? window.HoneI18n.t("cb.label") : "Colour-blind palette");
+  btn.title = label();
+  btn.setAttribute("aria-label", label());
+  btn.setAttribute("aria-pressed", document.body.classList.contains("cb-safe") ? "true" : "false");
+  btn.onclick = () => {
+    const on = !document.body.classList.contains("cb-safe");
+    document.body.classList.toggle("cb-safe", on);
+    btn.setAttribute("aria-pressed", on ? "true" : "false");
+    try { localStorage.setItem("hone_cb", on ? "1" : "0"); } catch (e) {}
+    refreshPalette();
+    redrawCurrentView();
+  };
+  help.parentNode.insertBefore(btn, help.nextSibling);
 }
 
 function wireTabs() {
@@ -310,11 +365,15 @@ function deltaColor(d, m) {
   // Colour is doubled up with segment width (see drawMap) so the read survives
   // red/green colour-blindness — the line gets THICKER the more time is lost.
   const t = Math.max(-1, Math.min(1, d / (m || 1)));
-  // Near-zero delta is neutral grey, not a faint "slower" pink: a segment where
+  // Near-zero delta is neutral grey, not a faint "slower" tint: a segment where
   // you neither gain nor lose shouldn't read as a (tiny) loss.
   if (Math.abs(t) < 0.04) return "rgb(150,156,166)";
-  if (t > 0) return `rgb(255,${Math.round(220 - 143 * t)},${Math.round(225 - 131 * t)})`;  // pale -> #FF4D5E
-  return `rgb(${Math.round(232 + 180 * t)},${224},${Math.round(228 + 90 * t)})`;            // pale -> #34E08A
+  // Interpolate pale -> the active palette colour (slow/fast), so the colour-
+  // blind toggle changes this too. Colour is doubled with width (see drawMap).
+  const c = t > 0 ? PAL.slow : PAL.fast;
+  const f = Math.abs(t), pale = 235;
+  const mix = (x) => Math.round(pale + (x - pale) * f);
+  return `rgb(${mix(c[0])},${mix(c[1])},${mix(c[2])})`;
 }
 
 function drawMap(a, cx) {
@@ -641,8 +700,9 @@ function drawDelta(a, cx) {
   const d = a.review.delta;
   let m = 0.05;
   for (const v of d.delta_s) m = Math.max(m, Math.abs(v));
-  ctx.fillStyle = "rgba(255,59,48,0.10)"; ctx.fillRect(0, 0, w, h / 2);
-  ctx.fillStyle = "rgba(34,221,102,0.10)"; ctx.fillRect(0, h / 2, w, h / 2);
+  const tint = (c) => `rgba(${c[0]},${c[1]},${c[2]},0.10)`;
+  ctx.fillStyle = tint(PAL.slow); ctx.fillRect(0, 0, w, h / 2);
+  ctx.fillStyle = tint(PAL.fast); ctx.fillRect(0, h / 2, w, h / 2);
   cornerBands(ctx, w, h, a.corners);
   ctx.strokeStyle = "rgba(255,255,255,0.25)";
   ctx.beginPath(); ctx.moveTo(0, h / 2); ctx.lineTo(w, h / 2); ctx.stroke();
@@ -797,17 +857,17 @@ let _resizeTimer = null;
 window.addEventListener("resize", () => {
   if (!CURRENT) return;
   clearTimeout(_resizeTimer);
-  _resizeTimer = setTimeout(() => {
-    if (VIEW === "map") { if (DATA) drawMap(DATA, null); }
-    else if (VIEW === "sectors") loadSectors();
-    else if (VIEW === "progress") loadProgress(CURRENT);
-    else redraw(null);                 // compare: redraw from DATA
-  }, 150);
+  _resizeTimer = setTimeout(redrawCurrentView, 150);
 });
 // Live language switch: i18n.js already re-applied the static chrome; here we
 // re-render the dynamic, JS-built parts in the new language without a reload,
 // keeping the current combo/lap selection and hover position.
 window.HoneI18nRerender = function () {
+  const cb = document.querySelector(".cb-toggle");
+  if (cb && window.HoneI18n) {
+    cb.title = window.HoneI18n.t("cb.label");
+    cb.setAttribute("aria-label", window.HoneI18n.t("cb.label"));
+  }
   fillCombos();
   if (DATA) fillLaps(DATA, true);
   if (VIEW === "compare") {
@@ -827,4 +887,5 @@ window.HoneI18nRerender = function () {
 };
 
 wireTour();
+wireCbToggle();
 init();
