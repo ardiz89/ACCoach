@@ -22,9 +22,8 @@ corners you don't brake for and through normal corner exits).
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-
 from ..telemetry.snapshot import ACStatus, TelemetrySnapshot
+from ._detector import Episode, make_cue, step
 from .cue import Cue, CueCategory
 
 _MIN_SPEED_KMH = 80.0       # technique only matters at pace
@@ -43,27 +42,19 @@ _STEER_BACK = 0.05          # steering must drop below this to re-arm turn-in
 _RECENT_BRAKE_S = 0.8       # how recently the hard stop must have been
 _EXIT_THROTTLE = 0.20       # above this we're on exit, not entry — ignore
 
-_EVENT_SEGMENTS = 20
 _PRIORITY = 270.0           # useful entry advice, below acute slides/locks
-
-
-@dataclass(slots=True)
-class _Episode:
-    active: bool = False
-    since: float = 0.0
-    fired: bool = False
 
 
 class BrakingDetector:
     """Stateful: fed (snapshot, now) each frame, yields braking-technique cues."""
 
     def __init__(self) -> None:
-        self._coast = _Episode()
+        self._coast = Episode()
         self._last_hard_brake_t = -1e9
         self._in_turn = False
 
     def reset(self) -> None:
-        self._coast = _Episode()
+        self._coast = Episode()
         self._last_hard_brake_t = -1e9
         self._in_turn = False
 
@@ -82,13 +73,13 @@ class BrakingDetector:
         if s.brake >= _BRAKE_HARD:
             self._last_hard_brake_t = now
 
-        if self._step(self._coast, self._is_coasting(s), now):
-            cues.append(self._make(s, CueCategory.COASTING,
-                                   "Stai veleggiando: riduci il tempo morto fra freno e gas"))
+        if step(self._coast, self._is_coasting(s), now, _COAST_HOLD_S):
+            cues.append(make_cue(s, CueCategory.COASTING,
+                                 "Stai veleggiando: riduci il tempo morto fra freno e gas", _PRIORITY))
 
         if self._trail_fault(s, now):
-            cues.append(self._make(s, CueCategory.TRAIL_BRAKE,
-                                   "Rilasci il freno troppo presto: portane un filo fino all'inserimento"))
+            cues.append(make_cue(s, CueCategory.TRAIL_BRAKE,
+                                 "Rilasci il freno troppo presto: portane un filo fino all'inserimento", _PRIORITY))
         return cues
 
     # --- conditions -------------------------------------------------------
@@ -114,24 +105,3 @@ class BrakingDetector:
             and s.brake < _BRAKE_RELEASED
             and s.throttle < _EXIT_THROTTLE
         )
-
-    # --- debounce ---------------------------------------------------------
-    @staticmethod
-    def _step(ep: _Episode, cond: bool, now: float) -> bool:
-        if cond:
-            if not ep.active:
-                ep.active = True
-                ep.since = now
-                ep.fired = False
-            elif not ep.fired and now - ep.since >= _COAST_HOLD_S:
-                ep.fired = True
-                return True
-        else:
-            ep.active = False
-        return False
-
-    @staticmethod
-    def _make(s: TelemetrySnapshot, category: CueCategory, message: str) -> Cue:
-        seg = min(_EVENT_SEGMENTS - 1, max(0, int(s.lap_position * _EVENT_SEGMENTS)))
-        return Cue(category=category, message=message,
-                   priority=_PRIORITY, segment=seg, pos=s.lap_position)

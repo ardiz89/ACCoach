@@ -29,9 +29,8 @@ deliberately conservative first guesses; tighten them against a real session.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-
 from ..telemetry.snapshot import ACStatus, TelemetrySnapshot
+from ._detector import Episode, make_cue, step
 from .cue import Cue, CueCategory
 
 # Calibrated against live AC (2026-06-26): in clean corners steer*yaw_rate was
@@ -55,27 +54,19 @@ _STEER_CATCH = 0.04        # rad of (opposite) lock that counts as a correction
 _YAW_LOOSE = 0.30          # rad/s of rotation that counts as the rear stepping out
 
 _MIN_HOLD_S = 0.15         # sustain time before a balance fault fires
-_EVENT_SEGMENTS = 20       # granularity for de-duplicating by location
 _PRIORITY_BASE = 280.0     # just below lock-up/wheelspin, above segment time-loss
-
-
-@dataclass(slots=True)
-class _Episode:
-    active: bool = False
-    since: float = 0.0
-    fired: bool = False
 
 
 class BalanceDetector:
     """Stateful: fed (snapshot, now) each frame, yields understeer/oversteer cues."""
 
     def __init__(self) -> None:
-        self._push = _Episode()
-        self._loose = _Episode()
+        self._push = Episode()
+        self._loose = Episode()
 
     def reset(self) -> None:
-        self._push = _Episode()
-        self._loose = _Episode()
+        self._push = Episode()
+        self._loose = Episode()
 
     def update(self, s: TelemetrySnapshot, now: float) -> list[Cue]:
         if not (s.connected and s.status == ACStatus.LIVE) or s.in_pit:
@@ -87,12 +78,12 @@ class BalanceDetector:
         # story, not a push, and the two conditions are mutually exclusive anyway.
         loose = self._is_oversteer(s)
         push = self._is_understeer(s) and not loose
-        if self._step(self._loose, loose, now):
-            cues.append(self._make(s, CueCategory.OVERSTEER,
-                                   "Sovrasterzo, sii più dolce col gas in uscita"))
-        if self._step(self._push, push, now):
-            cues.append(self._make(s, CueCategory.UNDERSTEER,
-                                   "L'anteriore scivola, entra più piano"))
+        if step(self._loose, loose, now, _MIN_HOLD_S):
+            cues.append(make_cue(s, CueCategory.OVERSTEER,
+                                 "Sovrasterzo, sii più dolce col gas in uscita", _PRIORITY_BASE))
+        if step(self._push, push, now, _MIN_HOLD_S):
+            cues.append(make_cue(s, CueCategory.UNDERSTEER,
+                                 "L'anteriore scivola, entra più piano", _PRIORITY_BASE))
         return cues
 
     # --- conditions -------------------------------------------------------
@@ -118,24 +109,3 @@ class BalanceDetector:
             abs(s.steer_angle) >= _STEER_CATCH and s.steer_angle * yaw < 0.0
         )
         return abs(yaw) >= _YAW_LOOSE and applying_opposite_lock
-
-    # --- debounce (identical contract to EventDetector) -------------------
-    @staticmethod
-    def _step(ep: _Episode, cond: bool, now: float) -> bool:
-        if cond:
-            if not ep.active:
-                ep.active = True
-                ep.since = now
-                ep.fired = False
-            elif not ep.fired and now - ep.since >= _MIN_HOLD_S:
-                ep.fired = True
-                return True
-        else:
-            ep.active = False
-        return False
-
-    @staticmethod
-    def _make(s: TelemetrySnapshot, category: CueCategory, message: str) -> Cue:
-        seg = min(_EVENT_SEGMENTS - 1, max(0, int(s.lap_position * _EVENT_SEGMENTS)))
-        return Cue(category=category, message=message,
-                   priority=_PRIORITY_BASE, segment=seg, pos=s.lap_position)

@@ -26,9 +26,8 @@ at the same corner. Time is injected (``now``, monotonic seconds) for testabilit
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-
 from ..telemetry.snapshot import ACStatus, TelemetrySnapshot
+from ._detector import Episode, make_cue, step
 from .cue import Cue, CueCategory
 
 # Braking / lock-up
@@ -66,27 +65,19 @@ _SPIN_RATIO = 0.10         # rear slip ratio: wheel ≥10% faster than ground
 _RATIO_MIN_SPEED = 40.0    # km/h
 
 _MIN_HOLD_S = 0.12         # sustain time before an event fires
-_EVENT_SEGMENTS = 20       # granularity for de-duplicating by location
 _PRIORITY_BASE = 300.0     # ranks above most segment time-loss cues
-
-
-@dataclass(slots=True)
-class _Episode:
-    active: bool = False
-    since: float = 0.0
-    fired: bool = False
 
 
 class EventDetector:
     """Stateful: fed (snapshot, now) each frame, yields lock-up/wheelspin cues."""
 
     def __init__(self) -> None:
-        self._lock = _Episode()
-        self._spin = _Episode()
+        self._lock = Episode()
+        self._spin = Episode()
 
     def reset(self) -> None:
-        self._lock = _Episode()
-        self._spin = _Episode()
+        self._lock = Episode()
+        self._spin = Episode()
 
     def update(self, s: TelemetrySnapshot, now: float) -> list[Cue]:
         if not (s.connected and s.status == ACStatus.LIVE) or s.in_pit:
@@ -94,12 +85,12 @@ class EventDetector:
             return []
 
         cues: list[Cue] = []
-        if self._step(self._lock, self._is_lockup(s), now):
-            cues.append(self._make(s, CueCategory.LOCKED,
-                                   "Bloccaggio, alleggerisci il freno"))
-        if self._step(self._spin, self._is_wheelspin(s), now):
-            cues.append(self._make(s, CueCategory.WHEELSPIN,
-                                   "Pattini in uscita, meno gas"))
+        if step(self._lock, self._is_lockup(s), now, _MIN_HOLD_S):
+            cues.append(make_cue(s, CueCategory.LOCKED,
+                                 "Bloccaggio, alleggerisci il freno", _PRIORITY_BASE))
+        if step(self._spin, self._is_wheelspin(s), now, _MIN_HOLD_S):
+            cues.append(make_cue(s, CueCategory.WHEELSPIN,
+                                 "Pattini in uscita, meno gas", _PRIORITY_BASE))
         return cues
 
     # --- conditions -------------------------------------------------------
@@ -121,25 +112,3 @@ class EventDetector:
             return True
         rear_ratio = max(s.slip_ratio[2], s.slip_ratio[3])   # fastest-spinning rear
         return s.speed_kmh >= _RATIO_MIN_SPEED and rear_ratio >= _SPIN_RATIO
-
-    # --- debounce ---------------------------------------------------------
-    @staticmethod
-    def _step(ep: _Episode, cond: bool, now: float) -> bool:
-        """Advance an episode; return True exactly once when it fires."""
-        if cond:
-            if not ep.active:
-                ep.active = True
-                ep.since = now
-                ep.fired = False
-            elif not ep.fired and now - ep.since >= _MIN_HOLD_S:
-                ep.fired = True
-                return True
-        else:
-            ep.active = False
-        return False
-
-    @staticmethod
-    def _make(s: TelemetrySnapshot, category: CueCategory, message: str) -> Cue:
-        seg = min(_EVENT_SEGMENTS - 1, max(0, int(s.lap_position * _EVENT_SEGMENTS)))
-        return Cue(category=category, message=message,
-                   priority=_PRIORITY_BASE, segment=seg, pos=s.lap_position)
