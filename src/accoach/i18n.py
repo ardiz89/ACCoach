@@ -122,6 +122,8 @@ _UI: dict[str, dict[str, str]] = {
     "set.voice": {"en": "Coach voice", "it": "Voce del coach"},
     "set.engineer_voice": {"en": "Speak engineer proposals",
                            "it": "Annuncia proposte ingegnere"},
+    "set.male_voice": {"en": "Male voice", "it": "Voce maschile"},
+    "set.radio": {"en": "Team-radio effect", "it": "Effetto radio di pista"},
     "set.rate": {"en": "Reading speed (wpm)", "it": "Velocità lettura (ppm)"},
     "set.scale": {"en": "Overlay scale", "it": "Scala overlay"},
     "set.scale_hint": {"en": "Applies on the next Coach Live start.",

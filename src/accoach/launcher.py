@@ -222,6 +222,14 @@ class Settings(QDialog):
         self._engineer_voice.setChecked(cfg.voice.engineer)
         form.addRow(t("set.engineer_voice"), self._engineer_voice)
 
+        self._male = QCheckBox()
+        self._male.setChecked(cfg.voice.male)
+        form.addRow(t("set.male_voice"), self._male)
+
+        self._radio = QCheckBox()
+        self._radio.setChecked(cfg.voice.radio)
+        form.addRow(t("set.radio"), self._radio)
+
         self._rate = QSpinBox()
         self._rate.setRange(80, 300)
         self._rate.setValue(cfg.voice.rate)
@@ -252,6 +260,8 @@ class Settings(QDialog):
         cfg = load_config()
         cfg.voice.enabled = self._voice.isChecked()
         cfg.voice.engineer = self._engineer_voice.isChecked()
+        cfg.voice.male = self._male.isChecked()
+        cfg.voice.radio = self._radio.isChecked()
         cfg.voice.rate = self._rate.value()
         cfg.overlay.scale = round(self._scale.value(), 2)
         save_config(cfg)

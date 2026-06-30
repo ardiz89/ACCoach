@@ -52,10 +52,12 @@ def main(argv: list[str] | None = None) -> None:
 
         engine = make_demo_engine()
         if voice_on:
-            engine.voice = Voice(enabled=True, rate=cfg.voice.rate, language=lang)
+            engine.voice = Voice(enabled=True, rate=cfg.voice.rate, language=lang,
+                                 male=cfg.voice.male, radio=cfg.voice.radio)
     else:
         engine = CoachEngine(
-            voice=Voice(enabled=voice_on, rate=cfg.voice.rate, language=lang),
+            voice=Voice(enabled=voice_on, rate=cfg.voice.rate, language=lang,
+                        male=cfg.voice.male, radio=cfg.voice.radio),
             acquire_hz=cfg.acquire.hz, engineer_voice=cfg.voice.engineer)
 
     app = QApplication(sys.argv)
