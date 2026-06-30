@@ -61,6 +61,13 @@ def real_boundaries(lap: Lap) -> list[float]:
         prev = v
     if len(distinct) < 2:
         return []
+    # Every sector 1..hi must have contributed a forward boundary. If one was
+    # skipped by decimation (samples jump e.g. 0→2, never landing in sector 1),
+    # we'd emit fewer spans than the sim actually has — a malformed split. Rather
+    # than report a wrong map, fall back to equal thirds.
+    hi = max(distinct)
+    if any(v not in bounds for v in range(1, hi + 1)):
+        return []
     bs = sorted(round(p, 4) for v, p in bounds.items() if v > 0)
     # Drop any non-increasing duplicates that decimation noise could introduce.
     out: list[float] = []

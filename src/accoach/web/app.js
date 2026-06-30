@@ -310,7 +310,10 @@ function deltaColor(d, m) {
   // Colour is doubled up with segment width (see drawMap) so the read survives
   // red/green colour-blindness — the line gets THICKER the more time is lost.
   const t = Math.max(-1, Math.min(1, d / (m || 1)));
-  if (t >= 0) return `rgb(255,${Math.round(220 - 143 * t)},${Math.round(225 - 131 * t)})`; // pale -> #FF4D5E
+  // Near-zero delta is neutral grey, not a faint "slower" pink: a segment where
+  // you neither gain nor lose shouldn't read as a (tiny) loss.
+  if (Math.abs(t) < 0.04) return "rgb(150,156,166)";
+  if (t > 0) return `rgb(255,${Math.round(220 - 143 * t)},${Math.round(225 - 131 * t)})`;  // pale -> #FF4D5E
   return `rgb(${Math.round(232 + 180 * t)},${224},${Math.round(228 + 90 * t)})`;            // pale -> #34E08A
 }
 

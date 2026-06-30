@@ -76,3 +76,13 @@ def test_engine_closed_on_shutdown():
     with TestClient(create_app(engine=eng, hz=50)):
         pass
     assert eng.closed is True
+
+
+def test_invalid_hz_does_not_crash():
+    # A misconfigured hz=0 must not blow up (1/hz) at startup; it falls back to a
+    # sane rate and still broadcasts.
+    eng = _StubEngine()
+    with TestClient(create_app(engine=eng, hz=0)) as client:
+        with client.websocket_connect("/ws") as ws:
+            json.loads(ws.receive_text())   # a broadcast still arrives
+        assert client.get("/health").status_code == 200

@@ -35,6 +35,19 @@ def test_real_boundaries_ignore_trailing_wrap_sample():
     assert abs(bs[1] - 0.65) < 0.02      # not dragged down to ~0
 
 
+def test_skipped_sector_index_falls_back_to_thirds():
+    # If decimation drops every sample of an intermediate sector (index jumps
+    # 0 -> 2, never landing in 1) we'd emit one boundary instead of two — a
+    # malformed split. Detecting the missing boundary must fall back to thirds.
+    lap = synth.build_lap()
+    for smp in lap.samples:
+        smp.current_sector = 0 if smp.pos < 0.5 else 2   # sector 1 never appears
+    assert real_boundaries(lap) == []
+    spans, real = sector_spans(lap)
+    assert real is False
+    assert spans == sector_bounds(3)
+
+
 def test_real_spans_used_when_available():
     lap = synth.build_lap()
     spans, real = sector_spans(lap)

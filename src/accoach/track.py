@@ -17,7 +17,11 @@ Detection is deliberately dependency-light (no numpy):
    exit" can be judged), within small caps.
 
 Corners straddling the start/finish line are uncommon (the line is normally on a
-straight) and are not handled specially in this version.
+straight). We don't model a corner as wrapping across the line (its position
+span stays within [0,1]); instead the trailing half is kept as a normal corner
+(its exit just truncates at the line) and the spurious exit-only stub that the
+*next* lap's start would add is suppressed, so it can't inject a phantom corner
+and shift every corner's number by one.
 """
 
 from __future__ import annotations
@@ -123,6 +127,15 @@ def detect_corners(samples) -> list[Corner]:
         for k in range(a, b + 1):
             if aspd[k] < aspd[apex]:
                 apex = k
+
+        # A run pinned to the lap start (a==0) whose speed only rises (apex at the
+        # very first sample) and that carries no braking is not a corner of its
+        # own: it's the exit tail of a corner straddling start/finish, whose entry
+        # and apex live at the END of the lap (kept as the final corner). Keeping
+        # it would inject a phantom "corner 0" and renumber every corner. Drop it.
+        # No-op when s/f is on a straight (no cornering run at pos≈0).
+        if a == 0 and apex == a and max(brake[a:b + 1]) < _BRAKE_TRAIL:
+            continue
 
         # 3) extend entry back over the braking zone
         e = a
