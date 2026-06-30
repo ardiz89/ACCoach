@@ -30,7 +30,7 @@ PIPER_EXE = PIPER / "piper.exe"
 # male is an optional drop-in the runtime prefers when the male option is on.
 _VARIANTS = {
     "female": (ROOT / "src" / "accoach" / "voice_cues", "voices/it_IT-paola-medium.onnx"),
-    "male": (ROOT / "src" / "accoach" / "voice_cues_male", "voices/it_IT-riccardo-medium.onnx"),
+    "male": (ROOT / "src" / "accoach" / "voice_cues_male", "voices/it_IT-riccardo-x_low.onnx"),
 }
 
 
@@ -110,9 +110,9 @@ def main() -> None:
         fname = slug(text) + ".wav"
         if render(text, out / fname, model):
             manifest[text] = fname
-            print(f"  ✓ {text}")
+            print(f"  OK   {text}")
         else:
-            print(f"  ✗ FAILED: {text}")
+            print(f"  FAIL {text}")
 
     (out / "manifest.json").write_text(
         json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
