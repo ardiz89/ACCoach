@@ -63,3 +63,42 @@ def test_fires_once_per_episode():
     det = BalanceDetector()
     out, _ = _hold(det, _snap(0.25, 0.05), frames=20)
     assert sum(c.category is CueCategory.UNDERSTEER for c in out) == 1
+
+
+def _feed(det, frames, dt=0.05, start=0.0):
+    """Feed a list of (steer, yaw) snapshots one frame apart."""
+    out, now = [], start
+    for steer, yaw in frames:
+        out += det.update(_snap(steer, yaw), now)
+        now += dt
+    return out, now
+
+
+def test_understeer_turnin_transient_is_silent():
+    # Turn-in: the driver winds lock on (0.05 → 0.30) while yaw_rate still lags.
+    # yaw/steer dips low here on ANY car — must not be called understeer.
+    det = BalanceDetector()
+    ramp = [(0.05, 0.02), (0.12, 0.04), (0.20, 0.06), (0.28, 0.08), (0.30, 0.10)]
+    out, _ = _feed(det, ramp)
+    assert not any(c.category is CueCategory.UNDERSTEER for c in out)
+
+
+def test_understeer_fires_once_steering_settles():
+    # Same brisk turn-in, but then the wheel settles and the car still won't
+    # rotate (yaw stuck low) — that IS a push and should fire after the hold.
+    det = BalanceDetector()
+    ramp = [(0.05, 0.02), (0.15, 0.04), (0.25, 0.05), (0.30, 0.05)]
+    settled = [(0.30, 0.05)] * 8            # wheel steady, car pushing
+    out, _ = _feed(det, ramp + settled)
+    assert any(c.category is CueCategory.UNDERSTEER for c in out)
+
+
+def test_balanced_turnin_never_fires():
+    # Wind lock on, then the car rotates as asked (yaw catches up to ratio ~1.9).
+    # Clean corner => steer and RAW yaw have opposite signs in this game, so a
+    # balanced right-hand turn-in has NEGATIVE yaw growing with the lock.
+    det = BalanceDetector()
+    ramp = [(0.05, -0.02), (0.15, -0.10), (0.25, -0.30), (0.30, -0.50)]
+    settled = [(0.30, -0.57)] * 8          # yaw/steer ≈ 1.9, clean
+    out, _ = _feed(det, ramp + settled)
+    assert out == []

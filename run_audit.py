@@ -87,6 +87,10 @@ def _raw_oversteer(s) -> bool:
 
 
 def _raw_understeer(s) -> bool:
+    # Ground-truth RAW ratio only (stateless): the live BalanceDetector additionally
+    # suppresses the turn-in transient (steer still winding on — yaw lags), so a
+    # raw_understeer that has NO matching spoken cue near turn-in is that filter
+    # working, not a miss. See balance._winding_on / _TURNIN_RATE.
     if s.speed_kmh < _BAL_MIN_SPEED or _raw_oversteer(s):
         return False
     steer = abs(s.steer_angle)
