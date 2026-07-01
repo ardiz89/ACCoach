@@ -6,6 +6,10 @@ f-strings / dynamic numeric phrases, which fall back to SAPI5 at runtime),
 synthesizes each with Piper's Italian voice, and writes them to
 `src/accoach/voice_cues/<slug>.wav` plus a `manifest.json` (message -> filename)
 that the runtime PrerenderedBackend loads. Re-run whenever cue phrases change.
+
+Pass `--male` to render the optional male neural set (Piper it_IT-riccardo) into
+`src/accoach/voice_cues_male/`; the runtime uses it when the "male voice" option
+is on, otherwise that option falls back to a male SAPI5 voice.
 """
 
 from __future__ import annotations
@@ -19,10 +23,15 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 COACHING = ROOT / "src" / "accoach" / "coaching"
-OUT = ROOT / "src" / "accoach" / "voice_cues"
 PIPER = ROOT / "tools" / "piper"
 PIPER_EXE = PIPER / "piper.exe"
-MODEL = "voices/it_IT-paola-medium.onnx"
+
+# (output folder, Piper model) per voice variant. Female is the shipped default;
+# male is an optional drop-in the runtime prefers when the male option is on.
+_VARIANTS = {
+    "female": (ROOT / "src" / "accoach" / "voice_cues", "voices/it_IT-paola-medium.onnx"),
+    "male": (ROOT / "src" / "accoach" / "voice_cues_male", "voices/it_IT-riccardo-x_low.onnx"),
+}
 
 
 def static_cue_messages() -> set[str]:
@@ -74,36 +83,40 @@ def slug(text: str) -> str:
     return f"cue_{h}"
 
 
-def render(text: str, dest: Path) -> bool:
+def render(text: str, dest: Path, model: str) -> bool:
     p = subprocess.run(
-        [str(PIPER_EXE), "-m", MODEL, "-f", str(dest)],
+        [str(PIPER_EXE), "-m", model, "-f", str(dest)],
         input=text, text=True, capture_output=True, cwd=str(PIPER),
     )
     return p.returncode == 0 and dest.exists()
 
 
 def main() -> None:
+    variant = "male" if "--male" in sys.argv[1:] else "female"
+    out, model = _VARIANTS[variant]
+
     if not PIPER_EXE.exists():
         print("Piper not found at", PIPER_EXE)
         print("Download piper_windows_amd64.zip + an Italian voice into tools/piper/")
         raise SystemExit(1)
 
-    OUT.mkdir(parents=True, exist_ok=True)
+    out.mkdir(parents=True, exist_ok=True)
     messages = sorted(static_cue_messages() | dynamic_cue_messages())
-    print(f"rendering {len(messages)} cue phrases (static + numeric) with Piper…")
+    print(f"rendering {len(messages)} cue phrases (static + numeric) "
+          f"with Piper [{variant}: {model}]…")
 
     manifest: dict[str, str] = {}
     for text in messages:
         fname = slug(text) + ".wav"
-        if render(text, OUT / fname):
+        if render(text, out / fname, model):
             manifest[text] = fname
-            print(f"  ✓ {text}")
+            print(f"  OK   {text}")
         else:
-            print(f"  ✗ FAILED: {text}")
+            print(f"  FAIL {text}")
 
-    (OUT / "manifest.json").write_text(
+    (out / "manifest.json").write_text(
         json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"\nwrote {len(manifest)} WAVs + manifest.json to {OUT}")
+    print(f"\nwrote {len(manifest)} WAVs + manifest.json to {out}")
 
 
 if __name__ == "__main__":

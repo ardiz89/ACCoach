@@ -2,7 +2,7 @@
 from PyInstaller.utils.hooks import collect_submodules
 from PyInstaller.utils.hooks import collect_all
 
-datas = [('src/accoach/web', 'accoach/web'), ('src/accoach/voice_cues', 'accoach/voice_cues'), ('GUIDA.md', '.')]
+datas = [('src/accoach/web', 'accoach/web'), ('src/accoach/voice_cues', 'accoach/voice_cues'), ('src/accoach/voice_cues_male', 'accoach/voice_cues_male'), ('GUIDA.md', '.')]
 binaries = []
 hiddenimports = ['pyttsx3.drivers', 'pyttsx3.drivers.sapi5']
 hiddenimports += collect_submodules('uvicorn')

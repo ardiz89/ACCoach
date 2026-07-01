@@ -129,7 +129,8 @@ def main(argv: list[str] | None = None) -> None:
     from .config import load_config
     cfg = load_config()
     voice = Voice(enabled=(not silent) and cfg.voice.enabled,
-                  rate=cfg.voice.rate, language=cfg.language)
+                  rate=cfg.voice.rate, language=cfg.language,
+                  male=cfg.voice.male, radio=cfg.voice.radio)
     engine = CoachEngine(voice=voice, acquire_hz=cfg.acquire.hz,
                          engineer_voice=cfg.voice.engineer)
 

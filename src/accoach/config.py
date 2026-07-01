@@ -42,6 +42,10 @@ class VoiceCfg:
     # Speak the race engineer's setup proposals aloud (in addition to the
     # Engineer page). Independent of the per-cue coaching voice above.
     engineer: bool = True
+    # Prefer an installed male system voice (skips the shipped neural cues).
+    male: bool = False
+    # Pit-to-car radio effect (band-pass + squelch) on whatever is spoken.
+    radio: bool = True
 
 
 @dataclass
@@ -108,6 +112,8 @@ hz = 60.0            # telemetry sampling rate (recording fidelity)
 enabled = true       # coach voice on/off
 rate = 165           # reading speed (words/min approx.)
 engineer = true      # also speak the race engineer's setup proposals
+male = false         # use an installed male system voice instead of the default
+radio = true         # pit-to-car radio effect on the voice (band-pass + squelch)
 
 [overlay]
 x = -1               # overlay X (px); -1 = auto top-centre (drag it in --interactive)
@@ -177,6 +183,8 @@ hz = {cfg.acquire.hz}            # telemetry sampling rate (recording fidelity)
 enabled = {b(cfg.voice.enabled)}       # coach voice on/off
 rate = {cfg.voice.rate}           # reading speed (words/min approx.)
 engineer = {b(cfg.voice.engineer)}      # also speak the race engineer's setup proposals
+male = {b(cfg.voice.male)}         # use an installed male system voice instead of the default
+radio = {b(cfg.voice.radio)}         # pit-to-car radio effect on the voice (band-pass + squelch)
 
 [overlay]
 x = {cfg.overlay.x}               # overlay X (px); -1 = auto top-centre
