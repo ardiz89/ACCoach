@@ -7,7 +7,9 @@ asking with the wheel, and names the two faults that cost the most mid-corner:
 * **Understeer (push)** — lots of steering lock and real cornering speed, but the
   car isn't rotating: ``yaw_rate`` stays low while ``steer_angle`` is large. The
   nose is washing out; you carried too much speed in or you're on the power too
-  early.
+  early. Judged only once the steering has **settled**: during turn-in the yaw
+  naturally lags the wheel, so a still-winding-on transient is not a push (see
+  ``_winding_on`` / ``_TURNIN_RATE``).
 * **Oversteer (loose)** — the rear is coming round faster than you steered for.
   The giveaway is **opposite lock**: the front wheels point one way while the car
   yaws the other (``steer_angle`` and ``yaw_rate`` have opposite signs). That's
@@ -56,6 +58,13 @@ _YAW_LOOSE = 0.30          # rad/s of rotation that counts as the rear stepping 
 _MIN_HOLD_S = 0.15         # sustain time before a balance fault fires
 _PRIORITY_BASE = 280.0     # just below lock-up/wheelspin, above segment time-loss
 
+# Turn-in guard: yaw_rate always LAGS the steering input — when the driver is
+# still winding lock ON, the car hasn't started rotating yet, so yaw/steer dips
+# low on a perfectly balanced car too. That transient is the classic understeer
+# false positive. Suppress the push test while lock is being added faster than
+# this (rad/s of |steer|); a genuine mid-corner push has settled steering.
+_TURNIN_RATE = 0.6
+
 
 class BalanceDetector:
     """Stateful: fed (snapshot, now) each frame, yields understeer/oversteer cues."""
@@ -63,10 +72,14 @@ class BalanceDetector:
     def __init__(self) -> None:
         self._push = Episode()
         self._loose = Episode()
+        self._prev_steer: float | None = None
+        self._prev_t: float | None = None
 
     def reset(self) -> None:
         self._push = Episode()
         self._loose = Episode()
+        self._prev_steer = None
+        self._prev_t = None
 
     def update(self, s: TelemetrySnapshot, now: float) -> list[Cue]:
         if not (s.connected and s.status == ACStatus.LIVE) or s.in_pit:
@@ -77,7 +90,10 @@ class BalanceDetector:
         # Oversteer takes precedence: if the rear is genuinely loose, that's the
         # story, not a push, and the two conditions are mutually exclusive anyway.
         loose = self._is_oversteer(s)
-        push = self._is_understeer(s) and not loose
+        # A push only counts once the steering has settled — while lock is still
+        # being wound on (turn-in), low yaw/steer is just the rotation lagging.
+        winding_on = self._winding_on(s.steer_angle, now)
+        push = self._is_understeer(s) and not loose and not winding_on
         if step(self._loose, loose, now, _MIN_HOLD_S):
             cues.append(make_cue(s, CueCategory.OVERSTEER,
                                  "Sovrasterzo, sii più dolce col gas in uscita", _PRIORITY_BASE))
@@ -87,6 +103,20 @@ class BalanceDetector:
         return cues
 
     # --- conditions -------------------------------------------------------
+    def _winding_on(self, steer: float, now: float) -> bool:
+        """True while the driver is adding lock quickly (the turn-in transient),
+        where yaw naturally lags. Stateful: compares |steer| against the previous
+        frame. The first frame of a corner has no rate yet → treated as transient
+        so a push never fires on the very first sample."""
+        prev_s, prev_t = self._prev_steer, self._prev_t
+        self._prev_steer, self._prev_t = steer, now
+        if prev_s is None or prev_t is None:
+            return True
+        dt = now - prev_t
+        if dt <= 0.0:
+            return False
+        return (abs(steer) - abs(prev_s)) / dt > _TURNIN_RATE
+
     @staticmethod
     def _is_understeer(s: TelemetrySnapshot) -> bool:
         if s.speed_kmh < _MIN_SPEED_KMH:
