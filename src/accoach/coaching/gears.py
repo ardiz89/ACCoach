@@ -21,9 +21,8 @@ against a live session if a car's powerband sits unusually low.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-
 from ..telemetry.snapshot import ACStatus, TelemetrySnapshot
+from ._detector import Episode, make_cue, step
 from .cue import Cue, CueCategory
 
 _ON_POWER = 0.85           # throttle that counts as "under power"
@@ -37,15 +36,7 @@ _BOG_MIN_SPEED = 40.0      # above a standing start
 _BOG_MAX_SPEED = 170.0     # a corner exit, not a top-gear straight
 
 _MIN_HOLD_S = 0.30
-_EVENT_SEGMENTS = 20
 _PRIORITY = 260.0
-
-
-@dataclass(slots=True)
-class _Episode:
-    active: bool = False
-    since: float = 0.0
-    fired: bool = False
 
 
 def _gear_num(gear: str) -> int | None:
@@ -57,13 +48,13 @@ class GearDetector:
     """Stateful: fed (snapshot, now) each frame, yields gear-selection cues."""
 
     def __init__(self) -> None:
-        self._limiter = _Episode()
-        self._bog = _Episode()
+        self._limiter = Episode()
+        self._bog = Episode()
         self._max_gear_seen = 1
 
     def reset(self) -> None:
-        self._limiter = _Episode()
-        self._bog = _Episode()
+        self._limiter = Episode()
+        self._bog = Episode()
         # Keep _max_gear_seen: it's a property of the car, not the lap.
 
     def update(self, s: TelemetrySnapshot, now: float) -> list[Cue]:
@@ -77,12 +68,12 @@ class GearDetector:
             self._max_gear_seen = max(self._max_gear_seen, gear)
 
         cues: list[Cue] = []
-        if self._step(self._limiter, self._is_limiter(s, gear), now):
-            cues.append(self._make(s, CueCategory.LIMITER,
-                                   "Sei sul limitatore, cambia prima"))
-        if self._step(self._bog, self._is_bogged(s, gear), now):
-            cues.append(self._make(s, CueCategory.GEAR_TOO_TALL,
-                                   "Marcia troppo lunga, scala per avere più spinta"))
+        if step(self._limiter, self._is_limiter(s, gear), now, _MIN_HOLD_S):
+            cues.append(make_cue(s, CueCategory.LIMITER,
+                                 "Sei sul limitatore, cambia prima", _PRIORITY))
+        if step(self._bog, self._is_bogged(s, gear), now, _MIN_HOLD_S):
+            cues.append(make_cue(s, CueCategory.GEAR_TOO_TALL,
+                                 "Marcia troppo lunga, scala per avere più spinta", _PRIORITY))
         return cues
 
     # --- conditions -------------------------------------------------------
@@ -101,24 +92,3 @@ class GearDetector:
         if not (_BOG_MIN_SPEED <= s.speed_kmh <= _BOG_MAX_SPEED):
             return False
         return s.rpm <= _BOG_FRAC * s.max_rpm
-
-    # --- debounce ---------------------------------------------------------
-    @staticmethod
-    def _step(ep: _Episode, cond: bool, now: float) -> bool:
-        if cond:
-            if not ep.active:
-                ep.active = True
-                ep.since = now
-                ep.fired = False
-            elif not ep.fired and now - ep.since >= _MIN_HOLD_S:
-                ep.fired = True
-                return True
-        else:
-            ep.active = False
-        return False
-
-    @staticmethod
-    def _make(s: TelemetrySnapshot, category: CueCategory, message: str) -> Cue:
-        seg = min(_EVENT_SEGMENTS - 1, max(0, int(s.lap_position * _EVENT_SEGMENTS)))
-        return Cue(category=category, message=message,
-                   priority=_PRIORITY, segment=seg, pos=s.lap_position)
