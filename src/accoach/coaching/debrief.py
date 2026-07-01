@@ -156,7 +156,14 @@ class LapDebrief:
 
     @property
     def is_reference(self) -> bool:
-        return self.reference_lap_ms >= self.lap_time_ms
+        if self.reference_lap_ms > self.lap_time_ms:
+            return True   # a new best — genuinely reference-grade
+        if self.reference_lap_ms < self.lap_time_ms:
+            return False  # slower than the reference
+        # Exact tie on total time: it's the reference only if there's nothing to
+        # learn. A lap that ties overall but bleeds time in some corners (offset
+        # by gains elsewhere) still has lessons — don't mislabel it as clean.
+        return not self.losses
 
 
 def _mean(xs: list[float]) -> float:

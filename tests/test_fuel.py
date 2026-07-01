@@ -27,10 +27,10 @@ def test_warning_sequence():
     assert out == []
     out, now = _lap(eng, 9.5, now)      # burn 2.5; remaining 3.8 -> none
     assert out == []
-    out, now = _lap(eng, 7.0, now)      # remaining 2.8 -> "3 giri"
-    assert any("3 giri" in c.message for c in out)
-    out, now = _lap(eng, 4.5, now)      # remaining 1.8 -> "2 giri"
+    out, now = _lap(eng, 7.0, now)      # remaining 2.8 -> floor "2 giri"
     assert any("2 giri" in c.message for c in out)
+    out, now = _lap(eng, 4.5, now)      # remaining 1.8 -> floor "1 giro"
+    assert any("1 giro" in c.message for c in out)
     out, now = _lap(eng, 2.0, now)      # remaining 0.8 -> last lap
     assert any(c.category is CueCategory.FUEL and "Ultimo giro" in c.message for c in out)
 
@@ -39,18 +39,18 @@ def test_each_warning_once():
     eng = FuelEngineer()
     out, now = _lap(eng, 12.0)
     out, now = _lap(eng, 9.5, now)
-    out, now = _lap(eng, 7.0, now)
-    assert sum("3 giri" in c.message for c in out) == 1
-    out2, now = _lap(eng, 6.0, now)
-    assert not any("3 giri" in c.message for c in out2)
+    out, now = _lap(eng, 7.0, now)      # remaining 2.8 -> floor "2 giri", once
+    assert sum("2 giri" in c.message for c in out) == 1
+    out2, now = _lap(eng, 6.0, now)     # remaining 2.4: no new threshold crossed
+    assert not any("2 giri" in c.message for c in out2)
 
 
 def test_refuel_resets():
     eng = FuelEngineer()
     out, now = _lap(eng, 12.0)
     out, now = _lap(eng, 9.5, now)
-    out, now = _lap(eng, 7.0, now)
-    assert any("3 giri" in c.message for c in out)
+    out, now = _lap(eng, 7.0, now)      # remaining 2.8 -> floor "2 giri"
+    assert any("2 giri" in c.message for c in out)
     out, now = _lap(eng, 30.0, now, in_pit=True)   # refuel
     assert out == []
     out, now = _lap(eng, 27.5, now)

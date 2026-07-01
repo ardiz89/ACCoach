@@ -17,6 +17,25 @@
   --font-mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
 }
 
+/* Colour-blind–safe palette: red/green delta cues are indistinguishable for the
+   ~8% of men with deutan/protan vision. Toggle (header ◑ button) remaps the two
+   delta colours to blue↔orange, which stay distinct across the common types.
+   Every slower/faster surface uses var(--red)/var(--green), so they all switch
+   together — and app.js drives the canvas map/delta colours from these too. */
+body.cb-safe {
+  --green: #3B82F6;     /* faster — blue   */
+  --red:   #F59E0B;     /* slower — orange */
+}
+
+/* DEMO banner — injected by the backend when serving synthetic laps, so a demo
+   server bound to the analysis port can never be mistaken for your real data. */
+.demo-banner {
+  position: sticky; top: 0; z-index: 100;
+  background: var(--amber); color: #1A1205;
+  text-align: center; font-weight: 700; font-size: 13px;
+  letter-spacing: .04em; padding: 6px 12px;
+}
+
 * { box-sizing: border-box; }
 
 body {
@@ -54,6 +73,18 @@ h1 span { color: var(--muted); font-weight: 400; }
   padding: 0;
 }
 .tour-help:hover { border-color: var(--cyan); color: var(--cyan); }
+
+/* Colour-blind palette toggle — same pill as the "?" button. */
+.cb-toggle {
+  width: 26px; height: 26px; border-radius: 50%;
+  background: var(--inset); color: var(--muted);
+  border: 1px solid var(--line); cursor: pointer;
+  font-size: 14px; line-height: 1;
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 0; margin-left: 6px;
+}
+.cb-toggle:hover { border-color: var(--cyan); color: var(--cyan); }
+.cb-toggle[aria-pressed="true"] { border-color: var(--cyan); color: var(--cyan); }
 
 /* Language selector — sits next to the "?" tour button in the header */
 .lang-select {

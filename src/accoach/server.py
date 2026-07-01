@@ -51,10 +51,15 @@ def create_app(engine: CoachEngine | None = None, hz: float = 15.0) -> FastAPI:
         "started": time.monotonic(), "prev_tick": 0.0,
         "tick_hz": None, "last_state": None,
     }
+    # A misconfigured hz (0 or negative) would make 1/hz blow up or busy-loop;
+    # fall back to a sane default instead of crashing the backend at startup.
+    if hz <= 0:
+        _log.warning("invalid broadcast hz=%r, falling back to 15", hz)
+        hz = 15.0
     interval = 1.0 / hz
 
     async def broadcast_loop() -> None:
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         while True:
             now = time.monotonic()
             try:
@@ -94,8 +99,18 @@ def create_app(engine: CoachEngine | None = None, hz: float = 15.0) -> FastAPI:
         try:
             yield
         finally:
-            if holder["task"] is not None:
-                holder["task"].cancel()
+            task = holder["task"]
+            if task is not None:
+                task.cancel()
+                # Wait for the loop to actually unwind (it may be mid-tick in the
+                # executor) before closing the engine, so we don't tear down the
+                # engine under a tick still touching shared memory.
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
+                except Exception:
+                    _log.debug("broadcast loop ended with error", exc_info=True)
             if holder["engine"] is not None:
                 holder["engine"].close()
 

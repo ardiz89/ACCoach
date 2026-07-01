@@ -49,7 +49,7 @@
 
     <main id="charts">
       <div class="chart">
-        <h3 data-i18n-html="chart.delta">Lap delta <small>(s · red = slower, green = faster)</small></h3>
+        <h3 data-i18n-html="chart.delta">Lap delta <small>(s · above the line = slower, below = faster)</small></h3>
         <canvas id="c-delta"></canvas>
       </div>
       <div class="chart">
@@ -72,7 +72,7 @@
   </div>
 
   <div id="view-map" class="hidden">
-    <div id="map-readout" class="readout" data-i18n="map.readout">Racing line · colour = delta (red slower, green faster) · ▽ your braking · ○ reference braking</div>
+    <div id="map-readout" class="readout" data-i18n="map.readout">Racing line · colour = delta · thicker line = more time lost · ▽ your braking · ○ reference braking</div>
     <main>
       <div class="chart map">
         <h3 data-i18n-html="chart.map">Track map <small>(white dashed = reference · solid line = reviewed lap)</small></h3>
@@ -96,7 +96,7 @@
 
   <div id="view-sectors" class="hidden">
     <section id="sec-summary" class="summary"></section>
-    <div class="sec-head"><span data-i18n="sec.col.sector">Sector</span><span data-i18n-html="sec.col.time">Time <small>(ref)</small></span><span data-i18n-html="sec.col.delta">Δ vs reference <small>(green faster, red slower)</small></span></div>
+    <div class="sec-head"><span data-i18n="sec.col.sector">Sector</span><span data-i18n-html="sec.col.time">Time <small>(ref)</small></span><span data-i18n-html="sec.col.delta">Δ vs reference <small>(bars left = faster, right = slower)</small></span></div>
     <div id="sectors" class="sectors"></div>
     <section id="ideal" class="ideal"></section>
   </div>

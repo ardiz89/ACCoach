@@ -32,6 +32,23 @@ def test_corner_contains_and_indices():
     assert c0.mid == c0.apex_pos
 
 
+def test_straddling_corner_stub_is_suppressed():
+    # A corner straddling start/finish leaves its EXIT tail at the very start of
+    # the lap: steering unwinding, speed rising, no braking. That tail must not
+    # become a phantom "corner 0" that renumbers the real corners.
+    lap = synth.build_lap()
+    for smp in lap.samples:
+        if smp.pos < 0.05:
+            f = smp.pos / 0.05                  # 0 -> 1 across the tail
+            smp.steer_angle = 0.25 * (1 - f)    # unwinding (decreasing)
+            smp.brake = 0.0
+            smp.throttle = 1.0
+            smp.speed_kmh = 120.0 + 100.0 * f   # accelerating out
+    corners = detect_corners(lap.samples)
+    assert [c.index for c in corners] == [0, 1]   # stub dropped, still 2 corners
+    assert all(c.apex_pos > 0.1 for c in corners)  # none pinned to the lap start
+
+
 def test_straights_are_outside_every_corner():
     corners = detect_corners(synth.build_lap().samples)
     # 0.5 sits on the straight between the two corners.

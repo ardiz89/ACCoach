@@ -22,6 +22,8 @@
     // shared chrome
     "lang.label":      { en: `Language`, it: `Lingua` },
     "tour.help":       { en: `Guided tour`, it: `Visita guidata` },
+    "cb.label":        { en: `Colour-blind palette (blue/orange)`, it: `Palette daltonici (blu/arancio)` },
+    "demo.banner":     { en: `DEMO — synthetic laps, not your real data`, it: `DEMO — giri sintetici, non i tuoi dati reali` },
 
     // ---- analysis page (index.html) ----
     "title.analysis":  { en: `HONE · Analysis`, it: `HONE · Analisi` },
@@ -39,8 +41,8 @@
     "readout.hint":    { en: `Hover over the charts for point-by-point values…`,
                          it: `Passa il mouse sui grafici per i valori punto per punto…` },
 
-    "chart.delta":     { en: `Lap delta <small>(s · red = slower, green = faster)</small>`,
-                         it: `Delta sul giro <small>(s · rosso = più lento, verde = più veloce)</small>` },
+    "chart.delta":     { en: `Lap delta <small>(s · above the line = slower, below = faster)</small>`,
+                         it: `Delta sul giro <small>(s · sopra la linea = più lento, sotto = più veloce)</small>` },
     "chart.speed":     { en: `Speed <small>(km/h · white = reviewed lap, cyan = comparison)</small>`,
                          it: `Velocità <small>(km/h · bianco = giro in esame, ciano = confronto)</small>` },
     "chart.inputs":    { en: `Throttle / Brake <small>(green = throttle, red = brake · dashed = reference)</small>`,
@@ -48,8 +50,8 @@
     "chart.steer":     { en: `Steering <small>(white = reviewed lap, cyan = comparison · left up / right down)</small>`,
                          it: `Sterzo <small>(bianco = giro in esame, ciano = confronto · sinistra su / destra giù)</small>` },
 
-    "map.readout":     { en: `Racing line · colour = delta (red slower, green faster) · ▽ your braking · ○ reference braking`,
-                         it: `Traiettoria · colore = delta (rosso più lento, verde più veloce) · ▽ tua frenata · ○ frenata di riferimento` },
+    "map.readout":     { en: `Racing line · colour = delta · thicker line = more time lost · ▽ your braking · ○ reference braking`,
+                         it: `Traiettoria · colore = delta · linea più spessa = più tempo perso · ▽ tua frenata · ○ frenata di riferimento` },
     "chart.map":       { en: `Track map <small>(white dashed = reference · solid line = reviewed lap)</small>`,
                          it: `Mappa pista <small>(tratteggio bianco = riferimento · linea continua = giro in esame)</small>` },
     "map.grad.fast":   { en: `faster`, it: `più veloce` },
@@ -63,8 +65,8 @@
 
     "sec.col.sector":  { en: `Sector`, it: `Settore` },
     "sec.col.time":    { en: `Time <small>(ref)</small>`, it: `Tempo <small>(rif)</small>` },
-    "sec.col.delta":   { en: `Δ vs reference <small>(green faster, red slower)</small>`,
-                         it: `Δ vs riferimento <small>(verde più veloce, rosso più lento)</small>` },
+    "sec.col.delta":   { en: `Δ vs reference <small>(bars left = faster, right = slower)</small>`,
+                         it: `Δ vs riferimento <small>(barre a sinistra = più veloce, a destra = più lento)</small>` },
 
     "prog.chart":      { en: `Lap times over time <small>(each point = a lap · green line = running best)</small>`,
                          it: `Tempi sul giro nel tempo <small>(ogni punto = un giro · linea verde = miglior progressivo)</small>` },
@@ -134,8 +136,8 @@
     "ideal.from":      { en: `Your best sectors so far, stitched together.`,
                          it: `I tuoi migliori settori finora, uniti insieme.` },
 
-    "vmin.header":     { en: `Min speed per corner <small>(km/h · green = faster than reference)</small>`,
-                         it: `Velocità minima per curva <small>(km/h · verde = più veloce del riferimento)</small>` },
+    "vmin.header":     { en: `Min speed per corner <small>(km/h · + = faster than reference)</small>`,
+                         it: `Velocità minima per curva <small>(km/h · + = più veloce del riferimento)</small>` },
     "vmin.corner":     { en: `Corner`, it: `Curva` },
     "vmin.you":        { en: `You`, it: `Tu` },
     "vmin.ref":        { en: `Ref`, it: `Rif` },
@@ -164,8 +166,8 @@
     "tour.a3.x": { en: `Where you're gaining or losing vs your reference, across the lap. Green (below the line) is faster.`,
                    it: `Dove guadagni o perdi rispetto al riferimento, lungo il giro. Verde (sotto la linea) è più veloce.` },
     "tour.a4.t": { en: `Min speed per corner`, it: `Velocità minima per curva` },
-    "tour.a4.x": { en: `Apex speed in every corner vs the reference — green means you carried more speed.`,
-                   it: `Velocità all'apice in ogni curva rispetto al riferimento — verde significa più velocità portata.` },
+    "tour.a4.x": { en: `Apex speed in every corner vs the reference — a positive delta means you carried more speed.`,
+                   it: `Velocità all'apice in ogni curva rispetto al riferimento — un delta positivo significa più velocità portata.` },
     "tour.a5.t": { en: `Where to improve`, it: `Dove migliorare` },
     "tour.a5.x": { en: `Your biggest time losses, corner by corner, with the likely cause and a fix.`,
                    it: `Le tue perdite di tempo maggiori, curva per curva, con la causa probabile e una correzione.` },
@@ -257,6 +259,8 @@
                          it: `Nessun backup da ripristinare per questo setup.` },
     "eng.restoreErr":  { en: `Restore error: `, it: `Errore ripristino: ` },
     "eng.corners":     { en: `Corners `, it: `Curve ` },
+    "eng.lowConf":     { en: `Low confidence — based on little data. Gather a few more clean laps before applying.`,
+                         it: `Confidenza bassa — pochi dati. Raccogli qualche altro giro pulito prima di applicare.` },
     "eng.dash":        { en: `—`, it: `—` },
     "eng.pit1":        { en: `🅿️ You're in the pits: MFD → <b>Setup</b> → load <b>`,
                          it: `🅿️ Sei ai box: MFD → <b>Setup</b> → carica <b>` },

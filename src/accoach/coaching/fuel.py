@@ -100,7 +100,12 @@ class FuelEngineer:
                 if thresh <= 1:
                     msg = "Ultimo giro di benzina, rientra ai box!"
                 else:
-                    msg = f"Benzina per circa {thresh} giri."
+                    # Report whole laps you can actually finish (floor), not the
+                    # threshold band's upper bound: at 2.5 laps left the tank is
+                    # good for ~2 laps, not 3 — overstating risks running dry.
+                    laps_left = int(remaining)
+                    unit = "giro" if laps_left == 1 else "giri"
+                    msg = f"Benzina per circa {laps_left} {unit}."
                 return [Cue(category=CueCategory.FUEL, message=msg,
                             priority=_PRIORITY, segment=0, pos=0.0)]
         return []
