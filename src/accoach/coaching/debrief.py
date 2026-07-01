@@ -26,6 +26,7 @@ from ..track import Corner
 from .analyzer import _BRAKE_ON, _LOSS_MS, CornerStats, classify_corner
 from .cue import CueCategory
 from .diagnosis import corner_symptoms, dominant_symptom
+from .tuning import tuning_for_car
 from ..i18n import current_language
 
 _C = CueCategory
@@ -252,6 +253,7 @@ def build_lap_debrief(lap: Lap, reference: Reference, corners: list[Corner],
     """Break ``lap`` down against ``reference`` over the given ``corners``."""
     lg = _lang(lang)
     titles = _CATEGORY_TITLE.get(lg, _CATEGORY_TITLE["en"])
+    tuning = tuning_for_car(lap.car_model)      # class-dependent symptom bands
     losses: list[CornerLoss] = []
 
     for c in corners:
@@ -300,7 +302,7 @@ def build_lap_debrief(lap: Lap, reference: Reference, corners: list[Corner],
         # in this corner, lead the detail with it — the causal explanation the
         # live coach can't give mid-corner ("dice il cosa, non il perché").
         cause = ""
-        dom = dominant_symptom(corner_symptoms(lap.samples, c))
+        dom = dominant_symptom(corner_symptoms(lap.samples, c, tuning))
         if dom is not None:
             cause = explain_cause(dom, lg)
             detail = f"{cause} {detail}"

@@ -49,6 +49,17 @@ def test_engine_saves_valid_lap_and_builds_reference(tmp_path):
     assert final.reference_ms > 0, "reference should be built from the saved lap"
 
 
+def test_car_change_retunes_event_detector(tmp_path):
+    # A Formula car tolerates more rear slip before it's wheelspin than the GT3
+    # default: the engine must retune the live detector when the car connects.
+    frames = [synth.snap(pos=0.1, car_model="rss_formula_hybrid_2022", track="monza")]
+    eng = CoachEngine(reader=_StubReader(frames), voice=None, laps_dir=tmp_path)
+    assert eng.events._spin_ratio == 0.13          # GT3 default before any car seen
+    eng.tick(0.0)
+    assert eng.events._spin_ratio == 0.15          # Formula, after the car connects
+    eng.close()
+
+
 def test_disconnected_tick_is_safe(tmp_path):
     eng = CoachEngine(reader=_StubReader([TelemetrySnapshot.disconnected()]),
                       voice=None, laps_dir=tmp_path)

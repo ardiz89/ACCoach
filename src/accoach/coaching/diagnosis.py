@@ -35,16 +35,17 @@ from .events import (
     _BRAKE_MIN,
     _LOCK_RATIO,
     _RATIO_MIN_SPEED,
-    _SPIN_RATIO,
     _TC_LEVEL,
     _THROTTLE_MIN,
 )
+from .tuning import DEFAULT_TUNING, ClassTuning, tuning_for_car
 
 # Apex band half-width (normalized track position) around the speed minimum.
 _APEX_HALF = 0.02
 _BRAKE_ON = 0.15            # entry = braking before the apex
 _THROTTLE_ON = 0.20        # exit = on the power after the apex
-_SPEED_SPLIT_KMH = 120.0   # low/high corner speed band (per the taxonomy)
+# The low/high corner-speed band is class-dependent (higher-grip classes corner
+# faster) — see coaching.tuning.ClassTuning.speed_split_kmh.
 # A phase must reach this aggregate intensity to count the symptom present there.
 _PRESENCE = 0.15
 # Mean tyre core temp above this = warmed up. Slicks read low pressure when cold,
@@ -90,9 +91,9 @@ def _oversteer_mag(s: LapSample) -> float:
     return min(1.0, abs(yaw) / (2.0 * _YAW_LOOSE))
 
 
-def _speed_band(speeds: list[float]) -> Speed:
+def _speed_band(speeds: list[float], split_kmh: float) -> Speed:
     vmin = min(speeds) if speeds else 0.0
-    return Speed.LOW if vmin < _SPEED_SPLIT_KMH else Speed.HIGH
+    return Speed.LOW if vmin < split_kmh else Speed.HIGH
 
 
 def _warmed_up(samples: list[LapSample]) -> bool:
@@ -106,7 +107,7 @@ def _seg(pos: float) -> int:
     return min(_SEG_N - 1, max(0, int(pos * _SEG_N)))
 
 
-def _lock_spin_segments(samples: list[LapSample]) -> tuple[int, int]:
+def _lock_spin_segments(samples: list[LapSample], spin_ratio: float) -> tuple[int, int]:
     """Distinct track segments with a lock-up / wheelspin (physical slip ratio).
 
     Same thresholds as the live EventDetector; needs the v6 ``slip_ratio`` channel
@@ -127,7 +128,7 @@ def _lock_spin_segments(samples: list[LapSample]) -> tuple[int, int]:
         if (s.throttle >= _THROTTLE_MIN and s.gear not in ("R", "N") and (
                 s.tc_active >= _TC_LEVEL
                 or (s.speed_kmh >= _RATIO_MIN_SPEED
-                    and max(s.slip_ratio[2], s.slip_ratio[3]) >= _SPIN_RATIO))):
+                    and max(s.slip_ratio[2], s.slip_ratio[3]) >= spin_ratio))):
             spins.add(_seg(s.pos))
     return len(locks), len(spins)
 
@@ -152,11 +153,13 @@ def _pressures_hot(samples: list[LapSample]) -> dict | None:
     return {"front": sum(fronts) / len(fronts), "rear": sum(rears) / len(rears)}
 
 
-def corner_symptoms(samples: list[LapSample], c: Corner) -> dict[Symptom, float]:
+def corner_symptoms(samples: list[LapSample], c: Corner,
+                    tuning: ClassTuning = DEFAULT_TUNING) -> dict[Symptom, float]:
     """Handling symptoms for ONE corner: {Symptom: intensity≥_PRESENCE}.
 
     Shared by :func:`build_lap_stats` (aggregate, for the engineer) and the
-    debrief (per-corner, for the "why" of each time loss).
+    debrief (per-corner, for the "why" of each time loss). ``tuning`` supplies the
+    class-dependent low/high corner-speed band; defaults to GT3 when unknown.
     """
     by_phase: dict[Phase, list[LapSample]] = {}
     corner_speeds: list[float] = []
@@ -169,7 +172,7 @@ def corner_symptoms(samples: list[LapSample], c: Corner) -> dict[Symptom, float]
             by_phase.setdefault(ph, []).append(s)
     if not corner_speeds:
         return {}
-    speed = _speed_band(corner_speeds)
+    speed = _speed_band(corner_speeds, tuning.speed_split_kmh)
 
     out: dict[Symptom, float] = {}
     for phase, frames in by_phase.items():
@@ -197,17 +200,18 @@ def build_lap_stats(lap: Lap, corners: list[Corner] | None = None) -> LapStats:
     """Diagnose one recorded lap into a :class:`LapStats` for the engineer."""
     if corners is None:
         corners = detect_corners(lap.samples)
+    tuning = tuning_for_car(lap.car_model)
 
     scores: dict[Symptom, float] = {}
     corner_counts: dict[Symptom, int] = {}
     corner_idx: dict[Symptom, list[int]] = {}
     for c in corners:
-        for sym, intensity in corner_symptoms(lap.samples, c).items():
+        for sym, intensity in corner_symptoms(lap.samples, c, tuning).items():
             scores[sym] = max(scores.get(sym, 0.0), intensity)
             corner_counts[sym] = corner_counts.get(sym, 0) + 1
             corner_idx.setdefault(sym, []).append(c.index)
 
-    lock_segments, spin_segments = _lock_spin_segments(lap.samples)
+    lock_segments, spin_segments = _lock_spin_segments(lap.samples, tuning.spin_ratio)
     return LapStats(
         lap_time_ms=lap.lap_time_ms,
         # `valid` means complete; `clean` (from the reference-integrity work) means

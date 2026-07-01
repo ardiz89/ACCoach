@@ -6,12 +6,18 @@ Measured that day: abs/tc channels read constant garbage (~0.12/0.10), so the
 slip-ratio fallback does all the lock/spin work; hardest deliberate lock reached
 front slip -0.225 (typical hard braking -0.073); biggest wheelspin +0.138
 (typical traction +0.071); clean fast corners ran yaw/steer ~1.9.
+
+The wheelspin slip ratio was later made per-class (3-class audit 2026-06-27,
+coaching.tuning): Road 0.12, GT3 0.13, Formula 0.15. GT3 0.13 still sits between
+the traction ceiling (0.071) and the hardest real GT3 spin (0.138).
 """
 from dataclasses import replace
 
 from accoach.coaching.events import EventDetector
 from accoach.coaching.balance import BalanceDetector
 from accoach.coaching.cue import CueCategory
+from accoach.coaching.tuning import tuning_for_car
+from accoach.engineer import CarClass
 from accoach.telemetry.snapshot import ACStatus, SessionType, TelemetrySnapshot
 
 _BASE = replace(
@@ -47,17 +53,38 @@ def test_lockup_silent_on_normal_hard_braking():
 
 # ---- wheelspin (slip-only, since tc is stuck at 0.10) ----
 def test_wheelspin_fires_on_real_spin():
-    det = EventDetector()
-    s = replace(_BASE, throttle=0.9, gear="3", slip_ratio=(0.0, 0.0, 0.12, 0.12))
+    det = EventDetector(CarClass.GT3)
+    # The hardest real GT3 spin that day reached +0.138 — above the 0.13 threshold.
+    s = replace(_BASE, throttle=0.9, gear="3", slip_ratio=(0.0, 0.0, 0.138, 0.138))
     out = _hold(det, s)
     assert any(c.category is CueCategory.WHEELSPIN for c in out)
 
 
 def test_wheelspin_silent_on_normal_traction():
-    det = EventDetector()
+    det = EventDetector(CarClass.GT3)
     s = replace(_BASE, throttle=0.9, gear="3", slip_ratio=(0.0, 0.0, 0.06, 0.06))
     out = _hold(det, s)
     assert not any(c.category is CueCategory.WHEELSPIN for c in out)
+
+
+def test_wheelspin_threshold_is_per_class():
+    # Rear slip of 0.128: real spin for a road car (0.12), still traction for a
+    # GT3 (0.13) and a Formula (0.15). Pins the per-class table (M9).
+    s = replace(_BASE, throttle=0.9, gear="3", slip_ratio=(0.0, 0.0, 0.128, 0.128))
+
+    road = EventDetector(CarClass.ROAD)
+    assert any(c.category is CueCategory.WHEELSPIN for c in _hold(road, s))
+
+    for cls in (CarClass.GT3, CarClass.FORMULA):
+        det = EventDetector(cls)
+        assert not any(c.category is CueCategory.WHEELSPIN for c in _hold(det, s))
+
+
+def test_tuning_values_pinned():
+    # The exact per-class thresholds (guard against silent drift).
+    assert tuning_for_car("bmw_z4_gt3").spin_ratio == 0.13
+    assert tuning_for_car("ks_mazda_miata").spin_ratio == 0.12
+    assert tuning_for_car("rss_formula_hybrid_2022").spin_ratio == 0.15
 
 
 # ---- understeer (yaw/steer ratio model) ----
