@@ -190,6 +190,42 @@ def test_progress_pro_level_appears_after_import(tmp_path):
     assert "pro" in {lv["key"] for lv in data["levels"]}
 
 
+def test_progress_tyres_empty_without_channel(tmp_path):
+    # Synth laps carry no per-wheel temps/pressures → the trend is empty but the
+    # key is always present so the frontend can hide the section cleanly.
+    c = _client(tmp_path)
+    data = c.get("/api/progress", params={"car": CAR, "track": TRACK}).json()
+    assert data["tyres"] == []
+
+
+def test_progress_tyres_trend_when_recorded(tmp_path):
+    for k, day in enumerate(("2026-06-20", "2026-06-21", "2026-06-22"), start=1):
+        lap = synth.build_lap()
+        for s in lap.samples:
+            s.tyre_core_temp = (80.0 + k, 81.0 + k, 85.0 + k, 86.0 + k)
+            s.tyre_pressure = (26.0 + 0.1 * k, 26.1 + 0.1 * k,
+                               26.5 + 0.1 * k, 26.6 + 0.1 * k)
+        lap.recorded_utc = f"{day}T18:00:00+00:00"
+        save_lap(lap, tmp_path)
+    data = TestClient(create_api(tmp_path)).get(
+        "/api/progress", params={"car": CAR, "track": TRACK}).json()
+    tyres = data["tyres"]
+    assert len(tyres) == 3
+    assert tyres[0]["temp"] == [81.0, 82.0, 86.0, 87.0]        # k=1, per wheel
+    assert len(tyres[0]["press"]) == 4
+    # Chronological: rears heat up across the stint (last lap hotter than first).
+    assert tyres[-1]["temp"][2] > tyres[0]["temp"][2]
+
+
+def test_tyre_means_ignores_unrecorded_channel():
+    from accoach.api import _tyre_means
+    lap = synth.build_lap()                                    # all-zero tyres
+    assert _tyre_means(lap.samples, "tyre_core_temp", 1) is None
+    for s in lap.samples:
+        s.tyre_pressure = (26.0, 27.0, 28.0, 29.0)
+    assert _tyre_means(lap.samples, "tyre_pressure", 2) == [26.0, 27.0, 28.0, 29.0]
+
+
 def test_export_csv_has_header_and_rows(tmp_path):
     c = _client(tmp_path)
     r = c.get("/api/export", params={"car": CAR, "track": TRACK, "fmt": "csv"})
