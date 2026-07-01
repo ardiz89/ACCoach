@@ -175,6 +175,15 @@ main { padding: 16px 24px; display: grid; gap: 18px; }
 .chart h3 small { color: var(--muted); font-weight: 400; }
 .chart canvas { width: 100%; height: 150px; display: block; background: var(--inset); border: 1px solid var(--line); border-radius: 12px; }
 
+/* Mini track-map in the Compare view: hovering any chart highlights the same
+   point here (and hovering the mini-map drives the chart crosshairs), so the
+   lap's geometry sits next to the traces without leaving the tab. */
+.minimap { padding: 8px 24px 0; }
+.minimap canvas {
+  width: 100%; height: 160px; display: block; cursor: crosshair;
+  background: var(--inset); border: 1px solid var(--line); border-radius: 12px;
+}
+
 /* Track-map delta legend */
 .map-legend {
   display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px;

@@ -250,6 +250,7 @@ def create_api(
                 "path": r["path"], "lap_time": format_lap_time(r["lap_time_ms"]),
                 "lap_time_ms": r["lap_time_ms"],
                 "valid": bool(r["valid"]), "source": r.get("source", "own"),
+                "recorded_utc": r["recorded_utc"],
             } for r in all_laps],
         }
 
