@@ -190,6 +190,7 @@ async function loadProgress(combo) {
     : item(t("prog.dash"), t("prog.noValid"));
 
   drawProgress(p);
+  drawTyres(p);
   renderLevels(p.levels);
   renderTrends(p.trends);
 
@@ -283,6 +284,93 @@ function drawProgress(p) {
   ctx.fillStyle = "rgba(255,255,255,0.45)"; ctx.font = "10px Segoe UI";
   ctx.fillText(fmtMs(realLo), w - 70, Y(realLo) - 4);
   ctx.fillText(fmtMs(realHi), w - 70, Y(realHi) + 12);
+}
+
+// --- tyres over time ------------------------------------------------------
+// Four wheels, encoded axle-by-colour + side-by-dash so it stays readable for
+// colour-blind users (front = cyan, rear = amber; left solid, right dashed).
+const TYRE_SERIES = [
+  { key: "fl", color: "#22D3CE", dash: [] },
+  { key: "fr", color: "#22D3CE", dash: [5, 4] },
+  { key: "rl", color: "#FFB020", dash: [] },
+  { key: "rr", color: "#FFB020", dash: [5, 4] },
+];
+
+function drawTyres(p) {
+  const sec = $("tyres");
+  if (!sec) return;
+  const tyres = (p && p.tyres) || [];
+  const anyTemp = tyres.some((l) => l.temp);
+  const anyPress = tyres.some((l) => l.press);
+  if (!tyres.length || (!anyTemp && !anyPress)) { sec.classList.add("hidden"); return; }
+  sec.classList.remove("hidden");
+
+  // Legend: a short line sample (dashed for the right-side wheels) + label.
+  $("tyre-legend").innerHTML = TYRE_SERIES.map((s) =>
+    `<span class="tl"><span class="sw" style="border-top:2px ${s.dash.length ? "dashed" : "solid"} ${s.color}"></span>` +
+    `${t("tyre." + s.key)}</span>`).join("");
+
+  $("tyre-temp-wrap").classList.toggle("hidden", !anyTemp);
+  $("tyre-press-wrap").classList.toggle("hidden", !anyPress);
+  if (anyTemp) drawTyreLines($("c-tyre-temp"), tyres, "temp", 0, "°");
+  if (anyPress) drawTyreLines($("c-tyre-press"), tyres, "press", 1, "");
+
+  // Drift readout: per-axle change from the first to the last lap that carries
+  // data (the heat build-up / pressure creep a driver feels over a stint).
+  const firstT = tyres.find((l) => l.temp), lastT = [...tyres].reverse().find((l) => l.temp);
+  const firstP = tyres.find((l) => l.press), lastP = [...tyres].reverse().find((l) => l.press);
+  const axle = (v, a, b) => (v[a] + v[b]) / 2;
+  const sgn = (x, d, u) => (x >= 0 ? "+" : "") + x.toFixed(d) + u;
+  const bits = [];
+  if (firstT && lastT && firstT !== lastT) {
+    const df = axle(lastT.temp, 0, 1) - axle(firstT.temp, 0, 1);
+    const dr = axle(lastT.temp, 2, 3) - axle(firstT.temp, 2, 3);
+    bits.push(`<b>${t("tyre.tempLabel")}</b> ${t("tyre.front")} ${sgn(df, 0, "°")} · ${t("tyre.rear")} ${sgn(dr, 0, "°")}`);
+  }
+  if (firstP && lastP && firstP !== lastP) {
+    const df = axle(lastP.press, 0, 1) - axle(firstP.press, 0, 1);
+    const dr = axle(lastP.press, 2, 3) - axle(firstP.press, 2, 3);
+    bits.push(`<b>${t("tyre.pressLabel")}</b> ${t("tyre.front")} ${sgn(df, 1, "")} · ${t("tyre.rear")} ${sgn(dr, 1, "")} psi`);
+  }
+  $("tyre-drift").innerHTML = bits.length
+    ? `<span class="muted">${t("tyre.driftLead")}:</span> ${bits.join("  ·  ")}`
+    : "";
+}
+
+// One tyre chart: four wheel lines over the laps that carry ``field`` (temp or
+// press). Returns false and leaves the canvas blank if no lap has the channel.
+function drawTyreLines(cv, tyres, field, digits, unit) {
+  const { ctx, w, h } = setup(cv);
+  const pts = [];
+  tyres.forEach((l, i) => { if (l[field]) pts.push({ i, v: l[field] }); });
+  if (!pts.length) return false;
+  let lo = Infinity, hi = -Infinity;
+  for (const p of pts) for (const v of p.v) { lo = Math.min(lo, v); hi = Math.max(hi, v); }
+  const rlo = lo, rhi = hi;
+  if (hi === lo) hi = lo + 1;
+  const pad = (hi - lo) * 0.15; lo -= pad; hi += pad;
+  const n = tyres.length;
+  const X = (i) => (n === 1 ? w / 2 : (i / (n - 1)) * (w - 46) + 10);
+  const Y = (v) => h - (((v - lo) / (hi - lo)) * (h - 24) + 12);
+
+  TYRE_SERIES.forEach((s, wi) => {
+    ctx.beginPath();
+    ctx.setLineDash(s.dash);
+    let started = false;
+    for (const p of pts) {
+      const x = X(p.i), y = Y(p.v[wi]);
+      started ? ctx.lineTo(x, y) : ctx.moveTo(x, y); started = true;
+    }
+    ctx.strokeStyle = s.color; ctx.lineWidth = 2; ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = s.color;
+    for (const p of pts) { ctx.beginPath(); ctx.arc(X(p.i), Y(p.v[wi]), 2.5, 0, 6.283); ctx.fill(); }
+  });
+
+  ctx.fillStyle = "rgba(255,255,255,0.45)"; ctx.font = "10px Segoe UI";
+  ctx.fillText(rhi.toFixed(digits) + unit, w - 44, Y(rhi) + 10);
+  ctx.fillText(rlo.toFixed(digits) + unit, w - 44, Y(rlo) - 3);
+  return true;
 }
 
 // --- sectors --------------------------------------------------------------

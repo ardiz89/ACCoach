@@ -114,6 +114,22 @@
         <canvas id="c-progress" class="tall"></canvas>
       </div>
     </main>
+    <section id="tyres" class="debrief tyres hidden">
+      <h3 data-i18n-html="tyre.header">Tyres over time <small>(core temp &amp; pressure across the stint · dashed = right side)</small></h3>
+      <div id="tyre-legend" class="tyre-legend"></div>
+      <div class="tyre-charts">
+        <div id="tyre-temp-wrap" class="chart">
+          <h4 data-i18n="tyre.temp">Core temperature (°C)</h4>
+          <canvas id="c-tyre-temp"></canvas>
+        </div>
+        <div id="tyre-press-wrap" class="chart">
+          <h4 data-i18n="tyre.press">Pressure (psi)</h4>
+          <canvas id="c-tyre-press"></canvas>
+        </div>
+      </div>
+      <div id="tyre-drift" class="tyre-drift"></div>
+    </section>
+
     <section class="debrief">
       <h3 data-i18n-html="prog.weak">Weak points <small>(corner by corner · systematic = to train)</small></h3>
       <div id="trends"></div>

@@ -102,6 +102,26 @@ def _pick_known(requested: str | None, fallback: str | None, known: set[str]) ->
     return requested if requested in known else None
 
 
+def _tyre_means(samples, attr: str, ndigits: int) -> list[float] | None:
+    """Per-wheel average of a 4-tuple channel (FL, FR, RL, RR) over a lap.
+
+    Returns ``None`` when the lap has no samples or the channel was never
+    recorded (all-zero — older lap versions predate per-wheel temps/pressures),
+    so the tyre trend can hide laps with no data instead of plotting a flat zero.
+    """
+    n = len(samples)
+    if not n:
+        return None
+    acc = [0.0, 0.0, 0.0, 0.0]
+    for s in samples:
+        v = getattr(s, attr)
+        acc[0] += v[0]; acc[1] += v[1]; acc[2] += v[2]; acc[3] += v[3]
+    means = [a / n for a in acc]
+    if max(means) <= 0:
+        return None
+    return [round(m, ndigits) for m in means]
+
+
 def create_api(
     laps_dir: Path | str = DEFAULT_LAPS_DIR,
     setups_root: Path | str | None = None,
@@ -340,7 +360,7 @@ def create_api(
         if not valid:
             return {"car": car, "track": track, "laps": [], "pb_trend": [],
                     "consistency": lap_time_consistency([]), "levels": [],
-                    "trends": [], "recurring": []}
+                    "trends": [], "recurring": [], "tyres": []}
 
         # Chronological (oldest first) for the trend.
         chrono = sorted(valid, key=lambda r: r["recorded_utc"] or "")
@@ -398,12 +418,40 @@ def create_api(
             recurring = []
             trends = []
 
+        # Load each valid lap once; shared by the tyre trend and the ideal-lap
+        # ladder below (both need the raw samples — no triple file read).
+        lap_objs: dict = {}
+        for r in valid:
+            try:
+                lap_objs[r["path"]] = load_lap(r["path"])
+            except (OSError, ValueError):
+                pass
+
+        # Tyre temps & pressures per lap, chronological — to spot heat build-up
+        # and pressure drift across a stint (the degradation signal a driver
+        # feels but can't see). Laps predating per-wheel capture are skipped.
+        tyres: list[dict] = []
+        for r in chrono:
+            lp = lap_objs.get(r["path"])
+            if lp is None:
+                continue
+            temp = _tyre_means(lp.samples, "tyre_core_temp", 1)
+            press = _tyre_means(lp.samples, "tyre_pressure", 2)
+            if temp is None and press is None:
+                continue
+            tyres.append({
+                "recorded_utc": r["recorded_utc"],
+                "lap_time": format_lap_time(r["lap_time_ms"]),
+                "temp": temp, "press": press,
+            })
+
         # Benchmark ladder: rolling best → ideal (consistency) → PRO (skill ceiling).
         ideal_ms = pro_ms = None
         try:
-            objs = [load_lap(r["path"]) for r in valid]
-            spans, _ = sector_spans(load_lap(fastest))
-            il = ideal_lap(objs, [r["path"] for r in valid], spans)
+            paths = [r["path"] for r in valid if r["path"] in lap_objs]
+            objs = [lap_objs[p] for p in paths]
+            spans, _ = sector_spans(lap_objs.get(fastest) or load_lap(fastest))
+            il = ideal_lap(objs, paths, spans)
             ideal_ms = il.ideal_ms if il else None
         except (OSError, ValueError):
             ideal_ms = None
@@ -425,6 +473,7 @@ def create_api(
             "levels": levels,
             "trends": trends,
             "recurring": recurring,
+            "tyres": tyres,
         }
 
     @app.get("/api/export")
@@ -528,7 +577,14 @@ def _seed_demo() -> str:
                 steer = max(0.0, steer)
         return spd, brake, thr, steer
 
-    def build(slow_corner, amt):
+    def build(slow_corner, amt, stint=0):
+        # Tyre heat & pressure build up over the stint (rears run hotter on this
+        # RWD demo car, with a slight left/right bias), so the "tyres over time"
+        # trend shows a real shape instead of flat lines.
+        warm = 1.9 * stint
+        temp = (82.0 + warm, 83.5 + warm, 88.0 + warm * 1.15, 89.6 + warm * 1.15)
+        press = (26.4 + 0.05 * stint, 26.5 + 0.05 * stint,
+                 26.9 + 0.06 * stint, 27.0 + 0.06 * stint)
         s, off = [], 0
         for i in range(401):
             pos = i / 400
@@ -548,17 +604,22 @@ def _seed_demo() -> str:
             sector = 0 if pos < 0.30 else (1 if pos < 0.65 else 2)  # unequal sectors
             s.append(LapSample(int(pos * 100000) + off, pos, spd, thr, brake,
                                steer, "4", 8000, 0.0, 0.0, car_x=cx, car_z=cz,
-                               current_sector=sector))
+                               current_sector=sector,
+                               tyre_core_temp=temp, tyre_pressure=press))
         return Lap("HONE Demo", "Demo Circuit", SessionType.PRACTICE,
                    100000 + off, True, samples=s)
 
     d = tempfile.mkdtemp(prefix="accoach_webdemo_")
-    save_lap(build(None, 0), d)   # the fast reference lap
+    ref = build(None, 0)          # the fast reference lap (coolest tyres)
+    # Dated before the stint laps so the "tyres over time" trend reads as a
+    # coherent warm-up across the session instead of a stray cool lap at the end.
+    ref.recorded_utc = "2026-06-19T18:00:00+00:00"
+    save_lap(ref, d)
     # A few laps getting better over successive days (less time lost each time).
     specs = [(0, 30, "2026-06-20"), (0, 24, "2026-06-21"), (1, 20, "2026-06-22"),
              (0, 16, "2026-06-23"), (1, 12, "2026-06-24"), (0, 8, "2026-06-25")]
-    for sc, amt, day in specs:
-        lap = build(sc, amt)
+    for k, (sc, amt, day) in enumerate(specs, start=1):
+        lap = build(sc, amt, stint=k)
         lap.recorded_utc = f"{day}T18:00:00+00:00"
         save_lap(lap, d)
     return d
