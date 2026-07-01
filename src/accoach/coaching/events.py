@@ -26,9 +26,11 @@ at the same corner. Time is injected (``now``, monotonic seconds) for testabilit
 
 from __future__ import annotations
 
+from ..engineer import CarClass
 from ..telemetry.snapshot import ACStatus, TelemetrySnapshot
 from ._detector import Episode, make_cue, step
 from .cue import Cue, CueCategory
+from .tuning import DEFAULT_TUNING, tuning_for_class
 
 # Braking / lock-up
 _BRAKE_MIN = 0.30          # must be meaningfully on the brakes
@@ -38,7 +40,9 @@ _LOCK_RATIO = -0.15        # front slip ratio: wheel ≥15% slower than ground
 # Throttle / wheelspin
 _THROTTLE_MIN = 0.50       # must be meaningfully on the throttle
 _TC_LEVEL = 0.35           # TC intervention that counts as wheelspin
-_SPIN_RATIO = 0.10         # rear slip ratio: wheel ≥10% faster than ground
+# The rear slip ratio that counts as wheelspin is class-dependent (see
+# coaching.tuning): stiffer/more-powerful classes tolerate more slip. Set per
+# car via the constructor / set_car_class; DEFAULT_TUNING (GT3) until known.
 
 # The slip-ratio fallback is a PHYSICAL ratio (see reader._slip_ratio), so unlike
 # the raw wheel_slip channel it doesn't need per-car calibration — a locked or
@@ -71,9 +75,15 @@ _PRIORITY_BASE = 300.0     # ranks above most segment time-loss cues
 class EventDetector:
     """Stateful: fed (snapshot, now) each frame, yields lock-up/wheelspin cues."""
 
-    def __init__(self) -> None:
+    def __init__(self, car_class: CarClass | None = None) -> None:
         self._lock = Episode()
         self._spin = Episode()
+        self._spin_ratio = (tuning_for_class(car_class).spin_ratio
+                            if car_class is not None else DEFAULT_TUNING.spin_ratio)
+
+    def set_car_class(self, car_class: CarClass) -> None:
+        """Retune the wheelspin threshold when the car (class) changes."""
+        self._spin_ratio = tuning_for_class(car_class).spin_ratio
 
     def reset(self) -> None:
         self._lock = Episode()
@@ -104,11 +114,10 @@ class EventDetector:
         front_ratio = min(s.slip_ratio[0], s.slip_ratio[1])  # most-negative front wheel
         return s.speed_kmh >= _RATIO_MIN_SPEED and front_ratio <= _LOCK_RATIO
 
-    @staticmethod
-    def _is_wheelspin(s: TelemetrySnapshot) -> bool:
+    def _is_wheelspin(self, s: TelemetrySnapshot) -> bool:
         if s.throttle < _THROTTLE_MIN or s.gear in ("R", "N"):
             return False
         if s.tc_active >= _TC_LEVEL:                 # primary: reliable at any speed
             return True
         rear_ratio = max(s.slip_ratio[2], s.slip_ratio[3])   # fastest-spinning rear
-        return s.speed_kmh >= _RATIO_MIN_SPEED and rear_ratio >= _SPIN_RATIO
+        return s.speed_kmh >= _RATIO_MIN_SPEED and rear_ratio >= self._spin_ratio

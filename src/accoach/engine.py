@@ -41,7 +41,7 @@ from .coaching.diagnosis import build_lap_stats
 from .coaching.focus import FocusCoach, FocusReport
 from .i18n import cue_text, current_language
 from .comparison import DeltaState, LapComparator, Reference
-from .engineer import RaceEngineer, engineer_for
+from .engineer import RaceEngineer, classify, engineer_for
 from .recording import DEFAULT_LAPS_DIR, Lap, LapRecorder, find_reference_lap, save_lap
 from .telemetry import SharedMemoryReader, TelemetrySnapshot
 from .telemetry.feed import TelemetryFeed
@@ -307,6 +307,8 @@ class CoachEngine:
         if snap.connected and (snap.car_model, snap.track) != self._key:
             self._key = (snap.car_model, snap.track)
             self._rebuild_reference(snap.car_model, snap.track)
+            # Retune the class-dependent live thresholds (wheelspin) for this car.
+            self.events.set_car_class(classify(snap.car_model))
             # A new car/track is a new setup problem: start a fresh engineer.
             self._engineer = engineer_for(snap.car_model, snap.track)
             self._engineer_decision = None

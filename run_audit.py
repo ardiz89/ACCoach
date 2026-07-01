@@ -24,6 +24,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
+from accoach.coaching.tuning import tuning_for_car  # noqa: E402
 from accoach.engine import CoachEngine  # noqa: E402
 
 
@@ -55,7 +56,6 @@ def _live(s) -> dict:
 _BRAKE_MIN = 0.30
 _LOCK_RATIO = -0.15
 _THROTTLE_MIN = 0.50
-_SPIN_RATIO = 0.10
 
 
 def _raw_lock(s) -> bool:
@@ -63,9 +63,12 @@ def _raw_lock(s) -> bool:
 
 
 def _raw_spin(s) -> bool:
+    # Wheelspin slip ratio is class-dependent now (coaching.tuning): resolve it
+    # from the live car so the mirror tracks the detector per class.
     if s.throttle < _THROTTLE_MIN or s.gear in ("R", "N"):
         return False
-    return max(s.slip_ratio[2], s.slip_ratio[3]) >= _SPIN_RATIO
+    spin_ratio = tuning_for_car(s.car_model).spin_ratio
+    return max(s.slip_ratio[2], s.slip_ratio[3]) >= spin_ratio
 
 
 # Balance thresholds — MIRROR accoach.coaching.balance (independent check).
