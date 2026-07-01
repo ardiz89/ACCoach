@@ -567,6 +567,16 @@ async function loadCombo(combo, lapPath, baselinePath) {
   wireHover();
 }
 
+// Local time-of-day (HH:MM) a lap was recorded, so laps with identical times
+// stay distinguishable in the dropdowns. Empty for laps with no timestamp
+// (e.g. bundled PRO reference laps).
+function lapClock(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
 function fillLaps(a, force) {
   const key = a.car + a.track;
   // Skip if already filled for this combo — unless forced (e.g. language switch
@@ -592,7 +602,8 @@ function fillLaps(a, force) {
       o.value = l.path;
       const star = l.path === bestPath ? "★ " : "";
       const pro = l.source === "pro" ? " [PRO]" : "";
-      o.textContent = `${star}${l.lap_time}${l.valid ? "" : " " + t("lap.invalid")}${pro}`;
+      const clock = lapClock(l.recorded_utc);
+      o.textContent = `${star}${l.lap_time}${l.valid ? "" : " " + t("lap.invalid")}${clock ? " · " + clock : ""}${pro}`;
       if (l.path === selectedPath) o.selected = true;
       sel.appendChild(o);
     }
