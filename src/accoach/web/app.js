@@ -14,6 +14,8 @@ let VIEW = "compare"; // "compare" | "progress"
 let HOVER_WIRED = false;
 let MAP_HIT = null;   // {rv, X, Y} screen transform captured by drawMap, for map hover
 let MINI_HIT = null;  // same, for the Compare-view mini map
+let DYN_GG = null;    // {pts:[{px,py,pos}]} screen points captured by drawGG, for its hover
+let DYN_BAL_HIT = null; // {rv, X, Y} transform captured by the balance ribbon, for its hover
 const MAP_READOUT_DEFAULT = () => t("map.readout");
 
 // Delta palette, read from the CSS --red/--green vars so the colour-blind toggle
@@ -122,6 +124,7 @@ function wireTour() {
 // colour-blind toggle.
 function redrawCurrentView() {
   if (VIEW === "map") { if (DATA) drawMap(DATA, null); }
+  else if (VIEW === "dynamics") { if (DATA) drawDynamics(LAST_HOVER); }
   else if (VIEW === "sectors") { if (CURRENT) loadSectors(); }
   else if (VIEW === "progress") { if (CURRENT) loadProgress(CURRENT); }
   else if (DATA) redraw(LAST_HOVER);   // compare
@@ -161,9 +164,11 @@ function wireTabs() {
       $("view-compare").classList.toggle("hidden", VIEW !== "compare");
       $("view-map").classList.toggle("hidden", VIEW !== "map");
       $("view-sectors").classList.toggle("hidden", VIEW !== "sectors");
+      $("view-dynamics").classList.toggle("hidden", VIEW !== "dynamics");
       $("view-progress").classList.toggle("hidden", VIEW !== "progress");
       if (VIEW === "progress" && CURRENT) loadProgress(CURRENT);
       if (VIEW === "map" && DATA) drawMap(DATA, null);
+      if (VIEW === "dynamics" && DATA) drawDynamics(null);
       if (VIEW === "sectors" && CURRENT) loadSectors();
     };
   }
@@ -193,6 +198,7 @@ async function loadProgress(combo) {
   drawTyres(p);
   renderLevels(p.levels);
   renderTrends(p.trends);
+  renderCornerConsistency(p.corner_consistency);
 
   const el = $("recurring");
   if (!p.recurring.length) {
@@ -254,6 +260,30 @@ function renderTrends(trends) {
       `<span class="lost">−${w.total_s.toFixed(3)}s</span></div>` +
       `<div class="detail">${tag} · ` +
       `${t("trends.median")} −${w.median_s.toFixed(3)}s · ${w.occurrences}/${w.laps} ${t("lbl.laps")}</div>` +
+      `</div>`;
+  }).join("");
+}
+
+// Per-corner consistency: a spread bar per corner (min-speed range across the
+// recent laps), worst-first. Wide bar = a corner you don't repeat — where to
+// work on rhythm, distinct from the systematic time-loss the weak-points list
+// already flags.
+function renderCornerConsistency(rows) {
+  const el = $("corner-consistency");
+  if (!el) return;
+  if (!rows || !rows.length) {
+    el.innerHTML = `<div class="clean">${t("cons.none")}</div>`;
+    return;
+  }
+  let mx = 0.1;
+  for (const r of rows) mx = Math.max(mx, r.spread_kmh);
+  el.innerHTML = rows.map((r) => {
+    const w = (Math.min(r.spread_kmh / mx, 1) * 100).toFixed(0);
+    return `<div class="cons-row">` +
+      `<span class="corner">${r.name}</span>` +
+      `<span class="cons-track"><span class="cons-fill" style="width:${w}%"></span></span>` +
+      `<span class="cons-nums">${t("cons.spread")} <b>${r.spread_kmh.toFixed(1)}</b> km/h · ` +
+      `σ ${r.std_kmh.toFixed(1)} · ${r.n} ${t("lbl.laps")}</span>` +
       `</div>`;
   }).join("");
 }
@@ -465,6 +495,17 @@ function deltaColor(d, m) {
   return `rgb(${mix(c[0])},${mix(c[1])},${mix(c[2])})`;
 }
 
+// Balance ribbon palette: understeer (v<0) = blue, oversteer (v>0) = red,
+// near-neutral = pale grey. Distinct hues (not red/green) so it reads on its own.
+function balanceColor(v) {
+  const x = Math.max(-1, Math.min(1, v || 0));
+  if (Math.abs(x) < 0.06) return "rgb(150,156,166)";
+  const c = x > 0 ? [255, 90, 60] : [88, 150, 255];
+  const f = Math.abs(x), pale = 210;
+  const mix = (k) => Math.round(pale + (k - pale) * f);
+  return `rgb(${mix(c[0])},${mix(c[1])},${mix(c[2])})`;
+}
+
 // Full track map (its own tab). Wrapper around drawMapTo that also publishes the
 // screen transform for the map's own hover.
 function drawMap(a, cx) {
@@ -487,7 +528,8 @@ function drawMiniMap(a, cx) {
 // the screen transform {rv, X, Y} so a hover can map cursor → nearest sample,
 // or null when there's no map. ``missing`` (optional) is a placeholder element
 // to toggle when the lap has no coordinates.
-function drawMapTo(canvas, missing, a, cx) {
+function drawMapTo(canvas, missing, a, cx, mode) {
+  mode = mode || "delta";
   if (!canvas) return null;
   if (!a.has_map) {
     if (missing) missing.classList.remove("hidden");
@@ -532,19 +574,27 @@ function drawMapTo(canvas, missing, a, cx) {
   ctx.stroke();
   ctx.restore();
 
-  // Your line: colour each segment by the delta AND scale its width by |delta|,
-  // so the read survives red/green colour-blindness (thicker = more time lost).
+  // Your line: in "delta" mode colour each segment by the delta AND scale its
+  // width by |delta| (thicker = more time lost, so the read survives red/green
+  // colour-blindness). In "balance" mode colour by handling (blue understeer /
+  // red oversteer) at constant width — the balance ribbon.
+  const bal = rv.balance || [];
   let mx = 0.05;
   for (const v of d.delta_s) mx = Math.max(mx, Math.abs(v));
   ctx.lineCap = "round"; ctx.lineJoin = "round";
   for (let i = 1; i < rv.x.length; i++) {
-    const dv = d.delta_s[i] || 0;
-    const t = Math.min(1, Math.abs(dv) / (mx || 1));
-    ctx.lineWidth = 2 + 5 * t;   // 2px at parity -> 7px at biggest swing
     ctx.beginPath();
     ctx.moveTo(X(rv.x[i - 1]), Y(rv.z[i - 1]));
     ctx.lineTo(X(rv.x[i]), Y(rv.z[i]));
-    ctx.strokeStyle = deltaColor(dv, mx);
+    if (mode === "balance") {
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = balanceColor(bal[i] || 0);
+    } else {
+      const dv = d.delta_s[i] || 0;
+      const tt = Math.min(1, Math.abs(dv) / (mx || 1));
+      ctx.lineWidth = 2 + 5 * tt;   // 2px at parity -> 7px at biggest swing
+      ctx.strokeStyle = deltaColor(dv, mx);
+    }
     ctx.stroke();
   }
 
@@ -648,9 +698,11 @@ async function loadCombo(combo, lapPath, baselinePath) {
   fillLaps(a);
   drawSummary(a);
   drawCornerSpeeds(a);
+  drawWaterfall(a);
   drawDebrief(a);
   redraw(null);
   if (VIEW === "map") { $("map-readout").innerHTML = MAP_READOUT_DEFAULT(); drawMap(a, null); }
+  if (VIEW === "dynamics") drawDynamics(null);
   if (VIEW === "sectors") loadSectors();
   wireHover();
 }
@@ -743,6 +795,35 @@ function cornerLegend(a) {
   if (!a.corners || !a.corners.length) return "";
   return `<div class="legend">` + a.corners.map((c) =>
     `<span><b>T${c.index + 1}</b>${c.name}</span>`).join("") + `</div>`;
+}
+
+// Waterfall: the corner time losses ranked biggest-first as proportional bars —
+// the "what to fix first" glance. Reuses the losses the debrief already computed
+// (no backend), so it stays in sync with the mini-lessons below it.
+function lossColor(sev) {
+  const hot = [255, 90, 60], mild = [255, 190, 80];
+  const mix = (i) => Math.round(mild[i] + (hot[i] - mild[i]) * sev);
+  return `rgb(${mix(0)},${mix(1)},${mix(2)})`;
+}
+
+function drawWaterfall(a) {
+  const el = $("waterfall");
+  if (!el) return;
+  const losses = (a.losses || []).filter((l) => l.lost_s > 0)
+    .sort((x, y) => y.lost_s - x.lost_s);
+  if (!losses.length) { el.innerHTML = ""; return; }
+  let mx = 0.05;
+  for (const l of losses) mx = Math.max(mx, l.lost_s);
+  const rows = losses.map((l) => {
+    const w = (Math.min(l.lost_s / mx, 1) * 100).toFixed(0);
+    const sev = Math.min(1, l.lost_s / Math.max(mx, 0.3));
+    return `<div class="cons-row">` +
+      `<span class="corner">${l.label}</span>` +
+      `<span class="cons-track"><span class="cons-fill" style="width:${w}%;background:${lossColor(sev)}"></span></span>` +
+      `<span class="cons-nums"><b>−${l.lost_s.toFixed(3)}s</b> · ${l.message}</span>` +
+      `</div>`;
+  }).join("");
+  el.innerHTML = `<h3>${t("wf.title")}</h3>` + rows;
 }
 
 function drawDebrief(a) {
@@ -898,6 +979,341 @@ function drawSteer(a, cx) {
   crosshair(ctx, w, h, cx);
 }
 
+// --- dynamics tab (G-G · lock/spin · coasting) ----------------------------
+// All three read channels that were recorded since v6/v7 but never plotted:
+// g_lat/g_long (grip envelope) and per-axle slip_ratio (lock/spin). Old laps
+// carry all-zero here, so hasDynamics() gates the tab behind a "no data" note.
+function _anyNonZero(arr) {
+  return Array.isArray(arr) && arr.some((v) => Math.abs(v) > 0.001);
+}
+function hasDynamics(a) {
+  const c = a && a.review && a.review.channels;
+  if (!c) return false;
+  return _anyNonZero(c.g_lat) || _anyNonZero(c.g_long) ||
+    _anyNonZero(c.slip_front) || _anyNonZero(c.slip_rear);
+}
+function hasBalance(a) {
+  const c = a && a.review && a.review.channels;
+  return !!(a && a.has_map && c && _anyNonZero(c.balance));
+}
+
+function drawDynamics(cx) {
+  if (!DATA) return;
+  const miss = $("dyn-missing"), main = $("dyn-charts"), coast = $("dyn-coasting");
+  const hasOff = Array.isArray(DATA.review.line_offset);
+  const anyData = hasDynamics(DATA) || hasOff || DATA.review.tyres || hasBalance(DATA);
+  if (!anyData) {
+    if (miss) miss.classList.remove("hidden");
+    if (main) main.classList.add("hidden");
+    if (coast) coast.innerHTML = "";
+    $("dyn-tyres").classList.add("hidden");
+    $("dyn-balance-wrap").classList.add("hidden");
+    $("dyn-readout").innerHTML = t("dyn.readout");
+    DYN_GG = null; DYN_BAL_HIT = null;
+    return;
+  }
+  if (miss) miss.classList.add("hidden");
+  if (main) main.classList.remove("hidden");
+  drawCoasting(DATA);
+  DYN_GG = drawGG(DATA, cx);
+  drawSlip(DATA, cx);
+  drawLineOffset(DATA, cx);
+  drawYaw(DATA, cx);
+  drawShift(DATA, cx);
+  drawDynTyres(DATA, cx);
+  drawBalanceRibbon(DATA, cx);
+  updateDynReadout(DATA, cx);
+}
+
+// Coasting = time with neither brake nor throttle (dead time between releasing
+// the brake and getting back on the gas). Trail-braking = overlap of the two.
+// Samples are ~uniform in time (evenly downsampled from a 50 Hz capture), so a
+// fraction of samples ≈ a fraction of the lap time — good enough for a readout.
+function drawCoasting(a) {
+  const el = $("dyn-coasting");
+  if (!el) return;
+  const c = a.review.channels;
+  const thr = c.throttle || [], brk = c.brake || [];
+  const n = Math.min(thr.length, brk.length);
+  if (!n) { el.innerHTML = ""; return; }
+  let coast = 0, trail = 0;
+  for (let i = 0; i < n; i++) {
+    const gas = thr[i] > 0.05, on = brk[i] > 0.05;
+    if (!gas && !on) coast++;
+    if (gas && on) trail++;
+  }
+  const lapS = (a.review.lap_time_ms || 0) / 1000;
+  const coastPct = (coast / n) * 100, trailPct = (trail / n) * 100;
+  const coastS = lapS * coast / n;
+  let gmax = 0;
+  const gl = c.g_lat || [], gL = c.g_long || [];
+  for (let i = 0; i < gl.length; i++) gmax = Math.max(gmax, Math.hypot(gl[i], gL[i]));
+  // Steering reversals: how many times the wheel crosses centre (a smoothness
+  // proxy — lots of reversals = chasing the car / sawing at the wheel).
+  const st = c.steer || [];
+  let reversals = 0, prevSign = 0;
+  for (let i = 0; i < st.length; i++) {
+    const sign = st[i] > 0.02 ? 1 : (st[i] < -0.02 ? -1 : 0);
+    if (sign !== 0) {
+      if (prevSign !== 0 && sign !== prevSign) reversals++;
+      prevSign = sign;
+    }
+  }
+  const item = (k, v, sub) =>
+    `<div class="item"><div class="k">${k}</div><div class="v">${v}</div>` +
+    (sub ? `<div class="k">${sub}</div>` : "") + `</div>`;
+  el.innerHTML =
+    item(t("dyn.coasting"), `${coastPct.toFixed(0)}% · ~${coastS.toFixed(2)}s`, t("dyn.hint")) +
+    item(t("dyn.trail"), `${trailPct.toFixed(0)}% ${t("dyn.ofLap")}`) +
+    item(t("dyn.gmax"), `${gmax.toFixed(2)} g`) +
+    item(t("dyn.smooth"), reversals, t("dyn.smoothUnit"));
+}
+
+// G-G scatter (friction circle): lateral G on X, longitudinal on Y (accel up,
+// brake down). Distance from centre = grip used; a full "circle" of dots means
+// the driver blends braking and cornering, a "cross" means they brake straight
+// then turn (grip left on the table). Returns the screen points for the hover.
+function drawGG(a, cx) {
+  const cv = $("c-gg");
+  if (!cv) return null;
+  const { ctx, w, h } = setup(cv);
+  const c = a.review.channels;
+  const gx = c.g_lat || [], gy = c.g_long || [], pos = c.pos || [];
+  const n = Math.min(gx.length, gy.length);
+  const cx0 = w / 2, cy0 = h / 2, m = 26;
+  const R = Math.min(w, h) / 2 - m;
+  let gmax = 1.0, peak = 0;
+  for (let i = 0; i < n; i++) {
+    gmax = Math.max(gmax, Math.abs(gx[i]), Math.abs(gy[i]));
+    peak = Math.max(peak, Math.hypot(gx[i], gy[i]));
+  }
+  gmax = Math.ceil(gmax * 2) / 2;                 // round up to a clean 0.5g grid
+  const unit = R / gmax;
+  const PX = (v) => cx0 + v * unit, PY = (v) => cy0 - v * unit;
+
+  // Reference grid rings at each 1g, faint, with a value label.
+  ctx.strokeStyle = "rgba(255,255,255,0.12)"; ctx.fillStyle = "rgba(255,255,255,0.35)";
+  ctx.font = "10px Segoe UI"; ctx.lineWidth = 1;
+  for (let g = 1; g <= gmax + 0.01; g += 1) {
+    ctx.beginPath(); ctx.arc(cx0, cy0, g * unit, 0, 6.283); ctx.stroke();
+    ctx.fillText(g + "g", cx0 + 2, cy0 - g * unit + 11);
+  }
+  // Axes.
+  ctx.strokeStyle = "rgba(255,255,255,0.25)";
+  ctx.beginPath(); ctx.moveTo(cx0 - R, cy0); ctx.lineTo(cx0 + R, cy0);
+  ctx.moveTo(cx0, cy0 - R); ctx.lineTo(cx0, cy0 + R); ctx.stroke();
+
+  // Points, coloured by whether the car is braking (red-ish) or on power
+  // (green-ish); alpha low so density reads. Highlighted point drawn after.
+  for (let i = 0; i < n; i++) {
+    const px = PX(gx[i]), py = PY(gy[i]);
+    const c2 = gy[i] < -0.05 ? PAL.slow : (gy[i] > 0.05 ? PAL.fast : [150, 156, 166]);
+    ctx.fillStyle = `rgba(${c2[0]},${c2[1]},${c2[2]},0.40)`;
+    ctx.beginPath(); ctx.arc(px, py, 1.8, 0, 6.283); ctx.fill();
+  }
+  // Peak-grip ring (how much of the circle the driver actually reaches).
+  if (peak > 0) {
+    ctx.strokeStyle = "rgba(255,255,255,0.55)"; ctx.setLineDash([4, 4]); ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(cx0, cy0, peak * unit, 0, 6.283); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  // Axis captions.
+  ctx.fillStyle = "rgba(255,255,255,0.5)"; ctx.font = "10px Segoe UI";
+  ctx.fillText(t("dyn.gg.accel"), cx0 + 4, cy0 - R + 10);
+  ctx.fillText(t("dyn.gg.brake"), cx0 + 4, cy0 + R - 3);
+  ctx.fillText(t("dyn.gg.lat"), cx0 + R - 34, cy0 - 4);
+
+  // Highlighted moment (from the shared hover position).
+  const pts = [];
+  for (let i = 0; i < n; i++) pts.push({ px: PX(gx[i]), py: PY(gy[i]), pos: pos[i] });
+  if (cx != null && n) {
+    const i = nearest(pos, cx);
+    ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(PX(gx[i]), PY(gy[i]), 5, 0, 6.283); ctx.stroke();
+  }
+  return { pts };
+}
+
+// Per-axle slip ratio over the lap: front (cyan) and rear (amber), symmetric
+// around zero. Below zero = the axle is locking (braking); above = spinning
+// (power). Shares the position x-axis, so the crosshair lines up with the map
+// and the other traces.
+function drawSlip(a, cx) {
+  const cv = $("c-slip");
+  if (!cv) return;
+  const { ctx, w, h } = setup(cv);
+  const c = a.review.channels;
+  const sf = c.slip_front || [], sr = c.slip_rear || [], pos = c.pos || [];
+  let m = 0.15;
+  for (const v of sf) m = Math.max(m, Math.abs(v));
+  for (const v of sr) m = Math.max(m, Math.abs(v));
+  cornerBands(ctx, w, h, a.corners);
+  // Zero line.
+  ctx.strokeStyle = "rgba(255,255,255,0.25)";
+  ctx.beginPath(); ctx.moveTo(0, h / 2); ctx.lineTo(w, h / 2); ctx.stroke();
+  line(ctx, w, h, pos, sr, -m, m, "#FFB020", 1.4);   // rear
+  line(ctx, w, h, pos, sf, -m, m, "#22D3CE", 1.5);   // front
+  axisLabel(ctx, w, t("dyn.slip.spin"), t("dyn.slip.lock"));
+  crosshair(ctx, w, h, cx);
+}
+
+// Line deviation: signed metres off the reference line, over the position axis.
+// Above zero = one side, below = the other — where you run wide or tight. Hidden
+// when the lap (or its reference) has no map coordinates.
+function drawLineOffset(a, cx) {
+  const wrap = $("lineoff-wrap");
+  const off = a.review.line_offset;
+  if (!wrap) return;
+  if (!Array.isArray(off) || !off.length) { wrap.classList.add("hidden"); return; }
+  wrap.classList.remove("hidden");
+  const { ctx, w, h } = setup($("c-lineoff"));
+  const pos = a.review.channels.pos;
+  let m = 1.0;
+  for (const v of off) m = Math.max(m, Math.abs(v));
+  cornerBands(ctx, w, h, a.corners);
+  ctx.strokeStyle = "rgba(255,255,255,0.25)";
+  ctx.beginPath(); ctx.moveTo(0, h / 2); ctx.lineTo(w, h / 2); ctx.stroke();
+  line(ctx, w, h, pos, off, -m, m, "#c58cff", 1.6);
+  axisLabel(ctx, w, `+${m.toFixed(1)}m`, `-${m.toFixed(1)}m`);
+  crosshair(ctx, w, h, cx);
+}
+
+// Rotation vs steering: the steering input (white) and the car's yaw/rotation
+// (orange), each scaled to its own range so they overlay. Yaw is flipped by the
+// title's sign convention (see balance _YAW_SIGN) so a clean corner has the two
+// tracking together; where yaw lags the wheel = understeer, leads it = oversteer.
+function drawYaw(a, cx) {
+  const cv = $("c-yaw");
+  if (!cv) return;
+  const { ctx, w, h } = setup(cv);
+  const c = a.review.channels;
+  const pos = c.pos, st = c.steer || [], yw = c.yaw || [];
+  let ms = 0.1, my = 0.1;
+  for (const v of st) ms = Math.max(ms, Math.abs(v));
+  for (const v of yw) my = Math.max(my, Math.abs(v));
+  cornerBands(ctx, w, h, a.corners);
+  ctx.strokeStyle = "rgba(255,255,255,0.25)";
+  ctx.beginPath(); ctx.moveTo(0, h / 2); ctx.lineTo(w, h / 2); ctx.stroke();
+  line(ctx, w, h, pos, yw.map((v) => -v), -my, my, "#FFB020", 1.4);
+  line(ctx, w, h, pos, st, -ms, ms, "#ffffff", 1.5);
+  axisLabel(ctx, w, "left", "right");
+  crosshair(ctx, w, h, cx);
+}
+
+// Revs & shift points: rpm over the lap with up/down-shift markers where the
+// gear number changes (▲ upshift near the top, ▼ downshift near the bottom).
+function drawShift(a, cx) {
+  const cv = $("c-rpm");
+  if (!cv) return;
+  const { ctx, w, h } = setup(cv);
+  const c = a.review.channels;
+  const pos = c.pos, rpm = c.rpm || [], gear = c.gear || [];
+  if (!rpm.length) return;
+  let lo = Infinity, hi = -Infinity;
+  for (const v of rpm) { lo = Math.min(lo, v); hi = Math.max(hi, v); }
+  const rlo = lo, rhi = hi;
+  if (hi === lo) hi = lo + 1;
+  const pad = (hi - lo) * 0.1; lo -= pad; hi += pad;
+  cornerBands(ctx, w, h, a.corners);
+  line(ctx, w, h, pos, rpm, lo, hi, "#34E08A", 1.4);
+  const gnum = (g) => { const n = parseInt(g, 10); return isNaN(n) ? null : n; };
+  for (let i = 1; i < gear.length; i++) {
+    const g0 = gnum(gear[i - 1]), g1 = gnum(gear[i]);
+    if (g0 == null || g1 == null || g0 === g1) continue;
+    const x = pos[i] * w, up = g1 > g0, y = up ? 10 : h - 4;
+    ctx.fillStyle = up ? "#22D3CE" : "#FFB020";
+    ctx.beginPath();
+    if (up) { ctx.moveTo(x, y - 6); ctx.lineTo(x - 4, y); ctx.lineTo(x + 4, y); }
+    else { ctx.moveTo(x, y); ctx.lineTo(x - 4, y - 6); ctx.lineTo(x + 4, y - 6); }
+    ctx.closePath(); ctx.fill();
+  }
+  ctx.fillStyle = "rgba(255,255,255,0.45)"; ctx.font = "10px Segoe UI";
+  ctx.fillText(Math.round(rhi) + "", w - 46, 12);
+  ctx.fillText(Math.round(rlo) + "", w - 46, h - 4);
+  crosshair(ctx, w, h, cx);
+}
+
+// Tyres across THIS lap (not the stint): core temp and pressure per wheel over
+// the position axis, so heat build-up and pressure swings show corner by corner.
+// Reuses the stint view's axle-by-colour + side-by-dash encoding (TYRE_SERIES).
+function drawDynTyres(a, cx) {
+  const sec = $("dyn-tyres");
+  const ty = a.review.tyres;
+  if (!sec) return;
+  if (!ty) { sec.classList.add("hidden"); return; }
+  sec.classList.remove("hidden");
+  $("dyn-tyre-legend").innerHTML = TYRE_SERIES.map((s) =>
+    `<span class="tl"><span class="sw" style="border-top:2px ${s.dash.length ? "dashed" : "solid"} ${s.color}"></span>` +
+    `${t("tyre." + s.key)}</span>`).join("");
+  const pos = a.review.channels.pos;
+  drawTyreOverLap($("c-dtyre-temp"), ty.temp, pos, a.corners, cx, "°");
+  drawTyreOverLap($("c-dtyre-press"), ty.press, pos, a.corners, cx, "");
+}
+
+function drawTyreOverLap(cv, wheels, pos, corners, cx, unit) {
+  if (!cv) return;
+  const { ctx, w, h } = setup(cv);
+  let lo = Infinity, hi = -Infinity;
+  for (const s of TYRE_SERIES) for (const v of (wheels[s.key] || [])) {
+    lo = Math.min(lo, v); hi = Math.max(hi, v);
+  }
+  if (!isFinite(lo)) return;
+  const rlo = lo, rhi = hi;
+  if (hi === lo) hi = lo + 1;
+  const pad = (hi - lo) * 0.15; lo -= pad; hi += pad;
+  cornerBands(ctx, w, h, corners);
+  for (const s of TYRE_SERIES) {
+    const vals = wheels[s.key] || [];
+    if (!vals.length) continue;
+    ctx.save(); ctx.setLineDash(s.dash);
+    line(ctx, w, h, pos, vals, lo, hi, s.color, 1.4);
+    ctx.restore();
+  }
+  ctx.fillStyle = "rgba(255,255,255,0.45)"; ctx.font = "10px Segoe UI";
+  ctx.fillText(rhi.toFixed(unit ? 0 : 1) + unit, w - 44, 12);
+  ctx.fillText(rlo.toFixed(unit ? 0 : 1) + unit, w - 44, h - 4);
+  crosshair(ctx, w, h, cx);
+}
+
+// Balance ribbon: the racing line coloured by handling (blue understeer / red
+// oversteer). Reuses drawMapTo in "balance" mode. Hidden unless the lap has a
+// map and a non-flat balance signal (yaw recorded from v6).
+function drawBalanceRibbon(a, cx) {
+  const wrap = $("dyn-balance-wrap");
+  if (!wrap) return;
+  if (!hasBalance(a)) { wrap.classList.add("hidden"); DYN_BAL_HIT = null; return; }
+  wrap.classList.remove("hidden");
+  const hit = drawMapTo($("c-balance"), null, a, cx, "balance");
+  if (hit) DYN_BAL_HIT = hit;
+}
+
+function dynReadoutHTML(a, p) {
+  const c = a.review.channels;
+  const i = nearest(c.pos, p);
+  const corner = (a.corners || []).find((x) => p >= x.entry && p <= x.exit);
+  const where = corner ? `<b class="muted">${corner.name}</b> &nbsp;·&nbsp; ` : "";
+  const gl = (c.g_lat || [])[i] || 0, gL = (c.g_long || [])[i] || 0;
+  const gt = Math.hypot(gl, gL);
+  const sf = (c.slip_front || [])[i] || 0, sr = (c.slip_rear || [])[i] || 0;
+  let extra = "";
+  if (Array.isArray(a.review.line_offset)) {
+    const off = a.review.line_offset[i] || 0;
+    extra += ` &nbsp;·&nbsp; ${t("dyn.ro.off")} <b>${off >= 0 ? "+" : ""}${off.toFixed(1)}m</b>`;
+  }
+  return where +
+    `<b>${t("ro.pos")} ${Math.round(p * 100)}%</b> &nbsp;·&nbsp; ` +
+    `${t("dyn.ro.g")} <b>${gt.toFixed(2)}g</b> <span class="muted">(${t("dyn.ro.lat")} ${gl.toFixed(2)}, ${t("dyn.ro.lon")} ${gL.toFixed(2)})</span> &nbsp;·&nbsp; ` +
+    `${t("dyn.ro.slipF")} <b>${sf.toFixed(2)}</b>  ${t("dyn.ro.slipR")} <b>${sr.toFixed(2)}</b>` + extra;
+}
+
+function updateDynReadout(a, p) {
+  LAST_HOVER = p;
+  const el = $("dyn-readout");
+  if (!el) return;
+  if (p == null) { el.innerHTML = t("dyn.readout"); return; }
+  el.innerHTML = dynReadoutHTML(a, p);
+}
+
 // --- hover / readout ------------------------------------------------------
 function nearest(posArr, p) {
   let lo = 0, hi = posArr.length - 1;
@@ -988,6 +1404,45 @@ function wireHover() {
     });
     mini.addEventListener("mouseleave", () => redraw(null));
   }
+
+  // Dynamics tab: the slip trace is on the position axis (same as the Compare
+  // charts), the G-G scatter isn't — so slip hover reads cursor→position, while
+  // G-G hover finds the nearest dot in screen space and reuses its position.
+  const slip = $("c-slip");
+  if (slip) {
+    slip.addEventListener("mousemove", (e) => {
+      if (!DATA) return;
+      const rect = slip.getBoundingClientRect();
+      const p = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+      drawDynamics(p);
+    });
+    slip.addEventListener("mouseleave", () => { if (DATA) drawDynamics(null); });
+  }
+  const gg = $("c-gg");
+  if (gg) {
+    gg.addEventListener("mousemove", (e) => {
+      if (!DATA || !DYN_GG) return;
+      const rect = gg.getBoundingClientRect();
+      const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+      let best = -1, bd = Infinity;
+      const pts = DYN_GG.pts;
+      for (let i = 0; i < pts.length; i++) {
+        const dx = pts[i].px - mx, dy = pts[i].py - my, dd = dx * dx + dy * dy;
+        if (dd < bd) { bd = dd; best = i; }
+      }
+      if (best >= 0) drawDynamics(pts[best].pos);
+    });
+    gg.addEventListener("mouseleave", () => { if (DATA) drawDynamics(null); });
+  }
+  const ribbon = $("c-balance");
+  if (ribbon) {
+    ribbon.addEventListener("mousemove", (e) => {
+      if (!DATA) return;
+      const p = nearestPos(DYN_BAL_HIT, ribbon, e);
+      if (p != null) drawDynamics(p);
+    });
+    ribbon.addEventListener("mouseleave", () => { if (DATA) drawDynamics(null); });
+  }
 }
 
 // Debounced so a resize drag fires once at rest, not per pixel. Compare/Map
@@ -1014,11 +1469,14 @@ window.HoneI18nRerender = function () {
     if (DATA) {
       drawSummary(DATA);
       drawCornerSpeeds(DATA);
+      drawWaterfall(DATA);
       drawDebrief(DATA);
       redraw(LAST_HOVER);
     }
   } else if (VIEW === "map") {
     if (DATA) { $("map-readout").innerHTML = MAP_READOUT_DEFAULT(); drawMap(DATA, null); }
+  } else if (VIEW === "dynamics") {
+    if (DATA) drawDynamics(LAST_HOVER);
   } else if (VIEW === "sectors") {
     if (CURRENT) loadSectors();
   } else if (VIEW === "progress") {

@@ -39,6 +39,7 @@
     <button class="tab active" data-view="compare" data-i18n="tab.compare">Compare</button>
     <button class="tab" data-view="map" data-i18n="tab.map">Map</button>
     <button class="tab" data-view="sectors" data-i18n="tab.sectors">Sectors</button>
+    <button class="tab" data-view="dynamics" data-i18n="tab.dynamics">Dynamics</button>
     <button class="tab" data-view="progress" data-i18n="tab.trends">Trends</button>
   </nav>
 
@@ -71,6 +72,8 @@
     </main>
 
     <section id="vmin" class="vmin"></section>
+
+    <section id="waterfall" class="debrief"></section>
 
     <section id="debrief" class="debrief"></section>
   </div>
@@ -135,9 +138,57 @@
       <div id="trends"></div>
     </section>
     <section class="debrief">
+      <h3 data-i18n-html="prog.consistency">Corner consistency <small>(spread of your min speed per corner · wider = less repeatable)</small></h3>
+      <div id="corner-consistency"></div>
+    </section>
+    <section class="debrief">
       <h3 data-i18n="prog.recurring">Recurring mistakes</h3>
       <div id="recurring"></div>
     </section>
+  </div>
+
+  <div id="view-dynamics" class="hidden">
+    <div id="dyn-readout" class="readout" data-i18n="dyn.readout">Hover the traces for point-by-point values…</div>
+    <section id="dyn-coasting" class="summary"></section>
+    <main id="dyn-charts">
+      <div class="chart gg">
+        <h3 data-i18n-html="chart.gg">Grip usage · G-G <small>(each dot = a moment · far from centre = more grip used · the ring = your peak)</small></h3>
+        <canvas id="c-gg"></canvas>
+      </div>
+      <div class="chart">
+        <h3 data-i18n-html="chart.slip">Lock &amp; spin <small>(slip ratio · cyan = front, amber = rear · below 0 = locking, above = spinning)</small></h3>
+        <canvas id="c-slip"></canvas>
+      </div>
+      <div id="lineoff-wrap" class="chart hidden">
+        <h3 data-i18n-html="chart.lineoff">Line deviation <small>(m off the reference line · above = one side, below = the other)</small></h3>
+        <canvas id="c-lineoff"></canvas>
+      </div>
+      <div class="chart">
+        <h3 data-i18n-html="chart.yaw">Rotation vs steering <small>(orange = yaw/rotation, white = steering · they should track together)</small></h3>
+        <canvas id="c-yaw"></canvas>
+      </div>
+      <div class="chart">
+        <h3 data-i18n-html="chart.rpm">Revs &amp; shift points <small>(rpm across the lap · ▲ = upshift, ▼ = downshift)</small></h3>
+        <canvas id="c-rpm"></canvas>
+      </div>
+    </main>
+    <section id="dyn-tyres" class="debrief tyres hidden">
+      <h3 data-i18n-html="dyn.tyre.header">Tyres across this lap <small>(core temp &amp; pressure corner by corner · dashed = right side)</small></h3>
+      <div id="dyn-tyre-legend" class="tyre-legend"></div>
+      <div class="tyre-charts">
+        <div class="chart"><h4 data-i18n="tyre.temp">Core temperature (°C)</h4><canvas id="c-dtyre-temp"></canvas></div>
+        <div class="chart"><h4 data-i18n="tyre.press">Pressure (psi)</h4><canvas id="c-dtyre-press"></canvas></div>
+      </div>
+    </section>
+    <div id="dyn-balance-wrap" class="chart ribbon hidden">
+      <h3 data-i18n-html="chart.balance">Balance ribbon <small>(racing line coloured by handling · blue = understeer, red = oversteer)</small></h3>
+      <canvas id="c-balance"></canvas>
+      <div class="map-legend">
+        <span class="swatch"><span class="marker" style="color:#5896ff">■</span> <span data-i18n="bal.under">understeer</span></span>
+        <span class="swatch"><span class="marker" style="color:#ff5a3c">■</span> <span data-i18n="bal.over">oversteer</span></span>
+      </div>
+    </div>
+    <div id="dyn-missing" class="empty hidden" data-i18n="dyn.missing">This lap has no dynamics data (G / slip were recorded from v6). Drive and record a new lap to see it here.</div>
   </div>
 
   <div id="empty" class="empty">

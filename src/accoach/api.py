@@ -58,6 +58,88 @@ def _downsample(lap):
     return [lap.samples[int(i * step)] for i in range(_MAX_POINTS)]
 
 
+def _axle_slip(pair) -> float:
+    """The worst slip ratio across one axle's two wheels — the wheel with the
+    largest magnitude, sign kept. Negative = locking (braking), positive =
+    spinning (power). So a front-axle lock and a rear-axle wheelspin both survive
+    the aggregation to a single per-axle trace the Dynamics view can plot."""
+    a, b = pair
+    return a if abs(a) >= abs(b) else b
+
+
+# Handling-balance thresholds are owned by the live coach (coaching/balance.py);
+# import them so the report's per-point balance ribbon stays in sync with what
+# the coach calls understeer/oversteer instead of drifting from a second copy.
+from .coaching.balance import (  # noqa: E402
+    _MIN_SPEED_KMH as _BAL_MIN_SPEED,
+    _STEER_CATCH as _BAL_CATCH,
+    _STEER_HARD as _BAL_STEER_HARD,
+    _UNDERSTEER_RATIO as _BAL_UNDER,
+    _YAW_LOOSE as _BAL_LOOSE,
+    _YAW_SIGN as _BAL_YAW_SIGN,
+)
+
+
+def _balance_at(s) -> float:
+    """A signed handling-balance value for one frame, in roughly [-1, 1]:
+    negative = understeer (the nose pushes — lots of lock, little rotation),
+    positive = oversteer (the rear steps out — rotation against opposite lock),
+    0 = neutral or not cornering. Mirrors coaching/balance.py's tests so the map
+    ribbon reads the same faults the live coach calls."""
+    if s.speed_kmh < _BAL_MIN_SPEED:
+        return 0.0
+    yaw = s.yaw_rate * _BAL_YAW_SIGN
+    # Oversteer takes precedence (like the live coach): opposite lock — steer and
+    # yaw disagree in sign — while genuinely rotating. Small steer is fine here:
+    # catching a slide often means little or reducing lock, so this uses the
+    # lower _STEER_CATCH gate, not _STEER_HARD.
+    if (abs(s.steer_angle) >= _BAL_CATCH and s.steer_angle * yaw < 0.0
+            and abs(yaw) >= _BAL_LOOSE):
+        return round(min(1.0, abs(yaw) / (2 * _BAL_LOOSE)), 3)
+    # Understeer: rotating far less than the wheel asks (yaw/steer below normal),
+    # judged only once the driver is genuinely cornering (steer past _STEER_HARD).
+    steer = abs(s.steer_angle)
+    if steer < _BAL_STEER_HARD:
+        return 0.0
+    ratio = abs(yaw) / steer
+    if ratio < _BAL_UNDER:
+        return round(-min(1.0, (_BAL_UNDER - ratio) / _BAL_UNDER), 3)
+    return 0.0
+
+
+def _lateral_offsets(review_s, base_s) -> list[float] | None:
+    """Signed lateral distance (m) of each review point from the reference line:
+    positive = to one side, negative = the other. For every reviewed sample, find
+    the nearest reference vertex and take the perpendicular offset from the local
+    reference direction (a cross product). Shows *where* the driver runs wide or
+    tight, in metres — the line-deviation view. None if either line has no map."""
+    bx = [s.car_x for s in base_s]
+    bz = [s.car_z for s in base_s]
+    n = len(bx)
+    if n < 3:
+        return None
+    out = []
+    for s in review_s:
+        px, pz = s.car_x, s.car_z
+        bestj, bestd = 0, float("inf")
+        for j in range(n):
+            dx = bx[j] - px
+            dz = bz[j] - pz
+            d = dx * dx + dz * dz
+            if d < bestd:
+                bestd = d
+                bestj = j
+        j0 = (bestj - 1) % n
+        j1 = (bestj + 1) % n
+        dxr = bx[j1] - bx[j0]
+        dzr = bz[j1] - bz[j0]
+        length = (dxr * dxr + dzr * dzr) ** 0.5 or 1.0
+        ox = px - bx[bestj]
+        oz = pz - bz[bestj]
+        out.append(round((dxr * oz - dzr * ox) / length, 2))
+    return out
+
+
 def _channels(lap) -> dict:
     s = _downsample(lap)
     return {
@@ -71,7 +153,34 @@ def _channels(lap) -> dict:
         # frontend checks ``has_map`` before drawing the track map.
         "x": [round(x.car_x, 2) for x in s],
         "z": [round(x.car_z, 2) for x in s],
+        # --- Dynamics view (Tier 1) — channels recorded since v6/v7 but never
+        # plotted before. All from the same downsampled frames, so they line up
+        # point-for-point with pos/speed and share the crosshair.
+        "g_lat": [round(x.g_lat, 3) for x in s],     # lateral G (cornering)
+        "g_long": [round(x.g_long, 3) for x in s],   # longitudinal G (+accel/-brake)
+        # Physical slip ratio aggregated per axle (front / rear), sign kept.
+        "slip_front": [round(_axle_slip(x.slip_ratio[:2]), 3) for x in s],
+        "slip_rear": [round(_axle_slip(x.slip_ratio[2:]), 3) for x in s],
+        # Signed handling balance (- understeer / + oversteer) for the map ribbon.
+        "balance": [_balance_at(x) for x in s],
+        # Rotation vs input (yaw trace) and engine revs (shift-point view).
+        "yaw": [round(x.yaw_rate, 4) for x in s],
+        "rpm": [int(x.rpm) for x in s],
     }
+
+
+def _tyre_channels(lap) -> dict | None:
+    """Per-point tyre core temp & pressure along the lap (4 wheels each), for the
+    intra-lap tyre view — how heat and pressure build corner by corner, which the
+    stint-level means in /api/progress can't show. None when the lap never
+    recorded per-wheel tyres (older laps), so the frontend hides the charts."""
+    s = _downsample(lap)
+    temp = {w: [round(getattr(x, "tyre_core_temp")[i], 1) for x in s]
+            for i, w in enumerate(("fl", "fr", "rl", "rr"))}
+    press = {w: [round(getattr(x, "tyre_pressure")[i], 2) for x in s]
+             for i, w in enumerate(("fl", "fr", "rl", "rr"))}
+    hot = any(v > 0 for v in temp["fl"]) or any(v > 0 for v in press["fl"])
+    return {"temp": temp, "press": press} if hot else None
 
 
 def _has_map(lap) -> bool:
@@ -249,6 +358,12 @@ def create_api(
                 "lap_time": format_lap_time(review.lap_time_ms),
                 "channels": _channels(review),
                 "delta": _delta_trace(review, reference),
+                # Line-deviation (Tier 2): signed metres off the reference line,
+                # aligned with the review channels' pos. Only when both have a map.
+                "line_offset": (_lateral_offsets(_downsample(review), _downsample(baseline_lap))
+                                if _has_map(review) and _has_map(baseline_lap) else None),
+                # Per-point tyre temps/pressures along this lap (or None if absent).
+                "tyres": _tyre_channels(review),
             },
             "corners": [{
                 "index": c.index, "entry": c.entry_pos,
@@ -360,7 +475,8 @@ def create_api(
         if not valid:
             return {"car": car, "track": track, "laps": [], "pb_trend": [],
                     "consistency": lap_time_consistency([]), "levels": [],
-                    "trends": [], "recurring": [], "tyres": []}
+                    "trends": [], "recurring": [], "tyres": [],
+                    "corner_consistency": []}
 
         # Chronological (oldest first) for the trend.
         chrono = sorted(valid, key=lambda r: r["recorded_utc"] or "")
@@ -381,6 +497,8 @@ def create_api(
         best_ms = fastest_row["lap_time_ms"]
         recurring: list[dict] = []
         trends: list[dict] = []
+        corners: list = []
+        cnames: dict = {}
         try:
             ref_lap = load_lap(fastest)
             reference = Reference(ref_lap)
@@ -445,6 +563,32 @@ def create_api(
                 "temp": temp, "press": press,
             })
 
+        # Consistency per corner: how much the min speed at each corner varies
+        # across the recent laps. A wide spread means the driver isn't repeating
+        # that corner — a "where you're inconsistent" signal the global σ hides.
+        corner_consistency: list[dict] = []
+        for c in corners:
+            vmins = []
+            for r in chrono[-15:]:
+                lp = lap_objs.get(r["path"])
+                if lp is None:
+                    continue
+                inside = [s.speed_kmh for s in lp.samples if c.entry_pos <= s.pos <= c.exit_pos]
+                if inside:
+                    vmins.append(min(inside))
+            if len(vmins) >= 3:
+                mean = sum(vmins) / len(vmins)
+                var = sum((v - mean) ** 2 for v in vmins) / len(vmins)
+                corner_consistency.append({
+                    "corner_index": c.index,
+                    "name": cnames.get(c.index, f"Corner {c.index + 1}"),
+                    "n": len(vmins),
+                    "mean_kmh": round(mean, 1),
+                    "spread_kmh": round(max(vmins) - min(vmins), 1),
+                    "std_kmh": round(var ** 0.5, 2),
+                })
+        corner_consistency.sort(key=lambda x: x["spread_kmh"], reverse=True)
+
         # Benchmark ladder: rolling best → ideal (consistency) → PRO (skill ceiling).
         ideal_ms = pro_ms = None
         try:
@@ -474,6 +618,7 @@ def create_api(
             "trends": trends,
             "recurring": recurring,
             "tyres": tyres,
+            "corner_consistency": corner_consistency,
         }
 
     @app.get("/api/export")
@@ -590,11 +735,13 @@ def _seed_demo() -> str:
             pos = i / 400
             spd, brake, thr, steer = profile(pos)
             cx, cz = track_xz(pos)
+            wide = False
             if slow_corner is not None:
                 lo, hi = zones[slow_corner]
                 if lo <= pos <= hi:
                     off += max(1, amt // 5)
                     spd = max(spd - amt, 80.0)
+                    wide = True
                     # Ran wide here: nudge the line radially outward so the
                     # track map shows a visibly different racing line.
                     r = math.hypot(cx, cz) or 1.0
@@ -602,10 +749,32 @@ def _seed_demo() -> str:
                     cx += cx / r * push
                     cz += cz / r * push
             sector = 0 if pos < 0.30 else (1 if pos < 0.65 else 2)  # unequal sectors
+            # Synthetic dynamics so the Dynamics tab isn't blank in --demo: G from
+            # the pedals/steering, slip ratio as a light front lock under braking
+            # and a touch of rear spin on corner exit (low speed + throttle).
+            g_long = thr * 0.85 - brake * 1.55
+            g_lat = (steer / 0.28) * 2.30
+            lock = -0.05 * brake
+            spin = 0.06 * thr if spd < 165.0 else 0.0
+            slip = (lock, lock, spin, spin)
+            # Yaw for the balance ribbon: a normal yaw/steer ratio in clean
+            # corners, dropping in the corner where the car ran wide (a push).
+            yaw = -steer * (0.5 if wide else 2.0)
+            # Gear/RPM from speed so the shift-point view has a shape: revs climb
+            # within a gear then drop on the upshift (a sawtooth), gear steps up.
+            if spd < 110.0:
+                gear, glo, ghi = "2", 60.0, 110.0
+            elif spd < 170.0:
+                gear, glo, ghi = "3", 110.0, 170.0
+            else:
+                gear, glo, ghi = "4", 170.0, 260.0
+            rpm = int(4200 + max(0.0, min(1.0, (spd - glo) / (ghi - glo))) * 4200)
             s.append(LapSample(int(pos * 100000) + off, pos, spd, thr, brake,
-                               steer, "4", 8000, 0.0, 0.0, car_x=cx, car_z=cz,
-                               current_sector=sector,
-                               tyre_core_temp=temp, tyre_pressure=press))
+                               steer, gear, rpm, round(g_lat, 3), round(g_long, 3),
+                               car_x=cx, car_z=cz, current_sector=sector,
+                               yaw_rate=round(yaw, 4),
+                               tyre_core_temp=temp, tyre_pressure=press,
+                               slip_ratio=slip))
         return Lap("HONE Demo", "Demo Circuit", SessionType.PRACTICE,
                    100000 + off, True, samples=s)
 

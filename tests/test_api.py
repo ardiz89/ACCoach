@@ -93,6 +93,113 @@ def test_analysis_exposes_track_map(tmp_path):
     assert len(data["review"]["delta"]["delta_s"]) == len(data["review"]["channels"]["x"])
 
 
+def test_analysis_exposes_dynamics_channels(tmp_path):
+    # The Dynamics tab (G-G, lock/spin) reads these — always present and aligned
+    # point-for-point with pos, even on laps that recorded them as zero.
+    c = _client(tmp_path)
+    data = c.get("/api/analysis", params={"car": CAR, "track": TRACK}).json()
+    ch = data["review"]["channels"]
+    for k in ("g_lat", "g_long", "slip_front", "slip_rear"):
+        assert k in ch and len(ch[k]) == len(ch["pos"])
+
+
+def test_axle_slip_keeps_worst_wheel_signed():
+    from accoach.api import _axle_slip
+    assert _axle_slip((-0.20, -0.05)) == -0.20   # front lock: most-negative wins
+    assert _axle_slip((0.03, 0.18)) == 0.18       # rear spin: most-positive wins
+    assert _axle_slip((-0.30, 0.10)) == -0.30     # largest magnitude, sign kept
+
+
+def test_dynamics_channels_aggregate_slip_per_axle(tmp_path):
+    lap = synth.build_lap()
+    for s in lap.samples:
+        s.g_lat, s.g_long = 1.2, -0.8
+        s.slip_ratio = (-0.18, -0.04, 0.02, 0.15)   # front locking, rear spinning
+    lap.recorded_utc = "2026-06-20T18:00:00+00:00"
+    save_lap(lap, tmp_path)
+    data = TestClient(create_api(tmp_path)).get(
+        "/api/analysis", params={"car": CAR, "track": TRACK}).json()
+    ch = data["review"]["channels"]
+    assert all(v == -0.18 for v in ch["slip_front"])   # worst front wheel
+    assert all(v == 0.15 for v in ch["slip_rear"])     # worst rear wheel
+    assert all(v == 1.2 for v in ch["g_lat"])
+
+
+def test_analysis_exposes_yaw_and_rpm_channels(tmp_path):
+    c = _client(tmp_path)
+    data = c.get("/api/analysis", params={"car": CAR, "track": TRACK}).json()
+    ch = data["review"]["channels"]
+    for k in ("yaw", "rpm"):
+        assert k in ch and len(ch[k]) == len(ch["pos"])
+
+
+def test_analysis_line_offset_and_balance_present(tmp_path):
+    c = _client(tmp_path)
+    data = c.get("/api/analysis", params={"car": CAR, "track": TRACK}).json()
+    rev = data["review"]
+    n = len(rev["channels"]["pos"])
+    assert isinstance(rev["line_offset"], list) and len(rev["line_offset"]) == n
+    assert "balance" in rev["channels"] and len(rev["channels"]["balance"]) == n
+
+
+def test_analysis_line_offset_flags_wide_line(tmp_path):
+    # The slow laps ran wide in corner 0 (nudged off the reference line): the
+    # lateral offset must be visibly non-zero somewhere.
+    c = _client(tmp_path)
+    laps = c.get("/api/laps", params={"car": CAR, "track": TRACK}).json()
+    slow = max(laps, key=lambda l: l["lap_time_ms"])["path"]
+    fast = min(laps, key=lambda l: l["lap_time_ms"])["path"]
+    data = c.get("/api/analysis",
+                 params={"car": CAR, "track": TRACK, "lap": slow, "baseline": fast}).json()
+    assert any(abs(v) > 1.0 for v in data["review"]["line_offset"])
+
+
+def test_balance_at_signs_faults():
+    from accoach.api import _balance_at
+    from accoach.recording.lap import LapSample
+
+    def mk(steer, yaw, speed=120.0):
+        return LapSample(0, 0.3, speed, 0.0, 0.0, steer, "4", 8000, 0.0, 0.0,
+                         yaw_rate=yaw)
+
+    assert _balance_at(mk(0.30, -0.60)) == 0.0        # clean corner → neutral
+    assert _balance_at(mk(0.30, -0.15)) < 0.0         # low yaw/steer → understeer
+    assert _balance_at(mk(0.10, 0.40)) > 0.0          # opposite lock → oversteer
+    assert _balance_at(mk(0.30, -0.15, speed=30.0)) == 0.0   # too slow → ignored
+
+
+def test_analysis_tyres_per_point_absent_without_channel(tmp_path):
+    c = _client(tmp_path)
+    data = c.get("/api/analysis", params={"car": CAR, "track": TRACK}).json()
+    assert data["review"]["tyres"] is None            # synth laps carry no tyres
+
+
+def test_analysis_tyres_per_point_present_when_recorded(tmp_path):
+    lap = synth.build_lap()
+    for s in lap.samples:
+        s.tyre_core_temp = (85.0, 86.0, 90.0, 91.0)
+        s.tyre_pressure = (27.0, 27.1, 27.5, 27.6)
+    lap.recorded_utc = "2026-06-20T18:00:00+00:00"
+    save_lap(lap, tmp_path)
+    data = TestClient(create_api(tmp_path)).get(
+        "/api/analysis", params={"car": CAR, "track": TRACK}).json()
+    ty = data["review"]["tyres"]
+    assert ty and set(ty["temp"]) == {"fl", "fr", "rl", "rr"}
+    assert len(ty["temp"]["fl"]) == len(data["review"]["channels"]["pos"])
+    assert ty["temp"]["rl"][0] == 90.0
+
+
+def test_progress_corner_consistency(tmp_path):
+    c = _client(tmp_path)
+    data = c.get("/api/progress", params={"car": CAR, "track": TRACK}).json()
+    cc = data["corner_consistency"]
+    assert cc, "expected per-corner consistency across the laps"
+    row = cc[0]
+    assert {"corner_index", "name", "n", "mean_kmh", "spread_kmh", "std_kmh"} <= set(row)
+    # Sorted worst-first: the biggest spread leads.
+    assert cc == sorted(cc, key=lambda x: x["spread_kmh"], reverse=True)
+
+
 def test_sectors_breakdown_and_ideal(tmp_path):
     c = _client(tmp_path)
     # Review the slowest lap against the fastest baseline.

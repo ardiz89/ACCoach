@@ -162,6 +162,23 @@ main { padding: 16px 24px; display: grid; gap: 18px; }
 .chart canvas { cursor: crosshair; }
 .chart canvas.tall { height: 240px; }
 .chart.map canvas { height: 60vh; min-height: 380px; }
+/* G-G scatter: taller and capped in width so it reads as a square-ish plot;
+   drawGG scales the friction circle by min(w,h) so it stays circular anyway. */
+.chart.gg canvas { height: 340px; max-width: 440px; margin: 0 auto; }
+/* Balance ribbon: a moderate track map (smaller than the full Map tab). */
+.chart.ribbon canvas { height: 44vh; min-height: 300px; cursor: crosshair; }
+
+/* Corner-consistency rows: a corner label, a spread bar, and the numbers. */
+.cons-row { display: grid; grid-template-columns: 120px 1fr auto; align-items: center;
+  gap: 12px; padding: 7px 12px; margin: 6px 0; background: var(--panel);
+  border: 1px solid var(--line); border-radius: 10px; }
+.cons-row .corner { font-weight: 600; }
+.cons-track { position: relative; height: 10px; background: var(--inset);
+  border-radius: 999px; overflow: hidden; }
+.cons-fill { position: absolute; top: 0; left: 0; height: 100%; border-radius: 999px;
+  background: linear-gradient(90deg, var(--green), var(--amber) 60%, var(--red)); }
+.cons-nums { font-family: var(--font-mono); font-size: 12px; color: var(--muted); white-space: nowrap; }
+.cons-nums b { color: var(--fg); }
 
 .recur {
   display: flex; align-items: center; gap: 14px;
