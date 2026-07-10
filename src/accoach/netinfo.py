@@ -31,7 +31,8 @@ def lan_ip() -> str | None:
 
 
 def device_urls(port: int, ip: str | None = None) -> dict[str, str] | None:
-    """Report + engineer URLs a LAN device opens, or ``None`` if no LAN IP.
+    """Report + engineer + on-track test URLs a LAN device opens, or ``None`` if
+    no LAN IP.
 
     Pass ``ip`` to skip auto-detection (useful for tests).
     """
@@ -39,7 +40,8 @@ def device_urls(port: int, ip: str | None = None) -> dict[str, str] | None:
     if not ip:
         return None
     base = f"http://{ip}:{port}"
-    return {"report": base + "/", "engineer": base + "/engineer"}
+    return {"report": base + "/", "engineer": base + "/engineer",
+            "test": base + "/test"}
 
 
 def qr_png(data: str, scale: int = 6) -> bytes | None:

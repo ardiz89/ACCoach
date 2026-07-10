@@ -400,8 +400,10 @@ class DevicesPanel(QWidget):
         cols.setSpacing(16)
         cols.addWidget(self._qr_col(t("mob.report"), urls["report"]))
         cols.addWidget(self._qr_col(t("mob.engineer"), urls["engineer"]))
+        cols.addWidget(self._qr_col(t("mob.test"), urls["test"]))
         self._body.addWidget(pair)
         self._body.addWidget(_hint(t("mob.scan")))
+        self._body.addWidget(_hint(t("mob.test_live")))
         self._body.addWidget(_hint(t("mob.same_net")))
         self._body.addWidget(_hint(t("mob.firewall")))
 

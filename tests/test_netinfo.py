@@ -7,6 +7,7 @@ def test_device_urls_builds_report_and_engineer():
     assert urls == {
         "report": "http://192.168.1.50:8778/",
         "engineer": "http://192.168.1.50:8778/engineer",
+        "test": "http://192.168.1.50:8778/test",
     }
 
 

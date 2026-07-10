@@ -1,0 +1,121 @@
+/* HONE on-track test checklist — tablet-first (optimised for a 10" screen).
+   Palette mirrors accoach/brand.py; kept self-contained so the touch UI doesn't
+   inherit the desktop analysis layout. */
+:root {
+  --ink:#0B0E12; --slate:#151A21; --line:#232B35; --cyan:#22D3CE;
+  --green:#34E08A; --red:#FF4D5E; --amber:#FFB020; --text:#E8EDF2; --muted:#8A95A3;
+}
+* { box-sizing:border-box; }
+html,body { margin:0; }
+body {
+  background:var(--ink); color:var(--text);
+  font-family:"Space Grotesk","Segoe UI",system-ui,sans-serif;
+  font-size:18px; line-height:1.4;
+  -webkit-text-size-adjust:100%;
+}
+.wrap { max-width:900px; margin:0 auto; padding:0 16px 140px; }
+
+/* --- live status bar (sticky top) --- */
+.livebar {
+  position:sticky; top:0; z-index:10;
+  background:var(--slate); border-bottom:1px solid var(--line);
+  display:flex; flex-wrap:wrap; align-items:center; gap:10px 16px;
+  padding:10px 16px; margin:0 -16px 14px;
+}
+.brand { display:flex; align-items:center; gap:8px; font-weight:700; font-size:20px; }
+.dot { width:12px; height:12px; border-radius:50%; background:var(--muted); }
+.dot.on { background:var(--green); box-shadow:0 0 8px var(--green); }
+.dot.off { background:var(--red); }
+.live-field { display:flex; flex-direction:column; line-height:1.1; }
+.live-field .k { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; }
+.live-field .v { font-size:18px; font-weight:600; font-variant-numeric:tabular-nums; }
+.cuechip {
+  margin-left:auto; padding:8px 14px; border-radius:20px;
+  background:var(--line); color:var(--muted); font-weight:600; max-width:100%;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.cuechip.hot { background:rgba(255,176,32,.16); color:var(--amber); }
+
+/* --- session setup --- */
+.setup { display:flex; flex-wrap:wrap; gap:12px; margin-bottom:16px; }
+.setup label { display:flex; flex-direction:column; gap:4px; font-size:13px; color:var(--muted); flex:1 1 160px; }
+.setup select, .setup input {
+  background:var(--slate); color:var(--text); border:1px solid var(--line);
+  border-radius:10px; padding:12px 12px; font-size:17px; min-height:52px;
+}
+.seg { display:flex; gap:6px; }
+.seg button {
+  flex:1; padding:12px; border-radius:10px; border:1px solid var(--line);
+  background:var(--slate); color:var(--muted); font-size:16px; min-height:52px;
+}
+.seg button.sel { background:var(--cyan); color:var(--ink); border-color:var(--cyan); font-weight:700; }
+
+/* --- progress --- */
+.progress { display:flex; align-items:center; gap:12px; margin-bottom:12px; color:var(--muted); font-size:14px; }
+.bar { flex:1; height:8px; background:var(--line); border-radius:5px; overflow:hidden; }
+.bar > i { display:block; height:100%; background:var(--cyan); width:0; transition:width .2s; }
+
+/* --- test card --- */
+.card { background:var(--slate); border:1px solid var(--line); border-radius:16px; padding:20px; }
+.card .num { color:var(--cyan); font-weight:700; font-size:14px; letter-spacing:.04em; text-transform:uppercase; }
+.card h2 { margin:.2em 0 .5em; font-size:24px; line-height:1.25; }
+.block { margin:14px 0; }
+.block .lab { font-size:12px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); margin-bottom:4px; }
+.block.expected { border-left:3px solid var(--cyan); padding-left:12px; }
+
+/* --- verdict buttons --- */
+.verdicts { display:grid; grid-template-columns:repeat(2,1fr); gap:12px; margin:16px 0; }
+.verdict {
+  min-height:72px; border-radius:14px; border:2px solid var(--line);
+  background:transparent; color:var(--text); font-size:20px; font-weight:700;
+  display:flex; align-items:center; justify-content:center; gap:8px;
+}
+.verdict[data-v="pass"].sel { background:rgba(52,224,138,.16); border-color:var(--green); color:var(--green); }
+.verdict[data-v="fail"].sel { background:rgba(255,77,94,.16); border-color:var(--red); color:var(--red); }
+.verdict[data-v="partial"].sel { background:rgba(255,176,32,.16); border-color:var(--amber); color:var(--amber); }
+.verdict[data-v="skip"].sel { background:var(--line); border-color:var(--muted); color:var(--muted); }
+
+textarea {
+  width:100%; min-height:80px; background:var(--ink); color:var(--text);
+  border:1px solid var(--line); border-radius:12px; padding:12px; font-size:17px;
+  font-family:inherit; resize:vertical;
+}
+
+/* --- captured cues + attached lap --- */
+.captured { margin-top:14px; }
+.captured .lab { display:flex; justify-content:space-between; align-items:center; }
+.captured .lab button { background:none; border:none; color:var(--muted); font-size:13px; text-decoration:underline; }
+.cue-list { list-style:none; margin:8px 0 0; padding:0; display:flex; flex-direction:column; gap:6px; }
+.cue-list li { background:var(--ink); border:1px solid var(--line); border-radius:10px; padding:8px 12px; font-size:14px; }
+.cue-list .cat { color:var(--amber); font-weight:600; }
+.cue-list .tel { color:var(--muted); font-size:12px; font-variant-numeric:tabular-nums; }
+.cue-empty { color:var(--muted); font-size:14px; font-style:italic; }
+.lapchip { margin-top:10px; padding:8px 12px; border-radius:10px; background:var(--ink); border:1px solid var(--line); font-size:14px; color:var(--muted); }
+.lapchip b { color:var(--text); font-weight:600; }
+
+/* --- bottom action bar (sticky) --- */
+.actionbar {
+  position:fixed; left:0; right:0; bottom:0; z-index:10;
+  background:var(--slate); border-top:1px solid var(--line);
+  display:flex; align-items:center; gap:10px; padding:12px 16px;
+}
+.actionbar .wrap-inner { max-width:900px; margin:0 auto; width:100%; display:flex; align-items:center; gap:10px; }
+.nav-btn { min-height:56px; padding:0 20px; border-radius:12px; border:1px solid var(--line); background:transparent; color:var(--text); font-size:17px; font-weight:600; }
+.nav-btn.primary { background:var(--cyan); color:var(--ink); border-color:var(--cyan); }
+.nav-btn:disabled { opacity:.4; }
+.savestate { margin-left:auto; font-size:13px; color:var(--muted); }
+.savestate.ok { color:var(--green); }
+
+/* --- glossary drawer --- */
+dialog { background:var(--slate); color:var(--text); border:1px solid var(--line); border-radius:16px; max-width:680px; width:92%; padding:20px; }
+dialog::backdrop { background:rgba(0,0,0,.6); }
+dialog h3 { margin-top:0; }
+.gloss dt { font-weight:700; color:var(--cyan); margin-top:12px; }
+.gloss dd { margin:2px 0 0; color:var(--text); }
+.linkbtn { background:none; border:none; color:var(--cyan); text-decoration:underline; font-size:15px; }
+
+@media (max-width:520px) {
+  body { font-size:17px; }
+  .verdicts { grid-template-columns:1fr 1fr; }
+  .card h2 { font-size:21px; }
+}

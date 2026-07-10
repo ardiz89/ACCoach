@@ -1,0 +1,473 @@
+{
+  "generated_from": "HONE_Test_Plan_AC_ACC.xlsx",
+  "categories": [
+    {
+      "id": "GT3",
+      "title": "HONE · Test di guida — GT3",
+      "intro": "Vetture GT3 (ACC o AC). Categoria con aiuti elettronici (TC/ABS). Ripeti ogni test e segna l'esito.",
+      "tests": [
+        {
+          "id": "GT3-1",
+          "n": "1",
+          "what": "1) Giro pulito = silenzio",
+          "how": "Fai un giro normale e pulito, senza errori grossi. Questa categoria di solito ha aiuti elettronici (TC/ABS): tienili al minimo utile o come li useresti in gara.",
+          "expected": "HONE NON deve dare nessun allarme di guida (niente 'scivola', 'pattini', 'bloccaggio', ecc.) su un giro fatto bene. Se parla senza motivo, è un falso allarme da annotare."
+        },
+        {
+          "id": "GT3-2",
+          "n": "2",
+          "what": "2) Bloccaggio in frenata",
+          "how": "In una staccata (frenata forte prima di una curva) premi il freno molto forte, fino a far slittare le ruote davanti (le senti 'raschiare' e l'auto non rallenta bene). Il termine tecnico è «bloccaggio».",
+          "expected": "HONE dice subito qualcosa tipo «Bloccaggio, alleggerisci il freno». Nei tornanti lentissimi (sotto ~40 km/h) non deve lamentarsi per niente."
+        },
+        {
+          "id": "GT3-3",
+          "n": "3",
+          "what": "3) Pattinamento in uscita",
+          "how": "All'uscita di una curva lenta, dai gas in modo deciso/brusco così le ruote motrici girano a vuoto e slittano un istante. Il termine tecnico è «pattinamento» (o wheelspin).",
+          "expected": "HONE dice «Pattini in uscita, meno gas». Su questa categoria la soglia è tarata a 0,13: se dà l'allarme anche quando la trazione è pulita (nessuno slittamento vero), annotalo."
+        },
+        {
+          "id": "GT3-4",
+          "n": "4",
+          "what": "4) Muso che tira dritto (sottosterzo)",
+          "how": "Entra in curva un po' troppo forte e gira il volante: l'auto NON gira abbastanza e il muso va verso l'esterno (come se volesse andare dritta). Il termine tecnico è «sottosterzo».",
+          "expected": "HONE dice «L'anteriore scivola, entra più piano» mentre stai davvero tirando dritto a metà curva."
+        },
+        {
+          "id": "GT3-5",
+          "n": "5",
+          "what": "5) Coda che scappa (sovrasterzo)",
+          "how": "In uscita dai gas di colpo (o in rilascio) così il RETRO dell'auto scivola verso l'esterno e l'auto ruota troppo; correggi col volante. Il termine tecnico è «sovrasterzo».",
+          "expected": "HONE dice «Sovrasterzo, sii più dolce col gas in uscita». Deve scattare quando il retro scappa davvero, non in una curva normale."
+        },
+        {
+          "id": "GT3-6",
+          "n": "6",
+          "what": "6) Ingresso curva: NON deve sbagliare (importante)",
+          "how": "Entra in una curva girando il volante in modo deciso, ma con un'auto ben bilanciata (nessun problema vero). Il momento in cui inizi a girare si chiama «ingresso» (turn-in).",
+          "expected": "Nell'attimo dell'ingresso HONE NON deve dire 'l'anteriore scivola': è normale che l'auto giri un po' in ritardo rispetto al volante. Se invece tieni il volante fermo a metà curva e l'auto non gira, ALLORA sì l'allarme è giusto."
+        },
+        {
+          "id": "GT3-7",
+          "n": "7",
+          "what": "7) Freno mollato troppo presto (trail braking)",
+          "how": "«Trail braking» vuol dire continuare a frenare LEGGERO mentre entri in curva. Per il test fai il contrario: molla il freno TUTTO di colpo appena prima di girare, invece di rilasciarlo dolcemente.",
+          "expected": "HONE segnala che hai mollato il freno troppo presto / suggerisce di rilasciarlo più dolcemente. I messaggi devono essere coerenti, senza falsi allarmi."
+        },
+        {
+          "id": "GT3-8",
+          "n": "8",
+          "what": "8) Tempo morto tra freno e gas (coasting)",
+          "how": "«Coasting» = l'auto va per inerzia senza pedali. Per il test, tra quando lasci il freno e quando riprendi il gas, lascia un buco: né freno né gas per un attimo lungo.",
+          "expected": "HONE segnala il tempo morto (coasting) invitandoti a raccordare freno e gas senza buchi."
+        },
+        {
+          "id": "GT3-9",
+          "n": "9",
+          "what": "9) Marcia troppo alta / limitatore",
+          "how": "Esci da una curva in una marcia troppo alta, così il motore 'annaspa' a bassi giri. Poi, in rettilineo, resta nella marcia finché il motore arriva al massimo dei giri e non sale più (il «limitatore»).",
+          "expected": "HONE dice «Marcia troppo lunga» quando esci sottocoppia e «Sei sul limitatore» quando resti troppo a lungo al massimo dei giri."
+        },
+        {
+          "id": "GT3-10",
+          "n": "10",
+          "what": "10) Curve lente e veloci etichettate bene",
+          "how": "Guida un giro con curve sia lente sia veloci, poi guarda il resoconto (debrief) nell'app o nella pagina Ingegnere.",
+          "expected": "Nel resoconto le curve devono essere classificate 'lente' o 'veloci' in modo sensato per QUESTA categoria (una curva 'lenta' di una Formula è comunque veloce rispetto a una stradale). Se non torna, annotalo."
+        },
+        {
+          "id": "GT3-11",
+          "n": "11",
+          "what": "11) Giro anomalo = solo allarmi di sicurezza",
+          "how": "Fai un giro NON rappresentativo: un giro di uscita dai box lento, oppure un testacoda con recupero (giro rovinato).",
+          "expected": "Su un giro rovinato HONE deve dire SOLO gli allarmi di sicurezza (bloccaggio, pattinamento, benzina). Non deve riempirti di 'sottosterzo / sovrasterzo': quelli avrebbero poco senso su un giro non pulito."
+        },
+        {
+          "id": "GT3-12",
+          "n": "12",
+          "what": "12) Pressioni gomme a caldo",
+          "how": "Fai qualche giro finché le gomme sono in temperatura (calde), poi guarda i consigli sulle pressioni nella pagina Ingegnere.",
+          "expected": "Le pressioni sono giudicate a gomma CALDA (obiettivo ~27,5 psi a gomma calda), non sui primi giri di riscaldamento."
+        },
+        {
+          "id": "GT3-13",
+          "n": "13",
+          "what": "13) HONE 'vede' gli errori anche con gli aiuti (solo GT3/ACC)",
+          "how": "Con una GT3 su ACC e gli aiuti attivi (TC/ABS), provoca qualche bloccaggio e pattinamento in più curve, poi apri la pagina Ingegnere / il resoconto.",
+          "expected": "HONE deve RILEVARE lo stesso i bloccaggi/pattinamenti, anche se gli aiuti elettronici tengono tutto 'liscio'. Prima li ignorava."
+        }
+      ]
+    },
+    {
+      "id": "Formula",
+      "title": "HONE · Test di guida — Formula",
+      "intro": "Monoposto / Formula (AC). Categoria senza aiuti, molto sensibile. Ripeti ogni test e segna l'esito.",
+      "tests": [
+        {
+          "id": "Formula-1",
+          "n": "1",
+          "what": "1) Giro pulito = silenzio",
+          "how": "Fai un giro normale e pulito, senza errori grossi. Questa categoria di solito NON ha aiuti elettronici (niente TC/ABS): gas e freno vanno dosati a mano.",
+          "expected": "HONE NON deve dare nessun allarme di guida (niente 'scivola', 'pattini', 'bloccaggio', ecc.) su un giro fatto bene. Se parla senza motivo, è un falso allarme da annotare."
+        },
+        {
+          "id": "Formula-2",
+          "n": "2",
+          "what": "2) Bloccaggio in frenata",
+          "how": "In una staccata (frenata forte prima di una curva) premi il freno molto forte, fino a far slittare le ruote davanti (le senti 'raschiare' e l'auto non rallenta bene). Il termine tecnico è «bloccaggio».",
+          "expected": "HONE dice subito qualcosa tipo «Bloccaggio, alleggerisci il freno». Nei tornanti lentissimi (sotto ~40 km/h) non deve lamentarsi per niente."
+        },
+        {
+          "id": "Formula-3",
+          "n": "3",
+          "what": "3) Pattinamento in uscita",
+          "how": "All'uscita di una curva lenta, dai gas in modo deciso/brusco così le ruote motrici girano a vuoto e slittano un istante. Il termine tecnico è «pattinamento» (o wheelspin).",
+          "expected": "HONE dice «Pattini in uscita, meno gas». Su questa categoria la soglia è tarata a 0,15: se dà l'allarme anche quando la trazione è pulita (nessuno slittamento vero), annotalo."
+        },
+        {
+          "id": "Formula-4",
+          "n": "4",
+          "what": "4) Muso che tira dritto (sottosterzo)",
+          "how": "Entra in curva un po' troppo forte e gira il volante: l'auto NON gira abbastanza e il muso va verso l'esterno (come se volesse andare dritta). Il termine tecnico è «sottosterzo».",
+          "expected": "HONE dice «L'anteriore scivola, entra più piano» mentre stai davvero tirando dritto a metà curva. Su questa categoria valuta anche se l'allarme di 'muso che tira dritto' arriva al momento giusto o troppo/troppo poco."
+        },
+        {
+          "id": "Formula-5",
+          "n": "5",
+          "what": "5) Coda che scappa (sovrasterzo)",
+          "how": "In uscita dai gas di colpo (o in rilascio) così il RETRO dell'auto scivola verso l'esterno e l'auto ruota troppo; correggi col volante. Il termine tecnico è «sovrasterzo».",
+          "expected": "HONE dice «Sovrasterzo, sii più dolce col gas in uscita». Deve scattare quando il retro scappa davvero, non in una curva normale."
+        },
+        {
+          "id": "Formula-6",
+          "n": "6",
+          "what": "6) Ingresso curva: NON deve sbagliare (importante)",
+          "how": "Entra in una curva girando il volante in modo deciso, ma con un'auto ben bilanciata (nessun problema vero). Il momento in cui inizi a girare si chiama «ingresso» (turn-in).",
+          "expected": "Nell'attimo dell'ingresso HONE NON deve dire 'l'anteriore scivola': è normale che l'auto giri un po' in ritardo rispetto al volante. Se invece tieni il volante fermo a metà curva e l'auto non gira, ALLORA sì l'allarme è giusto."
+        },
+        {
+          "id": "Formula-7",
+          "n": "7",
+          "what": "7) Freno mollato troppo presto (trail braking)",
+          "how": "«Trail braking» vuol dire continuare a frenare LEGGERO mentre entri in curva. Per il test fai il contrario: molla il freno TUTTO di colpo appena prima di girare, invece di rilasciarlo dolcemente.",
+          "expected": "HONE segnala che hai mollato il freno troppo presto / suggerisce di rilasciarlo più dolcemente. I messaggi devono essere coerenti, senza falsi allarmi."
+        },
+        {
+          "id": "Formula-8",
+          "n": "8",
+          "what": "8) Tempo morto tra freno e gas (coasting)",
+          "how": "«Coasting» = l'auto va per inerzia senza pedali. Per il test, tra quando lasci il freno e quando riprendi il gas, lascia un buco: né freno né gas per un attimo lungo.",
+          "expected": "HONE segnala il tempo morto (coasting) invitandoti a raccordare freno e gas senza buchi."
+        },
+        {
+          "id": "Formula-9",
+          "n": "9",
+          "what": "9) Marcia troppo alta / limitatore",
+          "how": "Esci da una curva in una marcia troppo alta, così il motore 'annaspa' a bassi giri. Poi, in rettilineo, resta nella marcia finché il motore arriva al massimo dei giri e non sale più (il «limitatore»).",
+          "expected": "HONE dice «Marcia troppo lunga» quando esci sottocoppia e «Sei sul limitatore» quando resti troppo a lungo al massimo dei giri."
+        },
+        {
+          "id": "Formula-10",
+          "n": "10",
+          "what": "10) Curve lente e veloci etichettate bene",
+          "how": "Guida un giro con curve sia lente sia veloci, poi guarda il resoconto (debrief) nell'app o nella pagina Ingegnere.",
+          "expected": "Nel resoconto le curve devono essere classificate 'lente' o 'veloci' in modo sensato per QUESTA categoria (una curva 'lenta' di una Formula è comunque veloce rispetto a una stradale). Se non torna, annotalo."
+        },
+        {
+          "id": "Formula-11",
+          "n": "11",
+          "what": "11) Giro anomalo = solo allarmi di sicurezza",
+          "how": "Fai un giro NON rappresentativo: un giro di uscita dai box lento, oppure un testacoda con recupero (giro rovinato).",
+          "expected": "Su un giro rovinato HONE deve dire SOLO gli allarmi di sicurezza (bloccaggio, pattinamento, benzina). Non deve riempirti di 'sottosterzo / sovrasterzo': quelli avrebbero poco senso su un giro non pulito."
+        },
+        {
+          "id": "Formula-12",
+          "n": "12",
+          "what": "12) Pressioni gomme a caldo",
+          "how": "Fai qualche giro finché le gomme sono in temperatura (calde), poi guarda i consigli sulle pressioni nella pagina Ingegnere.",
+          "expected": "Le pressioni sono giudicate a gomma CALDA (obiettivo il target della tua mescola, a gomma calda), non sui primi giri di riscaldamento."
+        }
+      ]
+    },
+    {
+      "id": "Stradali",
+      "title": "HONE · Test di guida — Stradali",
+      "intro": "Auto stradali/sportive a basso carico aerodinamico (AC). Poco grip, di solito senza aiuti.",
+      "tests": [
+        {
+          "id": "Stradali-1",
+          "n": "1",
+          "what": "1) Giro pulito = silenzio",
+          "how": "Fai un giro normale e pulito, senza errori grossi. Questa categoria di solito NON ha aiuti elettronici (niente TC/ABS): gas e freno vanno dosati a mano.",
+          "expected": "HONE NON deve dare nessun allarme di guida (niente 'scivola', 'pattini', 'bloccaggio', ecc.) su un giro fatto bene. Se parla senza motivo, è un falso allarme da annotare."
+        },
+        {
+          "id": "Stradali-2",
+          "n": "2",
+          "what": "2) Bloccaggio in frenata",
+          "how": "In una staccata (frenata forte prima di una curva) premi il freno molto forte, fino a far slittare le ruote davanti (le senti 'raschiare' e l'auto non rallenta bene). Il termine tecnico è «bloccaggio».",
+          "expected": "HONE dice subito qualcosa tipo «Bloccaggio, alleggerisci il freno». Nei tornanti lentissimi (sotto ~40 km/h) non deve lamentarsi per niente."
+        },
+        {
+          "id": "Stradali-3",
+          "n": "3",
+          "what": "3) Pattinamento in uscita",
+          "how": "All'uscita di una curva lenta, dai gas in modo deciso/brusco così le ruote motrici girano a vuoto e slittano un istante. Il termine tecnico è «pattinamento» (o wheelspin).",
+          "expected": "HONE dice «Pattini in uscita, meno gas». Su questa categoria la soglia è tarata a 0,12: se dà l'allarme anche quando la trazione è pulita (nessuno slittamento vero), annotalo."
+        },
+        {
+          "id": "Stradali-4",
+          "n": "4",
+          "what": "4) Muso che tira dritto (sottosterzo)",
+          "how": "Entra in curva un po' troppo forte e gira il volante: l'auto NON gira abbastanza e il muso va verso l'esterno (come se volesse andare dritta). Il termine tecnico è «sottosterzo».",
+          "expected": "HONE dice «L'anteriore scivola, entra più piano» mentre stai davvero tirando dritto a metà curva."
+        },
+        {
+          "id": "Stradali-5",
+          "n": "5",
+          "what": "5) Coda che scappa (sovrasterzo)",
+          "how": "In uscita dai gas di colpo (o in rilascio) così il RETRO dell'auto scivola verso l'esterno e l'auto ruota troppo; correggi col volante. Il termine tecnico è «sovrasterzo».",
+          "expected": "HONE dice «Sovrasterzo, sii più dolce col gas in uscita». Deve scattare quando il retro scappa davvero, non in una curva normale."
+        },
+        {
+          "id": "Stradali-6",
+          "n": "6",
+          "what": "6) Ingresso curva: NON deve sbagliare (importante)",
+          "how": "Entra in una curva girando il volante in modo deciso, ma con un'auto ben bilanciata (nessun problema vero). Il momento in cui inizi a girare si chiama «ingresso» (turn-in).",
+          "expected": "Nell'attimo dell'ingresso HONE NON deve dire 'l'anteriore scivola': è normale che l'auto giri un po' in ritardo rispetto al volante. Se invece tieni il volante fermo a metà curva e l'auto non gira, ALLORA sì l'allarme è giusto."
+        },
+        {
+          "id": "Stradali-7",
+          "n": "7",
+          "what": "7) Freno mollato troppo presto (trail braking)",
+          "how": "«Trail braking» vuol dire continuare a frenare LEGGERO mentre entri in curva. Per il test fai il contrario: molla il freno TUTTO di colpo appena prima di girare, invece di rilasciarlo dolcemente. ATTENZIONE su questa categoria: verifica che NON dia l'allarme troppo facilmente quando freni ancora un pochino entrando in curva (sarebbe un falso allarme da correggere).",
+          "expected": "HONE segnala che hai mollato il freno troppo presto / suggerisce di rilasciarlo più dolcemente. I messaggi devono essere coerenti, senza falsi allarmi."
+        },
+        {
+          "id": "Stradali-8",
+          "n": "8",
+          "what": "8) Tempo morto tra freno e gas (coasting)",
+          "how": "«Coasting» = l'auto va per inerzia senza pedali. Per il test, tra quando lasci il freno e quando riprendi il gas, lascia un buco: né freno né gas per un attimo lungo.",
+          "expected": "HONE segnala il tempo morto (coasting) invitandoti a raccordare freno e gas senza buchi."
+        },
+        {
+          "id": "Stradali-9",
+          "n": "9",
+          "what": "9) Marcia troppo alta / limitatore",
+          "how": "Esci da una curva in una marcia troppo alta, così il motore 'annaspa' a bassi giri. Poi, in rettilineo, resta nella marcia finché il motore arriva al massimo dei giri e non sale più (il «limitatore»).",
+          "expected": "HONE dice «Marcia troppo lunga» quando esci sottocoppia e «Sei sul limitatore» quando resti troppo a lungo al massimo dei giri."
+        },
+        {
+          "id": "Stradali-10",
+          "n": "10",
+          "what": "10) Curve lente e veloci etichettate bene",
+          "how": "Guida un giro con curve sia lente sia veloci, poi guarda il resoconto (debrief) nell'app o nella pagina Ingegnere.",
+          "expected": "Nel resoconto le curve devono essere classificate 'lente' o 'veloci' in modo sensato per QUESTA categoria (una curva 'lenta' di una Formula è comunque veloce rispetto a una stradale). Se non torna, annotalo."
+        },
+        {
+          "id": "Stradali-11",
+          "n": "11",
+          "what": "11) Giro anomalo = solo allarmi di sicurezza",
+          "how": "Fai un giro NON rappresentativo: un giro di uscita dai box lento, oppure un testacoda con recupero (giro rovinato).",
+          "expected": "Su un giro rovinato HONE deve dire SOLO gli allarmi di sicurezza (bloccaggio, pattinamento, benzina). Non deve riempirti di 'sottosterzo / sovrasterzo': quelli avrebbero poco senso su un giro non pulito."
+        },
+        {
+          "id": "Stradali-12",
+          "n": "12",
+          "what": "12) Pressioni gomme a caldo",
+          "how": "Fai qualche giro finché le gomme sono in temperatura (calde), poi guarda i consigli sulle pressioni nella pagina Ingegnere.",
+          "expected": "Le pressioni sono giudicate a gomma CALDA (obiettivo il target della tua gomma, a caldo), non sui primi giri di riscaldamento."
+        }
+      ]
+    },
+    {
+      "id": "Generale",
+      "title": "HONE · Test generali (una volta sola)",
+      "intro": "Non dipendono dalla categoria di auto: falli una volta e segna l'esito.",
+      "tests": [
+        {
+          "id": "Generale-1",
+          "n": "1",
+          "what": "Connessione al gioco",
+          "how": "Avvia AC/ACC ed entra in una sessione di Prova. Avvia HONE (launcher o 'python -m accoach monitor').",
+          "expected": "HONE passa da 'in attesa del gioco' a connesso e mostra auto, pista, velocità, marce e gomme che si aggiornano dal vivo."
+        },
+        {
+          "id": "Generale-2",
+          "n": "2",
+          "what": "Registrazione di un giro",
+          "how": "Con il coach attivo, guida 2-3 giri completi (dal traguardo al traguardo).",
+          "expected": "Il primo giro parziale viene scartato; ogni giro completo viene salvato e il contatore 'Giri salvati' aumenta."
+        },
+        {
+          "id": "Generale-3",
+          "n": "3",
+          "what": "Giri di box scartati",
+          "how": "Esci dai box (giro di uscita = out-lap), fai un giro lanciato pulito, poi rientra (giro di rientro = in-lap).",
+          "expected": "I giri di uscita e rientro NON vengono salvati; il primo salvato è il primo giro lanciato vero."
+        },
+        {
+          "id": "Generale-4",
+          "n": "4",
+          "what": "Overlay sopra il gioco",
+          "how": "Con il gioco in modalità 'Borderless' (finestra senza bordi), avvia il Coach Live.",
+          "expected": "L'overlay trasparente si vede sopra il gioco e non ruba i clic del mouse."
+        },
+        {
+          "id": "Generale-5",
+          "n": "5",
+          "what": "Barra e numero del delta",
+          "how": "Guida sopra e sotto il tuo tempo di riferimento. Il «delta» è quanto sei più veloce (verde) o più lento (rosso) rispetto al giro di riferimento.",
+          "expected": "La barra si riempie a destra (rosso = più lento) o a sinistra (verde = più veloce); il numero col segno è leggibile a colpo d'occhio."
+        },
+        {
+          "id": "Generale-6",
+          "n": "6",
+          "what": "Segnale del punto di frenata",
+          "how": "Avvicinati a una staccata del giro di riferimento.",
+          "expected": "Nell'overlay compare un conto alla rovescia dei metri al punto di frenata («FRENA / BRAKE  N m»)."
+        },
+        {
+          "id": "Generale-7",
+          "n": "7",
+          "what": "Delta non 'impazzisce' al traguardo",
+          "how": "Guarda il delta nell'ultimo tratto e nel passaggio sul traguardo.",
+          "expected": "Il delta resta plausibile fino alla linea, senza salti improvvisi di ±un giro."
+        },
+        {
+          "id": "Generale-8",
+          "n": "8",
+          "what": "Pagina Analisi (browser)",
+          "how": "Avvia 'HONE · Analisi' con qualche giro salvato; apri i tab Confronto / Mappa / Settori / Andamento.",
+          "expected": "Tutti i tab funzionano: grafici, mappa della pista, settori, livelli e punti deboli."
+        },
+        {
+          "id": "Generale-9",
+          "n": "9",
+          "what": "Analisi · Gomme nel tempo",
+          "how": "Con più giri registrati (gomme calde), apri il tab 'Andamento'.",
+          "expected": "Compare la sezione 'Gomme nel tempo': due grafici (temperatura e pressione) con una linea per ruota e il riepilogo di quanto sono salite nello stint."
+        },
+        {
+          "id": "Generale-10",
+          "n": "10",
+          "what": "Analisi · Mini-mappa e orari",
+          "how": "Nel tab Confronto passa il mouse sui grafici e apri i menu dei giri.",
+          "expected": "La mini-mappa evidenzia lo stesso punto al passaggio del mouse; i menu mostrano ★ per il migliore, [PRO] per i riferimenti e l'orario per distinguere giri con lo stesso tempo."
+        },
+        {
+          "id": "Generale-11",
+          "n": "11",
+          "what": "Pagina Ingegnere · proposta setup",
+          "how": "Guida finché l'Ingegnere propone una modifica di assetto.",
+          "expected": "La proposta indica le curve interessate e la confidenza (alta/media); il pulsante 'Prepara modifica' funziona."
+        },
+        {
+          "id": "Generale-12",
+          "n": "12",
+          "what": "Voce italiana",
+          "how": "Imposta la lingua su Italiano nel launcher e avvia il Coach Live.",
+          "expected": "Gli avvisi sono PARLATI in italiano (voce naturale) e il testo mostrato è in italiano."
+        },
+        {
+          "id": "Generale-13",
+          "n": "13",
+          "what": "Lingua nelle pagine web",
+          "how": "Nelle pagine web usa il selettore lingua in alto e alterna EN/IT.",
+          "expected": "Cambiano sia le etichette sia i contenuti (spiegazioni, livelli, nomi curva)."
+        }
+      ]
+    }
+  ],
+  "glossary": [
+    {
+      "term": "Sottosterzo",
+      "meaning": "L'auto 'tira dritto': giri il volante ma il muso non entra in curva e va verso l'esterno. Di solito perché entri troppo forte."
+    },
+    {
+      "term": "Sovrasterzo",
+      "meaning": "Il RETRO dell'auto scappa verso l'esterno e l'auto ruota troppo (scodata). Spesso col gas in uscita o in rilascio."
+    },
+    {
+      "term": "Bloccaggio",
+      "meaning": "Freni così forte che le ruote davanti smettono di girare e slittano sull'asfalto: l'auto non rallenta bene e la gomma 'raschia'/fuma."
+    },
+    {
+      "term": "Pattinamento (wheelspin)",
+      "meaning": "Dai gas e le ruote motrici girano più veloci dell'auto, slittando: perdi trazione in uscita di curva."
+    },
+    {
+      "term": "Trail braking",
+      "meaning": "Tecnica: continuare a frenare LEGGERO anche dopo aver iniziato a girare in curva, invece di mollare il freno tutto prima. 'Mollare troppo presto' = lasciare il freno di colpo prima della curva."
+    },
+    {
+      "term": "Coasting",
+      "meaning": "Il momento 'morto' in cui l'auto va per inerzia: né freno né gas. Un buco tra il rilascio del freno e la ripresa del gas."
+    },
+    {
+      "term": "Ingresso / Turn-in",
+      "meaning": "Il momento in cui inizi a girare il volante per entrare in curva."
+    },
+    {
+      "term": "Corda / Apex",
+      "meaning": "Il punto più interno della curva, dove passi più vicino al bordo interno."
+    },
+    {
+      "term": "Staccata",
+      "meaning": "La frenata forte prima di una curva."
+    },
+    {
+      "term": "Percorrenza",
+      "meaning": "La fase centrale della curva, quando sei già girato e mantieni la velocità."
+    },
+    {
+      "term": "Uscita",
+      "meaning": "La fase finale della curva, quando riapri il gas verso il rettilineo."
+    },
+    {
+      "term": "Cordolo",
+      "meaning": "Il bordo colorato (rosso/bianco) ai lati della pista in curva."
+    },
+    {
+      "term": "Out-lap / In-lap",
+      "meaning": "Giro di uscita dai box (out-lap) e giro di rientro ai box (in-lap): giri 'di trasferimento', non veri giri veloci."
+    },
+    {
+      "term": "Limitatore",
+      "meaning": "Quando il motore arriva al massimo dei giri e non sale più: senti che 'sbatte' contro un muro di giri."
+    },
+    {
+      "term": "Marcia troppo lunga",
+      "meaning": "Sei in una marcia troppo alta per quella curva: il motore gira basso e 'annaspa', poca spinta."
+    },
+    {
+      "term": "Delta",
+      "meaning": "La differenza di tempo rispetto al tuo giro di riferimento: quanto sei più veloce (verde) o più lento (rosso), istante per istante."
+    },
+    {
+      "term": "Riferimento",
+      "meaning": "Il giro migliore con cui HONE ti confronta."
+    },
+    {
+      "term": "Settore",
+      "meaning": "Una porzione della pista. La pista è divisa in settori per misurare i tempi parziali."
+    },
+    {
+      "term": "Aiuti TC / ABS",
+      "meaning": "TC = controllo di trazione: riduce il pattinamento quando dai gas. ABS = antibloccaggio: evita che le ruote si blocchino in frenata. Le GT3 li hanno; molte Formula e stradali no."
+    },
+    {
+      "term": "Cue / Segnale",
+      "meaning": "Un avviso di HONE, vocale o a schermo (es. «Bloccaggio, alleggerisci il freno»)."
+    },
+    {
+      "term": "Debrief / Resoconto",
+      "meaning": "Il riepilogo di fine giro con dove hai perso tempo e perché."
+    },
+    {
+      "term": "Stint",
+      "meaning": "Una serie di giri consecutivi con lo stesso set di gomme."
+    }
+  ]
+}

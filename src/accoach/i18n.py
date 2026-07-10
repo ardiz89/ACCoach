@@ -143,6 +143,11 @@ _UI: dict[str, dict[str, str]] = {
                 "it": "Consenti l'accesso dagli altri dispositivi in rete"},
     "mob.report": {"en": "Report", "it": "Report"},
     "mob.engineer": {"en": "Engineer", "it": "Ingegnere"},
+    "mob.test": {"en": "On-track test", "it": "Test in pista"},
+    "mob.test_live": {"en": "For live cue capture on the test page, also start the "
+                            "Live backend (second screen).",
+                      "it": "Per la cattura dei cue dal vivo nella pagina test, avvia "
+                            "anche il Backend live (secondo schermo)."},
     "mob.scan": {"en": "Scan with your phone's camera, or type the address.",
                  "it": "Inquadra col telefono, oppure digita l'indirizzo."},
     "mob.off": {"en": "Turn on the option above to open these pages from your phone.",
