@@ -21,5 +21,9 @@ if not exist ".venv\Scripts\python.exe" (
   call ".venv\Scripts\activate.bat"
 )
 
+rem LAN mode needs a firewall rule or phones just hang on a blank page. This checks
+rem silently and only prompts (once) when something is missing; it never blocks startup.
+powershell -NoProfile -ExecutionPolicy Bypass -File "tools\setup_firewall.ps1" -Auto
+
 python run_launcher.py
 if errorlevel 1 pause
