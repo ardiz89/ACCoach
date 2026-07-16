@@ -48,7 +48,7 @@ from . import brand
 from .config import load_config, save_config, set_language
 from .hub_home import HomePanel
 from .i18n import LANGUAGES, language_name, t
-from .netinfo import device_urls, qr_png
+from .netinfo import device_urls, port_open, qr_png
 from .paths import base_dir
 from .theme import qss, window_icon
 
@@ -357,6 +357,16 @@ class DevicesPanel(QWidget):
         self._body.setSpacing(8)
         root.addLayout(self._body)
 
+        # The QR codes come from the config, so they render whether or not a
+        # server is behind them. Say which it is, rather than let the user find
+        # out by scanning and watching a page hang.
+        self._status = QLabel()
+        self._status.setWordWrap(True)
+        root.addWidget(self._status)
+        self._poll = QTimer(self)
+        self._poll.setInterval(2000)
+        self._poll.timeout.connect(self._refresh_status)
+
         line = QFrame()
         line.setProperty("role", "hline")
         line.setFixedHeight(1)
@@ -387,6 +397,9 @@ class DevicesPanel(QWidget):
                 w.deleteLater()
 
         cfg = load_config()
+        # Ahead of the early returns below: the status line reflects the config,
+        # so it must be right on every path (LAN off, no IP, or the full QR set).
+        self._refresh_status()
         if not cfg.lan:
             self._body.addWidget(_hint(t("mob.off")))
             return
@@ -406,6 +419,31 @@ class DevicesPanel(QWidget):
         self._body.addWidget(_hint(t("mob.test_live")))
         self._body.addWidget(_hint(t("mob.same_net")))
         self._body.addWidget(_hint(t("mob.firewall")))
+
+    def showEvent(self, event) -> None:   # noqa: N802 - Qt naming
+        # Poll only while the section is on screen: off it, nobody reads it.
+        super().showEvent(event)
+        self._refresh_status()
+        self._poll.start()
+
+    def hideEvent(self, event) -> None:   # noqa: N802 - Qt naming
+        super().hideEvent(event)
+        self._poll.stop()
+
+    def _refresh_status(self) -> None:
+        """Say whether the server behind the QR codes is actually up."""
+        cfg = load_config()
+        if not cfg.lan:
+            self._status.setVisible(False)
+            return
+        self._status.setVisible(True)
+        up = port_open(cfg.web.port)
+        self._status.setText(t("mob.server_on") if up else t("mob.server_off"))
+        self._status.setProperty("role", "good" if up else "bad")
+        # Qt resolves the stylesheet once per property value; without a re-polish
+        # the colour keeps whatever it had when the label was first shown.
+        self._status.style().unpolish(self._status)
+        self._status.style().polish(self._status)
 
     def _qr_col(self, title: str, url: str) -> QWidget:
         w = QWidget()

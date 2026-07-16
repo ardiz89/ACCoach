@@ -162,6 +162,12 @@ _UI: dict[str, dict[str, str]] = {
                     "it": "Dopo la modifica, (ri)avvia Coach Live o Analisi."},
     "mob.no_qr": {"en": "(QR unavailable — install 'segno')",
                   "it": "(QR non disponibile — installa 'segno')"},
+    "mob.server_on": {"en": "Analysis server is running — these pages will open.",
+                      "it": "Server analisi acceso: queste pagine si aprono."},
+    "mob.server_off": {"en": "Analysis server is off — these pages will not load. "
+                             "Start it from Analysis.",
+                       "it": "Server analisi spento: queste pagine non si aprono. "
+                             "Avvialo da Analisi."},
     # settings dialog
     "ui.settings": {"en": "Settings", "it": "Impostazioni"},
     "set.voice": {"en": "Coach voice", "it": "Voce del coach"},
