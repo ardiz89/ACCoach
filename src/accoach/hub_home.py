@@ -29,6 +29,7 @@ from . import brand
 from .coaching.debrief import CornerLoss
 from .i18n import t
 from .telemetry.snapshot import format_lap_time
+from .theme import MONO
 
 
 @dataclass(slots=True)
@@ -308,7 +309,10 @@ class HomePanel(QWidget):
         text = QPlainTextEdit()
         text.setReadOnly(True)
         text.setPlainText(self._data.debrief_text)
-        text.setStyleSheet("font-family: 'Cascadia Mono', 'Consolas', monospace;")
+        # The debrief is a column of times and gaps — the brand mono face, same as
+        # the stat readouts (theme.MONO), with the old system stack as fallback.
+        text.setStyleSheet(
+            f"font-family: '{MONO}', 'Cascadia Mono', 'Consolas', monospace;")
         lay.addWidget(text)
         row = QHBoxLayout()
         row.addStretch(1)

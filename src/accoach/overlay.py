@@ -28,6 +28,7 @@ import sys
 import time
 
 from .i18n import t
+from .theme import DISPLAY, MONO, load_fonts
 
 try:
     from PySide6.QtCore import Qt, QTimer, QUrl
@@ -212,7 +213,7 @@ class Overlay(QWidget):
 
         # Big delta number. The text already carries the sign (+slower / -faster),
         # which is the colour-blind-safe redundancy alongside the red/green.
-        self._set_font(p, 28, bold=True)
+        self._set_font(p, 28, bold=True, mono=True)
         p.setPen(colour)
         p.drawText(0, y + bar_h + 2, w, 34, Qt.AlignHCenter,
                    f"{delta.get('text', '0.000')}")
@@ -222,7 +223,7 @@ class Overlay(QWidget):
         local = delta.get("local_s", 0.0)
         if abs(local) >= 0.01:
             losing = delta.get("local_losing", local > 0)
-            self._set_font(p, 11, bold=True)
+            self._set_font(p, 11, bold=True, mono=True)
             p.setPen(_RED if losing else _GREEN)
             arrow = "▲" if losing else "▼"
             p.drawText(0, y + bar_h + 38, w, 16, Qt.AlignHCenter,
@@ -285,10 +286,17 @@ class Overlay(QWidget):
                    f"{t('overlay.focus')} · {theme} · {name}{gap}")
 
     # --- helpers -----------------------------------------------------------
-    def _set_font(self, p: QPainter, size: int, bold: bool = False) -> None:
-        # Space Grotesk is the brand display face; fall back to Segoe UI offline.
-        f = QFont("Space Grotesk", size)
-        f.setStyleHint(QFont.SansSerif)
+    def _set_font(self, p: QPainter, size: int, bold: bool = False,
+                  mono: bool = False) -> None:
+        """The brand display face, or the mono one for numbers that refresh in place.
+
+        Both ship with the app (theme.load_fonts); the style hint covers the case
+        where a bundle is missing them. Mono matters here: the delta is centred and
+        redrawn every frame, and proportional digits make it breathe sideways in
+        the corner of your eye while you're driving.
+        """
+        f = QFont(MONO if mono else DISPLAY, size)
+        f.setStyleHint(QFont.Monospace if mono else QFont.SansSerif)
         f.setBold(bold)
         p.setFont(f)
 
@@ -335,6 +343,7 @@ def main(argv: list[str] | None = None) -> None:
             url = a
 
     app = QApplication(sys.argv)
+    load_fonts()                     # the overlay paints in the brand face too
     # Let Ctrl+C in the launching terminal close the overlay.
     signal.signal(signal.SIGINT, lambda *_: app.quit())
     tick = QTimer()

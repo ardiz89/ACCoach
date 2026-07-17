@@ -22,6 +22,7 @@ import time
 from .coaching import Voice
 from .engine import CoachEngine
 from .serialize import state_to_dict
+from .theme import load_fonts
 
 TICK_MS = 50  # 20 Hz engine tick
 
@@ -61,6 +62,7 @@ def main(argv: list[str] | None = None) -> None:
             acquire_hz=cfg.acquire.hz, engineer_voice=cfg.voice.engineer)
 
     app = QApplication(sys.argv)
+    load_fonts()                     # the overlay paints in the brand face too
     signal.signal(signal.SIGINT, lambda *_: app.quit())
 
     overlay = Overlay(url=None, interactive=interactive)  # fed in-process
