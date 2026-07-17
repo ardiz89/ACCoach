@@ -1,14 +1,15 @@
-"""A small GUI launcher — buttons instead of command lines.
+"""The HONE desktop hub — one window, a sidebar, and the last session up front.
 
-Double-click ``ACCoach.bat`` (or run ``python -m accoach launcher``) to get a
-window with one button per mode. Each button starts the matching command in its
-own process; terminal modes open in their own console window so you can read
-their output.
+This replaces the old button-list launcher: a main window with a left sidebar of
+six intent-based sections (Home · Drive · Analysis · Setup · Devices · Settings)
+and a stacked panel per section. The **Home** shows your last session diagnosed
+natively (see :mod:`accoach.hub_home`); the other sections start the matching
+mode in its own process, exactly as before.
 
-The launcher OWNS the processes it starts: it tracks every child and kills the
-whole tree when you close the window, so nothing is left running in the
-background. There's also a dedicated button to stop Coach Live on demand (its
-overlay is click-through and has no window of its own).
+The hub OWNS the processes it starts: it tracks every child and kills the whole
+tree when you close the window. Coach Live stays a *separate* process on purpose
+(crash isolation — a coach crash mid-lap must not take the hub down with it), so
+there's still a dedicated Stop button and the "one voice at a time" rule.
 """
 
 from __future__ import annotations
@@ -21,7 +22,6 @@ from pathlib import Path
 
 try:
     from PySide6.QtCore import Qt, QTimer
-    from PySide6.QtGui import QPixmap
     from PySide6.QtWidgets import (
         QApplication,
         QCheckBox,
@@ -32,19 +32,25 @@ try:
         QFrame,
         QHBoxLayout,
         QLabel,
+        QListWidget,
         QPushButton,
         QSpinBox,
+        QStackedWidget,
         QVBoxLayout,
         QWidget,
     )
+    from PySide6.QtGui import QPixmap
 except ImportError:  # pragma: no cover - optional dependency
     print("The launcher needs PySide6.  Install it with:  pip install PySide6")
     raise SystemExit(1)
 
+from . import brand
 from .config import load_config, save_config, set_language
+from .hub_home import HomePanel
 from .i18n import LANGUAGES, language_name, t
-from .netinfo import device_urls, qr_png
+from .netinfo import device_urls, port_open, qr_png
 from .paths import base_dir
+from .theme import qss, window_icon
 
 _SRC = Path(__file__).resolve().parents[1]   # .../src
 
@@ -52,8 +58,16 @@ _SRC = Path(__file__).resolve().parents[1]   # .../src
 _GUIDE = "__guide__"
 _STOP_LIVE = "__stop_live__"
 _WIZARD = "__wizard__"
-_SETTINGS = "__settings__"
-_MOBILE = "__mobile__"
+
+# Commands that run a speaking coach. Only one may run at a time — two voice
+# engines talking together sound like an echo — so starting one stops the other.
+_VOICE_CMDS = {"live", "coach"}
+
+# While Coach Live is running these action keys stay clickable; all other action
+# buttons are disabled so you can't stack a second coach/telemetry reader on top
+# of it. (The sidebar itself always stays navigable.)
+_LIVE_SAFE_KEYS = {_STOP_LIVE, _GUIDE, _WIZARD,
+                   ("web",), ("web", "--engineer"), ("server",)}
 
 
 # --- first-run "getting started" wizard ------------------------------------
@@ -72,37 +86,6 @@ def mark_wizard_seen() -> None:
         _wizard_marker().write_text("1", encoding="utf-8")
     except OSError:  # pragma: no cover - best-effort
         pass
-
-# Commands that run a speaking coach. Only one may run at a time — two voice
-# engines talking together sound like an echo — so starting one stops the other.
-_VOICE_CMDS = {"live", "coach"}
-
-# While Coach Live is running these buttons stay clickable; all others are
-# disabled so you can't stack a second coach/telemetry reader on top of it.
-# Keys: command buttons by their args tuple, special buttons by their sentinel.
-_LIVE_SAFE_KEYS = {_STOP_LIVE, _GUIDE, _WIZARD, _SETTINGS, _MOBILE,
-                   ("web",), ("web", "--engineer"), ("server",)}
-
-# (label key, command args / sentinel, opens-its-own-console). The label key is
-# resolved through i18n at build time so the launcher follows the chosen language.
-_BUTTONS = [
-    ("btn.coach_live", ["live"], False),
-    ("btn.coach_live_demo", ["live", "--demo"], False),
-    ("btn.stop_live", _STOP_LIVE, False),
-    ("—", None, False),
-    ("btn.analysis", ["web"], False),
-    ("btn.engineer", ["web", "--engineer"], False),
-    ("btn.server", ["server"], True),
-    ("btn.debrief", ["debrief"], True),
-    ("btn.monitor", ["monitor"], True),
-    ("btn.coach_term", ["coach"], True),
-    ("btn.verify_g", ["verify-g"], True),
-    ("—", None, False),
-    ("btn.get_started", _WIZARD, False),
-    ("btn.mobile", _MOBILE, False),
-    ("btn.settings", _SETTINGS, False),
-    ("btn.guide", _GUIDE, False),
-]
 
 
 _WIZARD_STEPS = [
@@ -130,21 +113,20 @@ class GettingStarted(QDialog):
         lay.setSpacing(12)
 
         title = QLabel("Welcome to HONE")
-        title.setStyleSheet("font-size: 22px; font-weight: bold;")
+        title.setProperty("role", "title")
         sub = QLabel("Know why you're slow. Here's how to get going:")
-        sub.setStyleSheet("color: #888;")
+        sub.setProperty("role", "muted")
         sub.setWordWrap(True)
         lay.addWidget(title)
         lay.addWidget(sub)
 
         steps = "".join(
-            f"<p style='margin:0 0 12px 0;'><b>{i}.</b> {t}</p>"
-            for i, t in enumerate(_WIZARD_STEPS, 1)
+            f"<p style='margin:0 0 12px 0;'><b>{i}.</b> {text}</p>"
+            for i, text in enumerate(_WIZARD_STEPS, 1)
         )
         body = QLabel(steps)
         body.setTextFormat(Qt.RichText)
         body.setWordWrap(True)
-        body.setStyleSheet("font-size: 13px;")
         lay.addWidget(body)
         lay.addStretch(1)
 
@@ -156,6 +138,7 @@ class GettingStarted(QDialog):
         guide = QPushButton("Open full guide")
         guide.clicked.connect(_open_guide)
         ok = QPushButton("Get started")
+        ok.setProperty("accent", True)
         ok.setDefault(True)
         ok.clicked.connect(self.accept)
         row.addWidget(guide)
@@ -204,59 +187,123 @@ def _open_guide() -> None:
         print(f"Cannot open the guide ({path}): {exc}")
 
 
-class Settings(QDialog):
-    """Voice + overlay preferences, persisted to config.toml (no hand-editing)."""
+def _section(title_key: str) -> tuple[QWidget, QVBoxLayout]:
+    """A section page shell: padded column with a title. Returns (page, body)."""
+    page = QWidget()
+    lay = QVBoxLayout(page)
+    lay.setContentsMargins(24, 24, 24, 24)
+    lay.setSpacing(12)
+    title = QLabel(t(title_key))
+    title.setProperty("role", "title")
+    title.setProperty("i18nKey", title_key)   # swept on language change
+    lay.addWidget(title)
+    return page, lay
 
-    def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__(parent)
-        self.setWindowTitle(t("ui.settings"))
-        self.setModal(True)
+
+def _hint(text: str, key: str | None = None) -> QLabel:
+    lbl = QLabel(text)
+    lbl.setProperty("role", "muted")
+    lbl.setWordWrap(True)
+    if key:
+        lbl.setProperty("i18nKey", key)   # swept on language change
+    return lbl
+
+
+class SettingsPanel(QWidget):
+    """Voice + overlay preferences, persisted to config.toml (no hand-editing).
+
+    The old Settings *dialog* becomes an embedded panel: a Save button persists and
+    a small note confirms it, instead of modal accept/cancel.
+    """
+
+    def __init__(self, hub: "MainWindow") -> None:
+        super().__init__()
+        self._hub = hub
+        root = QVBoxLayout(self)
+        root.setContentsMargins(24, 24, 24, 24)
+        root.setSpacing(12)
+
+        self._title = QLabel(t("nav.settings").strip())
+        self._title.setProperty("role", "title")
+        root.addWidget(self._title)
+
         cfg = load_config()
-        form = QFormLayout(self)
+        form = QFormLayout()
+        form.setSpacing(10)
+        self._labels: dict[str, QLabel] = {}
+
+        def row(key: str, widget: QWidget) -> None:
+            lbl = QLabel(t(key))
+            self._labels[key] = lbl
+            form.addRow(lbl, widget)
 
         self._voice = QCheckBox()
         self._voice.setChecked(cfg.voice.enabled)
-        form.addRow(t("set.voice"), self._voice)
+        row("set.voice", self._voice)
 
         self._engineer_voice = QCheckBox()
         self._engineer_voice.setChecked(cfg.voice.engineer)
-        form.addRow(t("set.engineer_voice"), self._engineer_voice)
+        row("set.engineer_voice", self._engineer_voice)
 
         self._male = QCheckBox()
         self._male.setChecked(cfg.voice.male)
-        form.addRow(t("set.male_voice"), self._male)
+        row("set.male_voice", self._male)
 
         self._radio = QCheckBox()
         self._radio.setChecked(cfg.voice.radio)
-        form.addRow(t("set.radio"), self._radio)
+        row("set.radio", self._radio)
 
         self._rate = QSpinBox()
         self._rate.setRange(80, 300)
         self._rate.setValue(cfg.voice.rate)
-        form.addRow(t("set.rate"), self._rate)
+        row("set.rate", self._rate)
 
         self._scale = QDoubleSpinBox()
         self._scale.setRange(0.5, 2.5)
         self._scale.setSingleStep(0.1)
         self._scale.setValue(cfg.overlay.scale or 1.0)
-        form.addRow(t("set.scale"), self._scale)
+        row("set.scale", self._scale)
+        root.addLayout(form)
 
-        hint = QLabel(t("set.scale_hint"))
-        hint.setStyleSheet("color: #888; font-size: 11px;")
-        form.addRow(hint)
+        self._scale_hint = _hint(t("set.scale_hint"))
+        root.addWidget(self._scale_hint)
 
-        row = QHBoxLayout()
-        cancel = QPushButton(t("btn.cancel"))
-        cancel.clicked.connect(self.reject)
-        save = QPushButton(t("btn.save"))
-        save.setDefault(True)
-        save.clicked.connect(self._save)
-        row.addStretch(1)
-        row.addWidget(cancel)
-        row.addWidget(save)
-        form.addRow(row)
+        save_row = QHBoxLayout()
+        self._save = QPushButton(t("btn.save"))
+        self._save.setProperty("accent", True)
+        self._save.clicked.connect(self._do_save)
+        self._saved_note = _hint("")
+        save_row.addWidget(self._save)
+        save_row.addWidget(self._saved_note)
+        save_row.addStretch(1)
+        root.addLayout(save_row)
 
-    def _save(self) -> None:
+        # Divider + advanced/dev tools + guide/wizard.
+        line = QFrame()
+        line.setProperty("role", "hline")
+        line.setFixedHeight(1)
+        root.addWidget(line)
+        self._devtools = QLabel(t("sec.devtools"))
+        self._devtools.setProperty("role", "muted")
+        root.addWidget(self._devtools)
+
+        tools = QHBoxLayout()
+        tools.setSpacing(10)
+        tools.addWidget(hub.action_button("btn.monitor", ["monitor"], console=True))
+        tools.addWidget(hub.action_button("btn.coach_term", ["coach"], console=True))
+        tools.addWidget(hub.action_button("btn.verify_g", ["verify-g"], console=True))
+        tools.addStretch(1)
+        root.addLayout(tools)
+
+        extras = QHBoxLayout()
+        extras.setSpacing(10)
+        extras.addWidget(hub.special_button("btn.get_started", _WIZARD, hub._show_wizard))
+        extras.addWidget(hub.special_button("btn.guide", _GUIDE, _open_guide))
+        extras.addStretch(1)
+        root.addLayout(extras)
+        root.addStretch(1)
+
+    def _do_save(self) -> None:
         cfg = load_config()
         cfg.voice.enabled = self._voice.isChecked()
         cfg.voice.engineer = self._engineer_voice.isChecked()
@@ -265,48 +312,73 @@ class Settings(QDialog):
         cfg.voice.rate = self._rate.value()
         cfg.overlay.scale = round(self._scale.value(), 2)
         save_config(cfg)
-        self.accept()
+        self._saved_note.setText("✓ " + t("btn.save"))
+
+    def retranslate(self) -> None:
+        self._title.setText(t("nav.settings").strip())
+        for key, lbl in self._labels.items():
+            lbl.setText(t(key))
+        self._scale_hint.setText(t("set.scale_hint"))
+        self._save.setText(t("btn.save"))
+        self._devtools.setText(t("sec.devtools"))
+        if self._saved_note.text():
+            self._saved_note.setText("✓ " + t("btn.save"))
 
 
-class MobileAccess(QDialog):
-    """Open the report/engineer pages on a phone or tablet over the LAN.
+class DevicesPanel(QWidget):
+    """Phone/tablet LAN access (QR) plus the second-screen server and overlay.
 
-    Toggling LAN access binds the servers to ``0.0.0.0`` (persisted to config);
-    it only takes effect when the web/live servers (re)start, so the dialog says
-    so. When LAN is on and a network address is available it shows a scannable QR
-    plus the typed URL for each page.
+    The LAN block is the old MobileAccess dialog, re-hosted as a panel: toggling
+    LAN binds the servers to ``0.0.0.0`` (persisted); it only takes effect when the
+    web/live servers (re)start, so the note says so.
     """
 
-    def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__(parent)
-        self.setWindowTitle(t("mob.title"))
-        self.setModal(True)
-        lay = QVBoxLayout(self)
-        lay.setContentsMargins(20, 18, 20, 16)
-        lay.setSpacing(10)
+    def __init__(self, hub: "MainWindow") -> None:
+        super().__init__()
+        self._hub = hub
+        root = QVBoxLayout(self)
+        root.setContentsMargins(24, 24, 24, 24)
+        root.setSpacing(12)
+
+        self._title = QLabel(t("mob.title"))
+        self._title.setProperty("role", "title")
+        root.addWidget(self._title)
 
         self._lan = QCheckBox(t("mob.lan"))
         self._lan.setChecked(load_config().lan)
         self._lan.toggled.connect(self._on_toggle)
-        lay.addWidget(self._lan)
+        root.addWidget(self._lan)
 
-        restart = QLabel(t("mob.restart"))
-        restart.setStyleSheet("color: #888; font-size: 11px;")
-        restart.setWordWrap(True)
-        lay.addWidget(restart)
+        self._restart = _hint(t("mob.restart"))
+        root.addWidget(self._restart)
 
         # Swappable body: the QR pair when LAN is on, else an explanatory line.
         self._body = QVBoxLayout()
         self._body.setSpacing(8)
-        lay.addLayout(self._body)
+        root.addLayout(self._body)
 
-        row = QHBoxLayout()
-        close = QPushButton(t("btn.close"))
-        close.setDefault(True)
-        close.clicked.connect(self.accept)
-        row.addStretch(1)
-        row.addWidget(close)
-        lay.addLayout(row)
+        # The QR codes come from the config, so they render whether or not a
+        # server is behind them. Say which it is, rather than let the user find
+        # out by scanning and watching a page hang.
+        self._status = QLabel()
+        self._status.setWordWrap(True)
+        root.addWidget(self._status)
+        self._poll = QTimer(self)
+        self._poll.setInterval(2000)
+        self._poll.timeout.connect(self._refresh_status)
+
+        line = QFrame()
+        line.setProperty("role", "hline")
+        line.setFixedHeight(1)
+        root.addWidget(line)
+
+        srv_row = QHBoxLayout()
+        srv_row.setSpacing(10)
+        srv_row.addWidget(hub.action_button("btn.server", ["server"], console=True))
+        srv_row.addWidget(hub.action_button("btn.overlay", ["overlay"]))
+        srv_row.addStretch(1)
+        root.addLayout(srv_row)
+        root.addStretch(1)
 
         self._render()
 
@@ -317,7 +389,7 @@ class MobileAccess(QDialog):
         self._render()
 
     def _render(self) -> None:
-        """Rebuild the body to match the current LAN state."""
+        """Rebuild the QR body to match the current LAN state."""
         while self._body.count():
             item = self._body.takeAt(0)
             w = item.widget()
@@ -325,24 +397,53 @@ class MobileAccess(QDialog):
                 w.deleteLater()
 
         cfg = load_config()
+        # Ahead of the early returns below: the status line reflects the config,
+        # so it must be right on every path (LAN off, no IP, or the full QR set).
+        self._refresh_status()
         if not cfg.lan:
-            self._body.addWidget(self._note(t("mob.off")))
-        else:
-            urls = device_urls(cfg.web.port)
-            if not urls:
-                self._body.addWidget(self._note(t("mob.no_ip")))
-            else:
-                pair = QWidget()
-                cols = QHBoxLayout(pair)
-                cols.setContentsMargins(0, 0, 0, 0)
-                cols.setSpacing(16)
-                cols.addWidget(self._qr_col(t("mob.report"), urls["report"]))
-                cols.addWidget(self._qr_col(t("mob.engineer"), urls["engineer"]))
-                self._body.addWidget(pair)
-                self._body.addWidget(self._note(t("mob.scan")))
-                self._body.addWidget(self._note(t("mob.same_net")))
-                self._body.addWidget(self._note(t("mob.firewall")))
-        self.adjustSize()
+            self._body.addWidget(_hint(t("mob.off")))
+            return
+        urls = device_urls(cfg.web.port)
+        if not urls:
+            self._body.addWidget(_hint(t("mob.no_ip")))
+            return
+        pair = QWidget()
+        cols = QHBoxLayout(pair)
+        cols.setContentsMargins(0, 0, 0, 0)
+        cols.setSpacing(16)
+        cols.addWidget(self._qr_col(t("mob.report"), urls["report"]))
+        cols.addWidget(self._qr_col(t("mob.engineer"), urls["engineer"]))
+        cols.addWidget(self._qr_col(t("mob.test"), urls["test"]))
+        self._body.addWidget(pair)
+        self._body.addWidget(_hint(t("mob.scan")))
+        self._body.addWidget(_hint(t("mob.test_live")))
+        self._body.addWidget(_hint(t("mob.same_net")))
+        self._body.addWidget(_hint(t("mob.firewall")))
+
+    def showEvent(self, event) -> None:   # noqa: N802 - Qt naming
+        # Poll only while the section is on screen: off it, nobody reads it.
+        super().showEvent(event)
+        self._refresh_status()
+        self._poll.start()
+
+    def hideEvent(self, event) -> None:   # noqa: N802 - Qt naming
+        super().hideEvent(event)
+        self._poll.stop()
+
+    def _refresh_status(self) -> None:
+        """Say whether the server behind the QR codes is actually up."""
+        cfg = load_config()
+        if not cfg.lan:
+            self._status.setVisible(False)
+            return
+        self._status.setVisible(True)
+        up = port_open(cfg.web.port)
+        self._status.setText(t("mob.server_on") if up else t("mob.server_off"))
+        self._status.setProperty("role", "good" if up else "bad")
+        # Qt resolves the stylesheet once per property value; without a re-polish
+        # the colour keeps whatever it had when the label was first shown.
+        self._status.style().unpolish(self._status)
+        self._status.style().polish(self._status)
 
     def _qr_col(self, title: str, url: str) -> QWidget:
         w = QWidget()
@@ -362,93 +463,71 @@ class MobileAccess(QDialog):
             img.setPixmap(pix)
         else:
             img.setText(t("mob.no_qr"))
-            img.setStyleSheet("color: #888; font-size: 11px;")
+            img.setProperty("role", "muted")
         v.addWidget(img)
         link = QLabel(url)
         link.setAlignment(Qt.AlignHCenter)
-        link.setStyleSheet("color: #22D3CE; font-size: 11px;")
+        link.setProperty("role", "link")
         link.setTextInteractionFlags(Qt.TextSelectableByMouse)
         link.setWordWrap(True)
         v.addWidget(link)
         return w
 
-    @staticmethod
-    def _note(text: str) -> QLabel:
-        lbl = QLabel(text)
-        lbl.setStyleSheet("color: #888; font-size: 11px;")
-        lbl.setWordWrap(True)
-        return lbl
+    def retranslate(self) -> None:
+        self._title.setText(t("mob.title"))
+        self._lan.setText(t("mob.lan"))
+        self._restart.setText(t("mob.restart"))
+        self._render()
 
 
-class Launcher(QWidget):
+class MainWindow(QWidget):
+    """The hub shell: sidebar + stacked sections, and process ownership."""
+
+    # Sidebar order → stack pages.
+    _NAV = [
+        ("nav.home", "🏠"),
+        ("nav.live", "▶"),
+        ("nav.analysis", "📊"),
+        ("nav.setup", "🔧"),
+        ("nav.devices", "📱"),
+        ("nav.settings", "⚙"),
+    ]
+
     def __init__(self) -> None:
         super().__init__()
         self.setWindowTitle("HONE")
-        self.resize(380, 560)
+        self.setWindowIcon(window_icon())
+        self.resize(900, 600)
         # Every process we spawn, so we can stop them on demand / on close.
         self._children: list[tuple[subprocess.Popen, list[str]]] = []
-        # key -> button, so we can enable/disable them while Coach Live runs.
-        self._buttons: dict = {}
+        # Registered action buttons: (gating key, label key, button).
+        self._actions: list[tuple[object, str, QPushButton]] = []
+        self._panels: list[QWidget] = []
 
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 20, 20, 20)
-        layout.setSpacing(10)
+        outer = QHBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
 
-        title = QLabel("HONE")
-        title.setStyleSheet("font-size: 22px; font-weight: bold;")
-        subtitle = QLabel("Know why you're slow. · AC / ACC")
-        subtitle.setStyleSheet("color: #888;")
-        layout.addWidget(title)
-        layout.addWidget(subtitle)
+        outer.addWidget(self._build_sidebar())
+        self._stack = QStackedWidget()
+        outer.addWidget(self._stack, 1)
 
-        # Language selector — switches the interface + coach voice. Applies on the
-        # next Coach Live start (the voice picks its language at startup).
-        lang_row = QHBoxLayout()
-        lang_lbl = QLabel(t("ui.language"))
-        lang_lbl.setStyleSheet("color: #888;")
-        self._lang = QComboBox()
-        for code in LANGUAGES:
-            self._lang.addItem(language_name(code), code)
-        cur = load_config().language
-        i = self._lang.findData(cur)
-        if i >= 0:
-            self._lang.setCurrentIndex(i)
-        self._lang.currentIndexChanged.connect(self._on_language)
-        lang_row.addWidget(lang_lbl)
-        lang_row.addWidget(self._lang, 1)
-        layout.addLayout(lang_row)
+        # Home first — it's page 0 and the landing section.
+        self._home = HomePanel(
+            on_analysis=partial(self._spawn, ["web"], False),
+            on_setup=partial(self._spawn, ["web", "--engineer"], False),
+        )
+        self._stack.addWidget(self._home)
+        self._stack.addWidget(self._build_live_page())
+        self._stack.addWidget(self._build_analysis_page())
+        self._stack.addWidget(self._build_setup_page())
+        self._devices = DevicesPanel(self)
+        self._stack.addWidget(self._devices)
+        self._settings = SettingsPanel(self)
+        self._stack.addWidget(self._settings)
+        self._panels = [self._home, self._settings, self._devices]
 
-        for label, args, console in _BUTTONS:
-            if args is None:
-                line = QFrame()
-                line.setFrameShape(QFrame.HLine)
-                line.setStyleSheet("color: #444;")
-                layout.addWidget(line)
-                continue
-            btn = QPushButton(t(label))
-            btn.setMinimumHeight(40)
-            btn.setStyleSheet("text-align: left; padding-left: 12px; font-size: 14px;")
-            if args == _GUIDE:
-                btn.clicked.connect(_open_guide)
-            elif args == _WIZARD:
-                btn.clicked.connect(self._show_wizard)
-            elif args == _SETTINGS:
-                btn.clicked.connect(self._show_settings)
-            elif args == _MOBILE:
-                btn.clicked.connect(self._show_mobile)
-            elif args == _STOP_LIVE:
-                btn.clicked.connect(self._stop_live)
-            else:
-                btn.clicked.connect(partial(self._spawn, args, console))
-            key = tuple(args) if isinstance(args, list) else args
-            self._buttons[key] = btn
-            layout.addWidget(btn)
-
-        layout.addStretch(1)
-        hint = QLabel(t("ui.tip_borderless"))
-        hint.setStyleSheet("color: #888; font-size: 11px;")
-        hint.setWordWrap(True)
-        layout.addWidget(hint)
+        self._nav.setCurrentRow(0)
 
         # Poll the children so the buttons re-enable themselves when Coach Live
         # ends (stopped, closed, or crashed), not only when you press Stop.
@@ -456,6 +535,94 @@ class Launcher(QWidget):
         self._timer.timeout.connect(self._refresh_buttons)
         self._timer.start(1000)
         self._refresh_buttons()
+
+    # --- sidebar ---------------------------------------------------------
+    def _build_sidebar(self) -> QWidget:
+        side = QWidget()
+        side.setFixedWidth(210)
+        lay = QVBoxLayout(side)
+        lay.setContentsMargins(12, 16, 12, 12)
+        lay.setSpacing(10)
+
+        wordmark = QLabel(f"‹ {brand.NAME} ›")
+        wordmark.setProperty("role", "brand")
+        lay.addWidget(wordmark)
+
+        self._nav = QListWidget()
+        self._nav.setObjectName("sidebar")
+        for key, glyph in self._NAV:
+            self._nav.addItem(f"{glyph}{t(key)}")
+        self._nav.currentRowChanged.connect(self._on_nav)
+        lay.addWidget(self._nav, 1)
+
+        # Language selector — switches the interface + coach voice. Applies on the
+        # next Coach Live start (the voice picks its language at startup).
+        self._lang_lbl = QLabel(t("ui.language"))
+        self._lang_lbl.setProperty("role", "muted")
+        lay.addWidget(self._lang_lbl)
+        self._lang = QComboBox()
+        for code in LANGUAGES:
+            self._lang.addItem(language_name(code), code)
+        i = self._lang.findData(load_config().language)
+        if i >= 0:
+            self._lang.setCurrentIndex(i)
+        self._lang.currentIndexChanged.connect(self._on_language)
+        lay.addWidget(self._lang)
+        return side
+
+    def _on_nav(self, row: int) -> None:
+        self._stack.setCurrentIndex(row)
+        if row == 0:                 # returning to Home → re-read the last session
+            self._home.refresh()
+
+    # --- section pages ---------------------------------------------------
+    def _build_live_page(self) -> QWidget:
+        page, lay = _section("nav.live")
+        lay.addWidget(self.action_button("btn.coach_live", ["live"], accent=True))
+        lay.addWidget(self.action_button("btn.coach_live_demo", ["live", "--demo"]))
+        lay.addWidget(self.special_button("btn.stop_live", _STOP_LIVE,
+                                          self._stop_live, danger=True))
+        lay.addSpacing(8)
+        lay.addWidget(_hint(t("ui.tip_borderless"), key="ui.tip_borderless"))
+        lay.addStretch(1)
+        return page
+
+    def _build_analysis_page(self) -> QWidget:
+        page, lay = _section("nav.analysis")
+        lay.addWidget(self.action_button("btn.analysis", ["web"], accent=True))
+        lay.addWidget(self.action_button("btn.debrief", ["debrief"], console=True))
+        lay.addStretch(1)
+        return page
+
+    def _build_setup_page(self) -> QWidget:
+        page, lay = _section("nav.setup")
+        lay.addWidget(self.action_button("btn.engineer", ["web", "--engineer"],
+                                         accent=True))
+        lay.addStretch(1)
+        return page
+
+    # --- button factories ------------------------------------------------
+    def action_button(self, label_key: str, args: list[str], *,
+                      console: bool = False, accent: bool = False) -> QPushButton:
+        """A button that spawns ``args`` and is gated while Coach Live runs."""
+        btn = QPushButton(t(label_key))
+        btn.setMinimumHeight(40)
+        if accent:
+            btn.setProperty("accent", True)
+        btn.clicked.connect(partial(self._spawn, args, console))
+        self._actions.append((tuple(args), label_key, btn))
+        return btn
+
+    def special_button(self, label_key: str, key: str, handler, *,
+                       danger: bool = False) -> QPushButton:
+        """A button wired to a handler (not a spawn), gated by its sentinel key."""
+        btn = QPushButton(t(label_key))
+        btn.setMinimumHeight(40)
+        if danger:
+            btn.setProperty("danger", True)
+        btn.clicked.connect(lambda: handler())
+        self._actions.append((key, label_key, btn))
+        return btn
 
     # --- process management ----------------------------------------------
     def _spawn(self, args: list[str], new_console: bool) -> None:
@@ -483,10 +650,10 @@ class Launcher(QWidget):
         self._refresh_buttons()
 
     def _refresh_buttons(self) -> None:
-        """Disable everything but the live-safe buttons while Coach Live runs."""
+        """Disable every action but the live-safe ones while Coach Live runs."""
         self._prune()
         live = any(a and a[0] == "live" for _p, a in self._children)
-        for key, btn in self._buttons.items():
+        for key, _label, btn in self._actions:
             btn.setEnabled(not live or key in _LIVE_SAFE_KEYS)
 
     def _prune(self) -> None:
@@ -508,28 +675,30 @@ class Launcher(QWidget):
             pass
 
     def _on_language(self) -> None:
-        """Persist the chosen language and re-label the launcher right away (the
+        """Persist the chosen language and re-label the whole hub right away (the
         coach voice picks it up on the next Coach Live start)."""
         set_language(self._lang.currentData())
-        for label_key, args, _console in _BUTTONS:
-            if args is None:
-                continue
-            key = tuple(args) if isinstance(args, list) else args
-            btn = self._buttons.get(key)
-            if btn is not None:
-                btn.setText(t(label_key))
+        # Sidebar items.
+        for i, (key, glyph) in enumerate(self._NAV):
+            self._nav.item(i).setText(f"{glyph}{t(key)}")
+        # Registered action/special buttons.
+        for _key, label_key, btn in self._actions:
+            btn.setText(t(label_key))
+        # Language label + every static label tagged with an i18n key (section
+        # titles, hints), swept in one pass across the whole window.
+        self._lang_lbl.setText(t("ui.language"))
+        for lbl in self.findChildren(QLabel):
+            key = lbl.property("i18nKey")
+            if key:
+                lbl.setText(t(key))
+        # Panels with dynamic/non-label text (checkboxes, QR, saved note, stats).
+        for panel in self._panels:
+            if hasattr(panel, "retranslate"):
+                panel.retranslate()
 
     def _show_wizard(self) -> None:
         """Open the getting-started wizard (also auto-shown on first run)."""
         GettingStarted(self).exec()
-
-    def _show_settings(self) -> None:
-        """Open the settings dialog (voice + overlay), persisted to config.toml."""
-        Settings(self).exec()
-
-    def _show_mobile(self) -> None:
-        """Open the phone/tablet dialog: LAN toggle + QR codes for the pages."""
-        MobileAccess(self).exec()
 
     def _stop_live(self) -> None:
         """Stop any running Coach Live / Live-Demo process."""
@@ -540,7 +709,7 @@ class Launcher(QWidget):
         self._refresh_buttons()
 
     def closeEvent(self, event) -> None:  # noqa: N802 (Qt naming)
-        """Kill every process this launcher started before exiting."""
+        """Kill every process this hub started before exiting."""
         for proc, _args in list(self._children):
             self._kill(proc)
         self._children.clear()
@@ -551,7 +720,8 @@ def main(argv: list[str] | None = None) -> None:
     from .logging_setup import setup_logging
     setup_logging()
     app = QApplication(sys.argv)
-    win = Launcher()
+    app.setStyleSheet(qss())
+    win = MainWindow()
     win.show()
     if not wizard_seen():            # first run: greet with the getting-started wizard
         win._show_wizard()

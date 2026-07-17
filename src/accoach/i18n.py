@@ -97,12 +97,57 @@ _UI: dict[str, dict[str, str]] = {
     "btn.settings": {"en": "⚙  Settings", "it": "⚙  Impostazioni"},
     "btn.mobile": {"en": "📱  Phone / tablet", "it": "📱  Telefono / tablet"},
     "btn.guide": {"en": "❓  Guide — how to use", "it": "❓  Guida — come si usa"},
+    "btn.overlay": {"en": "🖥  Overlay only", "it": "🖥  Solo overlay"},
+    # hub — sidebar navigation
+    "nav.home": {"en": "  Home", "it": "  Home"},
+    "nav.live": {"en": "  Drive", "it": "  Guida"},
+    "nav.analysis": {"en": "  Analysis", "it": "  Analisi"},
+    "nav.setup": {"en": "  Setup", "it": "  Setup"},
+    "nav.devices": {"en": "  Devices", "it": "  Dispositivi"},
+    "nav.settings": {"en": "  Settings", "it": "  Impostazioni"},
+    # hub — section intros
+    "sec.devtools": {"en": "Advanced tools", "it": "Strumenti avanzati"},
+    # hub — Home (last session)
+    "home.loading": {"en": "Loading your last session…",
+                     "it": "Carico l'ultima sessione…"},
+    "home.empty_title": {"en": "No sessions yet",
+                         "it": "Nessuna sessione ancora"},
+    "home.empty_body": {"en": "Get on track and drive two laps — I'll listen and "
+                              "tell you where you lose time.",
+                        "it": "Sali in pista e fai due giri — io ascolto e ti dico "
+                              "dove perdi tempo."},
+    "home.no_ref_title": {"en": "Almost there", "it": "Ci siamo quasi"},
+    "home.no_ref_body": {"en": "Drive one clean, valid lap so I have a reference to "
+                               "compare against.",
+                         "it": "Fai un giro pulito e valido, così ho un riferimento "
+                               "con cui confrontare."},
+    "home.clean_title": {"en": "Clean lap", "it": "Giro pulito"},
+    "home.clean_body": {"en": "Slower than your reference, but no single corner cost "
+                              "you much — work on consistency to close the gap.",
+                        "it": "Più lento del riferimento, ma nessuna curva ti è "
+                              "costata molto — lavora sulla costanza per recuperare."},
+    "home.is_reference": {"en": "This is your reference lap — nothing faster to "
+                                "compare against. Nice one.",
+                          "it": "Questo è il tuo giro di riferimento — niente di più "
+                                "veloce da confrontare. Ottimo."},
+    "home.cta_analysis": {"en": "📊  Analyze", "it": "📊  Analizza"},
+    "home.cta_debrief": {"en": "📈  Full debrief", "it": "📈  Debrief completo"},
+    "home.cta_setup": {"en": "🔧  Try a setup", "it": "🔧  Prova un setup"},
+    "home.stat_best": {"en": "Best lap", "it": "Miglior giro"},
+    "home.stat_gap": {"en": "Gap to ref", "it": "Distacco rif."},
+    "home.stat_laps": {"en": "Valid laps", "it": "Giri validi"},
+    "home.stat_consistency": {"en": "Spread", "it": "Costanza"},
     # phone / tablet (LAN) dialog
     "mob.title": {"en": "Open on phone / tablet", "it": "Apri su telefono / tablet"},
     "mob.lan": {"en": "Allow access from other devices on my network",
                 "it": "Consenti l'accesso dagli altri dispositivi in rete"},
     "mob.report": {"en": "Report", "it": "Report"},
     "mob.engineer": {"en": "Engineer", "it": "Ingegnere"},
+    "mob.test": {"en": "On-track test", "it": "Test in pista"},
+    "mob.test_live": {"en": "For live cue capture on the test page, also start the "
+                            "Live backend (second screen).",
+                      "it": "Per la cattura dei cue dal vivo nella pagina test, avvia "
+                            "anche il Backend live (secondo schermo)."},
     "mob.scan": {"en": "Scan with your phone's camera, or type the address.",
                  "it": "Inquadra col telefono, oppure digita l'indirizzo."},
     "mob.off": {"en": "Turn on the option above to open these pages from your phone.",
@@ -117,6 +162,12 @@ _UI: dict[str, dict[str, str]] = {
                     "it": "Dopo la modifica, (ri)avvia Coach Live o Analisi."},
     "mob.no_qr": {"en": "(QR unavailable — install 'segno')",
                   "it": "(QR non disponibile — installa 'segno')"},
+    "mob.server_on": {"en": "Analysis server is running — these pages will open.",
+                      "it": "Server analisi acceso: queste pagine si aprono."},
+    "mob.server_off": {"en": "Analysis server is off — these pages will not load. "
+                             "Start it from Analysis.",
+                       "it": "Server analisi spento: queste pagine non si aprono. "
+                             "Avvialo da Analisi."},
     # settings dialog
     "ui.settings": {"en": "Settings", "it": "Impostazioni"},
     "set.voice": {"en": "Coach voice", "it": "Voce del coach"},

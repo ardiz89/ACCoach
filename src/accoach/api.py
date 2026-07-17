@@ -15,7 +15,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import Body, FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 
@@ -681,6 +681,54 @@ def create_api(
     def engineer() -> Response:
         """The race-engineer setup page (live diagnosis + setup editor)."""
         return _serve("engineer.html")
+
+    @app.get("/test")
+    def test_page() -> Response:
+        """The on-track test checklist — tablet-first, reads the live feed and
+        auto-captures the cues HONE fires for each test."""
+        return _serve("test.html")
+
+    @app.get("/api/test/latest_lap")
+    def test_latest_lap() -> dict:
+        """The most recently recorded lap, so the tablet can auto-attach it to a
+        test result (a real telemetry reference for later calibration)."""
+        with _catalog() as cat:
+            row = cat._conn.execute(
+                "SELECT path, car_model, track, lap_time_ms, valid, recorded_utc "
+                "FROM lap ORDER BY recorded_utc DESC LIMIT 1"
+            ).fetchone()
+        if row is None:
+            return {"lap": None}
+        return {"lap": {
+            "path": Path(row["path"]).name,
+            "car": row["car_model"],
+            "track": row["track"],
+            "lap_time_ms": row["lap_time_ms"],
+            "lap_time": format_lap_time(row["lap_time_ms"]),
+            "valid": bool(row["valid"]),
+            "recorded_utc": row["recorded_utc"],
+        }}
+
+    @app.post("/api/test/save")
+    def test_save(payload: dict = Body(...)) -> dict:
+        """Persist a test run as JSON under ``<data>/test_runs/`` on this PC.
+
+        Named by the run's stable ``run_id`` so the tablet's periodic autosave
+        overwrites one file per session instead of littering the folder.
+        """
+        import json as _json
+        from datetime import datetime, timezone
+
+        runs = laps_dir.parent / "test_runs"
+        runs.mkdir(parents=True, exist_ok=True)
+        cat = _slug(str(payload.get("category") or "run"))
+        rid = _slug(str(payload.get("run_id") or ""))[:24]
+        stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        name = f"testrun__{cat}__{rid or stamp}.json"
+        path = runs / name
+        path.write_text(_json.dumps(payload, ensure_ascii=False, indent=2),
+                        encoding="utf-8")
+        return {"ok": True, "file": name, "path": str(path)}
 
     if _WEB_DIR.is_dir():
         app.mount("/static", StaticFiles(directory=str(_WEB_DIR)), name="static")

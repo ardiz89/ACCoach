@@ -31,7 +31,8 @@ def lan_ip() -> str | None:
 
 
 def device_urls(port: int, ip: str | None = None) -> dict[str, str] | None:
-    """Report + engineer URLs a LAN device opens, or ``None`` if no LAN IP.
+    """Report + engineer + on-track test URLs a LAN device opens, or ``None`` if
+    no LAN IP.
 
     Pass ``ip`` to skip auto-detection (useful for tests).
     """
@@ -39,7 +40,24 @@ def device_urls(port: int, ip: str | None = None) -> dict[str, str] | None:
     if not ip:
         return None
     base = f"http://{ip}:{port}"
-    return {"report": base + "/", "engineer": base + "/engineer"}
+    return {"report": base + "/", "engineer": base + "/engineer",
+            "test": base + "/test"}
+
+
+def port_open(port: int, host: str = "127.0.0.1", timeout: float = 0.3) -> bool:
+    """True if something is listening on ``host:port``.
+
+    The QR codes are built from the config, so they look ready even when no
+    server is behind them — scanning one then yields a page that never loads.
+    The launcher polls this to say so out loud. Probing the port (rather than
+    tracking the child process) also sees servers started outside the hub.
+    """
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.settimeout(timeout)
+            return s.connect_ex((host, port)) == 0
+    except OSError:
+        return False
 
 
 def qr_png(data: str, scale: int = 6) -> bytes | None:
