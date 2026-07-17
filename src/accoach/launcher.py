@@ -50,7 +50,7 @@ from .hub_home import HomePanel
 from .i18n import LANGUAGES, language_name, t
 from .netinfo import device_urls, port_open, qr_png
 from .paths import base_dir
-from .theme import qss, window_icon
+from .theme import load_fonts, qss, window_icon
 
 _SRC = Path(__file__).resolve().parents[1]   # .../src
 
@@ -720,6 +720,7 @@ def main(argv: list[str] | None = None) -> None:
     from .logging_setup import setup_logging
     setup_logging()
     app = QApplication(sys.argv)
+    load_fonts()                     # before the stylesheet: it only names the faces
     app.setStyleSheet(qss())
     win = MainWindow()
     win.show()

@@ -1,0 +1,11 @@
+# Font binaries: never touch these. Git usually detects them as binary on its own,
+# but a checkout with core.autocrlf=true would silently rewrite any byte pair that
+# looks like a line ending, and a corrupted .ttf fails at *render* time — the app
+# just quietly falls back to a system face, exactly the bug the fonts were added to
+# fix. Being explicit costs nothing.
+*.ttf binary
+*.otf binary
+*.woff binary
+*.woff2 binary
+*.png binary
+*.wav binary
