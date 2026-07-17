@@ -16,6 +16,15 @@ def test_class_table_is_ordered_by_stiffness():
     assert road.speed_split_kmh < gt3.speed_split_kmh < formula.speed_split_kmh
 
 
+def test_trail_brake_coached_only_on_downforce_classes():
+    # Road cars: straight-line stop then turn is correct, and the live audit found
+    # only false positives there. Silence rather than a relaxed threshold.
+    assert tuning_for_class(CarClass.ROAD).trail_brake_cue is False
+    assert tuning_for_class(CarClass.GT3).trail_brake_cue is True
+    assert tuning_for_class(CarClass.FORMULA).trail_brake_cue is True
+    assert tuning_for_car("bmw_m3_e92").trail_brake_cue is False
+
+
 def test_unknown_or_empty_car_falls_back_to_default():
     assert tuning_for_car("") is DEFAULT_TUNING
     assert tuning_for_car(None) is DEFAULT_TUNING

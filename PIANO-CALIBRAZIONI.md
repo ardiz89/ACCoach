@@ -196,7 +196,20 @@ Stradale senza fix. TP senza aiuti, basso carico. Completa il giro sui 3 profili
 ⚠️ poco sensibile SOLO su Formula (mediana 2.54) → relativo-al-baseline lì.
 `_LOCK_RATIO = -0.15`: ✅ globale su tutte e 3 le classi.
 
-### Nuovo finding (lane `coaching/braking.py`): trail_brake class-aware
+### ✅ CHIUSO 2026-07-17 — trail_brake per-classe
+Il cue trail-brake è ora **spento sul profilo Stradale** e attivo su GT3/Formula,
+via `trail_brake_cue` in `coaching/tuning.py` (stessa tabella di `spin_ratio`).
+Scelto **silenzio** e non una soglia rilassata: l'audit sulla M3 dà 6 falsi e zero
+veri, quindi non c'è alcun dato che dica *dove* mettere una soglia intermedia (a
+differenza dello spin, dove avevamo 0.11 pulito vs 0.16 vero). Se in una sessione
+futura emergono trail-brake **veri** su stradale, si riaccende con una soglia tarata
+su quei numeri. `BrakingDetector` prende la classe come `EventDetector`
+(costruttore + `set_car_class`), l'engine la aggiorna al cambio auto.
+Sistemato anche `diagnostics dryrun`: costruiva i detector senza classe, quindi
+auditava una stradale con le soglie GT3 — ora ritara al cambio auto e stampa la
+classe riconosciuta.
+
+### Finding originale (lane `coaching/braking.py`): trail_brake class-aware
 Il detector (`_trail_fault`, braking.py:99) spara su "frenata forte → inserimento
 col freno già rilasciato" entro 0.8s. Su stradali a basso carico la frenata in
 rettilineo + rilascio prima dell'inserimento è TECNICA CORRETTA → 6 falsi sulla
