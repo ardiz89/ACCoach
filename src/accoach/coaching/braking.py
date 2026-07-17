@@ -18,13 +18,19 @@ Both reuse the established debounce / dedup-by-segment conventions. Thresholds a
 conservative first guesses; the trail-brake one in particular is heuristic and
 worth tightening against a live session (it should stay silent through fast
 corners you don't brake for and through normal corner exits).
+
+Whether the trail-brake fault is coached at all is class-dependent — see
+``trail_brake_cue`` in :mod:`accoach.coaching.tuning` for why road cars get
+silence. Coasting is class-agnostic: dead pedal time costs metres on anything.
 """
 
 from __future__ import annotations
 
+from ..engineer import CarClass
 from ..telemetry.snapshot import ACStatus, TelemetrySnapshot
 from ._detector import Episode, make_cue, step
 from .cue import Cue, CueCategory
+from .tuning import DEFAULT_TUNING, tuning_for_class
 
 _MIN_SPEED_KMH = 80.0       # technique only matters at pace
 
@@ -48,10 +54,16 @@ _PRIORITY = 270.0           # useful entry advice, below acute slides/locks
 class BrakingDetector:
     """Stateful: fed (snapshot, now) each frame, yields braking-technique cues."""
 
-    def __init__(self) -> None:
+    def __init__(self, car_class: CarClass | None = None) -> None:
         self._coast = Episode()
         self._last_hard_brake_t = -1e9
         self._in_turn = False
+        self._trail_cue = (tuning_for_class(car_class).trail_brake_cue
+                           if car_class is not None else DEFAULT_TUNING.trail_brake_cue)
+
+    def set_car_class(self, car_class: CarClass) -> None:
+        """Enable/disable the trail-brake cue when the car (class) changes."""
+        self._trail_cue = tuning_for_class(car_class).trail_brake_cue
 
     def reset(self) -> None:
         self._coast = Episode()
@@ -77,7 +89,11 @@ class BrakingDetector:
             cues.append(make_cue(s, CueCategory.COASTING,
                                  "Stai veleggiando: riduci il tempo morto fra freno e gas", _PRIORITY))
 
-        if self._trail_fault(s, now):
+        # Always step the turn-in state machine, even when the cue is off for this
+        # class: set_car_class can flip it mid-session, and a state machine that
+        # only ran while enabled would come back with a stale _in_turn.
+        trail_fault = self._trail_fault(s, now)
+        if trail_fault and self._trail_cue:
             cues.append(make_cue(s, CueCategory.TRAIL_BRAKE,
                                  "Rilasci il freno troppo presto: portane un filo fino all'inserimento", _PRIORITY))
         return cues

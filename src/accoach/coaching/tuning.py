@@ -15,6 +15,12 @@ Nürburgring, road M3 E92 @ Suzuka, on AC):
   0.13, Formula 0.15). GT3 0.13 still catches the hardest real GT3 spin (~0.138).
 * ``speed_split_kmh`` — the low/high corner-speed band for the diagnosis taxonomy.
   A higher-grip class corners faster, so its "slow corner" boundary sits higher.
+* ``trail_brake_cue`` — whether to coach trail braking at all. Bleeding the brake
+  to the apex buys front load a downforce car needs; on a low-downforce road car,
+  stopping in a straight line and *then* turning is correct technique, and lifting
+  late can snap it. The road audit (M3 E92 @ Suzuka) fired 6 trail-brake cues that
+  the driver called false, and no true ones — so the class gets silence rather than
+  a relaxed threshold, since nothing in the data says where a relaxed one would go.
 
 ⚠ These are best-known values pending a fresh live re-validation per class; the
 table is the single place to retune them.
@@ -33,12 +39,16 @@ class ClassTuning:
 
     spin_ratio: float          # rear slip ratio = wheelspin (events + diagnosis)
     speed_split_kmh: float     # low/high corner-speed band (diagnosis taxonomy)
+    trail_brake_cue: bool      # coach trail braking for this class at all (braking)
 
 
 _TUNING: dict[CarClass, ClassTuning] = {
-    CarClass.ROAD:    ClassTuning(spin_ratio=0.12, speed_split_kmh=100.0),
-    CarClass.GT3:     ClassTuning(spin_ratio=0.13, speed_split_kmh=120.0),
-    CarClass.FORMULA: ClassTuning(spin_ratio=0.15, speed_split_kmh=140.0),
+    CarClass.ROAD:    ClassTuning(spin_ratio=0.12, speed_split_kmh=100.0,
+                                  trail_brake_cue=False),
+    CarClass.GT3:     ClassTuning(spin_ratio=0.13, speed_split_kmh=120.0,
+                                  trail_brake_cue=True),
+    CarClass.FORMULA: ClassTuning(spin_ratio=0.15, speed_split_kmh=140.0,
+                                  trail_brake_cue=True),
 }
 
 # Unknown / empty car → GT3: the most common class and the middle of the range,

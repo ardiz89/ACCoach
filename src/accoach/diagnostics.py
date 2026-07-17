@@ -525,13 +525,26 @@ def run_dryrun(seconds: float | None = None) -> None:
     """
     _utf8()
     from .coaching import BalanceDetector, BrakingDetector, EventDetector, GearDetector
+    from .engineer import classify
 
     detectors = [EventDetector(), BalanceDetector(), BrakingDetector(), GearDetector()]
     counts: dict[str, int] = {}
     print("Coach dry-run. Drive a clean lap, then provoke faults on purpose.")
     print("Every cue the detectors raise is printed with its trigger values.\n")
 
+    # Some thresholds are per-class (coaching.tuning). The engine retunes on car
+    # change; do the same here or the audit would read a road car with GT3 numbers
+    # — exactly the calibration this tool exists to check.
+    car: list[str] = [""]
+
     def on_sample(s, t) -> None:
+        if s.car_model and s.car_model != car[0]:
+            car[0] = s.car_model
+            car_class = classify(s.car_model)
+            for det in detectors:
+                if hasattr(det, "set_car_class"):
+                    det.set_car_class(car_class)
+            print(f"--- car: {s.car_model} -> class {car_class.value} ---", flush=True)
         flock = min(s.slip_ratio[0], s.slip_ratio[1])
         rspin = max(s.slip_ratio[2], s.slip_ratio[3])
         for det in detectors:
