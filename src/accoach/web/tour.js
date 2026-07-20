@@ -6,6 +6,9 @@
 //   HoneTour.start(steps, key)     same thing, namespaced
 //   HoneTour.auto(steps, key)      starts only on first visit (key absent)
 //
+// An optional third argument overrides the button labels, for pages that aren't
+// in English: {skip, back, next, done, step}. Any key left out keeps its default.
+//
 // `sel` is a CSS selector for the element to highlight. Steps whose target is
 // missing or not visible are skipped defensively. The whole thing is one
 // overlay layer that never touches the page's own DOM (no canvas interference).
@@ -14,6 +17,20 @@
   var GAP = 12;         // distance between target and the tooltip card
   var styleInjected = false;
   var closeCurrent = null;   // teardown of the tour currently on screen, if any
+
+  var DEFAULT_LABELS = {
+    skip: "Skip", back: "Back", next: "Next", done: "Done", step: "Step"
+  };
+
+  function labelsFor(over) {
+    var out = {};
+    for (var k in DEFAULT_LABELS) {
+      if (Object.prototype.hasOwnProperty.call(DEFAULT_LABELS, k)) {
+        out[k] = (over && over[k]) || DEFAULT_LABELS[k];
+      }
+    }
+    return out;
+  }
 
   function injectStyle() {
     if (styleInjected) return;
@@ -25,14 +42,15 @@
       ".hone-tour-hole{position:fixed;border:2px solid #22D3CE;border-radius:10px;" +
       "box-shadow:0 0 0 9999px rgba(7,10,14,0.66),0 0 18px rgba(34,211,206,0.55);" +
       "pointer-events:none;transition:left .18s ease,top .18s ease,width .18s ease,height .18s ease;}" +
-      ".hone-tour-card{position:fixed;max-width:320px;background:#151A21;border:1px solid #232B35;" +
+      // 360px, not 320: translated labels ("Indietro" vs "Back") need the room.
+      ".hone-tour-card{position:fixed;max-width:360px;background:#151A21;border:1px solid #232B35;" +
       "border-radius:14px;padding:16px 18px;box-shadow:0 14px 44px rgba(0,0,0,.55);" +
       "color:#E8EDF2;pointer-events:auto;}" +
       ".hone-tour-card h4{margin:0 0 6px;font-size:16px;font-weight:600;color:#E8EDF2;" +
       "font-family:var(--font-display,'Space Grotesk',system-ui,'Segoe UI',sans-serif);}" +
       ".hone-tour-card p{margin:0 0 14px;font-size:13px;line-height:1.5;color:#8A95A3;}" +
       ".hone-tour-foot{display:flex;align-items:center;gap:8px;}" +
-      ".hone-tour-count{font-size:12px;color:#8A95A3;margin-right:auto;" +
+      ".hone-tour-count{font-size:12px;color:#8A95A3;margin-right:auto;white-space:nowrap;" +
       "font-family:var(--font-mono,ui-monospace,Consolas,monospace);}" +
       ".hone-tour-btn{background:#0B0E12;color:#E8EDF2;border:1px solid #232B35;border-radius:8px;" +
       "padding:7px 14px;font-size:13px;cursor:pointer;font-family:inherit;}" +
@@ -60,10 +78,11 @@
     return cs.display !== "none" && cs.visibility !== "hidden";
   }
 
-  function startTour(steps, storageKey) {
+  function startTour(steps, storageKey, labels) {
     if (!Array.isArray(steps) || !steps.length) return;
     if (typeof closeCurrent === "function") closeCurrent();   // one tour at a time
     injectStyle();
+    var L = labelsFor(labels);
 
     // Steps that actually have a visible target right now (defensive skip).
     function showable() {
@@ -147,11 +166,11 @@
       foot.className = "hone-tour-foot";
       var count = document.createElement("span");
       count.className = "hone-tour-count";
-      count.textContent = "Step " + (pos + 1) + "/" + list.length;
-      var skip = mkBtn("Skip", false, finish);
-      var back = mkBtn("Back", false, function () { go(-1); });
+      count.textContent = L.step + " " + (pos + 1) + "/" + list.length;
+      var skip = mkBtn(L.skip, false, finish);
+      var back = mkBtn(L.back, false, function () { go(-1); });
       back.disabled = pos === 0;
-      var next = mkBtn(last ? "Done" : "Next", true, function () { go(1); });
+      var next = mkBtn(last ? L.done : L.next, true, function () { go(1); });
       foot.appendChild(count);
       foot.appendChild(skip);
       foot.appendChild(back);
@@ -211,10 +230,10 @@
     render();
   }
 
-  function autoTour(steps, storageKey) {
+  function autoTour(steps, storageKey, labels) {
     try { if (storageKey && localStorage.getItem(storageKey)) return; }
     catch (e) { return; }
-    startTour(steps, storageKey);
+    startTour(steps, storageKey, labels);
   }
 
   window.startTour = startTour;

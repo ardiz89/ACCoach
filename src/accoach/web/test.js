@@ -56,6 +56,8 @@
   function render() {
     const t = curTest();
     const list = tests();
+    // Every category carries its own intro in the plan; show the current one.
+    $("intro").textContent = cat() ? (cat().intro || "") : "";
     const done = list.filter((x) => result(x.id).outcome).length;
     $("p-text").textContent = `${done} / ${list.length}`;
     $("p-bar").style.width = list.length ? `${(done / list.length) * 100}%` : "0";
@@ -252,6 +254,40 @@
       .map((g) => `<dt>${esc(g.term)}</dt><dd>${esc(g.meaning)}</dd>`).join("");
     $("glossBtn").onclick = () => $("glossDlg").showModal();
   }
+
+  // --- guided tour (vanilla coachmarks — see tour.js) -------------------
+  // Says what to *do*, not what each control is: you arrive here from a QR code
+  // with a helmet on, not looking for a UI reference. Targets that aren't on
+  // screen are skipped by the tour engine, so the card steps are safe even when
+  // a category has no tests.
+  function tourSteps() {
+    return [
+      { sel: ".setup", title: "Dimmi cosa stai provando",
+        text: "Scegli la categoria dell'auto e il simulatore. Auto e pista li riconosco da " +
+              "solo appena vai in pista." },
+      { sel: "#card", title: "Una prova alla volta",
+        text: "Leggi come farla e cosa dovrei fare io. Ripetila due o tre volte prima di " +
+              "darmi un giudizio." },
+      { sel: ".verdicts", title: "Dimmi se ho azzeccato l'avviso",
+        text: "Tocca il verdetto dopo la prova. Mi serve per capire se un avviso parte " +
+              "quando non deve — non è un voto sulla tua guida." },
+      { sel: ".captured", title: "Quello che dico lo segno io",
+        text: "Ogni avviso che do mentre guidi finisce qui con la telemetria del momento. " +
+              "Tu pensa a guidare." },
+      { sel: "#savestate", title: "Salvo da solo, sul tuo PC",
+        text: "Non devi premere niente: puoi chiudere la pagina e riprendere quando vuoi." },
+    ];
+  }
+  // This page is Italian-only (it doesn't load i18n.js), so the tour buttons
+  // have to be told their labels — tour.js defaults to English.
+  const TOUR_LABELS = {
+    skip: "Salta", back: "Indietro", next: "Avanti", done: "Ho capito", step: "Passo",
+  };
+  function wireTour() {
+    if (!window.HoneTour) return;
+    $("tourBtn").onclick =
+      () => window.HoneTour.start(tourSteps(), "hone_tour_test", TOUR_LABELS);
+  }
   function wireSetup() {
     $("car").value = S.car; $("track").value = S.track;
     $("car").oninput = (e) => { S.car = e.target.value; persist(); scheduleSave(); };
@@ -286,8 +322,12 @@
     fillCategories();
     fillGlossary();
     wireSetup();
+    wireTour();
     render();
     connectLive();
+    // First visit only: pop the tour once the card is on screen so its steps
+    // have something to point at.
+    if (window.HoneTour) window.HoneTour.auto(tourSteps(), "hone_tour_test", TOUR_LABELS);
   }
   boot();
 })();
