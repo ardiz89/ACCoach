@@ -156,9 +156,15 @@ Il clean-ceiling posteriore scala con la classe — confermato su due classi:
 Formula +0.15), NON un globale. `_LOCK_RATIO = -0.15` invece regge globale.
 
 ### Altri finding (lane `coaching/`)
-- **Sottosterzo relativo**: `_UNDERSTEER_RATIO` assoluto (0.9) è poco sensibile su
+- ~~**Sottosterzo relativo**: `_UNDERSTEER_RATIO` assoluto (0.9) è poco sensibile su
   auto ad alto yaw (F1 baseline 2.54). Meglio "ratio < frazione del baseline pulito
-  dell'auto" invece di una soglia assoluta.
+  dell'auto" invece di una soglia assoluta.~~ **RISOLTO 2026-07-20.** Baseline
+  misurato sui giri registrati: Formula 2.50 (1737 campioni, SF25 @ Nürburgring),
+  GT3 1.93/1.98, stradale 1.95 — conferma il 2.54 annotato qui. La soglia è ora
+  `yaw_baseline × 0.45` per classe (`coaching/tuning.py`), cioè il ~5% peggiore dei
+  campioni in curva in ogni classe. Effetto misurato: Formula 0.90 → 1.12 (frame
+  rilevati 4.0% → 5.4%), GT3 e stradali invariati (0.90 → 0.88). **Da confermare
+  in pista**: che i nuovi rilevamenti su Formula siano sottosterzi veri.
 - **Burst lock**: in staccata pesante l'F1 spara 5 `locked` in ~1.5s (stesso evento,
   segmenti pos diversi → non deduplicati). Tema cadenza/scheduler.
 - **Abnormal-state gate**: frame `st+1.00 Flk-1.00 yaw-1.09` = quasi-testacoda →

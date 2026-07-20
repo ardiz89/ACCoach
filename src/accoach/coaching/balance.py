@@ -31,9 +31,21 @@ deliberately conservative first guesses; tighten them against a real session.
 
 from __future__ import annotations
 
+from ..engineer import CarClass
 from ..telemetry.snapshot import ACStatus, TelemetrySnapshot
 from ._detector import Episode, make_cue, step
 from .cue import Cue, CueCategory
+from .tuning import DEFAULT_TUNING, UNDERSTEER_FRAC, ClassTuning, tuning_for_class
+
+
+def understeer_ratio_for(t: ClassTuning) -> float:
+    """The yaw/steer below which this class counts as pushing.
+
+    Understeer is judged relative to what the class normally rotates, so the same
+    verdict means the same thing on a Formula car and on a road car. Callers that
+    don't know the car yet get :data:`_UNDERSTEER_RATIO`, the GT3 default.
+    """
+    return t.yaw_baseline * UNDERSTEER_FRAC
 
 # Calibrated against live AC (2026-06-26): in clean corners steer*yaw_rate was
 # ~70% NEGATIVE, i.e. the game's yaw_rate is signed opposite to steer_angle, so
@@ -49,7 +61,9 @@ _MIN_SPEED_KMH = 60.0
 # the yaw/steer ratio — on AC1 GT3 (Imola) clean fast corners sat at a median
 # ratio of ~1.9 (yaw rad/s per steer rad); a push drops it well below that.
 _STEER_HARD = 0.15         # rad of steering — genuinely cornering, not noise
-_UNDERSTEER_RATIO = 0.9    # yaw/steer below this (vs ~1.9 normal) = pushing
+# Default push threshold, for callers that don't know the car's class yet. Live
+# coaching and the debrief both retune it per class — see understeer_ratio_for().
+_UNDERSTEER_RATIO = DEFAULT_TUNING.yaw_baseline * UNDERSTEER_FRAC
 
 # Oversteer: meaningful rotation while the driver is applying opposite lock.
 _STEER_CATCH = 0.04        # rad of (opposite) lock that counts as a correction
@@ -69,11 +83,21 @@ _TURNIN_RATE = 0.6
 class BalanceDetector:
     """Stateful: fed (snapshot, now) each frame, yields understeer/oversteer cues."""
 
-    def __init__(self) -> None:
+    def __init__(self, car_class: CarClass | None = None) -> None:
         self._push = Episode()
         self._loose = Episode()
         self._prev_steer: float | None = None
         self._prev_t: float | None = None
+        self._understeer_ratio = understeer_ratio_for(
+            tuning_for_class(car_class) if car_class is not None else DEFAULT_TUNING)
+
+    def set_car_class(self, car_class: CarClass) -> None:
+        """Retune the understeer threshold when the car (class) changes.
+
+        A Formula car rotates far more than a GT3 for the same steering, so
+        "pushing" has to be measured against what this class normally does.
+        """
+        self._understeer_ratio = understeer_ratio_for(tuning_for_class(car_class))
 
     def reset(self) -> None:
         self._push = Episode()
@@ -117,16 +141,16 @@ class BalanceDetector:
             return False
         return (abs(steer) - abs(prev_s)) / dt > _TURNIN_RATE
 
-    @staticmethod
-    def _is_understeer(s: TelemetrySnapshot) -> bool:
+    def _is_understeer(self, s: TelemetrySnapshot) -> bool:
         if s.speed_kmh < _MIN_SPEED_KMH:
             return False
         steer = abs(s.steer_angle)
         if steer < _STEER_HARD:
             return False
-        # Rotating far less than the steering asks: yaw/steer well below normal.
-        # (Magnitude only — the sign convention doesn't matter for a ratio.)
-        return (abs(s.yaw_rate) / steer) < _UNDERSTEER_RATIO
+        # Rotating far less than the steering asks: yaw/steer well below what
+        # THIS class normally does. (Magnitude only — the sign convention
+        # doesn't matter for a ratio.)
+        return (abs(s.yaw_rate) / steer) < self._understeer_ratio
 
     @staticmethod
     def _is_oversteer(s: TelemetrySnapshot) -> bool:
