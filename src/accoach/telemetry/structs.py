@@ -102,6 +102,20 @@ class SPageFilePhysics(ctypes.Structure):
         ("tyreContactHeading", (_FLOAT * 3) * 4),
         ("brakeBias", _FLOAT),
         ("localVelocity", _FLOAT * 3),
+        # ACC v1.7+ tail. ACC leaves the AC1 `tyreRadius` (static) at zero, so the
+        # radius-based slip formula can't work here — but ACC exposes a native,
+        # signed `slipRatio` per wheel (<0 locking, >0 spinning), which the reader
+        # uses instead. Order verified live (currentMaxRpm reads the real max rpm,
+        # proving the offsets up to slipRatio). On plain AC these bytes don't exist
+        # and are zero-padded, so the reader falls back to the radius formula.
+        ("P2PActivation", _INT),
+        ("P2PStatus", _INT),
+        ("currentMaxRpm", _INT),
+        ("mz", _FLOAT * 4),
+        ("fx", _FLOAT * 4),
+        ("fy", _FLOAT * 4),
+        ("slipRatio", _FLOAT * 4),
+        ("slipAngle", _FLOAT * 4),
     ]
 
 

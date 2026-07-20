@@ -40,8 +40,11 @@ def _build_frames():
             frames.append(_frame(pos, throttle=0.0, brake=0.0, speed_kmh=150))
         elif 0.60 <= pos < 0.70:
             # A sustained lock-up: an ACUTE safety cue that fires even with no
-            # reference yet (the only kind spoken on a non-flying lap).
-            frames.append(_frame(pos, brake=0.9, abs_active=0.6, speed_kmh=110))
+            # reference yet (the only kind spoken on a non-flying lap). ABS is
+            # modulating AND the front slip is past the lock threshold, so the
+            # corroboration gate (see events.py) lets it through.
+            frames.append(_frame(pos, brake=0.9, abs_active=0.6, speed_kmh=110,
+                                 slip_ratio=(-0.4, -0.4, 0.0, 0.0)))
         else:
             frames.append(_frame(pos, throttle=0.8, speed_kmh=180))
     for i in range(60):
