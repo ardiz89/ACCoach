@@ -1,4 +1,6 @@
 """Post-lap debrief: ranked corner losses, consistency, formatting."""
+import pytest
+
 from accoach.coaching.analyzer import CornerStats
 from accoach.coaching.cue import CueCategory
 from accoach.coaching.debrief import (
@@ -95,6 +97,26 @@ def test_consistency_summary():
     assert c["best_ms"] == 100000
     assert c["spread_ms"] == 1000
     assert c["std_ms"] > 0
+
+
+def test_consistency_uses_sample_stdev():
+    """σ is the sample stdev (÷n-1), not the population one (÷n).
+
+    These laps are a sample of how you drive, and ÷n understates the spread on
+    exactly the small sets we deal with — ~11% at n=5. Here: deviations from the
+    100500 mean are -500/0/+500, so ÷(n-1) gives sqrt(500000/2) ≈ 500.0 where
+    ÷n gave ≈ 408.2.
+    """
+    c = lap_time_consistency([100000, 100500, 101000])
+    assert c["std_ms"] == pytest.approx(500.0, abs=0.1)
+
+
+def test_consistency_single_lap_has_no_spread():
+    # One lap can't have a sample stdev — must be 0.0, not a ZeroDivisionError.
+    c = lap_time_consistency([100000])
+    assert c["n"] == 1
+    assert c["std_ms"] == 0.0
+    assert c["spread_ms"] == 0
 
 
 def test_consistency_ignores_nonpositive_and_handles_empty():
