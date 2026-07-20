@@ -328,7 +328,16 @@ def build_lap_debrief(lap: Lap, reference: Reference, corners: list[Corner],
 
 
 def lap_time_consistency(lap_times_ms: list[int]) -> dict:
-    """Spread of a set of lap times — how repeatable the driver is."""
+    """Spread of a set of lap times — how repeatable the driver is.
+
+    ``std_ms`` is the *sample* standard deviation (Bessel's ÷(n-1)): these laps are
+    a sample of how you drive, not the whole population, and dividing by n
+    understates the spread on exactly the small sets we deal with (~11% at n=5).
+
+    ``spread_ms`` (max−best) is a range, so it grows on its own as laps are added:
+    it reads as "worst case seen so far", and is **not** comparable between
+    sessions of different length. ``std_ms`` is the one to compare.
+    """
     times = [t for t in lap_times_ms if t > 0]
     if not times:
         return {"n": 0, "best_ms": 0, "mean_ms": 0, "spread_ms": 0, "std_ms": 0.0}
@@ -336,7 +345,7 @@ def lap_time_consistency(lap_times_ms: list[int]) -> dict:
     best = min(times)
     mean = sum(times) / n
     spread = max(times) - best
-    var = sum((t - mean) ** 2 for t in times) / n
+    var = sum((t - mean) ** 2 for t in times) / (n - 1) if n > 1 else 0.0
     return {"n": n, "best_ms": best, "mean_ms": int(mean),
             "spread_ms": spread, "std_ms": var ** 0.5}
 

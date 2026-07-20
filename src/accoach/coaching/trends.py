@@ -21,6 +21,7 @@ no I/O — so the API layer and tests can call them directly.
 
 from __future__ import annotations
 
+import math
 import statistics
 from collections import Counter
 from dataclasses import dataclass
@@ -68,7 +69,10 @@ def classify_losses(
     n = len(debriefs)
     if n == 0:
         return []
-    recur_min = max(2, round(recur_frac * n))
+    # ceil, not round: round() is banker's rounding, so round(0.5 * 5) == 2 and the
+    # promised "at least half the laps" silently became 2/5 = 40% (and 4/9 = 44%).
+    # A corner that shows up in fewer than half the laps must not read "systematic".
+    recur_min = max(2, math.ceil(recur_frac * n))
 
     losses: dict[int, list[float]] = {}
     names: dict[int, str] = {}
