@@ -42,6 +42,28 @@ def test_small_recurring_loss_is_not_systematic():
     assert trends[0].systematic is False
 
 
+def test_half_the_laps_really_means_half():
+    """A loss in 2 laps out of 5 is 40% — it must not read as "systematic".
+
+    Regression: recur_min used round(), and Python rounds half to even, so
+    round(0.5 * 5) == 2 and the promised >=50% quietly became 40%. Same at n=9,
+    where round(4.5) == 4 gave 44%.
+    """
+    for n, occurrences in ((5, 2), (9, 4)):
+        debriefs = ([_debrief(_loss(0, 300))] * occurrences
+                    + [_debrief()] * (n - occurrences))
+        trends = classify_losses(debriefs)
+        assert trends[0].occurrences == occurrences
+        assert trends[0].systematic is False, f"{occurrences}/{n} is under half"
+
+
+def test_exactly_half_the_laps_is_systematic():
+    # The boundary itself stays inclusive: 3/6 is >= 50% and still counts.
+    debriefs = [_debrief(_loss(0, 300))] * 3 + [_debrief()] * 3
+    trends = classify_losses(debriefs)
+    assert trends[0].systematic is True
+
+
 def test_trends_sorted_by_total_cost():
     debriefs = [
         _debrief(_loss(0, 150), _loss(1, 400)),
