@@ -47,8 +47,8 @@ def test_loads_rejects_non_setup():
 
 
 def test_slot_labels():
-    assert slot_labels(4) == ("Ant-Sx", "Ant-Dx", "Post-Sx", "Post-Dx")
-    assert slot_labels(2) == ("Ant", "Post")
+    assert slot_labels(4) == ("FL", "FR", "RL", "RR")
+    assert slot_labels(2) == ("F", "R")
     assert slot_labels(3) == ("0", "1", "2")
 
 
@@ -61,7 +61,7 @@ def test_read_scalar_and_array():
     assert s.click(_spec("rearWing")) == 11
     assert s.slots(_spec("rearWing")) == 1
     assert s.slots(_spec("tyrePressure")) == 4
-    assert s.click(_spec("tyrePressure"), 3) == 48      # Post-Dx
+    assert s.click(_spec("tyrePressure"), 3) == 48      # RR
 
 
 def test_adjust_in_clicks():
@@ -85,7 +85,7 @@ def test_slot_out_of_range():
 
 def test_physical_pressure_conversion():
     s = _setup()
-    # base 20.3 + 48*0.1 = 25.1 psi (Post-Dx)
+    # base 20.3 + 48*0.1 = 25.1 psi (RR)
     assert s.physical(_spec("tyrePressure"), 3).startswith("25.1")
 
 
@@ -121,11 +121,11 @@ def test_diff_lists_only_changes():
     after.adjust(_spec("rearWing"), 0, -1)
     changes = compute_diff(before, after)
     keys = {(c.label, c.slot) for c in changes}
-    assert ("Pressione", "Post-Dx") in keys
-    assert ("Ala posteriore", "") in keys
+    assert ("Pressure", "RR") in keys
+    assert ("Rear wing", "") in keys
     assert len(changes) == 2
     # delta sign and rendering
-    press = next(c for c in changes if c.label == "Pressione")
+    press = next(c for c in changes if c.label == "Pressure")
     assert press.delta == 2
     assert "→" in str(press)
 

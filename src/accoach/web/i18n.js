@@ -102,14 +102,14 @@
     "chart.steer":     { en: `Steering <small>(white = reviewed lap, cyan = comparison · left up / right down)</small>`,
                          it: `Sterzo <small>(bianco = giro in esame, ciano = confronto · sinistra su / destra giù)</small>` },
 
-    "map.readout":     { en: `Racing line · colour = delta · thicker line = more time lost · ▽ your braking · ○ reference braking`,
-                         it: `Traiettoria · colore = delta · linea più spessa = più tempo perso · ▽ tua frenata · ○ frenata di riferimento` },
+    "map.readout":     { en: `Racing line · colour = speed vs reference (red = slower here, green = faster) · thicker line = bigger gap · ▽ your braking · ○ reference braking`,
+                         it: `Traiettoria · colore = velocità vs riferimento (rosso = qui più lento, verde = più veloce) · linea più spessa = scarto maggiore · ▽ tua frenata · ○ frenata di riferimento` },
     "chart.map":       { en: `Track map <small>(white dashed = reference · solid line = reviewed lap)</small>`,
                          it: `Mappa pista <small>(tratteggio bianco = riferimento · linea continua = giro in esame)</small>` },
     "map.grad.fast":   { en: `faster`, it: `più veloce` },
     "map.grad.slow":   { en: `slower`, it: `più lento` },
-    "map.grad.note":   { en: `line thickens with time lost`,
-                         it: `la linea si ispessisce col tempo perso` },
+    "map.grad.note":   { en: `line thickens with the speed gap`,
+                         it: `la linea si ispessisce con lo scarto di velocità` },
     "map.leg.you":     { en: `your braking`, it: `tua frenata` },
     "map.leg.ref":     { en: `reference braking`, it: `frenata di riferimento` },
     "map.missing":     { en: `This lap has no coordinates (recorded before the map update). Drive and record a new lap to see it here.`,
@@ -433,7 +433,15 @@
     // Re-render the dynamic views without a reload when the page provides a
     // hook; otherwise fall back to a full reload (state is in localStorage).
     try {
-      if (typeof window.HoneI18nRerender === "function") window.HoneI18nRerender();
+      if (typeof window.HoneI18nRerender === "function") {
+        var r = window.HoneI18nRerender();
+        // The hook may be async — the engineer re-fetches its backend-rendered
+        // labels. A rejected promise never reaches the catch below, so route it
+        // to the same fallback instead of leaving the page half-translated.
+        if (r && typeof r.catch === "function") {
+          r.catch(function () { try { location.reload(); } catch (e2) {} });
+        }
+      }
     } catch (e) {
       try { location.reload(); } catch (e2) {}
     }

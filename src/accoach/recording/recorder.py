@@ -112,6 +112,15 @@ class LapRecorder:
         return finished
 
     def _maybe_append(self, buf: _Buffer, s: TelemetrySnapshot) -> None:
+        # A full lap opens exactly at the line, but the sim bumps completed_laps
+        # one frame before it wraps normalizedCarPosition from ~1.0 back to 0.0,
+        # so the opening frame can still read ~1.0. That pre-wrap frame belongs to
+        # the lap that just closed; kept as this lap's first sample it poisons
+        # every position-indexed consumer (Reference/detect_corners/sectors seed
+        # their strictly-forward filter at ~1.0 and reject every later sample,
+        # collapsing the lap to one point). Drop it — the next frame has wrapped.
+        if not buf.samples and buf.is_full and s.lap_position > 0.5:
+            return
         t = int(s.current_lap_ms)
         moved = abs(s.lap_position - buf.last_pos) >= _MIN_POS_DELTA
         waited = (t - buf.last_t_ms) >= _MIN_DT_MS

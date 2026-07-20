@@ -22,8 +22,9 @@ const state = {
 const slotKey = (param, i) => `${param}#${i}`;
 
 async function api(url, opts) {
-  // Pass the active language so backend-generated content arrives localised
-  // (the backend ignores &lang until it handles it — harmless today).
+  // Pass the active language so backend-generated content arrives localised.
+  // The setup routes honour it (labels, groups, notes, the engineer's phases and
+  // the reload hint); routes that don't yet just ignore the param.
   if (url.indexOf("/api/") === 0) {
     url += (url.indexOf("?") === -1 ? "?" : "&") + "lang=" + encodeURIComponent(LANG());
   }
@@ -784,13 +785,31 @@ if (tourBtn && window.HoneTour) {
 
 // Live language switch: re-render the dynamic, JS-built parts in the new
 // language (i18n.js has already re-applied the static chrome).
-window.HoneI18nRerender = function () {
+window.HoneI18nRerender = async function () {
   if (state.setupPath) {
+    // The editor's text (group, label, note, slot) is rendered by the backend in
+    // the requested language, so a switch has to RE-FETCH it — repainting
+    // state.params would just draw the previous language again.
+    //
+    // Deliberately not onSetupChange(): that resets state.pending, and dropping
+    // someone's unapplied clicks because they changed language would be a nasty
+    // surprise. Only the text differs here — the click values are identical — so
+    // pending edits and their baseline carry over untouched.
+    try {
+      const data = await api(
+        `/api/setup/current?path=${encodeURIComponent(state.setupPath)}`);
+      state.params = data.params;
+    } catch (e) {
+      // Backend unreachable: keep the labels we have. Stale language beats a
+      // blank editor with the user's edits still in it.
+    }
     renderSetup({ groups: groupsOf(state.params), params: state.params });
     renderTray();
   } else {
     $("setup-body").innerHTML = noSetupHTML();
   }
+  // The engineer profile (phases, al-volo levers) is backend text too.
+  if (state.car) await loadClass(state.car);
   // Re-render the live block from the last payload (or the offline state).
   applyLive(state.lastLive || { connected: false });
 };

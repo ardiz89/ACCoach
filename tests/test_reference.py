@@ -31,6 +31,18 @@ def test_drops_non_forward_samples():
     assert ref._pos == [0.1, 0.3, 1.0]
 
 
+def test_leading_wrap_frame_does_not_collapse_the_index():
+    # Regression: at the start/finish crossing the sim bumps its lap counter one
+    # frame before it wraps pos ~1.0 -> 0.0, so a lap's first sample can read ~1.0.
+    # Left in, it seeds the strictly-forward filter at 1.0 and every real sample
+    # (all lower) is rejected — the reference collapses to one point and 422s the
+    # whole car+track in the analysis UI. The leading wrap must be dropped.
+    lap = _lap([_smp(1.0, 5), _smp(0.02, 20), _smp(0.5, 500), _smp(0.98, 900)])
+    ref = Reference(lap)
+    assert ref.usable
+    assert ref._pos[0] == 0.0 and ref._pos[-1] == 1.0   # real samples survive
+
+
 def test_time_at_interpolates_linearly():
     lap = _lap([_smp(0.0, 0), _smp(0.5, 1000), _smp(1.0, 3000)])
     ref = Reference(lap)

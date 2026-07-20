@@ -190,11 +190,17 @@ def _has_map(lap) -> bool:
 
 def _delta_trace(lap, reference: Reference) -> dict:
     s = _downsample(lap)
-    pos, dms = [], []
+    pos, dms, sd = [], [], []
     for x in s:
+        rp = reference.point_at(x.pos)
         pos.append(round(x.pos, 4))
-        dms.append(round((x.t_ms - reference.time_at(x.pos)) / 1000.0, 3))
-    return {"pos": pos, "delta_s": dms}
+        dms.append(round((x.t_ms - rp.t_ms) / 1000.0, 3))
+        # Local speed gap vs the reference AT THE SAME track position (+ = you're
+        # faster here, - = slower). Unlike the cumulative time delta this doesn't
+        # accumulate, so it's the signal the track-map heatmap colours by: where
+        # you carry more/less speed than the reference, corner by corner.
+        sd.append(round(x.speed_kmh - rp.speed_kmh, 1))
+    return {"pos": pos, "delta_s": dms, "speed_delta": sd}
 
 
 def _pick_known(requested: str | None, fallback: str | None, known: set[str]) -> str | None:

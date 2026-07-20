@@ -28,6 +28,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from .recording.lap import strip_leading_wrap
+
 # Tuning (all in normalized-position / steering-radian units).
 _STEER_ON = 0.08        # |steer| (rad) that starts a corner
 _STEER_OFF = 0.05       # drop below this to end it (hysteresis)
@@ -78,7 +80,7 @@ def detect_corners(samples) -> list[Corner]:
     brake: list[float] = []
     thr: list[float] = []
     last = -1.0
-    for s in samples:
+    for s in strip_leading_wrap(samples):
         if s.pos <= last:
             continue
         last = s.pos

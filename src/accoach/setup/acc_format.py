@@ -21,8 +21,13 @@ from pathlib import Path
 from typing import Any
 
 # ACC wheel-indexed arrays are ordered FL, FR, RL, RR.
-WHEEL_LABELS = ("Ant-Sx", "Ant-Dx", "Post-Sx", "Post-Dx")
-AXLE_LABELS = ("Ant", "Post")
+#
+# These are canonical identifiers, not just display text: the CLI takes them by
+# hand (--slot RL) and _resolve_slot matches on them. The web UI sends slots back
+# as integer indices, so it never round-trips these strings — which is why they
+# can be translated for display (see setup/labels.py) without breaking anything.
+WHEEL_LABELS = ("FL", "FR", "RL", "RR")
+AXLE_LABELS = ("F", "R")
 
 
 def slot_labels(n: int) -> tuple[str, ...]:
@@ -47,8 +52,8 @@ class ParamSpec:
     """
 
     key: str                      # leaf key, e.g. "tyrePressure"
-    group: str                    # UI grouping, e.g. "Gomme"
-    label: str                    # human label, e.g. "Pressione"
+    group: str                    # UI grouping, e.g. "Tyres"
+    label: str                    # human label, e.g. "Pressure"
     path: tuple[str, ...]         # parent keys to the leaf (excludes key)
     unit: str | None = None       # "psi", "%", "mm", "liv.", "click", ...
     step: float | None = None     # physical units per click
@@ -71,73 +76,73 @@ _BASIC = ("basicSetup",)
 _ADV = ("advancedSetup",)
 
 SETUP_PARAMS: tuple[ParamSpec, ...] = (
-    # --- Gomme -------------------------------------------------------------
-    ParamSpec("tyrePressure", "Gomme", "Pressione", _BASIC + ("tyres",),
+    # --- Tyres -------------------------------------------------------------
+    ParamSpec("tyrePressure", "Tyres", "Pressure", _BASIC + ("tyres",),
               unit="psi", step=0.1, base=20.3,
-              note="≈ a freddo; base 20.3 psi, 0.1 psi/click"),
-    ParamSpec("tyreCompound", "Gomme", "Mescola", _BASIC + ("tyres",),
+              note="≈ cold; base 20.3 psi, 0.1 psi/click"),
+    ParamSpec("tyreCompound", "Tyres", "Compound", _BASIC + ("tyres",),
               unit="", step=None, base=None),
-    # --- Allineamento ------------------------------------------------------
-    ParamSpec("camber", "Allineamento", "Camber", _BASIC + ("alignment",),
-              unit="click", step=None, note="gradi reali in staticCamber"),
-    ParamSpec("toe", "Allineamento", "Convergenza", _BASIC + ("alignment",),
+    # --- Alignment ------------------------------------------------------
+    ParamSpec("camber", "Alignment", "Camber", _BASIC + ("alignment",),
+              unit="click", step=None, note="real degrees in staticCamber"),
+    ParamSpec("toe", "Alignment", "Toe", _BASIC + ("alignment",),
               unit="click", step=None),
-    ParamSpec("casterLF", "Allineamento", "Caster Sx", _BASIC + ("alignment",),
+    ParamSpec("casterLF", "Alignment", "Caster LF", _BASIC + ("alignment",),
               unit="click", step=None),
-    ParamSpec("casterRF", "Allineamento", "Caster Dx", _BASIC + ("alignment",),
+    ParamSpec("casterRF", "Alignment", "Caster RF", _BASIC + ("alignment",),
               unit="click", step=None),
-    # --- Elettronica -------------------------------------------------------
-    ParamSpec("tC1", "Elettronica", "TC1", _BASIC + ("electronics",),
+    # --- Electronics -------------------------------------------------------
+    ParamSpec("tC1", "Electronics", "TC1", _BASIC + ("electronics",),
               unit="liv.", step=1, base=0),
-    ParamSpec("tC2", "Elettronica", "TC2", _BASIC + ("electronics",),
+    ParamSpec("tC2", "Electronics", "TC2", _BASIC + ("electronics",),
               unit="liv.", step=1, base=0),
-    ParamSpec("abs", "Elettronica", "ABS", _BASIC + ("electronics",),
+    ParamSpec("abs", "Electronics", "ABS", _BASIC + ("electronics",),
               unit="liv.", step=1, base=0),
-    ParamSpec("eCUMap", "Elettronica", "Mappa motore", _BASIC + ("electronics",),
+    ParamSpec("eCUMap", "Electronics", "Engine map", _BASIC + ("electronics",),
               unit="liv.", step=1, base=0),
-    ParamSpec("fuelMix", "Elettronica", "Mappa benzina", _BASIC + ("electronics",),
+    ParamSpec("fuelMix", "Electronics", "Fuel map", _BASIC + ("electronics",),
               unit="liv.", step=1, base=0),
-    # --- Strategia ---------------------------------------------------------
-    ParamSpec("fuel", "Strategia", "Benzina", _BASIC + ("strategy",),
+    # --- Strategy ---------------------------------------------------------
+    ParamSpec("fuel", "Strategy", "Fuel", _BASIC + ("strategy",),
               unit="L", step=1, base=0),
-    # --- Bilanciamento meccanico ------------------------------------------
-    ParamSpec("aRBFront", "Meccanica", "Barra ant.", _ADV + ("mechanicalBalance",),
+    # --- Mechanical balance ------------------------------------------
+    ParamSpec("aRBFront", "Mechanical", "Front ARB", _ADV + ("mechanicalBalance",),
               unit="click", step=None),
-    ParamSpec("aRBRear", "Meccanica", "Barra post.", _ADV + ("mechanicalBalance",),
+    ParamSpec("aRBRear", "Mechanical", "Rear ARB", _ADV + ("mechanicalBalance",),
               unit="click", step=None),
-    ParamSpec("wheelRate", "Meccanica", "Molle", _ADV + ("mechanicalBalance",),
+    ParamSpec("wheelRate", "Mechanical", "Springs", _ADV + ("mechanicalBalance",),
               unit="click", step=None),
-    ParamSpec("bumpStopRateUp", "Meccanica", "Bump stop (su)",
+    ParamSpec("bumpStopRateUp", "Mechanical", "Bump stop (up)",
               _ADV + ("mechanicalBalance",), unit="click", step=None),
-    ParamSpec("bumpStopRateDn", "Meccanica", "Bump stop (giù)",
+    ParamSpec("bumpStopRateDn", "Mechanical", "Bump stop (down)",
               _ADV + ("mechanicalBalance",), unit="click", step=None),
-    ParamSpec("bumpStopWindow", "Meccanica", "Finestra bump stop",
+    ParamSpec("bumpStopWindow", "Mechanical", "Bump stop window",
               _ADV + ("mechanicalBalance",), unit="click", step=None),
-    ParamSpec("brakeTorque", "Meccanica", "Coppia frenante",
+    ParamSpec("brakeTorque", "Mechanical", "Brake torque",
               _ADV + ("mechanicalBalance",), unit="click", step=None),
-    ParamSpec("brakeBias", "Meccanica", "Bilanciamento freni",
+    ParamSpec("brakeBias", "Mechanical", "Brake bias",
               _ADV + ("mechanicalBalance",), unit="%", step=0.2, base=None,
-              note="~0.2%/click; base anteriore dipende dall'auto"),
-    # --- Ammortizzatori ----------------------------------------------------
-    ParamSpec("bumpSlow", "Ammortizzatori", "Compressione lenta",
+              note="~0.2%/click; front base depends on the car"),
+    # --- Dampers ----------------------------------------------------
+    ParamSpec("bumpSlow", "Dampers", "Slow bump",
               _ADV + ("dampers",), unit="click", step=None),
-    ParamSpec("bumpFast", "Ammortizzatori", "Compressione veloce",
+    ParamSpec("bumpFast", "Dampers", "Fast bump",
               _ADV + ("dampers",), unit="click", step=None),
-    ParamSpec("reboundSlow", "Ammortizzatori", "Estensione lenta",
+    ParamSpec("reboundSlow", "Dampers", "Slow rebound",
               _ADV + ("dampers",), unit="click", step=None),
-    ParamSpec("reboundFast", "Ammortizzatori", "Estensione veloce",
+    ParamSpec("reboundFast", "Dampers", "Fast rebound",
               _ADV + ("dampers",), unit="click", step=None),
-    # --- Aero / altezze ----------------------------------------------------
-    ParamSpec("rideHeight", "Aero", "Altezza", _ADV + ("aeroBalance",),
-              unit="mm", step=1, base=0, note="passo 1 mm (approssimato)"),
+    # --- Aero / ride height ----------------------------------------------------
+    ParamSpec("rideHeight", "Aero", "Ride height", _ADV + ("aeroBalance",),
+              unit="mm", step=1, base=0, note="1 mm step (approximate)"),
     ParamSpec("splitter", "Aero", "Splitter", _ADV + ("aeroBalance",),
               unit="click", step=None),
-    ParamSpec("rearWing", "Aero", "Ala posteriore", _ADV + ("aeroBalance",),
+    ParamSpec("rearWing", "Aero", "Rear wing", _ADV + ("aeroBalance",),
               unit="click", step=None),
-    ParamSpec("brakeDuct", "Aero", "Condotti freni", _ADV + ("aeroBalance",),
+    ParamSpec("brakeDuct", "Aero", "Brake ducts", _ADV + ("aeroBalance",),
               unit="click", step=None),
-    # --- Trasmissione ------------------------------------------------------
-    ParamSpec("preload", "Trasmissione", "Precarico diff.",
+    # --- Drivetrain ------------------------------------------------------
+    ParamSpec("preload", "Drivetrain", "Diff preload",
               _ADV + ("drivetrain",), unit="click", step=None),
 )
 
@@ -208,7 +213,7 @@ class AccSetup:
 
     def set_click(self, spec: ParamSpec, slot: int, value: int) -> None:
         if value < 0:
-            raise SetupError(f"valore negativo non valido per {spec.key}: {value}")
+            raise SetupError(f"invalid negative value for {spec.key}: {value}")
         node, key = self._leaf_container(spec)
         cur = node[key]
         if isinstance(cur, list):
@@ -258,7 +263,7 @@ def load(path: Path | str) -> AccSetup:
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as e:
-        raise SetupError(f"JSON non valido in {path.name}: {e}") from e
+        raise SetupError(f"invalid JSON in {path.name}: {e}") from e
     if not isinstance(raw, dict) or "basicSetup" not in raw:
         raise SetupError(f"{path.name} non sembra un setup ACC")
     return AccSetup(raw=raw, path=path)

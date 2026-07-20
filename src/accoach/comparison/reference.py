@@ -21,7 +21,7 @@ from __future__ import annotations
 import bisect
 from dataclasses import dataclass
 
-from ..recording.lap import Lap
+from ..recording.lap import Lap, strip_leading_wrap
 
 
 @dataclass(slots=True)
@@ -65,7 +65,7 @@ class Reference:
         self._yaw: list[float] = []
 
         last_pos = -1.0
-        for s in lap.samples:
+        for s in strip_leading_wrap(lap.samples):
             if s.pos <= last_pos:
                 continue
             last_pos = s.pos

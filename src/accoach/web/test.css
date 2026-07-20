@@ -51,6 +51,14 @@ body {
 .seg button.sel { background:var(--cyan); color:var(--ink); border-color:var(--cyan); font-weight:700; }
 
 /* --- progress --- */
+/* Category intro — comes from test_plan.json, hidden when the category has none. */
+.intro {
+  margin:0 0 14px; padding:12px 15px; font-size:15px; line-height:1.5; color:var(--muted);
+  background:var(--slate); border:1px solid var(--line); border-left:3px solid var(--cyan);
+  border-radius:10px;
+}
+.intro:empty { display:none; }
+
 .progress { display:flex; align-items:center; gap:12px; margin-bottom:12px; color:var(--muted); font-size:14px; }
 .bar { flex:1; height:8px; background:var(--line); border-radius:5px; overflow:hidden; }
 .bar > i { display:block; height:100%; background:var(--cyan); width:0; transition:width .2s; }
