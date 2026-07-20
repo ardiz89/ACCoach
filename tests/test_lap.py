@@ -111,6 +111,26 @@ def test_from_dict_tolerates_bad_session():
     assert lap.session == SessionType.UNKNOWN
 
 
+def test_from_dict_strips_leading_prewrap_frame():
+    # Regression: older laps on disk can carry a leading pre-line wrap sample
+    # (pos~1.0 recorded one frame before the sim reset it to 0). Loaded as-is it
+    # poisoned position-indexed consumers — the debrief credited a whole lap's
+    # time to the last corner (a ~+108s phantom loss). from_dict must drop it.
+    d = {
+        "car_model": "x", "track": "y", "session": 0,
+        "lap_time_ms": 90000, "valid": True,
+        "samples": [
+            [50, 1.0, 200.0, 1.0, 0.0, 0.0, "6", 8000, 0.0, 0.0],   # pre-wrap poison
+            [70, 0.01, 195.0, 1.0, 0.0, 0.0, "6", 8000, 0.0, 0.0],
+            [1200, 0.30, 150.0, 0.0, 0.5, 0.1, "4", 6000, 0.0, 0.0],
+            [3000, 0.98, 210.0, 1.0, 0.0, 0.0, "6", 8200, 0.0, 0.0],
+        ],
+    }
+    lap = Lap.from_dict(d)
+    assert len(lap.samples) == 3                 # the leading pos~1.0 frame is gone
+    assert lap.samples[0].pos == 0.01            # real lap start survives
+
+
 def test_duration_s():
     lap = replace(synth.build_lap(n=2), lap_time_ms=83456)
     assert lap.duration_s == 83.456

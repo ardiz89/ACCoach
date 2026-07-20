@@ -66,6 +66,27 @@ SAMPLE_FIELDS = (
 _Z4 = (0.0, 0.0, 0.0, 0.0)
 
 
+def strip_leading_wrap(samples: list["LapSample"]) -> list["LapSample"]:
+    """Drop leading pre-line wrap frames from a lap.
+
+    At the start/finish crossing the sim bumps its lap counter one frame before
+    it wraps ``normalizedCarPosition`` from ~1.0 back to 0.0, so the first sample
+    of a lap can still read ~1.0. That single high ``pos`` is poison to any
+    strictly-forward position filter (``Reference``, ``detect_corners``,
+    ``sector_times``): it seeds the filter near 1.0 and every real sample after it
+    — all lower — is then rejected, collapsing the lap to one point (``usable``
+    False, zero corners). We identify such a frame precisely: a *leading* sample
+    that is both high and immediately followed by a lower ``pos`` (the wrap
+    discontinuity). A lap that legitimately starts mid-track (a partial in-lap)
+    rises monotonically instead, so it's left untouched.
+    """
+    i = 0
+    n = len(samples)
+    while i < n - 1 and samples[i].pos > 0.5 and samples[i].pos > samples[i + 1].pos:
+        i += 1
+    return samples[i:] if i else samples
+
+
 @dataclass(slots=True)
 class LapSample:
     """One frame of a lap, the set coaching/comparison needs."""
@@ -243,7 +264,14 @@ class Lap:
             valid=bool(d.get("valid", False)),
             recorded_utc=str(d.get("recorded_utc", "")),
             schema_version=int(d.get("schema", 1)),
-            samples=[LapSample.from_named(fields, r) for r in d.get("samples", [])],
+            # Sanitize on load: drop any leading pre-line wrap frame (pos~1.0
+            # recorded one frame before the sim reset it to 0). Older laps on disk
+            # carry it and it poisons every position-indexed consumer downstream
+            # (the debrief credited a full lap's time to the last corner, the map's
+            # first segment jumped across the line). New laps are already clean —
+            # the recorder now drops it at the source.
+            samples=strip_leading_wrap(
+                [LapSample.from_named(fields, r) for r in d.get("samples", [])]),
             clean=clean,
             air_temp=float(d.get("air_temp", 0.0) or 0.0),
             road_temp=float(d.get("road_temp", 0.0) or 0.0),

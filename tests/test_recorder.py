@@ -98,6 +98,25 @@ def test_partial_lap_clean_is_unknown():
     assert partial.clean is None
 
 
+def test_full_lap_drops_leading_prewrap_frame():
+    # Regression: the sim bumps completed_laps one frame before pos wraps ~1.0->0,
+    # so the frame that opens a full lap can still read ~1.0. Recorded as the
+    # lap's first sample it collapses every position-indexed consumer. The opening
+    # pre-wrap frame must be dropped so the lap starts near pos 0.
+    rec = LapRecorder()
+    _drive_lap(rec, completed=0)                  # partial
+    # Cross into the full lap on a frame whose pos hasn't wrapped yet (0.998).
+    rec.update(synth.snap(pos=0.998, completed_laps=1, current_lap_ms=0,
+                          last_lap_ms=89000, speed_kmh=150.0))
+    # The next frame has wrapped; fill the rest of the lap.
+    for i in range(1, 30):
+        rec.update(synth.snap(pos=i / 30, completed_laps=1,
+                              current_lap_ms=i * 100, last_lap_ms=89000,
+                              speed_kmh=150.0))
+    assert rec._buf is not None and rec._buf.samples
+    assert rec._buf.samples[0].pos < 0.5          # no leading ~1.0 poison frame
+
+
 def test_decimation_thins_dense_samples():
     rec = LapRecorder()
     # Many frames at the same position and time should not all be stored.
