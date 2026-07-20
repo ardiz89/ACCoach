@@ -207,7 +207,7 @@ class SharedMemoryReader:
             tyres_out=p.numberOfTyresOut if 0 <= p.numberOfTyresOut <= 4 else 0,
             air_temp=p.airTemp,
             road_temp=p.roadTemp,
-            surface_grip=g.surfaceGrip,
+            surface_grip=SharedMemoryReader._surface_grip(g),
             tyre_compound=str(g.tyreCompound),
             penalty=g.penalty,
             **SharedMemoryReader._car_xz(g),
@@ -250,6 +250,32 @@ class SharedMemoryReader:
         car_x = ctypes.c_float.from_address(base + 0).value     # offset 252
         car_z = ctypes.c_float.from_address(base + 8).value     # offset 260 (skip y)
         return {"car_x": float(car_x), "car_z": float(car_z)}
+
+    @staticmethod
+    def _surface_grip(g: SPageFileGraphics) -> float:
+        """Track grip (0..1), reading it where each game actually keeps it.
+
+        Same layout split as :meth:`_car_xz`: our struct declares the **ACC**
+        page, where ``surfaceGrip`` lands at offset 1240 — after ``activeCars``,
+        ``carCoordinates[60][3]``, ``carID[60]``, ``playerCarID`` and ``penalty``.
+        AC1 has none of those, so its ``surfaceGrip`` sits at offset **280**, only
+        28 bytes past ``activeCars`` (x, y, z, penaltyTime, flag, idealLineOn,
+        isInPitLane, then grip). Reading it ACC-style is 960 bytes past the end of
+        the AC1 page, which is why every recorded lap carried ``grip = 0.0``.
+
+        Note this fixes AC only: ACC leaves the legacy field at 0 by design and
+        reports condition through ``trackGripStatus`` instead, which is further
+        down a tail we don't declare yet.
+        """
+        if 0 < g.activeCars <= 60:                       # ACC layout
+            raw = float(g.surfaceGrip)
+        else:                                            # AC1 layout
+            base = ctypes.addressof(g) + SPageFileGraphics.activeCars.offset
+            raw = ctypes.c_float.from_address(base + 28).value   # offset 280
+        # Grip is a fraction. Anything else means we're reading the wrong bytes
+        # (mod content, a cold frame, a future layout change) — report "no data"
+        # rather than feed a nonsense number to the reference picker.
+        return raw if 0.0 <= raw <= 1.0 else 0.0
 
     # Adjustable-aid levels come from the ACC-only graphics tail; on plain AC
     # that region is zero-padded and the raw struct can also carry garbage on a
