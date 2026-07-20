@@ -255,9 +255,17 @@ class CoachEngine:
             return None
         sym = d.change.symptom if d.change else None
         corners = self._engineer.corners_for(sym) if self._engineer else []
+        # Current phase (key + localized label) so the UI can tell the driver what
+        # THIS phase wants — "phase X done → moving to Y" alone doesn't say what to
+        # do next. After a PHASE_DONE the engine has already advanced, so this is
+        # the phase now in progress. None once the setup is complete.
+        from .engineer.profiles._common import tr
+        ph = self._engineer.phase if self._engineer else None
+        phase = {"key": ph.key, "label": tr(ph.label)} if ph else None
         return {
             "kind": d.kind.value,
             "message": d.message,
+            "phase": phase,
             "change": d.change.as_setup_payload() if d.change else None,
             "rationale": d.change.rationale if d.change else None,
             "tag": d.change.tag if d.change else None,

@@ -140,6 +140,12 @@
     clearTimeout(saveTimer);
     saveTimer = setTimeout(saveRun, 800);
   }
+  // "Fine": skip the debounce and persist immediately, with a clear confirmation.
+  async function saveNow() {
+    clearTimeout(saveTimer);
+    setSaveState("salvo…", false);
+    await saveRun();
+  }
   async function saveRun() {
     const payload = {
       run_id: S.runId, started: S.started, app: "HONE test",
@@ -259,6 +265,7 @@
     $("prev").onclick = () => { if (S.index > 0) { S.index--; persist(); render(); } };
     $("next").onclick = () => {
       if (S.index < tests().length - 1) { S.index++; persist(); render(); }
+      else { saveNow(); }   // on the last step the button is "Fine": force a save now
     };
   }
 

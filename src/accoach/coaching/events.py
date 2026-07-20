@@ -104,20 +104,31 @@ class EventDetector:
         return cues
 
     # --- conditions -------------------------------------------------------
+    # The aid flag (ABS/TC ≥ level) GATES but no longer TRIGGERS on its own: on ACC
+    # it goes high during normal braking-into-ABS / TC-managed traction, so the flag
+    # alone nagged on correct technique (audit 2026-07-19: 8 false wheelspin + 3
+    # false lock on a clean GT3 lap). Now the flag only says "an aid is modulating";
+    # the physical slip ratio must corroborate a genuine lock/spin before a cue
+    # fires. Validated live (McLaren 720S GT3, Imola): ABS-managed braking sits at
+    # front slip -0.05..-0.09 and TC-managed traction at rear +0.05..+0.07 (both
+    # inside the -0.15 / spin_ratio thresholds), while a real lock/launch-spin blows
+    # well past them. With the flag present we skip the speed gate — the ACC native
+    # slip ratio is trustworthy even at low v (unlike the formula the gate protects).
     @staticmethod
     def _is_lockup(s: TelemetrySnapshot) -> bool:
         if s.brake < _BRAKE_MIN:
             return False
-        if s.abs_active >= _ABS_LEVEL:               # primary: reliable at any speed
-            return True
-        # Slip-ratio fallback, but only above a speed where the ratio is trustworthy.
         front_ratio = min(s.slip_ratio[0], s.slip_ratio[1])  # most-negative front wheel
-        return s.speed_kmh >= _RATIO_MIN_SPEED and front_ratio <= _LOCK_RATIO
+        locked = front_ratio <= _LOCK_RATIO
+        if s.abs_active >= _ABS_LEVEL:               # aid modulating: slip must confirm
+            return locked
+        return s.speed_kmh >= _RATIO_MIN_SPEED and locked
 
     def _is_wheelspin(self, s: TelemetrySnapshot) -> bool:
         if s.throttle < _THROTTLE_MIN or s.gear in ("R", "N"):
             return False
-        if s.tc_active >= _TC_LEVEL:                 # primary: reliable at any speed
-            return True
         rear_ratio = max(s.slip_ratio[2], s.slip_ratio[3])   # fastest-spinning rear
-        return s.speed_kmh >= _RATIO_MIN_SPEED and rear_ratio >= self._spin_ratio
+        spinning = rear_ratio >= self._spin_ratio
+        if s.tc_active >= _TC_LEVEL:                 # aid modulating: slip must confirm
+            return spinning
+        return s.speed_kmh >= _RATIO_MIN_SPEED and spinning

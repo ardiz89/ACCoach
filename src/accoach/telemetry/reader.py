@@ -275,10 +275,19 @@ class SharedMemoryReader:
     def _slip_ratio(
         p: SPageFilePhysics, s: SPageFileStatic,
     ) -> tuple[float, float, float, float]:
-        """Physical per-wheel slip ratio: (wheel surface speed - car speed) / car speed.
+        """Per-wheel slip ratio: negative => locking under braking, positive =>
+        wheelspin. Car-agnostic, so no per-car calibration.
 
-        Negative => wheel turning slower than the ground (locking under braking);
-        positive => faster (wheelspin). Car-agnostic, so no per-car calibration.
+        Two sources, picked per wheel by which sim we're on:
+
+        * **AC** populates the static ``tyreRadius`` but has no native slip field,
+          so we derive it: ``(wheelAngularSpeed * tyreRadius - v) / v``.
+        * **ACC** leaves ``tyreRadius`` at zero (an AC1 leftover it never fills) but
+          exposes a native, signed ``slipRatio`` per wheel — verified live against
+          real braking/traction. We read that directly; the radius formula would
+          otherwise always yield 0 on ACC and the lock/spin cues would never fire
+          on the physical channel (falling back to the binary ABS/TC flags, which
+          trip on normal aided driving).
         """
         v = p.speedKmh / 3.6
         if v < SharedMemoryReader._SLIP_MIN_SPEED_MS:
@@ -286,11 +295,10 @@ class SharedMemoryReader:
         out = []
         for i in range(4):
             radius = s.tyreRadius[i]
-            if radius <= 0.0:
-                out.append(0.0)
-                continue
-            wheel_v = p.wheelAngularSpeed[i] * radius
-            out.append((wheel_v - v) / v)
+            if radius > 0.0:                        # AC: derive from wheel speed
+                out.append((p.wheelAngularSpeed[i] * radius - v) / v)
+            else:                                   # ACC: native signed slip ratio
+                out.append(float(p.slipRatio[i]))
         return (out[0], out[1], out[2], out[3])
 
     def close(self) -> None:

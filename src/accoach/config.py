@@ -53,6 +53,9 @@ class OverlayCfg:
     x: int = -1          # -1 = auto (top-centre); set by dragging in --interactive
     y: int = -1
     scale: float = 1.0
+    # Live throttle/brake trace strip under the HUD — a calibration aid for
+    # trail-braking and coasting ("tempo morto"). Off by default (declutters).
+    pedals: bool = False
 
 
 @dataclass
@@ -119,6 +122,7 @@ radio = true         # pit-to-car radio effect on the voice (band-pass + squelch
 x = -1               # overlay X (px); -1 = auto top-centre (drag it in --interactive)
 y = -1               # overlay Y (px); -1 = auto
 scale = 1.0          # overlay scale factor
+pedals = false       # show the live throttle/brake trace strip (trail-braking + coasting)
 
 [logging]
 level = "INFO"       # console level: DEBUG | INFO | WARNING | ERROR
@@ -190,6 +194,7 @@ radio = {b(cfg.voice.radio)}         # pit-to-car radio effect on the voice (ban
 x = {cfg.overlay.x}               # overlay X (px); -1 = auto top-centre
 y = {cfg.overlay.y}               # overlay Y (px); -1 = auto
 scale = {cfg.overlay.scale}          # overlay scale factor
+pedals = {b(cfg.overlay.pedals)}       # show the live throttle/brake trace strip (trail-braking + coasting)
 
 [logging]
 level = "{cfg.logging.level}"

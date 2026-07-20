@@ -46,6 +46,10 @@ _UI: dict[str, dict[str, str]] = {
                     "it": "REC ● sto imparando il giro di riferimento…"},
     "overlay.brake": {"en": "BRAKE", "it": "FRENA"},
     "overlay.focus": {"en": "FOCUS", "it": "FOCUS"},
+    "overlay.throttle_pedal": {"en": "THR", "it": "GAS"},
+    "overlay.brake_pedal": {"en": "BRK", "it": "FRENO"},
+    "overlay.trail": {"en": "TRAIL", "it": "TRAIL"},
+    "overlay.coast": {"en": "COAST", "it": "COAST"},
     # terminal coach
     "coach.title": {"en": "voice coach", "it": "coach vocale"},
     "coach.no_ref": {"en": "no reference yet — drive a clean lap",
