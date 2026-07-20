@@ -623,6 +623,20 @@ function renderEngineer(st) {
   const conf = $("es-conf"), prep = $("es-prepare"), hint = $("es-hint");
   const boxProposal = eng && eng.kind === "propose" && eng.tag === "BOX" && eng.change;
 
+  // Persistent "what to do in this phase" line: the decision message alone
+  // ("phase done → moving to X") never says what the driver should now do.
+  const phaseEl = $("es-phase");
+  if (eng && eng.phase && eng.phase.key) {
+    const k = "eng.do." + eng.phase.key;
+    let txt = t(k);
+    if (txt === k) txt = t("eng.do.default");   // t() falls back to the key if missing
+    phaseEl.hidden = false;
+    // label + txt are trusted constants (profile label via tr(), i18n string).
+    phaseEl.innerHTML = `<b>${t("eng.phaseNow")}: ${eng.phase.label || ""}</b> — ${txt}`;
+  } else {
+    phaseEl.hidden = true;
+  }
+
   // Default: no low-confidence caution; the proposal branch re-arms it.
   hint.hidden = true;
   says.removeAttribute("data-conf");
