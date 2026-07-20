@@ -15,6 +15,10 @@ Requirements / caveats
 * The window is click-through by default so it never steals input from the game;
   pass ``--interactive`` to make it clickable/movable, or just close the terminal
   that launched it (Ctrl+C) to quit.
+* ``--pedals`` (or ``overlay.pedals = true`` in the config) adds a live
+  throttle/brake trace strip under the HUD — a calibration aid that makes
+  trail-braking (the two traces overlapping) and coasting / "tempo morto" (both
+  at zero) readable at a glance.
 
 The drawing uses ``QWebSocket`` so the socket lives on Qt's event loop — no extra
 threads — and reconnects automatically if the backend isn't up yet.
@@ -31,8 +35,8 @@ from .i18n import t
 from .theme import DISPLAY, MONO, load_fonts
 
 try:
-    from PySide6.QtCore import Qt, QTimer, QUrl
-    from PySide6.QtGui import QColor, QFont, QPainter, QPen
+    from PySide6.QtCore import QPointF, Qt, QTimer, QUrl
+    from PySide6.QtGui import QColor, QFont, QPainter, QPen, QPolygonF
     from PySide6.QtWebSockets import QWebSocket
     from PySide6.QtWidgets import QApplication, QWidget
 except ImportError:  # pragma: no cover - optional dependency
@@ -44,6 +48,15 @@ RECONNECT_MS = 2000
 CUE_HOLD_S = 1.8          # how long a cue stays on screen before fading out
 DELTA_CLAMP_S = 1.0       # bar is full at ±1.0 s
 _BASE_W, _BASE_H = 560, 210   # design size; the window is this × the config scale
+
+# --- live pedal trace (opt-in: --pedals / config overlay.pedals) --------------
+# A rolling throttle/brake strip drawn under the HUD. It's a calibration aid:
+# trail-braking shows as the two traces overlapping (brake decaying while
+# throttle rises), and "tempo morto" (coasting) shows as a gap where both sit at
+# zero — the ribbon under the plot colours those states so they read at a glance.
+_PEDAL_PANEL_H = 128          # extra window height (base coords) when pedals on
+_PEDAL_WINDOW_S = 6.0         # seconds of history the strip shows
+_PEDAL_EPS = 0.04             # below this a pedal counts as released (coasting)
 
 # HONE palette (see accoach.brand). QColor wants ints, so they're spelled here.
 _CYAN = QColor(0x22, 0xD3, 0xCE)     # brand mark / cue accent
@@ -57,11 +70,15 @@ _DARK = QColor(0x0B, 0x0E, 0x12, 165)  # Ink, semi-transparent backing pill
 
 
 class Overlay(QWidget):
-    def __init__(self, url: str | None = None, interactive: bool = False) -> None:
+    def __init__(self, url: str | None = None, interactive: bool = False,
+                 pedals: bool = False) -> None:
         super().__init__()
         self._state: dict = {}
         self._cue: dict | None = None
         self._cue_at: float = -1e9
+        # Rolling (t, throttle, brake) samples for the optional pedal strip.
+        self._show_pedals = pedals
+        self._pedal_hist: list[tuple[float, float, float]] = []
 
         flags = Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool
         if not interactive:
@@ -77,7 +94,8 @@ class Overlay(QWidget):
         self._scale = ov.scale if (ov.scale and ov.scale > 0) else 1.0
         self._interactive = interactive
         self._drag_off = None
-        self.resize(int(_BASE_W * self._scale), int(_BASE_H * self._scale))
+        self._base_h = _BASE_H + (_PEDAL_PANEL_H if pedals else 0)
+        self.resize(int(_BASE_W * self._scale), int(self._base_h * self._scale))
         if ov.x >= 0 and ov.y >= 0:
             self.move(ov.x, ov.y)
         else:
@@ -105,11 +123,38 @@ class Overlay(QWidget):
         if cue:
             self._cue = cue
             self._cue_at = time.monotonic()
+        if self._show_pedals:
+            self._record_pedals(data)
+
+    def _record_pedals(self, data: dict) -> None:
+        thr, brk = data.get("throttle"), data.get("brake")
+        if thr is None or brk is None:
+            return
+        now = time.monotonic()
+        self._pedal_hist.append((now, float(thr), float(brk)))
+        # Drop samples older than the visible window (they scroll off the left).
+        cutoff = now - _PEDAL_WINDOW_S
+        drop = 0
+        for t0, _, _ in self._pedal_hist:
+            if t0 >= cutoff:
+                break
+            drop += 1
+        if drop:
+            del self._pedal_hist[:drop]
 
     # --- placement ---------------------------------------------------------
     def _place_top_center(self) -> None:
-        screen = QApplication.primaryScreen().geometry()
-        self.move(screen.center().x() - self.width() // 2, screen.top() + 24)
+        # Center on the middle of the whole desktop, not the primary screen's:
+        # on a triple / AMD Eyefinity rig the "center" the driver looks at is the
+        # middle panel. This lands there whether the driver merges the three into
+        # one wide screen (Eyefinity) or Windows keeps them as separate displays.
+        prim = QApplication.primaryScreen()
+        vg = prim.virtualGeometry()
+        center = vg.center()
+        # Use the top edge of the screen under that center point (handles panels
+        # that aren't all the same height / vertically aligned).
+        under = QApplication.screenAt(center) or prim
+        self.move(center.x() - self.width() // 2, under.geometry().top() + 24)
 
     # --- websocket ---------------------------------------------------------
     def _connect(self) -> None:
@@ -137,6 +182,9 @@ class Overlay(QWidget):
             p.scale(self._scale, self._scale)   # everything below uses base coords
         st = self._state
         w = _BASE_W
+
+        if self._show_pedals:
+            self._draw_pedals(p, w)
 
         if not st or not st.get("connected"):
             self._draw_mark(p, 22, 22, 18)
@@ -285,6 +333,113 @@ class Overlay(QWidget):
         p.drawText(42, y, w - 60, 20, Qt.AlignVCenter,
                    f"{t('overlay.focus')} · {theme} · {name}{gap}")
 
+    # --- live pedal trace --------------------------------------------------
+    def _draw_pedals(self, p: QPainter, w: int) -> None:
+        """Rolling throttle (green) / brake (red) strip under the HUD.
+
+        Reads the trail-brake overlap and the coasting gaps ("tempo morto") at a
+        glance: the ribbon below the plot is amber while both pedals are pressed
+        (trailing) and grey while neither is (coasting)."""
+        top = _BASE_H
+        px, pw = 28, w - 56
+        plot_top, plot_h = top + 30, 64
+        ribbon_y, ribbon_h = plot_top + plot_h + 4, 6
+
+        # backing pill
+        p.setPen(Qt.NoPen)
+        p.setBrush(_DARK)
+        p.drawRoundedRect(12, top + 2, w - 24, _PEDAL_PANEL_H - 10, 8, 8)
+
+        # grid: 0 / 50 / 100 %
+        grid = QColor(_LINE)
+        p.setPen(QPen(grid, 1))
+        for frac in (0.0, 0.5, 1.0):
+            gy = int(plot_top + plot_h * (1.0 - frac))
+            p.drawLine(px, gy, px + pw, gy)
+
+        hist = self._pedal_hist
+        now = time.monotonic()
+
+        def xy(t0: float, v: float) -> QPointF:
+            age = now - t0
+            x = px + pw * (1.0 - age / _PEDAL_WINDOW_S)
+            y = plot_top + plot_h * (1.0 - max(0.0, min(1.0, v)))
+            return QPointF(x, y)
+
+        # ribbon: colour each time-span by pedal state (uses the left sample)
+        for i in range(len(hist) - 1):
+            t0, thr, brk = hist[i]
+            x0 = xy(t0, 0.0).x()
+            x1 = xy(hist[i + 1][0], 0.0).x()
+            col = None
+            if thr > _PEDAL_EPS and brk > _PEDAL_EPS:
+                col = _AMBER                       # trail-braking overlap
+            elif thr <= _PEDAL_EPS and brk <= _PEDAL_EPS:
+                col = _GREY                        # coasting / tempo morto
+            if col is not None:
+                p.setPen(Qt.NoPen)
+                p.setBrush(col)
+                p.drawRect(int(x0), ribbon_y, max(1, int(x1 - x0) + 1), ribbon_h)
+
+        # traces
+        if len(hist) >= 2:
+            brake_line = QPolygonF([xy(t0, brk) for t0, _, brk in hist])
+            thr_line = QPolygonF([xy(t0, thr) for t0, thr, _ in hist])
+            pen = QPen(_RED, 2)
+            pen.setJoinStyle(Qt.RoundJoin)
+            pen.setCapStyle(Qt.RoundCap)
+            p.setPen(pen)
+            p.setBrush(Qt.NoBrush)
+            p.drawPolyline(brake_line)
+            pen = QPen(_GREEN, 2)
+            pen.setJoinStyle(Qt.RoundJoin)
+            pen.setCapStyle(Qt.RoundCap)
+            p.setPen(pen)
+            p.drawPolyline(thr_line)
+
+        # header: live readouts + current state tag
+        thr = brk = 0.0
+        if hist:
+            _, thr, brk = hist[-1]
+        self._set_font(p, 11, bold=True, mono=True)
+        p.setPen(Qt.NoPen)
+        p.setBrush(_GREEN)
+        p.drawEllipse(px, top + 10, 7, 7)
+        p.setPen(_GREEN)
+        p.drawText(px + 12, top + 6, 96, 16, Qt.AlignVCenter,
+                   f"{t('overlay.throttle_pedal')} {thr * 100:3.0f}%")
+        p.setPen(Qt.NoPen)
+        p.setBrush(_RED)
+        p.drawEllipse(px + 116, top + 10, 7, 7)
+        p.setPen(_RED)
+        p.drawText(px + 128, top + 6, 96, 16, Qt.AlignVCenter,
+                   f"{t('overlay.brake_pedal')} {brk * 100:3.0f}%")
+
+        tag, tag_col = self._pedal_tag(now)
+        if tag:
+            p.setPen(tag_col)
+            self._set_font(p, 11, bold=True)
+            p.drawText(px, top + 6, pw, 16, Qt.AlignRight | Qt.AlignVCenter, tag)
+
+    def _pedal_tag(self, now: float) -> tuple[str, QColor]:
+        """Current-state chip: TRAIL while overlapping, COAST + how long while
+        coasting, else nothing."""
+        hist = self._pedal_hist
+        if not hist:
+            return "", _GREY
+        _, thr, brk = hist[-1]
+        if thr > _PEDAL_EPS and brk > _PEDAL_EPS:
+            return t("overlay.trail"), _AMBER
+        if thr <= _PEDAL_EPS and brk <= _PEDAL_EPS:
+            start = hist[-1][0]
+            for t0, th, bk in reversed(hist):
+                if th <= _PEDAL_EPS and bk <= _PEDAL_EPS:
+                    start = t0
+                else:
+                    break
+            return f"{t('overlay.coast')} {now - start:.1f}s", _GREY
+        return "", _GREY
+
     # --- helpers -----------------------------------------------------------
     def _set_font(self, p: QPainter, size: int, bold: bool = False,
                   mono: bool = False) -> None:
@@ -342,6 +497,10 @@ def main(argv: list[str] | None = None) -> None:
         if a.startswith("ws://") or a.startswith("wss://"):
             url = a
 
+    # Pedal strip: CLI flag wins, else the persisted config toggle.
+    from .config import load_config
+    pedals = "--pedals" in argv or load_config().overlay.pedals
+
     app = QApplication(sys.argv)
     load_fonts()                     # the overlay paints in the brand face too
     # Let Ctrl+C in the launching terminal close the overlay.
@@ -350,7 +509,7 @@ def main(argv: list[str] | None = None) -> None:
     tick.timeout.connect(lambda: None)
     tick.start(200)
 
-    overlay = Overlay(url, interactive)
+    overlay = Overlay(url, interactive, pedals=pedals)
     overlay.show()
     sys.exit(app.exec())
 
