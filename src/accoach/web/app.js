@@ -479,10 +479,21 @@ function drawSectors(s) {
 }
 
 // --- track map ------------------------------------------------------------
+// The p-th percentile of |vals|, clamped to [lo, hi]. Used to scale the map
+// heatmap so outliers (a spin's huge speed gap) don't collapse the colour range.
+function robustScale(vals, p, lo, hi) {
+  const a = [];
+  for (const v of vals) a.push(Math.abs(v || 0));
+  if (!a.length) return lo;
+  a.sort((x, y) => x - y);
+  const q = a[Math.min(a.length - 1, Math.floor((p / 100) * a.length))];
+  return Math.max(lo, Math.min(hi, q));
+}
+
 function deltaColor(d, m) {
   // slower (d>0) -> Delta Red, faster (d<0) -> Delta Green, near-zero -> pale.
   // Colour is doubled up with segment width (see drawMap) so the read survives
-  // red/green colour-blindness — the line gets THICKER the more time is lost.
+  // red/green colour-blindness — the line gets THICKER the bigger the gap.
   const t = Math.max(-1, Math.min(1, d / (m || 1)));
   // Near-zero delta is neutral grey, not a faint "slower" tint: a segment where
   // you neither gain nor lose shouldn't read as a (tiny) loss.
@@ -579,8 +590,16 @@ function drawMapTo(canvas, missing, a, cx, mode) {
   // colour-blindness). In "balance" mode colour by handling (blue understeer /
   // red oversteer) at constant width — the balance ribbon.
   const bal = rv.balance || [];
-  let mx = 0.05;
-  for (const v of d.delta_s) mx = Math.max(mx, Math.abs(v));
+  // Heatmap signal: the LOCAL speed gap vs the reference at each point (km/h),
+  // + = faster here, - = slower. Not the cumulative time delta — that only grows
+  // through the lap and washed the whole first half to near-white. Scale to the
+  // biggest gap on this lap (floored so a near-identical lap doesn't saturate).
+  const sd = d.speed_delta || [];
+  // Robust scale: the 90th percentile of |gap|, clamped to a sane km/h band, so a
+  // single spike (a spin can read -150 km/h vs the reference) can't wash the whole
+  // lap out the way scaling to the raw max did — the outlier just clamps to full
+  // red while normal corner gaps still span the gradient.
+  const mx = robustScale(sd, 90, 12, 45);
   ctx.lineCap = "round"; ctx.lineJoin = "round";
   for (let i = 1; i < rv.x.length; i++) {
     ctx.beginPath();
@@ -590,10 +609,11 @@ function drawMapTo(canvas, missing, a, cx, mode) {
       ctx.lineWidth = 3;
       ctx.strokeStyle = balanceColor(bal[i] || 0);
     } else {
-      const dv = d.delta_s[i] || 0;
+      const dv = sd[i] || 0;        // + = faster than ref here, - = slower
       const tt = Math.min(1, Math.abs(dv) / (mx || 1));
-      ctx.lineWidth = 2 + 5 * tt;   // 2px at parity -> 7px at biggest swing
-      ctx.strokeStyle = deltaColor(dv, mx);
+      ctx.lineWidth = 2 + 5 * tt;   // 2px at parity -> 7px at biggest gap
+      // deltaColor treats +t as "slow" (red): slower here means dv<0, so negate.
+      ctx.strokeStyle = deltaColor(-dv, mx);
     }
     ctx.stroke();
   }
