@@ -19,6 +19,15 @@ from pydantic import BaseModel
 
 from .acc_format import slot_labels
 from .diff import diff
+from .labels import (
+    canonical_slot,
+    err_needs_value,
+    err_slot_invalid,
+    err_slot_out_of_range,
+    err_slot_required,
+    reload_hint,
+    tr,
+)
 from .loader import load_any
 from .store import DEFAULT_ROOTS, backup, latest_backup, list_setups, save
 
@@ -61,25 +70,29 @@ def _safe(path: str | Path, roots: list[Path]) -> Path:
     raise HTTPException(403, "path outside the setup folders")
 
 
-def _resolve_slot(setup, spec, slot) -> tuple[int, str | None]:
+def _resolve_slot(setup, spec, slot, lang: str | None = None) -> tuple[int, str | None]:
     """Map a slot label/index to an int slot; returns (slot, error)."""
     n = setup.slots(spec)
     if n == 1:
         return 0, None
     labels = slot_labels(n)
     if slot is None:
-        return -1, f"slot richiesto per '{spec.key}' ({', '.join(labels)})"
+        return -1, err_slot_required(spec.key, labels, lang)
     if isinstance(slot, int) or (isinstance(slot, str) and slot.isdigit()):
         i = int(slot)
         if 0 <= i < n:
             return i, None
-        return -1, f"slot {i} fuori range per '{spec.key}'"
-    if slot in labels:
-        return labels.index(slot), None
-    return -1, f"slot '{slot}' non valido per '{spec.key}'"
+        return -1, err_slot_out_of_range(i, spec.key, lang)
+    # Accept the label in any language we render it in, not just the canonical
+    # spelling — the web UI sends indices, so this path is a human typing.
+    canon = canonical_slot(slot) if isinstance(slot, str) else slot
+    if canon in labels:
+        return labels.index(canon), None
+    return -1, err_slot_invalid(slot, spec.key, lang)
 
 
-def _apply_changes(setup, changes: list[SetupChange]) -> list[str]:
+def _apply_changes(setup, changes: list[SetupChange],
+                   lang: str | None = None) -> list[str]:
     """Apply changes in place; return a list of error strings (empty == ok)."""
     errors: list[str] = []
     for ch in changes:
@@ -90,7 +103,7 @@ def _apply_changes(setup, changes: list[SetupChange]) -> list[str]:
         if not setup.present(spec):
             errors.append(f"'{ch.param}' not present in this setup")
             continue
-        slot, err = _resolve_slot(setup, spec, ch.slot)
+        slot, err = _resolve_slot(setup, spec, ch.slot, lang)
         if err:
             errors.append(err)
             continue
@@ -100,14 +113,18 @@ def _apply_changes(setup, changes: list[SetupChange]) -> list[str]:
             elif ch.delta_clicks is not None:
                 setup.adjust(spec, slot, ch.delta_clicks)
             else:
-                errors.append(f"'{ch.param}': specifica delta_clicks o value")
+                errors.append(err_needs_value(ch.param, lang))
         except ValueError as e:
             errors.append(str(e))
     return errors
 
 
-def _setup_payload(setup, path: Path) -> dict:
-    """Structured view of a setup for the UI: groups -> params -> slots."""
+def _setup_payload(setup, path: Path, lang: str | None = None) -> dict:
+    """Structured view of a setup for the UI: groups -> params -> slots.
+
+    ``group``/``label``/``note`` are display text and get translated; ``key`` is
+    the identifier the UI sends back to us, so it stays canonical.
+    """
     params = []
     for spec in setup.specs():
         if not setup.present(spec):
@@ -115,9 +132,10 @@ def _setup_payload(setup, path: Path) -> dict:
         n = setup.slots(spec)
         labels = slot_labels(n) if n > 1 else ("",)
         params.append({
-            "key": spec.key, "group": spec.group, "label": spec.label,
-            "unit": spec.unit, "step": spec.step, "note": spec.note,
-            "slots": [{"slot": labels[i], "click": setup.click(spec, i),
+            "key": spec.key, "group": tr(spec.group, lang),
+            "label": tr(spec.label, lang),
+            "unit": spec.unit, "step": spec.step, "note": tr(spec.note, lang),
+            "slots": [{"slot": tr(labels[i], lang), "click": setup.click(spec, i),
                        "physical": setup.physical(spec, i)} for i in range(n)],
         })
     groups: list[str] = []
@@ -128,9 +146,10 @@ def _setup_payload(setup, path: Path) -> dict:
             "format": setup.ext, "groups": groups, "params": params}
 
 
-def _diff_payload(changes) -> list[dict]:
+def _diff_payload(changes, lang: str | None = None) -> list[dict]:
     return [{
-        "group": c.group, "label": c.label, "slot": c.slot,
+        "group": tr(c.group, lang), "label": tr(c.label, lang),
+        "slot": tr(c.slot, lang) if isinstance(c.slot, str) else c.slot,
         "old_click": c.old_click, "new_click": c.new_click,
         "delta": c.delta, "old_phys": c.old_phys, "new_phys": c.new_phys,
     } for c in changes]
@@ -175,42 +194,49 @@ def register_setup_routes(app: FastAPI, root=DEFAULT_ROOTS) -> None:
         return [{"name": p.stem, "path": str(p)} for p in found]
 
     @app.get("/api/setup/class")
-    def setup_class(car: str = Query(...)) -> dict:
+    def setup_class(car: str = Query(...),
+                    lang: str | None = Query(None)) -> dict:
         """Which engineer (GT3 / Formula / Road) a car gets, and its profile."""
         from ..engineer.classmap import classify, profile_for
-        from ..engineer.profiles._common import tr
+        from ..engineer.profiles._common import tr as tr_engineer
         cls = classify(car)
         prof = profile_for(cls)
         # name (GT3 / Formula / Road) is a class identifier and stays as-is; the
-        # phase labels and al-volo lever names follow the active app language.
+        # phase labels and al-volo lever names follow the REQUEST's language. They
+        # used to follow config.language, which is the desktop's setting — so a
+        # browser set to English rendered these phases in Italian next to English
+        # chrome, on the same screen.
         return {"car": car, "class": cls.value,
                 "profile": {"name": prof.name,
-                            "phases": [tr(p.label) for p in prof.phases],
-                            "al_volo": [tr(x) for x in prof.al_volo]}}
+                            "phases": [tr_engineer(p.label, lang) for p in prof.phases],
+                            "al_volo": [tr_engineer(x, lang) for x in prof.al_volo]}}
 
     @app.get("/api/setup/current")
-    def setup_current(path: str = Query(...)) -> dict:
+    def setup_current(path: str = Query(...),
+                      lang: str | None = Query(None)) -> dict:
         p = _safe(path, roots)
-        return _setup_payload(_load(p), p)
+        return _setup_payload(_load(p), p, lang)
 
     @app.post("/api/setup/preview")
-    def setup_preview(body: PreviewBody) -> dict:
+    def setup_preview(body: PreviewBody,
+                      lang: str | None = Query(None)) -> dict:
         p = _safe(body.path, roots)
         before = _load(p)
         after = before.copy()
-        errors = _apply_changes(after, body.changes)
+        errors = _apply_changes(after, body.changes, lang)
         if errors:
             return {"ok": False, "errors": errors, "diff": []}
-        return {"ok": True, "errors": [], "diff": _diff_payload(diff(before, after))}
+        return {"ok": True, "errors": [],
+                "diff": _diff_payload(diff(before, after), lang)}
 
     @app.post("/api/setup/apply")
-    def setup_apply(body: ApplyBody) -> dict:
+    def setup_apply(body: ApplyBody, lang: str | None = Query(None)) -> dict:
         if not body.confirm:
             raise HTTPException(400, "confirmation required (confirm=true)")
         p = _safe(body.path, roots)
         before = _load(p)
         after = before.copy()
-        errors = _apply_changes(after, body.changes)
+        errors = _apply_changes(after, body.changes, lang)
         if errors:
             raise HTTPException(422, {"errors": errors})
         try:
@@ -219,9 +245,8 @@ def register_setup_routes(app: FastAPI, root=DEFAULT_ROOTS) -> None:
             raise HTTPException(409, str(e))
         return {
             "ok": True, "path": str(out), "name": out.stem,
-            "diff": _diff_payload(diff(before, after)),
-            "reload_hint": (f"Rientra ai box → schermata Setup → carica "
-                            f"'{out.stem}' → riparti."),
+            "diff": _diff_payload(diff(before, after), lang),
+            "reload_hint": reload_hint(out.stem, lang),
         }
 
     @app.post("/api/setup/undo")

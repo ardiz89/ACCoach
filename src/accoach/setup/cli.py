@@ -6,7 +6,7 @@ setup file, with no game running. Examples::
     python -m accoach.setup.cli list  --car mclaren_720s_gt3_evo --track Imola
     python -m accoach.setup.cli show  "<path>.json"
     python -m accoach.setup.cli bump  "<path>.json" --param tyrePressure \
-        --slot Post-Dx --clicks +2                       # preview only
+        --slot RR --clicks +2                            # preview only
     python -m accoach.setup.cli bump  "<path>.json" --param rearWing \
         --clicks -1 --apply --as ACCoach_test            # writes a new file
     python -m accoach.setup.cli undo  "<dir>/ACCoach_test.json"
@@ -20,6 +20,7 @@ from pathlib import Path
 
 from .acc_format import SETUP_PARAMS, AccSetup, load, slot_labels
 from .diff import diff, format_diff
+from .labels import canonical_slot, reload_hint
 from .store import SETUPS_ROOT, list_setups, save, undo
 
 _SPECS = {s.key: s for s in SETUP_PARAMS}
@@ -30,15 +31,17 @@ def _resolve_slot(setup: AccSetup, spec, slot_arg: str | None) -> int:
     if n == 1:
         return 0
     if slot_arg is None:
-        raise SystemExit(f"--slot richiesto per '{spec.key}' ({n} slot: "
+        raise SystemExit(f"--slot required for '{spec.key}' ({n} slots: "
                          f"{', '.join(slot_labels(n))})")
     labels = slot_labels(n)
-    if slot_arg in labels:
-        return labels.index(slot_arg)
+    # Also accept the Italian spelling this CLI used to take (Post-Dx → RR).
+    canon = canonical_slot(slot_arg)
+    if canon in labels:
+        return labels.index(canon)
     if slot_arg.isdigit() and 0 <= int(slot_arg) < n:
         return int(slot_arg)
-    raise SystemExit(f"slot '{slot_arg}' non valido; scegli tra: "
-                     f"{', '.join(labels)} (o 0..{n - 1})")
+    raise SystemExit(f"slot '{slot_arg}' is not valid; choose from: "
+                     f"{', '.join(labels)} (or 0..{n - 1})")
 
 
 def _cmd_list(args) -> None:
@@ -74,11 +77,11 @@ def _cmd_show(args) -> None:
 def _cmd_bump(args) -> None:
     spec = _SPECS.get(args.param)
     if spec is None:
-        raise SystemExit(f"parametro sconosciuto: {args.param}\n"
-                         f"disponibili: {', '.join(_SPECS)}")
+        raise SystemExit(f"unknown parameter: {args.param}\n"
+                         f"available: {', '.join(_SPECS)}")
     before = load(args.file)
     if not before.present(spec):
-        raise SystemExit(f"'{spec.key}' non presente in questo setup")
+        raise SystemExit(f"'{spec.key}' is not present in this setup")
     slot = _resolve_slot(before, spec, args.slot)
     after = before.copy()
     new_val = after.adjust(spec, slot, args.clicks)
@@ -92,9 +95,8 @@ def _cmd_bump(args) -> None:
     dest_dir = Path(args.file).parent
     name = args.as_name or (Path(args.file).stem + "_ACCoach")
     out = save(after, dest_dir, name, overwrite=args.overwrite)
-    print(f"\nScritto: {out}")
-    print("→ Rientra ai box → schermata Setup → carica "
-          f"'{out.stem}' → riparti.")
+    print(f"\nWritten: {out}")
+    print("→ " + reload_hint(out.stem))
     _ = new_val
 
 

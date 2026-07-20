@@ -161,13 +161,18 @@ _IT: dict[str, str] = {
 }
 
 
-def tr(text: str) -> str:
-    """Translate a fixed engineer string into the active language (EN→IT).
+def tr(text: str, lang: str | None = None) -> str:
+    """Translate a fixed engineer string into ``lang`` (EN→IT).
 
     English is canonical; for any other language a missing entry passes through
     unchanged (a safe fallback). Strings with no Italian variant (e.g. "Aero /
-    rake", "TC", "ABS", "Brake migration") simply map to themselves."""
-    if current_language() == "it":
+    rake", "TC", "ABS", "Brake migration") simply map to themselves.
+
+    ``lang`` is for callers that know the language of the *request* — the web
+    page's own selector. Without it we fall back to ``config.language``, which is
+    right for the in-process callers (the coach's voice, the overlay) but wrong
+    for a browser that may be set to something else."""
+    if (lang or current_language()) == "it":
         return _IT.get(text, text)
     return text
 

@@ -15,7 +15,7 @@ from .acc_format import slot_labels
 class Change:
     group: str
     label: str          # parameter label
-    slot: str           # slot label ("Post-Dx", "Ant", or "" for scalars)
+    slot: str           # canonical slot label ("RR", "F", or "" for scalars)
     old_click: int
     new_click: int
     old_phys: str

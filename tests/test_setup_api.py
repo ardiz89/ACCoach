@@ -46,6 +46,45 @@ def _client(tmp_path):
     return client, str(setup_path)
 
 
+def test_current_follows_the_requested_language(tmp_path):
+    # The whole page used to arrive in Italian regardless — labels were authored
+    # in Italian with no translation. Both languages must now come out clean.
+    c, path = _client(tmp_path)
+    en = c.get("/api/setup/current", params={"path": path, "lang": "en"}).json()
+    it = c.get("/api/setup/current", params={"path": path, "lang": "it"}).json()
+
+    assert "Tyres" in en["groups"] and "Gomme" in it["groups"]
+    p_en = next(p for p in en["params"] if p["key"] == "tyrePressure")
+    p_it = next(p for p in it["params"] if p["key"] == "tyrePressure")
+    assert (p_en["label"], p_it["label"]) == ("Pressure", "Pressione")
+    # Wheel slots are identical in both languages (see setup/labels.py).
+    assert [s["slot"] for s in p_en["slots"]] == ["FL", "FR", "RL", "RR"]
+    assert [s["slot"] for s in p_it["slots"]] == ["FL", "FR", "RL", "RR"]
+    # The identifier the UI sends back must NOT move with the language.
+    assert p_en["key"] == p_it["key"] == "tyrePressure"
+    # Notes are display text too — they were Italian-only as well.
+    assert "cold" in p_en["note"] and "freddo" in p_it["note"]
+
+
+def test_english_request_stays_english_with_an_italian_desktop(tmp_path, monkeypatch):
+    """The mixed-language screen, at the level it actually showed up.
+
+    The engineer's phases resolved against config.language, so an Italian desktop
+    served Italian phases to a browser set to English — English chrome, Italian
+    content, same screen.
+    """
+    from accoach.engineer.profiles import _common
+    monkeypatch.setattr(_common, "current_language", lambda: "it")
+    c, path = _client(tmp_path)
+
+    en = c.get("/api/setup/class", params={"car": CAR, "lang": "en"}).json()
+    it = c.get("/api/setup/class", params={"car": CAR, "lang": "it"}).json()
+    assert en["profile"]["phases"] != it["profile"]["phases"]
+    assert "Engine braking" not in it["profile"]["al_volo"]      # translated
+    # class name is an identifier, not prose — it must not translate
+    assert en["class"] == it["class"] == "GT3"
+
+
 def test_combos_and_list(tmp_path):
     c, _ = _client(tmp_path)
     combos = c.get("/api/setup/combos").json()
@@ -58,10 +97,9 @@ def test_current_returns_structured_params(tmp_path):
     c, path = _client(tmp_path)
     data = c.get("/api/setup/current", params={"path": path}).json()
     assert data["car"] == CAR
-    assert "Gomme" in data["groups"]
+    assert "Tyres" in data["groups"]
     press = next(p for p in data["params"] if p["key"] == "tyrePressure")
-    assert [s["slot"] for s in press["slots"]] == ["Ant-Sx", "Ant-Dx",
-                                                   "Post-Sx", "Post-Dx"]
+    assert [s["slot"] for s in press["slots"]] == ["FL", "FR", "RL", "RR"]
     assert press["slots"][3]["click"] == 48
     assert press["slots"][3]["physical"].startswith("25.1")
 
@@ -69,7 +107,7 @@ def test_current_returns_structured_params(tmp_path):
 def test_preview_does_not_write(tmp_path):
     c, path = _client(tmp_path)
     body = {"path": path, "changes": [
-        {"param": "tyrePressure", "slot": "Post-Dx", "delta_clicks": 2}]}
+        {"param": "tyrePressure", "slot": "RR", "delta_clicks": 2}]}
     res = c.post("/api/setup/preview", json=body).json()
     assert res["ok"] is True
     assert res["diff"][0]["delta"] == 2
@@ -102,7 +140,7 @@ def test_apply_writes_new_file(tmp_path):
             "changes": [{"param": "rearWing", "delta_clicks": -1}]}
     r = c.post("/api/setup/apply", json=body).json()
     assert r["ok"] is True and r["name"] == "ACCoach_run1"
-    assert "box" in r["reload_hint"].lower()
+    assert "pits" in r["reload_hint"].lower()
     # the new file exists with the change; original untouched
     newp = r["path"]
     assert json.loads(open(newp, encoding="utf-8").read())[

@@ -433,7 +433,15 @@
     // Re-render the dynamic views without a reload when the page provides a
     // hook; otherwise fall back to a full reload (state is in localStorage).
     try {
-      if (typeof window.HoneI18nRerender === "function") window.HoneI18nRerender();
+      if (typeof window.HoneI18nRerender === "function") {
+        var r = window.HoneI18nRerender();
+        // The hook may be async — the engineer re-fetches its backend-rendered
+        // labels. A rejected promise never reaches the catch below, so route it
+        // to the same fallback instead of leaving the page half-translated.
+        if (r && typeof r.catch === "function") {
+          r.catch(function () { try { location.reload(); } catch (e2) {} });
+        }
+      }
     } catch (e) {
       try { location.reload(); } catch (e2) {}
     }
