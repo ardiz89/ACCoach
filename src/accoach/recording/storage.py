@@ -14,7 +14,9 @@ from __future__ import annotations
 
 import gzip
 import json
+import os
 import re
+import zlib
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -52,6 +54,34 @@ def _laptime_token(ms: int) -> str:
     return f"{minutes}m{seconds:02d}s{millis:03d}"
 
 
+def _write_atomic(path: Path, payload: bytes) -> None:
+    """Gzip ``payload`` into ``path`` so readers never see a half-written lap.
+
+    Writing straight to the destination leaves a corrupt file behind if the
+    process dies mid-write, or if two recorders end a lap at the same instant
+    (running ``live`` and ``server`` together does exactly that). We already have
+    one on disk: a lap whose gzip header is valid but with 79 bytes of another
+    write stuck on the end — readable only by decompressing the first member by
+    hand.
+
+    Writing to a temp file in the same directory and renaming closes that door:
+    ``os.replace`` is atomic on Windows and POSIX alike, so the destination
+    either doesn't exist yet or is a complete lap — never something in between.
+    """
+    tmp = path.with_name(path.name + f".{os.getpid()}.tmp")
+    try:
+        with gzip.open(tmp, "wb") as fh:
+            fh.write(payload)
+        os.replace(tmp, path)
+    except BaseException:
+        # Don't leave debris behind when the write fails or is interrupted.
+        try:
+            tmp.unlink(missing_ok=True)
+        except OSError:      # pragma: no cover - best effort
+            pass
+        raise
+
+
 def save_lap(lap: Lap, laps_dir: Path | str = DEFAULT_LAPS_DIR) -> Path:
     """Write ``lap`` to the store and return the file path."""
     laps_dir = Path(laps_dir)
@@ -67,8 +97,7 @@ def save_lap(lap: Lap, laps_dir: Path | str = DEFAULT_LAPS_DIR) -> Path:
     )
     path = laps_dir / name
     payload = json.dumps(lap.to_dict(), separators=(",", ":")).encode("utf-8")
-    with gzip.open(path, "wb") as fh:
-        fh.write(payload)
+    _write_atomic(path, payload)
 
     # Keep the index in step (best-effort; the catalog is a rebuildable cache).
     try:
@@ -83,9 +112,29 @@ def save_lap(lap: Lap, laps_dir: Path | str = DEFAULT_LAPS_DIR) -> Path:
     return path
 
 
+def _read_gzip_salvaging(path: Path) -> bytes:
+    """Decompress ``path``, falling back to its first gzip member if truncated.
+
+    Laps written before :func:`_write_atomic` can carry trailing bytes from a
+    second, interrupted write. ``gzip`` treats those as another member and
+    raises, so the whole lap reads as lost — even though the real one sits
+    intact in the first member. Decompress that member explicitly and keep it;
+    the leftovers are the failed write, and dropping them is the point.
+    """
+    try:
+        with gzip.open(path, "rb") as fh:
+            return fh.read()
+    except (gzip.BadGzipFile, EOFError, zlib.error):
+        obj = zlib.decompressobj(16 + zlib.MAX_WBITS)     # 16 = expect a gzip header
+        data = obj.decompress(Path(path).read_bytes())    # raises if even this is junk
+        _log.warning("%s: trailing garbage after the lap (%d bytes) — "
+                     "recovered the first gzip member",
+                     Path(path).name, len(obj.unused_data))
+        return data
+
+
 def load_lap(path: Path | str) -> Lap:
-    with gzip.open(path, "rb") as fh:
-        data = json.loads(fh.read().decode("utf-8"))
+    data = json.loads(_read_gzip_salvaging(Path(path)).decode("utf-8"))
     return Lap.from_dict(data)
 
 

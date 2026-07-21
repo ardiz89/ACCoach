@@ -29,6 +29,7 @@ from .balance import (
     _UNDERSTEER_RATIO,
     _YAW_LOOSE,
     _YAW_SIGN,
+    understeer_ratio_for,
 )
 from .events import (
     _ABS_LEVEL,
@@ -66,17 +67,22 @@ def _phase_of(pos: float, s: LapSample, c: Corner) -> Phase | None:
     return None
 
 
-def _understeer_mag(s: LapSample) -> float:
-    """0..1 understeer intensity for one frame (0 when not pushing)."""
+def _understeer_mag(s: LapSample, threshold: float = _UNDERSTEER_RATIO) -> float:
+    """0..1 understeer intensity for one frame (0 when not pushing).
+
+    ``threshold`` comes from the car's class (a Formula car rotates far more than
+    a GT3 for the same lock), so the report grades a push against what that class
+    normally does — the same way the live coach does.
+    """
     if s.speed_kmh < _MIN_SPEED_KMH:
         return 0.0
     steer = abs(s.steer_angle)
     if steer < _STEER_HARD:
         return 0.0
     ratio = abs(s.yaw_rate) / steer          # sign-independent (magnitude)
-    if ratio >= _UNDERSTEER_RATIO:
+    if ratio >= threshold:
         return 0.0
-    return min(1.0, (_UNDERSTEER_RATIO - ratio) / _UNDERSTEER_RATIO)
+    return min(1.0, (threshold - ratio) / threshold)
 
 
 def _oversteer_mag(s: LapSample) -> float:
@@ -173,6 +179,7 @@ def corner_symptoms(samples: list[LapSample], c: Corner,
     if not corner_speeds:
         return {}
     speed = _speed_band(corner_speeds, tuning.speed_split_kmh)
+    push_threshold = understeer_ratio_for(tuning)
 
     out: dict[Symptom, float] = {}
     for phase, frames in by_phase.items():
@@ -181,7 +188,8 @@ def corner_symptoms(samples: list[LapSample], c: Corner,
         # Oversteer takes precedence per frame (it's the rear genuinely loose).
         over = [_oversteer_mag(s) for s in frames]
         under = [u if o == 0.0 else 0.0
-                 for u, o in ((_understeer_mag(s), om) for s, om in zip(frames, over))]
+                 for u, o in ((_understeer_mag(s, push_threshold), om)
+                              for s, om in zip(frames, over))]
         u_int = sum(under) / len(frames)
         o_int = sum(over) / len(frames)
         for balance, intensity in ((Balance.UNDERSTEER, u_int),
