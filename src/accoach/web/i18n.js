@@ -22,6 +22,12 @@
     // shared chrome
     "lang.label":      { en: `Language`, it: `Lingua` },
     "tour.help":       { en: `Guided tour`, it: `Visita guidata` },
+    // Buttons of the coachmark overlay itself (tour.js reads these directly).
+    "tour.btn.skip":   { en: `Skip`, it: `Salta` },
+    "tour.btn.back":   { en: `Back`, it: `Indietro` },
+    "tour.btn.next":   { en: `Next`, it: `Avanti` },
+    "tour.btn.done":   { en: `Done`, it: `Ho capito` },
+    "tour.btn.step":   { en: `Step`, it: `Passo` },
     "cb.label":        { en: `Colour-blind palette (blue/orange)`, it: `Palette daltonici (blu/arancio)` },
     "demo.banner":     { en: `DEMO — synthetic laps, not your real data`, it: `DEMO — giri sintetici, non i tuoi dati reali` },
 
