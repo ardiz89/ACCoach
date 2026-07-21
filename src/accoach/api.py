@@ -217,6 +217,20 @@ def _pick_known(requested: str | None, fallback: str | None, known: set[str]) ->
     return requested if requested in known else None
 
 
+def _off_track(row: dict) -> bool:
+    """Did the driver put 3+ wheels off on this lap?
+
+    Deliberately two-valued while the stored flag has three states (clean / dirty
+    / unknown): only *dirty* is a fact worth a mark. "Unknown" covers every lap
+    recorded before the flag existed — the majority of most archives — and a UI
+    that renders it reads as broken rather than informative. So absence of data
+    is absence of UI, and the day the legacy laps age out nothing changes shape.
+
+    The catalog stores -1 unknown / 0 dirty / 1 clean (see `_clean_to_int`).
+    """
+    return row.get("clean") == 0
+
+
 def _elected_path(cat, car: str, track: str, valid: list[dict]) -> str | None:
     """The lap the coach treats as the reference, for the page to agree with it.
 
@@ -306,6 +320,7 @@ def create_api(
             "lap_time_ms": r["lap_time_ms"],
             "lap_time": format_lap_time(r["lap_time_ms"]),
             "valid": bool(r["valid"]),
+            "off_track": _off_track(r),
             "source": r.get("source", "own"),
             "recorded_utc": r["recorded_utc"],
             "samples": r["sample_count"],
@@ -411,7 +426,8 @@ def create_api(
             "laps": [{
                 "path": r["path"], "lap_time": format_lap_time(r["lap_time_ms"]),
                 "lap_time_ms": r["lap_time_ms"],
-                "valid": bool(r["valid"]), "source": r.get("source", "own"),
+                "valid": bool(r["valid"]), "off_track": _off_track(r),
+                "source": r.get("source", "own"),
                 "recorded_utc": r["recorded_utc"],
             } for r in all_laps],
         }
@@ -477,7 +493,8 @@ def create_api(
                          "lap_time": format_lap_time(base.lap_time_ms)},
             "sectors": sectors_out,
             "laps": [{"path": r["path"], "lap_time": format_lap_time(r["lap_time_ms"]),
-                      "valid": bool(r["valid"])} for r in all_laps],
+                      "valid": bool(r["valid"]), "off_track": _off_track(r)}
+                     for r in all_laps],
         }
         if ideal:
             your_best = min(valid, key=lambda r: r["lap_time_ms"])["lap_time_ms"]

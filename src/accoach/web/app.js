@@ -762,7 +762,10 @@ function fillLaps(a, force) {
       const star = l.path === bestPath ? "★ " : "";
       const pro = l.source === "pro" ? " [PRO]" : "";
       const clock = lapClock(l.recorded_utc);
-      o.textContent = `${star}${l.lap_time}${l.valid ? "" : " " + t("lap.invalid")}${clock ? " · " + clock : ""}${pro}`;
+      // Text, not colour: <option> styling isn't reliable across browsers and a
+      // colour on a closed dropdown is invisible anyway.
+      const off = l.off_track ? " · " + t("lap.offTrack") : "";
+      o.textContent = `${star}${l.lap_time}${l.valid ? "" : " " + t("lap.invalid")}${off}${clock ? " · " + clock : ""}${pro}`;
       if (l.path === selectedPath) o.selected = true;
       sel.appendChild(o);
     }
@@ -776,9 +779,16 @@ function drawSummary(a) {
   const c = a.consistency || {};
   const item = (k, v, cls) =>
     `<div class="item"><div class="k">${k}</div><div class="v ${cls || ""}">${v}</div></div>`;
+  // Amber, not red: going off track isn't an app error and isn't the game's own
+  // invalidation either — it's a fact about the lap that explains why it can't be
+  // the reference. The tooltip is where that "why" lives.
+  const rev = (a.laps || []).find((l) => l.path === a.review.path);
+  const off = rev && rev.off_track
+    ? ` <span class="off-track" title="${t("lap.offTrack.why")}">${t("lap.offTrack")}</span>`
+    : "";
   $("summary").innerHTML =
     item(t("lbl.comparison"), a.reference.lap_time) +
-    item(t("lbl.lap"), a.review.lap_time) +
+    item(t("lbl.lap"), a.review.lap_time + off) +
     item(t("lbl.gap"), fmt(gap) + "s", gap > 0 ? "slower" : "faster") +
     (c.n >= 2 ? item(t("sum.consistency"), `σ ${(c.std_ms / 1000).toFixed(3)}s · ${c.n} ${t("lbl.laps")}`) : "");
 }

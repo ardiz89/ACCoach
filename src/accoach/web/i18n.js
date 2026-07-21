@@ -222,6 +222,13 @@
     // has ever seen this label — every recorded lap is complete — so renaming it
     // costs nothing now and would cost a habit later.
     "lap.invalid":     { en: `(partial)`, it: `(incompleto)` },
+    // Track limits. NOT "dirty/sporco": "clean lap / giro pulito" already means
+    // "no significant time lost per corner" in the debrief and on the hub's Home,
+    // and "drive a clean lap" means "a complete one" in the coach — three senses
+    // of one word would be worse than the gap this fills.
+    "lap.offTrack":    { en: `off track`, it: `fuori pista` },
+    "lap.offTrack.why": { en: `You went off track on this lap (3 or more wheels off), so it can't become your reference.`,
+                          it: `In questo giro sei uscito di pista (3+ ruote fuori), quindi non può diventare il tuo riferimento.` },
     "debrief.title":   { en: `Where to improve`, it: `Dove migliorare` },
     "debrief.clean":   { en: `Clean lap — no significant time lost per corner.`,
                          it: `Giro pulito — nessuna perdita di tempo significativa per curva.` },

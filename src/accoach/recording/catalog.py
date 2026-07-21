@@ -241,7 +241,8 @@ class LapCatalog:
     def laps_for(self, car_model: str, track: str) -> list[dict]:
         """All indexed laps for a car+track, most recently recorded first."""
         rows = self._conn.execute(
-            """SELECT path, lap_time_ms, valid, source, recorded_utc, sample_count
+            """SELECT path, lap_time_ms, valid, clean, source, recorded_utc,
+                      sample_count
                FROM lap WHERE car_key = ? AND track_key = ?
                ORDER BY recorded_utc DESC""",
             (self._slug(car_model), self._slug(track)),
