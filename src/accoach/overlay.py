@@ -100,10 +100,17 @@ class Overlay(QWidget):
         self._drag_off = None
         self._base_h = _BASE_H + (_PEDAL_PANEL_H if pedals else 0)
         self.resize(int(_BASE_W * self._scale), int(self._base_h * self._scale))
-        if ov.x >= 0 and ov.y >= 0:
-            self.move(ov.x, ov.y)
-        else:
+        # A pinned position (dragged in --interactive) wins and is never moved for
+        # the driver; otherwise we place it ourselves — and keep placing it, see
+        # _watch_screens().
+        self._auto_place = not (ov.x >= 0 and ov.y >= 0)
+        if self._auto_place:
             self._place_top_center()
+        else:
+            self.move(ov.x, ov.y)
+            if not self._on_a_screen():      # saved on a monitor that's now gone
+                self._place_top_center()
+        self._watch_screens()
 
         # WebSocket client on the Qt event loop — only when a URL is given.
         # In-process callers feed it via apply_state() instead.
@@ -157,6 +164,51 @@ class Overlay(QWidget):
             del self._pedal_hist[:drop]
 
     # --- placement ---------------------------------------------------------
+    def _watch_screens(self) -> None:
+        """Re-place when the desktop is rearranged under us.
+
+        Placing once at startup is not enough on a triple rig, because turning
+        AMD Eyefinity on *moves the origin*. Measured on this machine:
+
+            Eyefinity off → three screens at x = -2560 / 0 / +2560,
+                            virtual desktop starts at -2560, centre 1279
+            Eyefinity on  → one 7680-wide screen at x = 0, centre 3840
+
+        The overlay placed at x≈959 (dead centre of the middle panel with
+        Eyefinity off) keeps that absolute coordinate, and once the origin shifts
+        by 2560 the same x lands in the *left* third of the span. Which is exactly
+        where the driver found it. Nothing was wrong with the maths — it was
+        computed against a desktop that no longer existed.
+        """
+        app = QApplication.instance()
+        if app is None:
+            return
+        app.screenAdded.connect(self._on_screens_changed)
+        app.screenRemoved.connect(self._on_screens_changed)
+        app.primaryScreenChanged.connect(self._on_screens_changed)
+        for screen in app.screens():
+            screen.geometryChanged.connect(self._on_screens_changed)
+
+    def _on_screens_changed(self, *_args) -> None:
+        # New screens need watching too, or a later rearrangement goes unseen.
+        for screen in QApplication.screens():
+            try:
+                screen.geometryChanged.disconnect(self._on_screens_changed)
+            except (RuntimeError, TypeError):
+                pass
+            screen.geometryChanged.connect(self._on_screens_changed)
+        if self._auto_place:
+            self._place_top_center()
+        elif not self._on_a_screen():
+            # Even a pinned position has to stay reachable: a saved x of 5000 on a
+            # desktop that just shrank is an overlay the driver reports as "gone".
+            self._place_top_center()
+
+    def _on_a_screen(self) -> bool:
+        """Is any part of the overlay actually on a physical screen?"""
+        return any(s.geometry().intersects(self.frameGeometry())
+                   for s in QApplication.screens())
+
     def _place_top_center(self) -> None:
         # Center on the middle of the whole desktop, not the primary screen's:
         # on a triple / AMD Eyefinity rig the "center" the driver looks at is the
