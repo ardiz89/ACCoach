@@ -31,8 +31,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from ..logging_setup import get_logger
 from ..telemetry.snapshot import ACStatus, TelemetrySnapshot
 from .lap import Lap, LapSample
+
+_log = get_logger("recorder")
 
 # Decimation: keep a sample when the car has moved this far around the track
 # (~0.2% ≈ 10 m on a 5 km circuit) or this much time has passed. Dense enough
@@ -44,6 +47,12 @@ _MIN_DT_MS = 100
 # A lap is dirty once this many wheels leave the track (a real excursion). 1-2
 # wheels clipping a kerb is legal; 3+ off is the track-limits / cut threshold.
 _TYRES_OUT_DIRTY = 3
+
+# Refusing to record while the car is clearly lapping means one of our flags is
+# wrong. Warn once per stretch, after long enough that pit-lane speed limiters and
+# formation laps don't trip it (~10-30 s depending on the acquisition rate).
+_DRIVING_KMH = 60.0
+_REFUSAL_WARN_FRAMES = 600
 
 
 @dataclass(slots=True)
@@ -63,6 +72,7 @@ class LapRecorder:
         self._prev_completed: int | None = None
         self._car: str = ""
         self._track: str = ""
+        self._blocked_frames = 0        # consecutive frames refused while driving
 
     def reset(self) -> None:
         self._buf = None
@@ -80,11 +90,34 @@ class LapRecorder:
         return (s.connected and s.status == ACStatus.LIVE
                 and not s.in_pit and not s.in_pit_lane)
 
+    def _note_refusal(self, s: TelemetrySnapshot) -> None:
+        """Say so in the log when we refuse to record a car that's plainly driving.
+
+        Every gate in this codebase that stayed quiet turned into a bug report of
+        the form "I drove and nothing happened" — and the recorder is the gate
+        where that costs the most, because the session is unrepeatable. If one of
+        the flags it trusts is ever misread on some title or content, this is what
+        turns a silent lost session into one line naming the culprit.
+        """
+        if not (s.connected and s.speed_kmh > _DRIVING_KMH):
+            self._blocked_frames = 0
+            return
+        self._blocked_frames += 1
+        if self._blocked_frames == _REFUSAL_WARN_FRAMES:
+            _log.warning(
+                "not recording though the car is at %.0f km/h — status=%s "
+                "in_pit=%s in_pit_lane=%s", s.speed_kmh, s.status.name,
+                s.in_pit, s.in_pit_lane)
+
     def update(self, s: TelemetrySnapshot) -> Lap | None:
         """Consume one snapshot; return a finished lap or ``None``."""
         if not self._recording_allowed(s):
+            self._note_refusal(s)
             self.reset()
             return None
+        # Recording again: the stretch is over, so two separate near-misses can't
+        # add up into a warning about a problem that isn't there.
+        self._blocked_frames = 0
 
         # A car or track change means a different session entirely.
         if (self._car and s.car_model != self._car) or (

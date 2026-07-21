@@ -312,12 +312,18 @@ class SharedMemoryReader:
 
         Same layout split as :meth:`_surface_grip`, one slot earlier.
         """
+        # Strictly ``== 1`` on both branches, never a truthiness test. This flag
+        # *stops the recorder*, so a misread that happens to be non-zero would
+        # silently record nothing for a whole session — the worst failure this
+        # codebase can have, and one it has already had once (surfaceGrip, read at
+        # the ACC offset on AC1, sat at 0.0 for months). Anything that isn't a
+        # clean 0/1 means we're reading the wrong bytes: assume on track.
         if SharedMemoryReader._is_acc(g):                # ACC layout
-            return bool(g.isInPitLane)
+            return int(g.isInPitLane) == 1
         base = ctypes.addressof(g) + SPageFileGraphics.activeCars.offset
         raw = ctypes.c_int.from_address(
             base + SharedMemoryReader._AC1_IS_IN_PIT_LANE).value
-        return raw == 1          # anything else means we're misreading; assume track
+        return raw == 1
 
     @staticmethod
     def _penalty(g: SPageFileGraphics) -> int:
