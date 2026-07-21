@@ -71,7 +71,11 @@ def _tyres_panel(s: TelemetrySnapshot) -> Panel:
             w,
             f"{s.tyre_core_temp[i]:.0f}",
             f"{s.tyre_pressure[i]:.1f}",
-            f"{s.brake_temp[i]:.0f}",
+            # AC declares brake temperature and never simulates it: measured live
+            # at Spa it sat frozen at [16.2, 16.2, 16.5, 16.5] for seconds at
+            # 315 km/h while the tyre temps moved every frame. A number that never
+            # moves reads as a measurement — a dash reads as "not available".
+            f"{s.brake_temp[i]:.0f}" if s.is_acc else "—",
             f"{s.wheel_slip[i]:.2f}",
         )
     return Panel(table, title="Tyres", border_style="yellow")
