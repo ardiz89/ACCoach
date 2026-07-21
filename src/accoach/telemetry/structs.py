@@ -170,6 +170,32 @@ class SPageFileGraphics(ctypes.Structure):
         ("TCCut", _INT),                       # current TC-cut (slip allowance) level
         ("EngineMap", _INT),                   # current engine map (0-based; HUD shows +1)
         ("ABS", _INT),                         # current ABS level
+        # ---- further ACC tail, declared only to reach isValidLap -------------
+        # ACC is the only one of the two that tells us whether the lap still
+        # counts. It has to: `numberOfTyresOut`, which carries track limits on
+        # AC, is one of the legacy physics fields ACC never fills — measured live
+        # at Monza with all four wheels off the tarmac, it read 0 on every single
+        # frame. So on ACC a lap is "clean" if and only if the sim says the lap is
+        # still valid, and that lives here.
+        #
+        # The fields in between are not modelled: their exact order isn't
+        # something we can verify, and a wrong guess about a field we don't read
+        # is a wrong guess we'd never notice. Skipping them as opaque bytes keeps
+        # the one offset that matters anchored on what was measured.
+        ("_acc_tail", ctypes.c_byte * 120),    # 1284 → 1404
+        # The SDK puts iEstimatedLapTime here. What's verified is narrower: it
+        # reads a plausible lap-time-scale value (142427 ms at Monza), which is
+        # what makes it a usable anchor. Never read as data — it exists so that a
+        # future layout change shows up as a nonsense number in the offset check
+        # instead of as a silently inverted flag.
+        ("iEstimatedLapTime", _INT),           # 1404
+        # 0 while the current lap is invalidated (track limits), 1 while it
+        # counts. Measured: 0 through the out lap, 0→1 exactly at the line,
+        # 1→0 at Monza's first chicane at 69 km/h — twice, in two independent
+        # sessions, at lap position 0.161 and 0.164. It latches: once dropped it
+        # stays down for the rest of the lap, which is what separated it from the
+        # half-dozen neighbouring flags that blink at low speed.
+        ("isValidLap", _INT),                  # 1408
     ]
 
 

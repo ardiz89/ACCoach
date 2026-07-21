@@ -212,6 +212,7 @@ class SharedMemoryReader:
             penalty=SharedMemoryReader._penalty(g),
             in_pit_lane=SharedMemoryReader._in_pit_lane(g),
             is_acc=SharedMemoryReader._is_acc(g),
+            lap_valid=SharedMemoryReader._lap_valid(g),
             **SharedMemoryReader._car_xz(g),
         )
 
@@ -324,6 +325,34 @@ class SharedMemoryReader:
         raw = ctypes.c_int.from_address(
             base + SharedMemoryReader._AC1_IS_IN_PIT_LANE).value
         return raw == 1
+
+    # A lap time this far from plausible means we're reading the wrong bytes.
+    # Used only to sanity-check the tail's anchor — see _lap_valid.
+    _EST_LAP_MS = (20_000, 900_000)
+
+    @staticmethod
+    def _lap_valid(g: SPageFileGraphics) -> bool | None:
+        """Does the sim still count this lap? ``None`` when it can't tell us.
+
+        Only ACC answers. On AC the field doesn't exist, the page ends long
+        before offset 1408, and our zero-padding would read it as 0 — i.e. as
+        "invalidated", on every frame of every lap. That failure would be
+        invisible and total, so AC returns None ("unknown") and its track limits
+        keep coming from ``numberOfTyresOut``, which ACC in turn never fills.
+        Each title has exactly one field that works, and they aren't the same one.
+
+        The neighbouring ``iEstimatedLapTime`` is the anchor: if the tail ever
+        shifts, it stops reading like a lap time and we report unknown rather
+        than a flag that is now some other field entirely. Cheap insurance
+        against the class of bug that kept ``surfaceGrip`` at zero for months.
+        """
+        if not SharedMemoryReader._is_acc(g):
+            return None
+        lo, hi = SharedMemoryReader._EST_LAP_MS
+        if not (lo <= int(g.iEstimatedLapTime) <= hi):
+            return None                      # anchor doesn't hold — don't guess
+        raw = int(g.isValidLap)
+        return raw == 1 if raw in (0, 1) else None
 
     @staticmethod
     def _penalty(g: SPageFileGraphics) -> int:

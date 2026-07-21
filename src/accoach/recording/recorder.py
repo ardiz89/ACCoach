@@ -67,6 +67,25 @@ _LAP_MS_MIN = 1_000
 _LAP_MS_MAX = 3_600_000
 
 
+def _clean_verdict(buf: "_Buffer") -> bool:
+    """Did this lap stay inside the track limits?
+
+    The two sims answer through different fields, and each leaves the other's at
+    a constant — so this picks the one that's actually alive rather than merging
+    them. ACC publishes its own verdict (``isValidLap``) and never fills
+    ``numberOfTyresOut``: measured live at Monza with all four wheels off the
+    tarmac, that counter read 0 on every frame. AC is the mirror image — it fills
+    the counter and has no verdict to give.
+
+    Trusting the sim where it speaks also means inheriting its rules, which is
+    the right outcome: ACC's own track-limits geometry decides, not our guess at
+    it from a wheel count.
+    """
+    if buf.saw_valid_flag:
+        return not buf.saw_invalid
+    return buf.max_tyres_out < _TYRES_OUT_DIRTY
+
+
 @dataclass(slots=True)
 class _Buffer:
     samples: list[LapSample]
@@ -74,6 +93,8 @@ class _Buffer:
     last_pos: float
     last_t_ms: int
     max_tyres_out: int = 0  # worst off-track excursion seen during the lap
+    saw_invalid: bool = False   # the sim dropped its lap-valid flag at some point
+    saw_valid_flag: bool = False  # …and it was telling us about it at all
 
 
 class LapRecorder:
@@ -177,6 +198,13 @@ class LapRecorder:
         # so a brief off between stored samples still marks the lap dirty.
         if s.tyres_out > self._buf.max_tyres_out:
             self._buf.max_tyres_out = s.tyres_out
+        # …and the same for the sim's own verdict, which is what ACC gives us
+        # instead. Latched: the flag resets at the line, so a lap is dirty if it
+        # was ever dropped, not if it happens to be down at the closing frame.
+        if s.lap_valid is not None:
+            self._buf.saw_valid_flag = True
+            if not s.lap_valid:
+                self._buf.saw_invalid = True
 
         self._maybe_append(self._buf, s)
         return finished
@@ -205,7 +233,7 @@ class LapRecorder:
         # `clean` is known only for a full lap (we watched it from the line); a
         # partial lap stays unknown (None). Conditions are ~constant over a lap,
         # so the crossing frame is a fine snapshot of them.
-        clean = (buf.max_tyres_out < _TYRES_OUT_DIRTY) if buf.is_full else None
+        clean = _clean_verdict(buf) if buf.is_full else None
         # ACC reports 2147483647 for "no lap time yet" — which is exactly what the
         # out lap carries at its own crossing, now that the position wrap closes
         # laps the counter never counted. A lap we can't put a time on isn't a

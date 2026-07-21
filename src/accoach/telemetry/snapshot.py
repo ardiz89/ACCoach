@@ -122,6 +122,10 @@ class TelemetrySnapshot:
     # games and *filled* by only one (brake_temp is simulated on ACC and frozen at
     # a static value on AC), so a consumer has to know before showing a number.
     is_acc: bool = False
+    # Does the sim still count the current lap? True/False on ACC, which says so
+    # directly; None on AC, which doesn't have the notion and where track limits
+    # are inferred from `tyres_out` instead. None means "unknown", never "valid".
+    lap_valid: bool | None = None
 
     @staticmethod
     def disconnected() -> "TelemetrySnapshot":
