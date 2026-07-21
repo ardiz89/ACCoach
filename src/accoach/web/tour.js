@@ -6,8 +6,10 @@
 //   HoneTour.start(steps, key)     same thing, namespaced
 //   HoneTour.auto(steps, key)      starts only on first visit (key absent)
 //
-// An optional third argument overrides the button labels, for pages that aren't
-// in English: {skip, back, next, done, step}. Any key left out keeps its default.
+// Button labels follow the page: they come from HoneI18n ("tour.btn.next" & co.)
+// when the page loads i18n.js, and fall back to English otherwise. An optional
+// third argument overrides them outright — {skip, back, next, done, step}, any
+// key left out falls through — for pages that carry no catalogue of their own.
 //
 // `sel` is a CSS selector for the element to highlight. Steps whose target is
 // missing or not visible are skipped defensively. The whole thing is one
@@ -22,11 +24,26 @@
     skip: "Skip", back: "Back", next: "Next", done: "Done", step: "Step"
   };
 
+  // The label for one button: an explicit override wins, then the page's own
+  // i18n catalogue ("tour.btn.next"), then the English default. HoneI18n.t()
+  // echoes the key back when it doesn't know it, so treat that as "no answer" —
+  // that's what keeps a page without i18n (or an older catalogue) on English
+  // instead of showing "tour.btn.next" as a button label.
+  function label(key, over) {
+    if (over && over[key]) return over[key];
+    if (window.HoneI18n && typeof window.HoneI18n.t === "function") {
+      var k = "tour.btn." + key;
+      var s = window.HoneI18n.t(k);
+      if (s && s !== k) return s;
+    }
+    return DEFAULT_LABELS[key];
+  }
+
   function labelsFor(over) {
     var out = {};
     for (var k in DEFAULT_LABELS) {
       if (Object.prototype.hasOwnProperty.call(DEFAULT_LABELS, k)) {
-        out[k] = (over && over[k]) || DEFAULT_LABELS[k];
+        out[k] = label(k, over);
       }
     }
     return out;
