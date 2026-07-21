@@ -54,6 +54,18 @@ _TYRES_OUT_DIRTY = 3
 _DRIVING_KMH = 60.0
 _REFUSAL_WARN_FRAMES = 600
 
+# Position wrap that marks the start/finish line. Wide margins on purpose: at
+# 270 km/h a 13 Hz acquisition moves ~0.006 of a lap between frames, so the pair
+# straddling the line can sit well inside these bounds.
+_WRAP_FROM = 0.9
+_WRAP_TO = 0.1
+
+# A lap time we're willing to store. ACC reports 2147483647 (INT_MAX) for "no
+# lap time yet", which is what the out lap carries at its own crossing; storing
+# that as a duration would poison every statistic downstream.
+_LAP_MS_MIN = 1_000
+_LAP_MS_MAX = 3_600_000
+
 
 @dataclass(slots=True)
 class _Buffer:
@@ -72,11 +84,13 @@ class LapRecorder:
         self._prev_completed: int | None = None
         self._car: str = ""
         self._track: str = ""
+        self._prev_pos: float | None = None
         self._blocked_frames = 0        # consecutive frames refused while driving
 
     def reset(self) -> None:
         self._buf = None
         self._prev_completed = None
+        self._prev_pos = None
         self._car = ""
         self._track = ""
 
@@ -129,9 +143,25 @@ class LapRecorder:
         completed = s.completed_laps
         finished: Lap | None = None
 
-        # Detect the start/finish crossing via the lap counter.
-        crossed = self._prev_completed is not None and completed > self._prev_completed
+        # Detect the start/finish crossing two ways, because neither is enough.
+        #
+        # The lap counter is the authoritative signal — except ACC does not count
+        # the out lap. Measured at Monza: leaving the box and crossing the line
+        # left completedLaps at 0, and it only reached 1 at the *second* crossing.
+        # With the counter alone the buffer therefore ran straight through the out
+        # lap AND the first flying lap, closed as one 128 s partial, and got
+        # thrown away — so on ACC the first flying lap after every pit exit was
+        # silently lost, and a two-lap run recorded nothing at all.
+        #
+        # The position wrap catches that crossing (measured: 1.000 -> 0.000 on the
+        # same frame). It can't be the only signal either: it needs a frame near
+        # each end, and a dropped frame at speed could straddle the line.
+        wrapped = (self._prev_pos is not None
+                   and self._prev_pos > _WRAP_FROM and s.lap_position < _WRAP_TO)
+        counted = self._prev_completed is not None and completed > self._prev_completed
+        crossed = counted or wrapped
         self._prev_completed = completed
+        self._prev_pos = s.lap_position
 
         if crossed and self._buf is not None:
             finished = self._finalize(self._buf, s)
@@ -176,12 +206,18 @@ class LapRecorder:
         # partial lap stays unknown (None). Conditions are ~constant over a lap,
         # so the crossing frame is a fine snapshot of them.
         clean = (buf.max_tyres_out < _TYRES_OUT_DIRTY) if buf.is_full else None
+        # ACC reports 2147483647 for "no lap time yet" — which is exactly what the
+        # out lap carries at its own crossing, now that the position wrap closes
+        # laps the counter never counted. A lap we can't put a time on isn't a
+        # timed lap, whatever the buffer thinks.
+        lap_ms = int(s.last_lap_ms)
+        timed = _LAP_MS_MIN <= lap_ms <= _LAP_MS_MAX
         return Lap(
             car_model=self._car,
             track=self._track,
             session=s.session,
-            lap_time_ms=int(s.last_lap_ms),
-            valid=buf.is_full,
+            lap_time_ms=lap_ms if timed else 0,
+            valid=buf.is_full and timed,
             samples=buf.samples,
             clean=clean,
             air_temp=s.air_temp,
