@@ -740,19 +740,18 @@ function lapClock(iso) {
 function fillLaps(a, force) {
   const key = a.car + a.track;
   // Skip if already filled for this combo — unless forced (e.g. language switch
-  // needs to relabel "(invalid)" while keeping the current selection).
+  // needs to relabel "(partial)" while keeping the current selection).
   if (!force && $("lap").dataset.for === key) return;
   $("lap").dataset.for = key;
   const keepLap = force ? $("lap").value : null;
   const keepBase = force ? $("baseline").value : null;
 
-  // Find the fastest valid lap so we can star it in the dropdowns.
-  let bestPath = null, bestMs = Infinity;
-  for (const l of a.laps) {
-    if (l.valid && l.lap_time_ms > 0 && l.lap_time_ms < bestMs) {
-      bestMs = l.lap_time_ms; bestPath = l.path;
-    }
-  }
+  // Star the elected reference, not the fastest lap. They differ: a lap driven
+  // off track is time you can't repeat, so it's excluded from the reference while
+  // still being the fastest in the list — the old rule starred a lap the coach
+  // had already rejected. The server sends the elected one so the two can't drift
+  // apart, and it isn't a.reference.path: that follows the "compare with" picker.
+  const bestPath = a.best_path || null;
 
   const fill = (id, selectedPath) => {
     const sel = $(id);

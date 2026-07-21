@@ -71,7 +71,14 @@ class LapRecorder:
         self._track = ""
 
     def _recording_allowed(self, s: TelemetrySnapshot) -> bool:
-        return s.connected and s.status == ACStatus.LIVE and not s.in_pit
+        # The whole pit lane, not just the box. `in_pit` is only true standing in
+        # the garage, so an in-lap used to be recorded to the end and stored as an
+        # ordinary timed lap — a real one (Imola 1:57.235 against a 1:46 best) sat
+        # in the archive inflating the session's spread by 11 s. Resetting here
+        # drops the in-lap and leaves the following out-lap partial, which is what
+        # both of them are.
+        return (s.connected and s.status == ACStatus.LIVE
+                and not s.in_pit and not s.in_pit_lane)
 
     def update(self, s: TelemetrySnapshot) -> Lap | None:
         """Consume one snapshot; return a finished lap or ``None``."""

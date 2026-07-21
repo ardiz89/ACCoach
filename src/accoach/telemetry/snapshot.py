@@ -114,7 +114,10 @@ class TelemetrySnapshot:
     road_temp: float = 0.0       # deg C
     surface_grip: float = 0.0    # 0..1 track grip
     tyre_compound: str = ""      # e.g. "dry_compound" / "wet_compound"
-    penalty: int = 0             # current penalty enum (0 = none)
+    penalty: int = 0             # current penalty enum (0 = none); ACC only
+    # True anywhere in the pit lane, not just stopped in the box (`in_pit`). A lap
+    # that touches the pit lane is not a timed lap — see LapRecorder.
+    in_pit_lane: bool = False
 
     @staticmethod
     def disconnected() -> "TelemetrySnapshot":

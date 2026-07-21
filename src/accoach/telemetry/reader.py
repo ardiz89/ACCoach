@@ -209,7 +209,8 @@ class SharedMemoryReader:
             road_temp=p.roadTemp,
             surface_grip=SharedMemoryReader._surface_grip(g),
             tyre_compound=str(g.tyreCompound),
-            penalty=g.penalty,
+            penalty=SharedMemoryReader._penalty(g),
+            in_pit_lane=SharedMemoryReader._in_pit_lane(g),
             **SharedMemoryReader._car_xz(g),
         )
 
@@ -271,11 +272,48 @@ class SharedMemoryReader:
             raw = float(g.surfaceGrip)
         else:                                            # AC1 layout
             base = ctypes.addressof(g) + SPageFileGraphics.activeCars.offset
-            raw = ctypes.c_float.from_address(base + 28).value   # offset 280
+            raw = ctypes.c_float.from_address(
+                base + SharedMemoryReader._AC1_SURFACE_GRIP).value   # offset 280
         # Grip is a fraction. Anything else means we're reading the wrong bytes
         # (mod content, a cold frame, a future layout change) — report "no data"
         # rather than feed a nonsense number to the reference picker.
         return raw if 0.0 <= raw <= 1.0 else 0.0
+
+    # Byte offsets inside the AC1 graphics page, counted from where our (ACC)
+    # struct puts `activeCars`. AC1 has no activeCars/carCoordinates[60]/carID[60]
+    # /playerCarID/penalty, so from that point it reads:
+    #   x, y, z, penaltyTime, flag, idealLineOn, isInPitLane, surfaceGrip
+    _AC1_IS_IN_PIT_LANE = 24
+    _AC1_SURFACE_GRIP = 28
+
+    @staticmethod
+    def _in_pit_lane(g: SPageFileGraphics) -> bool:
+        """True anywhere in the pit lane — the whole corridor, not just the box.
+
+        ``isInPit`` only covers standing in the garage, so without this a lap that
+        ends by driving down the pit lane is recorded as an ordinary timed lap
+        (measured: a 1:57.235 at Imola against a 1:46 best, which alone tripled the
+        session's σ). ``normalizedCarPosition`` keeps advancing in the lane, so
+        position can't tell them apart either.
+
+        Same layout split as :meth:`_surface_grip`, one slot earlier.
+        """
+        if 0 < g.activeCars <= 60:                       # ACC layout
+            return bool(g.isInPitLane)
+        base = ctypes.addressof(g) + SPageFileGraphics.activeCars.offset
+        raw = ctypes.c_int.from_address(
+            base + SharedMemoryReader._AC1_IS_IN_PIT_LANE).value
+        return raw == 1          # anything else means we're misreading; assume track
+
+    @staticmethod
+    def _penalty(g: SPageFileGraphics) -> int:
+        """Current penalty enum — **ACC only**.
+
+        AC1 has no such field at all: its page ends long before offset 1228, so
+        reading it ACC-style is the same out-of-page read that kept ``surfaceGrip``
+        at zero. Report "no penalty" instead of whatever those bytes happen to hold.
+        """
+        return int(g.penalty) if 0 < g.activeCars <= 60 else 0
 
     # Adjustable-aid levels come from the ACC-only graphics tail; on plain AC
     # that region is zero-padded and the raw struct can also carry garbage on a
