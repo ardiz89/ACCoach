@@ -96,6 +96,11 @@ class _Page:
         self._tagname = tagname
         self._struct_type = struct_type
         self._size = ctypes.sizeof(struct_type)
+        # Did the last read have to invent the tail? True when the game published
+        # a shorter page than our struct — AC does, ACC doesn't. Whoever reads a
+        # field that only exists in the tail has to know, because zero-padding is
+        # indistinguishable from a real zero. See SharedMemoryReader._lap_valid.
+        self.padded = False
 
     def read(self) -> ctypes.Structure | None:
         handle = _OpenFileMapping(_FILE_MAP_READ, False, self._tagname)
@@ -112,7 +117,8 @@ class _Page:
             available = int(mbi.RegionSize) if mbi.RegionSize else self._size
             n = min(self._size, available)
             raw = ctypes.string_at(view, n)
-            if n < self._size:
+            self.padded = n < self._size
+            if self.padded:
                 raw += b"\x00" * (self._size - n)  # zero-pad ACC-only tail on AC
             return self._struct_type.from_buffer_copy(raw)
         except OSError:
@@ -141,13 +147,16 @@ class SharedMemoryReader:
         if phys is None or graph is None or stat is None:
             return TelemetrySnapshot.disconnected()
 
-        return self._to_snapshot(phys, graph, stat)
+        # The graphics page is shorter on AC than our (ACC-shaped) struct, so the
+        # tail is invented there; anything reading it needs to know that.
+        return self._to_snapshot(phys, graph, stat, self._graphics.padded)
 
     @staticmethod
     def _to_snapshot(
         p: SPageFilePhysics,
         g: SPageFileGraphics,
         s: SPageFileStatic,
+        graphics_padded: bool = True,   # assume invented unless told otherwise
     ) -> TelemetrySnapshot:
         try:
             status = ACStatus(g.status)
@@ -212,7 +221,7 @@ class SharedMemoryReader:
             penalty=SharedMemoryReader._penalty(g),
             in_pit_lane=SharedMemoryReader._in_pit_lane(g),
             is_acc=SharedMemoryReader._is_acc(g),
-            lap_valid=SharedMemoryReader._lap_valid(g),
+            lap_valid=SharedMemoryReader._lap_valid(g, graphics_padded),
             **SharedMemoryReader._car_xz(g),
         )
 
@@ -326,12 +335,8 @@ class SharedMemoryReader:
             base + SharedMemoryReader._AC1_IS_IN_PIT_LANE).value
         return raw == 1
 
-    # A lap time this far from plausible means we're reading the wrong bytes.
-    # Used only to sanity-check the tail's anchor — see _lap_valid.
-    _EST_LAP_MS = (20_000, 900_000)
-
     @staticmethod
-    def _lap_valid(g: SPageFileGraphics) -> bool | None:
+    def _lap_valid(g: SPageFileGraphics, padded: bool) -> bool | None:
         """Does the sim still count this lap? ``None`` when it can't tell us.
 
         Only ACC answers. On AC the field doesn't exist, the page ends long
@@ -341,16 +346,17 @@ class SharedMemoryReader:
         keep coming from ``numberOfTyresOut``, which ACC in turn never fills.
         Each title has exactly one field that works, and they aren't the same one.
 
-        The neighbouring ``iEstimatedLapTime`` is the anchor: if the tail ever
-        shifts, it stops reading like a lap time and we report unknown rather
-        than a flag that is now some other field entirely. Cheap insurance
-        against the class of bug that kept ``surfaceGrip`` at zero for months.
+        ``padded`` says whether the game actually published bytes this far, which
+        is the honest guard: a field the page doesn't contain is unknown, full
+        stop. An earlier attempt sanity-checked the neighbouring counter's *value*
+        instead and got it badly wrong — that field mirrors the running lap clock,
+        so it reads under 20 s at the start of every lap. The check rejected the
+        first twenty seconds of every ACC lap, fell back to the dead wheel counter
+        and reported those laps clean: the guard against a silent failure was
+        itself failing silently. Structure is checkable; a live value isn't.
         """
-        if not SharedMemoryReader._is_acc(g):
+        if padded or not SharedMemoryReader._is_acc(g):
             return None
-        lo, hi = SharedMemoryReader._EST_LAP_MS
-        if not (lo <= int(g.iEstimatedLapTime) <= hi):
-            return None                      # anchor doesn't hold — don't guess
         raw = int(g.isValidLap)
         return raw == 1 if raw in (0, 1) else None
 

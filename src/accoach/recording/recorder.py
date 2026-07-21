@@ -66,6 +66,14 @@ _WRAP_TO = 0.1
 _LAP_MS_MIN = 1_000
 _LAP_MS_MAX = 3_600_000
 
+# A lap has to carry a lap's worth of telemetry to be one. Two real files in a
+# user's archive had **zero** samples, 428 bytes, `valid=True` — enough to be
+# offered as a reference and to break every consumer that assumes a lap has
+# points in it. The decimator keeps roughly ten samples a second, so even a very
+# short circuit clears this by two orders of magnitude; it is a floor against
+# nonsense, not a quality bar.
+_MIN_SAMPLES = 20
+
 
 def _clean_verdict(buf: "_Buffer") -> bool:
     """Did this lap stay inside the track limits?
@@ -240,6 +248,13 @@ class LapRecorder:
         # timed lap, whatever the buffer thinks.
         lap_ms = int(s.last_lap_ms)
         timed = _LAP_MS_MIN <= lap_ms <= _LAP_MS_MAX
+        if buf.is_full and len(buf.samples) < _MIN_SAMPLES:
+            # Don't just drop it quietly — that's how the empty files got made in
+            # the first place. Whatever produced a lap with no telemetry is worth
+            # seeing in the log the next time it happens.
+            _log.warning("discarding a %.3fs lap with only %d samples",
+                         lap_ms / 1000.0, len(buf.samples))
+            timed = False
         return Lap(
             car_model=self._car,
             track=self._track,

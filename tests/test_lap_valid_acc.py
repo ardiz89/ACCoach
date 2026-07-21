@@ -41,8 +41,8 @@ def test_the_offsets_are_where_they_were_measured():
 
 
 def test_acc_reports_the_sims_own_verdict():
-    assert SharedMemoryReader._lap_valid(_graphics(20, valid=1)) is True
-    assert SharedMemoryReader._lap_valid(_graphics(20, valid=0)) is False
+    assert SharedMemoryReader._lap_valid(_graphics(20, valid=1), False) is True
+    assert SharedMemoryReader._lap_valid(_graphics(20, valid=0), False) is False
 
 
 def test_ac_reports_unknown_never_invalid():
@@ -51,23 +51,31 @@ def test_ac_reports_unknown_never_invalid():
     Read as a bool, that zero would mean "this lap is invalidated" on every
     frame of every AC lap — a total, silent failure.
     """
-    assert SharedMemoryReader._lap_valid(_graphics(0, valid=0)) is None
+    assert SharedMemoryReader._lap_valid(_graphics(0, valid=0), True) is None
 
 
-def test_a_broken_anchor_reports_unknown():
-    """If the tail ever shifts, say we don't know instead of reading a stranger."""
-    for est in (0, 12, 5_000_000, -1):
-        assert SharedMemoryReader._lap_valid(_graphics(20, est=est)) is None
+def test_a_page_that_did_not_reach_the_field_is_unknown():
+    """The guard is structural: a field the page doesn't contain is unknown.
+
+    Even if everything else looked like ACC. The previous attempt guarded on the
+    neighbouring counter's *value* and was wrong about what that counter is — it
+    mirrors the running lap clock, so it read under 20 s at the start of every
+    lap and the guard rejected the first twenty seconds of every ACC lap.
+    """
+    assert SharedMemoryReader._lap_valid(_graphics(20, valid=1), True) is None
 
 
 def test_a_flag_that_is_neither_0_nor_1_is_unknown():
-    assert SharedMemoryReader._lap_valid(_graphics(20, valid=1078530011)) is None
+    assert SharedMemoryReader._lap_valid(_graphics(20, valid=1078530011), False) is None
 
 
-def test_the_anchor_is_not_read_as_data():
-    """It only gates; a plausible-but-different value must not change the verdict."""
-    for est in (25_000, 142_427, 800_000):
-        assert SharedMemoryReader._lap_valid(_graphics(20, est=est, valid=0)) is False
+def test_the_neighbouring_counter_never_changes_the_verdict():
+    """It is not a gate: it tracks the lap clock and legitimately reads anything."""
+    for est in (0, 4_952, 142_427, 2_147_483_647):
+        assert SharedMemoryReader._lap_valid(
+            _graphics(20, est=est, valid=0), False) is False
+        assert SharedMemoryReader._lap_valid(
+            _graphics(20, est=est, valid=1), False) is True
 
 
 # --- the recorder ---------------------------------------------------------
@@ -81,7 +89,8 @@ _ACC = replace(
 
 
 def _lap(**kw):
-    return [replace(_ACC, lap_position=p / 100, **kw) for p in range(0, 100, 5)]
+    """Sampled every 2%, so the lap carries enough telemetry to count as one."""
+    return [replace(_ACC, lap_position=p / 100, **kw) for p in range(0, 100, 2)]
 
 
 def _run(rec, frames):
@@ -95,7 +104,7 @@ def test_acc_lap_is_dirty_when_the_sim_dropped_the_flag():
     frames += [replace(_ACC, lap_position=0.05, completed_laps=1),
                replace(_ACC, lap_position=0.16, completed_laps=1, lap_valid=False)]
     frames += [replace(_ACC, lap_position=p / 100, completed_laps=1, lap_valid=False)
-               for p in range(20, 100, 5)]
+               for p in range(20, 100, 2)]
     # The flag resets at the line — the verdict must not be read off that frame.
     frames += [replace(_ACC, lap_position=0.0, completed_laps=2, lap_valid=True)]
     laps = [lap for lap in _run(rec, frames) if lap.valid]

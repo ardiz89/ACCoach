@@ -30,9 +30,13 @@ _ACC_NO_TIME = 2_147_483_647       # what ACC reports for "no lap time yet"
 
 
 def _lap_frames(completed: int, **kw):
-    """One trip around, sampled every 5% — the shape the recorder sees."""
+    """One trip around, sampled every 2% — a lap's worth of telemetry.
+
+    Dense enough to clear the recorder's minimum-samples floor, which a real lap
+    (~1000 points) clears by two orders of magnitude.
+    """
     return [replace(_LIVE, lap_position=p / 100, completed_laps=completed, **kw)
-            for p in range(0, 100, 5)]
+            for p in range(0, 100, 2)]
 
 
 def _run(rec, frames):
@@ -88,6 +92,35 @@ def test_a_wrap_and_a_count_on_the_same_frame_close_one_lap():
     # Three trips, two of them closed by a crossing seen at the start of the next.
     assert len(laps) == 2
     assert [lap.valid for lap in laps] == [False, True]
+
+
+def test_a_lap_with_no_telemetry_is_not_a_lap(caplog):
+    """Two of these reached a real archive: 428 bytes, zero samples, valid=True.
+
+    Empty enough to break every consumer that assumes a lap has points in it, and
+    marked well enough to be offered as a reference.
+    """
+    import logging
+
+    rec = LapRecorder()
+    # A buffer that opens at a crossing and closes at the next one having kept
+    # nothing — every frame sat in the pre-wrap region the appender drops.
+    frames = [replace(_LIVE, lap_position=0.95, completed_laps=0),
+              replace(_LIVE, lap_position=0.96, completed_laps=1),   # crossing
+              replace(_LIVE, lap_position=0.97, completed_laps=1),
+              replace(_LIVE, lap_position=0.98, completed_laps=2)]   # and again
+    with caplog.at_level(logging.WARNING):
+        laps = _run(rec, frames)
+    assert all(not lap.valid for lap in laps)
+    assert any("only" in r.getMessage() for r in caplog.records)
+
+
+def test_a_real_lap_clears_the_floor_by_far():
+    rec = LapRecorder()
+    frames = _lap_frames(0) + _lap_frames(1)
+    frames += [replace(_LIVE, lap_position=0.0, completed_laps=2)]
+    timed = [lap for lap in _run(rec, frames) if lap.valid]
+    assert timed and len(timed[0].samples) >= 20
 
 
 def test_going_backwards_over_the_line_is_not_a_lap():
