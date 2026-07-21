@@ -217,6 +217,24 @@ def _pick_known(requested: str | None, fallback: str | None, known: set[str]) ->
     return requested if requested in known else None
 
 
+def _elected_path(cat, car: str, track: str, valid: list[dict]) -> str | None:
+    """The lap the coach treats as the reference, for the page to agree with it.
+
+    Not simply the fastest: a lap driven off track is time you can't repeat, so
+    the catalog's reference query excludes it (``clean <> 0``, confirmed-clean
+    preferred). Comparing against the plain fastest meant the analysis page could
+    silently baseline everything on a lap the live coach had already rejected —
+    and then star it in the dropdown while comparing against something else.
+
+    Falls back to the fastest when every lap on record is dirty, so the page keeps
+    working instead of going blank.
+    """
+    elected = cat.best_reference_path(car, track)
+    if elected is not None:
+        return elected
+    return min(valid, key=lambda r: r["lap_time_ms"])["path"] if valid else None
+
+
 def _tyre_means(samples, attr: str, ndigits: int) -> list[float] | None:
     """Per-wheel average of a 4-tuple channel (FL, FR, RL, RR) over a lap.
 
@@ -304,11 +322,11 @@ def create_api(
         lg = lang or current_language()
         with _catalog() as cat:
             all_laps = cat.laps_for(car, track)
-        valid = [r for r in all_laps if r["valid"] and r["lap_time_ms"] > 0]
-        fastest = min(valid, key=lambda r: r["lap_time_ms"])["path"] if valid else None
+            valid = [r for r in all_laps if r["valid"] and r["lap_time_ms"] > 0]
+            elected = _elected_path(cat, car, track, valid)
 
         known = {r["path"] for r in all_laps}
-        baseline_path = _pick_known(baseline, fastest, known)
+        baseline_path = _pick_known(baseline, elected, known)
         review_path = _pick_known(lap, next((r["path"] for r in all_laps if r["valid"]), None), known)
         if baseline_path is None or review_path is None:
             raise HTTPException(404, "no valid lap for this car+track")
@@ -352,6 +370,9 @@ def create_api(
         return {
             "car": car, "track": track,
             "has_map": _has_map(review) and _has_map(baseline_lap),
+            # The elected reference, regardless of what the user is comparing
+            # against right now — that's what the dropdown's ★ marks.
+            "best_path": elected,
             "reference": {
                 "path": baseline_path,
                 "lap_time_ms": reference.lap_time_ms,
@@ -405,12 +426,12 @@ def create_api(
         """Per-sector breakdown of review vs baseline, plus the ideal lap."""
         with _catalog() as cat:
             all_laps = cat.laps_for(car, track)
-        valid = [r for r in all_laps if r["valid"] and r["lap_time_ms"] > 0]
-        if not valid:
-            raise HTTPException(404, "no valid lap for this car+track")
-        fastest = min(valid, key=lambda r: r["lap_time_ms"])["path"]
+            valid = [r for r in all_laps if r["valid"] and r["lap_time_ms"] > 0]
+            if not valid:
+                raise HTTPException(404, "no valid lap for this car+track")
+            elected = _elected_path(cat, car, track, valid)
         known = {r["path"] for r in all_laps}
-        baseline_path = _pick_known(baseline, fastest, known)
+        baseline_path = _pick_known(baseline, elected, known)
         review_path = _pick_known(lap, next((r["path"] for r in all_laps if r["valid"]), None), known)
         if baseline_path is None or review_path is None:
             raise HTTPException(404, "no valid lap for this car+track")

@@ -211,7 +211,11 @@
     "vmin.ref":        { en: `Ref`, it: `Rif` },
     "vmin.delta":      { en: `Δ`, it: `Δ` },
 
-    "lap.invalid":     { en: `(invalid)`, it: `(non valido)` },
+    // "invalid" was a lie: `valid` means the lap was *complete* (it started at a
+    // start/finish crossing), which has nothing to do with track limits. Nobody
+    // has ever seen this label — every recorded lap is complete — so renaming it
+    // costs nothing now and would cost a habit later.
+    "lap.invalid":     { en: `(partial)`, it: `(incompleto)` },
     "debrief.title":   { en: `Where to improve`, it: `Dove migliorare` },
     "debrief.clean":   { en: `Clean lap — no significant time lost per corner.`,
                          it: `Giro pulito — nessuna perdita di tempo significativa per curva.` },
