@@ -46,6 +46,7 @@ except ImportError:  # pragma: no cover - optional dependency
 DEFAULT_URL = "ws://127.0.0.1:8777/ws"
 RECONNECT_MS = 2000
 CUE_HOLD_S = 1.8          # how long a cue stays on screen before fading out
+_GREEN_HOLD_S = 2.5       # how long "green — flying lap" stays up at the line
 DELTA_CLAMP_S = 1.0       # bar is full at ±1.0 s
 _BASE_W, _BASE_H = 560, 210   # design size; the window is this × the config scale
 
@@ -76,6 +77,9 @@ class Overlay(QWidget):
         self._state: dict = {}
         self._cue: dict | None = None
         self._cue_at: float = -1e9
+        # Edge detection for the "green — flying lap" flash.
+        self._prev_quiet: str = ""
+        self._green_at: float = 0.0
         # Rolling (t, throttle, brake) samples for the optional pedal strip.
         self._show_pedals = pedals
         self._pedal_hist: list[tuple[float, float, float]] = []
@@ -118,6 +122,16 @@ class Overlay(QWidget):
 
     def apply_state(self, data: dict) -> None:
         """Feed a state dict directly (in-process) — same path as a WS message."""
+        # Catch the gate opening here, not in paintEvent: the overlay repaints at
+        # 30 fps regardless of new state, so an edge detected there would be read
+        # off whatever frame happened to be drawing.
+        quiet = data.get("quiet") or ""
+        if self._prev_quiet and not quiet:
+            self._green_at = time.monotonic()
+        elif quiet:
+            self._green_at = 0.0
+        self._prev_quiet = quiet
+
         self._state = data
         cue = data.get("cue")
         if cue:
@@ -196,12 +210,40 @@ class Overlay(QWidget):
 
         self._draw_brand_header(p, w)
         delta = st.get("delta")
+        quiet = st.get("quiet") or ""
         if delta is None:
-            self._draw_pill(p, t("overlay.rec"), _AMBER, y=78)
+            # Say WHY there's nothing to compare against. The old text assumed the
+            # only reason was "still learning the reference", which was wrong on an
+            # out-lap and read as a stuck app.
+            self._draw_pill(p, t(f"quiet.{quiet}") if quiet else t("overlay.rec"),
+                            _AMBER, y=78)
         else:
             self._draw_delta(p, delta, w)
+            if quiet:
+                # The delta is still worth seeing (you can read how far off you
+                # are), but the coach isn't advising — say so under the number.
+                self._set_font(p, 11)
+                p.setPen(_GREY)
+                p.drawText(0, 108, w, 16, Qt.AlignHCenter, t(f"quiet.{quiet}"))
+        self._draw_green_flag(p, w, quiet)
         self._draw_cue(p, w)
         self._draw_focus(p, w)
+
+    def _draw_green_flag(self, p: QPainter, w: int, quiet: str) -> None:
+        """Flash "green — flying lap" the moment the coach starts working.
+
+        Without it the driver never learns when the silence ended and keeps
+        suspecting the app is broken well after it resumed. Cheapest half of the
+        fix, and the half that's usually forgotten. The edge itself is caught in
+        :meth:`apply_state`; this only draws it.
+        """
+        if quiet or not self._green_at:
+            return
+        if time.monotonic() - self._green_at > _GREEN_HOLD_S:
+            return
+        self._set_font(p, 12, bold=True)
+        p.setPen(_GREEN)
+        p.drawText(0, 108, w, 16, Qt.AlignHCenter, t("quiet.green"))
 
     # --- the HONE mark: a cyan chevron with a green apex dot ----------------
     def _draw_mark(self, p: QPainter, x: int, y: int, h: int) -> None:

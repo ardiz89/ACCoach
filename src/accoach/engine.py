@@ -44,6 +44,7 @@ from .comparison import DeltaState, LapComparator, Reference
 from .engineer import RaceEngineer, classify, engineer_for
 from .recording import DEFAULT_LAPS_DIR, Lap, LapRecorder, find_reference_lap, save_lap
 from .telemetry import SharedMemoryReader, TelemetrySnapshot
+from .telemetry.snapshot import ACStatus
 from .telemetry.feed import TelemetryFeed
 from .track import Corner, detect_corners
 
@@ -104,6 +105,10 @@ class EngineState:
     history: list[str]           # recent spoken cue messages, newest last
     engineer: dict | None = None  # latest race-engineer decision (setup advice)
     focus: dict | None = None     # latest Focus/Lesson report (driver coaching)
+    # Why the coach is holding back, "" when it's coaching normally. Every gate
+    # has to say so: a silent gate reads as a broken app (the driver's own words
+    # after a calibration session were "I drove and nothing happened").
+    quiet: str = ""              # "" | "pit" | "out_lap" | "no_reference" | "off_pace"
 
 
 def _load_reference(car: str, track: str, laps_dir: Path | str) -> Reference | None:
@@ -166,6 +171,11 @@ class CoachEngine:
         self._key: tuple[str, str] = ("", "")
         self.saved_laps = 0
         self.history: list[str] = []
+        # Out-lap tracking, mirroring LapRecorder's rule: a lap is "flying" only
+        # once we've watched it open at the start/finish line. Kept here rather
+        # than read off the recorder because that one lives on the feed thread.
+        self._prev_completed: int | None = None
+        self._flying_lap = False
 
         # Race engineer: rebuilt per car/track; fed a per-lap diagnosis (LapStats)
         # at each completed lap, surfaces its latest decision in the payload.
@@ -353,10 +363,12 @@ class CoachEngine:
             self._rebuild_reference(lap.car_model, lap.track)        # chase the new best
 
         delta = self._comparator.compare(snap) if self._comparator else None
-        # On an abnormal lap (no comparison, or delta blown out) gate everything
-        # except acute safety cues — detectors still run so their state advances,
-        # we just don't speak technique/setup advice that isn't worth hearing.
-        flying = delta is not None and abs(delta.delta_ms) <= _GATE_DELTA_MS
+        # On an abnormal lap (out of the pits, no comparison, or delta blown out)
+        # gate everything except acute safety cues — detectors still run so their
+        # state advances, we just don't speak advice that isn't worth hearing.
+        self._track_flying_lap(snap)
+        quiet = self._quiet_reason(snap, delta)
+        flying = not quiet
 
         def _submit(cues: list[Cue]) -> None:
             kept = cues if flying else [c for c in cues
@@ -398,7 +410,44 @@ class CoachEngine:
             history=list(self.history),
             engineer=self._engineer_block(),
             focus=self._focus_block(),
+            quiet=quiet,
         )
+
+    def _track_flying_lap(self, s: TelemetrySnapshot) -> None:
+        """Am I on a lap that started at the line, or still on the way out?
+
+        Same rule as :class:`LapRecorder` — the lap counter incrementing is the
+        only start/finish signal that holds on both titles and in every session
+        type. Everything cheaper lies: ``lap_position`` keeps advancing down the
+        pit lane, ``current_lap_ms`` starts ticking as you leave the box, and the
+        session type doesn't help because an ACC hotlap has an out-lap too.
+        """
+        if not (s.connected and s.status == ACStatus.LIVE) or s.in_pit or s.in_pit_lane:
+            self._prev_completed = None
+            self._flying_lap = False
+            return
+        if self._prev_completed is not None and s.completed_laps > self._prev_completed:
+            # Set on the crossing frame itself, not the next tick: the tyre-temp
+            # and pressure advisors emit exactly here, and they're the one thing
+            # an out-lap is good for.
+            self._flying_lap = True
+        self._prev_completed = s.completed_laps
+
+    def _quiet_reason(self, s: TelemetrySnapshot, delta: DeltaState | None) -> str:
+        """Why the coach is holding back this tick, "" if it isn't.
+
+        Ordered most-specific first, because they overlap: an out-lap also has no
+        usable delta, and saying "no reference yet" there would be a lie.
+        """
+        if s.in_pit or s.in_pit_lane:
+            return "pit"
+        if not self._flying_lap:
+            return "out_lap"
+        if delta is None:
+            return "no_reference"
+        if abs(delta.delta_ms) > _GATE_DELTA_MS:
+            return "off_pace"
+        return ""
 
     def close(self) -> None:
         if self.voice is not None:

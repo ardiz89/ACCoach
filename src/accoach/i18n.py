@@ -44,6 +44,17 @@ _UI: dict[str, dict[str, str]] = {
     "overlay.waiting": {"en": "waiting for the game…", "it": "in attesa del gioco…"},
     "overlay.rec": {"en": "REC ● learning the reference lap…",
                     "it": "REC ● sto imparando il giro di riferimento…"},
+    # Why the coach is quiet. One per EngineState.quiet value: a gate that says
+    # nothing is indistinguishable from a broken app, so each one names itself.
+    "quiet.pit": {"en": "In the pits — I start at the line",
+                  "it": "Ai box — parto dal traguardo"},
+    "quiet.out_lap": {"en": "Out lap — I start at the line",
+                      "it": "In ricognizione — parto dal traguardo"},
+    "quiet.no_reference": {"en": "No reference yet — complete one clean lap",
+                           "it": "Nessun riferimento — completa un giro pulito"},
+    "quiet.off_pace": {"en": "Off-pace lap — I'll resume at the line",
+                       "it": "Giro fuori ritmo — riprendo dal traguardo"},
+    "quiet.green": {"en": "Green — flying lap", "it": "Via — giro lanciato"},
     "overlay.brake": {"en": "BRAKE", "it": "FRENA"},
     "overlay.focus": {"en": "FOCUS", "it": "FOCUS"},
     "overlay.throttle_pedal": {"en": "THR", "it": "GAS"},
