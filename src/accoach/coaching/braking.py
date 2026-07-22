@@ -41,6 +41,23 @@ _COAST_HOLD_S = 0.6
 
 # Trail braking: a hard stop that finished with the brake already released right
 # as the car is turned in (and not on the way out of a corner).
+# Held partial throttle. Straight from how human coaches actually talk: a driver
+# stuck at a plateau gets told they hold 1-90% throttle for too long through
+# corners, that it adds understeer rather than accelerating the car, and that the
+# fix is to be patient and then commit — coast BEFORE the throttle if you must,
+# but once you open, open all the way.
+#
+# The fault is HOLDING, not modulating: rolling on progressively is correct
+# technique and passes straight through this band every corner exit. So we
+# require the pedal to sit in the band without climbing meaningfully — a plateau,
+# not a ramp. Long hold and a wide dead zone on purpose: this one is new and
+# unvalidated on track, and a false "commit!" on a corner where the driver is
+# rightly feeding it in is worse than staying quiet.
+_PART_THROTTLE_LO = 0.15    # above this we're actually on the throttle
+_PART_THROTTLE_HI = 0.85    # below this we're not committed
+_PART_THROTTLE_HOLD_S = 1.2
+_PART_THROTTLE_RAMP = 0.12  # more rise than this over the episode = modulating
+
 _BRAKE_HARD = 0.50          # peak brake that marks a real braking zone
 _BRAKE_RELEASED = 0.12      # brake this low at turn-in = nothing left to trail
 _STEER_TURNIN = 0.10        # rad of steering that marks turn-in
@@ -56,6 +73,8 @@ class BrakingDetector:
 
     def __init__(self, car_class: CarClass | None = None) -> None:
         self._coast = Episode()
+        self._part = Episode()
+        self._part_start_throttle = 0.0
         self._last_hard_brake_t = -1e9
         self._in_turn = False
         self._trail_cue = (tuning_for_class(car_class).trail_brake_cue
@@ -67,6 +86,8 @@ class BrakingDetector:
 
     def reset(self) -> None:
         self._coast = Episode()
+        self._part = Episode()
+        self._part_start_throttle = 0.0
         self._last_hard_brake_t = -1e9
         self._in_turn = False
 
@@ -79,6 +100,7 @@ class BrakingDetector:
         if s.speed_kmh < _MIN_SPEED_KMH:
             # Keep timers sane but don't coach at low speed.
             self._coast.active = False
+            self._part.active = False
             self._in_turn = abs(s.steer_angle) >= _STEER_TURNIN
             return cues
 
@@ -88,6 +110,10 @@ class BrakingDetector:
         if step(self._coast, self._is_coasting(s), now, _COAST_HOLD_S):
             cues.append(make_cue(s, CueCategory.COASTING,
                                  "Stai veleggiando: riduci il tempo morto fra freno e gas", _PRIORITY))
+
+        if self._held_partial_throttle(s, now):
+            cues.append(make_cue(s, CueCategory.PARTIAL_THROTTLE,
+                                 "Gas a metà troppo a lungo: aspetta e poi apri tutto", _PRIORITY))
 
         # Always step the turn-in state machine, even when the cue is off for this
         # class: set_car_class can flip it mid-session, and a state machine that
@@ -102,6 +128,25 @@ class BrakingDetector:
     @staticmethod
     def _is_coasting(s: TelemetrySnapshot) -> bool:
         return s.brake < _PEDAL_OFF and s.throttle < _PEDAL_OFF
+
+    def _held_partial_throttle(self, s: TelemetrySnapshot, now: float) -> bool:
+        """Throttle parked mid-pedal through a corner, rather than fed in.
+
+        Three conditions, and the third is what keeps this honest: the pedal must
+        be in the band, the car must be turning (mid-throttle down a straight is
+        just a lift, and a lift is somebody else's cue), and the pedal must not be
+        climbing. A progressive roll-on crosses this whole band on every corner
+        exit and is exactly what we want the driver to do — flagging that would
+        teach the opposite of the lesson.
+        """
+        in_band = _PART_THROTTLE_LO <= s.throttle <= _PART_THROTTLE_HI
+        turning = abs(s.steer_angle) >= _STEER_TURNIN
+        cond = in_band and turning and s.brake < _PEDAL_OFF
+        if cond and not self._part.active:
+            self._part_start_throttle = s.throttle
+        if not step(self._part, cond, now, _PART_THROTTLE_HOLD_S):
+            return False
+        return s.throttle - self._part_start_throttle < _PART_THROTTLE_RAMP
 
     def _trail_fault(self, s: TelemetrySnapshot, now: float) -> bool:
         """Fire once on the turn-in edge when a straight-line stop just ended."""

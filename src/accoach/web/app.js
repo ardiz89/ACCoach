@@ -866,15 +866,28 @@ function drawWaterfall(a) {
   el.innerHTML = `<h3>${t("wf.title")}</h3>` + rows;
 }
 
+// Lap-wide findings, above the corner list because that's the order a human
+// coach uses them: "you lift on the Kemmel straight" comes before turn 7.
+function noteBlocks(a) {
+  return (a.notes || []).map((n) =>
+    `<div class="loss note">` +
+    `<div class="loss-head"><span class="corner">${n.message}</span>` +
+    (n.lost_s > 0 ? `<span class="lost">−${n.lost_s.toFixed(3)}s</span>` : "") +
+    `</div>` +
+    (n.detail ? `<div class="detail">${n.detail}</div>` : "") +
+    `</div>`).join("");
+}
+
 function drawDebrief(a) {
   const el = $("debrief");
   const legend = cornerLegend(a);
+  const notes = noteBlocks(a);
   if (!a.losses.length) {
-    el.innerHTML = `<h3>${t("debrief.title")}</h3>${legend}` +
-      `<div class="clean">${t("debrief.clean")}</div>`;
+    el.innerHTML = `<h3>${t("debrief.title")}</h3>${legend}${notes}` +
+      (notes ? "" : `<div class="clean">${t("debrief.clean")}</div>`);
     return;
   }
-  let html = `<h3>${t("debrief.title")}</h3>${legend}`;
+  let html = `<h3>${t("debrief.title")}</h3>${legend}${notes}`;
   for (const l of a.losses) {
     const major = l.lost_s >= 0.2 ? "major" : "";
     html += `<div class="loss ${major}">` +

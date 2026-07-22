@@ -340,6 +340,9 @@ main { padding: 16px 24px; display: grid; gap: 18px; }
   border-left: 4px solid var(--amber); border-radius: 12px;
 }
 .loss.major { border-left-color: var(--red); }
+/* Lap-wide finding, not a corner: cyan edge so it reads as a different KIND of
+   observation rather than as the worst corner of the list. */
+.loss.note { border-left-color: var(--cyan); }
 .loss-head { display: flex; align-items: baseline; gap: 12px; }
 .loss .corner { font-weight: 700; font-size: 15px; }
 .loss .lost { color: var(--red); font-family: var(--font-mono); font-variant-numeric: tabular-nums; }

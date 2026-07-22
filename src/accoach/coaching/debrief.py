@@ -143,6 +143,18 @@ class CornerLoss:
 
 
 @dataclass(slots=True)
+class LapNote:
+    """A lap-wide finding: what, where, how much it cost, and what to check."""
+
+    kind: str            # "lift" | "top_speed"
+    message: str
+    detail: str = ""
+    lost_ms: float = 0.0
+    pos: float = 0.0     # where it happened, 0..1 (0 = the whole lap)
+    where: str = ""      # corner name, or "" on a straight
+
+
+@dataclass(slots=True)
 class LapDebrief:
     """Ranked breakdown of where a lap lost time vs the reference."""
 
@@ -151,6 +163,10 @@ class LapDebrief:
     lap_time_ms: int
     reference_lap_ms: int
     losses: list[CornerLoss] = field(default_factory=list)  # worst first
+    # Findings that are not a corner. Real coaches say these first — a lift on a
+    # flat-out section and a top-speed deficit are both lap-wide facts that the
+    # per-corner breakdown structurally cannot express.
+    notes: list["LapNote"] = field(default_factory=list)
 
     @property
     def total_gap_ms(self) -> int:
@@ -221,6 +237,42 @@ def _metres_between(lap: Lap, a: float, b: float) -> float:
     return math.hypot(pa[0] - pb[0], pa[1] - pb[1])
 
 
+# --- lap-wide findings ------------------------------------------------------
+# Straight from how human coaches actually open a debrief. Neither of these fits
+# the per-corner breakdown: a lift lives on a straight, and top speed is one
+# number for the whole lap.
+
+_FLAT_REF = 0.98        # the reference is pinned here — this stretch IS flat out
+_LIFT_THROTTLE = 0.90   # you dropped below this: a lift, not pedal noise
+_LIFT_MIN_S = 0.15      # shorter than this is a twitch, not a decision
+_LIFT_MIN_MS = 60.0     # …and it has to have cost something worth saying
+
+# Top speed. 4 km/h is past run-to-run noise (fuel load, tow, a metre of line)
+# and still small enough to catch a wing click. The wording only turns into a
+# setup hypothesis when the corners say the driver isn't simply slower.
+_VMAX_GAP_KMH = 4.0
+_VMIN_COMPARABLE_KMH = 3.0
+
+_LIFT_MSG = {"en": "You lift where the reference is flat",
+             "it": "Sollevi dove il riferimento sta in pieno"}
+_LIFT_DETAIL = {
+    "en": " Throttle down to {thr:.0f}% for {secs:.1f}s{where}: ~{tenths:.1f} "
+          "tenths, and it multiplies down the straight that follows.",
+    "it": " Gas giù al {thr:.0f}% per {secs:.1f}s{where}: ~{tenths:.1f} decimi, "
+          "e si moltiplicano sul rettilineo che segue."}
+_TOP_SPEED_MSG = {"en": "Down {gap:.0f} km/h on top speed",
+                  "it": "Ti mancano {gap:.0f} km/h di velocità di punta"}
+_TOP_SPEED_AERO = {
+    "en": " Your corner speeds match the reference, so the car isn't slower — "
+          "check wing and gearing.",
+    "it": " Nelle curve vai come il riferimento, quindi non è l'auto a essere "
+          "più lenta: controlla ala e rapporti."}
+_TOP_SPEED_EXIT = {
+    "en": " You're also slower through the corners, so this is exit speed, not "
+          "setup: fix the exits first.",
+    "it": " Sei più lento anche in curva, quindi è velocità in uscita, non "
+          "assetto: prima sistema le uscite."}
+
 _BRAKE_EARLY = {"en": " You brake ~{m:.0f} m too early.",
                 "it": " Anticipi la staccata di ~{m:.0f} m."}
 _BRAKE_PEAK = {"en": " Peak brake {pl:.0f}% vs {pr:.0f}%: press harder.",
@@ -247,6 +299,95 @@ def _braking_detail(lap: Lap, reference: Reference, inside: list,
             extra += _BRAKE_PEAK.get(lg, _BRAKE_PEAK["en"]).format(
                 pl=peak_live * 100, pr=peak_ref * 100)
     return extra
+
+
+def _lift_notes(lap: Lap, reference: Reference, corners: list[Corner],
+                lg: str) -> list[LapNote]:
+    """Stretches where the reference is pinned flat and you weren't.
+
+    A human coach opens with this — "that little lift cost you three tenths, and
+    the Kemmel straight multiplies it" — and our per-corner breakdown cannot say
+    it, because the lift happens on the straight *between* two corners and gets
+    silently folded into the previous corner's window.
+
+    The cost is measured over the stretch itself, from the moment you lift to the
+    moment the reference stops being flat: that end point is what carries the
+    "…and it multiplies down the straight" part into the number instead of
+    leaving it as a figure of speech.
+    """
+    out: list[LapNote] = []
+    run: list = []
+    for s in lap.samples:
+        flat = reference.point_at(s.pos).throttle >= _FLAT_REF
+        if flat and s.throttle < _LIFT_THROTTLE:
+            run.append(s)
+            continue
+        if run:
+            note = _lift_note(lap, reference, corners, run, s.pos, lg)
+            if note is not None:
+                out.append(note)
+            run = []
+    out.sort(key=lambda n: n.lost_ms, reverse=True)
+    return out
+
+
+def _lift_note(lap: Lap, reference: Reference, corners: list[Corner],
+               run: list, end_pos: float, lg: str) -> LapNote | None:
+    first, last = run[0], run[-1]
+    secs = (last.t_ms - first.t_ms) / 1000.0
+    if secs < _LIFT_MIN_S:
+        return None
+    # Time lost from the lift to where the reference comes off full throttle —
+    # so the straight it costs you on is inside the number.
+    lost = ((last.t_ms - first.t_ms)
+            - (reference.time_at(end_pos) - reference.time_at(first.pos)))
+    lost = max(0.0, lost)
+    if lost < _LIFT_MIN_MS:
+        return None
+    name = ""
+    for c in corners:
+        if c.entry_pos <= first.pos <= c.exit_pos:
+            name = corner_name(lap.track, c.index, c.apex_pos, lg)
+            break
+    where = f" ({name})" if name else ""
+    detail = _LIFT_DETAIL.get(lg, _LIFT_DETAIL["en"]).format(
+        thr=min(s.throttle for s in run) * 100, secs=secs,
+        tenths=lost / 100.0, where=where)
+    return LapNote(kind="lift", message=_LIFT_MSG.get(lg, _LIFT_MSG["en"]),
+                   detail=detail, lost_ms=lost, pos=first.pos, where=name)
+
+
+def _top_speed_note(lap: Lap, reference: Reference, corners: list[Corner],
+                    lg: str) -> LapNote | None:
+    """Top-speed deficit, and whether the corners let us blame the setup.
+
+    The distinction is the whole value of the note. Down on top speed *with*
+    matching corner speeds points at drag or gearing; down on top speed *because*
+    you're slower everywhere points at exits, and telling that driver to take
+    wing off would make the car worse in the only place they were losing time.
+    """
+    if not lap.samples:
+        return None
+    vmax_live = max(s.speed_kmh for s in lap.samples)
+    vmax_ref = max(reference.point_at(s.pos).speed_kmh for s in lap.samples)
+    gap = vmax_ref - vmax_live
+    if gap < _VMAX_GAP_KMH:
+        return None
+    # Are the corners comparable? Compare the slowest point of each corner.
+    deficits = []
+    for c in corners:
+        inside = [s for s in lap.samples if c.entry_pos <= s.pos <= c.exit_pos]
+        if len(inside) < 2:
+            continue
+        deficits.append(min(reference.point_at(s.pos).speed_kmh for s in inside)
+                        - min(s.speed_kmh for s in inside))
+    corners_match = bool(deficits) and _mean(deficits) < _VMIN_COMPARABLE_KMH
+    tail = (_TOP_SPEED_AERO if corners_match else _TOP_SPEED_EXIT)
+    return LapNote(
+        kind="top_speed",
+        message=_TOP_SPEED_MSG.get(lg, _TOP_SPEED_MSG["en"]).format(gap=gap),
+        detail=tail.get(lg, tail["en"]),
+    )
 
 
 def build_lap_debrief(lap: Lap, reference: Reference, corners: list[Corner],
@@ -329,10 +470,14 @@ def build_lap_debrief(lap: Lap, reference: Reference, corners: list[Corner],
         ))
 
     losses.sort(key=lambda x: x.lost_ms, reverse=True)
+    notes = _lift_notes(lap, reference, corners, lg)
+    top = _top_speed_note(lap, reference, corners, lg)
+    if top is not None:
+        notes.append(top)
     return LapDebrief(
         car_model=lap.car_model, track=lap.track,
         lap_time_ms=lap.lap_time_ms, reference_lap_ms=reference.lap_time_ms,
-        losses=losses,
+        losses=losses, notes=notes,
     )
 
 

@@ -451,6 +451,14 @@ def create_api(
                 "vmin_ref": round(x.min_speed_ref, 0),
                 "apex": x.apex_pos,
             } for x in debrief.losses],
+            # Lap-wide findings that aren't a corner: a lift where the reference
+            # is flat, a top-speed deficit. Human coaches open a debrief with
+            # these, and the per-corner list structurally can't hold them.
+            "notes": [{
+                "kind": n.kind, "message": n.message, "detail": n.detail,
+                "lost_s": round(n.lost_ms / 1000, 3),
+                "pos": round(n.pos, 4), "where": n.where,
+            } for n in debrief.notes],
             "consistency": consistency,
             "laps": [{
                 "path": r["path"], "lap_time": format_lap_time(r["lap_time_ms"]),

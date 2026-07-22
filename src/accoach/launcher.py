@@ -58,6 +58,7 @@ _SRC = Path(__file__).resolve().parents[1]   # .../src
 _GUIDE = "__guide__"
 _STOP_LIVE = "__stop_live__"
 _WIZARD = "__wizard__"
+_IMPORT_PRO = "__import_pro__"
 
 # Commands that run a speaking coach. Only one may run at a time — two voice
 # engines talking together sound like an echo — so starting one stops the other.
@@ -66,7 +67,7 @@ _VOICE_CMDS = {"live", "coach"}
 # While Coach Live is running these action keys stay clickable; all other action
 # buttons are disabled so you can't stack a second coach/telemetry reader on top
 # of it. (The sidebar itself always stays navigable.)
-_LIVE_SAFE_KEYS = {_STOP_LIVE, _GUIDE, _WIZARD,
+_LIVE_SAFE_KEYS = {_STOP_LIVE, _GUIDE, _WIZARD, _IMPORT_PRO,
                    ("web",), ("web", "--engineer"), ("server",)}
 
 
@@ -614,8 +615,45 @@ class MainWindow(QWidget):
         page, lay = _section("nav.analysis")
         lay.addWidget(self.action_button("btn.analysis", ["web"], accent=True))
         lay.addWidget(self.action_button("btn.debrief", ["debrief"], console=True))
+        # Importing a benchmark lap existed only as a CLI command, so the whole
+        # "PRO reference" level of the product was unreachable in practice: a
+        # driver three seconds off the pace trained against their own
+        # three-seconds-off lap, and every loss was measured off a wrong line.
+        lay.addWidget(self.special_button("btn.import_pro", _IMPORT_PRO,
+                                          self._import_pro))
+        self._import_note = _hint(t("import.hint"), "import.hint")
+        lay.addWidget(self._import_note)
         lay.addStretch(1)
         return page
+
+    def _import_pro(self) -> None:
+        """Pick a lap file and register it as a trusted PRO benchmark."""
+        from PySide6.QtWidgets import QFileDialog
+
+        path, _ = QFileDialog.getOpenFileName(
+            self, t("btn.import_pro"), "",
+            "HONE lap (*.lap.json.gz);;All files (*)")
+        if not path:
+            return
+        from .recording import load_lap, save_lap
+
+        try:
+            lap = load_lap(Path(path))
+            if lap.lap_time_ms <= 0 or not lap.samples:
+                raise ValueError("no lap time or no samples")
+        except Exception as exc:  # noqa: BLE001 - any bad file lands here
+            # Say which file and why. An import that fails silently is how a
+            # driver ends up wondering why the reference never changed.
+            self._import_note.setText(t("import.failed").format(err=exc))
+            return
+        lap.valid = True          # a reference must be a complete lap
+        lap.clean = True          # imported as a trusted clean benchmark
+        lap.source = "pro"        # its own level, not one of the driver's laps
+        lap.recorded_utc = ""     # let save_lap stamp it
+        save_lap(lap)
+        self._import_note.setText(t("import.done").format(
+            car=lap.car_model, track=lap.track,
+            time=f"{lap.lap_time_ms / 1000:.3f}s"))
 
     def _build_setup_page(self) -> QWidget:
         page, lay = _section("nav.setup")

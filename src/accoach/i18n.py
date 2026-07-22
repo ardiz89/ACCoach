@@ -116,6 +116,19 @@ _UI: dict[str, dict[str, str]] = {
     "btn.get_started": {"en": "✨  Get started", "it": "✨  Come iniziare"},
     "btn.settings": {"en": "⚙  Settings", "it": "⚙  Impostazioni"},
     "btn.mobile": {"en": "📱  Phone / tablet", "it": "📱  Telefono / tablet"},
+    "btn.import_pro": {"en": "⬇  Import a PRO reference lap",
+                       "it": "⬇  Importa un giro di riferimento PRO"},
+    # Says what it's FOR, not what it does. The feature only makes sense once you
+    # know the default reference is yourself.
+    "import.hint": {
+        "en": "Your reference is normally your own best lap. Import a faster "
+              "one and the coach measures you against that instead.",
+        "it": "Il riferimento è normalmente il tuo giro migliore. Importane uno "
+              "più veloce e il coach ti misura su quello."},
+    "import.done": {"en": "✓ Imported: {car} / {track} ({time})",
+                    "it": "✓ Importato: {car} / {track} ({time})"},
+    "import.failed": {"en": "Could not read that lap: {err}",
+                      "it": "Giro illeggibile: {err}"},
     "btn.guide": {"en": "❓  Guide — how to use", "it": "❓  Guida — come si usa"},
     "btn.overlay": {"en": "🖥  Overlay only", "it": "🖥  Solo overlay"},
     # hub — sidebar navigation
