@@ -1,6 +1,6 @@
-# Guida a ACCoach — il tuo ingegnere di pista in tempo reale
+# Guida a HONE — il tuo ingegnere di pista in tempo reale
 
-ACCoach è un **coach di guida in tempo reale** per **Assetto Corsa** e **Assetto
+HONE è un **coach di guida in tempo reale** per **Assetto Corsa** e **Assetto
 Corsa Competizione**. Mentre giri ti parla (voce italiana) e ti mostra un overlay
 con il distacco dal tuo giro migliore; a fine sessione ti fa un debrief e un'analisi
 dettagliata nel browser. Non serve configurare nulla nel gioco: legge la telemetria
@@ -13,9 +13,9 @@ Questa guida ti porta dall'avvio al primo giro coachato, fino all'analisi.
 ## 1. Cosa ti serve
 
 - **Assetto Corsa** o **Assetto Corsa Competizione** installato.
-- **ACCoach**, in uno dei due modi:
-  - **Eseguibile** (consigliato per usarlo): apri `ACCoach.exe` (o doppio clic su
-    `ACCoach.bat`). Non serve Python.
+- **HONE**, in uno dei due modi:
+  - **Eseguibile** (consigliato per usarlo): doppio clic su
+    `HONE.bat`. Non serve Python.
   - **Da sorgente** (per chi sviluppa): Python 3.11+, poi
     `pip install -r requirements.txt`.
 
@@ -31,8 +31,12 @@ dall'exe sia da sorgente), così l'analisi li ritrova sempre.
 2. **IMPOSTA IL GIOCO IN MODALITÀ BORDERLESS** (finestra senza bordi), *non*
    fullscreen esclusivo. L'overlay trasparente non si disegna sopra un fullscreen
    esclusivo: con borderless lo vedi, con fullscreen no.
-3. **Apri ACCoach.** Si apre il **Launcher**, una finestra con un pulsante per ogni
-   funzione. Premi **▶ Live (coach + overlay)**.
+3. **Apri HONE.** Si apre l'**hub**: una finestra con sei sezioni nella barra
+   laterale — **Home · Guida · Analisi · Setup · Dispositivi · Impostazioni**.
+   Vai su **Guida** e premi **▶ Coach Live**.
+
+> La Home ti mostra l'ultima sessione già analizzata, quindi dopo la prima volta
+> è lì che arrivi per sapere com'è andata.
 
 Da riga di comando l'equivalente è:
 
@@ -151,7 +155,7 @@ Vale la pena saperlo alla prima sessione su un'auto nuova.
 
 Finita la sessione, rivedi tutto con calma:
 
-- Dal Launcher: **📊 Analisi & Report (browser)**, oppure
+- Dall'hub, sezione **Analisi**: **📊 Analisi & Report (browser)**, oppure
   ```
   python -m accoach web
   ```
@@ -165,6 +169,34 @@ Cosa trovi:
 - **Andamento**: l'andamento dei tempi nel tempo, la **costanza** (migliore/media/
   scarto), e gli **errori ricorrenti** ("5× Porta più velocità in curva · Curve 1, 2").
 
+Nella tendina dei giri, accanto al tempo, trovi **i gradi dell'asfalto** (es.
+`2:03.732 · 37.8°`). Non è un dettaglio: fra pista fredda e pista calda i punti
+di frenata si spostano di 10-20 metri, quindi due giri con temperature molto
+diverse sono due circuiti diversi e confrontarli dice poco.
+
+Nel debrief, **sopra** l'elenco delle curve, possono comparire uno o due riquadri
+col bordo azzurro. Sono osservazioni **sull'intero giro**, non su una curva:
+- *«Sollevi dove il riferimento sta in pieno»* — con quanto ti è costato, contando
+  anche il rettilineo che segue;
+- *«Ti mancano N km/h di punta»* — e qui la parte che conta: se in curva vai come
+  il riferimento non è l'auto a essere lenta, guarda ala e rapporti; se sei più
+  lento anche in curva, è velocità in uscita e l'assetto non c'entra.
+
+### Chi diventa il riferimento
+
+È il tuo giro più veloce su quella auto e quella pista, con due regole sopra:
+
+- **I giri sporchi non sono mai candidabili.** Un giro tagliato è più veloce per
+  un motivo.
+- **La temperatura dell'asfalto conta.** Un giro fatto in condizioni simili a
+  oggi batte uno un po' più veloce fatto in condizioni molto diverse. È una
+  preferenza, non un filtro: se niente somiglia a oggi ti do comunque il tuo
+  giro migliore, non "nessun riferimento".
+
+Se sei lontano dal passo, il tuo miglior giro è un bersaglio che ti tiene dove
+sei. Dalla sezione **Analisi** puoi importare un **giro di riferimento PRO** più
+veloce, e da lì in poi il coach ti misura su quello.
+
 > Vuoi solo provarlo senza gioco? `python -m accoach web --demo` carica dati finti.
 
 ### Aprire su telefono / tablet (stessa rete)
@@ -172,7 +204,7 @@ Cosa trovi:
 Comodo se giochi in triple monitor e vuoi il **Report** o l'**Ingegnere** su un
 dispositivo a fianco:
 
-1. Nel Launcher premi **📱 Telefono / tablet** e spunta **"Consenti l'accesso
+1. Nell'hub, sezione **Dispositivi**, attiva e spunta **"Consenti l'accesso
    dagli altri dispositivi in rete"** (si ricorda nel config).
 2. Compaiono due **QR code** — **Report** e **Ingegnere** — con sotto l'indirizzo
    (es. `http://192.168.1.23:8778`). **Inquadra il QR** col telefono, oppure
@@ -236,7 +268,7 @@ i giri salvati: il gioco non deve essere aperto.
 ## 9. Risoluzione problemi
 
 - **"Resta in attesa del gioco" / non si connette** → il gioco dev'essere aperto e
-  tu in pista (stato LIVE) in una sessione. ACCoach legge la memoria condivisa solo
+  tu in pista (stato LIVE) in una sessione. HONE legge la memoria condivisa solo
   mentre il gioco gira.
 - **Non vedo l'overlay** → sei in fullscreen esclusivo. Passa a **borderless**.
 - **Non sento la voce** → lancia `python -m accoach selftest` (o il pulsante): scrive

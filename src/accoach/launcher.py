@@ -89,16 +89,9 @@ def mark_wizard_seen() -> None:
         pass
 
 
-_WIZARD_STEPS = [
-    "Set your game (AC / ACC) to <b>Borderless</b> so the overlay can draw over it.",
-    "Click <b>Coach Live</b> — you get the voice coach and the on-screen overlay "
-    "while you drive.",
-    "Drive one clean lap: it becomes your <b>reference</b>. Beat it and the next "
-    "lap becomes the new one.",
-    "After a session, open <b>Analysis &amp; Report</b> for the corner-by-corner "
-    "debrief, and <b>Race engineer</b> for setup advice.",
-    "No game handy? Try <b>Coach Live — DEMO</b> to see it work on a synthetic lap.",
-]
+# The five steps, by key: the text lives in the catalogue like every other
+# string, so the first screen follows the chosen language too.
+_WIZARD_STEP_KEYS = ("wiz.s1", "wiz.s2", "wiz.s3", "wiz.s4", "wiz.s5")
 
 
 class GettingStarted(QDialog):
@@ -106,16 +99,16 @@ class GettingStarted(QDialog):
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.setWindowTitle("Welcome to HONE")
+        self.setWindowTitle(t("wiz.title"))
         self.setModal(True)
         self.resize(460, 460)
         lay = QVBoxLayout(self)
         lay.setContentsMargins(24, 24, 24, 20)
         lay.setSpacing(12)
 
-        title = QLabel("Welcome to HONE")
+        title = QLabel(t("wiz.title"))
         title.setProperty("role", "title")
-        sub = QLabel("Know why you're slow. Here's how to get going:")
+        sub = QLabel(t("wiz.sub"))
         sub.setProperty("role", "muted")
         sub.setWordWrap(True)
         lay.addWidget(title)
@@ -123,7 +116,7 @@ class GettingStarted(QDialog):
 
         steps = "".join(
             f"<p style='margin:0 0 12px 0;'><b>{i}.</b> {text}</p>"
-            for i, text in enumerate(_WIZARD_STEPS, 1)
+            for i, text in enumerate((t(k) for k in _WIZARD_STEP_KEYS), 1)
         )
         body = QLabel(steps)
         body.setTextFormat(Qt.RichText)
@@ -131,14 +124,14 @@ class GettingStarted(QDialog):
         lay.addWidget(body)
         lay.addStretch(1)
 
-        self._dont_show = QCheckBox("Don't show this again")
+        self._dont_show = QCheckBox(t("wiz.dont_show"))
         self._dont_show.setChecked(True)
         lay.addWidget(self._dont_show)
 
         row = QHBoxLayout()
-        guide = QPushButton("Open full guide")
+        guide = QPushButton(t("wiz.open_guide"))
         guide.clicked.connect(_open_guide)
-        ok = QPushButton("Get started")
+        ok = QPushButton(t("wiz.go"))
         ok.setProperty("accent", True)
         ok.setDefault(True)
         ok.clicked.connect(self.accept)
@@ -159,19 +152,32 @@ class GettingStarted(QDialog):
 
 
 def _guide_path() -> Path:
-    """Locate GUIDA.md from source or from a frozen build."""
+    """The user guide, in the language the app is set to.
+
+    Two documents, one per language: ``GUIDA.md`` (Italian) and ``docs/FAQ.md``
+    (English). Before this the app opened the Italian one whatever you had
+    chosen, so an English session's "Guide" button answered in Italian.
+
+    Falls back to the other document rather than to nothing: a guide in the wrong
+    language still beats a button that appears to do nothing.
+    """
+    from .i18n import current_language
+
+    names = (["GUIDA.md", "docs/FAQ.md"] if current_language() == "it"
+             else ["docs/FAQ.md", "GUIDA.md"])
+    roots = []
     if getattr(sys, "frozen", False):
         base = getattr(sys, "_MEIPASS", None)
-        candidates = []
         if base:
-            candidates.append(Path(base) / "GUIDA.md")
-        candidates.append(Path(sys.executable).parent / "GUIDA.md")
+            roots.append(Path(base))
+        roots.append(Path(sys.executable).parent)
     else:
-        candidates = [_SRC.parent / "GUIDA.md"]
+        roots.append(_SRC.parent)
+    candidates = [root / name for name in names for root in roots]
     for c in candidates:
         if c.is_file():
             return c
-    return candidates[-1]
+    return candidates[0]
 
 
 def _open_guide() -> None:

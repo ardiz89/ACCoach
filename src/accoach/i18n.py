@@ -116,6 +116,43 @@ _UI: dict[str, dict[str, str]] = {
     "btn.get_started": {"en": "✨  Get started", "it": "✨  Come iniziare"},
     "btn.settings": {"en": "⚙  Settings", "it": "⚙  Impostazioni"},
     "btn.mobile": {"en": "📱  Phone / tablet", "it": "📱  Telefono / tablet"},
+    # First-run wizard. Was hardcoded English in a bilingual app: the very first
+    # screen a new driver sees ignored the language they had just chosen.
+    "wiz.title": {"en": "Welcome to HONE", "it": "Benvenuto in HONE"},
+    "wiz.sub": {"en": "Know why you're slow. Here's how to get going:",
+                "it": "Scopri perché sei lento. Ecco come si comincia:"},
+    "wiz.dont_show": {"en": "Don't show this again",
+                      "it": "Non mostrarlo più"},
+    "wiz.open_guide": {"en": "Open full guide", "it": "Apri la guida completa"},
+    "wiz.go": {"en": "Get started", "it": "Cominciamo"},
+    "wiz.s1": {
+        "en": "Set your game (AC / ACC) to <b>Borderless</b> — the overlay cannot "
+              "draw over exclusive fullscreen.",
+        "it": "Metti il gioco (AC / ACC) in <b>Borderless</b> — sul fullscreen "
+              "esclusivo l'overlay non si disegna."},
+    "wiz.s2": {
+        "en": "Open <b>Drive</b> in the sidebar and hit <b>Coach Live</b>: voice "
+              "coach plus the on-screen overlay while you drive.",
+        "it": "Apri <b>Guida</b> nella barra laterale e premi <b>Coach Live</b>: "
+              "coach vocale più overlay a schermo mentre guidi."},
+    "wiz.s3": {
+        "en": "Drive one complete lap. It becomes your <b>reference</b>, and the "
+              "delta appears from the next lap on. Until then the coach still "
+              "calls locks, slides and tyres — everything that doesn't need a "
+              "lap to compare against.",
+        "it": "Fai un giro completo. Diventa il tuo <b>riferimento</b>, e il delta "
+              "compare dal giro dopo. Fino a lì il coach ti dice comunque "
+              "bloccaggi, scivolate e gomme — tutto ciò che non ha bisogno di un "
+              "giro con cui confrontarsi."},
+    "wiz.s4": {
+        "en": "After the session open <b>Analysis</b> for the corner-by-corner "
+              "debrief, and <b>Setup</b> for the race engineer.",
+        "it": "A fine sessione apri <b>Analisi</b> per il debrief curva per curva, "
+              "e <b>Setup</b> per l'ingegnere di pista."},
+    "wiz.s5": {
+        "en": "No game handy? <b>Coach Live — DEMO</b> runs it all on a synthetic lap.",
+        "it": "Non hai il gioco sottomano? <b>Coach Live — DEMO</b> fa girare "
+              "tutto su un giro finto."},
     "btn.import_pro": {"en": "⬇  Import a PRO reference lap",
                        "it": "⬇  Importa un giro di riferimento PRO"},
     # Says what it's FOR, not what it does. The feature only makes sense once you

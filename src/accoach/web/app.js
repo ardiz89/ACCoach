@@ -108,6 +108,8 @@ function tourSteps() {
     { sel: "#c-delta", title: t("tour.a3.t"), text: t("tour.a3.x") },
     { sel: "#vmin", title: t("tour.a4.t"), text: t("tour.a4.x") },
     { sel: "#debrief", title: t("tour.a5.t"), text: t("tour.a5.x") },
+    { sel: "#debrief", title: t("tour.a7.t"), text: t("tour.a7.x") },
+    { sel: "#combo", title: t("tour.a8.t"), text: t("tour.a8.x") },
     { sel: ".export", title: t("tour.a6.t"), text: t("tour.a6.x") },
   ];
 }

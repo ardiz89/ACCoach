@@ -149,8 +149,10 @@ Start AC/ACC and enter a session (practice/hotlap/race). HONE connects as soon a
 the game starts publishing telemetry.
 
 **I have no reference lap.**
-Drive at least one valid lap: it becomes the reference. Or seed a PRO lap:
-`python -m accoach import-reference <file.lap.json.gz>`.
+Drive at least one valid lap: it becomes the reference. Or import a faster one —
+**Analysis → Import a PRO reference lap** in the hub. (There's a command-line
+equivalent, `python -m accoach import-reference <file.lap.json.gz>`, but the
+button is the same thing with a file picker.)
 
 **The voice isn't speaking.**
 Run with the voice on (default) rather than `--silent`. Fixed phrases use a
