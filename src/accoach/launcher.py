@@ -232,10 +232,31 @@ class SettingsPanel(QWidget):
         form.setSpacing(10)
         self._labels: dict[str, QLabel] = {}
 
+        self._helps: dict[str, QLabel] = {}
+
         def row(key: str, widget: QWidget) -> None:
+            """Label + a "?" whose tooltip explains the setting.
+
+            Reported by the user: a field called "Overlay scale" or "Reading
+            speed" means nothing to someone who didn't build the app, and this
+            panel had no help of any kind. A tooltip alone isn't enough — with
+            nothing visible to hover, nobody hovers. Hence a "?" you can see.
+            """
             lbl = QLabel(t(key))
             self._labels[key] = lbl
-            form.addRow(lbl, widget)
+            mark = QLabel("?")
+            mark.setProperty("role", "help")
+            mark.setToolTip(t(f"{key}.help"))
+            mark.setCursor(Qt.WhatsThisCursor)
+            self._helps[key] = mark
+            box = QWidget()
+            line = QHBoxLayout(box)
+            line.setContentsMargins(0, 0, 0, 0)
+            line.setSpacing(6)
+            line.addWidget(lbl)
+            line.addWidget(mark)
+            line.addStretch(1)
+            form.addRow(box, widget)
 
         self._voice = QCheckBox()
         self._voice.setChecked(cfg.voice.enabled)
@@ -318,6 +339,8 @@ class SettingsPanel(QWidget):
         self._title.setText(t("nav.settings").strip())
         for key, lbl in self._labels.items():
             lbl.setText(t(key))
+        for key, mark in self._helps.items():
+            mark.setToolTip(t(f"{key}.help"))
         self._scale_hint.setText(t("set.scale_hint"))
         self._save.setText(t("btn.save"))
         self._devtools.setText(t("sec.devtools"))

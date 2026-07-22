@@ -106,19 +106,41 @@ Pro will be a one-time purchase. The model may change before launch.
 You don't have to do anything special: start the session (Practice, Hotlap, Race)
 and drive.
 
-- A lap is closed when you **cross the start/finish line** — HONE reads the game's
-  lap counter (not the jittery position signal), and uses the game's official lap
-  time.
+- A lap is closed when you **cross the start/finish line**. HONE watches **two
+  signals at once**: the game's lap counter and the wrap of your track position.
+  Neither is enough alone — ACC **doesn't count the out-lap**, so on the counter
+  alone the first flying lap after every pit exit was lost. The saved time is the
+  game's own official lap time.
 - The **first lap is almost always partial** (you start mid-track), so it's
   discarded automatically. Only **complete, line-to-line laps** are saved.
-- **Starting from the pits:** recording is paused while you're in the pits; your
-  **out-lap** (pit exit → line) is partial and discarded; your **first flying lap**
-  is the first one saved. Your **in-lap** (returning to the pits) isn't saved
-  either, and changing car/track resets everything — a lap never spans two
-  sessions.
+- **Starting from the pits:** recording is paused in the garage *and in the pit
+  lane*; your **out-lap** is partial and discarded; your **first flying lap** is
+  the first one saved. Your **in-lap** isn't saved either, and changing car/track
+  resets everything — a lap never spans two sessions.
 - Two independent qualities: a lap is **complete** (started at the line — required
-  to be saved) and **clean** (no real excursion: fewer than 3 wheels off). A dirty
-  lap is still saved but **never used as the reference**.
+  to be saved) and **clean** (no track-limits excursion). A dirty lap is still
+  saved but **never used as the reference**.
+- **How "clean" is decided depends on the game**, because the two titles expose
+  different things: **AC** counts wheels off track (3 or more = dirty), **ACC**
+  reads the game's own track-limits verdict. On ACC that includes cutting a
+  chicane without ever touching the grass. If the game tells us nothing the lap
+  stays *unknown*, which is not the same as clean.
+- The report also names **which corner** you lost the lap at (e.g. "off track at
+  Variante Ascari"). Laps recorded before schema v8 don't carry this: they say
+  the lap was dirty, not where.
+
+## Which lap becomes the reference
+
+The reference is the fastest lap you've driven on that car and track — with two
+rules on top:
+
+- **Dirty laps are never eligible.** A cut lap is faster for a reason.
+- **Track temperature is taken into account.** Braking points move 10-20 m
+  between a cold track and a hot one, so a lap driven in comparable conditions
+  wins over a slightly faster one driven in very different ones. It's a
+  preference, not a filter: if nothing matches today's conditions you still get
+  your best lap rather than "no reference". The lap dropdown shows the track
+  temperature of each lap next to its time.
 
 ## Troubleshooting
 

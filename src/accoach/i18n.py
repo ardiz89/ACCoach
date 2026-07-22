@@ -197,6 +197,50 @@ _UI: dict[str, dict[str, str]] = {
     "set.radio": {"en": "Team-radio effect", "it": "Effetto radio di pista"},
     "set.rate": {"en": "Reading speed (wpm)", "it": "Velocità lettura (ppm)"},
     "set.scale": {"en": "Overlay scale", "it": "Scala overlay"},
+    # One "?" per setting. Reported by the user: a field named "Overlay scale"
+    # or "Reading speed" means nothing to someone who didn't build it, and the
+    # panel had no help text of any kind. Each answers WHAT it does and WHEN to
+    # touch it — a definition alone ("scales the overlay") helps nobody.
+    "set.voice.help": {
+        "en": "Speaks the coaching cues out loud. Turn it off to keep the "
+              "on-screen overlay only — useful in a race, or on a headset "
+              "you're sharing with a voice chat.",
+        "it": "Legge i consigli ad alta voce. Spegnila per tenere solo "
+              "l'overlay a schermo — utile in gara, o se le cuffie le stai "
+              "usando anche per parlare con qualcuno."},
+    "set.engineer_voice.help": {
+        "en": "Whether the race engineer's setup proposals are spoken too. "
+              "They arrive between laps, not while you're driving a corner. "
+              "Off means you'll still find them in the Setup section.",
+        "it": "Se anche le proposte di assetto dell'ingegnere vengono dette a "
+              "voce. Arrivano fra un giro e l'altro, non mentre sei in curva. "
+              "Se la spegni le trovi comunque nella sezione Assetto."},
+    "set.male_voice.help": {
+        "en": "Picks the male voice instead of the female one. Same words, "
+              "same timing — it only changes who says them.",
+        "it": "Sceglie la voce maschile invece di quella femminile. Stesse "
+              "parole, stessi tempi: cambia solo chi le dice."},
+    "set.radio.help": {
+        "en": "Filters the voice to sound like a pit-to-car radio. Purely "
+              "cosmetic: it costs nothing in lap time and changes nothing in "
+              "the advice. Off is the clearest.",
+        "it": "Filtra la voce perché suoni come una radio di pista. È solo "
+              "estetica: non cambia una virgola dei consigli. Spenta è la più "
+              "comprensibile."},
+    "set.rate.help": {
+        "en": "How fast the voice talks, in words per minute. Around 165 is "
+              "normal speech. Raise it if cues arrive too late in fast "
+              "corners; lower it if you're missing words.",
+        "it": "Quanto in fretta parla la voce, in parole al minuto. Intorno a "
+              "165 è il parlato normale. Alzala se nelle curve veloci i "
+              "consigli arrivano tardi, abbassala se ti perdi delle parole."},
+    "set.scale.help": {
+        "en": "How big the overlay is drawn on screen. 1.0 is the design size; "
+              "raise it on a 4K monitor or if you sit far from the screen, "
+              "lower it if it covers too much track.",
+        "it": "Quanto è grande l'overlay a schermo. 1.0 è la dimensione di "
+              "progetto: alzala su un monitor 4K o se stai lontano, abbassala "
+              "se ti copre troppa pista."},
     "set.scale_hint": {"en": "Applies on the next Coach Live start.",
                        "it": "Attivo al prossimo avvio di Coach Live."},
     "btn.save": {"en": "Save", "it": "Salva"},
