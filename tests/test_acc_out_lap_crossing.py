@@ -103,12 +103,13 @@ def test_a_lap_with_no_telemetry_is_not_a_lap(caplog):
     import logging
 
     rec = LapRecorder()
-    # A buffer that opens at a crossing and closes at the next one having kept
-    # nothing — every frame sat in the pre-wrap region the appender drops.
-    frames = [replace(_LIVE, lap_position=0.95, completed_laps=0),
-              replace(_LIVE, lap_position=0.96, completed_laps=1),   # crossing
-              replace(_LIVE, lap_position=0.97, completed_laps=1),
-              replace(_LIVE, lap_position=0.98, completed_laps=2)]   # and again
+    # A whole lap, start to finish, that yielded eight samples: acquisition so
+    # starved there is no telemetry left to coach on. Sampled every 12% instead of
+    # every 2% — the shape of a real lap, a fraction of the points.
+    frames = [replace(_LIVE, lap_position=0.9, completed_laps=0)]   # before the line
+    frames += [replace(_LIVE, lap_position=p / 100, completed_laps=1)
+               for p in range(0, 100, 12)]
+    frames += [replace(_LIVE, lap_position=0.0, completed_laps=2)]
     with caplog.at_level(logging.WARNING):
         laps = _run(rec, frames)
     assert all(not lap.valid for lap in laps)

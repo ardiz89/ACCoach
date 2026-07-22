@@ -126,6 +126,7 @@ class TelemetryFeed:
         win_start = next_t
         win_frames = 0
         low_warned = False
+        low_since = next_t
         while not self._stop.is_set():
             self._pump()
 
@@ -135,7 +136,12 @@ class TelemetryFeed:
                 self._measured_hz = win_frames / (now - win_start)
                 win_frames = 0
                 win_start = now
-                # Warn once if we persistently fall short of the target rate.
+                # Report the START and the END of every slow stretch. Warning only
+                # on the way down turned out to be worse than not warning at all:
+                # the log kept one line per session naming the worst single second
+                # ("13 Hz"), never said it recovered, and that line got read as the
+                # steady state twice — including in a written-up finding. The laps
+                # themselves said ~60 Hz all along.
                 if self._measured_hz < 0.7 * self._target_hz:
                     if not low_warned:
                         _log.warning(
@@ -143,7 +149,12 @@ class TelemetryFeed:
                             self._measured_hz, self._target_hz,
                         )
                         low_warned = True
-                else:
+                        low_since = now
+                elif low_warned:
+                    _log.info(
+                        "acquisition back to %.0f Hz after %.0f s",
+                        self._measured_hz, now - low_since,
+                    )
                     low_warned = False
 
             # Fixed-rate pacing with drift correction; interruptible by stop().

@@ -104,6 +104,47 @@ def crossed_start_line(
     return counted or wrapped
 
 
+class StartLineWatcher:
+    """One crossing per pass, not one per signal.
+
+    The OR above fires twice at a normal crossing, because the two signals are a
+    frame apart: the sim bumps the lap counter *before* it wraps
+    ``normalizedCarPosition`` (the same one-frame offset :meth:`_maybe_append`
+    already had to work around). So the counter closes the lap and opens the next
+    buffer, and one frame later the wrap closes that brand-new buffer too — a
+    second lap, same lap time, **zero samples**, one frame long.
+
+    Observed in the user's log twice in four minutes, e.g.::
+
+        discarding a 123.732s lap with only 0 samples
+
+    and only the 20-sample floor stopped it becoming a file. Two such files were
+    already in the archive with no known cause; this is the cause.
+
+    So the crossing is latched: it fires once, then re-arms only when the car is
+    unambiguously mid-lap again. Anything near either end of the lap is exactly
+    where the two signals disagree, which is why the re-arm window is the middle.
+    """
+
+    def __init__(self) -> None:
+        self._prev_pos: float | None = None
+        self._prev_completed: int | None = None
+        self._armed = True
+
+    def reset(self) -> None:
+        self.__init__()
+
+    def crossed(self, pos: float, completed: int) -> bool:
+        hit = crossed_start_line(self._prev_pos, pos, self._prev_completed, completed)
+        self._prev_pos, self._prev_completed = pos, completed
+        if hit:
+            was_armed, self._armed = self._armed, False
+            return was_armed
+        if not self._armed and _WRAP_TO <= pos <= _WRAP_FROM:
+            self._armed = True
+        return False
+
+
 def _clean_verdict(buf: "_Buffer") -> bool:
     """Did this lap stay inside the track limits?
 
@@ -139,16 +180,14 @@ class LapRecorder:
 
     def __init__(self) -> None:
         self._buf: _Buffer | None = None
-        self._prev_completed: int | None = None
+        self._line = StartLineWatcher()
         self._car: str = ""
         self._track: str = ""
-        self._prev_pos: float | None = None
         self._blocked_frames = 0        # consecutive frames refused while driving
 
     def reset(self) -> None:
         self._buf = None
-        self._prev_completed = None
-        self._prev_pos = None
+        self._line.reset()
         self._car = ""
         self._track = ""
 
@@ -205,11 +244,7 @@ class LapRecorder:
         # the first flying lap, closed as one 128 s partial, and got thrown away:
         # on ACC the first flying lap after every pit exit was silently lost, and
         # a two-lap run recorded nothing at all. See :func:`crossed_start_line`.
-        crossed = crossed_start_line(
-            self._prev_pos, s.lap_position, self._prev_completed, completed,
-        )
-        self._prev_completed = completed
-        self._prev_pos = s.lap_position
+        crossed = self._line.crossed(s.lap_position, completed)
 
         if crossed and self._buf is not None:
             finished = self._finalize(self._buf, s)

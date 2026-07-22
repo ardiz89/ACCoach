@@ -106,8 +106,15 @@ def test_truly_corrupt_file_still_raises(tmp_path):
 
 
 def test_recovered_payload_matches_the_intact_one(tmp_path):
-    intact = save_lap(_lap(), tmp_path / "a")
-    damaged = save_lap(_lap(), tmp_path / "b")
+    # Both copies carry the SAME timestamp on purpose. `save_lap` stamps
+    # `recorded_utc` to the second at write time, so saving two laps compared the
+    # clock as well as the payload — and failed whenever the two writes straddled
+    # a second boundary. It did, on CI, once. The question here is whether
+    # salvaging recovers the content, not what time it is.
+    lap = _lap()
+    lap.recorded_utc = "2026-07-22T09:00:00+00:00"
+    intact = save_lap(lap, tmp_path / "a")
+    damaged = save_lap(lap, tmp_path / "b")
     with damaged.open("ab") as fh:
         fh.write(b"\x1f\x8b\x08\x00garbage")      # looks like a second member
 
