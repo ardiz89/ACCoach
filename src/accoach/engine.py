@@ -118,8 +118,9 @@ class EngineState:
     lap_invalid: bool = False
 
 
-def _load_reference(car: str, track: str, laps_dir: Path | str) -> Reference | None:
-    lap = find_reference_lap(car, track, laps_dir)
+def _load_reference(car: str, track: str, laps_dir: Path | str,
+                    road_temp: float | None = None) -> Reference | None:
+    lap = find_reference_lap(car, track, laps_dir, road_temp)
     if lap is None:
         return None
     ref = Reference(lap)
@@ -183,6 +184,7 @@ class CoachEngine:
         # than read off the recorder because that one lives on the feed thread.
         self._line = StartLineWatcher()
         self._flying_lap = False
+        self._road_temp: float | None = None    # today's, for reference election
 
         # Race engineer: rebuilt per car/track; fed a per-lap diagnosis (LapStats)
         # at each completed lap, surfaces its latest decision in the payload.
@@ -207,7 +209,11 @@ class CoachEngine:
         self._applied_pending = False
 
     def _rebuild_reference(self, car: str, track: str) -> None:
-        self._reference = _load_reference(car, track, self.laps_dir)
+        # Today's track temperature decides which past lap is a fair benchmark:
+        # a personal best set on a rubbered-in evening track is the wrong target
+        # for a cold morning, and every tenth in the debrief would be weather.
+        self._reference = _load_reference(car, track, self.laps_dir,
+                                          self._road_temp)
         self._comparator = LapComparator(self._reference) if self._reference else None
         corners = detect_corners(self._reference.lap.samples) if self._reference else []
         self._corners = corners
@@ -331,6 +337,7 @@ class CoachEngine:
 
         if snap.connected and (snap.car_model, snap.track) != self._key:
             self._key = (snap.car_model, snap.track)
+            self._road_temp = snap.road_temp or None
             self._rebuild_reference(snap.car_model, snap.track)
             # Retune the class-dependent live thresholds (wheelspin, trail-brake
             # coaching) for this car.

@@ -340,6 +340,13 @@ def create_api(
             "source": r.get("source", "own"),
             "recorded_utc": r["recorded_utc"],
             "samples": r["sample_count"],
+            # Track temperature, recorded since v5 and never shown until now.
+            # Braking points move 10-20 m between a cold track and a hot one, so
+            # comparing two laps without knowing this is comparing two different
+            # circuits. 0/None = the lap predates the field: no badge (see
+            # `_off_track` for the same "absence of data is absence of UI" rule).
+            "road_temp": (round(r["road_temp"], 1)
+                          if r["road_temp"] else None),
         } for r in rows]
 
     @app.get("/api/analysis")

@@ -765,7 +765,11 @@ function fillLaps(a, force) {
       // Text, not colour: <option> styling isn't reliable across browsers and a
       // colour on a closed dropdown is invisible anyway.
       const off = l.off_track ? " · " + t("lap.offTrack") : "";
-      o.textContent = `${star}${l.lap_time}${l.valid ? "" : " " + t("lap.invalid")}${off}${clock ? " · " + clock : ""}${pro}`;
+      // Track temp, when the lap carries it: two laps at 18° and 40° are two
+      // different circuits, and until now the dropdown let you compare them
+      // side by side with nothing to warn you.
+      const temp = l.road_temp ? ` · ${l.road_temp}°` : "";
+      o.textContent = `${star}${l.lap_time}${l.valid ? "" : " " + t("lap.invalid")}${off}${temp}${clock ? " · " + clock : ""}${pro}`;
       if (l.path === selectedPath) o.selected = true;
       sel.appendChild(o);
     }

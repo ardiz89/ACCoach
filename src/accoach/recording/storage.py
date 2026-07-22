@@ -149,11 +149,18 @@ def find_reference_lap(
     car_model: str,
     track: str,
     laps_dir: Path | str = DEFAULT_LAPS_DIR,
+    road_temp: float | None = None,
 ) -> Lap | None:
     """Fastest valid lap on disk for this car+track, or ``None`` if there is none.
 
     Uses the SQLite catalog (one indexed lookup, loads only the winning file) and
     falls back to a full directory scan if the catalog can't be used.
+
+    ``road_temp`` is today's track temperature: pass it and a lap driven in
+    comparable conditions is preferred over a faster one driven in different
+    ones (see :meth:`LapCatalog.best_reference_path`). Omitting it keeps the
+    old behaviour, which is what the offline analysis tools want — there,
+    "the best lap" means the best lap.
     """
     laps_dir = Path(laps_dir)
 
@@ -163,7 +170,7 @@ def find_reference_lap(
 
         with LapCatalog(_catalog_path(laps_dir)) as cat:
             cat.sync(list_lap_files(laps_dir))   # pick up any new/removed files
-            path = cat.best_reference_path(car_model, track)
+            path = cat.best_reference_path(car_model, track, road_temp)
             if path is None:
                 return None
             lap = load_lap(path)
