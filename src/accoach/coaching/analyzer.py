@@ -44,6 +44,13 @@ _THROTTLE_MARGIN = 0.10    # avg throttle deficit that blames throttle
 _BRAKE_MARGIN = 0.10       # avg brake excess that blames over-braking
 _SPEED_MARGIN = 6.0        # km/h min-speed deficit that blames entry speed
 _LEAD_POS = 0.025          # how far before a corner (in pos) to speak its advice
+# How much earlier than the reference you must brake before we say so. Every other
+# branch of `classify_corner` carries a margin; this one did not, so touching the
+# brake ONE METRE early was enough to answer "you can brake later" — and since it
+# is tested first, that answer displaced the real cause. In normalized position
+# because the live path has no track length; 0.0025 is ~12 m at Monza and ~17 m on
+# a 7 km circuit, which is above both sensor noise and lap-to-lap variation.
+_BRAKE_EARLY_POS = 0.0025
 
 # Cross-module coherence: a live handling/grip fault in a corner contradicts some
 # of the reference-delta advice for that same corner, and the live evidence (you
@@ -76,6 +83,24 @@ class CornerStats:
     min_speed_live: float
     min_speed_ref: float
     braking_early: bool
+
+
+def _braked_early(live_onset: float, ref_onset: float, ref_brake_at_onset: float) -> bool:
+    """Did you get on the brakes meaningfully earlier than the reference?
+
+    Shared by the live analyzer and the post-lap debrief so both answer this the
+    same way. Two cases:
+
+    * the reference brakes in this corner too — then it is a distance question,
+      and the gap has to clear :data:`_BRAKE_EARLY_POS`;
+    * the reference never brakes here at all — then you braked in a corner it
+      takes flat, which is a difference no margin can shrink.
+    """
+    if live_onset < 0.0:
+        return False                       # you never braked here
+    if ref_onset < 0.0:
+        return 0.0 <= ref_brake_at_onset < _BRAKE_ON
+    return live_onset <= ref_onset - _BRAKE_EARLY_POS
 
 
 def classify_corner(st: CornerStats, index: int, pos: float) -> Cue | None:
@@ -120,6 +145,7 @@ class _Seg:
     min_speed_ref: float = field(default=1e9)
     live_brake_onset: float = -1.0
     ref_brake_at_onset: float = -1.0  # what the reference brake was where you first braked
+    ref_brake_onset: float = -1.0     # …and WHERE the reference started braking
 
 
 class CoachAnalyzer:
@@ -276,6 +302,8 @@ class CoachAnalyzer:
         if seg.live_brake_onset < 0.0 and s.brake >= _BRAKE_ON:
             seg.live_brake_onset = s.lap_position
             seg.ref_brake_at_onset = rp.brake
+        if seg.ref_brake_onset < 0.0 and rp.brake >= _BRAKE_ON:
+            seg.ref_brake_onset = s.lap_position
 
     def _finalize(self, seg: _Seg) -> Cue | None:
         if seg.n == 0:
@@ -288,11 +316,10 @@ class CoachAnalyzer:
             brake_ref=seg.brake_ref / seg.n,
             min_speed_live=seg.min_speed_live,
             min_speed_ref=seg.min_speed_ref,
-            # You braked here while the reference was not yet braking at that point.
-            braking_early=(
-                seg.live_brake_onset >= 0.0
-                and 0.0 <= seg.ref_brake_at_onset < _BRAKE_ON
-            ),
+            # You braked here while the reference was not yet braking at that
+            # point — and by a margin worth mentioning.
+            braking_early=_braked_early(
+                seg.live_brake_onset, seg.ref_brake_onset, seg.ref_brake_at_onset),
         )
         return classify_corner(st, seg.index, _seg_pos(seg, self))
 

@@ -375,11 +375,20 @@ class CoachEngine:
         # state advances, we just don't speak advice that isn't worth hearing.
         self._track_flying_lap(snap)
         quiet = self._quiet_reason(snap, delta)
-        flying = not quiet
+
+        # "No reference yet" is NOT an abnormal lap — it's a normal lap we can't
+        # put a stopwatch on. Lumping it in with pit/out-lap/off-pace silenced
+        # every detector that never needed a reference in the first place
+        # (under/oversteer, coasting, trail braking, gears, tyres, pressures, all
+        # of them absolute by construction), so the first session on a new car or
+        # track produced lock-ups, fuel and nothing else. The analyzer is the only
+        # consumer that needs the delta, and with no delta it emits nothing
+        # anyway, so it needs no gate of its own here.
+        unrepresentative = bool(quiet) and quiet != "no_reference"
 
         def _submit(cues: list[Cue]) -> None:
-            kept = cues if flying else [c for c in cues
-                                        if c.category in _SAFETY_CATEGORIES]
+            kept = cues if not unrepresentative else [
+                c for c in cues if c.category in _SAFETY_CATEGORIES]
             self.scheduler.submit_all(kept, now)
 
         # Corner advice (needs a reference) + acute events (don't) + the aid
