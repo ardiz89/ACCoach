@@ -81,20 +81,30 @@ pressioni vengono giudicate solo a gomme in temperatura, sul target GT3 (~27.5 p
 ### d) Come vengono registrati i giri (e se parti dai box)
 Non devi fare nulla di speciale: avvia la sessione (Pratica, Hotlap, Gara) e guida.
 
-- Il giro viene chiuso quando **passi sul traguardo** (lo capisce dal contatore
-  giri del gioco, non dalla posizione che traballa). Il tempo salvato è quello
-  ufficiale del gioco.
+- Il giro viene chiuso quando **passi sul traguardo**. Lo riconosce da **due
+  segnali insieme**: il contatore giri del gioco e il riavvolgimento della
+  posizione. Nessuno dei due basta da solo — su ACC il contatore **non conta il
+  giro di ricognizione**, e senza il secondo segnale il primo giro lanciato dopo
+  ogni uscita dai box andava perso. Il tempo salvato è quello ufficiale del gioco.
 - Il **primo giro è quasi sempre parziale** (hai iniziato a metà pista): viene
   scartato automaticamente. I giri salvati sono solo quelli **completi,
   traguardo→traguardo**.
-- **Se parti dai box:** nei box la registrazione è in pausa; l'**out-lap**
-  (uscita box → traguardo) è parziale e viene scartata; il **primo giro lanciato**
-  vero è il primo che viene salvato. Anche quando **rientri ai box** quel giro non
-  viene salvato, e cambiare auto/pista azzera tutto (un giro non scavalca mai due
+- **Se parti dai box:** in garage *e in corsia box* la registrazione è in pausa;
+  l'**out-lap** è parziale e viene scartata; il **primo giro lanciato** vero è il
+  primo che viene salvato. Anche quando **rientri ai box** quel giro non viene
+  salvato, e cambiare auto/pista azzera tutto (un giro non scavalca mai due
   sessioni).
 - Due qualità indipendenti del giro: **completo** (partito dalla linea → requisito
-  per essere salvato) e **pulito** (niente escursioni serie: <3 ruote fuori). Un
+  per essere salvato) e **pulito** (nessuna uscita dai limiti della pista). Un
   giro sporco viene salvato ma **non usato come riferimento**.
+- **Come si stabilisce se è pulito dipende dal gioco**, perché i due titoli
+  espongono cose diverse: su **AC** si contano le ruote fuori (3 o più = sporco),
+  su **ACC** si legge il verdetto del gioco stesso sui track limits. Su ACC vale
+  quindi anche un taglio senza mai mettere una ruota nell'erba. Se il gioco non
+  dice niente il giro resta "sconosciuto", che non è la stessa cosa di "pulito".
+- Il report ti dice anche **in che curva** hai perso il giro (es. «fuori pista
+  alla Variante Ascari»). I giri registrati prima della versione 8 dello schema
+  non hanno questo dato: dicono che il giro è sporco, non dove.
 
 ---
 
@@ -102,9 +112,38 @@ Non devi fare nulla di speciale: avvia la sessione (Pratica, Hotlap, Gara) e gui
 
 - **Barra del delta**: si riempie a **destra in rosso** se sei più lento del
   riferimento, a **sinistra in verde** se sei più veloce.
-- In alto: il tuo **PB**, il **tempo previsto** se mantieni il passo.
+- In alto: il tuo **PB** — cioè *contro cosa stai correndo* — e il **tempo
+  previsto** se mantieni il passo. Quando sta arrivando una staccata, quello
+  spazio lo prende il **conto alla rovescia in metri**, che al momento di frenare
+  diventa una sola parola rossa: **FRENA**. La soglia è in *tempo*, non in
+  distanza, perché dieci metri sono 0,14 s a 250 km/h e mezzo secondo in una
+  curva lenta.
 - Una **pastiglia** mostra l'ultimo consiglio pronunciato, e sfuma da sola.
-- Stati dedicati per "in attesa del gioco" e "nessun riferimento ancora".
+
+### Quando il delta non c'è
+
+Il delta compare **solo sui giri che possono contare**, cioè quelli cominciati
+dal traguardo. Non è un guasto: un numero che confronta la corsia box con un giro
+lanciato caldo schizza oltre i +30 s e pianta la barra sul fondo scala, che si
+legge come un giro disastroso invece che come nessun giro. Al suo posto trovi
+sempre **il motivo**:
+
+| Cosa leggi | Che sta succedendo |
+|---|---|
+| *Ai box* | sei in garage o in corsia box |
+| *In ricognizione* | out-lap: il coach parte dal traguardo |
+| *Nessun riferimento* | non hai ancora un giro completo su questa auto+pista |
+| *Giro invalidato — continua* | il gioco ha annullato questo giro (solo ACC) |
+| *Giro fuori ritmo* | qui il delta **resta**: il giro è cominciato dal traguardo |
+| *Via — giro lanciato* | lampeggia quando il coach ricomincia a lavorare |
+
+Su un **giro invalidato il coach continua a parlare**: sparisce solo il
+cronometro. Un giro annullato è un giro gratis — frenate, bloccaggi, gomme e
+assetto si leggono uguale, e rientrare ai box è tempo buttato.
+
+Senza riferimento, invece, resta acceso tutto ciò che non ne ha bisogno:
+sotto/sovrasterzo, veleggiamento, trail brake, marce, pressioni e temperature.
+Vale la pena saperlo alla prima sessione su un'auto nuova.
 
 ---
 

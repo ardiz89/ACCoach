@@ -156,6 +156,14 @@ def qss() -> str:
     QLabel[role="good"]     {{ color: {b.GREEN}; }}
     QLabel[role="bad"]      {{ color: {b.RED}; }}
     QLabel[role="link"]     {{ color: {b.CYAN}; font-size: 11px; }}
+    /* The "?" beside a setting: visible enough to invite a hover, quiet enough
+       not to compete with the setting's own name. */
+    QLabel[role="help"]     {{ color: {b.MUTED}; font-size: 11px; font-weight: bold;
+                               border: 1px solid {b.MUTED}; border-radius: 7px;
+                               min-width: 14px; max-width: 14px;
+                               min-height: 14px; max-height: 14px;
+                               qproperty-alignment: AlignCenter; }}
+    QLabel[role="help"]:hover {{ color: {b.CYAN}; border-color: {b.CYAN}; }}
 
     /* --- cards --- */
     QFrame[role="card"] {{
