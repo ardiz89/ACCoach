@@ -258,6 +258,14 @@
     "tour.a5.t": { en: `Where to improve`, it: `Dove migliorare` },
     "tour.a5.x": { en: `Your biggest time losses, corner by corner, with the likely cause and a fix.`,
                    it: `Le tue perdite di tempo maggiori, curva per curva, con la causa probabile e una correzione.` },
+    // Added when the debrief grew lap-wide findings and the lap list grew track
+    // temperature: two things a driver sees before anyone explains them.
+    "tour.a7.t": { en: `Whole-lap findings`, it: `Osservazioni sul giro` },
+    "tour.a7.x": { en: `The blue-edged blocks above the corners are lap-wide: a lift where the reference is flat, a top-speed deficit. Coaches say these first.`,
+                   it: `I riquadri col bordo azzurro sopra le curve valgono per tutto il giro: un sollevamento dove il riferimento sta in pieno, dei km/h di punta che mancano. Un coach parte da qui.` },
+    "tour.a8.t": { en: `Track temperature`, it: `Temperatura asfalto` },
+    "tour.a8.x": { en: `The degrees next to each lap are the track, not the air. Braking points move 10-20 m between a cold track and a hot one, so two laps far apart in temperature are two different circuits.`,
+                   it: `I gradi accanto a ogni giro sono dell'asfalto, non dell'aria. Fra pista fredda e calda i punti di frenata si spostano di 10-20 m: due giri con temperature lontane sono due circuiti diversi.` },
     "tour.a6.t": { en: `Take it with you`, it: `Portalo con te` },
     "tour.a6.x": { en: `Export the lap as CSV or JSON for deeper analysis.`,
                    it: `Esporta il giro in CSV o JSON per un'analisi più approfondita.` },
