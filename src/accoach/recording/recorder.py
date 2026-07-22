@@ -367,4 +367,9 @@ class LapRecorder:
             road_temp=s.road_temp,
             grip=s.surface_grip,
             tyre_compound=s.tyre_compound,
+            # The setup the lap finished on — the one the next lap inherits.
+            tc_level=s.tc_level,
+            abs_level=s.abs_level,
+            engine_map=s.engine_map,
+            brake_bias=s.brake_bias,
         )

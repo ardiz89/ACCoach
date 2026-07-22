@@ -799,11 +799,33 @@ function drawSummary(a) {
   const off = rev && rev.off_track
     ? ` <span class="off-track" title="${t("lap.offTrack.why")}">${t("lap.offTrack")}${where}</span>`
     : "";
+  // The setup each lap was on, when the two differ. A gap you're reading as
+  // "I drove worse" can be a brake-bias click, and until now the page gave you
+  // no way to tell. Only shown when it changes the story: same setup, no note.
+  const setupNote = setupDelta(a.reference.setup, a.review.setup);
   $("summary").innerHTML =
     item(t("lbl.comparison"), a.reference.lap_time) +
     item(t("lbl.lap"), a.review.lap_time + off) +
     item(t("lbl.gap"), fmt(gap) + "s", gap > 0 ? "slower" : "faster") +
-    (c.n >= 2 ? item(t("sum.consistency"), `σ ${(c.std_ms / 1000).toFixed(3)}s · ${c.n} ${t("lbl.laps")}`) : "");
+    (c.n >= 2 ? item(t("sum.consistency"), `σ ${(c.std_ms / 1000).toFixed(3)}s · ${c.n} ${t("lbl.laps")}`) : "") +
+    (setupNote ? item(t("sum.setup_diff"), setupNote, "warn") : "");
+}
+
+// A one-line summary of how two laps' setups differ, or "" if they match / are
+// unknown. Reads "BB 54% → 53% · TC 3 → 2": reference on the left, this lap on
+// the right, so it lines up with how the rest of the summary is written.
+function setupDelta(ref, rev) {
+  if (!ref || !rev) return "";
+  const bits = [];
+  const num = (k, label, suffix) => {
+    if (ref[k] === undefined || rev[k] === undefined || ref[k] === rev[k]) return;
+    bits.push(`${label} ${ref[k]}${suffix || ""} → ${rev[k]}${suffix || ""}`);
+  };
+  num("brake_bias", "BB", "%");
+  num("tc", "TC", "");
+  num("abs", "ABS", "");
+  num("engine_map", "Map", "");
+  return bits.join(" · ");
 }
 
 // Min-speed-per-corner table: how fast you carry through each apex vs the

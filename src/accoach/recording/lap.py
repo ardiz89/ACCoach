@@ -39,7 +39,10 @@ from ..telemetry.snapshot import SessionType, TelemetrySnapshot
 # v8: `lost_at` — WHERE the lap stopped counting. `clean=False` said a lap was
 #     thrown away without ever saying at which corner, which is the only part the
 #     driver can do anything about.
-SCHEMA_VERSION = 8
+# v9: the in-car setup a lap was driven on (tc/abs/engine map levels, brake bias)
+#     — so the race engineer's ACCEPT/REVERT verdict can check which setup the
+#     laps it compared were actually on. ACC only; -1 on AC.
+SCHEMA_VERSION = 9
 
 # Fixed serialization order for a LapSample, written into every file. Per-wheel
 # channels are flattened with [fl, fr, rl, rr] suffixes.
@@ -226,6 +229,16 @@ class Lap:
     tyre_compound: str = ""
     # --- v7: provenance — "own" (driver's lap) or "pro" (imported benchmark) ---
     source: str = "own"
+    # --- v9: the in-car setup this lap was driven on (ACC; -1/-1.0 = unknown/AC).
+    # The race engineer judged an accepted change on the median time of a window
+    # of laps WITHOUT being able to check which setup those laps were actually on:
+    # the ACCEPT/REVERT verdict rested on an unrecorded assumption. These close
+    # that loop. Aids can be changed mid-lap, so this is the value at the line —
+    # the setup the lap FINISHED on, which is the one the next lap inherits.
+    tc_level: int = -1
+    abs_level: int = -1
+    engine_map: int = -1
+    brake_bias: float = -1.0
 
     @property
     def duration_s(self) -> float:
@@ -246,6 +259,10 @@ class Lap:
             "grip": round(self.grip, 4),
             "tyre_compound": self.tyre_compound,
             "source": self.source,
+            "tc_level": self.tc_level,
+            "abs_level": self.abs_level,
+            "engine_map": self.engine_map,
+            "brake_bias": (None if self.brake_bias < 0 else round(self.brake_bias, 4)),
             "recorded_utc": self.recorded_utc,
             "fields": list(SAMPLE_FIELDS),
             "samples": [s.as_row() for s in self.samples],
@@ -291,4 +308,12 @@ class Lap:
             # Absent on pre-v7 files → "own" (the safe default; only an explicit
             # import marks a lap "pro").
             source=str(d.get("source") or "own"),
+            # Absent on pre-v9 files → unknown. brake_bias stored as null when
+            # unknown, so distinguish missing from a real 0.0 bias (which no car
+            # has, but the load path shouldn't assume that).
+            tc_level=int(d.get("tc_level", -1)),
+            abs_level=int(d.get("abs_level", -1)),
+            engine_map=int(d.get("engine_map", -1)),
+            brake_bias=(-1.0 if d.get("brake_bias") is None
+                        else float(d["brake_bias"])),
         )

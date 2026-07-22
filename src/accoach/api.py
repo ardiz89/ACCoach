@@ -217,6 +217,28 @@ def _pick_known(requested: str | None, fallback: str | None, known: set[str]) ->
     return requested if requested in known else None
 
 
+def _setup_of(lap) -> dict | None:
+    """The in-car setup a lap was driven on, or None if it wasn't recorded.
+
+    None on AC (no aid levels) and on pre-v9 laps. Comparing two laps that turn
+    out to be on different brake bias or TC is half the reason a delta looks the
+    way it does; without this the driver was comparing them blind.
+    """
+    if lap.tc_level < 0 and lap.abs_level < 0 and lap.brake_bias < 0:
+        return None
+    out: dict = {}
+    if lap.tc_level >= 0:
+        out["tc"] = lap.tc_level
+    if lap.abs_level >= 0:
+        out["abs"] = lap.abs_level
+    if lap.engine_map >= 0:
+        out["engine_map"] = lap.engine_map
+    if lap.brake_bias >= 0:
+        # Front bias as the percentage the game shows, not the raw fraction.
+        out["brake_bias"] = round(lap.brake_bias * 100, 1)
+    return out or None
+
+
 def _corner_at(pos: float | None, corners, names: dict) -> str | None:
     """Which corner a track position falls in, by name; None if it's on a straight.
 
@@ -416,9 +438,11 @@ def create_api(
                 "lap_time_ms": reference.lap_time_ms,
                 "lap_time": format_lap_time(reference.lap_time_ms),
                 "channels": _channels(baseline_lap),
+                "setup": _setup_of(baseline_lap),
             },
             "review": {
                 "path": review_path,
+                "setup": _setup_of(review),
                 "lap_time_ms": review.lap_time_ms,
                 "lap_time": format_lap_time(review.lap_time_ms),
                 "channels": _channels(review),
