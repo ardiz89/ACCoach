@@ -284,6 +284,16 @@ _UI: dict[str, dict[str, str]] = {
         "it": "Quanto in fretta parla la voce, in parole al minuto. Intorno a "
               "165 è il parlato normale. Alzala se nelle curve veloci i "
               "consigli arrivano tardi, abbassala se ti perdi delle parole."},
+    "set.wean": {"en": "Retire braking markers", "it": "Ritira i segnali di frenata"},
+    "set.wean.help": {
+        "en": "As you master a corner, the braking countdown stops appearing "
+              "there — the way you peel the racing line and braking boards away "
+              "one at a time once you know a track. Off keeps them at every "
+              "corner forever.",
+        "it": "Man mano che domini una curva, il conto alla rovescia della "
+              "frenata smette di comparire lì — come togli la traiettoria e i "
+              "cartelli di frenata uno alla volta quando impari un tracciato. "
+              "Spento li tiene a ogni curva per sempre."},
     "set.scale.help": {
         "en": "How big the overlay is drawn on screen. 1.0 is the design size; "
               "raise it on a 4K monitor or if you sit far from the screen, "

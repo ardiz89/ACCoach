@@ -68,6 +68,19 @@ class LapComparator:
         # Precompute the reference's braking points + a (pos, x, z) path for the
         # "brake in N m" marker. Empty if the reference has no world coords.
         self._brake_onsets, self._path = self._index_braking()
+        # Position spans where the braking countdown is retired (corners the
+        # driver has mastered). The engine fills this as the Focus coach clears
+        # corners; empty means the crutch is on everywhere, as before.
+        self._muted_spans: list[tuple[float, float]] = []
+
+    def set_muted_spans(self, spans: list[tuple[float, float]]) -> None:
+        """Corners whose braking countdown to suppress (lo, hi in track position).
+
+        A braking onset inside any span stops being counted down to — the driver
+        has shown they know that braking point and the marker is now clutter, the
+        way a track guide's braking boards come off once you've learned them.
+        """
+        self._muted_spans = spans
 
     def _index_braking(self) -> tuple[list[float], list[tuple[float, float, float]]]:
         path: list[tuple[float, float, float]] = []
@@ -98,10 +111,14 @@ class LapComparator:
                 return (a[1] + f * (b[1] - a[1]), a[2] + f * (b[2] - a[2]))
         return (p[-1][1], p[-1][2])
 
+    def _is_muted(self, onset: float) -> bool:
+        return any(lo <= onset <= hi for lo, hi in self._muted_spans)
+
     def _brake_in(self, pos: float) -> int | None:
         """Metres to the reference's next braking point ahead, or None if none is
         within the lookahead (chord distance on the reference's world path)."""
-        nxt = next((o for o in self._brake_onsets if o > pos + 0.005), None)
+        nxt = next((o for o in self._brake_onsets
+                    if o > pos + 0.005 and not self._is_muted(o)), None)
         if nxt is None or nxt - pos > _BRAKE_LOOKAHEAD_POS:
             return None
         a, b = self._xy_at(pos), self._xy_at(nxt)

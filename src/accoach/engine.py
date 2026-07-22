@@ -185,6 +185,9 @@ class CoachEngine:
         self._line = StartLineWatcher()
         self._flying_lap = False
         self._road_temp: float | None = None    # today's, for reference election
+        # Whether to retire the braking countdown at mastered corners.
+        from .config import load_config
+        self._wean = load_config().overlay.wean
 
         # Race engineer: rebuilt per car/track; fed a per-lap diagnosis (LapStats)
         # at each completed lap, surfaces its latest decision in the payload.
@@ -243,6 +246,24 @@ class CoachEngine:
             debrief = build_lap_debrief(lap, self._reference, self._corners)
             stable = lap.valid and lap.clean is not False
             self._focus_report = self._focus.observe(debrief, stable=stable)
+            self._update_wean()
+
+    def _update_wean(self) -> None:
+        """Retire the braking countdown at corners the Focus coach has cleared.
+
+        Reuses the coach's own "mastered" set rather than inventing a second
+        notion of "you've got this corner", so the crutch retires exactly where
+        the lesson plan says the weakness is gone. Guarded by config so a driver
+        who wants every braking board forever can keep them.
+        """
+        if self._comparator is None:
+            return
+        if not (self._wean and self._focus is not None):
+            self._comparator.set_muted_spans([])
+            return
+        spans = [(c.entry_pos, c.exit_pos) for c in self._corners
+                 if c.index in self._focus.mastered]
+        self._comparator.set_muted_spans(spans)
 
     def _announce_engineer(self, decision) -> None:
         """Speak a brief alert when the engineer wants a setup change.
