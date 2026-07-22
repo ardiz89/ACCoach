@@ -56,6 +56,12 @@ class OverlayCfg:
     # Live throttle/brake trace strip under the HUD — a calibration aid for
     # trail-braking and coasting ("tempo morto"). Off by default (declutters).
     pedals: bool = False
+    # Retire the braking countdown at corners you've mastered, the way fast
+    # drivers peel the reference line and braking markers away one at a time as
+    # they learn a track (two independent drivers described exactly this on
+    # r/simracing). On by default: the crutch is meant to be outgrown. Off keeps
+    # it on at every corner forever.
+    wean: bool = True
 
 
 @dataclass
@@ -123,6 +129,7 @@ x = -1               # overlay X (px); -1 = auto top-centre (drag it in --intera
 y = -1               # overlay Y (px); -1 = auto
 scale = 1.0          # overlay scale factor
 pedals = false       # show the live throttle/brake trace strip (trail-braking + coasting)
+wean = true          # retire the braking countdown at corners you've mastered
 
 [logging]
 level = "INFO"       # console level: DEBUG | INFO | WARNING | ERROR
@@ -195,6 +202,7 @@ x = {cfg.overlay.x}               # overlay X (px); -1 = auto top-centre
 y = {cfg.overlay.y}               # overlay Y (px); -1 = auto
 scale = {cfg.overlay.scale}          # overlay scale factor
 pedals = {b(cfg.overlay.pedals)}       # show the live throttle/brake trace strip (trail-braking + coasting)
+wean = {b(cfg.overlay.wean)}          # retire the braking countdown at corners you've mastered
 
 [logging]
 level = "{cfg.logging.level}"

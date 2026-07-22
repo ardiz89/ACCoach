@@ -291,6 +291,10 @@ class SettingsPanel(QWidget):
         self._scale.setSingleStep(0.1)
         self._scale.setValue(cfg.overlay.scale or 1.0)
         row("set.scale", self._scale)
+
+        self._wean = QCheckBox()
+        self._wean.setChecked(cfg.overlay.wean)
+        row("set.wean", self._wean)
         root.addLayout(form)
 
         self._scale_hint = _hint(t("set.scale_hint"))
@@ -339,6 +343,7 @@ class SettingsPanel(QWidget):
         cfg.voice.radio = self._radio.isChecked()
         cfg.voice.rate = self._rate.value()
         cfg.overlay.scale = round(self._scale.value(), 2)
+        cfg.overlay.wean = self._wean.isChecked()
         save_config(cfg)
         self._saved_note.setText("✓ " + t("btn.save"))
 
