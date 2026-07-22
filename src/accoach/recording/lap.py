@@ -36,7 +36,10 @@ from ..telemetry.snapshot import SessionType, TelemetrySnapshot
 #     pressures offline — the raw wheel_slip channel is car-dependent).
 # v7: lap-level `source` ("own" / "pro") so an imported PRO reference is a
 #     first-class benchmark level, distinct from the driver's own laps.
-SCHEMA_VERSION = 7
+# v8: `lost_at` — WHERE the lap stopped counting. `clean=False` said a lap was
+#     thrown away without ever saying at which corner, which is the only part the
+#     driver can do anything about.
+SCHEMA_VERSION = 8
 
 # Fixed serialization order for a LapSample, written into every file. Per-wheel
 # channels are flattened with [fl, fr, rl, rr] suffixes.
@@ -213,6 +216,10 @@ class Lap:
     # clean is None when unknown (legacy files, or a sim that doesn't expose the
     # track-limits signal). A reference lap must be valid AND not clean==False.
     clean: bool | None = None
+    # --- v8: where it went wrong, 0..1 track position; None if it didn't (or if
+    # the lap predates the field). The first point at which the lap stopped
+    # counting, not the worst one — after that the lap was already gone.
+    lost_at: float | None = None
     air_temp: float = 0.0           # deg C
     road_temp: float = 0.0          # deg C
     grip: float = 0.0               # 0..1 surface grip
@@ -233,6 +240,7 @@ class Lap:
             "lap_time_ms": self.lap_time_ms,
             "valid": self.valid,
             "clean": self.clean,        # True / False / null (unknown)
+            "lost_at": (None if self.lost_at is None else round(self.lost_at, 4)),
             "air_temp": round(self.air_temp, 1),
             "road_temp": round(self.road_temp, 1),
             "grip": round(self.grip, 4),
@@ -273,6 +281,9 @@ class Lap:
             samples=strip_leading_wrap(
                 [LapSample.from_named(fields, r) for r in d.get("samples", [])]),
             clean=clean,
+            # Absent on pre-v8 files. "We never recorded where" — which is not the
+            # same as "nowhere", so it stays None rather than becoming a position.
+            lost_at=(None if d.get("lost_at") is None else float(d["lost_at"])),
             air_temp=float(d.get("air_temp", 0.0) or 0.0),
             road_temp=float(d.get("road_temp", 0.0) or 0.0),
             grip=float(d.get("grip", 0.0) or 0.0),

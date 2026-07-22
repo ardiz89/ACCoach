@@ -783,8 +783,15 @@ function drawSummary(a) {
   // invalidation either — it's a fact about the lap that explains why it can't be
   // the reference. The tooltip is where that "why" lives.
   const rev = (a.laps || []).find((l) => l.path === a.review.path);
+  // …and WHERE, when the lap carries it. "Off track" alone names a fact the
+  // driver can't act on; the corner is the part they can go and work on. Absent
+  // on laps recorded before the field existed, so the badge degrades to the bare
+  // wording rather than to an empty parenthesis.
+  const where = a.review.lost_at_corner
+    ? ` ${t("lap.offTrack.at")} ${a.review.lost_at_corner}`
+    : "";
   const off = rev && rev.off_track
-    ? ` <span class="off-track" title="${t("lap.offTrack.why")}">${t("lap.offTrack")}</span>`
+    ? ` <span class="off-track" title="${t("lap.offTrack.why")}">${t("lap.offTrack")}${where}</span>`
     : "";
   $("summary").innerHTML =
     item(t("lbl.comparison"), a.reference.lap_time) +

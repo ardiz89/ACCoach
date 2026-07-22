@@ -35,3 +35,33 @@ def test_apex_outside_tolerance_falls_back():
 def test_name_corners_maps_a_list():
     corners = [_corner(0, 0.143), _corner(1, 0.291), _corner(2, 0.351)]
     assert name_corners("imola", corners) == ["Tamburello", "Villeneuve", "Tosa"]
+
+
+# --- Monza -----------------------------------------------------------------
+# Anchored to a real lap (Ferrari 488 GT3 Evo, 2:03.7): detected apexes 0.169 /
+# 0.247 / 0.378 / 0.447 / 0.500 / 0.686 / 0.888. The minimum speeds pin the
+# identification — 49 km/h at the first chicane, 205 through Curva Grande.
+
+def test_monza_first_chicane_is_named():
+    """The corner the driver loses the lap at, twice measured at 0.161/0.164."""
+    assert corner_name("monza", 0, 0.169) == "Variante del Rettifilo"
+    assert corner_name("monza", 0, 0.161) == "Variante del Rettifilo"
+
+
+def test_monza_ascari_is_named():
+    """Where a real lap went off on 2026-07-22 (pos 0.715, 33 km/h)."""
+    assert corner_name("monza", 5, 0.715) == "Variante Ascari"
+
+
+def test_monza_names_the_whole_lap():
+    corners = [_corner(i, p) for i, p in enumerate(
+        (0.169, 0.227, 0.379, 0.443, 0.508, 0.716, 0.901))]
+    assert name_corners("monza", corners) == [
+        "Variante del Rettifilo", "Curva Grande", "Variante della Roggia",
+        "Lesmo 1", "Lesmo 2", "Variante Ascari", "Parabolica",
+    ]
+
+
+def test_the_two_lesmos_do_not_collapse_into_one():
+    """0.447 and 0.500 are closer together than the tolerance is wide."""
+    assert corner_name("monza", 3, 0.447) != corner_name("monza", 4, 0.500)

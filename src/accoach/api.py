@@ -217,6 +217,22 @@ def _pick_known(requested: str | None, fallback: str | None, known: set[str]) ->
     return requested if requested in known else None
 
 
+def _corner_at(pos: float | None, corners, names: dict) -> str | None:
+    """Which corner a track position falls in, by name; None if it's on a straight.
+
+    Deliberately no nearest-corner fallback: "you lost it at Lesmo" when the
+    driver actually ran wide 300 m earlier on the straight is a confident wrong
+    answer, and those are worse than no answer here — the whole point of the
+    field is to send them to look at one specific place.
+    """
+    if pos is None:
+        return None
+    for c in corners:
+        if c.entry_pos <= pos <= c.exit_pos:
+            return names.get(c.index, f"Corner {c.index + 1}")
+    return None
+
+
 def _off_track(row: dict) -> bool:
     """Did the driver put 3+ wheels off on this lap?
 
@@ -406,6 +422,12 @@ def create_api(
                                 if _has_map(review) and _has_map(baseline_lap) else None),
                 # Per-point tyre temps/pressures along this lap (or None if absent).
                 "tyres": _tyre_channels(review),
+                # Where the lap stopped counting, and which corner that is.
+                # `off_track` said a lap was thrown away without ever saying
+                # where, which is the only part the driver can act on. None on
+                # laps recorded before v8 — never recorded is not "nowhere".
+                "lost_at": review.lost_at,
+                "lost_at_corner": _corner_at(review.lost_at, corners, names),
             },
             "corners": [{
                 "index": c.index, "entry": c.entry_pos,

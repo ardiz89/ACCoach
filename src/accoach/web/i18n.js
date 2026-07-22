@@ -227,6 +227,8 @@
     // and "drive a clean lap" means "a complete one" in the coach — three senses
     // of one word would be worse than the gap this fills.
     "lap.offTrack":    { en: `off track`, it: `fuori pista` },
+    // Reads as "off track at Variante Ascari" / "fuori pista alla Variante Ascari".
+    "lap.offTrack.at": { en: `at`, it: `alla` },
     "lap.offTrack.why": { en: `You went off track on this lap (3 or more wheels off), so it can't become your reference.`,
                           it: `In questo giro sei uscito di pista (3+ ruote fuori), quindi non può diventare il tuo riferimento.` },
     "debrief.title":   { en: `Where to improve`, it: `Dove migliorare` },

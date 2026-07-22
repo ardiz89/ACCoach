@@ -173,6 +173,11 @@ class _Buffer:
     max_tyres_out: int = 0  # worst off-track excursion seen during the lap
     saw_invalid: bool = False   # the sim dropped its lap-valid flag at some point
     saw_valid_flag: bool = False  # …and it was telling us about it at all
+    # Where the lap stopped counting, 0..1, or None if it never did. The FIRST
+    # such point, not the worst: a driver who runs wide and then spins recovering
+    # needs the corner that started it, and by the second event the lap was
+    # already gone.
+    lost_at: float | None = None
 
 
 class LapRecorder:
@@ -260,12 +265,22 @@ class LapRecorder:
         # so a brief off between stored samples still marks the lap dirty.
         if s.tyres_out > self._buf.max_tyres_out:
             self._buf.max_tyres_out = s.tyres_out
+            if (s.tyres_out >= _TYRES_OUT_DIRTY
+                    and self._buf.lost_at is None):
+                self._buf.lost_at = s.lap_position
         # …and the same for the sim's own verdict, which is what ACC gives us
         # instead. Latched: the flag resets at the line, so a lap is dirty if it
         # was ever dropped, not if it happens to be down at the closing frame.
         if s.lap_valid is not None:
             self._buf.saw_valid_flag = True
             if not s.lap_valid:
+                if not self._buf.saw_invalid:
+                    # The transition frame, so the position is the corner where it
+                    # happened rather than wherever the driver was when the lap
+                    # ended. Whichever signal this title actually publishes wins:
+                    # AC counts tyres, ACC latches a flag, and neither is live on
+                    # the other.
+                    self._buf.lost_at = s.lap_position
                 self._buf.saw_invalid = True
 
         self._maybe_append(self._buf, s)
@@ -317,6 +332,9 @@ class LapRecorder:
             valid=buf.is_full and timed,
             samples=buf.samples,
             clean=clean,
+            # Only meaningful alongside a lap we actually judged dirty; on a lap
+            # whose verdict is unknown a position would look like a finding.
+            lost_at=buf.lost_at if clean is False else None,
             air_temp=s.air_temp,
             road_temp=s.road_temp,
             grip=s.surface_grip,
