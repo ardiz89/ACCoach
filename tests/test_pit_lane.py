@@ -21,6 +21,9 @@ _ON_TRACK = replace(
     TelemetrySnapshot.disconnected(),
     connected=True, status=ACStatus.LIVE, session=SessionType.PRACTICE,
     car_model="car", track="track", speed_kmh=120.0,
+    # The sim reports the just-closed lap's time at the crossing; without one the
+    # recorder has nothing to stamp on the lap and won't call it timed.
+    last_lap_ms=90_000,
 )
 
 

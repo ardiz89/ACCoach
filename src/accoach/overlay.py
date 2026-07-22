@@ -47,6 +47,27 @@ DEFAULT_URL = "ws://127.0.0.1:8777/ws"
 RECONNECT_MS = 2000
 CUE_HOLD_S = 1.8          # how long a cue stays on screen before fading out
 _GREEN_HOLD_S = 2.5       # how long "green — flying lap" stays up at the line
+# Braking countdown, in seconds-to-the-point rather than metres (see
+# _draw_brake_cue). NOW fires a touch before human reaction time (~0.25 s) so the
+# colour lands with the foot, not after it; NEAR is where it starts asking to be
+# looked at.
+_BRAKE_NOW_S = 0.35
+_BRAKE_NEAR_S = 1.5
+
+# Gates where the lap hasn't started at the line yet, so there is nothing a delta
+# could honestly compare. Reported from the pits: leaving the box against a hot
+# reference sends the number past +30 s and pins the bar at full-scale red, which
+# reads as a catastrophic lap rather than as no lap at all.
+_NO_DELTA_QUIET = frozenset({"pit", "out_lap"})
+
+# The big delta number. Its box has to be taller than the glyphs' line box or Qt
+# silently slices the digits — which is what happened at 28px in a 34px box
+# ("+156.454" arrived on screen with its bottom cut off). A line box runs about
+# 1.2-1.4x the pixel size depending on the face, so the box carries a margin over
+# that. Can't be checked with QFontMetrics in CI: headless Qt ships no fonts and
+# reports the pixel size back as the height.
+_DELTA_FONT_PX = 28
+_DELTA_BOX_H = 42
 DELTA_CLAMP_S = 1.0       # bar is full at ±1.0 s
 _BASE_W, _BASE_H = 560, 210   # design size; the window is this × the config scale
 
@@ -100,10 +121,17 @@ class Overlay(QWidget):
         self._drag_off = None
         self._base_h = _BASE_H + (_PEDAL_PANEL_H if pedals else 0)
         self.resize(int(_BASE_W * self._scale), int(self._base_h * self._scale))
-        if ov.x >= 0 and ov.y >= 0:
-            self.move(ov.x, ov.y)
-        else:
+        # A pinned position (dragged in --interactive) wins and is never moved for
+        # the driver; otherwise we place it ourselves — and keep placing it, see
+        # _watch_screens().
+        self._auto_place = not (ov.x >= 0 and ov.y >= 0)
+        if self._auto_place:
             self._place_top_center()
+        else:
+            self.move(ov.x, ov.y)
+            if not self._on_a_screen():      # saved on a monitor that's now gone
+                self._place_top_center()
+        self._watch_screens()
 
         # WebSocket client on the Qt event loop — only when a URL is given.
         # In-process callers feed it via apply_state() instead.
@@ -157,6 +185,51 @@ class Overlay(QWidget):
             del self._pedal_hist[:drop]
 
     # --- placement ---------------------------------------------------------
+    def _watch_screens(self) -> None:
+        """Re-place when the desktop is rearranged under us.
+
+        Placing once at startup is not enough on a triple rig, because turning
+        AMD Eyefinity on *moves the origin*. Measured on this machine:
+
+            Eyefinity off → three screens at x = -2560 / 0 / +2560,
+                            virtual desktop starts at -2560, centre 1279
+            Eyefinity on  → one 7680-wide screen at x = 0, centre 3840
+
+        The overlay placed at x≈959 (dead centre of the middle panel with
+        Eyefinity off) keeps that absolute coordinate, and once the origin shifts
+        by 2560 the same x lands in the *left* third of the span. Which is exactly
+        where the driver found it. Nothing was wrong with the maths — it was
+        computed against a desktop that no longer existed.
+        """
+        app = QApplication.instance()
+        if app is None:
+            return
+        app.screenAdded.connect(self._on_screens_changed)
+        app.screenRemoved.connect(self._on_screens_changed)
+        app.primaryScreenChanged.connect(self._on_screens_changed)
+        for screen in app.screens():
+            screen.geometryChanged.connect(self._on_screens_changed)
+
+    def _on_screens_changed(self, *_args) -> None:
+        # New screens need watching too, or a later rearrangement goes unseen.
+        for screen in QApplication.screens():
+            try:
+                screen.geometryChanged.disconnect(self._on_screens_changed)
+            except (RuntimeError, TypeError):
+                pass
+            screen.geometryChanged.connect(self._on_screens_changed)
+        if self._auto_place:
+            self._place_top_center()
+        elif not self._on_a_screen():
+            # Even a pinned position has to stay reachable: a saved x of 5000 on a
+            # desktop that just shrank is an overlay the driver reports as "gone".
+            self._place_top_center()
+
+    def _on_a_screen(self) -> bool:
+        """Is any part of the overlay actually on a physical screen?"""
+        return any(s.geometry().intersects(self.frameGeometry())
+                   for s in QApplication.screens())
+
     def _place_top_center(self) -> None:
         # Center on the middle of the whole desktop, not the primary screen's:
         # on a triple / AMD Eyefinity rig the "center" the driver looks at is the
@@ -211,14 +284,26 @@ class Overlay(QWidget):
         self._draw_brand_header(p, w)
         delta = st.get("delta")
         quiet = st.get("quiet") or ""
-        if delta is None:
+        invalid = bool(st.get("lap_invalid"))
+        # One rule for the delta: it appears when the lap started at the line and
+        # can still count. Everywhere else the number is a comparison against a
+        # lap that doesn't exist — in the pit lane it pins the bar at full-scale
+        # red, which looks exactly like a disastrous lap instead of like no lap.
+        # `off_pace` is deliberately NOT here: that lap did start at the line, the
+        # number is ugly but true, and how much you dropped is worth reading.
+        if invalid or quiet in _NO_DELTA_QUIET:
+            # Everything else — braking, locking, tyres — still applies. This
+            # replaces the number and nothing more.
+            self._draw_pill(p, t("overlay.lap_invalid") if invalid
+                            else t(f"quiet.{quiet}"), _AMBER, y=78)
+        elif delta is None:
             # Say WHY there's nothing to compare against. The old text assumed the
             # only reason was "still learning the reference", which was wrong on an
             # out-lap and read as a stuck app.
             self._draw_pill(p, t(f"quiet.{quiet}") if quiet else t("overlay.rec"),
                             _AMBER, y=78)
         else:
-            self._draw_delta(p, delta, w)
+            self._draw_delta(p, delta, w, quiet)
             if quiet:
                 # The delta is still worth seeing (you can read how far off you
                 # are), but the coach isn't advising — say so under the number.
@@ -270,17 +355,56 @@ class Overlay(QWidget):
         # When a braking point is coming up, the countdown takes the header's right
         # slot (it's time-critical); otherwise show the reference lap time (PB).
         brake_m = delta.get("brake_in_m")
-        self._set_font(p, 13, bold=True)
         if brake_m is not None:
-            p.setPen(_AMBER)
-            p.drawText(w - 240, 12, 220, 22, Qt.AlignRight | Qt.AlignVCenter,
-                       f"▼ {t('overlay.brake')}  {brake_m} m")
+            self._draw_brake_cue(p, w, brake_m)
         else:
+            self._set_font(p, 13, bold=True)
             p.setPen(_GREY)
             pb = delta.get("reference") or "--:--.---"
             p.drawText(w - 240, 12, 220, 22, Qt.AlignRight | Qt.AlignVCenter, f"PB {pb}")
 
-    def _draw_delta(self, p: QPainter, delta: dict, w: int) -> None:
+    def _draw_brake_cue(self, p: QPainter, w: int, metres: int) -> None:
+        """Countdown to the reference's next braking point.
+
+        Two jobs that pull against each other: be impossible to miss at the
+        instant you must act, and be ignorable for the seconds before that. So it
+        grows into the driver's attention instead of sitting there shouting —
+        dim while the point is far, brighter as it closes, and at the moment
+        itself it stops being a number and becomes one red word. A digit you have
+        to read is the wrong thing to put in front of someone at 250 km/h.
+
+        The switch is on TIME, not distance: at 250 km/h ten metres is 0.14 s and
+        the cue would arrive after the braking point, while in a slow corner the
+        same ten metres is half a second early. Metres are what the driver sees;
+        seconds are what decides when it flips.
+        """
+        speed_ms = max(1.0, (self._state.get("speed_kmh") or 0.0) / 3.6)
+        seconds = metres / speed_ms
+
+        if seconds <= _BRAKE_NOW_S:
+            # Filled red pill: peripheral vision reads the block of colour long
+            # before the eye could read a number.
+            box_w, box_h = 132, 26
+            x, y = w - 24 - box_w, 10
+            p.setPen(Qt.NoPen)
+            p.setBrush(_RED)
+            p.drawRoundedRect(x, y, box_w, box_h, 8, 8)
+            self._set_font(p, 15, bold=True)
+            p.setPen(QColor(0x0B, 0x0E, 0x12))
+            p.drawText(x, y, box_w, box_h, Qt.AlignCenter, t("overlay.brake"))
+            return
+
+        # Approaching: metres only, no word — the word is reserved for the moment
+        # it matters, or it stops meaning anything.
+        colour = QColor(_AMBER)
+        if seconds > _BRAKE_NEAR_S:
+            colour.setAlpha(150)            # far out: present, not loud
+        self._set_font(p, 15 if seconds <= _BRAKE_NEAR_S else 13, bold=True)
+        p.setPen(colour)
+        p.drawText(w - 240, 12, 216, 22, Qt.AlignRight | Qt.AlignVCenter,
+                   f"▼ {metres} m")
+
+    def _draw_delta(self, p: QPainter, delta: dict, w: int, quiet: str = "") -> None:
         ahead = delta.get("ahead", False)
         colour = _GREEN if ahead else _RED
 
@@ -303,15 +427,23 @@ class Overlay(QWidget):
 
         # Big delta number. The text already carries the sign (+slower / -faster),
         # which is the colour-blind-safe redundancy alongside the red/green.
-        self._set_font(p, 28, bold=True, mono=True)
+        # 42 high and vertically centred, not 34 top-aligned: at 28px the mono
+        # digits' line box is taller than 34, so descenders (and the digits
+        # themselves on a big delta) were clipped off the bottom. Same optical
+        # centre as before — the box grew upwards and downwards by 4.
+        self._set_font(p, _DELTA_FONT_PX, bold=True, mono=True)
         p.setPen(colour)
-        p.drawText(0, y + bar_h + 2, w, 34, Qt.AlignHCenter,
+        p.drawText(0, y + bar_h - 2, w, _DELTA_BOX_H,
+                   Qt.AlignHCenter | Qt.AlignVCenter,
                    f"{delta.get('text', '0.000')}")
 
         # Local delta: gaining/losing RIGHT NOW (this micro-sector) — the
         # predictive signal a cumulative number can't give. Small, under it.
+        # Skipped while the coach is holding back: it shares this line with the
+        # reason it's holding back, and the reason is the more useful of the two
+        # (a micro-delta on an out lap is measuring cold tyres against a hot lap).
         local = delta.get("local_s", 0.0)
-        if abs(local) >= 0.01:
+        if not quiet and abs(local) >= 0.01:
             losing = delta.get("local_losing", local > 0)
             self._set_font(p, 11, bold=True, mono=True)
             p.setPen(_RED if losing else _GREEN)

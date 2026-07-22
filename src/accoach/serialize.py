@@ -94,4 +94,5 @@ def state_to_dict(st: EngineState) -> dict:
         "engineer": st.engineer,
         "focus": st.focus,
         "quiet": st.quiet,
+        "lap_invalid": st.lap_invalid,
     }

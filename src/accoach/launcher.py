@@ -655,6 +655,12 @@ class MainWindow(QWidget):
         live = any(a and a[0] == "live" for _p, a in self._children)
         for key, _label, btn in self._actions:
             btn.setEnabled(not live or key in _LIVE_SAFE_KEYS)
+            # "Stop Coach Live" is meaningless before there's one to stop, and a
+            # disabled Stop sitting next to Start reads as "something is already
+            # running" — the opposite of the truth. Hide it instead: the panel
+            # then shows exactly the one action that applies right now.
+            if key == _STOP_LIVE:
+                btn.setVisible(live)
 
     def _prune(self) -> None:
         """Forget children that have already exited."""

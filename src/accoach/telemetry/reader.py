@@ -1,4 +1,4 @@
-"""Reader for the AC / ACC shared memory.
+﻿"""Reader for the AC / ACC shared memory.
 
 Opens the three memory-mapped pages, polls them, and converts each read into a
 clean :class:`TelemetrySnapshot`. Designed to be polled in a loop:
@@ -11,7 +11,7 @@ clean :class:`TelemetrySnapshot`. Designed to be polled in a loop:
 Why the raw Win32 API instead of the ``mmap`` module
 ----------------------------------------------------
 On Windows, ``mmap.mmap(-1, size, tagname)`` *creates* a fresh anonymous
-mapping when the named one doesn't exist instead of failing — so it would
+mapping when the named one doesn't exist instead of failing â€” so it would
 silently report "connected" (reading zeros) while the game is closed, and it
 could collide with the section the game later creates. We therefore use
 ``OpenFileMapping`` directly, which returns NULL when the game isn't running,
@@ -96,6 +96,11 @@ class _Page:
         self._tagname = tagname
         self._struct_type = struct_type
         self._size = ctypes.sizeof(struct_type)
+        # Did the last read have to invent the tail? True when the game published
+        # a shorter page than our struct — AC does, ACC doesn't. Whoever reads a
+        # field that only exists in the tail has to know, because zero-padding is
+        # indistinguishable from a real zero. See SharedMemoryReader._lap_valid.
+        self.padded = False
 
     def read(self) -> ctypes.Structure | None:
         handle = _OpenFileMapping(_FILE_MAP_READ, False, self._tagname)
@@ -112,7 +117,8 @@ class _Page:
             available = int(mbi.RegionSize) if mbi.RegionSize else self._size
             n = min(self._size, available)
             raw = ctypes.string_at(view, n)
-            if n < self._size:
+            self.padded = n < self._size
+            if self.padded:
                 raw += b"\x00" * (self._size - n)  # zero-pad ACC-only tail on AC
             return self._struct_type.from_buffer_copy(raw)
         except OSError:
@@ -141,13 +147,16 @@ class SharedMemoryReader:
         if phys is None or graph is None or stat is None:
             return TelemetrySnapshot.disconnected()
 
-        return self._to_snapshot(phys, graph, stat)
+        # The graphics page is shorter on AC than our (ACC-shaped) struct, so the
+        # tail is invented there; anything reading it needs to know that.
+        return self._to_snapshot(phys, graph, stat, self._graphics.padded)
 
     @staticmethod
     def _to_snapshot(
         p: SPageFilePhysics,
         g: SPageFileGraphics,
         s: SPageFileStatic,
+        graphics_padded: bool = True,   # assume invented unless told otherwise
     ) -> TelemetrySnapshot:
         try:
             status = ACStatus(g.status)
@@ -211,6 +220,8 @@ class SharedMemoryReader:
             tyre_compound=str(g.tyreCompound),
             penalty=SharedMemoryReader._penalty(g),
             in_pit_lane=SharedMemoryReader._in_pit_lane(g),
+            is_acc=SharedMemoryReader._is_acc(g),
+            lap_valid=SharedMemoryReader._lap_valid(g, graphics_padded),
             **SharedMemoryReader._car_xz(g),
         )
 
@@ -222,26 +233,39 @@ class SharedMemoryReader:
         return raw if 0 <= raw < 30 else -1
 
     @staticmethod
+    def _is_acc(g: SPageFileGraphics) -> bool:
+        """Which title is on the other end of the shared memory.
+
+        ACC fills ``activeCars`` with a real car count; on AC1 that slot holds the
+        player's X coordinate as a float, whose int reinterpretation is always far
+        outside 1..60. Everything that reads the diverging half of the graphics
+        page asks this first â€” and so does anything that needs to know whether a
+        field is *simulated* at all (AC1 declares brake temperatures and never
+        fills them).
+        """
+        return 0 < g.activeCars <= 60
+
+    @staticmethod
     def _car_xz(g: SPageFileGraphics) -> dict:
         """Player's world ground-plane position (X, Z) for the track map.
 
         The two games lay the graphics page out differently right here:
 
         * **ACC** has ``activeCars`` (int) followed by ``carCoordinates[60][3]``
-          indexed by ``playerCarID`` — exactly what our struct declares. The
+          indexed by ``playerCarID`` â€” exactly what our struct declares. The
           player's position is ``carCoordinates[playerCarID] = (x, y, z)``.
         * **AC1** has *no* ``activeCars`` and ``carCoordinates`` is just the
           player's own ``float[3]``, so the whole triple sits 4 bytes earlier:
           x at the ``activeCars`` offset, then y, then z. Reading it ACC-style
-          gives ``(y, z, garbage)`` — i.e. car_x became the elevation and car_z
-          read a zero (validated live 2026-06-28 on a Ferrari SF25 @ Nürburgring:
+          gives ``(y, z, garbage)`` â€” i.e. car_x became the elevation and car_z
+          read a zero (validated live 2026-06-28 on a Ferrari SF25 @ NÃ¼rburgring:
           the real X/Z were at offsets 252/260, not 256/264).
 
         We tell them apart by ``activeCars``: ACC fills it with a real car count
         (1..60); on AC1 that slot holds the X coordinate as a float, whose int
         reinterpretation is always far outside that range.
         """
-        if 0 < g.activeCars <= 60:                       # ACC layout
+        if SharedMemoryReader._is_acc(g):                # ACC layout
             idx = g.playerCarID if 0 <= g.playerCarID < 60 else 0
             c = g.carCoordinates[idx]
             return {"car_x": float(c[0]), "car_z": float(c[2])}
@@ -257,7 +281,7 @@ class SharedMemoryReader:
         """Track grip (0..1), reading it where each game actually keeps it.
 
         Same layout split as :meth:`_car_xz`: our struct declares the **ACC**
-        page, where ``surfaceGrip`` lands at offset 1240 — after ``activeCars``,
+        page, where ``surfaceGrip`` lands at offset 1240 â€” after ``activeCars``,
         ``carCoordinates[60][3]``, ``carID[60]``, ``playerCarID`` and ``penalty``.
         AC1 has none of those, so its ``surfaceGrip`` sits at offset **280**, only
         28 bytes past ``activeCars`` (x, y, z, penaltyTime, flag, idealLineOn,
@@ -268,14 +292,14 @@ class SharedMemoryReader:
         reports condition through ``trackGripStatus`` instead, which is further
         down a tail we don't declare yet.
         """
-        if 0 < g.activeCars <= 60:                       # ACC layout
+        if SharedMemoryReader._is_acc(g):                # ACC layout
             raw = float(g.surfaceGrip)
         else:                                            # AC1 layout
             base = ctypes.addressof(g) + SPageFileGraphics.activeCars.offset
             raw = ctypes.c_float.from_address(
                 base + SharedMemoryReader._AC1_SURFACE_GRIP).value   # offset 280
         # Grip is a fraction. Anything else means we're reading the wrong bytes
-        # (mod content, a cold frame, a future layout change) — report "no data"
+        # (mod content, a cold frame, a future layout change) â€” report "no data"
         # rather than feed a nonsense number to the reference picker.
         return raw if 0.0 <= raw <= 1.0 else 0.0
 
@@ -288,32 +312,63 @@ class SharedMemoryReader:
 
     @staticmethod
     def _in_pit_lane(g: SPageFileGraphics) -> bool:
-        """True anywhere in the pit lane — the whole corridor, not just the box.
+        """True anywhere in the pit lane â€” the whole corridor, not just the box.
 
         ``isInPit`` only covers standing in the garage, so without this a lap that
         ends by driving down the pit lane is recorded as an ordinary timed lap
         (measured: a 1:57.235 at Imola against a 1:46 best, which alone tripled the
-        session's σ). ``normalizedCarPosition`` keeps advancing in the lane, so
+        session's Ïƒ). ``normalizedCarPosition`` keeps advancing in the lane, so
         position can't tell them apart either.
 
         Same layout split as :meth:`_surface_grip`, one slot earlier.
         """
-        if 0 < g.activeCars <= 60:                       # ACC layout
-            return bool(g.isInPitLane)
+        # Strictly ``== 1`` on both branches, never a truthiness test. This flag
+        # *stops the recorder*, so a misread that happens to be non-zero would
+        # silently record nothing for a whole session — the worst failure this
+        # codebase can have, and one it has already had once (surfaceGrip, read at
+        # the ACC offset on AC1, sat at 0.0 for months). Anything that isn't a
+        # clean 0/1 means we're reading the wrong bytes: assume on track.
+        if SharedMemoryReader._is_acc(g):                # ACC layout
+            return int(g.isInPitLane) == 1
         base = ctypes.addressof(g) + SPageFileGraphics.activeCars.offset
         raw = ctypes.c_int.from_address(
             base + SharedMemoryReader._AC1_IS_IN_PIT_LANE).value
-        return raw == 1          # anything else means we're misreading; assume track
+        return raw == 1
+
+    @staticmethod
+    def _lap_valid(g: SPageFileGraphics, padded: bool) -> bool | None:
+        """Does the sim still count this lap? ``None`` when it can't tell us.
+
+        Only ACC answers. On AC the field doesn't exist, the page ends long
+        before offset 1408, and our zero-padding would read it as 0 — i.e. as
+        "invalidated", on every frame of every lap. That failure would be
+        invisible and total, so AC returns None ("unknown") and its track limits
+        keep coming from ``numberOfTyresOut``, which ACC in turn never fills.
+        Each title has exactly one field that works, and they aren't the same one.
+
+        ``padded`` says whether the game actually published bytes this far, which
+        is the honest guard: a field the page doesn't contain is unknown, full
+        stop. An earlier attempt sanity-checked the neighbouring counter's *value*
+        instead and got it badly wrong — that field mirrors the running lap clock,
+        so it reads under 20 s at the start of every lap. The check rejected the
+        first twenty seconds of every ACC lap, fell back to the dead wheel counter
+        and reported those laps clean: the guard against a silent failure was
+        itself failing silently. Structure is checkable; a live value isn't.
+        """
+        if padded or not SharedMemoryReader._is_acc(g):
+            return None
+        raw = int(g.isValidLap)
+        return raw == 1 if raw in (0, 1) else None
 
     @staticmethod
     def _penalty(g: SPageFileGraphics) -> int:
-        """Current penalty enum — **ACC only**.
+        """Current penalty enum â€” **ACC only**.
 
         AC1 has no such field at all: its page ends long before offset 1228, so
         reading it ACC-style is the same out-of-page read that kept ``surfaceGrip``
         at zero. Report "no penalty" instead of whatever those bytes happen to hold.
         """
-        return int(g.penalty) if 0 < g.activeCars <= 60 else 0
+        return int(g.penalty) if SharedMemoryReader._is_acc(g) else 0
 
     # Adjustable-aid levels come from the ACC-only graphics tail; on plain AC
     # that region is zero-padded and the raw struct can also carry garbage on a
@@ -347,7 +402,7 @@ class SharedMemoryReader:
         * **AC** populates the static ``tyreRadius`` but has no native slip field,
           so we derive it: ``(wheelAngularSpeed * tyreRadius - v) / v``.
         * **ACC** leaves ``tyreRadius`` at zero (an AC1 leftover it never fills) but
-          exposes a native, signed ``slipRatio`` per wheel — verified live against
+          exposes a native, signed ``slipRatio`` per wheel â€” verified live against
           real braking/traction. We read that directly; the radius formula would
           otherwise always yield 0 on ACC and the lock/spin cues would never fire
           on the physical channel (falling back to the binary ABS/TC flags, which
