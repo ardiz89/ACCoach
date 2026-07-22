@@ -26,6 +26,12 @@ from pathlib import Path
 # v3: added `source` ("own"/"pro") so a PRO benchmark lap can be found cheaply.
 _DB_VERSION = 3
 
+# How far the track temperature may differ before a lap stops being a fair
+# benchmark. Wide on purpose: the point is to rule out the morning-vs-evening
+# gap, not to demand a twin of today's session — too narrow a band and the
+# preference never finds anything, which is the same as not having it.
+_TEMP_BAND_C = 8.0
+
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS lap (
     lap_id         INTEGER PRIMARY KEY,
@@ -210,21 +216,44 @@ class LapCatalog:
         ).fetchone()
         return row["path"] if row else None
 
-    def best_reference_path(self, car_model: str, track: str) -> str | None:
+    def best_reference_path(self, car_model: str, track: str,
+                            road_temp: float | None = None) -> str | None:
         """Path of the best *trustworthy* reference lap for this car+track.
 
         Excludes dirty laps (clean = 0) entirely, and prefers a confirmed-clean
         lap (clean = 1) over an unknown/legacy one (clean = -1); ties break on
         lap time. Returns ``None`` if there is no usable lap — the caller then
         honestly reports "no reference" instead of coaching against a cut lap.
+
+        With ``road_temp``, a lap driven in comparable track conditions wins over
+        a faster one driven in different ones. Braking points move 10-20 m
+        between a cold track and a hot one, on the same car — a driver's own
+        published comparison, and the reason a personal best set on a rubbered-in
+        evening track is the wrong target for a cold morning session: every
+        tenth in the debrief is then weather, not driving.
+
+        Deliberately a preference and not a filter. If nothing matches the
+        conditions we return the plain best rather than "no reference": a
+        slightly wrong benchmark still beats silence, and the conditions of the
+        elected lap are shown to the driver anyway.
         """
-        row = self._conn.execute(
-            """SELECT path FROM lap
-               WHERE car_key = ? AND track_key = ? AND valid = 1
-                     AND lap_time_ms > 0 AND clean <> 0
-               ORDER BY (clean = 1) DESC, lap_time_ms ASC LIMIT 1""",
-            (self._slug(car_model), self._slug(track)),
-        ).fetchone()
+        base = """SELECT path FROM lap
+                  WHERE car_key = ? AND track_key = ? AND valid = 1
+                        AND lap_time_ms > 0 AND clean <> 0"""
+        order = " ORDER BY (clean = 1) DESC, lap_time_ms ASC LIMIT 1"
+        keys = (self._slug(car_model), self._slug(track))
+
+        if road_temp is not None and road_temp > 0:
+            row = self._conn.execute(
+                # road_temp NULL/0 means the lap predates the field or the sim
+                # never reported it: unknown conditions can't be called similar.
+                base + " AND road_temp > 0 AND ABS(road_temp - ?) <= ?" + order,
+                (*keys, float(road_temp), _TEMP_BAND_C),
+            ).fetchone()
+            if row:
+                return row["path"]
+
+        row = self._conn.execute(base + order, keys).fetchone()
         return row["path"] if row else None
 
     def fastest_pro_path(self, car_model: str, track: str) -> str | None:
@@ -242,7 +271,7 @@ class LapCatalog:
         """All indexed laps for a car+track, most recently recorded first."""
         rows = self._conn.execute(
             """SELECT path, lap_time_ms, valid, clean, source, recorded_utc,
-                      sample_count
+                      sample_count, air_temp, road_temp, grip, tyre_compound
                FROM lap WHERE car_key = ? AND track_key = ?
                ORDER BY recorded_utc DESC""",
             (self._slug(car_model), self._slug(track)),
