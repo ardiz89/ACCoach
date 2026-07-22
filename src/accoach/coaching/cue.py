@@ -30,6 +30,7 @@ class CueCategory(Enum):
     OVERSTEER = "oversteer"
     COASTING = "coasting"
     TRAIL_BRAKE = "trail_brake"
+    PARTIAL_THROTTLE = "partial_throttle"
     # In-car aid adjustments — suggested at lap end when a symptom recurs across
     # the lap (a knob to change on the straight, not a per-corner technique fix).
     TC_UP = "tc_up"
