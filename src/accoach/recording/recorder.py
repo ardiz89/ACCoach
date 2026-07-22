@@ -136,11 +136,21 @@ class StartLineWatcher:
 
     def crossed(self, pos: float, completed: int) -> bool:
         hit = crossed_start_line(self._prev_pos, pos, self._prev_completed, completed)
+        prev = self._prev_pos
         self._prev_pos, self._prev_completed = pos, completed
         if hit:
             was_armed, self._armed = self._armed, False
             return was_armed
         if not self._armed and _WRAP_TO <= pos <= _WRAP_FROM:
+            self._armed = True
+        elif (not self._armed and prev is not None
+                and prev < _WRAP_TO and pos > _WRAP_FROM):
+            # Went back OVER the line, which only happens off-track: a spin just
+            # past the start/finish slides the car back across it. Without this,
+            # the latch was still holding from the crossing a second ago, so the
+            # driver's next (real, forward) crossing was swallowed and the whole
+            # recovery plus the entire next lap were stored as one file — carrying
+            # a lap time from a lap it doesn't contain, and eligible as reference.
             self._armed = True
         return False
 
@@ -260,6 +270,24 @@ class LapRecorder:
             self._buf = _Buffer(
                 samples=[], is_full=crossed, last_pos=-1.0, last_t_ms=-_MIN_DT_MS,
             )
+
+        # The frame that opens a full lap can still read pos ~1.0: the sim bumps
+        # the lap counter one frame BEFORE the position wraps, so this frame is
+        # physically part of the lap that just closed. `_maybe_append` already
+        # refuses to store it as telemetry — and yet its verdict was being read
+        # into the new lap, which is the same frame judged two opposite ways.
+        #
+        # On ACC that was not an edge case but a rule: `isValidLap` is latched at
+        # 0 for the rest of an invalidated lap and only resets at the wrap, so
+        # the counter frame still carries the 0. Every lap FOLLOWING an
+        # invalidated one was condemned with it — measured: a clean lap came out
+        # `clean=False, lost_at=0.995`, which also excludes it from ever becoming
+        # the reference (catalog.py, `clean = 0`).
+        opening_pre_wrap = (not self._buf.samples and self._buf.is_full
+                            and s.lap_position > 0.5)
+        if opening_pre_wrap:
+            self._maybe_append(self._buf, s)
+            return finished
 
         # Track the worst excursion on EVERY frame (not just decimated samples),
         # so a brief off between stored samples still marks the lap dirty.

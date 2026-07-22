@@ -76,3 +76,55 @@ def test_a_lap_is_not_finished_twice():
     laps = [lap for f in frames if (lap := rec.update(f)) is not None]
     assert len(laps) == 1
     assert laps[0].samples, "and it's the one with the telemetry in it"
+
+
+def test_the_crossing_frame_does_not_condemn_the_next_lap():
+    """The frame that opens a lap can still read pos ~1.0 and the OLD lap's state.
+
+    On ACC `isValidLap` is latched at 0 for the rest of an invalidated lap and
+    only resets at the wrap — one frame after the counter bumps. So the opening
+    frame carried a 0 into the fresh buffer and every lap FOLLOWING an
+    invalidated one was condemned with it, which also bars it from ever being
+    elected reference. Measured before the fix: `clean=False, lost_at=0.995` on a
+    lap driven perfectly.
+    """
+    rec = LapRecorder()
+    frames = [replace(_LIVE, lap_position=0.9, completed_laps=0)]
+    # lap 1: cut at the first chicane, flag latched down from there on
+    frames += [replace(_LIVE, lap_position=p / 100, completed_laps=1,
+                       lap_valid=(p < 16)) for p in range(0, 100, 2)]
+    # the counter bumps one frame BEFORE the wrap, flag still down
+    frames += [replace(_LIVE, lap_position=0.995, completed_laps=2, lap_valid=False),
+               replace(_LIVE, lap_position=0.002, completed_laps=2, lap_valid=True)]
+    # lap 2: spotless
+    frames += [replace(_LIVE, lap_position=p / 100, completed_laps=2, lap_valid=True)
+               for p in range(2, 100, 2)]
+    frames += [replace(_LIVE, lap_position=0.995, completed_laps=3, lap_valid=True),
+               replace(_LIVE, lap_position=0.002, completed_laps=3, lap_valid=True)]
+    laps = [lap for f in frames if (lap := rec.update(f)) is not None and lap.valid]
+    assert len(laps) == 2
+    assert (laps[0].clean, laps[0].lost_at) == (False, 0.16)
+    assert laps[1].clean is True and laps[1].lost_at is None
+
+
+def test_a_spin_back_over_the_line_re_arms_the_latch():
+    """A spin just past start/finish slides the car back across it.
+
+    The latch was still holding from the crossing a second earlier, so the
+    driver's next real forward crossing was swallowed — and the recovery plus the
+    whole next lap were stored as one file, carrying a lap time from a lap it
+    does not contain, and eligible as a reference.
+    """
+    w = StartLineWatcher()
+    w.crossed(0.98, 1)
+    assert w.crossed(0.005, 2) is True
+    assert w.crossed(0.995, 2) is False, "going backwards is not a crossing"
+    assert w.crossed(0.004, 2) is True, "…but the way back over it must count"
+
+
+def test_it_still_does_not_re_arm_on_the_normal_two_signal_crossing():
+    """The re-arm must not undo the fix it sits next to."""
+    w = StartLineWatcher()
+    w.crossed(0.98, 1)
+    assert w.crossed(0.995, 2) is True      # counter, pre-wrap
+    assert w.crossed(0.002, 2) is False     # wrap, same crossing
