@@ -23,7 +23,8 @@ from ..engineer import Balance, Phase, Speed, Symptom
 from ..recording.lap import Lap
 from ..telemetry.snapshot import format_lap_time
 from ..track import Corner
-from .analyzer import _BRAKE_ON, _LOSS_MS, CornerStats, classify_corner
+from ..trackdata import corner_name
+from .analyzer import _BRAKE_ON, _LOSS_MS, CornerStats, _braked_early, classify_corner
 from .cue import CueCategory
 from .diagnosis import corner_symptoms, dominant_symptom
 from .tuning import tuning_for_car
@@ -280,12 +281,15 @@ def build_lap_debrief(lap: Lap, reference: Reference, corners: list[Corner],
         brk_ref = _mean([r.brake for r in refs])
         vmin_ref = min(r.speed_kmh for r in refs)
 
-        # Did you brake where the reference wasn't braking yet?
-        braking_early = False
-        for s in inside:
-            if s.brake >= _BRAKE_ON:
-                braking_early = reference.point_at(s.pos).brake < _BRAKE_ON
-                break
+        # Did you brake meaningfully earlier than the reference? Same rule as the
+        # live analyzer, on purpose: the two used to differ only by accident.
+        live_onset = _onset(inside, lambda s: s.brake)
+        ref_onset = _onset(inside, lambda s: reference.point_at(s.pos).brake)
+        braking_early = _braked_early(
+            -1.0 if live_onset is None else live_onset,
+            -1.0 if ref_onset is None else ref_onset,
+            reference.point_at(live_onset).brake if live_onset is not None else -1.0,
+        )
 
         stats = CornerStats(
             lost_ms=lost, throttle_live=thr_live, throttle_ref=thr_ref,
@@ -317,6 +321,11 @@ def build_lap_debrief(lap: Lap, reference: Reference, corners: list[Corner],
             message=titles.get(cue.category, cue.message),
             detail=detail, fix=fix, cause=cause,
             min_speed_live=vmin_live, min_speed_ref=vmin_ref,
+            # Name the corner HERE rather than leaving it to the caller. The web
+            # app did it and the live path didn't, so the overlay and the voice
+            # said "Corner 7" — in English, in an Italian session — while the
+            # report for the same lap said "Variante Ascari".
+            name=corner_name(lap.track, c.index, c.apex_pos, lg),
         ))
 
     losses.sort(key=lambda x: x.lost_ms, reverse=True)
