@@ -164,6 +164,8 @@ select {
 .summary .item .v { font-size: 18px; font-weight: 600; font-family: var(--font-mono); }
 .summary .v.slower { color: var(--red); }
 .summary .v.faster { color: var(--green); }
+/* Setup difference: amber and smaller — a caveat on the gap, not a verdict. */
+.summary .v.warn { color: var(--amber); font-size: 13px; }
 /* Track-limits chip, sized like the [PRO] tag — it qualifies the lap time, it
    doesn't compete with it. */
 .summary .off-track {

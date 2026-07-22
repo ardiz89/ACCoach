@@ -202,6 +202,7 @@
     "lbl.sectors":     { en: `Sectors`, it: `Settori` },
     "lbl.laps":        { en: `laps`, it: `giri` },
     "sum.consistency": { en: `Consistency`, it: `Costanza` },
+    "sum.setup_diff":  { en: `Setup differs`, it: `Setup diverso` },
 
     "sec.real":        { en: `real track sectors`, it: `settori reali pista` },
     "sec.thirds":      { en: `thirds (position)`, it: `terzi (posizione)` },
