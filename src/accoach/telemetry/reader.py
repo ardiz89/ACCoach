@@ -17,9 +17,13 @@ could collide with the section the game later creates. We therefore use
 ``OpenFileMapping`` directly, which returns NULL when the game isn't running,
 giving us honest connect/disconnect detection.
 
-We also ``VirtualQuery`` the mapped view to learn its real size: plain Assetto
-Corsa allocates a shorter region than ACC, so we read only the bytes that
-actually exist and zero-pad the ACC-only tail. The mapping is opened and closed
+We also ``VirtualQuery`` the mapped view, intending to learn its real size and
+read only the bytes that exist. **It cannot tell us that**: ``RegionSize`` comes
+back rounded up to the 4 KB page, and every one of these structs is smaller than
+a page, so the answer is always "there's plenty". On AC we therefore read the
+ACC-only tail out of the page — harmless as memory (the page is mapped) but the
+values there are meaningless, which is why the title has to be identified from a
+field instead (see ``_is_acc``). The mapping is opened and closed
 on every read so that when the game exits we notice immediately (the kernel
 keeps a section alive only while a handle is open).
 """
@@ -346,14 +350,28 @@ class SharedMemoryReader:
         keep coming from ``numberOfTyresOut``, which ACC in turn never fills.
         Each title has exactly one field that works, and they aren't the same one.
 
-        ``padded`` says whether the game actually published bytes this far, which
-        is the honest guard: a field the page doesn't contain is unknown, full
-        stop. An earlier attempt sanity-checked the neighbouring counter's *value*
-        instead and got it badly wrong — that field mirrors the running lap clock,
-        so it reads under 20 s at the start of every lap. The check rejected the
-        first twenty seconds of every ACC lap, fell back to the dead wheel counter
-        and reported those laps clean: the guard against a silent failure was
-        itself failing silently. Structure is checkable; a live value isn't.
+        **``_is_acc`` is the only guard here, and this comment used to claim
+        otherwise.** ``padded`` was introduced as "the honest structural guard —
+        a field the page doesn't contain is unknown, full stop", replacing an
+        earlier check on the neighbouring counter's *value* that had failed
+        badly (that field mirrors the running lap clock, so it read under 20 s at
+        the start of every lap and rejected the first twenty seconds of every ACC
+        lap, silently falling back to the dead wheel counter).
+
+        The replacement never fires either. ``VirtualQuery`` reports a mapped
+        view's ``RegionSize`` rounded **up to the 4 KB page**, and this struct is
+        1412 bytes, so ``available`` is always ≥ the struct and ``padded`` is
+        always False — measured, not deduced. Two guards were claimed and one
+        exists.
+
+        No third guard is bolted on here on purpose. The obvious candidate is
+        another live-value relationship, and that is exactly the shape that broke
+        twice: when it misfires it returns "unknown", we fall back to a field the
+        title doesn't fill, and every lap comes out clean — a silent, total
+        failure of the same kind. ``_is_acc`` reads ``activeCars``, which is a
+        field AC1's page does not have at all; if that ever stops being
+        decisive the honest fix is a different structural signal, not a value
+        heuristic layered on top of one.
         """
         if padded or not SharedMemoryReader._is_acc(g):
             return None

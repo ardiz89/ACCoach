@@ -36,8 +36,17 @@ def _graphics(active_cars: int, est=_PLAUSIBLE_EST, valid=1) -> SPageFileGraphic
 # --- the reader -----------------------------------------------------------
 
 def test_the_offsets_are_where_they_were_measured():
+    """Pins OUR struct, not the game's page — and that is all it can do.
+
+    `isValidLap` at 1408 was found by watching ACC's shared memory frame by
+    frame; nothing in this repository can re-check that. What this catches is a
+    field added or resized above it, which would silently shift the offset and
+    turn the flag into a neighbouring one. Read it as a layout lock, not as
+    evidence about ACC.
+    """
     assert SPageFileGraphics.iEstimatedLapTime.offset == 1404
     assert SPageFileGraphics.isValidLap.offset == 1408
+    assert ctypes.sizeof(SPageFileGraphics) == 1412
 
 
 def test_acc_reports_the_sims_own_verdict():
@@ -55,14 +64,28 @@ def test_ac_reports_unknown_never_invalid():
 
 
 def test_a_page_that_did_not_reach_the_field_is_unknown():
-    """The guard is structural: a field the page doesn't contain is unknown.
+    """Kept, but it is not the guard the docstring used to claim it was.
 
-    Even if everything else looked like ACC. The previous attempt guarded on the
-    neighbouring counter's *value* and was wrong about what that counter is — it
-    mirrors the running lap clock, so it read under 20 s at the start of every
-    lap and the guard rejected the first twenty seconds of every ACC lap.
+    ``padded`` can only be True if the game published fewer bytes than the struct
+    AND we could detect that. We can't: ``VirtualQuery`` rounds a view's
+    ``RegionSize`` up to the 4 KB page and every one of these structs is smaller
+    than a page, so in production this argument is always False and this branch
+    is unreachable. Two guards were documented; ``_is_acc`` is the only one that
+    ever runs — see :meth:`SharedMemoryReader._lap_valid`.
     """
     assert SharedMemoryReader._lap_valid(_graphics(20, valid=1), True) is None
+
+
+def test_the_only_guard_that_actually_runs_is_the_title_check():
+    """Pins the truth rather than the intention: with ``padded`` False — which is
+    what production always passes — everything rests on ``activeCars``."""
+    assert SharedMemoryReader._lap_valid(_graphics(0, valid=0), False) is None
+    assert SharedMemoryReader._lap_valid(_graphics(20, valid=0), False) is False
+
+
+def test_the_page_is_smaller_than_the_granularity_we_could_measure():
+    """Why the structural guard can't work, as an assertion instead of a claim."""
+    assert ctypes.sizeof(SPageFileGraphics) < 4096
 
 
 def test_a_flag_that_is_neither_0_nor_1_is_unknown():

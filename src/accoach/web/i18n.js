@@ -228,7 +228,12 @@
     // of one word would be worse than the gap this fills.
     "lap.offTrack":    { en: `off track`, it: `fuori pista` },
     // Reads as "off track at Variante Ascari" / "fuori pista alla Variante Ascari".
-    "lap.offTrack.at": { en: `at`, it: `alla` },
+    // Italian needs the article to agree with the corner's gender, and corner
+    // names are proper nouns we don't inflect ("alla Tamburello" is wrong,
+    // "al Tamburello" is right). A neutral preposition sidesteps the whole
+    // problem and reads fine for every name in every table: "fuori pista in
+    // Variante Ascari", "fuori pista in Tamburello".
+    "lap.offTrack.at": { en: `at`, it: `in` },
     "lap.offTrack.why": { en: `You went off track on this lap (3 or more wheels off), so it can't become your reference.`,
                           it: `In questo giro sei uscito di pista (3+ ruote fuori), quindi non può diventare il tuo riferimento.` },
     "debrief.title":   { en: `Where to improve`, it: `Dove migliorare` },

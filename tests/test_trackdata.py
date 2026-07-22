@@ -63,5 +63,23 @@ def test_monza_names_the_whole_lap():
 
 
 def test_the_two_lesmos_do_not_collapse_into_one():
-    """0.447 and 0.500 are closer together than the tolerance is wide."""
-    assert corner_name("monza", 3, 0.447) != corner_name("monza", 4, 0.500)
+    """Con gli apici RILEVATI, non con quelli curati.
+
+    La versione precedente passava esattamente 0.447 e 0.500, cioè i valori che
+    avevamo scritto noi nella tabella: era una tautologia e sarebbe rimasta verde
+    con qualunque tolleranza. I due Lesmo distano 0.053 e la tolleranza è 0.05,
+    quindi il caso vero è un apice rilevato un po' spostato.
+    """
+    corners = [_corner(3, 0.4505), _corner(4, 0.4955)]   # entrambi verso il mezzo
+    names = name_corners("monza", corners)
+    assert names == ["Lesmo 1", "Lesmo 2"], names
+
+
+def test_a_split_complex_does_not_produce_three_identical_names():
+    """Se il rilevatore spezza l'Ascari in tre, ogni parte è vicina allo stesso
+    apice curato: il report finiva con tre righe chiamate "Variante Ascari",
+    indistinguibili nelle perdite, nelle velocità e nella voce del coach."""
+    corners = [_corner(0, 0.672), _corner(1, 0.686), _corner(2, 0.700)]
+    names = name_corners("monza", corners)
+    assert names.count("Variante Ascari") == 1, names
+    assert len(set(names)) == 3, names
