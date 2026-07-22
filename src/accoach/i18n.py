@@ -55,6 +55,11 @@ _UI: dict[str, dict[str, str]] = {
     "quiet.off_pace": {"en": "Off-pace lap — I'll resume at the line",
                        "it": "Giro fuori ritmo — riprendo dal traguardo"},
     "quiet.green": {"en": "Green — flying lap", "it": "Via — giro lanciato"},
+    # Not a quiet reason: the coach keeps working, only the delta goes away.
+    # Says what happened AND that the lap is still worth driving, because the
+    # instinct on seeing "invalidated" is to abort and go back to the pits.
+    "overlay.lap_invalid": {"en": "Lap invalidated — keep driving, no delta",
+                            "it": "Giro invalidato — continua, niente delta"},
     "overlay.brake": {"en": "BRAKE", "it": "FRENA"},
     "overlay.focus": {"en": "FOCUS", "it": "FOCUS"},
     "overlay.throttle_pedal": {"en": "THR", "it": "GAS"},

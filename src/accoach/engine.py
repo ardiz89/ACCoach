@@ -43,6 +43,7 @@ from .i18n import cue_text, current_language
 from .comparison import DeltaState, LapComparator, Reference
 from .engineer import RaceEngineer, classify, engineer_for
 from .recording import DEFAULT_LAPS_DIR, Lap, LapRecorder, find_reference_lap, save_lap
+from .recording.recorder import crossed_start_line
 from .telemetry import SharedMemoryReader, TelemetrySnapshot
 from .telemetry.snapshot import ACStatus
 from .telemetry.feed import TelemetryFeed
@@ -109,6 +110,12 @@ class EngineState:
     # has to say so: a silent gate reads as a broken app (the driver's own words
     # after a calibration session were "I drove and nothing happened").
     quiet: str = ""              # "" | "pit" | "out_lap" | "no_reference" | "off_pace"
+    # The game says this lap is already invalidated (ACC only; None on AC, where
+    # the page ends before the flag). Not a gate: an invalidated lap is a free
+    # lap, and everything but the stopwatch still applies. It only tells the
+    # frontend to stop showing a delta that compares against a lap that won't
+    # count.
+    lap_invalid: bool = False
 
 
 def _load_reference(car: str, track: str, laps_dir: Path | str) -> Reference | None:
@@ -175,6 +182,7 @@ class CoachEngine:
         # once we've watched it open at the start/finish line. Kept here rather
         # than read off the recorder because that one lives on the feed thread.
         self._prev_completed: int | None = None
+        self._prev_pos: float | None = None
         self._flying_lap = False
 
         # Race engineer: rebuilt per car/track; fed a per-lap diagnosis (LapStats)
@@ -411,27 +419,36 @@ class CoachEngine:
             engineer=self._engineer_block(),
             focus=self._focus_block(),
             quiet=quiet,
+            # Only on a lap that actually started at the line: on ACC the flag is
+            # 0 for the whole out-lap too, and answering "invalidated" there would
+            # be technically true and useless — the out-lap has its own message.
+            lap_invalid=self._flying_lap and snap.lap_valid is False,
         )
 
     def _track_flying_lap(self, s: TelemetrySnapshot) -> None:
         """Am I on a lap that started at the line, or still on the way out?
 
-        Same rule as :class:`LapRecorder` — the lap counter incrementing is the
-        only start/finish signal that holds on both titles and in every session
-        type. Everything cheaper lies: ``lap_position`` keeps advancing down the
-        pit lane, ``current_lap_ms`` starts ticking as you leave the box, and the
-        session type doesn't help because an ACC hotlap has an out-lap too.
+        Exactly the recorder's rule, via the shared :func:`crossed_start_line`.
+        This used to trust the lap counter alone, with a comment claiming that was
+        the one signal holding on both titles — measurement says otherwise, and on
+        ACC the counter skips the out-lap crossing, so the coach stayed silent
+        through the whole first flying lap after every pit exit. The driver saw
+        "out lap" on the overlay while setting a genuine time.
         """
         if not (s.connected and s.status == ACStatus.LIVE) or s.in_pit or s.in_pit_lane:
             self._prev_completed = None
+            self._prev_pos = None
             self._flying_lap = False
             return
-        if self._prev_completed is not None and s.completed_laps > self._prev_completed:
+        if crossed_start_line(
+            self._prev_pos, s.lap_position, self._prev_completed, s.completed_laps,
+        ):
             # Set on the crossing frame itself, not the next tick: the tyre-temp
             # and pressure advisors emit exactly here, and they're the one thing
             # an out-lap is good for.
             self._flying_lap = True
         self._prev_completed = s.completed_laps
+        self._prev_pos = s.lap_position
 
     def _quiet_reason(self, s: TelemetrySnapshot, delta: DeltaState | None) -> str:
         """Why the coach is holding back this tick, "" if it isn't.

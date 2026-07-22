@@ -278,7 +278,14 @@ class Overlay(QWidget):
         self._draw_brand_header(p, w)
         delta = st.get("delta")
         quiet = st.get("quiet") or ""
-        if delta is None:
+        invalid = bool(st.get("lap_invalid"))
+        if invalid:
+            # The delta is a stopwatch reading, and this lap has no stopwatch: it
+            # would show the driver how they're doing against a reference on a lap
+            # that will never count. Everything else — braking, locking, tyres —
+            # still applies, so this replaces the number and nothing more.
+            self._draw_pill(p, t("overlay.lap_invalid"), _AMBER, y=78)
+        elif delta is None:
             # Say WHY there's nothing to compare against. The old text assumed the
             # only reason was "still learning the reference", which was wrong on an
             # out-lap and read as a stuck app.

@@ -75,6 +75,35 @@ _LAP_MS_MAX = 3_600_000
 _MIN_SAMPLES = 20
 
 
+def crossed_start_line(
+    prev_pos: float | None,
+    pos: float,
+    prev_completed: int | None,
+    completed: int,
+) -> bool:
+    """Did the car just cross the start/finish line?
+
+    Two signals OR'd, because neither is enough on its own.
+
+    The lap counter is the authoritative one — except ACC does not count the out
+    lap. Measured at Monza: leaving the box and crossing the line left
+    ``completedLaps`` at 0, and it only reached 1 at the *second* crossing. On the
+    counter alone, everything watching for the line sat through the out lap AND
+    the first flying lap as if they were one.
+
+    The position wrap catches that crossing (measured: 1.000 -> 0.000 on the same
+    frame). It can't stand alone either: it needs a frame near each end, and a
+    dropped frame at speed could straddle the line.
+
+    Shared by the recorder and the coach on purpose. They were written apart, both
+    trusted the counter, and both were wrong on ACC in the same way — one lost the
+    lap, the other stayed silent through it.
+    """
+    wrapped = prev_pos is not None and prev_pos > _WRAP_FROM and pos < _WRAP_TO
+    counted = prev_completed is not None and completed > prev_completed
+    return counted or wrapped
+
+
 def _clean_verdict(buf: "_Buffer") -> bool:
     """Did this lap stay inside the track limits?
 
@@ -172,23 +201,13 @@ class LapRecorder:
         completed = s.completed_laps
         finished: Lap | None = None
 
-        # Detect the start/finish crossing two ways, because neither is enough.
-        #
-        # The lap counter is the authoritative signal — except ACC does not count
-        # the out lap. Measured at Monza: leaving the box and crossing the line
-        # left completedLaps at 0, and it only reached 1 at the *second* crossing.
-        # With the counter alone the buffer therefore ran straight through the out
-        # lap AND the first flying lap, closed as one 128 s partial, and got
-        # thrown away — so on ACC the first flying lap after every pit exit was
-        # silently lost, and a two-lap run recorded nothing at all.
-        #
-        # The position wrap catches that crossing (measured: 1.000 -> 0.000 on the
-        # same frame). It can't be the only signal either: it needs a frame near
-        # each end, and a dropped frame at speed could straddle the line.
-        wrapped = (self._prev_pos is not None
-                   and self._prev_pos > _WRAP_FROM and s.lap_position < _WRAP_TO)
-        counted = self._prev_completed is not None and completed > self._prev_completed
-        crossed = counted or wrapped
+        # With the counter alone the buffer ran straight through the out lap AND
+        # the first flying lap, closed as one 128 s partial, and got thrown away:
+        # on ACC the first flying lap after every pit exit was silently lost, and
+        # a two-lap run recorded nothing at all. See :func:`crossed_start_line`.
+        crossed = crossed_start_line(
+            self._prev_pos, s.lap_position, self._prev_completed, completed,
+        )
         self._prev_completed = completed
         self._prev_pos = s.lap_position
 
