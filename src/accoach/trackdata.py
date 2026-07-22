@@ -42,6 +42,19 @@ _CORNERS: dict[str, list[tuple[str, float]]] = {
         ("Variante Alta", 0.693),    # chicane
         ("Rivazza", 0.844),          # double left before the line
     ],
+    # Anchored the same way, to a real Monza lap (Ferrari 488 GT3 Evo, 2:03.7)
+    # whose detected apexes were 0.169 / 0.247 / 0.378 / 0.447 / 0.500 / 0.686 /
+    # 0.888. The minimum speeds identify them beyond doubt: 49 km/h at the first
+    # chicane, 205 through Curva Grande, 119 in the Parabolica.
+    "monza": [
+        ("Variante del Rettifilo", 0.169),   # 1st chicane, slowest point of the lap
+        ("Curva Grande", 0.247),             # long right, taken near flat
+        ("Variante della Roggia", 0.378),    # 2nd chicane
+        ("Lesmo 1", 0.447),
+        ("Lesmo 2", 0.500),
+        ("Variante Ascari", 0.686),          # triple, detected as one corner
+        ("Parabolica", 0.888),               # onto the main straight
+    ],
 }
 
 
