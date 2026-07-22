@@ -20,6 +20,14 @@ import re
 
 # Max distance (in normalized position) between a detected apex and a curated
 # apex for the name to apply.
+#
+# 0.05 was chosen when the only curated track was Imola, whose corners are far
+# apart. Monza's Lesmo 1 and Lesmo 2 sit 0.053 apart, i.e. barely more than the
+# tolerance itself: a detected apex three thousandths off the midpoint flips
+# which name it takes. The value stays (tightening it would orphan corners on
+# other layouts) and the ambiguity is handled where it belongs — `name_corners`
+# assigns each curated name once, nearest first, so two adjacent corners can no
+# longer both answer "Lesmo 1".
 _NAME_TOL = 0.05
 
 
@@ -72,8 +80,33 @@ def corner_name(track: str, index: int, apex_pos: float, lang: str | None = None
 
 
 def name_corners(track: str, corners, lang: str | None = None) -> list[str]:
-    """Names for a list of detected corners (objects with ``index``/``apex_pos``)."""
-    return [corner_name(track, c.index, c.apex_pos, lang) for c in corners]
+    """Names for a list of detected corners (objects with ``index``/``apex_pos``).
+
+    Each curated name is handed out **once**. Naming corner-by-corner is fine in
+    isolation but wrong for a set: the detector's corner count is not fixed, and
+    with a different car or a slower line a multi-part complex splits — Ascari
+    into three, say. Every part is then nearest to the same curated apex and the
+    report grows three rows called "Variante Ascari", in the losses, in the
+    corner speeds, and in what the coach says out loud. Whichever part is nearest
+    to the real apex keeps the name; the others fall back to a number, which is
+    vague but at least tells them apart.
+    """
+    named: list[str | None] = [None] * len(corners)
+    table = _CORNERS.get(_slug(track))
+    if table:
+        for name, pos in table:
+            best, best_d = None, _NAME_TOL
+            for i, c in enumerate(corners):
+                if named[i] is not None:
+                    continue
+                d = abs(c.apex_pos - pos)
+                if d <= best_d:
+                    best, best_d = i, d
+            if best is not None:
+                named[best] = name
+    return [named[i] if named[i] is not None
+            else corner_name("", c.index, c.apex_pos, lang)
+            for i, c in enumerate(corners)]
 
 
 def has_names(track: str) -> bool:

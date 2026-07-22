@@ -659,7 +659,14 @@ def create_api(
                     vmins.append(min(inside))
             if len(vmins) >= 3:
                 mean = sum(vmins) / len(vmins)
-                var = sum((v - mean) ** 2 for v in vmins) / len(vmins)
+                # Sample variance (÷ n-1), matching `lap_time_consistency`. These
+                # laps are a sample of how you drive, not the population, and the
+                # page showed two numbers both labelled σ computed two different
+                # ways — the lap-time one Bessel-corrected, this one not. On the
+                # handful of laps we actually deal with that is ~11% at n=5, so
+                # the two σ on the same screen disagreed for no reason a reader
+                # could see.
+                var = sum((v - mean) ** 2 for v in vmins) / (len(vmins) - 1)
                 corner_consistency.append({
                     "corner_index": c.index,
                     "name": cnames.get(c.index, f"Corner {c.index + 1}"),

@@ -294,8 +294,16 @@ class Overlay(QWidget):
         if invalid or quiet in _NO_DELTA_QUIET:
             # Everything else — braking, locking, tyres — still applies. This
             # replaces the number and nothing more.
-            self._draw_pill(p, t("overlay.lap_invalid") if invalid
-                            else t(f"quiet.{quiet}"), _AMBER, y=78)
+            #
+            # "Invalidated" only wins when a delta would otherwise have been
+            # there. On a first session with no reference yet, leading with it
+            # implies that without the cut there'd be a number — so the driver
+            # waits for the next lap for a delta that isn't coming. The reason
+            # that would still be true after a perfect lap is the truer one.
+            label = (t(f"quiet.{quiet}") if (delta is None and quiet)
+                     else t("overlay.lap_invalid") if invalid
+                     else t(f"quiet.{quiet}"))
+            self._draw_pill(p, label, _AMBER, y=78)
         elif delta is None:
             # Say WHY there's nothing to compare against. The old text assumed the
             # only reason was "still learning the reference", which was wrong on an
