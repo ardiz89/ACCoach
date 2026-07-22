@@ -54,6 +54,12 @@ _GREEN_HOLD_S = 2.5       # how long "green — flying lap" stays up at the line
 _BRAKE_NOW_S = 0.35
 _BRAKE_NEAR_S = 1.5
 
+# Gates where the lap hasn't started at the line yet, so there is nothing a delta
+# could honestly compare. Reported from the pits: leaving the box against a hot
+# reference sends the number past +30 s and pins the bar at full-scale red, which
+# reads as a catastrophic lap rather than as no lap at all.
+_NO_DELTA_QUIET = frozenset({"pit", "out_lap"})
+
 # The big delta number. Its box has to be taller than the glyphs' line box or Qt
 # silently slices the digits — which is what happened at 28px in a 34px box
 # ("+156.454" arrived on screen with its bottom cut off). A line box runs about
@@ -279,12 +285,17 @@ class Overlay(QWidget):
         delta = st.get("delta")
         quiet = st.get("quiet") or ""
         invalid = bool(st.get("lap_invalid"))
-        if invalid:
-            # The delta is a stopwatch reading, and this lap has no stopwatch: it
-            # would show the driver how they're doing against a reference on a lap
-            # that will never count. Everything else — braking, locking, tyres —
-            # still applies, so this replaces the number and nothing more.
-            self._draw_pill(p, t("overlay.lap_invalid"), _AMBER, y=78)
+        # One rule for the delta: it appears when the lap started at the line and
+        # can still count. Everywhere else the number is a comparison against a
+        # lap that doesn't exist — in the pit lane it pins the bar at full-scale
+        # red, which looks exactly like a disastrous lap instead of like no lap.
+        # `off_pace` is deliberately NOT here: that lap did start at the line, the
+        # number is ugly but true, and how much you dropped is worth reading.
+        if invalid or quiet in _NO_DELTA_QUIET:
+            # Everything else — braking, locking, tyres — still applies. This
+            # replaces the number and nothing more.
+            self._draw_pill(p, t("overlay.lap_invalid") if invalid
+                            else t(f"quiet.{quiet}"), _AMBER, y=78)
         elif delta is None:
             # Say WHY there's nothing to compare against. The old text assumed the
             # only reason was "still learning the reference", which was wrong on an
