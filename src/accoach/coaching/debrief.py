@@ -273,6 +273,34 @@ _TOP_SPEED_EXIT = {
     "it": " Sei più lento anche in curva, quindi è velocità in uscita, non "
           "assetto: prima sistema le uscite."}
 
+# --- combined grip (the friction circle) ------------------------------------
+# `g_lat`/`g_long` have been recorded in every lap file for versions and read by
+# nothing but a chart. They answer the question the whole product is named after
+# and that drivers say no coach ever answers: *why* can't I brake later here.
+# Usually because the tyre is already spending its grip on turning — brake and
+# corner draw on one budget, not two.
+#
+# The envelope is measured from the reference lap rather than assumed, so it
+# needs no per-car constant and adapts to compound, fuel and track state. The
+# 95th percentile, not the max: one kerb strike or one bump spikes |g| well past
+# anything sustainable and would make every corner look like it had spare grip.
+_GRIP_PCTL = 0.95
+_GRIP_AT_LIMIT = 0.95     # this close to the envelope = nothing left to ask for
+_GRIP_SPARE = 0.85        # this far below it = grip the driver isn't using
+_GRIP_MIN_G = 0.3         # below this the lap has no usable G data at all
+
+_GRIP_LIMITED = {
+    "en": " You're already at {pct:.0f}% of the grip the reference uses here, so "
+          "there is no later braking to find — the tyre is spending it on turning.",
+    "it": " Sei già al {pct:.0f}% dell'aderenza che il riferimento usa qui, quindi "
+          "non c'è una frenata più tarda da trovare: la gomma la sta spendendo "
+          "per girare."}
+_GRIP_UNUSED = {
+    "en": " You only reach {pct:.0f}% of the grip the reference uses here: there "
+          "is load left on the tyre, not just time.",
+    "it": " Arrivi solo al {pct:.0f}% dell'aderenza che il riferimento usa qui: "
+          "sulla gomma è rimasto carico, non solo tempo."}
+
 _BRAKE_EARLY = {"en": " You brake ~{m:.0f} m too early.",
                 "it": " Anticipi la staccata di ~{m:.0f} m."}
 _BRAKE_PEAK = {"en": " Peak brake {pl:.0f}% vs {pr:.0f}%: press harder.",
@@ -299,6 +327,62 @@ def _braking_detail(lap: Lap, reference: Reference, inside: list,
             extra += _BRAKE_PEAK.get(lg, _BRAKE_PEAK["en"]).format(
                 pl=peak_live * 100, pr=peak_ref * 100)
     return extra
+
+
+def _combined_g(g_lat: float, g_long: float) -> float:
+    """Total grip being used at one instant — the radius on the friction circle."""
+    return math.hypot(g_lat, g_long)
+
+
+def _percentile(vals: list[float], q: float) -> float:
+    """Nearest-rank percentile. Used on both sides of the grip comparison so the
+    two numbers are the same kind of number."""
+    if not vals:
+        return 0.0
+    ordered = sorted(vals)
+    return ordered[min(len(ordered) - 1, int(len(ordered) * q))]
+
+
+def _grip_envelope(lap: Lap, reference: Reference) -> float:
+    """How much grip this car actually has, measured off the reference lap.
+
+    The 95th percentile of combined G rather than the maximum: a kerb or a bump
+    spikes |g| far past anything the tyre can hold through a corner, and one
+    such sample would make every corner look like it had spare grip.
+    """
+    return _percentile([_combined_g(reference.point_at(s.pos).g_lat,
+                                    reference.point_at(s.pos).g_long)
+                        for s in lap.samples], _GRIP_PCTL)
+
+
+def _grip_detail(inside: list, envelope: float, category: CueCategory,
+                 lg: str) -> str:
+    """Was there grip left in this corner, or was the driver already at the limit?
+
+    Only said where it changes the advice. On "brake later" and "carry more
+    speed" it is the difference between an instruction the driver can follow and
+    one that would put them in the gravel: if the tyre is already saturated, the
+    honest answer is that the time is somewhere else.
+    """
+    if envelope < _GRIP_MIN_G or category not in (
+            CueCategory.BRAKE_LATER, CueCategory.CARRY_SPEED):
+        return ""
+    # The SAME percentile as the envelope, not the raw maximum. Comparing a peak
+    # against a 95th percentile is comparing two different statistics: on real
+    # laps it produced "you're at 120% of the grip", which is nonsense on its
+    # face and would have cost the driver their trust in the whole line.
+    peak = _percentile([_combined_g(s.g_lat, s.g_long) for s in inside], _GRIP_PCTL)
+    if peak <= 0.0:
+        return ""                      # lap recorded before the G channels
+    # The envelope is an estimate, so a corner can still read slightly over it.
+    # Clamp the number rather than print an impossible one: "at 104% of the grip"
+    # invites a question whose honest answer is "the limit is approximate".
+    ratio = min(1.0, peak / envelope)
+    if ratio >= _GRIP_AT_LIMIT:
+        return _GRIP_LIMITED.get(lg, _GRIP_LIMITED["en"]).format(pct=ratio * 100)
+    if ratio <= _GRIP_SPARE:
+        return _GRIP_UNUSED.get(lg, _GRIP_UNUSED["en"]).format(pct=ratio * 100)
+    return ""                          # in between: nothing worth claiming
 
 
 def _lift_notes(lap: Lap, reference: Reference, corners: list[Corner],
@@ -396,6 +480,7 @@ def build_lap_debrief(lap: Lap, reference: Reference, corners: list[Corner],
     lg = _lang(lang)
     titles = _CATEGORY_TITLE.get(lg, _CATEGORY_TITLE["en"])
     tuning = tuning_for_car(lap.car_model)      # class-dependent symptom bands
+    envelope = _grip_envelope(lap, reference)   # this car's grip, measured
     losses: list[CornerLoss] = []
 
     for c in corners:
@@ -454,6 +539,8 @@ def build_lap_debrief(lap: Lap, reference: Reference, corners: list[Corner],
 
         # Braking decomposition (earliness in metres + peak pressure).
         detail += _braking_detail(lap, reference, inside, refs, cue.category, lg)
+        # …and whether there was any grip left to do it with.
+        detail += _grip_detail(inside, envelope, cue.category, lg)
 
         losses.append(CornerLoss(
             index=c.index, entry_pos=c.entry_pos, apex_pos=c.apex_pos,
