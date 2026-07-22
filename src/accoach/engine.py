@@ -43,7 +43,7 @@ from .i18n import cue_text, current_language
 from .comparison import DeltaState, LapComparator, Reference
 from .engineer import RaceEngineer, classify, engineer_for
 from .recording import DEFAULT_LAPS_DIR, Lap, LapRecorder, find_reference_lap, save_lap
-from .recording.recorder import crossed_start_line
+from .recording.recorder import StartLineWatcher
 from .telemetry import SharedMemoryReader, TelemetrySnapshot
 from .telemetry.snapshot import ACStatus
 from .telemetry.feed import TelemetryFeed
@@ -181,8 +181,7 @@ class CoachEngine:
         # Out-lap tracking, mirroring LapRecorder's rule: a lap is "flying" only
         # once we've watched it open at the start/finish line. Kept here rather
         # than read off the recorder because that one lives on the feed thread.
-        self._prev_completed: int | None = None
-        self._prev_pos: float | None = None
+        self._line = StartLineWatcher()
         self._flying_lap = False
 
         # Race engineer: rebuilt per car/track; fed a per-lap diagnosis (LapStats)
@@ -436,19 +435,14 @@ class CoachEngine:
         "out lap" on the overlay while setting a genuine time.
         """
         if not (s.connected and s.status == ACStatus.LIVE) or s.in_pit or s.in_pit_lane:
-            self._prev_completed = None
-            self._prev_pos = None
+            self._line.reset()
             self._flying_lap = False
             return
-        if crossed_start_line(
-            self._prev_pos, s.lap_position, self._prev_completed, s.completed_laps,
-        ):
+        if self._line.crossed(s.lap_position, s.completed_laps):
             # Set on the crossing frame itself, not the next tick: the tyre-temp
             # and pressure advisors emit exactly here, and they're the one thing
             # an out-lap is good for.
             self._flying_lap = True
-        self._prev_completed = s.completed_laps
-        self._prev_pos = s.lap_position
 
     def _quiet_reason(self, s: TelemetrySnapshot, delta: DeltaState | None) -> str:
         """Why the coach is holding back this tick, "" if it isn't.
