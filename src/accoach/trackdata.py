@@ -80,9 +80,27 @@ _CORNERS: dict[str, list[tuple[str, float]]] = {
 # Until then the list stays empty and the debrief falls back to metres — the
 # mechanism is live, the words are not.
 _LANDMARKS: dict[str, list[tuple[str, str, float]]] = {
-    # DA VERIFICARE — riempire insieme da una fonte fidata (giri registrati o la
-    # scheda dei punti di frenata). Lista vuota = questa pista resta ai metri.
-    "monza": [],
+    # Monza. Positions MEASURED from the anchor reference lap (Ferrari 488 GT3
+    # Evo, 2:03.7) — the same lap the corner names are anchored to — by finding
+    # where its brake trace crosses onset (see comparison/delta.py _BRAKE_ONSET).
+    # Visual descriptions taken from published ACC/GT3 track guides, not invented:
+    #   - Full Grip Motorsport ACC guide (GT3, same class as the reference):
+    #     T1 150 m board, Roggia 50 m board, Lesmo 1 50 m board, Ascari 100 m board.
+    #   - si.com / general Monza guides corroborate the physical features used
+    #     where they beat a distance board: Roggia's orange barrier on the left,
+    #     the orange block on the armco at Ascari, Parabolica's green run-off end.
+    # Lesmo 2 is left out on purpose: a light brake with no clean visual marker in
+    # any source — better silent than guessing. These are a first sourced draft;
+    # each stays anchored to the metres in the debrief, so an imperfect one is
+    # bounded, not misleading.
+    "monza": [
+        ("al cartello dei 150 m", "at the 150 m board", 0.122),                 # Variante del Rettifilo
+        ("alla barriera arancione sulla sinistra", "at the orange barrier on the left", 0.337),  # Roggia
+        ("al cartello dei 50 m", "at the 50 m board", 0.418),                   # Lesmo 1
+        ("al cartello dei 100 m", "at the 100 m board", 0.650),                 # Variante Ascari
+        ("alla fine del verde sulla sinistra", "at the end of the green run-off on the left", 0.860),  # Parabolica
+    ],
+    # DA VERIFICARE — Imola non ancora sourced. Lista vuota = resta ai metri.
     "imola": [],
 }
 

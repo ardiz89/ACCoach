@@ -122,10 +122,28 @@ def test_landmark_unknown_track_is_none(_fake_landmarks):
     assert landmark_at("nordschleife", 0.165, "it") is None
 
 
-def test_shipped_landmark_tables_are_empty_until_verified():
-    # Guard the honesty rule: no landmark reaches the driver before it's checked
-    # against a trusted source. When Monza's data is filled, this test is the one
-    # to update deliberately — it should never fail silently.
-    assert all(not v for v in trackdata._LANDMARKS.values()), (
-        "un landmark è stato spedito senza verifica: aggiorna questo test solo "
+def test_imola_landmarks_still_unsourced():
+    # Guard the honesty rule per track: Imola has no sourced landmarks yet, so it
+    # must stay empty and fall back to metres. Filling it is a deliberate change
+    # that updates this test — it must never grow landmarks silently.
+    assert trackdata._LANDMARKS["imola"] == [], (
+        "un landmark Imola è stato spedito senza fonte: aggiorna questo test solo "
         "dopo aver validato i punti su una fonte fidata")
+
+
+def test_shipped_landmarks_are_well_formed():
+    # Every shipped landmark: both languages non-empty, position a real fraction.
+    for track, table in trackdata._LANDMARKS.items():
+        for it, en, pos in table:
+            assert it and en, f"{track}: descrizione vuota"
+            assert 0.0 <= pos <= 1.0, f"{track}: pos {pos} fuori da 0..1"
+
+
+def test_monza_landmarks_resolve_at_measured_positions():
+    # The Monza positions were measured from the anchor reference lap's braking
+    # onsets; landmark_at must return each at its own position, in both languages.
+    assert landmark_at("monza", 0.122, "it") == "al cartello dei 150 m"
+    assert landmark_at("monza", 0.122, "en") == "at the 150 m board"
+    assert landmark_at("monza", 0.860, "it") == "alla fine del verde sulla sinistra"
+    # Curva Grande (0.247) is taken near flat — no braking landmark there.
+    assert landmark_at("monza", 0.247, "it") is None
