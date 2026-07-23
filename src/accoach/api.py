@@ -466,6 +466,9 @@ def create_api(
                 "name": names.get(c.index, f"Corner {c.index + 1}"),
             } for c in corners],
             "corner_speeds": corner_speeds,
+            # One theme above the corners when the driver is far off the pace —
+            # corner-by-corner is the wrong lens there. "" when the gap is small.
+            "headline": debrief.headline,
             "losses": [{
                 "label": names.get(x.index, f"Corner {x.index + 1}"),
                 "lost_s": round(x.lost_ms / 1000, 3),

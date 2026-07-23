@@ -163,6 +163,12 @@ class LapDebrief:
     lap_time_ms: int
     reference_lap_ms: int
     losses: list[CornerLoss] = field(default_factory=list)  # worst first
+    # One overarching theme, shown ABOVE the corners when the driver is far
+    # enough off the pace that corner-by-corner is the wrong lens. Straight from a
+    # coach on r/simracing: "at your pace it's more about general technique than
+    # a corner-by-corner analysis." Empty when the gap is small enough that the
+    # per-corner detail IS the right level.
+    headline: str = ""
     # Findings that are not a corner. Real coaches say these first — a lift on a
     # flat-out section and a top-speed deficit are both lap-wide facts that the
     # per-corner breakdown structurally cannot express.
@@ -327,6 +333,69 @@ def _braking_detail(lap: Lap, reference: Reference, inside: list,
             extra += _BRAKE_PEAK.get(lg, _BRAKE_PEAK["en"]).format(
                 pl=peak_live * 100, pr=peak_ref * 100)
     return extra
+
+
+# The gap, as a fraction of the reference lap, above which a driver is better
+# served by one theme than by a corner list. ~3% is roughly two seconds on a
+# ninety-second lap — the range where the losses are spread across so many
+# corners that ranking them is noise, and the honest advice is "commit more
+# everywhere", not "find 0.08 at turn 11".
+_HEADLINE_GAP_FRAC = 0.03
+# …and it only fires if that dominant theme really dominates: if the time is
+# genuinely scattered across unrelated causes, a single headline would be a lie.
+_HEADLINE_SHARE = 0.5
+
+_HEADLINE = {
+    "braking": {
+        "en": "You're {pct:.0f}% off the pace, most of it in braking — before "
+              "chasing single corners, commit later and harder into the stops.",
+        "it": "Sei al {pct:.0f}% dal passo, quasi tutto in frenata — prima di "
+              "rincorrere le singole curve, frena più tardi e più deciso."},
+    "traction": {
+        "en": "You're {pct:.0f}% off the pace, most of it on exits — the theme is "
+              "getting back to full throttle sooner, everywhere, not one corner.",
+        "it": "Sei al {pct:.0f}% dal passo, quasi tutto in uscita — il tema è "
+              "tornare in pieno prima, dappertutto, non una curva sola."},
+    "cornering": {
+        "en": "You're {pct:.0f}% off the pace, most of it mid-corner — carry more "
+              "speed through the apexes before fine-tuning any single one.",
+        "it": "Sei al {pct:.0f}% dal passo, quasi tutto in percorrenza — porta più "
+              "velocità agli apici prima di limare la singola curva."},
+    "line": {
+        "en": "You're {pct:.0f}% off the pace, spread across the lap — work on a "
+              "clean, repeatable line before corner-by-corner detail.",
+        "it": "Sei al {pct:.0f}% dal passo, sparso sul giro — lavora su una "
+              "traiettoria pulita e ripetibile prima del dettaglio per curva."},
+}
+
+
+def _headline(losses: list[CornerLoss], gap_ms: int, ref_ms: int,
+              lg: str) -> str:
+    """One theme when the driver is far enough off to need the big picture first."""
+    from .focus import _theme
+
+    if ref_ms <= 0 or gap_ms <= 0 or gap_ms / ref_ms < _HEADLINE_GAP_FRAC:
+        return ""
+    by_theme: dict[str, float] = {}
+    for l in losses:
+        if l.lost_ms > 0:
+            by_theme[_theme_key(l.category)] = (
+                by_theme.get(_theme_key(l.category), 0.0) + l.lost_ms)
+    if not by_theme:
+        return ""
+    total = sum(by_theme.values())
+    theme, share = max(by_theme.items(), key=lambda kv: kv[1])
+    if share / total < _HEADLINE_SHARE:
+        theme = "line"                 # scattered: the honest theme is the line
+    tmpl = _HEADLINE.get(theme, _HEADLINE["line"])
+    return tmpl.get(lg, tmpl["en"]).format(pct=gap_ms / ref_ms * 100)
+
+
+def _theme_key(cat: CueCategory) -> str:
+    """The English theme key regardless of language, for aggregation."""
+    from .focus import _THEME, _THEME_DEFAULT
+
+    return _THEME.get(cat, _THEME_DEFAULT)["en"]
 
 
 def _combined_g(g_lat: float, g_long: float) -> float:
@@ -561,10 +630,12 @@ def build_lap_debrief(lap: Lap, reference: Reference, corners: list[Corner],
     top = _top_speed_note(lap, reference, corners, lg)
     if top is not None:
         notes.append(top)
+    gap_ms = lap.lap_time_ms - reference.lap_time_ms
     return LapDebrief(
         car_model=lap.car_model, track=lap.track,
         lap_time_ms=lap.lap_time_ms, reference_lap_ms=reference.lap_time_ms,
         losses=losses, notes=notes,
+        headline=_headline(losses, gap_ms, reference.lap_time_ms, lg),
     )
 
 
