@@ -352,6 +352,14 @@ main { padding: 16px 24px; display: grid; gap: 18px; }
 .loss .detail { color: var(--muted); font-size: 12px; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 .loss .fix { color: var(--cyan); font-size: 13px; margin-top: 2px; }
 .clean { color: var(--green); padding: 10px 0; }
+/* The lap-wide theme: reframes the debrief, so it reads as a heading, not a row.
+   Cyan left edge like the notes, but bigger and above them. */
+.debrief .headline {
+  border-left: 3px solid var(--cyan);
+  padding: 8px 12px; margin: 8px 0 12px;
+  font-size: 14px; font-weight: 600; line-height: 1.4;
+  background: color-mix(in srgb, var(--cyan) 8%, transparent);
+}
 
 .empty { display: none; padding: 60px 24px; text-align: center; color: var(--muted); }
 body.no-data main, body.no-data .summary, body.no-data .debrief { display: none; }

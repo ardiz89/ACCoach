@@ -911,7 +911,12 @@ function drawDebrief(a) {
       (notes ? "" : `<div class="clean">${t("debrief.clean")}</div>`);
     return;
   }
-  let html = `<h3>${t("debrief.title")}</h3>${legend}${notes}`;
+  // The theme, above everything, when the driver is far enough off the pace
+  // that the corner list is the wrong lens. Distinct look — it reframes the
+  // whole debrief rather than adding to it.
+  const head = a.headline
+    ? `<div class="headline">${a.headline}</div>` : "";
+  let html = `<h3>${t("debrief.title")}</h3>${legend}${head}${notes}`;
   for (const l of a.losses) {
     const major = l.lost_s >= 0.2 ? "major" : "";
     html += `<div class="loss ${major}">` +
