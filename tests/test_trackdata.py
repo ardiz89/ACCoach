@@ -1,6 +1,9 @@
 """trackdata: friendly corner names assigned by apex position."""
+import pytest
+
+from accoach import trackdata
 from accoach.track import Corner
-from accoach.trackdata import corner_name, has_names, name_corners
+from accoach.trackdata import corner_name, has_names, landmark_at, name_corners
 
 
 def _corner(index, apex):
@@ -83,3 +86,46 @@ def test_a_split_complex_does_not_produce_three_identical_names():
     names = name_corners("monza", corners)
     assert names.count("Variante Ascari") == 1, names
     assert len(set(names)) == 3, names
+
+
+# --- visual braking landmarks ----------------------------------------------
+# The lookup is tested against an injected table so the mechanism is proven while
+# the *shipped* tables stay empty until their landmarks are verified on track.
+
+@pytest.fixture
+def _fake_landmarks(monkeypatch):
+    monkeypatch.setitem(
+        trackdata._LANDMARKS,
+        "monza",
+        [("al cordolo bianco-rosso", "at the white-and-red kerb", 0.165),
+         ("al cartello dei 100 m", "at the 100 m board", 0.370)],
+    )
+
+
+def test_landmark_by_nearest_position(_fake_landmarks):
+    # A braking onset a few thousandths off the curated spot still resolves.
+    assert landmark_at("monza", 0.167, "it") == "al cordolo bianco-rosso"
+    assert landmark_at("monza", 0.368, "it") == "al cartello dei 100 m"
+
+
+def test_landmark_language(_fake_landmarks):
+    assert landmark_at("monza", 0.165, "en") == "at the white-and-red kerb"
+    assert landmark_at("Monza", 0.165, "en") == "at the white-and-red kerb"  # slug
+
+
+def test_landmark_outside_tolerance_is_none(_fake_landmarks):
+    # 0.20 is >0.02 from either landmark -> no phrase rather than a wrong one.
+    assert landmark_at("monza", 0.20, "it") is None
+
+
+def test_landmark_unknown_track_is_none(_fake_landmarks):
+    assert landmark_at("nordschleife", 0.165, "it") is None
+
+
+def test_shipped_landmark_tables_are_empty_until_verified():
+    # Guard the honesty rule: no landmark reaches the driver before it's checked
+    # against a trusted source. When Monza's data is filled, this test is the one
+    # to update deliberately — it should never fail silently.
+    assert all(not v for v in trackdata._LANDMARKS.values()), (
+        "un landmark è stato spedito senza verifica: aggiorna questo test solo "
+        "dopo aver validato i punti su una fonte fidata")
