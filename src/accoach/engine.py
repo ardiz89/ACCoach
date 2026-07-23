@@ -202,6 +202,7 @@ class CoachEngine:
         # debrief (vs the reference), it picks one recurring weakness at a time and
         # coaches it. Rebuilt per car/track; needs a reference to produce debriefs.
         self._focus: FocusCoach | None = None
+        self._focus_key: tuple[str, str] | None = None
         self._focus_report: FocusReport | None = None
 
         # Commands from other threads (e.g. the server's POST /engineer/applied,
@@ -245,8 +246,41 @@ class CoachEngine:
         if self._focus is not None and self._reference is not None and self._corners:
             debrief = build_lap_debrief(lap, self._reference, self._corners)
             stable = lap.valid and lap.clean is not False
+            before = (frozenset(self._focus.mastered), frozenset(self._focus.parked))
             self._focus_report = self._focus.observe(debrief, stable=stable)
+            after = (frozenset(self._focus.mastered), frozenset(self._focus.parked))
+            if after != before:
+                self._save_focus_state()   # a corner just changed status; persist
             self._update_wean()
+
+    def _load_focus_state(self, car: str, track: str) -> tuple[set[int], set[int]]:
+        """Last session's mastered/parked corners for this car+track, or empty.
+
+        Best-effort: a missing or locked catalog just means "start fresh", never
+        an error that stops coaching.
+        """
+        try:
+            from .recording.catalog import LapCatalog
+            from .recording.storage import _catalog_path
+
+            with LapCatalog(_catalog_path(Path(self.laps_dir))) as cat:
+                return cat.load_focus_state(car, track)
+        except Exception:
+            return set(), set()
+
+    def _save_focus_state(self) -> None:
+        if self._focus is None or self._focus_key is None:
+            return
+        try:
+            from .recording.catalog import LapCatalog
+            from .recording.storage import _catalog_path
+
+            car, track = self._focus_key
+            with LapCatalog(_catalog_path(Path(self.laps_dir))) as cat:
+                cat.save_focus_state(car, track,
+                                     self._focus.mastered, self._focus.parked)
+        except Exception:
+            pass   # persistence is a convenience; never let it break a lap
 
     def _update_wean(self) -> None:
         """Retire the braking countdown at corners the Focus coach has cleared.
@@ -370,8 +404,11 @@ class CoachEngine:
             self._engineer = engineer_for(snap.car_model, snap.track)
             self._engineer_decision = None
             self._engineer_spoken_sig = None
-            # …and a fresh lesson plan for the driver.
-            self._focus = FocusCoach()
+            # …and the lesson plan, restored from last session's memory for this
+            # car+track so a mastered corner stays mastered across restarts.
+            self._focus_key = (snap.car_model, snap.track)
+            mastered, parked = self._load_focus_state(snap.car_model, snap.track)
+            self._focus = FocusCoach(mastered=mastered, parked=parked)
             self._focus_report = None
 
         # Drain cross-thread commands on this (the engine's) thread.

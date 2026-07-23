@@ -58,7 +58,32 @@ CREATE INDEX IF NOT EXISTS ix_lap_ref
 CREATE INDEX IF NOT EXISTS ix_lap_recent
     ON lap (car_key, track_key, recorded_utc);
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT);
+-- The Focus coach's memory across sessions: which corners a driver has mastered
+-- (or parked as won't-improve) on a given car+track. Without this, closing HONE
+-- reset the lesson plan and the coach re-worked corners already conquered,
+-- three laps of ASSESS every time. Survives a lap-table rebuild because
+-- `_migrate` only drops `lap`.
+CREATE TABLE IF NOT EXISTS focus_state (
+    car_key    TEXT NOT NULL,
+    track_key  TEXT NOT NULL,
+    mastered   TEXT NOT NULL DEFAULT '',   -- comma-separated corner indices
+    parked     TEXT NOT NULL DEFAULT '',
+    PRIMARY KEY (car_key, track_key)
+);
 """
+
+
+def _parse_indices(raw: str) -> set[int]:
+    out: set[int] = set()
+    for part in (raw or "").split(","):
+        part = part.strip()
+        if part.lstrip("-").isdigit():
+            out.add(int(part))
+    return out
+
+
+def _join_indices(idx: set[int]) -> str:
+    return ",".join(str(i) for i in sorted(idx))
 
 
 def _clean_to_int(value: object) -> int:
@@ -280,6 +305,30 @@ class LapCatalog:
 
     def count(self) -> int:
         return self._conn.execute("SELECT COUNT(*) AS n FROM lap").fetchone()["n"]
+
+    # --- Focus coach memory (per car+track) -------------------------------
+
+    def load_focus_state(self, car_model: str, track: str) -> tuple[set[int], set[int]]:
+        """(mastered, parked) corner indices for this car+track; empty if none."""
+        row = self._conn.execute(
+            "SELECT mastered, parked FROM focus_state WHERE car_key=? AND track_key=?",
+            (self._slug(car_model), self._slug(track)),
+        ).fetchone()
+        if row is None:
+            return set(), set()
+        return _parse_indices(row["mastered"]), _parse_indices(row["parked"])
+
+    def save_focus_state(self, car_model: str, track: str,
+                         mastered: set[int], parked: set[int]) -> None:
+        self._conn.execute(
+            """INSERT INTO focus_state(car_key, track_key, mastered, parked)
+               VALUES(?,?,?,?)
+               ON CONFLICT(car_key, track_key)
+               DO UPDATE SET mastered=excluded.mastered, parked=excluded.parked""",
+            (self._slug(car_model), self._slug(track),
+             _join_indices(mastered), _join_indices(parked)),
+        )
+        self._conn.commit()
 
     def close(self) -> None:
         self._conn.close()

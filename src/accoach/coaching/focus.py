@@ -183,13 +183,19 @@ class _Agg:
 class FocusCoach:
     """Deterministic, one-weakness-at-a-time driver coach over lap debriefs."""
 
-    def __init__(self, *, min_laps: int = _MIN_LAPS) -> None:
+    def __init__(self, *, min_laps: int = _MIN_LAPS,
+                 mastered: set[int] | None = None,
+                 parked: set[int] | None = None) -> None:
         self.min_laps = min_laps
         self.window: list[LapDebrief] = []
         self.focus: Focus | None = None
         self._focus_losses: list[float] = []     # losses at the focus since BRIEF
-        self.mastered: set[int] = set()          # corners coached to the ground
-        self.parked: set[int] = set()            # corners that wouldn't improve
+        # Seeded from last session's saved state (per car+track) so the coach
+        # doesn't re-teach a corner you already mastered. A corner already here is
+        # simply never chosen as a focus again — the same effect as mastering it
+        # live, minus the three ASSESS laps.
+        self.mastered: set[int] = set(mastered or ())
+        self.parked: set[int] = set(parked or ())
         self._last = FocusReport(
             FocusKind.ASSESS,
             _m("assess", current_language(), n=0, total=min_laps))
