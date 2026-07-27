@@ -23,7 +23,7 @@ from ..engineer import Balance, Phase, Speed, Symptom
 from ..recording.lap import Lap
 from ..telemetry.snapshot import format_lap_time
 from ..track import Corner
-from ..trackdata import corner_name
+from ..trackdata import corner_name, landmark_at
 from .analyzer import _BRAKE_ON, _LOSS_MS, CornerStats, _braked_early, classify_corner
 from .cue import CueCategory
 from .diagnosis import corner_symptoms, dominant_symptom
@@ -309,6 +309,12 @@ _GRIP_UNUSED = {
 
 _BRAKE_EARLY = {"en": " You brake ~{m:.0f} m too early.",
                 "it": " Anticipi la staccata di ~{m:.0f} m."}
+# Visual braking reference, appended *after* the metres so it augments rather than
+# replaces: even a slightly-off landmark stays anchored to the distance. Fires
+# only where the track has a verified landmark near the reference's braking onset
+# (see landmark_at); everywhere else the driver just gets the metres, as before.
+_BRAKE_LANDMARK = {"en": " The reference brakes {lm}.",
+                   "it": " Il riferimento frena {lm}."}
 _BRAKE_PEAK = {"en": " Peak brake {pl:.0f}% vs {pr:.0f}%: press harder.",
                "it": " Picco freno {pl:.0f}% contro {pr:.0f}%: premi più deciso."}
 
@@ -326,6 +332,9 @@ def _braking_detail(lap: Lap, reference: Reference, inside: list,
             m = _metres_between(lap, live, ref)
             if m >= 2.0:
                 extra += _BRAKE_EARLY.get(lg, _BRAKE_EARLY["en"]).format(m=m)
+                lm = landmark_at(lap.track, ref, lg)
+                if lm is not None:
+                    extra += _BRAKE_LANDMARK.get(lg, _BRAKE_LANDMARK["en"]).format(lm=lm)
     if category in (CueCategory.BRAKE_LATER, CueCategory.LESS_BRAKE):
         peak_live = max((s.brake for s in inside), default=0.0)
         peak_ref = max((r.brake for r in refs), default=0.0)

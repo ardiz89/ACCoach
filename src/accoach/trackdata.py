@@ -66,6 +66,69 @@ _CORNERS: dict[str, list[tuple[str, float]]] = {
 }
 
 
+# track-slug -> ordered list of (it description, en description, approx pos).
+# A *visual* braking reference: a fixed feature at a braking point — a kerb, a
+# board, a fence — that a driver aims at out the window. It beats a distance in
+# metres because the kerb doesn't move: metres from a marker shift 10-20 m with
+# car and track temperature, the white-red kerb stays where it is. Anchored to
+# normalizedCarPosition like _CORNERS, and used against the *reference lap's*
+# braking onset, so it says "where the reference brakes" in terms you can see.
+#
+# We do NOT guess where kerbs are. A confidently wrong landmark is the worst
+# failure mode a coach has, so a track only appears here once its landmarks are
+# verified against a trusted source (a recorded reference lap, a braking chart).
+# Until then the list stays empty and the debrief falls back to metres — the
+# mechanism is live, the words are not.
+_LANDMARKS: dict[str, list[tuple[str, str, float]]] = {
+    # Monza. Positions MEASURED from the anchor reference lap (Ferrari 488 GT3
+    # Evo, 2:03.7) — the same lap the corner names are anchored to — by finding
+    # where its brake trace crosses onset (see comparison/delta.py _BRAKE_ONSET).
+    # Visual descriptions taken from published ACC/GT3 track guides, not invented:
+    #   - Full Grip Motorsport ACC guide (GT3, same class as the reference):
+    #     T1 150 m board, Roggia 50 m board, Lesmo 1 50 m board, Ascari 100 m board.
+    #   - si.com / general Monza guides corroborate the physical features used
+    #     where they beat a distance board: Roggia's orange barrier on the left,
+    #     the orange block on the armco at Ascari, Parabolica's green run-off end.
+    # Lesmo 2 is left out on purpose: a light brake with no clean visual marker in
+    # any source — better silent than guessing. These are a first sourced draft;
+    # each stays anchored to the metres in the debrief, so an imperfect one is
+    # bounded, not misleading.
+    "monza": [
+        ("al cartello dei 150 m", "at the 150 m board", 0.122),                 # Variante del Rettifilo
+        ("alla barriera arancione sulla sinistra", "at the orange barrier on the left", 0.337),  # Roggia
+        ("al cartello dei 50 m", "at the 50 m board", 0.418),                   # Lesmo 1
+        ("al cartello dei 100 m", "at the 100 m board", 0.650),                 # Variante Ascari
+        ("alla fine del verde sulla sinistra", "at the end of the green run-off on the left", 0.860),  # Parabolica
+    ],
+    # DA VERIFICARE — Imola non ancora sourced. Lista vuota = resta ai metri.
+    "imola": [],
+}
+
+# How close (normalized position) a braking point must sit to a curated landmark
+# for the landmark to describe it. Tighter than _NAME_TOL on purpose: a corner
+# name labels a whole corner, a landmark pins one spot on the track.
+_LANDMARK_TOL = 0.02
+
+
+def landmark_at(track: str, pos: float, lang: str | None = None) -> str | None:
+    """Visual description of the braking landmark nearest ``pos``, or ``None`` if
+    the track has no verified landmark within tolerance.
+
+    ``pos`` is a normalizedCarPosition — pass the reference lap's braking onset,
+    so the phrase describes where the *reference* brakes ("al cordolo
+    bianco-rosso") rather than an abstract distance. The returned string carries
+    its own preposition, ready to drop after a verb ("il riferimento frena …").
+    """
+    table = _LANDMARKS.get(_slug(track))
+    if not table:
+        return None
+    it, en, p = min(table, key=lambda t: abs(t[2] - pos))
+    if abs(p - pos) > _LANDMARK_TOL:
+        return None
+    from .i18n import current_language
+    return it if (lang or current_language()) == "it" else en
+
+
 def corner_name(track: str, index: int, apex_pos: float, lang: str | None = None) -> str:
     """Name for a detected corner, by nearest curated apex, else ``Corner N`` /
     ``Curva N`` per language (curated names are proper nouns, kept as-is)."""

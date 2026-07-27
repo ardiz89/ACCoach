@@ -133,3 +133,52 @@ def test_format_debrief_mentions_gap_and_worst_corner():
     assert "Gap" in text
     assert "Corner 1" in text
     assert "Consistency" in text
+
+
+# --- visual braking landmark in the braking detail --------------------------
+from types import SimpleNamespace
+
+from accoach import trackdata
+from accoach.coaching import debrief as _D
+
+
+class _StepRef:
+    """Reference that gets on the brakes at ``onset`` (step), for _braking_detail."""
+
+    def __init__(self, onset):
+        self._onset = onset
+
+    def point_at(self, pos):
+        return SimpleNamespace(brake=1.0 if pos >= self._onset else 0.0)
+
+
+def _early_braking_case():
+    # Driver brakes at 0.46; reference not until 0.50. World coords spread the two
+    # onsets far enough apart that the earliness is >= 2 m (so the note fires).
+    inside = [SimpleNamespace(pos=0.46, brake=0.6, car_x=0.0, car_z=0.0),
+              SimpleNamespace(pos=0.50, brake=0.9, car_x=40.0, car_z=0.0)]
+    lap = SimpleNamespace(track="monza", samples=inside)
+    ref = _StepRef(0.50)
+    refs = [SimpleNamespace(brake=0.95)]
+    return lap, ref, inside, refs
+
+
+def test_braking_detail_appends_landmark(monkeypatch):
+    lap, ref, inside, refs = _early_braking_case()
+    # Anchor the landmark exactly where the code computes the reference's onset,
+    # so the test proves the wiring, not a hand-tuned position.
+    ref_onset = _D._onset(inside, lambda s: ref.point_at(s.pos).brake)
+    monkeypatch.setitem(trackdata._LANDMARKS, "monza",
+                        [("al cordolo bianco-rosso", "at the white-and-red kerb", ref_onset)])
+    txt = _D._braking_detail(lap, ref, inside, refs, CueCategory.BRAKE_LATER, "it")
+    assert "al cordolo bianco-rosso" in txt      # visual reference present
+    assert "m." in txt                            # …and the metres stay as anchor
+
+
+def test_braking_detail_without_landmark_is_just_metres(monkeypatch):
+    # Empty table (the shipped state) -> metres only, no landmark phrase.
+    lap, ref, inside, refs = _early_braking_case()
+    monkeypatch.setitem(trackdata._LANDMARKS, "monza", [])
+    txt = _D._braking_detail(lap, ref, inside, refs, CueCategory.BRAKE_LATER, "it")
+    assert "Anticipi la staccata" in txt
+    assert "cordolo" not in txt

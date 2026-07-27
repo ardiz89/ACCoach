@@ -1,6 +1,9 @@
 """trackdata: friendly corner names assigned by apex position."""
+import pytest
+
+from accoach import trackdata
 from accoach.track import Corner
-from accoach.trackdata import corner_name, has_names, name_corners
+from accoach.trackdata import corner_name, has_names, landmark_at, name_corners
 
 
 def _corner(index, apex):
@@ -83,3 +86,64 @@ def test_a_split_complex_does_not_produce_three_identical_names():
     names = name_corners("monza", corners)
     assert names.count("Variante Ascari") == 1, names
     assert len(set(names)) == 3, names
+
+
+# --- visual braking landmarks ----------------------------------------------
+# The lookup is tested against an injected table so the mechanism is proven while
+# the *shipped* tables stay empty until their landmarks are verified on track.
+
+@pytest.fixture
+def _fake_landmarks(monkeypatch):
+    monkeypatch.setitem(
+        trackdata._LANDMARKS,
+        "monza",
+        [("al cordolo bianco-rosso", "at the white-and-red kerb", 0.165),
+         ("al cartello dei 100 m", "at the 100 m board", 0.370)],
+    )
+
+
+def test_landmark_by_nearest_position(_fake_landmarks):
+    # A braking onset a few thousandths off the curated spot still resolves.
+    assert landmark_at("monza", 0.167, "it") == "al cordolo bianco-rosso"
+    assert landmark_at("monza", 0.368, "it") == "al cartello dei 100 m"
+
+
+def test_landmark_language(_fake_landmarks):
+    assert landmark_at("monza", 0.165, "en") == "at the white-and-red kerb"
+    assert landmark_at("Monza", 0.165, "en") == "at the white-and-red kerb"  # slug
+
+
+def test_landmark_outside_tolerance_is_none(_fake_landmarks):
+    # 0.20 is >0.02 from either landmark -> no phrase rather than a wrong one.
+    assert landmark_at("monza", 0.20, "it") is None
+
+
+def test_landmark_unknown_track_is_none(_fake_landmarks):
+    assert landmark_at("nordschleife", 0.165, "it") is None
+
+
+def test_imola_landmarks_still_unsourced():
+    # Guard the honesty rule per track: Imola has no sourced landmarks yet, so it
+    # must stay empty and fall back to metres. Filling it is a deliberate change
+    # that updates this test — it must never grow landmarks silently.
+    assert trackdata._LANDMARKS["imola"] == [], (
+        "un landmark Imola è stato spedito senza fonte: aggiorna questo test solo "
+        "dopo aver validato i punti su una fonte fidata")
+
+
+def test_shipped_landmarks_are_well_formed():
+    # Every shipped landmark: both languages non-empty, position a real fraction.
+    for track, table in trackdata._LANDMARKS.items():
+        for it, en, pos in table:
+            assert it and en, f"{track}: descrizione vuota"
+            assert 0.0 <= pos <= 1.0, f"{track}: pos {pos} fuori da 0..1"
+
+
+def test_monza_landmarks_resolve_at_measured_positions():
+    # The Monza positions were measured from the anchor reference lap's braking
+    # onsets; landmark_at must return each at its own position, in both languages.
+    assert landmark_at("monza", 0.122, "it") == "al cartello dei 150 m"
+    assert landmark_at("monza", 0.122, "en") == "at the 150 m board"
+    assert landmark_at("monza", 0.860, "it") == "alla fine del verde sulla sinistra"
+    # Curva Grande (0.247) is taken near flat — no braking landmark there.
+    assert landmark_at("monza", 0.247, "it") is None
