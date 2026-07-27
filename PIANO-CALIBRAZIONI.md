@@ -10,8 +10,14 @@
 > se non lo passa, la calibrazione resta "non fidata" e l'ingegnere non agisce su
 > quel sintomo.
 
-Comando generico (da sorgente): `python -m accoach.diagnostics <cmd> --seconds N`.
-Puoi lanciarli tu col prefisso `!`, oppure dimmi "pronto" e li avvio io.
+Comando generico: `python -m accoach <cmd> --seconds N` (`dryrun`, `stats`, `yaw`,
+`aids`, `sectors`, `verify-g`). Puoi lanciarli tu col prefisso `!`, oppure dimmi
+"pronto" e li avvio io.
+
+> **Le tre sessioni qui sotto sono tutte su Assetto Corsa.** Su ACC non è mai
+> stata tarata nessuna soglia, e non basta trasferirle: il canale su cui
+> poggiano bloccaggi e pattinamenti ha una sorgente diversa sui due giochi. Il
+> piano dedicato è in [`TARATURE-ACC.md`](TARATURE-ACC.md).
 
 ---
 
