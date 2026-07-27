@@ -17,7 +17,7 @@ Telemetria di guida: giri registrati, canali fisici, delta vs giro di riferiment
 ## Canali chiave (e trappole)
 - **slip_ratio** (`reader._slip_ratio`): `(ω·r - v)/v` per ruota, car-agnostic. Lock → -1, spin → positivo. Azzerato sotto 3 m/s. Usa questo, NON `wheel_slip` grezzo (scala dipende dall'auto).
 - **yaw_rate**: dal nuovo campo `localAngularVel[1]`. Il gioco lo segna all'opposto dello sterzo → in `balance.py` `_YAW_SIGN = -1.0`.
-- **g**: `accG` — l'asse va confermato live (`diagnostics.py`, `run_verify_g.py`). Non dare per scontata la mappatura senza verifica.
+- **g**: `accG` — l'asse va confermato live (`diagnostics.py`, `python -m accoach verify-g`). Non dare per scontata la mappatura senza verifica.
 - **aids in auto**: `tc_level`, `abs_level`, `engine_map`, `brake_bias` in snapshot/reader. Su auto senza aids regolabili leggono 0 (es. Dodge Charger); brake_bias plausibile ~0.580. Gli offset della struct aid-level ACC GT3 vanno ancora validati con un'auto che mostra TC/ABS a HUD.
 - Altri: throttle, brake, gear, steer_angle, g_lat, g_long, wheel_slip grezzo, abs/tc_active, temp core gomme.
 
