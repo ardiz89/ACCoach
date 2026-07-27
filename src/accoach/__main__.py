@@ -43,6 +43,10 @@ Multi-client (backend and clients as separate processes):
   web [--demo]               analysis web app (--demo: synthetic laps, no game)
 
 Validation — these read the live game, so the sim must be running:
+  dryrun [--seconds N]       print every cue the detectors would raise, with the
+                             channel values that triggered it (no voice)
+  stats [--seconds N]        channel distributions in the regimes the thresholds
+                             live in — braking, cornering, throttle-on
   verify-g                   validate the G-force axes against the game
   verify-yaw                 validate the yaw-rate sign (oversteer detection)
   verify-aids                validate the ACC aid-level mapping (live)
@@ -99,6 +103,13 @@ def main() -> None:
     elif cmd == "compare":
         from .compare_app import main as run
         run()
+    elif cmd in ("dryrun", "dry", "stats", "stat"):
+        # The two instruments a calibration session is actually made of (see
+        # TARATURE-ACC.md). They were reachable only as `python -m
+        # accoach.diagnostics dryrun`, which is not a thing anyone types with a
+        # helmet on. Delegated whole so `--seconds` keeps being parsed in one place.
+        from .diagnostics import main as diagnose
+        diagnose([cmd, *rest])
     elif cmd in ("verify-g", "gaxis"):
         from .diagnostics import run_gaxis
         run_gaxis()

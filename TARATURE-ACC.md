@@ -1,0 +1,242 @@
+# Tarature su ACC — piano per la prossima sessione in pista
+
+> **Stato al 2026-07-27: su ACC non è mai stata tarata nessuna soglia.** Tutte le
+> tarature del coach vengono da tre sessioni su **Assetto Corsa** (vedi
+> `PIANO-CALIBRAZIONI.md`): M4 GT3 a Monza, SF25 al Nürburgring, M3 E92 a Suzuka.
+> ACC ha cominciato a registrare un giro solo il 20 luglio 2026 (PR #22).
+>
+> Questo documento è la voce **11** della `ROADMAP.md`. È l'unica voce ferma su
+> di te: nessuna riga di codice la sblocca. Serve una sessione guidata.
+>
+> Come funziona, come nelle sessioni AC: tu guidi come indicato, i comandi li
+> lanci col prefisso `!` oppure dici "pronto" e li avvio io. Ogni voce ha un
+> **criterio di promozione** netto. Se non lo passa, **la soglia resta com'è** e
+> la diagnosi corrispondente resta non fidata: non si inventa un numero per
+> chiudere la casella.
+
+---
+
+## Perché non basta dire «vale anche su ACC»
+
+Tre motivi, in ordine di forza.
+
+**1. Il canale su cui poggiano bloccaggi e pattinamenti ha una sorgente diversa
+sui due giochi.** In `telemetry/reader.py::_slip_ratio`:
+
+- su **AC** il rapporto di slittamento non esiste come campo, e lo calcoliamo
+  noi: `(wheelAngularSpeed × tyreRadius − v) / v`;
+- su **ACC** `tyreRadius` resta a zero (un residuo di AC1 che ACC non riempie) e
+  leggiamo il campo **nativo** `slipRatio`.
+
+Stesso nome, stesso significato fisico, **due numeri prodotti da due strade
+diverse**. `_LOCK_RATIO = -0.15` e gli `spin_ratio` per classe (0.12 / 0.13 /
+0.15) sono stati misurati sul primo. Che valgano anche sul secondo è
+un'assunzione, e finora nessuno l'ha misurata.
+
+**2. Non c'è materiale ACC su cui rifare i conti a tavolino.** Nei 39 giri
+registrati non ce n'è uno che porti dati che solo ACC riempie: i livelli aiuti
+sono `-1` su tutti e nessun giro arriva allo schema v9. Qualunque numero ACC va
+quindi *guidato*, non estratto dallo storico.
+
+**3. Metà delle diagnosi che il coach oggi pronuncia sono nate dopo l'ultima
+sessione in pista.** Gas parziale, sollevamento in zona di pieno, velocità di
+punta come indizio d'ala, cerchio di aderenza, riferimenti visivi di staccata,
+svezzamento del countdown: tutte spedite fra il 22 e il 27 luglio, tutte provate
+solo su giri registrati. Nessuna ha mai parlato a un pilota in movimento.
+
+### Cosa invece NON è in dubbio
+
+Da non rifare da zero — ma il primo passo di ogni sessione le riconferma in due
+minuti, perché costano poco e reggono tutto il resto:
+
+| Taratura | Dove è stata misurata | Su ACC |
+|---|---|---|
+| `_YAW_SIGN = -1.0` | 3 classi, 100% dei frame in curva pulita | riconfermare in 2 min (`verify-yaw`), non ricalibrare |
+| `_LOCK_RATIO = -0.15` | 3 classi, margine netto su tutte | **da rimisurare**: canale con sorgente diversa (motivo 1) |
+| `spin_ratio` per classe | 3 classi, ceiling pulito misurato | **da rimisurare**, stesso motivo |
+| `UNDERSTEER_FRAC = 0.45` | baseline yaw per classe, dai giri registrati | riconfermare che non spari falsi |
+| `trail_brake_cue` spento su Stradali | 6 falsi, 0 veri sulla M3 | invariato: su ACC non ci sono stradali |
+
+---
+
+## Sessione 0 — la struttura, prima dei numeri (~15 min, box + un giro)
+
+Nessuna di queste è una soglia: sono i campi da cui tutto il resto legge. Se uno
+è sbagliato, ogni numero misurato dopo è sbagliato con lui.
+
+### 0.1 Livelli aiuti — `verify-aids` ⚠️ **mai eseguito su ACC**
+- **Perché**: `TC`, `TCCut`, `EngineMap`, `ABS` stanno nella coda della struct
+  graphics (`structs.py`, offset 1252-1280) e **gli offset non sono confermati**.
+  Se leggiamo byte sbagliati, l'ingegnere consiglia manopole a vuoto e il giro
+  registra un setup che non è quello guidato (schema v9).
+- **Guida**: fermo ai box o in pista tranquilla, **ruota le manopole**: TC di due
+  tacche, ABS di due, mappa motore di una. Dimmi i valori a HUD mentre lo fai.
+- **Comando**: `python -m accoach verify-aids`
+- **Promozione**: i valori letti **seguono** il HUD, stessi numeri. Attenzione: la
+  mappa motore è 0-based da noi e il HUD mostra +1 — atteso, non è un errore.
+- **Se fallisce**: restano `-1` ("sconosciuto"), l'ingegnere degrada a consigli
+  direzionali e il campo setup del giro resta vuoto. Non si tira a indovinare un
+  offset: si misura confrontando le tacche con i byte.
+
+### 0.2 Assi G — `verify-g`
+- **Perché**: confermato due volte, ma **sempre su AC**. `g_lat`/`g_long`
+  alimentano il cerchio di aderenza, cioè la diagnosi più nuova.
+- **Guida**: una frenata forte in rettilineo, poi una curva tenuta a destra e una
+  a sinistra.
+- **Comando**: `python -m accoach verify-g`
+- **Promozione**: `✓ accel_g mapping CONFIRMED`.
+
+### 0.3 Settori reali — `verify-sectors`
+- **Perché**: la vista Settori usa `currentSectorIndex`/`sectorCount` del gioco.
+  Su ACC non è mai stata verificata.
+- **Guida**: un giro intero, pulito basta.
+- **Promozione**: i tre split coincidono con quelli del gioco.
+
+### 0.4 Il traguardo e la validità — un giro sporcato apposta
+- **Perché**: `isValidLap` all'offset 1408 è stato **trovato per misura** e regge
+  la regola del pulito su ACC (`numberOfTyresOut` su ACC è inerte: misurato a
+  Monza con quattro ruote fuori, restava 0). Va visto reggere in una sessione
+  vera, insieme a `lost_at` (schema v8), che dice *in che curva* il giro è morto.
+- **Guida**: un giro d'uscita, poi **un giro lanciato buono**, poi un giro in cui
+  **tagli deliberatamente** in un punto che ricordi (dimmi quale).
+- **Promozione**: il giro buono viene registrato e conta; quello tagliato risulta
+  non valido **e** `lost_at` nomina la curva giusta; l'out-lap non finisce nello
+  storico e il rientro ai box non gonfia la σ della consistenza.
+
+### 0.5 Temperature freni — vive o finte?
+- **Perché**: su AC `brakeTemp` è dichiarato e mai simulato (misurato a Spa:
+  fermo a 16.2 °C per secondi a 315 km/h). `monitor` per questo mostra `—` su AC
+  e i numeri su ACC. Se su ACC sono vivi, è un canale in più che oggi
+  raccogliamo e non usiamo.
+- **Guida**: due staccate forti di fila, poi guarda il cruscotto.
+- **Comando**: `python -m accoach monitor`
+- **Promozione**: i quattro numeri si muovono con le staccate. Non cambia niente
+  oggi: è la premessa per usarli domani.
+
+---
+
+## Sessione 1 — i numeri, su una GT3 ACC (~30 min in pista)
+
+Auto consigliata: la **GT3 che guidi più spesso**, su una pista che conosci
+(Monza chiude anche il punto 3.5 qui sotto). Le soglie sono per classe, e la
+classe GT3 è quella su cui ACC ha senso.
+
+### 1.1 Distribuzioni reali — `stats`
+- **Comando**: `python -m accoach stats --seconds 240`
+- **Guida**: 3-4 giri con **staccate forti** (qualche bloccaggio vero va bene, e
+  serve), **trazioni decise** in uscita, un mix di curve lente e veloci.
+- **Cosa raccoglie**: le distribuzioni dei canali nei regimi che contano —
+  slip anteriore in frenata, slip posteriore in trazione, rapporto yaw/sterzo in
+  curva.
+- **Promozione — anteriore**: lo slip **tipico** in frenata forte pulita resta
+  sopra `-0.15` (cioè non lo sfiora) e i bloccaggi **veri** lo superano netto,
+  come su AC (tipico -0.066 contro lock vero -0.417). Se il tipico lo sfora, la
+  soglia va rifatta dal p99 **per ACC**.
+- **Promozione — posteriore**: il tetto delle uscite **pulite** resta sotto
+  `0.13` (soglia GT3) e i pattinamenti veri lo superano. Su AC il tetto pulito
+  GT3 era 0.12: un margine di un centesimo, quindi qui basta poco per spostarlo.
+- **Promozione — sotto/sovrasterzo**: la mediana di `|yaw|/|steer|` in curva
+  pulita sta vicino al `yaw_baseline` GT3 (1.95). Se su ACC è sensibilmente
+  diversa, la soglia relativa (`× 0.45`) si sposta con lei e va aggiornata.
+
+### 1.2 Falsi positivi su giro pulito — `dryrun`
+- **Comando**: `python -m accoach dryrun --seconds 240` *(si ferma da solo a 240 s)*
+- **Guida**: **2-3 giri puliti al tuo passo**, senza errori voluti. Poi, solo
+  quando te lo dico, provoca **uno per volta**: un bloccaggio, un pattinamento in
+  uscita, un sottosterzo, un sovrasterzo.
+- **Promozione**: sui giri puliti i detector **tacciono quasi sempre** (meno di
+  un falso ogni 2-3 curve); sui difetti provocati, ognuno viene nominato con
+  numeri sensati.
+- **Cosa annotare**: ogni cue che *ti sembra falso*, con la curva. È il dato più
+  prezioso della giornata — le tre correzioni per classe su AC sono nate tutte da
+  lì, non dai test.
+
+### 1.3 Gas parziale in percorrenza ⚠️ **mai visto in pista**
+- **Perché**: rilevatore nuovo (`braking.py`, PR #30). Scatta se il gas resta fra
+  il 15% e l'85% per più di 1.2 s senza salire di 12 punti — il «1-90% tenuto»
+  che i coach umani indicano come causa diretta di sottosterzo.
+- **Guida**: in una curva lunga che conosci, **tieni il gas a metà** per un paio
+  di secondi invece di aprire. Poi rifà la stessa curva **giusta** (coasting e
+  poi pieno appena puoi).
+- **Promozione**: scatta sulla prima, **tace** sulla seconda.
+- **Se sbaglia**: su una GT3 in percorrenza lunga potrebbe essere normale tenere
+  gas parziale — in quel caso la soglia di durata (1.2 s) sale, o il cue diventa
+  per classe come il trail-brake.
+
+### 1.4 Il coach che parla ⚠️ **mai osservato su ACC**
+- **Perché**: che il coach parli subito dopo il traguardo del **primo giro
+  lanciato** su ACC è stato verificato solo dai test. Con le cuffie a zero non
+  l'ha mai sentito nessuno.
+- **Guida**: `python -m accoach live`, out-lap, un giro lanciato, **ascolta**.
+- **Promozione**: parla al momento giusto, con la curva giusta, in italiano.
+
+### 1.5 Riferimenti visivi di staccata — solo se la pista è Monza
+- **Perché**: la PR #37 spedisce cinque punti di riferimento visivi per Monza
+  (cartello dei 150 m al Rettifilo, barriera arancione alla Roggia, cartello dei
+  50 m a Lesmo 1, cartello dei 100 m all'Ascari, fine del verde alla Parabolica).
+  Sono presi da guide pubblicate e **mai verificati in pista**: nessuno dei giri
+  registrati perde per staccata anticipata, quindi la frase non è mai scattata su
+  dati veri.
+- **Guida**: un giro in cui **freni volutamente presto** in due o tre di quelle
+  curve.
+- **Promozione**: il debrief dice i metri **e** nomina il riferimento; tu guardi
+  la ripetizione e confermi che il punto nominato è dove il riferimento frena
+  davvero. Una descrizione che non corrisponde si **toglie**, non si aggiusta a
+  occhio: la tabella in `trackdata.py` accetta il silenzio.
+
+---
+
+## Sessione 2 — le diagnosi da tavolino (dopo la sessione, sui giri appena guidati)
+
+Queste non si provano in pista: parlano solo nel debrief, e per parlare hanno
+bisogno di un giro registrato e di un riferimento. Si fanno **dopo**, sui giri
+della sessione 1, aprendo `python -m accoach web`.
+
+| Voce | Come verificarla | Promozione |
+|---|---|---|
+| **Sollevamento in zona di pieno** | in un giro, **solleva** dove il riferimento è in pieno | la nota compare, con un costo in ms plausibile per la lunghezza del rettilineo |
+| **Velocità di punta → ipotesi ala** | confronta due giri con ala diversa, se ne hai | la nota compare solo con divario > 4 km/h, e dice "ala" non "sei lento" |
+| **Cerchio di aderenza** | guida un giro **conservativo** e uno al limite | il conservativo dice "hai margine", quello al limite tace |
+| **Titolo per livello** | confronta un tuo giro col riferimento di un pilota molto più veloce | oltre ~3% di distacco il debrief guida con **un** tema, non con 18 curve |
+| **Svezzamento del countdown** | ripeti la stessa curva bene per più giri | l'overlay smette di contare la staccata **lì**, non ovunque |
+| **Memoria del Focus** | chiudi tutto e riapri sulla stessa auto+pista | le curve domate restano domate |
+| **Tasso di falsi offline** | `python -m accoach verify-diag <auto> <pista>` | pochi cue tecnici sui giri che tu chiami puliti |
+
+---
+
+## Cosa porto a casa
+
+Per ogni voce, una riga in una tabella come quelle che chiudono
+`PIANO-CALIBRAZIONI.md`: **fidato / da correggere / non applicabile**, con il
+numero misurato accanto. Le soglie promosse restano; quelle bocciate si spostano
+**del valore misurato**, non di un valore scelto. Le diagnosi che sparano falsi
+si spengono per quella classe — come il trail-brake sulle stradali — finché non
+c'è un numero che dica dove rimetterle.
+
+E una regola che vale più di tutte, imparata su AC: **il giudizio del pilota è il
+dato**. Quando dici «quella uscita era pulita» e il coach ha detto pattinamento,
+hai appena misurato un falso positivo che nessun test avrebbe trovato.
+
+---
+
+## RISULTATI
+
+*(da riempire in sessione — una sezione per auto/pista, come in
+`PIANO-CALIBRAZIONI.md`)*
+
+### Sessione — data · auto · pista · ACC
+
+| # | Voce | Verdetto | Evidenza |
+|---|---|---|---|
+| 0.1 | livelli aiuti (offset struct) | | |
+| 0.2 | assi G | | |
+| 0.3 | settori reali | | |
+| 0.4 | `isValidLap` + `lost_at` | | |
+| 0.5 | temperature freni vive | | |
+| 1.1 | `_LOCK_RATIO` su slip nativo ACC | | |
+| 1.1 | `spin_ratio` GT3 su slip nativo ACC | | |
+| 1.1 | `yaw_baseline` GT3 | | |
+| 1.2 | falsi positivi su giro pulito | | |
+| 1.3 | gas parziale | | |
+| 1.4 | il coach parla al primo giro lanciato | | |
+| 1.5 | riferimenti visivi Monza | | |

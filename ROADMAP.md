@@ -128,7 +128,7 @@ costano. Le prime tre hanno evidenza esterna misurata; le altre no.
 | 8 | **Grip combinato (G-G) come causa** nel debrief | audit interno | medio |
 | 9 | **Granularità per livello**: tecnica generale prima dell'analisi curva per curva | vocabolario coach umani | medio |
 | 10 | **Riferimento esterno/PRO con interfaccia** | audit interno | medio |
-| 11 | **Tarature su ACC** | mai fatte | serve pista |
+| 11 | **Tarature su ACC** — piano pronto in [`TARATURE-ACC.md`](TARATURE-ACC.md) | mai fatte | serve pista |
 | 12 | **Documentazione e tutorial allineati** (fermi al 29/06) + aiuto contestuale nelle impostazioni | segnalazione utente | piccolo |
 
 ## Posizionamento
