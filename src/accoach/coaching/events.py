@@ -11,10 +11,12 @@ Signals
 The primary trigger is the car's own electronics telling us the driver asked for
 more than the grip allows: ``abs_active`` (braking past lock) and ``tc_active``
 (throttle past traction). Those are normalized 0..1 intervention levels and are
-reliable on ACC GT3s. Per-wheel ``wheel_slip`` is a secondary corroborator for
-cars/sessions running without aids; its absolute scale varies, so its thresholds
-are deliberately conservative and easy to recalibrate (see ``_FRONT_SLIP_LOCK`` /
-``_REAR_SLIP_SPIN``) — primary detection does not depend on them.
+reliable on ACC GT3s. The secondary corroborator, for cars/sessions running
+without aids, is the physical ``slip_ratio`` (see ``_LOCK_RATIO`` and the
+class-dependent rear-spin threshold in ``coaching.tuning``) — primary detection
+does not depend on it. It is *not* the sim's raw ``wheel_slip``: that channel's
+scale is car-dependent, which is why it was replaced here and, at schema v10,
+dropped from what a lap stores.
 
 Debounce
 --------

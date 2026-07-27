@@ -6,6 +6,23 @@ from accoach.telemetry.snapshot import SessionType
 
 import synth
 
+# The columns as they were actually WRITTEN up to v9, raw slip_fl..slip_rr and
+# all. Version-tolerance tests need a historic list, not a slice of today's
+# SAMPLE_FIELDS: a slice silently follows the constant, so the day a column is
+# added or dropped these tests quietly start describing a file that never
+# existed — which is exactly what happened when v10 stopped writing the raw
+# slip channel.
+_V9_FIELDS = (
+    "t_ms", "pos", "speed_kmh", "throttle", "brake", "steer_angle", "gear",
+    "rpm", "g_lat", "g_long",
+    "slip_fl", "slip_fr", "slip_rl", "slip_rr",
+    "abs_active", "tc_active", "yaw_rate",
+    "tyre_fl", "tyre_fr", "tyre_rl", "tyre_rr",
+    "car_x", "car_z", "current_sector",
+    "sr_fl", "sr_fr", "sr_rl", "sr_rr",
+    "press_fl", "press_fr", "press_rl", "press_rr",
+)
+
 
 def test_sample_from_snapshot_maps_channels():
     s = synth.snap(
@@ -19,7 +36,6 @@ def test_sample_from_snapshot_maps_channels():
     assert smp.pos == 0.4
     assert smp.gear == "5"
     assert smp.g_lat == 1.2 and smp.g_long == -0.8     # accel_g[0] / accel_g[2]
-    assert smp.wheel_slip == (0.1, 0.2, 0.3, 0.4)
     assert smp.tyre_core_temp == (90.0, 91.0, 92.0, 93.0)
 
 
@@ -47,13 +63,12 @@ def test_to_dict_is_self_describing():
 
 
 def test_from_named_defaults_missing_channels_to_zero():
-    # A v1-style file: only the first 10 columns, no slip/abs/tc/yaw/tyre.
-    fields = list(SAMPLE_FIELDS[:10])
+    # A v1-style file: only the first 10 columns, no abs/tc/yaw/tyre.
+    fields = list(_V9_FIELDS[:10])
     row = [1000, 0.5, 200.0, 1.0, 0.0, 0.1, "4", 7000, 0.5, -0.3]
     smp = LapSample.from_named(fields, row)
     assert smp.t_ms == 1000 and smp.gear == "4"
-    assert smp.wheel_slip == (0.0, 0.0, 0.0, 0.0)   # absent -> zero
-    assert smp.abs_active == 0.0 and smp.yaw_rate == 0.0
+    assert smp.abs_active == 0.0 and smp.yaw_rate == 0.0   # absent -> zero
     assert smp.tyre_core_temp == (0.0, 0.0, 0.0, 0.0)
 
 
@@ -68,7 +83,7 @@ def test_from_dict_loads_legacy_v1_without_fields_list():
     assert lap.schema_version == 1
     assert len(lap.samples) == 1
     assert lap.samples[0].speed_kmh == 100.0
-    assert lap.samples[0].wheel_slip == (0.0, 0.0, 0.0, 0.0)
+    assert lap.samples[0].abs_active == 0.0
 
 
 def test_car_xz_roundtrip():
@@ -81,7 +96,7 @@ def test_car_xz_roundtrip():
 
 def test_v2_lap_without_coords_loads_with_zero():
     # A v2 file (no car_x/car_z columns) must still load, coords defaulting to 0.
-    fields = list(SAMPLE_FIELDS[:21])   # everything up to tyre_rr, no car_x/car_z
+    fields = list(_V9_FIELDS[:21])      # everything up to tyre_rr, no car_x/car_z
     row = [0, 0.5, 100.0, 1.0, 0.0, 0.0, "4", 6000, 0.0, 0.0,
            0, 0, 0, 0, 0, 0, 0, 80, 80, 80, 80]
     smp = LapSample.from_named(fields, row)
@@ -98,7 +113,7 @@ def test_current_sector_roundtrip():
 
 def test_v3_lap_without_sector_loads_as_unknown():
     # A v3 file (through car_z, no current_sector column) loads with sector -1.
-    fields = list(SAMPLE_FIELDS[:23])   # up to car_z, no current_sector
+    fields = list(_V9_FIELDS[:23])      # up to car_z, no current_sector
     row = [0, 0.5, 100.0, 1.0, 0.0, 0.0, "4", 6000, 0.0, 0.0,
            0, 0, 0, 0, 0, 0, 0, 80, 80, 80, 80, 12.3, -4.5]
     smp = LapSample.from_named(fields, row)
@@ -181,7 +196,7 @@ def test_v6_slip_ratio_and_pressure_roundtrip():
 def test_v5_lap_without_v6_channels_loads_with_zero():
     # A v5 row (through current_sector, no slip_ratio/tyre_pressure) must load,
     # the new per-wheel channels defaulting to zero.
-    fields = list(SAMPLE_FIELDS[:24])   # up to current_sector
+    fields = list(_V9_FIELDS[:24])      # up to current_sector
     row = [0, 0.5, 100.0, 1.0, 0.0, 0.0, "4", 6000, 0.0, 0.0,
            0, 0, 0, 0, 0, 0, 0, 80, 80, 80, 80, 12.3, -4.5, 1]
     smp = LapSample.from_named(fields, row)
@@ -201,3 +216,28 @@ def test_legacy_lap_without_clean_is_unknown_not_dirty():
     lap = Lap.from_dict(legacy)
     assert lap.clean is None
     assert lap.air_temp == 0.0 and lap.tyre_compound == ""
+
+
+def test_v9_lap_with_the_dropped_slip_columns_still_loads():
+    # v10 stopped WRITING slip_fl..slip_rr. Every lap already on disk has them,
+    # so the reader must not merely survive the extra columns — it has to keep
+    # reading the ones after them correctly, which is only true because columns
+    # are matched by name and not by position.
+    row = [0, 0.5, 100.0, 1.0, 0.0, 0.0, "4", 6000, 0.0, 0.0,
+           0.7, 0.7, 0.2, 0.2,            # the dropped raw slip channel
+           0.4, 0.3, 0.15,
+           80.0, 81.0, 82.0, 83.0,
+           12.3, -4.5, 1,
+           -0.25, -0.24, 0.11, 0.12,
+           27.0, 27.1, 27.4, 27.5]
+    smp = LapSample.from_named(list(_V9_FIELDS), row)
+    assert smp.abs_active == 0.4 and smp.tc_active == 0.3 and smp.yaw_rate == 0.15
+    assert smp.current_sector == 1
+    assert smp.slip_ratio == (-0.25, -0.24, 0.11, 0.12)
+    assert smp.tyre_pressure == (27.0, 27.1, 27.4, 27.5)
+
+
+def test_the_dropped_channel_is_gone_from_what_we_write():
+    # Four columns on every frame of every lap, for no reader: the point of v10.
+    assert not [f for f in SAMPLE_FIELDS if f.startswith("slip_")]
+    assert len(synth.build_lap(n=3).to_dict()["samples"][0]) == len(SAMPLE_FIELDS)

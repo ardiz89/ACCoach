@@ -1,8 +1,15 @@
 """Unified entry point:  python -m accoach <command> [args]
 
-One front door instead of a pile of run_*.py scripts. Each command lazily imports
-its module so an optional dependency (e.g. PySide6 for the GUI bits) only matters
-when you actually use that command.
+One front door. From a source checkout the same commands go through
+``accoach_main.py`` (which puts ``src`` on the path and is also the packaged
+exe's entry point), so ``HONE.bat``, ``ACCoach.exe`` and ``python -m accoach``
+all dispatch here. Each command lazily imports its module so an optional
+dependency (e.g. PySide6 for the GUI bits) only matters when you use it.
+
+The default help lists the three commands a *driver* needs. The rest — headless
+backend, standalone overlay, live validation harnesses — are real and supported,
+but a driver reading fifteen commands has to decide which of them is their job,
+and none of them is. They live behind ``help --all``.
 """
 
 from __future__ import annotations
@@ -12,28 +19,38 @@ import sys
 _HELP = """HONE — know why you're slow. Real-time driving coach for Assetto Corsa / ACC
 
 Usage:  python -m accoach <command> [options]
+        python accoach_main.py <command>       (from a source checkout)
 
-Live coaching:
-  live [--silent] [--demo]   coach + on-screen overlay in one window  (default)
-  coach [--silent]           voice coach in the terminal
-  launcher                   small GUI with buttons for everything
+  live [--silent] [--demo]   coach + on-screen overlay while you drive  (default)
+  web                        review your saved laps in the browser
+  launcher                   the window with buttons for everything
 
-Frontend (multi-client / second screen):
+Nothing else is needed to drive.  `help --all` lists the tools.
+"""
+
+_HELP_TOOLS = """Tools — development, live validation, second-screen setups.
+
+Coaching, split up:
+  coach [--silent]           voice coach in the terminal (no overlay)
+  recorder                   record laps only, no coaching
+  debrief [car] [track]      post-session lap breakdown in the terminal
+  compare                    live delta dashboard
+  monitor                    raw telemetry dashboard
+
+Multi-client (backend and clients as separate processes):
   server [--demo]            headless backend, broadcasts over WebSocket
   overlay [--interactive]    on-screen HUD (connects to the backend)
-  web [--demo]               analysis web app (review saved laps in the browser)
+  web [--demo]               analysis web app (--demo: synthetic laps, no game)
 
-Review & tools:
-  debrief [car] [track]      post-session lap breakdown
-  monitor                    raw telemetry dashboard
-  recorder                   record laps only
-  compare                    live delta dashboard
+Validation — these read the live game, so the sim must be running:
   verify-g                   validate the G-force axes against the game
   verify-yaw                 validate the yaw-rate sign (oversteer detection)
   verify-aids                validate the ACC aid-level mapping (live)
   verify-sectors             validate the sim's real sector data (live)
   verify-diag [car] [track]  offline FP-rate check of the lap diagnosis
+
   import-reference <file>    import a lap as a clean reference (cold-start seed)
+  selftest                   check the TTS voice, write a report (works windowed)
   logs                       open the folder with logs and crash reports
 """
 
@@ -45,6 +62,8 @@ def main() -> None:
 
     if cmd in ("", "-h", "--help", "help"):
         print(_HELP)
+        if any(a.lower() in ("--all", "-a", "all", "tools") for a in rest):
+            print(_HELP_TOOLS)
         return
 
     from .logging_setup import setup_logging
@@ -112,8 +131,11 @@ def main() -> None:
         except Exception:
             pass
     else:
+        # Everything on an unknown command: whoever typed one knows what a
+        # command is, and the tool they meant is probably in the long list.
         print(f"Unknown command: {cmd!r}\n")
         print(_HELP)
+        print(_HELP_TOOLS)
         raise SystemExit(2)
 
 

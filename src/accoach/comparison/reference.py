@@ -12,8 +12,8 @@ yields a monotonic curve that ``bisect`` can search without numpy.
 
 The exposed :class:`ReferencePoint` carries everything the coaching layer needs
 to attribute a cause — not just speed/throttle/brake but steering, lateral G,
-per-wheel slip, ABS/TC intervention and yaw rate — so the analyzer can tell a
-lock-up from a coast from understeer.
+ABS/TC intervention and yaw rate — so the analyzer can tell a lock-up from a
+coast from understeer.
 """
 
 from __future__ import annotations
@@ -36,7 +36,6 @@ class ReferencePoint:
     g_lat: float
     steer_angle: float
     gear: str
-    wheel_slip: tuple[float, float, float, float]
     abs_active: float
     tc_active: float
     yaw_rate: float
@@ -59,7 +58,6 @@ class Reference:
         self._glat: list[float] = []
         self._steer: list[float] = []
         self._gear: list[str] = []
-        self._slip: list[tuple[float, float, float, float]] = []
         self._abs: list[float] = []
         self._tc: list[float] = []
         self._yaw: list[float] = []
@@ -78,7 +76,6 @@ class Reference:
             self._glat.append(s.g_lat)
             self._steer.append(s.steer_angle)
             self._gear.append(s.gear)
-            self._slip.append(s.wheel_slip)
             self._abs.append(s.abs_active)
             self._tc.append(s.tc_active)
             self._yaw.append(s.yaw_rate)
@@ -94,7 +91,7 @@ class Reference:
         keeps rising — inflating the delta by a growing bias near the finish.
         Endpoints reuse the nearest sample's channels; only pos and t are set."""
         chans = [self._speed, self._throttle, self._brake, self._glong, self._glat,
-                 self._steer, self._gear, self._slip, self._abs, self._tc, self._yaw]
+                 self._steer, self._gear, self._abs, self._tc, self._yaw]
         if len(self._pos) < 2:
             return                       # too few real samples to be a reference
 
@@ -140,9 +137,6 @@ class Reference:
     def point_at(self, pos: float) -> ReferencePoint:
         i, j, f = self._bracket(pos)
         lerp = self._lerp
-        slip = tuple(
-            lerp(self._slip[i][w], self._slip[j][w], f) for w in range(4)
-        )
         return ReferencePoint(
             t_ms=lerp(self._t[i], self._t[j], f),
             speed_kmh=lerp(self._speed[i], self._speed[j], f),
@@ -152,7 +146,6 @@ class Reference:
             g_lat=lerp(self._glat[i], self._glat[j], f),
             steer_angle=lerp(self._steer[i], self._steer[j], f),
             gear=self._gear[i] if f < 0.5 else self._gear[j],
-            wheel_slip=slip,  # type: ignore[arg-type]
             abs_active=lerp(self._abs[i], self._abs[j], f),
             tc_active=lerp(self._tc[i], self._tc[j], f),
             yaw_rate=lerp(self._yaw[i], self._yaw[j], f),
