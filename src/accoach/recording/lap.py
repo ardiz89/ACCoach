@@ -12,10 +12,11 @@ faster and a slower lap through the same corner are directly comparable.
 Channels
 --------
 Beyond the basic inputs we record the signals coaching actually needs to explain
-*why* time was lost: per-wheel ``slip`` (lock-ups, wheelspin, under/oversteer),
-``abs``/``tc`` intervention, ``yaw_rate`` (rotation vs steering), and tyre core
-temps. Anything cheap to capture now and expensive to add later (it would mean a
-re-drive) is worth storing.
+*why* time was lost: per-wheel ``slip_ratio`` (lock-ups, wheelspin), ``abs``/``tc``
+intervention, ``yaw_rate`` (rotation vs steering), tyre core temps and pressures.
+Anything cheap to capture now and expensive to add later (it would mean a
+re-drive) is worth storing — but a channel that duplicates another one, and that
+nothing reads, is not: see v10 in the version log below.
 
 Serialization is **self-describing and forward/backward compatible**: each file
 stores its ``fields`` list, and :meth:`Lap.from_dict` maps columns back to
@@ -42,7 +43,14 @@ from ..telemetry.snapshot import SessionType, TelemetrySnapshot
 # v9: the in-car setup a lap was driven on (tc/abs/engine map levels, brake bias)
 #     — so the race engineer's ACCEPT/REVERT verdict can check which setup the
 #     laps it compared were actually on. ACC only; -1 on AC.
-SCHEMA_VERSION = 9
+# v10: the raw `slip_fl..slip_rr` channel is no longer WRITTEN. v6 replaced it
+#     with the physical `sr_*` slip ratio for exactly the reason it was there
+#     (lock-ups and wheelspin) and nothing has read the raw one since: four of
+#     the 31 columns of every frame of every lap, for no reader. Files that have
+#     it still load — columns are matched by name, so the extra ones are simply
+#     ignored. The live channel is untouched: `monitor` still shows it raw, which
+#     is a raw dashboard's job.
+SCHEMA_VERSION = 10
 
 # Fixed serialization order for a LapSample, written into every file. Per-wheel
 # channels are flattened with [fl, fr, rl, rr] suffixes.
@@ -57,7 +65,6 @@ SAMPLE_FIELDS = (
     "rpm",
     "g_lat",         # lateral G
     "g_long",        # longitudinal G (+accel / -brake)
-    "slip_fl", "slip_fr", "slip_rl", "slip_rr",   # per-wheel slip
     "abs_active",    # 0..1 ABS intervention
     "tc_active",     # 0..1 TC intervention
     "yaw_rate",      # rad/s about the vertical axis (rotation)
@@ -107,7 +114,6 @@ class LapSample:
     rpm: int
     g_lat: float
     g_long: float
-    wheel_slip: tuple[float, float, float, float] = _Z4
     abs_active: float = 0.0
     tc_active: float = 0.0
     yaw_rate: float = 0.0
@@ -131,7 +137,6 @@ class LapSample:
             rpm=s.rpm,
             g_lat=s.accel_g[0],
             g_long=s.accel_g[2],
-            wheel_slip=s.wheel_slip,
             abs_active=s.abs_active,
             tc_active=s.tc_active,
             yaw_rate=s.yaw_rate,
@@ -155,8 +160,6 @@ class LapSample:
             self.rpm,
             round(self.g_lat, 3),
             round(self.g_long, 3),
-            round(self.wheel_slip[0], 3), round(self.wheel_slip[1], 3),
-            round(self.wheel_slip[2], 3), round(self.wheel_slip[3], 3),
             round(self.abs_active, 3),
             round(self.tc_active, 3),
             round(self.yaw_rate, 4),
@@ -190,7 +193,6 @@ class LapSample:
             rpm=int(m.get("rpm", 0) or 0),
             g_lat=f("g_lat"),
             g_long=f("g_long"),
-            wheel_slip=(f("slip_fl"), f("slip_fr"), f("slip_rl"), f("slip_rr")),
             abs_active=f("abs_active"),
             tc_active=f("tc_active"),
             yaw_rate=f("yaw_rate"),

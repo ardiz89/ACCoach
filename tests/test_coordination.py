@@ -16,7 +16,7 @@ _LIVE = replace(
 def _refpoint():
     return ReferencePoint(
         t_ms=0.0, speed_kmh=100.0, throttle=0.5, brake=0.0, g_long=0.0,
-        g_lat=0.0, steer_angle=0.0, gear="4", wheel_slip=(0.0,) * 4,
+        g_lat=0.0, steer_angle=0.0, gear="4",
         abs_active=0.0, tc_active=0.0, yaw_rate=0.0,
     )
 
