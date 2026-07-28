@@ -70,8 +70,11 @@ async function init() {
   const sel = $("combo");
   sel.onchange = () => {
     const combo = JSON.parse(sel.value);
+    SESSION = null;
+    SESSION_I = 0;        // a different car+track has different sessions
     loadCombo(combo);
     if (VIEW === "progress") loadProgress(combo);
+    if (VIEW === "session") loadSession(combo, 0);
   };
   $("lap").onchange = reloadSelection;
   $("baseline").onchange = reloadSelection;
@@ -139,6 +142,7 @@ function redrawCurrentView() {
   else if (VIEW === "sectors") { if (CURRENT) loadSectors(); }
   else if (VIEW === "progress") { if (CURRENT) loadProgress(CURRENT); }
   else if (VIEW === "flow") { if (DATA) renderFlow(DATA); }
+  else if (VIEW === "session") { if (CURRENT) loadSession(CURRENT, SESSION_I); }
   else if (DATA) redraw(LAST_HOVER);   // compare
 }
 
@@ -1095,6 +1099,133 @@ function drawFlowChart(a, step) {
     trace(d.pos, d.delta_s, -m, m, "#ffffff", 2);
     axisLabel(ctx, w, `+${m.toFixed(2)}s`, `-${m.toFixed(2)}s`);
   }
+}
+
+// --- one run of laps, as it was driven -----------------------------------
+// Everything else on this page is lap-centric: pick two laps, compare them.
+// That's the right shape for studying a lap and the wrong one for the question
+// you have when you get up from the wheel, which is how the run went.
+
+let SESSION = null;      // last /api/sessions payload
+let SESSION_I = 0;       // which run of that payload is on screen
+
+async function loadSession(combo, index) {
+  if (!combo) return;
+  const q = new URLSearchParams({ car: combo.car, track: combo.track,
+                                  index: index || 0 });
+  let s;
+  try { s = await getJSON("/api/sessions?" + q.toString()); }
+  catch (e) { s = { sessions: [], current: null }; }
+  SESSION = s;
+  SESSION_I = s.index || 0;
+  renderSession(s);
+}
+
+function fmtWhen(iso) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  return d.toLocaleDateString(undefined, { day: "numeric", month: "short" }) +
+         " · " + d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+}
+
+function renderSession(s) {
+  const cur = s && s.current;
+  const pick = $("ses-select");
+  if (!cur) {
+    $("ses-when").textContent = "";
+    $("ses-sub").textContent = "";
+    $("ses-numbers").innerHTML = `<div class="empty">${t("ses.none")}</div>`;
+    $("ses-laps").innerHTML = "";
+    $("ses-changed").innerHTML = "";
+    pick.innerHTML = "";
+    return;
+  }
+
+  pick.innerHTML = s.sessions.map((x, i) =>
+    `<option value="${i}"${i === s.index ? " selected" : ""}>` +
+    `${fmtWhen(x.started_utc)} · ${x.laps} ${t("lbl.laps")}` +
+    `${x.best ? " · " + x.best : ""}</option>`).join("");
+  pick.onchange = () => loadSession(CURRENT, parseInt(pick.value, 10));
+
+  $("ses-when").textContent = fmtWhen(cur.started_utc);
+  const bits = [tf("ses.sub", { laps: cur.laps, valid: cur.valid,
+                               mins: Math.max(1, Math.round(cur.duration_s / 60)) })];
+  if (cur.road_temp_from != null) {
+    bits.push(tf("ses.sub_temp", { from: cur.road_temp_from.toFixed(1),
+                                   to: cur.road_temp_to.toFixed(1) }));
+  }
+  $("ses-sub").textContent = bits.join("  ·  ");
+
+  const item = (k, v, cls) =>
+    `<div class="item"><div class="k">${k}</div><div class="v ${cls || ""}">${v}</div></div>`;
+  const c = cur.consistency || {};
+  const prev = cur.previous;
+  let numbers = "";
+  if (cur.best) {
+    numbers += item(t("ses.best"), cur.best);
+    if (c.n >= 2) {
+      numbers += item(t("ses.mean"), fmtMs(c.mean_ms));
+      numbers += item(t("ses.spread"), `σ ${(c.std_ms / 1000).toFixed(3)}s`);
+    }
+    if (prev && prev.delta_ms != null) {
+      const d = prev.delta_ms / 1000;
+      numbers += item(t("ses.vsprev"), (d > 0 ? "+" : "") + d.toFixed(3) + "s",
+                      d > 0 ? "slower" : "faster");
+    }
+  } else {
+    numbers = `<div class="empty">${t("ses.nobest")}</div>`;
+  }
+  $("ses-numbers").innerHTML = numbers;
+
+  // Every lap of the run in the order driven, cut ones included: leaving them
+  // out would show a session you didn't have. The bar length is the gap to the
+  // best of the run, so the shape of the list is the shape of the evening.
+  const times = cur.laps_detail.map((l) => l.lap_time_ms).filter((x) => x > 0);
+  const floor = Math.min.apply(null, times.concat([Infinity]));
+  const worst = Math.max.apply(null, times.concat([0]));
+  const span = Math.max(1, worst - floor);
+  $("ses-laps").innerHTML = `<h3>${t("ses.laps")}</h3>` +
+    cur.laps_detail.map((l) => {
+      const w = 6 + 94 * ((l.lap_time_ms - floor) / span);
+      const tags = (l.is_best ? `<span class="tag best">${t("ses.lap_best")}</span>` : "") +
+        (!l.valid ? `<span class="tag out">${t("ses.lap_out")}</span>` : "") +
+        (l.off_track ? `<span class="tag cut">${t("ses.lap_cut")}</span>` : "");
+      return `<button type="button" class="ses-lap${l.is_best ? " is-best" : ""}" ` +
+             `data-path="${l.path}" title="${t("ses.open")}">` +
+             `<span class="time">${l.lap_time}</span>` +
+             `<span class="bar"><i style="width:${w.toFixed(1)}%"></i></span>` +
+             `<span class="tags">${tags}</span></button>`;
+    }).join("");
+  for (const b of $("ses-laps").querySelectorAll(".ses-lap")) {
+    b.onclick = () => openLapInCompare(b.dataset.path);
+  }
+
+  // What moved since the run before. Both directions, because a session where
+  // you gained three tenths overall and lost half a second in one corner is a
+  // different evening from one where everything crept forward.
+  if (!prev) {
+    $("ses-changed").innerHTML =
+      `<h3>${t("ses.changed")}</h3><div class="empty">${t("ses.first")}</div>`;
+  } else {
+    const rows = (list, cls) => list.map((x) =>
+      `<div class="move ${cls}"><span class="corner">${x.label}</span>` +
+      `<span class="amount">${cls === "up" ? "−" : "+"}${x.gain_s.toFixed(2)}s</span>` +
+      `${x.message ? `<span class="why">${x.message}</span>` : ""}</div>`).join("");
+    const any = prev.improved.length + prev.regressed.length;
+    $("ses-changed").innerHTML = `<h3>${t("ses.changed")}</h3>` + (any
+      ? (prev.improved.length ? `<h4>${t("ses.improved")}</h4>` + rows(prev.improved, "up") : "") +
+        (prev.regressed.length ? `<h4>${t("ses.regressed")}</h4>` + rows(prev.regressed, "down") : "")
+      : `<div class="empty">${t("ses.nomoves")}</div>`);
+  }
+}
+
+function openLapInCompare(path) {
+  const sel = $("lap");
+  if ([...sel.options].some((o) => o.value === path)) {
+    sel.value = path;
+    reloadSelection();
+  }
+  showView("compare");
 }
 
 // --- canvas drawing -------------------------------------------------------

@@ -16,8 +16,8 @@ later on top of the same DB.
 
 from __future__ import annotations
 
-import gzip
 import json
+import zlib
 import sqlite3
 from pathlib import Path
 
@@ -94,11 +94,23 @@ def _clean_to_int(value: object) -> int:
 
 
 def _read_meta(path: Path) -> dict | None:
-    """Read a lap file's metadata + sample count without building samples."""
+    """Read a lap file's metadata + sample count without building samples.
+
+    Reads it the same way ``load_lap`` does, salvaging a file with trailing
+    garbage after the gzip member. It used to use a plain ``gzip.open``, which
+    meant a lap could be perfectly readable by every analysis path and yet
+    invisible to the catalogue — so it appeared in no list, no session, and
+    could never be elected as a reference, silently. Measured on a real lap:
+    ``imola__mclaren-720s-gt3-evo__1m50s460``, 110 460 ms, on disk since 18 July
+    and indexed by nothing.
+
+    The import is local because ``storage`` imports this module.
+    """
+    from .storage import _read_gzip_salvaging
+
     try:
-        with gzip.open(path, "rb") as fh:
-            d = json.loads(fh.read().decode("utf-8"))
-    except (OSError, ValueError):
+        d = json.loads(_read_gzip_salvaging(path).decode("utf-8"))
+    except (OSError, ValueError, EOFError, zlib.error):
         return None
     return {
         "car_model": str(d.get("car_model", "")),

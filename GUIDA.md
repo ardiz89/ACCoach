@@ -162,6 +162,19 @@ Finita la sessione, rivedi tutto con calma:
   Si apre da solo `http://127.0.0.1:8778`.
 
 Cosa trovi:
+- **Il giro spiegato** (è dove atterri): il giro una cosa alla volta invece di
+  cinque grafici insieme. Ti dice cosa ti è costato di più, perché, e cosa farci,
+  col grafico ritagliato sul tratto di cui sta parlando. Al massimo tre passi: se
+  sei lontano dal passo apre col tema generale e si ferma lì, perché a quella
+  distanza l'analisi curva per curva è la lente sbagliata. Sul tuo giro di
+  riferimento ti dice che non c'è niente da correggere, invece di inventarsi una
+  lezione.
+- **Sessione**: com'è andata una sola uscita. I giri nell'ordine in cui li hai
+  guidati (compresi quelli tagliati o non validi — sono giri che hai fatto, solo
+  non possono fare la media), migliore, costanza, temperatura dell'asfalto, e
+  **cosa è cambiato dall'ultima volta** su quella auto+pista, curva per curva.
+  Clicca un giro per aprirlo in Confronto. Le sessioni sono dedotte dagli orari:
+  una pausa lunga vale come sessione nuova.
 - **Confronto**: scegli auto+pista e due giri (uno da rivedere, uno di confronto).
   Tre grafici allineati alla posizione in pista — **delta sul giro**, **velocità**
   (tu vs riferimento), **gas/freno** — con le bande delle curve. Passa il mouse:

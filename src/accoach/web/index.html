@@ -38,6 +38,7 @@
 
   <nav class="tabs">
     <button class="tab active" data-view="flow" data-i18n="tab.flow">Lap explained</button>
+    <button class="tab" data-view="session" data-i18n="tab.session">Session</button>
     <button class="tab" data-view="compare" data-i18n="tab.compare">Compare</button>
     <button class="tab" data-view="map" data-i18n="tab.map">Map</button>
     <button class="tab" data-view="sectors" data-i18n="tab.sectors">Sectors</button>
@@ -63,6 +64,27 @@
         <button id="flow-whole" type="button" class="flow-btn ghost" data-i18n="flow.whole">Show the whole chart</button>
         <button id="flow-next" type="button" class="flow-btn primary" data-i18n="flow.next">Next →</button>
       </nav>
+    </div>
+  </div>
+
+  <!-- One run of laps, as it was driven. Sessions are inferred from when the
+       laps were written (see sessions.py) — the sim's own `session` field is the
+       session *type*, so every practice lap ever recorded reads the same. -->
+  <div id="view-session" class="hidden">
+    <div class="session-shell">
+      <header class="session-head">
+        <div>
+          <h2 id="ses-when" class="session-when"></h2>
+          <p id="ses-sub" class="session-sub"></p>
+        </div>
+        <label class="session-pick">
+          <span data-i18n="ses.which">Session</span>
+          <select id="ses-select"></select>
+        </label>
+      </header>
+      <section id="ses-numbers" class="summary"></section>
+      <section id="ses-laps" class="session-laps"></section>
+      <section id="ses-changed" class="session-changed"></section>
     </div>
   </div>
 

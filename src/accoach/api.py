@@ -33,12 +33,18 @@ from .recording.catalog import LapCatalog
 from .recording.lap import SAMPLE_FIELDS
 from .recording.storage import _catalog_path, _slug, list_lap_files
 from .sectors import ideal_lap, sector_spans, sector_times
+from .sessions import group_sessions
 from .telemetry.snapshot import format_lap_time
 from .track import detect_corners
 from .trackdata import name_corners
 
 PORT = 8778
 _MAX_POINTS = 600   # downsample traces for the browser
+
+# Below this, a corner didn't really move between two sessions. Same reasoning
+# as the guided flow's floor: it is inside the spread of one driver's own laps,
+# and reporting it as progress would be flattering rather than true.
+_SESSION_MOVE_MS = 60.0
 
 
 def _web_dir() -> Path:
@@ -506,6 +512,116 @@ def create_api(
                 "source": r.get("source", "own"),
                 "recorded_utc": r["recorded_utc"],
             } for r in all_laps],
+        }
+
+    def _corner_moves(newer_path: str, older_path: str, track: str,
+                      lg: str, limit: int = 3) -> dict:
+        """Which corners moved between two laps, both ways, named and explained.
+
+        Two debriefs rather than a new comparison: run it one way and you get
+        the corners where the newer lap is slower, run it the other way and the
+        same machinery names the corners where it is faster. Nothing here
+        computes a time difference itself — that would be a second, subtly
+        different implementation of the windowing rule the debrief already owns
+        (a corner is credited with the straight that follows it).
+        """
+        try:
+            newer, older = load_lap(newer_path), load_lap(older_path)
+            ref_old, ref_new = Reference(older), Reference(newer)
+            if not (ref_old.usable and ref_new.usable):
+                return {"improved": [], "regressed": []}
+            corners_old = detect_corners(older.samples)
+            corners_new = detect_corners(newer.samples)
+            worse = build_lap_debrief(newer, ref_old, corners_old, lg).losses
+            better = build_lap_debrief(older, ref_new, corners_new, lg).losses
+        except Exception:  # noqa: BLE001 - a session view must not 500 on one bad lap
+            return {"improved": [], "regressed": []}
+
+        def _rows(losses, advice: bool):
+            # The message is only carried for the corners that went backwards.
+            # Reversing the comparison names what the *older* lap did wrong, so
+            # on an improvement it would print an instruction ("more throttle on
+            # exit") under the heading "you got faster here" — advice aimed at a
+            # lap you already stopped driving. The corner and the time are the
+            # honest half of that finding.
+            return [{"label": x.label, "gain_s": round(x.lost_ms / 1000, 3),
+                     **({"message": x.message} if advice else {})}
+                    for x in losses[:limit] if x.lost_ms >= _SESSION_MOVE_MS]
+
+        return {"improved": _rows(better, advice=False),
+                "regressed": _rows(worse, advice=True)}
+
+    @app.get("/api/sessions")
+    def sessions(
+        car: str = Query(...),
+        track: str = Query(...),
+        index: int = Query(0),               # 0 = the most recent run
+        lang: str | None = Query(None),
+    ) -> dict:
+        """The laps of one sitting, and what changed since the sitting before.
+
+        The rest of the app is lap-centric — pick two laps, compare them — which
+        is the right shape for studying a lap and the wrong one for the question
+        you have when you get up from the wheel.
+        """
+        lg = lang or current_language()
+        with _catalog() as cat:
+            rows = cat.laps_for(car, track)
+        runs = group_sessions(rows)
+        if not runs:
+            return {"sessions": [], "current": None}
+
+        index = max(0, min(index, len(runs) - 1))
+        cur = runs[index]
+        best = cur.best
+        temps = cur.road_temps
+        valid_ms = [l["lap_time_ms"] for l in cur.valid_laps]
+
+        prev = runs[index + 1] if index + 1 < len(runs) else None
+        prev_best = prev.best if prev else None
+        moves = {"improved": [], "regressed": []}
+        if best and prev_best:
+            moves = _corner_moves(best["path"], prev_best["path"], track, lg)
+
+        def _summary(s):
+            b = s.best
+            return {
+                "started_utc": s.started.isoformat() if s.started else None,
+                "laps": len(s.laps), "valid": len(s.valid_laps),
+                "best_ms": b["lap_time_ms"] if b else None,
+                "best": format_lap_time(b["lap_time_ms"]) if b else None,
+            }
+
+        return {
+            "sessions": [_summary(s) for s in runs],
+            "index": index,
+            "current": {
+                **_summary(cur),
+                "ended_utc": cur.ended.isoformat() if cur.ended else None,
+                "duration_s": round(cur.duration_s),
+                "best_path": best["path"] if best else None,
+                "road_temp_from": min(temps) if temps else None,
+                "road_temp_to": max(temps) if temps else None,
+                "consistency": lap_time_consistency(valid_ms),
+                # Every lap of the run, in the order driven — cut and invalid
+                # ones included. They can't set the numbers, but leaving them out
+                # would show a session you didn't have.
+                "laps_detail": [{
+                    "path": l["path"],
+                    "lap_time": format_lap_time(l["lap_time_ms"]),
+                    "lap_time_ms": l["lap_time_ms"],
+                    "valid": bool(l["valid"]),
+                    "off_track": _off_track(l),
+                    "is_best": bool(best and l["path"] == best["path"]),
+                } for l in cur.laps],
+                "previous": {
+                    "started_utc": prev.started.isoformat() if prev and prev.started else None,
+                    "best_ms": prev_best["lap_time_ms"] if prev_best else None,
+                    "delta_ms": (best["lap_time_ms"] - prev_best["lap_time_ms"])
+                                if best and prev_best else None,
+                    **moves,
+                } if prev else None,
+            },
         }
 
     @app.get("/api/sectors")

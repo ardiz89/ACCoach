@@ -544,3 +544,68 @@ body.no-data .empty { display: block; }
   .flow-nav { flex-wrap: wrap; }
   .flow-btn.ghost { margin-left: 0; order: 3; width: 100%; }
 }
+
+/* --- One run of laps, as it was driven ----------------------------------- */
+.session-shell { max-width: 900px; margin: 0 auto; padding: 8px 0 40px; }
+.session-head {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  gap: 16px; flex-wrap: wrap; margin-bottom: 18px;
+}
+.session-when {
+  margin: 0; font-family: var(--font-display); font-size: 24px; font-weight: 600;
+}
+.session-sub { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
+.session-pick { color: var(--muted); font-size: 12px; display: grid; gap: 4px; }
+
+/* The laps of the run, in the order driven. Bar length is the gap to the best,
+   so the shape of the list is the shape of the evening. */
+.session-laps { margin-bottom: 28px; }
+.session-laps h3, .session-changed h3 {
+  margin: 0 0 10px; font-family: var(--font-display); font-size: 12px;
+  letter-spacing: .1em; text-transform: uppercase; color: var(--muted);
+  font-weight: 600;
+}
+.ses-lap {
+  display: grid; grid-template-columns: 84px minmax(60px, 1fr) auto;
+  align-items: center; gap: 12px; width: 100%; text-align: left;
+  background: transparent; border: 0; border-radius: 7px;
+  padding: 7px 10px; cursor: pointer; color: var(--text);
+  font-family: var(--font-ui); font-size: 13px;
+}
+.ses-lap:hover { background: var(--panel); }
+.ses-lap .time { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.ses-lap.is-best .time { color: var(--green); }
+.ses-lap .bar { display: block; height: 8px; background: var(--inset);
+                border-radius: 4px; overflow: hidden; }
+.ses-lap .bar i { display: block; height: 100%; background: var(--line); }
+.ses-lap.is-best .bar i { background: var(--green); }
+.ses-lap .tags { display: flex; gap: 6px; }
+.ses-lap .tag {
+  font-size: 10px; letter-spacing: .06em; text-transform: uppercase;
+  border: 1px solid var(--line); border-radius: 999px; padding: 2px 8px;
+  color: var(--muted); white-space: nowrap;
+}
+.ses-lap .tag.best { color: var(--green); border-color: var(--green); }
+.ses-lap .tag.out, .ses-lap .tag.cut { color: var(--amber); border-color: var(--amber); }
+
+.session-changed h4 {
+  margin: 16px 0 8px; font-size: 13px; font-weight: 600; color: var(--text);
+}
+.move {
+  display: grid; grid-template-columns: 180px 72px 1fr; gap: 12px;
+  align-items: baseline; padding: 6px 10px; border-radius: 6px;
+}
+.move + .move { border-top: 1px solid var(--line); }
+.move .corner { font-weight: 600; }
+.move .amount { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.move.up .amount { color: var(--green); }
+.move.down .amount { color: var(--red); }
+.move .why { color: var(--muted); font-size: 13px; }
+.session-changed .empty, .session-shell .empty { color: var(--muted); padding: 4px 0; }
+
+@media (max-width: 700px) {
+  .ses-lap { grid-template-columns: 76px 1fr; }
+  .ses-lap .tags { grid-column: 1 / -1; }
+  .move { grid-template-columns: 1fr auto; }
+  .move .why { grid-column: 1 / -1; }
+}
