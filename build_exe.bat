@@ -8,6 +8,7 @@ python -m PyInstaller --noconfirm --windowed --name HONE ^
   --add-data "src/accoach/web;accoach/web" ^
   --add-data "src/accoach/voice_cues;accoach/voice_cues" ^
   --add-data "GUIDA.md;." ^
+  --add-data "docs/FAQ.md;docs" ^
   --collect-submodules uvicorn ^
   --hidden-import pyttsx3.drivers ^
   --hidden-import pyttsx3.drivers.sapi5 ^

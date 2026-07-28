@@ -234,22 +234,37 @@ i giri salvati: il gioco non deve essere aperto.
 
 ## 7. Tutti i comandi
 
-`python -m accoach <comando>` (o i corrispettivi `run_*.py`):
+Da un terminale: `python -m accoach <comando>` (da sorgente, `python
+accoach_main.py <comando>`).
+
+**Per guidare bastano tre comandi**, ed è quello che vedi digitando
+`python -m accoach help`:
 
 | Comando | A cosa serve |
 |---|---|
-| `live [--silent]` | **Coach vocale + overlay** in un processo (uso normale) |
-| `coach [--silent]` | Coach vocale nel terminale (senza overlay) |
-| `launcher` | La finestra con i pulsanti |
-| `web [--demo]` | App di analisi nel browser |
-| `server [--demo]` | Backend headless (overlay/più schermi come client) |
-| `overlay [--interactive]` | Solo l'overlay (si collega al server) |
-| `debrief [auto] [pista]` | Debrief testuale post-sessione |
+| `live [--silent]` | **Coach vocale + overlay** in un processo — l'uso normale |
+| `web [--demo]` | App di analisi nel browser (giri salvati, report, guida) |
+| `launcher` | L'hub: la finestra con tutte le sezioni |
+
+Il resto sono strumenti — sviluppo, validazione in pista, secondo schermo. Non
+servono per guidare e stanno apposta fuori dalla prima schermata; l'elenco
+completo e sempre aggiornato è:
+
+```
+python -m accoach help --all
+```
+
+Quelli che potresti volere davvero:
+
+| Comando | A cosa serve |
+|---|---|
+| `debrief [auto] [pista]` | Debrief testuale post-sessione (il gioco può essere chiuso) |
+| `coach [--silent]` | Coach vocale nel terminale, senza overlay |
+| `recorder` | Registra solo i giri, niente coaching |
 | `monitor` | Cruscotto della telemetria grezza |
-| `recorder` | Registra solo i giri (niente coaching) |
-| `compare` | Cruscotto del delta live |
-| `verify-g` | Verifica gli assi delle forze G col gioco |
-| `selftest` | Controlla che la voce/TTS funzioni |
+| `setup show <file>` | Legge un setup ACC senza avviare il gioco |
+| `selftest` | Controlla che la voce/TTS funzioni, e scrive un report |
+| `logs` | Apre la cartella di log e crash report |
 
 ---
 
