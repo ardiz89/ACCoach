@@ -37,14 +37,36 @@
   </header>
 
   <nav class="tabs">
-    <button class="tab active" data-view="compare" data-i18n="tab.compare">Compare</button>
+    <button class="tab active" data-view="flow" data-i18n="tab.flow">Lap explained</button>
+    <button class="tab" data-view="compare" data-i18n="tab.compare">Compare</button>
     <button class="tab" data-view="map" data-i18n="tab.map">Map</button>
     <button class="tab" data-view="sectors" data-i18n="tab.sectors">Sectors</button>
     <button class="tab" data-view="dynamics" data-i18n="tab.dynamics">Dynamics</button>
     <button class="tab" data-view="progress" data-i18n="tab.trends">Trends</button>
   </nav>
 
-  <div id="view-compare">
+  <!-- The lap explained one step at a time. Same findings as the debrief below,
+       edited server-side into what to look at first (see coaching/flow.py). -->
+  <div id="view-flow">
+    <div class="flow-shell">
+      <header class="flow-head">
+        <span id="flow-count" class="flow-count"></span>
+        <span id="flow-dots" class="flow-dots"></span>
+      </header>
+      <article id="flow-card" class="flow-card"></article>
+      <div class="chart flow-chart">
+        <h3 id="flow-chart-title"></h3>
+        <canvas id="c-flow"></canvas>
+      </div>
+      <nav class="flow-nav">
+        <button id="flow-prev" type="button" class="flow-btn" data-i18n="flow.prev">← Back</button>
+        <button id="flow-whole" type="button" class="flow-btn ghost" data-i18n="flow.whole">Show the whole chart</button>
+        <button id="flow-next" type="button" class="flow-btn primary" data-i18n="flow.next">Next →</button>
+      </nav>
+    </div>
+  </div>
+
+  <div id="view-compare" class="hidden">
     <section id="summary" class="summary"></section>
 
     <div id="readout" class="readout" data-i18n="readout.hint">Hover over the charts for point-by-point values…</div>

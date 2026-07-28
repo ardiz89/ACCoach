@@ -21,6 +21,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .coaching import (
     benchmark_levels,
+    build_flow,
     build_lap_debrief,
     classify_losses,
     lap_time_consistency,
@@ -486,6 +487,17 @@ def create_api(
                 "lost_s": round(n.lost_ms / 1000, 3),
                 "pos": round(n.pos, 4), "where": n.where,
             } for n in debrief.notes],
+            # The same findings, edited into a short sequence: what to look at
+            # first, with the chart that shows it and the stretch to zoom to.
+            # Built server-side next to the diagnosis so the rules about what to
+            # drop are testable, instead of living in the view layer.
+            "flow": [{
+                "kind": s.kind, "title": s.title, "body": s.body,
+                "detail": s.detail, "fix": s.fix,
+                "lost_s": round(s.lost_ms / 1000, 3), "where": s.where,
+                "chart": s.chart,
+                "from": round(s.from_pos, 4), "to": round(s.to_pos, 4),
+            } for s in build_flow(debrief, lg)],
             "consistency": consistency,
             "laps": [{
                 "path": r["path"], "lap_time": format_lap_time(r["lap_time_ms"]),

@@ -15,6 +15,7 @@ from .debrief import (
     lap_time_consistency,
 )
 from .events import EventDetector
+from .flow import FlowStep, build_flow
 from .focus import Focus, FocusCoach, FocusKind, FocusReport, format_focus
 from .fuel import FuelEngineer
 from .gears import GearDetector
@@ -38,6 +39,8 @@ __all__ = [
     "build_lap_debrief",
     "format_debrief",
     "lap_time_consistency",
+    "FlowStep",
+    "build_flow",
     "Focus",
     "FocusCoach",
     "FocusKind",

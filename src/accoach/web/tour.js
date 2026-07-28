@@ -102,11 +102,17 @@
     var L = labelsFor(labels);
 
     // Steps that actually have a visible target right now (defensive skip).
+    // A step may declare a `before()` that puts its target on screen — switching
+    // to the tab the target lives on, typically. Such a step counts as showable
+    // even while hidden: the alternative is what used to happen when the
+    // analysis page grew a new first tab, which is that five of the eight steps
+    // silently vanished and the tour still reported "1/3" as if that were the
+    // whole thing. `render` runs the hook and re-checks before pointing at it.
     function showable() {
       var out = [];
       for (var i = 0; i < steps.length; i++) {
         var el = elFor(steps[i]);
-        if (el && visible(el)) out.push(i);
+        if (steps[i].before || (el && visible(el))) out.push(i);
       }
       return out;
     }
@@ -170,8 +176,9 @@
       if (list.indexOf(cursor) === -1) cursor = list[0];
       var pos = list.indexOf(cursor);
       var step = steps[cursor];
+      if (typeof step.before === "function") { try { step.before(); } catch (e) {} }
       var el = elFor(step);
-      if (!el) { finish(); return; }
+      if (!el || !visible(el)) { finish(); return; }
 
       var last = pos === list.length - 1;
       card.innerHTML = "";

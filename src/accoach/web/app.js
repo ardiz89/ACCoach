@@ -10,7 +10,7 @@ let CURRENT = null;   // current combo {car, track}
 let DATA = null;      // last /api/analysis payload
 let COMBOS = [];      // last /api/combos payload (kept for re-labelling on lang switch)
 let LAST_HOVER = null; // last hover position, so a re-render keeps the readout
-let VIEW = "compare"; // "compare" | "progress"
+let VIEW = "flow";    // whichever tab is `active` in index.html
 let HOVER_WIRED = false;
 let MAP_HIT = null;   // {rv, X, Y} screen transform captured by drawMap, for map hover
 let MINI_HIT = null;  // same, for the Compare-view mini map
@@ -52,8 +52,9 @@ function setPanelLoading(id, msg) {
 }
 
 async function getJSON(url) {
-  // Pass the active language so backend-generated content arrives localised
-  // (the backend ignores &lang until it handles it — harmless today).
+  // Pass the active language so backend-generated content arrives localised:
+  // the debrief, the corner names and the guided flow are all written server
+  // side. A language switch therefore has to re-request, not just repaint.
   const u = url + (url.indexOf("?") === -1 ? "?" : "&") + "lang=" + encodeURIComponent(LANG());
   const r = await fetch(u);
   if (!r.ok) throw new Error(await r.text());
@@ -77,6 +78,7 @@ async function init() {
   $("exp-csv").onclick = () => exportData("csv");
   $("exp-json").onclick = () => exportData("json");
   wireTabs();
+  wireFlow();
   await loadCombo(JSON.parse(sel.value));
   // First visit: pop the tour once data is on screen (so #vmin/#debrief exist).
   if (window.HoneTour) window.HoneTour.auto(tourSteps(), "hone_tour_analysis");
@@ -102,13 +104,20 @@ function fillCombos() {
 // in index.html; missing/hidden ones are skipped by the tour engine.
 // Built lazily so each step's text follows the active language at start time.
 function tourSteps() {
+  // `before` puts the step's target on screen. Most of these live in the
+  // Compare view, which stopped being the landing tab when the guided flow
+  // arrived — without the hook the tour would quietly shrink to the three
+  // steps that happened to still be visible.
+  const flow = () => showView("flow");
+  const compare = () => showView("compare");
   return [
     { sel: "#combo", title: t("tour.a1.t"), text: t("tour.a1.x") },
     { sel: ".tabs", title: t("tour.a2.t"), text: t("tour.a2.x") },
-    { sel: "#c-delta", title: t("tour.a3.t"), text: t("tour.a3.x") },
-    { sel: "#vmin", title: t("tour.a4.t"), text: t("tour.a4.x") },
-    { sel: "#debrief", title: t("tour.a5.t"), text: t("tour.a5.x") },
-    { sel: "#debrief", title: t("tour.a7.t"), text: t("tour.a7.x") },
+    { sel: "#flow-card", title: t("tour.a9.t"), text: t("tour.a9.x"), before: flow },
+    { sel: "#c-delta", title: t("tour.a3.t"), text: t("tour.a3.x"), before: compare },
+    { sel: "#vmin", title: t("tour.a4.t"), text: t("tour.a4.x"), before: compare },
+    { sel: "#debrief", title: t("tour.a5.t"), text: t("tour.a5.x"), before: compare },
+    { sel: "#debrief", title: t("tour.a7.t"), text: t("tour.a7.x"), before: compare },
     { sel: "#combo", title: t("tour.a8.t"), text: t("tour.a8.x") },
     { sel: ".export", title: t("tour.a6.t"), text: t("tour.a6.x") },
   ];
@@ -129,6 +138,7 @@ function redrawCurrentView() {
   else if (VIEW === "dynamics") { if (DATA) drawDynamics(LAST_HOVER); }
   else if (VIEW === "sectors") { if (CURRENT) loadSectors(); }
   else if (VIEW === "progress") { if (CURRENT) loadProgress(CURRENT); }
+  else if (VIEW === "flow") { if (DATA) renderFlow(DATA); }
   else if (DATA) redraw(LAST_HOVER);   // compare
 }
 
@@ -158,21 +168,25 @@ function wireCbToggle() {
   help.parentNode.insertBefore(btn, help.nextSibling);
 }
 
+// Switch to a view by name, as if its tab had been clicked. Used by the tabs
+// themselves and by the "show me the whole chart" button in the guided flow.
+function showView(name) {
+  VIEW = name;
+  for (const x of document.querySelectorAll(".tab")) {
+    x.classList.toggle("active", x.dataset.view === name);
+  }
+  // Derived from the DOM, not from a hand-written list: adding a view used to
+  // mean remembering it in three places, and forgetting one leaves two panels
+  // stacked on top of each other.
+  for (const p of document.querySelectorAll("[id^='view-']")) {
+    p.classList.toggle("hidden", p.id !== "view-" + name);
+  }
+  redrawCurrentView();
+}
+
 function wireTabs() {
   for (const b of document.querySelectorAll(".tab")) {
-    b.onclick = () => {
-      for (const x of document.querySelectorAll(".tab")) x.classList.toggle("active", x === b);
-      VIEW = b.dataset.view;
-      $("view-compare").classList.toggle("hidden", VIEW !== "compare");
-      $("view-map").classList.toggle("hidden", VIEW !== "map");
-      $("view-sectors").classList.toggle("hidden", VIEW !== "sectors");
-      $("view-dynamics").classList.toggle("hidden", VIEW !== "dynamics");
-      $("view-progress").classList.toggle("hidden", VIEW !== "progress");
-      if (VIEW === "progress" && CURRENT) loadProgress(CURRENT);
-      if (VIEW === "map" && DATA) drawMap(DATA, null);
-      if (VIEW === "dynamics" && DATA) drawDynamics(null);
-      if (VIEW === "sectors" && CURRENT) loadSectors();
-    };
+    b.onclick = () => showView(b.dataset.view);
   }
 }
 
@@ -717,11 +731,13 @@ async function loadCombo(combo, lapPath, baselinePath) {
     return;
   }
   DATA = a;
+  FLOW_STEP = 0;          // a new lap is a new explanation, from the top
   fillLaps(a);
   drawSummary(a);
   drawCornerSpeeds(a);
   drawWaterfall(a);
   drawDebrief(a);
+  renderFlow(a);
   redraw(null);
   if (VIEW === "map") { $("map-readout").innerHTML = MAP_READOUT_DEFAULT(); drawMap(a, null); }
   if (VIEW === "dynamics") drawDynamics(null);
@@ -928,6 +944,157 @@ function drawDebrief(a) {
       `</div>`;
   }
   el.innerHTML = html;
+}
+
+// --- the lap explained, one step at a time --------------------------------
+// The findings and their order are decided server-side in coaching/flow.py —
+// what to say first and what to leave out is a rule about the driver's
+// attention, and rules like that belong where they can be tested. Everything
+// below is presentation: the card, the step you're on, and a chart cropped to
+// the stretch of lap the step is talking about.
+
+let FLOW_STEP = 0;
+
+function tf(key, vals) {
+  let s = t(key);
+  for (const k in vals) s = s.split("{" + k + "}").join(vals[k]);
+  return s;
+}
+
+function flowSteps() {
+  return (DATA && DATA.flow) || [];
+}
+
+function renderFlow(a) {
+  const steps = a.flow || [];
+  const card = $("flow-card");
+  if (!card) return;
+  if (!steps.length) {
+    card.innerHTML = `<p class="flow-empty">${t("flow.empty")}</p>`;
+    $("flow-count").textContent = "";
+    $("flow-dots").innerHTML = "";
+    return;
+  }
+  FLOW_STEP = Math.max(0, Math.min(FLOW_STEP, steps.length - 1));
+  const s = steps[FLOW_STEP];
+
+  $("flow-count").textContent = tf("flow.step",
+    { n: FLOW_STEP + 1, total: steps.length });
+  $("flow-dots").innerHTML = steps.map((_, i) =>
+    `<span class="dot${i === FLOW_STEP ? " on" : ""}"></span>`).join("");
+
+  // The cost line is phrased as a superlative only on the first step — it is
+  // the biggest thing only once, and repeating the claim would make it false.
+  const cost = s.lost_s > 0
+    ? `<p class="flow-cost">${tf(FLOW_STEP === 0 ? "flow.cost" : "flow.cost_more",
+                                { s: s.lost_s.toFixed(2) })}</p>`
+    : "";
+  card.innerHTML =
+    (s.where ? `<span class="flow-where">${s.where}</span>` : "") +
+    cost +
+    `<h2 class="flow-title">${s.title}</h2>` +
+    (s.body ? `<p class="flow-body">${s.body}</p>` : "") +
+    (s.detail ? `<p class="flow-detail">${s.detail}</p>` : "") +
+    (s.fix ? `<div class="flow-fix"><span class="tag">${t("flow.fix")}</span>${s.fix}</div>` : "");
+
+  const hasChart = s.kind !== "clean";
+  const wrap = $("c-flow").parentNode;
+  wrap.classList.toggle("hidden", !hasChart);
+  $("flow-chart-title").textContent = hasChart ? t("flow.chart." + s.chart) : "";
+  if (hasChart) drawFlowChart(a, s);
+
+  $("flow-prev").disabled = FLOW_STEP === 0;
+  $("flow-next").disabled = FLOW_STEP >= steps.length - 1;
+}
+
+function wireFlow() {
+  const step = (d) => { FLOW_STEP += d; if (DATA) renderFlow(DATA); };
+  $("flow-prev").onclick = () => step(-1);
+  $("flow-next").onclick = () => step(+1);
+  $("flow-whole").onclick = () => showView("compare");
+}
+
+// A chart cropped to one stretch of lap. Deliberately its own drawing path
+// rather than a `window` parameter threaded through the shared primitives:
+// those are used by five other charts that all draw the whole lap, and adding
+// an option to each of them to serve one caller is how they stop being simple.
+function drawFlowChart(a, step) {
+  const cv = $("c-flow");
+  if (!cv) return;
+  const { ctx, w, h } = setup(cv);
+  const lo = step.from, hi = step.to;
+  const span = (hi - lo) || 1;
+  const X = (p) => ((p - lo) / span) * w;
+
+  // The corners inside the window, so the stretch is placeable on the track.
+  // The label degrades with the room available — full name, then "T7", then
+  // nothing. Real corner names are long ("Variante della Roggia") and on a wide
+  // window they overlap into an unreadable smear, which is worse than a band
+  // with no caption.
+  ctx.font = "10px Segoe UI";
+  for (const c of a.corners) {
+    if (c.exit < lo || c.entry > hi) continue;
+    const x0 = X(c.entry), band = X(c.exit) - x0;
+    ctx.fillStyle = "rgba(120,140,170,0.10)";
+    ctx.fillRect(x0, 0, band, h);
+
+    const full = c.name || "T" + (c.index + 1);
+    const short = "T" + (c.index + 1);
+    const label = ctx.measureText(full).width + 6 <= band ? full
+                : ctx.measureText(short).width + 4 <= band ? short : null;
+    if (label) {
+      ctx.fillStyle = "rgba(255,255,255,0.45)";
+      ctx.fillText(label, x0 + (band - ctx.measureText(label).width) / 2, 11);
+    }
+  }
+
+  const win = (pos, vals) => {
+    const p = [], v = [];
+    for (let i = 0; i < pos.length; i++) {
+      if (pos[i] >= lo && pos[i] <= hi) { p.push(pos[i]); v.push(vals[i]); }
+    }
+    return { p, v };
+  };
+  const trace = (pos, vals, min, max, color, lw, dash) => {
+    const { p, v } = win(pos, vals);
+    if (p.length < 2) return;
+    ctx.save();
+    if (dash) { ctx.setLineDash(dash); ctx.globalAlpha = 0.65; }
+    ctx.beginPath();
+    const range = (max - min) || 1;
+    for (let i = 0; i < p.length; i++) {
+      const x = X(p[i]), y = h - ((v[i] - min) / range) * h;
+      i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+    }
+    ctx.strokeStyle = color; ctx.lineWidth = lw; ctx.stroke();
+    ctx.restore();
+  };
+
+  const rv = a.review.channels, rf = a.reference.channels;
+  if (step.chart === "speed") {
+    let min = Infinity, max = -Infinity;
+    for (const src of [win(rv.pos, rv.speed).v, win(rf.pos, rf.speed).v]) {
+      for (const x of src) { min = Math.min(min, x); max = Math.max(max, x); }
+    }
+    if (!isFinite(min)) return;
+    min = Math.floor(min - 5); max = Math.ceil(max + 5);
+    trace(rf.pos, rf.speed, min, max, "#3fd0e0", 1.5);
+    trace(rv.pos, rv.speed, min, max, "#ffffff", 2);
+    axisLabel(ctx, w, max + " km/h", min + " km/h");
+  } else if (step.chart === "inputs") {
+    trace(rf.pos, rf.throttle, 0, 1, "#1d8f43", 1, [4, 3]);
+    trace(rf.pos, rf.brake, 0, 1, "#9e2a22", 1, [4, 3]);
+    trace(rv.pos, rv.throttle, 0, 1, "#22dd66", 2);
+    trace(rv.pos, rv.brake, 0, 1, "#ff3b30", 2);
+  } else {
+    const d = a.review.delta;
+    let m = 0.05;
+    for (const x of win(d.pos, d.delta_s).v) m = Math.max(m, Math.abs(x));
+    ctx.strokeStyle = "rgba(255,255,255,0.25)";
+    ctx.beginPath(); ctx.moveTo(0, h / 2); ctx.lineTo(w, h / 2); ctx.stroke();
+    trace(d.pos, d.delta_s, -m, m, "#ffffff", 2);
+    axisLabel(ctx, w, `+${m.toFixed(2)}s`, `-${m.toFixed(2)}s`);
+  }
 }
 
 // --- canvas drawing -------------------------------------------------------
@@ -1546,24 +1713,13 @@ window.HoneI18nRerender = function () {
     cb.setAttribute("aria-label", window.HoneI18n.t("cb.label"));
   }
   fillCombos();
-  if (DATA) fillLaps(DATA, true);
-  if (VIEW === "compare") {
-    if (DATA) {
-      drawSummary(DATA);
-      drawCornerSpeeds(DATA);
-      drawWaterfall(DATA);
-      drawDebrief(DATA);
-      redraw(LAST_HOVER);
-    }
-  } else if (VIEW === "map") {
-    if (DATA) { $("map-readout").innerHTML = MAP_READOUT_DEFAULT(); drawMap(DATA, null); }
-  } else if (VIEW === "dynamics") {
-    if (DATA) drawDynamics(LAST_HOVER);
-  } else if (VIEW === "sectors") {
-    if (CURRENT) loadSectors();
-  } else if (VIEW === "progress") {
-    if (CURRENT) loadProgress(CURRENT);
-  }
+  // Re-FETCH, not just re-draw. The debrief, the corner names, the lap-wide
+  // notes and every word of the guided flow are written by the backend in the
+  // language the request asked for, so repainting the cached payload leaves all
+  // of it in the language you just left. Only the chrome was ever translated
+  // here, and the comment at `getJSON` claiming the backend ignores `&lang` has
+  // been wrong since the debrief learned to speak Italian.
+  if (CURRENT) reloadSelection();
 };
 
 wireTour();
