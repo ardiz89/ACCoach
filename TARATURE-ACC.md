@@ -66,9 +66,24 @@ Nessuna di queste è una soglia: sono i campi da cui tutto il resto legge. Se un
 
 ### 0.1 Livelli aiuti — `verify-aids` ⚠️ **mai eseguito su ACC**
 - **Perché**: `TC`, `TCCut`, `EngineMap`, `ABS` stanno nella coda della struct
-  graphics (`structs.py`, offset 1252-1280) e **gli offset non sono confermati**.
-  Se leggiamo byte sbagliati, l'ingegnere consiglia manopole a vuoto e il giro
-  registra un setup che non è quello guidato (schema v9).
+  graphics (`structs.py`, offset 1268-1280). Se leggiamo byte sbagliati,
+  l'ingegnere consiglia manopole a vuoto e il giro registra un setup che non è
+  quello guidato (schema v9).
+- **Aggiornamento 2026-07-28 — il rischio è sceso, da tavolino.** Espandendo la
+  coda documentata di ACC campo per campo, `isValidLap` cade **esattamente sul
+  1408 misurato in pista**. Quel numero è la somma di tutto ciò che sta sopra:
+  se uno solo dei campi fosse mancante, di troppo o di dimensione sbagliata — i
+  tre di riempimento prima di `TC` compresi — il totale non tornerebbe. Quindi
+  **gli offset sono corroborati aritmeticamente**; resta da vedere in pista solo
+  la *semantica* (che i numeri seguano il HUD), che è un controllo da 30 secondi,
+  non una misura da reverse engineering. L'aritmetica è bloccata in
+  `tests/test_lap_valid_acc.py`.
+- **Un controllo gratis, già che ci sei**: la coda documentata chiamerebbe
+  `iSplit` l'intero a 1404, che noi chiamiamo `iEstimatedLapTime`. Non lo
+  leggiamo mai come dato, quindi nessun comportamento distingue i due nomi, e il
+  valore misurato a Monza (142 427 ms, scala giro e non settore) dà ragione al
+  nostro. Se durante 0.4 stampi anche 1396 e 1404, la questione si chiude senza
+  costare un metro di pista.
 - **Guida**: fermo ai box o in pista tranquilla, **ruota le manopole**: TC di due
   tacche, ABS di due, mappa motore di una. Dimmi i valori a HUD mentre lo fai.
 - **Comando**: `python -m accoach verify-aids`

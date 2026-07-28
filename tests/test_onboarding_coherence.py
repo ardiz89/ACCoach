@@ -64,6 +64,37 @@ def test_the_guide_calls_the_product_by_its_name():
     assert not stray, f"nome vecchio rimasto: {stray}"
 
 
+def _guide_commands() -> set[str]:
+    """I comandi che la guida elenca nelle sue tabelle, senza gli argomenti."""
+    rows = re.findall(r"^\|\s*`([a-z-]+)[^`]*`\s*\|", _GUIDA, re.M)
+    return set(rows)
+
+
+def test_the_guide_does_not_send_you_to_deleted_wrappers():
+    """I dodici `run_*.py` sono spariti coi tagli del 27/07, e la guida li
+    offriva ancora come alternativa a ogni comando. Un'istruzione che fallisce
+    con «file non trovato» è peggio di un'istruzione mancante."""
+    assert "run_*.py" not in _GUIDA
+    stray = re.findall(r"`run_[a-z_]+\.py`", _GUIDA)
+    assert not stray, f"wrapper cancellati citati nella guida: {stray}"
+
+
+def test_every_command_the_guide_names_still_exists():
+    """La tabella dei comandi non ha modo di accorgersi di un comando rinominato.
+
+    Il confronto è con i due testi di aiuto della CLI, che a loro volta un test
+    tiene allineati a ciò che il dispatcher accetta davvero
+    (``tests/test_cli.py``): così la catena guida → aiuto → dispatcher si chiude.
+    """
+    import accoach.__main__ as cli
+
+    documented = cli._HELP + cli._HELP_TOOLS
+    commands = _guide_commands()
+    assert commands, "nessun comando trovato nelle tabelle della guida"
+    for cmd in commands:
+        assert re.search(rf"^  {re.escape(cmd)}\b", documented, re.M), cmd
+
+
 def test_the_faq_points_at_the_button_not_only_the_command():
     """Il bottone di import è arrivato e la FAQ mandava ancora al terminale."""
     assert "Import a PRO reference lap" in _FAQ

@@ -22,6 +22,7 @@
     // shared chrome
     "lang.label":      { en: `Language`, it: `Lingua` },
     "tour.help":       { en: `Guided tour`, it: `Visita guidata` },
+    "nav.guide":       { en: `Guide`, it: `Guida` },
     // Buttons of the coachmark overlay itself (tour.js reads these directly).
     "tour.btn.skip":   { en: `Skip`, it: `Salta` },
     "tour.btn.back":   { en: `Back`, it: `Indietro` },

@@ -797,6 +797,27 @@ def create_api(
         """The race-engineer setup page (live diagnosis + setup editor)."""
         return _serve("engineer.html")
 
+    @app.get("/guida")
+    @app.get("/guide")
+    def guide_page(lang: str | None = None) -> Response:
+        """The user guide, rendered from the Markdown we ship.
+
+        Two paths because the guide has two names depending on which language
+        you're in, and a link that works only in Italian is the bug this page
+        replaces — the "Guide" button used to open the Italian file in Notepad
+        whatever you had chosen.
+        """
+        from .guide import render_guide
+
+        try:
+            return Response(content=render_guide(lang), media_type="text/html")
+        except FileNotFoundError:
+            # A build that lost the .md should say so, not serve a blank page.
+            return Response(
+                content="<h1>Guida non disponibile</h1><p>Il documento non è "
+                        "incluso in questa installazione.</p>",
+                media_type="text/html", status_code=404)
+
     @app.get("/test")
     def test_page() -> Response:
         """The on-track test checklist — tablet-first, reads the live feed and

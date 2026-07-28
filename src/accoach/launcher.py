@@ -17,6 +17,7 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
+import webbrowser
 from functools import partial
 from pathlib import Path
 
@@ -152,36 +153,37 @@ class GettingStarted(QDialog):
 
 
 def _guide_path() -> Path:
-    """The user guide, in the language the app is set to.
+    """The user guide document, in the language the app is set to.
 
-    Two documents, one per language: ``GUIDA.md`` (Italian) and ``docs/FAQ.md``
-    (English). Before this the app opened the Italian one whatever you had
-    chosen, so an English session's "Guide" button answered in Italian.
-
-    Falls back to the other document rather than to nothing: a guide in the wrong
-    language still beats a button that appears to do nothing.
+    One implementation, in :mod:`accoach.guide`, because the web page and this
+    fallback have to agree on which file they mean — and because getting the
+    frozen-vs-source lookup right twice is getting it wrong once.
     """
-    from .i18n import current_language
+    from .guide import guide_source
 
-    names = (["GUIDA.md", "docs/FAQ.md"] if current_language() == "it"
-             else ["docs/FAQ.md", "GUIDA.md"])
-    roots = []
-    if getattr(sys, "frozen", False):
-        base = getattr(sys, "_MEIPASS", None)
-        if base:
-            roots.append(Path(base))
-        roots.append(Path(sys.executable).parent)
-    else:
-        roots.append(_SRC.parent)
-    candidates = [root / name for name in names for root in roots]
-    for c in candidates:
-        if c.is_file():
-            return c
-    return candidates[0]
+    return guide_source()
 
 
 def _open_guide() -> None:
-    """Open the user guide in Notepad (plain, predictable — not the .md handler)."""
+    """Open the user guide as a web page.
+
+    It used to open in Notepad — "plain, predictable", and unreadable: a
+    284-line document whose tables are drawn in pipe characters and whose
+    headings are hash marks, wrapped by a program with no idea what either is.
+    The Markdown is still the source; what opens is that Markdown rendered.
+
+    A standalone copy on disk rather than a URL, because this button can be
+    pressed with nothing else running and starting a web server to read a
+    document would be a strange thing to do. Falls back to handing the raw file
+    to the OS: a guide in Notepad still beats a button that does nothing.
+    """
+    try:
+        from .guide import write_offline_copy
+        webbrowser.open(write_offline_copy().as_uri())
+        return
+    except Exception as exc:  # pragma: no cover - best-effort
+        print(f"Cannot render the guide ({exc}); opening the source instead.")
+
     path = _guide_path()
     try:
         if sys.platform == "win32":
