@@ -139,3 +139,44 @@ def test_a_language_switch_refetches_rather_than_repainting():
     block = _APPJS.split("window.HoneI18nRerender")[1]
     assert "reloadSelection()" in block
     assert "drawDebrief(DATA)" not in block
+
+
+# --- the page must not scroll sideways on a phone --------------------------
+# Measured in a 390px-wide frame against the real page, per view. Both rules
+# below fixed a page that scrolled horizontally; a static check can only pin
+# that the rule is still there, which is the half that regresses silently.
+
+_CSS = (WEB / "style.css").read_text(encoding="utf-8")
+
+
+def _rule(selector: str) -> str:
+    """The body of the first CSS rule whose selector line contains `selector`."""
+    i = _CSS.index(selector)
+    return _CSS[i:_CSS.index("}", i)]
+
+
+def test_the_header_row_wraps():
+    """It keeps growing — logo, name, the tour "?", the language picker, the
+    colour-blind toggle, the guide link. Unwrapped it measured 404px inside a
+    390px phone and took the whole page sideways with it."""
+    assert "flex-wrap: wrap" in _rule(".brand {")
+
+
+def test_the_consistency_rows_stack_on_a_narrow_screen():
+    """Their third column is `auto` + `white-space: nowrap`, so it cannot shrink:
+    39px of horizontal scroll on Trends, 17 on Compare. Reading the report on a
+    tablet next to the wheel is a documented use of this app."""
+    assert "@media (max-width: 700px)" in _CSS
+    narrow = _CSS[_CSS.index(".cons-nums {"):]
+    block = narrow[:narrow.index("\n.recur")] if "\n.recur" in narrow else narrow
+    assert ".cons-row { grid-template-columns: 1fr auto; }" in block
+    assert "white-space: normal" in block
+
+
+@pytest.mark.parametrize("view", ("flow", "session"))
+def test_the_new_views_declare_a_narrow_layout(view):
+    """Both were built two-column-ish; neither was checked on a phone until the
+    page was measured in a 390px frame."""
+    marker = {"flow": ".flow-btn.ghost", "session": ".ses-lap"}[view]
+    tail = _CSS[_CSS.index("@media (max-width: 700px)"):]
+    assert marker in tail, f"no narrow-screen rule for the {view} view"

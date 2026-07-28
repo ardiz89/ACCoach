@@ -89,7 +89,10 @@ header {
 h1 { margin: 0; font-size: 20px; font-family: var(--font-display); font-weight: 600; letter-spacing: .01em; }
 h1 span { color: var(--muted); font-weight: 400; }
 
-.brand { display: flex; align-items: center; gap: 10px; }
+/* Wraps because this row keeps growing: logo, name, the tour "?", the language
+   picker, the colour-blind toggle and the guide link. Unwrapped it measured
+   404px inside a 390px phone, and the whole page scrolled sideways to fit it. */
+.brand { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .brand svg { display: block; flex: none; }
 .brand .name { font-family: var(--font-display); }
 
@@ -228,6 +231,15 @@ main { padding: 16px 24px; display: grid; gap: 18px; }
   background: linear-gradient(90deg, var(--green), var(--amber) 60%, var(--red)); }
 .cons-nums { font-family: var(--font-mono); font-size: 12px; color: var(--muted); white-space: nowrap; }
 .cons-nums b { color: var(--fg); }
+/* On a phone the third column can't shrink (`auto` + `nowrap`) and pushed the
+   whole page sideways — 39px of horizontal scroll on Trends, 17 on Compare.
+   Reading the report on a tablet next to the wheel is a documented use of this
+   app, so the row stacks instead: name and figures on one line, bar under it. */
+@media (max-width: 700px) {
+  .cons-row { grid-template-columns: 1fr auto; }
+  .cons-row .cons-track { grid-column: 1 / -1; }
+  .cons-nums { white-space: normal; text-align: right; }
+}
 
 .recur {
   display: flex; align-items: center; gap: 14px;
