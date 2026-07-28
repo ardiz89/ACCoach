@@ -194,3 +194,39 @@ def test_upsert_is_idempotent(tmp_path):
         assert cat.upsert(path) is True
         assert cat.upsert(path) is True       # ON CONFLICT update, no duplicate
         assert cat.count() == 1
+
+
+def test_a_lap_with_trailing_garbage_is_still_indexed(tmp_path):
+    """It used to be readable by every analysis path and invisible here.
+
+    ``load_lap`` salvages a file with junk after the gzip member (it warns and
+    reads the first one); the catalogue used a plain ``gzip.open`` and returned
+    "unreadable", so the lap appeared in no list, no session, and could never be
+    elected as a reference — with nothing said. Found on a real lap in
+    ``~/Documents/ACCoach/laps``: a 1:50.460 at Imola, on disk since 18 July and
+    indexed by nothing.
+    """
+    save_lap(synth.build_lap(n=10), tmp_path)
+    path = list_lap_files(tmp_path)[0]
+    with path.open("ab") as fh:
+        fh.write(b"\x00" * 79)                # what the real file had after it
+
+    from accoach.recording import load_lap
+    assert load_lap(path).lap_time_ms > 0     # the analysis path was always fine
+    with LapCatalog(_catalog_path(tmp_path)) as cat:
+        assert cat.upsert(path) is True
+        assert cat.count() == 1
+
+
+def test_a_file_that_is_not_a_lap_at_all_is_still_refused(tmp_path):
+    """Salvaging trailing junk must not turn into accepting anything.
+
+    Written under a name that was never indexed: overwriting a saved lap would
+    leave the row ``save_lap`` already wrote, and the test would be measuring
+    that instead of this.
+    """
+    junk = tmp_path / "junk.lap.json.gz"
+    junk.write_bytes(b"not gzip, not json, not a lap")
+    with LapCatalog(_catalog_path(tmp_path)) as cat:
+        assert cat.upsert(junk) is False
+        assert cat.count() == 0
