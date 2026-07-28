@@ -178,10 +178,18 @@ class SPageFileGraphics(ctypes.Structure):
         # frame. So on ACC a lap is "clean" if and only if the sim says the lap is
         # still valid, and that lives here.
         #
-        # The fields in between are not modelled: their exact order isn't
-        # something we can verify, and a wrong guess about a field we don't read
-        # is a wrong guess we'd never notice. Skipping them as opaque bytes keeps
-        # the one offset that matters anchored on what was measured.
+        # The fields in between are not modelled: a wrong guess about a field we
+        # don't read is a wrong guess we'd never notice. Skipping them as opaque
+        # bytes keeps the one offset that matters anchored on what was measured.
+        #
+        # Their *count* is not a guess, though. Expanding the SDK's tail field by
+        # field lands `isValidLap` on 1408 — the byte found in the sim — which
+        # can only happen if every declaration above it, the three fillers just
+        # below included, is the right size. That is what stands behind the
+        # `TC`/`ABS`/`EngineMap` offsets until `verify-aids` finally runs on ACC.
+        # The arithmetic is in `tests/test_lap_valid_acc.py`; note that it
+        # corroborates the byte budget, not the *name* of any unread field —
+        # the SDK order it reproduces would call this next int `iSplit`.
         ("_acc_tail", ctypes.c_byte * 120),    # 1284 → 1404
         # The SDK puts iEstimatedLapTime here. What's verified is narrower: it
         # reads a plausible lap-time-scale value (142427 ms at Monza), which is

@@ -54,6 +54,8 @@ Validation — these read the live game, so the sim must be running:
   verify-diag [car] [track]  offline FP-rate check of the lap diagnosis
 
   import-reference <file>    import a lap as a clean reference (cold-start seed)
+  setup <list|show|bump|undo>  read and edit an ACC setup file, no game running
+                             (`setup bump --help` for the arguments)
   selftest                   check the TTS voice, write a report (works windowed)
   logs                       open the folder with logs and crash reports
 """
@@ -128,6 +130,11 @@ def main() -> None:
     elif cmd in ("import-reference", "import-ref"):
         from .diagnostics import run_import_reference
         run_import_reference(rest)
+    elif cmd == "setup":
+        # Reachable as `python -m accoach.setup.cli` since F0, and therefore by
+        # nobody: it was the last second front door left after the wrappers went.
+        from .setup.cli import main as setup_cli
+        setup_cli(rest)
     elif cmd == "selftest":
         from .diagnostics import run_selftest
         run_selftest()

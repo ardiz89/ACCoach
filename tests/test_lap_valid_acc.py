@@ -24,6 +24,57 @@ from accoach.telemetry.structs import SPageFileGraphics
 
 _PLAUSIBLE_EST = 142_427        # the value measured at Monza
 
+_FLOAT, _INT, _WCHAR = ctypes.c_float, ctypes.c_int, ctypes.c_wchar
+
+# The ACC graphics tail as the published SDK declares it, transcribed field by
+# field — including the stretch our own struct deliberately leaves opaque. This
+# list exists ONLY to be counted; nothing reads it. See
+# :func:`test_the_documented_layout_reproduces_the_measured_offset`.
+_DOCUMENTED_TAIL_AFTER_WIND_DIRECTION = [
+    ("isSetupMenuVisible", _INT),
+    ("mainDisplayIndex", _INT),
+    ("secondaryDisplayIndex", _INT),
+    ("TC", _INT),
+    ("TCCut", _INT),
+    ("EngineMap", _INT),
+    ("ABS", _INT),
+    # --- the stretch we model as 120 opaque bytes ---
+    ("fuelXLap", _FLOAT),
+    ("rainLights", _INT),
+    ("flashingLights", _INT),
+    ("lightsStage", _INT),
+    ("exhaustTemperature", _FLOAT),
+    ("wiperLV", _INT),
+    ("DriverStintTotalTimeLeft", _INT),
+    ("DriverStintTimeLeft", _INT),
+    ("rainTyres", _INT),
+    ("sessionIndex", _INT),
+    ("usedFuel", _FLOAT),
+    ("deltaLapTime", _WCHAR * 15),
+    ("iDeltaLapTime", _INT),
+    ("estimatedLapTime", _WCHAR * 15),
+    ("iEstimatedLapTime", _INT),
+    ("isDeltaPositive", _INT),
+    ("iSplit", _INT),
+    # --- and back onto ground we measured ---
+    ("isValidLap", _INT),
+]
+
+
+def _documented_graphics() -> type[ctypes.Structure]:
+    """Our base fields up to ``windDirection``, then the SDK's tail, expanded."""
+    head = []
+    for name, typ in SPageFileGraphics._fields_:
+        head.append((name, typ))
+        if name == "windDirection":
+            break
+
+    class _Documented(ctypes.Structure):
+        _pack_ = 4
+        _fields_ = head + _DOCUMENTED_TAIL_AFTER_WIND_DIRECTION
+
+    return _Documented
+
 
 def _graphics(active_cars: int, est=_PLAUSIBLE_EST, valid=1) -> SPageFileGraphics:
     g = SPageFileGraphics()
@@ -36,17 +87,73 @@ def _graphics(active_cars: int, est=_PLAUSIBLE_EST, valid=1) -> SPageFileGraphic
 # --- the reader -----------------------------------------------------------
 
 def test_the_offsets_are_where_they_were_measured():
-    """Pins OUR struct, not the game's page — and that is all it can do.
-
-    `isValidLap` at 1408 was found by watching ACC's shared memory frame by
-    frame; nothing in this repository can re-check that. What this catches is a
-    field added or resized above it, which would silently shift the offset and
-    turn the flag into a neighbouring one. Read it as a layout lock, not as
-    evidence about ACC.
+    """Pins OUR struct: a field added or resized above ``isValidLap`` would
+    silently shift it onto a neighbouring flag. A layout lock, nothing more —
+    the corroboration lives in the next test.
     """
     assert SPageFileGraphics.iEstimatedLapTime.offset == 1404
     assert SPageFileGraphics.isValidLap.offset == 1408
     assert ctypes.sizeof(SPageFileGraphics) == 1412
+
+
+def test_the_documented_layout_reproduces_the_measured_offset():
+    """Arithmetic corroboration of an offset that was found by hand.
+
+    1408 came from watching ACC's shared memory frame by frame, and this file
+    used to say that nothing here could re-check it. Something can, cheaply:
+    expand the SDK's tail field by field — *including* the stretch our struct
+    carries as 120 opaque bytes precisely because its order was never verified —
+    and count where ``isValidLap`` lands.
+
+    It lands on 1408. That number is the product of every declaration above it:
+    three filler ints after ``windDirection``, eleven scalars, two 15-wide
+    wchar strings whose 30 bytes each need two bytes of padding to realign. Any
+    field missing, extra, or wrongly sized anywhere in that chain moves the
+    total. Landing on the byte we measured in the sim is therefore evidence
+    about the whole chain — and in particular about the three fillers, which is
+    what puts ``TC``/``ABS``/``EngineMap`` where the next test asserts they are.
+
+    What this does NOT settle is the *identity* of any single unread field: two
+    compensating errors would still sum to 1408. See
+    :func:`test_the_field_names_in_the_opaque_stretch_are_not_claimed`.
+    """
+    documented = _documented_graphics()
+    assert documented.isValidLap.offset == 1408
+    assert ctypes.sizeof(documented) == ctypes.sizeof(SPageFileGraphics)
+
+
+def test_the_aid_levels_sit_where_the_documented_layout_puts_them():
+    """The offsets the engineer's advice and the recorded setup depend on.
+
+    ``verify-aids`` has never been run on ACC (see ``TARATURE-ACC.md`` 0.1), so
+    until it is, this arithmetic is the only thing standing behind these four
+    numbers. Reading the wrong bytes here means advising knobs that do nothing
+    and recording a setup that isn't the one driven.
+    """
+    documented = _documented_graphics()
+    for name in ("TC", "TCCut", "EngineMap", "ABS"):
+        assert (getattr(documented, name).offset
+                == getattr(SPageFileGraphics, name).offset), name
+
+
+def test_the_field_names_in_the_opaque_stretch_are_not_claimed():
+    """Where the two sources disagree — recorded rather than resolved.
+
+    Our struct calls the int at 1404 ``iEstimatedLapTime``; the transcribed SDK
+    order puts ``iEstimatedLapTime`` at 1396 and ``iSplit`` at 1404. Only one of
+    them can be right, and this repository cannot tell which: the field is
+    declared and never read as data, so no behaviour distinguishes them. The
+    live measurement (142 427 ms at Monza, lap-scale rather than sector-scale)
+    leans towards our name, which is why nothing is being renamed on the
+    strength of a transcription.
+
+    The check is one line of a session that is already planned — print both
+    offsets while doing ``TARATURE-ACC.md`` 0.4 — so this test records the open
+    question instead of quietly picking a side.
+    """
+    documented = _documented_graphics()
+    assert documented.iEstimatedLapTime.offset == 1396
+    assert SPageFileGraphics.iEstimatedLapTime.offset == 1404
 
 
 def test_acc_reports_the_sims_own_verdict():

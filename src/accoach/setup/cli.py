@@ -1,15 +1,19 @@
-"""Command-line demo for the setup foundation (F0).
+"""Terminal front end for the setup foundation (F0).
 
-Lets us exercise read -> adjust -> preview -> write -> undo against a real ACC
-setup file, with no game running. Examples::
+Exercises read -> adjust -> preview -> write -> undo against a real ACC setup
+file with no game running — the one path that reaches the setup writer without
+the Engineer UI. Reached through the single front door::
 
-    python -m accoach.setup.cli list  --car mclaren_720s_gt3_evo --track Imola
-    python -m accoach.setup.cli show  "<path>.json"
-    python -m accoach.setup.cli bump  "<path>.json" --param tyrePressure \
+    python -m accoach setup list  --car mclaren_720s_gt3_evo --track Imola
+    python -m accoach setup show  "<path>.json"
+    python -m accoach setup bump  "<path>.json" --param tyrePressure \
         --slot RR --clicks +2                            # preview only
-    python -m accoach.setup.cli bump  "<path>.json" --param rearWing \
+    python -m accoach setup bump  "<path>.json" --param rearWing \
         --clicks -1 --apply --as ACCoach_test            # writes a new file
-    python -m accoach.setup.cli undo  "<dir>/ACCoach_test.json"
+    python -m accoach setup undo  "<dir>/ACCoach_test.json"
+
+``python -m accoach.setup.cli`` still works and is what this module was born as;
+it stopped being the advertised way in when the ``run_*.py`` wrappers went.
 """
 
 from __future__ import annotations
@@ -106,8 +110,9 @@ def _cmd_undo(args) -> None:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="accoach.setup.cli",
-                                description="Demo lettura/scrittura setup ACC")
+    p = argparse.ArgumentParser(prog="accoach setup",
+                                description="Lettura/scrittura di un setup ACC, "
+                                            "senza il gioco avviato")
     sub = p.add_subparsers(dest="cmd", required=True)
 
     pl = sub.add_parser("list", help="elenca i setup per auto+pista")
