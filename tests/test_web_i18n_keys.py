@@ -22,15 +22,33 @@ _ENTRY = re.compile(r'"([\w.]+)"\s*:\s*\{\s*en:', re.M)
 _CALL = re.compile(r'\bt\(\s*"([\w.]+)"\s*\)')
 
 
+def _entry_end(src: str, start: int) -> int:
+    """Index of the brace that closes this entry's object literal.
+
+    Not "the first `}`", which is what this used to be: the values are backtick
+    strings and a string is allowed to contain a brace. The guided flow's steps
+    are the first to do it (`Step {n} of {total}`), and under the old rule the
+    entry was cut before its Italian, so a fully translated string was reported
+    as missing one. Skipping over backtick spans is the whole fix.
+    """
+    i = start
+    while i < len(src):
+        c = src[i]
+        if c == "`":
+            i = src.index("`", i + 1) + 1
+            continue
+        if c == "}":
+            return i
+        i += 1
+    raise ValueError("unterminated i18n entry")
+
+
 def _catalogue() -> dict[str, str]:
     """{key: the source text of its entry} — enough to check both languages exist."""
     src = (WEB / "i18n.js").read_text(encoding="utf-8")
     out: dict[str, str] = {}
     for m in _ENTRY.finditer(src):
-        # The entry runs to the closing brace of its object literal; the values are
-        # backtick strings, so the first "}" after the match ends it.
-        end = src.index("}", m.end())
-        out[m.group(1)] = src[m.end():end]
+        out[m.group(1)] = src[m.end():_entry_end(src, m.end())]
     return out
 
 
