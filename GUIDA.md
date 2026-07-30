@@ -209,6 +209,33 @@ Cosa trovi:
   di quello del riferimento, quanto stretto è l'**arco** che hai percorso e
   quanti **metri di strada in più** hai fatto. Sotto, la tabella di tutte le
   curve, scaricabile in **CSV**.
+  In basso a destra del disegno c'è **il giro intero con la curva cerchiata**: due
+  tornanti della stessa pista fanno la stessa immagine, e senza quello dovevi
+  ricordarti tu quale avevi aperto. In alto, la **frase del debrief** per quella
+  curva — la stessa, presa di peso: non è una seconda opinione.
+  Sul «prima o dopo» due avvertenze che la scheda ti dà da sola. Se la curva è
+  lunga, il fondo della velocità è **piatto** (a Fagnes per un centinaio di
+  metri): lì due giri identici avrebbero il minimo in due punti diversi per puro
+  rumore, quindi HONE scrive **«stesso punto»** e dice per quanti metri il minimo
+  è piatto, invece di mandarti a inseguire una differenza che non c'è. E se in
+  quella curva sei andato fuori o hai girato, non ti dice che hai apexato tardi:
+  ti dice che **a 32 km/h contro 93 non c'è una traiettoria da leggere**.
+- **Settori**: i tre settori (quelli **veri della pista** quando il gioco li
+  pubblica, altrimenti tre terzi di posizione — la scheda dichiara quale dei
+  due), il tuo tempo contro il riferimento con le barre del distacco, e il
+  **giro ideale**: i tuoi migliori settori cuciti insieme, con quanto vale
+  rispetto al tuo miglior giro vero. Sotto, **ogni giro settore per settore**,
+  col migliore di ogni colonna in evidenza: il giro ideale dichiara un tempo che
+  nessuno ha guidato, e lì vedi **di quali giri è fatto** — e se quel settore è
+  stato un colpo di fortuna o un'abitudine.
+- **Dinamica**: cosa faceva l'auto, non cosa hai fatto tu. G longitudinali e
+  laterali col **cerchio di aderenza** (quanto del grip disponibile stavi usando
+  davvero), lo **slittamento** per assale (anteriore che blocca, posteriore che
+  pattina), la **rotazione** contro lo sterzo, i **giri motore** con le cambiate,
+  le **gomme lungo il giro** (temperatura e pressione) e il **nastro del
+  bilanciamento**: la traiettoria colorata in blu dove l'auto sottosterza e in
+  rosso dove sovrasterza. È la scheda da aprire quando il debrief dice *perché* e
+  tu vuoi vederlo con i tuoi occhi.
 - **Andamento**: l'andamento dei tempi nel tempo, la **costanza** (migliore/media/
   scarto), e gli **errori ricorrenti** ("5× Porta più velocità in curva · Curve 1, 2").
   In cima c'è **Il tuo piano**: uno o due obiettivi presi dai tuoi punti deboli
@@ -226,6 +253,20 @@ Nella tendina dei giri, accanto al tempo, trovi **i gradi dell'asfalto** (es.
 `2:03.732 · 37.8°`). Non è un dettaglio: fra pista fredda e pista calda i punti
 di frenata si spostano di 10-20 metri, quindi due giri con temperature molto
 diverse sono due circuiti diversi e confrontarli dice poco.
+
+Sotto le schede c'è sempre **quale giro stai guardando** — tempo, riferimento,
+distacco e gradi dell'asfalto — perché con otto schede è facile finire a leggere
+i numeri di un giro pensando a un altro.
+
+E l'asse orizzontale di tutti i grafici è **in metri** (`1000 m · 2000 m …`), non
+in percentuale di giro: «al 50%» è un numero da convertire prima di poterci
+guidare. I metri sono **misurati sulle coordinate registrate**, non `posizione ×
+lunghezza della pista`; se un giro non ha coordinate, o se le sue coordinate non
+tornano con velocità e tempo, l'asse torna in percentuale invece di darti una
+scala sbagliata.
+
+Due scorciatoie: **1-9** aprono le schede in ordine, **[** e **]** scorrono i
+giri. (Le trovi anche passando il mouse sulle schede e sulla tendina.)
 
 Sotto ogni curva c'è anche **dove, dentro la curva, è finito il tempo**: una
 barra divisa in *ingresso · apex · uscita · tratto dopo* (passa il mouse per i

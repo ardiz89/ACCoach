@@ -86,6 +86,50 @@ clicks from the game).
 - **Move or close it:** start it with `--interactive`, or close the terminal that
   launched it (`Ctrl+C`).
 
+## What the analysis app shows
+
+Open it from the hub (**Analysis → 📊 Analysis & Report**) or with
+`python -m accoach web`. It runs on your machine, on your laps; there is no
+account and nothing is uploaded.
+
+Under the tabs you always see **which lap you are looking at** — its time, the
+reference, the gap and the track temperature — and every chart's x-axis is in
+**metres**, measured from the recorded coordinates rather than assumed from a
+track length. A lap whose coordinates don't add up falls back to per cent instead
+of showing you a wrong scale.
+
+- **Lap explained** — the lap one thing at a time: what cost you most, why, and
+  what to do, with the chart cropped to the stretch it is talking about and the
+  track map beside it showing where that is. Three steps at most. If you are a
+  long way off the pace it opens with the general theme and stops there, because
+  corner-by-corner is the wrong lens at that distance.
+- **Session** — one outing: the laps in the order you drove them (including the
+  ones that don't count — you still drove them), your best, consistency, track
+  temperature, and **what changed since last time** on that car and track.
+- **Compare** — two laps, aligned on track position: time delta, speed,
+  throttle/brake, steering, with a shared crosshair. Exports to CSV/JSON.
+- **Map** — your line coloured by where you gained and lost, your braking points
+  against the reference's, and **Your braking points**: the cheat sheet, built
+  from *your* recent laps in one track-temperature band, with the spread that
+  says whether you have a braking point at all. Prints and exports.
+- **Line** — where you actually drove, corner by corner: your line against the
+  reference with the gap between them shaded, how far inside or outside you were
+  at entry, apex and exit, the arc you drove, and the extra metres you covered.
+  Where a corner's speed minimum is flat it says "same place" instead of
+  inventing an apex shift, and where the car went off it says so instead of
+  reading the geometry as a choice.
+- **Sectors** — your sectors against the reference (the sim's real sectors when
+  it publishes them), the **ideal lap** stitched from your best sectors, and
+  every lap sector by sector so you can see which laps that ideal is made of.
+- **Dynamics** — what the car was doing: G with the friction circle, slip per
+  axle, rotation vs steering, revs and shifts, tyre temperatures and pressures
+  along the lap, and the handling ribbon (blue understeer, red oversteer).
+- **Trends** — lap times over time, consistency, recurring mistakes, and **your
+  plan**: one or two goals taken from your *systematic* weak points, with a
+  target in seconds, measured only on the laps you drive after you accept it.
+
+Keyboard: **1-9** switch tabs, **[** and **]** step through laps.
+
 ## Free vs Pro
 
 A **one-time freemium** model (no subscription). Everything is free today while
