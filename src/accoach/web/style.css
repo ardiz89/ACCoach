@@ -788,6 +788,9 @@ body.no-data .empty { display: block; }
 }
 .ses-lap .tag.best { color: var(--green); border-color: var(--green); }
 .ses-lap .tag.out, .ses-lap .tag.cut { color: var(--amber); border-color: var(--amber); }
+/* Litres burned: a measurement, so it stays quiet — the tags beside it are
+   about whether the lap counts, which is a louder thing to say. */
+.ses-lap .tag.fuel { color: var(--muted); border-color: var(--line); }
 
 .session-changed h4 {
   margin: 16px 0 8px; font-size: 13px; font-weight: 600; color: var(--text);

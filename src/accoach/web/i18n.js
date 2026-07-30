@@ -57,6 +57,7 @@
     "ses.mean":        { en: `Average`, it: `Media` },
     "ses.spread":      { en: `Consistency`, it: `Costanza` },
     "ses.vsprev":      { en: `vs previous session`, it: `vs sessione precedente` },
+    "ses.fuel":        { en: `Fuel per lap`, it: `Benzina al giro` },
     "ses.laps":        { en: `Your laps`, it: `I tuoi giri` },
     "ses.lap_best":    { en: `best`, it: `migliore` },
     "ses.lap_out":     { en: `didn't count`, it: `non conta` },

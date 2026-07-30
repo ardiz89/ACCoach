@@ -1546,6 +1546,11 @@ function renderSession(s) {
       numbers += item(t("ses.vsprev"), (d > 0 ? "+" : "") + d.toFixed(3) + "s",
                       d > 0 ? "slower" : "faster");
     }
+    // Measured, not modelled — and absent on laps recorded before the tank was
+    // written down, which is why it's a conditional item and not a dash.
+    if (cur.fuel_per_lap != null) {
+      numbers += item(t("ses.fuel"), `${cur.fuel_per_lap.toFixed(2)} L`);
+    }
   } else {
     numbers = `<div class="empty">${t("ses.nobest")}</div>`;
   }
@@ -1563,7 +1568,10 @@ function renderSession(s) {
       const w = 6 + 94 * ((l.lap_time_ms - floor) / span);
       const tags = (l.is_best ? `<span class="tag best">${t("ses.lap_best")}</span>` : "") +
         (!l.valid ? `<span class="tag out">${t("ses.lap_out")}</span>` : "") +
-        (l.off_track ? `<span class="tag cut">${t("ses.lap_cut")}</span>` : "");
+        (l.off_track ? `<span class="tag cut">${t("ses.lap_cut")}</span>` : "") +
+        (l.fuel_used != null
+          ? `<span class="tag fuel" title="${escAttr(t("ses.fuel"))}">${l.fuel_used.toFixed(2)} L</span>`
+          : "");
       return `<button type="button" class="ses-lap${l.is_best ? " is-best" : ""}" ` +
              `data-path="${l.path}" title="${t("ses.open")}">` +
              `<span class="time">${l.lap_time}</span>` +

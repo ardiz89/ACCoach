@@ -257,6 +257,26 @@ def _tyre_channels(lap) -> dict | None:
     return {"temp": temp, "press": press} if hot else None
 
 
+def _fuel_of(row) -> float | None:
+    """A catalog row's measured burn, or None when the lap never recorded fuel."""
+    try:
+        v = row["fuel_used"]
+    except (KeyError, IndexError, TypeError):
+        return None
+    return round(float(v), 2) if v not in (None, "") else None
+
+
+def _fuel_mean(rows) -> float | None:
+    """Litres per lap over the laps that measured it.
+
+    Averaged over the laps that *have* the number rather than over all of them:
+    an out-lap from the pits refuels, gets no burn, and would otherwise drag the
+    session's consumption towards zero.
+    """
+    vals = [v for v in (_fuel_of(r) for r in rows) if v is not None]
+    return round(sum(vals) / len(vals), 2) if vals else None
+
+
 def _has_map(lap) -> bool:
     """True if the lap carries real world coordinates (recorded under v3+)."""
     return any(s.car_x != 0.0 or s.car_z != 0.0 for s in lap.samples)
@@ -1028,6 +1048,11 @@ def create_api(
                 # Every lap of the run, in the order driven — cut and invalid
                 # ones included. They can't set the numbers, but leaving them out
                 # would show a session you didn't have.
+                # Litres per lap, measured from the tank level (schema v11).
+                # None on laps recorded before the channel existed and on laps
+                # that refuelled — the frontend hides the column rather than
+                # printing a zero nobody burned.
+                "fuel_per_lap": _fuel_mean(cur.laps),
                 "laps_detail": [{
                     "path": l["path"],
                     "lap_time": format_lap_time(l["lap_time_ms"]),
@@ -1035,6 +1060,7 @@ def create_api(
                     "valid": bool(l["valid"]),
                     "off_track": _off_track(l),
                     "is_best": bool(best and l["path"] == best["path"]),
+                    "fuel_used": _fuel_of(l),
                 } for l in cur.laps],
                 "previous": {
                     "started_utc": prev.started.isoformat() if prev and prev.started else None,

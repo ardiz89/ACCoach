@@ -184,6 +184,11 @@ Cosa trovi:
   **cosa è cambiato dall'ultima volta** su quella auto+pista, curva per curva.
   Clicca un giro per aprirlo in Confronto. Le sessioni sono dedotte dagli orari:
   una pausa lunga vale come sessione nuova.
+  Da qui in avanti trovi anche la **benzina al giro**, misurata dal serbatoio e
+  non stimata, accanto a ogni giro e come media della sessione. Sui giri
+  registrati prima non compare — non è «zero litri», è «non lo sappiamo» — e non
+  compare nemmeno sui giri in cui hai rifornito, perché fra i due estremi di quel
+  giro c'è un rifornimento, non un consumo.
 - **Confronto**: scegli auto+pista e due giri (uno da rivedere, uno di confronto).
   Tre grafici allineati alla posizione in pista — **delta sul giro**, **velocità**
   (tu vs riferimento), **gas/freno** — con le bande delle curve. Passa il mouse:

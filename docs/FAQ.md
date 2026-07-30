@@ -105,7 +105,8 @@ of showing you a wrong scale.
   corner-by-corner is the wrong lens at that distance.
 - **Session** — one outing: the laps in the order you drove them (including the
   ones that don't count — you still drove them), your best, consistency, track
-  temperature, and **what changed since last time** on that car and track.
+  temperature, **fuel per lap** (measured from the tank, on laps recorded from
+  v11 onwards), and **what changed since last time** on that car and track.
 - **Compare** — two laps, aligned on track position: time delta, speed,
   throttle/brake, steering, with a shared crosshair. Exports to CSV/JSON.
 - **Map** — your line coloured by where you gained and lost, your braking points

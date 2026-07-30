@@ -24,7 +24,7 @@ from pathlib import Path
 # v2: added clean (-1 unknown / 0 dirty / 1 clean) + track-condition columns,
 # so the reference query can exclude dirty laps and prefer confirmed-clean ones.
 # v3: added `source` ("own"/"pro") so a PRO benchmark lap can be found cheaply.
-_DB_VERSION = 3
+_DB_VERSION = 4
 
 # How far the track temperature may differ before a lap stops being a fair
 # benchmark. Wide on purpose: the point is to rule out the morning-vs-evening
@@ -59,7 +59,11 @@ CREATE TABLE IF NOT EXISTS lap (
     source         TEXT NOT NULL DEFAULT 'own',
     recorded_utc   TEXT,
     sample_count   INTEGER NOT NULL,
-    schema_version INTEGER NOT NULL
+    schema_version INTEGER NOT NULL,
+    -- Litres this lap burned (v11 files). NULL on every lap recorded before
+    -- the channel existed, and on laps that refuelled: 'not measured' and
+    -- 'burned nothing' are different answers.
+    fuel_used      REAL
 );
 CREATE INDEX IF NOT EXISTS ix_lap_ref
     ON lap (car_key, track_key, valid, clean, lap_time_ms);
@@ -114,6 +118,34 @@ def _clean_to_int(value: object) -> int:
     return 1 if value else 0
 
 
+
+def _fuel_used(d: dict) -> float | None:
+    """Litres burned, straight off the stored rows — no LapSample objects built.
+
+    The catalog is read on every page load, so it stays a header reader: the rows
+    are already parsed JSON here, and finding one column by name costs a lookup.
+    Mirrors :func:`accoach.coaching.fuel.burned` — including its refusals, so the
+    session view and a lap opened by hand can't disagree about a lap's burn.
+    """
+    fields = d.get("fields")
+    rows = d.get("samples") or []
+    if not fields or "fuel" not in fields or not rows:
+        return None
+    i = list(fields).index("fuel")
+    try:
+        vals = [float(r[i]) for r in rows if len(r) > i and r[i] not in (None, "")]
+    except (TypeError, ValueError):
+        return None
+    vals = [v for v in vals if v > 0.0]
+    if len(vals) < 2:
+        return None
+    used = vals[0] - vals[-1]
+    # Rose (a refuel or a pit stop) or absurd: not a burn rate.
+    if used <= 0.0 or used > 20.0:
+        return None
+    return round(used, 2)
+
+
 def _read_meta(path: Path) -> dict | None:
     """Read a lap file's metadata + sample count without building samples.
 
@@ -148,6 +180,7 @@ def _read_meta(path: Path) -> dict | None:
         "recorded_utc": str(d.get("recorded_utc", "")),
         "sample_count": len(d.get("samples", [])),
         "schema_version": int(d.get("schema", 1)),
+        "fuel_used": _fuel_used(d),
     }
 
 
@@ -214,8 +247,9 @@ class LapCatalog:
             """INSERT INTO lap
                  (path, car_key, track_key, car_model, track, session,
                   lap_time_ms, valid, clean, air_temp, road_temp, grip,
-                  tyre_compound, source, recorded_utc, sample_count, schema_version)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                  tyre_compound, source, recorded_utc, sample_count, schema_version,
+                  fuel_used)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                ON CONFLICT(path) DO UPDATE SET
                   car_key=excluded.car_key, track_key=excluded.track_key,
                   car_model=excluded.car_model, track=excluded.track,
@@ -225,7 +259,8 @@ class LapCatalog:
                   grip=excluded.grip, tyre_compound=excluded.tyre_compound,
                   source=excluded.source, recorded_utc=excluded.recorded_utc,
                   sample_count=excluded.sample_count,
-                  schema_version=excluded.schema_version""",
+                  schema_version=excluded.schema_version,
+                  fuel_used=excluded.fuel_used""",
             (
                 str(path), self._slug(meta["car_model"]),
                 self._slug(meta["track"]), meta["car_model"], meta["track"],
@@ -234,6 +269,7 @@ class LapCatalog:
                 meta.get("road_temp", 0.0), meta.get("grip", 0.0),
                 meta.get("tyre_compound", ""), meta.get("source", "own"),
                 meta["recorded_utc"], meta["sample_count"], meta["schema_version"],
+                meta.get("fuel_used"),
             ),
         )
         self._conn.commit()
@@ -366,7 +402,8 @@ class LapCatalog:
         """All indexed laps for a car+track, most recently recorded first."""
         rows = self._conn.execute(
             """SELECT path, lap_time_ms, valid, clean, source, recorded_utc,
-                      sample_count, air_temp, road_temp, grip, tyre_compound
+                      sample_count, air_temp, road_temp, grip, tyre_compound,
+                      fuel_used
                FROM lap WHERE car_key = ? AND track_key = ?
                ORDER BY recorded_utc DESC""",
             (self._slug(car_model), self._slug(track)),
