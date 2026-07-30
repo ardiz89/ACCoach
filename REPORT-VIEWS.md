@@ -179,8 +179,10 @@ alto», mai «quanto».
   Applicata a delta (s), velocità (km/h), gas/freno (%), slip, scostamento (m),
   giri motore. Dove l'unità non dice niente al pilota (radianti) restano le sole
   linee.
-- `gridX()` — tacche ogni 10% del giro, con le percentuali **solo sull'ultimo
+- `gridX()` — tacche lungo il giro, con le etichette **solo sull'ultimo
   grafico di ogni pila** (ripetere l'asse sotto ogni traccia è rumore).
+  *(dal 2026-07-30 le tacche cadono su metri tondi invece che ogni 10% —
+  vedi l'aggiornamento in fondo)*
 - **Font del brand anche sui canvas**: il canvas non eredita lo stack CSS, quindi
   ogni grafico disegnava nel font di sistema. I numeri vanno in mono per lo
   stesso motivo per cui ci vanno nel CSS.
@@ -197,5 +199,67 @@ alto», mai «quanto».
 - Il balance ribbon è reso come **mini-mappa nel tab Dinamica** (non un toggle sul tab Mappa) per non disturbare la legenda esistente della mappa.
 - `_balance_at` importa le costanti da `coaching/balance.py` per restare in sync col coach live (sovrasterzo ha precedenza, soglia sterzo più bassa `_STEER_CATCH`).
 - Verificato live su `--demo`: line-offset, gomme intra-giro, balance ribbon (blu sottosterzo) e consistenza per curva rendono con dati reali; suite 412 verde.
-</content>
-</invoke>
+
+---
+
+## Aggiornamento 2026-07-30 (sera) — l'asse in metri, il «sei qui», la frase
+
+Da uno screenshot di Track Titan: nel loro disegno della traiettoria il grafico
+ha l'asse **in metri**, c'è una mini-mappa che dice dove sei, e una frase è
+attaccata al disegno. Tre cose che **non dipendono dai bordi pista** (quelli
+restano il filo aperto: la spline `fast_lane.ai` di AC è nello stesso sistema di
+coordinate dei nostri giri, ma il blocco con le larghezze non è decodificato).
+
+### 1. L'asse in metri, misurato e corroborato
+
+`0.25 · 0.50 · 0.75` è un numero da convertire prima di poterci guidare. Adesso
+i grafici scrivono `1000 m · 2000 m …`, e le tacche cadono su metri tondi invece
+che su frazioni del giro.
+
+- la conversione **non è `pos × lunghezza pista`**: sarebbe un'ipotesi due volte
+  (il numero, e che la posizione avanzi linearmente con la distanza). È
+  `trajectory.cumulative_distance()` sulle coordinate registrate — la stessa
+  geometria con cui la scheda Traiettoria dice «hai percorso N m»;
+- misurata al **rate pieno** e solo dopo assottigliata ai 600 punti del browser
+  (`_pick_indices`, condiviso con `_downsample`): accumulare sui punti del
+  grafico taglierebbe ogni curva in dieci corde;
+- **il giro non è creduto sulla parola**: `_distance_channel()` confronta la
+  distanza dalle coordinate con quella da velocità×tempo. Misurato sui 39 giri
+  in archivio — i 30 sani stanno entro lo **0.1%**, i 6 del Nürburgring
+  precedenti al fix delle coordinate AC1 dicono **167 m per un giro di 5 km
+  (−96.7%)** e gli ACC di giugno non hanno coordinate (−100%). Tolleranza al 5%:
+  cinquanta volte lo scarto osservato, e respinge comunque i rotti. Un giro
+  respinto torna alle percentuali — **una scala sbagliata è peggio di una
+  astratta**;
+- ricaduta: la **demo** disegnava un circuito da 1.8 km e ci girava dentro a 255
+  km/h per 100 s. Ora l'anello è lungo 6.3 km, cioè quanto dicono le sue stesse
+  velocità: prima la barra della scala contraddiceva il tachimetro dello stesso
+  giro.
+
+### 2. La mini-mappa «sei qui» dentro lo zoom della curva
+
+Il disegno della curva era l'unica figura della pagina **senza contesto**: due
+tornanti della stessa pista fanno la stessa immagine. In basso a destra ora c'è
+il giro intero, con il tratto acceso, un **anello** attorno alla curva (a quella
+scala la curva è tre pixel: l'anello è ciò che l'occhio trova) e un punto —
+dove sei col cursore, all'apex quando non stai puntando. Stessa proiezione
+specchiata della mappa grande: tre figure dello stesso giro che litigano su
+destra e sinistra sarebbero peggio di due che non esistono.
+
+### 3. La frase attaccata al disegno
+
+Il debrief quella frase la **scriveva già**; semplicemente stava su un'altra
+scheda. Ora è in cima al disegno (`0.57 s · Frena più tardi`, e sotto la nota di
+fase o l'effetto a catena), presa **alla lettera** dal payload e mai riderivata:
+due moduli che scrivono della stessa curva è esattamente come finiscono per
+contraddirsi. La curva che non è costata niente non dice niente — il silenzio è
+a sua volta una lettura. L'aggancio è per **numero di curva** (`index`, aggiunto
+alle `losses`): i nomi sono curati per pista e due possono somigliarsi.
+
+### Verificato dal vivo (non solo in test)
+
+Sui giri veri in archivio, non sulla demo: Monza legge **5775 m** (pista reale
+5793 m, ed è la traiettoria percorsa, non la mezzeria); a Nürburgring l'unico
+giro sano prende i metri e i **sei rotti tornano alle percentuali**; gli ACC di
+Imola senza coordinate restano in percentuale. Nessun errore in console dopo aver
+girato tutte le schede, in italiano e in inglese. Suite **1083** verde.

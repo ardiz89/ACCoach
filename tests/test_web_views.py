@@ -234,3 +234,23 @@ def test_the_new_views_declare_a_narrow_layout(view):
               "line": ".line-grid"}[view]
     tail = _CSS[_CSS.index("@media (max-width: 700px)"):]
     assert marker in tail, f"no narrow-screen rule for the {view} view"
+
+
+# --- the lap position is one wording, in one place --------------------------
+# Three readouts print where you are on the lap (Compare, Dynamics, Trajectory).
+# They used to build the label by hand, in three places, in per cent; when the
+# axis learned to speak metres, a view left behind would keep saying "45%" next
+# to charts labelled "2000 m" and nothing would fail.
+
+def test_no_readout_writes_its_own_position_label():
+    for m in re.finditer(r'ro\.pos"\)\}([^`]{0,40})', _APPJS):
+        assert "posLabel(" in m.group(1), m.group(0)
+
+
+def test_the_metre_axis_still_has_a_way_back_to_per_cent():
+    """A lap with no coordinates — or with coordinates the backend refused to
+    believe — must fall back, not draw a scale it doesn't have."""
+    block = _APPJS[_APPJS.index("function gridX("):]
+    block = block[:block.index("\nfunction ")]
+    assert 'Math.round(q * 100) + "%"' in block
+    assert "distanceTicks()" in block

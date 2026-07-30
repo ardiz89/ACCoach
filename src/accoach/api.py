@@ -46,6 +46,7 @@ from .trajectory import (
     LinePoint,
     build_line_report,
     corner_path,
+    cumulative_distance,
     curvature_profile,
     lateral_offsets,
     line_points,
@@ -75,13 +76,23 @@ def _web_dir() -> Path:
 _WEB_DIR = _web_dir()
 
 
+def _pick_indices(n: int) -> list[int]:
+    """Which of a lap's frames the browser gets: evenly thinned to _MAX_POINTS.
+
+    Split out from :func:`_downsample` because the distance channel has to be
+    measured at full rate and *then* thinned — reproducing this arithmetic in a
+    second place is how two channels end up one frame out of register.
+    """
+    if n <= _MAX_POINTS:
+        return list(range(n))
+    step = n / _MAX_POINTS
+    return [int(i * step) for i in range(_MAX_POINTS)]
+
+
 def _downsample(lap):
     """Evenly thin a lap's samples to at most _MAX_POINTS for plotting."""
-    n = len(lap.samples)
-    if n <= _MAX_POINTS:
-        return lap.samples
-    step = n / _MAX_POINTS
-    return [lap.samples[int(i * step)] for i in range(_MAX_POINTS)]
+    s = lap.samples
+    return [s[i] for i in _pick_indices(len(s))]
 
 
 def _axle_slip(pair) -> float:
@@ -153,10 +164,60 @@ def _lateral_offsets(review_s, base_s) -> list[float] | None:
     return lateral_offsets(_points(review_s), _points(base_s)) or None
 
 
+# How far the coordinate trail may disagree with the clock before we stop
+# believing it. Measured on the 39 real laps in the archive: the 30 with sound
+# coordinates agree with speed×time to within **0.1%**, and the ones that don't
+# are not close calls — the six Nürburgring laps recorded before the AC1
+# coordinate fix (2026-06-28) report a 5 km lap as 167 m (−96.7%), and the June
+# ACC laps carry no coordinates at all (−100%). 5% leaves fifty times the
+# observed spread and still rejects both.
+_DIST_TOL = 0.05
+
+
+def _distance_channel(lap) -> list[float]:
+    """Metres covered at each frame — or all zeros when the coordinates lie.
+
+    This is the channel every chart's x-axis is labelled from, so it gets a
+    second, independent source before it is believed: distance from the
+    coordinate trail, against distance from speed integrated over time. Laps
+    whose two answers disagree come back as zeros, which the frontend reads as
+    "no distance to show" and falls back to per cent.
+
+    The guard is not hypothetical. Six laps in the archive have coordinates that
+    collapse a 5 km lap into 167 m; without this they would have been drawn with
+    an axis running to 150 m, labelled with total confidence. A silently wrong
+    scale is worse than an abstract one — and in this project a number nobody
+    corroborated has cost weeks before.
+    """
+    dist = cumulative_distance(_points(lap.samples))
+    if not dist or dist[-1] <= 0.0:
+        return [0.0] * len(lap.samples)
+    s = lap.samples
+    clock = 0.0
+    for i in range(1, len(s)):
+        dt = (s[i].t_ms - s[i - 1].t_ms) / 1000.0
+        # A gap of a second or more isn't a frame interval; it's a stitch in the
+        # recording, and the mean speed across it means nothing.
+        if 0.0 < dt < 1.0:
+            clock += (s[i].speed_kmh + s[i - 1].speed_kmh) / 7.2 * dt
+    if clock <= 0.0 or abs(dist[-1] - clock) / clock > _DIST_TOL:
+        return [0.0] * len(s)
+    return dist
+
+
 def _channels(lap) -> dict:
-    s = _downsample(lap)
+    idx = _pick_indices(len(lap.samples))
+    s = [lap.samples[i] for i in idx]
+    # Metres covered at each plotted frame — what turns every chart's x-axis from
+    # "50% of the lap" into a place on the track. Measured over the *full*-rate
+    # coordinates and only then thinned: accumulating over 600 plotting points
+    # would cut each corner into ten chords and report a lap shorter than the one
+    # the Trajectory tab measures for the same drive (the two agree to 5 m in
+    # 6.9 km on the real laps — same number, so the page can't contradict itself).
+    dist = _distance_channel(lap)
     return {
         "pos": [round(x.pos, 4) for x in s],
+        "dist_m": [dist[i] for i in idx],
         "speed": [round(x.speed_kmh, 1) for x in s],
         "throttle": [round(x.throttle, 3) for x in s],
         "brake": [round(x.brake, 3) for x in s],
@@ -586,6 +647,11 @@ def create_api(
             # corner-by-corner is the wrong lens there. "" when the gap is small.
             "headline": debrief.headline,
             "losses": [{
+                # The corner this is about, by number. The Trajectory view writes
+                # this same sentence onto its drawing, and matching it up by name
+                # would break the day two corners share one (and on every track
+                # with no curated names at all).
+                "index": x.index,
                 "label": names.get(x.index, f"Corner {x.index + 1}"),
                 "lost_s": round(x.lost_ms / 1000, 3),
                 "category": x.category.value, "message": x.message,
@@ -1500,10 +1566,17 @@ def _seed_demo() -> str:
     zones = {0: (0.16, 0.40), 1: (0.58, 0.80)}
 
     def track_xz(pos):
-        """A closed synthetic circuit; periodic in pos so it joins at 0≡1."""
+        """A closed synthetic circuit; periodic in pos so it joins at 0≡1.
+
+        Sized so the shape agrees with the speeds below: this outline is 6.3 km
+        long, which is what 100 s at these speeds covers. It used to be 1.8 km,
+        and a demo lap driven round it at 255 km/h was a circuit whose own scale
+        bar contradicted its own speedometer — visible now that the charts label
+        their axis with the distance measured off these coordinates.
+        """
         a = 2 * math.pi * pos
-        x = 300.0 * math.sin(a) + 70.0 * math.sin(2 * a)
-        z = 210.0 * math.cos(a) - 50.0 * math.sin(3 * a)
+        x = 1080.0 * math.sin(a) + 252.0 * math.sin(2 * a)
+        z = 756.0 * math.cos(a) - 180.0 * math.sin(3 * a)
         return x, z
 
     def profile(pos):

@@ -177,6 +177,38 @@ def path_length(points: list[LinePoint], lo: float = 0.0, hi: float = 1.0) -> fl
     return total
 
 
+# A step longer than this isn't driving. At 300 km/h a 60 Hz frame covers 1.4 m,
+# and the worst rate ever measured on our own recorder (9 Hz) still only ~9 m. A
+# 50 m jump is a teleport — a pit reset, a session restart, a lap stitched over a
+# gap — and adding it to the odometer would print a kilometre nobody drove on the
+# axis of every chart.
+_MAX_STEP_M = 50.0
+
+
+def cumulative_distance(points: list[LinePoint]) -> list[float]:
+    """Metres covered along the driven line at each point, from the first one.
+
+    This is what makes a distance axis honest. The games hand us position as a
+    fraction of the lap; turning that into metres by multiplying by a published
+    track length would be an assumption on two counts — the number itself, and
+    that position advances linearly with distance. Here it is measured on the
+    coordinates we recorded, the same geometry :func:`path_length` reports as
+    "you drove N m".
+
+    One value per point, in the order given, so a caller can hand back whatever
+    it is already plotting. A lap with no coordinates comes back all zeros —
+    which the caller must read as "no distance to show", not as "the start line".
+    """
+    out = [0.0] * len(points)
+    total = 0.0
+    for i in range(1, len(points)):
+        step = math.hypot(points[i].x - points[i - 1].x, points[i].z - points[i - 1].z)
+        if step <= _MAX_STEP_M:
+            total += step
+        out[i] = round(total, 1)
+    return out
+
+
 def curvature_profile(points: list[LinePoint],
                       span_m: float = _CURV_SPAN_M) -> list[float]:
     """Signed curvature (1/m) at each point: negative = left, positive = right.
