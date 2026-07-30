@@ -227,6 +227,15 @@ Nella tendina dei giri, accanto al tempo, trovi **i gradi dell'asfalto** (es.
 di frenata si spostano di 10-20 metri, quindi due giri con temperature molto
 diverse sono due circuiti diversi e confrontarli dice poco.
 
+Sotto ogni curva c'è anche **dove, dentro la curva, è finito il tempo**: una
+barra divisa in *ingresso · apex · uscita · tratto dopo* (passa il mouse per i
+secondi di ciascun pezzo), o una frase sola quando è tutto in un punto — «di
+questi, 0.21s in ingresso». Non è una stima: è quel numero **spezzato**, e i
+pezzi risommano esattamente al tempo perso nella curva. Il «tratto dopo» c'è
+perché il debrief attribuisce a una curva anche il rettilineo che la segue — è
+lì che si paga un'uscita storta — e senza nominarlo gli altri tre non
+tornerebbero.
+
 A volte, sotto il titolo di una curva, trovi una riga col bordo azzurro che
 comincia con **↩**. Vuol dire che **la perdita di quella curva non è nata lì**:
 ci sei arrivato già più lento, e i km/h che ti mancano all'ingresso ce li avevi
