@@ -41,6 +41,7 @@
     <button class="tab" data-view="session" data-i18n="tab.session">Session</button>
     <button class="tab" data-view="compare" data-i18n="tab.compare">Compare</button>
     <button class="tab" data-view="map" data-i18n="tab.map">Map</button>
+    <button class="tab" data-view="line" data-i18n="tab.line">Line</button>
     <button class="tab" data-view="sectors" data-i18n="tab.sectors">Sectors</button>
     <button class="tab" data-view="dynamics" data-i18n="tab.dynamics">Dynamics</button>
     <button class="tab" data-view="progress" data-i18n="tab.trends">Trends</button>
@@ -89,13 +90,17 @@
   </div>
 
   <div id="view-compare" class="hidden">
-    <section id="summary" class="summary"></section>
+    <!-- The numbers and the shape of the lap side by side. The mini-map used to
+         sit on its own full-width row, where a track drawn to true proportions
+         filled a fifth of it and left the rest empty. -->
+    <div class="hero">
+      <section id="summary" class="summary"></section>
+      <div id="minimap-wrap" class="minimap hidden">
+        <canvas id="c-minimap"></canvas>
+      </div>
+    </div>
 
     <div id="readout" class="readout" data-i18n="readout.hint">Hover over the charts for point-by-point values…</div>
-
-    <div id="minimap-wrap" class="minimap hidden">
-      <canvas id="c-minimap"></canvas>
-    </div>
 
     <main id="charts">
       <div class="chart">
@@ -144,6 +149,42 @@
       </div>
     </main>
     <div id="map-missing" class="empty hidden" data-i18n="map.missing">This lap has no coordinates (recorded before the map update). Drive and record a new lap to see it here.</div>
+  </div>
+
+  <!-- The line you drove, corner by corner. The map tab shows the whole lap and
+       leaves the reading to the eye; this one zooms into one corner at a time and
+       puts the geometry in metres (see trajectory.py — the numbers are computed
+       server-side next to their wording). -->
+  <div id="view-line" class="hidden">
+    <div id="line-readout" class="readout" data-i18n="line.readout">Hover the corner to read speed and how far you were from the reference line…</div>
+    <section id="line-summary" class="summary"></section>
+    <nav id="line-chips" class="chips"></nav>
+    <div class="line-grid">
+      <div class="chart corner-map">
+        <h3 id="line-corner-title"></h3>
+        <canvas id="c-corner"></canvas>
+        <div class="map-legend">
+          <span class="swatch"><span class="sw-line you"></span> <span data-i18n="line.leg.you">your line</span></span>
+          <span class="swatch"><span class="sw-line ref"></span> <span data-i18n="line.leg.ref">reference</span></span>
+          <span class="swatch"><span class="sw-band"></span> <span data-i18n="line.leg.band">the gap between them</span></span>
+          <span class="swatch"><span class="marker">●</span> <span data-i18n="line.leg.apex">your slowest point</span></span>
+          <span class="swatch"><span class="marker ring">○</span> <span data-i18n="line.leg.apexref">the reference's</span></span>
+        </div>
+      </div>
+      <aside id="line-facts" class="facts"></aside>
+    </div>
+    <main>
+      <div class="chart">
+        <h3 data-i18n-html="chart.offset">Where you were on the road <small>(m from the reference line · above = to its right, below = to its left)</small></h3>
+        <canvas id="c-offset"></canvas>
+      </div>
+      <div class="chart">
+        <h3 data-i18n-html="chart.curv">How tight you are turning <small>(white = you, cyan = reference · further from the middle = tighter arc)</small></h3>
+        <canvas id="c-curv"></canvas>
+      </div>
+    </main>
+    <section id="line-table" class="debrief"></section>
+    <div id="line-missing" class="empty hidden" data-i18n="line.missing">These laps have no coordinates (the track map arrived with schema v3). Drive and record a new lap to see your line here.</div>
   </div>
 
   <div id="view-sectors" class="hidden">
