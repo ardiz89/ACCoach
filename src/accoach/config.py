@@ -84,6 +84,10 @@ class Config:
     # on the same network can open the report/engineer pages (see launcher QR).
     # Off by default — local-only is the safe baseline.
     lan: bool = False
+    # Start the silent recorder by itself when AC/ACC appears. Off unless asked:
+    # software that records you without being asked is a different product from
+    # the one anyone installed. Never starts the voice — see watch.py.
+    autorecord: bool = False
     server: ServerCfg = field(default_factory=ServerCfg)
     web: WebCfg = field(default_factory=WebCfg)
     acquire: AcquireCfg = field(default_factory=AcquireCfg)
@@ -105,6 +109,7 @@ _DEFAULT_TOML = """# HONE — user configuration
 
 language = "en"      # app language: "en" | "it" (coach voice + interface)
 lan = false          # allow phones/tablets on your network to open the pages (binds 0.0.0.0)
+autorecord = false   # start recording by itself when the game appears (never the voice)
 
 [server]
 host = "127.0.0.1"   # backend interface (keep 127.0.0.1 for local use)
@@ -178,6 +183,7 @@ def _to_toml(cfg: Config) -> str:
 
 language = "{cfg.language}"      # app language: "en" | "it" (coach voice + interface)
 lan = {b(cfg.lan)}          # allow phones/tablets on your network to open the pages (binds 0.0.0.0)
+autorecord = {b(cfg.autorecord)}   # start recording by itself when the game appears (never the voice)
 
 [server]
 host = "{cfg.server.host}"
