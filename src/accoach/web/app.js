@@ -1330,6 +1330,7 @@ function renderFlow(a) {
   wrap.classList.toggle("hidden", !hasChart);
   $("flow-chart-title").textContent = hasChart ? t("flow.chart." + s.chart) : "";
   if (hasChart) drawFlowChart(a, s);
+  drawFlowMap(a, hasChart ? s : null);
 
   $("flow-prev").disabled = FLOW_STEP === 0;
   $("flow-next").disabled = FLOW_STEP >= steps.length - 1;
@@ -1346,6 +1347,55 @@ function wireFlow() {
 // rather than a `window` parameter threaded through the shared primitives:
 // those are used by five other charts that all draw the whole lap, and adding
 // an option to each of them to serve one caller is how they stop being simple.
+// Where on the track this step is.
+//
+// The trace beside the card says what happened; it doesn't say *where*, and the
+// landing view is the one place a driver has no map to fall back on — the corner
+// name in the card is a name, not a place. This is the same delta-coloured line
+// the Map tab draws (same function, so the two can't disagree about which way
+// round the track is), with the step's own stretch traced over it in the accent.
+//
+// Nothing is invented here: the colours are the speed gap the map already
+// computes, and the highlighted span is the window the step's chart is zoomed
+// to. A lap with no coordinates hides the panel rather than drawing an empty box.
+function drawFlowMap(a, step) {
+  const cv = $("c-flow-map");
+  if (!cv) return;
+  const wrap = cv.parentNode;
+  wrap.classList.toggle("hidden", !a.has_map);
+  // A step about the whole lap (the opening headline) has the whole lap as its
+  // window, and lighting up every metre of track says nothing while hiding the
+  // one thing the map is for. No highlight there — and the caption has to say so
+  // too, or it promises a stretch that isn't drawn.
+  const spot = !!step && (step.to - step.from) <= 0.6;
+  const title = $("flow-map-title");
+  if (title) title.textContent = a.has_map ? t(spot ? "flow.map" : "flow.map.all") : "";
+  if (!a.has_map) return;
+  const hit = drawMapTo(cv, null, a, null);
+  if (!hit || !spot) return;
+
+  const { rv, X, Y } = hit;
+  const ctx = cv.getContext("2d");
+  ctx.save();
+  // Drawn BEHIND what's already on the canvas: a fat band on top would bury the
+  // delta colours under a cyan smear, and those colours are the map's whole
+  // point. `destination-over` only paints where the canvas is still transparent,
+  // so this comes out as a halo around the line, not a coat of paint over it.
+  ctx.globalCompositeOperation = "destination-over";
+  ctx.lineCap = "round"; ctx.lineJoin = "round";
+  ctx.strokeStyle = "rgba(34,211,206,0.85)"; ctx.lineWidth = 14;
+  ctx.beginPath();
+  let drawing = false;
+  for (let i = 0; i < rv.pos.length; i++) {
+    if (rv.pos[i] < step.from || rv.pos[i] > step.to) { drawing = false; continue; }
+    const px = X(rv.x[i]), py = Y(rv.z[i]);
+    drawing ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+    drawing = true;
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
 function drawFlowChart(a, step) {
   const cv = $("c-flow");
   if (!cv) return;

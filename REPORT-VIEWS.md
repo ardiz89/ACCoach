@@ -301,6 +301,15 @@ Misurate: «Il giro spiegato» 627 px su 1271, «Sessione» 636, «Settori» 518
 - **Giro spiegato**: da 1180 px in su è una schermata di *focus* — frase a
   sinistra, grafico a destra alto fino a 440 px, bottoni sotto la frase,
   il tutto centrato verticalmente. Sotto i 1180 px resta la pila di prima.
+  Sotto la frase c'è la **mappa del giro colorata a delta** (la stessa funzione
+  della scheda Mappa, così le due non possono litigare su come gira la pista) col
+  **tratto del passo in evidenza**: la traccia accanto dice *cosa* è successo, il
+  nome della curva nella scheda è un nome, non un posto. Due difetti visti a
+  schermo e corretti subito: al passo panoramico la finestra è tutto il giro e
+  accendeva l'intera pista (ora niente evidenza, e **la didascalia cambia** —
+  altrimenti promette un tratto che non c'è), e la banda sopra la linea
+  seppelliva i colori del delta (ora è disegnata **dietro**, con
+  `destination-over`: viene fuori un alone, non una mano di vernice).
 - **Sessione**: i giri e «cosa è cambiato» affiancati.
 - **Settori**: sotto il giro ideale, **ogni giro settore per settore**
   (`per_lap` in `/api/sectors`), col migliore di ogni colonna in evidenza. Il

@@ -642,14 +642,15 @@ body.no-data .empty { display: block; }
     grid-template-columns: minmax(420px, 580px) minmax(0, 1fr);
     /* The chart spans both content rows so the buttons sit under the card they
        belong to, instead of stranded below a column of empty space. */
-    grid-template-areas: "head head" "card chart" "nav  chart";
-    grid-template-rows: auto auto 1fr;
+    grid-template-areas: "head head" "card chart" "map  chart" "nav  chart";
+    grid-template-rows: auto auto auto 1fr;
     column-gap: 26px;
     align-items: start;
   }
   .flow-head { grid-area: head; }
   .flow-card { grid-area: card; margin-bottom: 0; }
   .flow-chart { grid-area: chart; margin-bottom: 0; }
+  .flow-map { grid-area: map; margin-top: 18px; }
   .flow-nav { grid-area: nav; margin-top: 20px; }
   .flow-chart canvas { height: clamp(300px, 36vh, 440px); }
 }
@@ -702,7 +703,11 @@ body.no-data .empty { display: block; }
 .flow-empty { color: var(--muted); margin: 0; }
 
 .flow-chart { margin-bottom: 18px; }
-.flow-chart h3 { color: var(--muted); font-size: 12px; font-weight: 400; }
+.flow-chart h3, .flow-map h3 { color: var(--muted); font-size: 12px; font-weight: 400; }
+/* The map beside the step. Taller than a trace because a track is a shape, and
+   proportional to the window so it doesn't crowd the card it sits under. */
+.flow-map { margin-bottom: 18px; }
+.flow-map canvas { height: clamp(200px, 26vh, 320px); }
 
 .flow-nav { display: flex; gap: 10px; align-items: center; }
 .flow-btn {
