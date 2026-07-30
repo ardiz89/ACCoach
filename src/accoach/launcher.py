@@ -47,6 +47,7 @@ except ImportError:  # pragma: no cover - optional dependency
 
 from . import brand
 from .config import load_config, save_config, set_language
+from .watch import POLL_MS, GameWatcher, game_is_running
 from .hub_home import HomePanel
 from .i18n import LANGUAGES, language_name, t
 from .netinfo import device_urls, port_open, qr_png
@@ -297,7 +298,17 @@ class SettingsPanel(QWidget):
         self._wean = QCheckBox()
         self._wean.setChecked(cfg.overlay.wean)
         row("set.wean", self._wean)
+
+        self._autorecord = QCheckBox()
+        self._autorecord.setChecked(cfg.autorecord)
+        row("set.autorecord", self._autorecord)
         root.addLayout(form)
+
+        # What the watcher is doing right now, under the box that turns it on:
+        # a setting whose effect is invisible until the next time you play is a
+        # setting nobody trusts.
+        self._watch_state = _hint("")
+        root.addWidget(self._watch_state)
 
         self._scale_hint = _hint(t("set.scale_hint"))
         root.addWidget(self._scale_hint)
@@ -346,8 +357,13 @@ class SettingsPanel(QWidget):
         cfg.voice.rate = self._rate.value()
         cfg.overlay.scale = round(self._scale.value(), 2)
         cfg.overlay.wean = self._wean.isChecked()
+        cfg.autorecord = self._autorecord.isChecked()
         save_config(cfg)
         self._saved_note.setText("✓ " + t("btn.save"))
+
+    def show_watch_state(self, state: str) -> None:
+        """One line under the checkbox: off / waiting / recording."""
+        self._watch_state.setText("" if state == "off" else t("watch." + state))
 
     def retranslate(self) -> None:
         self._title.setText(t("nav.settings").strip())
@@ -573,6 +589,19 @@ class MainWindow(QWidget):
         self._timer.start(1000)
         self._refresh_buttons()
 
+        # Watch for the game and start the silent recorder if the driver asked
+        # for it. Its own, slower clock: the button poll runs every second and
+        # this one opens shared-memory handles.
+        self._watcher = GameWatcher(
+            connected=game_is_running,
+            busy=self._is_recording,
+            start=lambda: self._spawn(["recorder"], True),
+            enabled=lambda: load_config().autorecord,
+        )
+        self._watch_timer = QTimer(self)
+        self._watch_timer.timeout.connect(self._watch_tick)
+        self._watch_timer.start(POLL_MS)
+
     # --- sidebar ---------------------------------------------------------
     def _build_sidebar(self) -> QWidget:
         side = QWidget()
@@ -722,6 +751,21 @@ class MainWindow(QWidget):
         self._prune()
         self._children.append((proc, args))
         self._refresh_buttons()
+
+    def _is_recording(self) -> bool:
+        """Is anything of ours already writing laps?
+
+        Coach Live records too, so it counts: two processes recording one session
+        would save every lap twice, and the copy is indistinguishable from a real
+        second lap.
+        """
+        self._prune()
+        return any(a and a[0] in ("recorder", "live", "coach", "compare")
+                   for _p, a in self._children)
+
+    def _watch_tick(self) -> None:
+        self._watcher.tick()
+        self._settings.show_watch_state(self._watcher.state)
 
     def _refresh_buttons(self) -> None:
         """Disable every action but the live-safe ones while Coach Live runs."""

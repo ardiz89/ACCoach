@@ -38,6 +38,15 @@ dall'exe sia da sorgente), così l'analisi li ritrova sempre.
 > La Home ti mostra l'ultima sessione già analizzata, quindi dopo la prima volta
 > è lì che arrivi per sapere com'è andata.
 
+**Se ti dimentichi di premere il pulsante.** In **Impostazioni** c'è
+*«Registra da solo quando parte il gioco»*: con l'hub aperto, HONE si accorge che
+AC/ACC è comparso e **avvia la registrazione da sé**, così una sessione che non
+hai armato non è una sessione persa. Parte **solo la registrazione silenziosa**:
+voce e overlay restano spenti finché non premi tu ▶ Coach Live — un coach che si
+mette a parlare perché hai aperto il gioco è un'intrusione. **Di default è
+spenta**, e se fermi la registrazione a mano resta ferma: non riparte finché non
+chiudi e riapri il gioco.
+
 Da riga di comando l'equivalente è:
 
 ```

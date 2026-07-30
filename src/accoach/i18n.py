@@ -284,6 +284,27 @@ _UI: dict[str, dict[str, str]] = {
         "it": "Quanto in fretta parla la voce, in parole al minuto. Intorno a "
               "165 è il parlato normale. Alzala se nelle curve veloci i "
               "consigli arrivano tardi, abbassala se ti perdi delle parole."},
+    # Auto-record: the only setting that makes HONE do something without being
+    # pressed, so the help says exactly what starts (and what doesn't).
+    "set.autorecord": {"en": "Record by itself when the game starts",
+                       "it": "Registra da solo quando parte il gioco"},
+    "set.autorecord.help": {
+        "en": "With the hub open, HONE notices AC/ACC appearing and starts "
+              "recording your laps on its own — so a session you forgot to arm "
+              "isn't a session you lost. It starts the silent recorder only: "
+              "the voice and the overlay stay off until you press Coach Live. "
+              "Off by default.",
+        "it": "Con l'hub aperto, HONE si accorge che AC/ACC è partito e comincia "
+              "a registrare i tuoi giri da solo — così una sessione che hai "
+              "dimenticato di avviare non è una sessione persa. Parte solo la "
+              "registrazione silenziosa: voce e overlay restano spenti finché "
+              "non premi Coach Live. Di default è spenta.",
+    },
+    "watch.waiting": {"en": "listening — waiting for the game",
+                      "it": "in ascolto — aspetto il gioco"},
+    "watch.recording": {"en": "the game is here — starting the recorder",
+                        "it": "il gioco c'è — avvio la registrazione"},
+    "watch.busy": {"en": "already recording", "it": "sto già registrando"},
     "set.wean": {"en": "Retire braking markers", "it": "Ritira i segnali di frenata"},
     "set.wean.help": {
         "en": "As you master a corner, the braking countdown stops appearing "
