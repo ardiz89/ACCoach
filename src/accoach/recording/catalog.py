@@ -78,6 +78,19 @@ CREATE TABLE IF NOT EXISTS focus_state (
     parked     TEXT NOT NULL DEFAULT '',
     PRIMARY KEY (car_key, track_key)
 );
+-- The training plan you accepted for a car+track: what you're working on and,
+-- crucially, *since when* — progress is measured only on laps recorded after
+-- that moment. Stored here rather than as a file of its own because it is the
+-- same kind of thing as the Focus coach's memory right above it: small,
+-- per-combo, and worthless without the laps it refers to. Survives a lap-table
+-- rebuild for the same reason (`_migrate` only drops `lap`).
+CREATE TABLE IF NOT EXISTS plan (
+    car_key     TEXT NOT NULL,
+    track_key   TEXT NOT NULL,
+    created_utc TEXT NOT NULL,
+    goals_json  TEXT NOT NULL,
+    PRIMARY KEY (car_key, track_key)
+);
 """
 
 
@@ -385,6 +398,48 @@ class LapCatalog:
             (self._slug(car_model), self._slug(track),
              _join_indices(mastered), _join_indices(parked)),
         )
+        self._conn.commit()
+
+    def load_plan(self, car_model: str, track: str) -> dict | None:
+        """The accepted training plan for this car+track, or None.
+
+        Returns the stored dict as-is (``coaching.plan.TrainingPlan.from_dict``
+        turns it back into objects): the catalog stores plans, it doesn't have
+        opinions about what a goal is.
+        """
+        row = self._conn.execute(
+            "SELECT created_utc, goals_json FROM plan WHERE car_key=? AND track_key=?",
+            (self._slug(car_model), self._slug(track)),
+        ).fetchone()
+        if row is None:
+            return None
+        import json
+
+        try:
+            goals = json.loads(row["goals_json"])
+        except ValueError:
+            return None
+        return {"car": car_model, "track": track,
+                "created_utc": row["created_utc"], "goals": goals}
+
+    def save_plan(self, car_model: str, track: str, created_utc: str,
+                  goals: list[dict]) -> None:
+        """Accept a plan for this car+track, replacing any previous one."""
+        import json
+
+        self._conn.execute(
+            """INSERT INTO plan(car_key, track_key, created_utc, goals_json)
+               VALUES (?, ?, ?, ?)
+               ON CONFLICT(car_key, track_key) DO UPDATE SET
+                 created_utc=excluded.created_utc, goals_json=excluded.goals_json""",
+            (self._slug(car_model), self._slug(track), created_utc,
+             json.dumps(goals, ensure_ascii=False)),
+        )
+        self._conn.commit()
+
+    def clear_plan(self, car_model: str, track: str) -> None:
+        self._conn.execute("DELETE FROM plan WHERE car_key=? AND track_key=?",
+                           (self._slug(car_model), self._slug(track)))
         self._conn.commit()
 
     def close(self) -> None:

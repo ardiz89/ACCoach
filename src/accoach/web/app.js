@@ -239,6 +239,7 @@ async function loadProgress(combo) {
       item(t("prog.sigma"), (c.std_ms / 1000).toFixed(3) + "s")
     : item(t("prog.dash"), t("prog.noValid"));
 
+  renderPlan(p.plan);
   drawProgress(p);
   drawTyres(p);
   renderLevels(p.levels);
@@ -254,6 +255,75 @@ async function loadProgress(combo) {
       `<span class="msg">${r.message}</span>` +
       `<span class="where">${t("recur.corners")}${r.corners.join(", ")}</span></div>`).join("");
   }
+}
+
+// --- the training plan ----------------------------------------------------
+// A plan you can look at between sessions: what you're working on, the number
+// that says when it's done, and whether the laps you've driven *since accepting
+// it* are meeting that number. Everything below is presentation — which goals,
+// what target and whether it's done are decided in coaching/plan.py.
+
+function renderPlan(plan) {
+  const el = $("plan");
+  if (!el) return;
+  if (!plan || !plan.goals.length) {
+    // No systematic weakness is a real answer, and a good one: say it rather
+    // than showing an empty box that looks like something failed to load.
+    el.innerHTML = `<h3>${t("plan.title")}</h3>` +
+      `<div class="clean">${t("plan.none")}</div>`;
+    return;
+  }
+  const head = plan.saved
+    ? `<span class="plan-since">${tf("plan.since", { when: fmtWhen(plan.created_utc) })}` +
+      (plan.laps_since ? ` · ${tf("plan.laps_since", { n: plan.laps_since })}` : "") + `</span>` +
+      `<button type="button" id="plan-drop" class="mini-btn">${t("plan.change")}</button>`
+    : `<span class="plan-since">${t("plan.proposed")}</span>` +
+      `<button type="button" id="plan-start" class="mini-btn primary">${t("plan.start")}</button>`;
+
+  el.innerHTML = `<h3>${t("plan.title")} ${head}</h3>` +
+    plan.goals.map((g, i) => planGoal(g, i, plan.saved)).join("");
+
+  const start = $("plan-start");
+  if (start) start.onclick = async () => {
+    start.disabled = true;
+    try {
+      await fetch("/api/plan", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ car: CURRENT.car, track: CURRENT.track,
+                               goals: plan.goals }),
+      });
+    } finally { loadProgress(CURRENT); }
+  };
+  const drop = $("plan-drop");
+  if (drop) drop.onclick = async () => {
+    drop.disabled = true;
+    const q = new URLSearchParams({ car: CURRENT.car, track: CURRENT.track });
+    try { await fetch("/api/plan?" + q.toString(), { method: "DELETE" }); }
+    finally { loadProgress(CURRENT); }
+  };
+}
+
+function planGoal(g, i, saved) {
+  const p = g.progress;
+  const done = p && p.done;
+  // The bar fills with laps that met the target, not with time: "2 of the 3
+  // laps it takes" is a thing you can act on tonight, a percentage isn't.
+  const bar = p
+    ? `<div class="plan-bar"><span style="width:${Math.min(100, (p.hits / Math.max(1, p.needed)) * 100).toFixed(0)}%"></span></div>` +
+      `<div class="plan-prog">${tf("plan.hits", { hits: p.hits, needed: p.needed })}` +
+      ` · ${tf("plan.now", { s: p.median_s.toFixed(2) })}` +
+      ` · ${tf("plan.best", { s: p.best_s.toFixed(2) })}</div>`
+    // A plan you haven't accepted has no "since", so it can't be missing laps
+    // either: it says what will be measured once you do.
+    : `<div class="plan-prog muted">${t(saved ? "plan.nolaps" : "plan.willmeasure")}</div>`;
+  return `<div class="goal${done ? " done" : ""}">` +
+    `<div class="goal-head"><span class="n">${i + 1}</span>` +
+    `<span class="corner">${g.name}</span>` +
+    (done ? `<span class="goal-done">${t("plan.done")}</span>` : "") + `</div>` +
+    `<div class="cause">${g.what}</div>` +
+    `<div class="goal-target">${tf("plan.target", { from: g.baseline_s.toFixed(2), to: g.target_s.toFixed(2) })}</div>` +
+    (g.fix ? `<div class="fix">💡 ${g.fix}</div>` : "") +
+    bar + `</div>`;
 }
 
 // Benchmark ladder: best -> ideal (consistency) -> PRO (skill ceiling).
