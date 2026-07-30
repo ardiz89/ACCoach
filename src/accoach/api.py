@@ -37,6 +37,15 @@ from .sessions import group_sessions
 from .telemetry.snapshot import format_lap_time
 from .track import detect_corners
 from .trackdata import name_corners
+from .trajectory import (
+    LinePoint,
+    build_line_report,
+    corner_path,
+    curvature_profile,
+    lateral_offsets,
+    line_points,
+    tag_text,
+)
 
 PORT = 8778
 _MAX_POINTS = 600   # downsample traces for the browser
@@ -114,37 +123,24 @@ def _balance_at(s) -> float:
     return 0.0
 
 
+def _points(samples) -> list[LinePoint]:
+    """Plotting samples as bare line points, in the order they'll be drawn.
+
+    Deliberately no filtering: the caller aligns the result with the same lap's
+    ``pos`` channel index by index, so dropping a sample here would shift a whole
+    trace by one against the chart it's overlaid on.
+    """
+    return [LinePoint(s.pos, s.car_x, s.car_z, s.speed_kmh, s.brake) for s in samples]
+
+
 def _lateral_offsets(review_s, base_s) -> list[float] | None:
-    """Signed lateral distance (m) of each review point from the reference line:
-    positive = to one side, negative = the other. For every reviewed sample, find
-    the nearest reference vertex and take the perpendicular offset from the local
-    reference direction (a cross product). Shows *where* the driver runs wide or
-    tight, in metres — the line-deviation view. None if either line has no map."""
-    bx = [s.car_x for s in base_s]
-    bz = [s.car_z for s in base_s]
-    n = len(bx)
-    if n < 3:
-        return None
-    out = []
-    for s in review_s:
-        px, pz = s.car_x, s.car_z
-        bestj, bestd = 0, float("inf")
-        for j in range(n):
-            dx = bx[j] - px
-            dz = bz[j] - pz
-            d = dx * dx + dz * dz
-            if d < bestd:
-                bestd = d
-                bestj = j
-        j0 = (bestj - 1) % n
-        j1 = (bestj + 1) % n
-        dxr = bx[j1] - bx[j0]
-        dzr = bz[j1] - bz[j0]
-        length = (dxr * dxr + dzr * dzr) ** 0.5 or 1.0
-        ox = px - bx[bestj]
-        oz = pz - bz[bestj]
-        out.append(round((dxr * oz - dzr * ox) / length, 2))
-    return out
+    """Signed lateral distance (m) of each review point from the reference line.
+
+    Thin wrapper over :func:`trajectory.lateral_offsets` — the line geometry lives
+    in one module now, so the Dynamics trace and the Trajectory view can't drift
+    into disagreeing about which side of the road the driver was on.
+    """
+    return lateral_offsets(_points(review_s), _points(base_s)) or None
 
 
 def _channels(lap) -> dict:
@@ -513,6 +509,132 @@ def create_api(
                 "recorded_utc": r["recorded_utc"],
             } for r in all_laps],
         }
+
+    def _two_laps(car: str, track: str, lap: str | None, baseline: str | None):
+        """Resolve the (review, baseline) pair the whole page is built around.
+
+        Same election rule as /api/analysis — including refusing a path the
+        catalog doesn't know, which is what keeps these endpoints from reading
+        arbitrary files when the app is exposed on the LAN.
+        """
+        with _catalog() as cat:
+            all_laps = cat.laps_for(car, track)
+            valid = [r for r in all_laps if r["valid"] and r["lap_time_ms"] > 0]
+            elected = _elected_path(cat, car, track, valid)
+        known = {r["path"] for r in all_laps}
+        base_path = _pick_known(baseline, elected, known)
+        rev_path = _pick_known(
+            lap, next((r["path"] for r in all_laps if r["valid"]), None), known)
+        if base_path is None or rev_path is None:
+            raise HTTPException(404, "no valid lap for this car+track")
+        try:
+            return load_lap(rev_path), load_lap(base_path), rev_path, base_path
+        except (OSError, ValueError):
+            raise HTTPException(404, "lap file unreadable")
+
+    @app.get("/api/trajectory")
+    def trajectory(
+        car: str = Query(...),
+        track: str = Query(...),
+        lap: str | None = Query(None),
+        baseline: str | None = Query(None),
+        lang: str | None = Query(None),
+        fmt: str = Query("json"),            # "csv" downloads the corner table
+    ):
+        # No return annotation on purpose: this route answers with a JSON body
+        # or a CSV attachment, and FastAPI would try to make a response model out
+        # of the union.
+        """The line you drove, corner by corner, against the reference's.
+
+        Its own endpoint rather than more fields on /api/analysis: the zoomed
+        corner crops are the only part of the report that needs the lap at full
+        resolution, and paying for them on every tab that only wants a delta
+        trace would be the wrong trade.
+        """
+        lg = lang or current_language()
+        review, base, rev_path, base_path = _two_laps(car, track, lap, baseline)
+        try:
+            corners = detect_corners(base.samples)
+            names = {c.index: n
+                     for c, n in zip(corners, name_corners(track, corners, lg))}
+            report = build_line_report(review, base, corners, names)
+        except Exception:  # noqa: BLE001 - a degenerate lap shouldn't 500 the UI
+            raise HTTPException(422, "lap could not be analysed")
+
+        you_pts, ref_pts = line_points(review), line_points(base)
+        rows = [{
+            "index": c.index, "name": c.name,
+            "direction": c.direction, "kind": c.kind,
+            "entry": c.entry, "apex": c.apex, "exit": c.exit,
+            "apex_you": c.apex_pos_you, "apex_ref": c.apex_pos_ref,
+            "entry_m": c.entry_m, "apex_m": c.apex_m, "exit_m": c.exit_m,
+            "widest_m": c.widest_m, "widest_pos": c.widest_pos,
+            "tightest_m": c.tightest_m,
+            "apex_shift_m": c.apex_shift_m,
+            "radius_m": c.radius_m, "radius_ref_m": c.radius_ref_m,
+            "extra_m": c.extra_m,
+            "vmin": c.vmin, "vmin_ref": c.vmin_ref,
+            "vexit": c.vexit, "vexit_ref": c.vexit_ref,
+            "tags": [tag_text(k, v, lg) for k, v in c.tags],
+        } for c in report.corners]
+
+        if fmt == "csv":
+            return _trajectory_csv(car, track, review, rows)
+
+        # Zoomed crops, one per corner: this is the only place the full-rate
+        # samples are worth serving, and only over a few hundred metres each.
+        for row, c in zip(rows, report.corners):
+            row["line"] = {
+                "you": corner_path(you_pts, c.entry, c.exit),
+                "ref": corner_path(ref_pts, c.entry, c.exit),
+            }
+
+        def _curve(points) -> dict:
+            k = curvature_profile(points)
+            step = max(1, len(points) // _MAX_POINTS)
+            return {"pos": [round(points[i].pos, 4) for i in range(0, len(points), step)],
+                    "k": [round(k[i], 5) for i in range(0, len(points), step)]}
+
+        return {
+            "car": car, "track": track,
+            "has_map": bool(report.corners) or report.path_m > 0,
+            "review": {"path": rev_path, "lap_time": format_lap_time(review.lap_time_ms),
+                       "lap_time_ms": review.lap_time_ms},
+            "reference": {"path": base_path, "lap_time": format_lap_time(base.lap_time_ms),
+                          "lap_time_ms": base.lap_time_ms},
+            "lap": {
+                "path_m": report.path_m, "ref_path_m": report.ref_path_m,
+                "extra_m": report.extra_m, "mean_off_m": report.mean_off_m,
+                "max_off_m": report.max_off_m, "max_off_where": report.max_off_where,
+            },
+            "corners": rows,
+            "curvature": {"you": _curve(you_pts), "ref": _curve(ref_pts)},
+        }
+
+    def _trajectory_csv(car: str, track: str, review, rows: list[dict]) -> Response:
+        """The corner table as a spreadsheet — the dataset behind the view.
+
+        Offered because the numbers here are the ones people take away to a
+        forum post or a spreadsheet of their own; a screenshot of a table is a
+        worse answer to that than a file.
+        """
+        import csv
+        import io
+
+        cols = ["index", "name", "direction", "kind", "entry", "apex", "exit",
+                "apex_shift_m", "entry_m", "apex_m", "exit_m", "widest_m",
+                "tightest_m", "radius_m", "radius_ref_m", "extra_m",
+                "vmin", "vmin_ref", "vexit", "vexit_ref"]
+        buf = io.StringIO()
+        w = csv.writer(buf)
+        w.writerow(cols)
+        for r in rows:
+            w.writerow([r.get(c) for c in cols])
+        stem = (f"{_slug(car)}__{_slug(track)}__line__"
+                f"{format_lap_time(review.lap_time_ms).replace(':', 'm').replace('.', 's')}")
+        return Response(
+            buf.getvalue(), media_type="text/csv",
+            headers={"Content-Disposition": f'attachment; filename="{stem}.csv"'})
 
     def _corner_moves(newer_path: str, older_path: str, track: str,
                       lg: str, limit: int = 3) -> dict:

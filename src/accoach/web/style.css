@@ -485,6 +485,86 @@ body.no-data .empty { display: block; }
   .map-grad .grad { width: 120px; }
 }
 
+/* --- The line you drove ---------------------------------------------------
+   A corner at a time: the zoomed map on the left, the same corner as numbers on
+   the right. Two columns because they are read together — the band on the map
+   says "you were wide here", the panel says how wide, in metres. */
+.chips {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  padding: 12px 24px 0;
+}
+.chip {
+  background: var(--inset); color: var(--muted);
+  border: 1px solid var(--line); border-radius: 999px;
+  padding: 5px 13px; font-size: 12px; font-family: var(--font-mono);
+  cursor: pointer; line-height: 1;
+}
+.chip:hover { border-color: var(--cyan); color: var(--text); }
+.chip.on { border-color: var(--cyan); color: var(--cyan); background: color-mix(in srgb, var(--cyan) 12%, transparent); }
+
+.line-grid {
+  display: grid; grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 18px; padding: 12px 24px 0; align-items: start;
+}
+.chart.corner-map canvas { height: 46vh; min-height: 320px; }
+.chart.corner-map h3 { font-size: 15px; font-weight: 600; }
+.chart.corner-map h3 small { color: var(--muted); font-weight: 400; font-size: 12px; margin-left: 6px; }
+/* Legend swatches that are lines, not squares: the difference between your line
+   and the reference's IS the dash pattern, so the key has to show it. */
+.map-legend .sw-line { width: 20px; height: 0; border-top: 3px solid var(--cyan); display: inline-block; }
+.map-legend .sw-line.ref { border-top: 2px dashed rgba(255,255,255,0.6); }
+.map-legend .sw-band { width: 18px; height: 11px; display: inline-block;
+  background: rgba(255,176,32,0.28); border: 1px solid rgba(255,176,32,0.5); border-radius: 3px; }
+
+.facts {
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: 12px; padding: 14px 16px;
+}
+.facts .tagrow { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.ltag {
+  font-size: 11px; line-height: 1.5; padding: 3px 9px; border-radius: 999px;
+  color: var(--amber); border: 1px solid var(--amber); background: #241a08;
+}
+.ltag.ok { color: var(--green); border-color: var(--green); background: transparent; }
+.fact {
+  display: grid; grid-template-columns: 1fr auto; gap: 4px 10px;
+  padding: 7px 0; border-top: 1px solid var(--line); align-items: baseline;
+}
+.fact:first-of-type { border-top: 0; }
+.fact .fk { color: var(--muted); font-size: 12px; }
+.fact .fv { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 13px; }
+.fact .fv .muted { color: var(--muted); font-size: 12px; }
+.fact .fs { grid-column: 1 / -1; color: var(--muted); font-size: 11px; }
+
+/* The corner table: same skin as the min-speed table, wider and clickable. */
+.vmin-table.wide { max-width: none; }
+.vmin-table.wide tbody tr { cursor: pointer; }
+.vmin-table.wide tbody tr:hover { background: var(--panel); }
+.vmin-table.wide tbody tr.on { background: color-mix(in srgb, var(--cyan) 10%, transparent); }
+.vmin-table td.vn.in { color: var(--cyan); }
+.vmin-table td.vn.out { color: var(--amber); }
+.mini-btn {
+  background: var(--inset); color: var(--muted);
+  border: 1px solid var(--line); border-radius: 7px;
+  padding: 3px 9px; font-size: 11px; cursor: pointer; margin-left: 10px;
+  font-family: var(--font-ui);
+}
+.mini-btn:hover { border-color: var(--cyan); color: var(--cyan); }
+
+/* Narrow screens: the facts panel goes under the map rather than squeezing it,
+   and the table scrolls inside its own box instead of taking the page sideways
+   (reading the report on a tablet next to the wheel is a documented use). */
+@media (max-width: 900px) {
+  .line-grid { grid-template-columns: 1fr; }
+  .chart.corner-map canvas { height: 40vh; min-height: 260px; }
+}
+@media (max-width: 700px) {
+  .chips { padding-left: 16px; padding-right: 16px; }
+  .line-grid { padding-left: 16px; padding-right: 16px; }
+  #line-table { overflow-x: auto; }
+  #line-table .vmin-table { min-width: 560px; }
+}
+
 /* --- The lap explained, one step at a time -------------------------------
    Deliberately narrow and roomy: this view competes with five dashboards for
    the same screen, and its only advantage is that it asks for one thing at a
@@ -620,4 +700,26 @@ body.no-data .empty { display: block; }
   .ses-lap .tags { grid-column: 1 / -1; }
   .move { grid-template-columns: 1fr auto; }
   .move .why { grid-column: 1 / -1; }
+}
+
+/* The gap magnifier sits with the corner chips but isn't one of them. */
+.chip-group { display: inline-flex; align-items: center; gap: 4px; margin-left: 14px; }
+.chip-label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+.chip.mag { padding: 5px 9px; }
+
+/* Compare's top row: the numbers on the left, the shape of the lap on the right.
+   The mini-map is drawn to true proportions, so on a full-width row a track that
+   isn't square leaves most of it empty — beside the summary it fills its box and
+   the fold gets one screen more of the charts people came for. */
+.hero {
+  display: grid; grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 18px; align-items: center;
+  border-bottom: 1px solid var(--line);
+}
+.hero .summary { border-bottom: 0; }
+.hero .minimap { padding: 10px 24px 10px 0; }
+.hero .minimap canvas { height: 150px; }
+@media (max-width: 860px) {
+  .hero { grid-template-columns: 1fr; gap: 0; }
+  .hero .minimap { padding: 0 16px 12px; }
 }

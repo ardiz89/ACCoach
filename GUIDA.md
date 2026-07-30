@@ -179,6 +179,15 @@ Cosa trovi:
   Tre grafici allineati alla posizione in pista — **delta sul giro**, **velocità**
   (tu vs riferimento), **gas/freno** — con le bande delle curve. Passa il mouse:
   un mirino ti dà i valori puntuali. Esporti il giro in **CSV/JSON**.
+- **Traiettoria**: dove sei passato, curva per curva. La curva ingrandita con la
+  tua linea e quella di riferimento, e **la fascia colorata fra le due è lo
+  scarto**; se a scala vera è troppo sottile per vedersi, il selettore «scarto
+  ×3 / ×5» la ingrandisce (il grafico lo dichiara, e la barra di scala resta
+  reale). Accanto, la stessa curva in numeri: quanto eri **dentro o fuori** in
+  ingresso, all'apex e in uscita, se il tuo punto più lento cade **prima o dopo**
+  di quello del riferimento, quanto stretto è l'**arco** che hai percorso e
+  quanti **metri di strada in più** hai fatto. Sotto, la tabella di tutte le
+  curve, scaricabile in **CSV**.
 - **Andamento**: l'andamento dei tempi nel tempo, la **costanza** (migliore/media/
   scarto), e gli **errori ricorrenti** ("5× Porta più velocità in curva · Curve 1, 2").
 

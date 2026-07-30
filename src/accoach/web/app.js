@@ -37,6 +37,12 @@ function refreshPalette() {
 document.body.classList.toggle("cb-safe", localStorage.getItem("hone_cb") === "1");
 refreshPalette();
 
+// A value that rounds to nothing prints as "0", never "-0.0": a minus sign in
+// front of a zero reads as a measurement, and there isn't one.
+function fixz(v, d) {
+  return (Math.abs(v) < 0.5 * Math.pow(10, -d) ? 0 : v).toFixed(d);
+}
+
 function fmtMs(ms) {
   if (!ms || ms <= 0) return "--:--.---";
   const m = Math.floor(ms / 60000);
@@ -121,6 +127,8 @@ function tourSteps() {
     { sel: "#vmin", title: t("tour.a4.t"), text: t("tour.a4.x"), before: compare },
     { sel: "#debrief", title: t("tour.a5.t"), text: t("tour.a5.x"), before: compare },
     { sel: "#debrief", title: t("tour.a7.t"), text: t("tour.a7.x"), before: compare },
+    { sel: "#c-corner", title: t("tour.a10.t"), text: t("tour.a10.x"),
+      before: () => showView("line") },
     { sel: "#combo", title: t("tour.a8.t"), text: t("tour.a8.x") },
     { sel: ".export", title: t("tour.a6.t"), text: t("tour.a6.x") },
   ];
@@ -138,6 +146,7 @@ function wireTour() {
 // colour-blind toggle.
 function redrawCurrentView() {
   if (VIEW === "map") { if (DATA) drawMap(DATA, null); }
+  else if (VIEW === "line") { LINE ? renderLine(null) : loadLine(); }
   else if (VIEW === "dynamics") { if (DATA) drawDynamics(LAST_HOVER); }
   else if (VIEW === "sectors") { if (CURRENT) loadSectors(); }
   else if (VIEW === "progress") { if (CURRENT) loadProgress(CURRENT); }
@@ -331,7 +340,7 @@ function drawProgress(p) {
   ctx.fillStyle = "#ffffff";
   for (let i = 0; i < n; i++) { ctx.beginPath(); ctx.arc(X(i), Y(times[i]), 3, 0, 6.283); ctx.fill(); }
 
-  ctx.fillStyle = "rgba(255,255,255,0.45)"; ctx.font = "10px Segoe UI";
+  ctx.fillStyle = "rgba(255,255,255,0.45)"; ctx.font = "10px " + MONO;
   ctx.fillText(fmtMs(realLo), w - 70, Y(realLo) - 4);
   ctx.fillText(fmtMs(realHi), w - 70, Y(realHi) + 12);
 }
@@ -417,7 +426,7 @@ function drawTyreLines(cv, tyres, field, digits, unit) {
     for (const p of pts) { ctx.beginPath(); ctx.arc(X(p.i), Y(p.v[wi]), 2.5, 0, 6.283); ctx.fill(); }
   });
 
-  ctx.fillStyle = "rgba(255,255,255,0.45)"; ctx.font = "10px Segoe UI";
+  ctx.fillStyle = "rgba(255,255,255,0.45)"; ctx.font = "10px " + MONO;
   ctx.fillText(rhi.toFixed(digits) + unit, w - 44, Y(rhi) + 10);
   ctx.fillText(rlo.toFixed(digits) + unit, w - 44, Y(rlo) - 3);
   return true;
@@ -666,7 +675,7 @@ function drawMapTo(canvas, missing, a, cx, mode) {
   }
 
   // Corner labels at each apex.
-  ctx.fillStyle = "rgba(255,255,255,0.85)"; ctx.font = "11px Segoe UI";
+  ctx.fillStyle = "rgba(255,255,255,0.85)"; ctx.font = "11px " + UI_FONT;
   for (const c of a.corners || []) {
     const i = nearest(rv.pos, c.apex);
     ctx.fillText("T" + (c.index + 1), X(rv.x[i]) + 6, Y(rv.z[i]) - 4);
@@ -693,7 +702,7 @@ function drawMapTo(canvas, missing, a, cx, mode) {
   ctx.closePath(); ctx.fill();
   // start/finish dot + label
   ctx.beginPath(); ctx.arc(sx, sy, 5, 0, 6.283); ctx.fill();
-  ctx.font = "bold 11px Segoe UI";
+  ctx.font = "bold 11px " + UI_FONT;
   ctx.fillText("S/F", sx - ux * 14 - 6, sy - uy * 14 + 4);
 
   // Hover marker.
@@ -746,6 +755,10 @@ async function loadCombo(combo, lapPath, baselinePath) {
   if (VIEW === "map") { $("map-readout").innerHTML = MAP_READOUT_DEFAULT(); drawMap(a, null); }
   if (VIEW === "dynamics") drawDynamics(null);
   if (VIEW === "sectors") loadSectors();
+  // The line view is its own request (the zoomed corners need the lap at full
+  // resolution), so a new lap invalidates it whether or not the tab is open.
+  LINE = null;
+  if (VIEW === "line") loadLine();
   wireHover();
 }
 
@@ -1035,7 +1048,7 @@ function drawFlowChart(a, step) {
   // nothing. Real corner names are long ("Variante della Roggia") and on a wide
   // window they overlap into an unreadable smear, which is worse than a band
   // with no caption.
-  ctx.font = "10px Segoe UI";
+  ctx.font = "10px " + MONO;
   for (const c of a.corners) {
     if (c.exit < lo || c.entry > hi) continue;
     const x0 = X(c.entry), band = X(c.exit) - x0;
@@ -1084,7 +1097,7 @@ function drawFlowChart(a, step) {
     min = Math.floor(min - 5); max = Math.ceil(max + 5);
     trace(rf.pos, rf.speed, min, max, "#3fd0e0", 1.5);
     trace(rv.pos, rv.speed, min, max, "#ffffff", 2);
-    axisLabel(ctx, w, max + " km/h", min + " km/h");
+    axisLabel(ctx, w, h, max + " km/h", min + " km/h");
   } else if (step.chart === "inputs") {
     trace(rf.pos, rf.throttle, 0, 1, "#1d8f43", 1, [4, 3]);
     trace(rf.pos, rf.brake, 0, 1, "#9e2a22", 1, [4, 3]);
@@ -1097,7 +1110,7 @@ function drawFlowChart(a, step) {
     ctx.strokeStyle = "rgba(255,255,255,0.25)";
     ctx.beginPath(); ctx.moveTo(0, h / 2); ctx.lineTo(w, h / 2); ctx.stroke();
     trace(d.pos, d.delta_s, -m, m, "#ffffff", 2);
-    axisLabel(ctx, w, `+${m.toFixed(2)}s`, `-${m.toFixed(2)}s`);
+    axisLabel(ctx, w, h, `+${m.toFixed(2)}s`, `-${m.toFixed(2)}s`);
   }
 }
 
@@ -1229,6 +1242,13 @@ function openLapInCompare(path) {
 }
 
 // --- canvas drawing -------------------------------------------------------
+// Canvas doesn't inherit the page's font stack, so every chart was drawing in
+// the system UI face while everything around it used the brand ones. Numbers go
+// in the mono face for the same reason the CSS puts them there: a column of
+// figures that shifts sideways as the digits change is hard to compare.
+const UI_FONT = '"Inter", system-ui, "Segoe UI", sans-serif';
+const MONO = '"JetBrains Mono", ui-monospace, Consolas, monospace';
+
 function setup(cv) {
   const r = window.devicePixelRatio || 1;
   const w = cv.clientWidth, h = cv.clientHeight;
@@ -1243,8 +1263,60 @@ function cornerBands(ctx, w, h, corners) {
   ctx.fillStyle = "rgba(120,140,170,0.10)";
   for (const c of corners) ctx.fillRect(c.entry * w, 0, (c.exit - c.entry) * w, h);
   ctx.fillStyle = "rgba(255,255,255,0.35)";
-  ctx.font = "10px Segoe UI";
+  ctx.font = "10px " + UI_FONT;
   for (const c of corners) ctx.fillText("T" + (c.index + 1), c.apex * w - 6, 11);
+}
+
+// Horizontal reference lines with their value, drawn INSIDE the plot against the
+// left edge. Every trace on this page maps x straight from track position
+// (`pos * w`), and so do the crosshair and both hover handlers — a proper axis
+// gutter would mean re-deriving all of that in eight places. A label on a dark
+// chip costs nothing and answers the question the charts couldn't: not "is this
+// high" but "how high". `fmt` returning "" draws the lines without a scale,
+// which is what a channel in radians wants.
+function gridY(ctx, w, h, lo, hi, fmt, ticks) {
+  ticks = ticks || 4;
+  ctx.save();
+  ctx.font = "10px " + MONO;
+  for (let i = 0; i <= ticks; i++) {
+    const y = Math.round((i / ticks) * h) + 0.5;
+    if (i > 0 && i < ticks) {
+      ctx.strokeStyle = "rgba(255,255,255,0.07)";
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+    }
+    const label = fmt(hi - (i / ticks) * (hi - lo));
+    if (!label) continue;
+    // Keep the top and bottom labels inside the box rather than half-clipped.
+    const ty = i === 0 ? 11 : (i === ticks ? h - 4 : y + 3.5);
+    const tw = ctx.measureText(label).width;
+    ctx.fillStyle = "rgba(11,14,18,0.72)";
+    ctx.fillRect(3, ty - 9, tw + 6, 12);
+    ctx.fillStyle = "rgba(255,255,255,0.5)";
+    ctx.fillText(label, 6, ty);
+  }
+  ctx.restore();
+}
+
+// Vertical hairlines every 10% of the lap, so a feature can be placed along the
+// track without counting corner bands. Only the chart at the bottom of a stack
+// asks for `labels` — repeating the same axis under every trace is noise.
+function gridX(ctx, w, h, labels) {
+  ctx.save();
+  ctx.strokeStyle = "rgba(255,255,255,0.05)";
+  ctx.lineWidth = 1;
+  for (let i = 1; i < 10; i++) {
+    const x = Math.round((i / 10) * w) + 0.5;
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
+  }
+  if (labels) {
+    ctx.font = "10px " + MONO;
+    ctx.fillStyle = "rgba(255,255,255,0.4)";
+    for (const q of [0.25, 0.5, 0.75]) {
+      ctx.fillText(Math.round(q * 100) + "%", q * w - 11, h - 4);
+    }
+  }
+  ctx.restore();
 }
 
 function line(ctx, w, h, pos, vals, lo, hi, color, lw) {
@@ -1264,9 +1336,14 @@ function crosshair(ctx, w, h, cx) {
   ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
 }
 
-function axisLabel(ctx, w, top, bottom) {
-  ctx.fillStyle = "rgba(255,255,255,0.45)"; ctx.font = "10px Segoe UI";
-  ctx.fillText(top, w - 62, 12); ctx.fillText(bottom, w - 62, 145);
+// Semantic captions in the top-right / bottom-right corners ("left" / "right",
+// "spin" / "lock") — the two ends of an axis whose *units* mean nothing to a
+// driver. Where the number is the point, use gridY instead.
+// Takes the height: the bottom caption used to be pinned at y=145, which is
+// right for exactly one chart size and silently wrong for every other.
+function axisLabel(ctx, w, h, top, bottom) {
+  ctx.fillStyle = "rgba(255,255,255,0.45)"; ctx.font = "10px " + UI_FONT;
+  ctx.fillText(top, w - 62, 12); ctx.fillText(bottom, w - 62, h - 5);
 }
 
 function redraw(cx) {
@@ -1288,10 +1365,11 @@ function drawDelta(a, cx) {
   ctx.fillStyle = tint(PAL.slow); ctx.fillRect(0, 0, w, h / 2);
   ctx.fillStyle = tint(PAL.fast); ctx.fillRect(0, h / 2, w, h / 2);
   cornerBands(ctx, w, h, a.corners);
+  gridX(ctx, w, h);
+  gridY(ctx, w, h, -m, m, (v) => (v > 0 ? "+" : "") + fixz(v, 2) + "s");
   ctx.strokeStyle = "rgba(255,255,255,0.25)";
   ctx.beginPath(); ctx.moveTo(0, h / 2); ctx.lineTo(w, h / 2); ctx.stroke();
   line(ctx, w, h, d.pos, d.delta_s, -m, m, "#ffffff", 2);
-  axisLabel(ctx, w, `+${m.toFixed(2)}s`, `-${m.toFixed(2)}s`);
   crosshair(ctx, w, h, cx);
 }
 
@@ -1302,9 +1380,10 @@ function drawSpeed(a, cx) {
   for (const v of rv.speed.concat(rf.speed)) { lo = Math.min(lo, v); hi = Math.max(hi, v); }
   lo = Math.floor(lo - 5); hi = Math.ceil(hi + 5);
   cornerBands(ctx, w, h, a.corners);
+  gridX(ctx, w, h);
+  gridY(ctx, w, h, lo, hi, (v) => Math.round(v) + "");
   line(ctx, w, h, rf.pos, rf.speed, lo, hi, "#3fd0e0", 1.5);
   line(ctx, w, h, rv.pos, rv.speed, lo, hi, "#ffffff", 1.5);
-  axisLabel(ctx, w, hi + " km/h", lo + " km/h");
   crosshair(ctx, w, h, cx);
 }
 
@@ -1312,6 +1391,8 @@ function drawInputs(a, cx) {
   const { ctx, w, h } = setup($("c-inputs"));
   const rv = a.review.channels, rf = a.reference.channels;
   cornerBands(ctx, w, h, a.corners);
+  gridX(ctx, w, h);
+  gridY(ctx, w, h, 0, 1, (v) => Math.round(v * 100) + "%");
   // Reference inputs (faint, dashed) — see where it braked / got on the gas.
   ctx.save();
   ctx.setLineDash([4, 3]);
@@ -1335,7 +1416,7 @@ function drawSteer(a, cx) {
   const rv = a.review.channels, rf = a.reference.channels;
   const sv = rv && rv.steer, sf = rf && rf.steer;
   if (!Array.isArray(sv) || !sv.length) {
-    ctx.fillStyle = "rgba(255,255,255,0.35)"; ctx.font = "11px Segoe UI";
+    ctx.fillStyle = "rgba(255,255,255,0.35)"; ctx.font = "11px " + UI_FONT;
     ctx.fillText("No steering data for this lap.", 10, h / 2);
     return;
   }
@@ -1343,6 +1424,8 @@ function drawSteer(a, cx) {
   for (const v of sv) m = Math.max(m, Math.abs(v));
   if (Array.isArray(sf)) for (const v of sf) m = Math.max(m, Math.abs(v));
   cornerBands(ctx, w, h, a.corners);
+  gridX(ctx, w, h, true);      // the bottom chart of the Compare stack: label it
+  gridY(ctx, w, h, -m, m, () => "");
   // Zero line.
   ctx.strokeStyle = "rgba(255,255,255,0.25)";
   ctx.beginPath(); ctx.moveTo(0, h / 2); ctx.lineTo(w, h / 2); ctx.stroke();
@@ -1355,7 +1438,7 @@ function drawSteer(a, cx) {
   }
   // Your steering (white, solid).
   line(ctx, w, h, rv.pos, sv, -m, m, "#ffffff", 1.5);
-  axisLabel(ctx, w, "left", "right");
+  axisLabel(ctx, w, h, "left", "right");
   crosshair(ctx, w, h, cx);
 }
 
@@ -1473,7 +1556,7 @@ function drawGG(a, cx) {
 
   // Reference grid rings at each 1g, faint, with a value label.
   ctx.strokeStyle = "rgba(255,255,255,0.12)"; ctx.fillStyle = "rgba(255,255,255,0.35)";
-  ctx.font = "10px Segoe UI"; ctx.lineWidth = 1;
+  ctx.font = "10px " + MONO; ctx.lineWidth = 1;
   for (let g = 1; g <= gmax + 0.01; g += 1) {
     ctx.beginPath(); ctx.arc(cx0, cy0, g * unit, 0, 6.283); ctx.stroke();
     ctx.fillText(g + "g", cx0 + 2, cy0 - g * unit + 11);
@@ -1498,7 +1581,7 @@ function drawGG(a, cx) {
     ctx.setLineDash([]);
   }
   // Axis captions.
-  ctx.fillStyle = "rgba(255,255,255,0.5)"; ctx.font = "10px Segoe UI";
+  ctx.fillStyle = "rgba(255,255,255,0.5)"; ctx.font = "10px " + MONO;
   ctx.fillText(t("dyn.gg.accel"), cx0 + 4, cy0 - R + 10);
   ctx.fillText(t("dyn.gg.brake"), cx0 + 4, cy0 + R - 3);
   ctx.fillText(t("dyn.gg.lat"), cx0 + R - 34, cy0 - 4);
@@ -1528,12 +1611,14 @@ function drawSlip(a, cx) {
   for (const v of sf) m = Math.max(m, Math.abs(v));
   for (const v of sr) m = Math.max(m, Math.abs(v));
   cornerBands(ctx, w, h, a.corners);
+  gridX(ctx, w, h);
+  gridY(ctx, w, h, -m, m, (v) => (Math.abs(v) < 1e-9 ? "0" : v.toFixed(2)));
   // Zero line.
   ctx.strokeStyle = "rgba(255,255,255,0.25)";
   ctx.beginPath(); ctx.moveTo(0, h / 2); ctx.lineTo(w, h / 2); ctx.stroke();
   line(ctx, w, h, pos, sr, -m, m, "#FFB020", 1.4);   // rear
   line(ctx, w, h, pos, sf, -m, m, "#22D3CE", 1.5);   // front
-  axisLabel(ctx, w, t("dyn.slip.spin"), t("dyn.slip.lock"));
+  axisLabel(ctx, w, h, t("dyn.slip.spin"), t("dyn.slip.lock"));
   crosshair(ctx, w, h, cx);
 }
 
@@ -1551,10 +1636,11 @@ function drawLineOffset(a, cx) {
   let m = 1.0;
   for (const v of off) m = Math.max(m, Math.abs(v));
   cornerBands(ctx, w, h, a.corners);
+  gridX(ctx, w, h);
+  gridY(ctx, w, h, -m, m, (v) => fixz(v, 1) + " m");
   ctx.strokeStyle = "rgba(255,255,255,0.25)";
   ctx.beginPath(); ctx.moveTo(0, h / 2); ctx.lineTo(w, h / 2); ctx.stroke();
   line(ctx, w, h, pos, off, -m, m, "#c58cff", 1.6);
-  axisLabel(ctx, w, `+${m.toFixed(1)}m`, `-${m.toFixed(1)}m`);
   crosshair(ctx, w, h, cx);
 }
 
@@ -1572,11 +1658,13 @@ function drawYaw(a, cx) {
   for (const v of st) ms = Math.max(ms, Math.abs(v));
   for (const v of yw) my = Math.max(my, Math.abs(v));
   cornerBands(ctx, w, h, a.corners);
+  gridX(ctx, w, h);
+  gridY(ctx, w, h, -my, my, () => "");
   ctx.strokeStyle = "rgba(255,255,255,0.25)";
   ctx.beginPath(); ctx.moveTo(0, h / 2); ctx.lineTo(w, h / 2); ctx.stroke();
   line(ctx, w, h, pos, yw.map((v) => -v), -my, my, "#FFB020", 1.4);
   line(ctx, w, h, pos, st, -ms, ms, "#ffffff", 1.5);
-  axisLabel(ctx, w, "left", "right");
+  axisLabel(ctx, w, h, "left", "right");
   crosshair(ctx, w, h, cx);
 }
 
@@ -1591,10 +1679,11 @@ function drawShift(a, cx) {
   if (!rpm.length) return;
   let lo = Infinity, hi = -Infinity;
   for (const v of rpm) { lo = Math.min(lo, v); hi = Math.max(hi, v); }
-  const rlo = lo, rhi = hi;
   if (hi === lo) hi = lo + 1;
   const pad = (hi - lo) * 0.1; lo -= pad; hi += pad;
   cornerBands(ctx, w, h, a.corners);
+  gridX(ctx, w, h, true);
+  gridY(ctx, w, h, lo, hi, (v) => Math.round(v / 100) * 100 + "");
   line(ctx, w, h, pos, rpm, lo, hi, "#34E08A", 1.4);
   const gnum = (g) => { const n = parseInt(g, 10); return isNaN(n) ? null : n; };
   for (let i = 1; i < gear.length; i++) {
@@ -1607,9 +1696,6 @@ function drawShift(a, cx) {
     else { ctx.moveTo(x, y); ctx.lineTo(x - 4, y - 6); ctx.lineTo(x + 4, y - 6); }
     ctx.closePath(); ctx.fill();
   }
-  ctx.fillStyle = "rgba(255,255,255,0.45)"; ctx.font = "10px Segoe UI";
-  ctx.fillText(Math.round(rhi) + "", w - 46, 12);
-  ctx.fillText(Math.round(rlo) + "", w - 46, h - 4);
   crosshair(ctx, w, h, cx);
 }
 
@@ -1649,7 +1735,7 @@ function drawTyreOverLap(cv, wheels, pos, corners, cx, unit) {
     line(ctx, w, h, pos, vals, lo, hi, s.color, 1.4);
     ctx.restore();
   }
-  ctx.fillStyle = "rgba(255,255,255,0.45)"; ctx.font = "10px Segoe UI";
+  ctx.fillStyle = "rgba(255,255,255,0.45)"; ctx.font = "10px " + MONO;
   ctx.fillText(rhi.toFixed(unit ? 0 : 1) + unit, w - 44, 12);
   ctx.fillText(rlo.toFixed(unit ? 0 : 1) + unit, w - 44, h - 4);
   crosshair(ctx, w, h, cx);
@@ -1692,6 +1778,444 @@ function updateDynReadout(a, p) {
   if (!el) return;
   if (p == null) { el.innerHTML = t("dyn.readout"); return; }
   el.innerHTML = dynReadoutHTML(a, p);
+}
+
+// --- the line you drove ---------------------------------------------------
+// The Map tab draws two lines over a whole lap and leaves the reading to the
+// eye. This one takes a corner at a time and answers the questions the eye
+// can't: how far off the reference line you were, in metres and on which side;
+// where your slowest point sits compared with the reference's; how tight an arc
+// you actually drove. Every number arrives from /api/trajectory already decided
+// and already worded (see trajectory.py) — the code below is drawing.
+
+let LINE = null;        // last /api/trajectory payload
+let LINE_I = 0;         // which corner is on screen
+let LINE_HIT = null;    // screen transform of the zoomed corner, for its hover
+// How much the gap between the two lines is exaggerated on the zoomed map.
+// At true scale a corner is 200 m across and a good driver's line sits 1-2 m
+// off the reference: a few pixels, which is a real answer to a question nobody
+// can read. So the gap can be blown up — and when it is, the canvas says so and
+// the scale bar keeps measuring real ground, because an unlabelled exaggeration
+// is just a wrong drawing.
+let LINE_MAG = 1;
+
+async function loadLine() {
+  if (!CURRENT) return;
+  const q = new URLSearchParams({ car: CURRENT.car, track: CURRENT.track });
+  const lap = $("lap").value, base = $("baseline").value;
+  if (lap) q.set("lap", lap);
+  if (base) q.set("baseline", base);
+  setPanelLoading("line-summary", t("load.line"));
+  let L;
+  try { L = await getJSON("/api/trajectory?" + q.toString()); }
+  catch (e) {
+    LINE = null;
+    $("line-summary").innerHTML =
+      `<div class="item"><div class="v">—</div><div class="k">${t("err.line")}</div></div>`;
+    $("line-chips").innerHTML = ""; $("line-facts").innerHTML = "";
+    $("line-table").innerHTML = "";
+    return;
+  }
+  LINE = L;
+  if (LINE_I >= L.corners.length) LINE_I = 0;
+  renderLine(null);
+}
+
+// Metres, signed, with the side named in words. A bare "-1.4 m" needs a legend
+// every time it's read; "1.4 m outside" doesn't.
+function offWord(m, corner) {
+  if (m == null || !isFinite(m)) return "–";
+  const v = Math.abs(m);
+  if (v < 0.15) return t("line.same");
+  // With no direction there is no inside: the corner wasn't classified (no
+  // coordinates on the baseline), so we say which side of the line instead of
+  // guessing which side of the road.
+  const known = corner && corner.direction;
+  const word = known ? (m > 0 ? t("line.in") : t("line.out"))
+                     : (m > 0 ? t("line.right") : t("line.left"));
+  return `${v.toFixed(1)} m ${word}`;
+}
+
+function renderLine(cx) {
+  const L = LINE;
+  const shell = [$("line-chips"), $("line-facts"), $("line-table")];
+  const grid = document.querySelector(".line-grid");
+  const charts = document.querySelector("#view-line main");
+  if (!L || !L.corners.length) {
+    // Two different nothings, and they need different words: a lap recorded
+    // before the map existed has no geometry at all, while a lap of a track
+    // where no corner was detected has geometry we simply can't cut up.
+    const noMap = !L || !L.has_map;
+    $("line-missing").classList.toggle("hidden", !noMap);
+    if (grid) grid.classList.add("hidden");
+    if (charts) charts.classList.add("hidden");
+    for (const el of shell) if (el) el.innerHTML = "";
+    $("line-summary").innerHTML = (L && !noMap)
+      ? `<div class="item"><div class="v">—</div><div class="k">${t("line.none")}</div></div>` : "";
+    return;
+  }
+  $("line-missing").classList.add("hidden");
+  if (grid) grid.classList.remove("hidden");
+  if (charts) charts.classList.remove("hidden");
+  LINE_I = Math.max(0, Math.min(LINE_I, L.corners.length - 1));
+
+  const lap = L.lap;
+  const item = (k, v, sub, cls) =>
+    `<div class="item"><div class="k">${k}</div><div class="v ${cls || ""}">${v}</div>` +
+    (sub ? `<div class="k">${sub}</div>` : "") + `</div>`;
+  const extra = lap.extra_m;
+  $("line-summary").innerHTML =
+    item(t("line.extra"), `${extra >= 0 ? "+" : ""}${extra.toFixed(1)} m`,
+         tf("line.extraHint", { you: lap.path_m, ref: lap.ref_path_m }),
+         extra > 0 ? "warn" : "") +
+    item(t("line.mean"), `${lap.mean_off_m.toFixed(2)} m`) +
+    item(t("line.worst"), `${lap.max_off_m.toFixed(1)} m`, lap.max_off_where) +
+    item(t("line.corners"), L.corners.length);
+
+  $("line-chips").innerHTML =
+    L.corners.map((c, i) =>
+      `<button type="button" class="chip${i === LINE_I ? " on" : ""}" data-i="${i}">` +
+      `T${c.index + 1}</button>`).join("") +
+    `<span class="chip-group"><span class="chip-label">${t("line.mag")}</span>` +
+    [1, 3, 5].map((z) =>
+      `<button type="button" class="chip mag${z === LINE_MAG ? " on" : ""}" ` +
+      `data-mag="${z}">×${z}</button>`).join("") + `</span>`;
+  for (const b of $("line-chips").querySelectorAll(".chip[data-i]")) {
+    b.onclick = () => { LINE_I = parseInt(b.dataset.i, 10); renderLine(null); };
+  }
+  for (const b of $("line-chips").querySelectorAll(".chip[data-mag]")) {
+    b.onclick = () => { LINE_MAG = parseInt(b.dataset.mag, 10); renderLine(null); };
+  }
+
+  const c = L.corners[LINE_I];
+  const shape = [c.direction ? t("line.dir." + c.direction) : "",
+                 c.kind ? t("line.kind." + c.kind) : ""].filter(Boolean).join(" · ");
+  $("line-corner-title").innerHTML =
+    `<b>${c.name}</b>${shape ? ` <small>${shape}</small>` : ""}`;
+
+  renderLineFacts(c);
+  renderLineTable(L);
+  LINE_HIT = drawCornerZoom(L, c, cx);
+  drawOffsetTrace(L, c, cx);
+  drawCurvature(L, c, cx);
+  updateLineReadout(L, cx);
+}
+
+function renderLineFacts(c) {
+  const el = $("line-facts");
+  if (!el) return;
+  const row = (k, v, sub) =>
+    `<div class="fact"><span class="fk">${k}</span><span class="fv">${v}</span>` +
+    (sub ? `<span class="fs">${sub}</span>` : "") + `</div>`;
+  const shift = c.apex_shift_m;
+  const apex = Math.abs(shift) < 0.5
+    ? t("line.sameSpot")
+    : `${Math.abs(shift).toFixed(0)} m ${shift < 0 ? t("line.earlier") : t("line.later")}`;
+  const arc = (c.radius_m && c.radius_ref_m)
+    ? `${Math.round(c.radius_m)} m <span class="muted">${t("line.f.vs")} ${Math.round(c.radius_ref_m)} m</span>`
+    : "–";
+  const dist = `${c.extra_m >= 0 ? "+" : ""}${c.extra_m.toFixed(1)} m`;
+  el.innerHTML =
+    (c.tags.length
+      ? `<div class="tagrow">` + c.tags.map((x) => `<span class="ltag">${x}</span>`).join("") + `</div>`
+      : `<div class="tagrow"><span class="ltag ok">${t("line.same")}</span></div>`) +
+    row(t("line.f.apex"), apex) +
+    row(t("line.f.entry"), offWord(c.entry_m, c)) +
+    row(t("line.f.apexoff"), offWord(c.apex_m, c)) +
+    row(t("line.f.exit"), offWord(c.exit_m, c)) +
+    row(t("line.f.widest"), c.widest_m ? `${c.widest_m.toFixed(1)} m ${t("line.out")}` : t("line.same")) +
+    row(t("line.f.radius"), arc) +
+    row(t("line.f.extra"), dist) +
+    row(t("line.f.vmin"), `${c.vmin} <span class="muted">${t("line.f.vs")} ${c.vmin_ref} km/h</span>`) +
+    row(t("line.f.vexit"), `${c.vexit} <span class="muted">${t("line.f.vs")} ${c.vexit_ref} km/h</span>`);
+}
+
+// The dataset behind the view: one row per corner, the selected one highlighted,
+// clickable. Sorted by corner number rather than by severity — this is the table
+// you read alongside a lap, and a table whose rows move around between two laps
+// is one you have to re-read every time.
+function renderLineTable(L) {
+  const el = $("line-table");
+  if (!el) return;
+  const cell = (m, c) => {
+    const cls = m == null || Math.abs(m) < 0.15 ? "" : (m > 0 ? "in" : "out");
+    return `<td class="vn ${cls}">${offWord(m, c)}</td>`;
+  };
+  let body = "";
+  L.corners.forEach((c, i) => {
+    const shift = Math.abs(c.apex_shift_m) < 0.5 ? "–"
+      : `${c.apex_shift_m > 0 ? "+" : "−"}${Math.abs(c.apex_shift_m).toFixed(0)} m`;
+    const dv = c.vmin - c.vmin_ref;
+    body += `<tr class="${i === LINE_I ? "on" : ""}" data-i="${i}">` +
+      `<td class="vc">${c.name}</td>` +
+      `<td class="vn">${shift}</td>` +
+      cell(c.entry_m, c) + cell(c.apex_m, c) + cell(c.exit_m, c) +
+      `<td class="vn">${c.radius_m ? Math.round(c.radius_m) : "–"}` +
+      `<span class="muted"> / ${c.radius_ref_m ? Math.round(c.radius_ref_m) : "–"}</span></td>` +
+      `<td class="vn">${c.extra_m >= 0 ? "+" : ""}${c.extra_m.toFixed(1)}</td>` +
+      `<td class="vn ${dv > 0 ? "faster" : (dv < 0 ? "slower" : "")}">` +
+      `${c.vmin}<span class="muted"> / ${c.vmin_ref}</span></td></tr>`;
+  });
+  el.innerHTML =
+    `<h3>${t("line.table")} <button type="button" id="line-csv" class="mini-btn" ` +
+    `title="${t("line.csv.title")}">${t("line.csv")}</button></h3>` +
+    `<table class="vmin-table wide"><thead><tr>` +
+    `<th>${t("line.t.corner")}</th><th>${t("line.t.apex")}</th>` +
+    `<th>${t("line.t.entry")}</th><th>${t("line.t.apexoff")}</th><th>${t("line.t.exit")}</th>` +
+    `<th>${t("line.t.radius")}</th><th>${t("line.t.extra")}</th><th>${t("line.t.vmin")}</th>` +
+    `</tr></thead><tbody>${body}</tbody></table>`;
+  for (const tr of el.querySelectorAll("tbody tr")) {
+    tr.onclick = () => { LINE_I = parseInt(tr.dataset.i, 10); renderLine(null); };
+  }
+  const btn = $("line-csv");
+  if (btn) btn.onclick = () => {
+    const q = new URLSearchParams({ car: CURRENT.car, track: CURRENT.track,
+                                    fmt: "csv", lang: LANG() });
+    if ($("lap").value) q.set("lap", $("lap").value);
+    if ($("baseline").value) q.set("baseline", $("baseline").value);
+    window.location = "/api/trajectory?" + q.toString();
+  };
+}
+
+// One corner, zoomed. The two lines with the area between them shaded: the band
+// IS the difference, which is the one thing a driver wants from this picture and
+// the one thing two overlaid lines at track scale never show.
+function drawCornerZoom(L, c, cx) {
+  const cv = $("c-corner");
+  if (!cv) return null;
+  const { ctx, w, h } = setup(cv);
+  const you = c.line.you, ref = c.line.ref;
+  if (!you.x.length || !ref.x.length) return null;
+
+  // Pair each of your points with the reference point at the same track
+  // position — a running pointer, since both crops are sorted by position.
+  const pair = [];
+  let j = 0;
+  for (let i = 0; i < you.pos.length; i++) {
+    while (j + 1 < ref.pos.length &&
+           Math.abs(ref.pos[j + 1] - you.pos[i]) < Math.abs(ref.pos[j] - you.pos[i])) j++;
+    pair.push(j);
+  }
+  // Your line as drawn: the real one at ×1, otherwise pushed away from the
+  // reference by the magnification. The difference between paired points is
+  // almost entirely lateral (they're matched by track position), so blowing up
+  // the whole vector reads as "further off line" and not as "further round the
+  // corner".
+  const yx = [], yz = [];
+  for (let i = 0; i < you.x.length; i++) {
+    const k = pair[i];
+    yx.push(ref.x[k] + (you.x[i] - ref.x[k]) * LINE_MAG);
+    yz.push(ref.z[k] + (you.z[i] - ref.z[k]) * LINE_MAG);
+  }
+
+  let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+  for (const s of [{ x: yx, z: yz }, ref]) {
+    for (let i = 0; i < s.x.length; i++) {
+      minX = Math.min(minX, s.x[i]); maxX = Math.max(maxX, s.x[i]);
+      minZ = Math.min(minZ, s.z[i]); maxZ = Math.max(maxZ, s.z[i]);
+    }
+  }
+  const m = 34, spanX = (maxX - minX) || 1, spanZ = (maxZ - minZ) || 1;
+  const sc = Math.min((w - 2 * m) / spanX, (h - 2 * m) / spanZ);
+  const offX = (w - spanX * sc) / 2, offZ = (h - spanZ * sc) / 2;
+  // Same mirrored projection as the track map (AC/ACC world coords are
+  // left-handed), so a corner looks the way it does from the cockpit and the
+  // two views can be read one after the other without flipping your head.
+  const X = (x) => (maxX - x) * sc + offX;
+  const Y = (z) => h - ((z - minZ) * sc + offZ);
+
+  // The band between the lines.
+  ctx.beginPath();
+  for (let i = 0; i < yx.length; i++) {
+    const px = X(yx[i]), py = Y(yz[i]);
+    i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+  }
+  for (let i = yx.length - 1; i >= 0; i--) {
+    const k = pair[i];
+    ctx.lineTo(X(ref.x[k]), Y(ref.z[k]));
+  }
+  ctx.closePath();
+  ctx.fillStyle = "rgba(255,176,32,0.16)";
+  ctx.fill();
+
+  // Reference line: faint dashed, like the map's.
+  ctx.save();
+  ctx.setLineDash([6, 5]);
+  ctx.strokeStyle = "rgba(255,255,255,0.55)"; ctx.lineWidth = 2;
+  ctx.beginPath();
+  for (let i = 0; i < ref.x.length; i++) {
+    const px = X(ref.x[i]), py = Y(ref.z[i]);
+    i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+  }
+  ctx.stroke();
+  ctx.restore();
+
+  // Your line, thick and solid.
+  ctx.lineCap = "round"; ctx.lineJoin = "round";
+  ctx.strokeStyle = "#22D3CE"; ctx.lineWidth = 3;
+  ctx.beginPath();
+  for (let i = 0; i < yx.length; i++) {
+    const px = X(yx[i]), py = Y(yz[i]);
+    i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+  }
+  ctx.stroke();
+
+  // Braking points, same encoding as the track map: yours a filled triangle,
+  // the reference's a hollow ring. On a zoomed corner this is where "brake
+  // later" stops being an abstraction.
+  const onset = (s, i) => s.brake[i] >= 0.3 && s.brake[i - 1] < 0.3;
+  ctx.fillStyle = "#FFB020";
+  for (let i = 1; i < you.brake.length; i++) {
+    if (!onset(you, i)) continue;
+    const px = X(yx[i]), py = Y(yz[i]);
+    ctx.beginPath();
+    ctx.moveTo(px, py - 6); ctx.lineTo(px - 5, py - 14); ctx.lineTo(px + 5, py - 14);
+    ctx.closePath(); ctx.fill();
+  }
+  ctx.strokeStyle = "rgba(255,255,255,0.8)"; ctx.lineWidth = 2;
+  for (let i = 1; i < ref.brake.length; i++) {
+    if (!onset(ref, i)) continue;
+    ctx.beginPath(); ctx.arc(X(ref.x[i]), Y(ref.z[i]), 4.5, 0, 6.283); ctx.stroke();
+  }
+
+  // The two apexes (slowest point of each line through this corner).
+  const at = (s, pos) => {
+    let best = 0, bd = Infinity;
+    for (let i = 0; i < s.pos.length; i++) {
+      const d = Math.abs(s.pos[i] - pos);
+      if (d < bd) { bd = d; best = i; }
+    }
+    return best;
+  };
+  const ai = at(you, c.apex_you), ri = at(ref, c.apex_ref);
+  ctx.fillStyle = "#22D3CE";
+  ctx.beginPath(); ctx.arc(X(yx[ai]), Y(yz[ai]), 5, 0, 6.283); ctx.fill();
+  ctx.strokeStyle = "rgba(255,255,255,0.85)"; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(X(ref.x[ri]), Y(ref.z[ri]), 5.5, 0, 6.283); ctx.stroke();
+
+  // Direction of travel, from the first samples of your line.
+  const k = Math.min(6, yx.length - 1);
+  let ux = X(yx[k]) - X(yx[0]), uy = Y(yz[k]) - Y(yz[0]);
+  const ul = Math.hypot(ux, uy) || 1; ux /= ul; uy /= ul;
+  const sx = X(yx[0]), sy = Y(yz[0]);
+  const tipX = sx + ux * 22, tipY = sy + uy * 22;
+  ctx.strokeStyle = "rgba(255,255,255,0.75)"; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(tipX, tipY); ctx.stroke();
+  const ah = 6, nx = -uy, ny = ux;
+  ctx.fillStyle = "rgba(255,255,255,0.75)";
+  ctx.beginPath();
+  ctx.moveTo(tipX, tipY);
+  ctx.lineTo(tipX - ux * ah + nx * ah * 0.6, tipY - uy * ah + ny * ah * 0.6);
+  ctx.lineTo(tipX - ux * ah - nx * ah * 0.6, tipY - uy * ah - ny * ah * 0.6);
+  ctx.closePath(); ctx.fill();
+
+  // Scale bar — without it the zoom level is unknowable and "2 m wide" has no
+  // size on screen. Rounded to a number a human reads off a ruler.
+  const want = 90 / sc;
+  const nice = [1, 2, 5, 10, 20, 25, 50, 100, 200].reduce(
+    (a, b) => (Math.abs(b - want) < Math.abs(a - want) ? b : a));
+  const px0 = 14, py0 = h - 14, len = nice * sc;
+  ctx.strokeStyle = "rgba(255,255,255,0.55)"; ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(px0, py0 - 4); ctx.lineTo(px0, py0); ctx.lineTo(px0 + len, py0);
+  ctx.lineTo(px0 + len, py0 - 4); ctx.stroke();
+  ctx.fillStyle = "rgba(255,255,255,0.55)"; ctx.font = "11px " + MONO;
+  ctx.fillText(nice + " m", px0 + len + 6, py0 + 1);
+  if (LINE_MAG > 1) {
+    ctx.fillStyle = "#FFB020"; ctx.font = "11px " + UI_FONT;
+    ctx.fillText(tf("line.mag.note", { n: LINE_MAG }), 14, 18);
+  }
+
+  // Hover marker.
+  if (cx != null) {
+    const i = at(you, cx);
+    ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(X(yx[i]), Y(yz[i]), 7, 0, 6.283); ctx.stroke();
+  }
+  return { pos: you.pos, X: (i) => X(yx[i]), Y: (i) => Y(yz[i]) };
+}
+
+// The whole lap's distance from the reference line, with the corner you're
+// looking at picked out. Reuses the analysis payload's line_offset rather than
+// asking the backend for the same numbers twice.
+function drawOffsetTrace(L, corner, cx) {
+  const cv = $("c-offset");
+  if (!cv) return;
+  const { ctx, w, h } = setup(cv);
+  const off = DATA && DATA.review && DATA.review.line_offset;
+  const pos = DATA && DATA.review && DATA.review.channels.pos;
+  if (!Array.isArray(off) || !off.length) return;
+  let m = 1.0;
+  for (const v of off) m = Math.max(m, Math.abs(v));
+  cornerBands(ctx, w, h, (DATA && DATA.corners) || []);
+  // The corner on screen, lit up: the trace and the zoom are the same corner.
+  ctx.fillStyle = "rgba(34,211,206,0.10)";
+  ctx.fillRect(corner.entry * w, 0, (corner.exit - corner.entry) * w, h);
+  gridY(ctx, w, h, -m, m, (v) => fixz(v, 1) + " m");
+  ctx.strokeStyle = "rgba(255,255,255,0.3)";
+  ctx.beginPath(); ctx.moveTo(0, h / 2); ctx.lineTo(w, h / 2); ctx.stroke();
+  line(ctx, w, h, pos, off, -m, m, "#c58cff", 1.6);
+  crosshair(ctx, w, h, cx);
+}
+
+// Curvature: how tight the arc under the car is, yours against the reference's.
+// Plotted with the sign flipped so left is up, matching the steering trace — the
+// two are read together (steering is what you asked for, this is what you got).
+function drawCurvature(L, corner, cx) {
+  const cv = $("c-curv");
+  if (!cv) return;
+  const { ctx, w, h } = setup(cv);
+  const you = L.curvature.you, ref = L.curvature.ref;
+  if (!you.k.length) return;
+  // Scaled to a high percentile, not the maximum: one kerb strike would
+  // otherwise flatten the whole lap into a line through the middle.
+  const all = you.k.concat(ref.k).map(Math.abs).sort((a, b) => a - b);
+  const m = Math.max(0.002, all[Math.floor(all.length * 0.98)] || 0.01);
+  cornerBands(ctx, w, h, (DATA && DATA.corners) || []);
+  ctx.fillStyle = "rgba(34,211,206,0.10)";
+  ctx.fillRect(corner.entry * w, 0, (corner.exit - corner.entry) * w, h);
+  // Gridlines with no scale on purpose: curvature is in 1/m, which nobody feels,
+  // and labelling the ticks with the radius they stand for prints the same two
+  // numbers mirrored either side of a middle that means "straight". The radius
+  // in metres is where a driver reads it — the facts panel, the table and the
+  // hover readout, one corner at a time.
+  gridY(ctx, w, h, -m, m, () => "");
+  ctx.strokeStyle = "rgba(255,255,255,0.3)";
+  ctx.beginPath(); ctx.moveTo(0, h / 2); ctx.lineTo(w, h / 2); ctx.stroke();
+  // Flipped so left is up (matching the steering trace, which is read with it)
+  // and clamped to the box: the scale is a percentile, so a kerb strike would
+  // otherwise draw a spike straight through the chart below.
+  const flip = (a) => a.map((v) => Math.max(-m, Math.min(m, -v)));
+  line(ctx, w, h, ref.pos, flip(ref.k), -m, m, "#3fd0e0", 1.3);
+  line(ctx, w, h, you.pos, flip(you.k), -m, m, "#ffffff", 1.5);
+  axisLabel(ctx, w, h, t("line.left"), t("line.right"));
+  crosshair(ctx, w, h, cx);
+}
+
+function updateLineReadout(L, p) {
+  const el = $("line-readout");
+  if (!el) return;
+  if (p == null) { el.innerHTML = t("line.readout"); return; }
+  LAST_HOVER = p;
+  const c = L.corners[LINE_I];
+  const off = DATA && DATA.review && DATA.review.line_offset;
+  const pos = DATA && DATA.review && DATA.review.channels.pos;
+  let bits = `<b class="muted">${c.name}</b> &nbsp;·&nbsp; ` +
+             `<b>${t("ro.pos")} ${(p * 100).toFixed(1)}%</b>`;
+  if (Array.isArray(off) && pos) {
+    const i = nearest(pos, p);
+    bits += ` &nbsp;·&nbsp; ${t("line.ro.off")} <b>${offWord(off[i] * (c.direction === "left" ? -1 : 1), c)}</b>`;
+  }
+  const ki = nearest(L.curvature.you.pos, p);
+  const k = Math.abs(L.curvature.you.k[ki] || 0);
+  if (k > 0.001) bits += ` &nbsp;·&nbsp; ${t("line.ro.radius")} <b>${Math.round(1 / k)} m</b>`;
+  if (DATA) {
+    const rv = DATA.review.channels, rf = DATA.reference.channels;
+    const iv = nearest(rv.pos, p), ir = nearest(rf.pos, p);
+    bits += ` &nbsp;·&nbsp; ${t("ro.speed")} <b>${rv.speed[iv].toFixed(0)}</b> ` +
+            `<span class="muted">(${t("ro.ref")} ${rf.speed[ir].toFixed(0)})</span>`;
+  }
+  el.innerHTML = bits;
 }
 
 // --- hover / readout ------------------------------------------------------
@@ -1814,6 +2338,33 @@ function wireHover() {
     });
     gg.addEventListener("mouseleave", () => { if (DATA) drawDynamics(null); });
   }
+  // The zoomed corner: x isn't track position, so find the nearest point of
+  // your line in screen space and reuse its position, like the map does.
+  const corner = $("c-corner");
+  if (corner) {
+    corner.addEventListener("mousemove", (e) => {
+      if (!LINE || !LINE_HIT) return;
+      const rect = corner.getBoundingClientRect();
+      const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+      let best = -1, bd = Infinity;
+      for (let i = 0; i < LINE_HIT.pos.length; i++) {
+        const dx = LINE_HIT.X(i) - mx, dy = LINE_HIT.Y(i) - my, dd = dx * dx + dy * dy;
+        if (dd < bd) { bd = dd; best = i; }
+      }
+      if (best >= 0) renderLine(LINE_HIT.pos[best]);
+    });
+    corner.addEventListener("mouseleave", () => { if (LINE) renderLine(null); });
+  }
+  const offset = $("c-offset");
+  if (offset) {
+    offset.addEventListener("mousemove", (e) => {
+      if (!LINE) return;
+      const rect = offset.getBoundingClientRect();
+      renderLine(Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width)));
+    });
+    offset.addEventListener("mouseleave", () => { if (LINE) renderLine(null); });
+  }
+
   const ribbon = $("c-balance");
   if (ribbon) {
     ribbon.addEventListener("mousemove", (e) => {

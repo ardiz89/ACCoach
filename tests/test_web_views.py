@@ -132,6 +132,31 @@ def test_the_flow_is_rendered_when_a_lap_loads_and_when_the_tab_opens():
     assert 'VIEW === "flow"' in _APPJS
 
 
+# --- the line view is wired -----------------------------------------------
+
+@pytest.mark.parametrize("el", ("line-summary", "line-chips", "line-facts",
+                                "line-table", "line-readout", "line-missing",
+                                "c-corner", "c-offset", "c-curv"))
+def test_the_line_view_has_the_elements_its_code_reaches_for(el):
+    assert f'id="{el}"' in _HTML
+    assert f'"{el}"' in _APPJS
+
+
+def test_the_line_view_reloads_when_the_lap_changes():
+    """It's a separate request from /api/analysis (the zoomed corners need the
+    lap at full resolution), so nothing else invalidates it."""
+    block = _APPJS.split("async function loadCombo")[1].split("\n}")[0]
+    assert "LINE = null;" in block
+    assert 'VIEW === "line"' in block
+
+
+def test_an_exaggerated_gap_says_so_on_the_canvas():
+    """The zoom can blow up the distance between the two lines. An unlabelled
+    exaggeration is just a wrong drawing, so the label is part of the feature."""
+    assert "LINE_MAG > 1" in _APPJS
+    assert "line.mag.note" in _APPJS
+
+
 def test_a_language_switch_refetches_rather_than_repainting():
     """Every word of the flow, the debrief and the corner names is written by
     the backend in the requested language; repainting the cached payload leaves
@@ -173,10 +198,11 @@ def test_the_consistency_rows_stack_on_a_narrow_screen():
     assert "white-space: normal" in block
 
 
-@pytest.mark.parametrize("view", ("flow", "session"))
+@pytest.mark.parametrize("view", ("flow", "session", "line"))
 def test_the_new_views_declare_a_narrow_layout(view):
-    """Both were built two-column-ish; neither was checked on a phone until the
+    """All were built two-column-ish; none was checked on a phone until the
     page was measured in a 390px frame."""
-    marker = {"flow": ".flow-btn.ghost", "session": ".ses-lap"}[view]
+    marker = {"flow": ".flow-btn.ghost", "session": ".ses-lap",
+              "line": ".line-grid"}[view]
     tail = _CSS[_CSS.index("@media (max-width: 700px)"):]
     assert marker in tail, f"no narrow-screen rule for the {view} view"
