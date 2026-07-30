@@ -432,6 +432,13 @@
     "lap.offTrack.at": { en: `at`, it: `in` },
     "lap.offTrack.why": { en: `You went off track on this lap (3 or more wheels off), so it can't become your reference.`,
                           it: `In questo giro sei uscito di pista (3+ ruote fuori), quindi non può diventare il tuo riferimento.` },
+    // The four stretches of a corner. Same words the debrief uses for the cause
+    // ("understeer at the apex"), so one word keeps meaning one place.
+    "phase.entry":     { en: `entry`, it: `ingresso` },
+    "phase.apex":      { en: `apex`, it: `apex` },
+    "phase.exit":      { en: `exit`, it: `uscita` },
+    "phase.after":     { en: `the run after`, it: `tratto dopo` },
+
     "debrief.title":   { en: `Where to improve`, it: `Dove migliorare` },
     "debrief.clean":   { en: `Clean lap — no significant time lost per corner.`,
                          it: `Giro pulito — nessuna perdita di tempo significativa per curva.` },

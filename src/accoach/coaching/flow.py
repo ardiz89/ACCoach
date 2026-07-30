@@ -118,6 +118,10 @@ def _corner_step(loss) -> FlowStep:
     detail = loss.detail.strip()
     if loss.cause and detail.startswith(loss.cause):
         detail = detail[len(loss.cause):].strip()
+    # Where inside the corner the clock ran. It belongs with the figures, not
+    # with the cause: it doesn't say what went wrong, it says where to look.
+    if loss.phase_note:
+        detail = f"{detail} {loss.phase_note}".strip()
 
     # The chain, when there is one, belongs in the body: it is a *why*, and it
     # is the one sentence on the card that can move the driver to another corner.

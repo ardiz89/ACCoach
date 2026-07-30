@@ -809,3 +809,16 @@ body.no-data .empty { display: block; }
   .plan { padding-left: 16px; padding-right: 16px; }
   .plan h3 { flex-wrap: wrap; }
 }
+
+/* Where inside a corner the time went: one loss cut into its parts, so one hue
+   in four strengths rather than four colours. Labels ride inside the segments
+   that are wide enough to hold them. */
+.phase-bar {
+  display: flex; height: 16px; border-radius: 5px; overflow: hidden;
+  margin: 4px 0 2px; background: var(--inset);
+}
+.phase-bar .ph {
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; color: #1A1205; white-space: nowrap; overflow: hidden;
+  font-family: var(--font-ui); cursor: help;
+}

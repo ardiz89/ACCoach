@@ -26,6 +26,7 @@ from ..track import Corner
 from ..trackdata import corner_name, landmark_at
 from .analyzer import _BRAKE_ON, _LOSS_MS, CornerStats, _braked_early, classify_corner
 from .chain import link_corners
+from .phases import phase_note, split_loss
 from .cue import CueCategory
 from .diagnosis import corner_symptoms, dominant_symptom
 from .tuning import tuning_for_car
@@ -140,6 +141,10 @@ class CornerLoss:
     # fine, in the confident voice of a diagnosis.
     inherited: str = ""
     inherited_from: int = -1
+    # Where inside the corner the clock ran (coaching/phases.py). A
+    # decomposition of ``lost_ms``, not an estimate: the parts add back up to it.
+    phases: list = field(default_factory=list)
+    phase_note: str = ""
     min_speed_live: float = 0.0
     min_speed_ref: float = 0.0
     name: str = ""             # friendly corner name (set by the API layer)
@@ -583,6 +588,9 @@ def build_lap_debrief(lap: Lap, reference: Reference, corners: list[Corner],
         delta_entry = first.t_ms - reference.time_at(first.pos)
         delta_exit = last.t_ms - reference.time_at(last.pos)
         lost = delta_exit - delta_entry
+        # The same window, cut into the four stretches of the corner. Computed
+        # here rather than later so it can only ever be a split of *this* number.
+        phases = split_loss(window, reference, c)
 
         thr_live = _mean([s.throttle for s in inside])
         brk_live = _mean([s.brake for s in inside])
@@ -633,6 +641,7 @@ def build_lap_debrief(lap: Lap, reference: Reference, corners: list[Corner],
             category=cue.category,
             message=titles.get(cue.category, cue.message),
             detail=detail, fix=fix, cause=cause,
+            phases=phases, phase_note=phase_note(phases, lost, lg),
             min_speed_live=vmin_live, min_speed_ref=vmin_ref,
             # Name the corner HERE rather than leaving it to the caller. The web
             # app did it and the live path didn't, so the overlay and the voice
@@ -727,6 +736,8 @@ def format_debrief(d: LapDebrief, top: int = 3, consistency: dict | None = None,
                 # the driver goes and works on, and folding it into the one
                 # above would bury it at the end of a long sentence.
                 lines.append(f"      ↩ {loss.inherited}")
+            if loss.phase_note:
+                lines.append(f"      · {loss.phase_note}")
     elif not d.is_reference:
         lines.append(f"  {f['clean']}")
 

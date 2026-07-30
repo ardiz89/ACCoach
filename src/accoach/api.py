@@ -593,6 +593,11 @@ def create_api(
                 # When this corner's loss was made in the corner before it
                 # (coaching/chain.py). Empty most of the time, on purpose.
                 "inherited": x.inherited, "inherited_from": x.inherited_from,
+                # Where inside the corner the time went. A split of `lost_s`,
+                # so the parts add back up to it (coaching/phases.py).
+                "phases": [{"phase": p.phase, "lost_s": round(p.lost_ms / 1000.0, 3)}
+                           for p in x.phases],
+                "phase_note": x.phase_note,
                 "vmin_live": round(x.min_speed_live, 0),
                 "vmin_ref": round(x.min_speed_ref, 0),
                 "apex": x.apex_pos,

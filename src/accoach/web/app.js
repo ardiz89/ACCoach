@@ -1061,6 +1061,38 @@ function drawWaterfall(a) {
   el.innerHTML = `<h3>${t("wf.title")}</h3>` + rows;
 }
 
+// Where inside the corner the time went, as one bar cut into its parts.
+// Deliberately one hue in four strengths rather than four colours: this is one
+// loss split up, not four things being compared, and a four-colour bar with no
+// legend is a puzzle. Segments carry their own label when there's room — the
+// same rule the guided flow uses for corner names — and a tooltip always.
+const _PHASE_TINT = { entry: 0.95, apex: 0.75, exit: 0.55, after: 0.35 };
+
+// The bar when the loss is split across the corner, the sentence when it all
+// happened in one place. Never both: they are the same fact, and a card that
+// says it twice reads as two findings.
+function phaseBlock(loss) {
+  const bar = phaseBar(loss);
+  if (bar) return bar;
+  return loss.phase_note ? `<div class="detail">${loss.phase_note}</div>` : "";
+}
+
+function phaseBar(loss) {
+  const parts = (loss.phases || []).filter((p) => p.lost_s > 0.005);
+  if (parts.length < 2 || !(loss.lost_s > 0)) return "";
+  const total = parts.reduce((a, p) => a + p.lost_s, 0);
+  if (total <= 0) return "";
+  const seg = parts.map((p) => {
+    const pct = (p.lost_s / total) * 100;
+    const label = t("phase." + p.phase);
+    return `<span class="ph" style="width:${pct.toFixed(1)}%;` +
+      `background:rgba(255,176,32,${_PHASE_TINT[p.phase] || 0.5})" ` +
+      `title="${escAttr(label + " · " + p.lost_s.toFixed(2) + "s")}">` +
+      `${pct >= 18 ? label : ""}</span>`;
+  }).join("");
+  return `<div class="phase-bar">${seg}</div>`;
+}
+
 // Lap-wide findings, above the corner list because that's the order a human
 // coach uses them: "you lift on the Kemmel straight" comes before turn 7.
 function noteBlocks(a) {
@@ -1098,6 +1130,7 @@ function drawDebrief(a) {
       // because it changes *which corner* the driver should go and work on —
       // there is no point reading this corner's figures first.
       (l.inherited ? `<div class="chain">↩ ${l.inherited}</div>` : "") +
+      phaseBlock(l) +
       (l.detail ? `<div class="detail">${l.detail}</div>` : "") +
       (l.fix ? `<div class="fix">💡 ${l.fix}</div>` : "") +
       `</div>`;
