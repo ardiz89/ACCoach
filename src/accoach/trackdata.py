@@ -24,10 +24,14 @@ import re
 # 0.05 was chosen when the only curated track was Imola, whose corners are far
 # apart. Monza's Lesmo 1 and Lesmo 2 sit 0.053 apart, i.e. barely more than the
 # tolerance itself: a detected apex three thousandths off the midpoint flips
-# which name it takes. The value stays (tightening it would orphan corners on
-# other layouts) and the ambiguity is handled where it belongs — `name_corners`
-# assigns each curated name once, nearest first, so two adjacent corners can no
-# longer both answer "Lesmo 1".
+# which name it takes. `name_corners` handles that ambiguity where it belongs,
+# by assigning each curated name once, nearest first.
+#
+# Tightening it was tried on 2026-07-30, when Spa and Suzuka arrived, and was
+# wrong: a real Monza lap that went off at Ascari was detected 0.029 from the
+# curated apex, so anything under that orphans corners that genuinely exist. The
+# distance alone cannot separate "the same corner, detected a little off" from
+# "the corner next door" — so it isn't asked to. See ``_DIRECTIONS``.
 _NAME_TOL = 0.05
 
 
@@ -49,6 +53,48 @@ _CORNERS: dict[str, list[tuple[str, float]]] = {
         ("Acque Minerali", 0.585),   # right-left, downhill
         ("Variante Alta", 0.693),    # chicane
         ("Rivazza", 0.844),          # double left before the line
+    ],
+    # Spa. Anchored to a real lap in the archive (Formula mod SF25, 1:43.642),
+    # whose driven length measures 6933 m against the circuit's published 7004 —
+    # the 1% is the polyline plus the missing closing chord, which is the check
+    # that the positions below really are distances round this track.
+    #
+    # Each name was matched on THREE independent readings agreeing, not on a
+    # guess at where a corner "should" be: the distance along the lap, the
+    # direction the corner turns (measured from the driven line, see
+    # track._classify) and its character (apex speed + radius). Where any of the
+    # three disagreed, no name was given — which is why Eau Rouge and
+    # Blanchimont are absent: in a Formula car neither crosses the steering
+    # threshold that makes a corner, so there is nothing here to name. Naming
+    # the nearest thing instead is how "Eau Rouge" ends up printed on Raidillon.
+    "spa": [
+        ("La Source", 0.058),      # right hairpin, 70 km/h, 403 m — the slowest
+        ("Raidillon", 0.171),      # right at the top of the climb, 309 km/h
+        ("Les Combes", 0.351),     # right, 145 km/h, 2434 m
+        ("Rivage", 0.443),         # right hairpin, 131 km/h, 3072 m
+        ("Pouhon", 0.567),         # long LEFT, 262 km/h — the direction settles it
+        ("Fagnes", 0.657),         # right, 196 km/h, 4556 m
+        ("Stavelot", 0.712),       # right, 154 km/h, 4936 m
+        ("Bus Stop", 0.973),       # chicane before the line, 74 km/h
+    ],
+    # Suzuka. Same method, anchored to a real lap (BMW M3 E92, 2:36.079) that
+    # measures 5759 m against the published 5807. The two Degners are 0.031 of a
+    # lap apart — closer than _NAME_TOL — so the table's positions are the
+    # MEASURED apexes: an anchor at the true apex wins the nearest-corner match
+    # by a distance of zero, and neither name can be stolen by its neighbour.
+    #
+    # Turns 1-2, 10 and 12 are left numbered on purpose: they have no name in
+    # any published map of this circuit, and inventing one to fill the row would
+    # make the report authoritative about something it made up.
+    "suzuka": [
+        ("Esses", 0.301),          # the S curves, detected as one merged run
+        ("Dunlop", 0.343),         # left, 148 km/h, 1977 m
+        ("Degner 1", 0.394),       # right, 110 km/h
+        ("Degner 2", 0.425),       # right and much tighter, 72 km/h
+        ("Hairpin", 0.505),        # LEFT hairpin, 50 km/h — the slowest of the lap
+        ("Spoon", 0.683),          # double left, 90 km/h, 3935 m
+        ("130R", 0.857),           # fast left, 4934 m
+        ("Casio Triangle", 0.931), # final chicane, 61 km/h
     ],
     # Anchored the same way, to a real Monza lap (Ferrari 488 GT3 Evo, 2:03.7)
     # whose detected apexes were 0.169 / 0.247 / 0.378 / 0.447 / 0.500 / 0.686 /
@@ -129,17 +175,65 @@ def landmark_at(track: str, pos: float, lang: str | None = None) -> str | None:
     return it if (lang or current_language()) == "it" else en
 
 
-def corner_name(track: str, index: int, apex_pos: float, lang: str | None = None) -> str:
+def corner_name(track: str, index: int, apex_pos: float,
+                lang: str | None = None, direction: str = "") -> str:
     """Name for a detected corner, by nearest curated apex, else ``Corner N`` /
-    ``Curva N`` per language (curated names are proper nouns, kept as-is)."""
+    ``Curva N`` per language (curated names are proper nouns, kept as-is).
+
+    ``direction`` is the way this corner actually turns, when the lap carries
+    the coordinates to know. Passing it is what stops a name from reaching the
+    corner next door — this function names one corner at a time and has none of
+    the once-each protection ``name_corners`` uses.
+    """
     table = _CORNERS.get(_slug(track))
     if table:
-        name, pos = min(table, key=lambda t: abs(t[1] - apex_pos))
-        if abs(pos - apex_pos) <= _NAME_TOL:
-            return name
+        usable = [t for t in table if _direction_ok(track, t[0], direction)]
+        if usable:
+            name, pos = min(usable, key=lambda t: abs(t[1] - apex_pos))
+            if abs(pos - apex_pos) <= _NAME_TOL:
+                return name
     from .i18n import current_language
     word = "Curva" if (lang or current_language()) == "it" else "Corner"
     return f"{word} {index + 1}"
+
+
+# Which way each curated corner turns, where we have measured it. A name only
+# applies to a corner turning the same way — the one check that separates "the
+# same corner, detected a little off" from "the corner next door", using a
+# signal that cannot be half-right: a left is never a right.
+#
+# It exists because of two real misreadings found on 2026-07-30, both inside the
+# position tolerance: a corner detected at the bottom of Eau Rouge answered "La
+# Source" (300 m down the hill, and a right where Eau Rouge is a left), and the
+# right-hand kink before Suzuka's hairpin answered "Hairpin" (which is a left).
+#
+# Absent or empty = don't check: Imola's and Monza's tables predate this and
+# their directions were never measured, and a chicane has no single direction to
+# match anyway (Bus Stop is right-left, Casio Triangle right-left). Absence of a
+# measurement is not a reason to reject a name — it's a reason not to ask.
+_DIRECTIONS: dict[str, dict[str, str]] = {
+    "spa": {
+        "La Source": "right", "Raidillon": "right", "Les Combes": "right",
+        "Rivage": "right", "Pouhon": "left", "Fagnes": "right",
+        "Stavelot": "right",           # Bus Stop is a chicane: not checked
+    },
+    "suzuka": {
+        "Esses": "left", "Dunlop": "left", "Degner 1": "right",
+        "Degner 2": "right", "Hairpin": "left", "Spoon": "left",
+        "130R": "left",                # Casio Triangle is a chicane: not checked
+    },
+}
+
+
+def _direction_ok(track: str, name: str, direction: str) -> bool:
+    """Does this corner turn the way the curated one does?
+
+    True whenever either side has nothing to say — a lap with no coordinates
+    can't classify a corner, and most curated corners have no measured direction
+    yet. Unknown must not mean "no".
+    """
+    want = _DIRECTIONS.get(_slug(track), {}).get(name, "")
+    return not want or not direction or want == direction
 
 
 def name_corners(track: str, corners, lang: str | None = None) -> list[str]:
@@ -161,6 +255,8 @@ def name_corners(track: str, corners, lang: str | None = None) -> list[str]:
             best, best_d = None, _NAME_TOL
             for i, c in enumerate(corners):
                 if named[i] is not None:
+                    continue
+                if not _direction_ok(track, name, getattr(c, "direction", "")):
                     continue
                 d = abs(c.apex_pos - pos)
                 if d <= best_d:

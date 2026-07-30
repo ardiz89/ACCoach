@@ -147,3 +147,90 @@ def test_monza_landmarks_resolve_at_measured_positions():
     assert landmark_at("monza", 0.860, "it") == "alla fine del verde sulla sinistra"
     # Curva Grande (0.247) is taken near flat — no braking landmark there.
     assert landmark_at("monza", 0.247, "it") is None
+
+
+# --- Spa & Suzuka: added 2026-07-30 from real laps in the archive -----------
+# Both tables are anchored to a measured lap (see the comments in trackdata).
+# The archive itself can't be a test fixture — CI has no laps — so what is
+# pinned here is everything that can go wrong *without* one.
+
+_SPA = ["La Source", "Raidillon", "Les Combes", "Rivage", "Pouhon", "Fagnes",
+        "Stavelot", "Bus Stop"]
+_SUZUKA = ["Esses", "Dunlop", "Degner 1", "Degner 2", "Hairpin", "Spoon",
+           "130R", "Casio Triangle"]
+
+
+@pytest.mark.parametrize("track,expected", [("spa", _SPA), ("suzuka", _SUZUKA)])
+def test_each_name_lands_on_its_own_corner(track, expected):
+    """The real risk, and the reason the table stores *measured* apexes.
+
+    Suzuka's two Degners are 0.031 of a lap apart — inside _NAME_TOL — so a
+    table anchored on approximate positions could hand "Degner 1" to Degner 2
+    and leave the other numbered. Anchored on the measured apex, each name wins
+    its own corner by a distance of zero.
+    """
+    table = trackdata._CORNERS[track]
+    corners = [_corner(i, pos) for i, (_n, pos) in enumerate(table)]
+    assert name_corners(track, corners) == expected
+
+
+@pytest.mark.parametrize("track", ["spa", "suzuka"])
+def test_the_table_is_ordered_and_has_no_duplicates(track):
+    table = trackdata._CORNERS[track]
+    positions = [p for _n, p in table]
+    assert positions == sorted(positions)
+    assert all(0.0 < p < 1.0 for p in positions)
+    assert len({n for n, _p in table}) == len(table)
+
+
+def test_suzukas_unnamed_corners_stay_numbered():
+    """Turns 1-2, 10 and 12 have no name on any published map of the circuit.
+    Filling those rows would make the report authoritative about an invention.
+
+    Two of the three are inside the position tolerance of the Hairpin and are
+    kept out of it by which way they turn: they are rights, the Hairpin is a
+    left. That is the whole job of the direction check.
+    """
+    for apex in (0.147, 0.482, 0.551):
+        assert corner_name("suzuka", 0, apex, "en", "right") == "Corner 1"
+
+
+def test_eau_rouge_is_not_called_la_source():
+    """Eau Rouge and Blanchimont are deliberately absent from the table: in the
+    lap it was measured from, neither is a corner at all. A corner detected at
+    the bottom of the hill sits 0.042 from La Source — inside the tolerance —
+    and is a left where La Source is a right. Found on 2026-07-30, three hundred
+    metres of confident wrong answer."""
+    assert corner_name("spa", 0, 0.100, "en", "left") == "Corner 1"
+    assert corner_name("spa", 0, 0.860, "en", "left") == "Corner 1"   # Blanchimont
+
+
+def test_a_lap_with_no_coordinates_still_gets_its_names():
+    """Unknown must not mean "no": laps recorded before the map update can't
+    classify a corner's direction, and they were being named fine before this
+    check existed."""
+    assert corner_name("spa", 0, 0.058, "en", "") == "La Source"
+    assert corner_name("suzuka", 0, 0.505, "en") == "Hairpin"
+    corners = [_corner(i, pos) for i, (_n, pos) in enumerate(trackdata._CORNERS["spa"])]
+    assert name_corners("spa", corners) == _SPA
+
+
+def test_a_corner_turning_the_wrong_way_never_takes_the_name():
+    """The check has to bite in the list form too, not only one corner at a
+    time — the report and the live coach use different entry points."""
+    wrong = [_corner(0, 0.567)]            # Pouhon's position, but a right
+    wrong[0].direction = "right"
+    assert name_corners("spa", wrong, "en") == ["Corner 1"]
+
+
+@pytest.mark.parametrize("track,expected", [("spa", _SPA), ("suzuka", _SUZUKA)])
+def test_curated_names_are_proper_nouns_in_both_languages(track, expected):
+    table = trackdata._CORNERS[track]
+    for lang in ("en", "it"):
+        assert [corner_name(track, i, p, lang)
+                for i, (_n, p) in enumerate(table)] == expected
+
+
+@pytest.mark.parametrize("track", ["spa", "suzuka"])
+def test_the_new_tracks_report_that_they_have_names(track):
+    assert has_names(track)

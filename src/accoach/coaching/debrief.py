@@ -647,7 +647,9 @@ def build_lap_debrief(lap: Lap, reference: Reference, corners: list[Corner],
             # app did it and the live path didn't, so the overlay and the voice
             # said "Corner 7" — in English, in an Italian session — while the
             # report for the same lap said "Variante Ascari".
-            name=corner_name(lap.track, c.index, c.apex_pos, lg),
+            # The direction comes along: it is what keeps a curated name from
+            # reaching the corner next door (see trackdata._DIRECTIONS).
+            name=corner_name(lap.track, c.index, c.apex_pos, lg, c.direction),
         ))
 
     losses.sort(key=lambda x: x.lost_ms, reverse=True)
