@@ -268,3 +268,77 @@ def test_it_runs_on_corners_detected_from_the_lap_itself():
     corners = detect_corners(lap.samples)
     report = build_line_report(lap, lap, corners)
     assert len(report.corners) == len(corners)
+
+
+# --- when the apex shift means nothing --------------------------------------
+# Both cases were found by measuring the archive, not by reading the code: a
+# 60 m "apex shift" between two Spa laps whose minimum speed matched to the km/h,
+# and a 174 m one on a lap that spun at Ascari. Same number, two different ways
+# of being wrong.
+
+def _dip_lap(where: float, floor: float = 60.0, flat: float = 0.0,
+             radius: float = R, n: int = N) -> Lap:
+    """A circle lap whose speed bottoms out at ``where`` (0..1).
+
+    ``flat`` widens that bottom into a plateau of the given width in position,
+    which is what a long corner really looks like: the minimum is a stretch, not
+    a point, and which sample inside it is lowest is down to noise.
+    """
+    s = []
+    for i in range(n):
+        pos = i / n
+        a = 2 * math.pi * pos * -1.0
+        d = abs(pos - where)
+        v = floor if d <= flat / 2 else min(140.0, floor + (d - flat / 2) * 900.0)
+        s.append(LapSample(int(pos * 100000), pos, v, 0.5, 0.0, 0.2, "3", 5000,
+                           0.0, 0.0, car_x=radius * math.sin(a),
+                           car_z=radius * math.cos(a)))
+    return Lap("Fixture", "Circle", SessionType.PRACTICE, 100000, True, samples=s)
+
+
+def _one(review, base, entry=0.10, exit=0.30):
+    return build_line_report(review, base,
+                             [_corner(entry=entry, apex=0.20, exit=exit)]).corners[0]
+
+
+def test_a_flat_bottomed_corner_reports_no_apex_shift():
+    """The two minima are 0.04 of a lap apart — 25 m — but both sit inside a
+    plateau they share, so the two laps apex in the same place."""
+    c = _one(_dip_lap(0.16, flat=0.10), _dip_lap(0.20, flat=0.10))
+    assert abs(c.apex_shift_m) > 10.0, "the raw measurement still moves"
+    assert c.apex_flat_m > 0.0, "and the shared flat bottom is what says it can't"
+    assert not any(k.startswith("apex_") for k, _ in c.tags)
+
+
+def test_a_pointed_corner_still_reports_a_real_apex_shift():
+    """The floor only lifts where the corner is flat: on a sharp one the apex
+    moving is exactly what this view is for."""
+    c = _one(_dip_lap(0.16), _dip_lap(0.20))
+    assert c.apex_flat_m == 0.0
+    assert abs(c.apex_shift_m) > 10.0
+    assert any(k.startswith("apex_") for k, _ in c.tags)
+
+
+def test_a_corner_the_car_stopped_in_is_not_a_line():
+    """Down to a third of the reference's minimum: the geometry is still
+    recorded, but 'your apex moved' is a true number and a false sentence."""
+    c = _one(_dip_lap(0.20, floor=25.0), _dip_lap(0.20, floor=90.0))
+    assert c.off_here
+    assert not any(k.startswith("apex_") for k, _ in c.tags)
+    assert c.tags[0][0] == "off_here", "it leads: everything else is qualified by it"
+    assert "25" in tag_text(*c.tags[0], lang="en")
+
+
+def test_a_normal_slower_lap_is_not_called_an_off():
+    """A lap 15% down on minimum speed is a slow lap, not a spin — the badge has
+    to stay off or it fires on every early-season lap."""
+    assert not _one(_dip_lap(0.20, floor=76.0), _dip_lap(0.20, floor=90.0)).off_here
+
+
+def test_the_recorder_can_flag_the_off_by_itself():
+    """`lost_at` (v8+) is the recorder's own verdict on where the lap stopped
+    counting; it doesn't need the speed to collapse to be believed."""
+    review = _dip_lap(0.20, floor=88.0)
+    review.lost_at = 0.22
+    c = _one(review, _dip_lap(0.20, floor=90.0))
+    assert c.off_here

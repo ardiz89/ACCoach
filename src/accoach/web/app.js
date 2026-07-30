@@ -2420,16 +2420,35 @@ function renderLine(cx) {
   updateLineReadout(L, cx);
 }
 
+// Where your apex is against the reference's — or why that question has no
+// answer here.
+//
+// Two cases the plain number got wrong, both measured across the archive before
+// this existed. Through a long corner the bottom of the speed trace is flat for
+// ~100 m (Fagnes, Casio Triangle, Tamburello), so two identical laps could be
+// reported 60 m apart — a difference to go and chase that isn't there. And on a
+// lap that spun, the "apex" moved 174 m because the car nearly stopped somewhere
+// else, which is a true number and a false sentence.
+function apexWord(c) {
+  // A dash, with the reason on hover: the chip above already says it in full,
+  // and a sentence in a right-aligned number column wrecks the row it sits in.
+  if (c.off_here) return `<span title="${escAttr(t("line.apexOff"))}">–</span>`;
+  if (c.apex_flat_m > 0) {
+    return `${t("line.sameSpot")} <span class="muted">${
+      tf("line.apexFlat", { m: Math.round(c.apex_flat_m) })}</span>`;
+  }
+  const shift = c.apex_shift_m;
+  if (Math.abs(shift) < 0.5) return t("line.sameSpot");
+  return `${Math.abs(shift).toFixed(0)} m ${shift < 0 ? t("line.earlier") : t("line.later")}`;
+}
+
 function renderLineFacts(c) {
   const el = $("line-facts");
   if (!el) return;
   const row = (k, v, sub) =>
     `<div class="fact"><span class="fk">${k}</span><span class="fv">${v}</span>` +
     (sub ? `<span class="fs">${sub}</span>` : "") + `</div>`;
-  const shift = c.apex_shift_m;
-  const apex = Math.abs(shift) < 0.5
-    ? t("line.sameSpot")
-    : `${Math.abs(shift).toFixed(0)} m ${shift < 0 ? t("line.earlier") : t("line.later")}`;
+  const apex = apexWord(c);
   const arc = (c.radius_m && c.radius_ref_m)
     ? `${Math.round(c.radius_m)} m <span class="muted">${t("line.f.vs")} ${Math.round(c.radius_ref_m)} m</span>`
     : "–";
@@ -2462,11 +2481,20 @@ function renderLineTable(L) {
   };
   let body = "";
   L.corners.forEach((c, i) => {
-    const shift = Math.abs(c.apex_shift_m) < 0.5 ? "–"
+    // A dash, not a zero: "no answer here" and "the apex didn't move" are the
+    // same cell in a table, and only the tooltip can tell them apart.
+    const quiet = c.off_here || c.apex_flat_m > 0 || Math.abs(c.apex_shift_m) < 0.5;
+    const why = c.off_here ? t("line.apexOff")
+              : (c.apex_flat_m > 0 ? tf("line.apexFlat", { m: Math.round(c.apex_flat_m) })
+                                   : t("line.sameSpot"));
+    const shift = quiet
+      ? `<span title="${escAttr(why)}">–</span>`
       : `${c.apex_shift_m > 0 ? "+" : "−"}${Math.abs(c.apex_shift_m).toFixed(0)} m`;
     const dv = c.vmin - c.vmin_ref;
     body += `<tr class="${i === LINE_I ? "on" : ""}" data-i="${i}">` +
-      `<td class="vc">${c.name}</td>` +
+      `<td class="vc">${c.name}` +
+      (c.off_here ? ` <span class="off-track" title="${escAttr(t("line.apexOff"))}">!</span>` : "") +
+      `</td>` +
       `<td class="vn">${shift}</td>` +
       cell(c.entry_m, c) + cell(c.apex_m, c) + cell(c.exit_m, c) +
       `<td class="vn">${c.radius_m ? Math.round(c.radius_m) : "–"}` +

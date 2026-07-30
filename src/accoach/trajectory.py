@@ -54,6 +54,23 @@ _MIN_OFFSET_M = 0.8
 # change in the line. 5 m is short enough to catch a genuinely different apex
 # and long enough to sit outside that flatness.
 _MIN_APEX_SHIFT_M = 5.0
+# …and on a long corner 5 m is nowhere near enough. Measured over the archive:
+# Fagnes reported a 60 m "apex shift" between two laps whose minimum speed was
+# identical to the km/h, because the bottom of the V is flat for ~100 m there;
+# Casio Triangle 54 m, Tamburello 60 m, same story. So the floor is not a
+# distance at all — it is *the flat part itself*. The stretch where speed stays
+# within this fraction of the corner's minimum is the apex "plateau", and two
+# plateaus that overlap are two laps apexing in the same place, whatever the two
+# minima happen to measure. 2% is a little over 1 km/h at 60 km/h: below the
+# frame-to-frame wobble of the speed channel, above nothing that matters.
+_APEX_FLAT = 0.02
+# Below this fraction of the reference's minimum speed the car was not cornering:
+# it spun, went off, or stopped. Measured across every recorded lap: the two laps
+# with an off read 0.34 and 0.36, and every other corner of every other lap is at
+# 0.80 or above — a gap wide enough that the exact number doesn't matter much.
+# In that state "your apex moved 174 m" is a true sentence about a lap that no
+# longer had an apex.
+_OFF_VMIN_RATIO = 0.60
 # Extra distance worth a mention. A 2 m detour is ~0.05 s at 150 km/h — the same
 # order as the debrief's own reporting floor.
 _MIN_EXTRA_M = 2.0
@@ -114,6 +131,13 @@ class CornerLine:
     apex_shift_m: float = 0.0
     apex_pos_you: float = 0.0
     apex_pos_ref: float = 0.0
+    # Metres over which both laps' flat minima overlap. Greater than zero means
+    # the two apexes are the same place and `apex_shift_m` is measuring where
+    # inside a flat bottom each lap's lowest sample happened to land.
+    apex_flat_m: float = 0.0
+    # The car wasn't cornering here (spun, went off, stopped): the geometry below
+    # is still what was recorded, but none of it is a line anybody chose.
+    off_here: bool = False
     # Arc actually driven at the tightest point of the corner.
     radius_m: float = 0.0
     radius_ref_m: float = 0.0
@@ -343,6 +367,24 @@ def _apex_pos(points: list[LinePoint], lo: float, hi: float) -> float:
     return best
 
 
+def apex_plateau(points: list[LinePoint], lo: float, hi: float,
+                 flat: float = _APEX_FLAT) -> tuple[float, float] | None:
+    """The flat bottom of a corner: where speed stays within ``flat`` of its
+    minimum, as a (first, last) pair of track positions.
+
+    This is the width of the answer to "where is the apex". On a hairpin it is a
+    few metres and the apex is a point; through Fagnes it is a hundred, and two
+    laps whose lowest sample lands at opposite ends of it have not apexed in
+    different places — they have apexed in the same flat place twice.
+    """
+    sel = [p for p in points if lo <= p.pos <= hi]
+    if not sel:
+        return None
+    vmin = min(p.speed_kmh for p in sel)
+    inside = [p.pos for p in sel if p.speed_kmh <= vmin * (1.0 + flat)]
+    return (min(inside), max(inside)) if inside else None
+
+
 def _tags(c: CornerLine) -> list[tuple[str, dict]]:
     """Geometric facts about this corner, biggest first, at most three.
 
@@ -356,7 +398,15 @@ def _tags(c: CornerLine) -> list[tuple[str, dict]]:
     def add(score: float, key: str, **kw) -> None:
         out.append((score, key, kw))
 
-    if abs(c.apex_shift_m) >= _MIN_APEX_SHIFT_M:
+    # Nothing here is a choice: say that first, and say it with the number that
+    # establishes it rather than with a word the driver has to take on trust.
+    if c.off_here:
+        add(1e9, "off_here", v=round(c.vmin), vr=round(c.vmin_ref))
+    # An apex that "moved" inside a flat bottom hasn't moved. Reporting it is how
+    # a driver ends up chasing a difference between two identical laps.
+    if c.apex_flat_m > 0.0 or c.off_here:
+        pass
+    elif abs(c.apex_shift_m) >= _MIN_APEX_SHIFT_M:
         add(abs(c.apex_shift_m) / _MIN_APEX_SHIFT_M,
             "apex_late" if c.apex_shift_m > 0 else "apex_early",
             m=abs(round(c.apex_shift_m)))
@@ -393,6 +443,10 @@ def build_line_report(review_lap, base_lap, corners,
     names = names or {}
     you = line_points(review_lap)
     ref = line_points(base_lap)
+    # Where the recorder decided this lap stopped counting, when it knows (v8+).
+    # Used only to corroborate a corner the geometry already flags as an off, so
+    # an older lap loses the corroboration and nothing else.
+    lost_at = getattr(review_lap, "lost_at", None)
     if not (has_line(you) and has_line(ref)):
         return LineReport()
 
@@ -429,12 +483,31 @@ def build_line_report(review_lap, base_lap, corners,
         # `+ 0.0` so an unmoved apex prints as 0.0 and not as -0.0, which reads
         # like a rounding artefact the driver is meant to interpret.
         shift = path_length(ref, a, b) * (1.0 if apex_you > apex_ref else -1.0) + 0.0
+        # …and how much of that is the corner simply being flat at the bottom.
+        py = apex_plateau(you, lo, hi)
+        pr = apex_plateau(ref, lo, hi)
+        flat = 0.0
+        if py and pr:
+            f0, f1 = max(py[0], pr[0]), min(py[1], pr[1])
+            if f0 <= f1:
+                # Measured along the reference, like the shift it qualifies, so
+                # the two numbers are in the same units of tarmac.
+                flat = path_length(ref, f0, f1)
 
         widest = min(signed)          # most negative = furthest to the outside
         tightest = max(signed)
         wpos = inside[signed.index(widest)][1].pos
 
         ref_inside = [p.speed_kmh for p in ref if lo <= p.pos <= hi]
+        vmin = min(p.speed_kmh for _, p in inside)
+        vmin_ref = min(ref_inside) if ref_inside else 0.0
+        # Off, spin or stop. Two independent signals, either of which is enough:
+        # the recorder's own verdict on where the lap stopped counting (v8+, so
+        # None on older laps), and a minimum speed that collapsed against the
+        # reference's. Neither is inferred from the other.
+        off_here = bool(
+            (lost_at is not None and lo <= lost_at <= hi)
+            or (vmin_ref > 0.0 and vmin < vmin_ref * _OFF_VMIN_RATIO))
         row = CornerLine(
             index=c.index,
             name=names.get(c.index) or c.name or f"Corner {c.index + 1}",
@@ -449,11 +522,13 @@ def build_line_report(review_lap, base_lap, corners,
             apex_shift_m=round(shift, 1),
             apex_pos_you=round(apex_you, 4),
             apex_pos_ref=round(apex_ref, 4),
+            apex_flat_m=round(flat, 1),
+            off_here=off_here,
             radius_m=radius_over(you, kyou, lo, hi),
             radius_ref_m=radius_over(ref, kref, lo, hi),
             extra_m=round(path_length(you, lo, hi) - path_length(ref, lo, hi), 1),
-            vmin=round(min(p.speed_kmh for _, p in inside)),
-            vmin_ref=round(min(ref_inside)) if ref_inside else 0.0,
+            vmin=round(vmin),
+            vmin_ref=round(vmin_ref) if ref_inside else 0.0,
             vexit=round(_speed_at(you, hi)),
             vexit_ref=round(_speed_at(ref, hi)),
         )
@@ -508,6 +583,10 @@ def corner_path(points: list[LinePoint], lo: float, hi: float,
 # computed here: a template and its value drifting apart ("8 m earlier" rendered
 # for a 3 m shift) is the failure mode that keeps text next to its data.
 _TAGS: dict[str, dict[str, str]] = {
+    # States the measurement, not a verdict: the driver knows what happened here
+    # better than we do, and "no line to read" is the honest limit of this view.
+    "off_here": {"en": "Down to {v} km/h against {vr}: no line to read here",
+                 "it": "Sceso a {v} km/h contro {vr}: qui non c'è traiettoria da leggere"},
     "apex_early": {"en": "Apex {m} m earlier", "it": "Apex {m} m prima"},
     "apex_late": {"en": "Apex {m} m later", "it": "Apex {m} m dopo"},
     "wide_entry": {"en": "{m} m wide on entry", "it": "{m} m largo in entrata"},

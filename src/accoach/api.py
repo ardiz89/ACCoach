@@ -763,6 +763,11 @@ def create_api(
             "widest_m": c.widest_m, "widest_pos": c.widest_pos,
             "tightest_m": c.tightest_m,
             "apex_shift_m": c.apex_shift_m,
+            # …and the two things that say whether that number means anything:
+            # how much of the corner's bottom is flat, and whether the car was
+            # cornering here at all.
+            "apex_flat_m": c.apex_flat_m,
+            "off_here": c.off_here,
             "radius_m": c.radius_m, "radius_ref_m": c.radius_ref_m,
             "extra_m": c.extra_m,
             "vmin": c.vmin, "vmin_ref": c.vmin_ref,
@@ -814,7 +819,8 @@ def create_api(
         import io
 
         cols = ["index", "name", "direction", "kind", "entry", "apex", "exit",
-                "apex_shift_m", "entry_m", "apex_m", "exit_m", "widest_m",
+                "apex_shift_m", "apex_flat_m", "off_here",
+                "entry_m", "apex_m", "exit_m", "widest_m",
                 "tightest_m", "radius_m", "radius_ref_m", "extra_m",
                 "vmin", "vmin_ref", "vexit", "vexit_ref"]
         buf = io.StringIO()
