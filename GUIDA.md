@@ -231,10 +231,22 @@ col bordo azzurro. Sono osservazioni **sull'intero giro**, non su una curva:
 
 - **I giri sporchi non sono mai candidabili.** Un giro tagliato è più veloce per
   un motivo.
-- **La temperatura dell'asfalto conta.** Un giro fatto in condizioni simili a
-  oggi batte uno un po' più veloce fatto in condizioni molto diverse. È una
-  preferenza, non un filtro: se niente somiglia a oggi ti do comunque il tuo
-  giro migliore, non "nessun riferimento".
+- **Le condizioni contano**, e sono tre: la **gomma**, la **temperatura
+  dell'asfalto** e il **grip della pista**. Un giro fatto in condizioni simili a
+  oggi batte uno un po' più veloce fatto in condizioni molto diverse. La gomma
+  pesa più di tutto — una mescola diversa è un'altra macchina, quindi è l'ultima
+  cosa a cui rinuncio; il grip è la prima. È una preferenza, non un filtro: se
+  niente somiglia a oggi ti do comunque il tuo giro migliore, non "nessun
+  riferimento".
+
+  Due note oneste su questi campi. La gomma la **confronto e basta**, non la
+  interpreto: su ACC la stringa è canonica (`dry_compound` / `wet_compound`), su
+  AC è quella che ha scelto il mod (`Soft (S)`), e per rispondere a «i due giri
+  erano sulla stessa gomma?» va benissimo lo stesso. Il **grip su ACC vale
+  sempre 0**: quel gioco lascia il campo storico a zero e dice le condizioni
+  altrove, in una parte della memoria che non leggiamo ancora — quindi su ACC
+  quel criterio non fa niente, e il riferimento si decide su gomma e
+  temperatura.
 
 Nel **report** la stessa regola vale, ma "oggi" lì non esiste: il riferimento
 viene scelto per le condizioni **del giro che stai rivedendo**. Se rivedi un giro

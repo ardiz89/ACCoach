@@ -121,7 +121,7 @@ costano. Le prime tre hanno evidenza esterna misurata; le altre no.
 | 1 | ~~**Riferimenti di frenata adattati ad auto e condizioni**~~ — **fatta il 2026-07-30**: scheda «Le tue frenate» sotto la mappa (`braking_points.py` + `/api/braking`), misurata sui tuoi ultimi giri **nella stessa fascia di temperatura**, con riferimento visivo dove esiste, dispersione in km/h e in metri, CSV e stampa | 332 voti su Reddit | medio |
 | 2 | **Riferimenti visivi** («al cordolo», «al cartello») invece dei soli metri | richiesta esplicita | medio-grande |
 | 3 | **Aiuti che si ritirano** quando sei costante in quella curva | comportamento osservato | medio |
-| 4 | **Condizioni pista nell'elezione del riferimento** | audit + evidenza (2) | piccolo-medio |
+| 4 | ~~**Condizioni pista nell'elezione del riferimento**~~ — **completata il 2026-07-30**: temperatura asfalto (live + report), poi **gomma e grip**. I due campi erano in SQLite dal 20/07 e non li leggeva nessuno. Misurato sui 39 giri veri: la gomma è popolata su entrambi i giochi, **il grip su ACC è 0 su 15 giri su 15** (ACC lascia il campo storico a zero: serve dichiarare `trackGripStatus` nella coda della pagina, e si può validare col gioco fermo ai box) | audit + evidenza (2) | piccolo-medio |
 | 5 | **Rilevare il gas parziale** tenuto in percorrenza | vocabolario coach umani | piccolo |
 | 6 | **Sollevamenti in zona di pieno**, quantificati sul rettilineo seguente | vocabolario coach umani | piccolo |
 | 7 | **Velocità di punta vs riferimento → ipotesi ala/drag** | vocabolario coach umani | piccolo |

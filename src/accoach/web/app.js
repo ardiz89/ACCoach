@@ -871,12 +871,7 @@ function drawSummary(a) {
   // Why the benchmark isn't your fastest lap, when the answer is the weather.
   // Without it a slower baseline reads as a broken app; the backend only sends
   // this when conditions really are the reason (see api._conditions_note).
-  const cond = a.reference.by_conditions;
-  const condNote = cond
-    ? tf(cond.faster_road_temp == null ? "sum.cond.vx" : "sum.cond.v",
-         { temp: cond.road_temp, time: cond.faster_lap_time,
-           ftemp: cond.faster_road_temp })
-    : "";
+  const condNote = conditionsNote(a.reference.by_conditions);
   $("summary").innerHTML =
     item(t("lbl.comparison"), a.reference.lap_time) +
     item(t("lbl.lap"), a.review.lap_time + off) +
@@ -884,6 +879,31 @@ function drawSummary(a) {
     (c.n >= 2 ? item(t("sum.consistency"), `σ ${(c.std_ms / 1000).toFixed(3)}s · ${c.n} ${t("lbl.laps")}`) : "") +
     (condNote ? item(t("sum.cond"), condNote, "warn") : "") +
     (setupNote ? item(t("sum.setup_diff"), setupNote, "warn") : "");
+}
+
+// Which condition made a slower lap the benchmark, in words. The backend
+// decides *whether* there is a reason and *which* one — it holds the rule that
+// says the tyre outranks the temperature and the temperature outranks the grip.
+// This only writes the sentence.
+function conditionsNote(c) {
+  if (!c) return "";
+  if (c.reason === "compound") {
+    return tf("sum.cond.tyre", {
+      tyre: c.compound, time: c.faster_lap_time,
+      ftyre: c.faster_compound || t("sum.cond.unknown"),
+    });
+  }
+  if (c.reason === "grip") {
+    // Grip is a 0..1 fraction in the sim; nobody reads it that way.
+    const pct = (v) => Math.round(v * 100) + "%";
+    return tf(c.faster_grip == null ? "sum.cond.gripx" : "sum.cond.grip", {
+      grip: pct(c.grip), time: c.faster_lap_time,
+      fgrip: c.faster_grip == null ? "" : pct(c.faster_grip),
+    });
+  }
+  return tf(c.faster_road_temp == null ? "sum.cond.vx" : "sum.cond.v", {
+    temp: c.road_temp, time: c.faster_lap_time, ftemp: c.faster_road_temp,
+  });
 }
 
 // A one-line summary of how two laps' setups differ, or "" if they match / are
