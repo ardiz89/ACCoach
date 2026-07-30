@@ -77,6 +77,7 @@ async function init() {
   sel.onchange = () => {
     const combo = JSON.parse(sel.value);
     SESSION = null;
+    SHEET = null;         // another car+track has other braking points
     SESSION_I = 0;        // a different car+track has different sessions
     loadCombo(combo);
     if (VIEW === "progress") loadProgress(combo);
@@ -145,7 +146,7 @@ function wireTour() {
 // compare/map; sectors/progress re-run their loader). Shared by resize + the
 // colour-blind toggle.
 function redrawCurrentView() {
-  if (VIEW === "map") { if (DATA) drawMap(DATA, null); }
+  if (VIEW === "map") { if (DATA) drawMap(DATA, null); SHEET ? renderBrakeSheet(SHEET) : loadBraking(); }
   else if (VIEW === "line") { LINE ? renderLine(null) : loadLine(); }
   else if (VIEW === "dynamics") { if (DATA) drawDynamics(LAST_HOVER); }
   else if (VIEW === "sectors") { if (CURRENT) loadSectors(); }
@@ -752,7 +753,13 @@ async function loadCombo(combo, lapPath, baselinePath) {
   drawDebrief(a);
   renderFlow(a);
   redraw(null);
-  if (VIEW === "map") { $("map-readout").innerHTML = MAP_READOUT_DEFAULT(); drawMap(a, null); }
+  // The sheet is per car+track, not per lap: it survives a lap change and is
+  // only dropped when the combo does (see the combo picker).
+  if (VIEW === "map") {
+    $("map-readout").innerHTML = MAP_READOUT_DEFAULT();
+    drawMap(a, null);
+    if (!SHEET) loadBraking();
+  }
   if (VIEW === "dynamics") drawDynamics(null);
   if (VIEW === "sectors") loadSectors();
   // The line view is its own request (the zoomed corners need the lap at full
@@ -1778,6 +1785,79 @@ function updateDynReadout(a, p) {
   if (!el) return;
   if (p == null) { el.innerHTML = t("dyn.readout"); return; }
   el.innerHTML = dynReadoutHTML(a, p);
+}
+
+// --- your braking points --------------------------------------------------
+// The community's most upvoted braking reference is a static sheet of Monza,
+// and its own author lists the holes: the points move between cars and between
+// a cold track and a hot one. This one is measured from your own recent laps in
+// one temperature band, so it has none of them — and it says so in its header,
+// because a sheet that doesn't state its conditions is the static one again.
+
+let SHEET = null;       // last /api/braking payload
+
+async function loadBraking() {
+  if (!CURRENT) return;
+  const q = new URLSearchParams({ car: CURRENT.car, track: CURRENT.track });
+  let b;
+  try { b = await getJSON("/api/braking?" + q.toString()); }
+  catch (e) { SHEET = null; $("brakesheet").innerHTML = ""; return; }
+  SHEET = b;
+  renderBrakeSheet(b);
+}
+
+function renderBrakeSheet(b) {
+  const el = $("brakesheet");
+  if (!el) return;
+  if (!b || !b.rows.length) {
+    el.innerHTML = `<h3>${t("brk.title")}</h3>` +
+      `<div class="clean muted">${t("brk.none")}</div>`;
+    return;
+  }
+  const temps = (b.road_temp_from != null)
+    ? tf(b.road_temp_from === b.road_temp_to ? "brk.temp1" : "brk.temp",
+         { from: b.road_temp_from.toFixed(1), to: b.road_temp_to.toFixed(1) })
+    : t("brk.noTemp");
+
+  let body = "";
+  for (const r of b.rows) {
+    // The spread is the number a static sheet can't have: whether you have a
+    // braking point at all, or a different one every lap. Shown in km/h (what
+    // the dash says) with the metres it works out to (what the sheets people
+    // share are written in) — approximate, and marked as such.
+    const spread = r.spread_kmh
+      ? `±${r.spread_kmh}` + (r.spread_m ? ` <span class="muted">≈ ${r.spread_m} m</span>` : "")
+      : `<span class="muted">${t("brk.repeatable")}</span>`;
+    body += `<tr>` +
+      `<td class="vc">${r.name}</td>` +
+      `<td class="vn big">${r.speed_kmh}<span class="muted"> km/h</span></td>` +
+      `<td class="vn">${r.gear}</td>` +
+      `<td class="ref">${r.landmark || "<span class=\"muted\">–</span>"}</td>` +
+      `<td class="vn">${r.distance_m ? r.distance_m + " m" : "–"}</td>` +
+      `<td class="vn">${r.vmin_kmh}<span class="muted"> / ${r.gear_min}</span></td>` +
+      `<td class="vn">${spread}</td></tr>`;
+  }
+  el.innerHTML =
+    `<h3>${t("brk.title")} ` +
+    `<button type="button" id="brk-csv" class="mini-btn" title="${t("brk.csv.title")}">⬇ CSV</button>` +
+    `<button type="button" id="brk-print" class="mini-btn" title="${t("brk.print.title")}">🖨</button>` +
+    `</h3>` +
+    `<div class="sheet-sub">${tf("brk.sub", { laps: b.laps })} · ${temps}</div>` +
+    `<table class="vmin-table wide"><thead><tr>` +
+    `<th>${t("brk.c.corner")}</th><th>${t("brk.c.speed")}</th><th>${t("brk.c.gear")}</th>` +
+    `<th>${t("brk.c.landmark")}</th><th>${t("brk.c.zone")}</th>` +
+    `<th>${t("brk.c.vmin")}</th><th>${t("brk.c.spread")}</th>` +
+    `</tr></thead><tbody>${body}</tbody></table>` +
+    `<p class="sheet-note">${t("brk.note")}</p>`;
+
+  $("brk-csv").onclick = () => {
+    const q = new URLSearchParams({ car: CURRENT.car, track: CURRENT.track,
+                                    fmt: "csv", lang: LANG() });
+    window.location = "/api/braking?" + q.toString();
+  };
+  // Printing is the point: the sheet people shared was printed and taped up.
+  // The print stylesheet hides everything but this section.
+  $("brk-print").onclick = () => window.print();
 }
 
 // --- the line you drove ---------------------------------------------------

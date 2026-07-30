@@ -149,6 +149,11 @@
       </div>
     </main>
     <div id="map-missing" class="empty hidden" data-i18n="map.missing">This lap has no coordinates (recorded before the map update). Drive and record a new lap to see it here.</div>
+    <!-- The braking sheet lives here rather than on a tab of its own: this view
+         already draws where you brake, and the sheet is the same fact as
+         numbers. Measured across your recent laps in one temperature band —
+         see braking_points.py for why it is never generalised. -->
+    <section id="brakesheet" class="debrief sheet"></section>
   </div>
 
   <!-- The line you drove, corner by corner. The map tab shows the whole lap and

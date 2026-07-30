@@ -170,6 +170,33 @@
     "map.missing":     { en: `This lap has no coordinates (recorded before the map update). Drive and record a new lap to see it here.`,
                          it: `Questo giro non ha coordinate (registrato prima dell'aggiornamento mappa). Guida e registra un nuovo giro per vederlo qui.` },
 
+    // ---- braking sheet (under the track map) ----
+    // Your own braking points, measured. The wording carries the caveats the
+    // static sheets going round the forums don't: how many laps, which asphalt
+    // temperature, and that the metres are an approximation.
+    "brk.title":       { en: `Your braking points`, it: `Le tue frenate` },
+    "brk.sub":         { en: `measured on your last {laps} laps`,
+                         it: `misurate sui tuoi ultimi {laps} giri` },
+    "brk.temp":        { en: `track {from}° → {to}°`, it: `asfalto {from}° → {to}°` },
+    "brk.temp1":       { en: `track {from}°`, it: `asfalto {from}°` },
+    "brk.noTemp":      { en: `track temperature not recorded on these laps`,
+                         it: `temperatura asfalto non registrata su questi giri` },
+    "brk.none":        { en: `No braking point could be measured yet — drive a couple of clean laps on this car and track.`,
+                         it: `Nessun punto di frenata ancora misurabile — fai un paio di giri puliti su questa auto e questa pista.` },
+    "brk.repeatable":  { en: `same every lap`, it: `uguale ogni giro` },
+    "brk.c.corner":    { en: `Corner`, it: `Curva` },
+    "brk.c.speed":     { en: `You brake at`, it: `Freni a` },
+    "brk.c.gear":      { en: `Gear`, it: `Marcia` },
+    "brk.c.landmark":  { en: `Visual reference`, it: `Riferimento visivo` },
+    "brk.c.zone":      { en: `Braking zone`, it: `Staccata` },
+    "brk.c.vmin":      { en: `Min speed / gear`, it: `Minima / marcia` },
+    "brk.c.spread":    { en: `Spread`, it: `Dispersione` },
+    "brk.note":        { en: `Speed is the braking reference every car gives you for free — it's on the dash. The spread is how much your braking point moves lap to lap; the metres next to it are what that works out to over this braking zone.`,
+                         it: `La velocità è il riferimento di frenata che ogni auto ti dà gratis: è sul cruscotto. La dispersione è di quanto si sposta il tuo punto di frenata da un giro all'altro; i metri accanto sono quanto vale su questa staccata.` },
+    "brk.csv.title":   { en: `Download this sheet as a spreadsheet`,
+                         it: `Scarica questa scheda come foglio di calcolo` },
+    "brk.print.title": { en: `Print just this sheet`, it: `Stampa solo questa scheda` },
+
     // ---- line / trajectory tab ----
     // The map tab shows the whole lap and leaves the reading to the eye; this one
     // zooms one corner at a time and puts the geometry in metres. Wording for the
