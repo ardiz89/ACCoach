@@ -202,6 +202,16 @@ Cosa trovi:
   curve, scaricabile in **CSV**.
 - **Andamento**: l'andamento dei tempi nel tempo, la **costanza** (migliore/media/
   scarto), e gli **errori ricorrenti** ("5× Porta più velocità in curva · Curve 1, 2").
+  In cima c'è **Il tuo piano**: uno o due obiettivi presi dai tuoi punti deboli
+  *sistematici* (i casuali non ci finiscono: non puoi allenare un episodio), con
+  un bersaglio in secondi — «qui perdi 0.42s, portalo sotto 0.21s». Finché non
+  premi **Inizia questo piano** è solo una proposta; da quel momento ha una data,
+  **non cambia più** mentre ci lavori, e i giri che fai da lì in poi vengono
+  misurati su quel bersaglio: «2 dei 2 giri che servono». È fatto quando il
+  bersaglio regge in metà dei giri — la stessa frazione con cui una curva era
+  diventata un punto debole. Le curve che il coach live ha già dichiarato
+  **superate** non finiscono nel piano: la memoria di «questa curva ce l'hai» è
+  una sola. Con **Cambia obiettivo** butti il piano e te ne propone uno nuovo.
 
 Nella tendina dei giri, accanto al tempo, trovi **i gradi dell'asfalto** (es.
 `2:03.732 · 37.8°`). Non è un dettaglio: fra pista fredda e pista calda i punti

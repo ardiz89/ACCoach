@@ -130,6 +130,7 @@ costano. Le prime tre hanno evidenza esterna misurata; le altre no.
 | 10 | **Riferimento esterno/PRO con interfaccia** | audit interno | medio |
 | 11 | **Tarature su ACC** — piano pronto in [`TARATURE-ACC.md`](TARATURE-ACC.md) | mai fatte | serve pista |
 | 12 | **Documentazione e tutorial allineati** (fermi al 29/06) + aiuto contestuale nelle impostazioni | segnalazione utente | piccolo |
+| 14 | ~~**Piano di allenamento**~~ — **fatta il 2026-07-30**: uno o due obiettivi dai punti deboli sistematici, con bersaglio in secondi, **accettato** (quindi con una data) e misurato solo sui giri successivi (`coaching/plan.py`, tabella `plan` accanto a `focus_state`). È ciò che Track Titan fa pagare col Premium; da noi non inventa contenuto — obiettivi, parole e «fatto» vengono da quello che già calcoliamo | analisi concorrenza 2026-07-30 | medio |
 | 13 | ~~**Effetto a catena fra curve**~~ — **fatta il 2026-07-30**: quando la perdita di una curva era già nei km/h con cui ci arrivi, il debrief lo dice e ti manda sulla curva prima (`coaching/chain.py`). Nasce dall'analisi di Track Titan (il loro *Timekiller* è l'unica cosa loro che stava sul nostro differenziatore); da noi è più forte perché la causa fisica ce l'abbiamo già | analisi concorrenza 2026-07-30 | medio |
 
 ## Posizionamento

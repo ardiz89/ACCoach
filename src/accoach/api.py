@@ -21,11 +21,15 @@ from fastapi.staticfiles import StaticFiles
 
 from .braking_points import build_sheet
 from .coaching import (
+    Goal,
+    TrainingPlan,
     benchmark_levels,
     build_flow,
     build_lap_debrief,
     classify_losses,
     lap_time_consistency,
+    measure as measure_plan,
+    propose as propose_plan,
 )
 from .comparison import Reference
 from .i18n import current_language
@@ -1057,10 +1061,15 @@ def create_api(
             pro_path = cat.fastest_pro_path(car, track)
         valid = [r for r in all_laps if r["valid"] and r["lap_time_ms"] > 0]
         if not valid:
+            # Same shape as the full answer, empty: a caller that has to check
+            # whether a key exists before reading it is a caller that will
+            # eventually forget.
             return {"car": car, "track": track, "laps": [], "pb_trend": [],
                     "consistency": lap_time_consistency([]), "levels": [],
                     "trends": [], "recurring": [], "tyres": [],
-                    "corner_consistency": []}
+                    "corner_consistency": [],
+                    "plan": {"saved": False, "created_utc": None,
+                             "laps_since": 0, "goals": []}}
 
         # Chronological (oldest first) for the trend.
         chrono = sorted(valid, key=lambda r: r["recorded_utc"] or "")
@@ -1081,6 +1090,11 @@ def create_api(
         best_ms = fastest_row["lap_time_ms"]
         recurring: list[dict] = []
         trends: list[dict] = []
+        # (recorded_utc, debrief) rather than a bare list: the training plan is
+        # measured only on the laps driven *after* it was accepted, and a debrief
+        # doesn't carry when its lap happened.
+        dated: list[tuple[str, object]] = []
+        loss_trends: list = []
         corners: list = []
         cnames: dict = {}
         try:
@@ -1095,6 +1109,7 @@ def create_api(
                     continue
                 deb = build_lap_debrief(load_lap(r["path"]), reference, corners, lg)
                 debriefs.append(deb)
+                dated.append((r["recorded_utc"] or "", deb))
                 for loss in deb.losses:
                     t = tally.setdefault(loss.category.value,
                                          {"message": loss.message, "count": 0, "corners": set()})
@@ -1105,6 +1120,10 @@ def create_api(
                   "corners": sorted(v["corners"])} for k, v in tally.items()),
                 key=lambda x: x["count"], reverse=True)
             # Systematic (a weakness to train) vs sporadic (a one-off), per corner.
+            # Kept as objects too: the training plan below picks its goals from
+            # these, and re-deriving them from the serialised dicts would be a
+            # second definition of "systematic".
+            loss_trends = classify_losses(debriefs)
             trends = [{
                 "corner_index": t.corner_index,
                 "name": cnames.get(t.corner_index, t.name),
@@ -1115,7 +1134,7 @@ def create_api(
                 "laps": t.laps,
                 "median_s": round(t.median_ms / 1000.0, 3),
                 "total_s": round(t.total_ms / 1000.0, 3),
-            } for t in classify_losses(debriefs)]
+            } for t in loss_trends]
         except (OSError, ValueError):
             recurring = []
             trends = []
@@ -1203,6 +1222,7 @@ def create_api(
 
         return {
             "car": car, "track": track,
+            "plan": _plan_payload(car, track, lg, dated, loss_trends, cnames),
             "laps": laps, "pb_trend": pb_trend,
             "consistency": lap_time_consistency([r["lap_time_ms"] for r in valid]),
             "levels": levels,
@@ -1211,6 +1231,119 @@ def create_api(
             "tyres": tyres,
             "corner_consistency": corner_consistency,
         }
+
+    def _plan_payload(car: str, track: str, lg: str, dated: list, trends: list,
+                      names: dict) -> dict:
+        """The training plan section of the Trends tab.
+
+        Carried on /api/progress rather than given its own GET because it is
+        computed from exactly the same debriefs — asking for it separately would
+        replay every recent lap a second time to reach the same numbers.
+
+        A plan that hasn't been accepted yet comes back as a *proposal*
+        (``saved`` false). That distinction is the whole point of the feature: a
+        target you never agreed to isn't one you can be measured against, and a
+        plan recomputed on every page load can't be worked on.
+        """
+        try:
+            with _catalog() as cat:
+                stored = cat.load_plan(car, track)
+                mastered, _parked = cat.load_focus_state(car, track)
+        except Exception:  # noqa: BLE001 - the plan is a convenience, never a 500
+            stored, mastered = None, set()
+
+        if stored:
+            plan = TrainingPlan.from_dict(stored)
+            since = [d for when, d in dated if when > plan.created_utc]
+            saved = True
+        else:
+            plan = propose_plan([t for t in trends], [d for _, d in dated],
+                                mastered=mastered, car=car, track=track)
+            # Names are resolved by the API layer everywhere else on this page;
+            # do it here too so a curated corner isn't called "Corner 4" in the
+            # one panel that is meant to be read for weeks.
+            for g in plan.goals:
+                g.name = names.get(g.corner_index, g.name)
+            since = []
+            saved = False
+
+        progress = {p.corner_index: p for p in measure_plan(plan, since)}
+        return {
+            "saved": saved,
+            "created_utc": plan.created_utc or None,
+            "laps_since": len(since),
+            "goals": [{
+                "corner_index": g.corner_index, "name": g.name,
+                "category": g.category, "what": g.what, "fix": g.fix,
+                "baseline_s": round(g.baseline_ms / 1000.0, 3),
+                "target_s": round(g.target_ms / 1000.0, 3),
+                "laps_seen": g.laps_seen,
+                "progress": _progress_payload(progress.get(g.corner_index)),
+            } for g in plan.goals],
+        }
+
+    def _progress_payload(p) -> dict | None:
+        if p is None or not p.laps:
+            return None
+        return {"laps": p.laps, "hits": p.hits, "needed": p.needed,
+                "median_s": round(p.median_ms / 1000.0, 3),
+                "best_s": round(p.best_ms / 1000.0, 3), "done": p.done}
+
+    @app.post("/api/plan")
+    def accept_plan(payload: dict = Body(...)) -> dict:
+        """Accept the plan currently being proposed for a car+track.
+
+        Takes the goals from the client rather than recomputing them: the driver
+        is agreeing to the plan *they were shown*, and a plan that quietly
+        differed from the one on screen because a lap landed in between would be
+        a plan nobody agreed to.
+        """
+        from datetime import datetime, timezone
+
+        car = str(payload.get("car") or "")
+        track = str(payload.get("track") or "")
+        goals = payload.get("goals") or []
+        if not car or not track or not goals:
+            raise HTTPException(422, "a plan needs a car, a track and a goal")
+        # Accepts a goal exactly as it was served — seconds and all, extra keys
+        # ignored — so the client can echo back the object it displayed instead
+        # of rebuilding it in another unit. Rebuilt through the dataclass so a
+        # malformed goal is rejected here rather than stored and blown up on the
+        # next read.
+        try:
+            plan = TrainingPlan(car=car, track=track,
+                                goals=[_goal_from_payload(g) for g in goals])
+        except (KeyError, TypeError, ValueError):
+            raise HTTPException(422, "malformed goal")
+        stamp = datetime.now(timezone.utc).isoformat()
+        with _catalog() as cat:
+            cat.save_plan(car, track, stamp, plan.to_dict()["goals"])
+        return {"ok": True, "created_utc": stamp}
+
+    def _goal_from_payload(g: dict) -> Goal:
+        """One goal as the client sends it back: seconds accepted, ms preferred."""
+        def _ms(key: str) -> float:
+            if g.get(key + "_ms") is not None:
+                return float(g[key + "_ms"])
+            return float(g.get(key + "_s") or 0.0) * 1000.0
+
+        return Goal(
+            corner_index=int(g["corner_index"]),
+            name=str(g.get("name", "")),
+            category=str(g.get("category", "")),
+            what=str(g.get("what", "")),
+            fix=str(g.get("fix", "")),
+            baseline_ms=_ms("baseline"),
+            target_ms=_ms("target"),
+            laps_seen=int(g.get("laps_seen", 0)),
+        )
+
+    @app.delete("/api/plan")
+    def drop_plan(car: str = Query(...), track: str = Query(...)) -> dict:
+        """Give up on the current plan; the next read proposes a fresh one."""
+        with _catalog() as cat:
+            cat.clear_plan(car, track)
+        return {"ok": True}
 
     @app.get("/api/export")
     def export(

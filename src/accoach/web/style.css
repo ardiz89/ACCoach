@@ -765,3 +765,47 @@ body.no-data .empty { display: block; }
   padding: 1px 7px; white-space: nowrap;
   font-family: var(--font-mono);
 }
+
+/* --- The training plan (Trends) -------------------------------------------
+   Sits above the weak points it was built from: it is the answer, they are the
+   working. One card per goal, and the bar fills with laps that met the target
+   rather than with a percentage of anything. */
+.plan { padding: 12px 24px 0; }
+.plan h3 { font-size: 13px; margin: 0 0 10px; display: flex; align-items: center; gap: 10px; }
+.plan-since { color: var(--muted); font-size: 12px; font-weight: 400; font-family: var(--font-ui); }
+.mini-btn.primary { border-color: var(--cyan); color: var(--cyan); }
+.goal {
+  display: flex; flex-direction: column; gap: 5px;
+  padding: 12px 14px; margin: 8px 0;
+  background: var(--panel); border: 1px solid var(--line);
+  border-left: 4px solid var(--cyan); border-radius: 12px;
+}
+.goal.done { border-left-color: var(--green); }
+.goal-head { display: flex; align-items: baseline; gap: 10px; }
+.goal-head .n {
+  font-family: var(--font-mono); font-size: 11px; color: var(--muted);
+  border: 1px solid var(--line); border-radius: 50%; width: 20px; height: 20px;
+  display: inline-flex; align-items: center; justify-content: center; flex: none;
+}
+.goal .corner { font-weight: 700; font-size: 15px; }
+.goal-done { margin-left: auto; color: var(--green); font-size: 12px; font-weight: 600; }
+.goal .cause { color: var(--text); font-weight: 600; }
+.goal-target {
+  color: var(--muted); font-size: 12px;
+  font-family: var(--font-mono); font-variant-numeric: tabular-nums;
+}
+.goal .fix { color: var(--cyan); font-size: 13px; }
+.plan-bar {
+  height: 8px; background: var(--inset); border-radius: 999px;
+  overflow: hidden; margin-top: 4px;
+}
+.plan-bar span { display: block; height: 100%; background: var(--cyan); border-radius: 999px; }
+.goal.done .plan-bar span { background: var(--green); }
+.plan-prog {
+  font-size: 12px; color: var(--muted);
+  font-family: var(--font-mono); font-variant-numeric: tabular-nums;
+}
+@media (max-width: 700px) {
+  .plan { padding-left: 16px; padding-right: 16px; }
+  .plan h3 { flex-wrap: wrap; }
+}
