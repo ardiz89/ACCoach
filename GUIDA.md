@@ -227,6 +227,15 @@ col bordo azzurro. Sono osservazioni **sull'intero giro**, non su una curva:
   preferenza, non un filtro: se niente somiglia a oggi ti do comunque il tuo
   giro migliore, non "nessun riferimento".
 
+Nel **report** la stessa regola vale, ma "oggi" lì non esiste: il riferimento
+viene scelto per le condizioni **del giro che stai rivedendo**. Se rivedi un giro
+di un mattino freddo, il bersaglio giusto è il tuo migliore *a quel freddo*, non
+il primato messo giù di sera su asfalto gommato — altrimenti ogni decimo del
+debrief è meteo invece che guida. Quando il confronto risulta più lento del tuo
+giro migliore, il riepilogo te lo dice e ti mostra i gradi di entrambi
+(«scelto per le condizioni · asfalto 12° · il tuo 1:39.000 era a 32°»). Se scegli
+tu il giro di confronto dalla tendina, comanda la tua scelta e non si tocca più.
+
 Se sei lontano dal passo, il tuo miglior giro è un bersaglio che ti tiene dove
 sei. Dalla sezione **Analisi** puoi importare un **giro di riferimento PRO** più
 veloce, e da lì in poi il coach ti misura su quello.

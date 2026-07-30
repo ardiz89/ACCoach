@@ -157,6 +157,34 @@ def test_an_exaggerated_gap_says_so_on_the_canvas():
     assert "line.mag.note" in _APPJS
 
 
+# --- the comparison lap is only forwarded when it was actually chosen ------
+
+def test_the_comparison_lap_is_only_forwarded_when_the_driver_picked_it():
+    """The picker is *filled* with the elected reference, so sending its value
+    back on every reload pinned the page to a reference elected for another
+    lap's conditions — and hid the note explaining the choice, because the page
+    was then no longer showing the elected lap."""
+    assert "let BASELINE_PINNED = false;" in _APPJS
+    block = _APPJS.split("function reloadSelection()")[1].split("\n}")[0]
+    assert "pinnedBaseline()" in block
+    assert '$("baseline").value' not in block
+
+
+def test_every_view_that_forwards_the_baseline_uses_the_same_rule():
+    """Sectors, Line and the trajectory export all send it too; one of them
+    keeping the old habit would make the tabs disagree about the benchmark."""
+    for fn in ("loadSectors", "loadLine"):
+        block = _APPJS.split(f"async function {fn}()")[1].split("\n}\n")[0]
+        assert "pinnedBaseline()" in block, fn
+
+
+def test_the_starred_lap_is_repainted_when_the_election_moves():
+    """The star can move without the combo changing: the reference is elected
+    for the conditions of the lap under review."""
+    block = _APPJS.split("function fillLaps(")[1].split("\n}")[0]
+    assert 'dataset.star' in block
+
+
 def test_a_language_switch_refetches_rather_than_repainting():
     """Every word of the flow, the debrief and the corner names is written by
     the backend in the requested language; repainting the cached payload leaves

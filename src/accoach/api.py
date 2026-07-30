@@ -278,7 +278,14 @@ def _off_track(row: dict) -> bool:
     return row.get("clean") == 0
 
 
-def _elected_path(cat, car: str, track: str, valid: list[dict]) -> str | None:
+def _fastest_clean(valid: list[dict]) -> dict | None:
+    """The quickest lap that could be a reference at all, conditions aside."""
+    usable = [r for r in valid if not _off_track(r)]
+    return min(usable, key=lambda r: r["lap_time_ms"]) if usable else None
+
+
+def _elected_path(cat, car: str, track: str, valid: list[dict],
+                  road_temp: float | None = None) -> str | None:
     """The lap the coach treats as the reference, for the page to agree with it.
 
     Not simply the fastest: a lap driven off track is time you can't repeat, so
@@ -287,13 +294,50 @@ def _elected_path(cat, car: str, track: str, valid: list[dict]) -> str | None:
     silently baseline everything on a lap the live coach had already rejected —
     and then star it in the dropdown while comparing against something else.
 
+    ``road_temp`` is the *reviewed lap's* track temperature, not today's: the
+    report has no "today", and the honest benchmark for a lap driven at 12 degrees
+    is your best lap at about 12, not the personal best you set at 32 on a
+    rubbered-in evening. Without it this page kept electing the outright fastest
+    while the live coach - which does pass the temperature - was electing
+    something else, so the star in the dropdown could name a lap the coach had
+    never used. A preference, not a filter (see ``best_reference_path``).
+
     Falls back to the fastest when every lap on record is dirty, so the page keeps
     working instead of going blank.
     """
-    elected = cat.best_reference_path(car, track)
+    elected = cat.best_reference_path(car, track, road_temp)
     if elected is not None:
         return elected
     return min(valid, key=lambda r: r["lap_time_ms"])["path"] if valid else None
+
+
+def _conditions_note(elected: dict | None, fastest: dict | None,
+                     review_temp: float | None) -> dict | None:
+    """Why the baseline isn't your fastest lap, when the reason is the weather.
+
+    A driver who opens the page and finds a slower lap as the benchmark has to be
+    told why, or the app just looks broken. Emitted only when the reason really
+    is conditions: the elected lap sits inside the band around the reviewed lap
+    and the faster one sits outside it. When the faster lap is *also* in the band
+    it was passed over for cleanliness, and saying "conditions" would be a
+    confident wrong answer.
+    """
+    if not review_temp or elected is None or fastest is None:
+        return None
+    if elected["path"] == fastest["path"]:
+        return None
+    et = elected.get("road_temp") or 0.0
+    ft = fastest.get("road_temp") or 0.0
+    if not et or abs(et - review_temp) > _TEMP_BAND_C:
+        return None                      # the elected lap isn't a conditions pick
+    if ft and abs(ft - review_temp) <= _TEMP_BAND_C:
+        return None                      # the faster one matched too: not the reason
+    return {
+        "faster_lap_time": format_lap_time(fastest["lap_time_ms"]),
+        "faster_road_temp": round(ft, 1) if ft else None,
+        "road_temp": round(et, 1),
+        "review_road_temp": round(review_temp, 1),
+    }
 
 
 def _tyre_means(samples, attr: str, ndigits: int) -> list[float] | None:
@@ -392,13 +436,26 @@ def create_api(
         with _catalog() as cat:
             all_laps = cat.laps_for(car, track)
             valid = [r for r in all_laps if r["valid"] and r["lap_time_ms"] > 0]
-            elected = _elected_path(cat, car, track, valid)
+            known = {r["path"] for r in all_laps}
+            # The reviewed lap is resolved first because the reference is elected
+            # *for it*: its track temperature is the only "current conditions"
+            # this page has.
+            review_path = _pick_known(
+                lap, next((r["path"] for r in all_laps if r["valid"]), None), known)
+            review_row = next((r for r in all_laps if r["path"] == review_path), None)
+            review_temp = (review_row or {}).get("road_temp") or None
+            elected = _elected_path(cat, car, track, valid, review_temp)
+            fastest_row = _fastest_clean(valid)
 
-        known = {r["path"] for r in all_laps}
         baseline_path = _pick_known(baseline, elected, known)
-        review_path = _pick_known(lap, next((r["path"] for r in all_laps if r["valid"]), None), known)
         if baseline_path is None or review_path is None:
             raise HTTPException(404, "no valid lap for this car+track")
+        elected_row = next((r for r in all_laps if r["path"] == elected), None)
+        # Only when the page is actually showing the elected lap: with a baseline
+        # the user picked by hand, a note about the election explains a choice
+        # nobody made.
+        conditions = (_conditions_note(elected_row, fastest_row, review_temp)
+                      if baseline_path == elected else None)
 
         try:
             baseline_lap = load_lap(baseline_path)
@@ -448,9 +505,13 @@ def create_api(
                 "lap_time": format_lap_time(reference.lap_time_ms),
                 "channels": _channels(baseline_lap),
                 "setup": _setup_of(baseline_lap),
+                # Why this lap and not the faster one, when the answer is the
+                # weather. None when it isn't (see _conditions_note).
+                "by_conditions": conditions,
             },
             "review": {
                 "path": review_path,
+                "road_temp": round(review_temp, 1) if review_temp else None,
                 "setup": _setup_of(review),
                 "lap_time_ms": review.lap_time_ms,
                 "lap_time": format_lap_time(review.lap_time_ms),
@@ -513,6 +574,11 @@ def create_api(
                 "valid": bool(r["valid"]), "off_track": _off_track(r),
                 "source": r.get("source", "own"),
                 "recorded_utc": r["recorded_utc"],
+                # The dropdown has been written to show this since the day track
+                # temperature was recorded — and this payload never carried it,
+                # so the degrees next to a lap time have never once appeared.
+                # /api/laps sends it; the page reads its list from here.
+                "road_temp": (round(r["road_temp"], 1) if r["road_temp"] else None),
             } for r in all_laps],
         }
 
@@ -867,10 +933,16 @@ def create_api(
             valid = [r for r in all_laps if r["valid"] and r["lap_time_ms"] > 0]
             if not valid:
                 raise HTTPException(404, "no valid lap for this car+track")
-            elected = _elected_path(cat, car, track, valid)
-        known = {r["path"] for r in all_laps}
+            known = {r["path"] for r in all_laps}
+            # Same election as /api/analysis, for the same reason and with the
+            # same input: two tabs of one page must not disagree about which lap
+            # is the benchmark.
+            review_path = _pick_known(
+                lap, next((r["path"] for r in all_laps if r["valid"]), None), known)
+            review_row = next((r for r in all_laps if r["path"] == review_path), None)
+            elected = _elected_path(cat, car, track, valid,
+                                    (review_row or {}).get("road_temp") or None)
         baseline_path = _pick_known(baseline, elected, known)
-        review_path = _pick_known(lap, next((r["path"] for r in all_laps if r["valid"]), None), known)
         if baseline_path is None or review_path is None:
             raise HTTPException(404, "no valid lap for this car+track")
         try:
