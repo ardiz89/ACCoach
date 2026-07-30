@@ -50,6 +50,13 @@ function fixz(v, d) {
   return (Math.abs(v) < 0.5 * Math.pow(10, -d) ? 0 : v).toFixed(d);
 }
 
+// Text going into an HTML attribute (a tooltip): the debrief writes prose, and
+// prose contains apostrophes and quotes in both our languages.
+function escAttr(s) {
+  return String(s || "").replace(/&/g, "&amp;").replace(/"/g, "&quot;")
+                        .replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
 function fmtMs(ms) {
   if (!ms || ms <= 0) return "--:--.---";
   const m = Math.floor(ms / 60000);
@@ -949,8 +956,14 @@ function drawWaterfall(a) {
   const rows = losses.map((l) => {
     const w = (Math.min(l.lost_s / mx, 1) * 100).toFixed(0);
     const sev = Math.min(1, l.lost_s / Math.max(mx, 0.3));
+    // A corner whose loss was inherited gets a mark pointing back at the one
+    // that caused it: the waterfall is the "what do I fix first" glance, and
+    // without this it points at the wrong corner precisely when it matters.
+    const from = l.inherited_from >= 0
+      ? `<span class="chain-chip" title="${escAttr(l.inherited)}">↩ T${l.inherited_from + 1}</span>`
+      : "";
     return `<div class="cons-row">` +
-      `<span class="corner">${l.label}</span>` +
+      `<span class="corner">${l.label}${from}</span>` +
       `<span class="cons-track"><span class="cons-fill" style="width:${w}%;background:${lossColor(sev)}"></span></span>` +
       `<span class="cons-nums"><b>−${l.lost_s.toFixed(3)}s</b> · ${l.message}</span>` +
       `</div>`;
@@ -991,6 +1004,10 @@ function drawDebrief(a) {
       `<div class="loss-head"><span class="corner">${l.label}</span>` +
       `<span class="lost">−${l.lost_s.toFixed(3)}s</span></div>` +
       `<div class="cause">${l.message}</div>` +
+      // The link to the corner before, when there is one. Above the numbers
+      // because it changes *which corner* the driver should go and work on —
+      // there is no point reading this corner's figures first.
+      (l.inherited ? `<div class="chain">↩ ${l.inherited}</div>` : "") +
       (l.detail ? `<div class="detail">${l.detail}</div>` : "") +
       (l.fix ? `<div class="fix">💡 ${l.fix}</div>` : "") +
       `</div>`;

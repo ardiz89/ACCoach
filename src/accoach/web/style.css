@@ -752,3 +752,16 @@ body.no-data .empty { display: block; }
   .vmin-table td.ref { color: #000; }
   .vmin-table th, .vmin-table td { border-bottom: 1px solid #bbb; }
 }
+
+/* The corner before: when a loss was inherited, say so above the numbers — it
+   changes which corner the driver goes and works on, so it can't sit under them. */
+.loss .chain {
+  color: var(--cyan); font-size: 13px; line-height: 1.45;
+  border-left: 2px solid var(--cyan); padding-left: 9px; margin: 2px 0 2px;
+}
+.chain-chip {
+  margin-left: 8px; font-size: 11px; font-weight: 600; cursor: help;
+  color: var(--cyan); border: 1px solid var(--cyan); border-radius: 999px;
+  padding: 1px 7px; white-space: nowrap;
+  font-family: var(--font-mono);
+}

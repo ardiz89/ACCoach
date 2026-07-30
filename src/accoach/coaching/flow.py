@@ -119,9 +119,13 @@ def _corner_step(loss) -> FlowStep:
     if loss.cause and detail.startswith(loss.cause):
         detail = detail[len(loss.cause):].strip()
 
+    # The chain, when there is one, belongs in the body: it is a *why*, and it
+    # is the one sentence on the card that can move the driver to another corner.
+    body = " ".join(x for x in (loss.cause, loss.inherited) if x)
+
     lo, hi = _window(loss.entry_pos, loss.exit_pos)
     return FlowStep(
-        kind="corner", title=loss.message, body=loss.cause, detail=detail,
+        kind="corner", title=loss.message, body=body, detail=detail,
         fix=loss.fix, lost_ms=loss.lost_ms, where=loss.label,
         chart=_CHART.get(loss.category, "delta"), from_pos=lo, to_pos=hi,
     )

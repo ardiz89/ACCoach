@@ -25,6 +25,7 @@ from ..telemetry.snapshot import format_lap_time
 from ..track import Corner
 from ..trackdata import corner_name, landmark_at
 from .analyzer import _BRAKE_ON, _LOSS_MS, CornerStats, _braked_early, classify_corner
+from .chain import link_corners
 from .cue import CueCategory
 from .diagnosis import corner_symptoms, dominant_symptom
 from .tuning import tuning_for_car
@@ -133,6 +134,12 @@ class CornerLoss:
     detail: str = ""           # the numbers that prove the cause
     fix: str = ""              # the actionable correction
     cause: str = ""            # handling "why": understeer/oversteer × phase × speed
+    # Set when this corner's loss was inherited from the corner before it (see
+    # coaching/chain.py). Empty whenever the evidence isn't there, which is most
+    # of the time — an invented chain sends the driver to fix a corner that was
+    # fine, in the confident voice of a diagnosis.
+    inherited: str = ""
+    inherited_from: int = -1
     min_speed_live: float = 0.0
     min_speed_ref: float = 0.0
     name: str = ""             # friendly corner name (set by the API layer)
@@ -635,6 +642,15 @@ def build_lap_debrief(lap: Lap, reference: Reference, corners: list[Corner],
         ))
 
     losses.sort(key=lambda x: x.lost_ms, reverse=True)
+    # Which of these losses were made in the corner before them. Attached to the
+    # finding rather than returned alongside it, so every reader of a debrief —
+    # the guided flow, the report, the printed text — gets it without being
+    # taught about a second list.
+    for link in link_corners(lap, reference, corners, losses, lg):
+        target = next((x for x in losses if x.index == link.index), None)
+        if target is not None:
+            target.inherited = link.message
+            target.inherited_from = link.from_index
     notes = _lift_notes(lap, reference, corners, lg)
     top = _top_speed_note(lap, reference, corners, lg)
     if top is not None:
@@ -706,6 +722,11 @@ def format_debrief(d: LapDebrief, top: int = 3, consistency: dict | None = None,
             if loss.cause:
                 line += f"  · {loss.cause}"   # the handling "why"
             lines.append(line)
+            if loss.inherited:
+                # The corner before, on its own line: it changes which corner
+                # the driver goes and works on, and folding it into the one
+                # above would bury it at the end of a long sentence.
+                lines.append(f"      ↩ {loss.inherited}")
     elif not d.is_reference:
         lines.append(f"  {f['clean']}")
 
