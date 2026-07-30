@@ -544,6 +544,9 @@ def create_api(
                 "lost_s": round(x.lost_ms / 1000, 3),
                 "category": x.category.value, "message": x.message,
                 "detail": x.detail, "fix": x.fix,
+                # When this corner's loss was made in the corner before it
+                # (coaching/chain.py). Empty most of the time, on purpose.
+                "inherited": x.inherited, "inherited_from": x.inherited_from,
                 "vmin_live": round(x.min_speed_live, 0),
                 "vmin_ref": round(x.min_speed_ref, 0),
                 "apex": x.apex_pos,

@@ -130,6 +130,7 @@ costano. Le prime tre hanno evidenza esterna misurata; le altre no.
 | 10 | **Riferimento esterno/PRO con interfaccia** | audit interno | medio |
 | 11 | **Tarature su ACC** — piano pronto in [`TARATURE-ACC.md`](TARATURE-ACC.md) | mai fatte | serve pista |
 | 12 | **Documentazione e tutorial allineati** (fermi al 29/06) + aiuto contestuale nelle impostazioni | segnalazione utente | piccolo |
+| 13 | ~~**Effetto a catena fra curve**~~ — **fatta il 2026-07-30**: quando la perdita di una curva era già nei km/h con cui ci arrivi, il debrief lo dice e ti manda sulla curva prima (`coaching/chain.py`). Nasce dall'analisi di Track Titan (il loro *Timekiller* è l'unica cosa loro che stava sul nostro differenziatore); da noi è più forte perché la causa fisica ce l'abbiamo già | analisi concorrenza 2026-07-30 | medio |
 
 ## Posizionamento
 

@@ -208,6 +208,15 @@ Nella tendina dei giri, accanto al tempo, trovi **i gradi dell'asfalto** (es.
 di frenata si spostano di 10-20 metri, quindi due giri con temperature molto
 diverse sono due circuiti diversi e confrontarli dice poco.
 
+A volte, sotto il titolo di una curva, trovi una riga col bordo azzurro che
+comincia con **↩**. Vuol dire che **la perdita di quella curva non è nata lì**:
+ci sei arrivato già più lento, e i km/h che ti mancano all'ingresso ce li avevi
+già all'uscita della curva precedente. In quel caso è **quella** la curva su cui
+lavorare — sistemata lei, questa migliora da sé. Compare solo quando i conti
+tornano davvero: se il deficit l'hai creato *sul rettilineo* fra le due (un
+sollevamento, una cambiata sbagliata) non ti diciamo che è colpa della curva
+prima, perché non lo è.
+
 Nel debrief, **sopra** l'elenco delle curve, possono comparire uno o due riquadri
 col bordo azzurro. Sono osservazioni **sull'intero giro**, non su una curva:
 - *«Sollevi dove il riferimento sta in pieno»* — con quanto ti è costato, contando
