@@ -12,6 +12,13 @@ let COMBOS = [];      // last /api/combos payload (kept for re-labelling on lang
 let LAST_HOVER = null; // last hover position, so a re-render keeps the readout
 let VIEW = "flow";    // whichever tab is `active` in index.html
 let HOVER_WIRED = false;
+// Did the driver pick the comparison lap by hand, or is it just whatever the
+// page elected last time? The difference matters now that the election depends
+// on the lap being reviewed: the picker is filled with the elected reference, so
+// passing its value back on every reload pinned the page to a reference chosen
+// for a *different* lap's conditions — and, because the page was then no longer
+// showing the elected lap, it also swallowed the note explaining why.
+let BASELINE_PINNED = false;
 let MAP_HIT = null;   // {rv, X, Y} screen transform captured by drawMap, for map hover
 let MINI_HIT = null;  // same, for the Compare-view mini map
 let DYN_GG = null;    // {pts:[{px,py,pos}]} screen points captured by drawGG, for its hover
@@ -76,6 +83,7 @@ async function init() {
   const sel = $("combo");
   sel.onchange = () => {
     const combo = JSON.parse(sel.value);
+    BASELINE_PINNED = false;   // a new car+track elects its own reference
     SESSION = null;
     SHEET = null;         // another car+track has other braking points
     SESSION_I = 0;        // a different car+track has different sessions
@@ -84,7 +92,7 @@ async function init() {
     if (VIEW === "session") loadSession(combo, 0);
   };
   $("lap").onchange = reloadSelection;
-  $("baseline").onchange = reloadSelection;
+  $("baseline").onchange = () => { BASELINE_PINNED = true; reloadSelection(); };
   $("exp-csv").onclick = () => exportData("csv");
   $("exp-json").onclick = () => exportData("json");
   wireTabs();
@@ -444,7 +452,7 @@ function fmtSec(ms) {
 async function loadSectors() {
   if (!CURRENT) return;
   const q = new URLSearchParams({ car: CURRENT.car, track: CURRENT.track });
-  const lap = $("lap").value, base = $("baseline").value;
+  const lap = $("lap").value, base = pinnedBaseline();
   if (lap) q.set("lap", lap);
   if (base) q.set("baseline", base);
   setPanelLoading("sec-summary", t("load.sectors"));
@@ -717,8 +725,14 @@ function drawMapTo(canvas, missing, a, cx, mode) {
   return { rv, X, Y };
 }
 
+// The comparison lap, but only when the driver actually chose it. Unpinned, the
+// backend elects one for the lap under review (and for its track temperature).
+function pinnedBaseline() {
+  return BASELINE_PINNED ? $("baseline").value : "";
+}
+
 function reloadSelection() {
-  loadCombo(CURRENT, $("lap").value, $("baseline").value);
+  loadCombo(CURRENT, $("lap").value, pinnedBaseline());
 }
 
 function exportData(fmt) {
@@ -781,10 +795,14 @@ function lapClock(iso) {
 
 function fillLaps(a, force) {
   const key = a.car + a.track;
-  // Skip if already filled for this combo — unless forced (e.g. language switch
-  // needs to relabel "(partial)" while keeping the current selection).
-  if (!force && $("lap").dataset.for === key) return;
+  // The starred lap can move without the combo changing: the reference is
+  // elected for the conditions of the lap you're reviewing, so picking a lap
+  // from a cold morning moves the star to a cold reference. Repainting only on
+  // a combo change would leave the star on a lap the page is no longer using.
+  const star = a.best_path || "";
+  if (!force && $("lap").dataset.for === key && $("lap").dataset.star === star) return;
   $("lap").dataset.for = key;
+  $("lap").dataset.star = star;
   const keepLap = force ? $("lap").value : null;
   const keepBase = force ? $("baseline").value : null;
 
@@ -843,11 +861,21 @@ function drawSummary(a) {
   // "I drove worse" can be a brake-bias click, and until now the page gave you
   // no way to tell. Only shown when it changes the story: same setup, no note.
   const setupNote = setupDelta(a.reference.setup, a.review.setup);
+  // Why the benchmark isn't your fastest lap, when the answer is the weather.
+  // Without it a slower baseline reads as a broken app; the backend only sends
+  // this when conditions really are the reason (see api._conditions_note).
+  const cond = a.reference.by_conditions;
+  const condNote = cond
+    ? tf(cond.faster_road_temp == null ? "sum.cond.vx" : "sum.cond.v",
+         { temp: cond.road_temp, time: cond.faster_lap_time,
+           ftemp: cond.faster_road_temp })
+    : "";
   $("summary").innerHTML =
     item(t("lbl.comparison"), a.reference.lap_time) +
     item(t("lbl.lap"), a.review.lap_time + off) +
     item(t("lbl.gap"), fmt(gap) + "s", gap > 0 ? "slower" : "faster") +
     (c.n >= 2 ? item(t("sum.consistency"), `σ ${(c.std_ms / 1000).toFixed(3)}s · ${c.n} ${t("lbl.laps")}`) : "") +
+    (condNote ? item(t("sum.cond"), condNote, "warn") : "") +
     (setupNote ? item(t("sum.setup_diff"), setupNote, "warn") : "");
 }
 
@@ -1882,7 +1910,7 @@ let LINE_MAG = 1;
 async function loadLine() {
   if (!CURRENT) return;
   const q = new URLSearchParams({ car: CURRENT.car, track: CURRENT.track });
-  const lap = $("lap").value, base = $("baseline").value;
+  const lap = $("lap").value, base = pinnedBaseline();
   if (lap) q.set("lap", lap);
   if (base) q.set("baseline", base);
   setPanelLoading("line-summary", t("load.line"));
@@ -2052,7 +2080,7 @@ function renderLineTable(L) {
     const q = new URLSearchParams({ car: CURRENT.car, track: CURRENT.track,
                                     fmt: "csv", lang: LANG() });
     if ($("lap").value) q.set("lap", $("lap").value);
-    if ($("baseline").value) q.set("baseline", $("baseline").value);
+    if (pinnedBaseline()) q.set("baseline", pinnedBaseline());
     window.location = "/api/trajectory?" + q.toString();
   };
 }

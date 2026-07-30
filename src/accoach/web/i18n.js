@@ -356,6 +356,15 @@
     "lbl.laps":        { en: `laps`, it: `giri` },
     "sum.consistency": { en: `Consistency`, it: `Costanza` },
     "sum.setup_diff":  { en: `Setup differs`, it: `Setup diverso` },
+    // Why the benchmark can be slower than your best lap. Braking points move
+    // 10-20 m between a cold track and a hot one, so your evening PB is the
+    // wrong target for a cold morning - the coach has always known this, the
+    // report used to ignore it.
+    "sum.cond":        { en: `Chosen for conditions`, it: `Scelto per le condizioni` },
+    "sum.cond.v":      { en: `track {temp}° · your {time} was at {ftemp}°`,
+                         it: `asfalto {temp}° · il tuo {time} era a {ftemp}°` },
+    "sum.cond.vx":     { en: `track {temp}° · your {time} has no recorded temperature`,
+                         it: `asfalto {temp}° · il tuo {time} non ha la temperatura registrata` },
 
     "sec.real":        { en: `real track sectors`, it: `settori reali pista` },
     "sec.thirds":      { en: `thirds (position)`, it: `terzi (posizione)` },
