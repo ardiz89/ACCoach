@@ -31,6 +31,14 @@ _DB_VERSION = 3
 # gap, not to demand a twin of today's session — too narrow a band and the
 # preference never finds anything, which is the same as not having it.
 _TEMP_BAND_C = 8.0
+# How far apart two laps' track grip can be and still count as the same
+# conditions. A FIRST BAND, and it is worth knowing why it can't be better than
+# that yet: the archive it was written against carries grip on 5 laps out of 39
+# — ACC reports 0 by design (see the reader) and the AC laps all read a flat 1.0
+# — so nothing here was measured against a real spread. 0.05 is a twentieth of
+# the whole scale, which on ACC's own numbers is about the distance between a
+# green track and a rubbered-in one.
+_GRIP_BAND = 0.05
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS lap (
@@ -254,7 +262,9 @@ class LapCatalog:
         return row["path"] if row else None
 
     def best_reference_path(self, car_model: str, track: str,
-                            road_temp: float | None = None) -> str | None:
+                            road_temp: float | None = None,
+                            grip: float | None = None,
+                            compound: str | None = None) -> str | None:
         """Path of the best *trustworthy* reference lap for this car+track.
 
         Excludes dirty laps (clean = 0) entirely, and prefers a confirmed-clean
@@ -269,10 +279,30 @@ class LapCatalog:
         evening track is the wrong target for a cold morning session: every
         tenth in the debrief is then weather, not driving.
 
+        ``compound`` is compared, never interpreted. On ACC it is canonical
+        ("dry_compound" / "wet_compound"); on AC it is whatever string the mod
+        chose ("Soft (S)", "Semislicks (SM)"), which is useless for deciding
+        *what* the tyre is and perfectly good for deciding whether two laps were
+        driven on the *same* one — which is the only question asked here. A
+        different tyre is a different car, so this is the criterion held onto
+        longest.
+
+        ``grip`` is the sim's 0..1 track grip. Measured caveat: **ACC leaves it
+        at 0 by design** (it reports condition through ``trackGripStatus``, a
+        tail the reader doesn't declare yet), so on ACC this argument is inert
+        and the election falls back to the criteria below it. Its band is a first
+        guess — unlike the temperature one, no published comparison stands behind
+        it, and the archive it was written against holds a single value.
+
         Deliberately a preference and not a filter. If nothing matches the
         conditions we return the plain best rather than "no reference": a
         slightly wrong benchmark still beats silence, and the conditions of the
         elected lap are shown to the driver anyway.
+
+        With several conditions, they are relaxed one at a time, **least
+        evidenced first**: grip (no measured spread behind its band), then track
+        temperature (10-20 m of braking point, a published comparison), and the
+        tyre last of all.
         """
         base = """SELECT path FROM lap
                   WHERE car_key = ? AND track_key = ? AND valid = 1
@@ -280,18 +310,33 @@ class LapCatalog:
         order = " ORDER BY (clean = 1) DESC, lap_time_ms ASC LIMIT 1"
         keys = (self._slug(car_model), self._slug(track))
 
+        # Only conditions we actually know about. A zero or an empty string is
+        # "never recorded" — most archives predate these fields — and unknown
+        # conditions can't be called similar, on either side of the comparison.
+        known: dict[str, tuple[str, tuple]] = {}
+        if compound:
+            known["compound"] = (" AND tyre_compound = ?", (str(compound),))
         if road_temp is not None and road_temp > 0:
+            known["temp"] = (" AND road_temp > 0 AND ABS(road_temp - ?) <= ?",
+                             (float(road_temp), _TEMP_BAND_C))
+        if grip is not None and grip > 0:
+            known["grip"] = (" AND grip > 0 AND ABS(grip - ?) <= ?",
+                             (float(grip), _GRIP_BAND))
+
+        tried: set[tuple[str, ...]] = set()
+        for wanted in (("compound", "temp", "grip"), ("compound", "temp"),
+                       ("compound",), ("temp",), ()):
+            use = tuple(c for c in wanted if c in known)
+            if use in tried:
+                continue                     # same query as a stricter attempt
+            tried.add(use)
             row = self._conn.execute(
-                # road_temp NULL/0 means the lap predates the field or the sim
-                # never reported it: unknown conditions can't be called similar.
-                base + " AND road_temp > 0 AND ABS(road_temp - ?) <= ?" + order,
-                (*keys, float(road_temp), _TEMP_BAND_C),
+                base + "".join(known[c][0] for c in use) + order,
+                (*keys, *(p for c in use for p in known[c][1])),
             ).fetchone()
             if row:
                 return row["path"]
-
-        row = self._conn.execute(base + order, keys).fetchone()
-        return row["path"] if row else None
+        return None
 
     def fastest_pro_path(self, car_model: str, track: str) -> str | None:
         """Path of the fastest imported PRO benchmark lap, or ``None`` if none."""

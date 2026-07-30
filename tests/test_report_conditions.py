@@ -151,3 +151,53 @@ def test_the_lap_dropdown_gets_the_track_temperature_it_is_written_to_show(tmp_p
     temps = {r["lap_time"]: r["road_temp"] for r in a["laps"]}
     assert temps["1:39.000"] == 32.0
     assert temps["1:43.500"] == 12.5
+
+
+# --- the report honours the tyre and the grip too --------------------------
+
+def _save_full(tmp_path, ms, day, road_temp=0.0, grip=0.0, compound=""):
+    lap = synth.build_lap(clean=True, compound=compound)
+    lap.lap_time_ms = ms
+    lap.road_temp = road_temp
+    lap.grip = grip
+    lap.recorded_utc = f"{day}T18:00:00+00:00"
+    save_lap(lap, tmp_path)
+
+
+def test_a_wet_lap_is_not_measured_against_your_dry_personal_best(tmp_path):
+    """The case the tyre criterion exists for. A different compound is a
+    different car, and the report used to hand you the dry PB regardless."""
+    _save_full(tmp_path, 99_000, "2026-06-20", road_temp=30.0, compound="dry_compound")
+    _save_full(tmp_path, 118_000, "2026-06-21", road_temp=18.0, compound="wet_compound")
+    _save_full(tmp_path, 121_000, "2026-06-22", road_temp=18.0, compound="wet_compound")
+    c = TestClient(create_api(tmp_path))
+    p = _paths(c)
+    a = _analysis(c, lap=p[121_000])
+    assert a["reference"]["lap_time_ms"] == 118_000
+    note = a["reference"]["by_conditions"]
+    assert note["reason"] == "compound"
+    assert note["compound"] == "wet_compound"
+    assert note["faster_compound"] == "dry_compound"
+    assert note["faster_lap_time"] == "1:39.000"
+
+
+def test_the_tyre_is_named_before_the_temperature(tmp_path):
+    """Both differ; the sentence reports the stronger reason, not the first."""
+    _save_full(tmp_path, 99_000, "2026-06-20", road_temp=35.0, compound="dry_compound")
+    _save_full(tmp_path, 118_000, "2026-06-21", road_temp=18.0, compound="wet_compound")
+    _save_full(tmp_path, 121_000, "2026-06-22", road_temp=18.0, compound="wet_compound")
+    c = TestClient(create_api(tmp_path))
+    a = _analysis(c, lap=_paths(c)[121_000])
+    assert a["reference"]["by_conditions"]["reason"] == "compound"
+
+
+def test_grip_can_be_the_reason_when_nothing_else_differs(tmp_path):
+    _save_full(tmp_path, 99_000, "2026-06-20", grip=0.70)
+    _save_full(tmp_path, 104_000, "2026-06-21", grip=1.00)
+    _save_full(tmp_path, 106_000, "2026-06-22", grip=1.00)
+    c = TestClient(create_api(tmp_path))
+    a = _analysis(c, lap=_paths(c)[106_000])
+    assert a["reference"]["lap_time_ms"] == 104_000
+    note = a["reference"]["by_conditions"]
+    assert note["reason"] == "grip"
+    assert note["grip"] == 1.0 and note["faster_grip"] == 0.7

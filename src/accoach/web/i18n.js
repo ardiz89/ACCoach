@@ -365,6 +365,16 @@
                          it: `asfalto {temp}° · il tuo {time} era a {ftemp}°` },
     "sum.cond.vx":     { en: `track {temp}° · your {time} has no recorded temperature`,
                          it: `asfalto {temp}° · il tuo {time} non ha la temperatura registrata` },
+    // The tyre outranks the temperature: a different compound is a different
+    // car. The strings are the sim's own — canonical on ACC, whatever the mod
+    // decided on AC — and are shown, never translated.
+    "sum.cond.tyre":   { en: `tyres {tyre} · your {time} was on {ftyre}`,
+                         it: `gomme {tyre} · il tuo {time} era su {ftyre}` },
+    "sum.cond.unknown":{ en: `an unrecorded compound`, it: `una mescola non registrata` },
+    "sum.cond.grip":   { en: `track grip {grip} · your {time} was at {fgrip}`,
+                         it: `grip pista {grip} · il tuo {time} era a {fgrip}` },
+    "sum.cond.gripx":  { en: `track grip {grip} · your {time} has no recorded grip`,
+                         it: `grip pista {grip} · il tuo {time} non ha il grip registrato` },
 
     "sec.real":        { en: `real track sectors`, it: `settori reali pista` },
     "sec.thirds":      { en: `thirds (position)`, it: `terzi (posizione)` },

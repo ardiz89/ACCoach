@@ -30,7 +30,7 @@ from .coaching import (
 from .comparison import Reference
 from .i18n import current_language
 from .recording import DEFAULT_LAPS_DIR, load_lap
-from .recording.catalog import LapCatalog, _TEMP_BAND_C
+from .recording.catalog import LapCatalog, _GRIP_BAND, _TEMP_BAND_C
 from .recording.lap import SAMPLE_FIELDS
 from .recording.storage import _catalog_path, _slug, list_lap_files
 from .sectors import ideal_lap, sector_spans, sector_times
@@ -284,8 +284,25 @@ def _fastest_clean(valid: list[dict]) -> dict | None:
     return min(usable, key=lambda r: r["lap_time_ms"]) if usable else None
 
 
+def _conditions_of(row: dict | None) -> dict:
+    """The conditions a lap was driven in, with "never recorded" as absence.
+
+    A zero temperature, a zero grip and an empty compound all mean the same
+    thing — the field wasn't there when this lap was saved — and every rule
+    downstream treats unknown as "can't be called similar".
+    """
+    row = row or {}
+    return {
+        "road_temp": row.get("road_temp") or None,
+        "grip": row.get("grip") or None,
+        "compound": row.get("tyre_compound") or None,
+    }
+
+
 def _elected_path(cat, car: str, track: str, valid: list[dict],
-                  road_temp: float | None = None) -> str | None:
+                  road_temp: float | None = None,
+                  grip: float | None = None,
+                  compound: str | None = None) -> str | None:
     """The lap the coach treats as the reference, for the page to agree with it.
 
     Not simply the fastest: a lap driven off track is time you can't repeat, so
@@ -302,42 +319,65 @@ def _elected_path(cat, car: str, track: str, valid: list[dict],
     something else, so the star in the dropdown could name a lap the coach had
     never used. A preference, not a filter (see ``best_reference_path``).
 
+    ``grip`` and ``compound`` come from the same lap and are held to the same
+    rule. The tyre matters most (a different compound is a different car) and is
+    the last thing relaxed; grip is inert on ACC, which reports 0 there by
+    design. See ``best_reference_path``.
+
     Falls back to the fastest when every lap on record is dirty, so the page keeps
     working instead of going blank.
     """
-    elected = cat.best_reference_path(car, track, road_temp)
+    elected = cat.best_reference_path(car, track, road_temp, grip, compound)
     if elected is not None:
         return elected
     return min(valid, key=lambda r: r["lap_time_ms"])["path"] if valid else None
 
 
 def _conditions_note(elected: dict | None, fastest: dict | None,
-                     review_temp: float | None) -> dict | None:
-    """Why the baseline isn't your fastest lap, when the reason is the weather.
+                     review: dict | None) -> dict | None:
+    """Why the baseline isn't your fastest lap, when the reason is the conditions.
 
     A driver who opens the page and finds a slower lap as the benchmark has to be
     told why, or the app just looks broken. Emitted only when the reason really
-    is conditions: the elected lap sits inside the band around the reviewed lap
-    and the faster one sits outside it. When the faster lap is *also* in the band
-    it was passed over for cleanliness, and saying "conditions" would be a
-    confident wrong answer.
+    is conditions: the elected lap matches the reviewed lap on something the
+    faster one doesn't. When the faster lap matches on everything it was passed
+    over for cleanliness, and saying "conditions" would be a confident wrong
+    answer.
+
+    Which condition is *named* is decided in the order the election holds onto
+    them — tyre, then track temperature, then grip — so the sentence reports the
+    strongest reason rather than the first one that happens to differ.
     """
-    if not review_temp or elected is None or fastest is None:
+    if elected is None or fastest is None or not review:
         return None
     if elected["path"] == fastest["path"]:
         return None
-    et = elected.get("road_temp") or 0.0
-    ft = fastest.get("road_temp") or 0.0
-    if not et or abs(et - review_temp) > _TEMP_BAND_C:
-        return None                      # the elected lap isn't a conditions pick
-    if ft and abs(ft - review_temp) <= _TEMP_BAND_C:
-        return None                      # the faster one matched too: not the reason
-    return {
-        "faster_lap_time": format_lap_time(fastest["lap_time_ms"]),
-        "faster_road_temp": round(ft, 1) if ft else None,
-        "road_temp": round(et, 1),
-        "review_road_temp": round(review_temp, 1),
-    }
+    out = {"faster_lap_time": format_lap_time(fastest["lap_time_ms"])}
+
+    mine, e, f = review, _conditions_of(elected), _conditions_of(fastest)
+
+    # Tyre: compared, never interpreted (see best_reference_path).
+    if mine["compound"] and e["compound"] == mine["compound"] \
+            and f["compound"] != mine["compound"]:
+        return {**out, "reason": "compound", "compound": e["compound"],
+                "faster_compound": f["compound"]}
+
+    def _near(a, b, band):
+        return a is not None and b is not None and abs(a - b) <= band
+
+    if _near(e["road_temp"], mine["road_temp"], _TEMP_BAND_C) \
+            and not _near(f["road_temp"], mine["road_temp"], _TEMP_BAND_C):
+        return {**out, "reason": "temp",
+                "faster_road_temp": round(f["road_temp"], 1) if f["road_temp"] else None,
+                "road_temp": round(e["road_temp"], 1),
+                "review_road_temp": round(mine["road_temp"], 1)}
+
+    if _near(e["grip"], mine["grip"], _GRIP_BAND) \
+            and not _near(f["grip"], mine["grip"], _GRIP_BAND):
+        return {**out, "reason": "grip",
+                "grip": round(e["grip"], 2),
+                "faster_grip": round(f["grip"], 2) if f["grip"] else None}
+    return None
 
 
 def _tyre_means(samples, attr: str, ndigits: int) -> list[float] | None:
@@ -443,8 +483,10 @@ def create_api(
             review_path = _pick_known(
                 lap, next((r["path"] for r in all_laps if r["valid"]), None), known)
             review_row = next((r for r in all_laps if r["path"] == review_path), None)
-            review_temp = (review_row or {}).get("road_temp") or None
-            elected = _elected_path(cat, car, track, valid, review_temp)
+            mine = _conditions_of(review_row)
+            review_temp = mine["road_temp"]
+            elected = _elected_path(cat, car, track, valid, review_temp,
+                                    mine["grip"], mine["compound"])
             fastest_row = _fastest_clean(valid)
 
         baseline_path = _pick_known(baseline, elected, known)
@@ -454,7 +496,7 @@ def create_api(
         # Only when the page is actually showing the elected lap: with a baseline
         # the user picked by hand, a note about the election explains a choice
         # nobody made.
-        conditions = (_conditions_note(elected_row, fastest_row, review_temp)
+        conditions = (_conditions_note(elected_row, fastest_row, mine)
                       if baseline_path == elected else None)
 
         try:
@@ -943,8 +985,9 @@ def create_api(
             review_path = _pick_known(
                 lap, next((r["path"] for r in all_laps if r["valid"]), None), known)
             review_row = next((r for r in all_laps if r["path"] == review_path), None)
-            elected = _elected_path(cat, car, track, valid,
-                                    (review_row or {}).get("road_temp") or None)
+            mine = _conditions_of(review_row)
+            elected = _elected_path(cat, car, track, valid, mine["road_temp"],
+                                    mine["grip"], mine["compound"])
         baseline_path = _pick_known(baseline, elected, known)
         if baseline_path is None or review_path is None:
             raise HTTPException(404, "no valid lap for this car+track")
