@@ -263,3 +263,73 @@ Sui giri veri in archivio, non sulla demo: Monza legge **5775 m** (pista reale
 giro sano prende i metri e i **sei rotti tornano alle percentuali**; gli ACC di
 Imola senza coordinate restano in percentuale. Nessun errore in console dopo aver
 girato tutte le schede, in italiano e in inglese. Suite **1083** verde.
+
+---
+
+## Aggiornamento 2026-07-30 (tarda sera) — passata di layout, misurata
+
+Quattro difetti **misurati** su uno schermo 2560×1271, non stimati a occhio.
+
+### 1. Una larghezza sola (`--page` / `--gut`)
+
+Le viste a scheda erano centrate a 780-900 px mentre i grafici si stiravano a
+**2504 px**: due layout nella stessa app, e un delta alto 100 px lungo due metri
+e mezzo. Ora il contenuto è dentro **1600 px** centrati.
+
+Il gutter è `max(24px, calc((100% - var(--page)) / 2))` applicato a ogni fascia,
+**non un wrapper**: così ogni fascia tiene il suo sfondo da bordo a bordo mentre
+il contenuto si allinea. La percentuale si risolve sulla larghezza della fascia
+(il body), quindi è a prova di scrollbar dove `100vw` non lo sarebbe — **ma per
+la stessa ragione dentro una colonna stretta collassa a 24 px**: è per questo
+che il gutter della riga d'apertura di Confronto lo paga `.hero`, non la
+mini-mappa dentro di essa.
+
+### 2. La fascia del giro, su ogni scheda
+
+Giro · riferimento · gap · asfalto stavano **solo dentro il riepilogo di
+Confronto**: la landing spiegava un giro senza mai dirti quale. Ora è un nastro
+sotto le schede, e i tre numeri sono stati **tolti** dai riepiloghi di Confronto
+e Settori (due posti che stampano lo stesso gap divergono il giorno in cui uno
+dei due impara qualcosa). Il riepilogo di Confronto resta per ciò che riguarda
+*il confronto* (costanza, nota sulle condizioni, differenza di setup) e si
+nasconde quando non ha niente da dire.
+
+### 3. Le viste corte
+
+Misurate: «Il giro spiegato» 627 px su 1271, «Sessione» 636, «Settori» 518.
+
+- **Giro spiegato**: da 1180 px in su è una schermata di *focus* — frase a
+  sinistra, grafico a destra alto fino a 440 px, bottoni sotto la frase,
+  il tutto centrato verticalmente. Sotto i 1180 px resta la pila di prima.
+- **Sessione**: i giri e «cosa è cambiato» affiancati.
+- **Settori**: sotto il giro ideale, **ogni giro settore per settore**
+  (`per_lap` in `/api/sectors`), col migliore di ogni colonna in evidenza. Il
+  giro ideale dichiarava un tempo che nessuno ha guidato; qui vedi di quali giri
+  è fatto. Stessi span e stesso calcolo dell'ideale, così la tabella non può
+  contraddire la riga sopra.
+
+**Difetto trovato e corretto durante il lavoro**: `#view-flow { display: grid }`
+batte per specificità `.hidden { display: none }` — la landing restava sopra
+tutte le altre schede. Ora c'è un test che vieta a qualunque regola `#view-*` di
+toccare `display` senza `:not(.hidden)`.
+
+### 4. Ingegnere: il setup a colonne
+
+16 righe su 29 finivano a 1189 px di 2560 (1315 px vuoti) e la pagina scorreva
+per 2020 px. Ora `.setup-body` è una griglia `auto-fill` da 430 px: una colonna
+sul portatile (identico a prima), due o tre sul monitor largo. I gruppi con le
+righe per-ruota prendono tutta la riga **e al loro interno impaginano a loro
+volta** le leve a valore singolo — è lì che stava la maggior parte del vuoto
+(«Meccanica» da sola ne ha tre). Da 2020 a **1720 px**. Questa pagina **tiene la
+larghezza piena** apposta: è uno strumento a due pannelli, non un testo.
+
+### 5. Spiccioli
+
+Ultima scheda e ultima auto/pista ricordate (validate prima dell'uso: una vista
+salvata da una build vecchia non deve svuotare la pagina); titolo della finestra
+`monza · 2:09.775 — HONE`, con la parte che distingue davanti; **1-9** scelgono
+la scheda e **[ ]** scorrono i giri, scritti nei tooltip perché una scorciatoia
+che nessuno trova non esiste.
+
+Suite **1090** verde. Nessun errore in console girando tutte le schede, e
+nessuno scorrimento orizzontale a 390 px su nessuna vista.

@@ -137,14 +137,20 @@ function renderSetup(data) {
   const body = $("setup-body");
   body.innerHTML = "";
   for (const g of data.groups) {
+    const params = data.params.filter((x) => x.group === g);
     const wrap = document.createElement("div");
-    wrap.className = "grp";
+    // A group with per-wheel rows needs the whole width (label + four steppers
+    // measures ~1000px); one with single-value levers needs a third of that.
+    // Marking it here lets the CSS pack the narrow groups side by side instead
+    // of running all eight of them down one column — measured before this
+    // existed: 16 of 29 rows ended at 1189px of a 2560px screen, and the page
+    // still scrolled for 2020px.
+    const wide = params.some((p) => (p.slots || []).length > 2);
+    wrap.className = "grp" + (wide ? " wide" : "");
     const title = document.createElement("div");
     title.className = "grp-title"; title.textContent = g;
     wrap.appendChild(title);
-    for (const p of data.params.filter((x) => x.group === g)) {
-      wrap.appendChild(renderParam(p));
-    }
+    for (const p of params) wrap.appendChild(renderParam(p));
     body.appendChild(wrap);
   }
 }
@@ -164,7 +170,9 @@ function isAlVolo(p) {
 
 function renderParam(p) {
   const row = document.createElement("div");
-  row.className = "param";
+  // Per-wheel rows take the full width of their group; single-value levers sit
+  // two or three abreast (see .grp.wide in engineer.css).
+  row.className = "param" + ((p.slots || []).length > 2 ? " wide" : "");
   const label = document.createElement("div");
   label.className = "param-label";
   label.innerHTML = `${p.label}${p.note ? `<span class="note">${p.note}</span>` : ""}`;

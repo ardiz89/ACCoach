@@ -1084,11 +1084,30 @@ def create_api(
 
         # Ideal lap stitched from the best sector of every valid lap.
         ideal = None
+        objs: list = []
         try:
             objs = [load_lap(r["path"]) for r in valid]
             ideal = ideal_lap(objs, [r["path"] for r in valid], spans)
         except (OSError, ValueError):
-            ideal = None
+            objs, ideal = [], None
+
+        # Every lap's sectors against the same spans. The ideal lap already says
+        # a 2:03.412 is in there somewhere; this is where you see *which* laps it
+        # is made of, and whether a sector you're proud of was one good lap or a
+        # habit. Free-ish: these laps are already in memory for the ideal, so it
+        # costs a walk over samples and not a read from disk.
+        per_lap = []
+        for obj, row in zip(objs, valid):
+            st = sector_times(obj, spans)
+            if len(st) != n:
+                continue
+            per_lap.append({
+                "path": row["path"],
+                "lap_time": format_lap_time(row["lap_time_ms"]),
+                "recorded_utc": row.get("recorded_utc"),
+                "off_track": _off_track(row),
+                "ms": st,
+            })
 
         sectors_out = [{
             "index": i,
@@ -1107,6 +1126,7 @@ def create_api(
             "baseline": {"path": baseline_path, "lap_time_ms": base.lap_time_ms,
                          "lap_time": format_lap_time(base.lap_time_ms)},
             "sectors": sectors_out,
+            "per_lap": per_lap,
             "laps": [{"path": r["path"], "lap_time": format_lap_time(r["lap_time_ms"]),
                       "valid": bool(r["valid"]), "off_track": _off_track(r)}
                      for r in all_laps],

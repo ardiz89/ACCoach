@@ -45,6 +45,17 @@
   --font-ui: "Inter", system-ui, "Segoe UI", sans-serif;
   --font-display: "Space Grotesk", system-ui, "Segoe UI", sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
+
+  /* How wide the page is allowed to get, and the gutter that enforces it.
+     Measured on a 2560px monitor: the card views were centred at 780-900px
+     while the charts stretched to 2504px — two layouts in one app, and a delta
+     trace 100px tall and two and a half metres long. The gutter grows with the
+     window instead of a wrapper element, so every full-width band keeps its own
+     background running edge to edge while its *content* lines up with everything
+     else. The percentage resolves against the band's own width (the body), so it
+     is scrollbar-safe in a way 100vw is not. */
+  --page: 1600px;
+  --gut: max(24px, calc((100% - var(--page)) / 2));
 }
 
 /* Colour-blind–safe palette: red/green delta cues are indistinguishable for the
@@ -81,7 +92,7 @@ header {
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 12px;
-  padding: 16px 24px;
+  padding: 16px var(--gut);
   border-bottom: 1px solid var(--line);
   background: var(--panel);
 }
@@ -164,13 +175,38 @@ select {
 }
 .export button:hover { border-color: var(--cyan); color: var(--cyan); }
 
+/* The lap you are looking at — one strip, under the tabs, on every view.
+   Denser than .summary on purpose: it is chrome, not content, and it has to
+   survive being on screen all the time without competing with the view below. */
+.lapbar {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 22px;
+  padding: 9px var(--gut);
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+  font-family: var(--font-mono); font-variant-numeric: tabular-nums;
+}
+.lapbar:empty { display: none; }
+.lapbar .bit { display: flex; align-items: baseline; gap: 7px; }
+.lapbar .k {
+  color: var(--muted); font-family: var(--font-ui);
+  font-size: 10px; text-transform: uppercase; letter-spacing: .06em;
+}
+.lapbar .v { font-size: 15px; font-weight: 600; }
+.lapbar .v.slower { color: var(--red); }
+.lapbar .v.faster { color: var(--green); }
+.lapbar .off-track { font-family: var(--font-ui); }
+
 .summary {
   display: flex;
   gap: 28px;
   flex-wrap: wrap;
-  padding: 14px 24px;
+  padding: 14px var(--gut);
   border-bottom: 1px solid var(--line);
 }
+/* A summary whose every item moved to the lap bar must not leave a striped
+   empty band behind: the sections are filled by JS, and "nothing to say" is a
+   normal state now that the identity numbers live upstairs. */
+.summary:empty { display: none; }
 .summary .item { display: grid; gap: 2px; }
 .summary .item .k { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
 .summary .item .v { font-size: 18px; font-weight: 600; font-family: var(--font-mono); }
@@ -189,7 +225,7 @@ select {
 
 .readout {
   position: sticky; top: 0; z-index: 5;
-  padding: 10px 24px;
+  padding: 10px var(--gut);
   background: var(--inset); border-bottom: 1px solid var(--line);
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums; font-size: 13px; color: var(--muted);
@@ -199,7 +235,7 @@ select {
 .readout .slower { color: var(--red); }
 .readout .faster { color: var(--green); }
 
-.tabs { display: flex; gap: 4px; padding: 10px 24px 0; border-bottom: 1px solid var(--line); background: var(--panel); }
+.tabs { display: flex; gap: 4px; padding: 10px var(--gut) 0; border-bottom: 1px solid var(--line); background: var(--panel); }
 .tab {
   background: transparent; color: var(--muted);
   border: none; border-bottom: 2px solid transparent;
@@ -210,7 +246,7 @@ select {
 .tab.active { color: var(--text); border-bottom-color: var(--cyan); }
 .hidden { display: none; }
 
-main { padding: 16px 24px; display: grid; gap: 18px; }
+main { padding: 16px var(--gut); display: grid; gap: 18px; }
 .chart canvas { cursor: crosshair; }
 .chart canvas.tall { height: 240px; }
 .chart.map canvas { height: 60vh; min-height: 380px; }
@@ -256,7 +292,7 @@ main { padding: 16px 24px; display: grid; gap: 18px; }
 /* Mini track-map in the Compare view: hovering any chart highlights the same
    point here (and hovering the mini-map drives the chart crosshairs), so the
    lap's geometry sits next to the traces without leaving the tab. */
-.minimap { padding: 8px 24px 0; }
+.minimap { padding: 8px var(--gut) 0; }
 .minimap canvas {
   width: 100%; height: 160px; display: block; cursor: crosshair;
   background: var(--inset); border: 1px solid var(--line); border-radius: 12px;
@@ -288,7 +324,7 @@ main { padding: 16px 24px; display: grid; gap: 18px; }
 .map-legend .marker.ring { color: var(--cyan); }
 
 /* Min speed per corner table (Compare view) */
-.vmin { padding: 8px 24px 0; }
+.vmin { padding: 8px var(--gut) 0; }
 .vmin:empty { display: none; }
 .vmin h3 { font-size: 13px; margin: 0 0 8px; }
 .vmin h3 small { color: var(--muted); font-weight: 400; font-size: 11px; }
@@ -305,12 +341,12 @@ main { padding: 16px 24px; display: grid; gap: 18px; }
 .vmin-table td.vn.faster { color: var(--green); }
 .vmin-table td.vn.slower { color: var(--red); }
 
-.debrief { padding: 8px 24px 32px; }
+.debrief { padding: 8px var(--gut) 32px; }
 .debrief h3 { font-size: 13px; }
 .debrief h3 small { color: var(--muted); font-weight: 400; font-size: 11px; }
 
 /* Benchmark ladder (Andamento → Livelli) */
-.levels { padding: 8px 24px 0; }
+.levels { padding: 8px var(--gut) 0; }
 .levels h3 { font-size: 13px; margin: 0 0 8px; }
 .levels h3 small { color: var(--muted); font-weight: 400; font-size: 11px; }
 .ladder { display: flex; flex-direction: column; gap: 8px; }
@@ -398,11 +434,11 @@ body.no-data .empty { display: block; }
 /* --- sectors view --- */
 .sec-head {
   display: grid; grid-template-columns: 70px 200px 1fr; gap: 14px;
-  padding: 10px 24px 4px; color: var(--muted); font-size: 11px;
+  padding: 10px var(--gut) 4px; color: var(--muted); font-size: 11px;
   text-transform: uppercase; letter-spacing: .04em;
 }
 .sec-head small { text-transform: none; letter-spacing: 0; }
-.sectors { padding: 4px 24px; }
+.sectors { padding: 4px var(--gut); }
 .secrow {
   display: grid; grid-template-columns: 70px 200px 1fr; gap: 14px;
   align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line);
@@ -425,7 +461,7 @@ body.no-data .empty { display: block; }
 }
 .secbar .secd.slower { color: var(--red); }
 .secbar .secd.faster { color: var(--green); }
-.ideal { padding: 16px 24px 32px; }
+.ideal { padding: 16px var(--gut) 32px; }
 .ideal h3 { font-size: 13px; margin: 0 0 6px; }
 .ideal-time { font-size: 22px; font-weight: 700; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 .ideal-time .faster { color: var(--green); font-size: 14px; font-weight: 600; margin-left: 8px; }
@@ -456,13 +492,13 @@ body.no-data .empty { display: block; }
   select { min-width: 0; width: 100%; }
   .export { width: 100%; }
   .summary { gap: 14px 22px; }
-  .summary, .readout, main, .tabs, .vmin, .debrief, .levels,
+  .summary, .lapbar, .readout, main, .tabs, .vmin, .debrief, .levels,
   .sectors, .sec-head, .ideal, #map-readout { padding-left: 16px; padding-right: 16px; }
 }
 
 @media (max-width: 520px) {
   h1 { font-size: 18px; }
-  .summary, .readout, main, .tabs, .vmin, .debrief, .levels,
+  .summary, .lapbar, .readout, main, .tabs, .vmin, .debrief, .levels,
   .sectors, .sec-head, .ideal, #map-readout { padding-left: 12px; padding-right: 12px; }
   .tabs { gap: 0; overflow-x: auto; -webkit-overflow-scrolling: touch; }
   .tab { padding: 8px 12px; white-space: nowrap; }
@@ -491,7 +527,7 @@ body.no-data .empty { display: block; }
    says "you were wide here", the panel says how wide, in metres. */
 .chips {
   display: flex; flex-wrap: wrap; gap: 6px;
-  padding: 12px 24px 0;
+  padding: 12px var(--gut) 0;
 }
 .chip {
   background: var(--inset); color: var(--muted);
@@ -504,7 +540,7 @@ body.no-data .empty { display: block; }
 
 .line-grid {
   display: grid; grid-template-columns: minmax(0, 1fr) 300px;
-  gap: 18px; padding: 12px 24px 0; align-items: start;
+  gap: 18px; padding: 12px var(--gut) 0; align-items: start;
 }
 .chart.corner-map canvas { height: 46vh; min-height: 320px; }
 .chart.corner-map h3 { font-size: 15px; font-weight: 600; }
@@ -543,6 +579,15 @@ body.no-data .empty { display: block; }
 .vmin-table.wide tbody tr.on { background: color-mix(in srgb, var(--cyan) 10%, transparent); }
 .vmin-table td.vn.in { color: var(--cyan); }
 .vmin-table td.vn.out { color: var(--amber); }
+/* Your best in that sector. Colour *and* weight: the delta palette is already
+   spoken for by faster/slower, and this table is read by people who can't tell
+   the two greens apart with the colour-blind toggle on. */
+.vmin-table td.vn.best { color: var(--green); font-weight: 700; }
+/* The sector-by-sector table lists laps, it doesn't select them — the row is not
+   a button, so it must not offer a hand cursor like the corner tables do. */
+#sec-table .vmin-table.wide tbody tr { cursor: default; }
+#sec-table .vmin-table.wide tbody tr:hover { background: transparent; }
+#sec-table .vmin-table.wide tbody tr.on { background: color-mix(in srgb, var(--cyan) 10%, transparent); }
 .mini-btn {
   background: var(--inset); color: var(--muted);
   border: 1px solid var(--line); border-radius: 7px;
@@ -570,6 +615,44 @@ body.no-data .empty { display: block; }
    the same screen, and its only advantage is that it asks for one thing at a
    time. Filling the width would give that away. */
 .flow-shell { max-width: 780px; margin: 0 auto; padding: 8px 0 40px; }
+
+/* Wide screens: the sentence and the evidence side by side.
+   Measured before this existed — the landing view used 627px of a 1271px
+   screen, a card stacked on a 150px chart with the rest of the page black,
+   while the chart-heavy tabs ran the full width. Reading order is unchanged
+   (card first, then its chart), the prose keeps a readable measure, and the
+   chart finally gets the height a lap trace needs. Below 1180px this rule is
+   off and the original stack is what you get. */
+@media (min-width: 1180px) {
+  /* One step of an explanation is a focus screen, not a document: on a tall
+     monitor it used to sit pinned to the top with two thirds of the page black
+     below it. Centred, the space around it reads as deliberate. The min-height
+     is what the page chrome leaves (header + tabs + lap bar ≈ 190px); content
+     taller than that still grows the box and scrolls normally. */
+  /* `:not(.hidden)` is load-bearing, not decoration: an ID selector setting
+     `display: grid` outranks `.hidden { display: none }`, and the landing view
+     stayed on screen under every other tab. */
+  #view-flow:not(.hidden) {
+    min-height: calc(100vh - 190px); display: grid; align-content: center;
+  }
+  .flow-shell {
+    max-width: none;
+    padding: 8px var(--gut) 40px;
+    display: grid;
+    grid-template-columns: minmax(420px, 580px) minmax(0, 1fr);
+    /* The chart spans both content rows so the buttons sit under the card they
+       belong to, instead of stranded below a column of empty space. */
+    grid-template-areas: "head head" "card chart" "nav  chart";
+    grid-template-rows: auto auto 1fr;
+    column-gap: 26px;
+    align-items: start;
+  }
+  .flow-head { grid-area: head; }
+  .flow-card { grid-area: card; margin-bottom: 0; }
+  .flow-chart { grid-area: chart; margin-bottom: 0; }
+  .flow-nav { grid-area: nav; margin-top: 20px; }
+  .flow-chart canvas { height: clamp(300px, 36vh, 440px); }
+}
 .flow-head {
   display: flex; align-items: center; justify-content: space-between;
   margin-bottom: 14px;
@@ -639,6 +722,27 @@ body.no-data .empty { display: block; }
 
 /* --- One run of laps, as it was driven ----------------------------------- */
 .session-shell { max-width: 900px; margin: 0 auto; padding: 8px 0 40px; }
+
+/* Same move as the flow view: on a wide screen the laps you drove and what
+   changed since last time are read together, not one under the other. */
+@media (min-width: 1180px) {
+  .session-shell {
+    max-width: none;
+    padding: 8px var(--gut) 40px;
+    display: grid;
+    grid-template-columns: minmax(360px, 1fr) minmax(360px, 1.1fr);
+    grid-template-areas: "head head" "nums nums" "laps changed";
+    column-gap: 34px;
+    align-items: start;
+  }
+  .session-head { grid-area: head; }
+  #ses-numbers { grid-area: nums; }
+  #ses-laps { grid-area: laps; }
+  #ses-changed { grid-area: changed; }
+  /* The numbers band is inside the shell here, so it must not re-apply the
+     page gutter on top of the one the shell already pays. */
+  .session-shell .summary { padding-left: 0; padding-right: 0; }
+}
 .session-head {
   display: flex; align-items: flex-end; justify-content: space-between;
   gap: 16px; flex-wrap: wrap; margin-bottom: 18px;
@@ -716,8 +820,13 @@ body.no-data .empty { display: block; }
   gap: 18px; align-items: center;
   border-bottom: 1px solid var(--line);
 }
-.hero .summary { border-bottom: 0; }
-.hero .minimap { padding: 10px 24px 10px 0; }
+/* The page gutter is paid by the row, not by the mini map inside it: --gut is a
+   percentage of the element's own containing block, so on a 360px column it
+   collapses to the 24px floor and the map hangs off the edge of the column every
+   other band lines up with. Full-width parent, correct gutter. */
+.hero { padding-left: var(--gut); padding-right: var(--gut); }
+.hero .summary { border-bottom: 0; padding-left: 0; padding-right: 0; }
+.hero .minimap { padding: 10px 0 10px 0; }
 .hero .minimap canvas { height: 150px; }
 @media (max-width: 860px) {
   .hero { grid-template-columns: 1fr; gap: 0; }
@@ -770,7 +879,7 @@ body.no-data .empty { display: block; }
    Sits above the weak points it was built from: it is the answer, they are the
    working. One card per goal, and the bar fills with laps that met the target
    rather than with a percentage of anything. */
-.plan { padding: 12px 24px 0; }
+.plan { padding: 12px var(--gut) 0; }
 .plan h3 { font-size: 13px; margin: 0 0 10px; display: flex; align-items: center; gap: 10px; }
 .plan-since { color: var(--muted); font-size: 12px; font-weight: 400; font-family: var(--font-ui); }
 .mini-btn.primary { border-color: var(--cyan); color: var(--cyan); }

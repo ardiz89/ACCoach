@@ -91,6 +91,7 @@ async function init() {
   const sel = $("combo");
   sel.onchange = () => {
     const combo = JSON.parse(sel.value);
+    try { localStorage.setItem(_COMBO_KEY, sel.value); } catch (e) {}
     BASELINE_PINNED = false;   // a new car+track elects its own reference
     SESSION = null;
     SHEET = null;         // another car+track has other braking points
@@ -104,8 +105,16 @@ async function init() {
   $("exp-csv").onclick = () => exportData("csv");
   $("exp-json").onclick = () => exportData("json");
   wireTabs();
+  wireKeys();
+  wireHints();
   wireFlow();
+  // Pick up where you left off — but only if that car+track is still in the
+  // archive (a lap store can be moved or cleared between two runs).
+  const combo = savedCombo();
+  if (combo) sel.value = combo;
   await loadCombo(JSON.parse(sel.value));
+  const view = savedView();
+  if (view && view !== VIEW) showView(view);
   // First visit: pop the tour once data is on screen (so #vmin/#debrief exist).
   if (window.HoneTour) window.HoneTour.auto(tourSteps(), "hone_tour_analysis");
 }
@@ -214,10 +223,72 @@ function showView(name) {
   redrawCurrentView();
 }
 
+// Which tab you were on, and which car and track, across reloads. The page
+// reopens a dozen times in an evening — after a lap, after a language switch,
+// after the hub relaunches it — and it always came back to the landing tab and
+// the first combo in the list, so you re-navigated every time. Stored, never
+// trusted: a saved view whose panel no longer exists, or a combo no longer in
+// the archive, is ignored rather than left to blank the page.
+const _VIEW_KEY = "hone_view", _COMBO_KEY = "hone_combo";
+
+function rememberView(name) {
+  try { localStorage.setItem(_VIEW_KEY, name); } catch (e) {}
+}
+
+function savedView() {
+  let v = null;
+  try { v = localStorage.getItem(_VIEW_KEY); } catch (e) {}
+  return v && document.getElementById("view-" + v) ? v : null;
+}
+
+function savedCombo() {
+  let v = null;
+  try { v = localStorage.getItem(_COMBO_KEY); } catch (e) {}
+  if (!v) return null;
+  return [...$("combo").options].some((o) => o.value === v) ? v : null;
+}
+
 function wireTabs() {
   for (const b of document.querySelectorAll(".tab")) {
-    b.onclick = () => showView(b.dataset.view);
+    // The shortcut is on the tooltip because a keyboard shortcut nobody can find
+    // is the same as no shortcut.
+    const i = [...document.querySelectorAll(".tab")].indexOf(b) + 1;
+    if (i <= 9) b.title = `${t("kbd.tab")} ${i}`;
+    b.onclick = () => { rememberView(b.dataset.view); showView(b.dataset.view); };
   }
+}
+
+// Where the lap shortcut is written down: on the picker it drives.
+function wireHints() {
+  const sel = $("lap");
+  if (sel) sel.title = t("kbd.lap");
+}
+
+// Keyboard: 1-8 pick a tab, [ and ] step through the laps of this car+track.
+// Ignored while a form control has focus — the lap and baseline pickers are
+// <select>s, where every key already means something.
+function wireKeys() {
+  document.addEventListener("keydown", (e) => {
+    if (e.ctrlKey || e.altKey || e.metaKey) return;
+    const el = document.activeElement;
+    if (el && el.matches("input, select, textarea")) return;
+    if (document.querySelector(".tour-pop")) return;   // the tour owns the keys
+    const tabs = [...document.querySelectorAll(".tab")];
+    if (/^[1-9]$/.test(e.key)) {
+      const b = tabs[parseInt(e.key, 10) - 1];
+      if (b) { e.preventDefault(); b.click(); }
+      return;
+    }
+    if (e.key === "[" || e.key === "]") {
+      const sel = $("lap");
+      if (!sel || sel.options.length < 2) return;
+      const next = sel.selectedIndex + (e.key === "]" ? 1 : -1);
+      if (next < 0 || next >= sel.options.length) return;
+      e.preventDefault();
+      sel.selectedIndex = next;
+      sel.onchange();
+    }
+  });
 }
 
 async function loadProgress(combo) {
@@ -533,26 +604,24 @@ async function loadSectors() {
   const lap = $("lap").value, base = pinnedBaseline();
   if (lap) q.set("lap", lap);
   if (base) q.set("baseline", base);
-  setPanelLoading("sec-summary", t("load.sectors"));
+  $("sectors").innerHTML = `<div class="muted">${t("load.sectors")}</div>`;
   let s;
   try { s = await getJSON("/api/sectors?" + q.toString()); }
   catch (e) {
-    $("sec-summary").innerHTML = `<div class="item"><div class="v">—</div><div class="k">${e.message}</div></div>`;
-    $("sectors").innerHTML = ""; $("ideal").innerHTML = "";
+    $("sectors").innerHTML = `<div class="muted">${e.message}</div>`;
+    $("ideal").innerHTML = ""; $("sec-table").innerHTML = "";
     return;
   }
   drawSectors(s);
 }
 
 function drawSectors(s) {
-  const gap = (s.review.lap_time_ms - s.baseline.lap_time_ms) / 1000;
-  const item = (k, v, cls) =>
-    `<div class="item"><div class="k">${k}</div><div class="v ${cls || ""}">${v}</div></div>`;
-  $("sec-summary").innerHTML =
-    item(t("lbl.comparison"), s.baseline.lap_time) +
-    item(t("lbl.lap"), s.review.lap_time) +
-    item(t("lbl.gap"), fmt(gap) + "s", gap > 0 ? "slower" : "faster") +
-    item(t("lbl.sectors"), s.real ? t("sec.real") : t("sec.thirds"));
+  // Lap / reference / gap moved to the lap bar, on every tab. What was left of
+  // this view's own summary was one fact — whether these splits are the sim's
+  // own sectors or our thirds — and a whole banner to say it in. It belongs on
+  // the column it describes.
+  const kind = $("sec-kind");
+  if (kind) kind.textContent = s.real ? t("sec.real") : t("sec.thirds");
 
   // Diverging delta bars, scaled to the worst sector (min 0.05s).
   let mx = 0.05;
@@ -592,6 +661,44 @@ function drawSectors(s) {
   } else {
     $("ideal").innerHTML = "";
   }
+  drawSectorTable(s);
+}
+
+// Every lap of this car+track, sector by sector, best of each column marked.
+//
+// The ideal lap above says a 2:03.412 is in there somewhere; this is where you
+// see *which* laps it is made of — and whether the sector you're proud of was
+// one good lap or a habit. Same numbers as the ideal (the backend times every
+// lap against the same spans), so the star here and the "S2 ← 2:03.732" up
+// there can't disagree.
+function drawSectorTable(s) {
+  const el = $("sec-table");
+  if (!el) return;
+  const rows = (s.per_lap || []);
+  // One lap is not a table: with nothing to compare, the bars above already say
+  // everything this would.
+  if (rows.length < 2) { el.innerHTML = ""; return; }
+  const n = s.n;
+  const best = [];
+  for (let i = 0; i < n; i++) best.push(Math.min(...rows.map((r) => r.ms[i])));
+  let body = "";
+  for (const r of rows) {
+    const clock = lapClock(r.recorded_utc);
+    const mark = r.path === s.review.path ? " on" : "";
+    const off = r.off_track ? ` <span class="off-track" title="${t("lap.offTrack.why")}">${t("lap.offTrack")}</span>` : "";
+    body += `<tr class="${mark.trim()}"><td class="vc">${r.lap_time}${off}` +
+      (clock ? ` <span class="muted">${clock}</span>` : "") + `</td>` +
+      r.ms.map((v, i) =>
+        `<td class="vn${v === best[i] ? " best" : ""}">${fmtSec(v)}</td>`).join("") +
+      `</tr>`;
+  }
+  let head = `<th>${t("sec.t.lap")}</th>`;
+  for (let i = 0; i < n; i++) head += `<th>S${i + 1}</th>`;
+  el.innerHTML =
+    `<h3>${t("sec.t.title")}</h3>` +
+    `<table class="vmin-table wide"><thead><tr>${head}</tr></thead>` +
+    `<tbody>${body}</tbody></table>` +
+    `<div class="muted small">${t("sec.t.hint")}</div>`;
 }
 
 // --- track map ------------------------------------------------------------
@@ -840,6 +947,7 @@ async function loadCombo(combo, lapPath, baselinePath) {
   buildDistance(a);       // this lap's metres, for every chart's x-axis
   FLOW_STEP = 0;          // a new lap is a new explanation, from the top
   fillLaps(a);
+  drawLapBar(a);
   drawSummary(a);
   drawCornerSpeeds(a);
   drawWaterfall(a);
@@ -917,25 +1025,54 @@ function fillLaps(a, force) {
   fill("baseline", keepBase || a.reference.path);
 }
 
-function drawSummary(a) {
+// The identity of what's on screen — lap, reference, gap, track temperature —
+// as a strip under the tabs, on every view. It used to be three items inside
+// Compare's own summary, which meant the landing tab explained a lap without
+// ever naming it, and the Map, Trajectory and Sectors tabs showed numbers you
+// had to change tab to identify.
+function drawLapBar(a) {
+  const el = $("lapbar");
+  if (!el) return;
   const gap = (a.review.lap_time_ms - a.reference.lap_time_ms) / 1000;
-  const c = a.consistency || {};
-  const item = (k, v, cls) =>
-    `<div class="item"><div class="k">${k}</div><div class="v ${cls || ""}">${v}</div></div>`;
-  // Amber, not red: going off track isn't an app error and isn't the game's own
-  // invalidation either — it's a fact about the lap that explains why it can't be
-  // the reference. The tooltip is where that "why" lives.
+  const bit = (k, v, cls) =>
+    `<div class="bit"><span class="k">${k}</span><span class="v ${cls || ""}">${v}</span></div>`;
+  const temp = a.review.road_temp != null
+    ? bit(t("lbl.road"), `${a.review.road_temp}°`) : "";
+  el.innerHTML =
+    bit(t("lbl.lap"), a.review.lap_time + offTrackBadge(a)) +
+    bit(t("lbl.comparison"), a.reference.lap_time) +
+    bit(t("lbl.gap"), fmt(gap) + "s", gap > 0 ? "slower" : "faster") +
+    temp;
+  // The window title, so three windows open on three tracks are three different
+  // things in the taskbar instead of three "HONE · Analysis". The distinguishing
+  // part goes first: a tab strip only shows the first few characters.
+  document.title = `${a.track} · ${a.review.lap_time} — HONE`;
+}
+
+// Amber, not red: going off track isn't an app error and isn't the game's own
+// invalidation either — it's a fact about the lap that explains why it can't be
+// the reference. The tooltip is where that "why" lives. …and WHERE, when the lap
+// carries it: "off track" alone names a fact the driver can't act on, the corner
+// is the part they can go and work on. Absent on laps recorded before the field
+// existed, so the badge degrades to the bare wording rather than to an empty
+// parenthesis.
+function offTrackBadge(a) {
   const rev = (a.laps || []).find((l) => l.path === a.review.path);
-  // …and WHERE, when the lap carries it. "Off track" alone names a fact the
-  // driver can't act on; the corner is the part they can go and work on. Absent
-  // on laps recorded before the field existed, so the badge degrades to the bare
-  // wording rather than to an empty parenthesis.
+  if (!(rev && rev.off_track)) return "";
   const where = a.review.lost_at_corner
     ? ` ${t("lap.offTrack.at")} ${a.review.lost_at_corner}`
     : "";
-  const off = rev && rev.off_track
-    ? ` <span class="off-track" title="${t("lap.offTrack.why")}">${t("lap.offTrack")}${where}</span>`
-    : "";
+  return ` <span class="off-track" title="${t("lap.offTrack.why")}">` +
+         `${t("lap.offTrack")}${where}</span>`;
+}
+
+// What's left for Compare's own summary once the lap bar owns the identity: the
+// three notes that are about *this comparison* rather than about the lap. Often
+// all three are empty, and then the band hides itself (.summary:empty).
+function drawSummary(a) {
+  const c = a.consistency || {};
+  const item = (k, v, cls) =>
+    `<div class="item"><div class="k">${k}</div><div class="v ${cls || ""}">${v}</div></div>`;
   // The setup each lap was on, when the two differ. A gap you're reading as
   // "I drove worse" can be a brake-bias click, and until now the page gave you
   // no way to tell. Only shown when it changes the story: same setup, no note.
@@ -945,9 +1082,6 @@ function drawSummary(a) {
   // this when conditions really are the reason (see api._conditions_note).
   const condNote = conditionsNote(a.reference.by_conditions);
   $("summary").innerHTML =
-    item(t("lbl.comparison"), a.reference.lap_time) +
-    item(t("lbl.lap"), a.review.lap_time + off) +
-    item(t("lbl.gap"), fmt(gap) + "s", gap > 0 ? "slower" : "faster") +
     (c.n >= 2 ? item(t("sum.consistency"), `σ ${(c.std_ms / 1000).toFixed(3)}s · ${c.n} ${t("lbl.laps")}`) : "") +
     (condNote ? item(t("sum.cond"), condNote, "warn") : "") +
     (setupNote ? item(t("sum.setup_diff"), setupNote, "warn") : "");
@@ -2853,6 +2987,8 @@ window.HoneI18nRerender = function () {
     cb.title = window.HoneI18n.t("cb.label");
     cb.setAttribute("aria-label", window.HoneI18n.t("cb.label"));
   }
+  wireTabs();          // the tabs carry their shortcut in their tooltip
+  wireHints();
   fillCombos();
   // Re-FETCH, not just re-draw. The debrief, the corner names, the lap-wide
   // notes and every word of the guided flow are written by the backend in the
