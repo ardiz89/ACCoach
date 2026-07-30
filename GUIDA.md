@@ -179,6 +179,18 @@ Cosa trovi:
   Tre grafici allineati alla posizione in pista — **delta sul giro**, **velocità**
   (tu vs riferimento), **gas/freno** — con le bande delle curve. Passa il mouse:
   un mirino ti dà i valori puntuali. Esporti il giro in **CSV/JSON**.
+- **Mappa**: la traiettoria colorata sul distacco, i punti di frenata tuoi e del
+  riferimento, e sotto **«Le tue frenate»**: la scheda dei tuoi punti di frenata,
+  curva per curva. Per ognuna: **a che velocità stacchi** (è il riferimento che
+  ogni auto ti dà gratis, ce l'hai sul cruscotto), in che marcia, quanto è lunga
+  la staccata, la minima che porti, il **riferimento visivo** dove la pista ce
+  l'ha («al cartello dei 150 m»), e la **dispersione** — di quanto si sposta il
+  tuo punto di frenata da un giro all'altro, in km/h e nei metri che valgono su
+  quella staccata. È misurata sui tuoi ultimi giri **nella stessa fascia di
+  temperatura dell'asfalto**, e l'intestazione dice quali e a quanti gradi: le
+  schede di frenata che girano sui forum non possono saperlo, ed è il motivo per
+  cui i loro numeri non sono i tuoi. Si scarica in **CSV** e si **stampa** (il
+  tasto 🖨 stampa solo la scheda).
 - **Traiettoria**: dove sei passato, curva per curva. La curva ingrandita con la
   tua linea e quella di riferimento, e **la fascia colorata fra le due è lo
   scarto**; se a scala vera è troppo sottile per vedersi, il selettore «scarto

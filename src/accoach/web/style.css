@@ -561,8 +561,8 @@ body.no-data .empty { display: block; }
 @media (max-width: 700px) {
   .chips { padding-left: 16px; padding-right: 16px; }
   .line-grid { padding-left: 16px; padding-right: 16px; }
-  #line-table { overflow-x: auto; }
-  #line-table .vmin-table { min-width: 560px; }
+  #line-table, #brakesheet { overflow-x: auto; }
+  #line-table .vmin-table, #brakesheet .vmin-table { min-width: 560px; }
 }
 
 /* --- The lap explained, one step at a time -------------------------------
@@ -722,4 +722,33 @@ body.no-data .empty { display: block; }
 @media (max-width: 860px) {
   .hero { grid-template-columns: 1fr; gap: 0; }
   .hero .minimap { padding: 0 16px 12px; }
+}
+
+/* --- Your braking points (under the track map) ---------------------------
+   A sheet, not a chart: it is read at a glance before going out, and printed.
+   The braking speed is the number you act on, so it is the big one. */
+.sheet-sub { color: var(--muted); font-size: 12px; margin: -4px 0 10px; }
+/* A sheet is read across, so it is capped: columns spread over 1600px of screen
+   stop being a row and become a treasure hunt. */
+.sheet .vmin-table { max-width: 1080px; }
+.sheet-note { color: var(--muted); font-size: 12px; max-width: 70ch; margin-top: 12px; }
+.vmin-table td.vn.big { font-size: 16px; font-weight: 600; }
+.vmin-table td.vn.big .muted, .vmin-table td .muted { color: var(--muted); font-size: 12px; font-weight: 400; }
+.vmin-table td.ref { text-align: left; color: var(--cyan); }
+
+/* Print: the sheet and nothing else. The braking cheat sheet the community
+   shares is a printed page taped next to the wheel — so the print button has to
+   produce that, not a screenshot of a dark web app. */
+@media print {
+  body { background: #fff; color: #000; }
+  header, .tabs, .readout, .demo-banner, .summary, .map-legend,
+  #charts, #view-flow, #view-session, #view-compare, #view-line,
+  #view-sectors, #view-dynamics, #view-progress, #view-map main,
+  #map-missing, .tour-help, .cb-toggle, .mini-btn { display: none !important; }
+  #view-map { display: block !important; }
+  #brakesheet { padding: 0; }
+  #brakesheet h3 { font-size: 18px; }
+  .sheet-sub, .sheet-note, .vmin-table td .muted { color: #444; }
+  .vmin-table td.ref { color: #000; }
+  .vmin-table th, .vmin-table td { border-bottom: 1px solid #bbb; }
 }

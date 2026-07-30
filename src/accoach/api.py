@@ -19,6 +19,7 @@ from fastapi import Body, FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 
+from .braking_points import build_sheet
 from .coaching import (
     benchmark_levels,
     build_flow,
@@ -29,7 +30,7 @@ from .coaching import (
 from .comparison import Reference
 from .i18n import current_language
 from .recording import DEFAULT_LAPS_DIR, load_lap
-from .recording.catalog import LapCatalog
+from .recording.catalog import LapCatalog, _TEMP_BAND_C
 from .recording.lap import SAMPLE_FIELDS
 from .recording.storage import _catalog_path, _slug, list_lap_files
 from .sectors import ideal_lap, sector_spans, sector_times
@@ -54,6 +55,11 @@ _MAX_POINTS = 600   # downsample traces for the browser
 # as the guided flow's floor: it is inside the spread of one driver's own laps,
 # and reporting it as progress would be flattering rather than true.
 _SESSION_MOVE_MS = 60.0
+
+# How many recent laps the braking sheet pools. Enough for a median to mean
+# something, few enough that it describes how you drive *now* — a braking point
+# from three sessions ago is somebody else's.
+_SHEET_LAPS = 10
 
 
 def _web_dir() -> Path:
@@ -632,6 +638,108 @@ def create_api(
             w.writerow([r.get(c) for c in cols])
         stem = (f"{_slug(car)}__{_slug(track)}__line__"
                 f"{format_lap_time(review.lap_time_ms).replace(':', 'm').replace('.', 's')}")
+        return Response(
+            buf.getvalue(), media_type="text/csv",
+            headers={"Content-Disposition": f'attachment; filename="{stem}.csv"'})
+
+    @app.get("/api/braking")
+    def braking(
+        car: str = Query(...),
+        track: str = Query(...),
+        lang: str | None = Query(None),
+        fmt: str = Query("json"),            # "csv" downloads the sheet
+    ):
+        # No return annotation: JSON body or CSV attachment (see /api/trajectory).
+        """Your braking points for this car and track — the cheat sheet, yours.
+
+        Pooled across your recent laps rather than read off the single reference:
+        a braking point you hit once is not a reference, and the spread across
+        several laps is the number that says whether you have one at all.
+
+        Which laps get pooled is decided here rather than in
+        ``braking_points.py``, because "which laps belong together" is a question
+        about track temperature and about how recent they are — and both live in
+        the catalog.
+        """
+        lg = lang or current_language()
+        with _catalog() as cat:
+            all_laps = cat.laps_for(car, track)
+            valid = [r for r in all_laps
+                     if r["valid"] and r["lap_time_ms"] > 0 and not _off_track(r)]
+            elected = _elected_path(cat, car, track, valid)
+        if not valid or elected is None:
+            raise HTTPException(404, "no valid lap for this car+track")
+
+        # Same temperature band the live coach uses to elect a reference: two
+        # laps 20° apart are two circuits, and pooling them would produce a
+        # braking point that belongs to neither.
+        ref_row = next((r for r in valid if r["path"] == elected), None)
+        ref_temp = (ref_row or {}).get("road_temp") or 0.0
+        pool = valid
+        if ref_temp:
+            same = [r for r in valid
+                    if r["road_temp"] and abs(r["road_temp"] - ref_temp) <= _TEMP_BAND_C]
+            pool = same or valid
+        pool = sorted(pool, key=lambda r: r["recorded_utc"] or "")[-_SHEET_LAPS:]
+
+        objs = []
+        for r in pool:
+            try:
+                objs.append(load_lap(r["path"]))
+            except (OSError, ValueError):
+                pass
+        if not objs:
+            raise HTTPException(404, "lap file unreadable")
+        try:
+            ref_lap = next((o for o in objs if o.lap_time_ms), objs[0])
+            corners = detect_corners(load_lap(elected).samples)
+            names = {c.index: n
+                     for c, n in zip(corners, name_corners(track, corners, lg))}
+            sheet = build_sheet(objs, corners, names, track, lg,
+                                road_temps=[r["road_temp"] for r in pool])
+        except (OSError, ValueError):
+            raise HTTPException(404, "lap file unreadable")
+        except Exception:  # noqa: BLE001 - a degenerate lap shouldn't 500 the UI
+            raise HTTPException(422, "lap could not be analysed")
+
+        rows = [{
+            "index": r.index, "name": r.name, "pos": r.onset_pos,
+            "speed_kmh": r.speed_kmh, "spread_kmh": r.speed_spread_kmh,
+            "spread_m": r.speed_spread_m,
+            "gear": r.gear, "distance_m": r.distance_m,
+            "vmin_kmh": r.vmin_kmh, "gear_min": r.gear_min,
+            "peak_brake": r.peak_brake, "laps": r.laps,
+            "landmark": r.landmark,
+        } for r in sheet.rows]
+
+        if fmt == "csv":
+            return _braking_csv(car, track, rows)
+
+        return {
+            "car": car, "track": track,
+            "laps": sheet.laps,
+            "road_temp_from": sheet.road_temp_from,
+            "road_temp_to": sheet.road_temp_to,
+            "reference": {"path": elected,
+                          "lap_time": format_lap_time(ref_lap.lap_time_ms)},
+            "rows": rows,
+        }
+
+    def _braking_csv(car: str, track: str, rows: list[dict]) -> Response:
+        """The sheet as a file — this is the artefact people print and tape to
+        the desk, which is the whole reason the static one got 332 votes."""
+        import csv
+        import io
+
+        cols = ["index", "name", "speed_kmh", "gear", "spread_kmh", "spread_m",
+                "distance_m",
+                "vmin_kmh", "gear_min", "peak_brake", "laps", "landmark", "pos"]
+        buf = io.StringIO()
+        w = csv.writer(buf)
+        w.writerow(cols)
+        for r in rows:
+            w.writerow([r.get(c) for c in cols])
+        stem = f"{_slug(car)}__{_slug(track)}__frenate"
         return Response(
             buf.getvalue(), media_type="text/csv",
             headers={"Content-Disposition": f'attachment; filename="{stem}.csv"'})

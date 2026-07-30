@@ -118,7 +118,7 @@ costano. Le prime tre hanno evidenza esterna misurata; le altre no.
 
 | # | Voce | Origine | Peso |
 |---|---|---|---|
-| 1 | **Riferimenti di frenata adattati ad auto e condizioni** | 332 voti su Reddit | medio |
+| 1 | ~~**Riferimenti di frenata adattati ad auto e condizioni**~~ — **fatta il 2026-07-30**: scheda «Le tue frenate» sotto la mappa (`braking_points.py` + `/api/braking`), misurata sui tuoi ultimi giri **nella stessa fascia di temperatura**, con riferimento visivo dove esiste, dispersione in km/h e in metri, CSV e stampa | 332 voti su Reddit | medio |
 | 2 | **Riferimenti visivi** («al cordolo», «al cartello») invece dei soli metri | richiesta esplicita | medio-grande |
 | 3 | **Aiuti che si ritirano** quando sei costante in quella curva | comportamento osservato | medio |
 | 4 | **Condizioni pista nell'elezione del riferimento** | audit + evidenza (2) | piccolo-medio |
