@@ -7,18 +7,26 @@ and right edge of the asphalt. The decoding, and the evidence that it is right,
 are in `SPIKE-BORDI.md` — including the four bytes (a repeated point count) whose
 absence made an earlier attempt read "gas = 36.79".
 
-This module is the product-side half, and it is written around the two ways the
-answer can be *no*:
+**The geometry is not tied to the game the lap came from.** It used to be: the
+first version demanded that the spline's coordinates and the lap's coordinates be
+the same numbers, which meant the drawing appeared on Assetto Corsa and nowhere
+else — the one place in this app where what you saw depended on which sim you had
+launched. It shouldn't, and it no longer does. A circuit is a circuit: the shape
+you drove is *fitted* onto the shape in the file (rotation, translation and a
+scale that has to come out at 1), and if the two are the same place the fit says
+so in metres. So an ACC lap gets its asphalt from the same track's AC files, and
+Monza — 187 m out in raw coordinates, and refused for it — comes back in at 4 m.
 
-* **the track you have installed may not be the track you drove.** The spline's
-  coordinates are the installed model's; a lap recorded on a different version of
-  the same circuit sits somewhere else entirely — 187 m away, at Monza, on this
-  developer's own machine. So every answer is checked against the lap it will be
-  drawn under, and a mismatch returns nothing rather than a plausible ribbon in
-  the wrong place;
-* **there may be no file at all** — ACC (whose track data is packed), a mod track
-  without an AI line, a Steam library somewhere unusual, or a driver who has
-  never installed AC.
+What is left to say no to:
+
+* **it may not be the same circuit.** The fit is only believed when the residual
+  is small AND the scale is ~1: both, because either alone can be fooled. Spa
+  1998 fits modern Spa at scale 1.000 and is still a different track (58 m); a
+  lap whose coordinates are broken fits *everything* to 8 m by shrinking the
+  circuit seventy times over;
+* **there may be no file at all** — a driver with only ACC (whose own track data
+  is packed) and no AC installed, a mod track without an AI line, a Steam library
+  somewhere unusual.
 
 Both cases return ``None``. Nothing here guesses: an edge we cannot read is an
 edge we do not draw.
@@ -44,12 +52,38 @@ _DETAIL = 72
 _SIDE_L, _SIDE_R, _FX, _FZ = 5, 6, 13, 15
 _VERSION = 7
 
-# How far the spline's bounding box may sit from the lap's before we call them
-# two different track models. Measured across the archive: Imola, Spa and Suzuka
-# line up within 1.5 m, Monza is 187 m out. Anything in between doesn't exist,
-# so the exact number matters little — 5 m is comfortably outside the noise of
-# "the same track driven at different widths" and nowhere near a real mismatch.
-_ALIGN_TOL_M = 5.0
+# --- deciding whether two shapes are the same circuit ------------------------
+# Measured on the 39 real laps against the four installed splines — 24 pairings,
+# every one classified correctly by these two numbers together:
+#
+#   giro           spline      p95      scala
+#   Imola          imola      17.3      0.999   <- il peggiore dei veri
+#   monza          monza       4.2      1.001   <- 187 m di scarto grezzo
+#   spa            spa         4.0      1.000
+#   suzuka         suzuka      2.4      1.000
+#   spa_1998       spa        58.3      1.000   <- altro tracciato, scala giusta
+#   ks_nurburgring qualunque  12-18     0.015   <- coordinate rotte, forma finta
+#   pista sbagliata           162-839   0.68-1.23
+#
+# The gap between the worst true match (17.3 m) and the best false one (58.3 m)
+# is 3.4x, so the threshold sits in open space rather than on a boundary.
+#
+# The 95th percentile rather than the mean: a layout change is *local* — Spa 1998
+# is modern Spa everywhere except one corner, and an average dilutes exactly the
+# evidence that matters.
+_FIT_P95_M = 25.0
+# And the scale, because the residual alone is not enough. A lap whose
+# coordinates collapsed to nearly nothing (the Nürburgring laps recorded before
+# the AC1 fix) matches *every* circuit beautifully once you are allowed to shrink
+# it to the size of a car park.
+_FIT_SCALE = (0.97, 1.03)
+# Points compared. 200 is one every 25-35 m: enough that a missing chicane
+# cannot hide between two of them, cheap enough to try every rotation.
+_FIT_N = 200
+# The two shapes start wherever their own files start. Correct pairs all came out
+# at offset 0 — the spline does begin at the start line — but that is an
+# observation about four Kunos tracks, not a rule to build on.
+_FIT_STEP = 4
 
 # Beyond this the "edge" isn't an edge: a handful of points in some files carry a
 # side of hundreds of metres (a pit exit, or a spline that wanders off the
@@ -242,20 +276,134 @@ def read_edges(path: Path) -> TrackEdges | None:
                       left=left, right=right, breaks=breaks)
 
 
-def aligned(edges: TrackEdges, points) -> bool:
-    """Is this spline describing the same track model the lap was driven on?
+# --- putting the track under the lap ----------------------------------------
 
-    Compares where the two sit, not how big they are: a different version of the
-    same circuit has the same shape in a different place, which is exactly the
-    failure that looks like a decoding bug and isn't.
+def _resample(xs: list[float], zs: list[float], n: int) -> list[tuple[float, float]]:
+    """``n`` points spread evenly *by distance* around a closed shape.
+
+    By distance and not by index, because the two shapes are sampled by whatever
+    each file felt like: the spline puts a point every metre and a half, the
+    recorder puts one every 60th of a second, so a straight is dense in one and
+    sparse in the other. Comparing them index by index would compare a corner
+    against a straight and call the circuit a different circuit.
+    """
+    d = [0.0]
+    for i in range(1, len(xs)):
+        d.append(d[-1] + math.hypot(xs[i] - xs[i - 1], zs[i] - zs[i - 1]))
+    total = d[-1]
+    if total <= 0:
+        return []
+    out: list[tuple[float, float]] = []
+    j = 0
+    for k in range(n):
+        target = total * k / n
+        while j < len(d) - 2 and d[j + 1] < target:
+            j += 1
+        f = (target - d[j]) / max(1e-9, d[j + 1] - d[j])
+        out.append((xs[j] + f * (xs[j + 1] - xs[j]), zs[j] + f * (zs[j + 1] - zs[j])))
+    return out
+
+
+@dataclass(frozen=True, slots=True)
+class Fit:
+    """How to move a track's own coordinates onto a lap's."""
+
+    scale: float
+    cos: float
+    sin: float
+    dx: float
+    dz: float
+    p95_m: float
+    mirror: bool
+
+    def apply(self, x: float, z: float) -> tuple[float, float]:
+        if self.mirror:
+            x = -x
+        return (self.scale * (x * self.cos - z * self.sin) + self.dx,
+                self.scale * (x * self.sin + z * self.cos) + self.dz)
+
+
+def _kabsch(a: list[tuple[float, float]], b: list[tuple[float, float]]):
+    """The rotation and scale that best carry ``a`` onto ``b``, both centred.
+
+    Closed form, not a search: for a rotation plus a uniform scale the best
+    answer is an arctangent of two sums. Iterating towards it would be slower and
+    would also be able to stop somewhere that isn't the answer.
+    """
+    sxx = sum(p[0] * q[0] + p[1] * q[1] for p, q in zip(a, b))
+    sxy = sum(p[0] * q[1] - p[1] * q[0] for p, q in zip(a, b))
+    norm = sum(p[0] ** 2 + p[1] ** 2 for p in a)
+    if norm <= 0:
+        return None
+    theta = math.atan2(sxy, sxx)
+    scale = math.hypot(sxx, sxy) / norm
+    c, s = math.cos(theta), math.sin(theta)
+    err = sorted(math.hypot(scale * (p[0] * c - p[1] * s) - q[0],
+                            scale * (p[0] * s + p[1] * c) - q[1])
+                 for p, q in zip(a, b))
+    return scale, c, s, err[int(0.95 * len(err))]
+
+
+def fit(edges: TrackEdges, points) -> Fit | None:
+    """Is this the circuit the lap was driven on, and where does it sit?
+
+    Answers both at once, in metres. The older version of this asked only
+    "are the coordinates already the same numbers?", which is a question about
+    file formats rather than about places — and it is why the drawing used to
+    appear on one sim and not the other.
     """
     xs = [p.x for p in points]
     zs = [p.z for p in points]
-    if len(xs) < 2 or not any(xs) and not any(zs):
-        return False
-    dx = ((min(edges.x) - min(xs)) + (max(edges.x) - max(xs))) / 2
-    dz = ((min(edges.z) - min(zs)) + (max(edges.z) - max(zs))) / 2
-    return abs(dx) <= _ALIGN_TOL_M and abs(dz) <= _ALIGN_TOL_M
+    if len(xs) < 2 or not (any(xs) or any(zs)):
+        return None
+    lap = _resample(xs, zs, _FIT_N)
+    road = _resample(edges.x, edges.z, _FIT_N)
+    if len(lap) < _FIT_N or len(road) < _FIT_N:
+        return None
+    lb = (sum(p[0] for p in lap) / _FIT_N, sum(p[1] for p in lap) / _FIT_N)
+    b = [(p[0] - lb[0], p[1] - lb[1]) for p in lap]
+
+    best: Fit | None = None
+    for mirror in (False, True):
+        src = [(-x, z) for x, z in road] if mirror else road
+        ra = (sum(p[0] for p in src) / _FIT_N, sum(p[1] for p in src) / _FIT_N)
+        cent = [(p[0] - ra[0], p[1] - ra[1]) for p in src]
+        # Where each shape starts is an accident of its file, so every rotation
+        # of one against the other is tried and the best one wins.
+        for shift in range(0, _FIT_N, _FIT_STEP):
+            got = _kabsch(cent[shift:] + cent[:shift], b)
+            if got is None:
+                continue
+            scale, c, s, p95 = got
+            if best is not None and p95 >= best.p95_m:
+                continue
+            # The translation is derived, not searched: once the rotation is
+            # known, the two centres have to end up on top of each other.
+            # ``ra`` is already the mirrored centroid — mirroring it again here
+            # would move the track by twice its own offset.
+            ax, az = ra
+            best = Fit(scale=scale, cos=c, sin=s, mirror=mirror, p95_m=p95,
+                       dx=lb[0] - scale * (ax * c - az * s),
+                       dz=lb[1] - scale * (ax * s + az * c))
+    if best is None or best.p95_m > _FIT_P95_M:
+        return None
+    if not (_FIT_SCALE[0] <= best.scale <= _FIT_SCALE[1]):
+        return None
+    return best
+
+
+def placed(edges: TrackEdges, at: Fit) -> TrackEdges:
+    """The same asphalt, moved into the lap's coordinates."""
+    xz = [at.apply(x, z) for x, z in zip(edges.x, edges.z)]
+    return TrackEdges(
+        track=edges.track,
+        x=[p[0] for p in xz], z=[p[1] for p in xz],
+        # The widths ride along with the scale, or a circuit fitted at 0.99 would
+        # keep full-size edges around a shrunken centre line.
+        left=[v * at.scale for v in edges.left],
+        right=[v * at.scale for v in edges.right],
+        breaks=set(edges.breaks),
+    )
 
 
 def _nearest(edges: TrackEdges, x: float, z: float) -> int:
@@ -317,11 +465,14 @@ _cache: dict[str, TrackEdges | None] = {}
 
 
 def edges_for(track: str, points=None) -> TrackEdges | None:
-    """The asphalt for ``track``, checked against ``points`` when given.
+    """The asphalt for ``track``, laid under ``points`` when they are given.
 
     Cached per track: the files are 1-3 MB and the report re-asks on every
     corner. A miss is cached too — a track without an AI line will not grow one
     while the app is open.
+
+    With ``points`` the answer comes back **in the lap's own coordinates**,
+    whichever sim wrote them, or None when the fit says this isn't that circuit.
     """
     key = (track or "").lower()
     if key not in _cache:
@@ -330,4 +481,5 @@ def edges_for(track: str, points=None) -> TrackEdges | None:
     got = _cache[key]
     if got is None or points is None:
         return got
-    return got if aligned(got, points) else None
+    at = fit(got, points)
+    return placed(got, at) if at else None

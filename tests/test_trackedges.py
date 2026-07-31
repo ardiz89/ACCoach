@@ -17,15 +17,6 @@ import pytest
 from accoach import trackedges as te
 
 
-class _P:
-    """Il minimo che `aligned` guarda di un punto del giro."""
-
-    __slots__ = ("x", "z")
-
-    def __init__(self, x, z):
-        self.x, self.z = x, z
-
-
 def _spline(n=64, side_l=4.0, side_r=6.0, ox=0.0, oz=0.0, version=7, repeat=None):
     """Un fast_lane.ai sintetico: un rettilineo lungo z, largo side_l + side_r."""
     pts = [(ox, 0.0, oz + i * 2.0) for i in range(n)]
@@ -79,26 +70,9 @@ def test_anything_we_did_not_decode_reads_as_nothing(tmp_path, blob):
     assert te.read_edges(_write(tmp_path, blob)) is None
 
 
-# --- il controllo che conta: è la stessa pista? -----------------------------
-
-def test_a_lap_on_the_same_track_model_is_accepted(tmp_path):
-    e = te.read_edges(_write(tmp_path, _spline()))
-    lap = [_P(0.0, i * 2.0) for i in range(64)]
-    assert te.aligned(e, lap)
-
-
-def test_a_lap_from_another_version_of_the_same_circuit_is_refused(tmp_path):
-    """Stessa forma, altro posto: è esattamente il caso Monza (187 m di scarto),
-    e disegnarlo darebbe un nastro credibile attorno alla macchina sbagliata."""
-    e = te.read_edges(_write(tmp_path, _spline()))
-    lap = [_P(187.0, i * 2.0 - 154.0) for i in range(64)]
-    assert not te.aligned(e, lap)
-
-
-def test_a_lap_without_coordinates_is_refused(tmp_path):
-    e = te.read_edges(_write(tmp_path, _spline()))
-    assert not te.aligned(e, [_P(0.0, 0.0) for _ in range(64)])
-
+# Il controllo «è la stessa pista?» sta in test_track_fit.py: da quando la
+# geometria viene *posata* sul giro invece che confrontata numero per numero,
+# non è più una proprietà di questo file ma del fit.
 
 # --- ritagliare la curva ----------------------------------------------------
 

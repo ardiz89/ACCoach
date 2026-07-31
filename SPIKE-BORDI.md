@@ -57,51 +57,85 @@ indicano lo stesso punto. È la prova che conta.
 **3. Il giro pulito resta dentro, tranne sui cordoli.** Lo stesso Imola, giro
 1:46.097: sfora al massimo **2.4 m**, e lì dove passa sui cordoli.
 
-## I due limiti, misurati
+## I limiti, misurati — e quello che è caduto
 
 **Il sistema di coordinate è quello della pista che hai *installata*, non di
 quella che hai *guidato*.** A Monza le due sono lontane **187 m in x e 154 m in
-z**: i giri in archivio vengono da un Monza diverso da
-`content/tracks/monza`. Imola, Spa e Suzuka combaciano entro **1.5 m**. Quindi
-l'allineamento è **un controllo da fare pista per pista**, mai un'assunzione — e
-il controllo costa niente: stessa forma, stesso centro. Il tool si ferma da solo
-quando lo scarto supera i 5 m.
+z**: i giri in archivio vengono da un Monza diverso da `content/tracks/monza`.
+Imola, Spa e Suzuka combaciano entro **1.5 m**.
+
+Questo era un limite, e il **2026-07-31 è caduto**. Confrontare le coordinate
+numero per numero è una domanda sui *formati dei file*, non sui *luoghi*: la
+forma guidata si può **posare** su quella del file (rotazione, traslazione e una
+scala che deve venire 1), e allora l'origine non conta più. Misurato su tutti i
+39 giri veri contro le quattro spline installate — 24 confronti, tutti
+classificati giusti:
+
+| giro | spline | scarto p95 | scala | esito |
+|---|---|---|---|---|
+| Imola | imola | 17.3 m | 0.999 | accettata — il peggiore dei veri |
+| monza | monza | **4.2 m** | 1.001 | accettata — *era rifiutata a 187 m* |
+| spa | spa | 4.0 m | 1.000 | accettata |
+| suzuka | suzuka | 2.4 m | 1.000 | accettata |
+| spa_1998 | spa | 58.3 m | 1.000 | rifiutata — altro tracciato |
+| ks_nurburgring | qualunque | 12-18 m | **0.015** | rifiutata — coordinate rotte |
+| pista sbagliata | — | 162-839 m | 0.68-1.23 | rifiutata |
+
+Fra il peggiore dei veri (17.3 m) e il migliore dei falsi (58.3 m) c'è un
+fattore **3.4**: la soglia sta in campo aperto, non su un confine.
+
+Servono **tutte e due** le condizioni, e ognuna copre il buco dell'altra:
+
+* la **sola scala** non basta — Spa 1998 combacia con Spa moderna a scala 1.000
+  ed è un altro tracciato;
+* il **solo scarto** non basta — un giro con le coordinate rotte combacia con
+  *qualunque* circuito a 8 m, perché il fit è libero di rimpicciolirlo settanta
+  volte.
+
+Controllo indipendente dopo il fit: la linea guidata risulta a **0.7-4.4 m** dal
+centro pista. La macchina è sulla strada.
+
+E la conferma più bella è arrivata gratis: dei sette giri al Nürburgring, **sei
+hanno le coordinate rotte** (167 m per un giro da 5 km) e vengono rifiutati; il
+settimo ne ha di buone (5073 m contro i 5072 della spline) e passa a 6.9 m. Il
+fit sceglie il giro giusto da solo, senza sapere niente di quel difetto.
 
 **I bordi sono l'asfalto, non i limiti della pista.** Un giro pulito ci passa
-sopra di 2.4 m sui cordoli. Qualunque cosa ci disegnamo sopra deve dire
-**«asfalto»**, altrimenti chiama escursione un cordolo preso bene.
+sopra di 2.4 m sui cordoli — e a **La Source (Spa) la spline dice 24.5 m**,
+perché la via di fuga asfaltata è asfalto. Su tutto Spa solo 2 tratti su 6934 m
+superano i 16 m, e uno è esattamente quella curva. La legenda lo dice:
+`l'asfalto (di norma largo 10.4 m) — le vie di fuga contano, i cordoli no`.
 
-E i due limiti che si sapevano già: vale **solo per AC** (i dati pista di ACC
-sono impacchettati) e **solo per le piste installate**.
+Resta un limite solo: servono **i file di AC installati**. Non serve più che il
+giro venga da AC — un giro ACC prende il suo asfalto dagli stessi file, sulla
+stessa macchina. Chi ha **solo** ACC continua a non vedere niente, e quello si
+chiude solo impacchettando la geometria (decisione aperta: è dato derivato da
+file Kunos).
 
-## La feature: fatta, e come sono state chiuse le tre obiezioni
+## La feature: fatta, e come sono state chiuse le obiezioni
 
-Il nastro si disegna nella scheda Traiettoria (`src/accoach/trackedges.py`). Le
-tre cose che rendevano la decisione non automatica sono state affrontate una per
-una, e tutte e tre finiscono nello stesso posto: **un modo di dire di no**.
+Il nastro si disegna nella scheda Traiettoria (`src/accoach/trackedges.py`),
+scritto attorno ai modi di dire di no:
 
 1. **Dipendenza dall'installazione del gioco.** `tracks_dir()` cerca AC nelle due
    posizioni Steam standard **e nelle librerie dichiarate in
    `libraryfolders.vdf`** — i giochi stanno sul secondo disco più spesso che no.
    Niente gioco, niente cartella, niente file: `None`, e la pagina è quella di
-   sempre. Chi guida solo ad ACC non vede alcuna differenza.
-2. **Allineamento per pista.** Ogni risposta è verificata contro **il giro sotto
-   cui verrà disegnata**: se i due centri distano più di 5 m sono due modelli di
-   pista diversi e non si disegna niente. Verificato dal vivo: Imola, Spa e
-   Suzuka mostrano il nastro, **Monza no**.
+   sempre.
+2. **È la stessa pista?** Non più un confronto di coordinate ma un fit, con le
+   due soglie misurate qui sopra. Dal 31/07 **Monza rientra**.
 3. **Il caso «qui non c'è».** Non è un buco da riempire: il disegno è quello di
-   prima e **la voce di legenda compare solo quando il nastro c'è**. Il testo
-   dice `l'asfalto (largo 10.5 m) — i cordoli non ci sono`, perché il limite
-   misurato qui sopra va detto all'utente, non solo scritto in un documento.
+   prima e **la voce di legenda compare solo quando il nastro c'è**.
+4. **Scarto ×3/×5** — trovata disegnando: la linea mostrata non è più dove è
+   passata l'auto, quindi uscirebbe dal nastro e sembrerebbe un'uscita di pista
+   mai avvenuta. Con l'ingrandimento attivo **il nastro sparisce**.
+5. **Buchi nel file** — trovata misurando l'archivio il 31/07: a Suzuka la spline
+   ha **228 punti di fila** coi lati fuori scala. Scartarli è giusto, scartarli
+   in silenzio no: i superstiti si univano e il nastro tagliava dritto per
+   **343 m** attraverso il circuito. Ora un buco resta un buco.
 
-E una quarta, trovata disegnando: con lo **scarto ×3/×5** la linea mostrata non è
-più dove è passata l'auto, quindi uscirebbe dal nastro e sembrerebbe un'uscita di
-pista mai avvenuta. Con l'ingrandimento attivo **il nastro sparisce** — terreno
-vero, o niente terreno.
-
-Il ripiego per ACC e per le piste disallineate resta quello di prima:
-**l'inviluppo dei tuoi giri** su quella pista — «dove sei passato» — dichiarato
-così, mai chiamato bordo pista. Non è stato implementato.
+Il ripiego dell'**inviluppo dei tuoi giri** non è stato implementato e serve
+ormai solo a chi ha unicamente ACC.
 
 ## Come rifare le misure
 
