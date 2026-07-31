@@ -219,8 +219,8 @@
     // Due frasi perche' sono due cose diverse. Quella sopra descrive un
     // corridoio ricavato allargando la linea dell'IA; questa descrive la
     // strada, presa dal modello con cui il gioco decide dove sei.
-    "line.leg.mesh":   { en: `the track and its kerbs, from the game's own surface model`,
-                         it: `la pista e i suoi cordoli, dal modello delle superfici del gioco` },
+    "line.leg.mesh":   { en: `the track, its kerbs and what's beside it — from the game's own surface model`,
+                         it: `la pista, i cordoli e cosa c'è di fianco — dal modello delle superfici del gioco` },
     "line.leg.apex":   { en: `your slowest point`, it: `il tuo punto più lento` },
     "line.leg.apexref":{ en: `the reference's`, it: `quello del riferimento` },
     "chart.offset":    { en: `Where you were on the road <small>(m from the reference line · above = to its right, below = to its left)</small>`,

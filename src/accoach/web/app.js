@@ -746,6 +746,18 @@ function balanceColor(v) {
 //
 // The kerbs are the reason this is worth the trouble. They are the thing a
 // driver aims at, and no amount of widening a racing line invents one.
+// Nell'ordine in cui stanno per terra: prima le vie di fuga, poi la pista che ci
+// sta sopra, poi i cordoli che stanno sopra la pista. I colori sono spenti
+// apposta — devono dire "qui non sei più in pista" senza rubare l'occhio alle
+// due linee, che restano la ragione per cui si guarda questo disegno.
+const SURFACE_PAINT = [
+  ["grass",    "rgba(74,124,89,0.30)"],
+  ["gravel",   "rgba(176,146,96,0.30)"],
+  ["concrete", "rgba(150,155,165,0.20)"],
+  ["road",     "rgba(255,255,255,0.15)"],
+  ["kerb",     "rgba(226,86,96,0.55)"],
+];
+
 function drawSurfaces(ctx, shapes, X, Y) {
   const fill = (rings, colour) => {
     if (!rings || !rings.length) return;
@@ -761,8 +773,7 @@ function drawSurfaces(ctx, shapes, X, Y) {
     ctx.fill("evenodd");
   };
   ctx.save();
-  fill(shapes.road, "rgba(255,255,255,0.15)");
-  fill(shapes.kerb, "rgba(226,86,96,0.55)");
+  for (const [key, colour] of SURFACE_PAINT) fill(shapes[key], colour);
   ctx.restore();
 }
 
@@ -2677,6 +2688,9 @@ function drawCornerZoom(L, c, cx) {
   if (road) for (const r of road.runs) for (const side of [r.left, r.right]) {
     for (const p of side) pool.push([p[0], p[1]]);
   }
+  // Solo pista e cordoli entrano nell'inquadratura: l'erba attorno a una curva
+  // arriva fin dove le si e' chiesto, e farla decidere il riquadro vorrebbe dire
+  // rimpicciolire la curva per mostrare del prato.
   if (shapes) for (const k of ["road", "kerb"]) for (const ring of (shapes[k] || [])) {
     for (const p of ring) pool.push([p[0], p[1]]);
   }

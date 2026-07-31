@@ -50,13 +50,29 @@ from pathlib import Path
 _MAGIC = b"sc6969"
 _VERTEX = 44
 
-#: Le chiavi di `surfaces.ini` che ci interessano, raggruppate per come si
-#: disegnano. Tutto il resto (erba, sabbia, muri) resta fuori: e' terreno che
-#: non stiamo ancora dicendo di conoscere.
+#: Le chiavi di `surfaces.ini` raggruppate per come si disegnano. I nomi veri
+#: portano prefissi numerici e suffissi (``07GRASS001``), quindi il confronto e'
+#: per sottostringa. Censite sui sei modelli installati: ASPH-SPA, MONZA-ASPH,
+#: TARMAC-IMA, ROAD, GRASS001, SAND002, CONCRETE, CARPET, KERB003, CURB006...
+#:
+#: Le vie di fuga servono a rispondere alla domanda che il nastro da solo non
+#: chiudeva: **dove finisce la pista e comincia il resto**. Nei dati del gioco e'
+#: una distinzione esplicita — l'asfalto di fuga di La Source e' `ASPH` come la
+#: pista, ma l'erba e la ghiaia che lo circondano no.
+#:
+#: Fuori restano i muri (geometria verticale: in pianta sono un filo) e `OUT` /
+#: `OFFTRACK`, che non sono materiali ma verdetti, e si sovrappongono agli altri.
 _CLASSES = {
     "road": ("ASPH", "ROAD", "TARMAC"),
     "kerb": ("CURB", "KERB"),
+    "grass": ("GRASS", "CARPET"),
+    "gravel": ("SAND", "GRAVEL", "DIRT"),
+    "concrete": ("CONCRETE", "ILLCONC", "CNC"),
 }
+
+#: L'ordine in cui vanno disegnate: quello in cui stanno per terra. La pista
+#: sopra le sue vie di fuga, i cordoli sopra la pista.
+DRAW_ORDER = ("grass", "gravel", "concrete", "road", "kerb")
 
 #: Quante mesh nominate come superfici servono perche' il file sia quello buono.
 #:

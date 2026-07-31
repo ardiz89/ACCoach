@@ -205,3 +205,45 @@ def test_a_straight_edge_comes_out_straight(tmp_path, monkeypatch):
     assert len(ring) <= 8, f"{len(ring)} punti per un rettangolo"
     for x, _z in ring:
         assert abs(abs(x) - 5.0) < 0.2, f"bordo a x={x:.2f} invece che a +-5"
+
+
+# --- cosa c'e' di fianco alla pista ------------------------------------------
+
+def test_the_run_off_comes_back_with_its_own_name(tmp_path, monkeypatch):
+    """La domanda che il nastro da solo non chiudeva: dove finisce la pista e
+    comincia il resto.
+
+    Nei dati del gioco è una distinzione esplicita, e la si vede proprio dove
+    faceva male: l'asfalto di fuga di La Source è `ASPH` come la pista, ma
+    l'erba e la ghiaia che lo circondano no.
+    """
+    meshes = [
+        ("1ASPH_a", _quad(-5, 0, 5, 100)),
+        ("2CURB_a", _quad(5, 20, 6.5, 60)),
+        ("3GRASS_a", _quad(6.5, 0, 20, 100)),
+        ("4SAND_a", _quad(-20, 0, -5, 100)),
+        ("5CONCRETE_a", _quad(-30, 0, -20, 100)),
+    ]
+    monkeypatch.setattr(tm, "physics_model", lambda t: _kn5(tmp_path, meshes))
+    tm._cache.clear()
+    got = tm.road_shapes("qualunque", [(0.0, z) for z in range(5, 95, 5)],
+                         None, pad=30.0)
+    assert set(got) == {"road", "kerb", "grass", "gravel", "concrete"}, sorted(got)
+    side = lambda k: sum(p[0] for r in got[k] for p in r) / sum(len(r) for r in got[k])
+    assert side("grass") > 5, "l'erba è finita dalla parte sbagliata"
+    assert side("gravel") < -5 and side("concrete") < side("gravel")
+
+
+def test_the_walls_and_the_verdicts_stay_out():
+    """I muri sono geometria verticale — in pianta sono un filo — e `OUT` /
+    `OFFTRACK` non sono materiali ma verdetti, sovrapposti a tutto il resto."""
+    for name in ("12WALL003", "01OUT004", "03OFFTRACK", "07EDGE"):
+        assert tm._class_of(name) is None, name
+
+
+def test_every_class_has_a_place_in_the_drawing_order():
+    """Una classe estratta e mai disegnata è lavoro pagato e buttato; una
+    disegnata e mai estratta è una riga di codice che non fa niente."""
+    assert set(tm.DRAW_ORDER) == set(tm._CLASSES)
+    assert tm.DRAW_ORDER[-1] == "kerb", "i cordoli stanno sopra tutto"
+    assert tm.DRAW_ORDER.index("road") > tm.DRAW_ORDER.index("grass")
