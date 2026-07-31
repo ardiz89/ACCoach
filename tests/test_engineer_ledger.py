@@ -323,6 +323,100 @@ def test_the_fuel_reading_comes_from_the_lap_itself():
     assert _mean_fuel([]) == 0.0
 
 
+# --- the rain ---------------------------------------------------------------
+# There is not one wet lap in the 39-lap archive, so nothing about wet setup
+# work could be validated. What *can* be done honestly is refuse — and the
+# refusal is worth more than it sounds: without it the engineer judges your
+# pressures against a dry target in the rain, 2.5 psi the wrong way.
+
+def _wet_lap(wet, scores=None, time_ms=100000):
+    s = _lap(time_ms, scores or {SYM: 0.60})
+    s.wet = wet
+    return s
+
+
+def test_the_engineer_stands_down_in_the_rain():
+    eng = _eng()
+    for _ in range(5):
+        d = eng.observe(_wet_lap(True))
+    assert d.kind is DecisionKind.STAND_DOWN
+    assert d.change is None, "it must not propose anything"
+
+
+def test_the_refusal_says_why_rather_than_going_quiet():
+    """A tool that just stops looks broken. The reason is the message."""
+    eng = _eng()
+    d = eng.observe(_wet_lap(True))
+    assert "dry" in d.message.lower() or "asciutto" in d.message.lower()
+
+
+def test_a_lap_that_does_not_say_which_tyres_is_not_treated_as_dry():
+    """Sixteen of the archive's 39 laps carry no compound. Unknown must not be
+    read as dry, and must not be read as a change either."""
+    eng = _eng()
+    for _ in range(5):
+        d = eng.observe(_wet_lap(None))
+    assert d.kind is not DecisionKind.STAND_DOWN, "unknown is not a wet flag"
+
+
+def test_the_track_drying_out_mid_test_drops_the_verdict():
+    """A baseline on wets and a re-test on slicks is two cars on two circuits.
+    Reading a verdict off that would be a number with no meaning, presented as
+    one with one."""
+    eng = _eng()
+    for _ in range(6):
+        d = eng.observe(_wet_lap(False))
+        if d.kind is DecisionKind.PROPOSE:
+            break
+    assert d.kind is DecisionKind.PROPOSE
+    eng.mark_applied()
+    eng.observe(_wet_lap(False, {SYM: 0.20}))
+    out = eng.observe(_wet_lap(True, {SYM: 0.20}))     # it started raining
+    assert out.kind is DecisionKind.STAND_DOWN
+    assert out.outcome is None, "no verdict may be read off a mixed window"
+    assert eng.active is None, "the test in flight is abandoned, not judged"
+    # The lap that announced the change is itself the first of the new
+    # conditions, so it starts the new baseline rather than being thrown away.
+    assert [s.wet for s in eng.window] == [True]
+
+
+def test_the_window_survives_a_lap_that_simply_does_not_say():
+    eng = _eng()
+    eng.observe(_wet_lap(False))
+    eng.observe(_wet_lap(None))
+    d = eng.observe(_wet_lap(False))
+    assert d.kind is not DecisionKind.STAND_DOWN
+    assert len(eng.window) == 3, "an unknown lap is still a lap"
+
+
+def test_the_wet_pressure_window_exists_only_where_it_is_sourced():
+    """ACC's wet Pirelli has a published optimum (30.0 psi, 29.5-31.0) that
+    several independent guides agree on. Open-wheel and road cars have no such
+    figure and no wet lap here — and `None` has to stay `None`, because the dry
+    fallback is 2.5 psi the wrong way."""
+    from accoach.engineer.pressures import pressure_window, wet_pressure_window
+    gt3 = wet_pressure_window("ferrari_488_gt3_evo")
+    assert gt3 is not None and gt3[0] == pytest.approx(30.0)
+    assert gt3[0] > pressure_window("ferrari_488_gt3_evo")[0]
+    assert wet_pressure_window("bmw_m3_e92") is None
+    assert wet_pressure_window("gp_2025_sf25") is None
+
+
+def test_wet_is_read_from_the_tyres_the_driver_fitted():
+    """Not from grip: `surface_grip` reads 0.0 on all 39 laps in the archive,
+    on both games, so it is not a signal."""
+    from accoach.coaching.diagnosis import _is_wet
+
+    class _L:
+        def __init__(self, c):
+            self.tyre_compound = c
+    assert _is_wet(_L("wet_compound")) is True
+    assert _is_wet(_L("dry_compound")) is False
+    assert _is_wet(_L("Semislicks (SM)")) is False
+    assert _is_wet(_L("")) is None, "no compound is unknown, not dry"
+    assert _is_wet(_L(None)) is None
+
+
 # --- the ledger file --------------------------------------------------------
 
 def _rec(**kw):

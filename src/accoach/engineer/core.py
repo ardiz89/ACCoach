@@ -101,6 +101,14 @@ class LapStats:
     #: How heavy the car was, which is why a lap time from before a setup change
     #: and one from after may not be comparable at all — see `_fuel_gap`.
     fuel_l: float = 0.0
+    #: Whether this lap was driven on wet tyres. ``None`` means the lap doesn't
+    #: say — which is not the same as "dry", and is treated differently.
+    #:
+    #: It comes from the compound the driver fitted, not from a grip reading:
+    #: ``surface_grip`` is **0.0 on all 39 laps in our archive**, on both games,
+    #: so it is not a signal at all. The compound is the driver's own decision
+    #: about the conditions, and it is measured.
+    wet: bool | None = None
 
 
 # --- recommendations -------------------------------------------------------
@@ -202,6 +210,7 @@ class DecisionKind(Enum):
     REVERTED = "reverted"        # the last change didn't help — undo proposed
     PHASE_DONE = "phase_done"    # this phase's gate is satisfied
     DONE = "done"                # nothing left to improve
+    STAND_DOWN = "stand_down"    # it *could* advise here, and refuses to
 
 
 @dataclass(frozen=True)
@@ -353,6 +362,23 @@ _DECISION_MSG = {
         "it": "Come lo capiremo: in {n} giri puliti il tempo non deve peggiorare "
               "di più di {ms:.0f} ms. Se peggiora, la rimetto com'era.",
     },
+    "wet_stand_down": {
+        "en": "Wet tyres are on. I'm not going to work the setup in the rain: "
+              "every remedy I have was derived dry, and in the wet several of "
+              "them point the other way. Pressures aside, what I'd tell you "
+              "would be a guess wearing a number.",
+        "it": "Hai le gomme da bagnato. Sul bagnato il setup non lo tocco: ogni "
+              "rimedio che ho è stato ricavato sull'asciutto, e con la pioggia "
+              "più d'uno punta dalla parte opposta. Tolte le pressioni, quello "
+              "che ti direi sarebbe un'ipotesi travestita da numero.",
+    },
+    "conditions_changed": {
+        "en": "Conditions changed mid-test (dry ↔ wet): I'm dropping this "
+              "verdict rather than reading it. Those laps aren't comparable.",
+        "it": "Le condizioni sono cambiate durante la prova (asciutto ↔ "
+              "bagnato): butto via questo verdetto invece di leggerlo. Quei "
+              "giri non sono confrontabili.",
+    },
     "accepted_unjudged": {
         "en": "Change applied. I could not judge it on lap time — the tank was "
               "not the same weight before and after — so the phase target "
@@ -480,11 +506,29 @@ class RaceEngineer:
 
     def observe(self, stats: LapStats) -> Decision:
         """Feed one completed lap; return the next recommendation."""
+        # A dry↔wet switch invalidates everything measured either side of it: a
+        # baseline driven on slicks and a re-test driven on wets are two
+        # different cars on two different circuits. Checked before the lap is
+        # banked, so the abandoned test isn't judged on a mixed window.
+        changed = self._conditions_changed(stats)
+
         if stats.stable and stats.warmed_up:
             self.window.append(stats)
             self.window = self.window[-_WINDOW:]
             if self.active is not None:
                 self.active.laps_seen += 1
+
+        if changed:
+            return Decision(DecisionKind.STAND_DOWN,
+                            _msg("conditions_changed", current_language()))
+
+        # Wet: the remedy tables are dry-derived and several of them invert in
+        # the rain (less wing for understeer at a fast apex is exactly wrong on
+        # a wet track). Nothing here has ever seen a wet lap — the archive
+        # contains none — so this is a refusal, not a gap waiting for a switch.
+        if stats.wet is True:
+            return Decision(DecisionKind.STAND_DOWN,
+                            _msg("wet_stand_down", current_language()))
 
         # An applied change under evaluation takes priority.
         if self.active is not None:
@@ -529,6 +573,30 @@ class RaceEngineer:
         self.window = []
         self._pending = None
         self._pending_prediction = None
+
+    def _conditions_changed(self, stats: LapStats) -> bool:
+        """Did the track flip dry↔wet since the laps already in hand?
+
+        Only a *known* flip counts. A lap that doesn't say which tyres were on
+        (sixteen of the thirty-nine in our archive) can't contradict anything,
+        and treating "unknown" as a change would throw away good windows every
+        time an older lap turned up.
+
+        On a real flip everything in flight is dropped: the window, and any test
+        under evaluation. The alternative is a verdict computed across a rain
+        shower, which is a number with no meaning presented as one with one.
+        """
+        if stats.wet is None:
+            return False
+        known = [s.wet for s in self.window if s.wet is not None]
+        if not known or known[-1] == stats.wet:
+            return False
+        self.window = []
+        self.active = None
+        self._pending = None
+        self._pending_is_revert = False
+        self._pending_prediction = None
+        return True
 
     # -- the prediction ----------------------------------------------------
     def _all_scores(self) -> dict:

@@ -300,9 +300,8 @@ una delle due è vera.
 
 1. ~~**Verdetto su uno stint, non su tre giri.**~~ **Rivista, non chiusa** —
    vedi §7.4: allungare la finestra non era la correzione.
-2. **La pioggia: buco totale.** Cercando `rain|wet|weather` in `engineer/` e
-   `setup/` non c'è niente. Full Grip vende asciutto e bagnato, e sul bagnato
-   cambiano pressioni, altezze, TC/ABS, bias e ala.
+2. ~~**La pioggia: buco totale.**~~ **Chiuso il rifiuto, non la funzione** —
+   vedi §7.5.
 3. **Il setup di partenza.** Sappiamo solo *correggere* un setup esistente; chi
    comincia non ne ha uno. Non inseguire i 7 secondi: una base conservativa dai
    range della vettura, dichiarata per quello che è — *un punto di partenza
@@ -353,3 +352,53 @@ Tre conseguenze di dettaglio, tutte con un test:
 
 Resta fuori il **degrado gomma**, che ha lo stesso difetto e per cui non abbiamo
 una misura diretta: nessuna riga lo affermerà finché non ce l'avremo.
+
+### 7.5 La pioggia: prima il rifiuto, la funzione poi
+
+Due misure fatte sull'archivio **prima** di scrivere una riga, ed entrambe hanno
+cambiato il piano:
+
+- **`surface_grip` è 0.0 su tutti e 39 i giri**, su AC *e* su ACC. Non è «basso»:
+  non è un segnale. Qualsiasi rilevamento del bagnato costruito su quel campo
+  sarebbe stato codice morto;
+- **nell'archivio non esiste un solo giro sul bagnato.** Quindi niente di ciò che
+  riguarda il setup in pioggia poteva essere validato, e questo progetto non
+  scrive numeri che non ha misurato.
+
+Il segnale che invece c'è è la **mescola**: ACC dice `dry_compound` /
+`wet_compound`, AC dà il nome della gomma, ed è popolata su 23 giri su 39. È
+anche il testimone migliore, perché è **la decisione del pilota** sulle
+condizioni, non una stima. I 16 giri senza mescola restano `None` — *non lo
+sappiamo*, che non è «asciutto».
+
+Quello che è stato fatto è quindi **un rifiuto**, e vale più di come suona: senza,
+l'ingegnere in pioggia giudica le tue pressioni contro il bersaglio
+dell'asciutto, che su una GT3 sta **2.5 psi dalla parte sbagliata**.
+
+> *«Hai le gomme da bagnato. Sul bagnato il setup non lo tocco: ogni rimedio che
+> ho è stato ricavato sull'asciutto, e con la pioggia più d'uno punta dalla parte
+> opposta. Tolte le pressioni, quello che ti direi sarebbe un'ipotesi travestita
+> da numero.»*
+
+Non è una funzione che aspetta un interruttore: le 12 celle della tabella GT3
+sono tarate sull'asciutto e alcune **si invertono** con la pioggia (meno ala per
+il sottosterzo all'apex veloce è esattamente il contrario di quello che si fa su
+pista bagnata).
+
+**Il pezzo che vale anche sull'asciutto.** Un passaggio asciutto↔bagnato *durante*
+una prova adesso **la fa abbandonare invece di leggerla**: una base su slick e un
+ri-test su gomme da pioggia sono due macchine su due circuiti, e un verdetto
+calcolato attraverso un acquazzone è un numero senza significato presentato come
+se ne avesse uno. Il giro che annuncia il cambio non viene buttato: è il primo
+delle nuove condizioni, e apre la nuova base.
+
+**Pronto per il passo dopo**: `wet_pressure_window()` con la finestra ACC del
+bagnato (30.0 psi, banda 29.5-31.0), sourced da più guide indipendenti
+([simracingsetup](https://simracingsetup.com/assetto-corsa/acc-tyre-pressure-guide/),
+Coach Dave, ACC wiki) e **solo per le GT3**: monoposto e stradali non hanno una
+cifra pubblicata né un giro in archivio, e lì la funzione torna `None`. `None`
+deve restare `None` — ripiegare sull'asciutto non sarebbe una risposta degradata,
+sarebbe una risposta sbagliata.
+
+Cosa serve per andare oltre: **una sessione vera sul bagnato**, come per le
+tarature ACC. Fino ad allora questa è la posizione onesta.

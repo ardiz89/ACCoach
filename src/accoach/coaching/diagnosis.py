@@ -234,7 +234,27 @@ def build_lap_stats(lap: Lap, corners: list[Corner] | None = None) -> LapStats:
         lock_segments=lock_segments,
         spin_segments=spin_segments,
         fuel_l=_mean_fuel(lap.samples),
+        wet=_is_wet(lap),
     )
+
+
+def _is_wet(lap) -> bool | None:
+    """Wet tyres fitted? ``None`` when the lap doesn't say.
+
+    Read from the compound rather than from grip, and that is not a preference:
+    ``surface_grip`` measures **0.0 on all 39 laps in the archive**, on both AC
+    and ACC, so it carries no information. The compound is populated (ACC says
+    ``dry_compound`` / ``wet_compound``; AC gives the tyre's own name) and it is
+    the driver's own call on the conditions, which is a better witness than a
+    number nobody has validated.
+
+    Sixteen of those 39 laps carry no compound at all, so ``None`` is a case
+    that happens, not a theoretical one.
+    """
+    name = (getattr(lap, "tyre_compound", "") or "").strip().lower()
+    if not name:
+        return None
+    return "wet" in name or "rain" in name
 
 
 def _mean_fuel(samples) -> float:
