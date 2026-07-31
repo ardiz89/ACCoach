@@ -912,6 +912,11 @@ body.no-data .empty { display: block; }
   color: var(--muted); font-size: 13px;
 }
 
+.train-intro {
+  padding: 14px var(--gut) 0; margin: 0;
+  color: var(--muted); font-size: 13px; line-height: 1.6;
+}
+
 /* How far it is, and where it sits. The sector row is the only place on this
    tab with a table in it, and it stays a three-column grid rather than a table
    so it can collapse on a phone. */
@@ -1021,7 +1026,8 @@ body.no-data .empty { display: block; }
 .train-countdown { color: var(--cyan); font-size: 13px; margin-top: 12px; }
 
 @media (max-width: 700px) {
-  .plan, .train-gap, .train-steps, .train-session, .plan-elsewhere {
+  .plan, .train-gap, .train-steps, .train-session, .plan-elsewhere,
+  .train-intro {
     padding-left: 16px; padding-right: 16px;
   }
   .plan h3 { flex-wrap: wrap; }

@@ -256,6 +256,67 @@ def test_a_speed_gap_inside_your_own_spread_is_not_offered_as_a_target():
     assert not any("+0" in s for s in d.steps)
 
 
+# --- the words a beginner has to get through -------------------------------
+# This tab exists for the driver who can't do the last step alone, so the prose
+# is part of the feature. Checked here rather than left to review, because
+# jargon comes back one edit at a time and nobody notices until a beginner does.
+
+from accoach.coaching.training import _T          # noqa: E402 - prose under test
+
+
+def _drill_groups(lang):
+    """{drill key: all its sentences}, plus the page's own text as one group."""
+    groups = {}
+    for k, v in _T[lang].items():
+        name = k.split(".")[1] if k.startswith("d.") else "_page"
+        groups.setdefault(name, []).append(v)
+    return groups
+
+
+@pytest.mark.parametrize("lang,banned", [
+    ("it", ("staccata", "stacchi", "digitale")),
+    ("en", ("not digital", "radius")),
+])
+def test_words_a_plain_one_would_have_done_are_gone(lang, banned):
+    """"Il punto in cui inizi a frenare" says the same as "la staccata" and
+    costs a beginner nothing. Where a plain word loses nothing, it wins."""
+    for word in banned:
+        hits = [k for k, v in _T[lang].items() if word in v.lower()]
+        assert not hits, f"{word!r} is back in {hits}"
+
+
+@pytest.mark.parametrize("lang,term,gloss", [
+    ("it", "apex", "più stretto"),
+    ("en", "apex", "tightest"),
+])
+def test_a_term_that_stays_is_explained_inside_the_drill_that_uses_it(
+        lang, term, gloss):
+    """The gloss travels with the term because only one drill is ever open on
+    screen: explaining "apex" in the drill above is explaining it to nobody."""
+    for name, lines in _drill_groups(lang).items():
+        text = " ".join(lines).lower()
+        if term not in text:
+            continue
+        assert gloss in text, f"{name} uses {term!r} without explaining it"
+
+
+@pytest.mark.parametrize("lang,term,definition", [
+    ("it", "ideale teorico", "settore"),
+    ("en", "theoretical ideal", "sector"),
+])
+def test_the_app_s_own_jargon_is_defined_before_it_is_named(lang, term,
+                                                            definition):
+    """Not the other way round: the sentence says what the thing is and *then*
+    gives it its name, so the reader is never carrying an undefined word."""
+    users = [k for k, v in _T[lang].items() if term in v.lower()]
+    assert users, "the term should still be taught — the other tabs use it"
+    for k in users:
+        v = _T[lang][k].lower()
+        assert definition in v, f"{k} names {term!r} without saying what it is"
+        assert v.index(definition) < v.index(term), \
+            f"{k} names {term!r} before defining it"
+
+
 # --- the programme ----------------------------------------------------------
 
 def _run(plan, debriefs, gap=None, progress=None, laps=MIN_LAPS + 2,
@@ -403,6 +464,25 @@ def test_the_programme_serialises_whole():
     assert d["ready"] is True
     assert d["steps"][0]["drill"]["steps"]
     assert d["gap"]["sectors"] and d["session"]["lines"]
+
+
+def test_a_heading_that_says_nothing_is_not_printed():
+    """"Time lost here" is the debrief's label for a corner with no dominant
+    cause. On a card that already names the corner, says why it's first and
+    gives a target, it is a heading that tells the reader nothing — and the
+    drill's own first line says it properly."""
+    ds = [_debrief(_loss(0, 400.0)) for _ in range(4)]
+    p = _run(_plan(_goal(0, category=CueCategory.TIME_LOSS)), ds)
+    assert p.steps[0].what == ""
+    assert p.steps[0].drill.steps[0], "the drill still explains it"
+
+
+def test_a_heading_that_says_something_is_kept():
+    ds = [_debrief(_loss(0, 400.0)) for _ in range(4)]
+    goal = _goal(0, category=CueCategory.BRAKE_LATER)
+    goal.what = "Frena più tardi"
+    p = _run(_plan(goal), ds)
+    assert p.steps[0].what == "Frena più tardi"
 
 
 def test_a_goals_target_is_the_plans_and_is_not_recomputed_here():

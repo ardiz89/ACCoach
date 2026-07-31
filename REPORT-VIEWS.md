@@ -445,3 +445,37 @@ come una funzione rotta. Sull'archivio reale (39 giri) si accende su 3 combo su
 
 Suite **1254** verde. Verificato a schermo su Imola/720S (piano proposto,
 avviato, misurato) e a 390 px in iframe.
+
+### Passata sul linguaggio (stessa giornata)
+
+Rilettura richiesta: *il linguaggio deve essere comprensibile anche a un
+neofita*. È il punto: questa è **la scheda per chi non legge telemetria**, e ci
+era rimasto dentro il gergo di chi la legge. Contati sulle stringhe: `apex` in 7
+punti, `stacchi/staccata` in 6, `la minima` in 7, `riferimento` in 6 — e
+`riferimento` significava **due cose diverse** (il giro di confronto e un punto
+che guardi fuori dal parabrezza).
+
+Le tre regole adottate, scritte nel modulo perché non si perdano:
+
+1. **Dove una parola comune non toglie niente, vince lei**: «il punto in cui
+   inizi a frenare», non «la staccata».
+2. **Un termine che il resto dell'app usa resta** (settore, apex, ideale
+   teorico) — chi lo impara qui lo ritrova sulle altre schede — **ma si spiega
+   dentro l'esercizio che lo usa**. È l'unità giusta: a schermo un esercizio
+   solo è aperto, quindi una spiegazione ripetuta fra esercizi non è ripetizione
+   per nessun lettore.
+3. **Nessun termine viene introdotto per essere definito dopo.** «Ideale
+   teorico» si **descrive e poi si nomina**: *«il tuo tratto migliore in ogni
+   settore, messo insieme — è quello che qui si chiama ideale teorico»*.
+
+Più: una riga d'apertura che dice cosa **è** questa scheda (le altre ti mostrano
+qualcosa, questa ti chiede di andare a fare qualcosa), e il titolo generico
+**«Tempo perso qui» non si stampa più** — su una scheda che porta già il nome
+della curva, il motivo per cui è prima e un bersaglio in secondi, era
+un'intestazione che non diceva niente, e la prima riga dell'esercizio lo dice
+per bene.
+
+Tre test statici lo tengono fermo: le parole abbandonate non rientrano, un
+termine che resta è spiegato **nello stesso esercizio**, e il gergo dell'app è
+definito **prima** di essere nominato (verificato sull'ordine dei caratteri
+nella frase, non a occhio). Suite **1262**.

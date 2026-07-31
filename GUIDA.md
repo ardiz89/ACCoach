@@ -219,6 +219,14 @@ Cosa trovi:
   tempo che vedi **non si sommano**. Il divario dall'ideale teorico e quello che
   perdi in media ogni giro nelle curve sono la stessa strada misurata in due
   modi, e sommarli conterebbe due volte lo stesso tempo.
+
+  **È la scheda scritta per chi non mastica telemetria**, quindi è anche l'unica
+  che si spiega le parole mentre le usa: «l'ideale teorico» viene prima
+  descritto («il tuo tratto migliore in ogni settore, messo insieme») e poi
+  nominato, e i termini che restano — apex, settore, velocità minima — sono
+  spiegati dentro l'esercizio che li usa, perché a schermo ne è aperto uno solo.
+  Dove una parola comune bastava, c'è quella: *il punto in cui inizi a frenare*,
+  non *la staccata*.
 - **Sessione**: com'è andata una sola uscita. I giri nell'ordine in cui li hai
   guidati (compresi quelli tagliati o non validi — sono giri che hai fatto, solo
   non possono fare la media), migliore, costanza, temperatura dell'asfalto, e

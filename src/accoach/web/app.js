@@ -377,7 +377,8 @@ function renderTraining(b) {
   // panels below are emptied rather than left showing another combo's plan.
   const ready = b && b.ready;
   gate.classList.toggle("hidden", !!ready);
-  for (const id of ["train-gap", "plan", "train-steps", "train-session"]) {
+  for (const id of ["train-intro", "train-gap", "plan", "train-steps",
+                    "train-session"]) {
     const el = $(id);
     if (el) el.classList.toggle("hidden", !ready);
   }

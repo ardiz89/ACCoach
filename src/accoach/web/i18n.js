@@ -391,9 +391,11 @@
     // looking at, and it is exactly the one the plural got wrong.
     "train.countdown1": { en: `One more valid lap and this opens.`,
                           it: `Ancora un giro valido e questa scheda si apre.` },
-    "train.gap.title": { en: `Where the time is`, it: `Dove sono i tempi` },
+    "train.intro":     { en: `Here there is no more analysis: there is what to do on track, one exercise at a time, built from your own laps.`,
+                         it: `Qui non c'è altra analisi: c'è cosa fare in pista, un esercizio alla volta, costruito sui tuoi giri.` },
+    "train.gap.title": { en: `Where your time is going`, it: `Dove se ne va il tuo tempo` },
     "train.sector":    { en: `Sector {n}`, it: `Settore {n}` },
-    "train.drill":     { en: `Drill · {n} laps`, it: `Esercizio · {n} giri` },
+    "train.drill":     { en: `Exercise · {n} laps`, it: `Esercizio · {n} giri` },
     "train.watch":     { en: `Watch:`, it: `Guarda:` },
     "train.ignore":    { en: `Ignore:`, it: `Ignora:` },
     "train.wholelap":  { en: `The whole lap`, it: `Il giro intero` },
