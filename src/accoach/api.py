@@ -12,7 +12,9 @@ new files, so it doesn't touch the live-coaching code.
 
 from __future__ import annotations
 
+import statistics
 import sys
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from fastapi import Body, FastAPI, HTTPException, Query
@@ -21,16 +23,24 @@ from fastapi.staticfiles import StaticFiles
 
 from .braking_points import build_sheet
 from .coaching import (
+    CornerFacts,
+    CueCategory,
     Goal,
+    Programme,
     TrainingPlan,
     benchmark_levels,
     build_flow,
+    build_gap,
     build_lap_debrief,
+    build_programme,
+    category_words,
     classify_losses,
     lap_time_consistency,
     measure as measure_plan,
     propose as propose_plan,
+    trail_brake_for,
 )
+from .coaching.training import MIN_LAPS as _TRAIN_MIN_LAPS, assess as _assess_training
 from .comparison import Reference
 from .i18n import current_language
 from .recording import DEFAULT_LAPS_DIR, load_lap
@@ -487,6 +497,124 @@ def _tyre_means(samples, attr: str, ndigits: int) -> list[float] | None:
     return [round(m, ndigits) for m in means]
 
 
+#: How many recent laps get replayed against your best one. Both the Trends tab
+#: and the training programme read this same window: two panels describing "your
+#: recent laps" over different numbers of laps would disagree about what recurs.
+_RECENT_LAPS = 15
+
+
+@dataclass(slots=True)
+class _History:
+    """Your recent laps, replayed against your best one — once, for two readers.
+
+    The Trends tab and the training programme both need the same thing: every
+    recent lap turned into a debrief, then classified into what recurs. It used
+    to live inside ``/api/progress`` alone; the moment a second endpoint needed
+    it, copying the loop would have created a second definition of "recently"
+    and a second definition of "systematic", which is exactly the kind of split
+    this project keeps paying for.
+    """
+
+    fastest: str = ""
+    best_ms: int = 0
+    corners: list = field(default_factory=list)
+    names: dict = field(default_factory=dict)
+    debriefs: list = field(default_factory=list)
+    dated: list = field(default_factory=list)   # (recorded_utc, LapDebrief)
+    trends: list = field(default_factory=list)  # LossTrend, worst total first
+    recurring: list = field(default_factory=list)
+    lap_objs: dict = field(default_factory=dict)
+
+
+def _history(valid: list[dict], chrono: list[dict], track: str,
+             lg: str) -> _History:
+    """Load the laps once and build everything cross-lap from them.
+
+    Every failure mode here is a lap file we couldn't read, and none of them is
+    worth a 500: the answer degrades to "no trends" rather than taking the page
+    down with it, which is what the Trends tab already did.
+    """
+    fastest_row = min(valid, key=lambda r: r["lap_time_ms"])
+    h = _History(fastest=fastest_row["path"], best_ms=fastest_row["lap_time_ms"])
+
+    # Every valid lap, loaded once — shared by the debriefs, the tyre trend and
+    # the ideal lap. Three readers used to mean three file reads.
+    for r in valid:
+        try:
+            h.lap_objs[r["path"]] = load_lap(r["path"])
+        except (OSError, ValueError):
+            pass
+
+    try:
+        ref_lap = h.lap_objs.get(h.fastest) or load_lap(h.fastest)
+        reference = Reference(ref_lap)
+        h.corners = detect_corners(ref_lap.samples)
+        h.names = {c.index: n
+                   for c, n in zip(h.corners, name_corners(track, h.corners, lg))}
+        tally: dict[str, dict] = {}
+        for r in chrono[-_RECENT_LAPS:]:
+            if r["path"] == h.fastest:
+                continue
+            lp = h.lap_objs.get(r["path"])
+            if lp is None:
+                continue
+            deb = build_lap_debrief(lp, reference, h.corners, lg)
+            h.debriefs.append(deb)
+            h.dated.append((r["recorded_utc"] or "", deb))
+            for loss in deb.losses:
+                t = tally.setdefault(loss.category.value,
+                                     {"message": loss.message, "count": 0,
+                                      "corners": set()})
+                t["count"] += 1
+                t["corners"].add(h.names.get(loss.index, f"Corner {loss.index + 1}"))
+        h.recurring = sorted(
+            ({"category": k, "message": v["message"], "count": v["count"],
+              "corners": sorted(v["corners"])} for k, v in tally.items()),
+            key=lambda x: x["count"], reverse=True)
+        h.trends = classify_losses(h.debriefs)
+    except (OSError, ValueError):
+        h.debriefs, h.dated, h.trends, h.recurring = [], [], [], []
+    return h
+
+
+def _corner_vmins(corner, chrono: list[dict], lap_objs: dict) -> list[float]:
+    """Your minimum speed at one corner, lap by lap across the recent window.
+
+    One definition, two readers: the Trends tab turns this into "how repeatable
+    is this corner", and the training programme quotes the same spread inside a
+    drill. Written as the raw list rather than a summary so each caller keeps
+    its own statistic without either inventing a second window.
+    """
+    out: list[float] = []
+    for r in chrono[-_RECENT_LAPS:]:
+        lp = lap_objs.get(r["path"])
+        if lp is None:
+            continue
+        inside = [s.speed_kmh for s in lp.samples
+                  if corner.entry_pos <= s.pos <= corner.exit_pos]
+        if inside:
+            out.append(min(inside))
+    return out
+
+
+def _sheet_pool(valid: list[dict], ref_row: dict | None) -> list[dict]:
+    """Which of your laps a braking sheet is measured on.
+
+    Extracted so the Map tab's sheet and the braking drill quote the same
+    number: a drill that told you "you brake at 214 km/h here" while the sheet
+    two tabs over said 209 would be two answers to one question. The rule is the
+    live coach's own — the same road-temperature band it uses to elect a
+    reference, because two laps 20° apart are two circuits.
+    """
+    ref_temp = (ref_row or {}).get("road_temp") or 0.0
+    pool = valid
+    if ref_temp:
+        same = [r for r in valid
+                if r["road_temp"] and abs(r["road_temp"] - ref_temp) <= _TEMP_BAND_C]
+        pool = same or valid
+    return sorted(pool, key=lambda r: r["recorded_utc"] or "")[-_SHEET_LAPS:]
+
+
 class _RevalidatingStatic(StaticFiles):
     """Static files that the browser must always check before reusing.
 
@@ -928,17 +1056,10 @@ def create_api(
         if not valid or elected is None:
             raise HTTPException(404, "no valid lap for this car+track")
 
-        # Same temperature band the live coach uses to elect a reference: two
-        # laps 20° apart are two circuits, and pooling them would produce a
-        # braking point that belongs to neither.
-        ref_row = next((r for r in valid if r["path"] == elected), None)
-        ref_temp = (ref_row or {}).get("road_temp") or 0.0
-        pool = valid
-        if ref_temp:
-            same = [r for r in valid
-                    if r["road_temp"] and abs(r["road_temp"] - ref_temp) <= _TEMP_BAND_C]
-            pool = same or valid
-        pool = sorted(pool, key=lambda r: r["recorded_utc"] or "")[-_SHEET_LAPS:]
+        # Which laps belong together is `_sheet_pool`'s rule, shared with the
+        # braking drill in /api/training so the two never quote different points.
+        pool = _sheet_pool(valid, next((r for r in valid if r["path"] == elected),
+                                       None))
 
         objs = []
         for r in pool:
@@ -1236,9 +1357,7 @@ def create_api(
             return {"car": car, "track": track, "laps": [], "pb_trend": [],
                     "consistency": lap_time_consistency([]), "levels": [],
                     "trends": [], "recurring": [], "tyres": [],
-                    "corner_consistency": [],
-                    "plan": {"saved": False, "created_utc": None,
-                             "laps_since": 0, "goals": []}}
+                    "corner_consistency": []}
 
         # Chronological (oldest first) for the trend.
         chrono = sorted(valid, key=lambda r: r["recorded_utc"] or "")
@@ -1253,46 +1372,19 @@ def create_api(
         pb_trend = [{"day": d, "best_ms": ms, "best": format_lap_time(ms)}
                     for d, ms in sorted(per_day.items())]
 
-        # Recurring mistakes: aggregate the debrief over the recent valid laps.
-        fastest_row = min(valid, key=lambda r: r["lap_time_ms"])
-        fastest = fastest_row["path"]
-        best_ms = fastest_row["lap_time_ms"]
-        recurring: list[dict] = []
+        # Recurring mistakes, per-corner trends and every lap loaded once — all
+        # of it shared with /api/training (see `_history`). Systematic (a
+        # weakness to train) vs sporadic (a one-off) is decided in there and
+        # kept as objects, because the training plan below picks its goals from
+        # these and re-deriving them from the serialised dicts would be a second
+        # definition of "systematic".
+        h = _history(valid, chrono, track, lg)
+        fastest, best_ms = h.fastest, h.best_ms
+        corners, cnames = h.corners, h.names
+        recurring, loss_trends = h.recurring, h.trends
+        dated, lap_objs = h.dated, h.lap_objs
         trends: list[dict] = []
-        # (recorded_utc, debrief) rather than a bare list: the training plan is
-        # measured only on the laps driven *after* it was accepted, and a debrief
-        # doesn't carry when its lap happened.
-        dated: list[tuple[str, object]] = []
-        loss_trends: list = []
-        corners: list = []
-        cnames: dict = {}
-        try:
-            ref_lap = load_lap(fastest)
-            reference = Reference(ref_lap)
-            corners = detect_corners(ref_lap.samples)
-            cnames = {c.index: n for c, n in zip(corners, name_corners(track, corners, lg))}
-            debriefs = []
-            tally: dict[str, dict] = {}
-            for r in chrono[-15:]:
-                if r["path"] == fastest:
-                    continue
-                deb = build_lap_debrief(load_lap(r["path"]), reference, corners, lg)
-                debriefs.append(deb)
-                dated.append((r["recorded_utc"] or "", deb))
-                for loss in deb.losses:
-                    t = tally.setdefault(loss.category.value,
-                                         {"message": loss.message, "count": 0, "corners": set()})
-                    t["count"] += 1
-                    t["corners"].add(cnames.get(loss.index, f"Corner {loss.index + 1}"))
-            recurring = sorted(
-                ({"category": k, "message": v["message"], "count": v["count"],
-                  "corners": sorted(v["corners"])} for k, v in tally.items()),
-                key=lambda x: x["count"], reverse=True)
-            # Systematic (a weakness to train) vs sporadic (a one-off), per corner.
-            # Kept as objects too: the training plan below picks its goals from
-            # these, and re-deriving them from the serialised dicts would be a
-            # second definition of "systematic".
-            loss_trends = classify_losses(debriefs)
+        if loss_trends:
             trends = [{
                 "corner_index": t.corner_index,
                 "name": cnames.get(t.corner_index, t.name),
@@ -1304,18 +1396,6 @@ def create_api(
                 "median_s": round(t.median_ms / 1000.0, 3),
                 "total_s": round(t.total_ms / 1000.0, 3),
             } for t in loss_trends]
-        except (OSError, ValueError):
-            recurring = []
-            trends = []
-
-        # Load each valid lap once; shared by the tyre trend and the ideal-lap
-        # ladder below (both need the raw samples — no triple file read).
-        lap_objs: dict = {}
-        for r in valid:
-            try:
-                lap_objs[r["path"]] = load_lap(r["path"])
-            except (OSError, ValueError):
-                pass
 
         # Tyre temps & pressures per lap, chronological — to spot heat build-up
         # and pressure drift across a stint (the degradation signal a driver
@@ -1340,14 +1420,7 @@ def create_api(
         # that corner — a "where you're inconsistent" signal the global σ hides.
         corner_consistency: list[dict] = []
         for c in corners:
-            vmins = []
-            for r in chrono[-15:]:
-                lp = lap_objs.get(r["path"])
-                if lp is None:
-                    continue
-                inside = [s.speed_kmh for s in lp.samples if c.entry_pos <= s.pos <= c.exit_pos]
-                if inside:
-                    vmins.append(min(inside))
+            vmins = _corner_vmins(c, chrono, lap_objs)
             if len(vmins) >= 3:
                 mean = sum(vmins) / len(vmins)
                 # Sample variance (÷ n-1), matching `lap_time_consistency`. These
@@ -1391,7 +1464,6 @@ def create_api(
 
         return {
             "car": car, "track": track,
-            "plan": _plan_payload(car, track, lg, dated, loss_trends, cnames),
             "laps": laps, "pb_trend": pb_trend,
             "consistency": lap_time_consistency([r["lap_time_ms"] for r in valid]),
             "levels": levels,
@@ -1401,18 +1473,19 @@ def create_api(
             "corner_consistency": corner_consistency,
         }
 
-    def _plan_payload(car: str, track: str, lg: str, dated: list, trends: list,
-                      names: dict) -> dict:
-        """The training plan section of the Trends tab.
+    def _plan_for(car: str, track: str, dated: list, trends: list,
+                  names: dict, lang: str) -> tuple[TrainingPlan, list, bool, list]:
+        """The plan for this car+track: stored if you accepted one, proposed if not.
 
-        Carried on /api/progress rather than given its own GET because it is
-        computed from exactly the same debriefs — asking for it separately would
-        replay every recent lap a second time to reach the same numbers.
+        A plan that hasn't been accepted comes back as a *proposal* (``saved``
+        false). That distinction is the whole point of the feature: a target you
+        never agreed to isn't one you can be measured against, and a plan
+        recomputed on every page load can't be worked on.
 
-        A plan that hasn't been accepted yet comes back as a *proposal*
-        (``saved`` false). That distinction is the whole point of the feature: a
-        target you never agreed to isn't one you can be measured against, and a
-        plan recomputed on every page load can't be worked on.
+        Returns the plan, its per-goal progress, whether it was stored, and the
+        debriefs it is being measured on — the training programme needs the
+        objects, not the JSON, and rebuilding them from the payload would be a
+        second definition of every rule in ``plan.py``.
         """
         try:
             with _catalog() as cat:
@@ -1425,6 +1498,19 @@ def create_api(
             plan = TrainingPlan.from_dict(stored)
             since = [d for when, d in dated if when > plan.created_utc]
             saved = True
+            # A stored plan carries the words of the language it was accepted
+            # in, and it outlives that choice by weeks. The numbers stay exactly
+            # as agreed; the corner's name and the category's own sentences are
+            # re-derived for the language being asked for, because they are
+            # labels, not terms of the agreement. (Found on screen: an Italian
+            # page whose goals both read "Time lost here".)
+            for g in plan.goals:
+                g.name = names.get(g.corner_index, g.name)
+                try:
+                    what, fix = category_words(CueCategory(g.category), lang)
+                except ValueError:      # a category we no longer have
+                    continue
+                g.what, g.fix = what, fix
         else:
             plan = propose_plan([t for t in trends], [d for _, d in dated],
                                 mastered=mastered, car=car, track=track)
@@ -1435,19 +1521,23 @@ def create_api(
                 g.name = names.get(g.corner_index, g.name)
             since = []
             saved = False
+        return plan, measure_plan(plan, since), saved, since
 
-        progress = {p.corner_index: p for p in measure_plan(plan, since)}
+    def _plan_payload(plan: TrainingPlan, progress: list, saved: bool,
+                      laps_since: int) -> dict:
+        """The plan as the page draws it."""
+        by_index = {p.corner_index: p for p in progress}
         return {
             "saved": saved,
             "created_utc": plan.created_utc or None,
-            "laps_since": len(since),
+            "laps_since": laps_since,
             "goals": [{
                 "corner_index": g.corner_index, "name": g.name,
                 "category": g.category, "what": g.what, "fix": g.fix,
                 "baseline_s": round(g.baseline_ms / 1000.0, 3),
                 "target_s": round(g.target_ms / 1000.0, 3),
                 "laps_seen": g.laps_seen,
-                "progress": _progress_payload(progress.get(g.corner_index)),
+                "progress": _progress_payload(by_index.get(g.corner_index)),
             } for g in plan.goals],
         }
 
@@ -1457,6 +1547,139 @@ def create_api(
         return {"laps": p.laps, "hits": p.hits, "needed": p.needed,
                 "median_s": round(p.median_ms / 1000.0, 3),
                 "best_s": round(p.best_ms / 1000.0, 3), "done": p.done}
+
+    @app.get("/api/training")
+    def training(car: str = Query(...), track: str = Query(...),
+                 lang: str | None = Query(None)) -> dict:
+        """The Training tab: how to get to your theoretical ideal, in drills.
+
+        Everything the answer is built from already exists — the plan's goals,
+        the debriefs' phase split, the ideal lap, the braking sheet. What lives
+        here is the wiring: load each of those *once*, from the same laps, so
+        the programme quotes numbers that match the tab they came from. A drill
+        that says you brake at 214 km/h while the Map tab says 209 is worse than
+        a drill with no number in it.
+
+        The gate is checked before any lap is read: under the bar the whole
+        answer is one sentence, and replaying fifteen laps to write it would be
+        work nobody sees.
+        """
+        lg = lang or current_language()
+        with _catalog() as cat:
+            all_laps = cat.laps_for(car, track)
+            pro_path = cat.fastest_pro_path(car, track)
+            valid = [r for r in all_laps if r["valid"] and r["lap_time_ms"] > 0]
+            # The braking sheet has always been measured on clean laps only; a
+            # drill quoting a braking point set on a lap that went off would be
+            # quoting a mistake.
+            clean = [r for r in valid if not _off_track(r)]
+            elected = _elected_path(cat, car, track, clean) if clean else None
+
+        if len(valid) < _TRAIN_MIN_LAPS:
+            out = Programme(readiness=_assess_training(len(valid), 0, lg)).to_dict()
+            out.update({"car": car, "track": track, "plan": None})
+            return out
+
+        chrono = sorted(valid, key=lambda r: r["recorded_utc"] or "")
+        h = _history(valid, chrono, track, lg)
+        plan, progress, saved, since = _plan_for(car, track, h.dated, h.trends,
+                                                 h.names, lg)
+        goal_idx = {g.corner_index for g in plan.goals}
+
+        # What you bleed on a typical lap at the corners the plan names. The
+        # median, not the mean: one lap where you spun in that corner is not
+        # what you are being asked to train.
+        per_lap = [sum(x.lost_ms for x in d.losses if x.index in goal_idx)
+                   for d in h.debriefs]
+        pro_ms = 0
+        if pro_path:
+            try:
+                pro_ms = load_lap(pro_path).lap_time_ms
+            except (OSError, ValueError):
+                pro_ms = 0
+
+        gap = None
+        try:
+            best_lap = h.lap_objs.get(h.fastest)
+            paths = [r["path"] for r in valid if r["path"] in h.lap_objs]
+            objs = [h.lap_objs[p] for p in paths]
+            if best_lap is not None and objs:
+                spans, _ = sector_spans(best_lap)
+                il = ideal_lap(objs, paths, spans)
+                if il:
+                    gap = build_gap(
+                        h.best_ms, il.ideal_ms, sector_times(best_lap, spans),
+                        il.best_ms,
+                        per_lap_ms=statistics.median(per_lap) if per_lap else 0.0,
+                        pro_ms=pro_ms, lang=lg)
+        except (OSError, ValueError):
+            gap = None
+
+        facts = _training_facts(goal_idx, h, chrono, clean, elected, track, lg)
+        # Corners the chain analysis blamed for a *later* corner's loss: the
+        # programme puts them first, because fixing the corner that hands over
+        # the deficit fixes two and the other order fixes neither.
+        inherited = {x.inherited_from for d in h.debriefs for x in d.losses
+                     if x.inherited_from >= 0}
+
+        prog = build_programme(plan, progress, h.debriefs, gap, facts,
+                               valid_laps=len(valid), lang=lg,
+                               inherited_sources=inherited,
+                               trail_brake=trail_brake_for(car))
+        out = prog.to_dict()
+        out.update({"car": car, "track": track,
+                    "plan": _plan_payload(plan, progress, saved, len(since))})
+        return out
+
+    def _training_facts(indices: set[int], h: _History, chrono: list[dict],
+                        clean: list[dict], elected: str | None,
+                        track: str, lg: str) -> dict[int, CornerFacts]:
+        """The measured numbers a drill drops into its sentences.
+
+        Only for the corners the plan actually names — building a braking sheet
+        is not free, and nothing else on this page needs one. Anything that
+        can't be measured is simply left at its default: the drill then prints
+        one line fewer, which is the intended behaviour, not a degraded one.
+        """
+        if not indices:
+            return {}
+        out = {i: CornerFacts() for i in indices}
+
+        for i in indices:
+            live = [x.min_speed_live for d in h.debriefs for x in d.losses
+                    if x.index == i and x.min_speed_live > 0]
+            ref = [x.min_speed_ref for d in h.debriefs for x in d.losses
+                   if x.index == i and x.min_speed_ref > 0]
+            if live:
+                out[i].min_speed_kmh = round(statistics.median(live), 1)
+            if ref:
+                out[i].min_speed_ref_kmh = round(statistics.median(ref), 1)
+            corner = next((c for c in h.corners if c.index == i), None)
+            if corner is not None:
+                vmins = _corner_vmins(corner, chrono, h.lap_objs)
+                if len(vmins) >= 3:
+                    out[i].spread_kmh = round(max(vmins) - min(vmins), 1)
+
+        # The braking sheet, on exactly the laps the Map tab pools (`_sheet_pool`).
+        try:
+            ref_row = next((r for r in clean if r["path"] == elected), None)
+            pool = _sheet_pool(clean, ref_row)
+            objs = [h.lap_objs[r["path"]] for r in pool if r["path"] in h.lap_objs]
+            if objs and h.corners:
+                sheet = build_sheet(objs, h.corners, h.names, track, lg,
+                                    road_temps=[r["road_temp"] for r in pool])
+                for row in sheet.rows:
+                    if row.index not in out:
+                        continue
+                    out[row.index].brake_speed_kmh = row.speed_kmh
+                    out[row.index].brake_gear = row.gear
+                    out[row.index].brake_distance_m = row.distance_m
+                    out[row.index].brake_spread_m = row.speed_spread_m
+                    out[row.index].brake_spread_kmh = row.speed_spread_kmh
+                    out[row.index].landmark = row.landmark or ""
+        except Exception:  # noqa: BLE001 - a drill line, never a 500
+            pass
+        return out
 
     @app.post("/api/plan")
     def accept_plan(payload: dict = Body(...)) -> dict:

@@ -96,9 +96,11 @@ async function init() {
     SESSION = null;
     SHEET = null;         // another car+track has other braking points
     SESSION_I = 0;        // a different car+track has different sessions
+    TRAINING = null;      // and its own plan, drills and readiness
     loadCombo(combo);
     if (VIEW === "progress") loadProgress(combo);
     if (VIEW === "session") loadSession(combo, 0);
+    if (VIEW === "training") loadTraining(combo);
   };
   $("lap").onchange = reloadSelection;
   $("baseline").onchange = () => { BASELINE_PINNED = true; reloadSelection(); };
@@ -108,6 +110,13 @@ async function init() {
   wireKeys();
   wireHints();
   wireFlow();
+  // Trends still computes the weak points a plan is picked from; the plan
+  // itself is one tab away, so it says so and takes you there.
+  const goTrain = $("go-training");
+  if (goTrain) goTrain.onclick = () => {
+    rememberView("training");
+    showView("training");
+  };
   // Pick up where you left off — but only if that car+track is still in the
   // archive (a lap store can be moved or cleared between two runs).
   const combo = savedCombo();
@@ -149,6 +158,8 @@ function tourSteps() {
     { sel: "#combo", title: t("tour.a1.t"), text: t("tour.a1.x") },
     { sel: ".tabs", title: t("tour.a2.t"), text: t("tour.a2.x") },
     { sel: "#flow-card", title: t("tour.a9.t"), text: t("tour.a9.x"), before: flow },
+    { sel: "#train-steps", title: t("tour.a11.t"), text: t("tour.a11.x"),
+      before: () => showView("training") },
     { sel: "#c-delta", title: t("tour.a3.t"), text: t("tour.a3.x"), before: compare },
     { sel: "#vmin", title: t("tour.a4.t"), text: t("tour.a4.x"), before: compare },
     { sel: "#debrief", title: t("tour.a5.t"), text: t("tour.a5.x"), before: compare },
@@ -176,6 +187,9 @@ function redrawCurrentView() {
   else if (VIEW === "dynamics") { if (DATA) drawDynamics(LAST_HOVER); }
   else if (VIEW === "sectors") { if (CURRENT) loadSectors(); }
   else if (VIEW === "progress") { if (CURRENT) loadProgress(CURRENT); }
+  // Refetched rather than repainted: every word of the programme is written by
+  // the backend, so a cached payload would still be in the language you left.
+  else if (VIEW === "training") { if (CURRENT) loadTraining(CURRENT); }
   else if (VIEW === "flow") { if (DATA) renderFlow(DATA); }
   else if (VIEW === "session") { if (CURRENT) loadSession(CURRENT, SESSION_I); }
   else if (DATA) redraw(LAST_HOVER);   // compare
@@ -311,7 +325,6 @@ async function loadProgress(combo) {
       item(t("prog.sigma"), (c.std_ms / 1000).toFixed(3) + "s")
     : item(t("prog.dash"), t("prog.noValid"));
 
-  renderPlan(p.plan);
   drawProgress(p);
   drawTyres(p);
   renderLevels(p.levels);
@@ -329,13 +342,108 @@ async function loadProgress(combo) {
   }
 }
 
-// --- the training plan ----------------------------------------------------
-// A plan you can look at between sessions: what you're working on, the number
-// that says when it's done, and whether the laps you've driven *since accepting
-// it* are meeting that number. Everything below is presentation — which goals,
-// what target and whether it's done are decided in coaching/plan.py.
+// --- the Training tab ------------------------------------------------------
+// The one tab that answers "so what do I actually do?". Everything on it is
+// decided server-side (coaching/training.py): which drill, in what order, with
+// which of your numbers in it. The code below only draws.
+//
+// The plan lives here now rather than under Trends. It is the same plan and the
+// same storage — what changed is that its goals are no longer listed twice: a
+// goal *is* a step, and the step carries the drill that closes it.
 
-function renderPlan(plan) {
+let TRAINING = null;
+
+async function loadTraining(combo) {
+  setPanelLoading("train-gap", t("load.training"));
+  let b;
+  try {
+    b = await getJSON("/api/training?" +
+      new URLSearchParams({ car: combo.car, track: combo.track }));
+  } catch (e) {
+    TRAINING = null;
+    $("train-gap").innerHTML = "";
+    $("train-steps").innerHTML = `<div class="clean">${t("err.training")}</div>`;
+    $("train-session").innerHTML = "";
+    return;
+  }
+  TRAINING = b;
+  renderTraining(b);
+}
+
+function renderTraining(b) {
+  const gate = $("train-gate");
+  if (!gate) return;
+  // Not enough laps yet: the whole tab is the sentence that says so, and the
+  // panels below are emptied rather than left showing another combo's plan.
+  const ready = b && b.ready;
+  gate.classList.toggle("hidden", !!ready);
+  for (const id of ["train-intro", "train-gap", "plan", "train-steps",
+                    "train-session", "train-words"]) {
+    const el = $(id);
+    if (el) el.classList.toggle("hidden", !ready);
+  }
+  if (!ready) {
+    const r = (b && b.readiness) || {};
+    gate.innerHTML = `<h2 class="empty-title">${t("train.locked")}</h2>` +
+      `<p class="empty-hint">${r.reason || ""}</p>` +
+      (r.laps_needed
+        ? `<p class="train-countdown">${r.laps_needed === 1
+            ? t("train.countdown1")
+            : tf("train.countdown", { n: r.laps_needed })}</p>`
+        : "");
+    return;
+  }
+
+  renderGap(b.gap);
+  renderPlanBar(b.plan);
+  // The plan's per-goal progress is joined onto its step by corner: the bar
+  // that says "2 of the 3 laps it takes" belongs next to the drill that gets
+  // you there, not in a second list of the same corners.
+  const prog = {};
+  for (const g of ((b.plan && b.plan.goals) || [])) {
+    if (g.progress) prog[g.corner_index] = g.progress;
+  }
+  const saved = !!(b.plan && b.plan.saved);
+  $("train-steps").innerHTML =
+    (b.steps || []).map((s) => trainStep(s, prog[s.corner_index], saved)).join("");
+  renderRunPlan(b.session);
+  renderWords(b.glossary);
+}
+
+// The glossary. Closed it shows the words themselves, not the label "Glossary":
+// a driver scanning a row of terms can see whether one of them is a word they
+// don't know, and open it for that. A box labelled "Glossary" only says "you
+// don't know these things", and gets skipped by exactly the people it's for.
+function renderWords(entries) {
+  const el = $("train-words");
+  if (!el) return;
+  if (!entries || !entries.length) { el.innerHTML = ""; return; }
+  el.innerHTML =
+    `<details class="words"><summary><span class="words-lead">${t("train.words")}</span>` +
+    `<span class="words-list">${entries.map((e) => e.term).join(" · ")}</span></summary>` +
+    `<dl>${entries.map((e) =>
+      `<dt>${e.term}</dt><dd>${e.definition}</dd>`).join("")}</dl></details>`;
+}
+
+function renderGap(gap) {
+  const el = $("train-gap");
+  if (!el) return;
+  if (!gap) { el.innerHTML = ""; return; }
+  const bars = (gap.sectors || []).map((s) => {
+    const worst = s.number === gap.worst_sector;
+    return `<div class="gap-sec${worst ? " worst" : ""}">` +
+      `<span class="k">${tf("train.sector", { n: s.number })}</span>` +
+      `<span class="v">${fmtMs(s.your_ms)}</span>` +
+      `<span class="d">${s.gap_ms > 0 ? "−" + (s.gap_ms / 1000).toFixed(3) + "s" : "—"}</span></div>`;
+  }).join("");
+  el.innerHTML = `<h3>${t("train.gap.title")}</h3>` +
+    `<p class="gap-head">${gap.headline}</p>` +
+    (bars ? `<div class="gap-secs">${bars}</div>` : "") +
+    (gap.note ? `<p class="gap-note">${gap.note}</p>` : "");
+}
+
+// The plan's identity strip: since when, on how many laps, and the one button.
+function renderPlanBar(plan) {
   const el = $("plan");
   if (!el) return;
   if (!plan || !plan.goals.length) {
@@ -351,9 +459,7 @@ function renderPlan(plan) {
       `<button type="button" id="plan-drop" class="mini-btn">${t("plan.change")}</button>`
     : `<span class="plan-since">${t("plan.proposed")}</span>` +
       `<button type="button" id="plan-start" class="mini-btn primary">${t("plan.start")}</button>`;
-
-  el.innerHTML = `<h3>${t("plan.title")} ${head}</h3>` +
-    plan.goals.map((g, i) => planGoal(g, i, plan.saved)).join("");
+  el.innerHTML = `<h3>${t("plan.title")} ${head}</h3>`;
 
   const start = $("plan-start");
   if (start) start.onclick = async () => {
@@ -364,38 +470,66 @@ function renderPlan(plan) {
         body: JSON.stringify({ car: CURRENT.car, track: CURRENT.track,
                                goals: plan.goals }),
       });
-    } finally { loadProgress(CURRENT); }
+    } finally { loadTraining(CURRENT); }
   };
   const drop = $("plan-drop");
   if (drop) drop.onclick = async () => {
     drop.disabled = true;
     const q = new URLSearchParams({ car: CURRENT.car, track: CURRENT.track });
     try { await fetch("/api/plan?" + q.toString(), { method: "DELETE" }); }
-    finally { loadProgress(CURRENT); }
+    finally { loadTraining(CURRENT); }
   };
 }
 
-function planGoal(g, i, saved) {
-  const p = g.progress;
-  const done = p && p.done;
+function trainStep(s, progress, saved) {
+  const d = s.drill || {};
+  // Only the current step is opened. The others are a heading and a reason —
+  // a page that unrolls three drills at once is the list of weak points again.
+  const open = s.status === "now";
+  const body = open
+    ? `<ol class="drill-steps">${(d.steps || []).map((x) => `<li>${x}</li>`).join("")}</ol>` +
+      `<div class="drill-focus">` +
+      `<span class="watch">👁 ${t("train.watch")} ${d.watch || ""}</span>` +
+      `<span class="ignore">✕ ${t("train.ignore")} ${d.ignore || ""}</span></div>` +
+      `<div class="drill-done">${s.done_when}</div>` +
+      // Only the corner steps are plan goals, so only they carry the plan's
+      // own progress. The consistency step is measured against the ideal lap,
+      // and borrowing the goal bar for it would report the wrong thing.
+      (s.kind === "corner" ? planBar(progress, saved) : "")
+    : "";
+  return `<article class="train-step ${s.status}">` +
+    `<header class="step-head">` +
+    `<span class="n">${s.order}</span>` +
+    `<span class="where">${s.where || t("train.wholelap")}</span>` +
+    `<span class="badge">${t("train.status." + s.status)}</span></header>` +
+    (s.what ? `<div class="cause">${s.what}</div>` : "") +
+    `<div class="why">${s.why}</div>` +
+    `<div class="goal-target">🎯 ${s.target}</div>` +
+    (d.title ? `<div class="drill-title"><span class="drill-badge">${tf("train.drill", { n: d.laps })}</span>${d.title}</div>` : "") +
+    body + `</article>`;
+}
+
+function planBar(p, saved) {
   // The bar fills with laps that met the target, not with time: "2 of the 3
   // laps it takes" is a thing you can act on tonight, a percentage isn't.
-  const bar = p
-    ? `<div class="plan-bar"><span style="width:${Math.min(100, (p.hits / Math.max(1, p.needed)) * 100).toFixed(0)}%"></span></div>` +
-      `<div class="plan-prog">${tf("plan.hits", { hits: p.hits, needed: p.needed })}` +
-      ` · ${tf("plan.now", { s: p.median_s.toFixed(2) })}` +
-      ` · ${tf("plan.best", { s: p.best_s.toFixed(2) })}</div>`
-    // A plan you haven't accepted has no "since", so it can't be missing laps
-    // either: it says what will be measured once you do.
-    : `<div class="plan-prog muted">${t(saved ? "plan.nolaps" : "plan.willmeasure")}</div>`;
-  return `<div class="goal${done ? " done" : ""}">` +
-    `<div class="goal-head"><span class="n">${i + 1}</span>` +
-    `<span class="corner">${g.name}</span>` +
-    (done ? `<span class="goal-done">${t("plan.done")}</span>` : "") + `</div>` +
-    `<div class="cause">${g.what}</div>` +
-    `<div class="goal-target">${tf("plan.target", { from: g.baseline_s.toFixed(2), to: g.target_s.toFixed(2) })}</div>` +
-    (g.fix ? `<div class="fix">💡 ${g.fix}</div>` : "") +
-    bar + `</div>`;
+  // A plan you haven't accepted has no "since", so it can't be missing laps
+  // either: it says what will be measured once you do.
+  if (!p) return `<div class="plan-prog muted">${t(saved ? "plan.nolaps" : "plan.willmeasure")}</div>`;
+  return `<div class="plan-bar"><span style="width:${Math.min(100, (p.hits / Math.max(1, p.needed)) * 100).toFixed(0)}%"></span></div>` +
+    `<div class="plan-prog">${tf("plan.hits", { hits: p.hits, needed: p.needed })}` +
+    ` · ${tf("plan.now", { s: p.median_s.toFixed(2) })}` +
+    ` · ${tf("plan.best", { s: p.best_s.toFixed(2) })}</div>`;
+}
+
+// `renderRunPlan`, not `renderSession`: the Session tab already owns that name,
+// and a second declaration of it silently replaced the first — the run plan
+// simply never appeared, with nothing in the console to say so.
+function renderRunPlan(ses) {
+  const el = $("train-session");
+  if (!el) return;
+  if (!ses) { el.innerHTML = ""; return; }
+  el.innerHTML = `<h3>${t("train.session")} <small>${tf("train.session.laps", { n: ses.laps })}</small></h3>` +
+    `<ol class="ses-plan">${(ses.lines || []).map((x) => `<li>${x}</li>`).join("")}</ol>`;
 }
 
 // Benchmark ladder: best -> ideal (consistency) -> PRO (skill ceiling).
@@ -1578,11 +1712,14 @@ async function loadSession(combo, index) {
   renderSession(s);
 }
 
+// The page's language, not the browser's. `undefined` here meant the month name
+// came from Chrome's locale, so an English page read "since 31 lug · 13:58" on
+// an Italian machine — the one word on the strip that hadn't switched.
 function fmtWhen(iso) {
   if (!iso) return "—";
   const d = new Date(iso);
-  return d.toLocaleDateString(undefined, { day: "numeric", month: "short" }) +
-         " · " + d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+  return d.toLocaleDateString(LANG(), { day: "numeric", month: "short" }) +
+         " · " + d.toLocaleTimeString(LANG(), { hour: "2-digit", minute: "2-digit" });
 }
 
 function renderSession(s) {
@@ -3273,7 +3410,19 @@ window.HoneI18nRerender = function () {
   // of it in the language you just left. Only the chrome was ever translated
   // here, and the comment at `getJSON` claiming the backend ignores `&lang` has
   // been wrong since the debrief learned to speak Italian.
-  if (CURRENT) reloadSelection();
+  if (!CURRENT) return;
+  // `reloadSelection` refetches the *lap*, and with it Compare, Map, Line,
+  // Sectors and the guided flow. It has never touched the views that are per
+  // car+track rather than per lap — so switching language left Trends, Session
+  // and the braking sheet sitting in the language you just left, chrome in one
+  // language and content in the other. Found on the Training tab, but it was
+  // never only there.
+  SHEET = null;          // the braking sheet carries the landmark wording
+  TRAINING = null;       // the drills are prose, written server-side
+  reloadSelection();
+  if (VIEW === "progress") loadProgress(CURRENT);
+  if (VIEW === "session") loadSession(CURRENT, SESSION_I);
+  if (VIEW === "training") loadTraining(CURRENT);
 };
 
 wireTour();
