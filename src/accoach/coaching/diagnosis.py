@@ -233,4 +233,18 @@ def build_lap_stats(lap: Lap, corners: list[Corner] | None = None) -> LapStats:
         pressures_hot=_pressures_hot(lap.samples),
         lock_segments=lock_segments,
         spin_segments=spin_segments,
+        fuel_l=_mean_fuel(lap.samples),
     )
+
+
+def _mean_fuel(samples) -> float:
+    """Mean litres in the tank over the lap — how heavy the car was.
+
+    The engineer compares lap times from before and after a setup change, and
+    those two windows are routinely driven at different weights (the driver goes
+    to the garage to load the setup, which usually refuels). Zero when the lap
+    predates v11: no reading is "we don't know", which the engine treats
+    differently from "the loads matched".
+    """
+    vals = [s.fuel for s in samples if getattr(s, "fuel", 0.0) > 0]
+    return round(sum(vals) / len(vals), 2) if vals else 0.0

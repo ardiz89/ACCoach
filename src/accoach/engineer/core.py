@@ -97,6 +97,10 @@ class LapStats:
     pressures_hot: dict | None = None
     lock_segments: int = 0
     spin_segments: int = 0
+    #: Mean litres in the tank across the lap (v11 laps; 0.0 = not recorded).
+    #: How heavy the car was, which is why a lap time from before a setup change
+    #: and one from after may not be comparable at all — see `_fuel_gap`.
+    fuel_l: float = 0.0
 
 
 # --- recommendations -------------------------------------------------------
@@ -179,6 +183,12 @@ class Outcome:
     laps: int
     kept: bool
     remedy_rank: int = 0
+    fuel_before_l: float = 0.0
+    fuel_after_l: float = 0.0
+    #: True when the two windows were driven at fuel loads too far apart for
+    #: their lap times to be compared. The verdict then rests on the symptom
+    #: score, which doesn't care what the car weighs — and says so.
+    time_confounded: bool = False
     #: {Symptom: score change} for symptoms this change was *not* aiming at, and
     #: which the verdict therefore never looked at. Measured, never predicted.
     side_effects: tuple = ()
@@ -253,6 +263,19 @@ _EPS_SCORE = 0.10                # min symptom-score drop to call it an improvem
 _TIME_BAND_FRAC = 0.0015         # lap-time noise band (0.15%)
 _REMEDY_CAP = 5                  # max remedies tried per symptom before giving up
 _CLICK_BUDGET = 6                # max net clicks a single parameter may accumulate
+
+#: Litres of difference between the before and after windows past which their
+#: lap times are not comparable. Two litres is about one lap's worth of fuel for
+#: a GT3: at that point the two windows were driven with a different car, not a
+#: different setup.
+#:
+#: What this deliberately does **not** do is convert litres into seconds. That
+#: needs a per-car, per-track weight sensitivity we have never measured, and a
+#: made-up coefficient here would quietly become the thing that decides whether
+#: a setup change is kept. So the rule is the one this project keeps reaching
+#: for: when the evidence isn't comparable, say so and lean on the evidence that
+#: is — the symptom score, which doesn't care what the car weighs.
+_FUEL_BIAS_L = 2.0
 
 
 # Decision messages, per language; resolved with the active app language at the
@@ -330,6 +353,20 @@ _DECISION_MSG = {
         "it": "Come lo capiremo: in {n} giri puliti il tempo non deve peggiorare "
               "di più di {ms:.0f} ms. Se peggiora, la rimetto com'era.",
     },
+    "accepted_unjudged": {
+        "en": "Change applied. I could not judge it on lap time — the tank was "
+              "not the same weight before and after — so the phase target "
+              "decides. Moving on.",
+        "it": "Modifica applicata. Sul tempo non ho potuto giudicarla — prima e "
+              "dopo il serbatoio non pesava uguale — quindi decide l'obiettivo "
+              "della fase. Proseguo.",
+    },
+    "fuel_confounded": {
+        "en": " I left the lap time out of this: {a:.0f} L in the tank before, "
+              "{b:.0f} L after, so the two are not the same car.",
+        "it": " Il tempo sul giro l'ho lasciato fuori: {a:.0f} L nel serbatoio "
+              "prima, {b:.0f} L dopo — non è la stessa macchina.",
+    },
     "side_effect": {
         "en": " Also moved, and nobody was aiming at it: {items}.",
         "it": " Si è mosso anche questo, e non lo stavamo cercando: {items}.",
@@ -347,6 +384,18 @@ def _msg(key: str, lang: str | None = None, **kw) -> str:
     lang = lang or current_language()
     entry = _DECISION_MSG[key]
     return (entry.get(lang) or entry["en"]).format(**kw)
+
+
+def _fuel_tail(outcome: "Outcome", lang: str) -> str:
+    """Say when the lap-time half of the verdict couldn't be used.
+
+    A driver who is told "the handling improved" while the clock says something
+    else deserves to know why we ignored the clock.
+    """
+    if not outcome.time_confounded:
+        return ""
+    return _msg("fuel_confounded", lang,
+                a=outcome.fuel_before_l, b=outcome.fuel_after_l)
 
 
 def _side_effect_tail(outcome: "Outcome", lang: str) -> str:
@@ -373,6 +422,12 @@ def _median_score(window: list[LapStats], symptom: Symptom) -> float:
     return statistics.median([s.symptom_scores.get(symptom, 0.0) for s in window])
 
 
+def _median_fuel(window: list[LapStats]) -> float:
+    """Typical tank load over a window; 0.0 when the laps predate v11."""
+    vals = [s.fuel_l for s in window if s.fuel_l > 0]
+    return statistics.median(vals) if vals else 0.0
+
+
 # --- the engine ------------------------------------------------------------
 
 @dataclass
@@ -384,6 +439,7 @@ class _Active:
     laps_seen: int = 0
     prediction: "Prediction | None" = None
     remedy_rank: int = 0
+    base_fuel: float = 0.0
     #: Every symptom's score at the moment the change was applied, so the
     #: verdict can also report what moved that nobody was aiming at.
     base_scores: dict = field(default_factory=dict)
@@ -463,6 +519,7 @@ class RaceEngineer:
             base_score=_median_score(self.window, sym) if sym else 0.0,
             prediction=self._pending_prediction,
             remedy_rank=self.remedy_idx.get(sym, 0) if sym else 0,
+            base_fuel=_median_fuel(self.window),
             # Every symptom on the books, not just the target: the verdict is
             # about one of them, the ledger is about all of them.
             base_scores=self._all_scores(),
@@ -530,13 +587,37 @@ class RaceEngineer:
         out.sort(key=lambda kv: abs(kv[1]), reverse=True)
         return tuple(out)
 
+    def _fuel_gap(self, a: "_Active") -> tuple[float, bool]:
+        """(litres of difference, whether that breaks the time comparison).
+
+        The baseline laps are driven before the change and the re-test laps
+        after — and in between the driver goes to the garage to load the setup,
+        which on most sessions refuels the car. So the two windows are routinely
+        driven at different weights, in a direction that isn't predictable: the
+        post-change laps can be *heavier* (fresh tank) or *lighter* (long first
+        stint). This is not an edge case, it is the normal shape of the loop.
+
+        Returns 0.0 / False when either window predates v11 — no fuel recorded
+        is "we don't know", not "the loads matched".
+        """
+        after = _median_fuel(self.window)
+        if a.base_fuel <= 0 or after <= 0:
+            return 0.0, False
+        gap = after - a.base_fuel
+        return round(gap, 2), abs(gap) >= _FUEL_BIAS_L
+
     def _outcome(self, a: "_Active", *, kept: bool, score_after: float) -> Outcome:
+        gap, confounded = self._fuel_gap(a)
         return Outcome(
             prediction=a.prediction or self._predict(a.change),
             score_after=round(score_after, 3),
             time_before_ms=round(a.base_time, 1),
             time_after_ms=round(_median_time(self.window), 1),
             laps=a.laps_seen, kept=kept, remedy_rank=a.remedy_rank,
+            fuel_before_l=round(a.base_fuel, 2),
+            fuel_after_l=round(a.base_fuel + gap, 2) if gap else round(
+                _median_fuel(self.window), 2),
+            time_confounded=confounded,
             side_effects=self._side_effects(a),
         )
 
@@ -614,6 +695,15 @@ class RaceEngineer:
         self.active = None
         band_ok = d_time <= band
 
+        _gap, fuel_confounded = self._fuel_gap(a)
+        if fuel_confounded:
+            # The two windows weren't driven at the same weight, so their times
+            # aren't comparable. Suspending the veto rather than guessing at a
+            # correction: converting litres to seconds needs a sensitivity we
+            # have never measured, and a made-up number would end up deciding
+            # whether a setup change is kept.
+            band_ok = True
+
         # Structural changes (e.g. tyre pressures) carry no symptom: judge them on
         # lap time alone and let the phase gate re-check the real target.
         if a.symptom is None:
@@ -622,8 +712,14 @@ class RaceEngineer:
                 return self._revert(a.change, _msg("revert_structural", lang), out)
             out = self._outcome(a, kept=True, score_after=0.0)
             self._record(a.change)
-            return Decision(DecisionKind.ACCEPTED,
-                            _msg("accepted_structural", lang), outcome=out)
+            # With no symptom to fall back on there is nothing left to judge this
+            # on, so it is kept and *said* — the phase gate (the pressure window)
+            # remains the real authority, exactly as it is when the time is
+            # usable. Reverting instead would put the gate straight back into
+            # proposing the same change, forever.
+            key = ("accepted_unjudged" if fuel_confounded
+                   else "accepted_structural")
+            return Decision(DecisionKind.ACCEPTED, _msg(key, lang), outcome=out)
 
         improved = d_score <= -_EPS_SCORE and band_ok
 
@@ -633,7 +729,8 @@ class RaceEngineer:
             key = ("accepted_resolved" if new_score < _SYMPTOM_THRESH
                    else "accepted_improving")
             msg = _msg(key, lang, sym=str(a.symptom), a=a.base_score, b=new_score)
-            return Decision(DecisionKind.ACCEPTED, msg + _side_effect_tail(out, lang),
+            return Decision(DecisionKind.ACCEPTED,
+                            msg + _fuel_tail(out, lang) + _side_effect_tail(out, lang),
                             outcome=out)
 
         # Not an improvement (worse OR plateau): revert and try the next lever.

@@ -70,6 +70,13 @@ class Record:
     score_after: float
     time_before_ms: float
     time_after_ms: float
+    #: Tank load on each side of the change. Recorded even when it didn't break
+    #: the comparison, because the whole point of a ledger is that the question
+    #: "was that time difference just fuel?" can be asked later.
+    fuel_before_l: float = 0.0
+    fuel_after_l: float = 0.0
+    #: Whether the lap-time half of the verdict had to be thrown out.
+    time_confounded: bool = False
     #: {symptom: score change} for symptoms the change was *not* aiming at.
     side_effects: dict = field(default_factory=dict)
 

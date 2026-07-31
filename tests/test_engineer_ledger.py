@@ -220,6 +220,109 @@ def test_giving_up_on_a_symptom_is_recorded_as_a_claim_we_made():
     assert SYM in eng.exhausted_calls
 
 
+# --- the fuel confound ------------------------------------------------------
+# The baseline laps are driven before the change and the re-test laps after, and
+# in between the driver goes to the garage to load the setup — which usually
+# refuels. The two windows are routinely driven at different weights, in a
+# direction that isn't predictable. This is the normal shape of the loop, not an
+# edge case, which is why the verdict has to notice.
+
+def _fuel_lap(time_ms, scores, fuel):
+    s = _lap(time_ms, scores)
+    s.fuel_l = fuel
+    return s
+
+
+def _run(eng, *, before_fuel, after_fuel, after_scores, after_time,
+         before_scores=None, before_time=100000):
+    before_scores = before_scores or {SYM: 0.60}
+    for _ in range(6):
+        d = eng.observe(_fuel_lap(before_time, before_scores, before_fuel))
+        if d.kind is DecisionKind.PROPOSE:
+            break
+    assert d.kind is DecisionKind.PROPOSE
+    eng.mark_applied()
+    for _ in range(3):
+        out = eng.observe(_fuel_lap(after_time, after_scores, after_fuel))
+    return out
+
+
+def test_a_refuelled_car_is_not_the_same_car_and_the_verdict_says_so():
+    """The handling improved, but the clock is comparing 20 L against 60 L.
+    Reporting that time difference as evidence would be reporting the fuel."""
+    out = _run(_eng(), before_fuel=20.0, after_fuel=60.0,
+               after_scores={SYM: 0.20}, after_time=101000)
+    assert out.kind is DecisionKind.ACCEPTED, "the symptom score still decides"
+    assert out.outcome.time_confounded is True
+    assert out.outcome.fuel_before_l == pytest.approx(20.0)
+    assert out.outcome.fuel_after_l == pytest.approx(60.0)
+    assert "20" in out.message and "60" in out.message
+
+
+def test_the_time_veto_is_suspended_rather_than_corrected():
+    """A change that improves the symptom but shows a slower time is kept when
+    the loads differ. Converting litres to seconds instead would need a weight
+    sensitivity we have never measured — and that made-up number would be the
+    thing deciding whether a setup change survives."""
+    out = _run(_eng(), before_fuel=20.0, after_fuel=60.0,
+               after_scores={SYM: 0.20}, after_time=104000)   # 4 s "slower"
+    assert out.kind is DecisionKind.ACCEPTED
+
+
+def test_comparable_loads_leave_the_time_veto_armed():
+    out = _run(_eng(), before_fuel=40.0, after_fuel=39.0,
+               after_scores={SYM: 0.20}, after_time=104000)
+    assert out.outcome.time_confounded is False
+    assert out.kind is DecisionKind.REVERTED, "same weight → the clock counts"
+
+
+def test_laps_with_no_fuel_reading_are_unknown_not_matched():
+    """Laps recorded before v11 carry no fuel. "We don't know" must not be read
+    as "the loads matched" — that would silently re-arm a veto on evidence we
+    don't have."""
+    out = _run(_eng(), before_fuel=0.0, after_fuel=0.0,
+               after_scores={SYM: 0.20}, after_time=104000)
+    assert out.outcome.time_confounded is False
+    assert out.outcome.fuel_before_l == 0.0
+    assert out.kind is DecisionKind.REVERTED, "no reading → behave as before"
+
+
+def test_a_structural_change_that_cannot_be_judged_is_said_to_be_unjudged():
+    """Pressures have no symptom to fall back on. Keeping it silently would
+    claim a verdict we didn't reach; reverting would put the phase gate straight
+    back into proposing the same change, forever."""
+    eng = _eng()
+    cold = {"front": 24.0, "rear": 24.0}
+    d = None
+    for _ in range(6):
+        s = _lap(100000, {}, press=cold)
+        s.fuel_l = 20.0
+        d = eng.observe(s)
+        if d.kind is DecisionKind.PROPOSE:
+            break
+    assert d.kind is DecisionKind.PROPOSE and d.change.symptom is None
+    eng.mark_applied()
+    for _ in range(3):
+        s = _lap(103000, {}, press=cold)      # 3 s slower, but on 60 L
+        s.fuel_l = 60.0
+        out = eng.observe(s)
+    assert out.kind is DecisionKind.ACCEPTED
+    assert out.outcome.time_confounded is True
+    assert "serbatoio" in out.message or "tank" in out.message
+
+
+def test_the_fuel_reading_comes_from_the_lap_itself():
+    """`build_lap_stats` has to fill it, or the engine is blind by default."""
+    from accoach.coaching.diagnosis import _mean_fuel
+
+    class _S:
+        def __init__(self, f):
+            self.fuel = f
+    assert _mean_fuel([_S(50.0), _S(48.0)]) == pytest.approx(49.0)
+    assert _mean_fuel([_S(0.0), _S(0.0)]) == 0.0, "no reading is 0, not a mean"
+    assert _mean_fuel([]) == 0.0
+
+
 # --- the ledger file --------------------------------------------------------
 
 def _rec(**kw):

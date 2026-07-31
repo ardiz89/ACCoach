@@ -375,6 +375,9 @@ class CoachEngine:
                 score_after=out.score_after,
                 time_before_ms=out.time_before_ms,
                 time_after_ms=out.time_after_ms,
+                fuel_before_l=out.fuel_before_l,
+                fuel_after_l=out.fuel_after_l,
+                time_confounded=out.time_confounded,
                 side_effects={str(sym): d for sym, d in out.side_effects},
             ))
         except Exception:  # noqa: BLE001 - evidence for us, never a live failure
@@ -420,6 +423,9 @@ class CoachEngine:
                 "score_after": d.outcome.score_after,
                 "time_before_ms": d.outcome.time_before_ms,
                 "time_after_ms": d.outcome.time_after_ms,
+                "fuel_before_l": d.outcome.fuel_before_l,
+                "fuel_after_l": d.outcome.fuel_after_l,
+                "time_confounded": d.outcome.time_confounded,
                 "side_effects": [{"symptom": str(s), "delta": v}
                                  for s, v in d.outcome.side_effects],
             }),

@@ -298,12 +298,8 @@ una delle due è vera.
 
 ### 7.3 Cosa resta aperto (dall'analisi concorrenza, in ordine)
 
-1. **Verdetto su uno stint, non su tre giri.** Il test d'accettazione della
-   [guida di Coach Dave](https://coachdaveacademy.com/tutorials/the-ultimate-acc-car-setup-guide/)
-   è *«riesci a ripetere lo stesso tempo per 30 minuti?»*; noi giudichiamo su
-   `_MIN_STABLE = 3`. Con la benzina registrata (schema v11) possiamo separare
-   «il setup è migliorato» da «l'auto si è alleggerita» — un verdetto corretto
-   per consumo e degrado non ce l'ha nessuno.
+1. ~~**Verdetto su uno stint, non su tre giri.**~~ **Rivista, non chiusa** —
+   vedi §7.4: allungare la finestra non era la correzione.
 2. **La pioggia: buco totale.** Cercando `rain|wet|weather` in `engineer/` e
    `setup/` non c'è niente. Full Grip vende asciutto e bagnato, e sul bagnato
    cambiano pressioni, altezze, TC/ABS, bias e ala.
@@ -311,3 +307,49 @@ una delle due è vera.
    comincia non ne ha uno. Non inseguire i 7 secondi: una base conservativa dai
    range della vettura, dichiarata per quello che è — *un punto di partenza
    sicuro, non un setup veloce*.
+
+### 7.4 La benzina: la voce di roadmap era posta male
+
+Il punto 1 era *«giudica su uno stint invece che su tre giri, come fa la guida
+di Coach Dave»*. Implementandolo è venuto fuori che **allungare la finestra non
+è la correzione, ed è anzi il contrario**.
+
+Il confronto del motore è fra **due finestre**: i giri prima della modifica e
+quelli dopo. In mezzo il pilota va in garage a caricare il setup — e in garage
+quasi sempre si rifornisce. Le due finestre sono quindi guidate di routine **con
+pesi diversi**, in una direzione che non è prevedibile: i giri dopo possono
+essere più **pesanti** (serbatoio fresco) o più **leggeri** (primo stint lungo).
+Non è un caso limite, è la forma normale del ciclo. E una finestra più lunga
+brucia più benzina, cioè **peggiora** il problema invece di diluirlo.
+
+Quindi non correggiamo: **ci accorgiamo**. `LapStats.fuel_l` (litri medi nel
+serbatoio, schema v11) arriva fino al verdetto; se le due finestre distano più
+di `_FUEL_BIAS_L = 2.0` litri — circa un giro di benzina per una GT3 — il
+confronto sul tempo **viene sospeso e dichiarato**:
+
+> *«Tenuta: sottosterzo all'apex risolto (0.60→0.20). Il tempo sul giro l'ho
+> lasciato fuori: 20 L nel serbatoio prima, 60 L dopo — non è la stessa
+> macchina.»*
+
+**Perché sospendere e non correggere.** Convertire litri in secondi richiede una
+sensibilità al peso per auto e per pista che non abbiamo **mai misurato**, e un
+coefficiente inventato qui finirebbe per essere la cosa che decide se una
+modifica di setup sopravvive. Il punteggio del sintomo, che non sa quanto pesa
+la macchina, resta il giudice — ed era già lui a decidere: il tempo è sempre
+stato solo un veto.
+
+Tre conseguenze di dettaglio, tutte con un test:
+
+- **niente lettura ≠ pesi uguali.** Sui giri anteriori alla v11 il carburante è
+  0.0, e quello vuol dire *non lo sappiamo*: il veto resta armato com'era, non
+  viene sospeso su prove che non abbiamo;
+- **le modifiche strutturali** (pressioni) non hanno un sintomo su cui ripiegare.
+  Se il tempo non è giudicabile la modifica viene **tenuta e dichiarata tale**,
+  e decide l'obiettivo di fase. Ripristinarla rimetterebbe il gate a proporre la
+  stessa modifica all'infinito;
+- **il registro annota i litri da entrambe le parti** anche quando non hanno
+  rotto il confronto, perché il senso di un registro è poter chiedere *dopo* se
+  quella differenza di tempo era solo benzina.
+
+Resta fuori il **degrado gomma**, che ha lo stesso difetto e per cui non abbiamo
+una misura diretta: nessuna riga lo affermerà finché non ce l'avremo.
