@@ -177,9 +177,10 @@
       the stretch it's talking about. A long way off the pace? It opens with the
       general theme and stops, because corner-by-corner is the wrong lens there.</p></div>
     <div class="card"><h3>Line</h3><p>Your line against the reference, corner by
-      corner, with the gap shaded — and on Assetto Corsa the <b>asphalt drawn
-      underneath</b>, read from the game's own track data. Only when it really is
-      the circuit you drove, and never while the gap is magnified.</p></div>
+      corner, with the gap shaded — and the <b>asphalt drawn underneath</b>, from
+      the 26 circuits HONE ships with or from Assetto Corsa's own data if you have
+      it. The circuit is recognised by the shape you drove, not by its name, so it
+      doesn't matter which sim wrote the lap.</p></div>
     <div class="card"><h3>Map &amp; braking points</h3><p>Your line coloured by where
       you gained and lost, plus the cheat sheet built from <i>your</i> recent laps in
       one track-temperature band — with the spread that says whether you have a
@@ -230,12 +231,16 @@
     <details><summary>Does it work with plain Assetto Corsa, or only ACC?</summary>
       <p>Both. HONE reads the shared memory common to AC and ACC. The setup engineer
         has profiles for low-downforce road cars too, not just GT3.</p>
-      <p>One thing is not the same on both, and it's honest to say so: the
-        <b>asphalt drawn under your line</b> comes from Assetto Corsa's own track
-        files. If you have AC installed you get it on your ACC laps too — the
-        circuit is fitted onto the lap, so it doesn't matter which sim wrote the
-        coordinates. If you only have ACC, that one drawing is missing; everything
-        else is identical.</p></details>
+      <p>The same, including the <b>asphalt drawn under your line</b>: HONE ships
+        with the geometry of 26 real circuits, and recognises which one you drove
+        from the shape of the lap rather than from its name — the two sims don't
+        even agree on those (Mount Panorama is <code>mount_panorama</code> in one
+        and <code>rt_bathurst</code> in the other). If you also have Assetto Corsa
+        installed, its own track data joins in as a second source and whichever
+        describes your lap better wins.</p>
+      <p>Only limit worth stating: those 26 don't cover everything. On a circuit
+        that's in neither the bundle nor your AC install, the asphalt simply isn't
+        drawn — the two lines are still there, as they always were.</p></details>
     <details><summary>What does “100% offline” cost me?</summary>
       <p>Nothing you'd miss, and one thing you would: there are no shared laps from
         other drivers. That's deliberate. Your reference is your own best lap, or a

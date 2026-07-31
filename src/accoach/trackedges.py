@@ -50,6 +50,7 @@ from __future__ import annotations
 import math
 import re
 import struct
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -262,6 +263,63 @@ def all_splines() -> list[tuple[str, Path]]:
     return out
 
 
+# --- circuits that ship with HONE -------------------------------------------
+# The game's own files only cover the tracks you have installed, in the sim you
+# have installed. These 26 cover everyone — see tracks/NOTICE.md for where they
+# come from and under what licence. They are also *better* where they overlap:
+# their widths are measured off satellite imagery, so they describe the track,
+# while the game's describe every square metre of tarmac (Spa's La Source reads
+# 24.5 m in AC's own data, because the paved run-off is paved).
+
+def bundled_dir() -> Path:
+    base = getattr(sys, "_MEIPASS", None)
+    return (Path(base) / "accoach" / "tracks") if base else (Path(__file__).resolve().parent / "tracks")
+
+
+def bundled_tracks() -> list[tuple[str, Path]]:
+    """The circuits shipped with HONE, by name."""
+    d = bundled_dir()
+    if not d.is_dir():
+        return []
+    return [(p.stem, p) for p in sorted(d.glob("*.csv"))]
+
+
+def read_csv_edges(path: Path, track: str | None = None) -> TrackEdges | None:
+    """Parse one bundled circuit: ``x_m, y_m, w_tr_right_m, w_tr_left_m``.
+
+    Same shape as everything else in this module, so a bundled circuit and one
+    read out of the game go through exactly the same fitting, cropping and
+    drawing. Nothing downstream knows which is which — which is the point.
+    """
+    xs: list[float] = []
+    zs: list[float] = []
+    left: list[float] = []
+    right: list[float] = []
+    try:
+        text = path.read_text(encoding="utf-8", errors="ignore")
+    except OSError:
+        return None
+    for line in text.splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        bits = line.split(",")
+        if len(bits) < 4:
+            continue
+        try:
+            x, z, wr, wl = (float(b) for b in bits[:4])
+        except ValueError:
+            continue
+        # Same guard as the game's files: a side of hundreds of metres is not an
+        # edge. These files have never needed it, which is itself worth knowing.
+        if not (0.0 < wl < _MAX_SIDE_M and 0.0 < wr < _MAX_SIDE_M):
+            continue
+        xs.append(x); zs.append(z); left.append(wl); right.append(wr)
+    if len(xs) < 16:
+        return None
+    return TrackEdges(track=track or path.stem, x=xs, z=zs, left=left, right=right)
+
+
 def spline_length(path: Path) -> float:
     """How long the AI line is, in metres — reading only the point block.
 
@@ -286,6 +344,25 @@ def spline_length(path: Path) -> float:
                 for i in range(1, count))
     # Closing chord: the last point sits next to the first, not on it.
     return total + math.hypot(pts[0][0] - pts[-1][0], pts[0][2] - pts[-1][2])
+
+
+def _length_of(path: Path) -> float:
+    """How long a circuit is, for the cheap first pass — either kind of file."""
+    if path.suffix.lower() != ".csv":
+        return spline_length(path)
+    key = "len:" + str(path)
+    if key not in _len_cache:
+        e = read_csv_edges(path)
+        if e is None:
+            _len_cache[key] = 0.0
+        else:
+            total = sum(math.hypot(e.x[i] - e.x[i - 1], e.z[i] - e.z[i - 1])
+                        for i in range(1, len(e)))
+            _len_cache[key] = total + math.hypot(e.x[0] - e.x[-1], e.z[0] - e.z[-1])
+    return _len_cache[key]
+
+
+_len_cache: dict[str, float] = {}
 
 
 # How far a candidate's length may sit from the driven lap's before it isn't
@@ -545,9 +622,11 @@ _cache: dict[str, TrackEdges | None] = {}
 
 
 def _at_path(path: Path, track: str) -> TrackEdges | None:
+    """One circuit, from whichever kind of file it lives in."""
     key = str(path)
     if key not in _cache:
-        _cache[key] = read_edges(path, track)
+        reader = read_csv_edges if path.suffix.lower() == ".csv" else read_edges
+        _cache[key] = reader(path, track)
     return _cache[key]
 
 
@@ -583,8 +662,11 @@ def _by_shape(points) -> TrackEdges | None:
         return None
     best: TrackEdges | None = None
     best_p95 = float("inf")
-    for name, path in all_splines():
-        length = spline_length(path)
+    # Both sources, scored against each other. Not "bundled first, game as a
+    # fallback": on a track that is in both, whichever describes *your* lap
+    # better should win, and only the fit knows which that is.
+    for name, path in bundled_tracks() + all_splines():
+        length = _length_of(path)
         if not length or abs(length - want) / want > _LENGTH_TOL:
             continue
         got = _at_path(path, name)

@@ -118,12 +118,14 @@ of showing you a wrong scale.
   at entry, apex and exit, the arc you drove, and the extra metres you covered.
   Where a corner's speed minimum is flat it says "same place" instead of
   inventing an apex shift, and where the car went off it says so instead of
-  reading the geometry as a choice. On **Assetto Corsa** it also draws the
-  **asphalt** under both lines, read from the track data you have installed —
-  only when that track is the one the lap was driven on, and never while the gap
-  is magnified (a magnified line isn't where the car was). Kerbs are not part of
-  it: a clean lap sits a couple of metres past these edges. ACC's track data is
-  packed, so there it isn't available.
+  reading the geometry as a choice. It also draws the **asphalt** under both
+  lines — from the 26 circuits HONE ships with, or from Assetto Corsa's own
+  track data if you have it installed, whichever describes your lap better. The
+  circuit is recognised by the shape you drove, not by its name, so it does not
+  matter which sim wrote the lap. It appears only when the fit says this really
+  is that circuit, and never while the gap is magnified (a magnified line isn't
+  where the car was). Kerbs are not part of it: a clean lap sits a couple of
+  metres past these edges.
 - **Sectors** — your sectors against the reference (the sim's real sectors when
   it publishes them), the **ideal lap** stitched from your best sectors, and
   every lap sector by sector so you can see which laps that ideal is made of.

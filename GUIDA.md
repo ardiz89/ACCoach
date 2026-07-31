@@ -218,12 +218,16 @@ Cosa trovi:
   tornanti della stessa pista fanno la stessa immagine, e senza quello dovevi
   ricordarti tu quale avevi aperto. In alto, la **frase del debrief** per quella
   curva — la stessa, presa di peso: non è una seconda opinione.
-  Su **Assetto Corsa** vedi anche **il nastro d'asfalto**, letto dai dati della
-  pista che hai installata. Tre avvertenze, tutte e tre visibili nella pagina
-  stessa: è l'**asfalto**, non i limiti di pista (sui cordoli ci passi sopra di
-  un paio di metri ed è normale); compare **solo se la pista installata è quella
-  su cui hai guidato** (di uno stesso circuito girano versioni diverse, e una
-  che non combacia disegnerebbe la strada nel posto sbagliato); e **sparisce se
+  Sotto le due linee vedi anche **il nastro d'asfalto**. Viene da due posti:
+  i 26 circuiti che HONE si porta dietro, e — se hai Assetto Corsa installato —
+  i dati delle piste che hai. Le due sorgenti vengono messe in concorrenza e
+  vince quella che descrive meglio *il tuo* giro; il gioco non c'entra, perché
+  la pista viene riconosciuta dalla forma del giro e non dal nome. Tre
+  avvertenze, tutte e tre visibili nella pagina stessa: è l'**asfalto**, non i
+  limiti di pista (sui cordoli ci passi sopra di un paio di metri ed è normale);
+  compare **solo se la pista trovata è davvero quella su cui hai guidato** (di
+  uno stesso circuito girano versioni diverse, e una che non combacia
+  disegnerebbe la strada nel posto sbagliato); e **sparisce se
   ingrandisci lo scarto ×3/×5**, perché lì la linea disegnata non è più dove sei
   passato e sembreresti fuori strada senza esserlo. Su ACC non c'è: i dati pista
   di ACC non sono leggibili.

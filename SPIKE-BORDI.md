@@ -125,10 +125,60 @@ giusta vince in tutti e 24 i casi (Suzuka 3 contro 22, Imola 17 contro 32, Spa 4
 contro 51). Per questo si valutano tutti e vince il migliore, mai il primo che
 passa; e la soglia resta solo come tetto.
 
-Resta un limite solo: servono **i file di AC installati**. Non serve più che il
-giro venga da AC, né che le due piste si chiamino allo stesso modo. Chi ha
-**solo** ACC continua a non vedere niente, e quello si chiude solo impacchettando
-la geometria (decisione aperta: è dato derivato da file Kunos).
+## E infine: la geometria non viene più solo dal gioco (2026-07-31)
+
+L'ultimo limite — *servono i file di AC installati* — è caduto cercando in rete
+una sorgente aperta. Ce n'è una che ha esattamente la nostra struttura:
+
+* **[TUMFTM/racetrack-database](https://github.com/TUMFTM/racetrack-database)**
+  (LGPL-3.0): 25 circuiti, linea centrale in metri e larghezze a destra e
+  sinistra, un punto ogni 5 m. Le linee vengono da punti GPS di OpenStreetMap,
+  **le larghezze da immagini satellitari**;
+* **[TUMRT/online_3D_racing_line_planning](https://github.com/TUMRT/online_3D_racing_line_planning)**
+  (LGPL-3.0): **Mount Panorama** con le due sponde in 3D, 6001 coppie di punti.
+
+Scartati: `bacinger/f1-circuits` (MIT, 40 circuiti) ha **solo** la linea
+centrale a 125 punti e nessuna larghezza — non ci si disegna una pista;
+`f1tenth_racetracks` è il TUM rimpicciolito 1:10.
+
+Provati sui giri veri prima di impacchettarli:
+
+| tracciato | contro | scarto p95 | scala |
+|---|---|---|---|
+| TUM Spa | il nostro giro Spa | **8.1 m** | 0.998 |
+| TUM Suzuka | il nostro giro Suzuka | **11.3 m** | 1.002 |
+| TUM Monza | il nostro giro Monza | 26.9 m | 1.005 |
+| TUM Spa | il nostro giro **Spa 1998** | 63.4 m | rifiutato |
+| TUM Bathurst | il **mod Kunos** installato | 16.1 m | 0.993 |
+
+Monza è la peggiore perché la loro linea è il **centro pista** e la nostra è la
+**linea IA**: due linee diverse dentro la stessa strada. Bathurst non ha giri in
+archivio, quindi è stata validata contro il mod: due sorgenti indipendenti
+(satellite/GPS contro modello 3D) sullo stesso circuito. Serve lo **specchio**,
+perché i dati reali sono destrorsi e AC è mancino — la ricerca dello specchio nel
+fit non era decorativa.
+
+E il motivo migliore per averli non era la copertura:
+
+| | mediana | massimo | rapporto max/mediana |
+|---|---|---|---|
+| TUM Spa | 9.2 m | **16.4 m** | 1.78 |
+| AC spa | 10.4 m | **24.5 m** | 2.36 ← La Source |
+| TUM Suzuka | 9.2 m | **15.3 m** | 1.66 |
+| AC suzuka | 10.0 m | **33.5 m** | 3.35 ← il buco dei 343 m |
+
+Le larghezze da satellite misurano **la pista**; quelle del gioco misurano ogni
+metro quadro di asfalto. I 26 impacchettati stanno tutti fra 1.06 e 2.12 di
+rapporto — Austin, il peggiore, ha davvero il rettilineo dei box largo 27 m.
+
+Le due sorgenti **non** sono in gerarchia: finiscono nello stesso elenco di
+candidati e vince il punteggio. Sui nostri giri vince sempre il file del gioco
+(sono le sue piste, e i giri vengono da lì); togliendo AC dal quadro, i 26
+impacchettati coprono da soli Monza, Spa e Suzuka. Imola no — non è fra i 25 — e
+la Nürburgring del TUM viene **rifiutata a 52.4 m** perché è un'altra
+configurazione da quella di AC: la stessa distanza che separa Spa 1998 da Spa.
+
+Attribuzione e licenze: `src/accoach/tracks/NOTICE.md`.
 
 ## La feature: fatta, e come sono state chiuse le obiezioni
 

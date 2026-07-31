@@ -33,6 +33,7 @@ jobs:
           --icon hone.ico --paths src
           --add-data "src/accoach/web;accoach/web"
           --add-data "src/accoach/voice_cues;accoach/voice_cues"
+          --add-data "src/accoach/tracks;accoach/tracks"
           --add-data "GUIDA.md;."
           --collect-submodules uvicorn
           --hidden-import pyttsx3.drivers
