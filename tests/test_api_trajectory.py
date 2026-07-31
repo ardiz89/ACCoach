@@ -129,3 +129,15 @@ def test_the_dynamics_line_trace_still_lines_up_with_its_position_channel(tmp_pa
     c = _client(tmp_path)
     a = c.get("/api/analysis", params={"car": CAR, "track": TRACK}).json()
     assert len(a["review"]["line_offset"]) == len(a["review"]["channels"]["pos"])
+
+
+def test_the_asphalt_is_absent_rather_than_invented(tmp_path):
+    """I bordi arrivano dai dati di Assetto Corsa e solo se la pista installata è
+    quella su cui il giro è stato guidato (vedi trackedges). Un giro sintetico non
+    corrisponde a nessuna pista installata: la vista deve funzionare identica,
+    senza nastro e senza un buco al suo posto."""
+    j = _get(_client(tmp_path)).json()
+    assert j["edges"] is None
+    for c in j["corners"]:
+        assert "edges" not in c["line"] or c["line"]["edges"] is None
+        assert c["line"]["you"]["x"], "il disegno della curva resta quello di sempre"

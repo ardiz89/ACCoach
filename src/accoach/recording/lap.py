@@ -50,7 +50,13 @@ from ..telemetry.snapshot import SessionType, TelemetrySnapshot
 #     it still load — columns are matched by name, so the extra ones are simply
 #     ignored. The live channel is untouched: `monitor` still shows it raw, which
 #     is a raw dashboard's job.
-SCHEMA_VERSION = 10
+# v11: `fuel` — litres in the tank, per frame. The live fuel engineer has always
+#      measured the burn from this channel and spoken about it over the radio,
+#      and then thrown the measurement away: the report knew nothing about fuel,
+#      so "how much does a lap cost me" had no answer once you got up from the
+#      wheel. One float per frame, ~2% on the file. It is a *measurement* and not
+#      a strategy: what the burn means for a race is the driver's call.
+SCHEMA_VERSION = 11
 
 # Fixed serialization order for a LapSample, written into every file. Per-wheel
 # channels are flattened with [fl, fr, rl, rr] suffixes.
@@ -73,6 +79,7 @@ SAMPLE_FIELDS = (
     "current_sector",   # 0-based sim sector, for real sector splits (v4); -1 unknown
     "sr_fl", "sr_fr", "sr_rl", "sr_rr",           # physical slip ratio per wheel (v6)
     "press_fl", "press_fr", "press_rl", "press_rr",  # tyre pressure psi per wheel (v6)
+    "fuel",             # litres in the tank (v11)
 )
 
 # Defaults for channels absent from an older file, keyed by field name.
@@ -123,6 +130,7 @@ class LapSample:
     current_sector: int = -1
     slip_ratio: tuple[float, float, float, float] = _Z4
     tyre_pressure: tuple[float, float, float, float] = _Z4
+    fuel: float = 0.0                 # litres in the tank (v11)
 
     @staticmethod
     def from_snapshot(s: TelemetrySnapshot) -> "LapSample":
@@ -146,6 +154,7 @@ class LapSample:
             current_sector=s.current_sector,
             slip_ratio=s.slip_ratio,
             tyre_pressure=s.tyre_pressure,
+            fuel=s.fuel,
         )
 
     def as_row(self) -> list:
@@ -171,6 +180,7 @@ class LapSample:
             round(self.slip_ratio[2], 3), round(self.slip_ratio[3], 3),
             round(self.tyre_pressure[0], 2), round(self.tyre_pressure[1], 2),
             round(self.tyre_pressure[2], 2), round(self.tyre_pressure[3], 2),
+            round(self.fuel, 2),
         ]
 
     @staticmethod
@@ -202,6 +212,7 @@ class LapSample:
             current_sector=int(m["current_sector"]) if m.get("current_sector") is not None else -1,
             slip_ratio=(f("sr_fl"), f("sr_fr"), f("sr_rl"), f("sr_rr")),
             tyre_pressure=(f("press_fl"), f("press_fr"), f("press_rl"), f("press_rr")),
+            fuel=f("fuel"),
         )
 
 

@@ -115,3 +115,25 @@ class FuelEngineer:
         self._pos_max = 0.0
         self._prev_pos = -1.0
         self._pit_this_lap = False
+
+
+def burned(lap) -> float | None:
+    """Litres this lap burned, measured from the recorded tank level.
+
+    The live engineer above works this out frame by frame and then forgets it;
+    this is the same subtraction done offline, so a lap you drove last week can
+    still answer "what does a lap cost me". Only from v11 files — older laps
+    never recorded the channel and come back None, which is not zero.
+
+    None (rather than a number) when the tank *rose* during the lap: that is a
+    refuel or a pit stop, and the difference between the two ends of it is not a
+    burn rate. Same reason the live engineer drops those laps from its average.
+    """
+    samples = getattr(lap, "samples", lap)
+    fuels = [s.fuel for s in samples if s.fuel > 0.0]
+    if len(fuels) < 2:
+        return None
+    used = fuels[0] - fuels[-1]
+    if used <= 0.0 or used > _PLAUSIBLE_BURN_L[1]:
+        return None
+    return round(used, 2)

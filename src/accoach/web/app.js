@@ -8,6 +8,7 @@ const LANG = () => (window.HoneI18n ? window.HoneI18n.lang : "en");
 
 let CURRENT = null;   // current combo {car, track}
 let DATA = null;      // last /api/analysis payload
+let DIST = null;      // {pos[], m[], total} — the reviewed lap in metres (see buildDistance)
 let COMBOS = [];      // last /api/combos payload (kept for re-labelling on lang switch)
 let LAST_HOVER = null; // last hover position, so a re-render keeps the readout
 let VIEW = "flow";    // whichever tab is `active` in index.html
@@ -90,6 +91,7 @@ async function init() {
   const sel = $("combo");
   sel.onchange = () => {
     const combo = JSON.parse(sel.value);
+    try { localStorage.setItem(_COMBO_KEY, sel.value); } catch (e) {}
     BASELINE_PINNED = false;   // a new car+track elects its own reference
     SESSION = null;
     SHEET = null;         // another car+track has other braking points
@@ -103,8 +105,16 @@ async function init() {
   $("exp-csv").onclick = () => exportData("csv");
   $("exp-json").onclick = () => exportData("json");
   wireTabs();
+  wireKeys();
+  wireHints();
   wireFlow();
+  // Pick up where you left off — but only if that car+track is still in the
+  // archive (a lap store can be moved or cleared between two runs).
+  const combo = savedCombo();
+  if (combo) sel.value = combo;
   await loadCombo(JSON.parse(sel.value));
+  const view = savedView();
+  if (view && view !== VIEW) showView(view);
   // First visit: pop the tour once data is on screen (so #vmin/#debrief exist).
   if (window.HoneTour) window.HoneTour.auto(tourSteps(), "hone_tour_analysis");
 }
@@ -213,10 +223,72 @@ function showView(name) {
   redrawCurrentView();
 }
 
+// Which tab you were on, and which car and track, across reloads. The page
+// reopens a dozen times in an evening — after a lap, after a language switch,
+// after the hub relaunches it — and it always came back to the landing tab and
+// the first combo in the list, so you re-navigated every time. Stored, never
+// trusted: a saved view whose panel no longer exists, or a combo no longer in
+// the archive, is ignored rather than left to blank the page.
+const _VIEW_KEY = "hone_view", _COMBO_KEY = "hone_combo";
+
+function rememberView(name) {
+  try { localStorage.setItem(_VIEW_KEY, name); } catch (e) {}
+}
+
+function savedView() {
+  let v = null;
+  try { v = localStorage.getItem(_VIEW_KEY); } catch (e) {}
+  return v && document.getElementById("view-" + v) ? v : null;
+}
+
+function savedCombo() {
+  let v = null;
+  try { v = localStorage.getItem(_COMBO_KEY); } catch (e) {}
+  if (!v) return null;
+  return [...$("combo").options].some((o) => o.value === v) ? v : null;
+}
+
 function wireTabs() {
   for (const b of document.querySelectorAll(".tab")) {
-    b.onclick = () => showView(b.dataset.view);
+    // The shortcut is on the tooltip because a keyboard shortcut nobody can find
+    // is the same as no shortcut.
+    const i = [...document.querySelectorAll(".tab")].indexOf(b) + 1;
+    if (i <= 9) b.title = `${t("kbd.tab")} ${i}`;
+    b.onclick = () => { rememberView(b.dataset.view); showView(b.dataset.view); };
   }
+}
+
+// Where the lap shortcut is written down: on the picker it drives.
+function wireHints() {
+  const sel = $("lap");
+  if (sel) sel.title = t("kbd.lap");
+}
+
+// Keyboard: 1-8 pick a tab, [ and ] step through the laps of this car+track.
+// Ignored while a form control has focus — the lap and baseline pickers are
+// <select>s, where every key already means something.
+function wireKeys() {
+  document.addEventListener("keydown", (e) => {
+    if (e.ctrlKey || e.altKey || e.metaKey) return;
+    const el = document.activeElement;
+    if (el && el.matches("input, select, textarea")) return;
+    if (document.querySelector(".tour-pop")) return;   // the tour owns the keys
+    const tabs = [...document.querySelectorAll(".tab")];
+    if (/^[1-9]$/.test(e.key)) {
+      const b = tabs[parseInt(e.key, 10) - 1];
+      if (b) { e.preventDefault(); b.click(); }
+      return;
+    }
+    if (e.key === "[" || e.key === "]") {
+      const sel = $("lap");
+      if (!sel || sel.options.length < 2) return;
+      const next = sel.selectedIndex + (e.key === "]" ? 1 : -1);
+      if (next < 0 || next >= sel.options.length) return;
+      e.preventDefault();
+      sel.selectedIndex = next;
+      sel.onchange();
+    }
+  });
 }
 
 async function loadProgress(combo) {
@@ -532,26 +604,24 @@ async function loadSectors() {
   const lap = $("lap").value, base = pinnedBaseline();
   if (lap) q.set("lap", lap);
   if (base) q.set("baseline", base);
-  setPanelLoading("sec-summary", t("load.sectors"));
+  $("sectors").innerHTML = `<div class="muted">${t("load.sectors")}</div>`;
   let s;
   try { s = await getJSON("/api/sectors?" + q.toString()); }
   catch (e) {
-    $("sec-summary").innerHTML = `<div class="item"><div class="v">—</div><div class="k">${e.message}</div></div>`;
-    $("sectors").innerHTML = ""; $("ideal").innerHTML = "";
+    $("sectors").innerHTML = `<div class="muted">${e.message}</div>`;
+    $("ideal").innerHTML = ""; $("sec-table").innerHTML = "";
     return;
   }
   drawSectors(s);
 }
 
 function drawSectors(s) {
-  const gap = (s.review.lap_time_ms - s.baseline.lap_time_ms) / 1000;
-  const item = (k, v, cls) =>
-    `<div class="item"><div class="k">${k}</div><div class="v ${cls || ""}">${v}</div></div>`;
-  $("sec-summary").innerHTML =
-    item(t("lbl.comparison"), s.baseline.lap_time) +
-    item(t("lbl.lap"), s.review.lap_time) +
-    item(t("lbl.gap"), fmt(gap) + "s", gap > 0 ? "slower" : "faster") +
-    item(t("lbl.sectors"), s.real ? t("sec.real") : t("sec.thirds"));
+  // Lap / reference / gap moved to the lap bar, on every tab. What was left of
+  // this view's own summary was one fact — whether these splits are the sim's
+  // own sectors or our thirds — and a whole banner to say it in. It belongs on
+  // the column it describes.
+  const kind = $("sec-kind");
+  if (kind) kind.textContent = s.real ? t("sec.real") : t("sec.thirds");
 
   // Diverging delta bars, scaled to the worst sector (min 0.05s).
   let mx = 0.05;
@@ -591,6 +661,44 @@ function drawSectors(s) {
   } else {
     $("ideal").innerHTML = "";
   }
+  drawSectorTable(s);
+}
+
+// Every lap of this car+track, sector by sector, best of each column marked.
+//
+// The ideal lap above says a 2:03.412 is in there somewhere; this is where you
+// see *which* laps it is made of — and whether the sector you're proud of was
+// one good lap or a habit. Same numbers as the ideal (the backend times every
+// lap against the same spans), so the star here and the "S2 ← 2:03.732" up
+// there can't disagree.
+function drawSectorTable(s) {
+  const el = $("sec-table");
+  if (!el) return;
+  const rows = (s.per_lap || []);
+  // One lap is not a table: with nothing to compare, the bars above already say
+  // everything this would.
+  if (rows.length < 2) { el.innerHTML = ""; return; }
+  const n = s.n;
+  const best = [];
+  for (let i = 0; i < n; i++) best.push(Math.min(...rows.map((r) => r.ms[i])));
+  let body = "";
+  for (const r of rows) {
+    const clock = lapClock(r.recorded_utc);
+    const mark = r.path === s.review.path ? " on" : "";
+    const off = r.off_track ? ` <span class="off-track" title="${t("lap.offTrack.why")}">${t("lap.offTrack")}</span>` : "";
+    body += `<tr class="${mark.trim()}"><td class="vc">${r.lap_time}${off}` +
+      (clock ? ` <span class="muted">${clock}</span>` : "") + `</td>` +
+      r.ms.map((v, i) =>
+        `<td class="vn${v === best[i] ? " best" : ""}">${fmtSec(v)}</td>`).join("") +
+      `</tr>`;
+  }
+  let head = `<th>${t("sec.t.lap")}</th>`;
+  for (let i = 0; i < n; i++) head += `<th>S${i + 1}</th>`;
+  el.innerHTML =
+    `<h3>${t("sec.t.title")}</h3>` +
+    `<table class="vmin-table wide"><thead><tr>${head}</tr></thead>` +
+    `<tbody>${body}</tbody></table>` +
+    `<div class="muted small">${t("sec.t.hint")}</div>`;
 }
 
 // --- track map ------------------------------------------------------------
@@ -836,8 +944,10 @@ async function loadCombo(combo, lapPath, baselinePath) {
     return;
   }
   DATA = a;
+  buildDistance(a);       // this lap's metres, for every chart's x-axis
   FLOW_STEP = 0;          // a new lap is a new explanation, from the top
   fillLaps(a);
+  drawLapBar(a);
   drawSummary(a);
   drawCornerSpeeds(a);
   drawWaterfall(a);
@@ -915,25 +1025,54 @@ function fillLaps(a, force) {
   fill("baseline", keepBase || a.reference.path);
 }
 
-function drawSummary(a) {
+// The identity of what's on screen — lap, reference, gap, track temperature —
+// as a strip under the tabs, on every view. It used to be three items inside
+// Compare's own summary, which meant the landing tab explained a lap without
+// ever naming it, and the Map, Trajectory and Sectors tabs showed numbers you
+// had to change tab to identify.
+function drawLapBar(a) {
+  const el = $("lapbar");
+  if (!el) return;
   const gap = (a.review.lap_time_ms - a.reference.lap_time_ms) / 1000;
-  const c = a.consistency || {};
-  const item = (k, v, cls) =>
-    `<div class="item"><div class="k">${k}</div><div class="v ${cls || ""}">${v}</div></div>`;
-  // Amber, not red: going off track isn't an app error and isn't the game's own
-  // invalidation either — it's a fact about the lap that explains why it can't be
-  // the reference. The tooltip is where that "why" lives.
+  const bit = (k, v, cls) =>
+    `<div class="bit"><span class="k">${k}</span><span class="v ${cls || ""}">${v}</span></div>`;
+  const temp = a.review.road_temp != null
+    ? bit(t("lbl.road"), `${a.review.road_temp}°`) : "";
+  el.innerHTML =
+    bit(t("lbl.lap"), a.review.lap_time + offTrackBadge(a)) +
+    bit(t("lbl.comparison"), a.reference.lap_time) +
+    bit(t("lbl.gap"), fmt(gap) + "s", gap > 0 ? "slower" : "faster") +
+    temp;
+  // The window title, so three windows open on three tracks are three different
+  // things in the taskbar instead of three "HONE · Analysis". The distinguishing
+  // part goes first: a tab strip only shows the first few characters.
+  document.title = `${a.track} · ${a.review.lap_time} — HONE`;
+}
+
+// Amber, not red: going off track isn't an app error and isn't the game's own
+// invalidation either — it's a fact about the lap that explains why it can't be
+// the reference. The tooltip is where that "why" lives. …and WHERE, when the lap
+// carries it: "off track" alone names a fact the driver can't act on, the corner
+// is the part they can go and work on. Absent on laps recorded before the field
+// existed, so the badge degrades to the bare wording rather than to an empty
+// parenthesis.
+function offTrackBadge(a) {
   const rev = (a.laps || []).find((l) => l.path === a.review.path);
-  // …and WHERE, when the lap carries it. "Off track" alone names a fact the
-  // driver can't act on; the corner is the part they can go and work on. Absent
-  // on laps recorded before the field existed, so the badge degrades to the bare
-  // wording rather than to an empty parenthesis.
+  if (!(rev && rev.off_track)) return "";
   const where = a.review.lost_at_corner
     ? ` ${t("lap.offTrack.at")} ${a.review.lost_at_corner}`
     : "";
-  const off = rev && rev.off_track
-    ? ` <span class="off-track" title="${t("lap.offTrack.why")}">${t("lap.offTrack")}${where}</span>`
-    : "";
+  return ` <span class="off-track" title="${t("lap.offTrack.why")}">` +
+         `${t("lap.offTrack")}${where}</span>`;
+}
+
+// What's left for Compare's own summary once the lap bar owns the identity: the
+// three notes that are about *this comparison* rather than about the lap. Often
+// all three are empty, and then the band hides itself (.summary:empty).
+function drawSummary(a) {
+  const c = a.consistency || {};
+  const item = (k, v, cls) =>
+    `<div class="item"><div class="k">${k}</div><div class="v ${cls || ""}">${v}</div></div>`;
   // The setup each lap was on, when the two differ. A gap you're reading as
   // "I drove worse" can be a brake-bias click, and until now the page gave you
   // no way to tell. Only shown when it changes the story: same setup, no note.
@@ -943,9 +1082,6 @@ function drawSummary(a) {
   // this when conditions really are the reason (see api._conditions_note).
   const condNote = conditionsNote(a.reference.by_conditions);
   $("summary").innerHTML =
-    item(t("lbl.comparison"), a.reference.lap_time) +
-    item(t("lbl.lap"), a.review.lap_time + off) +
-    item(t("lbl.gap"), fmt(gap) + "s", gap > 0 ? "slower" : "faster") +
     (c.n >= 2 ? item(t("sum.consistency"), `σ ${(c.std_ms / 1000).toFixed(3)}s · ${c.n} ${t("lbl.laps")}`) : "") +
     (condNote ? item(t("sum.cond"), condNote, "warn") : "") +
     (setupNote ? item(t("sum.setup_diff"), setupNote, "warn") : "");
@@ -1194,6 +1330,7 @@ function renderFlow(a) {
   wrap.classList.toggle("hidden", !hasChart);
   $("flow-chart-title").textContent = hasChart ? t("flow.chart." + s.chart) : "";
   if (hasChart) drawFlowChart(a, s);
+  drawFlowMap(a, hasChart ? s : null);
 
   $("flow-prev").disabled = FLOW_STEP === 0;
   $("flow-next").disabled = FLOW_STEP >= steps.length - 1;
@@ -1210,6 +1347,55 @@ function wireFlow() {
 // rather than a `window` parameter threaded through the shared primitives:
 // those are used by five other charts that all draw the whole lap, and adding
 // an option to each of them to serve one caller is how they stop being simple.
+// Where on the track this step is.
+//
+// The trace beside the card says what happened; it doesn't say *where*, and the
+// landing view is the one place a driver has no map to fall back on — the corner
+// name in the card is a name, not a place. This is the same delta-coloured line
+// the Map tab draws (same function, so the two can't disagree about which way
+// round the track is), with the step's own stretch traced over it in the accent.
+//
+// Nothing is invented here: the colours are the speed gap the map already
+// computes, and the highlighted span is the window the step's chart is zoomed
+// to. A lap with no coordinates hides the panel rather than drawing an empty box.
+function drawFlowMap(a, step) {
+  const cv = $("c-flow-map");
+  if (!cv) return;
+  const wrap = cv.parentNode;
+  wrap.classList.toggle("hidden", !a.has_map);
+  // A step about the whole lap (the opening headline) has the whole lap as its
+  // window, and lighting up every metre of track says nothing while hiding the
+  // one thing the map is for. No highlight there — and the caption has to say so
+  // too, or it promises a stretch that isn't drawn.
+  const spot = !!step && (step.to - step.from) <= 0.6;
+  const title = $("flow-map-title");
+  if (title) title.textContent = a.has_map ? t(spot ? "flow.map" : "flow.map.all") : "";
+  if (!a.has_map) return;
+  const hit = drawMapTo(cv, null, a, null);
+  if (!hit || !spot) return;
+
+  const { rv, X, Y } = hit;
+  const ctx = cv.getContext("2d");
+  ctx.save();
+  // Drawn BEHIND what's already on the canvas: a fat band on top would bury the
+  // delta colours under a cyan smear, and those colours are the map's whole
+  // point. `destination-over` only paints where the canvas is still transparent,
+  // so this comes out as a halo around the line, not a coat of paint over it.
+  ctx.globalCompositeOperation = "destination-over";
+  ctx.lineCap = "round"; ctx.lineJoin = "round";
+  ctx.strokeStyle = "rgba(34,211,206,0.85)"; ctx.lineWidth = 14;
+  ctx.beginPath();
+  let drawing = false;
+  for (let i = 0; i < rv.pos.length; i++) {
+    if (rv.pos[i] < step.from || rv.pos[i] > step.to) { drawing = false; continue; }
+    const px = X(rv.x[i]), py = Y(rv.z[i]);
+    drawing ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+    drawing = true;
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
 function drawFlowChart(a, step) {
   const cv = $("c-flow");
   if (!cv) return;
@@ -1360,6 +1546,11 @@ function renderSession(s) {
       numbers += item(t("ses.vsprev"), (d > 0 ? "+" : "") + d.toFixed(3) + "s",
                       d > 0 ? "slower" : "faster");
     }
+    // Measured, not modelled — and absent on laps recorded before the tank was
+    // written down, which is why it's a conditional item and not a dash.
+    if (cur.fuel_per_lap != null) {
+      numbers += item(t("ses.fuel"), `${cur.fuel_per_lap.toFixed(2)} L`);
+    }
   } else {
     numbers = `<div class="empty">${t("ses.nobest")}</div>`;
   }
@@ -1377,7 +1568,10 @@ function renderSession(s) {
       const w = 6 + 94 * ((l.lap_time_ms - floor) / span);
       const tags = (l.is_best ? `<span class="tag best">${t("ses.lap_best")}</span>` : "") +
         (!l.valid ? `<span class="tag out">${t("ses.lap_out")}</span>` : "") +
-        (l.off_track ? `<span class="tag cut">${t("ses.lap_cut")}</span>` : "");
+        (l.off_track ? `<span class="tag cut">${t("ses.lap_cut")}</span>` : "") +
+        (l.fuel_used != null
+          ? `<span class="tag fuel" title="${escAttr(t("ses.fuel"))}">${l.fuel_used.toFixed(2)} L</span>`
+          : "");
       return `<button type="button" class="ses-lap${l.is_best ? " is-best" : ""}" ` +
              `data-path="${l.path}" title="${t("ses.open")}">` +
              `<span class="time">${l.lap_time}</span>` +
@@ -1473,22 +1667,107 @@ function gridY(ctx, w, h, lo, hi, fmt, ticks) {
   ctx.restore();
 }
 
-// Vertical hairlines every 10% of the lap, so a feature can be placed along the
-// track without counting corner bands. Only the chart at the bottom of a stack
-// asks for `labels` — repeating the same axis under every trace is noise.
+// --- the lap in metres ------------------------------------------------------
+// Every chart on this page has the lap as its x-axis, and until now that axis
+// was labelled in per cent — "50%" is a number you have to convert before you
+// can go and drive to it. The backend now sends the metres actually covered at
+// each plotted frame (`dist_m`, measured on the recorded coordinates), so the
+// axis can say "1500 m". Laps with no coordinates send zeros and keep per cent:
+// a wrong scale is worse than an abstract one.
+function buildDistance(a) {
+  DIST = null;
+  const ch = a && a.review && a.review.channels;
+  const d = ch && ch.dist_m;
+  if (!Array.isArray(d) || d.length < 2 || !Array.isArray(ch.pos)) return;
+  // Drop the pre-line wrap frame the same way the backend does (see
+  // strip_leading_wrap): the first sample of a lap can still read pos≈1.0, and
+  // a lookup table seeded at 1.0 answers every later position wrongly.
+  let i = 0;
+  while (i < ch.pos.length - 1 && ch.pos[i] > 0.5 && ch.pos[i] > ch.pos[i + 1]) i++;
+  const pos = [], m = [];
+  for (; i < d.length; i++) {
+    if (pos.length && ch.pos[i] <= pos[pos.length - 1]) continue;   // strictly forward
+    pos.push(ch.pos[i]); m.push(d[i]);
+  }
+  const total = m.length ? m[m.length - 1] : 0;
+  // Under 100 m there is no lap here — an all-zero distance channel (a lap
+  // recorded before the coordinates existed) lands exactly on this.
+  if (pos.length < 2 || total < 100) return;
+  DIST = { pos, m, total };
+}
+
+// Metres covered at a track position, linearly between the two frames around it.
+function metresAt(p) {
+  if (!DIST) return null;
+  const i = nearest(DIST.pos, p);
+  const j = DIST.pos[i] > p ? i - 1 : i + 1;
+  if (j < 0 || j >= DIST.pos.length) return DIST.m[i];
+  const lo = Math.min(i, j), hi = Math.max(i, j);
+  const span = DIST.pos[hi] - DIST.pos[lo];
+  if (!span) return DIST.m[lo];
+  const f = Math.max(0, Math.min(1, (p - DIST.pos[lo]) / span));
+  return DIST.m[lo] + (DIST.m[hi] - DIST.m[lo]) * f;
+}
+
+// The inverse: where along the lap (0..1) a distance mark falls, so a round
+// number of metres can be drawn as a gridline.
+function posAtMetres(v) {
+  if (!DIST) return null;
+  const i = nearest(DIST.m, v);
+  const j = DIST.m[i] > v ? i - 1 : i + 1;
+  if (j < 0 || j >= DIST.m.length) return DIST.pos[i];
+  const lo = Math.min(i, j), hi = Math.max(i, j);
+  const span = DIST.m[hi] - DIST.m[lo];
+  if (!span) return DIST.pos[lo];
+  const f = Math.max(0, Math.min(1, (v - DIST.m[lo]) / span));
+  return DIST.pos[lo] + (DIST.pos[hi] - DIST.pos[lo]) * f;
+}
+
+// Round distance marks along the lap — 5 to 8 of them, at a step read off a pit
+// board rather than at whatever a tenth of the lap happens to be. Null when the
+// lap has no coordinates, and the axis falls back to per cent.
+function distanceTicks() {
+  if (!DIST) return null;
+  const step = [100, 200, 250, 500, 1000, 2000, 5000]
+    .find((s) => DIST.total / s <= 8) || 5000;
+  const out = [];
+  for (let v = step; v < DIST.total - step * 0.3; v += step) {
+    out.push({ at: posAtMetres(v), m: v });
+  }
+  // A lap too short for even one mark keeps the tenths of a lap: a chart with no
+  // gridlines at all is a worse answer than an abstract one.
+  return out.length ? out : null;
+}
+
+// A position for the readouts: metres when we know them, per cent when we don't.
+function posLabel(p) {
+  const m = metresAt(p);
+  return m == null ? Math.round(p * 100) + "%" : Math.round(m) + " m";
+}
+
+// Vertical hairlines along the lap, so a feature can be placed on the track
+// without counting corner bands. Where the distance is known they fall on round
+// metre marks instead of every 10%, so the gridlines and the labels agree. Only
+// the chart at the bottom of a stack asks for `labels` — repeating the same axis
+// under every trace is noise.
 function gridX(ctx, w, h, labels) {
   ctx.save();
   ctx.strokeStyle = "rgba(255,255,255,0.05)";
   ctx.lineWidth = 1;
-  for (let i = 1; i < 10; i++) {
-    const x = Math.round((i / 10) * w) + 0.5;
+  const ticks = distanceTicks();
+  const xs = ticks ? ticks.map((k) => k.at)
+                   : [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9];
+  for (const p of xs) {
+    const x = Math.round(p * w) + 0.5;
     ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
   }
   if (labels) {
     ctx.font = "10px " + MONO;
     ctx.fillStyle = "rgba(255,255,255,0.4)";
-    for (const q of [0.25, 0.5, 0.75]) {
-      ctx.fillText(Math.round(q * 100) + "%", q * w - 11, h - 4);
+    const marks = ticks ? ticks.map((k) => ({ at: k.at, s: k.m + " m" }))
+                        : [0.25, 0.5, 0.75].map((q) => ({ at: q, s: Math.round(q * 100) + "%" }));
+    for (const k of marks) {
+      ctx.fillText(k.s, k.at * w - ctx.measureText(k.s).width / 2, h - 4);
     }
   }
   ctx.restore();
@@ -1942,7 +2221,7 @@ function dynReadoutHTML(a, p) {
     extra += ` &nbsp;·&nbsp; ${t("dyn.ro.off")} <b>${off >= 0 ? "+" : ""}${off.toFixed(1)}m</b>`;
   }
   return where +
-    `<b>${t("ro.pos")} ${Math.round(p * 100)}%</b> &nbsp;·&nbsp; ` +
+    `<b>${t("ro.pos")} ${posLabel(p)}</b> &nbsp;·&nbsp; ` +
     `${t("dyn.ro.g")} <b>${gt.toFixed(2)}g</b> <span class="muted">(${t("dyn.ro.lat")} ${gl.toFixed(2)}, ${t("dyn.ro.lon")} ${gL.toFixed(2)})</span> &nbsp;·&nbsp; ` +
     `${t("dyn.ro.slipF")} <b>${sf.toFixed(2)}</b>  ${t("dyn.ro.slipR")} <b>${sr.toFixed(2)}</b>` + extra;
 }
@@ -2141,6 +2420,18 @@ function renderLine(cx) {
   $("line-corner-title").innerHTML =
     `<b>${c.name}</b>${shape ? ` <small>${shape}</small>` : ""}`;
 
+  // The road is in the legend only when it is on the drawing — and it is named
+  // "asphalt", never "track limits": a clean lap uses the kerbs and sits a
+  // couple of metres past this line (see SPIKE-BORDI.md).
+  const legRoad = $("leg-road");
+  if (legRoad) {
+    const road = LINE_MAG > 1 ? null : L.edges;
+    legRoad.classList.toggle("hidden", !road);
+    if (road) {
+      $("leg-road-text").textContent = tf("line.leg.road", { m: road.width_m });
+    }
+  }
+
   renderLineFacts(c);
   renderLineTable(L);
   LINE_HIT = drawCornerZoom(L, c, cx);
@@ -2149,16 +2440,35 @@ function renderLine(cx) {
   updateLineReadout(L, cx);
 }
 
+// Where your apex is against the reference's — or why that question has no
+// answer here.
+//
+// Two cases the plain number got wrong, both measured across the archive before
+// this existed. Through a long corner the bottom of the speed trace is flat for
+// ~100 m (Fagnes, Casio Triangle, Tamburello), so two identical laps could be
+// reported 60 m apart — a difference to go and chase that isn't there. And on a
+// lap that spun, the "apex" moved 174 m because the car nearly stopped somewhere
+// else, which is a true number and a false sentence.
+function apexWord(c) {
+  // A dash, with the reason on hover: the chip above already says it in full,
+  // and a sentence in a right-aligned number column wrecks the row it sits in.
+  if (c.off_here) return `<span title="${escAttr(t("line.apexOff"))}">–</span>`;
+  if (c.apex_flat_m > 0) {
+    return `${t("line.sameSpot")} <span class="muted">${
+      tf("line.apexFlat", { m: Math.round(c.apex_flat_m) })}</span>`;
+  }
+  const shift = c.apex_shift_m;
+  if (Math.abs(shift) < 0.5) return t("line.sameSpot");
+  return `${Math.abs(shift).toFixed(0)} m ${shift < 0 ? t("line.earlier") : t("line.later")}`;
+}
+
 function renderLineFacts(c) {
   const el = $("line-facts");
   if (!el) return;
   const row = (k, v, sub) =>
     `<div class="fact"><span class="fk">${k}</span><span class="fv">${v}</span>` +
     (sub ? `<span class="fs">${sub}</span>` : "") + `</div>`;
-  const shift = c.apex_shift_m;
-  const apex = Math.abs(shift) < 0.5
-    ? t("line.sameSpot")
-    : `${Math.abs(shift).toFixed(0)} m ${shift < 0 ? t("line.earlier") : t("line.later")}`;
+  const apex = apexWord(c);
   const arc = (c.radius_m && c.radius_ref_m)
     ? `${Math.round(c.radius_m)} m <span class="muted">${t("line.f.vs")} ${Math.round(c.radius_ref_m)} m</span>`
     : "–";
@@ -2191,11 +2501,20 @@ function renderLineTable(L) {
   };
   let body = "";
   L.corners.forEach((c, i) => {
-    const shift = Math.abs(c.apex_shift_m) < 0.5 ? "–"
+    // A dash, not a zero: "no answer here" and "the apex didn't move" are the
+    // same cell in a table, and only the tooltip can tell them apart.
+    const quiet = c.off_here || c.apex_flat_m > 0 || Math.abs(c.apex_shift_m) < 0.5;
+    const why = c.off_here ? t("line.apexOff")
+              : (c.apex_flat_m > 0 ? tf("line.apexFlat", { m: Math.round(c.apex_flat_m) })
+                                   : t("line.sameSpot"));
+    const shift = quiet
+      ? `<span title="${escAttr(why)}">–</span>`
       : `${c.apex_shift_m > 0 ? "+" : "−"}${Math.abs(c.apex_shift_m).toFixed(0)} m`;
     const dv = c.vmin - c.vmin_ref;
     body += `<tr class="${i === LINE_I ? "on" : ""}" data-i="${i}">` +
-      `<td class="vc">${c.name}</td>` +
+      `<td class="vc">${c.name}` +
+      (c.off_here ? ` <span class="off-track" title="${escAttr(t("line.apexOff"))}">!</span>` : "") +
+      `</td>` +
       `<td class="vn">${shift}</td>` +
       cell(c.entry_m, c) + cell(c.apex_m, c) + cell(c.exit_m, c) +
       `<td class="vn">${c.radius_m ? Math.round(c.radius_m) : "–"}` +
@@ -2263,6 +2582,22 @@ function drawCornerZoom(L, c, cx) {
       minZ = Math.min(minZ, s.z[i]); maxZ = Math.max(maxZ, s.z[i]);
     }
   }
+  // The road, when the game's own track data could be read and matched to this
+  // lap (see trackedges.py). It joins the fit so the picture is framed on the
+  // asphalt rather than on the two lines: a corner where you ran wide should
+  // show the edge you ran past, not crop it out.
+  // …but not while the gap is magnified. At ×3 the line drawn is deliberately
+  // not where the car was, and a real edge under a fake line would read as an
+  // excursion that never happened. Real ground, or no ground.
+  const road = LINE_MAG > 1 ? null : c.line.edges;
+  if (road) {
+    for (const side of [road.left, road.right]) {
+      for (const p of side) {
+        minX = Math.min(minX, p[0]); maxX = Math.max(maxX, p[0]);
+        minZ = Math.min(minZ, p[1]); maxZ = Math.max(maxZ, p[1]);
+      }
+    }
+  }
   const m = 34, spanX = (maxX - minX) || 1, spanZ = (maxZ - minZ) || 1;
   const sc = Math.min((w - 2 * m) / spanX, (h - 2 * m) / spanZ);
   const offX = (w - spanX * sc) / 2, offZ = (h - spanZ * sc) / 2;
@@ -2271,6 +2606,28 @@ function drawCornerZoom(L, c, cx) {
   // two views can be read one after the other without flipping your head.
   const X = (x) => (maxX - x) * sc + offX;
   const Y = (z) => h - ((z - minZ) * sc + offZ);
+
+  // The asphalt first, so everything else is drawn ON the road rather than
+  // beside it. Filled dark and edged with a hairline: the ribbon has to read as
+  // ground, not as a third racing line competing with the two above it.
+  if (road && road.left.length > 1) {
+    ctx.beginPath();
+    road.left.forEach((p, i) => (i ? ctx.lineTo(X(p[0]), Y(p[1]))
+                                   : ctx.moveTo(X(p[0]), Y(p[1]))));
+    for (let i = road.right.length - 1; i >= 0; i--) {
+      ctx.lineTo(X(road.right[i][0]), Y(road.right[i][1]));
+    }
+    ctx.closePath();
+    ctx.fillStyle = "rgba(255,255,255,0.06)";
+    ctx.fill();
+    ctx.strokeStyle = "rgba(255,255,255,0.32)"; ctx.lineWidth = 1.5;
+    for (const side of [road.left, road.right]) {
+      ctx.beginPath();
+      side.forEach((p, i) => (i ? ctx.lineTo(X(p[0]), Y(p[1]))
+                                : ctx.moveTo(X(p[0]), Y(p[1]))));
+      ctx.stroke();
+    }
+  }
 
   // The band between the lines.
   ctx.beginPath();
@@ -2369,10 +2726,16 @@ function drawCornerZoom(L, c, cx) {
   ctx.lineTo(px0 + len, py0 - 4); ctx.stroke();
   ctx.fillStyle = "rgba(255,255,255,0.55)"; ctx.font = "11px " + MONO;
   ctx.fillText(nice + " m", px0 + len + 6, py0 + 1);
+  // The magnification caveat sits with the scale bar, not in the top-left
+  // corner: they are the same warning ("what you see is not the ground"), and
+  // the top of the canvas now carries the sentence about the corner.
   if (LINE_MAG > 1) {
     ctx.fillStyle = "#FFB020"; ctx.font = "11px " + UI_FONT;
-    ctx.fillText(tf("line.mag.note", { n: LINE_MAG }), 14, 18);
+    ctx.fillText(tf("line.mag.note", { n: LINE_MAG }), px0, py0 - 14);
   }
+
+  cornerNote(ctx, w, c);
+  insetMap(ctx, w, h, c, cx);
 
   // Hover marker.
   if (cx != null) {
@@ -2381,6 +2744,122 @@ function drawCornerZoom(L, c, cx) {
     ctx.beginPath(); ctx.arc(X(yx[i]), Y(yz[i]), 7, 0, 6.283); ctx.stroke();
   }
   return { pos: you.pos, X: (i) => X(yx[i]), Y: (i) => Y(yz[i]) };
+}
+
+// One line of canvas text, cut with an ellipsis rather than run off the edge.
+function clipText(ctx, s, maxw) {
+  s = String(s || "");
+  if (ctx.measureText(s).width <= maxw) return s;
+  while (s.length > 1 && ctx.measureText(s + "…").width > maxw) s = s.slice(0, -1);
+  return s.replace(/[\s,;:.]+$/, "") + "…";
+}
+
+// The sentence that belongs to this drawing.
+//
+// The debrief already wrote it — this corner's diagnosis, in the driver's own
+// language — and until now you had to leave the picture and go and find it on
+// another tab. It is copied verbatim from the analysis payload and never
+// re-derived here: two modules writing about the same corner is exactly how they
+// end up disagreeing (see the note at the top of trajectory.py).
+//
+// Nothing is drawn when this corner cost nothing, which is itself a reading: the
+// line you are looking at is not where the lap went.
+function cornerNote(ctx, w, corner) {
+  const l = ((DATA && DATA.losses) || []).find((x) => x.index === corner.index);
+  if (!l || !l.message) return;
+  const maxw = w - 28;
+  ctx.save();
+  ctx.font = "12px " + UI_FONT;
+  const head = `${(l.lost_s || 0).toFixed(2)} s · ${l.message}`;
+  // A backdrop, because this text lies over a drawing: the two lines cross the
+  // whole canvas and a bare label on top of them is unreadable at the crossing.
+  const sub = l.inherited || l.phase_note || "";
+  const lines = sub ? 2 : 1;
+  ctx.fillStyle = "rgba(11,14,18,0.72)";
+  ctx.fillRect(0, 0, w, 12 + lines * 15);
+  ctx.fillStyle = "#FFB020";
+  ctx.fillText(clipText(ctx, head, maxw), 14, 20);
+  if (sub) {
+    ctx.font = "11px " + UI_FONT;
+    ctx.fillStyle = "rgba(255,255,255,0.6)";
+    ctx.fillText(clipText(ctx, (l.inherited ? "↩ " : "") + sub, maxw), 14, 35);
+  }
+  ctx.restore();
+}
+
+// "You are here": the whole lap, small, with the corner on screen lit up.
+//
+// The zoomed corner is the one picture on this page with no context at all —
+// two hairpins on the same track draw the same shape, and which one you clicked
+// is something you had to remember. The outline costs nothing: it is the same
+// coordinates the track map is already drawn from.
+function insetMap(ctx, w, h, corner, cx) {
+  const ch = DATA && DATA.has_map && DATA.review && DATA.review.channels;
+  if (!ch || !Array.isArray(ch.x) || ch.x.length < 3) return;
+  // Too small a canvas and the inset would cover the corner it is placing.
+  if (w < 260 || h < 200) return;
+  const side = Math.max(64, Math.min(132, Math.min(w, h) * 0.34));
+  const pad = 10, x0 = w - side - pad, y0 = h - side - pad;
+
+  let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+  for (let i = 0; i < ch.x.length; i++) {
+    minX = Math.min(minX, ch.x[i]); maxX = Math.max(maxX, ch.x[i]);
+    minZ = Math.min(minZ, ch.z[i]); maxZ = Math.max(maxZ, ch.z[i]);
+  }
+  const spanX = (maxX - minX) || 1, spanZ = (maxZ - minZ) || 1;
+  const inner = side - 16;
+  const s = Math.min(inner / spanX, inner / spanZ);
+  const ox = x0 + (side - spanX * s) / 2, oz = y0 + (side - spanZ * s) / 2;
+  // Same mirrored projection as the track map and as the zoom above it: three
+  // pictures of the same lap that disagree about left and right are worse than
+  // two of them not existing.
+  const X = (x) => (maxX - x) * s + ox;
+  const Y = (z) => y0 + side - ((z - minZ) * s + oz - y0);
+
+  ctx.save();
+  ctx.fillStyle = "rgba(11,14,18,0.72)";
+  ctx.strokeStyle = "rgba(255,255,255,0.12)"; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.rect(x0 + 0.5, y0 + 0.5, side, side);
+  ctx.fill(); ctx.stroke();
+
+  ctx.lineJoin = "round"; ctx.lineCap = "round";
+  ctx.strokeStyle = "rgba(255,255,255,0.35)"; ctx.lineWidth = 1.4;
+  ctx.beginPath();
+  for (let i = 0; i < ch.x.length; i++) {
+    const px = X(ch.x[i]), py = Y(ch.z[i]);
+    i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+  }
+  ctx.stroke();
+
+  // The stretch you are looking at, in the same accent as your line above. Drawn
+  // fat on purpose: a corner is a per cent of a lap, so at this size it is three
+  // pixels of track and a hairline would read as nothing.
+  ctx.strokeStyle = "#22D3CE"; ctx.lineWidth = 5;
+  ctx.beginPath();
+  let drawing = false;
+  for (let i = 0; i < ch.x.length; i++) {
+    if (ch.pos[i] < corner.entry || ch.pos[i] > corner.exit) { drawing = false; continue; }
+    const px = X(ch.x[i]), py = Y(ch.z[i]);
+    drawing ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+    drawing = true;
+  }
+  ctx.stroke();
+
+  // A ring around the corner, because at this size the highlighted stretch is a
+  // few pixels of a whole lap: the ring is what the eye lands on, the stretch is
+  // what tells it how much of the track that is.
+  const aj = nearest(ch.pos, corner.apex_you);
+  ctx.strokeStyle = "rgba(34,211,206,0.75)"; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.arc(X(ch.x[aj]), Y(ch.z[aj]), 11, 0, 6.283); ctx.stroke();
+
+  // The dot: where the cursor is when you're hovering, the apex when you're not.
+  // Small, with a dark hairline rather than a filled halo — a fat marker here
+  // covers the very stretch it is marking.
+  const i = cx != null ? nearest(ch.pos, cx) : aj;
+  ctx.beginPath(); ctx.arc(X(ch.x[i]), Y(ch.z[i]), 3, 0, 6.283);
+  ctx.fillStyle = "#ffffff"; ctx.fill();
+  ctx.strokeStyle = "rgba(11,14,18,0.85)"; ctx.lineWidth = 1.5; ctx.stroke();
+  ctx.restore();
 }
 
 // The whole lap's distance from the reference line, with the corner you're
@@ -2399,6 +2878,7 @@ function drawOffsetTrace(L, corner, cx) {
   // The corner on screen, lit up: the trace and the zoom are the same corner.
   ctx.fillStyle = "rgba(34,211,206,0.10)";
   ctx.fillRect(corner.entry * w, 0, (corner.exit - corner.entry) * w, h);
+  gridX(ctx, w, h);
   gridY(ctx, w, h, -m, m, (v) => fixz(v, 1) + " m");
   ctx.strokeStyle = "rgba(255,255,255,0.3)";
   ctx.beginPath(); ctx.moveTo(0, h / 2); ctx.lineTo(w, h / 2); ctx.stroke();
@@ -2422,6 +2902,7 @@ function drawCurvature(L, corner, cx) {
   cornerBands(ctx, w, h, (DATA && DATA.corners) || []);
   ctx.fillStyle = "rgba(34,211,206,0.10)";
   ctx.fillRect(corner.entry * w, 0, (corner.exit - corner.entry) * w, h);
+  gridX(ctx, w, h, true);   // the bottom chart of the Trajectory stack: label it
   // Gridlines with no scale on purpose: curvature is in 1/m, which nobody feels,
   // and labelling the ticks with the radius they stand for prints the same two
   // numbers mirrored either side of a middle that means "straight". The radius
@@ -2449,7 +2930,7 @@ function updateLineReadout(L, p) {
   const off = DATA && DATA.review && DATA.review.line_offset;
   const pos = DATA && DATA.review && DATA.review.channels.pos;
   let bits = `<b class="muted">${c.name}</b> &nbsp;·&nbsp; ` +
-             `<b>${t("ro.pos")} ${(p * 100).toFixed(1)}%</b>`;
+             `<b>${t("ro.pos")} ${posLabel(p)}</b>`;
   if (Array.isArray(off) && pos) {
     const i = nearest(pos, p);
     bits += ` &nbsp;·&nbsp; ${t("line.ro.off")} <b>${offWord(off[i] * (c.direction === "left" ? -1 : 1), c)}</b>`;
@@ -2483,7 +2964,7 @@ function readoutHTML(a, p) {
   const corner = (a.corners || []).find((c) => p >= c.entry && p <= c.exit);
   const where = corner ? `<b class="muted">${corner.name}</b> &nbsp;·&nbsp; ` : "";
   return where +
-    `<b>${t("ro.pos")} ${Math.round(p * 100)}%</b> &nbsp;·&nbsp; ` +
+    `<b>${t("ro.pos")} ${posLabel(p)}</b> &nbsp;·&nbsp; ` +
     `${t("ro.speed")} <b>${yv.toFixed(0)}</b> <span class="muted">(${t("ro.ref")} ${rfv.toFixed(0)}, ${dv >= 0 ? "+" : ""}${dv.toFixed(0)})</span> &nbsp;·&nbsp; ` +
     `Δ <b class="${dl > 0 ? "slower" : "faster"}">${dl >= 0 ? "+" : ""}${dl.toFixed(3)}s</b> &nbsp;·&nbsp; ` +
     `${t("ro.throttle")} <b>${Math.round(rv.throttle[iv] * 100)}%</b>  ${t("ro.brake")} <b>${Math.round(rv.brake[iv] * 100)}%</b> &nbsp;·&nbsp; ` +
@@ -2642,6 +3123,8 @@ window.HoneI18nRerender = function () {
     cb.title = window.HoneI18n.t("cb.label");
     cb.setAttribute("aria-label", window.HoneI18n.t("cb.label"));
   }
+  wireTabs();          // the tabs carry their shortcut in their tooltip
+  wireHints();
   fillCombos();
   // Re-FETCH, not just re-draw. The debrief, the corner names, the lap-wide
   // notes and every word of the guided flow are written by the backend in the

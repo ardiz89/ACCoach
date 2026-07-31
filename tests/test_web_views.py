@@ -234,3 +234,83 @@ def test_the_new_views_declare_a_narrow_layout(view):
               "line": ".line-grid"}[view]
     tail = _CSS[_CSS.index("@media (max-width: 700px)"):]
     assert marker in tail, f"no narrow-screen rule for the {view} view"
+
+
+# --- the lap position is one wording, in one place --------------------------
+# Three readouts print where you are on the lap (Compare, Dynamics, Trajectory).
+# They used to build the label by hand, in three places, in per cent; when the
+# axis learned to speak metres, a view left behind would keep saying "45%" next
+# to charts labelled "2000 m" and nothing would fail.
+
+def test_no_readout_writes_its_own_position_label():
+    for m in re.finditer(r'ro\.pos"\)\}([^`]{0,40})', _APPJS):
+        assert "posLabel(" in m.group(1), m.group(0)
+
+
+def test_the_metre_axis_still_has_a_way_back_to_per_cent():
+    """A lap with no coordinates — or with coordinates the backend refused to
+    believe — must fall back, not draw a scale it doesn't have."""
+    block = _APPJS[_APPJS.index("function gridX("):]
+    block = block[:block.index("\nfunction ")]
+    assert 'Math.round(q * 100) + "%"' in block
+    assert "distanceTicks()" in block
+
+
+# --- the lap bar: one identity strip, on every tab --------------------------
+# The landing view explained a lap without ever naming it — the lap time, the
+# reference and the gap lived inside Compare's own summary. They moved to a strip
+# under the tabs; these pin the two ways that can silently regress.
+
+def test_the_lap_bar_is_outside_every_view():
+    """Inside a view panel it would show on one tab and vanish on the other
+    seven, which is the bug it was built to fix."""
+    assert 'id="lapbar"' in _HTML
+    assert _view_of_ids()["lapbar"] == "", "the lap bar sits in a view panel"
+
+
+def test_the_compare_summary_no_longer_repeats_the_lap_bar():
+    """Two places printing the same gap drift apart the day one of them learns
+    something the other doesn't."""
+    body = _APPJS[_APPJS.index("function drawSummary("):]
+    body = body[:body.index("\n}")]
+    for key in ('t("lbl.lap")', 't("lbl.comparison")', 't("lbl.gap")'):
+        assert key not in body, key
+
+
+def test_a_remembered_view_is_checked_before_it_is_used():
+    """localStorage outlives the page: a view saved by an older build, or one
+    removed since, must not be restored onto a panel that isn't there."""
+    body = _APPJS[_APPJS.index("function savedView("):]
+    body = body[:body.index("\n}")]
+    assert 'getElementById("view-" + v)' in body
+
+
+def test_no_id_rule_can_outrank_the_hidden_class():
+    """`.hidden { display: none }` is how one view is shown and seven are not,
+    and it is a *class*: any `#view-x` rule that sets `display` wins on
+    specificity and leaves that panel on screen under every other tab. It
+    happened the day the landing view was centred vertically, so the rule is
+    pinned here: qualify such selectors with `:not(.hidden)`.
+    """
+    for m in re.finditer(r"(#view-[\w-]+)([^{]*)\{([^}]*)\}", _screen_css()):
+        sel, rest, body = m.group(1), m.group(2), m.group(3)
+        if "display" not in body:
+            continue
+        assert ":not(.hidden)" in sel + rest, f"{sel}{rest} sets display"
+
+
+def _screen_css() -> str:
+    """The stylesheet without its print block — printing deliberately forces
+    every panel visible, which is the opposite rule and not a mistake."""
+    i = _CSS.find("@media print")
+    if i == -1:
+        return _CSS
+    depth, j = 0, _CSS.index("{", i)
+    for k in range(j, len(_CSS)):
+        if _CSS[k] == "{":
+            depth += 1
+        elif _CSS[k] == "}":
+            depth -= 1
+            if depth == 0:
+                return _CSS[:i] + _CSS[k + 1:]
+    return _CSS[:i]

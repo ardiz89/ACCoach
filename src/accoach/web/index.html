@@ -47,6 +47,12 @@
     <button class="tab" data-view="progress" data-i18n="tab.trends">Trends</button>
   </nav>
 
+  <!-- Which lap you are looking at, on every tab. These four numbers used to
+       live only inside Compare's own summary, so the landing view — the first
+       thing the page shows, and the one that explains the lap — never said
+       which lap it was explaining. -->
+  <section id="lapbar" class="lapbar"></section>
+
   <!-- The lap explained one step at a time. Same findings as the debrief below,
        edited server-side into what to look at first (see coaching/flow.py). -->
   <div id="view-flow">
@@ -59,6 +65,12 @@
       <div class="chart flow-chart">
         <h3 id="flow-chart-title"></h3>
         <canvas id="c-flow"></canvas>
+      </div>
+      <!-- Where on the track this step is: the delta-coloured line the Map tab
+           already draws, with the stretch under discussion lit up. -->
+      <div class="chart flow-map">
+        <h3 id="flow-map-title"></h3>
+        <canvas id="c-flow-map"></canvas>
       </div>
       <nav class="flow-nav">
         <button id="flow-prev" type="button" class="flow-btn" data-i18n="flow.prev">← Back</button>
@@ -174,6 +186,10 @@
           <span class="swatch"><span class="sw-band"></span> <span data-i18n="line.leg.band">the gap between them</span></span>
           <span class="swatch"><span class="marker">●</span> <span data-i18n="line.leg.apex">your slowest point</span></span>
           <span class="swatch"><span class="marker ring">○</span> <span data-i18n="line.leg.apexref">the reference's</span></span>
+          <!-- Only when the game's track data could be read AND matched to this
+               lap; the wording says asphalt, because that is what it is. -->
+          <span class="swatch hidden" id="leg-road"><span class="sw-road"></span>
+            <span id="leg-road-text"></span></span>
         </div>
       </div>
       <aside id="line-facts" class="facts"></aside>
@@ -193,10 +209,12 @@
   </div>
 
   <div id="view-sectors" class="hidden">
-    <section id="sec-summary" class="summary"></section>
-    <div class="sec-head"><span data-i18n="sec.col.sector">Sector</span><span data-i18n-html="sec.col.time">Time <small>(ref)</small></span><span data-i18n-html="sec.col.delta">Δ vs reference <small>(bars left = faster, right = slower)</small></span></div>
+    <div class="sec-head"><span><span data-i18n="sec.col.sector">Sector</span> <small id="sec-kind"></small></span><span data-i18n-html="sec.col.time">Time <small>(ref)</small></span><span data-i18n-html="sec.col.delta">Δ vs reference <small>(bars left = faster, right = slower)</small></span></div>
     <div id="sectors" class="sectors"></div>
     <section id="ideal" class="ideal"></section>
+    <!-- Which laps the ideal is actually made of: every lap, sector by sector,
+         best of each column marked. -->
+    <section id="sec-table" class="debrief"></section>
   </div>
 
   <div id="view-progress" class="hidden">

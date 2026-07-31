@@ -223,6 +223,22 @@ def test_sectors_breakdown_and_ideal(tmp_path):
     assert ideal["gain_ms"] >= 0
 
 
+def test_sectors_carry_every_lap_so_the_ideal_can_be_checked(tmp_path):
+    """The ideal lap claims a time nobody drove; `per_lap` is where you see the
+    laps it was stitched from. Same spans and same timing as the ideal itself —
+    if these two ever disagreed, the table would contradict the line above it."""
+    c = _client(tmp_path)
+    data = c.get("/api/sectors", params={"car": CAR, "track": TRACK}).json()
+    rows = data["per_lap"]
+    assert rows, "every valid lap should be here"
+    for r in rows:
+        assert len(r["ms"]) == data["n"]
+        assert set(("path", "lap_time", "ms")) <= set(r)
+    # The best of each column *is* the ideal lap's best sector.
+    for i, best in enumerate(data["ideal"]["best_ms"]):
+        assert min(r["ms"][i] for r in rows) == best
+
+
 def test_analysis_404_for_unknown_combo(tmp_path):
     c = _client(tmp_path)
     r = c.get("/api/analysis", params={"car": "nope", "track": "nowhere"})
