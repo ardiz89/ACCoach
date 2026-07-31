@@ -766,11 +766,14 @@ function drawRoad(ctx, road, X, Y, hair) {
       ctx.closePath();
     }
   }
-  ctx.fillStyle = "rgba(255,255,255,0.06)";
+  // Misurato: al 6% su un pannello #151A21 l'asfalto sposta il fondo di 14
+  // livelli su 255 — c'e' ma non LEGGE come una strada, e il disegno resta
+  // "due linee nel vuoto" invece di "una pista vista dall'alto".
+  ctx.fillStyle = "rgba(255,255,255,0.14)";
   ctx.fill();
   // Each run is stroked on its own and never closed: where the track data has a
   // hole the ribbon stops, instead of taking a shortcut across the circuit.
-  ctx.strokeStyle = "rgba(255,255,255,0.32)";
+  ctx.strokeStyle = "rgba(255,255,255,0.55)";
   ctx.lineWidth = hair;
   for (const r of road.runs) {
     for (const side of [r.left, r.right]) {
@@ -2600,7 +2603,8 @@ function drawCornerZoom(L, c, cx) {
   const cv = $("c-corner");
   if (!cv) return null;
   const { ctx, w, h } = setup(cv);
-  const you = c.line.you, ref = c.line.ref;
+  const you = c.line.you;
+  let ref = c.line.ref;
   if (!you.x.length || !ref.x.length) return null;
 
   // Pair each of your points with the reference point at the same track
@@ -2617,20 +2621,13 @@ function drawCornerZoom(L, c, cx) {
   // almost entirely lateral (they're matched by track position), so blowing up
   // the whole vector reads as "further off line" and not as "further round the
   // corner".
-  const yx = [], yz = [];
+  let yx = [], yz = [];
   for (let i = 0; i < you.x.length; i++) {
     const k = pair[i];
     yx.push(ref.x[k] + (you.x[i] - ref.x[k]) * LINE_MAG);
     yz.push(ref.z[k] + (you.z[i] - ref.z[k]) * LINE_MAG);
   }
 
-  let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
-  for (const s of [{ x: yx, z: yz }, ref]) {
-    for (let i = 0; i < s.x.length; i++) {
-      minX = Math.min(minX, s.x[i]); maxX = Math.max(maxX, s.x[i]);
-      minZ = Math.min(minZ, s.z[i]); maxZ = Math.max(maxZ, s.z[i]);
-    }
-  }
   // The road, when the game's own track data could be read and matched to this
   // lap (see trackedges.py). It joins the fit so the picture is framed on the
   // asphalt rather than on the two lines: a corner where you ran wide should
@@ -2638,23 +2635,73 @@ function drawCornerZoom(L, c, cx) {
   // …but not while the gap is magnified. At ×3 the line drawn is deliberately
   // not where the car was, and a real edge under a fake line would read as an
   // excursion that never happened. Real ground, or no ground.
-  const road = LINE_MAG > 1 ? null : c.line.edges;
-  if (road) {
-    for (const r of road.runs) {
-      for (const side of [r.left, r.right]) {
-        for (const p of side) {
-          minX = Math.min(minX, p[0]); maxX = Math.max(maxX, p[0]);
-          minZ = Math.min(minZ, p[1]); maxZ = Math.max(maxZ, p[1]);
-        }
-      }
-    }
+  let road = LINE_MAG > 1 ? null : c.line.edges;
+
+  // Everything that has to fit inside the box.
+  const pool = [];
+  for (let i = 0; i < yx.length; i++) pool.push([yx[i], yz[i]]);
+  for (let i = 0; i < ref.x.length; i++) pool.push([ref.x[i], ref.z[i]]);
+  if (road) for (const r of road.runs) for (const side of [r.left, r.right]) {
+    for (const p of side) pool.push([p[0], p[1]]);
   }
-  const m = 34, spanX = (maxX - minX) || 1, spanZ = (maxZ - minZ) || 1;
-  const sc = Math.min((w - 2 * m) / spanX, (h - 2 * m) / spanZ);
+
+  // The box is wide and short; a corner is whatever shape it is. Drawn in the
+  // world's own axes, a corner that happens to run north-south uses a fifth of
+  // the width and the driver gets a stamp in the middle of an empty panel.
+  //
+  // So the picture is TURNED — the whole thing, by one angle, chosen as the one
+  // that lets it be drawn biggest. A rotation moves no point relative to any
+  // other: the shape, the widths and the metres are exactly what they were, and
+  // the scale bar still measures the same 25 m. It is the same corner, held up
+  // at a better angle, which is all "seen from above" ever meant.
+  const m = 34;
+  const cx0 = pool.reduce((a, p) => a + p[0], 0) / pool.length;
+  const cz0 = pool.reduce((a, p) => a + p[1], 0) / pool.length;
+  let best = null;
+  for (let deg = 0; deg < 180; deg += 3) {
+    const a = deg * Math.PI / 180, ca = Math.cos(a), sa = Math.sin(a);
+    let lx = Infinity, hx = -Infinity, lz = Infinity, hz = -Infinity;
+    for (const p of pool) {
+      const dx = p[0] - cx0, dz = p[1] - cz0;
+      const rx = dx * ca - dz * sa, rz = dx * sa + dz * ca;
+      if (rx < lx) lx = rx; if (rx > hx) hx = rx;
+      if (rz < lz) lz = rz; if (rz > hz) hz = rz;
+    }
+    const sX = (hx - lx) || 1, sZ = (hz - lz) || 1;
+    const scale = Math.min((w - 2 * m) / sX, (h - 2 * m) / sZ);
+    if (!best || scale > best.scale) best = { ca, sa, lx, hx, lz, hz, scale };
+  }
+
+  // The turn is applied to the DATA, once, so everything downstream — the
+  // lines, the band, the markers, the hover — keeps working in one flat
+  // coordinate system and cannot drift out of register with the road.
+  const turn = (x, z) => {
+    const dx = x - cx0, dz = z - cz0;
+    return [dx * best.ca - dz * best.sa, dx * best.sa + dz * best.ca];
+  };
+  const turnPair = (xs, zs) => {
+    const ox = [], oz = [];
+    for (let i = 0; i < xs.length; i++) {
+      const r = turn(xs[i], zs[i]);
+      ox.push(r[0]); oz.push(r[1]);
+    }
+    return [ox, oz];
+  };
+  [yx, yz] = turnPair(yx, yz);
+  ref = { ...ref, ...(([a, b]) => ({ x: a, z: b }))(turnPair(ref.x, ref.z)) };
+  if (road) {
+    road = { ...road, runs: road.runs.map((r) => ({
+      left: r.left.map((p) => turn(p[0], p[1])),
+      right: r.right.map((p) => turn(p[0], p[1])),
+    })) };
+  }
+
+  const minX = best.lx, maxX = best.hx, minZ = best.lz;
+  const sc = best.scale;
+  const spanX = (best.hx - best.lx) || 1, spanZ = (best.hz - best.lz) || 1;
   const offX = (w - spanX * sc) / 2, offZ = (h - spanZ * sc) / 2;
-  // Same mirrored projection as the track map (AC/ACC world coords are
-  // left-handed), so a corner looks the way it does from the cockpit and the
-  // two views can be read one after the other without flipping your head.
+  // Mirrored like the track map (AC/ACC world coords are left-handed), so a
+  // corner still bends the way it does from the cockpit.
   const X = (x) => (maxX - x) * sc + offX;
   const Y = (z) => h - ((z - minZ) * sc + offZ);
 
