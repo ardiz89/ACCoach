@@ -479,3 +479,113 @@ Tre test statici lo tengono fermo: le parole abbandonate non rientrano, un
 termine che resta è spiegato **nello stesso esercizio**, e il gergo dell'app è
 definito **prima** di essere nominato (verificato sull'ordine dei caratteri
 nella frase, non a occhio). Suite **1262**.
+
+### Revisione del panel — lessico e dizionario (31/07)
+
+Quattro revisori sulla sola scheda Allenamento: i tre ingegneri di pista
+(GT3, monoposto, stradali — le classi hanno vocabolari e fisiche diverse) e un
+revisore di lingua incaricato di difendere chi non ha mai letto un grafico.
+Sono arrivati separatamente sugli stessi punti, ed è quello che li rende
+credibili.
+
+#### Quello che avevamo scritto ed era sbagliato
+
+- **«L'apex è il punto più stretto della curva».** Tutti e tre gli ingegneri,
+  indipendentemente: **una curva non ha un punto più stretto**, l'asfalto è
+  largo uguale. L'apex è il punto in cui *la tua traiettoria* passa più vicino
+  al bordo interno. Era la glossa più ripetuta della libreria, quindi una
+  correzione sola si è propagata ovunque.
+- **«Se blocchi le ruote sei andato oltre».** Con l'ABS **le ruote non si
+  bloccano**: l'esercizio aspettava un segnale che non sarebbe mai arrivato, e
+  il pilota continuava a spostare il punto. Ora la riga nomina i due segnali —
+  il bloccaggio dove prima non bloccavi, oppure il pedale che vibra e l'auto che
+  va dritta invece di girare.
+- **«Se le ruote pattinano».** Stessa cosa col controllo di trazione: non
+  pattinano, si strozza il motore. E su una stradale potente **senza** TC il
+  posteriore pattina anche da un'uscita perfetta, quindi la diagnosi mandava a
+  riparare una curva fatta giusta.
+- **Il grafico «Bloccaggio e pattinamento» dice "tutto ok" proprio nel caso
+  peggiore**: col TC acceso la traccia posteriore resta a zero *perché è il TC a
+  tenercela*. Ora la riga lo dichiara.
+- **Due esercizi si contraddicevano.** `apex_speed` diceva che il freno serve
+  «prima della curva, non dentro»; `brake_release`, un esercizio più in là,
+  insegna esattamente a tenerlo dentro. Chi li faceva in due sessioni riceveva
+  due istruzioni opposte.
+- **`exit_throttle` si contraddiceva da solo**: «da lì il gas è a fondo» al
+  primo passo, «apri poco alla volta» al quarto. Su un'auto senza TC il primo è
+  l'istruzione per girarsi.
+- **L'esercizio «frena più tardi» non diceva mai in che direzione spostare il
+  punto.** La direzione si deduceva solo sbagliando.
+- **«Perdi un decimo in ingresso e ne prendi due sul dritto»**: l'unico numero
+  della libreria che non veniva da una misura, in un modulo il cui docstring
+  promette di non inventarne.
+- **Due rimandi a schede che non esistono** (verificati contro `i18n.js`):
+  «Tendenze» per una scheda che si chiama **Andamento**, «Blocchi e
+  pattinamenti» per un grafico che si chiama **Bloccaggio e pattinamento**.
+- **`in {g}`** in inglese stampava «in 3» invece di «in gear 3».
+
+#### La contraddizione più seria, e non era di lingua
+
+`tuning.py` mette **`trail_brake_cue=False` per le stradali**, e non per
+un'intuizione: l'audit su strada (M3 E92 a Suzuka) ha fatto scattare **sei cue
+di trail braking, tutti dichiarati falsi dal pilota, e nessuno vero**.
+`braking.py` lo rispetta e il coach live tace. Ma `drill_key` instradava lo
+stesso una stradale su `brake_release`, che è **venti giri di esercizio proprio
+su quella tecnica**. Le due metà dell'app davano consigli opposti alla stessa
+auto.
+
+Chiuso: `drill_key` prende ora `trail_brake` dalla tabella di taratura (una
+riga, `trail_brake_for`), e quelle curve ricevono **«Frena dritto, poi gira»** —
+sesto esercizio, con dentro anche la scalata prima di girare, che è la causa di
+instabilità in ingresso che nessun esercizio nominava.
+
+#### Il dizionario
+
+Otto voci al massimo, ma il punto non è il testo: sono le tre regole di
+comportamento, quelle che decidono se un glossario si legge o si salta.
+
+1. **Non è mai l'unico posto in cui una parola è spiegata.** Ogni termine resta
+   glossato dentro l'esercizio che lo usa. Il dizionario è la *seconda*
+   spiegazione — ed è per questo che saltarlo non costa niente, e che chi lo
+   apre lo apre di proposito.
+2. **Mostra solo le parole dell'esercizio aperto.** A schermo un esercizio alla
+   volta: un dizionario che spiega *trail braking* accanto all'esercizio
+   dell'uscita è zavorra. In pratica restano 3-6 voci, e la lista non invecchia.
+3. **Chiuso mostra le parole, non l'etichetta «Glossario».** Un box intitolato
+   «Glossario» dice al lettore che non sa le cose, e viene saltato esattamente
+   da chi ne ha bisogno. La riga di termini è l'invito: la scorri e apri per
+   l'unica parola che non hai.
+
+L'ordine è quello della pagina, non alfabetico, e un test verifica che **nessuna
+definizione si appoggi a un termine definito più sotto** — che è l'argomento per
+cui un glossario non si ordina alfabeticamente.
+
+#### Cosa il panel ha chiesto e **non** abbiamo fatto
+
+Detto qui perché non venga scambiato per fatto. Tutto quanto segue richiede di
+far arrivare la **classe dell'auto e il livello degli aiuti** dentro le stringhe,
+non solo dentro la scelta dell'esercizio — un lavoro diverso da una passata di
+lessico, e i dati per farlo ci sono già (`classify()`, `abs_level`, `tc_level`,
+`speed_split_kmh`, `spin_ratio`).
+
+- **Varianti per aiuti**: oggi le righe di ABS e TC nominano *entrambi* i casi.
+  È onesto per tutti, ma meno preciso di una riga scritta per l'auto che hai.
+- **Curva lenta contro curva veloce** (`speed_split_kmh` esiste ed è
+  inutilizzato). Su monoposto, «allarga l'ingresso» e «entra con meno freno per
+  misurare» sono **da disattivare** in curva veloce, dove il carico cresce col
+  quadrato della velocità e due metri fuori traiettoria sono asfalto sporco a
+  200 km/h.
+- **Passo del punto di frenata**: cinque metri sono il 15% di una staccata corta
+  e il 5% di una lunga. Andrebbe calcolato da `brake_distance_m`, con pavimento
+  alla dispersione misurata — oggi il drill può chiedere di spostare il punto di
+  meno di quanto già oscilla da solo.
+- **`_REPEATABLE_KMH` fisso a 3 km/h**: è il 5% in un tornante e l'1.4% in una
+  curva veloce da monoposto. Andrebbe in percentuale, e **separato** dalla stessa
+  soglia usata in `_speed_gain`, dove l'errore va nella direzione opposta.
+- **`spin_ratio` per classe** nella riga del grafico invece di «quasi piatta».
+- **Un sesto esercizio sulle scalate**, per l'instabilità in ingresso da
+  sovrasterzo: `diagnosis.py` produce già l'informazione.
+- **Il cordolo in uscita** come asfalto da usare, non solo come riferimento
+  visivo.
+
+Suite **1287**.

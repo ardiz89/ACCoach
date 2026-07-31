@@ -369,15 +369,17 @@
     "plan.since":      { en: `since {when}`, it: `dal {when}` },
     "plan.laps_since": { en: `{n} laps since`, it: `{n} giri da allora` },
     "plan.start":      { en: `Start this plan`, it: `Inizia questo piano` },
-    "plan.change":     { en: `Change goal`, it: `Cambia obiettivo` },
+    "plan.change":     { en: `Change target`, it: `Cambia obiettivo` },
     "plan.hits":       { en: `{hits} of the {needed} laps it takes`,
                          it: `{hits} dei {needed} giri che servono` },
-    "plan.now":        { en: `now ~{s}s`, it: `ora ~{s}s` },
-    "plan.best":       { en: `best {s}s`, it: `migliore {s}s` },
+    // Both used to render as bare numbers next to each other — "now ~0.31s ·
+    // best 0.18s" — with nothing saying 0.31s *of what*.
+    "plan.now":        { en: `you lose ~{s}s now`, it: `ora perdi ~{s}s` },
+    "plan.best":       { en: `your best {s}s`, it: `il tuo meglio {s}s` },
     "plan.nolaps":     { en: `no laps since you started it — go and drive`,
                          it: `nessun giro da quando l'hai avviato — vai a guidare` },
-    "plan.willmeasure":{ en: `start it and every lap from then on is measured against this`,
-                         it: `avvialo e da lì in poi ogni giro viene misurato su questo` },
+    "plan.willmeasure":{ en: `start the plan and from then on every lap is measured against this target`,
+                         it: `avvia il piano e da lì in poi ogni giro viene misurato su questo obiettivo` },
 
     // ---- the Training tab ----
     // Only the chrome is declared here. Every sentence with a number in it is
@@ -400,10 +402,15 @@
     "train.ignore":    { en: `Ignore:`, it: `Ignora:` },
     "train.wholelap":  { en: `The whole lap`, it: `Il giro intero` },
     "train.status.now":   { en: `now`, it: `adesso` },
-    "train.status.later": { en: `after this`, it: `dopo` },
+    "train.status.later": { en: `later`, it: `dopo` },
     "train.status.done":  { en: `✓ done`, it: `✓ fatto` },
     "train.session":   { en: `Your next session`, it: `La tua prossima sessione` },
     "train.session.laps": { en: `({n} laps)`, it: `({n} giri)` },
+    // Not "Glossary": that label tells the reader they don't know things, and
+    // gets skipped by the people it exists for. The words themselves are the
+    // invitation.
+    "train.words":     { en: `The words you'll hear other people use:`,
+                         it: `Le parole che sentirai dire dagli altri:` },
 
     "lvl.header":      { en: `Levels <small>(best → ideal → PRO · gap = time available)</small>`,
                          it: `Livelli <small>(migliore → ideale → PRO · gap = tempo disponibile)</small>` },

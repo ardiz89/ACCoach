@@ -1011,6 +1011,23 @@ body.no-data .empty { display: block; }
 }
 .plan-prog.muted { font-family: var(--font-ui); }
 
+/* The glossary. Closed, it is a row of words — that row is the whole design:
+   you scan it, and you open it only if one of them is a word you don't know. */
+.train-words { padding: 18px var(--gut) 0; }
+.train-words .words { border-top: 1px solid var(--line); padding-top: 12px; }
+.train-words summary {
+  cursor: pointer; list-style: none; font-size: 13px;
+  display: flex; gap: 8px; flex-wrap: wrap; align-items: baseline;
+}
+.train-words summary::-webkit-details-marker { display: none; }
+.train-words summary::before { content: "▸"; color: var(--muted); }
+.train-words .words[open] summary::before { content: "▾"; }
+.words-lead { color: var(--muted); }
+.words-list { color: var(--cyan); }
+.train-words dl { margin: 12px 0 0; display: grid; gap: 8px; }
+.train-words dt { font-weight: 700; font-size: 13px; }
+.train-words dd { margin: 0 0 4px; color: var(--muted); font-size: 13px; line-height: 1.6; }
+
 /* The run plan. Deliberately the plainest thing on the page: it is what you
    read last, standing up. */
 .train-session { padding: 14px var(--gut) 0; }
@@ -1027,7 +1044,7 @@ body.no-data .empty { display: block; }
 
 @media (max-width: 700px) {
   .plan, .train-gap, .train-steps, .train-session, .plan-elsewhere,
-  .train-intro {
+  .train-intro, .train-words {
     padding-left: 16px; padding-right: 16px;
   }
   .plan h3 { flex-wrap: wrap; }

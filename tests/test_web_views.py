@@ -185,8 +185,19 @@ def test_no_two_functions_in_app_js_share_a_name():
 
 # --- the training tab is wired --------------------------------------------
 
+def test_the_glossary_shows_its_words_when_closed():
+    """A box labelled "Glossary" tells the reader they don't know things, and
+    gets skipped by exactly the people it exists for. The row of terms is the
+    invitation: you scan it and open it for the one word you don't have."""
+    block = _APPJS.split("function renderWords(")[1].split("\n}")[0]
+    assert "words-list" in block and "e.term" in block
+    assert "<details" in block, "it has to start closed"
+    assert 'id="train-words"' in _HTML
+    assert _view_of_ids()["train-words"] == "training"
+
+
 @pytest.mark.parametrize("el", ("train-gate", "train-gap", "train-steps",
-                                "train-session", "plan"))
+                                "train-session", "train-words", "plan"))
 def test_the_training_view_has_the_elements_its_code_reaches_for(el):
     assert f'id="{el}"' in _HTML
     assert f'"{el}"' in _APPJS

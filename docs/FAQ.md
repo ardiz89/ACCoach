@@ -135,6 +135,18 @@ of showing you a wrong scale.
   up together**. The gap to your theoretical ideal and what you bleed on an
   average lap in the corners are the same road measured two ways, and summing
   them would count the same time twice.
+
+  At the bottom sits **«The words you'll hear other people use»** — a short
+  glossary, closed, showing the terms in a row: you scan it and open it for the
+  one word you don't have. It is never the only place a word is explained (the
+  exercise above still glosses its own), and it only carries the terms of the
+  exercise you have open.
+
+  The exercises are **not the same for every car** where the difference matters:
+  on a low-downforce road car HONE won't have you practise trail braking, because
+  on those cars slowing in a straight line and then turning is the correct
+  technique — the same decision, on the same data, that makes the live coach stay
+  silent about it there. You get **«Brake in a straight line, then turn»** instead.
 - **Session** — one outing: the laps in the order you drove them (including the
   ones that don't count — you still drove them), your best, consistency, track
   temperature, **fuel per lap** (measured from the tank, on laps recorded from

@@ -222,11 +222,24 @@ Cosa trovi:
 
   **È la scheda scritta per chi non mastica telemetria**, quindi è anche l'unica
   che si spiega le parole mentre le usa: «l'ideale teorico» viene prima
-  descritto («il tuo tratto migliore in ogni settore, messo insieme») e poi
+  descritto («i tuoi tempi migliori, uno per settore, messi insieme») e poi
   nominato, e i termini che restano — apex, settore, velocità minima — sono
   spiegati dentro l'esercizio che li usa, perché a schermo ne è aperto uno solo.
   Dove una parola comune bastava, c'è quella: *il punto in cui inizi a frenare*,
   non *la staccata*.
+
+  In fondo alla scheda c'è **«Le parole che sentirai dire dagli altri»**: un
+  dizionario di poche voci, chiuso, che mostra i termini in fila. Lo scorri e lo
+  apri solo per la parola che non conosci. Non è mai l'unico posto in cui una
+  parola è spiegata — l'esercizio sopra la spiega comunque — e contiene solo i
+  termini dell'esercizio che hai aperto in quel momento.
+
+  Gli esercizi **non sono uguali per tutte le auto** dove la differenza conta:
+  su una stradale a basso carico HONE non ti fa allenare il trail braking (il
+  freno trascinato dentro la curva), perché su quelle auto la tecnica corretta è
+  rallentare dritti e poi girare — è la stessa decisione, presa sugli stessi
+  dati, per cui il coach in tempo reale su quelle auto sta zitto. Al suo posto
+  ricevi **«Frena dritto, poi gira»**.
 - **Sessione**: com'è andata una sola uscita. I giri nell'ordine in cui li hai
   guidati (compresi quelli tagliati o non validi — sono giri che hai fatto, solo
   non possono fare la media), migliore, costanza, temperatura dell'asfalto, e

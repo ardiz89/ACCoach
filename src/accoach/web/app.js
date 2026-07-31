@@ -378,7 +378,7 @@ function renderTraining(b) {
   const ready = b && b.ready;
   gate.classList.toggle("hidden", !!ready);
   for (const id of ["train-intro", "train-gap", "plan", "train-steps",
-                    "train-session"]) {
+                    "train-session", "train-words"]) {
     const el = $(id);
     if (el) el.classList.toggle("hidden", !ready);
   }
@@ -407,6 +407,22 @@ function renderTraining(b) {
   $("train-steps").innerHTML =
     (b.steps || []).map((s) => trainStep(s, prog[s.corner_index], saved)).join("");
   renderRunPlan(b.session);
+  renderWords(b.glossary);
+}
+
+// The glossary. Closed it shows the words themselves, not the label "Glossary":
+// a driver scanning a row of terms can see whether one of them is a word they
+// don't know, and open it for that. A box labelled "Glossary" only says "you
+// don't know these things", and gets skipped by exactly the people it's for.
+function renderWords(entries) {
+  const el = $("train-words");
+  if (!el) return;
+  if (!entries || !entries.length) { el.innerHTML = ""; return; }
+  el.innerHTML =
+    `<details class="words"><summary><span class="words-lead">${t("train.words")}</span>` +
+    `<span class="words-list">${entries.map((e) => e.term).join(" · ")}</span></summary>` +
+    `<dl>${entries.map((e) =>
+      `<dt>${e.term}</dt><dd>${e.definition}</dd>`).join("")}</dl></details>`;
 }
 
 function renderGap(gap) {

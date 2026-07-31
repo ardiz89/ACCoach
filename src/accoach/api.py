@@ -38,6 +38,7 @@ from .coaching import (
     lap_time_consistency,
     measure as measure_plan,
     propose as propose_plan,
+    trail_brake_for,
 )
 from .coaching.training import MIN_LAPS as _TRAIN_MIN_LAPS, assess as _assess_training
 from .comparison import Reference
@@ -1623,7 +1624,8 @@ def create_api(
 
         prog = build_programme(plan, progress, h.debriefs, gap, facts,
                                valid_laps=len(valid), lang=lg,
-                               inherited_sources=inherited)
+                               inherited_sources=inherited,
+                               trail_brake=trail_brake_for(car))
         out = prog.to_dict()
         out.update({"car": car, "track": track,
                     "plan": _plan_payload(plan, progress, saved, len(since))})

@@ -11,6 +11,7 @@ sentence explaining why a step comes first is only true relative to where it
 ended up — which is how two steps once both came out saying "start here".
 """
 import re
+from pathlib import Path
 
 import pytest
 
@@ -20,15 +21,19 @@ from accoach.coaching.phases import PhaseLoss
 from accoach.coaching.plan import Goal, GoalProgress, TrainingPlan
 from accoach.coaching.thresholds import SIGNIF_LOSS_MS
 from accoach.coaching.training import (
+    MAX_GLOSSARY,
     MAX_STEPS,
     MIN_LAPS,
     CornerFacts,
+    _DRILL_TERMS,
     assess,
     build_drill,
     build_gap,
     build_programme,
     dominant_phase,
     drill_key,
+    glossary_for,
+    trail_brake_for,
 )
 
 CAR, TRACK = "ferrari_488_gt3", "monza"
@@ -308,8 +313,11 @@ def test_words_a_plain_one_would_have_done_are_gone(lang, banned):
 
 
 @pytest.mark.parametrize("lang,term,gloss", [
-    ("it", "apex", "più stretto"),
-    ("en", "apex", "tightest"),
+    # "il punto più stretto della curva" was wrong and the race engineers all
+    # said so: a corner doesn't get narrower. The apex is where *your* line
+    # passes closest to the inside edge.
+    ("it", "apex", "bordo interno"),
+    ("en", "apex", "inside edge"),
 ])
 def test_a_term_that_stays_is_explained_inside_the_drill_that_uses_it(
         lang, term, gloss):
@@ -323,8 +331,8 @@ def test_a_term_that_stays_is_explained_inside_the_drill_that_uses_it(
 
 
 @pytest.mark.parametrize("lang,term,definition", [
-    ("it", "ideale teorico", "settore"),
-    ("en", "theoretical ideal", "sector"),
+    ("it", "ideale teorico", "settori"),
+    ("en", "theoretical ideal", "sectors"),
 ])
 def test_the_app_s_own_jargon_is_defined_before_it_is_named(lang, term,
                                                             definition):
@@ -337,6 +345,174 @@ def test_the_app_s_own_jargon_is_defined_before_it_is_named(lang, term,
         assert definition in v, f"{k} names {term!r} without saying what it is"
         assert v.index(definition) < v.index(term), \
             f"{k} names {term!r} before defining it"
+
+
+def test_no_drill_claims_a_signal_the_car_may_not_give():
+    """The race-engineer panel's first finding, and all three said it: with ABS
+    the wheels don't lock and with TC they don't spin, so a drill whose stop
+    condition is "when you lock" or "when you spin" never fires on most of the
+    cars people drive — and the driver keeps pushing past the point."""
+    it = _T["it"]
+    lock = it["d.brake_move_later.s3"].lower()
+    assert "abs" in lock and "vibrare" in lock, "il caso con ABS non è coperto"
+    spin = it["d.exit_throttle.s1"].lower()
+    assert "controllo di trazione" in spin, "il caso col TC non è coperto"
+    chart = it["d.exit_throttle.s4"].lower()
+    assert "controllo di trazione" in chart, \
+        "il grafico dice 'tutto ok' proprio col TC acceso: va detto"
+
+
+def test_the_two_entry_drills_do_not_contradict_each_other():
+    """`apex_speed` used to say the brake has no business inside the corner,
+    which is the opposite of what the trail-braking drill next door teaches. A
+    driver doing both in two sessions got two opposite instructions."""
+    for lang in ("it", "en"):
+        s2 = _T[lang]["d.apex_speed.s2"].lower()
+        assert "poco alla volta" in s2 or "gradually" in s2
+        assert "non dentro la curva" not in s2 and "not inside it" not in s2
+
+
+def test_the_exit_drill_does_not_ask_for_full_throttle_from_a_fixed_point():
+    """Taken literally on a powerful car with no traction control, "flat out
+    from here" is the instruction to spin — and it contradicted the same drill's
+    own «open it a bit at a time» two lines later."""
+    for lang in ("it", "en"):
+        s0 = _T[lang]["d.exit_throttle.s0"].lower()
+        assert "non torna" in s0 or "never comes back" in s0
+
+
+def test_the_braking_drill_says_which_way_to_move_the_point():
+    """It is the "brake later" exercise and neither the title nor the step ever
+    said *later*: the direction could only be inferred by overshooting."""
+    assert "più avanti" in _T["it"]["d.brake_move_later.s2"]
+    assert "later" in _T["en"]["d.brake_move_later.s2"]
+    assert "più avanti" in _T["it"]["d.brake_move_later.title"]
+    assert "later" in _T["en"]["d.brake_move_later.title"]
+
+
+def test_every_drill_that_asks_for_an_edge_says_how_to_back_off():
+    """A drill that deliberately sends a driver past the limit and then goes
+    quiet is a dare, not an exercise."""
+    it = _T["it"]
+    assert "non alzare il piede di scatto" in it["d.apex_speed.s1b"]
+    assert "non staccare il piede di colpo" in it["d.brake_release.s2b"]
+    assert "torna al punto di prima" in it["d.brake_move_later.s3"].lower()
+
+
+def test_the_invented_ratio_is_gone():
+    """"Lose a tenth on entry, take two back" was the one number in the library
+    that came from nobody's measurement, in a module whose docstring promises it
+    never invents a finding."""
+    for lang in ("it", "en"):
+        s2 = _T[lang]["d.exit_throttle.s2"]
+        assert "due" not in s2.split(":")[-1] or "interessi" in s2
+        assert "take two back" not in s2
+
+
+@pytest.mark.parametrize("lang", ("it", "en"))
+def test_the_page_points_at_tabs_that_exist(lang):
+    """Two Italian cross-references named tabs by the wrong label: «Tendenze»
+    for a tab called Andamento, «Blocchi e pattinamenti» for a chart called
+    Bloccaggio e pattinamento. A pointer to a thing that isn't there is worse
+    than no pointer."""
+    i18n = (Path(__file__).resolve().parents[1] / "src" / "accoach" / "web"
+            / "i18n.js").read_text(encoding="utf-8")
+    label = {"it": "Andamento", "en": "Trends"}[lang]
+    assert label in _T[lang]["need_weakness"]
+    assert f"`{label}`" in i18n or f"{label}<" in i18n or label in i18n
+    slip = {"it": "Bloccaggio e pattinamento", "en": "Lock &amp; spin"}[lang]
+    assert slip in _T[lang]["d.exit_throttle.s4"]
+
+
+# --- the glossary -----------------------------------------------------------
+
+def test_the_glossary_only_carries_words_that_are_on_screen():
+    """It follows the open drill: a definition for a word the reader hasn't met
+    is the thing that makes a glossary skippable."""
+    braking = {e.term for e in glossary_for("brake_move_later", "it")}
+    exiting = {e.term for e in glossary_for("exit_throttle", "it")}
+    assert "Trail braking" not in braking and "Trail braking" not in exiting
+    assert "Bloccaggio" in braking and "Bloccaggio" not in exiting
+    assert "Pattinamento" in exiting
+
+
+def test_the_glossary_always_carries_the_words_the_page_itself_uses():
+    for key in ("brake_move_later", "exit_throttle", "consistency", ""):
+        terms = {e.term for e in glossary_for(key, "it")}
+        assert {"Settore", "Ideale teorico", "Giro valido"} <= terms, key
+
+
+def test_the_glossary_is_never_the_only_place_a_word_is_explained():
+    """It is the *second* explanation, which is why skipping it costs nothing.
+    Each drill still glosses its own terms."""
+    for key, gloss in (("brake_move_later", "bordo interno"),
+                       ("brake_release", "trail braking"),
+                       ("exit_throttle", "più veloci di quanto")):
+        text = " ".join(v for k, v in _T["it"].items()
+                        if k.startswith(f"d.{key}.")).lower()
+        assert gloss in text, f"{key} si appoggia al glossario per {gloss!r}"
+
+
+@pytest.mark.parametrize("lang", ("it", "en"))
+def test_the_glossary_never_leans_on_a_word_defined_below_it(lang):
+    """The order is the page's, not the alphabet's, exactly so this holds: a
+    reader going top to bottom must never meet a term whose definition is still
+    ahead of them. An alphabetical glossary can't promise that — which is the
+    argument for not sorting it."""
+    for key in _DRILL_TERMS:
+        entries = glossary_for(key, lang)
+        for i, e in enumerate(entries):
+            later = [x.term.lower() for x in entries[i + 1:]]
+            body = e.definition.lower()
+            leaned = [t for t in later if t in body]
+            assert not leaned, f"{key}/{e.term} usa {leaned}, definiti più sotto"
+
+
+def test_the_glossary_stays_short_enough_to_read():
+    for key in _DRILL_TERMS:
+        assert len(glossary_for(key, "it")) <= MAX_GLOSSARY, key
+
+
+@pytest.mark.parametrize("lang", ("it", "en"))
+def test_every_glossary_entry_is_one_self_contained_sentence(lang):
+    for key in _DRILL_TERMS:
+        for e in glossary_for(key, lang):
+            assert e.term and e.definition
+            assert e.definition.endswith("."), e.definition
+            assert e.definition.count(".") == 1, e.definition
+
+
+# --- the class the car belongs to -------------------------------------------
+
+def test_road_cars_are_not_taught_the_technique_the_coach_refuses_to_mention():
+    """`tuning.py` sets trail_brake_cue=False for road cars on a real audit —
+    the M3 E92 at Suzuka fired six trail-brake cues, the driver called all six
+    false and none true — and `braking.py` honours it. Teaching a twenty-lap
+    drill on it here would be the two halves of the app contradicting each
+    other about the same car."""
+    assert drill_key(CueCategory.LESS_BRAKE.value, "entry",
+                     trail_brake=True) == "brake_release"
+    assert drill_key(CueCategory.LESS_BRAKE.value, "entry",
+                     trail_brake=False) == "brake_straight"
+    assert drill_key(CueCategory.BRAKE_EARLIER.value, "",
+                     trail_brake=False) == "brake_straight"
+
+
+def test_the_flag_is_the_tuning_tables_own_answer_not_a_second_opinion():
+    from accoach.coaching.tuning import tuning_for_car
+    for car in ("bmw_m3_e92", "ferrari_488_gt3_evo", "gp_2025_sf25"):
+        assert trail_brake_for(car) is tuning_for_car(car).trail_brake_cue
+
+
+def test_a_road_car_gets_a_whole_drill_not_a_gap():
+    ds = [_debrief(_loss(0, 400.0, [("entry", 300.0)],
+                         category=CueCategory.LESS_BRAKE)) for _ in range(4)]
+    p = build_programme(_plan(_goal(0, category=CueCategory.LESS_BRAKE)), [],
+                        ds, None, {}, valid_laps=MIN_LAPS + 2, lang="it",
+                        trail_brake=False)
+    d = p.steps[0].drill
+    assert d.key == "brake_straight"
+    assert len(d.steps) >= 4 and d.title and d.watch and d.ignore
 
 
 # --- the programme ----------------------------------------------------------

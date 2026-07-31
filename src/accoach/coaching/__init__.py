@@ -31,10 +31,13 @@ from .trends import (
 )
 from .training import (
     CornerFacts,
+    GlossaryEntry,
     Programme,
     build_gap,
     build_programme,
     dominant_phase,
+    glossary_for,
+    trail_brake_for,
 )
 from .tyretemp import TyreTempAdvisor
 from .voice import Voice
@@ -75,9 +78,12 @@ __all__ = [
     "benchmark_levels",
     "classify_losses",
     "CornerFacts",
+    "GlossaryEntry",
     "Programme",
     "build_gap",
     "build_programme",
     "dominant_phase",
+    "glossary_for",
+    "trail_brake_for",
     "Voice",
 ]
