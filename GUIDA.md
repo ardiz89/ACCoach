@@ -178,6 +178,47 @@ Cosa trovi:
   distanza l'analisi curva per curva è la lente sbagliata. Sul tuo giro di
   riferimento ti dice che non c'è niente da correggere, invece di inventarsi una
   lezione.
+- **Allenamento**: la scheda che risponde alla domanda che tutte le altre
+  lasciano aperta — *e adesso come mi alleno?*. Parte da dove sei e da dove puoi
+  arrivare: il tuo miglior giro contro il tuo **ideale teorico** (i tuoi settori
+  migliori ricuciti), che non è un tempo inventato — l'hai già guidato tutto,
+  solo mai nello stesso giro — e ti dice **in quale settore** sta il grosso di
+  quel divario. Sotto, il programma: al massimo tre passi, **uno alla volta**, e
+  solo il primo è aperto. Ogni passo porta un **esercizio vero**: quanti giri
+  farlo, cosa fare giro per giro, **cosa guardare** e **cosa ignorare di
+  proposito**, più il numero che dice quando è fatto. L'esercizio non è generico:
+  viene scelto da dove *dentro la curva* stai perdendo il tempo — se il tempo se
+  ne va in staccata ti fa spostare il punto di frenata un'auto per volta, se se
+  ne va all'apex ti fa prima misurare quanta velocità la macchina regge davvero,
+  se se ne va in uscita ti fa costruire l'uscita prima dell'apex — e dentro ci
+  sono i **tuoi** numeri: a che velocità stacchi lì, di quanto ti sposti da un
+  giro all'altro, che minima porti contro quella del riferimento. In fondo c'è
+  **la tua prossima sessione**, in giri: riscaldamento, i giri di esercizio, e
+  qualche giro libero per vedere se è entrato quando smetti di pensarci.
+
+  Qui vive anche **Il tuo piano** (prima stava in Andamento): uno o due obiettivi
+  presi dai tuoi punti deboli *sistematici* (i casuali non ci finiscono: non puoi
+  allenare un episodio), con un bersaglio in secondi — «qui perdi 0.42s, portalo
+  sotto 0.21s». Finché non premi **Inizia questo piano** è solo una proposta; da
+  quel momento ha una data, **non cambia più** mentre ci lavori, e i giri che fai
+  da lì in poi vengono misurati su quel bersaglio: «2 dei 2 giri che servono». È
+  fatto quando il bersaglio regge in metà dei giri — la stessa frazione con cui
+  una curva era diventata un punto debole. Le curve che il coach live ha già
+  dichiarato **superate** non ci finiscono: la memoria di «questa curva ce l'hai»
+  è una sola. Con **Cambia obiettivo** butti il piano e te ne propone uno nuovo.
+
+  **La scheda si apre solo quando ha di che parlare**: servono **6 giri validi**
+  su quella auto e quella pista, e almeno una debolezza che si ripeta. Sotto
+  quella soglia non trovi una pagina vuota, trovi quanti giri mancano — sei giri
+  ne lasciano cinque da confrontare col tuo riferimento, e una debolezza per
+  chiamarsi tale deve tornare in tre di quei cinque. Con meno, quello che sembra
+  un punto debole è quello che hanno fatto due giri, e un programma costruito lì
+  sopra cambierebbe ogni volta che guidi.
+
+  Una cosa che la scheda dice e vale la pena leggere due volte: i due numeri di
+  tempo che vedi **non si sommano**. Il divario dall'ideale teorico e quello che
+  perdi in media ogni giro nelle curve sono la stessa strada misurata in due
+  modi, e sommarli conterebbe due volte lo stesso tempo.
 - **Sessione**: com'è andata una sola uscita. I giri nell'ordine in cui li hai
   guidati (compresi quelli tagliati o non validi — sono giri che hai fatto, solo
   non possono fare la media), migliore, costanza, temperatura dell'asfalto, e
@@ -266,17 +307,9 @@ Cosa trovi:
   rosso dove sovrasterza. È la scheda da aprire quando il debrief dice *perché* e
   tu vuoi vederlo con i tuoi occhi.
 - **Andamento**: l'andamento dei tempi nel tempo, la **costanza** (migliore/media/
-  scarto), e gli **errori ricorrenti** ("5× Porta più velocità in curva · Curve 1, 2").
-  In cima c'è **Il tuo piano**: uno o due obiettivi presi dai tuoi punti deboli
-  *sistematici* (i casuali non ci finiscono: non puoi allenare un episodio), con
-  un bersaglio in secondi — «qui perdi 0.42s, portalo sotto 0.21s». Finché non
-  premi **Inizia questo piano** è solo una proposta; da quel momento ha una data,
-  **non cambia più** mentre ci lavori, e i giri che fai da lì in poi vengono
-  misurati su quel bersaglio: «2 dei 2 giri che servono». È fatto quando il
-  bersaglio regge in metà dei giri — la stessa frazione con cui una curva era
-  diventata un punto debole. Le curve che il coach live ha già dichiarato
-  **superate** non finiscono nel piano: la memoria di «questa curva ce l'hai» è
-  una sola. Con **Cambia obiettivo** butti il piano e te ne propone uno nuovo.
+  scarto), i **punti deboli** curva per curva (sistematici o casuali) e gli
+  **errori ricorrenti** ("5× Porta più velocità in curva · Curve 1, 2"). È il
+  quaderno dei conti; il piano che ne esce sta in **Allenamento**.
 
 Nella tendina dei giri, accanto al tempo, trovi **i gradi dell'asfalto** (es.
 `2:03.732 · 37.8°`). Non è un dettaglio: fra pista fredda e pista calda i punti

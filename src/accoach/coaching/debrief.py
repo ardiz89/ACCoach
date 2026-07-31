@@ -108,6 +108,24 @@ def explain_cause(sym: Symptom, lang: str | None = None) -> str:
     return f"{bal[sym.balance].capitalize()} {pha[sym.phase]} ({spd[sym.speed]})."
 
 
+def category_words(category: CueCategory, lang: str | None = None) -> tuple[str, str]:
+    """The title and the correction for a loss category, with no lap behind them.
+
+    ``explain_loss`` needs a lap's stats because its *detail* quotes numbers off
+    that lap. The title and the fix don't: they are one fixed sentence per
+    category. The training plan stores a goal's words on the day you accept it,
+    and has to print them today in whatever language the page is set to — so it
+    re-derives them from the stored category through here, and keeps only the
+    numbers frozen. A plan whose target moved with the language would be a
+    different plan; a plan whose heading stayed English on an Italian page is
+    just a bug.
+    """
+    table = _LOSS.get(_lang(lang), _LOSS["en"])
+    titles = _CATEGORY_TITLE.get(_lang(lang), _CATEGORY_TITLE["en"])
+    _detail, fix = table.get(category, table[_C.TIME_LOSS])
+    return titles.get(category, titles[_C.TIME_LOSS]), fix
+
+
 def explain_loss(category: CueCategory, st: CornerStats,
                  lang: str | None = None) -> tuple[str, str]:
     """Turn a corner's cause into (detail, fix): the numbers that prove it and a

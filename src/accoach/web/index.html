@@ -38,6 +38,7 @@
 
   <nav class="tabs">
     <button class="tab active" data-view="flow" data-i18n="tab.flow">Lap explained</button>
+    <button class="tab" data-view="training" data-i18n="tab.training">Training</button>
     <button class="tab" data-view="session" data-i18n="tab.session">Session</button>
     <button class="tab" data-view="compare" data-i18n="tab.compare">Compare</button>
     <button class="tab" data-view="map" data-i18n="tab.map">Map</button>
@@ -77,6 +78,30 @@
         <button id="flow-whole" type="button" class="flow-btn ghost" data-i18n="flow.whole">Show the whole chart</button>
         <button id="flow-next" type="button" class="flow-btn primary" data-i18n="flow.next">Next →</button>
       </nav>
+    </div>
+  </div>
+
+  <!-- How to get there, not just how far it is. Every other tab answers "what"
+       and "why"; this one turns the plan's goals into drills you can run
+       tonight, and it only opens once there are enough laps to mean it (see
+       coaching/training.py). -->
+  <div id="view-training" class="hidden">
+    <div class="train-shell">
+      <!-- Under the bar the whole tab is this one paragraph: what is missing
+           and how far off it is. Never an empty panel — that reads as broken. -->
+      <!-- Not `.empty`: that class is `display: none` until the page decides
+           there is no data at all, so the gate would never have shown. -->
+      <section id="train-gate" class="train-gate hidden"></section>
+      <!-- Where you are, where your own sectors say you could be, and why the
+           two numbers on this page must not be added together. -->
+      <section id="train-gap" class="train-gap"></section>
+      <!-- The plan's identity strip: since when, measured on how many laps, and
+           the button that starts or drops it. The goals themselves are not
+           listed here — they are the steps below, with their drills. -->
+      <section id="plan" class="plan"></section>
+      <section id="train-steps" class="train-steps"></section>
+      <!-- The next time you sit down, as laps to run. -->
+      <section id="train-session" class="train-session"></section>
     </div>
   </div>
 
@@ -219,10 +244,14 @@
 
   <div id="view-progress" class="hidden">
     <section id="prog-summary" class="summary"></section>
-    <!-- What you're working on at the moment. Proposed from the systematic weak
-         points below, and only *yours* once you accept it — from then on it is
-         measured against the laps you drive after that date (coaching/plan.py). -->
-    <section id="plan" class="plan"></section>
+    <!-- The plan used to live here, next to the weak points it is picked from.
+         It moved to the Training tab, which is where the same goals now come
+         with the drills that close them: two panels for one plan is two places
+         to disagree about what you are working on. -->
+    <p class="plan-elsewhere"><span data-i18n="plan.elsewhere">Working on a
+      plan? It lives under Training, with the drills.</span>
+      <button type="button" id="go-training" class="mini-btn"
+              data-i18n="plan.goto">Open Training</button></p>
     <section id="levels" class="levels"></section>
     <main>
       <div class="chart">
