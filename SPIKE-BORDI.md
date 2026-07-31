@@ -265,9 +265,12 @@ Il nastro dalla spline resta come ripiego, per le piste senza mesh leggibili.
 
 Le sue mesh stanno dentro un `.pak` di Unreal Engine da **17 GB**: un altro
 problema. Ma ACC pubblica `fastlane.ai` per tutte e 25 le piste **fuori** dal
-pak, versione **8**. La decodifica della v7 non si trasporta: provate tutte le
-dimensioni di record da 12 a 88 byte e tutti gli offset, nessuna dà una
-polilinea vicina ai 5793 m di Monza. È uno spike a sé.
+pak, versione **8** — ed è stato aperto: [`SPIKE-ACC-SPLINE.md`](SPIKE-ACC-SPLINE.md).
+
+Punti decodificati e validati su **tutte e 25** (le coordinate sono a 64 bit,
+non a 32: era quello a rendere inutile ogni tentativo di trasportare la v7).
+Larghezze ferme a **9 piste su 25**. Finché non reggono ovunque non c'è niente
+da disegnare, quindi nel prodotto non è entrato niente.
 
 ## Come rifare le misure
 
