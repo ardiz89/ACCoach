@@ -106,12 +106,48 @@ def _menger_curvature(p0, p1, p2) -> float:
     return 2.0 * cross / denom
 
 
-def _classify(xz: list[tuple[float, float]], apex: int, apex_kmh: float) -> tuple:
+#: A corner that turns both ways is a chicane, and the number below decides how
+#: much "both ways" it has to be: the counter-curvature (the weaker sign's total
+#: curvature) as a fraction of the stronger one's.
+#:
+#: Misurato su ogni curva di ogni giro valido in archivio — 60 curve su cinque
+#: circuiti — e le due famiglie **non si toccano**:
+#:
+#:   curve singole    0.000 - 0.132   Curva Grande, Lesmo 1 e 2, Parabolica,
+#:                                    La Source, Pouhon, Tosa, Spoon, Degner,
+#:                                    Rivazza, il Tornante di Suzuka, 130R
+#:   varianti ed esse 0.344 - 0.993   Rettifilo, Roggia, Ascari, Bus Stop,
+#:                                    Les Combes, Fagnes, Casio Triangle,
+#:                                    Variante Alta, Villeneuve, Tamburello
+#:
+#: Fra 0.132 e 0.344 non c'è niente: un fattore 2.6 di spazio vuoto, quindi 0.30
+#: non è una taratura ma una scelta dentro un varco.
+#:
+#: Prima di questo la curva veniva etichettata con la **metà in cui casca
+#: l'apex**, che in una variante è la seconda: la Variante del Rettifilo si
+#: presentava come «curva a sinistra · tornante» a chi ci entra girando a destra.
+_CHICANE_RATIO = 0.30
+
+
+def _curvatures(xz: list[tuple[float, float]], lo: int, hi: int) -> list[float]:
+    """Signed curvature along a stretch, one value per usable point."""
+    out = []
+    for i in range(max(lo, _STENCIL), min(hi, len(xz) - _STENCIL - 1) + 1):
+        out.append(_menger_curvature(xz[i - _STENCIL], xz[i], xz[i + _STENCIL]))
+    return out
+
+
+def _classify(xz: list[tuple[float, float]], apex: int, apex_kmh: float,
+              lo: int | None = None, hi: int | None = None) -> tuple:
     """Shape of the corner at ``apex``: (direction, kind, radius_m).
 
     Curvature is taken as the *median* over a few stencils straddling the apex,
     not the mean: a single wobble in the line — a kerb, a correction — throws a
     mean off entirely, while the median ignores it.
+
+    ``lo``/``hi`` bound the corner. With them the whole corner is looked at and
+    not only its apex, which is the difference between naming a chicane and
+    naming the half of it the driver happens to be slowest in.
     """
     n = len(xz)
     ks = []
@@ -138,6 +174,19 @@ def _classify(xz: list[tuple[float, float]], apex: int, apex_kmh: float) -> tupl
         kind = "fast"
     else:
         kind = "medium"
+
+    if lo is not None and hi is not None:
+        span = _curvatures(xz, lo, hi)
+        pos_k = sum(v for v in span if v > 0)
+        neg_k = -sum(v for v in span if v < 0)
+        weak, strong = min(pos_k, neg_k), max(pos_k, neg_k)
+        if strong > 0 and weak / strong >= _CHICANE_RATIO:
+            kind = "chicane"
+            # …and the direction becomes the one you *enter* on, not the apex's:
+            # a driver arrives at a corner before reaching its slowest point.
+            head = [v for v in span[:max(3, len(span) // 3)] if v != 0.0]
+            if head:
+                direction = "right" if statistics.median(head) > 0 else "left"
     return direction, kind, radius
 
 
@@ -240,7 +289,7 @@ def detect_corners(samples) -> list[Corner]:
 
         apex_kmh = spd[apex]
         direction, kind, radius = (
-            _classify(xz, apex, apex_kmh) if has_xz else ("", "", 0.0))
+            _classify(xz, apex, apex_kmh, e, x) if has_xz else ("", "", 0.0))
         corners.append(Corner(
             index=len(corners),
             entry_pos=pos[e],

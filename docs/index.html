@@ -86,7 +86,8 @@
   <div class="brand"><svg width="26" height="22"><use href="#mark"/></svg> HONE</div>
   <nav>
     <a href="#why">Why</a>
-    <a href="#features">Features</a>
+    <a href="#features">Driving</a>
+    <a href="#analysis">Analysis</a>
     <a href="#pricing">Free / Pro</a>
     <a href="#faq">FAQ</a>
     <a href="https://github.com/ardiz89/ACCoach">GitHub</a>
@@ -134,8 +135,9 @@
     <div class="card">
       <div class="num">03</div>
       <h3>Offline, free, in your language</h3>
-      <p>Everything runs on your PC, no subscription. A neural coach voice
-        (Italian today, more to come) so coaching feels native.</p>
+      <p>Everything runs on your PC, no subscription. The calls you hear most are
+        pre-rendered in a neural voice; the ones with numbers in them fall back to
+        the system voice.</p>
     </div>
   </div>
   <div class="quote">“The car understeers at the apex in slow corners — carry more
@@ -143,7 +145,7 @@
 </div></section>
 
 <section id="features"><div class="wrap">
-  <h2>What it does</h2>
+  <h2>While you drive</h2>
   <p class="lead">From your first lap to your setup, a coach with a plan.</p>
   <div class="grid">
     <div class="card"><h3>🎙️ Voice coach</h3><p>The single most useful call at the
@@ -153,12 +155,50 @@
     <div class="card"><h3>🔧 Race engineer</h3><p>Concrete setup advice, one change
       at a time, with tyre, pressure and electronics management.</p></div>
     <div class="card"><h3>🧠 Focus / Lesson</h3><p>One weakness at a time, trained
-      with measured praise: “Turn 4: from 0.30s to 0.07s.”</p></div>
-    <div class="card"><h3>📊 Analysis app</h3><p>Traces, sectors, map, trend,
-      multi-level benchmarking and systematic vs sporadic weaknesses.</p></div>
+      with measured praise: “Turn 4: from 0.30s to 0.07s.” It stops teaching a
+      corner once you've mastered it.</p></div>
+    <div class="card"><h3>▶️ Starts on its own</h3><p>Optional: the hub watches for
+      AC or ACC and starts the silent recorder when the game appears. Off by
+      default, and it never starts the voice.</p></div>
     <div class="card"><h3>🗣️ Debrief</h3><p>Your worst corners, the cause of each,
-      your consistency — after every session.</p></div>
+      your consistency — after every session, in the words a coach would use.</p></div>
   </div>
+</div></section>
+
+<section id="analysis"><div class="wrap">
+  <h2>After you drive</h2>
+  <p class="lead">The analysis app runs on your machine, on your laps. Every
+    chart's x-axis is in <b>metres measured from the recorded coordinates</b> — and
+    a lap whose coordinates don't add up falls back to per cent rather than show
+    you a wrong scale.</p>
+  <div class="grid">
+    <div class="card"><h3>Lap explained</h3><p>One thing at a time: what cost you
+      most, why, and what to do — three steps at most, with the chart cropped to
+      the stretch it's talking about. A long way off the pace? It opens with the
+      general theme and stops, because corner-by-corner is the wrong lens there.</p></div>
+    <div class="card"><h3>Line</h3><p>Your line against the reference, corner by
+      corner, with the gap shaded — on <b>the track seen from above</b>: asphalt,
+      kerbs, and the grass and gravel beside them, read from the game's own
+      surface model. The circuit is recognised by the shape you drove, not by its
+      name, so it doesn't matter which sim wrote the lap.</p></div>
+    <div class="card"><h3>Map &amp; braking points</h3><p>Your line coloured by where
+      you gained and lost, plus the cheat sheet built from <i>your</i> recent laps in
+      one track-temperature band — with the spread that says whether you have a
+      braking point at all.</p></div>
+    <div class="card"><h3>Session</h3><p>One outing: the laps in the order you drove
+      them, your best, consistency, track temperature, fuel per lap, and what
+      changed since last time on that car and track.</p></div>
+    <div class="card"><h3>Sectors &amp; dynamics</h3><p>The sim's real sectors, the
+      ideal lap stitched from your best ones, and what the car was doing: G with
+      the friction circle, slip per axle, tyre temperatures, the handling ribbon.</p></div>
+    <div class="card"><h3>Trends &amp; your plan</h3><p>Lap times, consistency,
+      recurring mistakes — and one or two goals taken from your <i>systematic</i>
+      weak points, with a target in seconds, measured only on the laps you drive
+      after you accept it.</p></div>
+  </div>
+  <div class="quote">Corners have their names on Monza, Imola, Spa and Suzuka —
+    measured from real laps in the archive, never guessed. Where a name couldn't be
+    confirmed three independent ways, the corner keeps its number.</div>
 </div></section>
 
 <section id="pricing"><div class="wrap">
@@ -190,7 +230,26 @@
         Full steps in the <a href="https://github.com/ardiz89/ACCoach/blob/main/docs/FAQ.md">FAQ</a>.</p></details>
     <details><summary>Does it work with plain Assetto Corsa, or only ACC?</summary>
       <p>Both. HONE reads the shared memory common to AC and ACC. The setup engineer
-        has profiles for low-downforce road cars too, not just GT3.</p></details>
+        has profiles for low-downforce road cars too, not just GT3.</p>
+      <p>The same, with one honest difference in <b>how much detail the track
+        under your line has</b>. HONE ships with the geometry of 26 real circuits
+        — centre line and widths, from OpenStreetMap and satellite imagery — and
+        recognises which one you drove from the shape of the lap rather than from
+        its name, since the two sims don't even agree on those (Mount Panorama is
+        <code>mount_panorama</code> in one and <code>rt_bathurst</code> in the
+        other).</p>
+      <p>If you have <b>Assetto Corsa</b> installed, its own surface model is read
+        instead, and that is a different level: the actual road, its kerbs, and
+        the grass and gravel beside them — the geometry the game uses to decide
+        where you are. It works on your ACC laps too, because the circuit is
+        matched by shape.</p>
+      <p>On a circuit that is in neither, the track simply isn't drawn — the two
+        lines are still there, as they always were.</p></details>
+    <details><summary>What does “100% offline” cost me?</summary>
+      <p>Nothing you'd miss, and one thing you would: there are no shared laps from
+        other drivers. That's deliberate. Your reference is your own best lap, or a
+        faster lap you import yourself — and nothing about your driving ever leaves
+        your PC.</p></details>
     <details><summary>The overlay doesn't show over the game</summary>
       <p>Set the game to <b>Borderless</b> (windowed-fullscreen): a transparent
         overlay can't draw over exclusive fullscreen. Same constraint as SimHub
@@ -205,7 +264,9 @@
   HONE — source-available under
   <a href="https://github.com/ardiz89/ACCoach/blob/main/LICENSE">PolyForm Noncommercial 1.0.0</a>.
   Not affiliated with Kunos Simulazioni. ·
-  <a href="https://github.com/ardiz89/ACCoach">GitHub</a>
+  <a href="https://github.com/ardiz89/ACCoach">GitHub</a> ·
+  <a href="https://github.com/ardiz89/ACCoach/blob/main/docs/FAQ.md">FAQ</a>
+  <br><small>This page describes the build of 31 July 2026.</small>
 </div></footer>
 </body>
 </html>

@@ -342,3 +342,69 @@ def test_the_recorder_can_flag_the_off_by_itself():
     review.lost_at = 0.22
     c = _one(review, _dip_lap(0.20, floor=90.0))
     assert c.off_here
+
+
+# --- una variante non ha un "dentro" solo -----------------------------------
+
+def test_a_chicane_reports_sides_not_an_inside():
+    """Trovato il 2026-07-31 correggendo l'etichetta della Variante del
+    Rettifilo.
+
+    Il segno dentro/fuori e' **uno solo per tutta la curva**, ma l'interno di
+    una variante sta a destra nella prima meta' e a sinistra nella seconda.
+    Qualunque segno si scelga, meta' dei numeri in pagina esce invertita — e a
+    lungo e' stato quello dell'apex, che rendeva sbagliato l'ingresso.
+
+    Non si sceglie: si smette di dire «dentro». «3.3 m a destra della linea» e'
+    vero in tutte e due le meta'.
+    """
+    review, base = _circle_lap(radius=R - 3), _circle_lap()
+    chic = Corner(index=0, entry_pos=0.10, apex_pos=0.20, exit_pos=0.30, name="",
+                  direction="right", kind="chicane", radius_m=40.0,
+                  apex_speed_kmh=70.0)
+    plain = Corner(index=0, entry_pos=0.10, apex_pos=0.20, exit_pos=0.30, name="",
+                   direction="right", kind="medium", radius_m=90.0,
+                   apex_speed_kmh=110.0)
+    assert build_line_report(review, base, [chic]).corners[0].sided is False
+    assert build_line_report(review, base, [plain]).corners[0].sided is True
+
+
+def test_the_two_framings_differ_only_by_a_sign():
+    """Il ripiego non butta via la misura: cambia la parola, non i metri."""
+    review, base = _circle_lap(radius=R - 3), _circle_lap()
+    mk = lambda kind: Corner(index=0, entry_pos=0.10, apex_pos=0.20, exit_pos=0.30,
+                             name="", direction="left", kind=kind, radius_m=90.0,
+                             apex_speed_kmh=110.0)
+    a = build_line_report(review, base, [mk("medium")]).corners[0]
+    b = build_line_report(review, base, [mk("chicane")]).corners[0]
+    assert abs(a.apex_m) == pytest.approx(abs(b.apex_m), abs=1e-6)
+    assert a.apex_m == pytest.approx(-b.apex_m, abs=1e-6)
+
+
+def test_a_chicane_says_which_side_of_the_line_not_wide_or_tight():
+    """Le pastiglie in cima alla curva usavano le stesse parole del pannello.
+    Corrette insieme: «largo in uscita» presuppone un esterno, e in una
+    variante non c'e'."""
+    from accoach.track import Corner
+    from accoach.trajectory import build_line_report
+
+    review, base = _circle_lap(radius=R - 3), _circle_lap()
+    mk = lambda kind: Corner(index=0, entry_pos=0.10, apex_pos=0.20, exit_pos=0.30,
+                             name="", direction="right", kind=kind, radius_m=60.0,
+                             apex_speed_kmh=90.0)
+    keys = lambda rows: {k for k, _v in rows[0].tags}
+    plain = keys(build_line_report(review, base, [mk("medium")]).corners)
+    chic = keys(build_line_report(review, base, [mk("chicane")]).corners)
+    assert any(k.startswith(("wide_", "tight_")) for k in plain), plain
+    assert not any(k.startswith(("wide_", "tight_")) for k in chic), chic
+    assert any(k.startswith(("left_", "right_")) for k in chic), chic
+
+
+def test_every_side_phrase_exists_in_both_languages():
+    """Una chiave senza testo esce in pagina come 'left_apex'."""
+    from accoach.trajectory import tag_text
+    for key in ("left_entry", "right_entry", "left_apex", "right_apex",
+                "left_exit", "right_exit"):
+        for lang in ("en", "it"):
+            got = tag_text(key, {"m": 1.4}, lang)
+            assert key not in got and "1.4" in got, f"{key}/{lang}: {got!r}"

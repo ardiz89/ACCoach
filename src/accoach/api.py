@@ -41,8 +41,9 @@ from .sectors import ideal_lap, sector_spans, sector_times
 from .sessions import group_sessions
 from .telemetry.snapshot import format_lap_time
 from .track import detect_corners
-from .trackedges import crop as crop_edges, edges_for
+from .trackedges import crop as crop_edges, edges_and_fit, edges_for
 from .trackdata import name_corners
+from .trackmesh import road_shapes
 from .trajectory import (
     LinePoint,
     build_line_report,
@@ -486,6 +487,30 @@ def _tyre_means(samples, attr: str, ndigits: int) -> list[float] | None:
     return [round(m, ndigits) for m in means]
 
 
+class _RevalidatingStatic(StaticFiles):
+    """Static files that the browser must always check before reusing.
+
+    Found on 2026-07-31 while verifying a fix: the page was running JavaScript
+    from cache while the server had the new file, and no reload shifted it.
+    Without a ``Cache-Control`` header a browser is free to guess how long a
+    file stays fresh, and its guess is a fraction of the file's age — which for
+    a bundled release means *days*. So an update lands, the app looks updated,
+    and the driver is still running last month's page.
+
+    ``no-cache`` does not mean "don't cache": it means "cache it, but ask me
+    first". Everything is served from localhost, so a revalidation costs
+    nothing and an unnoticed stale file costs a bug report nobody can reproduce.
+    """
+
+    def is_not_modified(self, response_headers, request_headers) -> bool:
+        return super().is_not_modified(response_headers, request_headers)
+
+    def file_response(self, *args, **kwargs):
+        resp = super().file_response(*args, **kwargs)
+        resp.headers["Cache-Control"] = "no-cache"
+        return resp
+
+
 def create_api(
     laps_dir: Path | str = DEFAULT_LAPS_DIR,
     setups_root: Path | str | None = None,
@@ -777,7 +802,7 @@ def create_api(
         you_pts, ref_pts = line_points(review), line_points(base)
         rows = [{
             "index": c.index, "name": c.name,
-            "direction": c.direction, "kind": c.kind,
+            "direction": c.direction, "kind": c.kind, "sided": c.sided,
             "entry": c.entry, "apex": c.apex, "exit": c.exit,
             "apex_you": c.apex_pos_you, "apex_ref": c.apex_pos_ref,
             "entry_m": c.entry_m, "apex_m": c.apex_m, "exit_m": c.exit_m,
@@ -803,7 +828,7 @@ def create_api(
         # the track installed here is the track this lap was driven on. See
         # trackedges: a mismatch is a ribbon drawn 187 m from the car, and no
         # ribbon at all is the better answer.
-        track_edges = edges_for(track, you_pts)
+        track_edges, track_fit = edges_and_fit(track, you_pts)
 
         # Zoomed crops, one per corner: this is the only place the full-rate
         # samples are worth serving, and only over a few hundred metres each.
@@ -813,9 +838,16 @@ def create_api(
                 "you": you_crop,
                 "ref": corner_path(ref_pts, c.entry, c.exit),
             }
-            if track_edges is not None:
-                row["line"]["edges"] = crop_edges(
-                    track_edges, list(zip(you_crop["x"], you_crop["z"])))
+            crop_xz = list(zip(you_crop["x"], you_crop["z"]))
+            # La strada vera, dal modello di collisione del gioco: e' il
+            # poligono dell'asfalto, non il corridoio attorno alla linea
+            # dell'IA, e porta con se' i cordoli. Dove c'e', vince.
+            shapes = (road_shapes(track, crop_xz, track_fit)
+                      if track_fit is not None else None)
+            if shapes:
+                row["line"]["road"] = shapes
+            elif track_edges is not None:
+                row["line"]["edges"] = crop_edges(track_edges, crop_xz)
 
         def _curve(points) -> dict:
             k = curvature_profile(points)
@@ -1613,7 +1645,8 @@ def create_api(
         return {"ok": True, "file": name, "path": str(path)}
 
     if _WEB_DIR.is_dir():
-        app.mount("/static", StaticFiles(directory=str(_WEB_DIR)), name="static")
+        app.mount("/static", _RevalidatingStatic(directory=str(_WEB_DIR)),
+                  name="static")
 
     return app
 

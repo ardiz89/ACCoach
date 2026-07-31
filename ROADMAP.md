@@ -120,14 +120,15 @@ pubblico, stesso problema, reazione opposta a seconda di come è presentato.**
 
 ## Cosa resta aperto
 
-Tre voci su diciassette. Due delle tre **non si chiudono da scrivania**: sono le
-uniche del documento il cui costo non è codice ma tempo in pista.
+Due voci su diciassette, e **nessuna delle due si chiude da scrivania**: sono le
+uniche del documento il cui costo non è codice ma tempo in pista (o, per la 2,
+qualcuno che quelle piste le abbia davanti agli occhi).
 
 | # | Voce | Origine | Cosa manca davvero |
 |---|---|---|---|
-| 2 | **Riferimenti visivi** («al cordolo», «al cartello») | richiesta esplicita | Il meccanismo c'è dal 27/07 (`_LANDMARKS` + `landmark_at`, la nota additiva nel debrief, e la scheda frenate li usa dove esistono). Manca la **copertura** — oggi: **Monza 5 staccate, Imola 0**, tutte le altre piste zero — e soprattutto la **validazione**: nessun landmark ha mai fatto scattare una frase su un giro reale. Aggiungere piste a tavolino senza quella prova moltiplica un meccanismo mai visto funzionare |
+| 2 | **Riferimenti visivi** («al cordolo», «al cartello») | richiesta esplicita | Il meccanismo **funziona end-to-end**: verificato il 31/07 sui giri Monza in archivio, la scheda frenate stampa *«Parabolica — alla fine del verde sulla sinistra»*. Manca la **copertura**, e il 31/07 si è capito che non si chiude da scrivania: a Imola due fonti indipendenti **si contraddicono su quasi ogni curva** (cartelli contro flag-light), e la distanza stacco→apex misurata non arbitra fra un cartello dei 50 e uno dei 100. Le posizioni sono già misurate, le parole no. Spa e Suzuka hanno un ostacolo in più: i riferimenti in archivio sono una monoposto e una stradale, e i cartelli delle guide sono tarati sulle GT3 |
 | 11 | **Tarature su ACC** | mai fatte | Serve pista. Piano pronto in [`TARATURE-ACC.md`](TARATURE-ACC.md). Il pezzo scomodo è noto: lo **slip ratio ha sorgente diversa fra AC e ACC**, quindi le soglie non si trasportano |
-| 12 | **Documentazione allineata** | segnalazione utente | La parte che riguarda chi usa il prodotto **è stata chiusa il 30/07**: `GUIDA.md` e `docs/FAQ.md` ora descrivono tutte le schede (prima l'inglese non nominava l'intera app di analisi). Resta **`docs/index.html`**, la pagina pubblica, ferma al 29/06 — è incompleta, non falsa — e l'**aiuto contestuale nelle impostazioni** |
+| ~~12~~ | ~~**Documentazione allineata**~~ | segnalazione utente | **Chiusa il 31/07.** `GUIDA.md` e `docs/FAQ.md` il 30/07; `docs/index.html` (la pagina pubblica, ferma al 29/06) riscritta il 31/07 con quello che l'app fa davvero, e con la sola differenza fra i due giochi dichiarata invece che taciuta. L'**aiuto contestuale nelle impostazioni** risulta fatto e testato da prima (un «?» per riga, `tests/test_settings_help.py` verifica pure che righe e testi coincidano) |
 
 ## Cosa è stato chiuso, e da cosa
 
@@ -161,9 +162,12 @@ non descrive il prodotto.
 - **«Il giro spiegato» e «Sessione»** (28/07) — dall'analisi di Track Titan: le
   loro cinque tracce «essenziali» le avevamo già, **il divario era la
   presentazione**.
-- **Vista Traiettoria** (30/07) e il **nastro d'asfalto** sotto le due linee
-  (31/07) — i bordi veri di Kunos, letti da `fast_lane.ai`, e solo dove la pista
-  installata è quella guidata ([`SPIKE-BORDI.md`](SPIKE-BORDI.md)).
+- **Vista Traiettoria** (30/07) e **la pista vista dall'alto** sotto le due linee
+  (31/07): asfalto, cordoli, erba e ghiaia, letti dal **modello delle superfici**
+  del gioco — la geometria con cui decide dove sei. Il circuito si riconosce
+  **dalla forma del giro, non dal nome**, quindi vale su entrambi i simulatori; e
+  chi non ha AC installato ha i **26 circuiti impacchettati**, da OpenStreetMap e
+  satellite ([`SPIKE-BORDI.md`](SPIKE-BORDI.md), `src/accoach/tracks/NOTICE.md`).
 - **Asse in metri misurati** (31/07) — non `pos × lunghezza`: la distanza dalle
   coordinate, **corroborata con velocità×tempo**, e chi non passa il controllo
   torna alle percentuali invece di mostrare una scala sbagliata.

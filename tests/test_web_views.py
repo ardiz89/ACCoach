@@ -314,3 +314,18 @@ def _screen_css() -> str:
             if depth == 0:
                 return _CSS[:i] + _CSS[k + 1:]
     return _CSS[:i]
+
+
+def test_every_surface_the_backend_extracts_is_painted():
+    """Il disegno e il decodificatore devono conoscere le stesse superfici.
+
+    Una classe estratta e mai dipinta è lavoro pagato e buttato; una dipinta e
+    mai estratta è un colore che nessuno vedrà mai.
+    """
+    import re
+    from accoach import trackmesh as tm
+
+    js = (Path(__file__).resolve().parents[1] / "src" / "accoach" / "web" / "app.js").read_text(encoding="utf-8")
+    block = js[js.index("const SURFACE_PAINT"):js.index("];", js.index("const SURFACE_PAINT"))]
+    painted = set(re.findall(r'\["(\w+)"', block))
+    assert painted == set(tm._CLASSES), (sorted(painted), sorted(tm._CLASSES))

@@ -377,3 +377,20 @@ def test_demo_banner_only_in_demo_mode(tmp_path):
         d = demo.get(page).text
         assert 'class="demo-banner"' in d and 'class="demo-mode"' in d
         assert "demo-banner" not in real.get(page).text
+
+
+def test_static_files_are_always_revalidated(tmp_path):
+    """Trovato il 2026-07-31 verificando una correzione: la pagina girava con
+    il JavaScript in cache mentre il server aveva quello nuovo.
+
+    Senza `Cache-Control` il browser decide da solo quanto un file resta buono,
+    e la sua stima è una frazione dell'ETÀ del file — che in una release
+    impacchettata vuol dire giorni. L'aggiornamento arriva, l'app sembra
+    aggiornata, e chi guida sta ancora usando la pagina del mese scorso.
+    """
+    from fastapi.testclient import TestClient
+    from accoach.api import create_api
+
+    r = TestClient(create_api(tmp_path)).get("/static/app.js")
+    assert r.status_code == 200
+    assert r.headers.get("cache-control") == "no-cache", r.headers

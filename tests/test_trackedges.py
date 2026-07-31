@@ -17,15 +17,6 @@ import pytest
 from accoach import trackedges as te
 
 
-class _P:
-    """Il minimo che `aligned` guarda di un punto del giro."""
-
-    __slots__ = ("x", "z")
-
-    def __init__(self, x, z):
-        self.x, self.z = x, z
-
-
 def _spline(n=64, side_l=4.0, side_r=6.0, ox=0.0, oz=0.0, version=7, repeat=None):
     """Un fast_lane.ai sintetico: un rettilineo lungo z, largo side_l + side_r."""
     pts = [(ox, 0.0, oz + i * 2.0) for i in range(n)]
@@ -79,26 +70,9 @@ def test_anything_we_did_not_decode_reads_as_nothing(tmp_path, blob):
     assert te.read_edges(_write(tmp_path, blob)) is None
 
 
-# --- il controllo che conta: è la stessa pista? -----------------------------
-
-def test_a_lap_on_the_same_track_model_is_accepted(tmp_path):
-    e = te.read_edges(_write(tmp_path, _spline()))
-    lap = [_P(0.0, i * 2.0) for i in range(64)]
-    assert te.aligned(e, lap)
-
-
-def test_a_lap_from_another_version_of_the_same_circuit_is_refused(tmp_path):
-    """Stessa forma, altro posto: è esattamente il caso Monza (187 m di scarto),
-    e disegnarlo darebbe un nastro credibile attorno alla macchina sbagliata."""
-    e = te.read_edges(_write(tmp_path, _spline()))
-    lap = [_P(187.0, i * 2.0 - 154.0) for i in range(64)]
-    assert not te.aligned(e, lap)
-
-
-def test_a_lap_without_coordinates_is_refused(tmp_path):
-    e = te.read_edges(_write(tmp_path, _spline()))
-    assert not te.aligned(e, [_P(0.0, 0.0) for _ in range(64)])
-
+# Il controllo «è la stessa pista?» sta in test_track_fit.py: da quando la
+# geometria viene *posata* sul giro invece che confrontata numero per numero,
+# non è più una proprietà di questo file ma del fit.
 
 # --- ritagliare la curva ----------------------------------------------------
 
@@ -106,8 +80,10 @@ def test_the_crop_follows_the_stretch_that_was_driven(tmp_path):
     e = te.read_edges(_write(tmp_path, _spline(n=200)))
     drive = [(0.0, z) for z in range(40, 120, 2)]
     got = te.crop(e, drive, pad=2)
-    assert got and len(got["left"]) == len(got["right"])
-    zs = [p[1] for p in got["left"]]
+    assert got and len(got["runs"]) == 1
+    run = got["runs"][0]
+    assert len(run["left"]) == len(run["right"])
+    zs = [p[1] for p in run["left"]]
     assert min(zs) < 40 and max(zs) > 118, "il pad deve sporgere ai due estremi"
 
 
@@ -116,7 +92,7 @@ def test_a_corner_may_straddle_the_start_line(tmp_path):
     il suo nastro, il che vuol dire camminare *avanti* passando dallo zero."""
     e = te.read_edges(_write(tmp_path, _spline(n=200)))   # z va da 0 a 398
     got = te.crop(e, [(0.0, 380.0), (0.0, 4.0)], pad=0)
-    assert got is not None and len(got["left"]) < 30
+    assert got is not None and len(got["runs"][0]["left"]) < 30
 
 
 def test_a_crop_that_would_wrap_most_of_the_lap_is_refused(tmp_path):
@@ -129,7 +105,7 @@ def test_a_crop_that_would_wrap_most_of_the_lap_is_refused(tmp_path):
 def test_the_crop_is_capped_so_the_payload_stays_small(tmp_path):
     e = te.read_edges(_write(tmp_path, _spline(n=1200)))
     got = te.crop(e, [(0.0, 20.0), (0.0, 2000.0)], max_points=40)
-    assert got is None or len(got["left"]) <= 40
+    assert got is None or sum(len(r["left"]) for r in got["runs"]) <= 40
 
 
 # --- senza il gioco ---------------------------------------------------------

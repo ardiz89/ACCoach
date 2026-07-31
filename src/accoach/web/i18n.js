@@ -211,8 +211,16 @@
     "line.leg.you":    { en: `your line`, it: `la tua traiettoria` },
     "line.leg.ref":    { en: `reference`, it: `riferimento` },
     "line.leg.band":   { en: `the gap between them`, it: `lo scarto fra le due` },
-    "line.leg.road":   { en: `the asphalt ({m} m wide) — kerbs not included`,
-                         it: `l'asfalto (largo {m} m) — i cordoli non ci sono` },
+    // "{m} m wide" was the MEDIAN width, printed under corners drawn far wider:
+    // at Spa's La Source the game's data says 24.5 m, because the paved run-off
+    // is asphalt too. The picture was right and the caption contradicted it.
+    "line.leg.road":   { en: `the asphalt (usually {m} m wide) — paved run-off counts, kerbs don't`,
+                         it: `l'asfalto (di norma largo {m} m) — le vie di fuga contano, i cordoli no` },
+    // Due frasi perche' sono due cose diverse. Quella sopra descrive un
+    // corridoio ricavato allargando la linea dell'IA; questa descrive la
+    // strada, presa dal modello con cui il gioco decide dove sei.
+    "line.leg.mesh":   { en: `the track, its kerbs and what's beside it — from the game's own surface model`,
+                         it: `la pista, i cordoli e cosa c'è di fianco — dal modello delle superfici del gioco` },
     "line.leg.apex":   { en: `your slowest point`, it: `il tuo punto più lento` },
     "line.leg.apexref":{ en: `the reference's`, it: `quello del riferimento` },
     "chart.offset":    { en: `Where you were on the road <small>(m from the reference line · above = to its right, below = to its left)</small>`,
@@ -260,6 +268,10 @@
     "line.dir.left":   { en: `left-hander`, it: `curva a sinistra` },
     "line.dir.right":  { en: `right-hander`, it: `curva a destra` },
     "line.kind.hairpin": { en: `hairpin`, it: `tornante` },
+    // Una variante NON e' un tornante, e non e' nemmeno "una curva a sinistra"
+    // solo perche' il punto piu' lento casca nella seconda meta'. Il verso qui
+    // e' quello in cui ci ENTRI, che e' l'unico che serve a chi guida.
+    "line.kind.chicane": { en: `chicane`, it: `variante` },
     "line.kind.slow":  { en: `slow`, it: `lenta` },
     "line.kind.medium":{ en: `medium`, it: `media` },
     "line.kind.fast":  { en: `fast`, it: `veloce` },

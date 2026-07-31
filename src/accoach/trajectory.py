@@ -108,9 +108,16 @@ class CornerLine:
     """How your line through one corner differs from the reference's.
 
     Offsets are signed **inside (+) / outside (−)** relative to the way the
-    corner turns; they fall back to the raw right(+)/left(−) sign only when the
-    corner's direction is unknown (a lap with no coordinates can't classify it,
-    but then there is no geometry here at all).
+    corner turns — but only where "inside" means something. ``sided`` says
+    whether it did; when it is False the numbers are the raw right(+)/left(−)
+    side of the reference line, and the view says so.
+
+    Two cases have no inside. A corner the detector couldn't classify (a lap
+    with no coordinates), and — found on 2026-07-31 — **a chicane**: the inside
+    of a Variante del Rettifilo is on the right for the first half and on the
+    left for the second, so any single sign is right about one half and wrong
+    about the other. Whichever half you pick, a number on the page is confidently
+    inverted. Saying "3.3 m to the right of the line" is true throughout.
     """
 
     index: int
@@ -147,6 +154,8 @@ class CornerLine:
     vmin_ref: float = 0.0
     vexit: float = 0.0
     vexit_ref: float = 0.0
+    #: Do the offsets above mean inside/outside (True) or right/left (False)?
+    sided: bool = True
     tags: list[tuple[str, dict]] = field(default_factory=list)
 
 
@@ -413,9 +422,12 @@ def _tags(c: CornerLine) -> list[tuple[str, dict]]:
     for where, value in (("entry", c.entry_m), ("apex", c.apex_m), ("exit", c.exit_m)):
         if abs(value) < _MIN_OFFSET_M:
             continue
-        add(abs(value) / _MIN_OFFSET_M,
-            ("tight_" if value > 0 else "wide_") + where,
-            m=abs(round(value, 1)))
+        if c.sided:
+            word = "tight_" if value > 0 else "wide_"
+        else:
+            # Nessun interno da nominare: il segno grezzo è il lato della linea.
+            word = "right_" if value > 0 else "left_"
+        add(abs(value) / _MIN_OFFSET_M, word + where, m=abs(round(value, 1)))
     if abs(c.extra_m) >= _MIN_EXTRA_M:
         add(abs(c.extra_m) / _MIN_EXTRA_M,
             "longer_line" if c.extra_m > 0 else "shorter_line",
@@ -462,12 +474,12 @@ def build_line_report(review_lap, base_lap, corners,
         inside = [(i, p) for i, p in enumerate(you) if lo <= p.pos <= hi]
         if len(inside) < 3:
             continue
-        sign = _turn_sign(c.direction)
-        # Unknown direction (a corner the detector couldn't classify): keep the
-        # raw right/left sign rather than inventing an inside. The view labels
-        # the column accordingly instead of lying about which side of the road
-        # the driver was on.
-        s = sign or 1.0
+        # A chicane has no single inside — see CornerLine — and neither has a
+        # corner the detector couldn't classify. Both keep the raw right/left
+        # sign rather than inventing an inside, and the view labels the column
+        # accordingly instead of lying about which side of the road you were on.
+        sided = c.kind != "chicane" and bool(_turn_sign(c.direction))
+        s = _turn_sign(c.direction) if sided else 1.0
         signed = [offsets[i] * s for i, _ in inside]
 
         apex_you = _apex_pos(you, lo, hi)
@@ -511,7 +523,7 @@ def build_line_report(review_lap, base_lap, corners,
         row = CornerLine(
             index=c.index,
             name=names.get(c.index) or c.name or f"Corner {c.index + 1}",
-            direction=c.direction, kind=c.kind,
+            direction=c.direction, kind=c.kind, sided=sided,
             entry=round(lo, 4), apex=round(c.apex_pos, 4), exit=round(hi, 4),
             entry_m=round(_at(you, offsets, lo) * s, 2),
             apex_m=round(_at(you, offsets, c.apex_pos) * s, 2),
@@ -595,6 +607,20 @@ _TAGS: dict[str, dict[str, str]] = {
     "tight_apex": {"en": "{m} m inside at the apex", "it": "{m} m più dentro all'apex"},
     "wide_exit": {"en": "{m} m wide on exit", "it": "{m} m largo in uscita"},
     "tight_exit": {"en": "{m} m tight on exit", "it": "{m} m stretto in uscita"},
+    # Dove non c'è un interno solo (una variante), «largo» e «stretto» non
+    # vogliono dire niente: resta il lato della linea, che è vero comunque.
+    "left_entry": {"en": "{m} m left of the line on entry",
+                   "it": "{m} m a sinistra della linea in entrata"},
+    "right_entry": {"en": "{m} m right of the line on entry",
+                    "it": "{m} m a destra della linea in entrata"},
+    "left_apex": {"en": "{m} m left of the line at the apex",
+                  "it": "{m} m a sinistra della linea all'apex"},
+    "right_apex": {"en": "{m} m right of the line at the apex",
+                   "it": "{m} m a destra della linea all'apex"},
+    "left_exit": {"en": "{m} m left of the line on exit",
+                  "it": "{m} m a sinistra della linea in uscita"},
+    "right_exit": {"en": "{m} m right of the line on exit",
+                   "it": "{m} m a destra della linea in uscita"},
     "longer_line": {"en": "{m} m longer through here", "it": "{m} m di strada in più"},
     "shorter_line": {"en": "{m} m shorter through here", "it": "{m} m di strada in meno"},
     "tighter_arc": {"en": "Tighter arc: {r} m vs {rr} m",

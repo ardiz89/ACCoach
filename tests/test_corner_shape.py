@@ -84,7 +84,7 @@ def test_corners_on_a_synthetic_lap_are_classified():
     assert corners, "the synthetic lap should still produce corners"
     for c in corners:
         assert c.direction in ("left", "right")
-        assert c.kind in ("hairpin", "slow", "medium", "fast")
+        assert c.kind in ("hairpin", "slow", "medium", "fast", "chicane")
         assert c.radius_m > 0.0
         assert c.apex_speed_kmh > 0.0
 
@@ -113,3 +113,54 @@ def test_median_ignores_a_single_wobble():
     pts[mid] = (pts[mid][0] + 3.0, pts[mid][1] - 3.0)     # yank the line sideways
     assert _classify(pts, mid, 120.0)[0] == clean[0]      # direction holds
     assert _classify(pts, mid, 120.0)[1] == clean[1]      # kind holds
+
+
+# --- varianti: una curva che gira in tutti e due i versi ---------------------
+# Segnalato guardando la Variante del Rettifilo a Monza: si presentava come
+# «curva a sinistra · tornante». È entrata girando a DESTRA, e non è un
+# tornante. La causa: `_classify` leggeva la curvatura **solo all'apex**, e in
+# una variante l'apex casca nella seconda metà — quella in cui non entri.
+
+def _ess(turn_m=60.0, n=240):
+    """Una esse: destra e poi sinistra, di raggio uguale."""
+    import math
+    pts, x, z, h = [], 0.0, 0.0, 0.0
+    for i in range(n):
+        # prima metà a destra (curvatura positiva in queste coordinate), poi a sinistra
+        h += (1.0 if i < n // 2 else -1.0) * (math.pi / (n / 2))
+        x += math.cos(h) * (turn_m / n * 4)
+        z += math.sin(h) * (turn_m / n * 4)
+        pts.append((x, z))
+    return pts
+
+
+def test_a_corner_that_turns_both_ways_is_a_chicane():
+    from accoach.track import _classify
+    pts = _ess()
+    direction, kind, _r = _classify(pts, len(pts) // 2, 80.0, 0, len(pts) - 1)
+    assert kind == "chicane", f"una esse classificata «{kind}»"
+    assert direction in ("left", "right")
+
+
+def test_the_direction_is_the_one_you_enter_on():
+    """Chi guida arriva alla curva prima di raggiungerne il punto più lento.
+    Dire «a sinistra» perché l'apex casca nella seconda metà è una risposta a
+    una domanda che nessuno ha fatto."""
+    from accoach.track import _classify
+    pts = _ess()
+    mirrored = [(x, -z) for x, z in pts]        # la stessa esse, specchiata
+    a, ka, _ = _classify(pts, len(pts) // 2, 80.0, 0, len(pts) - 1)
+    b, kb, _ = _classify(mirrored, len(pts) // 2, 80.0, 0, len(pts) - 1)
+    assert ka == kb == "chicane"
+    assert a != b, "due esse specchiate danno lo stesso verso: non è quello d'ingresso"
+
+
+def test_a_plain_corner_is_not_promoted_to_chicane():
+    """Il varco misurato sull'archivio: curve singole 0.000-0.132, varianti
+    0.344-0.993. Un arco unico non deve avvicinarsi nemmeno alla soglia."""
+    import math
+    from accoach.track import _classify
+    arc = [(200.0 * math.cos(t / 240 * math.pi), 200.0 * math.sin(t / 240 * math.pi))
+           for t in range(240)]
+    _d, kind, _r = _classify(arc, 120, 90.0, 0, 239)
+    assert kind != "chicane", "un arco unico è stato chiamato variante"

@@ -740,6 +740,89 @@ function balanceColor(v) {
   return `rgb(${mix(c[0])},${mix(c[1])},${mix(c[2])})`;
 }
 
+// The road as the game's own collision model has it: one closed ring per piece
+// of surface, already cropped to this corner (see trackmesh.py). Asphalt first,
+// then the kerbs on top of it — which is the order they exist in.
+//
+// The kerbs are the reason this is worth the trouble. They are the thing a
+// driver aims at, and no amount of widening a racing line invents one.
+// Nell'ordine in cui stanno per terra: prima le vie di fuga, poi la pista che ci
+// sta sopra, poi i cordoli che stanno sopra la pista. I colori sono spenti
+// apposta — devono dire "qui non sei più in pista" senza rubare l'occhio alle
+// due linee, che restano la ragione per cui si guarda questo disegno.
+const SURFACE_PAINT = [
+  ["grass",    "rgba(74,124,89,0.30)"],
+  ["gravel",   "rgba(176,146,96,0.30)"],
+  ["concrete", "rgba(150,155,165,0.20)"],
+  ["road",     "rgba(255,255,255,0.15)"],
+  ["kerb",     "rgba(226,86,96,0.55)"],
+];
+
+function drawSurfaces(ctx, shapes, X, Y) {
+  const fill = (rings, colour) => {
+    if (!rings || !rings.length) return;
+    ctx.beginPath();
+    for (const ring of rings) {
+      ring.forEach((p, i) => (i ? ctx.lineTo(X(p[0]), Y(p[1]))
+                                : ctx.moveTo(X(p[0]), Y(p[1]))));
+      ctx.closePath();
+    }
+    ctx.fillStyle = colour;
+    // Even-odd, so a piece of surface with a hole in it — the infield of a
+    // hairpin — comes out with the hole instead of filled solid.
+    ctx.fill("evenodd");
+  };
+  ctx.save();
+  for (const [key, colour] of SURFACE_PAINT) fill(shapes[key], colour);
+  ctx.restore();
+}
+
+// The asphalt, from the game's own track data (see trackedges.py). Filled dark
+// and edged with a hairline: the ribbon has to read as GROUND, not as a third
+// racing line competing with the two drawn on top of it.
+//
+// ``road.runs`` is a list because the track data can have holes in it — where it
+// does, the ribbon has to stop rather than join up across them.
+function drawRoad(ctx, road, X, Y, hair) {
+  if (!road || !Array.isArray(road.runs)) return;
+  ctx.save();
+  // The surface is laid down as one quad per step, all in a single path filled
+  // once. Tracing the two edges as one big outline instead looks simpler and
+  // isn't: on a hairpin the inner edge folds back through itself, and on a
+  // closed circuit the shape has to be an annulus rather than a polygon. A
+  // strip of quads has neither problem — overlaps merge, and the fill is the
+  // ground actually covered.
+  ctx.beginPath();
+  for (const r of road.runs) {
+    for (let i = 1; i < r.left.length; i++) {
+      const a = r.left[i - 1], b = r.left[i], c = r.right[i], d = r.right[i - 1];
+      ctx.moveTo(X(a[0]), Y(a[1]));
+      ctx.lineTo(X(b[0]), Y(b[1]));
+      ctx.lineTo(X(c[0]), Y(c[1]));
+      ctx.lineTo(X(d[0]), Y(d[1]));
+      ctx.closePath();
+    }
+  }
+  // Misurato: al 6% su un pannello #151A21 l'asfalto sposta il fondo di 14
+  // livelli su 255 — c'e' ma non LEGGE come una strada, e il disegno resta
+  // "due linee nel vuoto" invece di "una pista vista dall'alto".
+  ctx.fillStyle = "rgba(255,255,255,0.14)";
+  ctx.fill();
+  // Each run is stroked on its own and never closed: where the track data has a
+  // hole the ribbon stops, instead of taking a shortcut across the circuit.
+  ctx.strokeStyle = "rgba(255,255,255,0.55)";
+  ctx.lineWidth = hair;
+  for (const r of road.runs) {
+    for (const side of [r.left, r.right]) {
+      ctx.beginPath();
+      side.forEach((p, i) => (i ? ctx.lineTo(X(p[0]), Y(p[1]))
+                                : ctx.moveTo(X(p[0]), Y(p[1]))));
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
 // Full track map (its own tab). Wrapper around drawMapTo that also publishes the
 // screen transform for the map's own hover.
 function drawMap(a, cx) {
@@ -2354,10 +2437,12 @@ function offWord(m, corner) {
   if (m == null || !isFinite(m)) return "–";
   const v = Math.abs(m);
   if (v < 0.15) return t("line.same");
-  // With no direction there is no inside: the corner wasn't classified (no
-  // coordinates on the baseline), so we say which side of the line instead of
-  // guessing which side of the road.
-  const known = corner && corner.direction;
+  // Where there is no single inside we say which side of the LINE instead of
+  // guessing which side of the road. Two cases: a corner the detector couldn't
+  // classify (no coordinates on the baseline), and a chicane — whose inside is
+  // on the right for one half and on the left for the other, so any single
+  // answer is confidently wrong about half the corner.
+  const known = corner && corner.sided !== false && corner.direction;
   const word = known ? (m > 0 ? t("line.in") : t("line.out"))
                      : (m > 0 ? t("line.right") : t("line.left"));
   return `${v.toFixed(1)} m ${word}`;
@@ -2425,9 +2510,15 @@ function renderLine(cx) {
   // couple of metres past this line (see SPIKE-BORDI.md).
   const legRoad = $("leg-road");
   if (legRoad) {
+    const mesh = LINE_MAG > 1 ? null : (L.corners[LINE_I] || {}).line;
+    const surf = mesh && mesh.road;
     const road = LINE_MAG > 1 ? null : L.edges;
-    legRoad.classList.toggle("hidden", !road);
-    if (road) {
+    legRoad.classList.toggle("hidden", !(surf || road));
+    if (surf) {
+      // Con le superfici del gioco i cordoli CI SONO: dire il contrario
+      // sarebbe una didascalia che contraddice il proprio disegno.
+      $("leg-road-text").textContent = t("line.leg.mesh");
+    } else if (road) {
       $("leg-road-text").textContent = tf("line.leg.road", { m: road.width_m });
     }
   }
@@ -2481,7 +2572,11 @@ function renderLineFacts(c) {
     row(t("line.f.entry"), offWord(c.entry_m, c)) +
     row(t("line.f.apexoff"), offWord(c.apex_m, c)) +
     row(t("line.f.exit"), offWord(c.exit_m, c)) +
-    row(t("line.f.widest"), c.widest_m ? `${c.widest_m.toFixed(1)} m ${t("line.out")}` : t("line.same")) +
+    // `widest_m` is the biggest excursion on the minus side — the outside of a
+    // corner, or simply the LEFT of the line where there is no single inside.
+    row(t("line.f.widest"), c.widest_m
+        ? `${c.widest_m.toFixed(1)} m ${c.sided === false ? t("line.left") : t("line.out")}`
+        : t("line.same")) +
     row(t("line.f.radius"), arc) +
     row(t("line.f.extra"), dist) +
     row(t("line.f.vmin"), `${c.vmin} <span class="muted">${t("line.f.vs")} ${c.vmin_ref} km/h</span>`) +
@@ -2551,7 +2646,8 @@ function drawCornerZoom(L, c, cx) {
   const cv = $("c-corner");
   if (!cv) return null;
   const { ctx, w, h } = setup(cv);
-  const you = c.line.you, ref = c.line.ref;
+  const you = c.line.you;
+  let ref = c.line.ref;
   if (!you.x.length || !ref.x.length) return null;
 
   // Pair each of your points with the reference point at the same track
@@ -2568,20 +2664,13 @@ function drawCornerZoom(L, c, cx) {
   // almost entirely lateral (they're matched by track position), so blowing up
   // the whole vector reads as "further off line" and not as "further round the
   // corner".
-  const yx = [], yz = [];
+  let yx = [], yz = [];
   for (let i = 0; i < you.x.length; i++) {
     const k = pair[i];
     yx.push(ref.x[k] + (you.x[i] - ref.x[k]) * LINE_MAG);
     yz.push(ref.z[k] + (you.z[i] - ref.z[k]) * LINE_MAG);
   }
 
-  let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
-  for (const s of [{ x: yx, z: yz }, ref]) {
-    for (let i = 0; i < s.x.length; i++) {
-      minX = Math.min(minX, s.x[i]); maxX = Math.max(maxX, s.x[i]);
-      minZ = Math.min(minZ, s.z[i]); maxZ = Math.max(maxZ, s.z[i]);
-    }
-  }
   // The road, when the game's own track data could be read and matched to this
   // lap (see trackedges.py). It joins the fit so the picture is framed on the
   // asphalt rather than on the two lines: a corner where you ran wide should
@@ -2589,45 +2678,97 @@ function drawCornerZoom(L, c, cx) {
   // …but not while the gap is magnified. At ×3 the line drawn is deliberately
   // not where the car was, and a real edge under a fake line would read as an
   // excursion that never happened. Real ground, or no ground.
-  const road = LINE_MAG > 1 ? null : c.line.edges;
-  if (road) {
-    for (const side of [road.left, road.right]) {
-      for (const p of side) {
-        minX = Math.min(minX, p[0]); maxX = Math.max(maxX, p[0]);
-        minZ = Math.min(minZ, p[1]); maxZ = Math.max(maxZ, p[1]);
-      }
-    }
+  let road = LINE_MAG > 1 ? null : c.line.edges;
+
+  // Everything that has to fit inside the box.
+  let shapes = LINE_MAG > 1 ? null : c.line.road;
+  const pool = [];
+  for (let i = 0; i < yx.length; i++) pool.push([yx[i], yz[i]]);
+  for (let i = 0; i < ref.x.length; i++) pool.push([ref.x[i], ref.z[i]]);
+  if (road) for (const r of road.runs) for (const side of [r.left, r.right]) {
+    for (const p of side) pool.push([p[0], p[1]]);
   }
-  const m = 34, spanX = (maxX - minX) || 1, spanZ = (maxZ - minZ) || 1;
-  const sc = Math.min((w - 2 * m) / spanX, (h - 2 * m) / spanZ);
+  // Solo pista e cordoli entrano nell'inquadratura: l'erba attorno a una curva
+  // arriva fin dove le si e' chiesto, e farla decidere il riquadro vorrebbe dire
+  // rimpicciolire la curva per mostrare del prato.
+  if (shapes) for (const k of ["road", "kerb"]) for (const ring of (shapes[k] || [])) {
+    for (const p of ring) pool.push([p[0], p[1]]);
+  }
+
+  // The box is wide and short; a corner is whatever shape it is. Drawn in the
+  // world's own axes, a corner that happens to run north-south uses a fifth of
+  // the width and the driver gets a stamp in the middle of an empty panel.
+  //
+  // So the picture is TURNED — the whole thing, by one angle, chosen as the one
+  // that lets it be drawn biggest. A rotation moves no point relative to any
+  // other: the shape, the widths and the metres are exactly what they were, and
+  // the scale bar still measures the same 25 m. It is the same corner, held up
+  // at a better angle, which is all "seen from above" ever meant.
+  const m = 34;
+  const cx0 = pool.reduce((a, p) => a + p[0], 0) / pool.length;
+  const cz0 = pool.reduce((a, p) => a + p[1], 0) / pool.length;
+  let best = null;
+  for (let deg = 0; deg < 180; deg += 3) {
+    const a = deg * Math.PI / 180, ca = Math.cos(a), sa = Math.sin(a);
+    let lx = Infinity, hx = -Infinity, lz = Infinity, hz = -Infinity;
+    for (const p of pool) {
+      const dx = p[0] - cx0, dz = p[1] - cz0;
+      const rx = dx * ca - dz * sa, rz = dx * sa + dz * ca;
+      if (rx < lx) lx = rx; if (rx > hx) hx = rx;
+      if (rz < lz) lz = rz; if (rz > hz) hz = rz;
+    }
+    const sX = (hx - lx) || 1, sZ = (hz - lz) || 1;
+    const scale = Math.min((w - 2 * m) / sX, (h - 2 * m) / sZ);
+    if (!best || scale > best.scale) best = { ca, sa, lx, hx, lz, hz, scale };
+  }
+
+  // The turn is applied to the DATA, once, so everything downstream — the
+  // lines, the band, the markers, the hover — keeps working in one flat
+  // coordinate system and cannot drift out of register with the road.
+  const turn = (x, z) => {
+    const dx = x - cx0, dz = z - cz0;
+    return [dx * best.ca - dz * best.sa, dx * best.sa + dz * best.ca];
+  };
+  const turnPair = (xs, zs) => {
+    const ox = [], oz = [];
+    for (let i = 0; i < xs.length; i++) {
+      const r = turn(xs[i], zs[i]);
+      ox.push(r[0]); oz.push(r[1]);
+    }
+    return [ox, oz];
+  };
+  [yx, yz] = turnPair(yx, yz);
+  ref = { ...ref, ...(([a, b]) => ({ x: a, z: b }))(turnPair(ref.x, ref.z)) };
+  if (road) {
+    road = { ...road, runs: road.runs.map((r) => ({
+      left: r.left.map((p) => turn(p[0], p[1])),
+      right: r.right.map((p) => turn(p[0], p[1])),
+    })) };
+  }
+  if (shapes) {
+    const t = {};
+    for (const k of Object.keys(shapes)) {
+      t[k] = shapes[k].map((ring) => ring.map((p) => turn(p[0], p[1])));
+    }
+    shapes = t;
+  }
+
+  const minX = best.lx, maxX = best.hx, minZ = best.lz;
+  const sc = best.scale;
+  const spanX = (best.hx - best.lx) || 1, spanZ = (best.hz - best.lz) || 1;
   const offX = (w - spanX * sc) / 2, offZ = (h - spanZ * sc) / 2;
-  // Same mirrored projection as the track map (AC/ACC world coords are
-  // left-handed), so a corner looks the way it does from the cockpit and the
-  // two views can be read one after the other without flipping your head.
+  // Mirrored like the track map (AC/ACC world coords are left-handed), so a
+  // corner still bends the way it does from the cockpit.
   const X = (x) => (maxX - x) * sc + offX;
   const Y = (z) => h - ((z - minZ) * sc + offZ);
 
   // The asphalt first, so everything else is drawn ON the road rather than
-  // beside it. Filled dark and edged with a hairline: the ribbon has to read as
-  // ground, not as a third racing line competing with the two above it.
-  if (road && road.left.length > 1) {
-    ctx.beginPath();
-    road.left.forEach((p, i) => (i ? ctx.lineTo(X(p[0]), Y(p[1]))
-                                   : ctx.moveTo(X(p[0]), Y(p[1]))));
-    for (let i = road.right.length - 1; i >= 0; i--) {
-      ctx.lineTo(X(road.right[i][0]), Y(road.right[i][1]));
-    }
-    ctx.closePath();
-    ctx.fillStyle = "rgba(255,255,255,0.06)";
-    ctx.fill();
-    ctx.strokeStyle = "rgba(255,255,255,0.32)"; ctx.lineWidth = 1.5;
-    for (const side of [road.left, road.right]) {
-      ctx.beginPath();
-      side.forEach((p, i) => (i ? ctx.lineTo(X(p[0]), Y(p[1]))
-                                : ctx.moveTo(X(p[0]), Y(p[1]))));
-      ctx.stroke();
-    }
-  }
+  // beside it. Two sources, and the better one wins: the game's own collision
+  // model gives the road as a POLYGON with its kerbs, while the AI spline can
+  // only give a corridor around the AI's own line — which on a chicane is a
+  // smoothed-out version of a road that is not smooth.
+  if (shapes) drawSurfaces(ctx, shapes, X, Y);
+  else drawRoad(ctx, road, X, Y, 1.5);
 
   // The band between the lines.
   ctx.beginPath();
@@ -2933,7 +3074,7 @@ function updateLineReadout(L, p) {
              `<b>${t("ro.pos")} ${posLabel(p)}</b>`;
   if (Array.isArray(off) && pos) {
     const i = nearest(pos, p);
-    bits += ` &nbsp;·&nbsp; ${t("line.ro.off")} <b>${offWord(off[i] * (c.direction === "left" ? -1 : 1), c)}</b>`;
+    bits += ` &nbsp;·&nbsp; ${t("line.ro.off")} <b>${offWord(off[i] * (c.sided !== false && c.direction === "left" ? -1 : 1), c)}</b>`;
   }
   const ki = nearest(L.curvature.you.pos, p);
   const k = Math.abs(L.curvature.you.k[ki] || 0);
