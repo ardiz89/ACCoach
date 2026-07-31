@@ -120,10 +120,15 @@ def test_the_outline_of_a_straight_road_is_the_road(tmp_path, monkeypatch):
 
 
 def test_pieces_side_by_side_give_one_outline_not_a_seam_each(tmp_path, monkeypatch):
-    """Il motivo per cui il contorno si ricava rasterizzando invece che dai
-    lati dei triangoli: due mesh affiancate NON condividono i vertici, e il
-    bordo geometrico avrebbe una cucitura in mezzo alla strada ogni dieci
-    metri."""
+    """Il dubbio che aveva portato, sbagliando, a rasterizzare.
+
+    Se due mesh affiancate avessero vertici diversi sul confine, ogni giunzione
+    diventerebbe un finto bordo in mezzo alla strada. Misurato sul modello vero
+    attorno alla Variante del Rettifilo: 18.473 triangoli, 28.168 lati, **917 di
+    bordo — il 3%**, e arrotondare i vertici a 1 o 5 cm non cambia un lato. Le
+    mesh combaciano. Qui la stessa cosa in piccolo, perche' se un giorno
+    smettessero di combaciare si vedrebbe da qui e non da uno screenshot.
+    """
     monkeypatch.setattr(tm, "physics_model", lambda track: _straight(tmp_path))
     tm._cache.clear()
     got = tm.road_shapes("qualunque", [(0.0, z) for z in range(10, 110, 5)], None, pad=6.0)
@@ -143,8 +148,8 @@ def test_the_kerbs_come_back_separately(tmp_path, monkeypatch):
 
 
 def test_the_payload_is_an_outline_not_a_mesh(tmp_path, monkeypatch):
-    """Attorno a una sola curva vera ci sono ventimila triangoli — un megabyte
-    e mezzo. Il contorno ne pesa dieci chilobyte."""
+    """Attorno a una sola curva vera ci sono ventimila triangoli — un megabyte e
+    mezzo. Il contorno di tutta Monza sta in ottantasei chilobyte."""
     import json
     monkeypatch.setattr(tm, "physics_model", lambda track: _straight(tmp_path, 400.0))
     tm._cache.clear()
@@ -183,3 +188,20 @@ def test_the_surfaces_are_placed_with_the_same_fit_as_everything_else(tmp_path,
     cx = sum(p[0] for p in ring) / len(ring)
     lx = sum(p[0] for p in xz) / len(xz)
     assert abs(cx - lx) < 15.0, f"la strada è a {abs(cx - lx):.0f} m dal giro"
+
+
+def test_a_straight_edge_comes_out_straight(tmp_path, monkeypatch):
+    """Il difetto che si vedeva: il bordo usciva a gradini.
+
+    Veniva dalla rasterizzazione a mezzo metro — a questo ingrandimento sono
+    quattro pixel per scalino. Ora il bordo e' quello vero, quindi il lato di
+    una strada dritta dev'essere fatto di pochissimi punti in fila.
+    """
+    monkeypatch.setattr(tm, "physics_model", lambda track: _straight(tmp_path, 200.0))
+    tm._cache.clear()
+    got = tm.road_shapes("qualunque", [(0.0, z) for z in range(10, 190, 5)], None, pad=6.0)
+    ring = max(got["road"], key=len)
+    # Un rettangolo lungo: quattro angoli, e nessuna scaletta in mezzo.
+    assert len(ring) <= 8, f"{len(ring)} punti per un rettangolo"
+    for x, _z in ring:
+        assert abs(abs(x) - 5.0) < 0.2, f"bordo a x={x:.2f} invece che a +-5"

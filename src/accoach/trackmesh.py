@@ -32,9 +32,8 @@ Cosa NON fa, per scelta:
   contando quante mesh seguono la convenzione — chi ne ha, ne ha decine; chi non
   ne ha, ne ha zero;
 * non manda triangoli al browser. Attorno a una sola curva ce ne sono ventimila.
-  Manda il **contorno** della superficie, ricavato per rasterizzazione — che
-  risolve gratis anche le cuciture fra mesh adiacenti, perché due pezzi
-  affiancati non condividono i vertici ma coprono celle contigue.
+  Manda il **contorno** della superficie: i lati usati da un solo triangolo,
+  cuciti in anelli.
 """
 
 from __future__ import annotations
@@ -206,107 +205,153 @@ def physics_model(track: str) -> Path | None:
     return None
 
 
-_cache: dict[str, dict[str, array] | None] = {}
+# Una sola voce per pista, con dentro TUTTO quello che si e' ricavato dal file:
+# i triangoli e l'indice per trovarli. Tenerli in due cache separate e' costato
+# subito un IndexError — svuotarne una lasciava l'altra a indicare offset di una
+# geometria che non c'era piu'.
+_cache: dict[str, dict | None] = {}
+
+#: Lato delle caselle dell'indice. Una curva ne tocca una manciata, e ogni
+#: casella tiene qualche centinaio di triangoli. Senza, ogni curva scorreva tutti
+#: e quattrocentomila: cinque secondi a pista, e li' dentro non c'era niente di
+#: difficile — solo il novantacinque per cento di lavoro buttato.
+_BUCKET_M = 40.0
 
 
-def surfaces(track: str) -> dict[str, array] | None:
-    """{"road": [x,z,x,z,...], "kerb": [...]} — tre vertici per triangolo."""
+def _loaded(track: str) -> dict | None:
     key = (track or "").lower()
     if key not in _cache:
         path = physics_model(track)
         got = _walk(path, collect=True) if path else None
-        _cache[key] = got["tris"] if got else None
+        if not got:
+            _cache[key] = None
+        else:
+            tris = got["tris"]
+            grid = {}
+            for cls, flat in tris.items():
+                g: dict[tuple, list] = {}
+                for t in range(0, len(flat) - 5, 6):
+                    xs = (flat[t], flat[t + 2], flat[t + 4])
+                    zs = (flat[t + 1], flat[t + 3], flat[t + 5])
+                    for i in range(int(min(xs) // _BUCKET_M), int(max(xs) // _BUCKET_M) + 1):
+                        for j in range(int(min(zs) // _BUCKET_M), int(max(zs) // _BUCKET_M) + 1):
+                            g.setdefault((i, j), []).append(t)
+                grid[cls] = g
+            _cache[key] = {"tris": tris, "grid": grid}
     return _cache[key]
 
 
+def surfaces(track: str) -> dict[str, array] | None:
+    """{"road": [x,z,x,z,...], "kerb": [...]} — tre vertici per triangolo."""
+    got = _loaded(track)
+    return got["tris"] if got else None
+
+
 # --- dal mucchio di triangoli al contorno --------------------------------------
+#
+# Il bordo di una superficie sono i lati che appartengono a **un solo**
+# triangolo. Detta cosi' e' ovvia; il dubbio era un altro, e cioe' se i pezzi di
+# pista si tocchino davvero — se due mesh affiancate avessero vertici diversi
+# sul confine, ogni giunzione diventerebbe un finto bordo in mezzo alla strada.
+#
+# Misurato attorno alla Variante del Rettifilo: **18.473 triangoli, 28.168 lati,
+# 917 di bordo — il 3%**. E arrotondare i vertici a 1 o a 5 cm non cambia
+# nemmeno un lato: le mesh combaciano esattamente. Il timore era infondato.
+#
+# La prima versione rasterizzava a mezzo metro per aggirare quel problema che
+# non c'era, e si vedeva: a un decimo di millimetro per pixel un gradino da 50 cm
+# e' spesso quattro pixel, e la pista usciva scalettata.
 
-#: Lato della cella, in metri. A 0.5 m il contorno di un cordolo largo 1.5 m ha
-#: comunque tre celle di spessore, e una curva intera sta in poche decine di
-#: migliaia di celle — il conto si fa in millisecondi.
-_CELL = 0.5
+#: Quanto semplificare l'anello prima di mandarlo. 12 cm e' sotto lo spessore
+#: della linea con cui viene disegnato: toglie i vertici che il modello mette
+#: per ragioni sue senza spostare un bordo di quanto si veda.
+_SIMPLIFY_M = 0.12
 
-#: Quanto semplificare il contorno prima di mandarlo. 0.35 m e' sotto la
-#: risoluzione della griglia: toglie i gradini della rasterizzazione senza
-#: spostare un bordo di quanto si veda.
-_SIMPLIFY_M = 0.35
+#: Un anello piu' corto di cosi' e' un ritaglio, non un pezzo di pista.
+_MIN_RING = 4
 
 
-def _raster(tris: array, x0: float, z0: float, nx: int, nz: int) -> bytearray:
-    """Segna le celle coperte dai triangoli. Scanline, un triangolo alla volta."""
-    grid = bytearray(nx * nz)
-    n = len(tris)
-    for t in range(0, n - 5, 6):
-        ax, az = tris[t], tris[t + 1]
-        bx, bz = tris[t + 2], tris[t + 3]
-        cx, cz = tris[t + 4], tris[t + 5]
-        lo_j = int((min(az, bz, cz) - z0) / _CELL)
-        hi_j = int((max(az, bz, cz) - z0) / _CELL)
-        if hi_j < 0 or lo_j >= nz:
+def _boundary(tris: array, offsets, keep) -> list[list]:
+    """Gli anelli di bordo dei triangoli indicati che passano ``keep``."""
+    edges: dict[tuple, int] = {}
+    for t in offsets:
+        a = (round(tris[t], 3), round(tris[t + 1], 3))
+        b = (round(tris[t + 2], 3), round(tris[t + 3], 3))
+        c = (round(tris[t + 4], 3), round(tris[t + 5], 3))
+        if not keep(a, b, c):
             continue
-        lo_i = int((min(ax, bx, cx) - x0) / _CELL)
-        hi_i = int((max(ax, bx, cx) - x0) / _CELL)
-        if hi_i < 0 or lo_i >= nx:
+        for p, q in ((a, b), (b, c), (c, a)):
+            key = (p, q) if p <= q else (q, p)
+            edges[key] = edges.get(key, 0) + 1
+
+    # Da ogni vertice partono i lati di bordo che lo toccano. Un vertice puo'
+    # averne piu' di due (due pezzi che si sfiorano in un punto), quindi la
+    # cucitura consuma i lati invece di seguire un "prossimo" fisso.
+    at: dict[tuple, list] = {}
+    for (p, q), n in edges.items():
+        if n != 1:
             continue
-        d = (bz - cz) * (ax - cx) + (cx - bx) * (az - cz)
-        if d == 0.0:
-            continue
-        for j in range(max(0, lo_j), min(nz - 1, hi_j) + 1):
-            pz = z0 + (j + 0.5) * _CELL
-            row = j * nx
-            for i in range(max(0, lo_i), min(nx - 1, hi_i) + 1):
-                px = x0 + (i + 0.5) * _CELL
-                w1 = ((bz - cz) * (px - cx) + (cx - bx) * (pz - cz)) / d
-                if w1 < 0.0 or w1 > 1.0:
-                    continue
-                w2 = ((cz - az) * (px - cx) + (ax - cx) * (pz - cz)) / d
-                if w2 < 0.0 or w1 + w2 > 1.0:
-                    continue
-                grid[row + i] = 1
-    return grid
-
-
-def _contours(grid: bytearray, nx: int, nz: int, x0: float, z0: float) -> list[list]:
-    """Il bordo delle celle segnate, come anelli chiusi (marching squares).
-
-    Prende i lati fra una cella piena e una vuota e li cuce. Cosi' due mesh
-    affiancate — che NON condividono i vertici, e il cui bordo geometrico
-    avrebbe una cucitura in mezzo alla strada — danno un contorno solo.
-    """
-    edges: dict[tuple, tuple] = {}
-
-    def add(a, b):
-        edges[a] = b
-
-    for j in range(nz):
-        row = j * nx
-        for i in range(nx):
-            if not grid[row + i]:
-                continue
-            # Lati verso un vicino vuoto, orientati in senso antiorario.
-            if i == 0 or not grid[row + i - 1]:
-                add((i, j + 1), (i, j))
-            if i == nx - 1 or not grid[row + i + 1]:
-                add((i + 1, j), (i + 1, j + 1))
-            if j == 0 or not grid[row - nx + i]:
-                add((i, j), (i + 1, j))
-            if j == nz - 1 or not grid[row + nx + i]:
-                add((i + 1, j + 1), (i, j + 1))
+        at.setdefault(p, []).append(q)
+        at.setdefault(q, []).append(p)
 
     rings = []
-    while edges:
-        start = next(iter(edges))
+    while at:
+        start = next(iter(at))
         ring = [start]
-        cur = start
+        cur, prev = start, None
         while True:
-            nxt = edges.pop(cur, None)
-            if nxt is None or nxt == start:
+            opts = at.get(cur)
+            if not opts:
+                break
+            nxt = next((o for o in opts if o != prev), opts[0])
+            opts.remove(nxt)
+            if not opts:
+                at.pop(cur, None)
+            back = at.get(nxt)
+            if back and cur in back:
+                back.remove(cur)
+                if not back:
+                    at.pop(nxt, None)
+            if nxt == start:
                 break
             ring.append(nxt)
-            cur = nxt
-        if len(ring) >= 8:
-            rings.append([[x0 + p[0] * _CELL, z0 + p[1] * _CELL] for p in ring])
+            prev, cur = cur, nxt
+        if len(ring) >= _MIN_RING:
+            rings.append([list(p) for p in ring])
     return rings
+
+
+def _clip(ring: list, x0: float, z0: float, x1: float, z1: float) -> list:
+    """Taglia un anello sul rettangolo della finestra (Sutherland-Hodgman).
+
+    Serve perche' i triangoli si tengono per intero: senza, il bordo del disegno
+    seguirebbe i denti dei triangoli tagliati invece di una riga dritta.
+    """
+    def half(pts, inside, cross):
+        out = []
+        n = len(pts)
+        for i in range(n):
+            a, b = pts[i], pts[(i + 1) % n]
+            ia, ib = inside(a), inside(b)
+            if ia:
+                out.append(a)
+            if ia != ib:
+                out.append(cross(a, b))
+        return out
+
+    def cx(v):
+        return lambda a, b: [v, a[1] + (b[1] - a[1]) * (v - a[0]) / (b[0] - a[0])]             if b[0] != a[0] else [v, a[1]]
+
+    def cz(v):
+        return lambda a, b: [a[0] + (b[0] - a[0]) * (v - a[1]) / (b[1] - a[1]), v]             if b[1] != a[1] else [a[0], v]
+
+    pts = ring
+    for inside, cross in ((lambda p: p[0] >= x0, cx(x0)), (lambda p: p[0] <= x1, cx(x1)),
+                          (lambda p: p[1] >= z0, cz(z0)), (lambda p: p[1] <= z1, cz(z1))):
+        if not pts:
+            return []
+        pts = half(pts, inside, cross)
+    return pts
 
 
 def _simplify(pts: list, tol: float) -> list:
@@ -345,8 +390,8 @@ def road_shapes(track: str, xz, at=None, pad: float = 22.0,
     ``xz`` e' il tratto in coordinate del **giro**; ``at`` e' il fit che porta il
     modello in quelle coordinate (da `trackedges.fit`). Il ritaglio si fa nelle
     coordinate del modello — ci si va con l'inverso del fit — perche' e' li' che
-    stanno i quattrocentomila triangoli, e trasformarli tutti per poi buttarne
-    il 99% sarebbe lavoro pagato due volte.
+    stanno i quattrocentomila triangoli, e trasformarli tutti per poi buttarne il
+    novantanove per cento sarebbe lavoro pagato due volte.
     """
     tris = surfaces(track)
     if not tris or not xz:
@@ -358,27 +403,31 @@ def road_shapes(track: str, xz, at=None, pad: float = 22.0,
     z0 = min(p[1] for p in pts) - pad
     z1 = max(p[1] for p in pts) + pad
     # Una finestra grande come mezzo circuito non e' una curva: e' un ritaglio
-    # andato storto, e rasterizzarla costerebbe secondi per un disegno inutile.
+    # andato storto, e nessun disegno utile ne uscirebbe.
     if (x1 - x0) > max_span or (z1 - z0) > max_span:
         return None
-    nx = max(4, int((x1 - x0) / _CELL) + 1)
-    nz = max(4, int((z1 - z0) / _CELL) + 1)
 
+    def keep(a, b, c):
+        # Il triangolo si tiene INTERO se tocca la finestra: tagliarlo qui
+        # lascerebbe denti, e il taglio dritto lo fa `_clip` sull'anello.
+        return (max(a[0], b[0], c[0]) >= x0 and min(a[0], b[0], c[0]) <= x1 and
+                max(a[1], b[1], c[1]) >= z0 and min(a[1], b[1], c[1]) <= z1)
+
+    grids = _loaded(track)["grid"]
     out = {}
     for cls, flat in tris.items():
-        near = array("f")
-        for t in range(0, len(flat) - 5, 6):
-            if (x0 <= flat[t] <= x1 and z0 <= flat[t + 1] <= z1) or \
-               (x0 <= flat[t + 2] <= x1 and z0 <= flat[t + 3] <= z1) or \
-               (x0 <= flat[t + 4] <= x1 and z0 <= flat[t + 5] <= z1):
-                near.extend(flat[t:t + 6])
-        if not near:
+        grid = grids.get(cls, {})
+        offs = set()
+        for i in range(int(x0 // _BUCKET_M), int(x1 // _BUCKET_M) + 1):
+            for j in range(int(z0 // _BUCKET_M), int(z1 // _BUCKET_M) + 1):
+                offs.update(grid.get((i, j), ()))
+        if not offs:
             continue
-        rings = _contours(_raster(near, x0, z0, nx, nz), nx, nz, x0, z0)
         shapes = []
-        for ring in rings:
+        for ring in _boundary(flat, sorted(offs), keep):
+            ring = _clip(ring, x0, z0, x1, z1)
             ring = _simplify(ring, _SIMPLIFY_M)
-            if len(ring) < 4:
+            if len(ring) < _MIN_RING:
                 continue
             if at is not None:
                 ring = [list(at.apply(p[0], p[1])) for p in ring]

@@ -239,10 +239,25 @@ Due cose non ovvie, entrambe misurate:
   falliva su metà delle piste. Ora conta: chi ne ha, ne ha 74-375; chi non ne
   ha, ne ha **zero**.
 * **al browser non si mandano i triangoli.** Attorno a una sola curva ce ne sono
-  ventimila, un megabyte e mezzo. Si manda il **contorno**, ricavato
-  rasterizzando a mezzo metro — che risolve gratis anche le cuciture, perché due
-  mesh affiancate non condividono i vertici ma coprono celle contigue. Dieci
-  chilobyte a curva, un decimo di secondo.
+  ventimila, un megabyte e mezzo. Si manda il **contorno**: i lati che
+  appartengono a un solo triangolo, cuciti in anelli. Tutta Monza sta in 86 KB.
+
+La prima versione ricavava quel contorno **rasterizzando a mezzo metro**, per
+aggirare un problema che non esisteva — il timore che due mesh affiancate non
+condividessero i vertici, e che ogni giunzione diventasse un finto bordo in mezzo
+alla strada. Si vedeva: a questo ingrandimento un gradino da 50 cm è spesso
+quattro pixel, e la pista usciva **scalettata**.
+
+Bastava misurare, e la misura dice il contrario: attorno alla Variante del
+Rettifilo ci sono **18.473 triangoli, 28.168 lati, 917 di bordo — il 3%**, e
+arrotondare i vertici a 1 o a 5 cm non cambia **nemmeno un lato**. Le mesh
+combaciano esattamente. Ora il bordo è quello vero, e i lati dritti escono
+dritti.
+
+Perché resti veloce serve un indice: senza, ogni curva scorreva tutti e
+quattrocentomila i triangoli — cinque secondi a pista, con dentro il 95% di
+lavoro buttato. Con le caselle da 40 m si scende a **0.07-1.8 s per un giro
+intero**, dopo un caricamento di mezzo secondo.
 
 Il nastro dalla spline resta come ripiego, per le piste senza mesh leggibili.
 
