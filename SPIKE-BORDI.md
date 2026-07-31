@@ -205,6 +205,55 @@ scritto attorno ai modi di dire di no:
 Il ripiego dell'**inviluppo dei tuoi giri** non è stato implementato e serve
 ormai solo a chi ha unicamente ACC.
 
+## 2026-07-31, sera: la strada non era la strada
+
+Segnalato guardando la Variante del Rettifilo accanto a una foto aerea: la
+nostra si disegnava come una **esse morbida**, quella vera è un **flick secco**.
+
+La geometria del giro era giusta (verificata contro la Monza da satellite:
+−54°/−87° a destra, poi +78°/+107° a sinistra). A sbagliare era il nastro, e la
+causa sta in questo documento fin dall'inizio senza che me ne accorgessi:
+`sideLeft`/`sideRight` sono misurati **perpendicolarmente alla linea dell'IA**.
+Dove l'IA taglia una variante il piede della perpendicolare non cade sul punto
+giusto del bordo, e quello che se ne ricava è **il corridoio attorno alla
+traiettoria dell'IA**, non la strada.
+
+La strada sta altrove, e nello stesso gioco: le **mesh delle superfici**, una per
+pezzo di pista, nominate con le chiavi di `surfaces.ini`.
+
+| Monza | mesh | triangoli |
+|---|---|---|
+| `MONZA-ASPH` + `ROAD` | 113 | **404.824** |
+| `CURB` + `KERB` | 36 | **19.755** |
+| `GRASS` · `SAND` · `CONCRETE` · `WALL` | 152 | il resto |
+
+Posate con lo stesso fit: **la linea guidata sta a 0.34 m dal vertice d'asfalto
+più vicino** (p95 1.26 m). Il dato satellitare, sullo stesso giro, ne dava 7-14.
+
+Due cose non ovvie, entrambe misurate:
+
+* **dove stiano le mesh non è una regola.** Monza, Spa, il Nürburgring e
+  Bathurst hanno un modello a parte, piccolo; Imola e Suzuka le tengono dentro
+  il modello **visivo** da centinaia di MB, fra `Object112` e `bush767`. La
+  prima versione cercava il file «in cui quasi tutti i nomi sono superfici» e
+  falliva su metà delle piste. Ora conta: chi ne ha, ne ha 74-375; chi non ne
+  ha, ne ha **zero**.
+* **al browser non si mandano i triangoli.** Attorno a una sola curva ce ne sono
+  ventimila, un megabyte e mezzo. Si manda il **contorno**, ricavato
+  rasterizzando a mezzo metro — che risolve gratis anche le cuciture, perché due
+  mesh affiancate non condividono i vertici ma coprono celle contigue. Dieci
+  chilobyte a curva, un decimo di secondo.
+
+Il nastro dalla spline resta come ripiego, per le piste senza mesh leggibili.
+
+### E ACC?
+
+Le sue mesh stanno dentro un `.pak` di Unreal Engine da **17 GB**: un altro
+problema. Ma ACC pubblica `fastlane.ai` per tutte e 25 le piste **fuori** dal
+pak, versione **8**. La decodifica della v7 non si trasporta: provate tutte le
+dimensioni di record da 12 a 88 byte e tutti gli offset, nessuna dà una
+polilinea vicina ai 5793 m di Monza. È uno spike a sé.
+
 ## Come rifare le misure
 
 ```

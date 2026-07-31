@@ -41,8 +41,9 @@ from .sectors import ideal_lap, sector_spans, sector_times
 from .sessions import group_sessions
 from .telemetry.snapshot import format_lap_time
 from .track import detect_corners
-from .trackedges import crop as crop_edges, edges_for
+from .trackedges import crop as crop_edges, edges_and_fit, edges_for
 from .trackdata import name_corners
+from .trackmesh import road_shapes
 from .trajectory import (
     LinePoint,
     build_line_report,
@@ -827,7 +828,7 @@ def create_api(
         # the track installed here is the track this lap was driven on. See
         # trackedges: a mismatch is a ribbon drawn 187 m from the car, and no
         # ribbon at all is the better answer.
-        track_edges = edges_for(track, you_pts)
+        track_edges, track_fit = edges_and_fit(track, you_pts)
 
         # Zoomed crops, one per corner: this is the only place the full-rate
         # samples are worth serving, and only over a few hundred metres each.
@@ -837,9 +838,16 @@ def create_api(
                 "you": you_crop,
                 "ref": corner_path(ref_pts, c.entry, c.exit),
             }
-            if track_edges is not None:
-                row["line"]["edges"] = crop_edges(
-                    track_edges, list(zip(you_crop["x"], you_crop["z"])))
+            crop_xz = list(zip(you_crop["x"], you_crop["z"]))
+            # La strada vera, dal modello di collisione del gioco: e' il
+            # poligono dell'asfalto, non il corridoio attorno alla linea
+            # dell'IA, e porta con se' i cordoli. Dove c'e', vince.
+            shapes = (road_shapes(track, crop_xz, track_fit)
+                      if track_fit is not None else None)
+            if shapes:
+                row["line"]["road"] = shapes
+            elif track_edges is not None:
+                row["line"]["edges"] = crop_edges(track_edges, crop_xz)
 
         def _curve(points) -> dict:
             k = curvature_profile(points)

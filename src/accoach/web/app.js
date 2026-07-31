@@ -740,6 +740,32 @@ function balanceColor(v) {
   return `rgb(${mix(c[0])},${mix(c[1])},${mix(c[2])})`;
 }
 
+// The road as the game's own collision model has it: one closed ring per piece
+// of surface, already cropped to this corner (see trackmesh.py). Asphalt first,
+// then the kerbs on top of it — which is the order they exist in.
+//
+// The kerbs are the reason this is worth the trouble. They are the thing a
+// driver aims at, and no amount of widening a racing line invents one.
+function drawSurfaces(ctx, shapes, X, Y) {
+  const fill = (rings, colour) => {
+    if (!rings || !rings.length) return;
+    ctx.beginPath();
+    for (const ring of rings) {
+      ring.forEach((p, i) => (i ? ctx.lineTo(X(p[0]), Y(p[1]))
+                                : ctx.moveTo(X(p[0]), Y(p[1]))));
+      ctx.closePath();
+    }
+    ctx.fillStyle = colour;
+    // Even-odd, so a piece of surface with a hole in it — the infield of a
+    // hairpin — comes out with the hole instead of filled solid.
+    ctx.fill("evenodd");
+  };
+  ctx.save();
+  fill(shapes.road, "rgba(255,255,255,0.15)");
+  fill(shapes.kerb, "rgba(226,86,96,0.55)");
+  ctx.restore();
+}
+
 // The asphalt, from the game's own track data (see trackedges.py). Filled dark
 // and edged with a hairline: the ribbon has to read as GROUND, not as a third
 // racing line competing with the two drawn on top of it.
@@ -2473,9 +2499,15 @@ function renderLine(cx) {
   // couple of metres past this line (see SPIKE-BORDI.md).
   const legRoad = $("leg-road");
   if (legRoad) {
+    const mesh = LINE_MAG > 1 ? null : (L.corners[LINE_I] || {}).line;
+    const surf = mesh && mesh.road;
     const road = LINE_MAG > 1 ? null : L.edges;
-    legRoad.classList.toggle("hidden", !road);
-    if (road) {
+    legRoad.classList.toggle("hidden", !(surf || road));
+    if (surf) {
+      // Con le superfici del gioco i cordoli CI SONO: dire il contrario
+      // sarebbe una didascalia che contraddice il proprio disegno.
+      $("leg-road-text").textContent = t("line.leg.mesh");
+    } else if (road) {
       $("leg-road-text").textContent = tf("line.leg.road", { m: road.width_m });
     }
   }
@@ -2638,11 +2670,15 @@ function drawCornerZoom(L, c, cx) {
   let road = LINE_MAG > 1 ? null : c.line.edges;
 
   // Everything that has to fit inside the box.
+  let shapes = LINE_MAG > 1 ? null : c.line.road;
   const pool = [];
   for (let i = 0; i < yx.length; i++) pool.push([yx[i], yz[i]]);
   for (let i = 0; i < ref.x.length; i++) pool.push([ref.x[i], ref.z[i]]);
   if (road) for (const r of road.runs) for (const side of [r.left, r.right]) {
     for (const p of side) pool.push([p[0], p[1]]);
+  }
+  if (shapes) for (const k of ["road", "kerb"]) for (const ring of (shapes[k] || [])) {
+    for (const p of ring) pool.push([p[0], p[1]]);
   }
 
   // The box is wide and short; a corner is whatever shape it is. Drawn in the
@@ -2695,6 +2731,13 @@ function drawCornerZoom(L, c, cx) {
       right: r.right.map((p) => turn(p[0], p[1])),
     })) };
   }
+  if (shapes) {
+    const t = {};
+    for (const k of Object.keys(shapes)) {
+      t[k] = shapes[k].map((ring) => ring.map((p) => turn(p[0], p[1])));
+    }
+    shapes = t;
+  }
 
   const minX = best.lx, maxX = best.hx, minZ = best.lz;
   const sc = best.scale;
@@ -2706,8 +2749,12 @@ function drawCornerZoom(L, c, cx) {
   const Y = (z) => h - ((z - minZ) * sc + offZ);
 
   // The asphalt first, so everything else is drawn ON the road rather than
-  // beside it.
-  drawRoad(ctx, road, X, Y, 1.5);
+  // beside it. Two sources, and the better one wins: the game's own collision
+  // model gives the road as a POLYGON with its kerbs, while the AI spline can
+  // only give a corridor around the AI's own line — which on a chicane is a
+  // smoothed-out version of a road that is not smooth.
+  if (shapes) drawSurfaces(ctx, shapes, X, Y);
+  else drawRoad(ctx, road, X, Y, 1.5);
 
   // The band between the lines.
   ctx.beginPath();

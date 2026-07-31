@@ -475,6 +475,29 @@ class Fit:
         return (self.scale * (x * self.cos - z * self.sin) + self.dx,
                 self.scale * (x * self.sin + z * self.cos) + self.dz)
 
+    def inverse(self) -> "Fit":
+        """Il fit al contrario: dalle coordinate del giro a quelle del file.
+
+        Serve a chi ha molta geometria e ne vuole poca: si porta la finestra nel
+        mondo del modello e si ritaglia li', invece di trasformare
+        quattrocentomila triangoli per poi buttarne il novantanove per cento.
+
+        Il caso con lo specchio non e' una variante del primo. `apply` specchia
+        in INGRESSO, e l'inversa dovrebbe specchiare in USCITA: le due cose
+        coincidono solo cambiando segno all'angolo, perche' M·R(t)·M = R(-t).
+        Scritto a mano invece che "quasi come sopra", e verificato andata e
+        ritorno su punti a caso.
+        """
+        s = 1.0 / self.scale if self.scale else 1.0
+        c, si = self.cos, self.sin
+        if self.mirror:
+            return Fit(scale=s, cos=c, sin=si, mirror=True, p95_m=self.p95_m,
+                       dx=(c * self.dx + si * self.dz) * s,
+                       dz=(si * self.dx - c * self.dz) * s)
+        return Fit(scale=s, cos=c, sin=-si, mirror=False, p95_m=self.p95_m,
+                   dx=-(c * self.dx + si * self.dz) * s,
+                   dz=(si * self.dx - c * self.dz) * s)
+
 
 def _kabsch(a: list[tuple[float, float]], b: list[tuple[float, float]]):
     """The rotation and scale that best carry ``a`` onto ``b``, both centred.
@@ -640,7 +663,7 @@ def _lap_length(points) -> float:
                for i in range(1, len(points)))
 
 
-def _by_shape(points) -> TrackEdges | None:
+def _by_shape(points):
     """Find the circuit by what it *looks like*, not by what it's called.
 
     The names belong to the sims, and the sims disagree: Mount Panorama is
@@ -659,8 +682,9 @@ def _by_shape(points) -> TrackEdges | None:
     """
     want = _lap_length(points)
     if want <= 0:
-        return None
+        return None, None
     best: TrackEdges | None = None
+    best_at: Fit | None = None
     best_p95 = float("inf")
     # Both sources, scored against each other. Not "bundled first, game as a
     # fallback": on a track that is in both, whichever describes *your* lap
@@ -674,8 +698,8 @@ def _by_shape(points) -> TrackEdges | None:
             continue
         at = fit(got, points)
         if at is not None and at.p95_m < best_p95:
-            best, best_p95 = placed(got, at), at.p95_m
-    return best
+            best, best_at, best_p95 = placed(got, at), at, at.p95_m
+    return best, best_at
 
 
 def edges_for(track: str, points=None) -> TrackEdges | None:
@@ -693,4 +717,16 @@ def edges_for(track: str, points=None) -> TrackEdges | None:
     """
     if points is None:
         return _by_name(track)
+    return _by_shape(points)[0]
+
+
+def edges_and_fit(track: str, points):
+    """Come `edges_for`, ma restituisce anche COME la pista e' stata posata.
+
+    Il fit non e' un dettaglio interno: chiunque abbia altra geometria della
+    stessa pista — il modello di collisione, per dire — deve posarla nello
+    stesso identico modo, o le due finiranno l'una accanto all'altra.
+    """
+    if points is None:
+        return _by_name(track), None
     return _by_shape(points)
