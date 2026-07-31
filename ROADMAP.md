@@ -1,9 +1,16 @@
 # Roadmap HONE
 
-Aggiornata il **2026-07-22**. Ogni voce dice da dove viene: una richiesta reale
+Evidenza raccolta il **2026-07-22**, stato delle voci riverificato **contro il
+codice** il **2026-07-31**. Ogni voce dice da dove viene: una richiesta reale
 misurata, un difetto trovato in casa, o un'ipotesi nostra. Le ipotesi nostre sono
 etichettate come tali, perché in questo progetto ne abbiamo già sbagliate due in
 un giorno.
+
+> **Come si aggiorna questa tabella.** Una voce si dichiara fatta solo dopo aver
+> aperto il codice che la chiude, non a memoria: la riverifica del 31/07 ha
+> trovato **sette voci ancora scritte come aperte che erano state implementate**
+> fra il 22 e il 23 luglio. Una roadmap che sopravvaluta il lavoro rimasto
+> costa quanto una che lo sottovaluta — si finisce a rifare cose già fatte.
 
 ---
 
@@ -111,30 +118,58 @@ pubblico, stesso problema, reazione opposta a seconda di come è presentato.**
 
 ---
 
-## Cosa entra in roadmap
+## Cosa resta aperto
 
-Ordinate per rapporto tra quanto spostano il cronometro (o la fiducia) e quanto
-costano. Le prime tre hanno evidenza esterna misurata; le altre no.
+Tre voci su diciassette. Due delle tre **non si chiudono da scrivania**: sono le
+uniche del documento il cui costo non è codice ma tempo in pista.
 
-| # | Voce | Origine | Peso |
+| # | Voce | Origine | Cosa manca davvero |
 |---|---|---|---|
-| 1 | ~~**Riferimenti di frenata adattati ad auto e condizioni**~~ — **fatta il 2026-07-30**: scheda «Le tue frenate» sotto la mappa (`braking_points.py` + `/api/braking`), misurata sui tuoi ultimi giri **nella stessa fascia di temperatura**, con riferimento visivo dove esiste, dispersione in km/h e in metri, CSV e stampa | 332 voti su Reddit | medio |
-| 2 | **Riferimenti visivi** («al cordolo», «al cartello») invece dei soli metri | richiesta esplicita | medio-grande |
-| 3 | **Aiuti che si ritirano** quando sei costante in quella curva | comportamento osservato | medio |
-| 4 | ~~**Condizioni pista nell'elezione del riferimento**~~ — **completata il 2026-07-30**: temperatura asfalto (live + report), poi **gomma e grip**. I due campi erano in SQLite dal 20/07 e non li leggeva nessuno. Misurato sui 39 giri veri: la gomma è popolata su entrambi i giochi, **il grip su ACC è 0 su 15 giri su 15** (ACC lascia il campo storico a zero: serve dichiarare `trackGripStatus` nella coda della pagina, e si può validare col gioco fermo ai box) | audit + evidenza (2) | piccolo-medio |
-| 5 | **Rilevare il gas parziale** tenuto in percorrenza | vocabolario coach umani | piccolo |
-| 6 | **Sollevamenti in zona di pieno**, quantificati sul rettilineo seguente | vocabolario coach umani | piccolo |
-| 7 | **Velocità di punta vs riferimento → ipotesi ala/drag** | vocabolario coach umani | piccolo |
-| 8 | **Grip combinato (G-G) come causa** nel debrief | audit interno | medio |
-| 9 | **Granularità per livello**: tecnica generale prima dell'analisi curva per curva | vocabolario coach umani | medio |
-| 10 | **Riferimento esterno/PRO con interfaccia** | audit interno | medio |
-| 11 | **Tarature su ACC** — piano pronto in [`TARATURE-ACC.md`](TARATURE-ACC.md) | mai fatte | serve pista |
-| 12 | **Documentazione e tutorial allineati** (fermi al 29/06) + aiuto contestuale nelle impostazioni | segnalazione utente | piccolo |
-| 17 | ~~**Nomi delle curve oltre Monza e Imola**~~ — **fatta il 2026-07-30**: Spa e Suzuka, misurati dai giri veri in archivio (lunghezza del giro entro l'1% dal dato pubblicato) e verificati su tre letture indipendenti: distanza sul giro, **verso della curva** e carattere. Il Nürburgring resta fuori: quei giri sono precedenti al fix delle coordinate AC1. Trovato e corretto un difetto vero — un nome poteva raggiungere la curva accanto (Eau Rouge chiamata «La Source») → ora il verso è un vincolo | analisi concorrenza 2026-07-30 | piccolo |
-| 16 | ~~**Tempo perso per fase dentro la curva**~~ — **fatta il 2026-07-30**: ingresso / apex / uscita / tratto dopo, con i pezzi che **risommano** al tempo perso nella curva (`coaching/phases.py`). Dall'analisi di Coach Dave Delta (le loro *Auto Insights* danno il delta per fase); da noi si incastra con la diagnosi che già dice *cosa* fa l'auto in ogni fase | analisi concorrenza 2026-07-30 | medio |
-| 15 | ~~**Avvio automatico col gioco**~~ — **fatta il 2026-07-30**: l'hub sorveglia la memoria condivisa e avvia il **solo registratore silenzioso** quando AC/ACC compare (`watch.py`, impostazione spenta di default, mai la voce). Il rilevamento riusa il `connected` del reader: una definizione sola di «il gioco c'è» | analisi concorrenza 2026-07-30 | piccolo |
-| 14 | ~~**Piano di allenamento**~~ — **fatta il 2026-07-30**: uno o due obiettivi dai punti deboli sistematici, con bersaglio in secondi, **accettato** (quindi con una data) e misurato solo sui giri successivi (`coaching/plan.py`, tabella `plan` accanto a `focus_state`). È ciò che Track Titan fa pagare col Premium; da noi non inventa contenuto — obiettivi, parole e «fatto» vengono da quello che già calcoliamo | analisi concorrenza 2026-07-30 | medio |
-| 13 | ~~**Effetto a catena fra curve**~~ — **fatta il 2026-07-30**: quando la perdita di una curva era già nei km/h con cui ci arrivi, il debrief lo dice e ti manda sulla curva prima (`coaching/chain.py`). Nasce dall'analisi di Track Titan (il loro *Timekiller* è l'unica cosa loro che stava sul nostro differenziatore); da noi è più forte perché la causa fisica ce l'abbiamo già | analisi concorrenza 2026-07-30 | medio |
+| 2 | **Riferimenti visivi** («al cordolo», «al cartello») | richiesta esplicita | Il meccanismo c'è dal 27/07 (`_LANDMARKS` + `landmark_at`, la nota additiva nel debrief, e la scheda frenate li usa dove esistono). Manca la **copertura** — oggi: **Monza 5 staccate, Imola 0**, tutte le altre piste zero — e soprattutto la **validazione**: nessun landmark ha mai fatto scattare una frase su un giro reale. Aggiungere piste a tavolino senza quella prova moltiplica un meccanismo mai visto funzionare |
+| 11 | **Tarature su ACC** | mai fatte | Serve pista. Piano pronto in [`TARATURE-ACC.md`](TARATURE-ACC.md). Il pezzo scomodo è noto: lo **slip ratio ha sorgente diversa fra AC e ACC**, quindi le soglie non si trasportano |
+| 12 | **Documentazione allineata** | segnalazione utente | La parte che riguarda chi usa il prodotto **è stata chiusa il 30/07**: `GUIDA.md` e `docs/FAQ.md` ora descrivono tutte le schede (prima l'inglese non nominava l'intera app di analisi). Resta **`docs/index.html`**, la pagina pubblica, ferma al 29/06 — è incompleta, non falsa — e l'**aiuto contestuale nelle impostazioni** |
+
+## Cosa è stato chiuso, e da cosa
+
+Riverificato aprendo il codice il 2026-07-31, non a memoria: le voci 3, 5, 6, 7,
+8, 9 e 10 erano ancora scritte come aperte pur essendo state implementate fra il
+22 e il 23 luglio.
+
+| # | Voce | Chiusa | Dove sta |
+|---|---|---|---|
+| 5 | **Gas parziale** tenuto in percorrenza | 22/07 (`4e84f66`) | `coaching/braking.py` (`_held_partial_throttle`) + cue `PARTIAL_THROTTLE`. È letteralmente la prima cosa che il coach umano del thread nomina |
+| 6 | **Sollevamenti in zona di pieno**, quantificati | 22/07 (`f43585e`) | `coaching/debrief.py` (`_lift_notes`): il costo è misurato **dal sollevamento fino a dove il riferimento stacca il gas**, cioè sul rettilineo che segue, com'era la richiesta |
+| 7 | **Velocità di punta → ipotesi ala/drag** | 22/07 (`f43585e`) | `debrief._top_speed_note`: distingue i due casi, *drag* se le velocità in curva combaciano, *uscita* se no — non attribuisce all'ala un problema di trazione |
+| 10 | **Riferimento PRO con interfaccia** | 22/07 (`daade07`) | `launcher.py` (`_import_pro`): esisteva solo da riga di comando, quindi in pratica il livello «riferimento PRO» era irraggiungibile |
+| 8 | **Grip combinato (G-G) come causa** | 22/07 (`cf1d6dd`) | `debrief._combined_g`, confrontato col riferimento al **95° percentile** e non al massimo (un cordolo o un dosso non sono aderenza usata) |
+| 3 | **Aiuti che si ritirano** | 23/07 (`58cff24`) | `coaching/focus.py`: le curve *domate* restano tali fra una sessione e l'altra e non vengono più insegnate |
+| 9 | **Granularità per livello** | 23/07 (`7b84037`) | Se il divario è troppo grande il debrief apre col **tema del giro** e si ferma lì: `MAX_STEPS_WITH_HEADLINE = 2`, perché seguire quella frase con tre curve la contraddirebbe |
+| 1 | **Frenate adattate ad auto e condizioni** | 30/07 | Scheda «Le tue frenate» (`braking_points.py` + `/api/braking`): i **tuoi** ultimi giri nella stessa fascia di temperatura, con la **dispersione** che dice se un punto di frenata ce l'hai davvero. È la cheat sheet dei 332 voti, ma misurata su di te |
+| 4 | **Condizioni pista nel riferimento** | 30/07 | Temperatura asfalto, poi gomma e grip — in SQLite dal 20/07 e letti da nessuno. Misurato sui 39 giri veri: **il grip su ACC è 0 su 15 giri su 15** (serve dichiarare `trackGripStatus`; si valida ai box, senza guidare) |
+| 13 | **Effetto a catena fra curve** | 30/07 | `coaching/chain.py`: se la perdita era già nei km/h con cui arrivi, ti manda sulla curva prima. È il loro *Timekiller*, ma noi la causa fisica ce l'abbiamo |
+| 14 | **Piano di allenamento** | 30/07 | `coaching/plan.py`: obiettivi dai punti deboli **sistematici**, accettati (quindi con una data), misurati **solo sui giri successivi** |
+| 15 | **Avvio automatico col gioco** | 30/07 | `watch.py`: parte il **solo registratore silenzioso**, spento di default, mai la voce |
+| 16 | **Tempo perso per fase in curva** | 30/07 | `coaching/phases.py`: ingresso / apex / uscita / tratto dopo, pezzi che **risommano** al totale — scomposizione, non stima |
+| 17 | **Nomi curva oltre Monza e Imola** | 30/07 | Spa e Suzuka, misurati dai giri in archivio e confermati su tre letture concordi. Il difetto trovato: un nome raggiungeva la curva accanto, e la leva non era la tolleranza ma il **verso** della curva |
+
+## Arrivato fuori tabella
+
+Cose costruite dopo il 22/07 che non erano in roadmap perché nessuno le aveva
+ancora chieste. Elencate qui perché una roadmap che ignora metà del lavoro fatto
+non descrive il prodotto.
+
+- **«Il giro spiegato» e «Sessione»** (28/07) — dall'analisi di Track Titan: le
+  loro cinque tracce «essenziali» le avevamo già, **il divario era la
+  presentazione**.
+- **Vista Traiettoria** (30/07) e il **nastro d'asfalto** sotto le due linee
+  (31/07) — i bordi veri di Kunos, letti da `fast_lane.ai`, e solo dove la pista
+  installata è quella guidata ([`SPIKE-BORDI.md`](SPIKE-BORDI.md)).
+- **Asse in metri misurati** (31/07) — non `pos × lunghezza`: la distanza dalle
+  coordinate, **corroborata con velocità×tempo**, e chi non passa il controllo
+  torna alle percentuali invece di mostrare una scala sbagliata.
+- **Consumo lungo il giro** (schema v11, 31/07) e **benzina per giro** in
+  Sessione.
+- **Guida e FAQ allineate alle schede** (30-31/07) — chiude metà della voce 12.
 
 ## Posizionamento
 
