@@ -2397,10 +2397,12 @@ function offWord(m, corner) {
   if (m == null || !isFinite(m)) return "–";
   const v = Math.abs(m);
   if (v < 0.15) return t("line.same");
-  // With no direction there is no inside: the corner wasn't classified (no
-  // coordinates on the baseline), so we say which side of the line instead of
-  // guessing which side of the road.
-  const known = corner && corner.direction;
+  // Where there is no single inside we say which side of the LINE instead of
+  // guessing which side of the road. Two cases: a corner the detector couldn't
+  // classify (no coordinates on the baseline), and a chicane — whose inside is
+  // on the right for one half and on the left for the other, so any single
+  // answer is confidently wrong about half the corner.
+  const known = corner && corner.sided !== false && corner.direction;
   const word = known ? (m > 0 ? t("line.in") : t("line.out"))
                      : (m > 0 ? t("line.right") : t("line.left"));
   return `${v.toFixed(1)} m ${word}`;
@@ -2524,7 +2526,11 @@ function renderLineFacts(c) {
     row(t("line.f.entry"), offWord(c.entry_m, c)) +
     row(t("line.f.apexoff"), offWord(c.apex_m, c)) +
     row(t("line.f.exit"), offWord(c.exit_m, c)) +
-    row(t("line.f.widest"), c.widest_m ? `${c.widest_m.toFixed(1)} m ${t("line.out")}` : t("line.same")) +
+    // `widest_m` is the biggest excursion on the minus side — the outside of a
+    // corner, or simply the LEFT of the line where there is no single inside.
+    row(t("line.f.widest"), c.widest_m
+        ? `${c.widest_m.toFixed(1)} m ${c.sided === false ? t("line.left") : t("line.out")}`
+        : t("line.same")) +
     row(t("line.f.radius"), arc) +
     row(t("line.f.extra"), dist) +
     row(t("line.f.vmin"), `${c.vmin} <span class="muted">${t("line.f.vs")} ${c.vmin_ref} km/h</span>`) +
@@ -2960,7 +2966,7 @@ function updateLineReadout(L, p) {
              `<b>${t("ro.pos")} ${posLabel(p)}</b>`;
   if (Array.isArray(off) && pos) {
     const i = nearest(pos, p);
-    bits += ` &nbsp;·&nbsp; ${t("line.ro.off")} <b>${offWord(off[i] * (c.direction === "left" ? -1 : 1), c)}</b>`;
+    bits += ` &nbsp;·&nbsp; ${t("line.ro.off")} <b>${offWord(off[i] * (c.sided !== false && c.direction === "left" ? -1 : 1), c)}</b>`;
   }
   const ki = nearest(L.curvature.you.pos, p);
   const k = Math.abs(L.curvature.you.k[ki] || 0);

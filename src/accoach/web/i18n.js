@@ -263,6 +263,10 @@
     "line.dir.left":   { en: `left-hander`, it: `curva a sinistra` },
     "line.dir.right":  { en: `right-hander`, it: `curva a destra` },
     "line.kind.hairpin": { en: `hairpin`, it: `tornante` },
+    // Una variante NON e' un tornante, e non e' nemmeno "una curva a sinistra"
+    // solo perche' il punto piu' lento casca nella seconda meta'. Il verso qui
+    // e' quello in cui ci ENTRI, che e' l'unico che serve a chi guida.
+    "line.kind.chicane": { en: `chicane`, it: `variante` },
     "line.kind.slow":  { en: `slow`, it: `lenta` },
     "line.kind.medium":{ en: `medium`, it: `media` },
     "line.kind.fast":  { en: `fast`, it: `veloce` },
