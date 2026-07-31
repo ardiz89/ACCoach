@@ -155,6 +155,56 @@ def test_a_lap_without_coordinates_is_refused(tmp_path):
     assert te.fit(e, [_P(0.0, 0.0) for _ in range(64)]) is None
 
 
+# --- trovare la pista senza sapere come si chiama ----------------------------
+
+def test_the_circuit_is_found_by_shape_not_by_name(tmp_path, monkeypatch):
+    """Mount Panorama si chiama `mount_panorama` in ACC e `rt_bathurst` nel mod
+    che la porta su AC. Cercare per stringa fa comparire il disegno in un gioco
+    e non nell'altro — cioè la cosa che questo modulo ha smesso di fare."""
+    _spline_of(tmp_path, _loop())
+    monkeypatch.setattr(te, "all_splines",
+                        lambda: [("qualsiasi_nome", tmp_path / "ai" / "fast_lane.ai")])
+    te._cache.clear()
+    got = te.edges_for("un_nome_che_nessuno_ha_mai_visto",
+                       _moved(_loop(), deg=31.0, dx=1200.0, dz=-800.0))
+    assert got is not None
+
+
+def test_a_circuit_of_the_wrong_length_is_never_even_tried(tmp_path):
+    """Il prefiltro sulla lunghezza è ciò che rende la ricerca istantanea: 65
+    piste installate diventano una manciata di candidati."""
+    e = _spline_of(tmp_path, _loop())
+    import math as _m
+    L = sum(_m.dist((e.x[i - 1], e.z[i - 1]), (e.x[i], e.z[i]))
+            for i in range(1, len(e)))
+    assert L > 0
+    letta = te.spline_length(tmp_path / "ai" / "fast_lane.ai")
+    assert abs(letta - L) / L < 0.05, "la lunghezza letta dai soli punti dev'essere quella"
+
+
+def test_the_right_circuit_beats_its_own_historic_version(tmp_path, monkeypatch):
+    """Il cuore della faccenda, misurato sull'archivio: **nessuna soglia
+    assoluta** separa un circuito dalla propria variante storica (il peggiore
+    dei veri sta a 26.7 m, il migliore dei falsi a 22.3). A separarli è solo il
+    fatto che la pista giusta prende un punteggio migliore — quindi si valutano
+    TUTTI i candidati e vince il migliore, mai il primo che passa.
+    """
+    vera = _spline_of(tmp_path, _loop(wobble=1.0))
+    storica = _spline_of(tmp_path, _loop(wobble=0.55), name="old.ai")
+    assert vera and storica
+    lap = _moved(_loop(wobble=1.0), deg=12.0, dx=300.0)
+    # entrambe passerebbero il tetto da sole...
+    assert te.fit(storica, lap) is not None, "la variante storica passa il tetto"
+    # ...ma messe a confronto vince quella giusta.
+    monkeypatch.setattr(te, "all_splines", lambda: [
+        ("storica", tmp_path / "ai" / "old.ai"),
+        ("vera", tmp_path / "ai" / "fast_lane.ai"),
+    ])
+    te._cache.clear()
+    got = te.edges_for("qualunque", lap)
+    assert got is not None and got.track == "vera"
+
+
 def test_edges_for_hands_back_the_track_in_the_laps_coordinates(tmp_path,
                                                                 monkeypatch):
     """La porta d'ingresso del modulo: chi chiama non deve sapere niente di fit,

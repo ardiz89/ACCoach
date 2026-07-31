@@ -106,11 +106,29 @@ perché la via di fuga asfaltata è asfalto. Su tutto Spa solo 2 tratti su 6934 
 superano i 16 m, e uno è esattamente quella curva. La legenda lo dice:
 `l'asfalto (di norma largo 10.4 m) — le vie di fuga contano, i cordoli no`.
 
+**E nemmeno il nome conta più.** I due giochi non chiamano le piste allo stesso
+modo: Mount Panorama è `mount_panorama` su ACC e `rt_bathurst` nel mod che la
+porta su AC. Cercare per stringa faceva ricomparire lo stesso difetto da un'altra
+porta. Siccome il fit riconosce un circuito dalla forma, la lunghezza del giro
+riduce le 65 piste installate a una manciata di candidati (misurato: da 1 a 5) e
+il fit sceglie fra quelli. Provato su tutto l'archivio buttando via il nome:
+**24 giri posati sulla pista giusta, nessuno su una sbagliata**, e i 15 rifiuti
+sono esattamente i giri con le coordinate rotte o assenti. 0.14 s a giro.
+
+E qui è arrivata la scoperta scomoda, misurando 24 accoppiamenti veri contro 95
+falsi: **nessuna statistica assoluta separa un circuito dalla propria versione
+storica.** Peggiore dei veri 26.7 m, migliore dei falsi 22.3 m (Suzuka contro
+Suzuka 1998). Provati e scartati anche il massimo, il rapporto max/p95 e persino
+il controllo fisico «quanta parte del giro finirebbe fuori dall'asfalto»: si
+sovrappongono tutti. A separarli è solo il **confronto fra candidati** — la pista
+giusta vince in tutti e 24 i casi (Suzuka 3 contro 22, Imola 17 contro 32, Spa 4
+contro 51). Per questo si valutano tutti e vince il migliore, mai il primo che
+passa; e la soglia resta solo come tetto.
+
 Resta un limite solo: servono **i file di AC installati**. Non serve più che il
-giro venga da AC — un giro ACC prende il suo asfalto dagli stessi file, sulla
-stessa macchina. Chi ha **solo** ACC continua a non vedere niente, e quello si
-chiude solo impacchettando la geometria (decisione aperta: è dato derivato da
-file Kunos).
+giro venga da AC, né che le due piste si chiamino allo stesso modo. Chi ha
+**solo** ACC continua a non vedere niente, e quello si chiude solo impacchettando
+la geometria (decisione aperta: è dato derivato da file Kunos).
 
 ## La feature: fatta, e come sono state chiuse le obiezioni
 

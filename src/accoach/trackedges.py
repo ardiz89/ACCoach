@@ -17,13 +17,22 @@ scale that has to come out at 1), and if the two are the same place the fit says
 so in metres. So an ACC lap gets its asphalt from the same track's AC files, and
 Monza — 187 m out in raw coordinates, and refused for it — comes back in at 4 m.
 
+**Nor is it tied to the name.** The sims don't agree on those either: Mount
+Panorama is ``mount_panorama`` in ACC and ``rt_bathurst`` in the mod that puts it
+in AC. Since the fit can recognise a circuit from its shape, the name is not
+needed — the lap's own length narrows 65 installed tracks to a handful, and the
+fit picks among them. Measured over the whole archive: 24 laps placed on the
+right circuit, none on a wrong one, and the 15 refusals are exactly the laps
+whose coordinates are broken or absent.
+
 What is left to say no to:
 
-* **it may not be the same circuit.** The fit is only believed when the residual
-  is small AND the scale is ~1: both, because either alone can be fooled. Spa
-  1998 fits modern Spa at scale 1.000 and is still a different track (58 m); a
-  lap whose coordinates are broken fits *everything* to 8 m by shrinking the
-  circuit seventy times over;
+* **it may not be the same circuit.** Believed only when the residual is small
+  AND the scale is ~1 AND it beat every other candidate: all three, because each
+  alone can be fooled. Spa 1998 fits modern Spa at scale 1.000 and is a different
+  track; a lap whose coordinates are broken fits *everything* by shrinking the
+  circuit seventy times over; and a circuit's own historic version cannot be
+  ruled out by any absolute number at all — only by the real one scoring better;
 * **there may be no file at all** — a driver with only ACC (whose own track data
   is packed) and no AC installed, a mod track without an AI line, a Steam library
   somewhere unusual.
@@ -53,25 +62,37 @@ _SIDE_L, _SIDE_R, _FX, _FZ = 5, 6, 13, 15
 _VERSION = 7
 
 # --- deciding whether two shapes are the same circuit ------------------------
-# Measured on the 39 real laps against the four installed splines — 24 pairings,
-# every one classified correctly by these two numbers together:
+# Misurato il 2026-07-31 su ogni giro valido in archivio contro ogni spline
+# installata compatibile per lunghezza: **24 accoppiamenti veri e 95 falsi**.
 #
-#   giro           spline      p95      scala
-#   Imola          imola      17.3      0.999   <- il peggiore dei veri
-#   monza          monza       4.2      1.001   <- 187 m di scarto grezzo
-#   spa            spa         4.0      1.000
-#   suzuka         suzuka      2.4      1.000
-#   spa_1998       spa        58.3      1.000   <- altro tracciato, scala giusta
-#   ks_nurburgring qualunque  12-18     0.015   <- coordinate rotte, forma finta
-#   pista sbagliata           162-839   0.68-1.23
+# La conclusione non è quella che speravo. **Nessuna statistica assoluta separa
+# un circuito dalla propria versione storica:**
 #
-# The gap between the worst true match (17.3 m) and the best false one (58.3 m)
-# is 3.4x, so the threshold sits in open space rather than on a boundary.
+#   peggiore dei veri      26.7 m   (monza, McLaren 720S 1:53.7)
+#   migliore dei falsi     22.3 m   (suzuka contro suzuka_1998)
 #
-# The 95th percentile rather than the mean: a layout change is *local* — Spa 1998
-# is modern Spa everywhere except one corner, and an average dilutes exactly the
-# evidence that matters.
-_FIT_P95_M = 25.0
+# Provati e scartati anche il massimo (veri fino a 49 m, falsi da 30 in su), il
+# rapporto max/p95 (veri 1.01-2.29, falsi 1.03-1.48) e perfino il controllo
+# fisico — quanta parte del giro finirebbe fuori dall'asfalto — che pure sembrava
+# il più promettente (veri fino al 18%, falsi dal 13%). Si sovrappongono tutti.
+#
+# Ciò che separa, e separa in tutti e 24 i casi, è il **confronto fra i
+# candidati**: la pista giusta batte sempre e nettamente la propria variante
+# storica — Suzuka 3 m contro 22, Imola 17 contro 32, Spa 4 contro 51. Per questo
+# `_by_shape` assegna un punteggio a tutti e tiene il migliore, invece di
+# fermarsi al primo che passa. È l'unica parte del meccanismo che non si può
+# togliere.
+#
+# Il 95° percentile e non la media: il cambio di tracciato è *locale* — Spa 1998
+# è Spa moderna dappertutto tranne una curva — e una media diluisce proprio la
+# prova che conta.
+#
+# Questa soglia resta quindi solo come **tetto**: dice «nessuna di queste è la
+# tua pista», non sceglie fra due. 35 m lascia aria sopra il peggiore dei veri e
+# resta lontanissima dalle piste sbagliate (162 m in su). Rischio residuo, e va
+# detto invece che nascosto: chi guidasse la Suzuka moderna avendo installata
+# **solo** quella del 1998 si vedrebbe disegnata quella del 1998.
+_FIT_P95_M = 35.0
 # And the scale, because the residual alone is not enough. A lap whose
 # coordinates collapsed to nearly nothing (the Nürburgring laps recorded before
 # the AC1 fix) matches *every* circuit beautifully once you are allowed to shrink
@@ -226,10 +247,65 @@ def spline_path(track: str) -> Path | None:
     return next(iter(sorted(folder.glob("*/ai/fast_lane.ai"))), None)
 
 
+def all_splines() -> list[tuple[str, Path]]:
+    """Every installed track that has an AI line, by folder name."""
+    root = tracks_dir()
+    if root is None:
+        return []
+    out = []
+    for p in sorted(root.iterdir()):
+        if not p.is_dir():
+            continue
+        got = spline_path(p.name)
+        if got is not None:
+            out.append((p.name, got))
+    return out
+
+
+def spline_length(path: Path) -> float:
+    """How long the AI line is, in metres — reading only the point block.
+
+    The rest of the file is 1-3 MB of detail records, and this number is used to
+    throw away most of the library before anything expensive happens.
+    """
+    try:
+        with path.open("rb") as f:
+            head = f.read(_HEAD)
+            if len(head) < _HEAD:
+                return 0.0
+            version, count = struct.unpack_from("<2i", head, 0)
+            if version != _VERSION or count <= 1:
+                return 0.0
+            blob = f.read(count * _POINT)
+    except OSError:
+        return 0.0
+    if len(blob) < count * _POINT:
+        return 0.0
+    pts = [struct.unpack_from("<3f", blob, i * _POINT) for i in range(count)]
+    total = sum(math.hypot(pts[i][0] - pts[i - 1][0], pts[i][2] - pts[i - 1][2])
+                for i in range(1, count))
+    # Closing chord: the last point sits next to the first, not on it.
+    return total + math.hypot(pts[0][0] - pts[-1][0], pts[0][2] - pts[-1][2])
+
+
+# How far a candidate's length may sit from the driven lap's before it isn't
+# worth fitting. Measured across the 65 installed tracks: at +-2% the shortlist
+# for any given circuit is 1 to 5 tracks, not 65 — and the ones that survive are
+# different enough in shape that the fit separates them by hundreds of metres.
+# Kept at 3% because the driven line is not the AI line: it cuts and it runs wide,
+# and Bathurst's own spline already measures 0.9% under the published length.
+_LENGTH_TOL = 0.03
+
+
 # --- reading it -------------------------------------------------------------
 
-def read_edges(path: Path) -> TrackEdges | None:
-    """Parse one ``fast_lane.ai``. None when it isn't the format we decoded."""
+def read_edges(path: Path, track: str | None = None) -> TrackEdges | None:
+    """Parse one ``fast_lane.ai``. None when it isn't the format we decoded.
+
+    ``track`` names the circuit. Without it the name is taken from the folder
+    two levels up, which is the *layout* on tracks that have several — the
+    Nürburgring would come back calling itself "layout_gp_a".
+    """
     try:
         b = path.read_bytes()
     except OSError:
@@ -272,7 +348,7 @@ def read_edges(path: Path) -> TrackEdges | None:
     # A hole that ends at the last point wraps round to the first one.
     if skipped and xs:
         breaks.add(0)
-    return TrackEdges(track=path.parent.parent.name, x=xs, z=zs,
+    return TrackEdges(track=track or path.parent.parent.name, x=xs, z=zs,
                       left=left, right=right, breaks=breaks)
 
 
@@ -461,7 +537,63 @@ def _shape(edges: TrackEdges, idx: list[int], places: int = 2) -> dict | None:
     return {"runs": runs, "width_m": edges.width_m()}
 
 
+# Keyed by the file, not by the name: the same spline is reachable under more
+# than one name (the sim's, the folder's), and `_by_shape` already holds the path
+# it wants — asking for it back by name is how a lookup ends up resolving to
+# somewhere else entirely.
 _cache: dict[str, TrackEdges | None] = {}
+
+
+def _at_path(path: Path, track: str) -> TrackEdges | None:
+    key = str(path)
+    if key not in _cache:
+        _cache[key] = read_edges(path, track)
+    return _cache[key]
+
+
+def _by_name(track: str) -> TrackEdges | None:
+    path = spline_path(track)
+    return _at_path(path, track) if path else None
+
+
+def _lap_length(points) -> float:
+    return sum(math.hypot(points[i].x - points[i - 1].x, points[i].z - points[i - 1].z)
+               for i in range(1, len(points)))
+
+
+def _by_shape(points) -> TrackEdges | None:
+    """Find the circuit by what it *looks like*, not by what it's called.
+
+    The names belong to the sims, and the sims disagree: Mount Panorama is
+    ``mount_panorama`` in ACC and ``rt_bathurst`` in the mod that puts it in AC.
+    Matching on the string is why the drawing appeared in one game and not the
+    other — the very thing this module has stopped doing.
+
+    It doesn't need the name. The fit already knows whether two shapes are the
+    same place, so the shape *is* the lookup. Length narrows the 65 installed
+    tracks to a handful first (measured: 1 to 5), because fitting all of them
+    would cost seconds instead of tenths.
+
+    **Every candidate is scored and the best one wins**, rather than the first
+    that passes. That is not tidiness, it is the only thing that separates a
+    circuit from its own historic version — see ``_FIT_P95_M``.
+    """
+    want = _lap_length(points)
+    if want <= 0:
+        return None
+    best: TrackEdges | None = None
+    best_p95 = float("inf")
+    for name, path in all_splines():
+        length = spline_length(path)
+        if not length or abs(length - want) / want > _LENGTH_TOL:
+            continue
+        got = _at_path(path, name)
+        if got is None:
+            continue
+        at = fit(got, points)
+        if at is not None and at.p95_m < best_p95:
+            best, best_p95 = placed(got, at), at.p95_m
+    return best
 
 
 def edges_for(track: str, points=None) -> TrackEdges | None:
@@ -472,14 +604,11 @@ def edges_for(track: str, points=None) -> TrackEdges | None:
     while the app is open.
 
     With ``points`` the answer comes back **in the lap's own coordinates**,
-    whichever sim wrote them, or None when the fit says this isn't that circuit.
+    whichever sim wrote them — and the name is not consulted at all, because the
+    shape is a better answer than the string (and the string is the sim's, not
+    the circuit's). Without ``points`` there is nothing to fit against, so the
+    name is all there is.
     """
-    key = (track or "").lower()
-    if key not in _cache:
-        path = spline_path(track)
-        _cache[key] = read_edges(path) if path else None
-    got = _cache[key]
-    if got is None or points is None:
-        return got
-    at = fit(got, points)
-    return placed(got, at) if at else None
+    if points is None:
+        return _by_name(track)
+    return _by_shape(points)
