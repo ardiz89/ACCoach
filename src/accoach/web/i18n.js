@@ -211,6 +211,8 @@
     "line.leg.you":    { en: `your line`, it: `la tua traiettoria` },
     "line.leg.ref":    { en: `reference`, it: `riferimento` },
     "line.leg.band":   { en: `the gap between them`, it: `lo scarto fra le due` },
+    "line.leg.road":   { en: `the asphalt ({m} m wide) — kerbs not included`,
+                         it: `l'asfalto (largo {m} m) — i cordoli non ci sono` },
     "line.leg.apex":   { en: `your slowest point`, it: `il tuo punto più lento` },
     "line.leg.apexref":{ en: `the reference's`, it: `quello del riferimento` },
     "chart.offset":    { en: `Where you were on the road <small>(m from the reference line · above = to its right, below = to its left)</small>`,

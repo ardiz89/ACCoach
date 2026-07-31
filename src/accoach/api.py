@@ -41,6 +41,7 @@ from .sectors import ideal_lap, sector_spans, sector_times
 from .sessions import group_sessions
 from .telemetry.snapshot import format_lap_time
 from .track import detect_corners
+from .trackedges import crop as crop_edges, edges_for
 from .trackdata import name_corners
 from .trajectory import (
     LinePoint,
@@ -798,13 +799,23 @@ def create_api(
         if fmt == "csv":
             return _trajectory_csv(car, track, review, rows)
 
+        # The edges of the asphalt, from the game's own track data — but only if
+        # the track installed here is the track this lap was driven on. See
+        # trackedges: a mismatch is a ribbon drawn 187 m from the car, and no
+        # ribbon at all is the better answer.
+        track_edges = edges_for(track, you_pts)
+
         # Zoomed crops, one per corner: this is the only place the full-rate
         # samples are worth serving, and only over a few hundred metres each.
         for row, c in zip(rows, report.corners):
+            you_crop = corner_path(you_pts, c.entry, c.exit)
             row["line"] = {
-                "you": corner_path(you_pts, c.entry, c.exit),
+                "you": you_crop,
                 "ref": corner_path(ref_pts, c.entry, c.exit),
             }
+            if track_edges is not None:
+                row["line"]["edges"] = crop_edges(
+                    track_edges, list(zip(you_crop["x"], you_crop["z"])))
 
         def _curve(points) -> dict:
             k = curvature_profile(points)
@@ -826,6 +837,9 @@ def create_api(
             },
             "corners": rows,
             "curvature": {"you": _curve(you_pts), "ref": _curve(ref_pts)},
+            # Present only when the edges are real: the view says "asphalt" — not
+            # "track limits" — and needs the width to say it with a number.
+            "edges": ({"width_m": track_edges.width_m()} if track_edges else None),
         }
 
     def _trajectory_csv(car: str, track: str, review, rows: list[dict]) -> Response:

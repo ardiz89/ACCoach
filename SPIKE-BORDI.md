@@ -5,10 +5,11 @@
 > La telemetria dice dove sta l'auto, mai dove finisce la strada — disegnarli a
 > occhio sarebbe un'invenzione.
 >
-> Stato: **spike concluso, feature non ancora decisa.** Vive in
-> `tools/track_edges.py`, fuori dal bundle (`HONE.spec` non lo include,
-> `requirements.txt` non cambia). Il seguito è una decisione di prodotto, e sta
-> in fondo a questo documento.
+> Stato: **spike concluso e feature fatta.** Lo strumento di indagine resta in
+> `tools/track_edges.py`, fuori dal bundle; il lato prodotto è
+> `src/accoach/trackedges.py`, e disegna il nastro nella scheda Traiettoria
+> quando — e solo quando — i bordi sono quelli della pista che hai guidato.
+> Come sono state chiuse le tre obiezioni: in fondo a questo documento.
 
 ---
 
@@ -73,25 +74,34 @@ sopra di 2.4 m sui cordoli. Qualunque cosa ci disegnamo sopra deve dire
 E i due limiti che si sapevano già: vale **solo per AC** (i dati pista di ACC
 sono impacchettati) e **solo per le piste installate**.
 
-## Cosa resta da decidere (non l'ho fatto)
+## La feature: fatta, e come sono state chiuse le tre obiezioni
 
-Disegnare il nastro nella scheda Traiettoria è una **feature**, non il seguito
-automatico dello spike, perché porta in casa tre cose nuove:
+Il nastro si disegna nella scheda Traiettoria (`src/accoach/trackedges.py`). Le
+tre cose che rendevano la decisione non automatica sono state affrontate una per
+una, e tutte e tre finiscono nello stesso posto: **un modo di dire di no**.
 
-1. **una dipendenza dall'installazione del gioco** — trovare `assettocorsa` su
-   disco, gestire chi ce l'ha altrove, chi gioca solo ad ACC, chi ha spostato la
-   libreria Steam. Oggi HONE legge solo la memoria condivisa e la sua cartella
-   giri: non ha mai aperto un file del gioco;
-2. **un controllo di allineamento per pista**, col suo modo di dire di no. A
-   Monza — cioè su una delle piste su cui l'utente guida davvero — la risposta
-   oggi è no;
-3. **una linea da disegnare che a volte non c'è**: metà delle viste avrebbero i
-   bordi e metà no, a seconda della pista e del gioco. Va progettato quel caso,
-   non aggiunto dopo.
+1. **Dipendenza dall'installazione del gioco.** `tracks_dir()` cerca AC nelle due
+   posizioni Steam standard **e nelle librerie dichiarate in
+   `libraryfolders.vdf`** — i giochi stanno sul secondo disco più spesso che no.
+   Niente gioco, niente cartella, niente file: `None`, e la pagina è quella di
+   sempre. Chi guida solo ad ACC non vede alcuna differenza.
+2. **Allineamento per pista.** Ogni risposta è verificata contro **il giro sotto
+   cui verrà disegnata**: se i due centri distano più di 5 m sono due modelli di
+   pista diversi e non si disegna niente. Verificato dal vivo: Imola, Spa e
+   Suzuka mostrano il nastro, **Monza no**.
+3. **Il caso «qui non c'è».** Non è un buco da riempire: il disegno è quello di
+   prima e **la voce di legenda compare solo quando il nastro c'è**. Il testo
+   dice `l'asfalto (largo 10.5 m) — i cordoli non ci sono`, perché il limite
+   misurato qui sopra va detto all'utente, non solo scritto in un documento.
 
-Il ripiego onesto per ACC e per le piste disallineate resta quello di prima:
+E una quarta, trovata disegnando: con lo **scarto ×3/×5** la linea mostrata non è
+più dove è passata l'auto, quindi uscirebbe dal nastro e sembrerebbe un'uscita di
+pista mai avvenuta. Con l'ingrandimento attivo **il nastro sparisce** — terreno
+vero, o niente terreno.
+
+Il ripiego per ACC e per le piste disallineate resta quello di prima:
 **l'inviluppo dei tuoi giri** su quella pista — «dove sei passato» — dichiarato
-così, mai chiamato bordo pista.
+così, mai chiamato bordo pista. Non è stato implementato.
 
 ## Come rifare le misure
 

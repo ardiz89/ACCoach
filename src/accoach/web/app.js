@@ -2420,6 +2420,18 @@ function renderLine(cx) {
   $("line-corner-title").innerHTML =
     `<b>${c.name}</b>${shape ? ` <small>${shape}</small>` : ""}`;
 
+  // The road is in the legend only when it is on the drawing — and it is named
+  // "asphalt", never "track limits": a clean lap uses the kerbs and sits a
+  // couple of metres past this line (see SPIKE-BORDI.md).
+  const legRoad = $("leg-road");
+  if (legRoad) {
+    const road = LINE_MAG > 1 ? null : L.edges;
+    legRoad.classList.toggle("hidden", !road);
+    if (road) {
+      $("leg-road-text").textContent = tf("line.leg.road", { m: road.width_m });
+    }
+  }
+
   renderLineFacts(c);
   renderLineTable(L);
   LINE_HIT = drawCornerZoom(L, c, cx);
@@ -2570,6 +2582,22 @@ function drawCornerZoom(L, c, cx) {
       minZ = Math.min(minZ, s.z[i]); maxZ = Math.max(maxZ, s.z[i]);
     }
   }
+  // The road, when the game's own track data could be read and matched to this
+  // lap (see trackedges.py). It joins the fit so the picture is framed on the
+  // asphalt rather than on the two lines: a corner where you ran wide should
+  // show the edge you ran past, not crop it out.
+  // …but not while the gap is magnified. At ×3 the line drawn is deliberately
+  // not where the car was, and a real edge under a fake line would read as an
+  // excursion that never happened. Real ground, or no ground.
+  const road = LINE_MAG > 1 ? null : c.line.edges;
+  if (road) {
+    for (const side of [road.left, road.right]) {
+      for (const p of side) {
+        minX = Math.min(minX, p[0]); maxX = Math.max(maxX, p[0]);
+        minZ = Math.min(minZ, p[1]); maxZ = Math.max(maxZ, p[1]);
+      }
+    }
+  }
   const m = 34, spanX = (maxX - minX) || 1, spanZ = (maxZ - minZ) || 1;
   const sc = Math.min((w - 2 * m) / spanX, (h - 2 * m) / spanZ);
   const offX = (w - spanX * sc) / 2, offZ = (h - spanZ * sc) / 2;
@@ -2578,6 +2606,28 @@ function drawCornerZoom(L, c, cx) {
   // two views can be read one after the other without flipping your head.
   const X = (x) => (maxX - x) * sc + offX;
   const Y = (z) => h - ((z - minZ) * sc + offZ);
+
+  // The asphalt first, so everything else is drawn ON the road rather than
+  // beside it. Filled dark and edged with a hairline: the ribbon has to read as
+  // ground, not as a third racing line competing with the two above it.
+  if (road && road.left.length > 1) {
+    ctx.beginPath();
+    road.left.forEach((p, i) => (i ? ctx.lineTo(X(p[0]), Y(p[1]))
+                                   : ctx.moveTo(X(p[0]), Y(p[1]))));
+    for (let i = road.right.length - 1; i >= 0; i--) {
+      ctx.lineTo(X(road.right[i][0]), Y(road.right[i][1]));
+    }
+    ctx.closePath();
+    ctx.fillStyle = "rgba(255,255,255,0.06)";
+    ctx.fill();
+    ctx.strokeStyle = "rgba(255,255,255,0.32)"; ctx.lineWidth = 1.5;
+    for (const side of [road.left, road.right]) {
+      ctx.beginPath();
+      side.forEach((p, i) => (i ? ctx.lineTo(X(p[0]), Y(p[1]))
+                                : ctx.moveTo(X(p[0]), Y(p[1]))));
+      ctx.stroke();
+    }
+  }
 
   // The band between the lines.
   ctx.beginPath();

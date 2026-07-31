@@ -549,7 +549,15 @@ body.no-data .empty { display: block; }
    and the reference's IS the dash pattern, so the key has to show it. */
 .map-legend .sw-line { width: 20px; height: 0; border-top: 3px solid var(--cyan); display: inline-block; }
 .map-legend .sw-line.ref { border-top: 2px dashed rgba(255,255,255,0.6); }
-.map-legend .sw-band { width: 18px; height: 11px; display: inline-block;
+.map-legend /* Legend swatch for the asphalt ribbon: the same dark fill and hairline the
+   canvas draws, so the legend looks like the thing it names. */
+.sw-road {
+  display: inline-block; width: 18px; height: 10px; vertical-align: middle;
+  background: rgba(255,255,255,0.05);
+  border-top: 1px solid rgba(255,255,255,0.32);
+  border-bottom: 1px solid rgba(255,255,255,0.32);
+}
+.sw-band { width: 18px; height: 11px; display: inline-block;
   background: rgba(255,176,32,0.28); border: 1px solid rgba(255,176,32,0.5); border-radius: 3px; }
 
 .facts {
