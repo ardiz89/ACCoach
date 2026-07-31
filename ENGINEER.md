@@ -302,10 +302,8 @@ una delle due è vera.
    vedi §7.4: allungare la finestra non era la correzione.
 2. ~~**La pioggia: buco totale.**~~ **Chiuso il rifiuto, non la funzione** —
    vedi §7.5.
-3. **Il setup di partenza.** Sappiamo solo *correggere* un setup esistente; chi
-   comincia non ne ha uno. Non inseguire i 7 secondi: una base conservativa dai
-   range della vettura, dichiarata per quello che è — *un punto di partenza
-   sicuro, non un setup veloce*.
+3. ~~**Il setup di partenza.**~~ **Ritirata** — vedi §7.6: poggiava su dati che
+   non abbiamo, e il problema che doveva risolvere è già risolto altrove.
 
 ### 7.4 La benzina: la voce di roadmap era posta male
 
@@ -402,3 +400,44 @@ sarebbe una risposta sbagliata.
 
 Cosa serve per andare oltre: **una sessione vera sul bagnato**, come per le
 tarature ACC. Fino ad allora questa è la posizione onesta.
+
+### 7.6 Il setup di partenza: voce ritirata
+
+L'avevo proposta io, guardando la concorrenza: *«una base conservativa generata
+dai range della vettura, dichiarata per quello che è — un punto di partenza
+sicuro, non un setup veloce»*. Andando a implementarla, il codice ha detto due
+cose che la smontano. Entrambe verificate, non ricordate.
+
+**1. I range non esistono.** Il piano §1 elenca `setup/params.py` —
+*«capability/range/passo per carModel»* — fra i pezzi della fondazione. **Non è
+mai stato scritto**: in `setup/` ci sono `acc_format`, `ac_format`, `cli`,
+`diff`, `labels`, `loader`, `store`, `web_api`, e basta. `acc_format.py` espone
+la conversione click→fisico *solo per il display*, e lo dichiara: «le conversioni
+sono riempite solo dove ragionevolmente affidabili; altrove restiamo in
+click/livelli **apposta**, invece di spedire un numero sbagliato in psi o gradi».
+
+Un setup «a metà range» richiede quindi di **inventare il minimo e il massimo di
+ogni parametro per ogni auto**. È esattamente ciò che quel file si rifiuta di
+fare, e sarebbe la prima volta che scriviamo su disco numeri che non abbiamo
+misurato.
+
+**2. Il problema che doveva risolvere è già risolto.** L'argomento era «chi
+comincia non ha una base da correggere». Ma la pagina Ingegnere ha già uno stato
+vuoto dedicato (`noSetupHTML`, con `eng.noSetupBody`) che spiega dove HONE cerca
+i setup — scritto proprio per togliere la contraddizione fra «scegli un setup» e
+una tendina vuota. E il coach in tempo reale non ha mai avuto bisogno del file:
+propone la modifica a voce, il pilota la applica dalla schermata setup del gioco.
+Il file serve alla scrittura automatica, non al consiglio.
+
+**Cosa la sostituisce nella lista.** Il limite **inferiore** dei click è già
+protetto (`AccSetup.set_click` rifiuta i negativi); quello **superiore** no, e
+non è protetto da niente: l'ingegnere può proporre `+1` su un parametro già al
+massimo, la scrittura riesce, e **il gioco tronca al caricamento**. Il setup che
+crediamo di aver scritto non è quello caricato, e il verdetto successivo viene
+misurato su una modifica avvenuta a metà. Oggi il sistema degrada con grazia (il
+plateau fa ripristinare, il tetto di rimedi fa passare oltre), ma è degrado, non
+correttezza.
+
+Quel buco si chiude **solo** con la tabella dei range per auto — cioè con
+`params.py`, che è lavoro di **contenuti e verifica per vettura**, non di codice,
+e va aperto come tale. È la voce vera; il «setup di partenza» era la sua ombra.
