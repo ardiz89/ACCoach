@@ -249,6 +249,7 @@ class CoachEngine:
             stats = build_lap_stats(lap, self._corners or None)
             self._engineer_decision = self._engineer.observe(stats)
             self._announce_engineer(self._engineer_decision)
+            self._log_engineer_outcome(lap, self._engineer_decision)
 
         # The Focus coach needs a reference to know where time was lost.
         if self._focus is not None and self._reference is not None and self._corners:
@@ -334,6 +335,51 @@ class CoachEngine:
         prefix = prefixes.get(lang) or prefixes["en"]
         self.voice.say(f"{prefix} {_voice_clean(rationale)}")
 
+    def _log_engineer_outcome(self, lap, decision) -> None:
+        """Write a finished test to the engineer's ledger.
+
+        The one thing this app can prove that a setup generator can't is that a
+        change was measured after it was made. That verdict used to exist for as
+        long as the message was on screen; now it is kept, and after enough laps
+        it answers the only question worth asking a setup tool — how many of its
+        changes actually worked. Best-effort: a ledger that can't be written must
+        never cost the driver a setup change (see engineer/ledger.py).
+        """
+        out = getattr(decision, "outcome", None)
+        if out is None:
+            return
+        from datetime import datetime, timezone
+
+        from .engineer.ledger import Record, append
+        change = decision.change
+        # On a REVERTED the decision carries the *reversal*, so its clicks are
+        # the opposite of the change that was actually tested.
+        atom = change.changes[0] if (change and change.changes) else None
+        delta = -atom.delta_clicks if (atom and not out.kept) else (
+            atom.delta_clicks if atom else 0)
+        try:
+            append(Record(
+                when_utc=datetime.now(timezone.utc).isoformat(),
+                car=getattr(lap, "car_model", "") or "",
+                track=getattr(lap, "track", "") or "",
+                car_class=classify(getattr(lap, "car_model", "") or "").value,
+                phase=change.phase_label if change else "",
+                symptom=str(out.prediction.symptom) if out.prediction.symptom else "",
+                param=atom.param if atom else "",
+                slot=atom.slot if atom else None,
+                delta_clicks=delta,
+                remedy_rank=out.remedy_rank,
+                kept=out.kept,
+                laps=out.laps,
+                score_before=out.prediction.score_now,
+                score_after=out.score_after,
+                time_before_ms=out.time_before_ms,
+                time_after_ms=out.time_after_ms,
+                side_effects={str(sym): d for sym, d in out.side_effects},
+            ))
+        except Exception:  # noqa: BLE001 - evidence for us, never a live failure
+            pass
+
     def _engineer_block(self) -> dict | None:
         """The latest engineer decision, in the shape the setup UI consumes."""
         d = self._engineer_decision
@@ -358,6 +404,25 @@ class CoachEngine:
             "confidence": d.confidence,
             # 1-based corner labels the proposal is anchored to ("Corners 7, 9").
             "corners": [i + 1 for i in corners],
+            # The bar the change will be judged against, so the driver reads it
+            # *before* the re-test laps instead of only hearing the verdict.
+            "prediction": (None if d.prediction is None else {
+                "text": d.prediction.text,
+                "score_now": d.prediction.score_now,
+                "score_below": d.prediction.score_below,
+                "time_band_ms": round(d.prediction.time_band_ms, 1),
+            }),
+            # …and what actually happened, on the lap the verdict lands.
+            "outcome": (None if d.outcome is None else {
+                "kept": d.outcome.kept,
+                "laps": d.outcome.laps,
+                "score_before": d.outcome.prediction.score_now,
+                "score_after": d.outcome.score_after,
+                "time_before_ms": d.outcome.time_before_ms,
+                "time_after_ms": d.outcome.time_after_ms,
+                "side_effects": [{"symptom": str(s), "delta": v}
+                                 for s, v in d.outcome.side_effects],
+            }),
         }
 
     def _focus_block(self) -> dict | None:

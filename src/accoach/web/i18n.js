@@ -600,6 +600,12 @@
                          it: `Nessun backup da ripristinare per questo setup.` },
     "eng.restoreErr":  { en: `Restore error: `, it: `Errore ripristino: ` },
     "eng.corners":     { en: `Corners `, it: `Curve ` },
+    // The verdict, after the re-test laps. The words are short because the
+    // sentence that explains it is written server-side, next to the rule.
+    "eng.oc.kept":     { en: `kept`, it: `tenuta` },
+    "eng.oc.reverted": { en: `put back`, it: `rimessa com'era` },
+    "eng.oc.laps":     { en: `over`, it: `su` },
+    "eng.oc.side":     { en: `Also moved, unasked:`, it: `Si è mosso anche:` },
     "eng.lowConf":     { en: `Low confidence — based on little data. Gather a few more clean laps before applying.`,
                          it: `Confidenza bassa — pochi dati. Raccogli qualche altro giro pulito prima di applicare.` },
     "eng.dash":        { en: `—`, it: `—` },

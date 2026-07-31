@@ -230,3 +230,84 @@ Si parte da **ACC** (JSON, dove abbiamo già brake_bias/TC/ABS/EngineMap come st
 5. **Qualità della diagnosi** dipende dal layer `coaching/` → siamo il vettore di presentazione.
 6. **Online/anti-cheat** — scrivere setup in garage è lecito; qualsiasi "live" sconfina nel cheat.
 7. **AC vs ACC** — formati diversi: partire solo da ACC.
+
+---
+
+## 7. Aggiornamento 2026-07-31 — la previsione dichiarata e il registro delle prove
+
+Nato da un giro di analisi della concorrenza. Da giugno il campo si è riempito:
+[Full Grip Vision](https://www.fullgripmotorsport.com/about/fullgripvision) gira
+**interamente offline, senza account**, legge la telemetria live e **scrive il
+file di setup** per cinque simulatori (ACC, AC, ACE, LMU, RaceRoom), asciutto e
+bagnato, a 9.99 $/mese; [ACCELX](https://accelxsim.com/) legge la shared memory
+di AC *e* ACC, 45 canali, e genera un setup completo con motivazione in ~7
+secondi. «Offline» e «scriviamo il file anche su AC» erano nostri a giugno:
+adesso sono il prezzo del biglietto.
+
+Quello che **non** ho trovato descritto da nessuno è la cosa che il nostro
+motore fa già: propone **una** modifica, aspetta che venga applicata, la
+**misura sui giri successivi** e su un plateau **la annulla**. Tutti gli altri
+*generano* un setup. Noi siamo gli unici in condizione di **dimostrare che la
+modifica ha funzionato** — e fino a oggi quel verdetto durava quanto il
+messaggio a schermo.
+
+### 7.1 La previsione (`core.Prediction`)
+
+Prima dei giri di ri-test il pilota legge il metro con cui sarà giudicato: *«il
+sintomo deve scendere da 0.60 sotto 0.50 in 3 giri puliti, senza che il tempo
+peggiori di più di 150 ms. Se non succede, la rimetto com'era.»*
+
+**Va detto cosa non è.** Quel metro è *esattamente* la regola di accettazione
+che il motore sta per applicare, quindi una previsione che «si avvera» è per
+costruzione una modifica accettata: **non è un secondo test indipendente**, e il
+docstring lo dichiara perché nessuno la legga come tale. Il suo valore è
+l'ordine in cui il pilota viene a sapere le cose — prima il metro, poi il voto —
+che è la differenza fra essere giudicati e poter controllare il giudice. Un test
+verifica che il numero annunciato sia *lo stesso* che decide: una previsione che
+divergesse dalla regola sarebbe peggio di nessuna previsione.
+
+### 7.2 Il registro (`engineer/ledger.py`)
+
+JSONL in append sotto `Documenti/ACCoach/engineer_log.jsonl`, una riga per test
+concluso, più `GET /api/setup/record` che la riassume. Scrittura **best-effort**:
+un registro che non si scrive non deve costare al pilota una modifica di setup.
+
+Tre cose registrate, e il motivo di ognuna:
+
+1. **L'esito** — tenuta o rimessa com'era, coi numeri da entrambe le parti. Dopo
+   qualche sessione è un tasso di riuscita per auto, sintomo e leva, **misurato
+   sui giri del pilota** invece che affermato in una pagina di marketing.
+2. **Il rango del rimedio.** I profili dichiarano le loro liste ordinate «per
+   efficacia decrescente». È un'affermazione falsificabile e non l'ha mai
+   verificata nessuno: se il rango 0 viene ripristinato mentre il rango 2 viene
+   tenuto, per quell'auto la tabella è sbagliata e il dato lo dice.
+3. **I sintomi che nessuno stava cercando.** Il verdetto guarda solo il bersaglio.
+   Una barra anteriore più morbida che risolve il sottosterzo all'apex può
+   costare in uscita, e finora succedeva in silenzio. Sono **misurati, mai
+   predetti**: questo file non affermerà mai un effetto collaterale che non ha
+   osservato.
+
+Sul ciclo simulato completo il registro produce già: *«1 modifica su 2 ha
+funzionato (50%), guadagno mediano −500 ms»*, con `preload` 0/1 e `aRBFront`
+1/1, e l'effetto collaterale `oversteer exit low +0.35` attribuito alla leva che
+l'ha prodotto.
+
+E `hit_rate` resta **`None`** finché non c'è niente: zero per cento e «non
+abbiamo ancora misurato niente» sono risposte diverse, e il primo giorno solo
+una delle due è vera.
+
+### 7.3 Cosa resta aperto (dall'analisi concorrenza, in ordine)
+
+1. **Verdetto su uno stint, non su tre giri.** Il test d'accettazione della
+   [guida di Coach Dave](https://coachdaveacademy.com/tutorials/the-ultimate-acc-car-setup-guide/)
+   è *«riesci a ripetere lo stesso tempo per 30 minuti?»*; noi giudichiamo su
+   `_MIN_STABLE = 3`. Con la benzina registrata (schema v11) possiamo separare
+   «il setup è migliorato» da «l'auto si è alleggerita» — un verdetto corretto
+   per consumo e degrado non ce l'ha nessuno.
+2. **La pioggia: buco totale.** Cercando `rain|wet|weather` in `engineer/` e
+   `setup/` non c'è niente. Full Grip vende asciutto e bagnato, e sul bagnato
+   cambiano pressioni, altezze, TC/ABS, bias e ala.
+3. **Il setup di partenza.** Sappiamo solo *correggere* un setup esistente; chi
+   comincia non ne ha uno. Non inseguire i 7 secondi: una base conservativa dai
+   range della vettura, dichiarata per quello che è — *un punto di partenza
+   sicuro, non un setup veloce*.

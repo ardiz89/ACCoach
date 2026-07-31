@@ -138,6 +138,52 @@ class ProposedChange:
                 for c in self.changes]
 
 
+@dataclass(frozen=True)
+class Prediction:
+    """What this change is expected to do, said *before* the laps are driven.
+
+    Be clear about what this is and isn't. The bar below is the engine's own
+    acceptance rule — the symptom has to drop by at least ``_EPS_SCORE`` and the
+    lap time must not fall outside the noise band — so a prediction that "hits"
+    is, by construction, a change that was kept. It is **not** a second,
+    independent test, and this docstring exists so nobody later reads it as one.
+
+    Its value is the order in which the driver learns things. Until now the loop
+    said "try this", took the car away for three laps and came back with a
+    verdict; the driver had no way to disagree, because they never knew what was
+    being measured. Stating the bar first turns that into something checkable
+    from the cockpit: you are told the number to beat, and afterwards you are
+    told whether you beat it.
+
+    Where a *real* prediction can eventually come from is the ledger
+    (``ledger.py``): what a lever does to the symptoms nobody was aiming at is
+    measured there and asserted nowhere, until there is enough of it to mean
+    something.
+    """
+
+    symptom: Symptom | None
+    score_now: float          # the symptom's typical score before the change
+    score_below: float        # the bar it has to get under for this to count
+    time_band_ms: float       # how much lap time it may cost and still count
+    text: str = ""            # the sentence the driver reads before driving
+
+
+@dataclass(frozen=True)
+class Outcome:
+    """What actually happened, next to what was said would happen."""
+
+    prediction: Prediction
+    score_after: float
+    time_before_ms: float
+    time_after_ms: float
+    laps: int
+    kept: bool
+    remedy_rank: int = 0
+    #: {Symptom: score change} for symptoms this change was *not* aiming at, and
+    #: which the verdict therefore never looked at. Measured, never predicted.
+    side_effects: tuple = ()
+
+
 class DecisionKind(Enum):
     COLLECT = "collect"          # not enough stable laps yet — keep driving
     EVALUATING = "evaluating"    # a change is applied; gathering re-test laps
@@ -154,6 +200,12 @@ class Decision:
     message: str
     change: ProposedChange | None = None
     confidence: str = ""         # "high" / "medium" on a PROPOSE, else ""
+    #: On a PROPOSE: the bar this change will be judged against, so the driver
+    #: reads it before driving instead of after.
+    prediction: Prediction | None = None
+    #: On an ACCEPTED / REVERTED: what happened, with the numbers on both sides.
+    #: This is what `ledger.py` writes down.
+    outcome: Outcome | None = None
 
 
 # --- the profile contract --------------------------------------------------
@@ -264,6 +316,24 @@ _DECISION_MSG = {
         "en": "Change made it worse",
         "it": "Modifica peggiorativa",
     },
+    "predict": {
+        "en": "How you'll know: '{sym}' has to come down from {a:.2f} to under "
+              "{b:.2f} over {n} clean laps, without the lap time getting worse "
+              "by more than {ms:.0f} ms. If it doesn't, I put it back.",
+        "it": "Come lo capiremo: «{sym}» deve scendere da {a:.2f} sotto {b:.2f} "
+              "in {n} giri puliti, senza che il tempo peggiori di più di "
+              "{ms:.0f} ms. Se non succede, la rimetto com'era.",
+    },
+    "predict_structural": {
+        "en": "How you'll know: over {n} clean laps the lap time must not get "
+              "worse by more than {ms:.0f} ms. If it does, I put it back.",
+        "it": "Come lo capiremo: in {n} giri puliti il tempo non deve peggiorare "
+              "di più di {ms:.0f} ms. Se peggiora, la rimetto com'era.",
+    },
+    "side_effect": {
+        "en": " Also moved, and nobody was aiming at it: {items}.",
+        "it": " Si è mosso anche questo, e non lo stavamo cercando: {items}.",
+    },
     "reason_noeffect": {
         "en": "No measurable effect",
         "it": "Nessun effetto misurabile",
@@ -277,6 +347,20 @@ def _msg(key: str, lang: str | None = None, **kw) -> str:
     lang = lang or current_language()
     entry = _DECISION_MSG[key]
     return (entry.get(lang) or entry["en"]).format(**kw)
+
+
+def _side_effect_tail(outcome: "Outcome", lang: str) -> str:
+    """Name what moved that nobody was aiming at — after the verdict, never before.
+
+    The engine judged one symptom; this is the rest of the car answering. It is
+    appended to the message rather than replacing it because it does not change
+    the verdict: a change is kept or reverted on its target, and a side effect
+    the driver isn't told about is one they'll meet in the next corner instead.
+    """
+    if not outcome.side_effects:
+        return ""
+    items = ", ".join(f"{sym} {delta:+.2f}" for sym, delta in outcome.side_effects)
+    return _msg("side_effect", lang, items=items)
 
 
 def _median_time(window: list[LapStats]) -> float:
@@ -298,6 +382,11 @@ class _Active:
     base_time: float
     base_score: float
     laps_seen: int = 0
+    prediction: "Prediction | None" = None
+    remedy_rank: int = 0
+    #: Every symptom's score at the moment the change was applied, so the
+    #: verdict can also report what moved that nobody was aiming at.
+    base_scores: dict = field(default_factory=dict)
 
 
 class RaceEngineer:
@@ -322,6 +411,11 @@ class RaceEngineer:
         self.applied_clicks: dict[str, int] = {}     # net clicks per parameter
         self._pending: ProposedChange | None = None  # proposed, awaiting mark_applied
         self._pending_is_revert = False              # the pending change is a restore
+        self._pending_prediction: Prediction | None = None
+        #: Symptoms whose remedies all failed — the engine's own "this is you,
+        #: not the car" call. Recorded because it is a claim we make and have
+        #: never checked (see ledger.py).
+        self.exhausted_calls: list[Symptom] = []
 
     # -- public API --------------------------------------------------------
     @property
@@ -359,6 +453,7 @@ class RaceEngineer:
             self.window = []
             self._pending = None
             self._pending_is_revert = False
+            self._pending_prediction = None
             return
         sym = self._pending.symptom
         self.active = _Active(
@@ -366,13 +461,87 @@ class RaceEngineer:
             symptom=sym,
             base_time=_median_time(self.window),
             base_score=_median_score(self.window, sym) if sym else 0.0,
+            prediction=self._pending_prediction,
+            remedy_rank=self.remedy_idx.get(sym, 0) if sym else 0,
+            # Every symptom on the books, not just the target: the verdict is
+            # about one of them, the ledger is about all of them.
+            base_scores=self._all_scores(),
         )
         # The reference shifts when the setup changes — restart the window so the
         # verdict is measured only on post-change laps.
         self.window = []
         self._pending = None
+        self._pending_prediction = None
 
-    def _revert(self, change: ProposedChange, message: str) -> Decision:
+    # -- the prediction ----------------------------------------------------
+    def _all_scores(self) -> dict:
+        """Every symptom's typical score over the current window."""
+        seen: set[Symptom] = set()
+        for s in self.window:
+            seen.update(s.symptom_scores.keys())
+        return {sym: _median_score(self.window, sym) for sym in seen}
+
+    def _predict(self, change: ProposedChange) -> Prediction:
+        """The bar this change will be judged against, stated in advance.
+
+        Nothing here is a guess: every number is the rule ``_evaluate_active``
+        is about to apply. That is the point — the driver is told the test
+        before sitting the exam, not the grade afterwards.
+        """
+        lang = current_language()
+        sym = change.symptom
+        base_time = _median_time(self.window)
+        band = max(base_time * _TIME_BAND_FRAC, 1.0)
+        if sym is None:
+            return Prediction(
+                symptom=None, score_now=0.0, score_below=0.0, time_band_ms=band,
+                text=_msg("predict_structural", lang, n=self.min_stable, ms=band))
+        now = _median_score(self.window, sym)
+        bar = round(now - _EPS_SCORE, 3)
+        return Prediction(
+            symptom=sym, score_now=round(now, 3), score_below=bar,
+            time_band_ms=band,
+            text=_msg("predict", lang, sym=str(sym), a=now, b=bar,
+                      n=self.min_stable, ms=band))
+
+    def _propose(self, change: ProposedChange, confidence: str) -> Decision:
+        """Hold a change as pending and hand it over with its acceptance bar."""
+        self._pending = change
+        self._pending_is_revert = False
+        self._pending_prediction = self._predict(change)
+        return Decision(DecisionKind.PROPOSE, change.rationale, change,
+                        confidence, prediction=self._pending_prediction)
+
+    def _side_effects(self, a: "_Active") -> tuple:
+        """Symptoms that moved and weren't the target, worst first.
+
+        Only what cleared the same bar the verdict uses for the target: below it
+        the engine already refuses to call a change an improvement, so calling
+        it a side effect would be a stricter claim made on weaker evidence.
+        """
+        after = self._all_scores()
+        out = []
+        for sym, before in a.base_scores.items():
+            if sym == a.symptom:
+                continue
+            delta = after.get(sym, 0.0) - before
+            if abs(delta) >= _EPS_SCORE:
+                out.append((sym, round(delta, 3)))
+        out.sort(key=lambda kv: abs(kv[1]), reverse=True)
+        return tuple(out)
+
+    def _outcome(self, a: "_Active", *, kept: bool, score_after: float) -> Outcome:
+        return Outcome(
+            prediction=a.prediction or self._predict(a.change),
+            score_after=round(score_after, 3),
+            time_before_ms=round(a.base_time, 1),
+            time_after_ms=round(_median_time(self.window), 1),
+            laps=a.laps_seen, kept=kept, remedy_rank=a.remedy_rank,
+            side_effects=self._side_effects(a),
+        )
+
+    def _revert(self, change: ProposedChange, message: str,
+                outcome: "Outcome | None" = None) -> Decision:
         """Reject a change: propose its reversal AND hold it as a *pending revert*.
 
         Resets the window so the engine returns to COLLECT — it won't propose the
@@ -383,8 +552,10 @@ class RaceEngineer:
         rev = change.reversed()
         self._pending = rev
         self._pending_is_revert = True
+        # The outcome has to be built by the caller, before this line: the window
+        # it is measured from is cleared right here.
         self.window = []
-        return Decision(DecisionKind.REVERTED, message, rev)
+        return Decision(DecisionKind.REVERTED, message, rev, outcome=outcome)
 
     # -- internals ---------------------------------------------------------
     def _advance(self) -> Decision:
@@ -410,9 +581,7 @@ class RaceEngineer:
             # window is handled by the gate's own remedy path below).
             change = self._pressure_remedy(phase)
             if change is not None:
-                self._pending = change
-                self._pending_is_revert = False
-                return Decision(DecisionKind.PROPOSE, change.rationale, change, "high")
+                return self._propose(change, "high")
             # Nothing actionable here; treat the phase as done to avoid a stall.
             self.phase_idx += 1
             return Decision(DecisionKind.PHASE_DONE,
@@ -421,12 +590,12 @@ class RaceEngineer:
         change = self._remedy_for(symptom, phase)
         if change is None:
             self.exhausted.add(symptom)
+            # "Setup can't fix this, so it's you" is a claim, and one we have
+            # never checked. Kept so the ledger can count how often we make it.
+            self.exhausted_calls.append(symptom)
             return Decision(DecisionKind.PHASE_DONE,
                             _msg("remedies_exhausted", lang, sym=str(symptom)))
-        self._pending = change
-        self._pending_is_revert = False
-        return Decision(DecisionKind.PROPOSE, change.rationale, change,
-                        self._confidence(symptom))
+        return self._propose(change, self._confidence(symptom))
 
     def _evaluate_active(self) -> Decision:
         a = self.active
@@ -449,32 +618,34 @@ class RaceEngineer:
         # lap time alone and let the phase gate re-check the real target.
         if a.symptom is None:
             if not band_ok:
-                return self._revert(a.change, _msg("revert_structural", lang))
+                out = self._outcome(a, kept=False, score_after=0.0)
+                return self._revert(a.change, _msg("revert_structural", lang), out)
+            out = self._outcome(a, kept=True, score_after=0.0)
             self._record(a.change)
             return Decision(DecisionKind.ACCEPTED,
-                            _msg("accepted_structural", lang))
+                            _msg("accepted_structural", lang), outcome=out)
 
         improved = d_score <= -_EPS_SCORE and band_ok
 
         if improved:
+            out = self._outcome(a, kept=True, score_after=new_score)
             self._record(a.change)
-            if new_score < _SYMPTOM_THRESH:
-                return Decision(DecisionKind.ACCEPTED,
-                                _msg("accepted_resolved", lang, sym=str(a.symptom),
-                                     a=a.base_score, b=new_score))
-            return Decision(DecisionKind.ACCEPTED,
-                            _msg("accepted_improving", lang, sym=str(a.symptom),
-                                 a=a.base_score, b=new_score))
+            key = ("accepted_resolved" if new_score < _SYMPTOM_THRESH
+                   else "accepted_improving")
+            msg = _msg(key, lang, sym=str(a.symptom), a=a.base_score, b=new_score)
+            return Decision(DecisionKind.ACCEPTED, msg + _side_effect_tail(out, lang),
+                            outcome=out)
 
         # Not an improvement (worse OR plateau): revert and try the next lever.
         # Reverting on a plateau too is deliberate — keeping changes a blind meter
         # reads as "harmless" is exactly how setup drift creeps in.
+        out = self._outcome(a, kept=False, score_after=new_score)
         self.remedy_idx[a.symptom] = self.remedy_idx.get(a.symptom, 0) + 1
         reason = (_msg("reason_worse", lang) if not band_ok or d_score > _EPS_SCORE
                   else _msg("reason_noeffect", lang))
         return self._revert(a.change,
                             _msg("revert_reason", lang, reason=reason,
-                                 sym=str(a.symptom)))
+                                 sym=str(a.symptom)), out)
 
     # -- symptom selection with safety gates -------------------------------
     def _corners(self, sym: Symptom) -> int:

@@ -249,6 +249,38 @@ def register_setup_routes(app: FastAPI, root=DEFAULT_ROOTS) -> None:
             "reload_hint": reload_hint(out.stem, lang),
         }
 
+    @app.get("/api/setup/record")
+    def setup_record(car: str = Query(""), track: str = Query("")) -> dict:
+        """The engineer's track record: how many of its changes actually worked.
+
+        The one number a setup tool should be willing to publish, and the only
+        one here that isn't a claim — it is counted from tests the driver drove.
+        Empty until the loop has been round a few times, and *empty is the right
+        answer then*: a hit rate over three samples is noise wearing a
+        percentage sign, so this returns the counts and lets the reader decide.
+        """
+        from ..engineer.ledger import read, side_effect_counts, summarise
+        rows = read(car=car, track=track)
+        s = summarise(rows)
+        return {
+            "tests": s.tests,
+            "kept": s.kept,
+            "hit_rate": s.hit_rate,
+            "median_gain_ms": s.median_gain_ms,
+            "by_param": {k: {"kept": v[0], "tests": v[1]}
+                         for k, v in sorted(s.by_param.items())},
+            "by_symptom": {k: {"kept": v[0], "tests": v[1]}
+                           for k, v in sorted(s.by_symptom.items())},
+            # Does "most effective first" hold up? Ranks are ints; JSON keys
+            # aren't, so they go out as strings on purpose.
+            "by_rank": {str(k): {"kept": v[0], "tests": v[1]}
+                        for k, v in sorted(s.by_rank.items())},
+            "side_effects": [{"param": p, "symptom": sym, "seen": n}
+                             for (p, sym), n in
+                             sorted(side_effect_counts(rows).items(),
+                                    key=lambda kv: kv[1], reverse=True)],
+        }
+
     @app.post("/api/setup/undo")
     def setup_undo(body: UndoBody) -> dict:
         p = _safe(body.path, roots)

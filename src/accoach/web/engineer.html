@@ -72,6 +72,14 @@
         <div class="es-phase" id="es-phase" hidden></div>
         <div class="es-msg" id="es-msg">—</div>
         <div class="es-cat" id="es-cat"></div>
+        <!-- The bar this change will be judged against, before the re-test laps.
+             Until now the loop took the car away for three laps and came back
+             with a verdict the driver had no way to argue with, because they
+             were never told what was being measured. -->
+        <div class="es-predict" id="es-predict" hidden></div>
+        <!-- …and the verdict, with the numbers on both sides plus whatever moved
+             that nobody was aiming at. -->
+        <div class="es-outcome" id="es-outcome" hidden></div>
         <div class="es-hint" id="es-hint" hidden></div>
         <button id="es-prepare" class="primary small" type="button" hidden
           data-i18n="eng.prepare">Prepare change in the editor →</button>

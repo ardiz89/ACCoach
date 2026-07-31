@@ -649,6 +649,8 @@ function renderEngineer(st) {
   // Default: no low-confidence caution; the proposal branch re-arms it.
   hint.hidden = true;
   says.removeAttribute("data-conf");
+  renderPrediction(eng);
+  renderOutcome(eng);
 
   if (boxProposal) {
     $("es-msg").textContent = eng.rationale || eng.message;
@@ -683,6 +685,48 @@ function renderEngineer(st) {
     conf.hidden = true; prep.hidden = true;
     says.classList.remove("active");
   }
+}
+
+// The acceptance bar, shown while the change is still a proposal and while it
+// is being re-tested. It is the engine's own rule said out loud (see
+// engineer/core.py `Prediction`): not a second test, but the difference between
+// being judged and being able to check the judge.
+function renderPrediction(eng) {
+  const el = $("es-predict");
+  if (!el) return;
+  const p = eng && eng.prediction;
+  const show = p && p.text && (eng.kind === "propose" || eng.kind === "evaluating");
+  el.hidden = !show;
+  el.textContent = show ? p.text : "";
+}
+
+// The verdict, with the numbers on both sides — and the symptoms that moved
+// while nobody was looking at them. Those are measured, never predicted.
+function renderOutcome(eng) {
+  const el = $("es-outcome");
+  if (!el) return;
+  const o = eng && eng.outcome;
+  if (!o) { el.hidden = true; el.innerHTML = ""; return; }
+  const dt = (o.time_after_ms - o.time_before_ms) / 1000;
+  const bits = [
+    `<span class="oc-verdict" data-kept="${o.kept}">` +
+    `${o.kept ? t("eng.oc.kept") : t("eng.oc.reverted")}</span>`,
+    `<span class="oc-num">${t("eng.oc.laps")} ${o.laps}</span>`,
+    `<span class="oc-num">${dt >= 0 ? "+" : ""}${dt.toFixed(2)}s</span>`,
+  ];
+  if (o.score_before || o.score_after) {
+    bits.splice(1, 0, `<span class="oc-num">${o.score_before.toFixed(2)}` +
+      ` → ${o.score_after.toFixed(2)}</span>`);
+  }
+  let side = "";
+  if (Array.isArray(o.side_effects) && o.side_effects.length) {
+    side = `<div class="oc-side">${t("eng.oc.side")} ` +
+      o.side_effects.map((s) =>
+        `${s.symptom} ${s.delta >= 0 ? "+" : ""}${s.delta.toFixed(2)}`).join(" · ") +
+      `</div>`;
+  }
+  el.innerHTML = bits.join("") + side;
+  el.hidden = false;
 }
 
 // Render the Focus/Lesson block (st.focus) — the driving coach working one
