@@ -740,6 +740,49 @@ function balanceColor(v) {
   return `rgb(${mix(c[0])},${mix(c[1])},${mix(c[2])})`;
 }
 
+// The asphalt, from the game's own track data (see trackedges.py). Filled dark
+// and edged with a hairline: the ribbon has to read as GROUND, not as a third
+// racing line competing with the two drawn on top of it.
+//
+// ``road.runs`` is a list because the track data can have holes in it — where it
+// does, the ribbon has to stop rather than join up across them.
+function drawRoad(ctx, road, X, Y, hair) {
+  if (!road || !Array.isArray(road.runs)) return;
+  ctx.save();
+  // The surface is laid down as one quad per step, all in a single path filled
+  // once. Tracing the two edges as one big outline instead looks simpler and
+  // isn't: on a hairpin the inner edge folds back through itself, and on a
+  // closed circuit the shape has to be an annulus rather than a polygon. A
+  // strip of quads has neither problem — overlaps merge, and the fill is the
+  // ground actually covered.
+  ctx.beginPath();
+  for (const r of road.runs) {
+    for (let i = 1; i < r.left.length; i++) {
+      const a = r.left[i - 1], b = r.left[i], c = r.right[i], d = r.right[i - 1];
+      ctx.moveTo(X(a[0]), Y(a[1]));
+      ctx.lineTo(X(b[0]), Y(b[1]));
+      ctx.lineTo(X(c[0]), Y(c[1]));
+      ctx.lineTo(X(d[0]), Y(d[1]));
+      ctx.closePath();
+    }
+  }
+  ctx.fillStyle = "rgba(255,255,255,0.06)";
+  ctx.fill();
+  // Each run is stroked on its own and never closed: where the track data has a
+  // hole the ribbon stops, instead of taking a shortcut across the circuit.
+  ctx.strokeStyle = "rgba(255,255,255,0.32)";
+  ctx.lineWidth = hair;
+  for (const r of road.runs) {
+    for (const side of [r.left, r.right]) {
+      ctx.beginPath();
+      side.forEach((p, i) => (i ? ctx.lineTo(X(p[0]), Y(p[1]))
+                                : ctx.moveTo(X(p[0]), Y(p[1]))));
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
 // Full track map (its own tab). Wrapper around drawMapTo that also publishes the
 // screen transform for the map's own hover.
 function drawMap(a, cx) {
@@ -2591,10 +2634,12 @@ function drawCornerZoom(L, c, cx) {
   // excursion that never happened. Real ground, or no ground.
   const road = LINE_MAG > 1 ? null : c.line.edges;
   if (road) {
-    for (const side of [road.left, road.right]) {
-      for (const p of side) {
-        minX = Math.min(minX, p[0]); maxX = Math.max(maxX, p[0]);
-        minZ = Math.min(minZ, p[1]); maxZ = Math.max(maxZ, p[1]);
+    for (const r of road.runs) {
+      for (const side of [r.left, r.right]) {
+        for (const p of side) {
+          minX = Math.min(minX, p[0]); maxX = Math.max(maxX, p[0]);
+          minZ = Math.min(minZ, p[1]); maxZ = Math.max(maxZ, p[1]);
+        }
       }
     }
   }
@@ -2608,26 +2653,8 @@ function drawCornerZoom(L, c, cx) {
   const Y = (z) => h - ((z - minZ) * sc + offZ);
 
   // The asphalt first, so everything else is drawn ON the road rather than
-  // beside it. Filled dark and edged with a hairline: the ribbon has to read as
-  // ground, not as a third racing line competing with the two above it.
-  if (road && road.left.length > 1) {
-    ctx.beginPath();
-    road.left.forEach((p, i) => (i ? ctx.lineTo(X(p[0]), Y(p[1]))
-                                   : ctx.moveTo(X(p[0]), Y(p[1]))));
-    for (let i = road.right.length - 1; i >= 0; i--) {
-      ctx.lineTo(X(road.right[i][0]), Y(road.right[i][1]));
-    }
-    ctx.closePath();
-    ctx.fillStyle = "rgba(255,255,255,0.06)";
-    ctx.fill();
-    ctx.strokeStyle = "rgba(255,255,255,0.32)"; ctx.lineWidth = 1.5;
-    for (const side of [road.left, road.right]) {
-      ctx.beginPath();
-      side.forEach((p, i) => (i ? ctx.lineTo(X(p[0]), Y(p[1]))
-                                : ctx.moveTo(X(p[0]), Y(p[1]))));
-      ctx.stroke();
-    }
-  }
+  // beside it.
+  drawRoad(ctx, road, X, Y, 1.5);
 
   // The band between the lines.
   ctx.beginPath();

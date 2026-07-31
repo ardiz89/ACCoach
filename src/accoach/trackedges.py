@@ -33,7 +33,7 @@ from __future__ import annotations
 import math
 import re
 import struct
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 # Header: version, point count, lapTime, sampleCount. Then `count` points of
@@ -66,6 +66,11 @@ class TrackEdges:
     z: list[float]
     left: list[float]        # metres to the left edge at each point
     right: list[float]       # metres to the right edge
+    # Indices where the edge does NOT continue from the point before, because
+    # the points in between were unreadable. Measured on the archive: Suzuka
+    # drops 228 points in one run, and joining across it drew 343 m of straight
+    # "asphalt" through the middle of the circuit. A hole has to stay a hole.
+    breaks: set[int] = field(default_factory=set)
 
     def __len__(self) -> int:
         return len(self.x)
@@ -75,21 +80,62 @@ class TrackEdges:
         w = sorted(l + r for l, r in zip(self.left, self.right))
         return round(w[len(w) // 2], 1) if w else 0.0
 
+    def _forward(self, i: int) -> tuple[float, float]:
+        """Unit heading at point ``i``, taken from a step that really exists.
+
+        Normally the step to the next point. At the last point before a hole
+        that step spans the hole, so the heading comes from behind instead —
+        otherwise the two edge points there are thrown out sideways, and the
+        ribbon ends with a flick that looks like a corner.
+        """
+        n = len(self.x)
+        j = (i + 1) % n
+        if j in self.breaks or n < 2:
+            j, i = i, (i - 1) % n
+        dx, dz = self.x[j] - self.x[i], self.z[j] - self.z[i]
+        d = math.hypot(dx, dz) or 1.0
+        return dx / d, dz / d
+
     def edge_points(self) -> tuple[list[tuple[float, float]], list[tuple[float, float]]]:
         """The two edges as world (x, z) polylines, in spline order."""
         left: list[tuple[float, float]] = []
         right: list[tuple[float, float]] = []
-        n = len(self.x)
-        for i in range(n):
-            j = (i + 1) % n
-            dx, dz = self.x[j] - self.x[i], self.z[j] - self.z[i]
-            d = math.hypot(dx, dz) or 1.0
+        for i in range(len(self.x)):
+            fx, fz = self._forward(i)
             # Perpendicular on the ground: the third axis is height, and a
             # track's width is measured flat.
-            px, pz = -dz / d, dx / d
+            px, pz = -fz, fx
             left.append((self.x[i] + px * self.left[i], self.z[i] + pz * self.left[i]))
             right.append((self.x[i] - px * self.right[i], self.z[i] - pz * self.right[i]))
         return left, right
+
+    def _crosses_hole(self, a: int, b: int) -> bool:
+        """Does the walk from ``a`` forward to ``b`` pass through a hole?
+
+        Asked about the interval and not about ``b`` alone, because the drawing
+        thins the walk: consecutive points in the picture can be ten apart on
+        the spline, and a hole between them is still a hole.
+        """
+        n = len(self.x)
+        span = (b - a) % n or n
+        return any((k - a) % n <= span for k in self.breaks)
+
+    def runs(self, idx: list[int]) -> list[list[int]]:
+        """Split a walk of indices wherever the asphalt stops being known.
+
+        Everything drawn goes through here, so a hole in the data comes out as a
+        hole in the picture rather than as a shortcut across it.
+        """
+        out: list[list[int]] = []
+        cur: list[int] = []
+        for i in idx:
+            if cur and self._crosses_hole(cur[-1], i):
+                out.append(cur)
+                cur = []
+            cur.append(i)
+        if cur:
+            out.append(cur)
+        return [r for r in out if len(r) > 1]
 
 
 # --- finding the game -------------------------------------------------------
@@ -170,17 +216,30 @@ def read_edges(path: Path) -> TrackEdges | None:
     detail_at += 4
 
     xs, zs, left, right = [], [], [], []
+    breaks: set[int] = set()
+    skipped = False
     for i in range(count):
         x, _y, z = struct.unpack_from("<3f", b, _HEAD + i * _POINT)
         d = struct.unpack_from("<18f", b, detail_at + i * _DETAIL)
         sl, sr = d[_SIDE_L], d[_SIDE_R]
         if not (0.0 < sl < _MAX_SIDE_M and 0.0 < sr < _MAX_SIDE_M):
+            # Dropping the point is right — a side of hundreds of metres is not
+            # an edge. Dropping it *silently* is not: the two survivors either
+            # side of the hole then join up, and the ribbon takes a shortcut
+            # across whatever is in between (343 m of it, at Suzuka).
+            skipped = True
             continue
+        if skipped and xs:
+            breaks.add(len(xs))
+        skipped = False
         xs.append(x); zs.append(z); left.append(sl); right.append(sr)
     if len(xs) < 16:
         return None
+    # A hole that ends at the last point wraps round to the first one.
+    if skipped and xs:
+        breaks.add(0)
     return TrackEdges(track=path.parent.parent.name, x=xs, z=zs,
-                      left=left, right=right)
+                      left=left, right=right, breaks=breaks)
 
 
 def aligned(edges: TrackEdges, points) -> bool:
@@ -238,11 +297,20 @@ def crop(edges: TrackEdges, xz: list[tuple[float, float]],
     if len(idx) > max_points:
         step = len(idx) / max_points
         idx = [idx[int(k * step)] for k in range(max_points)]
+    return _shape(edges, idx)
+
+
+def _shape(edges: TrackEdges, idx: list[int], places: int = 2) -> dict | None:
+    """Index walk -> the polylines to draw, one entry per unbroken stretch."""
     left, right = edges.edge_points()
-    return {
-        "left": [[round(left[i][0], 2), round(left[i][1], 2)] for i in idx],
-        "right": [[round(right[i][0], 2), round(right[i][1], 2)] for i in idx],
-    }
+    runs = [
+        {"left": [[round(left[i][0], places), round(left[i][1], places)] for i in r],
+         "right": [[round(right[i][0], places), round(right[i][1], places)] for i in r]}
+        for r in edges.runs(idx)
+    ]
+    if not runs:
+        return None
+    return {"runs": runs, "width_m": edges.width_m()}
 
 
 _cache: dict[str, TrackEdges | None] = {}

@@ -211,8 +211,11 @@
     "line.leg.you":    { en: `your line`, it: `la tua traiettoria` },
     "line.leg.ref":    { en: `reference`, it: `riferimento` },
     "line.leg.band":   { en: `the gap between them`, it: `lo scarto fra le due` },
-    "line.leg.road":   { en: `the asphalt ({m} m wide) — kerbs not included`,
-                         it: `l'asfalto (largo {m} m) — i cordoli non ci sono` },
+    // "{m} m wide" was the MEDIAN width, printed under corners drawn far wider:
+    // at Spa's La Source the game's data says 24.5 m, because the paved run-off
+    // is asphalt too. The picture was right and the caption contradicted it.
+    "line.leg.road":   { en: `the asphalt (usually {m} m wide) — paved run-off counts, kerbs don't`,
+                         it: `l'asfalto (di norma largo {m} m) — le vie di fuga contano, i cordoli no` },
     "line.leg.apex":   { en: `your slowest point`, it: `il tuo punto più lento` },
     "line.leg.apexref":{ en: `the reference's`, it: `quello del riferimento` },
     "chart.offset":    { en: `Where you were on the road <small>(m from the reference line · above = to its right, below = to its left)</small>`,

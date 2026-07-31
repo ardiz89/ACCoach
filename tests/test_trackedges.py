@@ -106,8 +106,10 @@ def test_the_crop_follows_the_stretch_that_was_driven(tmp_path):
     e = te.read_edges(_write(tmp_path, _spline(n=200)))
     drive = [(0.0, z) for z in range(40, 120, 2)]
     got = te.crop(e, drive, pad=2)
-    assert got and len(got["left"]) == len(got["right"])
-    zs = [p[1] for p in got["left"]]
+    assert got and len(got["runs"]) == 1
+    run = got["runs"][0]
+    assert len(run["left"]) == len(run["right"])
+    zs = [p[1] for p in run["left"]]
     assert min(zs) < 40 and max(zs) > 118, "il pad deve sporgere ai due estremi"
 
 
@@ -116,7 +118,7 @@ def test_a_corner_may_straddle_the_start_line(tmp_path):
     il suo nastro, il che vuol dire camminare *avanti* passando dallo zero."""
     e = te.read_edges(_write(tmp_path, _spline(n=200)))   # z va da 0 a 398
     got = te.crop(e, [(0.0, 380.0), (0.0, 4.0)], pad=0)
-    assert got is not None and len(got["left"]) < 30
+    assert got is not None and len(got["runs"][0]["left"]) < 30
 
 
 def test_a_crop_that_would_wrap_most_of_the_lap_is_refused(tmp_path):
@@ -129,7 +131,7 @@ def test_a_crop_that_would_wrap_most_of_the_lap_is_refused(tmp_path):
 def test_the_crop_is_capped_so_the_payload_stays_small(tmp_path):
     e = te.read_edges(_write(tmp_path, _spline(n=1200)))
     got = te.crop(e, [(0.0, 20.0), (0.0, 2000.0)], max_points=40)
-    assert got is None or len(got["left"]) <= 40
+    assert got is None or sum(len(r["left"]) for r in got["runs"]) <= 40
 
 
 # --- senza il gioco ---------------------------------------------------------
