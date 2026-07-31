@@ -162,9 +162,12 @@ non descrive il prodotto.
 - **«Il giro spiegato» e «Sessione»** (28/07) — dall'analisi di Track Titan: le
   loro cinque tracce «essenziali» le avevamo già, **il divario era la
   presentazione**.
-- **Vista Traiettoria** (30/07) e il **nastro d'asfalto** sotto le due linee
-  (31/07) — i bordi veri di Kunos, letti da `fast_lane.ai`, e solo dove la pista
-  installata è quella guidata ([`SPIKE-BORDI.md`](SPIKE-BORDI.md)).
+- **Vista Traiettoria** (30/07) e **la pista vista dall'alto** sotto le due linee
+  (31/07): asfalto, cordoli, erba e ghiaia, letti dal **modello delle superfici**
+  del gioco — la geometria con cui decide dove sei. Il circuito si riconosce
+  **dalla forma del giro, non dal nome**, quindi vale su entrambi i simulatori; e
+  chi non ha AC installato ha i **26 circuiti impacchettati**, da OpenStreetMap e
+  satellite ([`SPIKE-BORDI.md`](SPIKE-BORDI.md), `src/accoach/tracks/NOTICE.md`).
 - **Asse in metri misurati** (31/07) — non `pos × lunghezza`: la distanza dalle
   coordinate, **corroborata con velocità×tempo**, e chi non passa il controllo
   torna alle percentuali invece di mostrare una scala sbagliata.

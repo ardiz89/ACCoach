@@ -218,19 +218,30 @@ Cosa trovi:
   tornanti della stessa pista fanno la stessa immagine, e senza quello dovevi
   ricordarti tu quale avevi aperto. In alto, la **frase del debrief** per quella
   curva — la stessa, presa di peso: non è una seconda opinione.
-  Sotto le due linee vedi anche **il nastro d'asfalto**. Viene da due posti:
-  i 26 circuiti che HONE si porta dietro, e — se hai Assetto Corsa installato —
-  i dati delle piste che hai. Le due sorgenti vengono messe in concorrenza e
-  vince quella che descrive meglio *il tuo* giro; il gioco non c'entra, perché
-  la pista viene riconosciuta dalla forma del giro e non dal nome. Tre
-  avvertenze, tutte e tre visibili nella pagina stessa: è l'**asfalto**, non i
-  limiti di pista (sui cordoli ci passi sopra di un paio di metri ed è normale);
-  compare **solo se la pista trovata è davvero quella su cui hai guidato** (di
-  uno stesso circuito girano versioni diverse, e una che non combacia
-  disegnerebbe la strada nel posto sbagliato); e **sparisce se
-  ingrandisci lo scarto ×3/×5**, perché lì la linea disegnata non è più dove sei
-  passato e sembreresti fuori strada senza esserlo. Su ACC non c'è: i dati pista
-  di ACC non sono leggibili.
+  Sotto le due linee vedi **la pista vista dall'alto**: l'asfalto, i cordoli, e
+  di fianco l'erba, la ghiaia e il cemento. Non è un disegno nostro — è la
+  geometria con cui il gioco decide dove sei, letta dal suo modello delle
+  superfici, pezzo per pezzo e con i tipi già separati.
+
+  La pista viene riconosciuta **dalla forma del tuo giro, non dal nome**: i due
+  simulatori non chiamano i circuiti allo stesso modo (Mount Panorama è
+  `mount_panorama` per uno e `rt_bathurst` per l'altro), quindi il nome non è
+  una strada affidabile per arrivarci. Se il gioco non è installato restano i
+  **26 circuiti che HONE si porta dietro** (linea centrale e larghezze, da
+  OpenStreetMap e da immagini satellitari): meno dettagliati — niente cordoli —
+  ma indipendenti da cosa hai sul disco.
+
+  Due avvertenze, tutte e due visibili nella pagina:
+
+  * compare **solo se la pista trovata è davvero quella su cui hai guidato**. Di
+    uno stesso circuito girano versioni diverse, e una che non combacia
+    disegnerebbe la strada nel posto sbagliato;
+  * **sparisce se ingrandisci lo scarto ×3/×5**, perché lì la linea disegnata non
+    è più dove sei passato e sembreresti fuori strada senza esserlo.
+
+  E il disegno **si gira** per riempire il riquadro: una rotazione non muove un
+  punto rispetto a un altro, quindi forma, larghezze e metri restano quelli e la
+  barra della scala misura gli stessi metri.
   Sul «prima o dopo» due avvertenze che la scheda ti dà da sola. Se la curva è
   lunga, il fondo della velocità è **piatto** (a Fagnes per un centinaio di
   metri): lì due giri identici avrebbero il minimo in due punti diversi per puro
