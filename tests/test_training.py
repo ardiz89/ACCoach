@@ -10,6 +10,8 @@ The ordering tests are the other half. A programme is a *sequence*, and the
 sentence explaining why a step comes first is only true relative to where it
 ended up — which is how two steps once both came out saying "start here".
 """
+import re
+
 import pytest
 
 from accoach.coaching.cue import CueCategory
@@ -262,6 +264,26 @@ def test_a_speed_gap_inside_your_own_spread_is_not_offered_as_a_target():
 # jargon comes back one edit at a time and nobody notices until a beginner does.
 
 from accoach.coaching.training import _T          # noqa: E402 - prose under test
+
+
+def test_the_two_languages_say_exactly_the_same_things():
+    """A key present in one table only doesn't fail the tests, it fails the
+    reader — and only the reader on that language, with a KeyError deep in a
+    render. The catalogue is flat and hand-written, so it is checked flat."""
+    it, en = set(_T["it"]), set(_T["en"])
+    assert it - en == set(), f"no English for: {sorted(it - en)}"
+    assert en - it == set(), f"no Italian for: {sorted(en - it)}"
+
+
+def test_the_english_table_has_no_italian_left_in_it():
+    """Two translations were written in one sitting; the way that goes wrong is
+    a sentence half-turned, not a missing key."""
+    markers = re.compile(
+        r"\b(giro|giri|curva|curve|freno|velocit|settore|settori|tempo|adesso|"
+        r"perch|della|nella|delle|sotto|stacc|guarda|esercizio|punto)\b")
+    left = {k: sorted(set(markers.findall(v.lower())))
+            for k, v in _T["en"].items() if markers.search(v.lower())}
+    assert not left, left
 
 
 def _drill_groups(lang):

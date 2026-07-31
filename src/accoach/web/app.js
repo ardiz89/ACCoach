@@ -1696,11 +1696,14 @@ async function loadSession(combo, index) {
   renderSession(s);
 }
 
+// The page's language, not the browser's. `undefined` here meant the month name
+// came from Chrome's locale, so an English page read "since 31 lug · 13:58" on
+// an Italian machine — the one word on the strip that hadn't switched.
 function fmtWhen(iso) {
   if (!iso) return "—";
   const d = new Date(iso);
-  return d.toLocaleDateString(undefined, { day: "numeric", month: "short" }) +
-         " · " + d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+  return d.toLocaleDateString(LANG(), { day: "numeric", month: "short" }) +
+         " · " + d.toLocaleTimeString(LANG(), { hour: "2-digit", minute: "2-digit" });
 }
 
 function renderSession(s) {
@@ -3391,7 +3394,19 @@ window.HoneI18nRerender = function () {
   // of it in the language you just left. Only the chrome was ever translated
   // here, and the comment at `getJSON` claiming the backend ignores `&lang` has
   // been wrong since the debrief learned to speak Italian.
-  if (CURRENT) reloadSelection();
+  if (!CURRENT) return;
+  // `reloadSelection` refetches the *lap*, and with it Compare, Map, Line,
+  // Sectors and the guided flow. It has never touched the views that are per
+  // car+track rather than per lap — so switching language left Trends, Session
+  // and the braking sheet sitting in the language you just left, chrome in one
+  // language and content in the other. Found on the Training tab, but it was
+  // never only there.
+  SHEET = null;          // the braking sheet carries the landmark wording
+  TRAINING = null;       // the drills are prose, written server-side
+  reloadSelection();
+  if (VIEW === "progress") loadProgress(CURRENT);
+  if (VIEW === "session") loadSession(CURRENT, SESSION_I);
+  if (VIEW === "training") loadTraining(CURRENT);
 };
 
 wireTour();

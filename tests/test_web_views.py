@@ -254,6 +254,28 @@ def test_a_language_switch_refetches_rather_than_repainting():
     assert "drawDebrief(DATA)" not in block
 
 
+def test_dates_follow_the_page_language_not_the_browser_s():
+    """`toLocaleDateString(undefined, …)` asks Chrome, not the page: an English
+    page on an Italian machine read "since 31 lug · 13:58"."""
+    block = _APPJS[_APPJS.index("function fmtWhen("):]
+    block = block[:block.index("\n}")]
+    assert "toLocaleDateString(LANG()" in block
+    assert "undefined" not in block
+
+
+def test_a_language_switch_also_reaches_the_per_combo_views():
+    """`reloadSelection` refetches the *lap*. Trends, Session and Training are
+    per car+track and it never touched them, so the page came back with its
+    chrome in one language and its content in the other — caught on Training,
+    but it was never only there. Their cached payloads have to go too."""
+    block = _APPJS.split("window.HoneI18nRerender")[1]
+    for call in ("loadProgress(CURRENT)", "loadSession(CURRENT",
+                 "loadTraining(CURRENT)"):
+        assert call in block, call
+    for cache in ("SHEET = null", "TRAINING = null"):
+        assert cache in block, cache
+
+
 # --- the page must not scroll sideways on a phone --------------------------
 # Measured in a 390px-wide frame against the real page, per view. Both rules
 # below fixed a page that scrolled horizontally; a static check can only pin
