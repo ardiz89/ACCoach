@@ -146,9 +146,38 @@ _LANDMARKS: dict[str, list[tuple[str, str, float]]] = {
         ("al cartello dei 100 m", "at the 100 m board", 0.650),                 # Variante Ascari
         ("alla fine del verde sulla sinistra", "at the end of the green run-off on the left", 0.860),  # Parabolica
     ],
-    # DA VERIFICARE — Imola non ancora sourced. Lista vuota = resta ai metri.
+    # Imola: CERCATA il 2026-07-31, e resta vuota apposta. Le posizioni ci sono —
+    # misurate sul giro di riferimento (McLaren 720S GT3 Evo, 1:46.097, stessa
+    # classe del metodo di Monza), distanza stacco->apex:
+    #
+    #   Tamburello 147 m · Villeneuve 38 m · Tosa 111 m · Piratella 126 m
+    #   Acque Minerali 84 m · Variante Alta 137 m · Rivazza 139 m
+    #
+    # Manca l'altra metà: *quale oggetto* si vede lì. Due fonti indipendenti
+    # consultate, e si contraddicono su quasi ogni curva —
+    #
+    #   curva          guida ACC/GT3                wiki Le Mans Ultimate
+    #   Tamburello     nessun marker                flag-light sulla destra
+    #   Villeneuve     dopo il cartello dei 200     secondo cartello a destra
+    #   Tosa           intorno ai 50                nessun marker
+    #   Piratella      cartello dei 50              flag-light sulla destra
+    #   Rivazza        dopo il cartello dei 50      flag-light sulla destra
+    #
+    # (e la seconda descrive prototipi, che staccano da tutt'altra parte). La
+    # distanza stacco->apex non arbitra: non dice dov'è il punto di corda, quindi
+    # non distingue un cartello dei 50 da uno dei 100.
+    #
+    # A Monza le fonti concordavano; qui no, e una staccata sbagliata detta con
+    # sicurezza è il difetto peggiore che un coach possa avere. Lista vuota =
+    # resta ai metri, che sono misurati.
     "imola": [],
 }
+
+# Spa e Suzuka non compaiono qui, e non è per pigrizia: i loro giri di
+# riferimento in archivio sono una monoposto (SF25) e una stradale (BMW M3 E92).
+# I cartelli di staccata delle guide sono tarati sulle GT3, che staccano decine
+# di metri più tardi — copiarli lì darebbe un riferimento visivo giusto per
+# un'auto che nessuno sta guidando. Serve prima un giro GT3 su quelle piste.
 
 # How close (normalized position) a braking point must sit to a curated landmark
 # for the landmark to describe it. Tighter than _NAME_TOL on purpose: a corner
