@@ -209,10 +209,18 @@ def test_edges_for_hands_back_the_track_in_the_laps_coordinates(tmp_path,
                                                                 monkeypatch):
     """La porta d'ingresso del modulo: chi chiama non deve sapere niente di fit,
     di specchi o di sistemi di riferimento — chiede l'asfalto e lo riceve dove
-    stanno i suoi punti."""
-    e = _spline_of(tmp_path, _loop())
-    monkeypatch.setattr(te, "spline_path",
-                        lambda track: tmp_path / "ai" / "fast_lane.ai")
+    stanno i suoi punti.
+
+    Il rattoppo va su `all_splines`, non su `spline_path`: da quando la pista si
+    riconosce dalla forma, il nome non e' piu' la strada per arrivarci. Scritto
+    all'inizio sull'altra funzione, questo test passava sulla macchina di chi lo
+    aveva scritto — dove tutte e 67 le piste installate finivano per puntare al
+    file sintetico — e falliva in CI, dove di piste non ce n'e' nessuna.
+    """
+    _spline_of(tmp_path, _loop())
+    monkeypatch.setattr(te, "bundled_tracks", lambda: [])
+    monkeypatch.setattr(te, "all_splines",
+                        lambda: [("finta", tmp_path / "ai" / "fast_lane.ai")])
     te._cache.clear()
     lap = _moved(_loop(), deg=120.0, dx=-4000.0, dz=750.0)
     road = te.edges_for("qualunque", lap)
