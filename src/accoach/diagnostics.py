@@ -698,3 +698,120 @@ def _arg_value(argv: list[str], *names: str) -> str | None:
 
 if __name__ == "__main__":
     main()
+
+
+# --- ACC: trovare i campi della pioggia ------------------------------------
+
+# Dove comincia a guardare: subito dopo `isValidLap`, l'ultimo campo che questo
+# progetto ha **misurato** (offset 1408, trovato a mano nel simulatore). Tutto
+# ciò che sta oltre è tail non modellato, e nella pagina grafica di ACC è lì che
+# vivono `trackGripStatus` e i tre `rainIntensity*`.
+_RAIN_SCAN_FROM = 1412
+_RAIN_SCAN_TO = 1800
+
+# I candidati sono enum piccole: ACC_RAIN_INTENSITY va da 0 a 6 (asciutto →
+# diluvio) e ACC_TRACK_GRIP_STATUS da 0 a 5. Filtrare su questa banda toglie di
+# mezzo timer, millisecondi e puntatori, che è quasi tutto il resto del tail.
+_RAIN_ENUM_MAX = 10
+
+
+def _acc_graphics_bytes(size: int) -> bytes | None:
+    """I byte grezzi della pagina grafica, oltre ciò che la struct dichiara.
+
+    Deliberatamente separato dal reader: qui si cercano offset che **non
+    conosciamo**, e il reader esiste per leggere quelli che conosciamo.
+    """
+    import ctypes
+
+    from .telemetry.reader import (
+        _CloseHandle,
+        _FILE_MAP_READ,
+        _MapViewOfFile,
+        _OpenFileMapping,
+        _UnmapViewOfFile,
+    )
+    from .telemetry.structs import GRAPHICS_MAP
+
+    handle = _OpenFileMapping(_FILE_MAP_READ, False, GRAPHICS_MAP)
+    if not handle:
+        return None
+    view = _MapViewOfFile(handle, _FILE_MAP_READ, 0, 0, 0)
+    if not view:
+        _CloseHandle(handle)
+        return None
+    try:
+        return ctypes.string_at(view, size)
+    except OSError:
+        return None
+    finally:
+        _UnmapViewOfFile(ctypes.c_void_p(view))
+        _CloseHandle(handle)
+
+
+def run_rain(seconds: float | None = None) -> None:
+    """Trova gli offset dei campi pioggia di ACC, misurandoli invece di indovinarli.
+
+    Il progetto ha già pagato una volta per capire che gli offset del tail di ACC
+    si trovano a mano: `isValidLap` sta a 1408 perché qualcuno l'ha visto
+    cambiare, non perché un header lo diceva. Un offset sbagliato su un campo che
+    **non leggiamo** è un errore che non noteremmo mai; su uno che leggiamo
+    produce verdetti falsi con l'aria di misure.
+
+    Come si usa, e sono dieci minuti perché **la pioggia in ACC si ordina dal
+    menu** — non si aspetta il meteo:
+
+      1. Sessione con tempo **asciutto**, in pista. Avvia questo comando.
+      2. Senza fermarlo, cambia il meteo: pioggia leggera, poi forte.
+      3. Gli offset che si muovono in quella banda sono i candidati.
+
+    `rainIntensity` deve salire con l'acqua e `trackGripStatus` scendere con la
+    pista: due segni opposti sullo stesso evento, che è ciò che li distingue da
+    un contatore qualsiasi.
+    """
+    import ctypes
+    import struct as _struct
+
+    _utf8()
+    print("Ricerca dei campi pioggia (solo ACC).")
+    print("1) parti con tempo ASCIUTTO e la macchina in pista")
+    print("2) senza fermare questo comando, alza la pioggia dal menu del gioco")
+    print("3) gli offset che si muovono sono i candidati\n")
+    print(f"Finestra: byte {_RAIN_SCAN_FROM}-{_RAIN_SCAN_TO}, "
+          f"valori plausibili 0-{_RAIN_ENUM_MAX}\n")
+
+    first: dict[int, int] = {}
+    seen: dict[int, set] = {}
+
+    def ints(raw: bytes) -> dict[int, int]:
+        out = {}
+        for off in range(_RAIN_SCAN_FROM, min(_RAIN_SCAN_TO, len(raw) - 4), 4):
+            (v,) = _struct.unpack_from("<i", raw, off)
+            if 0 <= v <= _RAIN_ENUM_MAX:
+                out[off] = v
+        return out
+
+    def on_sample(s, t) -> None:                              # noqa: ARG001
+        raw = _acc_graphics_bytes(_RAIN_SCAN_TO + 8)
+        if raw is None:
+            return
+        for off, v in ints(raw).items():
+            if off not in first:
+                first[off] = v
+                seen[off] = {v}
+            elif v not in seen[off]:
+                seen[off].add(v)
+                print(f"[{t:5.1f}s] offset {off:5d}: {first[off]} → {v}  "
+                      f"(visti: {sorted(seen[off])})", flush=True)
+
+    live = _sample_loop(on_sample, seconds, 0.25)
+    _warn_if_no_live(live)
+    mossi = {o: vs for o, vs in seen.items() if len(vs) > 1}
+    print(f"\n=== OFFSET CHE SI SONO MOSSI ({len(mossi)}) ===")
+    for off in sorted(mossi):
+        print(f"  {off:5d}: {sorted(mossi[off])}")
+    if not mossi:
+        print("  nessuno — il meteo è cambiato davvero durante la cattura?")
+    else:
+        print("\nQuello che SALE con l'acqua è rainIntensity; quello che SCENDE")
+        print("è trackGripStatus. I due successivi a rainIntensity, con lo stesso")
+        print("passo, sono le previsioni a 10 e 30 minuti.")

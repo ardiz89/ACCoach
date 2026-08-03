@@ -514,6 +514,7 @@ Quelli che potresti volere davvero:
 | `setup show <file>` | Legge un setup ACC senza avviare il gioco |
 | `selftest` | Controlla che la voce/TTS funzioni, e scrive un report |
 | `logs` | Apre la cartella di log e crash report |
+| `find-rain` | Trova i campi pioggia di ACC misurandoli (serve una sessione con meteo variabile) |
 
 ### Il file di configurazione
 
