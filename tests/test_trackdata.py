@@ -335,6 +335,9 @@ _SOURCED = {
     "saopaulo": ["S do Senna", "Curva do Sol", "Descida do Lago", "Ferradura",
                  "Laranjinha", "Pinheirinho", "Bico de Pato", "Mergulho",
                  "Junção", "Subida dos Boxes", "Arquibancadas"],
+    "zandvoort": ["Tarzanbocht", "Gerlachbocht", "Hugenholtzbocht", "Hunserug",
+                  "Slotemakerbocht", "Scheivlak", "Mastersbocht", "Hans Ernst",
+                  "Arie Luyendijkbocht"],
 }
 
 

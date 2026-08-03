@@ -236,6 +236,27 @@ _CORNERS: dict[str, list[tuple[str | int, float]]] = {
         ("Subida dos Boxes", 0.811),  # left, taken flat
         ("Arquibancadas", 0.854),     # left, taken flat
     ],
+    # Zandvoort, from the circuit's own corner page (circuitzandvoort.nl/en/corners)
+    # rather than an encyclopaedia — it names the corners in order and says which
+    # way several of them go, and **all eight it states agree with the geometry**.
+    #
+    # Turns 9, 10 and 13 are left numbered: the circuit itself does not name
+    # them. The characters corroborate the rest — Hugenholtz is the tight left
+    # the page calls a "whirling bowl bend" (r=29 m), Hunserug its "mild but
+    # extremely fast curve to the right" (r=123 m), Hans Ernst comes out
+    # right-then-left, which is what a chicane is, and Arie Luyendijk is last
+    # before the line at 91% of the lap.
+    "zandvoort": [
+        ("Tarzanbocht", 0.086),        # right hairpin, r=30 m
+        ("Gerlachbocht", 0.107),       # right
+        ("Hugenholtzbocht", 0.202),    # LEFT, banked, r=29 m
+        ("Hunserug", 0.358),           # right, fast
+        ("Slotemakerbocht", 0.409),    # right
+        ("Scheivlak", 0.430),          # right, downhill
+        ("Mastersbocht", 0.545),       # right, r=26 m
+        ("Hans Ernst", 0.738),         # chicane, right then left
+        ("Arie Luyendijkbocht", 0.908),  # right, banked, onto the straight
+    ],
     # Anchored the same way, to a real Monza lap (Ferrari 488 GT3 Evo, 2:03.7)
     # whose detected apexes were 0.169 / 0.247 / 0.378 / 0.447 / 0.500 / 0.686 /
     # 0.888. The minimum speeds identify them beyond doubt: 49 km/h at the first
@@ -431,6 +452,13 @@ _DIRECTIONS: dict[str, dict[str, str]] = {
         "Forrest's Elbow": "left", "Murray's Corner": "left",
         # The Chase is right-left-right: a complex has no single direction, so
         # it is not checked — the same call already made for Bus Stop.
+    },
+    "zandvoort": {
+        "Tarzanbocht": "right", "Gerlachbocht": "right",
+        "Hugenholtzbocht": "left", "Hunserug": "right",
+        "Slotemakerbocht": "right", "Scheivlak": "right",
+        "Mastersbocht": "right", "Arie Luyendijkbocht": "right",
+        # Hans Ernst is a chicane: not checked.
     },
     "saopaulo": {
         "Curva do Sol": "left", "Descida do Lago": "left", "Ferradura": "right",
