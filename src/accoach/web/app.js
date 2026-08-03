@@ -292,7 +292,7 @@ function wireHints() {
   if (sel) sel.title = t("kbd.lap");
 }
 
-// Keyboard: 1-8 pick a tab, [ and ] step through the laps of this car+track.
+// Keyboard: the digit row picks a tab, [ and ] step through this car+track's laps.
 // Ignored while a form control has focus — the lap and baseline pickers are
 // <select>s, where every key already means something.
 function wireKeys() {
@@ -302,8 +302,11 @@ function wireKeys() {
     if (el && el.matches("input, select, textarea")) return;
     if (document.querySelector(".tour-pop")) return;   // the tour owns the keys
     const tabs = [...document.querySelectorAll(".tab")];
-    if (/^[1-9]$/.test(e.key)) {
-      const b = tabs[parseInt(e.key, 10) - 1];
+    // 1-9 then 0 for the tenth, the usual row-of-digits convention. Adding the
+    // Race pace tab pushed Trends to position ten, and with a bare [1-9] the
+    // last tab on the row silently stopped having a shortcut.
+    if (/^[0-9]$/.test(e.key)) {
+      const b = tabs[(parseInt(e.key, 10) + 9) % 10];
       if (b) { e.preventDefault(); b.click(); }
       return;
     }

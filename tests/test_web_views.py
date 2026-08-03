@@ -240,6 +240,16 @@ def test_the_pace_chart_is_scaled_to_the_laps_that_were_a_pace():
     assert "l.counted" in block
 
 
+def test_every_tab_on_the_row_has_a_keyboard_shortcut():
+    """The digits were [1-9] and the row grew to ten when Race pace arrived, so
+    the last tab silently lost its shortcut. Nothing breaks, nothing logs, and
+    the only way to notice is to press 0 and watch nothing happen."""
+    tabs = len(re.findall(r'class="tab[ "]', _HTML))
+    assert 0 < tabs <= 10, f"{tabs} tabs, more than the digit row can reach"
+    block = _APPJS.split("function wireKeys()")[1].split("\n}")[0]
+    assert "/^[0-9]$/" in block
+
+
 def test_printing_hides_every_view_without_naming_them():
     """The print sheet is the braking cheat sheet and nothing else.
 

@@ -328,6 +328,25 @@ Cosa trovi:
   registrati prima non compare — non è «zero litri», è «non lo sappiamo» — e non
   compare nemmeno sui giri in cui hai rifornito, perché fra i due estremi di quel
   giro c'è un rifornimento, non un consumo.
+- **Passo gara**: come regge il passo su **un pieno solo**. È un taglio diverso da
+  Sessione, e la differenza è misurata: una sessione la deduciamo dagli orari, e
+  dentro una sola uscita ci può stare un **rifornimento** — mediare il passo
+  attraverso quel confine media due carichi di benzina e chiama costanza il
+  risultato. Lo stint invece si taglia dove il serbatoio **risale**, confrontando
+  quanto ne resta a fine giro con quanto ce n'è all'inizio del successivo.
+  Per ogni stint: il **passo** (mediana dei giri che erano davvero un passo — un
+  testacoda resta nella lista ma non fa la media), la **dispersione**, il consumo
+  al giro e i giri che ti restano nel serbatoio, il grafico del passo giro per
+  giro e le **gomme lungo lo stint** (temperature e pressioni per ruota).
+  E poi la cosa che vale più dei numeri: **cosa quei numeri non dicono**. La
+  pendenza del passo è un valore **netto** — lo stint accelera perché il
+  serbatoio si svuota e rallenta perché le gomme mollano — e per separare le due
+  cose serve sapere quanto vale un litro in secondi, che oggi **non lo sappiamo**
+  (va misurato guidando uno stint apposta a passo costante). Quindi la pendenza
+  esce con la sua barra d'errore, e quando è più piccola di quella barra la
+  scheda scrive **«nessuna deriva misurabile»** invece di inventarti un degrado.
+  Non è nemmeno usura gomme: nessuno dei due simulatori pubblica un'usura che
+  registriamo, quello che vedi è la temperatura.
 - **Confronto**: scegli auto+pista e due giri (uno da rivedere, uno di confronto).
   Tre grafici allineati alla posizione in pista — **delta sul giro**, **velocità**
   (tu vs riferimento), **gas/freno** — con le bande delle curve. Passa il mouse:
@@ -407,7 +426,9 @@ Cosa trovi:
 - **Andamento**: l'andamento dei tempi nel tempo, la **costanza** (migliore/media/
   scarto), i **punti deboli** curva per curva (sistematici o casuali) e gli
   **errori ricorrenti** ("5× Porta più velocità in curva · Curve 1, 2"). È il
-  quaderno dei conti; il piano che ne esce sta in **Allenamento**.
+  quaderno dei conti; il piano che ne esce sta in **Allenamento**, e le gomme
+  stanno in **Passo gara** — qui la serie copriva tutto l'archivio pur
+  chiamandosi «lungo lo stint».
 
 Nella tendina dei giri, accanto al tempo, trovi **i gradi dell'asfalto** (es.
 `2:03.732 · 37.8°`). Non è un dettaglio: fra pista fredda e pista calda i punti
@@ -415,7 +436,7 @@ di frenata si spostano di 10-20 metri, quindi due giri con temperature molto
 diverse sono due circuiti diversi e confrontarli dice poco.
 
 Sotto le schede c'è sempre **quale giro stai guardando** — tempo, riferimento,
-distacco e gradi dell'asfalto — perché con otto schede è facile finire a leggere
+distacco e gradi dell'asfalto — perché con tutte queste schede è facile finire a leggere
 i numeri di un giro pensando a un altro.
 
 E l'asse orizzontale di tutti i grafici è **in metri** (`1000 m · 2000 m …`), non
@@ -425,7 +446,7 @@ lunghezza della pista`; se un giro non ha coordinate, o se le sue coordinate non
 tornano con velocità e tempo, l'asse torna in percentuale invece di darti una
 scala sbagliata.
 
-Due scorciatoie: **1-9** aprono le schede in ordine, **[** e **]** scorrono i
+Due scorciatoie: **1-9** e **0** aprono le schede in ordine, **[** e **]** scorrono i
 giri. (Le trovi anche passando il mouse sulle schede e sulla tendina.)
 
 Sotto ogni curva c'è anche **dove, dentro la curva, è finito il tempo**: una
