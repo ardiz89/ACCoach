@@ -611,7 +611,8 @@ def _direction_ok(track: str, name: str | int, direction: str) -> bool:
     return not want or not direction or want == direction
 
 
-def name_corners(track: str, corners, lang: str | None = None) -> list[str]:
+def name_corners(track: str, corners, lang: str | None = None,
+                 learned=None) -> list[str]:
     """Names for a list of detected corners (objects with ``index``/``apex_pos``).
 
     Each curated name is handed out **once**. Naming corner-by-corner is fine in
@@ -638,9 +639,27 @@ def name_corners(track: str, corners, lang: str | None = None) -> list[str]:
                     best, best_d = i, d
             if best is not None:
                 named[best] = label
-    return [render(named[i], lang) if named[i] is not None
-            else corner_name("", c.index, c.apex_pos, lang)
-            for i, c in enumerate(corners)]
+
+    # What is left keeps a number, and *which* number is the point. The
+    # detector's own index is the count of what it found on this lap, and that
+    # count moves: sixteen Monza laps by one car produce five to nine corners,
+    # so the corner at 0.371 answers to "Corner 4" on one lap and "Corner 5" on
+    # the next, with everything after it sliding too. `learned` is the same
+    # circuit's corners as the driver's own laps agree they exist
+    # (:mod:`accoach.cornermap`), and numbering against that holds still.
+    #
+    # An apex the map does not recognise still falls back to the detector's
+    # index: a kink that turned up on one odd lap has no number of its own, and
+    # inventing one for it is where the sliding started.
+    out: list[str] = []
+    for i, c in enumerate(corners):
+        if named[i] is not None:
+            out.append(render(named[i], lang))
+            continue
+        n = learned.number_of(c.apex_pos) if learned is not None else None
+        out.append(f"{_word(lang)} {n}" if n
+                   else corner_name("", c.index, c.apex_pos, lang))
+    return out
 
 
 def has_names(track: str) -> bool:

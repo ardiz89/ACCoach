@@ -42,6 +42,7 @@ from .coaching import (
 )
 from .coaching.training import MIN_LAPS as _TRAIN_MIN_LAPS, assess as _assess_training
 from .comparison import Reference
+from .cornermap import learn_from
 from .i18n import current_language
 from .recording import laps_root, load_lap
 from .recording.catalog import LapCatalog, _GRIP_BAND, _TEMP_BAND_C
@@ -725,6 +726,10 @@ class _History:
     best_ms: int = 0
     corners: list = field(default_factory=list)
     names: dict = field(default_factory=dict)
+    #: The corner map these laps agree on, built here because this is the one
+    #: place that already has every lap in memory. The caller persists it so the
+    #: tabs that don't load laps can number against it too.
+    corner_map: object = None
     debriefs: list = field(default_factory=list)
     dated: list = field(default_factory=list)   # (recorded_utc, LapDebrief)
     trends: list = field(default_factory=list)  # LossTrend, worst total first
@@ -755,8 +760,11 @@ def _history(valid: list[dict], chrono: list[dict], track: str,
         ref_lap = h.lap_objs.get(h.fastest) or load_lap(h.fastest)
         reference = Reference(ref_lap)
         h.corners = detect_corners(ref_lap.samples)
-        h.names = {c.index: n
-                   for c, n in zip(h.corners, name_corners(track, h.corners, lg))}
+        # Learned before the names are handed out, because it is what the
+        # unnamed ones are numbered against.
+        h.corner_map = learn_from(h.lap_objs.values())
+        h.names = {c.index: n for c, n in
+                   zip(h.corners, name_corners(track, h.corners, lg, h.corner_map))}
         tally: dict[str, dict] = {}
         for r in chrono[-_RECENT_LAPS:]:
             if r["path"] == h.fastest:
@@ -864,6 +872,18 @@ def create_api(
         cat.sync(list_lap_files(laps_dir))
         return cat
 
+    def _corner_map(car: str, track: str):
+        """This combo's learned corner map, or an empty one.
+
+        Read, never built: it is learned where the laps are already in memory
+        (see ``_history``), so opening the lap report never pays to load an
+        archive it doesn't otherwise need. Empty until the driver has opened a
+        tab that reads their laps, which is honest — before that, nothing has
+        seen enough laps to know which corners are really there.
+        """
+        with _catalog() as cat:
+            return cat.load_corner_map(car, track)
+
     @app.get("/api/combos")
     def combos() -> list[dict]:
         """Every car+track that has laps, with its best time."""
@@ -956,7 +976,9 @@ def create_api(
 
         try:
             corners = detect_corners(baseline_lap.samples)
-            names = {c.index: n for c, n in zip(corners, name_corners(track, corners, lg))}
+            names = {c.index: n for c, n in
+                     zip(corners, name_corners(track, corners, lg,
+                                               _corner_map(car, track)))}
             debrief = build_lap_debrief(review, reference, corners, lg)
             consistency = lap_time_consistency([r["lap_time_ms"] for r in valid])
         except Exception:  # noqa: BLE001 - a degenerate lap shouldn't 500 the UI
@@ -1128,7 +1150,8 @@ def create_api(
         try:
             corners = detect_corners(base.samples)
             names = {c.index: n
-                     for c, n in zip(corners, name_corners(track, corners, lg))}
+                     for c, n in zip(corners, name_corners(track, corners, lg,
+                                                           _corner_map(car, track)))}
             report = build_line_report(review, base, corners, names)
         except Exception:  # noqa: BLE001 - a degenerate lap shouldn't 500 the UI
             raise HTTPException(422, "lap could not be analysed")
@@ -1279,7 +1302,8 @@ def create_api(
             ref_lap = next((o for o in objs if o.lap_time_ms), objs[0])
             corners = detect_corners(load_lap(elected).samples)
             names = {c.index: n
-                     for c, n in zip(corners, name_corners(track, corners, lg))}
+                     for c, n in zip(corners, name_corners(track, corners, lg,
+                                                           _corner_map(car, track)))}
             sheet = build_sheet(objs, corners, names, track, lg,
                                 road_temps=[r["road_temp"] for r in pool])
         except (OSError, ValueError):
@@ -1618,6 +1642,13 @@ def create_api(
         # these and re-deriving them from the serialised dicts would be a second
         # definition of "systematic".
         h = _history(valid, chrono, track, lg)
+        # Persisted here and not inside `_history`: that function has the laps
+        # and this one has the catalog. Every tab that never loads a lap — the
+        # lap report, the line, the sectors — reads it back instead of paying
+        # to learn it again.
+        if h.corner_map is not None and h.corner_map.laps:
+            with _catalog() as cat:
+                cat.save_corner_map(car, track, h.corner_map)
         fastest, best_ms = h.fastest, h.best_ms
         corners, cnames = h.corners, h.names
         recurring, loss_trends = h.recurring, h.trends
@@ -1808,6 +1839,13 @@ def create_api(
 
         chrono = sorted(valid, key=lambda r: r["recorded_utc"] or "")
         h = _history(valid, chrono, track, lg)
+        # Persisted here and not inside `_history`: that function has the laps
+        # and this one has the catalog. Every tab that never loads a lap — the
+        # lap report, the line, the sectors — reads it back instead of paying
+        # to learn it again.
+        if h.corner_map is not None and h.corner_map.laps:
+            with _catalog() as cat:
+                cat.save_corner_map(car, track, h.corner_map)
         plan, progress, saved, since = _plan_for(car, track, h.dated, h.trends,
                                                  h.names, lg)
         goal_idx = {g.corner_index for g in plan.goals}
