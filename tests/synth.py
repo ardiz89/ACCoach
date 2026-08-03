@@ -90,3 +90,22 @@ def build_lap(slow_corner: int | None = None, amt: int = 0,
                                  current_sector=_sector_of(pos)))
     return Lap(car, track, SessionType.PRACTICE, 100000 + off, valid,
                samples=samples, clean=clean, tyre_compound=compound)
+
+
+def retime(lap: Lap, ms: int) -> Lap:
+    """Make ``lap`` a ``ms`` lap — clock included, not just the label.
+
+    Setting ``lap.lap_time_ms`` alone leaves the samples running at the old pace,
+    which is a lap that contradicts itself. Real laps can't do that, and since
+    `recording.lap.trusted_lap_ms` started checking, such a fixture gets its
+    declared time thrown away and replaced by the measured one — so a test about
+    lap-time ordering was quietly comparing something else. Scales the sample
+    clock instead, which is what a slower lap actually looks like.
+    """
+    span = lap.samples[-1].t_ms - lap.samples[0].t_ms if len(lap.samples) > 1 else 0
+    if span > 0:
+        t0, f = lap.samples[0].t_ms, ms / span
+        for s in lap.samples:
+            s.t_ms = int(t0 + (s.t_ms - t0) * f)
+    lap.lap_time_ms = ms
+    return lap

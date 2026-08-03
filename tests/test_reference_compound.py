@@ -27,7 +27,7 @@ CAR, TRACK = "ferrari_488_gt3", "monza"
 
 def _save(tmp_path, ms, day, road_temp=0.0, grip=0.0, compound=""):
     lap = synth.build_lap(clean=True, compound=compound)
-    lap.lap_time_ms = ms
+    synth.retime(lap, ms)
     lap.road_temp = road_temp
     lap.grip = grip
     lap.recorded_utc = f"{day}T18:00:00+00:00"
@@ -141,7 +141,7 @@ def test_asking_for_nothing_still_returns_the_fastest(tmp_path):
 def test_a_dirty_lap_is_never_elected_whatever_the_conditions(tmp_path):
     """Conditions are a preference; track limits are a rule."""
     dirty = synth.build_lap(clean=False, compound="dry_compound")
-    dirty.lap_time_ms = 95_000
+    synth.retime(dirty, 95_000)
     dirty.road_temp = 25.0
     dirty.recorded_utc = "2026-06-19T18:00:00+00:00"
     save_lap(dirty, tmp_path)

@@ -76,6 +76,6 @@ def test_it_reaches_the_debrief_object():
 
     ref = synth.build_lap()
     slow = synth.build_lap(slow_corner=0, amt=800)   # deliberately far off
-    slow.lap_time_ms = ref.lap_time_ms + 4000
+    synth.retime(slow, ref.lap_time_ms + 4000)
     d = build_lap_debrief(slow, Reference(ref), detect_corners(ref.samples), "it")
     assert isinstance(d.headline, str)      # sempre presente, magari vuoto

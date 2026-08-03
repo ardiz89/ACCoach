@@ -22,7 +22,7 @@ CAR, TRACK = "ferrari_488_gt3", "monza"
 
 def _save(tmp_path, ms, road_temp, day, clean=True):
     lap = synth.build_lap(clean=clean)
-    lap.lap_time_ms = ms
+    synth.retime(lap, ms)
     lap.road_temp = road_temp
     lap.recorded_utc = f"{day}T18:00:00+00:00"
     save_lap(lap, tmp_path)
@@ -108,7 +108,7 @@ def test_an_archive_with_no_temperatures_behaves_as_it_always_did(tmp_path):
     """Most archives predate the field: the outright fastest, and no note."""
     for ms, day in ((99_000, "2026-06-20"), (101_000, "2026-06-21")):
         lap = synth.build_lap()
-        lap.lap_time_ms = ms
+        synth.retime(lap, ms)
         lap.recorded_utc = f"{day}T18:00:00+00:00"
         save_lap(lap, tmp_path)
     c = TestClient(create_api(tmp_path))
@@ -193,7 +193,7 @@ def test_the_lap_dropdown_gets_the_track_temperature_it_is_written_to_show(tmp_p
 
 def _save_full(tmp_path, ms, day, road_temp=0.0, grip=0.0, compound=""):
     lap = synth.build_lap(clean=True, compound=compound)
-    lap.lap_time_ms = ms
+    synth.retime(lap, ms)
     lap.road_temp = road_temp
     lap.grip = grip
     lap.recorded_utc = f"{day}T18:00:00+00:00"

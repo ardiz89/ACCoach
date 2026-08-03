@@ -21,7 +21,7 @@ import synth
 
 def _lap(ms: int, road_temp: float, clean: bool | None = True):
     lap = synth.build_lap()
-    lap.lap_time_ms = ms
+    synth.retime(lap, ms)
     lap.road_temp = road_temp
     lap.clean = clean
     return lap

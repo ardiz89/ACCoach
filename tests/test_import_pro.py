@@ -40,12 +40,12 @@ def test_an_imported_lap_becomes_the_reference_when_it_is_faster(tmp_path):
     from accoach.recording.storage import find_reference_lap
 
     mine = synth.build_lap()
-    mine.lap_time_ms = 105_000
+    synth.retime(mine, 105_000)
     mine.recorded_utc = "2026-07-20T09:00:00+00:00"
     save_lap(mine, tmp_path)
 
     pro = _imported(synth.build_lap())
-    pro.lap_time_ms = 99_000
+    synth.retime(pro, 99_000)
     save_lap(pro, tmp_path)
 
     ref = find_reference_lap("ferrari_488_gt3", "monza", tmp_path)
@@ -58,13 +58,13 @@ def test_a_slower_imported_lap_does_not_displace_your_best(tmp_path):
     from accoach.recording.storage import find_reference_lap
 
     mine = synth.build_lap()
-    mine.lap_time_ms = 99_000
+    synth.retime(mine, 99_000)
     mine.clean = True          # come lo registra il recorder di oggi
     mine.recorded_utc = "2026-07-20T09:00:00+00:00"
     save_lap(mine, tmp_path)
 
     pro = _imported(synth.build_lap())
-    pro.lap_time_ms = 105_000
+    synth.retime(pro, 105_000)
     save_lap(pro, tmp_path)
 
     ref = find_reference_lap("ferrari_488_gt3", "monza", tmp_path)

@@ -65,7 +65,7 @@ def _lap(tmp_path, *, ms, schema, clean, compound, when):
     import json
 
     lap = synth.build_lap()
-    lap.lap_time_ms = ms
+    synth.retime(lap, ms)
     lap.clean = clean
     lap.tyre_compound = compound
     lap.recorded_utc = when

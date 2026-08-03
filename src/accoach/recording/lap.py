@@ -168,6 +168,99 @@ def strip_leading_wrap(samples: list["LapSample"]) -> list["LapSample"]:
     return samples[i:] if i else samples
 
 
+# A lap that opens at the line has a lap timer of about nothing. The line is
+# detected within a frame or two, so a genuine opening sample reads tens of
+# milliseconds; this is generous by an order of magnitude.
+_OPEN_CLOCK_MAX_MS = 1000
+
+
+def strip_trailing_wrap(samples: list["LapSample"]) -> list["LapSample"]:
+    """Drop trailing samples that already belong to the next lap.
+
+    The mirror of :func:`strip_leading_wrap`: the same one-frame disagreement at
+    the line can leave the *last* sample past it, at pos≈0.000 with a lap timer
+    of a few milliseconds. Measured in the archive on one lap of 59, closing at
+    pos 0.0005.
+
+    Two things it costs. Anything that walks the samples in order — the delta
+    trace the report draws, for one — plots that frame at the start of the lap
+    carrying end-of-lap numbers. And it makes the lap's measured duration come
+    out **negative**, which silently disables the lap-time check in
+    :func:`trusted_lap_ms` on precisely the laps that are ragged at the line.
+    """
+    n = len(samples)
+    while n > 1 and samples[n - 1].pos < samples[n - 2].pos:
+        n -= 1
+    return samples[:n] if n != len(samples) else samples
+
+
+def strip_stale_open(samples: list["LapSample"]) -> list["LapSample"]:
+    """Drop a leading sample whose lap timer still belongs to the lap before.
+
+    The sibling of :func:`strip_leading_wrap`, for the other clock. At the line
+    the sim resets ``normalizedCarPosition`` and ``iCurrentTime`` on *different*
+    frames, so the recorder's position guard can let through a frame that has
+    already wrapped in position (pos≈0.000) while still carrying the previous
+    lap's elapsed time. Measured in the archive: four laps open with t between
+    69.6 s and 189.2 s at pos 0.000.
+
+    What it costs, if left: :class:`Reference` indexes that sample at pos≈0 with
+    t≈70 s, so the reference "took 70 seconds to reach the start line" and every
+    live delta against it is out by that much. It is also why one lap's measured
+    duration came out **negative**.
+
+    Identified the same way its sibling identifies a wrap: a *leading* sample
+    whose clock is large and which is immediately followed by a smaller one. An
+    in-lap that legitimately begins mid-lap has a large clock too, but it rises.
+    """
+    i = 0
+    n = len(samples)
+    while (i < n - 1 and samples[i].t_ms > _OPEN_CLOCK_MAX_MS
+           and samples[i].t_ms > samples[i + 1].t_ms):
+        i += 1
+    return samples[i:] if i else samples
+
+
+# How far the sim's declared lap time may sit from the duration the samples
+# themselves measured before we stop believing it. The measured span always runs
+# a little short — the last sample lands just before the line — and across the
+# 59 laps of the real archive that shortfall is at most **1.36 s** (median
+# 0.069). The failures this catches are 104 s, 108 s and 118 s. Two orders of
+# magnitude of daylight, so the threshold is not a delicate choice; the fraction
+# is there so a three-minute circuit gets the same generosity as a one-minute one.
+_TIME_TOL_MS = 5_000
+_TIME_TOL_FRAC = 0.10
+
+
+def trusted_lap_ms(declared: int, samples: list["LapSample"]) -> int:
+    """The lap's time: the sim's, unless the lap's own clock contradicts it.
+
+    ``last_lap_ms`` is read on the crossing frame, and on some crossings the sim
+    has not published the new value yet — so the lap is stamped with the time of
+    the lap **before**. Measured in the archive: a Monza lap whose samples span
+    224.4 s is filed as a 1:55.902, which is the previous lap's time, and it sits
+    in the catalogue as an identical twin of the real 1:55.902. Two laps, one
+    time, and one of them a fiction.
+
+    That fiction is not cosmetic. Its :class:`Reference` would answer position
+    queries from a 224-second curve while declaring a 115.9-second lap, so both
+    the live delta and the predicted lap time would be nonsense — which is the
+    shape of "the numbers on screen don't match the game".
+
+    When the two disagree we take the samples' own span. It comes from the same
+    clock, read repeatedly through the lap, and the alternative is a number we
+    have just proved belongs to a different lap. It understates by the sliver of
+    track between the last sample and the line (see ``_TIME_TOL_MS``) — a tenth
+    of a second against a hundred seconds of error.
+    """
+    span = 0 if len(samples) < 2 else int(samples[-1].t_ms - samples[0].t_ms)
+    if declared <= 0 or span <= 0:
+        return declared
+    if abs(declared - span) <= max(_TIME_TOL_MS, declared * _TIME_TOL_FRAC):
+        return declared
+    return span
+
+
 @dataclass(slots=True)
 class LapSample:
     """One frame of a lap, the set coaching/comparison needs."""
@@ -355,11 +448,19 @@ class Lap:
         # False, so a legacy lap stays "unknown" (still eligible) rather than dirty.
         raw_clean = d.get("clean")
         clean = None if raw_clean is None else bool(raw_clean)
+        # Sanitized in one place, then used twice below: the lap time is judged
+        # against the very samples we're about to hand out, so the two can't
+        # disagree downstream.
+        samples = strip_trailing_wrap(strip_stale_open(strip_leading_wrap(
+            [LapSample.from_named(fields, r) for r in d.get("samples", [])])))
         return Lap(
             car_model=str(d.get("car_model", "")),
             track=str(d.get("track", "")),
             session=session,
-            lap_time_ms=int(d.get("lap_time_ms", 0)),
+            # Also sanitized on load, and for the same reason as the samples: the
+            # files already on disk carry the defect, and a rule that only runs in
+            # the recorder fixes it for nobody who has an archive.
+            lap_time_ms=trusted_lap_ms(int(d.get("lap_time_ms", 0)), samples),
             valid=bool(d.get("valid", False)),
             recorded_utc=str(d.get("recorded_utc", "")),
             schema_version=int(d.get("schema", 1)),
@@ -369,8 +470,7 @@ class Lap:
             # (the debrief credited a full lap's time to the last corner, the map's
             # first segment jumped across the line). New laps are already clean —
             # the recorder now drops it at the source.
-            samples=strip_leading_wrap(
-                [LapSample.from_named(fields, r) for r in d.get("samples", [])]),
+            samples=samples,
             clean=clean,
             # Absent on pre-v8 files. "We never recorded where" — which is not the
             # same as "nowhere", so it stays None rather than becoming a position.
