@@ -515,6 +515,23 @@ Quelli che potresti volere davvero:
 | `selftest` | Controlla che la voce/TTS funzioni, e scrive un report |
 | `logs` | Apre la cartella di log e crash report |
 
+### Il file di configurazione
+
+Quasi tutto si regola da **Impostazioni**. Il resto sta in
+`Documenti/ACCoach/config.toml`, che HONE crea al primo avvio con dentro un
+commento per ogni voce. Si modifica a app chiusa: **i valori si leggono
+all'avvio**.
+
+Le voci che esistono *solo* lì:
+
+| Voce | A cosa serve |
+|---|---|
+| `data.laps_dir` | Sposta la cartella dei giri (un altro disco, una cartella sincronizzata). Vuota = `Documenti/ACCoach/laps` |
+| `acquire.hz` | Quanti campioni al secondo legge il registratore |
+| `server.host` · `server.port` · `server.hz` | Interfaccia, porta e ritmo del backend live |
+| `web.port` | Porta dell'app di analisi |
+| `logging.level` · `logging.console` | Quanto scrivono i log |
+
 ---
 
 ## 8. Consigli per usarlo al meglio

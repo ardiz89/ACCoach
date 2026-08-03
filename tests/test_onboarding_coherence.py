@@ -58,16 +58,18 @@ def test_the_guide_describes_the_hub_not_the_old_launcher():
 def test_the_guide_calls_the_product_by_its_name():
     """La finestra dice HONE, la guida diceva ACCoach."""
     assert _GUIDA.startswith("# Guida a HONE")
-    # Il percorso dei giri su disco resta ACCoach: è la cartella vera.
+    # I percorsi su disco restano ACCoach: è la cartella vera.
     stray = [ln for ln in _GUIDA.splitlines()
-             if "ACCoach" in ln and "Documenti/ACCoach/laps" not in ln]
+             if "ACCoach" in ln and "Documenti/ACCoach/" not in ln]
     assert not stray, f"nome vecchio rimasto: {stray}"
 
 
 def _guide_commands() -> set[str]:
     """I comandi che la guida elenca nelle sue tabelle, senza gli argomenti."""
-    rows = re.findall(r"^\|\s*`([a-z-]+)[^`]*`\s*\|", _GUIDA, re.M)
-    return set(rows)
+    rows = re.findall(r"^\|\s*`([a-z-]+[^`]*)`\s*\|", _GUIDA, re.M)
+    # Le voci di `config.toml` stanno in una tabella con la stessa forma, ma sono
+    # chiavi puntate (`data.laps_dir`), non comandi. Il punto le distingue.
+    return {r.split()[0] for r in rows if "." not in r.split()[0]}
 
 
 def test_the_guide_does_not_send_you_to_deleted_wrappers():

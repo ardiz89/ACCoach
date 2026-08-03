@@ -33,7 +33,7 @@ from .coaching import (
 )
 from .comparison import Reference
 from .i18n import current_language
-from .recording import DEFAULT_LAPS_DIR, load_lap
+from .recording import laps_root, load_lap
 from .recording.catalog import LapCatalog, _GRIP_BAND, _TEMP_BAND_C
 from .recording.lap import SAMPLE_FIELDS
 from .recording.storage import _catalog_path, _slug, list_lap_files
@@ -523,7 +523,7 @@ class _RevalidatingStatic(StaticFiles):
 
 
 def create_api(
-    laps_dir: Path | str = DEFAULT_LAPS_DIR,
+    laps_dir: Path | str | None = None,
     setups_root: Path | str | None = None,
     demo: bool = False,
 ) -> FastAPI:

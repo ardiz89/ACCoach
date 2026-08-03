@@ -44,7 +44,7 @@ from .coaching.pitcall import PitCall
 from .i18n import cue_text, current_language
 from .comparison import DeltaState, LapComparator, Reference
 from .engineer import RaceEngineer, classify, engineer_for
-from .recording import DEFAULT_LAPS_DIR, Lap, LapRecorder, find_reference_lap, save_lap
+from .recording import Lap, LapRecorder, find_reference_lap, laps_root, save_lap
 from .recording.recorder import StartLineWatcher
 from .telemetry import SharedMemoryReader, TelemetrySnapshot
 from .telemetry.snapshot import ACStatus
@@ -158,7 +158,7 @@ class CoachEngine:
         reader: SharedMemoryReader | None = None,
         voice: Voice | None = None,
         num_segments: int = 24,
-        laps_dir: Path | str = DEFAULT_LAPS_DIR,
+        laps_dir: Path | str | None = None,
         feed: TelemetryFeed | None = None,
         acquire_hz: float | None = None,
         engineer_voice: bool = True,
@@ -168,7 +168,7 @@ class CoachEngine:
         # Whether to speak the race engineer's proposals (the per-cue coaching
         # voice is governed by ``voice`` itself; this gates only the engineer).
         self.engineer_voice = engineer_voice
-        self.laps_dir = laps_dir
+        self.laps_dir = Path(laps_dir) if laps_dir else laps_root()
         self.recorder = LapRecorder()   # used only on the legacy inline path
 
         # High-fidelity acquisition: a background thread reads + records at a

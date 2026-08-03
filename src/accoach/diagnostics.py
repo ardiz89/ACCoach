@@ -428,20 +428,20 @@ def run_diag(argv: list[str] | None = None) -> None:
     _utf8()
     argv = sys.argv[1:] if argv is None else argv
     from .coaching.diagnosis import build_lap_stats
-    from .recording import DEFAULT_LAPS_DIR, find_reference_lap, list_lap_files, load_lap
+    from .recording import find_reference_lap, laps_root, list_lap_files, load_lap
     from .track import detect_corners
 
     car = argv[0] if len(argv) > 0 else None
     track = argv[1] if len(argv) > 1 else None
     if not (car and track):
-        files = list_lap_files(DEFAULT_LAPS_DIR)
+        files = list_lap_files(laps_root())
         if not files:
-            print(f"Nessun giro registrato in {DEFAULT_LAPS_DIR}.")
+            print(f"Nessun giro registrato in {laps_root()}.")
             return
         last = load_lap(files[-1])
         car, track = last.car_model, last.track
 
-    ref = find_reference_lap(car, track, DEFAULT_LAPS_DIR)
+    ref = find_reference_lap(car, track, laps_root())
     if ref is None:
         print(f"Nessun giro pulito di riferimento per {car} / {track}.")
         return
@@ -485,10 +485,10 @@ def run_import_reference(argv: list[str] | None = None, laps_dir=None) -> None:
     _utf8()
     from pathlib import Path
 
-    from .recording import DEFAULT_LAPS_DIR, load_lap, save_lap
+    from .recording import laps_root, load_lap, save_lap
 
     argv = sys.argv[1:] if argv is None else argv
-    laps_dir = laps_dir or DEFAULT_LAPS_DIR
+    laps_dir = laps_dir or laps_root()
     if not argv:
         print("Uso: python -m accoach import-reference <file.lap.json.gz>")
         return

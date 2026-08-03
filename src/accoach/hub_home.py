@@ -66,7 +66,7 @@ def load_home_data(laps_dir: Path | str | None = None,
     from .coaching import build_lap_debrief, format_debrief, lap_time_consistency
     from .comparison import Reference
     from .recording import (
-        DEFAULT_LAPS_DIR,
+        laps_root,
         find_reference_lap,
         list_lap_files,
         load_lap,
@@ -76,7 +76,7 @@ def load_home_data(laps_dir: Path | str | None = None,
     from .track import detect_corners
     from .trackdata import name_corners
 
-    laps_dir = Path(laps_dir) if laps_dir else DEFAULT_LAPS_DIR
+    laps_dir = Path(laps_dir) if laps_dir else laps_root()
     try:
         with LapCatalog(_catalog_path(laps_dir)) as cat:
             cat.sync(list_lap_files(laps_dir))

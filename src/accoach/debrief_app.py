@@ -15,7 +15,7 @@ import sys
 
 from .coaching import build_lap_debrief, format_debrief, lap_time_consistency
 from .comparison import Reference
-from .recording import DEFAULT_LAPS_DIR, find_reference_lap, load_lap
+from .recording import find_reference_lap, laps_root, load_lap
 from .recording.catalog import LapCatalog
 from .recording.storage import _catalog_path, list_lap_files
 from .track import detect_corners
@@ -35,7 +35,7 @@ def main(argv: list[str] | None = None) -> None:
     except (AttributeError, ValueError):
         pass
 
-    laps_dir = DEFAULT_LAPS_DIR
+    laps_dir = laps_root()
     with LapCatalog(_catalog_path(laps_dir)) as cat:
         cat.sync(list_lap_files(laps_dir))
 

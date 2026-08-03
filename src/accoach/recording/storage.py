@@ -28,7 +28,17 @@ from .lap import Lap
 _log = get_logger("storage")
 
 
-DEFAULT_LAPS_DIR = _default_laps_dir()
+def laps_root() -> Path:
+    """La cartella dei giri, risolta **adesso**.
+
+    Era una costante calcolata all'import (`DEFAULT_LAPS_DIR`), e da lì finiva
+    come valore di default in una decina di firme. Una costante d'import non può
+    vedere la configurazione dell'utente — e infatti non la vedeva: `data.laps_dir`
+    lo onorava solo l'app web, e chi lo impostava si ritrovava i giri scritti in
+    un posto e letti in un altro. Una funzione risolve al momento della chiamata,
+    che è l'unico momento in cui la risposta è nota.
+    """
+    return _default_laps_dir()
 
 _SUFFIX = ".lap.json.gz"
 _DB_NAME = "catalog.db"
@@ -82,9 +92,9 @@ def _write_atomic(path: Path, payload: bytes) -> None:
         raise
 
 
-def save_lap(lap: Lap, laps_dir: Path | str = DEFAULT_LAPS_DIR) -> Path:
+def save_lap(lap: Lap, laps_dir: Path | str | None = None) -> Path:
     """Write ``lap`` to the store and return the file path."""
-    laps_dir = Path(laps_dir)
+    laps_dir = Path(laps_dir) if laps_dir else laps_root()
     laps_dir.mkdir(parents=True, exist_ok=True)
 
     if not lap.recorded_utc:
@@ -138,8 +148,8 @@ def load_lap(path: Path | str) -> Lap:
     return Lap.from_dict(data)
 
 
-def list_lap_files(laps_dir: Path | str = DEFAULT_LAPS_DIR) -> list[Path]:
-    laps_dir = Path(laps_dir)
+def list_lap_files(laps_dir: Path | str | None = None) -> list[Path]:
+    laps_dir = Path(laps_dir) if laps_dir else laps_root()
     if not laps_dir.is_dir():
         return []
     return sorted(laps_dir.glob(f"*{_SUFFIX}"))
@@ -148,7 +158,7 @@ def list_lap_files(laps_dir: Path | str = DEFAULT_LAPS_DIR) -> list[Path]:
 def find_reference_lap(
     car_model: str,
     track: str,
-    laps_dir: Path | str = DEFAULT_LAPS_DIR,
+    laps_dir: Path | str | None = None,
     road_temp: float | None = None,
     grip: float | None = None,
     compound: str | None = None,
@@ -164,7 +174,7 @@ def find_reference_lap(
     relaxed). Omitting them keeps the old behaviour, which is what the offline
     analysis tools want — there, "the best lap" means the best lap.
     """
-    laps_dir = Path(laps_dir)
+    laps_dir = Path(laps_dir) if laps_dir else laps_root()
 
     # Fast path: indexed lookup via the catalog.
     try:
