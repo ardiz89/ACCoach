@@ -145,7 +145,7 @@ del codice già scritto.
 | **Campi pioggia ACC** | Gli offset del tail si misurano, non si indovinano — `isValidLap` sta a 1408 perché qualcuno l'ha visto muoversi | `python -m accoach find-rain`, poi **alzare la pioggia dal menu** senza fermarlo: `rainIntensity` sale, `trackGripStatus` scende | ~10 min |
 | **`yaw_baseline` Formula** | Il 2.50 fu tarato il 27/06 su SF25/Nürburgring, che è una delle sessioni col **canale sterzo tosato**: quel numero non è confermato | Tre giri SF25 **con la periferica delle sessioni del 02/08** (passo sterzo 0.0004, non 0.009) | ~10 min |
 | **Burst lock** | In quattro minuti di Formula senza ABS non è avvenuto **nessun** bloccaggio: resta aperta per evento mancato, non per soglia | Tre frenate volutamente bloccate, ABS a 0 | ~5 min |
-| **Parola di attivazione** | La sintesi vocale serve a **bocciare**, non a promuovere: «ehi copilota» torna esatta con una dizione perfetta, non è detto con la voce del pilota in abitacolo | Dieci risvegli a motore acceso, poi si guarda `assistente-udito.jsonl` | ~5 min |
+| **Parola di attivazione** | La sintesi vocale serve a **bocciare**, non a promuovere: «ehi copilota» torna esatta con una dizione perfetta, non è detto con la voce del pilota in abitacolo | Dieci risvegli a motore acceso, poi si guarda `assistente-udito.jsonl`. Lo strumento è in [`tools/voce/`](tools/voce/README.md) dal 03/08 — prima stava nello scratchpad di una sessione, cioè in una cartella temporanea | ~5 min |
 
 Le prime due sbloccano codice che esiste già e non fa niente: la finestra
 pressioni sul bagnato (`engineer/pressures.py`, scritta e mai raggiunta) e il

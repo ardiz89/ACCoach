@@ -121,6 +121,24 @@ CREATE TABLE IF NOT EXISTS pit_entry (
     track_key  TEXT PRIMARY KEY,
     samples    TEXT NOT NULL DEFAULT ''    -- comma-separated positions, 0..1
 );
+-- Which corners a circuit really has, learned from the driver's own laps, so a
+-- corner keeps its number between them. The detector reads each lap on its own
+-- merits and returns five to nine corners for the same Monza depending on the
+-- lap, which slides every number after the one it missed; this is the reference
+-- to number against (see accoach/cornermap.py).
+--
+-- Keyed on car AND track, unlike the pit entry above, and the difference is
+-- measured: the Formula car finds seven corners at the Nürburgring where the
+-- circuit has fifteen, because it never turns the steering far enough in the
+-- others. Merging the cars would answer "corner 8" on a lap whose screen has no
+-- corners 3 to 7. Survives a lap-table rebuild like its neighbours.
+CREATE TABLE IF NOT EXISTS corner_map (
+    car_key    TEXT NOT NULL,
+    track_key  TEXT NOT NULL,
+    corners    TEXT NOT NULL DEFAULT '',   -- pos:direction:seen, semicolon separated
+    laps       INTEGER NOT NULL DEFAULT 0, -- laps it was learned from
+    PRIMARY KEY (car_key, track_key)
+);
 """
 
 
@@ -519,6 +537,32 @@ class LapCatalog:
             """INSERT INTO pit_entry(track_key, samples) VALUES(?,?)
                ON CONFLICT(track_key) DO UPDATE SET samples=excluded.samples""",
             (self._slug(track), ",".join(f"{v:.5f}" for v in samples)),
+        )
+        self._conn.commit()
+
+    # --- the corner map learned from the driver's laps --------------------
+
+    def load_corner_map(self, car_model: str, track: str):
+        """The learned corner map for this car+track, empty when never built."""
+        from ..cornermap import CornerMap, deserialize
+
+        row = self._conn.execute(
+            "SELECT corners, laps FROM corner_map WHERE car_key=? AND track_key=?",
+            (self._slug(car_model), self._slug(track)),
+        ).fetchone()
+        if row is None:
+            return CornerMap([], 0)
+        return deserialize(row["corners"], int(row["laps"] or 0))
+
+    def save_corner_map(self, car_model: str, track: str, cmap) -> None:
+        from ..cornermap import serialize
+
+        self._conn.execute(
+            """INSERT INTO corner_map(car_key, track_key, corners, laps)
+               VALUES(?,?,?,?)
+               ON CONFLICT(car_key, track_key) DO UPDATE SET
+                  corners=excluded.corners, laps=excluded.laps""",
+            (self._slug(car_model), self._slug(track), serialize(cmap), cmap.laps),
         )
         self._conn.commit()
 

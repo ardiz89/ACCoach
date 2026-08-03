@@ -234,3 +234,219 @@ def test_curated_names_are_proper_nouns_in_both_languages(track, expected):
 @pytest.mark.parametrize("track", ["spa", "suzuka"])
 def test_the_new_tracks_report_that_they_have_names(track):
     assert has_names(track)
+
+
+# --- one circuit, however the sim spells it (2026-08-03) --------------------
+
+def test_the_same_circuit_is_found_under_either_game_s_name():
+    """Kunos prefixes its Assetto Corsa tracks with ``ks-``; ACC drops the
+    prefix and renames outright. A table keyed on one spelling is invisible to
+    the other game — the exact bug the track drawings had to stop having, and it
+    would have shipped here the day a second circuit arrived."""
+    assert trackdata.has_names("ks-silverstone")
+    assert trackdata.has_names("Silverstone")
+    assert corner_name("ks-silverstone", 0, 0.533, "en", "right") == "Copse"
+
+
+def test_a_historic_layout_does_not_inherit_the_modern_one_s_corners():
+    """Spa 1998 shares a name with Spa and not a circuit: it has no Bus Stop
+    where the modern one does. Giving it the modern positions would print Les
+    Combes in the middle of a straight."""
+    assert not trackdata.has_names("spa-1998")
+    assert corner_name("spa-1998", 3, 0.351, "en") == "Corner 4"
+
+
+def test_every_alias_points_at_a_circuit_we_could_actually_name():
+    """An alias to a key with no table is a silent no-op that reads like
+    coverage. It is allowed to be empty *today* only if the key exists."""
+    for alias, key in trackdata._ALIASES.items():
+        assert key == trackdata._slug(key), f"{alias} -> {key} is not a slug"
+        assert key not in trackdata._ALIASES, f"{alias} -> {key} chains"
+
+
+# --- officially numbered corners (2026-08-03) ------------------------------
+
+def test_a_curated_turn_number_is_rendered_in_the_reader_s_language():
+    """Most modern circuits name nothing and number everything, and those
+    numbers are painted on the track map — they are facts, not our count of
+    what a detector happened to find. So a table may hold an integer, and
+    unlike a proper noun it gets translated."""
+    assert trackdata.render(7, "it") == "Curva 7"
+    assert trackdata.render(7, "en") == "Corner 7"
+    assert trackdata.render("Parabolica", "it") == "Parabolica"
+    assert trackdata.render("Parabolica", "en") == "Parabolica"
+
+
+def test_a_numbered_corner_goes_through_the_table_like_a_named_one(monkeypatch):
+    monkeypatch.setitem(trackdata._CORNERS, "tt", [(7, 0.400), ("Curvone", 0.700)])
+    corners = [_corner(0, 0.402), _corner(1, 0.698)]
+    assert name_corners("tt", corners, "it") == ["Curva 7", "Curvone"]
+    assert name_corners("tt", corners, "en") == ["Corner 7", "Curvone"]
+
+
+def test_the_fallback_number_is_the_detector_s_count_not_the_circuit_s():
+    """On a track with no table the only honest thing to say is "the seventh
+    corner I found" — claiming it is the circuit's Turn 7 would be inventing
+    an official fact."""
+    assert corner_name("no-such-track", 6, 0.5, "en") == "Corner 7"
+
+
+# --- Silverstone: the first table read off geometry, not off a lap ---------
+
+_SILVERSTONE = ["Abbey", "Farm Curve", "Village", "The Loop", "Aintree",
+                "Brooklands", "Luffield", "Woodcote", "Copse", "Maggotts",
+                "Becketts", "Chapel", "Stowe", "Vale", "Club"]
+
+
+def test_silverstone_names_land_on_their_own_corners():
+    table = trackdata._CORNERS["silverstone"]
+    corners = [_corner(i, pos) for i, (_n, pos) in enumerate(table)]
+    assert name_corners("silverstone", corners) == _SILVERSTONE
+
+
+def test_silverstone_every_name_carries_the_direction_that_proved_it():
+    """The table is trusted because the eighteen-symbol sequence of directions
+    the geometry produced matched the one the circuit's own corner list implies.
+    Dropping a direction would keep the names and throw away the evidence."""
+    want = trackdata._DIRECTIONS["silverstone"]
+    assert {n for n, _p in trackdata._CORNERS["silverstone"]} == set(want)
+    assert set(want.values()) == {"left", "right"}
+
+
+def test_a_silverstone_name_will_not_take_a_corner_turning_the_other_way():
+    assert corner_name("silverstone", 8, 0.533, "en", "right") == "Copse"
+    assert corner_name("silverstone", 8, 0.533, "en", "left") == "Corner 9"
+
+
+# --- circuits sourced from a published corner list (2026-08-03) ------------
+# The method: a source supplies the corners in order and which way each turns,
+# the bundled centreline supplies where they are, and the two have to agree.
+# Pinned here is what can be checked without a lap: every name lands on its own
+# corner, and every direction that proved the table is still recorded next to it.
+
+_SOURCED = {
+    "silverstone": ["Abbey", "Farm Curve", "Village", "The Loop", "Aintree",
+                    "Brooklands", "Luffield", "Woodcote", "Copse", "Maggotts",
+                    "Becketts", "Chapel", "Stowe", "Vale", "Club"],
+    "mountpanorama": ["Hell Corner", "Griffins Bend", "The Cutting",
+                      "Quarry Corner", "Reid Park", "Sulman Park",
+                      "McPhillamy Park", "Skyline", "The Dipper",
+                      "Forrest's Elbow", "The Chase", "Murray's Corner"],
+    "saopaulo": ["S do Senna", "Curva do Sol", "Descida do Lago", "Ferradura",
+                 "Laranjinha", "Pinheirinho", "Bico de Pato", "Mergulho",
+                 "Junção", "Subida dos Boxes", "Arquibancadas"],
+    "brandshatch": ["Paddock Hill Bend", "Druids", "Graham Hill Bend", "Surtees",
+                    "Hawthorn Bend", "Westfield Bend", "Sheene Curve",
+                    "Stirling's", "Clearways", "Clark Curve"],
+    "zandvoort": ["Tarzanbocht", "Gerlachbocht", "Hugenholtzbocht", "Hunserug",
+                  "Slotemakerbocht", "Scheivlak", "Mastersbocht", "Hans Ernst",
+                  "Arie Luyendijkbocht"],
+}
+
+
+@pytest.mark.parametrize("track", sorted(_SOURCED))
+def test_a_sourced_table_names_each_corner_once_and_in_order(track):
+    table = trackdata._CORNERS[track]
+    corners = [_corner(i, pos) for i, (_n, pos) in enumerate(table)]
+    assert name_corners(track, corners) == _SOURCED[track]
+
+
+@pytest.mark.parametrize("track", sorted(_SOURCED))
+def test_a_sourced_table_is_ordered_with_no_duplicates(track):
+    positions = [p for _n, p in trackdata._CORNERS[track]]
+    assert positions == sorted(positions)
+    assert all(0.0 < p < 1.0 for p in positions)
+
+
+@pytest.mark.parametrize("track", sorted(_SOURCED))
+def test_a_sourced_direction_is_never_recorded_for_a_name_we_do_not_have(track):
+    """A direction for a name that left the table is evidence for a claim
+    nobody makes any more — and the next person to read it will believe the
+    name is still there."""
+    names = {n for n, _p in trackdata._CORNERS[track]}
+    assert set(trackdata._DIRECTIONS.get(track, {})) <= names
+
+
+def test_a_complex_is_not_given_a_single_direction():
+    """The Chase is right-left-right and S do Senna is left-right. Asking a
+    complex which way it turns has no answer, so it isn't asked — the same call
+    already made for Spa's Bus Stop and Suzuka's Casio Triangle."""
+    assert "The Chase" not in trackdata._DIRECTIONS["mountpanorama"]
+    assert "S do Senna" not in trackdata._DIRECTIONS["saopaulo"]
+
+
+# --- a circuit curated by number (2026-08-03) ------------------------------
+
+def test_the_nurburgring_is_numbered_all_the_way_round():
+    """Half a numbering is worse than none: an official "Corner 3" printed next
+    to a detector-counted "Corner 4" gives the driver two numbering schemes in
+    one list and no way to tell them apart."""
+    labels = [n for n, _p in trackdata._CORNERS["nurburgring"]]
+    assert labels == list(range(1, len(labels) + 1))
+    assert all(isinstance(n, int) for n in labels)
+
+
+def test_a_numbered_circuit_reads_in_the_page_s_language():
+    table = trackdata._CORNERS["nurburgring"]
+    corners = [_corner(i, pos) for i, (_n, pos) in enumerate(table)]
+    assert name_corners("nurburgring", corners, "en")[:3] == \
+        ["Corner 1", "Corner 2", "Corner 3"]
+    assert name_corners("nurburgring", corners, "it")[:3] == \
+        ["Curva 1", "Curva 2", "Curva 3"]
+
+
+def test_the_nurburgring_is_reachable_from_assetto_corsa_s_spelling():
+    """Kunos ships it as ``ks-nurburgring``; ACC calls it ``nurburgring``."""
+    assert name_corners("ks-nurburgring",
+                        [_corner(0, 0.079)], "en") == ["Corner 1"]
+
+
+# --- the geometry the tables are read off (2026-08-03) ---------------------
+
+def test_every_bundled_circuit_turns_the_way_it_really_turns():
+    """The cheapest check that the traces and the mirror applied to them are
+    both right — and it is decided by a number computed from the raw trace,
+    which knows nothing about the circuit's name.
+
+    Suzuka is why it is worth keeping: it is a **figure of eight**, the only one
+    in the set, so its lap crosses itself and its net turning cancels to zero
+    instead of reaching ±360. Nothing in the code knows that; it falls out.
+    """
+    from pathlib import Path
+    import sys
+    root = Path(__file__).resolve().parent.parent
+    sys.path.insert(0, str(root / "tools"))
+    from corner_atlas import rotation, TRACKS
+
+    anticlockwise = {"Austin", "SaoPaulo", "MountPanorama", "YasMarina", "IMS",
+                     "MoscowRaceway", "Norisring"}
+    for csv in sorted(TRACKS.glob("*.csv")):
+        deg = rotation(csv.name)
+        if csv.stem == "Suzuka":
+            assert abs(deg) < 90.0, "Suzuka's lap crosses itself"
+            continue
+        assert abs(abs(deg) - 360.0) < 1.0, f"{csv.stem} is not a closed lap"
+        way = "anticlockwise" if deg > 0 else "clockwise"
+        want = "anticlockwise" if csv.stem in anticlockwise else "clockwise"
+        assert way == want, f"{csv.stem} reads {way}, it runs {want}"
+
+
+def test_cota_is_numbered_all_twenty_turns():
+    labels = [n for n, _p in trackdata._CORNERS["austin"]]
+    assert labels == list(range(1, 21))
+
+
+def test_cota_is_reachable_under_accs_spelling():
+    """ACC ships it as ``cota``; the trace and every guide call it Austin."""
+    assert trackdata.has_names("cota")
+    assert corner_name("cota", 0, 0.121, "it", "left") == "Curva 1"
+
+
+def test_cotas_back_straight_survives_in_the_table():
+    """T11 to T12 is 1195 m with no corner in it, against a published back
+    straight of 1016 m. It is the anchor that says the twenty positions sit on
+    the real circuit and not on a plausible shift of it — so if an edit ever
+    slides them, this is what notices."""
+    pos = dict((n, p) for n, p in trackdata._CORNERS["austin"])
+    gap_m = (pos[12] - pos[11]) * 5503.0
+    assert 1100 < gap_m < 1300
