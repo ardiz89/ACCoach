@@ -91,6 +91,39 @@ Tra un giro e l'altro, quando un sintomo si ripete, ti suggerisce una regolazion
 (pressioni gomme, livelli TC/ABS dove regolabili, bilanciamento freni). Le
 pressioni vengono giudicate solo a gomme in temperatura, sul target GT3 (~27.5 psi).
 
+Le modifiche sono di due tipi, e si chiudono in modo diverso.
+
+- **Al volo** — una manopola che giri sul rettilineo (TC, ABS, bilanciamento
+  freni). Non devi confermare niente: HONE **guarda il canale** e si accorge da
+  solo quando la manopola si muove, così la prova può cominciare senza che tu
+  tolga le mani dal volante. Su AC quei livelli non sono leggibili, quindi lì
+  trovi un pulsante **«Fatto — l'ho cambiato»** nella pagina Ingegnere.
+- **Da box** — un file di setup da scrivere. Qui non basta dirti *cosa*
+  cambiare, e infatti ti dice anche **quando rientrare**.
+
+### c-bis) Il rientro ai box
+
+Quando c'è una modifica che richiede il garage, senti tre cose:
+
+1. **All'inizio dell'ultimo settore** (o ~20 s prima dell'ingresso corsia, quello
+   che viene prima): *«Modifica pronta: rientra ai box a fine giro»*. Il secondo
+   criterio non è un doppione: su certi circuiti la corsia box si stacca dalla
+   curva **prima** dell'ultimo settore, e lì una chiamata legata al settore
+   arriverebbe con l'ingresso già alle spalle.
+2. **Poco prima dell'ingresso**: *«Ingresso box qui davanti, rientra»*.
+3. **Da fermo nel box**: cosa fare con la modifica, perché vive in una pagina del
+   browser che mentre guidavi non stavi guardando.
+
+Una cosa da sapere: **l'ingresso della corsia box nessun gioco lo pubblica**. Lo
+imparo guardando dove lasci la pista la prima volta che rientri davvero, e ne
+tengo la mediana su più visite. Quindi su una pista dove non sei mai rientrato
+l'avviso numero 2 **non esiste**: preferisco tacere che indicarti una corsia
+indovinata, per cui alzeresti il piede. Dalla seconda visita in poi c'è.
+
+Rientrare col menu di gioco («torna ai box») non insegna niente, ed è voluto:
+l'auto sparisce da metà pista e riappare in garage, e prendere per buono quel
+salto vorrebbe dire piazzare l'ingresso box in mezzo a un rettilineo.
+
 ### d) Come vengono registrati i giri (e se parti dai box)
 Non devi fare nulla di speciale: avvia la sessione (Pratica, Hotlap, Gara) e guida.
 
@@ -329,6 +362,16 @@ col bordo azzurro. Sono osservazioni **sull'intero giro**, non su una curva:
 
 - **I giri sporchi non sono mai candidabili.** Un giro tagliato è più veloce per
   un motivo.
+- **Un giro che nessuno ha giudicato non batte un giro giudicato.** Su ACC il
+  «pulito» dei giri registrati **prima del 21 luglio 2026** veniva da un campo
+  che quel gioco dichiara e non riempie mai: dice pulito perché nessuno ha
+  guardato, non perché lo fosse. Quei giri non vengono buttati — restano il tuo
+  riferimento se non hai altro, perché un bersaglio dubbio batte nessun
+  bersaglio — ma perdono contro qualunque giro verificato davvero. È nato da un
+  caso vero: a Monza il riferimento era un 1:53.712 che **tagliava la Variante
+  della Roggia** per metà curva, ed era il più veloce *proprio per quello*.
+  Quando succede il riepilogo te lo dice: «scelto perché verificato — il tuo
+  1:53.712 è più veloce ma nessuno ne ha mai verificato i limiti di pista».
 - **Le condizioni contano**, e sono tre: la **gomma**, la **temperatura
   dell'asfalto** e il **grip della pista**. Un giro fatto in condizioni simili a
   oggi batte uno un po' più veloce fatto in condizioni molto diverse. La gomma

@@ -646,8 +646,6 @@
                          it: `🅿️ Sei ai box e c'è una modifica in attesa: clicca la proposta qui sopra, poi <b>Prepara modifica</b> → <b>Scrivi</b>, e ricarica il setup dal garage prima di uscire.` },
     "eng.loadErr":     { en: `Setup loading error: `, it: `Errore caricamento setup: ` },
     "eng.avDone":      { en: `Done — I've made it`, it: `Fatto — l'ho cambiato` },
-    "eng.avAuto":      { en: `HONE will see the dial move on its own.`,
-                         it: `HONE se ne accorge da solo quando giri la manopola.` },
 
     // engineer tour
     "tour.e1.t": { en: `Live diagnosis`, it: `Diagnosi live` },
@@ -665,6 +663,9 @@
     "tour.e5.t": { en: `Setup editor`, it: `Editor setup` },
     "tour.e5.x": { en: `Adjust by game clicks, then “Write setup” saves a new file to load in the pits.`,
                    it: `Regola con i click di gioco, poi “Scrivi setup” salva un nuovo file da caricare ai box.` },
+    "tour.e6.t": { en: `Change it now, at the wheel`, it: `Cambiala adesso, al volante` },
+    "tour.e6.x": { en: `A dial you turn on the straight — no pit stop, no lap lost. On ACC there is nothing to confirm: HONE reads the level live and sees it move. On AC those levels aren't published, so use the button.`,
+                   it: `Una manopola che giri sul rettilineo: niente sosta, niente giro perso. Su ACC non devi confermare nulla, HONE legge il livello dal vivo e si accorge da solo che si è mosso. Su AC quei livelli non sono leggibili: usa il pulsante.` },
   };
 
   // ---- core ---------------------------------------------------------------

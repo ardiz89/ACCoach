@@ -855,6 +855,9 @@ function tourSteps() {
   return [
     { sel: "#gauges", title: t("tour.e1.t"), text: t("tour.e1.x") },
     { sel: "#tyres", title: t("tour.e2.t"), text: t("tour.e2.x") },
+    // Only appears when there IS an "al volo" proposal — the tour engine skips
+    // hidden targets, so it costs nothing on the sessions without one.
+    { sel: "#av-now", title: t("tour.e6.t"), text: t("tour.e6.x") },
     { sel: "#engineer-says", title: t("tour.e3.t"), text: t("tour.e3.x") },
     { sel: "#focus-says", title: t("tour.e4.t"), text: t("tour.e4.x") },
     { sel: ".eng-setup", title: t("tour.e5.t"), text: t("tour.e5.x") },
