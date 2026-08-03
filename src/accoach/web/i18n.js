@@ -339,6 +339,9 @@
     "err.progress":    { en: `Couldn't load progress — is the analysis backend running?`,
                          it: `Impossibile caricare l'andamento — il backend di analisi è in esecuzione?` },
     "err.lap":         { en: `Couldn't load this lap.`, it: `Impossibile caricare questo giro.` },
+    "load.training":   { en: `Building your programme…`, it: `Costruzione del programma…` },
+    "err.training":    { en: `Couldn't load the programme — is the analysis backend running?`,
+                         it: `Impossibile caricare il programma — il backend di analisi è in esecuzione?` },
 
     "prog.validLaps":  { en: `Valid laps`, it: `Giri validi` },
     "prog.best":       { en: `Best`, it: `Migliore` },
@@ -352,9 +355,13 @@
                          it: `Nessun errore ricorrente — bella costanza!` },
     "recur.corners":   { en: `Corners: `, it: `Curve: ` },
 
-    // The training plan (Trends). Deliberately spare: the goal, the number that
-    // ends it, and how many laps you're into it.
+    // The training plan. It lives on the Training tab now — the strip that says
+    // since when and the one button; the goals themselves are the steps, each
+    // with the drill that closes it.
     "plan.title":      { en: `Your plan`, it: `Il tuo piano` },
+    "plan.elsewhere":  { en: `Working on a plan? It lives under Training, next to the drills that close it.`,
+                         it: `Stai seguendo un piano? Sta nella scheda Allenamento, insieme agli esercizi che lo chiudono.` },
+    "plan.goto":       { en: `Open Training`, it: `Apri Allenamento` },
     "plan.none":       { en: `No systematic weakness to train — nothing worth putting in a plan yet.`,
                          it: `Nessun punto debole sistematico da allenare: per ora non c'è niente da mettere in un piano.` },
     "plan.proposed":   { en: `proposed from your recent laps — not started yet`,
@@ -362,18 +369,48 @@
     "plan.since":      { en: `since {when}`, it: `dal {when}` },
     "plan.laps_since": { en: `{n} laps since`, it: `{n} giri da allora` },
     "plan.start":      { en: `Start this plan`, it: `Inizia questo piano` },
-    "plan.change":     { en: `Change goal`, it: `Cambia obiettivo` },
-    "plan.target":     { en: `you lose {from}s here · get it under {to}s`,
-                         it: `qui perdi {from}s · portalo sotto {to}s` },
+    "plan.change":     { en: `Change target`, it: `Cambia obiettivo` },
     "plan.hits":       { en: `{hits} of the {needed} laps it takes`,
                          it: `{hits} dei {needed} giri che servono` },
-    "plan.now":        { en: `now ~{s}s`, it: `ora ~{s}s` },
-    "plan.best":       { en: `best {s}s`, it: `migliore {s}s` },
+    // Both used to render as bare numbers next to each other — "now ~0.31s ·
+    // best 0.18s" — with nothing saying 0.31s *of what*.
+    "plan.now":        { en: `you lose ~{s}s now`, it: `ora perdi ~{s}s` },
+    "plan.best":       { en: `your best {s}s`, it: `il tuo meglio {s}s` },
     "plan.nolaps":     { en: `no laps since you started it — go and drive`,
                          it: `nessun giro da quando l'hai avviato — vai a guidare` },
-    "plan.willmeasure":{ en: `start it and every lap from then on is measured against this`,
-                         it: `avvialo e da lì in poi ogni giro viene misurato su questo` },
-    "plan.done":       { en: `✓ done`, it: `✓ fatto` },
+    "plan.willmeasure":{ en: `start the plan and from then on every lap is measured against this target`,
+                         it: `avvia il piano e da lì in poi ogni giro viene misurato su questo obiettivo` },
+
+    // ---- the Training tab ----
+    // Only the chrome is declared here. Every sentence with a number in it is
+    // written server-side (coaching/training.py), in the language asked for,
+    // because the wording and the rule that decides it belong together.
+    "tab.training":    { en: `Training`, it: `Allenamento` },
+    "train.locked":    { en: `Not enough laps yet`, it: `Non ci sono ancora abbastanza giri` },
+    "train.countdown": { en: `{n} more valid laps and this opens.`,
+                         it: `Ancora {n} giri validi e questa scheda si apre.` },
+    // The last lap before it opens is the one the driver is most likely to be
+    // looking at, and it is exactly the one the plural got wrong.
+    "train.countdown1": { en: `One more valid lap and this opens.`,
+                          it: `Ancora un giro valido e questa scheda si apre.` },
+    "train.intro":     { en: `Here there is no more analysis: there is what to do on track, one exercise at a time, built from your own laps.`,
+                         it: `Qui non c'è altra analisi: c'è cosa fare in pista, un esercizio alla volta, costruito sui tuoi giri.` },
+    "train.gap.title": { en: `Where your time is going`, it: `Dove se ne va il tuo tempo` },
+    "train.sector":    { en: `Sector {n}`, it: `Settore {n}` },
+    "train.drill":     { en: `Exercise · {n} laps`, it: `Esercizio · {n} giri` },
+    "train.watch":     { en: `Watch:`, it: `Guarda:` },
+    "train.ignore":    { en: `Ignore:`, it: `Ignora:` },
+    "train.wholelap":  { en: `The whole lap`, it: `Il giro intero` },
+    "train.status.now":   { en: `now`, it: `adesso` },
+    "train.status.later": { en: `later`, it: `dopo` },
+    "train.status.done":  { en: `✓ done`, it: `✓ fatto` },
+    "train.session":   { en: `Your next session`, it: `La tua prossima sessione` },
+    "train.session.laps": { en: `({n} laps)`, it: `({n} giri)` },
+    // Not "Glossary": that label tells the reader they don't know things, and
+    // gets skipped by the people it exists for. The words themselves are the
+    // invitation.
+    "train.words":     { en: `The words you'll hear other people use:`,
+                         it: `Le parole che sentirai dire dagli altri:` },
 
     "lvl.header":      { en: `Levels <small>(best → ideal → PRO · gap = time available)</small>`,
                          it: `Livelli <small>(migliore → ideale → PRO · gap = tempo disponibile)</small>` },
@@ -519,6 +556,9 @@
     "tour.a10.t": { en: `Your line, corner by corner`, it: `La tua traiettoria, curva per curva` },
     "tour.a10.x": { en: `One corner at a time, zoomed in: the shaded band is how far your line was from the reference's, in metres. Underneath, the same corner as numbers — where your slowest point sits, how tight an arc you drove, how much extra road you covered.`,
                     it: `Una curva alla volta, ingrandita: la fascia colorata è quanto la tua traiettoria si è scostata da quella di riferimento, in metri. Sotto, la stessa curva in numeri — dov'è il tuo punto più lento, quanto stretto è l'arco che hai fatto, quanta strada in più hai percorso.` },
+    "tour.a11.t": { en: `And what do I do about it?`, it: `E adesso come mi alleno?` },
+    "tour.a11.x": { en: `The rest of the app tells you what you lose and why. This tab turns it into a drill: one thing at a time, how many laps to run it for, what to watch and what to deliberately ignore — plus the number that says when you're done. It opens once you have enough laps on this car and track for it to mean something.`,
+                    it: `Il resto dell'app ti dice cosa perdi e perché. Questa scheda lo trasforma in un esercizio: una cosa alla volta, per quanti giri farla, cosa guardare e cosa ignorare di proposito — più il numero che dice quando è fatta. Si apre quando hai abbastanza giri su questa auto e questa pista perché significhi qualcosa.` },
     "tour.a6.t": { en: `Take it with you`, it: `Portalo con te` },
     "tour.a6.x": { en: `Export the lap as CSV or JSON for deeper analysis.`,
                    it: `Esporta il giro in CSV o JSON per un'analisi più approfondita.` },

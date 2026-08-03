@@ -176,7 +176,9 @@ def _seed(tmp_path, laps=5, amt=26, first_day=21):
 
 
 def _plan(c, lang="en"):
-    r = c.get("/api/progress", params={"car": CAR, "track": TRACK, "lang": lang})
+    # The plan is served by the Training tab, not Trends: it is the same plan,
+    # but it has one home (see coaching/training.py).
+    r = c.get("/api/training", params={"car": CAR, "track": TRACK, "lang": lang})
     assert r.status_code == 200, r.text
     return r.json()["plan"]
 
@@ -271,9 +273,12 @@ def test_the_goal_carries_the_curated_corner_name(tmp_path):
 
 def test_no_valid_laps_is_an_empty_plan_not_a_crash(tmp_path):
     c = TestClient(create_api(tmp_path))
-    r = c.get("/api/progress", params={"car": CAR, "track": "spa"})
+    r = c.get("/api/training", params={"car": CAR, "track": "spa"})
     assert r.status_code == 200
-    assert r.json()["plan"]["goals"] == []
+    body = r.json()
+    assert body["plan"] is None and body["ready"] is False
+    # And it says why, rather than handing back an empty box.
+    assert body["readiness"]["reason"]
 
 
 def test_classify_and_propose_agree_on_what_systematic_means():

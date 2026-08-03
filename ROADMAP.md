@@ -194,6 +194,14 @@ non descrive il prodotto.
   torna alle percentuali invece di mostrare una scala sbagliata.
 - **Consumo lungo il giro** (schema v11, 31/07) e **benzina per giro** in
   Sessione.
+- **Scheda «Allenamento»** (31/07) — segnalazione utente: *insight e consigli
+  dappertutto, ma se non mastichi telemetria non capisci come migliorare*. È il
+  passo che mancava dopo la voce 14: il piano diceva **quale** curva e **quale**
+  bersaglio, mai **come allenarsi** per centrarlo. Ora ogni obiettivo porta un
+  esercizio scelto dalla **fase dominante** della perdita (`coaching/training.py`
+  + `/api/training`), con i tuoi numeri dentro e la prossima sessione contata in
+  giri. Il piano trasloca qui da Andamento: un obiettivo **è** un passo. Si apre
+  a **6 giri validi**; sotto soglia dice quanti ne mancano.
 - **Guida e FAQ allineate alle schede** (30-31/07) — chiude metà della voce 12.
 
 ## Posizionamento

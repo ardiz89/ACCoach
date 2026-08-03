@@ -180,6 +180,77 @@ def test_the_corner_is_turned_by_its_real_shape_not_by_the_stretched_one():
     assert "for (const p of draw)" in body
 
 
+def test_printing_hides_every_view_without_naming_them():
+    """The print sheet is the braking cheat sheet and nothing else.
+
+    The rule used to list the eight panels it wanted gone, by id. A ninth tab
+    then printed itself underneath the sheet, and the only way to notice is to
+    print. Derived from the id prefix, a new view is hidden the day it is added.
+    """
+    block = _CSS[_CSS.index("@media print"):]
+    block = block[:block.index("\n}")]
+    assert '[id^="view-"]' in block
+    assert "#view-map { display: block !important; }" in block
+
+
+def test_no_two_functions_in_app_js_share_a_name():
+    """The last declaration wins, in silence.
+
+    Found the day the Training tab grew a `renderSession` and the Session tab
+    already had one: the run plan simply never appeared on the page, nothing was
+    logged, and every test still passed. One flat 3000-line script has no module
+    scope to catch this, so it is caught here.
+    """
+    names = re.findall(r"^function (\w+)", _APPJS, re.M)
+    dupes = sorted({n for n in names if names.count(n) > 1})
+    assert not dupes, f"declared twice in app.js: {dupes}"
+
+
+# --- the training tab is wired --------------------------------------------
+
+def test_the_glossary_shows_its_words_when_closed():
+    """A box labelled "Glossary" tells the reader they don't know things, and
+    gets skipped by exactly the people it exists for. The row of terms is the
+    invitation: you scan it and open it for the one word you don't have."""
+    block = _APPJS.split("function renderWords(")[1].split("\n}")[0]
+    assert "words-list" in block and "e.term" in block
+    assert "<details" in block, "it has to start closed"
+    assert 'id="train-words"' in _HTML
+    assert _view_of_ids()["train-words"] == "training"
+
+
+@pytest.mark.parametrize("el", ("train-gate", "train-gap", "train-steps",
+                                "train-session", "train-words", "plan"))
+def test_the_training_view_has_the_elements_its_code_reaches_for(el):
+    assert f'id="{el}"' in _HTML
+    assert f'"{el}"' in _APPJS
+
+
+def test_the_plan_lives_on_exactly_one_tab():
+    """It used to sit under Trends. Two panels drawing the same plan is two
+    places for it to disagree about what you're working on — and the goals are
+    now the steps, each with the drill that closes it."""
+    assert _view_of_ids()["plan"] == "training"
+    assert "renderPlan(" not in _APPJS, "the old Trends renderer is still there"
+    block = _APPJS.split("async function loadProgress(")[1].split("\n}")[0]
+    assert "plan" not in block, "Trends is still drawing the plan"
+
+
+def test_trends_says_where_the_plan_went():
+    """A panel that vanishes without a pointer reads as a feature that broke."""
+    assert 'id="go-training"' in _HTML
+    assert _view_of_ids()["go-training"] == "progress"
+    assert 'showView("training")' in _APPJS
+
+
+def test_the_training_tab_refetches_rather_than_repainting():
+    """Every sentence of a drill is written by the backend in the requested
+    language, so a cached payload would still be in the language you left."""
+    block = _APPJS.split("function redrawCurrentView()")[1].split("\n}")[0]
+    assert 'VIEW === "training"' in block
+    assert "loadTraining(CURRENT)" in block
+
+
 # --- the comparison lap is only forwarded when it was actually chosen ------
 
 def test_the_comparison_lap_is_only_forwarded_when_the_driver_picked_it():
@@ -217,6 +288,28 @@ def test_a_language_switch_refetches_rather_than_repainting():
     assert "drawDebrief(DATA)" not in block
 
 
+def test_dates_follow_the_page_language_not_the_browser_s():
+    """`toLocaleDateString(undefined, …)` asks Chrome, not the page: an English
+    page on an Italian machine read "since 31 lug · 13:58"."""
+    block = _APPJS[_APPJS.index("function fmtWhen("):]
+    block = block[:block.index("\n}")]
+    assert "toLocaleDateString(LANG()" in block
+    assert "undefined" not in block
+
+
+def test_a_language_switch_also_reaches_the_per_combo_views():
+    """`reloadSelection` refetches the *lap*. Trends, Session and Training are
+    per car+track and it never touched them, so the page came back with its
+    chrome in one language and its content in the other — caught on Training,
+    but it was never only there. Their cached payloads have to go too."""
+    block = _APPJS.split("window.HoneI18nRerender")[1]
+    for call in ("loadProgress(CURRENT)", "loadSession(CURRENT",
+                 "loadTraining(CURRENT)"):
+        assert call in block, call
+    for cache in ("SHEET = null", "TRAINING = null"):
+        assert cache in block, cache
+
+
 # --- the page must not scroll sideways on a phone --------------------------
 # Measured in a 390px-wide frame against the real page, per view. Both rules
 # below fixed a page that scrolled horizontally; a static check can only pin
@@ -249,12 +342,12 @@ def test_the_consistency_rows_stack_on_a_narrow_screen():
     assert "white-space: normal" in block
 
 
-@pytest.mark.parametrize("view", ("flow", "session", "line"))
+@pytest.mark.parametrize("view", ("flow", "session", "line", "training"))
 def test_the_new_views_declare_a_narrow_layout(view):
     """All were built two-column-ish; none was checked on a phone until the
     page was measured in a 390px frame."""
     marker = {"flow": ".flow-btn.ghost", "session": ".ses-lap",
-              "line": ".line-grid"}[view]
+              "line": ".line-grid", "training": ".step-head"}[view]
     tail = _CSS[_CSS.index("@media (max-width: 700px)"):]
     assert marker in tail, f"no narrow-screen rule for the {view} view"
 

@@ -11,6 +11,7 @@ from .debrief import (
     CornerLoss,
     LapDebrief,
     build_lap_debrief,
+    category_words,
     format_debrief,
     lap_time_consistency,
 )
@@ -29,6 +30,16 @@ from .trends import (
     benchmark_levels,
     classify_losses,
 )
+from .training import (
+    CornerFacts,
+    GlossaryEntry,
+    Programme,
+    build_gap,
+    build_programme,
+    dominant_phase,
+    glossary_for,
+    trail_brake_for,
+)
 from .tyretemp import TyreTempAdvisor
 from .voice import Voice
 
@@ -39,6 +50,7 @@ __all__ = [
     "CornerLoss",
     "LapDebrief",
     "build_lap_debrief",
+    "category_words",
     "format_debrief",
     "lap_time_consistency",
     "FlowStep",
@@ -67,5 +79,13 @@ __all__ = [
     "LossTrend",
     "benchmark_levels",
     "classify_losses",
+    "CornerFacts",
+    "GlossaryEntry",
+    "Programme",
+    "build_gap",
+    "build_programme",
+    "dominant_phase",
+    "glossary_for",
+    "trail_brake_for",
     "Voice",
 ]

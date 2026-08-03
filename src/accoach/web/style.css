@@ -876,9 +876,11 @@ body.no-data .empty { display: block; }
    produce that, not a screenshot of a dark web app. */
 @media print {
   body { background: #fff; color: #000; }
+  /* Every view panel, derived rather than listed. It used to be eight ids
+     written out by hand, so a new tab printed itself under the sheet until
+     someone noticed — the same failure `showView` was already fixed for. */
   header, .tabs, .readout, .demo-banner, .summary, .map-legend,
-  #charts, #view-flow, #view-session, #view-compare, #view-line,
-  #view-sectors, #view-dynamics, #view-progress, #view-map main,
+  #charts, [id^="view-"], #view-map main,
   #map-missing, .tour-help, .cb-toggle, .mini-btn { display: none !important; }
   #view-map { display: block !important; }
   #brakesheet { padding: 0; }
@@ -901,48 +903,165 @@ body.no-data .empty { display: block; }
   font-family: var(--font-mono);
 }
 
-/* --- The training plan (Trends) -------------------------------------------
-   Sits above the weak points it was built from: it is the answer, they are the
-   working. One card per goal, and the bar fills with laps that met the target
-   rather than with a percentage of anything. */
+/* --- The Training tab -----------------------------------------------------
+   The one page that answers "so what do I do?". Laid out as one column with a
+   hard reading width: it is prose with numbers in it, and prose set across a
+   1600px window is prose nobody finishes.
+
+   The plan's strip sits between the gap and the steps — it is the thing that
+   turns the steps from a suggestion into something with a date on it. */
+.train-shell { max-width: 820px; margin: 0 auto; padding: 8px 0 40px; }
 .plan { padding: 12px var(--gut) 0; }
 .plan h3 { font-size: 13px; margin: 0 0 10px; display: flex; align-items: center; gap: 10px; }
 .plan-since { color: var(--muted); font-size: 12px; font-weight: 400; font-family: var(--font-ui); }
 .mini-btn.primary { border-color: var(--cyan); color: var(--cyan); }
-.goal {
-  display: flex; flex-direction: column; gap: 5px;
-  padding: 12px 14px; margin: 8px 0;
-  background: var(--panel); border: 1px solid var(--line);
-  border-left: 4px solid var(--cyan); border-radius: 12px;
+/* The pointer left behind on Trends, where the plan used to live. */
+.plan-elsewhere {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 0 var(--gut); margin: 4px 0 12px;
+  color: var(--muted); font-size: 13px;
 }
-.goal.done { border-left-color: var(--green); }
-.goal-head { display: flex; align-items: baseline; gap: 10px; }
-.goal-head .n {
+
+.train-intro {
+  padding: 14px var(--gut) 0; margin: 0;
+  color: var(--muted); font-size: 13px; line-height: 1.6;
+}
+
+/* How far it is, and where it sits. The sector row is the only place on this
+   tab with a table in it, and it stays a three-column grid rather than a table
+   so it can collapse on a phone. */
+.train-gap { padding: 12px var(--gut) 0; }
+.train-gap h3 { font-size: 13px; margin: 0 0 8px; }
+.gap-head { margin: 0; font-size: 15px; line-height: 1.6; }
+.gap-note {
+  margin: 10px 0 0; padding-left: 10px;
+  border-left: 2px solid var(--line);
+  color: var(--muted); font-size: 12px; line-height: 1.6;
+}
+.gap-secs { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.gap-sec {
+  display: grid; gap: 1px; padding: 8px 12px; min-width: 110px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+}
+.gap-sec.worst { border-color: var(--amber); }
+.gap-sec .k { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+.gap-sec .v { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 15px; }
+.gap-sec .d { font-family: var(--font-mono); font-size: 12px; color: var(--green); }
+.gap-sec.worst .d { color: var(--amber); }
+
+/* One card per step. Only the current one is unrolled — the others show their
+   heading and the reason they are not first, which is the whole argument for
+   doing them in that order. */
+.train-steps { padding: 4px var(--gut) 0; }
+.train-step {
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 14px 16px; margin: 10px 0;
+  background: var(--panel); border: 1px solid var(--line);
+  border-left: 4px solid var(--line); border-radius: 12px;
+}
+.train-step.now { border-left-color: var(--cyan); }
+.train-step.done { border-left-color: var(--green); }
+.train-step.later { opacity: .72; }
+.step-head { display: flex; align-items: baseline; gap: 10px; }
+.step-head .n {
   font-family: var(--font-mono); font-size: 11px; color: var(--muted);
   border: 1px solid var(--line); border-radius: 50%; width: 20px; height: 20px;
   display: inline-flex; align-items: center; justify-content: center; flex: none;
 }
-.goal .corner { font-weight: 700; font-size: 15px; }
-.goal-done { margin-left: auto; color: var(--green); font-size: 12px; font-weight: 600; }
-.goal .cause { color: var(--text); font-weight: 600; }
+.step-head .where { font-weight: 700; font-size: 16px; }
+.step-head .badge {
+  margin-left: auto; flex: none; font-size: 11px; color: var(--muted);
+  border: 1px solid var(--line); border-radius: 999px; padding: 1px 9px;
+}
+.train-step.now .badge { color: var(--cyan); border-color: var(--cyan); }
+.train-step.done .badge { color: var(--green); border-color: var(--green); }
+.train-step .cause { font-weight: 600; }
+.train-step .why { color: var(--muted); font-size: 13px; line-height: 1.6; }
 .goal-target {
   color: var(--muted); font-size: 12px;
   font-family: var(--font-mono); font-variant-numeric: tabular-nums;
 }
-.goal .fix { color: var(--cyan); font-size: 13px; }
+.drill-title {
+  display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+  margin-top: 6px; padding-top: 10px; border-top: 1px solid var(--line);
+  font-weight: 700; color: var(--cyan);
+}
+/* A pill, not a prefix: run together as text it read "Drill · 10 lapsFind the
+   minimum", which is two facts wearing one sentence. */
+.drill-badge {
+  flex: none; font-size: 11px; font-weight: 600; color: var(--muted);
+  font-family: var(--font-mono); letter-spacing: .02em;
+  border: 1px solid var(--line); border-radius: 999px; padding: 1px 9px;
+}
+/* Numbered because the order is the exercise: the measuring laps come before
+   the moving-the-point laps, and doing them the other way round measures
+   nothing. */
+.drill-steps { margin: 2px 0 0; padding-left: 22px; line-height: 1.7; }
+.drill-steps li { margin: 6px 0; }
+.drill-focus {
+  display: flex; gap: 14px; flex-wrap: wrap; margin-top: 8px;
+  font-size: 12px;
+}
+.drill-focus .watch { color: var(--green); }
+.drill-focus .ignore { color: var(--muted); }
+.drill-done {
+  margin-top: 8px; padding: 8px 10px;
+  background: var(--inset); border-radius: 8px;
+  font-size: 12px; line-height: 1.6;
+}
 .plan-bar {
   height: 8px; background: var(--inset); border-radius: 999px;
-  overflow: hidden; margin-top: 4px;
+  overflow: hidden; margin-top: 8px;
 }
 .plan-bar span { display: block; height: 100%; background: var(--cyan); border-radius: 999px; }
-.goal.done .plan-bar span { background: var(--green); }
+.train-step.done .plan-bar span { background: var(--green); }
 .plan-prog {
   font-size: 12px; color: var(--muted);
   font-family: var(--font-mono); font-variant-numeric: tabular-nums;
 }
+.plan-prog.muted { font-family: var(--font-ui); }
+
+/* The glossary. Closed, it is a row of words — that row is the whole design:
+   you scan it, and you open it only if one of them is a word you don't know. */
+.train-words { padding: 18px var(--gut) 0; }
+.train-words .words { border-top: 1px solid var(--line); padding-top: 12px; }
+.train-words summary {
+  cursor: pointer; list-style: none; font-size: 13px;
+  display: flex; gap: 8px; flex-wrap: wrap; align-items: baseline;
+}
+.train-words summary::-webkit-details-marker { display: none; }
+.train-words summary::before { content: "▸"; color: var(--muted); }
+.train-words .words[open] summary::before { content: "▾"; }
+.words-lead { color: var(--muted); }
+.words-list { color: var(--cyan); }
+.train-words dl { margin: 12px 0 0; display: grid; gap: 8px; }
+.train-words dt { font-weight: 700; font-size: 13px; }
+.train-words dd { margin: 0 0 4px; color: var(--muted); font-size: 13px; line-height: 1.6; }
+
+/* The run plan. Deliberately the plainest thing on the page: it is what you
+   read last, standing up. */
+.train-session { padding: 14px var(--gut) 0; }
+.train-session h3 { font-size: 13px; margin: 0 0 8px; }
+.train-session h3 small { color: var(--muted); font-weight: 400; }
+.ses-plan { margin: 0; padding-left: 22px; line-height: 1.9; }
+/* The locked state. It borrows the empty page's typography but not its
+   `display: none` — reusing the `.empty` class here left the whole tab blank,
+   which is precisely the failure this panel exists to prevent. */
+.train-gate { padding: 56px 24px; text-align: center; color: var(--muted); }
+.train-gate .empty-title { font-size: 20px; }
+.train-gate .empty-hint { max-width: 620px; margin: 0 auto; line-height: 1.7; }
+.train-countdown { color: var(--cyan); font-size: 13px; margin-top: 12px; }
+
 @media (max-width: 700px) {
-  .plan { padding-left: 16px; padding-right: 16px; }
+  .plan, .train-gap, .train-steps, .train-session, .plan-elsewhere,
+  .train-intro, .train-words {
+    padding-left: 16px; padding-right: 16px;
+  }
   .plan h3 { flex-wrap: wrap; }
+  /* The badge is `margin-left: auto` on a baseline row: with a long corner name
+     it stops fitting and pushes the row wider than the phone. */
+  .step-head { flex-wrap: wrap; }
+  .gap-sec { flex: 1 1 100%; }
 }
 
 /* Where inside a corner the time went: one loss cut into its parts, so one hue

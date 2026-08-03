@@ -133,6 +133,50 @@ of showing you a wrong scale.
   track map beside it showing where that is. Three steps at most. If you are a
   long way off the pace it opens with the general theme and stops there, because
   corner-by-corner is the wrong lens at that distance.
+- **Training** — the tab that answers the question the others leave open: *so
+  what do I actually do about it?* It starts from your best lap against your
+  **theoretical ideal** — your best sectors stitched together, which is not an
+  invented time: you have driven all of it, just never on the same lap — and
+  says which sector holds most of that gap. Then the programme: three steps at
+  most, **one at a time**, and only the first one is open. Each step carries a
+  real **drill** — how many laps to run it for, what to do lap by lap, what to
+  watch and what to deliberately ignore, and the number that says when it's
+  done. The drill isn't generic: it is chosen from where *inside the corner* the
+  time goes — braking zone, apex, or exit — and it is filled with **your** own
+  numbers: the speed you brake at there, how much your braking point moves from
+  lap to lap, the minimum speed you carry against the reference's. At the bottom
+  is **your next session**, counted in laps: warm-up, the drill laps, and a few
+  free laps to see whether it stuck once you stop thinking about it.
+
+  **Your plan** lives here too (it used to sit under Trends): one or two goals
+  taken from your *systematic* weak points, with a target in seconds, measured
+  only on the laps you drive after you accept it. Corners the live coach has
+  already cleared never enter it — there is one memory of "you've got this
+  corner", not two.
+
+  The tab **only opens once it has something to say**: **6 valid laps** on that
+  car and track, and at least one weakness that repeats. Below that you get how
+  many laps are missing, not an empty page. Six laps leave five to compare
+  against your best one, and a weakness has to come back on three of those five
+  to be called one; below that, what looks like a weakness is just what two laps
+  did, and a programme built on it would change every time you drive.
+
+  One thing worth reading twice: the two time figures on that tab **do not add
+  up together**. The gap to your theoretical ideal and what you bleed on an
+  average lap in the corners are the same road measured two ways, and summing
+  them would count the same time twice.
+
+  At the bottom sits **«The words you'll hear other people use»** — a short
+  glossary, closed, showing the terms in a row: you scan it and open it for the
+  one word you don't have. It is never the only place a word is explained (the
+  exercise above still glosses its own), and it only carries the terms of the
+  exercise you have open.
+
+  The exercises are **not the same for every car** where the difference matters:
+  on a low-downforce road car HONE won't have you practise trail braking, because
+  on those cars slowing in a straight line and then turning is the correct
+  technique — the same decision, on the same data, that makes the live coach stay
+  silent about it there. You get **«Brake in a straight line, then turn»** instead.
 - **Session** — one outing: the laps in the order you drove them (including the
   ones that don't count — you still drove them), your best, consistency, track
   temperature, **fuel per lap** (measured from the tank, on laps recorded from
@@ -165,9 +209,9 @@ of showing you a wrong scale.
 - **Dynamics** — what the car was doing: G with the friction circle, slip per
   axle, rotation vs steering, revs and shifts, tyre temperatures and pressures
   along the lap, and the handling ribbon (blue understeer, red oversteer).
-- **Trends** — lap times over time, consistency, recurring mistakes, and **your
-  plan**: one or two goals taken from your *systematic* weak points, with a
-  target in seconds, measured only on the laps you drive after you accept it.
+- **Trends** — lap times over time, consistency, your weak points corner by
+  corner (systematic or one-off) and recurring mistakes. It is the working; the
+  plan that comes out of it lives under **Training**.
 
 Keyboard: **1-9** switch tabs, **[** and **]** step through laps.
 
