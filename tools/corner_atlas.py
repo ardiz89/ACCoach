@@ -321,6 +321,50 @@ def fit(csv_name: str, wanted: list[tuple[str, str]], flip: bool) -> None:
               f"# {direction}, r={radius:.0f} m, {pos * total:.0f} m{flag}")
 
 
+def rotation(csv_name: str) -> float:
+    """Net turning of one lap, in degrees: **positive anticlockwise**.
+
+    Read in the trace's own frame, which is eastings and northings — a plan view
+    of the real world — so this is the direction the circuit really runs. The
+    mirror the rest of this file applies is between that frame and the *sim's*
+    left-handed coordinates, and does not belong here. (Applying it anyway was
+    the first thing tried, and it turned every circuit the wrong way round.)
+    """
+    xs, zs = centreline(TRACKS / csv_name)
+    n = len(xs)
+    total = 0.0
+    for i in range(n):
+        a, b, c = (i - 1) % n, i, (i + 1) % n
+        v1 = (xs[b] - xs[a], zs[b] - zs[a])
+        v2 = (xs[c] - xs[b], zs[c] - zs[b])
+        total += math.atan2(v1[0] * v2[1] - v1[1] * v2[0],
+                            v1[0] * v2[0] + v1[1] * v2[1])
+    return math.degrees(total)
+
+
+def sanity() -> None:
+    """The cheapest check that the traces and the mirror are both right.
+
+    Which way a circuit runs is a fact anybody can look up, and it is decided by
+    a number this tool computes from the raw trace without knowing the circuit's
+    name. Every one of the twenty-six agrees: Austin, Interlagos, Bathurst, Yas
+    Marina, Indianapolis's road course and the Norisring come out anticlockwise
+    and the rest clockwise, which is how they run.
+
+    Suzuka is the one that makes the check worth keeping. It is a **figure of
+    eight** — the only one here — so its lap crosses itself and its net turning
+    cancels to zero instead of coming out at ±360. Nothing in this file knows
+    that; it falls out of the geometry.
+    """
+    for name in sorted(p.name for p in TRACKS.glob("*.csv")):
+        deg = rotation(name)
+        if abs(deg) < 90.0:
+            way = "figure of eight (net turning cancels)"
+        else:
+            way = "clockwise" if deg < 0 else "anticlockwise"
+        print(f"   {Path(name).stem:16s} {deg:+7.1f} deg   {way}")
+
+
 def count(csv_name: str, flip: bool) -> None:
     """How many corners this trace has, as the "what counts as a corner"
     threshold is relaxed. A plateau that sits on a circuit's published turn
@@ -346,6 +390,9 @@ def main() -> None:
         raise SystemExit(__doc__)
     if args[0] == "--check":
         check()
+        return
+    if args[0] == "--sanity":
+        sanity()
         return
     if args[0] == "--count":
         flip = _handedness()

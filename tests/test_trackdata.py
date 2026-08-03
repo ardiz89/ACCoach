@@ -399,3 +399,33 @@ def test_the_nurburgring_is_reachable_from_assetto_corsa_s_spelling():
     """Kunos ships it as ``ks-nurburgring``; ACC calls it ``nurburgring``."""
     assert name_corners("ks-nurburgring",
                         [_corner(0, 0.079)], "en") == ["Corner 1"]
+
+
+# --- the geometry the tables are read off (2026-08-03) ---------------------
+
+def test_every_bundled_circuit_turns_the_way_it_really_turns():
+    """The cheapest check that the traces and the mirror applied to them are
+    both right — and it is decided by a number computed from the raw trace,
+    which knows nothing about the circuit's name.
+
+    Suzuka is why it is worth keeping: it is a **figure of eight**, the only one
+    in the set, so its lap crosses itself and its net turning cancels to zero
+    instead of reaching ±360. Nothing in the code knows that; it falls out.
+    """
+    from pathlib import Path
+    import sys
+    root = Path(__file__).resolve().parent.parent
+    sys.path.insert(0, str(root / "tools"))
+    from corner_atlas import rotation, TRACKS
+
+    anticlockwise = {"Austin", "SaoPaulo", "MountPanorama", "YasMarina", "IMS",
+                     "MoscowRaceway", "Norisring"}
+    for csv in sorted(TRACKS.glob("*.csv")):
+        deg = rotation(csv.name)
+        if csv.stem == "Suzuka":
+            assert abs(deg) < 90.0, "Suzuka's lap crosses itself"
+            continue
+        assert abs(abs(deg) - 360.0) < 1.0, f"{csv.stem} is not a closed lap"
+        way = "anticlockwise" if deg > 0 else "clockwise"
+        want = "anticlockwise" if csv.stem in anticlockwise else "clockwise"
+        assert way == want, f"{csv.stem} reads {way}, it runs {want}"
