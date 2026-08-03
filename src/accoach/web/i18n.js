@@ -560,8 +560,13 @@
     "eng.onfly":       { en: `On the fly:`, it: `Al volo:` },
     "eng.engPrefix":   { en: `Engineer `, it: `Ingegnere ` },
 
-    "eng.hint":        { en: `The diagnosis comes from the coach in real time (start <b>Coach Live</b> or the <b>backend</b>). The changes on the right apply to the setup file: they must be <b>loaded in the pits</b>, they don't change the car while you drive.`,
-                         it: `La diagnosi arriva dal coach in tempo reale (avvia <b>Coach Live</b> o il <b>backend</b>). Le modifiche a destra agiscono sul file di setup: vanno <b>caricate ai box</b>, non cambiano l'auto mentre guidi.` },
+    // Diceva «avvia Coach Live **o** il backend». Falso: `live` è un processo
+    // unico senza WebSocket, quindi non alimenta questa pagina — e chi lo aveva
+    // acceso restava su «in attesa di telemetria» per sempre mentre il coach gli
+    // parlava nelle cuffie. I due non possono nemmeno convivere: registrano
+    // entrambi, e insieme salverebbero ogni giro due volte.
+    "eng.hint":        { en: `This page is fed by the <b>live backend</b> — hub → <b>Devices</b> → 📡 Live backend. Coach Live does not feed it, and the two can't run together (they'd both record). The changes on the right apply to the setup file: they must be <b>loaded in the pits</b>, they don't change the car while you drive.`,
+                         it: `Questa pagina la alimenta il <b>backend live</b> — hub → <b>Dispositivi</b> → 📡 Backend live. Coach Live non la alimenta, e i due non possono stare accesi insieme (registrano entrambi). Le modifiche a destra agiscono sul file di setup: vanno <b>caricate ai box</b>, non cambiano l'auto mentre guidi.` },
 
     "setup.title":     { en: `Setup`, it: `Setup` },
     "legend2.click":   { en: `<b>click</b> = game step`, it: `<b>click</b> = scatto di gioco` },

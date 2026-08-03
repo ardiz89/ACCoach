@@ -315,6 +315,15 @@ _UI: dict[str, dict[str, str]] = {
               "frenata smette di comparire lì — come togli la traiettoria e i "
               "cartelli di frenata uno alla volta quando impari un tracciato. "
               "Spento li tiene a ogni curva per sempre."},
+    # Un pulsante spento senza motivo si legge come un guasto. Questo compare
+    # come suggerimento su tutto ciò che registra, quando qualcos'altro già lo fa.
+    "btn.busy_recording": {
+        "en": "Something is already recording this session. Two recorders save "
+              "every lap twice, and the copy looks exactly like a real extra lap "
+              "— stop the one that's running first.",
+        "it": "Qualcosa sta già registrando questa sessione. Due registratori "
+              "salvano ogni giro due volte, e la copia è identica a un giro vero "
+              "in più — ferma prima quello acceso."},
     "set.pedals": {"en": "Show the pedal trace", "it": "Mostra la traccia dei pedali"},
     "set.pedals.help": {
         "en": "A strip under the overlay with your throttle (green) and brake "

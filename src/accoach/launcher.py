@@ -69,8 +69,14 @@ _VOICE_CMDS = {"live", "coach"}
 # While Coach Live is running these action keys stay clickable; all other action
 # buttons are disabled so you can't stack a second coach/telemetry reader on top
 # of it. (The sidebar itself always stays navigable.)
+# NOTA: `("server",)` NON è qui, e non deve tornarci. Il backend live istanzia un
+# `CoachEngine` suo (server.py:97) che registra i giri come chiunque altro, quindi
+# acceso insieme a Coach Live **salva ogni giro due volte** — e la copia è
+# indistinguibile da un giro vero in più. È lo stesso incidente del 22/07 («il mio
+# fix del traguardo contava ogni giro due volte») da un'altra porta, reso più
+# probabile dal fatto che la pagina Ingegnere chiede proprio quel bottone.
 _LIVE_SAFE_KEYS = {_STOP_LIVE, _GUIDE, _WIZARD, _IMPORT_PRO,
-                   ("web",), ("web", "--engineer"), ("server",)}
+                   ("web",), ("web", "--engineer")}
 
 
 # --- first-run "getting started" wizard ------------------------------------
@@ -765,6 +771,12 @@ class MainWindow(QWidget):
         self._children.append((proc, args))
         self._refresh_buttons()
 
+    # Tutto ciò che apre un `CoachEngine` o un `LapRecorder` finisce qui. `server`
+    # ci è arrivato tardi: il suo motore (server.py:97) registra come gli altri,
+    # ma non essendo elencato il watcher poteva accendergli accanto il registratore
+    # silenzioso, e il pulsante del backend restava premibile durante Coach Live.
+    _RECORDING_CMDS = ("recorder", "live", "coach", "compare", "server")
+
     def _is_recording(self) -> bool:
         """Is anything of ours already writing laps?
 
@@ -773,19 +785,32 @@ class MainWindow(QWidget):
         second lap.
         """
         self._prune()
-        return any(a and a[0] in ("recorder", "live", "coach", "compare")
-                   for _p, a in self._children)
+        return any(a and a[0] in self._RECORDING_CMDS for _p, a in self._children)
 
     def _watch_tick(self) -> None:
         self._watcher.tick()
         self._settings.show_watch_state(self._watcher.state)
 
     def _refresh_buttons(self) -> None:
-        """Disable every action but the live-safe ones while Coach Live runs."""
+        """Disable every action but the live-safe ones while Coach Live runs.
+
+        E, simmetricamente, qualunque cosa registri mentre qualcos'altro sta già
+        registrando. La regola guardava solo `live`, quindi bastava accendere
+        prima il backend per poterci mettere sopra Coach Live e salvare ogni giro
+        due volte. Un pulsante spento senza motivo però si legge come un guasto,
+        quindi il perché finisce nel suggerimento.
+        """
         self._prune()
         live = any(a and a[0] == "live" for _p, a in self._children)
+        busy = self._is_recording()
         for key, _label, btn in self._actions:
-            btn.setEnabled(not live or key in _LIVE_SAFE_KEYS)
+            records = isinstance(key, tuple) and key and key[0] in self._RECORDING_CMDS
+            if live:
+                ok = key in _LIVE_SAFE_KEYS
+            else:
+                ok = not (busy and records)
+            btn.setEnabled(ok)
+            btn.setToolTip("" if ok else t("btn.busy_recording"))
             # "Stop Coach Live" is meaningless before there's one to stop, and a
             # disabled Stop sitting next to Start reads as "something is already
             # running" — the opposite of the truth. Hide it instead: the panel
