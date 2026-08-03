@@ -38,6 +38,7 @@ from .coaching import (
 from .coaching.cue import CueCategory
 from .coaching.debrief import build_lap_debrief
 from .coaching.diagnosis import build_lap_stats
+from .coaching.atwheel import WheelWatch
 from .coaching.focus import FocusCoach, FocusReport
 from .coaching.pitcall import PitCall
 from .i18n import cue_text, current_language
@@ -194,6 +195,9 @@ class CoachEngine:
         self.pressure = PressureAdvisor()
         self.tyretemp = TyreTempAdvisor()
         self.pitcall = PitCall()
+        # Watches the dials so an "al volo" change can finish by being *done*
+        # rather than by being clicked on a web page (see coaching/atwheel.py).
+        self.wheelwatch = WheelWatch()
         self.scheduler = CueScheduler()
 
         self._comparator: LapComparator | None = None
@@ -228,6 +232,8 @@ class CoachEngine:
         # …and the proposal the driver has already written at the box, so the pit
         # calls go quiet for it (see _garage_change_pending).
         self._engineer_done_sig: tuple | None = None
+        # …and the "al volo" proposal the dial watch is currently armed on.
+        self._armed_sig: tuple | None = None
 
         # Focus/Lesson coach: the driver's twin of the engineer. Fed a per-lap
         # debrief (vs the reference), it picks one recurring weakness at a time and
@@ -314,6 +320,32 @@ class CoachEngine:
                                      self._focus.mastered, self._focus.parked)
         except Exception:
             pass   # persistence is a convenience; never let it break a lap
+
+    def _watch_at_wheel(self, snap: TelemetrySnapshot) -> None:
+        """Close the loop on an "al volo" proposal by watching the dial move.
+
+        Without this an ``AV`` change could never be marked applied: the only
+        caller of ``mark_applied`` was the setup-file writer, which exists only
+        for ``BOX`` changes. So the engineer re-proposed the same click every
+        lap and its phase never closed — two phases out of five on the GT3
+        profile. See coaching/atwheel.py for why the answer is the car and not
+        a button.
+        """
+        d = self._engineer_decision
+        sig = _decision_sig(d)
+        if (self._engineer is None or d is None or d.change is None
+                or d.change.tag != "AV" or sig == self._engineer_done_sig):
+            self.wheelwatch.disarm()
+            self._armed_sig = None
+            return
+        if sig != self._armed_sig:
+            self._armed_sig = sig
+            atom = d.change.changes[0] if d.change.changes else None
+            if atom is not None:
+                self.wheelwatch.arm(atom.param, atom.delta_clicks, snap)
+        if self.wheelwatch.update(snap):
+            self._engineer.mark_applied()
+            self._engineer_done_sig = sig
 
     def _garage_change_pending(self) -> bool:
         """Is there a setup change waiting that can only be made in the garage?
@@ -474,6 +506,12 @@ class CoachEngine:
             # without this the page can't tell "still to do" from "done, go load
             # it" — and both the pit calls and the on-screen reminder need to.
             "applied": _decision_sig(d) == self._engineer_done_sig,
+            # Is the engine watching the dial for this one? Answered here rather
+            # than worked out again in the browser, so there is one place that
+            # knows which parameters are readable on which game. False on an AV
+            # proposal means the page has to offer a "done" button, or the change
+            # can never be finished (AC reports every aid level as -1).
+            "watched": self.wheelwatch.armed,
             "confidence": d.confidence,
             # 1-based corner labels the proposal is anchored to ("Corners 7, 9").
             "corners": [i + 1 for i in corners],
@@ -556,6 +594,8 @@ class CoachEngine:
             self._engineer_decision = None
             self._engineer_spoken_sig = None
             self._engineer_done_sig = None
+            self._armed_sig = None
+            self.wheelwatch.disarm()
             # The pit calls: fresh latches, and this track's measured pit entry
             # (see coaching/pitcall.py — it's learned, so a track never visited
             # simply has no approach call until the first time you come in).
@@ -597,6 +637,8 @@ class CoachEngine:
                 continue                                            # not this session
             self._observe_lap(lap)
             self._rebuild_reference(lap.car_model, lap.track)        # chase the new best
+
+        self._watch_at_wheel(snap)
 
         delta = self._comparator.compare(snap) if self._comparator else None
         # On an abnormal lap (out of the pits, no comparison, or delta blown out)

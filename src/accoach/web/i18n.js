@@ -645,6 +645,9 @@
     "eng.pitTodo":     { en: `🅿️ You're in the box with a change waiting: click the proposal above, then <b>Prepare change</b> → <b>Write</b>, and load the setup from the garage before you go out.`,
                          it: `🅿️ Sei ai box e c'è una modifica in attesa: clicca la proposta qui sopra, poi <b>Prepara modifica</b> → <b>Scrivi</b>, e ricarica il setup dal garage prima di uscire.` },
     "eng.loadErr":     { en: `Setup loading error: `, it: `Errore caricamento setup: ` },
+    "eng.avDone":      { en: `Done — I've made it`, it: `Fatto — l'ho cambiato` },
+    "eng.avAuto":      { en: `HONE will see the dial move on its own.`,
+                         it: `HONE se ne accorge da solo quando giri la manopola.` },
 
     // engineer tour
     "tour.e1.t": { en: `Live diagnosis`, it: `Diagnosi live` },

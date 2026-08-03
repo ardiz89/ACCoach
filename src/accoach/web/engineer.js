@@ -624,6 +624,13 @@ function renderEngineer(st) {
   if (eng && eng.tag === "AV" && eng.change) {
     av.hidden = false;
     $("av-msg").textContent = eng.rationale || eng.message || "";
+    // The button is the fallback, not the route. Where the game publishes the
+    // dial (ACC) the engine sees it move and closes the loop by itself, and
+    // asking a driver to click something at 250 km/h would be the wrong answer.
+    // Where it doesn't (AC: every aid level reads -1) this is the only way an
+    // "al volo" change can ever be marked applied — without it the engineer
+    // re-proposes the same click every lap and the phase never closes.
+    $("av-done").hidden = !!eng.watched || !!eng.applied;
   } else {
     av.hidden = true;
   }
@@ -823,6 +830,16 @@ function connectWS() {
 
 $("combo").onchange = () => { state.autoSelected = true; onComboChange(); };
 $("setup").onchange = onSetupChange;
+// "I've turned the dial." Same endpoint the setup writer calls, because it is
+// the same event: the change the engineer proposed is now on the car, so the
+// re-test window can start. Best-effort like the other one — a backend that
+// isn't running just means the engineer keeps proposing.
+$("av-done").onclick = () => {
+  $("av-done").hidden = true;
+  fetch(`http://${location.hostname}:${WS_PORT}/engineer/applied`,
+        { method: "POST" }).catch(() => { /* backend off — keeps proposing */ });
+};
+
 $("btn-reset").onclick = () => { state.pending = {};
   renderSetup({ groups: groupsOf(state.params), params: state.params }); renderTray(); };
 $("btn-write").onclick = openWriteModal;

@@ -62,6 +62,12 @@
       <div class="av-now" id="av-now" hidden>
         <div class="es-label" data-i18n="eng.avNow">⚡ Right now, in the car</div>
         <div class="av-msg" id="av-msg"></div>
+        <!-- Only shown where the car doesn't publish the dial. On ACC the
+             engine sees the knob move and closes this itself (atwheel.py);
+             on AC the levels read -1, and without this button an "al volo"
+             change could never be finished at all. -->
+        <button class="ghost small av-done" id="av-done" hidden
+                data-i18n="eng.avDone">Done — I've made it</button>
       </div>
 
       <div class="engineer-says" id="engineer-says">
