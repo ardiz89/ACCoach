@@ -101,6 +101,21 @@ Le modifiche sono di due tipi, e si chiudono in modo diverso.
 - **Da box** — un file di setup da scrivere. Qui non basta dirti *cosa*
   cambiare, e infatti ti dice anche **quando rientrare**.
 
+### c-ter) Il registro: quante modifiche hanno funzionato davvero
+
+Nella pagina **Ingegnere**, sotto la proposta, c'è il **registro**: quante delle
+modifiche che ti ha proposto sono state **tenute** dopo la misura, e quante
+annullate. È l'unico numero di quella pagina che non è una nostra affermazione —
+è contato su prove che hai guidato tu, e può darci torto.
+
+Ci trovi anche **quali leve si guadagnano il posto**, se regge l'ordine «prima il
+rimedio più efficace», e gli **effetti collaterali** osservati (una modifica che
+sistemava il sottosterzo in ingresso e ne portava uno in uscita). Quelli non li
+prevediamo mai: si vedono e si scrivono.
+
+Finché le prove sono poche **non trovi nessuna percentuale**, solo i conteggi. Un
+tasso di riuscita su tre campioni è rumore travestito da percentuale.
+
 ### c-bis) Il rientro ai box
 
 Quando c'è una modifica che richiede il garage, senti tre cose:

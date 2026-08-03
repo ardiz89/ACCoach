@@ -6,6 +6,14 @@ const WS_PORT = 8777;            // the live backend; the page itself is on 8778
 const $ = (id) => document.getElementById(id);
 // i18n: translate a chrome string (defensive if i18n.js failed to load).
 const t = (k) => (window.HoneI18n ? window.HoneI18n.t(k) : k);
+// …e la stessa con i segnaposto riempiti. Gemella di quella in app.js: le due
+// pagine hanno script separati e ognuna si porta il proprio `t`, quindi anche
+// questa. Quattro righe duplicate costano meno di un modulo condiviso per due.
+const tf = (k, vals) => {
+  let s = t(k);
+  for (const n in vals) s = s.split("{" + n + "}").join(vals[n]);
+  return s;
+};
 const LANG = () => (window.HoneI18n ? window.HoneI18n.lang : "en");
 
 const state = {
@@ -91,6 +99,58 @@ async function onComboChange() {
     sel.appendChild(o);
   }
   await onSetupChange();
+  loadRecord();                 // best-effort: il registro non blocca la pagina
+}
+
+// ---- il registro: quante modifiche hanno davvero funzionato ---------------
+//
+// L'unico numero di questa pagina che non è una nostra affermazione: è contato
+// su prove che il pilota ha guidato, e può darci torto. Restava su disco, dietro
+// un endpoint che nessuno chiamava.
+
+// Sotto questa soglia si mostrano solo i conteggi. Un tasso di riuscita su tre
+// campioni è rumore travestito da percentuale — lo dice il modulo che lo calcola.
+const REC_MIN_TESTS = 8;
+
+async function loadRecord() {
+  const box = $("eng-record");
+  let r;
+  try {
+    r = await api(`/api/setup/record?car=${encodeURIComponent(state.car)}` +
+                  `&track=${encodeURIComponent(state.track)}`);
+  } catch (e) { box.hidden = true; return; }
+  box.hidden = false;
+  if (!r.tests) {
+    $("rec-head").textContent = "";
+    $("rec-note").textContent = t("rec.none");
+    $("rec-tables").innerHTML = "";
+    return;
+  }
+  let head = tf("rec.counts", { kept: r.kept, tests: r.tests });
+  if (r.tests >= REC_MIN_TESTS && r.hit_rate != null) {
+    head += tf("rec.rate", { rate: Math.round(r.hit_rate * 100) });
+  }
+  if (r.median_gain_ms != null) {
+    head += tf("rec.gain", { gain: (r.median_gain_ms / 1000).toFixed(3) });
+  }
+  $("rec-head").innerHTML = head;
+  $("rec-note").textContent = r.tests < REC_MIN_TESTS ? t("rec.thin") : "";
+
+  const rows = (title, entries) => {
+    if (!entries.length) return "";
+    const li = entries.map(([k, v]) =>
+      `<div class="rec-row"><span>${k}</span><span>${v}</span></div>`).join("");
+    return `<div class="rec-block"><div class="rec-sub">${title}</div>${li}</div>`;
+  };
+  const kept = (o) => Object.entries(o).map(
+    ([k, v]) => [k, tf("rec.kept_of", { kept: v.kept, tests: v.tests })]);
+  $("rec-tables").innerHTML =
+    rows(t("rec.byparam"), kept(r.by_param || {})) +
+    rows(t("rec.byrank"), Object.entries(r.by_rank || {}).map(
+      ([n, v]) => [tf("rec.rank", { n: Number(n) + 1 }),
+                   tf("rec.kept_of", { kept: v.kept, tests: v.tests })])) +
+    rows(t("rec.side"), (r.side_effects || []).map(
+      (s) => [`${s.param} → ${s.symptom}`, tf("rec.seen", { n: s.seen })]));
 }
 
 async function loadClass(car) {

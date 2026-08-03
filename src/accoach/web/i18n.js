@@ -650,6 +650,29 @@
     "eng.pitTodo":     { en: `🅿️ You're in the box with a change waiting: click the proposal above, then <b>Prepare change</b> → <b>Write</b>, and load the setup from the garage before you go out.`,
                          it: `🅿️ Sei ai box e c'è una modifica in attesa: clicca la proposta qui sopra, poi <b>Prepara modifica</b> → <b>Scrivi</b>, e ricarica il setup dal garage prima di uscire.` },
     "eng.loadErr":     { en: `Setup loading error: `, it: `Errore caricamento setup: ` },
+
+    // --- il registro dell'ingegnere -----------------------------------------
+    // Presentato a CONTEGGI, non a percentuali, finché le prove non sono
+    // abbastanza: un tasso di successo su tre campioni è rumore travestito da
+    // percentuale, e il modulo che lo calcola lo dice per primo.
+    "rec.title":       { en: `📒 Track record`, it: `📒 Registro` },
+    "rec.none":        { en: `No test finished yet on this car and track. The engineer proposes a change, you drive it, and the verdict lands here — including the ones that didn't work.`,
+                         it: `Nessuna prova ancora conclusa su questa auto e questa pista. L'ingegnere propone una modifica, tu la guidi, e il verdetto finisce qui — comprese quelle che non hanno funzionato.` },
+    "rec.counts":      { en: `<b>{kept}</b> kept out of <b>{tests}</b> tested`,
+                         it: `<b>{kept}</b> tenute su <b>{tests}</b> provate` },
+    "rec.rate":        { en: ` · {rate}% hit rate`, it: ` · {rate}% di riuscita` },
+    "rec.gain":        { en: ` · median {gain}s on the lap`,
+                         it: ` · mediana {gain}s sul giro` },
+    "rec.thin":        { en: `Too few tests to publish a percentage — a hit rate over a handful of samples is noise wearing a percent sign. The counts are above.`,
+                         it: `Troppo poche prove per pubblicare una percentuale: un tasso di riuscita su una manciata di campioni è rumore travestito da percentuale. I conteggi sono qui sopra.` },
+    "rec.byparam":     { en: `Which levers earn their place`, it: `Quali leve si guadagnano il posto` },
+    "rec.byrank":      { en: `Does "most effective first" hold up?`,
+                         it: `Regge il «prima il rimedio più efficace»?` },
+    "rec.rank":        { en: `remedy #{n}`, it: `rimedio n.{n}` },
+    "rec.side":        { en: `Side effects seen (never predicted)`,
+                         it: `Effetti collaterali visti (mai predetti)` },
+    "rec.kept_of":     { en: `{kept}/{tests} kept`, it: `{kept}/{tests} tenute` },
+    "rec.seen":        { en: `{n}×`, it: `{n}×` },
     "eng.avDone":      { en: `Done — I've made it`, it: `Fatto — l'ho cambiato` },
 
     // engineer tour
