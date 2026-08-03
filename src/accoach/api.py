@@ -330,7 +330,8 @@ _STINT_TEXT = {
         "no_fuel_corr": "This pace is **not corrected for fuel**: the car sheds "
                         "{litres} L across the stint and gains time on its own, "
                         "but how much is not known yet — the seconds-per-litre "
-                        "figure has to be measured on a stint driven flat.",
+                        "figure has to be measured on a stint driven at a "
+                        "deliberately constant pace.",
         "no_fuel_corr_bare": "This pace is **not corrected for fuel**: the car "
                              "gets lighter as you drive, and the "
                              "seconds-per-litre figure is not measured yet.",
@@ -1594,7 +1595,7 @@ def create_api(
             # eventually forget.
             return {"car": car, "track": track, "laps": [], "pb_trend": [],
                     "consistency": lap_time_consistency([]), "levels": [],
-                    "trends": [], "recurring": [], "tyres": [],
+                    "trends": [], "recurring": [],
                     "corner_consistency": []}
 
         # Chronological (oldest first) for the trend.
@@ -1635,23 +1636,11 @@ def create_api(
                 "total_s": round(t.total_ms / 1000.0, 3),
             } for t in loss_trends]
 
-        # Tyre temps & pressures per lap, chronological — to spot heat build-up
-        # and pressure drift across a stint (the degradation signal a driver
-        # feels but can't see). Laps predating per-wheel capture are skipped.
-        tyres: list[dict] = []
-        for r in chrono:
-            lp = lap_objs.get(r["path"])
-            if lp is None:
-                continue
-            temp = _tyre_means(lp.samples, "tyre_core_temp", 1)
-            press = _tyre_means(lp.samples, "tyre_pressure", 2)
-            if temp is None and press is None:
-                continue
-            tyres.append({
-                "recorded_utc": r["recorded_utc"],
-                "lap_time": format_lap_time(r["lap_time_ms"]),
-                "temp": temp, "press": press,
-            })
+        # The per-lap tyre temps and pressures used to be built here and drawn on
+        # this tab, under a heading that said "across the stint" over a series
+        # that was every lap ever recorded for this car and track — different
+        # evenings, different track temperatures, refuels in the middle. They
+        # belong to /api/stint, which has a stint to draw them over.
 
         # Consistency per corner: how much the min speed at each corner varies
         # across the recent laps. A wide spread means the driver isn't repeating
@@ -1707,7 +1696,6 @@ def create_api(
             "levels": levels,
             "trends": trends,
             "recurring": recurring,
-            "tyres": tyres,
             "corner_consistency": corner_consistency,
         }
 

@@ -96,10 +96,13 @@ async function init() {
     SESSION = null;
     SHEET = null;         // another car+track has other braking points
     SESSION_I = 0;        // a different car+track has different sessions
+    STINT = null;         // …and different stints, on a different tank
+    STINT_I = 0;
     TRAINING = null;      // and its own plan, drills and readiness
     loadCombo(combo);
     if (VIEW === "progress") loadProgress(combo);
     if (VIEW === "session") loadSession(combo, 0);
+    if (VIEW === "stint") loadStint(combo, 0);
     if (VIEW === "training") loadTraining(combo);
   };
   $("lap").onchange = reloadSelection;
@@ -116,6 +119,13 @@ async function init() {
   if (goTrain) goTrain.onclick = () => {
     rememberView("training");
     showView("training");
+  };
+  // Same reason, same shape: the tyre charts left Trends because the span they
+  // were drawn over was the whole archive while the heading said "stint".
+  const goStint = $("go-stint");
+  if (goStint) goStint.onclick = () => {
+    rememberView("stint");
+    showView("stint");
   };
   // Pick up where you left off — but only if that car+track is still in the
   // archive (a lap store can be moved or cleared between two runs).
@@ -192,6 +202,10 @@ function redrawCurrentView() {
   else if (VIEW === "training") { if (CURRENT) loadTraining(CURRENT); }
   else if (VIEW === "flow") { if (DATA) renderFlow(DATA); }
   else if (VIEW === "session") { if (CURRENT) loadSession(CURRENT, SESSION_I); }
+  // Refetched, like Training: the notes strip is written by the backend in the
+  // requested language, so repainting a cached payload would leave the one
+  // paragraph on the tab in the language you just left.
+  else if (VIEW === "stint") { if (CURRENT) loadStint(CURRENT, STINT_I); }
   else if (DATA) redraw(LAST_HOVER);   // compare
 }
 
@@ -326,7 +340,10 @@ async function loadProgress(combo) {
     : item(t("prog.dash"), t("prog.noValid"));
 
   drawProgress(p);
-  drawTyres(p);
+  // The tyre charts are drawn by the Race pace tab now, over one tank. They
+  // were here, over every lap ever recorded for this car and track, under a
+  // heading that said "across the stint" — different evenings, different track
+  // temperatures, refuels in between.
   renderLevels(p.levels);
   renderTrends(p.trends);
   renderCornerConsistency(p.corner_consistency);
@@ -1838,6 +1855,215 @@ function renderSession(s) {
       ? (prev.improved.length ? `<h4>${t("ses.improved")}</h4>` + rows(prev.improved, "up") : "") +
         (prev.regressed.length ? `<h4>${t("ses.regressed")}</h4>` + rows(prev.regressed, "down") : "")
       : `<div class="empty">${t("ses.nomoves")}</div>`);
+  }
+}
+
+// --- race pace: one run on one tank --------------------------------------
+// A session and a stint are not the same cut. The session view is right about
+// "one sitting" and blind to the refuel that can sit inside it; this tab asks
+// the question a race asks, and every number on it is a NET number — the tank
+// emptying and the tyres giving up pull opposite ways and this archive cannot
+// separate them. The notes strip at the bottom is not decoration: without it a
+// median reads as a degradation figure, which is the one thing it is not.
+
+let STINT = null;        // last /api/stint payload
+let STINT_I = 0;         // which stint of that payload is on screen
+
+async function loadStint(combo, index) {
+  if (!combo) return;
+  const q = new URLSearchParams({ car: combo.car, track: combo.track,
+                                  index: index || 0 });
+  let s;
+  try { s = await getJSON("/api/stint?" + q.toString()); }
+  catch (e) { s = { stints: [], current: null }; }
+  STINT = s;
+  STINT_I = s.index || 0;
+  renderStint(s);
+}
+
+function renderStint(s) {
+  const cur = s && s.current;
+  const pick = $("st-select");
+  if (!pick) return;
+  if (!cur) {
+    $("st-when").textContent = "";
+    $("st-sub").textContent = "";
+    $("st-numbers").innerHTML = `<div class="empty">${t("st.none")}</div>`;
+    $("st-laps").innerHTML = "";
+    $("st-notes").innerHTML = "";
+    $("tyres").classList.add("hidden");
+    pick.innerHTML = "";
+    return;
+  }
+
+  // A stint nobody could check is still offered — it is the best reading there
+  // is — but the picker says so, because a pre-fuel-channel run may hide a
+  // refuel and the split would never know.
+  pick.innerHTML = s.stints.map((x, i) =>
+    `<option value="${i}"${i === s.index ? " selected" : ""}>` +
+    `${fmtWhen(x.started_utc)} · ${x.laps} ${t("lbl.laps")}` +
+    `${x.fuel_used != null ? " · " + x.fuel_used.toFixed(1) + " L" : ""}` +
+    `${x.verified ? "" : " · " + t("st.unverified")}</option>`).join("");
+  pick.onchange = () => loadStint(CURRENT, parseInt(pick.value, 10));
+
+  $("st-when").textContent = fmtWhen(cur.started_utc);
+  const mins = minutesBetween(cur.started_utc, cur.ended_utc);
+  const bits = [tf("st.sub", { laps: cur.laps, counted: cur.counted, mins })];
+  if (cur.fuel.start != null && cur.fuel.end != null) {
+    bits.push(tf("st.sub_fuel", { from: cur.fuel.start.toFixed(1),
+                                  to: cur.fuel.end.toFixed(1) }));
+  }
+  $("st-sub").textContent = bits.join("  ·  ");
+
+  const item = (k, v, cls) =>
+    `<div class="item"><div class="k">${k}</div><div class="v ${cls || ""}">${v}</div></div>`;
+  let numbers = "";
+  if (cur.median_ms != null) {
+    numbers += item(t("st.pace"), cur.median);
+    numbers += item(t("st.best"), cur.best);
+    numbers += item(t("st.spread"), `${(cur.spread_ms / 1000).toFixed(3)}s`);
+    // The drift reads "flat" rather than a number whenever the slope sits
+    // inside its own error bar. Printing ±0.26 there would be handing over a
+    // finding that the data does not contain.
+    if (cur.trend) {
+      const v = cur.trend.significant
+        ? (cur.trend.slope_ms > 0 ? "+" : "−") +
+          (Math.abs(cur.trend.slope_ms) / 1000).toFixed(3) + "s"
+        : t("st.flat");
+      numbers += item(t("st.drift"), v,
+                      cur.trend.significant
+                        ? (cur.trend.slope_ms > 0 ? "slower" : "faster") : "");
+    }
+    if (cur.fuel.per_lap != null) {
+      numbers += item(t("st.fuel"), `${cur.fuel.per_lap.toFixed(2)} L`);
+    }
+    if (cur.fuel.range_laps != null) {
+      numbers += item(t("st.range"), String(cur.fuel.range_laps));
+    }
+  } else {
+    numbers = `<div class="empty">${t("st.nopace")}</div>`;
+  }
+  $("st-numbers").innerHTML = numbers;
+
+  drawStintPace(cur);
+  drawTyres({ tyres: (cur.tyres && cur.tyres.wheels) || [] });
+
+  // Every lap of the stint in the order driven. The ones that weren't running a
+  // pace stay on the list and lose their weight, rather than disappearing: a
+  // stint drawn one lap shorter than the one you drove is a different stint.
+  // Scaled to the laps that were a pace, and the rest max out. Scaled to every
+  // lap instead, one 3:25 spin owns the full width and the nine laps of racing
+  // beside it are nine identical stubs — the list stops having a shape.
+  const paced = cur.laps_detail.filter((l) => l.counted)
+                              .map((l) => l.lap_time_ms).filter((x) => x > 0);
+  const times = paced.length ? paced
+    : cur.laps_detail.map((l) => l.lap_time_ms).filter((x) => x > 0);
+  const floor = Math.min.apply(null, times.concat([Infinity]));
+  const worst = Math.max.apply(null, times.concat([0]));
+  const span = Math.max(1, worst - floor);
+  $("st-laps").innerHTML = `<h3>${t("st.laps")}</h3>` +
+    cur.laps_detail.map((l) => {
+      const w = Math.min(100, 6 + 94 * ((l.lap_time_ms - floor) / span));
+      const tags = (l.counted ? "" : `<span class="tag out">${t("st.lap_off")}</span>`) +
+        (l.off_track ? `<span class="tag cut">${t("ses.lap_cut")}</span>` : "") +
+        (l.fuel_used != null
+          ? `<span class="tag fuel" title="${escAttr(t("st.fuel"))}">${l.fuel_used.toFixed(2)} L</span>`
+          : "") +
+        (l.tyre_c != null
+          ? `<span class="tag tyre" title="${escAttr(t("tyre.temp"))}">${l.tyre_c.toFixed(0)}°</span>`
+          : "");
+      return `<button type="button" class="ses-lap${l.counted ? "" : " not-pace"}" ` +
+             `data-path="${l.path}" title="${t("ses.open")}">` +
+             `<span class="time">${l.lap_time}</span>` +
+             `<span class="bar"><i style="width:${w.toFixed(1)}%"></i></span>` +
+             `<span class="tags">${tags}</span></button>`;
+    }).join("");
+  for (const b of $("st-laps").querySelectorAll(".ses-lap")) {
+    b.onclick = () => openLapInCompare(b.dataset.path);
+  }
+
+  $("st-notes").innerHTML = `<h3>${t("st.notes")}</h3>` +
+    cur.notes.map((n) => `<p class="note">${mdBold(n)}</p>`).join("");
+}
+
+function minutesBetween(a, b) {
+  if (!a || !b) return 1;
+  return Math.max(1, Math.round((new Date(b) - new Date(a)) / 60000));
+}
+
+// The backend writes the notes, and marks the load-bearing phrase with **…**.
+// Escaped first — escAttr over-escapes quotes for text content, which costs
+// nothing and covers the day one of these strings carries a car name a driver
+// typed rather than one we wrote.
+function mdBold(s) {
+  return escAttr(s).replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>");
+}
+
+function drawStintPace(cur) {
+  const { ctx, w, h } = setup($("c-stint"));
+  const laps = cur.laps_detail || [];
+  if (!laps.length) return;
+
+  // Scaled to the laps that were running a pace, not to every lap: one 3:25 spin
+  // squashes eight laps of racing into a single flat line at the top.
+  const paced = laps.filter((l) => l.counted).map((l) => l.lap_time_ms);
+  const base = paced.length ? paced : laps.map((l) => l.lap_time_ms);
+  let lo = Math.min(...base), hi = Math.max(...base);
+  if (hi === lo) hi = lo + 1000;
+  const pad = (hi - lo) * 0.18; lo -= pad; hi += pad;
+  const n = laps.length;
+  const X = (i) => (n === 1 ? w / 2 : (i / (n - 1)) * (w - 30) + 15);
+  const rawY = (ms) => ((ms - lo) / (hi - lo)) * (h - 24) + 12;
+  // Clamped, and the clamping is the feature. Scaled to the pace, a 3:25 spin
+  // lands a long way under the floor of the canvas: unclamped the polyline dives
+  // out of the frame and climbs back, which draws two vertical lines to nowhere
+  // and no point at all. Pinned to the edge it reads as what it is — a lap that
+  // was off this chart — and the tag on its row says why.
+  const Y = (ms) => Math.max(6, Math.min(h - 6, rawY(ms)));
+  const offScale = (ms) => rawY(ms) !== Y(ms);
+
+  // The fitted drift, drawn only when it was believed. A regression line over a
+  // slope that failed its own significance test would be the picture of a
+  // finding the numbers refused to state.
+  if (cur.trend && cur.trend.significant && paced.length) {
+    const xs = laps.map((l, i) => (l.counted ? i : null)).filter((x) => x !== null);
+    const mx = xs.reduce((a, b) => a + b, 0) / xs.length;
+    const my = paced.reduce((a, b) => a + b, 0) / paced.length;
+    const at = (x) => my + cur.trend.slope_ms * (x - mx);
+    ctx.beginPath();
+    ctx.moveTo(X(xs[0]), Y(at(xs[0])));
+    ctx.lineTo(X(xs[xs.length - 1]), Y(at(xs[xs.length - 1])));
+    ctx.strokeStyle = "#FFB020"; ctx.lineWidth = 2; ctx.setLineDash([6, 4]);
+    ctx.stroke(); ctx.setLineDash([]);
+  }
+
+  ctx.beginPath();
+  laps.forEach((l, i) => {
+    const x = X(i), y = Y(l.lap_time_ms);
+    i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+  });
+  ctx.strokeStyle = "rgba(255,255,255,0.20)"; ctx.lineWidth = 1; ctx.stroke();
+
+  laps.forEach((l, i) => {
+    const off = offScale(l.lap_time_ms);
+    ctx.beginPath();
+    ctx.arc(X(i), Y(l.lap_time_ms), l.counted ? 4 : 3, 0, 6.283);
+    if (off) {
+      // Hollow: a filled dot on the edge would claim to be a reading, and this
+      // one is only "further than the frame goes".
+      ctx.strokeStyle = "rgba(255,255,255,0.45)"; ctx.lineWidth = 1.5;
+      ctx.stroke();
+    } else {
+      ctx.fillStyle = l.counted ? "#ffffff" : "rgba(255,255,255,0.28)";
+      ctx.fill();
+    }
+  });
+
+  ctx.fillStyle = "rgba(255,255,255,0.45)"; ctx.font = "10px " + MONO;
+  if (paced.length) {
+    const fastest = Math.min(...paced), slowest = Math.max(...paced);
+    ctx.fillText(fmtMs(fastest), w - 74, Y(fastest) - 5);
+    ctx.fillText(fmtMs(slowest), w - 74, Y(slowest) + 13);
   }
 }
 
