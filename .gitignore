@@ -38,3 +38,11 @@ tools/piper/
 Thumbs.db
 .idea/
 .vscode/
+
+# Il modello vocale italiano di vosk (88 MB) sta accanto agli script che lo
+# usano ma non nel repo: e' un artefatto scaricabile, e un binario di quella
+# taglia nella storia di git non se ne va piu'. Vedi tools/voce/README.md.
+tools/voce/vosk-model-*/
+tools/voce/*.zip
+tools/voce/parla.lock
+tools/voce/assistente-udito.jsonl
