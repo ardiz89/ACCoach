@@ -282,6 +282,41 @@ _CORNERS: dict[str, list[tuple[str | int, float]]] = {
         ("Clearways", 0.881),          # right, r=53 m
         ("Clark Curve", 0.933),        # right, r=157 m, onto the straight
     ],
+    # Nürburgring GP-Strecke — the first circuit curated by NUMBER rather than by
+    # name, and deliberately so: almost every corner here is named after whoever
+    # is paying (Veedol became NGK, the Audi-S became the Michael-Schumacher-S),
+    # so a name is a subscription and a number is a fact. The turn numbers are
+    # what the guides, the marshals and the driver in the next car all use.
+    #
+    # Directions from a track guide, taken only where it writes them in words —
+    # "a sharp downhill right-hand hairpin", "a very tricky, high-speed
+    # left-right chicane", "a fast left into right chicane". All fifteen agree
+    # with the geometry, and four characters corroborate independently: T1 comes
+    # out at r=16 m (the tightest of the lap, and the guide calls it a hairpin),
+    # T7 at r=31 m (its other hairpin), T12 at r=110 m (the guide's "easily
+    # flat-out kink") and T13-T14 come out left-then-right, which is the chicane
+    # the guide describes in that order.
+    #
+    # Numbered ALL the way round on purpose. A half-numbered circuit prints an
+    # official "Corner 3" next to a detector-counted "Corner 4" and nothing on
+    # screen says which is which — worse than no numbering at all.
+    "nurburgring": [
+        (1, 0.079),   # right hairpin, r=16 m
+        (2, 0.108),   # left — Mercedes Arena begins
+        (3, 0.165),   # left
+        (4, 0.187),   # right — ends the Arena
+        (5, 0.286),   # left sweep
+        (6, 0.314),   # right
+        (7, 0.428),   # right hairpin, r=31 m
+        (8, 0.506),   # left — the S begins
+        (9, 0.540),   # right
+        (10, 0.623),  # left
+        (11, 0.655),  # right
+        (12, 0.747),  # right, r=110 m — flat out
+        (13, 0.840),  # left — the chicane begins
+        (14, 0.891),  # right
+        (15, 0.911),  # right, onto the pit straight
+    ],
     # Anchored the same way, to a real Monza lap (Ferrari 488 GT3 Evo, 2:03.7)
     # whose detected apexes were 0.169 / 0.247 / 0.378 / 0.447 / 0.500 / 0.686 /
     # 0.888. The minimum speeds identify them beyond doubt: 49 km/h at the first
@@ -483,6 +518,11 @@ _DIRECTIONS: dict[str, dict[str, str]] = {
         "Graham Hill Bend": "left", "Surtees": "left", "Hawthorn Bend": "right",
         "Westfield Bend": "right", "Sheene Curve": "right", "Stirling's": "left",
         "Clearways": "right", "Clark Curve": "right",
+    },
+    "nurburgring": {
+        1: "right", 2: "left", 3: "left", 4: "right", 5: "left", 6: "right",
+        7: "right", 8: "left", 9: "right", 10: "left", 11: "right",
+        12: "right", 13: "left", 14: "right", 15: "right",
     },
     "zandvoort": {
         "Tarzanbocht": "right", "Gerlachbocht": "right",

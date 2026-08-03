@@ -373,3 +373,29 @@ def test_a_complex_is_not_given_a_single_direction():
     already made for Spa's Bus Stop and Suzuka's Casio Triangle."""
     assert "The Chase" not in trackdata._DIRECTIONS["mountpanorama"]
     assert "S do Senna" not in trackdata._DIRECTIONS["saopaulo"]
+
+
+# --- a circuit curated by number (2026-08-03) ------------------------------
+
+def test_the_nurburgring_is_numbered_all_the_way_round():
+    """Half a numbering is worse than none: an official "Corner 3" printed next
+    to a detector-counted "Corner 4" gives the driver two numbering schemes in
+    one list and no way to tell them apart."""
+    labels = [n for n, _p in trackdata._CORNERS["nurburgring"]]
+    assert labels == list(range(1, len(labels) + 1))
+    assert all(isinstance(n, int) for n in labels)
+
+
+def test_a_numbered_circuit_reads_in_the_page_s_language():
+    table = trackdata._CORNERS["nurburgring"]
+    corners = [_corner(i, pos) for i, (_n, pos) in enumerate(table)]
+    assert name_corners("nurburgring", corners, "en")[:3] == \
+        ["Corner 1", "Corner 2", "Corner 3"]
+    assert name_corners("nurburgring", corners, "it")[:3] == \
+        ["Curva 1", "Curva 2", "Curva 3"]
+
+
+def test_the_nurburgring_is_reachable_from_assetto_corsa_s_spelling():
+    """Kunos ships it as ``ks-nurburgring``; ACC calls it ``nurburgring``."""
+    assert name_corners("ks-nurburgring",
+                        [_corner(0, 0.079)], "en") == ["Corner 1"]
