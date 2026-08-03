@@ -257,6 +257,31 @@ _CORNERS: dict[str, list[tuple[str | int, float]]] = {
         ("Hans Ernst", 0.738),         # chicane, right then left
         ("Arie Luyendijkbocht", 0.908),  # right, banked, onto the straight
     ],
+    # Brands Hatch, GP loop. Two sources were needed and they **disagree**, which
+    # is why this table records how the disagreement was settled rather than just
+    # its outcome. A guide summary called Paddock Hill Bend a left-hander and
+    # admitted the direction was "implied by positioning"; a prose description
+    # calls it, in words, "the right-hander at Paddock Hill Bend". The geometry
+    # says right. Explicit beats inferred, and measured beats both.
+    #
+    # Taking only the directions a source states in words, all ten agree with the
+    # geometry. One correction on top of the automatic fit, on the same physical
+    # grounds that corrected Interlagos: the solver put Hawthorn on an r=36 m
+    # apex, and the source calls Hawthorn "by far the fastest corner on the
+    # circuit" — so it is the r=151 m one, and Westfield and Sheene step back
+    # with it.
+    "brandshatch": [
+        ("Paddock Hill Bend", 0.058),  # right, r=94 m, downhill
+        ("Druids", 0.158),             # right hairpin, r=24 m
+        ("Graham Hill Bend", 0.202),   # left, r=118 m
+        ("Surtees", 0.318),            # left, r=37 m, uphill
+        ("Hawthorn Bend", 0.388),      # right, r=151 m — the fastest of the lap
+        ("Westfield Bend", 0.519),     # right, r=86 m
+        ("Sheene Curve", 0.605),       # right, r=36 m
+        ("Stirling's", 0.768),         # LEFT, r=33 m — the only left of the sector
+        ("Clearways", 0.881),          # right, r=53 m
+        ("Clark Curve", 0.933),        # right, r=157 m, onto the straight
+    ],
     # Anchored the same way, to a real Monza lap (Ferrari 488 GT3 Evo, 2:03.7)
     # whose detected apexes were 0.169 / 0.247 / 0.378 / 0.447 / 0.500 / 0.686 /
     # 0.888. The minimum speeds identify them beyond doubt: 49 km/h at the first
@@ -452,6 +477,12 @@ _DIRECTIONS: dict[str, dict[str, str]] = {
         "Forrest's Elbow": "left", "Murray's Corner": "left",
         # The Chase is right-left-right: a complex has no single direction, so
         # it is not checked — the same call already made for Bus Stop.
+    },
+    "brandshatch": {
+        "Paddock Hill Bend": "right", "Druids": "right",
+        "Graham Hill Bend": "left", "Surtees": "left", "Hawthorn Bend": "right",
+        "Westfield Bend": "right", "Sheene Curve": "right", "Stirling's": "left",
+        "Clearways": "right", "Clark Curve": "right",
     },
     "zandvoort": {
         "Tarzanbocht": "right", "Gerlachbocht": "right",
