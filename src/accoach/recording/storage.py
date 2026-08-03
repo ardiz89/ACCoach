@@ -195,12 +195,17 @@ def _find_reference_by_scan(
 ) -> Lap | None:
     """Reference lookup without the catalog: scan + confirm every candidate.
 
-    Same policy as the catalog query: drop dirty laps (clean is False) and prefer
-    a confirmed-clean lap over an unknown/legacy one, ties broken on lap time.
+    Same policy as the catalog query — and *literally* the same, through
+    :func:`clean_verdict`, not a second copy of it. It was a second copy once:
+    the catalog demoted an unjudged ACC lap and this scan re-elected it, so a
+    locked or corrupt catalog silently put the lap that cut the Roggia back in
+    charge, with nothing on screen to say so.
     """
+    from .lap import clean_verdict
+
     want_car, want_track = _slug(car_model), _slug(track)
-    best_clean: Lap | None = None      # clean is True
-    best_unknown: Lap | None = None    # clean is None (legacy/AC)
+    best_clean: Lap | None = None      # judged clean
+    best_unknown: Lap | None = None    # never judged (legacy/AC/pre-isValidLap)
     for path in list_lap_files(laps_dir):
         if not path.name.startswith(f"{want_track}__{want_car}__"):
             continue
@@ -212,7 +217,8 @@ def _find_reference_by_scan(
             continue
         if _slug(lap.car_model) != want_car or _slug(lap.track) != want_track:
             continue
-        if lap.clean is True:
+        if clean_verdict(lap.clean, lap.schema_version, lap.tyre_compound,
+                         lap.recorded_utc) == 1:
             if best_clean is None or lap.lap_time_ms < best_clean.lap_time_ms:
                 best_clean = lap
         elif best_unknown is None or lap.lap_time_ms < best_unknown.lap_time_ms:

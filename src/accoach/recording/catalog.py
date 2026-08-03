@@ -24,7 +24,10 @@ from pathlib import Path
 # v2: added clean (-1 unknown / 0 dirty / 1 clean) + track-condition columns,
 # so the reference query can exclude dirty laps and prefer confirmed-clean ones.
 # v3: added `source` ("own"/"pro") so a PRO benchmark lap can be found cheaply.
-_DB_VERSION = 4
+# v5: `clean` is re-derived on index — a pre-v8 ACC lap's "clean" is demoted to
+# unknown (see `_clean_to_int`). The bump matters: without it, every catalog
+# already on disk keeps the old verdict and the fix ships to nobody.
+_DB_VERSION = 5
 
 # How far the track temperature may differ before a lap stops being a fair
 # benchmark. Wide on purpose: the point is to rule out the morning-vs-evening
@@ -111,11 +114,19 @@ def _join_indices(idx: set[int]) -> str:
     return ",".join(str(i) for i in sorted(idx))
 
 
-def _clean_to_int(value: object) -> int:
-    """Lap JSON ``clean`` (true/false/null/absent) -> -1 unknown / 0 dirty / 1 clean."""
-    if value is None:
-        return -1
-    return 1 if value else 0
+def _clean_to_int(value: object, schema: int = 0, compound: str = "",
+                  recorded_utc: str = "") -> int:
+    """Lap JSON ``clean`` -> -1 unknown / 0 dirty / 1 clean.
+
+    A thin seam over :func:`accoach.recording.lap.clean_verdict`, which holds the
+    rule (and the measurement behind it). Kept as a name because the catalog's
+    three-state encoding is a catalog concern; the *policy* is shared with the
+    catalog-less fallback scan, and having it in two places is how the two once
+    disagreed.
+    """
+    from .lap import clean_verdict
+
+    return clean_verdict(value, schema, compound, recorded_utc)
 
 
 
@@ -171,7 +182,9 @@ def _read_meta(path: Path) -> dict | None:
         "session": int(d.get("session", -1)),
         "lap_time_ms": int(d.get("lap_time_ms", 0)),
         "valid": 1 if d.get("valid") else 0,
-        "clean": _clean_to_int(d.get("clean")),
+        "clean": _clean_to_int(d.get("clean"), int(d.get("schema", 1)),
+                               str(d.get("tyre_compound", "") or ""),
+                               str(d.get("recorded_utc", "") or "")),
         "air_temp": float(d.get("air_temp", 0.0) or 0.0),
         "road_temp": float(d.get("road_temp", 0.0) or 0.0),
         "grip": float(d.get("grip", 0.0) or 0.0),

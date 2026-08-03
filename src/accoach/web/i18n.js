@@ -411,6 +411,13 @@
     // wrong target for a cold morning - the coach has always known this, the
     // report used to ignore it.
     "sum.cond":        { en: `Chosen for conditions`, it: `Scelto per le condizioni` },
+    // The other reason a slower lap is the benchmark: the faster one was never
+    // checked for track limits. Its own label, because "chosen for conditions"
+    // over a sentence about track limits would be a confident wrong answer —
+    // the thing this whole note exists to avoid.
+    "sum.cond.unj":    { en: `Chosen as the judged lap`, it: `Scelto perché verificato` },
+    "sum.cond.unjt":   { en: `your {time} is faster but nothing ever checked it for track limits`,
+                         it: `il tuo {time} è più veloce ma nessuno ne ha mai verificato i limiti di pista` },
     "sum.cond.v":      { en: `track {temp}° · your {time} was at {ftemp}°`,
                          it: `asfalto {temp}° · il tuo {time} era a {ftemp}°` },
     "sum.cond.vx":     { en: `track {temp}° · your {time} has no recorded temperature`,

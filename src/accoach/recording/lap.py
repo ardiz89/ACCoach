@@ -27,8 +27,69 @@ attributes *by name*. So a v1 lap (10 channels) still loads against this v2 mode
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 
 from ..telemetry.snapshot import SessionType, TelemetrySnapshot
+
+# --- how far to trust a stored `clean` flag --------------------------------
+#
+# On ACC, `clean` used to be decided by `numberOfTyresOut` — a field ACC
+# declares and never fills (measured 2026-07-21 at Monza: four wheels off, flag
+# still zero). So an old ACC lap saying "clean" is not a verdict, it is the
+# absence of one, and treating it as evidence put a lap that cut the Variante
+# della Roggia in charge of every Monza debrief on this machine.
+#
+# The line is a MOMENT, not a schema version. `isValidLap` landed in 9227401 at
+# 2026-07-21 15:07 UTC; the schema only caught up the next day with v8 (`lost_at`,
+# 19c27f4). Judging by schema alone would throw away the laps recorded in those
+# 22 hours — the real archive holds five, and one of them says `clean=False`,
+# which the inert path cannot produce and which therefore proves the flag was
+# alive. So: v8 or later, OR recorded after the fix, counts as judged.
+_ACC_TRACK_LIMITS_SCHEMA = 8
+_ACC_TRACK_LIMITS_UTC = datetime(2026, 7, 21, 15, 7, 43, tzinfo=timezone.utc)
+
+# What ACC writes in `tyre_compound`. Canonical on that title and only that one:
+# AC mods put their own strings there ("Soft (S)", "Semislicks (SM)"). Used to
+# answer "which game recorded this lap", because the lap file doesn't say. On AC
+# the old rule worked — validated live at Spa — so AC laps keep their verdict.
+_ACC_COMPOUNDS = ("dry_compound", "wet_compound")
+
+
+def clean_verdict(clean: object, schema: int = 0, compound: str = "",
+                  recorded_utc: str = "") -> int:
+    """How much a stored ``clean`` flag is worth: -1 unknown / 0 dirty / 1 clean.
+
+    The single place that rule lives, because it has to give the same answer to
+    the catalog and to the catalog-less fallback scan. It didn't, once: the
+    catalog demoted the lap and :func:`_find_reference_by_scan` re-elected it,
+    so a locked or corrupt catalog silently restored the cut lap as the
+    benchmark.
+
+    Demotion is to **unknown**, never to dirty. We don't know those laps cut —
+    we know nothing looked. Unknown still qualifies as a reference when it's all
+    there is (a doubtful benchmark beats none); it just stops outranking a lap
+    that was actually judged.
+
+    A ``clean=False`` from that era is left alone: the inert path can't produce
+    one, so it came from somewhere real, and discarding a positive finding
+    because the instrument was unreliable in the *other* direction would throw
+    away the one thing it did tell us.
+    """
+    if clean is None:
+        return -1
+    if not clean:
+        return 0
+    if compound not in _ACC_COMPOUNDS:
+        return 1                        # AC, or a lap with no compound recorded
+    if schema >= _ACC_TRACK_LIMITS_SCHEMA:
+        return 1
+    try:
+        when = datetime.fromisoformat(recorded_utc)
+    except (TypeError, ValueError):
+        return -1                       # no date to appeal to: not judged
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=timezone.utc)
+    return 1 if when >= _ACC_TRACK_LIMITS_UTC else -1
 
 # Bump when the *writer* adds/changes channels. Readers tolerate older versions
 # because columns are matched by name via the stored ``fields`` list.

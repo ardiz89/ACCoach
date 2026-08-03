@@ -464,6 +464,17 @@ def _conditions_note(elected: dict | None, fastest: dict | None,
         return {**out, "reason": "grip",
                 "grip": round(e["grip"], 2),
                 "faster_grip": round(f["grip"], 2) if f["grip"] else None}
+
+    # Nothing about the weather explains it, so it's the other axis of the
+    # election: the faster lap was never judged for track limits and this one
+    # was. Added the day pre-v8 ACC laps stopped being trusted (see
+    # catalog._clean_to_int) — without it the driver opens the page, finds their
+    # personal best demoted with no explanation, and the app looks broken in
+    # exactly the way this function exists to prevent. Note the wording the UI
+    # gives it: "never checked", not "cut the corner". We don't know that it
+    # cut; we know nothing looked.
+    if elected.get("clean") == 1 and fastest.get("clean") == -1:
+        return {**out, "reason": "unjudged"}
     return None
 
 

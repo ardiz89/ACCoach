@@ -1170,9 +1170,14 @@ function drawSummary(a) {
   // Without it a slower baseline reads as a broken app; the backend only sends
   // this when conditions really are the reason (see api._conditions_note).
   const condNote = conditionsNote(a.reference.by_conditions);
+  // The label follows the reason: "chosen for conditions" over a sentence about
+  // track limits would name the wrong cause, which is the one thing this note
+  // must never do.
+  const condLabel = (a.reference.by_conditions || {}).reason === "unjudged"
+    ? t("sum.cond.unj") : t("sum.cond");
   $("summary").innerHTML =
     (c.n >= 2 ? item(t("sum.consistency"), `σ ${(c.std_ms / 1000).toFixed(3)}s · ${c.n} ${t("lbl.laps")}`) : "") +
-    (condNote ? item(t("sum.cond"), condNote, "warn") : "") +
+    (condNote ? item(condLabel, condNote, "warn") : "") +
     (setupNote ? item(t("sum.setup_diff"), setupNote, "warn") : "");
 }
 
@@ -1182,6 +1187,9 @@ function drawSummary(a) {
 // This only writes the sentence.
 function conditionsNote(c) {
   if (!c) return "";
+  if (c.reason === "unjudged") {
+    return tf("sum.cond.unjt", { time: c.faster_lap_time });
+  }
   if (c.reason === "compound") {
     return tf("sum.cond.tyre", {
       tyre: c.compound, time: c.faster_lap_time,
