@@ -750,11 +750,17 @@ function balanceColor(v) {
 // sta sopra, poi i cordoli che stanno sopra la pista. I colori sono spenti
 // apposta — devono dire "qui non sei più in pista" senza rubare l'occhio alle
 // due linee, che restano la ragione per cui si guarda questo disegno.
+//
+// L'asfalto però era spento *troppo*: bianco al 15% sotto un'erba al 30% e dei
+// cordoli al 55%, cioè la cosa meno visibile del disegno era il suo soggetto —
+// al Red Bull Ring non si capiva dove finisse la strada. Adesso è un grigio
+// neutro abbastanza sostenuto da leggersi come suolo, e resta comunque sotto la
+// linea guidata e il riferimento, che sono opachi.
 const SURFACE_PAINT = [
   ["grass",    "rgba(74,124,89,0.30)"],
   ["gravel",   "rgba(176,146,96,0.30)"],
   ["concrete", "rgba(150,155,165,0.20)"],
-  ["road",     "rgba(255,255,255,0.15)"],
+  ["road",     "rgba(188,196,208,0.34)"],
   ["kerb",     "rgba(226,86,96,0.55)"],
 ];
 

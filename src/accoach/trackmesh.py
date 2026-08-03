@@ -63,7 +63,15 @@ _VERTEX = 44
 #: Fuori restano i muri (geometria verticale: in pianta sono un filo) e `OUT` /
 #: `OFFTRACK`, che non sono materiali ma verdetti, e si sovrappongono agli altri.
 _CLASSES = {
-    "road": ("ASPH", "ROAD", "TARMAC"),
+    # "ASP" e non "ASPH": la chiave non e' una parola nostra, la **dichiara la
+    # pista** nel suo `surfaces.ini`, e ognuna se la sceglie. Il Red Bull Ring
+    # chiama il suo asfalto `ASPRBRING`, `ASPMID`, `ASPOLD` — dentro nessuno dei
+    # quali c'e' "ASPH". Risultato misurato il 2026-08-02: su 1298 mesh ne
+    # riconoscevamo 212, l'asfalto estratto copriva **un quarto** del circuito
+    # (x da -266 a 623 su un giro che va da -600 a 655) e al tornante la strada
+    # si disegnava nera mentre cordoli ed erba, che hanno chiavi standard,
+    # c'erano. Questo prefisso e' la toppa; la cura e' leggere `surfaces.ini`.
+    "road": ("ASP", "ROAD", "TARMAC"),
     "kerb": ("CURB", "KERB"),
     "grass": ("GRASS", "CARPET"),
     "gravel": ("SAND", "GRAVEL", "DIRT"),
