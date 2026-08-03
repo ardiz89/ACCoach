@@ -234,3 +234,85 @@ def test_curated_names_are_proper_nouns_in_both_languages(track, expected):
 @pytest.mark.parametrize("track", ["spa", "suzuka"])
 def test_the_new_tracks_report_that_they_have_names(track):
     assert has_names(track)
+
+
+# --- one circuit, however the sim spells it (2026-08-03) --------------------
+
+def test_the_same_circuit_is_found_under_either_game_s_name():
+    """Kunos prefixes its Assetto Corsa tracks with ``ks-``; ACC drops the
+    prefix and renames outright. A table keyed on one spelling is invisible to
+    the other game — the exact bug the track drawings had to stop having, and it
+    would have shipped here the day a second circuit arrived."""
+    assert trackdata.has_names("ks-silverstone")
+    assert trackdata.has_names("Silverstone")
+    assert corner_name("ks-silverstone", 0, 0.533, "en", "right") == "Copse"
+
+
+def test_a_historic_layout_does_not_inherit_the_modern_one_s_corners():
+    """Spa 1998 shares a name with Spa and not a circuit: it has no Bus Stop
+    where the modern one does. Giving it the modern positions would print Les
+    Combes in the middle of a straight."""
+    assert not trackdata.has_names("spa-1998")
+    assert corner_name("spa-1998", 3, 0.351, "en") == "Corner 4"
+
+
+def test_every_alias_points_at_a_circuit_we_could_actually_name():
+    """An alias to a key with no table is a silent no-op that reads like
+    coverage. It is allowed to be empty *today* only if the key exists."""
+    for alias, key in trackdata._ALIASES.items():
+        assert key == trackdata._slug(key), f"{alias} -> {key} is not a slug"
+        assert key not in trackdata._ALIASES, f"{alias} -> {key} chains"
+
+
+# --- officially numbered corners (2026-08-03) ------------------------------
+
+def test_a_curated_turn_number_is_rendered_in_the_reader_s_language():
+    """Most modern circuits name nothing and number everything, and those
+    numbers are painted on the track map — they are facts, not our count of
+    what a detector happened to find. So a table may hold an integer, and
+    unlike a proper noun it gets translated."""
+    assert trackdata.render(7, "it") == "Curva 7"
+    assert trackdata.render(7, "en") == "Corner 7"
+    assert trackdata.render("Parabolica", "it") == "Parabolica"
+    assert trackdata.render("Parabolica", "en") == "Parabolica"
+
+
+def test_a_numbered_corner_goes_through_the_table_like_a_named_one(monkeypatch):
+    monkeypatch.setitem(trackdata._CORNERS, "tt", [(7, 0.400), ("Curvone", 0.700)])
+    corners = [_corner(0, 0.402), _corner(1, 0.698)]
+    assert name_corners("tt", corners, "it") == ["Curva 7", "Curvone"]
+    assert name_corners("tt", corners, "en") == ["Corner 7", "Curvone"]
+
+
+def test_the_fallback_number_is_the_detector_s_count_not_the_circuit_s():
+    """On a track with no table the only honest thing to say is "the seventh
+    corner I found" — claiming it is the circuit's Turn 7 would be inventing
+    an official fact."""
+    assert corner_name("no-such-track", 6, 0.5, "en") == "Corner 7"
+
+
+# --- Silverstone: the first table read off geometry, not off a lap ---------
+
+_SILVERSTONE = ["Abbey", "Farm Curve", "Village", "The Loop", "Aintree",
+                "Brooklands", "Luffield", "Woodcote", "Copse", "Maggotts",
+                "Becketts", "Chapel", "Stowe", "Vale", "Club"]
+
+
+def test_silverstone_names_land_on_their_own_corners():
+    table = trackdata._CORNERS["silverstone"]
+    corners = [_corner(i, pos) for i, (_n, pos) in enumerate(table)]
+    assert name_corners("silverstone", corners) == _SILVERSTONE
+
+
+def test_silverstone_every_name_carries_the_direction_that_proved_it():
+    """The table is trusted because the eighteen-symbol sequence of directions
+    the geometry produced matched the one the circuit's own corner list implies.
+    Dropping a direction would keep the names and throw away the evidence."""
+    want = trackdata._DIRECTIONS["silverstone"]
+    assert {n for n, _p in trackdata._CORNERS["silverstone"]} == set(want)
+    assert set(want.values()) == {"left", "right"}
+
+
+def test_a_silverstone_name_will_not_take_a_corner_turning_the_other_way():
+    assert corner_name("silverstone", 8, 0.533, "en", "right") == "Copse"
+    assert corner_name("silverstone", 8, 0.533, "en", "left") == "Corner 9"

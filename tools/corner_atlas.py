@@ -1,0 +1,257 @@
+"""Corner positions and directions for a circuit, read off its centreline.
+
+**Why this exists.** ``trackdata._CORNERS`` maps a name to the normalized track
+position of its apex, and until now every one of those numbers was anchored to a
+*recorded reference lap*. That is why four circuits had names and twenty-two did
+not: what was missing was never the names, it was a lap on each track.
+
+It turns out a lap isn't needed. The bundled centrelines
+(``accoach/tracks/*.csv``, TUMFTM — GPS traces from OpenStreetMap) **start at the
+start/finish line**, so a point's fraction of the total arc length *is* a
+normalized track position. Measured on the three circuits that had both a curated
+table and a bundled centreline, comparing the curvature peaks here against the
+lap-anchored positions already in ``_CORNERS``:
+
+    Monza    best circular shift +0.000   mean error 0.0021  (12 m)
+    Spa                          -0.006               0.0047  (33 m)
+    Suzuka                       +0.001               0.0025  (14 m)
+
+Twelve to thirty-three metres on circuits five to seven kilometres long, against
+a naming tolerance (``_NAME_TOL`` = 0.05) worth about 290 m at Monza. The
+positions this prints are a sixth of the tolerance away from ones that took a
+reference lap to produce.
+
+**What it does not do: name anything.** It prints where the corners are, which
+way they turn and how tight they are. Attaching a name is a human reading a
+source, and the point of the printout is to make that reading checkable — the
+order and the direction of a real circuit's corners are facts you can hold
+against it, and a name that lands on a corner turning the wrong way is caught
+before it ships (see ``trackdata._DIRECTIONS``, which exists because two names
+reached the corner next door on 2026-07-30).
+
+Not part of the app: a developer tool for building the table, kept out of the
+bundle like the other tools here.
+
+    python tools/corner_atlas.py Silverstone
+    python tools/corner_atlas.py --all
+    python tools/corner_atlas.py --check      # re-measure against the tables we have
+"""
+
+from __future__ import annotations
+
+import math
+import sys
+from pathlib import Path
+
+_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(_ROOT / "src"))
+
+TRACKS = _ROOT / "src" / "accoach" / "tracks"
+
+#: A corner is a stretch tighter than this. 220 m is the radius above which a
+#: bend stops being something a driver takes as a corner and becomes a curved
+#: straight — Monza's Curva Grande is ~180 m and is named, the Kemmel kink is
+#: ~600 m and is not. It over-collects on purpose: an unnamed apex costs nothing
+#: (it falls back to a number at runtime), a missing one has to be noticed.
+MAX_RADIUS_M = 220.0
+
+#: Two apexes closer together than this along the lap are one corner seen twice.
+#: 2% of a 5.8 km lap is 116 m, which is shorter than the gap between Monza's
+#: two Lesmos (0.053 apart) and longer than the wobble inside one corner.
+MIN_SEP = 0.02
+
+#: Curvature is measured over a stencil this long, in metres. Short enough to
+#: resolve a chicane, long enough that the GPS jitter in the source traces does
+#: not read as a corner.
+STENCIL_M = 12.0
+
+
+def centreline(path: Path) -> tuple[list[float], list[float]]:
+    xs, zs = [], []
+    for line in path.read_text().splitlines():
+        if line.startswith("#") or not line.strip():
+            continue
+        parts = line.split(",")
+        xs.append(float(parts[0]))
+        zs.append(float(parts[1]))
+    return xs, zs
+
+
+def _menger(p0, p1, p2) -> float:
+    """Signed curvature, same formula and same sign meaning as ``track.py``."""
+    (x0, z0), (x1, z1), (x2, z2) = p0, p1, p2
+    cross = (x1 - x0) * (z2 - z0) - (z1 - z0) * (x2 - x0)
+    denom = (math.hypot(x1 - x0, z1 - z0) * math.hypot(x2 - x1, z2 - z1)
+             * math.hypot(x2 - x0, z2 - z0))
+    return 2.0 * cross / denom if denom > 0.0 else 0.0
+
+
+def analyse(xs: list[float], zs: list[float], *, flip: bool = False):
+    """(apexes, total_m) — apexes as (fraction, radius_m, direction), in lap order."""
+    n = len(xs)
+    dist = [0.0]
+    for i in range(1, n):
+        dist.append(dist[-1] + math.hypot(xs[i] - xs[i - 1], zs[i] - zs[i - 1]))
+    total = dist[-1]
+    frac = [d / total for d in dist]
+
+    step = max(2, round(STENCIL_M / (total / n)))
+    kappa = [0.0] * n
+    for i in range(n):
+        kappa[i] = _menger((xs[(i - step) % n], zs[(i - step) % n]),
+                           (xs[i], zs[i]),
+                           (xs[(i + step) % n], zs[(i + step) % n]))
+
+    # Smoothed magnitude for picking peaks; the sign is read at the peak itself,
+    # where it is least ambiguous.
+    win = max(1, step // 2)
+    mag = [sum(abs(kappa[(i + j) % n]) for j in range(-win, win + 1)) / (2 * win + 1)
+           for i in range(n)]
+
+    floor = 1.0 / MAX_RADIUS_M
+    picked: list[tuple[float, float, str]] = []
+    taken: list[float] = []
+    for i in sorted(range(n), key=lambda j: -mag[j]):
+        if mag[i] < floor:
+            break
+        if any(min(abs(frac[i] - t), 1.0 - abs(frac[i] - t)) < MIN_SEP for t in taken):
+            continue
+        taken.append(frac[i])
+        k = kappa[i]
+        direction = ("right" if k > 0 else "left")
+        if flip:
+            direction = "left" if direction == "right" else "right"
+        picked.append((frac[i], 1.0 / mag[i], direction))
+    picked.sort()
+    return picked, total
+
+
+def _handedness() -> bool:
+    """Do the bundled traces turn the way the sim says, or mirrored?
+
+    Not assumed: the centrelines are OpenStreetMap eastings and northings, the
+    sim's coordinates are left-handed, and a mirrored frame turns every left into
+    a right. Decided by measurement, against the only directions in the codebase
+    that were read off real laps (``_DIRECTIONS``, Spa and Suzuka).
+    """
+    from accoach.trackdata import _CORNERS, _DIRECTIONS
+
+    agree = disagree = 0
+    for track, csv in (("spa", "Spa.csv"), ("suzuka", "Suzuka.csv")):
+        want = _DIRECTIONS.get(track, {})
+        if not want:
+            continue
+        found, _ = analyse(*centreline(TRACKS / csv))
+        for name, pos in _CORNERS[track]:
+            if name not in want:
+                continue
+            near = min(found, key=lambda a: min(abs(a[0] - pos), 1.0 - abs(a[0] - pos)))
+            if min(abs(near[0] - pos), 1.0 - abs(near[0] - pos)) > MIN_SEP:
+                continue
+            if near[2] == want[name]:
+                agree += 1
+            else:
+                disagree += 1
+    if agree + disagree == 0:
+        raise SystemExit("no measured direction to calibrate against")
+    print(f"# handedness check: {agree} agree, {disagree} disagree "
+          f"-> {'MIRRORED, flipping' if disagree > agree else 'same as the sim'}")
+    return disagree > agree
+
+
+def report(csv_name: str, flip: bool) -> None:
+    path = TRACKS / csv_name
+    found, total = analyse(*centreline(path), flip=flip)
+    print(f"\n## {path.stem}  —  {total:.0f} m, {len(found)} corners")
+    print(f"{'#':>3}  {'pos':>6}  {'metres':>7}  {'radius':>7}  direction")
+    for i, (f, r, d) in enumerate(found, 1):
+        print(f"{i:>3}  {f:6.3f}  {f * total:7.0f}  {r:6.0f} m  {d}")
+
+
+#: circuit key in ``_CORNERS`` -> the centreline that describes it.
+CSV_FOR = {
+    "austin": "Austin.csv", "brandshatch": "BrandsHatch.csv",
+    "budapest": "Budapest.csv", "catalunya": "Catalunya.csv",
+    "hockenheim": "Hockenheim.csv", "ims": "IMS.csv",
+    "melbourne": "Melbourne.csv", "mexicocity": "MexicoCity.csv",
+    "montreal": "Montreal.csv", "monza": "Monza.csv",
+    "moscowraceway": "MoscowRaceway.csv", "mountpanorama": "MountPanorama.csv",
+    "norisring": "Norisring.csv", "nurburgring": "Nuerburgring.csv",
+    "oschersleben": "Oschersleben.csv", "sakhir": "Sakhir.csv",
+    "saopaulo": "SaoPaulo.csv", "sepang": "Sepang.csv",
+    "shanghai": "Shanghai.csv", "silverstone": "Silverstone.csv",
+    "sochi": "Sochi.csv", "spa": "Spa.csv", "redbullring": "Spielberg.csv",
+    "suzuka": "Suzuka.csv", "yasmarina": "YasMarina.csv",
+    "zandvoort": "Zandvoort.csv",
+}
+
+
+def check() -> None:
+    """Every curated table, re-measured against the geometry it should describe.
+
+    Two ways a row can be wrong, and both are caught here rather than on a
+    driver's screen: the position can land on no corner at all, and the name can
+    land on a corner turning the other way. The second is the one that actually
+    happened (2026-07-30, twice), and it is the one a human proof-reading a list
+    of names will never catch.
+
+    **One standing complaint, and it is the checker's limit, not the table's.**
+    Spa's Raidillon reads as a left here. Eau Rouge is a left-right-left inside
+    about 200 m, which is shorter than ``MIN_SEP``, so the right in the middle
+    is swallowed by the two lefts either side and the peak that survives is one
+    of them. The table's "right" was measured on a real lap and stands. Read it
+    as: this tool resolves corners, not the elements inside a complex.
+    """
+    from accoach.trackdata import _CORNERS, _DIRECTIONS, render
+
+    flip = _handedness()
+    bad = 0
+    for track in sorted(_CORNERS):
+        table = _CORNERS[track]
+        csv = CSV_FOR.get(track)
+        if not table:
+            continue
+        if csv is None:
+            print(f"\n## {track}: {len(table)} curated, NO CENTRELINE — unverified")
+            continue
+        found, total = analyse(*centreline(TRACKS / csv), flip=flip)
+        want = _DIRECTIONS.get(track, {})
+        print(f"\n## {track}: {len(table)} curated, {len(found)} geometric, {total:.0f} m")
+        worst = 0.0
+        for label, pos in table:
+            near = min(found, key=lambda a: min(abs(a[0] - pos), 1.0 - abs(a[0] - pos)))
+            d = min(abs(near[0] - pos), 1.0 - abs(near[0] - pos))
+            worst = max(worst, d)
+            flags = []
+            if d > MIN_SEP:
+                flags.append(f"FAR ({d * total:.0f} m)")
+            if label in want and want[label] != near[2]:
+                flags.append(f"DIRECTION: table says {want[label]}, geometry {near[2]}")
+            bad += bool(flags)
+            print(f"   {render(label, 'en'):26s} {pos:.3f} -> {near[0]:.3f}  "
+                  f"{near[2]:5s} r={near[1]:4.0f} m  {'  '.join(flags)}")
+        print(f"   worst {worst * total:.0f} m (tolerance {_NAME_TOL_M(total):.0f} m)")
+    print(f"\n{'OK' if not bad else str(bad) + ' ROWS TO LOOK AT'}")
+
+
+def _NAME_TOL_M(total: float) -> float:
+    from accoach.trackdata import _NAME_TOL
+    return _NAME_TOL * total
+
+
+def main() -> None:
+    args = sys.argv[1:]
+    if not args:
+        raise SystemExit(__doc__)
+    if args[0] == "--check":
+        check()
+        return
+    flip = _handedness()
+    names = ([p.name for p in sorted(TRACKS.glob("*.csv"))] if args[0] == "--all"
+             else [a if a.endswith(".csv") else a + ".csv" for a in args])
+    for n in names:
+        report(n, flip)
+
+
+if __name__ == "__main__":
+    main()

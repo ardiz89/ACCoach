@@ -40,11 +40,54 @@ def _slug(text: str) -> str:
     return re.sub(r"[^a-z0-9]+", "", text)
 
 
+# The same circuit, spelled the way each sim spells it. Kunos prefixes its own
+# Assetto Corsa tracks with ``ks-``; ACC drops the prefix and renames outright
+# (``cota`` for Austin, ``barcelona`` for Catalunya, ``indianapolis`` for the
+# Speedway's road course). A table keyed on one spelling is invisible to the
+# other game — which is the exact bug ``trackedges._by_shape`` was written to
+# kill for the track drawings, and it would have shipped here too.
+#
+# Only aliases for the *same layout* belong here. ``spa1998`` is deliberately
+# absent: it is a different circuit that happens to share a name, and giving it
+# the modern corner positions would put Les Combes in the middle of a straight.
+_ALIASES: dict[str, str] = {
+    "ksnurburgring": "nurburgring", "nurburgringgp": "nurburgring",
+    "ksredbullring": "redbullring", "spielberg": "redbullring",
+    "cota": "austin", "circuitoftheamericas": "austin",
+    "barcelona": "catalunya", "kscatalunya": "catalunya",
+    "hungaroring": "budapest", "kshungaroring": "budapest",
+    "ksbrandshatch": "brandshatch",
+    "ksmonza": "monza", "monza66": "monza",
+    "kssilverstone": "silverstone",
+    "interlagos": "saopaulo", "ksinterlagos": "saopaulo",
+    "autodromohermanosrodriguez": "mexicocity",
+    "albertpark": "melbourne",
+    "gillesvilleneuve": "montreal", "ksmontreal": "montreal",
+    "bahrain": "sakhir", "ksbahrain": "sakhir",
+    "sepanginternational": "sepang",
+    "yasmarinacircuit": "yasmarina",
+    "bathurst": "mountpanorama", "rtbathurst": "mountpanorama",
+    "kszandvoort": "zandvoort", "circuitzandvoort": "zandvoort",
+    "indianapolis": "ims", "indianapolisroad": "ims",
+    "ksnorisring": "norisring",
+    "kshockenheim": "hockenheim", "hockenheimring": "hockenheim",
+    "kssuzuka": "suzuka",
+    "ksimola": "imola",
+    "ksspa": "spa",
+}
+
+
+def _key(track: str) -> str:
+    """The circuit a sim's track string refers to."""
+    s = _slug(track)
+    return _ALIASES.get(s, s)
+
+
 # track-slug -> ordered list of (name, approx apex pos). Anchored to a real
 # Imola reference lap (BMW M4 GT3, 1:43.7) whose detected apexes were
 # 0.143 / 0.291 / 0.351 / 0.484 / 0.585 / 0.693 / 0.844 — matched here to the
 # known Imola corner sequence.
-_CORNERS: dict[str, list[tuple[str, float]]] = {
+_CORNERS: dict[str, list[tuple[str | int, float]]] = {
     "imola": [
         ("Tamburello", 0.143),       # 1st chicane after the straight
         ("Villeneuve", 0.291),       # 2nd chicane
@@ -95,6 +138,43 @@ _CORNERS: dict[str, list[tuple[str, float]]] = {
         ("Spoon", 0.683),          # double left, 90 km/h, 3935 m
         ("130R", 0.857),           # fast left, 4934 m
         ("Casio Triangle", 0.931), # final chicane, 61 km/h
+    ],
+    # Silverstone. The FIRST table not anchored to a recorded lap: the positions
+    # are read off the bundled centreline (`tools/corner_atlas.py`), whose arc
+    # length reproduces the lap-anchored positions of Monza, Spa and Suzuka to
+    # 12-33 m against a 290-350 m tolerance.
+    #
+    # What corroborates the naming is the **sequence of directions**. Written out
+    # from the circuit's own corner list — Abbey right, Farm left, Village right,
+    # The Loop left, Aintree left, Brooklands left, Luffield right, Woodcote
+    # right, Copse right, Maggotts left, Becketts right-left-right, Chapel left,
+    # Stowe right, Vale left, Club right — it reads
+    #
+    #     R L R L L L R R R L R L R L R L R R
+    #
+    # and the geometry, which knows nothing about any of those names, produces
+    # the same eighteen symbols in the same order. An eighteen-symbol binary
+    # sequence matching by accident is one chance in 260 000, so this is not
+    # "the positions look about right": it is the circuit identifying itself.
+    #
+    # Becketts is a sequence of three and gets one row; the other two fall back
+    # to numbers, which is what `name_corners`' once-each rule is for.
+    "silverstone": [
+        ("Abbey", 0.067),          # right, r=37 m
+        ("Farm Curve", 0.109),     # left, r=98 m
+        ("Village", 0.151),        # right, r=23 m
+        ("The Loop", 0.178),       # left, the tightest of the lap at r=15 m
+        ("Aintree", 0.212),        # left onto the Wellington straight
+        ("Brooklands", 0.340),     # left
+        ("Luffield", 0.371),       # right
+        ("Woodcote", 0.432),       # right onto the old pit straight
+        ("Copse", 0.533),          # right, r=52 m
+        ("Maggotts", 0.612),       # left, r=173 m
+        ("Becketts", 0.632),       # right — the complex's first named apex
+        ("Chapel", 0.713),         # left onto the Hangar straight
+        ("Stowe", 0.863),          # right
+        ("Vale", 0.937),           # left, r=20 m
+        ("Club", 0.958),           # right onto the pit straight
     ],
     # Anchored the same way, to a real Monza lap (Ferrari 488 GT3 Evo, 2:03.7)
     # whose detected apexes were 0.169 / 0.247 / 0.378 / 0.447 / 0.500 / 0.686 /
@@ -194,7 +274,7 @@ def landmark_at(track: str, pos: float, lang: str | None = None) -> str | None:
     bianco-rosso") rather than an abstract distance. The returned string carries
     its own preposition, ready to drop after a verb ("il riferimento frena …").
     """
-    table = _LANDMARKS.get(_slug(track))
+    table = _LANDMARKS.get(_key(track))
     if not table:
         return None
     it, en, p = min(table, key=lambda t: abs(t[2] - pos))
@@ -204,26 +284,47 @@ def landmark_at(track: str, pos: float, lang: str | None = None) -> str | None:
     return it if (lang or current_language()) == "it" else en
 
 
+def _word(lang: str | None) -> str:
+    from .i18n import current_language
+    return "Curva" if (lang or current_language()) == "it" else "Corner"
+
+
+def render(label: str | int, lang: str | None = None) -> str:
+    """A curated entry as the driver reads it.
+
+    A proper noun is kept as-is — "Parabolica" is "Parabolica" in every language.
+    An **integer** is the circuit's own turn number, and is rendered in the
+    reader's language. The distinction matters more than it looks: most modern
+    circuits name nothing and number everything, and their numbers are facts
+    published on the track map, not our count of what a detector found.
+    """
+    return label if isinstance(label, str) else f"{_word(lang)} {label}"
+
+
 def corner_name(track: str, index: int, apex_pos: float,
                 lang: str | None = None, direction: str = "") -> str:
     """Name for a detected corner, by nearest curated apex, else ``Corner N`` /
-    ``Curva N`` per language (curated names are proper nouns, kept as-is).
+    ``Curva N`` per language.
+
+    The fallback number is **the detector's count**, not the circuit's: it says
+    "the seventh corner I found", which on a track whose table we don't have is
+    the only honest thing to say. Where a circuit's real numbering is curated it
+    comes through the table above instead, and then the number on screen is the
+    one painted on the track map.
 
     ``direction`` is the way this corner actually turns, when the lap carries
     the coordinates to know. Passing it is what stops a name from reaching the
     corner next door — this function names one corner at a time and has none of
     the once-each protection ``name_corners`` uses.
     """
-    table = _CORNERS.get(_slug(track))
+    table = _CORNERS.get(_key(track))
     if table:
         usable = [t for t in table if _direction_ok(track, t[0], direction)]
         if usable:
-            name, pos = min(usable, key=lambda t: abs(t[1] - apex_pos))
+            label, pos = min(usable, key=lambda t: abs(t[1] - apex_pos))
             if abs(pos - apex_pos) <= _NAME_TOL:
-                return name
-    from .i18n import current_language
-    word = "Curva" if (lang or current_language()) == "it" else "Corner"
-    return f"{word} {index + 1}"
+                return render(label, lang)
+    return f"{_word(lang)} {index + 1}"
 
 
 # Which way each curated corner turns, where we have measured it. A name only
@@ -251,17 +352,26 @@ _DIRECTIONS: dict[str, dict[str, str]] = {
         "Degner 2": "right", "Hairpin": "left", "Spoon": "left",
         "130R": "left",                # Casio Triangle is a chicane: not checked
     },
+    # Silverstone's are measured off the centreline, not off a lap — and they
+    # are the whole reason its table is trusted, so every one is recorded.
+    "silverstone": {
+        "Abbey": "right", "Farm Curve": "left", "Village": "right",
+        "The Loop": "left", "Aintree": "left", "Brooklands": "left",
+        "Luffield": "right", "Woodcote": "right", "Copse": "right",
+        "Maggotts": "left", "Becketts": "right", "Chapel": "left",
+        "Stowe": "right", "Vale": "left", "Club": "right",
+    },
 }
 
 
-def _direction_ok(track: str, name: str, direction: str) -> bool:
+def _direction_ok(track: str, name: str | int, direction: str) -> bool:
     """Does this corner turn the way the curated one does?
 
     True whenever either side has nothing to say — a lap with no coordinates
     can't classify a corner, and most curated corners have no measured direction
     yet. Unknown must not mean "no".
     """
-    want = _DIRECTIONS.get(_slug(track), {}).get(name, "")
+    want = _DIRECTIONS.get(_key(track), {}).get(name, "")
     return not want or not direction or want == direction
 
 
@@ -277,25 +387,25 @@ def name_corners(track: str, corners, lang: str | None = None) -> list[str]:
     to the real apex keeps the name; the others fall back to a number, which is
     vague but at least tells them apart.
     """
-    named: list[str | None] = [None] * len(corners)
-    table = _CORNERS.get(_slug(track))
+    named: list[str | int | None] = [None] * len(corners)
+    table = _CORNERS.get(_key(track))
     if table:
-        for name, pos in table:
+        for label, pos in table:
             best, best_d = None, _NAME_TOL
             for i, c in enumerate(corners):
                 if named[i] is not None:
                     continue
-                if not _direction_ok(track, name, getattr(c, "direction", "")):
+                if not _direction_ok(track, label, getattr(c, "direction", "")):
                     continue
                 d = abs(c.apex_pos - pos)
                 if d <= best_d:
                     best, best_d = i, d
             if best is not None:
-                named[best] = name
-    return [named[i] if named[i] is not None
+                named[best] = label
+    return [render(named[i], lang) if named[i] is not None
             else corner_name("", c.index, c.apex_pos, lang)
             for i, c in enumerate(corners)]
 
 
 def has_names(track: str) -> bool:
-    return _slug(track) in _CORNERS
+    return _key(track) in _CORNERS
