@@ -316,3 +316,54 @@ def test_silverstone_every_name_carries_the_direction_that_proved_it():
 def test_a_silverstone_name_will_not_take_a_corner_turning_the_other_way():
     assert corner_name("silverstone", 8, 0.533, "en", "right") == "Copse"
     assert corner_name("silverstone", 8, 0.533, "en", "left") == "Corner 9"
+
+
+# --- circuits sourced from a published corner list (2026-08-03) ------------
+# The method: a source supplies the corners in order and which way each turns,
+# the bundled centreline supplies where they are, and the two have to agree.
+# Pinned here is what can be checked without a lap: every name lands on its own
+# corner, and every direction that proved the table is still recorded next to it.
+
+_SOURCED = {
+    "silverstone": ["Abbey", "Farm Curve", "Village", "The Loop", "Aintree",
+                    "Brooklands", "Luffield", "Woodcote", "Copse", "Maggotts",
+                    "Becketts", "Chapel", "Stowe", "Vale", "Club"],
+    "mountpanorama": ["Hell Corner", "Griffins Bend", "The Cutting",
+                      "Quarry Corner", "Reid Park", "Sulman Park",
+                      "McPhillamy Park", "Skyline", "The Dipper",
+                      "Forrest's Elbow", "The Chase", "Murray's Corner"],
+    "saopaulo": ["S do Senna", "Curva do Sol", "Descida do Lago", "Ferradura",
+                 "Laranjinha", "Pinheirinho", "Bico de Pato", "Mergulho",
+                 "Junção", "Subida dos Boxes", "Arquibancadas"],
+}
+
+
+@pytest.mark.parametrize("track", sorted(_SOURCED))
+def test_a_sourced_table_names_each_corner_once_and_in_order(track):
+    table = trackdata._CORNERS[track]
+    corners = [_corner(i, pos) for i, (_n, pos) in enumerate(table)]
+    assert name_corners(track, corners) == _SOURCED[track]
+
+
+@pytest.mark.parametrize("track", sorted(_SOURCED))
+def test_a_sourced_table_is_ordered_with_no_duplicates(track):
+    positions = [p for _n, p in trackdata._CORNERS[track]]
+    assert positions == sorted(positions)
+    assert all(0.0 < p < 1.0 for p in positions)
+
+
+@pytest.mark.parametrize("track", sorted(_SOURCED))
+def test_a_sourced_direction_is_never_recorded_for_a_name_we_do_not_have(track):
+    """A direction for a name that left the table is evidence for a claim
+    nobody makes any more — and the next person to read it will believe the
+    name is still there."""
+    names = {n for n, _p in trackdata._CORNERS[track]}
+    assert set(trackdata._DIRECTIONS.get(track, {})) <= names
+
+
+def test_a_complex_is_not_given_a_single_direction():
+    """The Chase is right-left-right and S do Senna is left-right. Asking a
+    complex which way it turns has no answer, so it isn't asked — the same call
+    already made for Spa's Bus Stop and Suzuka's Casio Triangle."""
+    assert "The Chase" not in trackdata._DIRECTIONS["mountpanorama"]
+    assert "S do Senna" not in trackdata._DIRECTIONS["saopaulo"]

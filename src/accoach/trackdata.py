@@ -176,6 +176,66 @@ _CORNERS: dict[str, list[tuple[str | int, float]]] = {
         ("Vale", 0.937),           # left, r=20 m
         ("Club", 0.958),           # right onto the pit straight
     ],
+    # Mount Panorama. Names and directions from the circuit's own corner list
+    # (Wikipedia, "Mount Panorama Circuit"); positions from the centreline. The
+    # two were joined by `corner_atlas.py --fit`, which lays an ordered list of
+    # corners onto the detected apexes keeping their order, and the result agrees
+    # with the source on **15 directions out of 15**.
+    #
+    # Two physical anchors say the alignment is on the real circuit and not on a
+    # plausible-looking shift of it: Hell Corner to Griffins Bend measures 1116 m
+    # (Mountain Straight), and Forrest's Elbow to The Chase measures 1116 m
+    # (Conrod). Both are straights you can find on any map of this track.
+    #
+    # The Chase is three corners (right-left-right) and gets one row, like
+    # Becketts and Ascari — `name_corners` hands each name out once and the other
+    # two elements fall back to numbers rather than printing "The Chase" thrice.
+    "mountpanorama": [
+        ("Hell Corner", 0.044),       # left, r=24 m
+        ("Griffins Bend", 0.223),     # right, after Mountain Straight
+        ("The Cutting", 0.305),       # left, r=30 m, uphill
+        ("Quarry Corner", 0.328),     # right
+        ("Reid Park", 0.361),         # right
+        ("Sulman Park", 0.527),       # left
+        ("McPhillamy Park", 0.550),   # left, r=23 m
+        ("Skyline", 0.589),           # right, at the crest
+        ("The Dipper", 0.610),        # left, r=30 m
+        ("Forrest's Elbow", 0.649),   # left, onto Conrod
+        ("The Chase", 0.828),         # right — first of right-left-right
+        ("Murray's Corner", 0.964),   # left, r=21 m, onto the pit straight
+    ],
+    # Interlagos. Same method, same source shape (Wikipedia, "Interlagos
+    # Circuit"): the automatic fit agreed on 14 directions out of 14 — and was
+    # still **wrong by one step**, which is worth writing down because it is the
+    # limit of the method.
+    #
+    # It slid Curva do Sol onto the left-hander at 1424 m. The geometry refuses
+    # that: between 744 m and 1424 m there is no corner at all, which is 680 m of
+    # Reta Oposta, and Curva do Sol is the corner that *leads onto* the back
+    # straight, not the one after it. So the corners here are stepped back one
+    # place from what the solver proposed. A direction-agreement score cannot see
+    # a straight; a person reading the metres can.
+    #
+    # Junção is likewise pinned by physics rather than by the solver: it is the
+    # last slow corner before the climb to the line, and everything after it is
+    # taken flat — so it is the tight r=27 m left at 3271 m, not one of the open
+    # left-handers before it.
+    #
+    # Café is left out: the source names it, and it sits inside the run of
+    # flat-out left-handers where nothing distinguishes one apex from the next.
+    "saopaulo": [
+        ("S do Senna", 0.087),        # left, r=24 m — the chicane's first element
+        ("Curva do Sol", 0.173),      # left, onto the Reta Oposta
+        ("Descida do Lago", 0.365),   # left, r=69 m
+        ("Ferradura", 0.504),         # right, r=61 m
+        ("Laranjinha", 0.540),        # right, r=25 m
+        ("Pinheirinho", 0.571),       # left, r=32 m
+        ("Bico de Pato", 0.647),      # right, r=18 m — the tightest of the lap
+        ("Mergulho", 0.701),          # left, r=63 m
+        ("Junção", 0.761),            # left, r=27 m — last slow corner
+        ("Subida dos Boxes", 0.811),  # left, taken flat
+        ("Arquibancadas", 0.854),     # left, taken flat
+    ],
     # Anchored the same way, to a real Monza lap (Ferrari 488 GT3 Evo, 2:03.7)
     # whose detected apexes were 0.169 / 0.247 / 0.378 / 0.447 / 0.500 / 0.686 /
     # 0.888. The minimum speeds identify them beyond doubt: 49 km/h at the first
@@ -352,14 +412,32 @@ _DIRECTIONS: dict[str, dict[str, str]] = {
         "Degner 2": "right", "Hairpin": "left", "Spoon": "left",
         "130R": "left",                # Casio Triangle is a chicane: not checked
     },
-    # Silverstone's are measured off the centreline, not off a lap — and they
-    # are the whole reason its table is trusted, so every one is recorded.
+    # From here down the directions are measured off the centreline rather than
+    # off a lap, and they are the whole reason these tables are trusted: each was
+    # written from a published corner list and then had to survive the geometry
+    # saying which way that corner actually turns. Recording them keeps the
+    # evidence next to the claim.
     "silverstone": {
         "Abbey": "right", "Farm Curve": "left", "Village": "right",
         "The Loop": "left", "Aintree": "left", "Brooklands": "left",
         "Luffield": "right", "Woodcote": "right", "Copse": "right",
         "Maggotts": "left", "Becketts": "right", "Chapel": "left",
         "Stowe": "right", "Vale": "left", "Club": "right",
+    },
+    "mountpanorama": {
+        "Hell Corner": "left", "Griffins Bend": "right", "The Cutting": "left",
+        "Quarry Corner": "right", "Reid Park": "right", "Sulman Park": "left",
+        "McPhillamy Park": "left", "Skyline": "right", "The Dipper": "left",
+        "Forrest's Elbow": "left", "Murray's Corner": "left",
+        # The Chase is right-left-right: a complex has no single direction, so
+        # it is not checked — the same call already made for Bus Stop.
+    },
+    "saopaulo": {
+        "Curva do Sol": "left", "Descida do Lago": "left", "Ferradura": "right",
+        "Laranjinha": "right", "Pinheirinho": "left", "Bico de Pato": "right",
+        "Mergulho": "left", "Junção": "left", "Subida dos Boxes": "left",
+        "Arquibancadas": "left",
+        # S do Senna is a left-right chicane: not checked.
     },
 }
 

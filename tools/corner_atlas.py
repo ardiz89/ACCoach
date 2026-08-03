@@ -239,6 +239,72 @@ def _NAME_TOL_M(total: float) -> float:
     return _NAME_TOL * total
 
 
+def fit(csv_name: str, wanted: list[tuple[str, str]], flip: bool) -> None:
+    """Lay an ordered list of (name, direction) onto the geometry.
+
+    The source supplies what it is good for — the corners of a circuit, in order,
+    and which way each turns — and the geometry supplies what no source states:
+    where each one is, as a fraction of the lap. The join between them is the
+    part a human does badly, because the detector over-collects (every kink is
+    an apex) and choosing which apexes the names belong to is a combinatorial
+    problem that *looks* like a reading exercise.
+
+    So it is solved rather than eyeballed: over every order-preserving
+    assignment, keep the one that agrees with the source's directions most
+    often. Order-preserving is not a convenience, it is the constraint that
+    makes the answer meaningful — corners cannot overtake each other.
+
+    Prints the alignment and, more importantly, the disagreements. A name whose
+    direction fights the geometry does not go in a table.
+    """
+    found, total = analyse(*centreline(TRACKS / csv_name), flip=flip)
+    n, m = len(wanted), len(found)
+    if n > m:
+        print(f"{csv_name}: {n} names for {m} apexes — the geometry is too coarse")
+        return
+
+    # Direction agreement decides; **prominence** breaks the ties, and without it
+    # the answer is wrong in a way that still scores perfectly. Measured on
+    # Interlagos, whose back half is a run of left-handers: with agreement as the
+    # only score the solver was free to slide Curva do Sol 700 m down the track
+    # onto a different left and still read 14/14. A circuit names its *notable*
+    # corners, so among alignments that agree equally, the one sitting on the
+    # tighter apexes is the one meant. Weighted far below a direction so it can
+    # never outvote one.
+    NEG = float("-inf")
+    best = [[NEG] * (m + 1) for _ in range(n + 1)]
+    back = [[0] * (m + 1) for _ in range(n + 1)]
+    for j in range(m + 1):
+        best[0][j] = 0
+    for i in range(1, n + 1):
+        for j in range(i, m + 1):
+            skip = best[i][j - 1]
+            take = best[i - 1][j - 1]
+            if take != NEG:
+                agree = (not wanted[i - 1][1]
+                         or wanted[i - 1][1] == found[j - 1][2])
+                take += (1.0 if agree else 0.0) + 0.1 * min(1.0, 40.0 / found[j - 1][1])
+            if take >= skip:
+                best[i][j], back[i][j] = take, 1
+            else:
+                best[i][j], back[i][j] = skip, 0
+
+    pairs, i, j = [], n, m
+    while i > 0:
+        if back[i][j] == 1:
+            pairs.append((wanted[i - 1], found[j - 1]))
+            i -= 1
+        j -= 1
+    pairs.reverse()
+
+    print(f"\n## {Path(csv_name).stem} — {n} names onto {m} apexes, "
+          f"{best[n][m]}/{n} directions agree")
+    for (name, want), (pos, radius, direction) in pairs:
+        flag = "" if (not want or want == direction) else f"  <-- source says {want}"
+        print(f'   ("{name}", {pos:.3f}),'.ljust(42) +
+              f"# {direction}, r={radius:.0f} m, {pos * total:.0f} m{flag}")
+
+
 def main() -> None:
     args = sys.argv[1:]
     if not args:
