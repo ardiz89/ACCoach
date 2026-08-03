@@ -104,3 +104,34 @@ def test_the_setting_has_a_label_in_both_languages():
     for lang in ("it", "en"):
         assert t("set.pedals", lang=lang) != "set.pedals"
         assert t("set.pedals_hint", lang=lang) != "set.pedals_hint"
+
+
+def test_coach_live_honours_the_setting_without_being_told(app, monkeypatch):
+    """Il difetto che rendeva inutile la spunta.
+
+    `pedals` era un parametro con default False, quindi ogni chiamante doveva
+    ricordarsene. Il comando `overlay` se lo ricordava; **`live` no** — cioè il
+    processo che il wizard e la guida dicono di avviare. Si poteva mettere la
+    spunta, salvarla, riaprire il pannello e ritrovarla messa, e sull'overlay
+    non succedeva niente.
+
+    Costruito come lo costruisce `app.py`, senza passare nulla.
+    """
+    import accoach.config as cfg_mod
+
+    real = cfg_mod.load_config()
+    real.overlay.pedals = True
+    monkeypatch.setattr(cfg_mod, "load_config", lambda *a, **k: real)
+    monkeypatch.setattr(ov_mod, "load_config", lambda *a, **k: real, raising=False)
+
+    o = Overlay(url=None, interactive=False)      # esattamente la riga di app.py
+    on = o._show_pedals
+    o.deleteLater()
+    assert on, "la spunta salvata deve arrivare a Coach Live da sola"
+
+
+def test_the_command_line_flag_still_forces_it_on(app):
+    o = Overlay(url=None, interactive=False, pedals=True)
+    forced = o._show_pedals
+    o.deleteLater()
+    assert forced
