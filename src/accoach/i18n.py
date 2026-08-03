@@ -315,6 +315,23 @@ _UI: dict[str, dict[str, str]] = {
               "frenata smette di comparire lì — come togli la traiettoria e i "
               "cartelli di frenata uno alla volta quando impari un tracciato. "
               "Spento li tiene a ogni curva per sempre."},
+    "set.pedals": {"en": "Show the pedal trace", "it": "Mostra la traccia dei pedali"},
+    "set.pedals.help": {
+        "en": "A strip under the overlay with your throttle (green) and brake "
+              "(red) as they happen. The ribbon under it turns amber while both "
+              "pedals are down — that's trail braking — and grey while neither "
+              "is, which is time you're giving away. It's the only place you "
+              "can watch your brake release as you do it, instead of being told "
+              "about it afterwards.",
+        "it": "Una striscia sotto l'overlay col tuo gas (verde) e il tuo freno "
+              "(rosso) mentre succedono. Il nastro sotto diventa ambra finché "
+              "premi tutti e due i pedali — è il trail braking — e grigio "
+              "quando non ne premi nessuno, che è tempo regalato. È l'unico "
+              "posto dove vedi il rilascio del freno **mentre** lo fai, invece "
+              "di sentirtelo raccontare dopo."},
+    "set.pedals_hint": {
+        "en": "Makes the overlay taller. Applies on the next Coach Live start.",
+        "it": "Allunga l'overlay. Attivo al prossimo avvio di Coach Live."},
     "set.scale.help": {
         "en": "How big the overlay is drawn on screen. 1.0 is the design size; "
               "raise it on a 4K monitor or if you sit far from the screen, "

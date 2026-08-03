@@ -85,6 +85,14 @@ clicks from the game).
   Crew Chief.
 - **Move or close it:** start it with `--interactive`, or close the terminal that
   launched it (`Ctrl+C`).
+- **Watching your own trail braking:** turn on **Settings → Show the pedal
+  trace**. It adds a strip under the HUD with your throttle (green) and brake
+  (red) over the last few seconds. The ribbon below them goes **amber** while
+  both pedals are down — that's trail braking — **grey** while neither is, which
+  is time you're giving away, and stays blank on a clean release. The coach
+  *tells* you about your brake release after the fact; this is the only place
+  you can watch it as you do it. Off by default because it makes the overlay
+  taller.
 
 ## Being called into the pits
 

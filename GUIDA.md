@@ -166,6 +166,35 @@ Non devi fare nulla di speciale: avvia la sessione (Pratica, Hotlap, Gara) e gui
   curva lenta.
 - Una **pastiglia** mostra l'ultimo consiglio pronunciato, e sfuma da sola.
 
+### La traccia dei pedali (per il trail braking)
+
+Si accende da **Impostazioni → Mostra la traccia dei pedali**, ed è **spenta di
+default** perché allunga l'overlay: tienila accesa quando stai lavorando sul
+rilascio del freno, spenta quando vuoi lo schermo pulito.
+
+È una striscia sotto l'HUD con il tuo **gas in verde** e il tuo **freno in
+rosso** mentre succedono, negli ultimi secondi. Sotto le due tracce c'è un
+nastro che si colora da solo:
+
+| Nastro | Cosa stai facendo |
+|---|---|
+| **ambra** | premi tutti e due i pedali → **stai trailando** |
+| **grigio** | non ne premi nessuno → **tempo morto**, tempo regalato |
+| niente | rilascio pulito: hai mollato il freno e ripreso il gas senza vuoto |
+
+In alto a destra la stessa cosa in una parola — **TRAIL**, oppure **COAST** col
+cronometro di quanto stai veleggiando.
+
+Serve per una ragione precisa: il coach il trail braking te lo **dice**, ma te lo
+dice a cose fatte. Qui lo **vedi mentre lo fai**, che è l'unico modo di correggere
+un rilascio — la sovrapposizione fra le due curve è, letteralmente, il tuo trail
+braking disegnato.
+
+> Il consiglio a voce sul trail braking è **spento sulle stradali**: lì portare
+> il freno fino all'inserimento fa girare l'auto, e su una macchina senza carico
+> aerodinamico mollarlo tardi la fa partire. La traccia invece resta, perché
+> guardare non è farsi dire cosa fare.
+
 ### Quando il delta non c'è
 
 Il delta compare **solo sui giri che possono contare**, cioè quelli cominciati

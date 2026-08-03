@@ -299,6 +299,14 @@ class SettingsPanel(QWidget):
         self._wean.setChecked(cfg.overlay.wean)
         row("set.wean", self._wean)
 
+        # L'unica cosa visiva e in tempo reale sul trail braking. Esisteva da
+        # settimane, spenta di default e senza un interruttore da nessuna parte:
+        # per accenderla bisognava scrivere a mano in `config.toml`. Una
+        # funzione che non si accende dall'app, per chi la usa, non esiste.
+        self._pedals = QCheckBox()
+        self._pedals.setChecked(cfg.overlay.pedals)
+        row("set.pedals", self._pedals)
+
         self._autorecord = QCheckBox()
         self._autorecord.setChecked(cfg.autorecord)
         row("set.autorecord", self._autorecord)
@@ -309,6 +317,9 @@ class SettingsPanel(QWidget):
         # setting nobody trusts.
         self._watch_state = _hint("")
         root.addWidget(self._watch_state)
+
+        self._pedals_hint = _hint(t("set.pedals_hint"))
+        root.addWidget(self._pedals_hint)
 
         self._scale_hint = _hint(t("set.scale_hint"))
         root.addWidget(self._scale_hint)
@@ -357,6 +368,7 @@ class SettingsPanel(QWidget):
         cfg.voice.rate = self._rate.value()
         cfg.overlay.scale = round(self._scale.value(), 2)
         cfg.overlay.wean = self._wean.isChecked()
+        cfg.overlay.pedals = self._pedals.isChecked()
         cfg.autorecord = self._autorecord.isChecked()
         save_config(cfg)
         self._saved_note.setText("✓ " + t("btn.save"))
@@ -371,6 +383,7 @@ class SettingsPanel(QWidget):
             lbl.setText(t(key))
         for key, mark in self._helps.items():
             mark.setToolTip(t(f"{key}.help"))
+        self._pedals_hint.setText(t("set.pedals_hint"))
         self._scale_hint.setText(t("set.scale_hint"))
         self._save.setText(t("btn.save"))
         self._devtools.setText(t("sec.devtools"))
