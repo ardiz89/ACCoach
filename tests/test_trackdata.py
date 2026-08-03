@@ -429,3 +429,24 @@ def test_every_bundled_circuit_turns_the_way_it_really_turns():
         way = "anticlockwise" if deg > 0 else "clockwise"
         want = "anticlockwise" if csv.stem in anticlockwise else "clockwise"
         assert way == want, f"{csv.stem} reads {way}, it runs {want}"
+
+
+def test_cota_is_numbered_all_twenty_turns():
+    labels = [n for n, _p in trackdata._CORNERS["austin"]]
+    assert labels == list(range(1, 21))
+
+
+def test_cota_is_reachable_under_accs_spelling():
+    """ACC ships it as ``cota``; the trace and every guide call it Austin."""
+    assert trackdata.has_names("cota")
+    assert corner_name("cota", 0, 0.121, "it", "left") == "Curva 1"
+
+
+def test_cotas_back_straight_survives_in_the_table():
+    """T11 to T12 is 1195 m with no corner in it, against a published back
+    straight of 1016 m. It is the anchor that says the twenty positions sit on
+    the real circuit and not on a plausible shift of it — so if an edit ever
+    slides them, this is what notices."""
+    pos = dict((n, p) for n, p in trackdata._CORNERS["austin"])
+    gap_m = (pos[12] - pos[11]) * 5503.0
+    assert 1100 < gap_m < 1300

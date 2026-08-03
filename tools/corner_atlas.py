@@ -184,6 +184,21 @@ def report(csv_name: str, flip: bool) -> None:
         print(f"{i:>3}  {f:6.3f}  {f * total:7.0f}  {r:6.0f} m  {d}")
 
 
+#: Circuits that needed the detector read at something other than the default,
+#: and why. Recorded rather than hard-coded into the table, so ``--check`` can
+#: re-derive each table with the settings it was actually built at.
+#:
+#: COTA: at the default 110 m minimum separation its esses merge into each other
+#: and the read comes out with T3 and T4 the wrong way round — the only two
+#: directions of fourteen that fought the source. At 77 m they resolve and all
+#: fourteen agree, with T6 showing up as the two apexes of one long corner,
+#: which is exactly what the source calls "a long, sweeping right-hander". The
+#: conflict was this tool's resolution, not a disagreement about the circuit.
+PARAMS: dict[str, tuple[float, float]] = {          # key -> (max radius, min sep)
+    "austin": (240.0, 0.014),
+}
+
+
 #: circuit key in ``_CORNERS`` -> the centreline that describes it.
 CSV_FOR = {
     "austin": "Austin.csv", "brandshatch": "BrandsHatch.csv",
@@ -230,7 +245,11 @@ def check() -> None:
         if csv is None:
             print(f"\n## {track}: {len(table)} curated, NO CENTRELINE — unverified")
             continue
+        global MAX_RADIUS_M, MIN_SEP
+        keep = (MAX_RADIUS_M, MIN_SEP)
+        MAX_RADIUS_M, MIN_SEP = PARAMS.get(track, keep)
         found, total = analyse(*centreline(TRACKS / csv), flip=flip)
+        MAX_RADIUS_M, MIN_SEP = keep
         want = _DIRECTIONS.get(track, {})
         print(f"\n## {track}: {len(table)} curated, {len(found)} geometric, {total:.0f} m")
         worst = 0.0

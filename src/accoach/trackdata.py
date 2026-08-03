@@ -327,6 +327,49 @@ _CORNERS: dict[str, list[tuple[str | int, float]]] = {
         (14, 0.891),  # right
         (15, 0.911),  # right, onto the pit straight
     ],
+    # Circuit of the Americas, by NUMBER: only Turn 1 has a name anybody uses,
+    # and its twenty turns are what every guide and every driver counts in.
+    #
+    # Directions from a track guide written in prose — "the sharp left-hander",
+    # "Turn 3 is a left-hand corner, Turn 4 is a right-hand corner", "the
+    # right-hand, sweeping eighth turn", "the triple-apex Turns 16-18". All
+    # fourteen it states agree with the geometry.
+    #
+    # It took a second read to get there, and the reason is worth keeping. At the
+    # tool's default resolution the esses merged and T3/T4 came out swapped —
+    # the only two of fourteen that fought the source. Read at 77 m of minimum
+    # separation instead of 110 they resolve, all fourteen agree, and T6 appears
+    # as two apexes of one corner, which is what the guide calls "a long,
+    # sweeping right-hander". The conflict was our resolution, not a
+    # disagreement about the circuit (see `corner_atlas.PARAMS`).
+    #
+    # Three anchors nobody could fake: T1 is the tightest corner of the lap at
+    # r=13 m and the guide calls it sharp; T11 is followed by **1195 m with no
+    # corner in it**, against a published back straight of 1016 m; and T16-T18
+    # come out as three consecutive rights about 100 m apart, which is the
+    # triple-apex the guide describes.
+    "austin": [
+        (1, 0.121),   # left, r=13 m — the tightest of the lap, uphill
+        (2, 0.172),   # right
+        (3, 0.212),   # left — the esses begin
+        (4, 0.231),   # right
+        (5, 0.248),   # left
+        (6, 0.286),   # right, long
+        (7, 0.313),   # left
+        (8, 0.339),   # right
+        (9, 0.360),   # left
+        (10, 0.397),  # left
+        (11, 0.471),  # left hairpin, r=15 m — onto the back straight
+        (12, 0.688),  # left, after 1195 m of nothing
+        (13, 0.730),  # right
+        (14, 0.747),  # right
+        (15, 0.781),  # left, r=13 m
+        (16, 0.821),  # right — the triple apex begins
+        (17, 0.838),  # right
+        (18, 0.856),  # right
+        (19, 0.917),  # left
+        (20, 0.975),  # left, onto the pit straight
+    ],
     # Anchored the same way, to a real Monza lap (Ferrari 488 GT3 Evo, 2:03.7)
     # whose detected apexes were 0.169 / 0.247 / 0.378 / 0.447 / 0.500 / 0.686 /
     # 0.888. The minimum speeds identify them beyond doubt: 49 km/h at the first
@@ -533,6 +576,12 @@ _DIRECTIONS: dict[str, dict[str, str]] = {
         1: "right", 2: "left", 3: "left", 4: "right", 5: "left", 6: "right",
         7: "right", 8: "left", 9: "right", 10: "left", 11: "right",
         12: "right", 13: "left", 14: "right", 15: "right",
+    },
+    "austin": {
+        1: "left", 2: "right", 3: "left", 4: "right", 5: "left", 6: "right",
+        7: "left", 8: "right", 9: "left", 10: "left", 11: "left", 12: "left",
+        13: "right", 14: "right", 15: "left", 16: "right", 17: "right",
+        18: "right", 19: "left", 20: "left",
     },
     "zandvoort": {
         "Tarzanbocht": "right", "Gerlachbocht": "right",
