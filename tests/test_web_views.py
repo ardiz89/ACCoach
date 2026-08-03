@@ -294,7 +294,14 @@ def test_no_id_rule_can_outrank_the_hidden_class():
     """
     for m in re.finditer(r"(#view-[\w-]+)([^{]*)\{([^}]*)\}", _screen_css()):
         sel, rest, body = m.group(1), m.group(2), m.group(3)
-        if "display" not in body:
+        decl = re.search(r"display\s*:\s*([\w-]+)", body)
+        if decl is None:
+            continue
+        # `display: none` è l'opposto del pericolo: non può lasciare un pannello
+        # a schermo, può solo toglierlo. Serve per lo stato «ancora nessun giro»,
+        # dove `#view-flow` riempiva la finestra di una card vuota e spingeva il
+        # messaggio sotto la piega. Il divieto vale per chi lo rende visibile.
+        if decl.group(1) == "none":
             continue
         assert ":not(.hidden)" in sel + rest, f"{sel}{rest} sets display"
 

@@ -28,8 +28,11 @@ from PySide6.QtWidgets import (
 from . import brand
 from .coaching.debrief import CornerLoss
 from .i18n import t
+from .logging_setup import get_logger
 from .telemetry.snapshot import format_lap_time
 from .theme import MONO
+
+_log = get_logger("hub")
 
 
 @dataclass(slots=True)
@@ -42,6 +45,10 @@ class HomeData:
       is_reference  — the latest lap *is* the fastest; nothing to beat
       no_reference  — laps exist but no usable reference yet
       empty         — no recorded laps at all
+      error         — the archive can't be read (locked catalog, corrupt file).
+                      Deliberately NOT "empty": telling someone who has just
+                      driven that they have never driven sends them to drive
+                      more instead of to the logs.
     """
 
     status: str
@@ -59,7 +66,7 @@ class HomeData:
 
 def load_home_data(laps_dir: Path | str | None = None,
                    lang: str | None = None) -> HomeData:
-    """Assemble the last-session diagnosis. Never raises — returns ``empty`` on any
+    """Assemble the last-session diagnosis. Never raises — returns ``error`` on a
     failure so the Home degrades gracefully instead of crashing the hub."""
     # Imported lazily so importing the launcher (e.g. in tests) doesn't drag in the
     # whole coaching/recording stack until the Home actually loads.
@@ -134,7 +141,13 @@ def load_home_data(laps_dir: Path | str | None = None,
                 debrief_text=text,
             )
     except Exception:  # pragma: no cover - defensive: never break the hub
-        return HomeData(status="empty")
+        # "error", non "empty". Un catalogo bloccato da un altro processo, uno
+        # schema vecchio, un file di giro corrotto: tutto atterrava su «Nessuna
+        # sessione ancora», detto a chi una sessione l'aveva appena finita. Non
+        # è tacere senza spiegare — è **dire la cosa sbagliata** sul perché, e
+        # manda l'utente a guidare di più invece che a guardare i log.
+        _log.warning("home data unavailable", exc_info=True)
+        return HomeData(status="error")
 
 
 class _HomeWorker(QThread):
@@ -261,7 +274,13 @@ class HomePanel(QWidget):
         self._cta_debrief.setEnabled(has_debrief)
         self._cta_debrief.setToolTip("" if has_debrief else t("home.empty_body"))
 
-        if data.status == "empty":
+        if data.status == "error":
+            # Distinto da "empty" di proposito: «non riesco a leggere» e «non hai
+            # ancora guidato» mandano l'utente in due direzioni opposte.
+            self._headline.setText(t("home.error_title"))
+            self._cause.setText(t("home.error_body"))
+            self._fix.setText("")
+        elif data.status == "empty":
             self._headline.setText(t("home.empty_title"))
             self._cause.setText(t("home.empty_body"))
             self._fix.setText("")

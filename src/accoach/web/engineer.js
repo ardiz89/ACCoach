@@ -53,6 +53,13 @@ async function loadCombos() {
   sel.innerHTML = "";
   if (!combos.length) {
     sel.innerHTML = `<option value="">${t("eng.noSetupOpt")}</option>`;
+    // Il `return` salta `onComboChange()`, quindi saltava anche `noSetupHTML()`
+    // — che esiste apposta per questo caso — e restava il testo statico
+    // dell'HTML: «Scegli un'auto/pista qui sopra», sotto una tendina che dice
+    // «(nessun setup trovato)». Una contraddizione, e proprio al primo avvio:
+    // un'installazione ACC nuova ha la cartella dei setup **vuota** finché non
+    // ne salvi uno dal gioco.
+    $("setup-body").innerHTML = noSetupHTML();
     return;
   }
   // Group the (potentially many) cars by engineer class for a usable dropdown.
@@ -748,7 +755,12 @@ function renderEngineer(st) {
     conf.hidden = true; prep.hidden = true;
     says.classList.add("active");
   } else {
-    $("es-msg").textContent = t("eng.dash"); $("es-cat").textContent = "";
+    // Un trattino è un silenzio che non dice perché tace, dentro un riquadro
+    // intitolato «Il tecnico suggerisce». Nei primi giri l'ingegnere non ha
+    // ancora una base e lo dice benissimo da solo appena il primo giro si
+    // chiude («servono 3 giri puliti, ne ho 1»): mancava solo prima.
+    $("es-msg").textContent = st.connected ? t("eng.warmup") : t("eng.dash");
+    $("es-cat").textContent = "";
     conf.hidden = true; prep.hidden = true;
     says.classList.remove("active");
   }

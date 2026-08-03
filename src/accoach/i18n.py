@@ -170,7 +170,10 @@ _UI: dict[str, dict[str, str]] = {
     "btn.overlay": {"en": "🖥  Overlay only", "it": "🖥  Solo overlay"},
     # hub — sidebar navigation
     "nav.home": {"en": "  Home", "it": "  Home"},
-    "nav.live": {"en": "  Drive", "it": "  Guida"},
+    # "In pista" e non "Guida": in italiano collideva con «❓ Guida — come si
+    # usa», e chi cercava il manuale finiva sui pulsanti di Coach Live. In
+    # inglese la collisione non c'era mai stata (Drive / Guide).
+    "nav.live": {"en": "  Drive", "it": "  In pista"},
     "nav.analysis": {"en": "  Analysis", "it": "  Analisi"},
     "nav.setup": {"en": "  Setup", "it": "  Setup"},
     "nav.devices": {"en": "  Devices", "it": "  Dispositivi"},
@@ -180,6 +183,19 @@ _UI: dict[str, dict[str, str]] = {
     # hub — Home (last session)
     "home.loading": {"en": "Loading your last session…",
                      "it": "Carico l'ultima sessione…"},
+    # Terzo stato accanto a "vuoto" e "nessun riferimento": l'archivio non si
+    # legge. Prima finiva su "vuoto", cioè si diceva «non hai mai guidato» a chi
+    # aveva appena finito una sessione — che manda a guidare di più invece che a
+    # guardare i log.
+    "home.error_title": {"en": "I can't read your laps",
+                         "it": "Non riesco a leggere i tuoi giri"},
+    "home.error_body": {
+        "en": "The lap archive didn't open — another HONE window may be using "
+              "it, or a file is damaged. Settings → Logs has the details. Your "
+              "laps are still on disk.",
+        "it": "L'archivio dei giri non si è aperto — può usarlo un'altra "
+              "finestra di HONE, o un file è danneggiato. I dettagli sono in "
+              "Impostazioni → Log. I tuoi giri sono ancora sul disco."},
     "home.empty_title": {"en": "No sessions yet",
                          "it": "Nessuna sessione ancora"},
     "home.empty_body": {"en": "Get on track and drive two laps — I'll listen and "

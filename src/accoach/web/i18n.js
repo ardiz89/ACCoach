@@ -621,6 +621,8 @@
     "eng.lowConf":     { en: `Low confidence — based on little data. Gather a few more clean laps before applying.`,
                          it: `Confidenza bassa — pochi dati. Raccogli qualche altro giro pulito prima di applicare.` },
     "eng.dash":        { en: `—`, it: `—` },
+    "eng.warmup":      { en: `I need 3 clean laps for a baseline — I'm watching.`,
+                         it: `Servono 3 giri puliti per una base — sto guardando.` },
     // What to do in the current setup phase — persistent guidance so "phase done →
     // moving to X" is always followed by a concrete instruction.
     "eng.phaseNow":    { en: `Phase`, it: `Fase` },

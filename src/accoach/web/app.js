@@ -2345,7 +2345,12 @@ async function loadBraking() {
   const q = new URLSearchParams({ car: CURRENT.car, track: CURRENT.track });
   let b;
   try { b = await getJSON("/api/braking?" + q.toString()); }
-  catch (e) { SHEET = null; $("brakesheet").innerHTML = ""; return; }
+  // Non svuotare: `renderBrakeSheet(null)` ha già il testo per «nessuna riga»,
+  // due righe più sotto. Era l'unico punto del codice dove un errore produceva
+  // **silenzio assoluto** — pannello a stringa vuota, zero testo, zero motivo —
+  // ed è il caso normale di chi su ACC tocca i limiti a ogni giro, perché
+  // /api/braking fa 404 finché non c'è un giro valido e pulito.
+  catch (e) { SHEET = null; renderBrakeSheet(null); return; }
   SHEET = b;
   renderBrakeSheet(b);
 }
