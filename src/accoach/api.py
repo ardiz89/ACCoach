@@ -48,7 +48,8 @@ from .recording.catalog import LapCatalog, _GRIP_BAND, _TEMP_BAND_C
 from .recording.lap import SAMPLE_FIELDS
 from .recording.storage import _catalog_path, _slug, list_lap_files
 from .sectors import ideal_lap, sector_spans, sector_times
-from .sessions import group_sessions
+from .sessions import group_sessions, parse_utc
+from .stints import MIN_TREND_LAPS, pace_of, split_stints, tyre_trace
 from .telemetry.snapshot import format_lap_time
 from .track import detect_corners
 from .trackedges import crop as crop_edges, edges_and_fit, edges_for
@@ -287,6 +288,199 @@ def _fuel_mean(rows) -> float | None:
     """
     vals = [v for v in (_fuel_of(r) for r in rows) if v is not None]
     return round(sum(vals) / len(vals), 2) if vals else None
+
+
+# --- the stint tab ---------------------------------------------------------
+#
+# Every sentence here exists to keep one promise the module behind it makes: the
+# pace trend is the NET of the tank emptying and the tyres giving up, and this
+# archive cannot separate them (ROADMAP voce 18). A number printed without that
+# caveat would read as a degradation figure, which is the one thing it is not.
+
+_STINT_TEXT = {
+    "it": {
+        "no_fuel_corr": "Il passo qui **non è corretto per la benzina**: "
+                        "l'auto si alleggerisce di {litres} L nello stint e "
+                        "quindi guadagna da sola, ma di quanto non lo sappiamo "
+                        "ancora — il coefficiente secondi/litro va misurato su "
+                        "uno stint guidato apposta a passo costante.",
+        "no_fuel_corr_bare": "Il passo qui **non è corretto per la benzina**: "
+                             "l'auto si alleggerisce mentre giri, e il "
+                             "coefficiente secondi/litro non è ancora misurato.",
+        "unverified": "Questi giri sono stati registrati prima che HONE leggesse "
+                      "il serbatoio: se hai rifornito in mezzo, qui non si vede.",
+        "few_laps": "Servono almeno {n} giri **a passo** per misurare una "
+                    "deriva; qui ce ne sono {have}.",
+        "flat": "Nessuna deriva misurabile: la pendenza ({slope:+.2f} s/giro) sta "
+                "dentro il suo stesso margine (±{err:.2f}). Su {n} giri il tuo "
+                "modo di guidare si muove più di quanto si muova il passo.",
+        "rising": "Il passo cala di **{slope:.2f} s/giro** (±{err:.2f}) su {n} "
+                  "giri a passo.",
+        "falling": "Il passo migliora di **{slope:.2f} s/giro** (±{err:.2f}) su "
+                   "{n} giri a passo — su uno stint corto è quasi sempre il "
+                   "pilota che si scalda, non l'auto.",
+        "tyres_flat": "Battistrada e pressioni non derivano in modo misurabile "
+                      "in questo stint.",
+        "tyres_rising": "Il battistrada sale di {slope:.1f} °C/giro.",
+        "tyres_falling": "Il battistrada cala di {slope:.1f} °C/giro.",
+        "no_wear": "Nessuno dei due simulatori pubblica un'usura gomme che "
+                   "registriamo: qui c'è la temperatura, che è il sintomo.",
+    },
+    "en": {
+        "no_fuel_corr": "This pace is **not corrected for fuel**: the car sheds "
+                        "{litres} L across the stint and gains time on its own, "
+                        "but how much is not known yet — the seconds-per-litre "
+                        "figure has to be measured on a stint driven flat.",
+        "no_fuel_corr_bare": "This pace is **not corrected for fuel**: the car "
+                             "gets lighter as you drive, and the "
+                             "seconds-per-litre figure is not measured yet.",
+        "unverified": "These laps were recorded before HONE read the fuel tank: "
+                      "if you refuelled part-way through, it doesn't show here.",
+        "few_laps": "A drift needs at least {n} laps **at pace**; there are "
+                    "{have} here.",
+        "flat": "No measurable drift: the slope ({slope:+.2f} s/lap) sits inside "
+                "its own margin (±{err:.2f}). Over {n} laps your driving moves "
+                "more than the pace does.",
+        "rising": "Pace drops by **{slope:.2f} s/lap** (±{err:.2f}) over {n} "
+                  "laps at pace.",
+        "falling": "Pace improves by **{slope:.2f} s/lap** (±{err:.2f}) over {n} "
+                   "laps at pace — over a short stint that is almost always the "
+                   "driver warming up, not the car.",
+        "tyres_flat": "Tread temperature and pressures show no measurable drift "
+                      "across this stint.",
+        "tyres_rising": "Tread temperature climbs {slope:.1f} °C/lap.",
+        "tyres_falling": "Tread temperature drops {slope:.1f} °C/lap.",
+        "no_wear": "Neither sim publishes a tyre-wear figure we record: what is "
+                   "here is temperature, which is the symptom.",
+    },
+}
+
+
+def _stint_summary(st) -> dict:
+    """One row of the stint picker."""
+    started = parse_utc(st.laps[0].get("recorded_utc")) if st.laps else None
+    best = min((l for l in st.laps if l.get("valid") and l.get("clean") != 0),
+               key=lambda l: l["lap_time_ms"], default=None)
+    return {
+        "started_utc": started.isoformat() if started else None,
+        "laps": len(st.laps),
+        "fuel_used": st.fuel_used,
+        "verified": st.fuel_known,
+        "best": format_lap_time(best["lap_time_ms"]) if best else None,
+        "best_ms": best["lap_time_ms"] if best else None,
+    }
+
+
+def _stint_detail(st, lg: str) -> dict:
+    """The open stint: pace, fuel, tyres, and the caveats each of them carries."""
+    txt = _STINT_TEXT.get(lg, _STINT_TEXT["en"])
+    pace = pace_of(st)
+    notes: list[str] = []
+
+    litres = st.fuel_used
+    notes.append(txt["no_fuel_corr"].format(litres=f"{litres:.1f}") if litres
+                 else txt["no_fuel_corr_bare"])
+    if not st.fuel_known:
+        notes.append(txt["unverified"])
+
+    trend = pace.trend
+    if trend is None:
+        notes.append(txt["few_laps"].format(n=MIN_TREND_LAPS, have=pace.counted))
+    else:
+        notes.append(txt[trend.direction if trend.significant else "flat"].format(
+            slope=abs(trend.slope) / 1000.0 if trend.significant
+            else trend.slope / 1000.0,
+            err=trend.error / 1000.0, n=pace.counted))
+
+    # The tyres need the sample stream, so this is the one part that reads files.
+    # A stint is at most a few dozen laps and the tab is opened on purpose. A
+    # lap whose file won't open keeps its row and loses its two tyre numbers —
+    # dropping the row instead would show a stint one lap shorter than the one
+    # you drove.
+    loaded = []
+    for row in st.laps:
+        try:
+            loaded.append(load_lap(row["path"]))
+        except (OSError, ValueError):
+            loaded.append(None)
+
+    tyres = tyre_trace([l for l in loaded if l is not None]) \
+        if any(l is not None for l in loaded) else None
+    if tyres is not None:
+        ct = tyres.core_trend
+        if ct is not None:
+            notes.append(txt["tyres_flat"] if not ct.significant else
+                         txt["tyres_" + ct.direction].format(slope=abs(ct.slope)))
+        notes.append(txt["no_wear"])
+
+    # tyre_trace only saw the laps that opened, so its series is walked with its
+    # own cursor while the rows are walked with theirs.
+    core = list(tyres.core_c) if tyres else []
+    psi = list(tyres.psi) if tyres else []
+    counted = set(pace.counted_at)
+    wheels: list[dict] = []
+    detail, k = [], 0
+    for i, (row, lap) in enumerate(zip(st.laps, loaded)):
+        if lap is not None:
+            temp = _tyre_means(lap.samples, "tyre_core_temp", 1)
+            press = _tyre_means(lap.samples, "tyre_pressure", 2)
+            if temp is not None or press is not None:
+                wheels.append({"lap": i, "temp": temp, "press": press})
+        c = core[k] if lap is not None and k < len(core) else None
+        p = psi[k] if lap is not None and k < len(psi) else None
+        if lap is not None:
+            k += 1
+        detail.append({
+            "path": row["path"],
+            "lap_time": format_lap_time(row["lap_time_ms"]),
+            "lap_time_ms": row["lap_time_ms"],
+            "valid": bool(row["valid"]),
+            "off_track": _off_track(row),
+            "fuel_used": _fuel_of(row),
+            "counted": i in counted,
+            "tyre_c": round(c, 1) if c else None,
+            "tyre_psi": round(p, 2) if p else None,
+        })
+
+    started = parse_utc(st.laps[0].get("recorded_utc")) if st.laps else None
+    ended = parse_utc(st.laps[-1].get("recorded_utc")) if st.laps else None
+    per_lap = _fuel_mean(st.laps)
+    return {
+        "started_utc": started.isoformat() if started else None,
+        "ended_utc": ended.isoformat() if ended else None,
+        "laps": pace.laps,
+        "counted": pace.counted,
+        "median": format_lap_time(int(pace.median_ms)) if pace.median_ms else None,
+        "median_ms": pace.median_ms,
+        "best": format_lap_time(pace.best_ms) if pace.best_ms else None,
+        "best_ms": pace.best_ms,
+        "spread_ms": pace.spread_ms,
+        "fuel": {
+            "used": st.fuel_used, "start": st.fuel_start, "end": st.fuel_end,
+            "per_lap": per_lap, "verified": st.fuel_known,
+            # Laps the tank still holds at this burn rate. Floored, for the same
+            # reason the live engineer floors it: overstating runs you dry.
+            "range_laps": (int(st.fuel_end / per_lap)
+                           if per_lap and st.fuel_end else None),
+        },
+        "trend": {
+            "slope_ms": trend.slope, "error_ms": trend.error,
+            "significant": trend.significant, "direction": trend.direction,
+        } if trend else None,
+        "no_trend": pace.no_trend,
+        # Two readings of the same channels, and both earn their place: the
+        # per-wheel series is what a driver reads (a right-front running hotter
+        # than its pair is a fact a mean erases), and the mean is what the drift
+        # verdict is fitted to, because four slopes with four error bars is not
+        # a verdict.
+        "tyres": {
+            "core_c": [round(v, 1) if v else None for v in core],
+            "psi": [round(v, 2) if v else None for v in psi],
+            "wheels": wheels,
+        } if tyres else None,
+        "laps_detail": detail,
+        "notes": notes,
+    }
 
 
 def _has_map(lap) -> bool:
@@ -1248,6 +1442,39 @@ def create_api(
                     **moves,
                 } if prev else None,
             },
+        }
+
+    @app.get("/api/stint")
+    def stint(
+        car: str = Query(...),
+        track: str = Query(...),
+        index: int = Query(0),               # 0 = the most recent stint
+        lang: str | None = Query(None),
+    ) -> dict:
+        """One run on one tank: the pace across it, the fuel, and the tyres.
+
+        Indexed over *stints* and not over sessions, because they are not the
+        same cut and this tab is about the one the sessions view cannot make: a
+        sitting can contain a refuel, and averaging a pace across it averages two
+        fuel loads (see :mod:`accoach.stints`).
+        """
+        lg = lang or current_language()
+        with _catalog() as cat:
+            rows = cat.laps_for(car, track)
+        # group_sessions hands sessions back newest-first with laps in driving
+        # order, so the stints inside one session come out oldest-first: flip
+        # just those, so the whole list reads newest-first like every other picker.
+        runs = [st for s in group_sessions(rows)
+                for st in reversed(split_stints(s.laps))]
+        if not runs:
+            return {"stints": [], "current": None}
+
+        index = max(0, min(index, len(runs) - 1))
+        cur = runs[index]
+        return {
+            "stints": [_stint_summary(s) for s in runs],
+            "index": index,
+            "current": _stint_detail(cur, lg),
         }
 
     @app.get("/api/sectors")

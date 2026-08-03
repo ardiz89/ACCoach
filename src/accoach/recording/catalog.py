@@ -27,7 +27,12 @@ from pathlib import Path
 # v5: `clean` is re-derived on index — a pre-v8 ACC lap's "clean" is demoted to
 # unknown (see `_clean_to_int`). The bump matters: without it, every catalog
 # already on disk keeps the old verdict and the fix ships to nobody.
-_DB_VERSION = 5
+# v6: added `fuel_start`/`fuel_end` — the tank level at the two ends of the lap.
+# `fuel_used` alone cannot find a stint boundary: a refuel that happens *between*
+# two laps leaves both of their burns perfectly normal. Measured on the archive
+# (720S/Monza): inside one stint the gap between one lap's end and the next
+# lap's start is ±0.01 L, and the one real refuel on disk is +3.18 L.
+_DB_VERSION = 6
 
 # How far the track temperature may differ before a lap stops being a fair
 # benchmark. Wide on purpose: the point is to rule out the morning-vs-evening
@@ -66,7 +71,14 @@ CREATE TABLE IF NOT EXISTS lap (
     -- Litres this lap burned (v11 files). NULL on every lap recorded before
     -- the channel existed, and on laps that refuelled: 'not measured' and
     -- 'burned nothing' are different answers.
-    fuel_used      REAL
+    fuel_used      REAL,
+    -- The tank at the two ends of the lap, in litres (v11 files, NULL before).
+    -- Deliberately kept alongside `fuel_used` rather than replacing it: the two
+    -- answer different questions. `fuel_used` is a *verdict* ("is this a burn
+    -- rate?") and refuses laps that refuelled; these two are raw readings, and
+    -- it is precisely a lap that refuelled which starts a new stint.
+    fuel_start     REAL,
+    fuel_end       REAL
 );
 CREATE INDEX IF NOT EXISTS ix_lap_ref
     ON lap (car_key, track_key, valid, clean, lap_time_ms);
@@ -141,13 +153,15 @@ def _clean_to_int(value: object, schema: int = 0, compound: str = "",
 
 
 
-def _fuel_used(d: dict) -> float | None:
-    """Litres burned, straight off the stored rows — no LapSample objects built.
+def _fuel_levels(d: dict) -> tuple[float, float] | None:
+    """The tank at the first and last sample that reported it, in litres.
 
-    The catalog is read on every page load, so it stays a header reader: the rows
-    are already parsed JSON here, and finding one column by name costs a lookup.
-    Mirrors :func:`accoach.coaching.fuel.burned` — including its refusals, so the
-    session view and a lap opened by hand can't disagree about a lap's burn.
+    Straight off the stored rows — no LapSample objects built. The catalog is
+    read on every page load, so it stays a header reader: the rows are already
+    parsed JSON here, and finding one column by name costs a lookup.
+
+    ``None`` when the lap predates the channel (v11) or never read a positive
+    level. No judgement is applied here on purpose; see ``_fuel_used``.
     """
     fields = d.get("fields")
     rows = d.get("samples") or []
@@ -159,9 +173,19 @@ def _fuel_used(d: dict) -> float | None:
     except (TypeError, ValueError):
         return None
     vals = [v for v in vals if v > 0.0]
-    if len(vals) < 2:
+    return (vals[0], vals[-1]) if len(vals) >= 2 else None
+
+
+def _fuel_used(d: dict) -> float | None:
+    """Litres burned this lap, or ``None`` when that question has no answer.
+
+    Mirrors :func:`accoach.coaching.fuel.burned` — including its refusals, so the
+    session view and a lap opened by hand can't disagree about a lap's burn.
+    """
+    levels = _fuel_levels(d)
+    if levels is None:
         return None
-    used = vals[0] - vals[-1]
+    used = levels[0] - levels[1]
     # Rose (a refuel or a pit stop) or absurd: not a burn rate.
     if used <= 0.0 or used > 20.0:
         return None
@@ -187,6 +211,7 @@ def _read_meta(path: Path) -> dict | None:
         d = json.loads(_read_gzip_salvaging(path).decode("utf-8"))
     except (OSError, ValueError, EOFError, zlib.error):
         return None
+    levels = _fuel_levels(d)
     return {
         "car_model": str(d.get("car_model", "")),
         "track": str(d.get("track", "")),
@@ -205,6 +230,8 @@ def _read_meta(path: Path) -> dict | None:
         "sample_count": len(d.get("samples", [])),
         "schema_version": int(d.get("schema", 1)),
         "fuel_used": _fuel_used(d),
+        "fuel_start": levels[0] if levels else None,
+        "fuel_end": levels[1] if levels else None,
     }
 
 
@@ -272,8 +299,8 @@ class LapCatalog:
                  (path, car_key, track_key, car_model, track, session,
                   lap_time_ms, valid, clean, air_temp, road_temp, grip,
                   tyre_compound, source, recorded_utc, sample_count, schema_version,
-                  fuel_used)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                  fuel_used, fuel_start, fuel_end)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                ON CONFLICT(path) DO UPDATE SET
                   car_key=excluded.car_key, track_key=excluded.track_key,
                   car_model=excluded.car_model, track=excluded.track,
@@ -284,7 +311,8 @@ class LapCatalog:
                   source=excluded.source, recorded_utc=excluded.recorded_utc,
                   sample_count=excluded.sample_count,
                   schema_version=excluded.schema_version,
-                  fuel_used=excluded.fuel_used""",
+                  fuel_used=excluded.fuel_used,
+                  fuel_start=excluded.fuel_start, fuel_end=excluded.fuel_end""",
             (
                 str(path), self._slug(meta["car_model"]),
                 self._slug(meta["track"]), meta["car_model"], meta["track"],
@@ -293,7 +321,7 @@ class LapCatalog:
                 meta.get("road_temp", 0.0), meta.get("grip", 0.0),
                 meta.get("tyre_compound", ""), meta.get("source", "own"),
                 meta["recorded_utc"], meta["sample_count"], meta["schema_version"],
-                meta.get("fuel_used"),
+                meta.get("fuel_used"), meta.get("fuel_start"), meta.get("fuel_end"),
             ),
         )
         self._conn.commit()
@@ -427,7 +455,7 @@ class LapCatalog:
         rows = self._conn.execute(
             """SELECT path, lap_time_ms, valid, clean, source, recorded_utc,
                       sample_count, air_temp, road_temp, grip, tyre_compound,
-                      fuel_used
+                      fuel_used, fuel_start, fuel_end
                FROM lap WHERE car_key = ? AND track_key = ?
                ORDER BY recorded_utc DESC""",
             (self._slug(car_model), self._slug(track)),
