@@ -102,3 +102,78 @@ def test_balanced_turnin_never_fires():
     settled = [(0.30, -0.57)] * 8          # yaw/steer ≈ 1.9, clean
     out, _ = _feed(det, ramp + settled)
     assert out == []
+
+
+# --- il canale sterzo tosato ------------------------------------------------
+#
+# Il push è `|yaw| / |steer|`: col denominatore tosato al fondo scala il rapporto
+# è al minimo per costruzione, e il coach accusa il pilota di una cosa che non ha
+# fatto. Misurato sui 59 giri veri: tutti e 34 i cue di sottosterzo dell'archivio
+# escono dai 15 giri col canale tosato, zero dai 44 puliti.
+
+def _rail(det, top, visits=4, dt=0.05, start=0.0):
+    """Guida che sbatte `visits` volte sullo stesso identico fondo scala."""
+    now = start
+    for _ in range(visits):
+        for steer in (0.05, top * 0.6, top, top, top * 0.6, 0.05):
+            det.update(_snap(steer, 0.9 * steer), now)
+            now += dt
+    return now
+
+
+def test_a_channel_that_keeps_hitting_the_same_rail_stops_being_judged():
+    det = BalanceDetector()
+    now = _rail(det, 0.90)
+    out, _ = _hold(det, _snap(0.25, 0.05), start=now)
+    assert not any(c.category is CueCategory.UNDERSTEER for c in out)
+
+
+def test_holding_the_wheel_still_through_one_long_corner_is_not_a_rail():
+    """È il caso che ha rifiutato la mia prima regola, ed è guida vera: una curva
+    lunga a sterzo fermo tiene un valore costante per molti campioni. Il
+    discriminante non è il valore *tenuto*, è che alla sbarra **ci si torna**."""
+    det = BalanceDetector()
+    out, _ = _hold(det, _snap(0.25, 0.05), frames=40)
+    assert any(c.category is CueCategory.UNDERSTEER for c in out)
+
+
+def test_a_rising_signal_with_one_peak_is_not_a_rail():
+    """Un massimo toccato una volta sola è ciò che fa un segnale continuo — e
+    ciò che fanno tutti e 44 i giri puliti dell'archivio."""
+    det = BalanceDetector()
+    now = 0.0
+    for steer in (0.10, 0.20, 0.32, 0.45, 0.32, 0.20, 0.10):
+        det.update(_snap(steer, 0.9 * steer), now)
+        now += 0.05
+    out, _ = _hold(det, _snap(0.25, 0.05), frames=8, start=now)
+    assert any(c.category is CueCategory.UNDERSTEER for c in out)
+
+
+def test_a_rail_below_the_cornering_threshold_is_ignored():
+    """Uno sterzo che sbatte a 0.05 rad non è un fondo scala: è un'auto che va
+    dritta, e lì il rapporto non lo guardiamo comunque."""
+    det = BalanceDetector()
+    now = _rail(det, 0.06)
+    out, _ = _hold(det, _snap(0.25, 0.05), start=now)
+    assert any(c.category is CueCategory.UNDERSTEER for c in out)
+
+
+def test_oversteer_still_works_on_a_clipped_channel():
+    """Il sovrasterzo non divide per lo sterzo: guarda il **segno**. Zittirlo
+    perché il canale è tosato toglierebbe il segnale più credibile che abbiamo,
+    per un difetto che non lo riguarda."""
+    det = BalanceDetector()
+    now = _rail(det, 0.90)
+    out, _ = _hold(det, _snap(-0.15, -0.6), start=now)
+    assert any(c.category is CueCategory.OVERSTEER for c in out)
+
+
+def test_the_rail_is_remembered_across_a_pit_visit():
+    """`reset()` scatta a ogni sosta e a ogni frame non-LIVE, ma la tosatura è
+    una proprietà della periferica: dimenticarla vorrebbe dire riscoprirla ogni
+    volta, e nel frattempo riparlare."""
+    det = BalanceDetector()
+    now = _rail(det, 0.90)
+    det.reset()
+    out, _ = _hold(det, _snap(0.25, 0.05), start=now)
+    assert not any(c.category is CueCategory.UNDERSTEER for c in out)

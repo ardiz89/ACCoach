@@ -79,6 +79,34 @@ _PRIORITY_BASE = 280.0     # just below lock-up/wheelspin, above segment time-lo
 # this (rad/s of |steer|); a genuine mid-corner push has settled steering.
 _TURNIN_RATE = 0.6
 
+# --- il canale sterzo tosato ------------------------------------------------
+#
+# Il push si misura come `|yaw| / |steer|`. Se il denominatore è **tosato al
+# fondo scala**, il rapporto è al minimo per costruzione e il detector accusa il
+# pilota di una cosa che non ha fatto.
+#
+# Misurato sui 59 giri d'archivio (2026-08-03): **tutti e 34** i cue di
+# sottosterzo escono dai 15 giri in cui `steer_angle` sbatte su un valore esatto
+# (0.9000, o 1.0000 su un mod). Sui 44 giri con traccia pulita, **zero**. Sul
+# giro più veloce dell'archivio a Monza il coach dice 9 volte «l'anteriore
+# scivola».
+#
+# La firma NON è il passo di quantizzazione — quello è 0.005-0.010 su tutti i
+# giri, tosati e puliti (misurato aspettandomi il contrario). E non è nemmeno il
+# valore *tenuto*: un pilota che attraversa una curva lunga a sterzo fermo tiene
+# un valore costante per molti campioni, ed è guida. La firma è che **alla sbarra
+# ci si torna**, in curve diverse: nei giri tosati lo stesso identico valore
+# compare da 7 a 109 volte, nei giri puliti il massimo è toccato **una volta
+# sola**, che è ciò che fa un picco vero.
+#
+# Cosa ne facciamo: **si tace**, per il resto della sessione. Non è prudenza
+# eccessiva — un canale che sbatte contro una sbarra non è affidabile nemmeno
+# sotto la sbarra (le stesse tracce saltano a 0.0000 in mezzo alla curva), e
+# questo detector ha il denominatore lì dentro. Stessa scelta già presa per il
+# trail brake sulle stradali: meglio un consiglio in meno che uno falso.
+_CLIP_EPS = 1e-6           # due float uguali, non "vicini"
+_CLIP_VISITS = 3           # ritorni allo stesso identico massimo, in curve diverse
+
 
 class BalanceDetector:
     """Stateful: fed (snapshot, now) each frame, yields understeer/oversteer cues."""
@@ -88,6 +116,10 @@ class BalanceDetector:
         self._loose = Episode()
         self._prev_steer: float | None = None
         self._prev_t: float | None = None
+        self._steer_top = 0.0
+        self._steer_hits = 0
+        self._steer_at_top = False
+        self._steer_clipped = False
         self._understeer_ratio = understeer_ratio_for(
             tuning_for_class(car_class) if car_class is not None else DEFAULT_TUNING)
 
@@ -104,11 +136,18 @@ class BalanceDetector:
         self._loose = Episode()
         self._prev_steer = None
         self._prev_t = None
+        # NOTA: `_steer_top` / `_steer_clipped` NON si azzerano qui. `reset()`
+        # scatta a ogni giro ai box e a ogni frame non-LIVE, mentre la tosatura è
+        # una proprietà della **periferica e della sessione**: dimenticarla ogni
+        # volta vorrebbe dire riscoprirla, e nel frattempo riparlare. Se ne va
+        # con il detector, cioè al cambio auto/pista.
 
     def update(self, s: TelemetrySnapshot, now: float) -> list[Cue]:
         if not (s.connected and s.status == ACStatus.LIVE) or s.in_pit:
             self.reset()
             return []
+
+        self._watch_clipping(s.steer_angle)
 
         cues: list[Cue] = []
         # Oversteer takes precedence: if the rear is genuinely loose, that's the
@@ -141,7 +180,34 @@ class BalanceDetector:
             return False
         return (abs(steer) - abs(prev_s)) / dt > _TURNIN_RATE
 
+    def _watch_clipping(self, steer: float) -> None:
+        """Il canale sterzo sta sbattendo contro una sbarra?
+
+        Non basta che il massimo sia *tenuto*: un pilota che attraversa una curva
+        lunga a sterzo fermo tiene un valore costante per molti campioni, ed è
+        guida, non tosatura. (I test lo hanno rifiutato subito, ed era giusto.)
+
+        Il discriminante è che alla sbarra **ci si torna**: il massimo esatto
+        viene rivisto in curve diverse, staccato da tratti sotto di esso. Nei
+        giri tosati dell'archivio lo stesso identico valore compare da 7 a 109
+        volte; nei 44 giri puliti il massimo è toccato **una volta sola**, che è
+        ciò che fa un picco vero.
+        """
+        v = abs(steer)
+        if v > self._steer_top + _CLIP_EPS:
+            # Massimo nuovo: il segnale stava salendo, non era una sbarra.
+            self._steer_top, self._steer_hits, self._steer_at_top = v, 1, True
+            return
+        at_top = v >= self._steer_top - _CLIP_EPS
+        if at_top and not self._steer_at_top and self._steer_top >= _STEER_HARD:
+            self._steer_hits += 1          # ci siamo tornati
+            if self._steer_hits >= _CLIP_VISITS:
+                self._steer_clipped = True
+        self._steer_at_top = at_top
+
     def _is_understeer(self, s: TelemetrySnapshot) -> bool:
+        if self._steer_clipped:
+            return False       # il denominatore non è misurato: si tace
         if s.speed_kmh < _MIN_SPEED_KMH:
             return False
         steer = abs(s.steer_angle)
