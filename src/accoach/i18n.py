@@ -374,6 +374,14 @@ _CUE_EN: dict[str, str] = {
     "Porta più velocità in curva": "Carry more speed through the corner",
     # fuel.py
     "Ultimo giro di benzina, rientra ai box!": "Last lap of fuel — box now!",
+    # pitcall.py
+    "Modifica pronta: rientra ai box a fine giro":
+        "Change ready — box this lap",
+    "Ingresso box qui davanti, rientra": "Pit entry just ahead — come in",
+    "Sei ai box. Apri la pagina Ingegnere nel browser: applica la "
+    "proposta, scrivi il setup e ricaricalo dal garage prima di uscire":
+        "You're in the box. Open the Engineer page in the browser: apply the "
+        "proposal, write the setup, and load it from the garage before you go out",
 }
 
 def _axle_en(it: str) -> str:

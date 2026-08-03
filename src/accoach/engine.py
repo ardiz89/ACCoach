@@ -39,6 +39,7 @@ from .coaching.cue import CueCategory
 from .coaching.debrief import build_lap_debrief
 from .coaching.diagnosis import build_lap_stats
 from .coaching.focus import FocusCoach, FocusReport
+from .coaching.pitcall import PitCall
 from .i18n import cue_text, current_language
 from .comparison import DeltaState, LapComparator, Reference
 from .engineer import RaceEngineer, classify, engineer_for
@@ -62,6 +63,12 @@ _GATE_DELTA_MS = 3000.0
 # lock-up or wheelspin still gets called.
 _SAFETY_CATEGORIES = {
     CueCategory.LOCKED, CueCategory.WHEELSPIN, CueCategory.FUEL,
+    # The pit calls pass every gate by construction. The gate's job is to stop
+    # driving advice on a lap it can't apply to; these two are the opposite —
+    # PIT_BRIEFING is spoken *because* the car is stopped in the box, which is
+    # exactly the state `quiet == "pit"` describes, and gating it would make the
+    # one cue that only makes sense there the one cue that never arrives.
+    CueCategory.PIT_IN, CueCategory.PIT_APPROACH, CueCategory.PIT_BRIEFING,
 }
 
 # A spoken alert prefix for an engineer proposal, by confidence-tone × tag ×
@@ -84,6 +91,19 @@ _ENG_VOICE_PREFIX = {
                "en": "Engineer, worth trying at the wheel:"},
     },
 }
+
+
+def _decision_sig(decision) -> tuple | None:
+    """Identity of an engineer proposal, for "have we already handled this one".
+
+    Same shape the spoken-once latch uses: the kind plus the rationale, which is
+    what actually distinguishes two proposals to a driver. ``None`` for anything
+    carrying no change (COLLECT / EVALUATING / …) so those can never match a real
+    proposal's signature.
+    """
+    if decision is None or decision.change is None:
+        return None
+    return (decision.kind.value, decision.change.rationale or "")
 
 
 def _voice_clean(text: str) -> str:
@@ -173,6 +193,7 @@ class CoachEngine:
         self.advisor = SetupAdvisor()
         self.pressure = PressureAdvisor()
         self.tyretemp = TyreTempAdvisor()
+        self.pitcall = PitCall()
         self.scheduler = CueScheduler()
 
         self._comparator: LapComparator | None = None
@@ -204,6 +225,9 @@ class CoachEngine:
         # engine re-emits every lap (until the driver applies it) is announced
         # once, not on a loop. Reset when the engineer is rebuilt.
         self._engineer_spoken_sig: tuple | None = None
+        # …and the proposal the driver has already written at the box, so the pit
+        # calls go quiet for it (see _garage_change_pending).
+        self._engineer_done_sig: tuple | None = None
 
         # Focus/Lesson coach: the driver's twin of the engineer. Fed a per-lap
         # debrief (vs the reference), it picks one recurring weakness at a time and
@@ -290,6 +314,47 @@ class CoachEngine:
                                      self._focus.mastered, self._focus.parked)
         except Exception:
             pass   # persistence is a convenience; never let it break a lap
+
+    def _garage_change_pending(self) -> bool:
+        """Is there a setup change waiting that can only be made in the garage?
+
+        Only ``BOX`` changes count. Something the driver can dial at the wheel is
+        not a reason to give up a lap, and the engineer already separates the two
+        — so this reads its answer rather than inventing a second rule.
+        """
+        d = self._engineer_decision
+        if d is None or d.change is None or d.change.tag != "BOX":
+            return False
+        return _decision_sig(d) != self._engineer_done_sig
+
+    def _load_pit_entry(self, track: str) -> list[float]:
+        """This track's measured pit-entry positions; empty if never measured.
+
+        Best-effort like the Focus memory next to it: no catalog means no
+        approach call, never a failure.
+        """
+        try:
+            from .recording.catalog import LapCatalog
+            from .recording.storage import _catalog_path
+
+            with LapCatalog(_catalog_path(Path(self.laps_dir))) as cat:
+                return cat.load_pit_entry(track)
+        except Exception:
+            return []
+
+    def _save_pit_entry(self, track: str) -> None:
+        try:
+            from .recording.catalog import LapCatalog
+            from .recording.storage import _catalog_path
+
+            with LapCatalog(_catalog_path(Path(self.laps_dir))) as cat:
+                cat.save_pit_entry(track, self.pitcall.samples())
+        except Exception:
+            pass    # a convenience memory; never let it break a lap
+        finally:
+            # Cleared either way: a catalog we can't write must not make every
+            # subsequent frame retry the write.
+            self.pitcall.mark_entry_saved()
 
     def _update_wean(self) -> None:
         """Retire the braking countdown at corners the Focus coach has cleared.
@@ -404,6 +469,11 @@ class CoachEngine:
             "change": d.change.as_setup_payload() if d.change else None,
             "rationale": d.change.rationale if d.change else None,
             "tag": d.change.tag if d.change else None,
+            # Has this exact proposal already been written to the setup file?
+            # The engineer keeps re-emitting it until the next completed lap, so
+            # without this the page can't tell "still to do" from "done, go load
+            # it" — and both the pit calls and the on-screen reminder need to.
+            "applied": _decision_sig(d) == self._engineer_done_sig,
             "confidence": d.confidence,
             # 1-based corner labels the proposal is anchored to ("Corners 7, 9").
             "corners": [i + 1 for i in corners],
@@ -485,6 +555,14 @@ class CoachEngine:
             self._engineer = engineer_for(snap.car_model, snap.track)
             self._engineer_decision = None
             self._engineer_spoken_sig = None
+            self._engineer_done_sig = None
+            # The pit calls: fresh latches, and this track's measured pit entry
+            # (see coaching/pitcall.py — it's learned, so a track never visited
+            # simply has no approach call until the first time you come in).
+            self.pitcall.reset()
+            for pos in self._load_pit_entry(snap.track):
+                self.pitcall.note_pit_entry(pos)
+            self.pitcall.mark_entry_saved()
             # …and the lesson plan, restored from last session's memory for this
             # car+track so a mastered corner stays mastered across restarts.
             self._focus_key = (snap.car_model, snap.track)
@@ -498,6 +576,11 @@ class CoachEngine:
             self._applied_pending = False
         if apply_setup and self._engineer is not None:
             self._engineer.mark_applied()
+            # The change has been written: stop calling the driver in for it.
+            # Without this the proposal — which the engineer keeps re-emitting
+            # until the next completed lap — would call them back to the box on
+            # the out-lap they just left it on.
+            self._engineer_done_sig = _decision_sig(self._engineer_decision)
 
         if self._feed is None:
             lap = self.recorder.update(snap)
@@ -553,7 +636,17 @@ class CoachEngine:
         _submit(self.pressure.update(snap, now))
         _submit(self.tyretemp.update(snap, now))
         _submit(self.fuel.update(snap, now))
+        self.pitcall.set_pending(self._garage_change_pending())
+        _submit(self.pitcall.update(snap, now))
+        if self.pitcall.entry_dirty and snap.track:
+            self._save_pit_entry(snap.track)
         spoken = self.scheduler.poll(now)
+        if spoken is not None and spoken.category is CueCategory.PIT_BRIEFING:
+            # Latch on the *spoken*, not on the emitted. The scheduler is allowed
+            # to drop a cue, and this one used to be emitted once in the life of
+            # a setup change — so a drop left the driver sitting in the garage
+            # with nothing said and no second chance.
+            self.pitcall.mark_briefed()
         if spoken is not None:
             # Cues are authored in Italian (so the neural WAVs match); render them
             # in the active language for both the voice and the on-screen text.

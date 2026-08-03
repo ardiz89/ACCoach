@@ -639,6 +639,11 @@
                          it: `🅿️ Sei ai box: MFD → <b>Setup</b> → carica <b>` },
     "eng.pit2":        { en: `</b> → leave the pits to apply it.`,
                          it: `</b> → esci dai box per applicarlo.` },
+    // Shown while stopped in the box with a garage change still unwritten —
+    // the screen half of the spoken briefing (coaching/pitcall.py). The voice
+    // sends you to this page; arriving to no instructions would waste the trip.
+    "eng.pitTodo":     { en: `🅿️ You're in the box with a change waiting: click the proposal above, then <b>Prepare change</b> → <b>Write</b>, and load the setup from the garage before you go out.`,
+                         it: `🅿️ Sei ai box e c'è una modifica in attesa: clicca la proposta qui sopra, poi <b>Prepara modifica</b> → <b>Scrivi</b>, e ricarica il setup dal garage prima di uscire.` },
     "eng.loadErr":     { en: `Setup loading error: `, it: `Errore caricamento setup: ` },
 
     // engineer tour

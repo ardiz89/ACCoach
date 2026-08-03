@@ -771,12 +771,26 @@ function renderFocus(st) {
 
 function renderPitReminder(st) {
   const el = $("pit-reminder");
-  if (state.lastWritten && st.in_pit) {
+  if (!st.in_pit) { el.hidden = true; return; }
+  // Stopped in the box with a garage change still unwritten. The voice has just
+  // sent the driver to this page (coaching/pitcall.py); the page has to say what
+  // to do here, or the trip in was for nothing. Checked BEFORE the "go load it"
+  // reminder because a proposal that arrived after the last write is the newer
+  // instruction — `applied` is what tells the two apart (the engineer re-emits
+  // the same proposal until the next completed lap, so its mere presence
+  // doesn't).
+  const e = st.engineer;
+  if (e && e.change && e.tag === "BOX" && !e.applied) {
+    el.hidden = false;
+    el.innerHTML = t("eng.pitTodo");
+    return;
+  }
+  if (state.lastWritten) {
     el.hidden = false;
     el.innerHTML = t("eng.pit1") + state.lastWritten + t("eng.pit2");
-  } else {
-    el.hidden = true;
+    return;
   }
+  el.hidden = true;
 }
 
 function maybeAutoSelect(car, track) {

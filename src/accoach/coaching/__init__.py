@@ -20,6 +20,7 @@ from .plan import Goal, GoalProgress, TrainingPlan, measure, propose
 from .focus import Focus, FocusCoach, FocusKind, FocusReport, format_focus
 from .fuel import FuelEngineer
 from .gears import GearDetector
+from .pitcall import PitCall
 from .pressure import PressureAdvisor
 from .scheduler import CueScheduler
 from .trends import (
@@ -58,6 +59,7 @@ __all__ = [
     "GearDetector",
     "FuelEngineer",
     "SetupAdvisor",
+    "PitCall",
     "PressureAdvisor",
     "TyreTempAdvisor",
     "CueScheduler",

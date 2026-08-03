@@ -98,6 +98,17 @@ CREATE TABLE IF NOT EXISTS plan (
     goals_json  TEXT NOT NULL,
     PRIMARY KEY (car_key, track_key)
 );
+-- Where a track's pit lane begins, as a normalized lap position. No telemetry
+-- field publishes it, so it is MEASURED: the last on-track position before the
+-- car enters the lane, one sample per visit (see coaching/pitcall.py). Keyed on
+-- the track alone — the pit entry belongs to the circuit, not to the car — and
+-- kept as several samples rather than one number so a rejoin or an aborted
+-- entry can be outvoted instead of overwriting the truth. Survives a lap-table
+-- rebuild for the same reason as the two above (`_migrate` only drops `lap`).
+CREATE TABLE IF NOT EXISTS pit_entry (
+    track_key  TEXT PRIMARY KEY,
+    samples    TEXT NOT NULL DEFAULT ''    -- comma-separated positions, 0..1
+);
 """
 
 
@@ -447,6 +458,39 @@ class LapCatalog:
                DO UPDATE SET mastered=excluded.mastered, parked=excluded.parked""",
             (self._slug(car_model), self._slug(track),
              _join_indices(mastered), _join_indices(parked)),
+        )
+        self._conn.commit()
+
+    # --- Learned pit entry (per track) ------------------------------------
+
+    def load_pit_entry(self, track: str) -> list[float]:
+        """The measured pit-entry positions for this track, oldest first.
+
+        A list and not an average on purpose: the caller takes the median, and a
+        median needs the samples. Anything unparseable is dropped rather than
+        raising — this is a convenience memory, and a corrupt row must cost at
+        most one silent pit call, never a session.
+        """
+        row = self._conn.execute(
+            "SELECT samples FROM pit_entry WHERE track_key=?", (self._slug(track),)
+        ).fetchone()
+        if row is None:
+            return []
+        out: list[float] = []
+        for part in (row["samples"] or "").split(","):
+            try:
+                v = float(part)
+            except ValueError:
+                continue
+            if 0.0 < v < 1.0:
+                out.append(v)
+        return out
+
+    def save_pit_entry(self, track: str, samples: list[float]) -> None:
+        self._conn.execute(
+            """INSERT INTO pit_entry(track_key, samples) VALUES(?,?)
+               ON CONFLICT(track_key) DO UPDATE SET samples=excluded.samples""",
+            (self._slug(track), ",".join(f"{v:.5f}" for v in samples)),
         )
         self._conn.commit()
 

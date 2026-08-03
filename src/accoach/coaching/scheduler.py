@@ -30,7 +30,7 @@ never goes stale.
 
 from __future__ import annotations
 
-from .cue import Cue, CueTier
+from .cue import Cue, CueCategory, CueTier
 
 _DEFAULT_MIN_INTERVAL_S = 4.0
 _DEFAULT_ACUTE_INTERVAL_S = 1.5      # acute cues may speak this soon after the last cue
@@ -63,9 +63,32 @@ class CueScheduler:
         self._pending.extend((c, now) for c in cues)
 
     def _stale_limit(self, cue: Cue) -> float:
+        # The pit briefing describes a STATE — the car is stopped in the garage —
+        # not an event, so it cannot stop being true while it waits. Everything
+        # else here ages because it refers to a moment that passes. Without this
+        # it was the shortest-lived cue in the app (2.5 s of staleness against a
+        # 4.0 s speak gap) and also the only one emitted once in the life of a
+        # setup change: anything spoken in the 1.5 s before the car stopped
+        # killed it outright, and the trip to the box was for nothing.
+        if cue.category == CueCategory.PIT_BRIEFING:
+            return float("inf")
         if cue.tier == CueTier.ACUTE:
             return self.min_interval_s + _ACUTE_STALE_MARGIN_S
         return self.technique_stale_s
+
+    @staticmethod
+    def _carries_over(cue: Cue) -> bool:
+        """Survives a cycle in which something else spoke, instead of being
+        dropped as stale-this-cycle.
+
+        Acute events, because they fire once per episode and would otherwise be
+        lost forever. And the pit briefing, for the same reason plus a worse
+        one: it is emitted once in the life of a setup change, and in the box
+        the cues that can beat it (lock-up, wheelspin, fuel, the pit calls) are
+        exactly the ones the `quiet == "pit"` gate lets through — so "nothing
+        competes with it there", which is what its tier assumed, was wrong.
+        """
+        return cue.tier == CueTier.ACUTE or cue.category == CueCategory.PIT_BRIEFING
 
     def _is_stale(self, cue: Cue, queued_at: float | None, now: float) -> bool:
         return queued_at is not None and (now - queued_at) > self._stale_limit(cue)
@@ -111,7 +134,7 @@ class CueScheduler:
         # isn't lost when it loses its slot — it speaks ~one gap later.
         self._pending = [
             (c, t0) for (c, t0) in self._pending
-            if c is not chosen and c.tier == CueTier.ACUTE
+            if c is not chosen and self._carries_over(c)
         ]
         self._last_spoken_at = now
         self._recent[chosen.dedup_key()] = now
