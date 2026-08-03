@@ -191,3 +191,13 @@ def test_the_screen_and_the_guide_use_the_same_words():
     assert "verificato i limiti di pista" in _flat(_GUIDA)
     assert "checked it for track limits" in _flat(_I18NJS)
     assert "checked it for track limits" in _flat(_FAQ)
+
+
+def test_the_guide_names_the_sidebar_sections_as_the_app_does():
+    """La guida dice al nuovo utente in quale sezione premere Coach Live: se
+    quel nome cambia nell'app e non qui, la prima istruzione che esegue punta a
+    una voce che non esiste. È già successo rinominando «Guida» → «In pista»,
+    che serviva proprio a togliere una collisione di nomi."""
+    for key in ("nav.home", "nav.live", "nav.analysis", "nav.setup",
+                "nav.devices", "nav.settings"):
+        assert t(key, lang="it").strip() in _flat(_GUIDA), key

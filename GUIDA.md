@@ -32,8 +32,8 @@ dall'exe sia da sorgente), così l'analisi li ritrova sempre.
    fullscreen esclusivo. L'overlay trasparente non si disegna sopra un fullscreen
    esclusivo: con borderless lo vedi, con fullscreen no.
 3. **Apri HONE.** Si apre l'**hub**: una finestra con sei sezioni nella barra
-   laterale — **Home · Guida · Analisi · Setup · Dispositivi · Impostazioni**.
-   Vai su **Guida** e premi **▶ Coach Live**.
+   laterale — **Home · In pista · Analisi · Setup · Dispositivi · Impostazioni**.
+   Vai su **In pista** e premi **▶ Coach Live**.
 
 > La Home ti mostra l'ultima sessione già analizzata, quindi dopo la prima volta
 > è lì che arrivi per sapere com'è andata.
