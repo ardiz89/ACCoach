@@ -47,16 +47,53 @@ class ClassTuning:
     speed_split_kmh: float     # low/high corner-speed band (diagnosis taxonomy)
     trail_brake_cue: bool      # coach trail braking for this class at all (braking)
     yaw_baseline: float        # normal yaw/steer while cornering (balance)
+    #: Finestra pressione a caldo (target, tolleranza) in psi, e temperatura del
+    #: battistrada (target, tolleranza) in °C. ``None`` = **non la sappiamo**, e
+    #: allora si tace. Vedi il blocco sotto la tabella.
+    tyre_psi: tuple[float, float] | None = None
+    tyre_c: tuple[float, float] | None = None
 
 
 _TUNING: dict[CarClass, ClassTuning] = {
     CarClass.ROAD:    ClassTuning(spin_ratio=0.12, speed_split_kmh=100.0,
                                   trail_brake_cue=False, yaw_baseline=1.95),
     CarClass.GT3:     ClassTuning(spin_ratio=0.13, speed_split_kmh=120.0,
-                                  trail_brake_cue=True, yaw_baseline=1.95),
+                                  trail_brake_cue=True, yaw_baseline=1.95,
+                                  tyre_psi=(27.5, 0.7), tyre_c=(80.0, 12.0)),
     CarClass.FORMULA: ClassTuning(spin_ratio=0.15, speed_split_kmh=140.0,
                                   trail_brake_cue=True, yaw_baseline=2.50),
 }
+
+# --- perché solo la GT3 ha una finestra gomme ------------------------------
+#
+# I due numeri (27.5 psi, 80 °C) sono la GT3 ACC all'asciutto, e i moduli che li
+# usavano lo dichiaravano — ma nessuno li spegneva altrove, e la finestra di una
+# categoria applicata a un'altra non è una stima approssimativa: è un'altra auto.
+#
+# Misurato sui giri d'archivio il 2026-08-03, media per auto:
+#
+#   Formula  AC   SF25              12.9 psi · 90 °C  -> «alza 14.6 psi»
+#   Road     AC   BMW M3 E92        34.7 psi · 66 °C  -> «cala 7.2» + «gomme fredde»
+#   GT3      AC   M4 GT3 (mod)         — psi · 63 °C  -> «gomme fredde»
+#   GT3      ACC  720S GT3 Evo      25.7 psi · 81 °C  -> «alza 1.8 psi»   ✔
+#   GT3      ACC  Ferrari 488 Evo   26.5 psi · 80 °C  -> «alza 1.0 psi»   ✔
+#
+# Una F1 che gira a 13 psi si sentiva dire di più che raddoppiarle, e una
+# stradale a 34.7 — che è la sua pressione di progetto — di scendere di sette.
+# Le uniche due righe giuste sono quelle su cui la finestra era stata misurata.
+#
+# Quindi: la finestra resta dov'è nata, e altrove si **tace**. È la stessa scelta
+# già presa per il trail brake sulle stradali (`trail_brake_cue=False`), e per la
+# stessa ragione — meglio un consiglio in meno che uno falso.
+#
+# Perché non tararle adesso sui numeri qui sopra: sono **un'auto per classe**, e
+# in questo progetto un'auto sola non muove una costante di classe (è già stato
+# scritto per `yaw_baseline`). E c'è una prova che si fa **ai box, senza
+# guidare**: il setup dichiara le pressioni target: basta leggerle.
+#
+# La classe non basta da sola, e serve anche il titolo: il M4 GT3 **mod su AC**
+# è classe GT3 e legge 63 °C, cioè il modello gomme del mod non è quello di ACC.
+# Vedi il gate `is_acc` in pressure.py / tyretemp.py.
 
 # Understeer is judged as a fraction of the class baseline, not as an absolute
 # yaw/steer number. An absolute 0.9 asked a Formula car to fall to 36% of its

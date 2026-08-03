@@ -28,8 +28,10 @@ never triggers bad advice, and implausible readings are ignored outright.
 
 from __future__ import annotations
 
+from ..engineer import CarClass
 from ..telemetry.snapshot import ACStatus, TelemetrySnapshot
 from .cue import Cue, CueCategory
+from .tuning import tuning_for_class
 
 # Dry ACC GT3 hot-pressure target and the half-width of the "fine" band: an axle
 # average inside [target - tol, target + tol] gets no comment.
@@ -64,12 +66,32 @@ class PressureAdvisor:
         target_psi: float = _DEFAULT_TARGET_PSI,
         tol_psi: float = _DEFAULT_TOL_PSI,
         warmup_temp_c: float = _DEFAULT_WARMUP_TEMP_C,
+        car_class: CarClass | None = None,
     ) -> None:
         self.target_psi = target_psi
         self.tol_psi = tol_psi
         self.warmup_temp_c = warmup_temp_c
+        #: Sappiamo qual è la finestra di QUESTA auto? Vedi `set_car_class`.
+        self._known = True
+        if car_class is not None:
+            self.set_car_class(car_class)
         self._reset_lap()
         self._cooldown = 0
+
+    def set_car_class(self, car_class: CarClass) -> None:
+        """Prendi la finestra della classe, o **taci** se non la conosciamo.
+
+        27.5 psi è la GT3 ACC all'asciutto, e applicata altrove non è una stima
+        approssimativa: è un'altra auto. Misurato sui giri veri — una SF25 gira a
+        12.9 psi e si sentiva dire «alza 14.6 psi», una stradale a 34.7 (che è la
+        sua pressione di progetto) «cala 7.2». Le uniche due auto per cui il
+        consiglio era giusto sono le due GT3 su ACC, cioè quelle su cui il numero
+        era stato misurato. Vedi il blocco in `tuning.py`.
+        """
+        window = tuning_for_class(car_class).tyre_psi
+        self._known = window is not None
+        if window is not None:
+            self.target_psi, self.tol_psi = window
 
     def reset(self) -> None:
         self._reset_lap()
@@ -77,6 +99,12 @@ class PressureAdvisor:
 
     def update(self, s: TelemetrySnapshot, now: float) -> list[Cue]:
         if not (s.connected and s.status == ACStatus.LIVE) or s.in_pit:
+            self._reset_lap()
+            return []
+        # La classe non basta: il **titolo** decide se la nostra misura vale. Il
+        # M4 GT3 *mod su AC* è classe GT3 e legge 63 °C di gomma — il modello del
+        # mod non è quello di ACC, ed è lì che 27.5 psi è stato misurato.
+        if not (self._known and s.is_acc):
             self._reset_lap()
             return []
 

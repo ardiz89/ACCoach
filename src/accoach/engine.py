@@ -589,6 +589,10 @@ class CoachEngine:
             self.events.set_car_class(car_class)
             self.braking.set_car_class(car_class)
             self.balance.set_car_class(car_class)
+            # …e le due finestre gomme, che fuori dalla GT3 non le conosciamo e
+            # quindi lì si tace (vedi il blocco in coaching/tuning.py).
+            self.pressure.set_car_class(car_class)
+            self.tyretemp.set_car_class(car_class)
             # A new car/track is a new setup problem: start a fresh engineer.
             self._engineer = engineer_for(snap.car_model, snap.track)
             self._engineer_decision = None

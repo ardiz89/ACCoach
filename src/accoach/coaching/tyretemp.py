@@ -21,8 +21,10 @@ parameters to be set per condition later.
 
 from __future__ import annotations
 
+from ..engineer import CarClass
 from ..telemetry.snapshot import ACStatus, TelemetrySnapshot
 from .cue import Cue, CueCategory
+from .tuning import tuning_for_class
 
 _DEFAULT_TARGET_C = 80.0
 _DEFAULT_TOL_C = 12.0       # wide on purpose: only a clear excursion speaks
@@ -43,11 +45,31 @@ class TyreTempAdvisor:
         self,
         target_c: float = _DEFAULT_TARGET_C,
         tol_c: float = _DEFAULT_TOL_C,
+        car_class: CarClass | None = None,
     ) -> None:
         self.target_c = target_c
         self.tol_c = tol_c
+        #: Sappiamo qual è la finestra di QUESTA auto? Vedi `set_car_class`.
+        self._known = True
+        if car_class is not None:
+            self.set_car_class(car_class)
         self._reset_lap()
         self._cooldown = 0
+
+    def set_car_class(self, car_class: CarClass) -> None:
+        """Prendi la finestra della classe, o **taci** se non la conosciamo.
+
+        80 °C è la GT3 ACC all'asciutto. Misurato sui giri veri: **tutti e 18** i
+        cue di temperatura dell'archivio escono da giri AC, zero da ACC — cioè
+        il detector parlava solo dove la sua finestra non vale. Una SF25 gira a
+        90 °C («stai forzando») e una stradale su semislick a 66 («gomme
+        fredde», detto sui suoi giri più veloci). Su ACC, dove il numero è nato,
+        legge 79-81 e sta correttamente zitto. Vedi il blocco in `tuning.py`.
+        """
+        window = tuning_for_class(car_class).tyre_c
+        self._known = window is not None
+        if window is not None:
+            self.target_c, self.tol_c = window
 
     def reset(self) -> None:
         self._reset_lap()
@@ -55,6 +77,12 @@ class TyreTempAdvisor:
 
     def update(self, s: TelemetrySnapshot, now: float) -> list[Cue]:
         if not (s.connected and s.status == ACStatus.LIVE) or s.in_pit:
+            self._reset_lap()
+            return []
+        # La classe non basta: serve anche il titolo. Il M4 GT3 *mod su AC* è
+        # classe GT3 e legge 63 °C — il modello gomme del mod non è quello di
+        # ACC, ed è su ACC che 80 °C è stato misurato.
+        if not (self._known and s.is_acc):
             self._reset_lap()
             return []
 
