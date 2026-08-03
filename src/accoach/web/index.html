@@ -40,6 +40,7 @@
     <button class="tab active" data-view="flow" data-i18n="tab.flow">Lap explained</button>
     <button class="tab" data-view="training" data-i18n="tab.training">Training</button>
     <button class="tab" data-view="session" data-i18n="tab.session">Session</button>
+    <button class="tab" data-view="stint" data-i18n="tab.stint">Race pace</button>
     <button class="tab" data-view="compare" data-i18n="tab.compare">Compare</button>
     <button class="tab" data-view="map" data-i18n="tab.map">Map</button>
     <button class="tab" data-view="line" data-i18n="tab.line">Line</button>
@@ -134,6 +135,55 @@
       <section id="ses-numbers" class="summary"></section>
       <section id="ses-laps" class="session-laps"></section>
       <section id="ses-changed" class="session-changed"></section>
+    </div>
+  </div>
+
+  <!-- Race pace: one run on ONE TANK. Not the same cut as a session — a sitting
+       can hold a refuel, and a pace averaged across one averages two fuel loads
+       (see stints.py). Everything here reports a NET number: the tank emptying
+       and the tyres giving up pull in opposite directions and this archive
+       cannot separate them, so the notes strip says so rather than letting a
+       median read as a degradation figure. -->
+  <div id="view-stint" class="hidden">
+    <div class="session-shell stint-shell">
+      <header class="session-head">
+        <div>
+          <h2 id="st-when" class="session-when"></h2>
+          <p id="st-sub" class="session-sub"></p>
+        </div>
+        <label class="session-pick">
+          <span data-i18n="st.which">Stint</span>
+          <select id="st-select"></select>
+        </label>
+      </header>
+      <section id="st-numbers" class="summary"></section>
+      <main id="st-chart-wrap">
+        <div class="chart">
+          <h3 data-i18n-html="st.chart">Pace across the stint <small>(each point = a lap · faded = not running pace · the line is the fitted drift)</small></h3>
+          <canvas id="c-stint" class="tall"></canvas>
+        </div>
+      </main>
+      <!-- Moved here from Trends, where its own heading said "across the stint"
+           and the span underneath it was every lap ever recorded for the combo —
+           different evenings, different track temperatures, refuels in between.
+           Same panel, finally over the span it claims. -->
+      <section id="tyres" class="debrief tyres hidden">
+        <h3 data-i18n-html="tyre.header">Tyres across the stint <small>(core temp &amp; pressure · dashed = right side)</small></h3>
+        <div id="tyre-legend" class="tyre-legend"></div>
+        <div class="tyre-charts">
+          <div id="tyre-temp-wrap" class="chart">
+            <h4 data-i18n="tyre.temp">Core temperature (°C)</h4>
+            <canvas id="c-tyre-temp"></canvas>
+          </div>
+          <div id="tyre-press-wrap" class="chart">
+            <h4 data-i18n="tyre.press">Pressure (psi)</h4>
+            <canvas id="c-tyre-press"></canvas>
+          </div>
+        </div>
+        <div id="tyre-drift" class="tyre-drift"></div>
+      </section>
+      <section id="st-laps" class="session-laps"></section>
+      <section id="st-notes" class="stint-notes"></section>
     </div>
   </div>
 
@@ -270,21 +320,14 @@
         <canvas id="c-progress" class="tall"></canvas>
       </div>
     </main>
-    <section id="tyres" class="debrief tyres hidden">
-      <h3 data-i18n-html="tyre.header">Tyres over time <small>(core temp &amp; pressure across the stint · dashed = right side)</small></h3>
-      <div id="tyre-legend" class="tyre-legend"></div>
-      <div class="tyre-charts">
-        <div id="tyre-temp-wrap" class="chart">
-          <h4 data-i18n="tyre.temp">Core temperature (°C)</h4>
-          <canvas id="c-tyre-temp"></canvas>
-        </div>
-        <div id="tyre-press-wrap" class="chart">
-          <h4 data-i18n="tyre.press">Pressure (psi)</h4>
-          <canvas id="c-tyre-press"></canvas>
-        </div>
-      </div>
-      <div id="tyre-drift" class="tyre-drift"></div>
-    </section>
+    <!-- The tyre charts used to sit here. They read the whole archive for the
+         combo while calling itself a stint, so they moved to the tab that
+         actually has one. A panel that vanishes without a pointer reads as a
+         feature that broke. -->
+    <p class="plan-elsewhere"><span data-i18n="tyre.elsewhere">Tyre temperatures
+      and pressures live under Race pace, over one tank.</span>
+      <button type="button" id="go-stint" class="mini-btn"
+              data-i18n="tyre.goto">Open Race pace</button></p>
 
     <section class="debrief">
       <h3 data-i18n-html="prog.weak">Weak points <small>(corner by corner · systematic = to train)</small></h3>

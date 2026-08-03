@@ -765,6 +765,25 @@ body.no-data .empty { display: block; }
   /* The numbers band is inside the shell here, so it must not re-apply the
      page gutter on top of the one the shell already pays. */
   .session-shell .summary { padding-left: 0; padding-right: 0; }
+
+  /* Race pace has six children, not four, and the areas above name only four.
+     Left to auto-place them the browser paired a 72px band of numbers with a
+     296px chart and left a 224px hole under the numbers — visible on the very
+     first screenshot of the tab. Its own template, then, sharing the shell's
+     gutters and column widths and nothing else. */
+  .stint-shell {
+    grid-template-areas:
+      "head  head"
+      "nums  nums"
+      "chart laps"
+      "tyres laps"
+      "notes laps";
+  }
+  #st-chart-wrap { grid-area: chart; }
+  #st-numbers { grid-area: nums; }
+  #st-laps { grid-area: laps; }
+  #st-notes { grid-area: notes; }
+  .stint-shell #tyres { grid-area: tyres; }
 }
 .session-head {
   display: flex; align-items: flex-end; justify-content: space-between;
@@ -809,6 +828,27 @@ body.no-data .empty { display: block; }
 /* Litres burned: a measurement, so it stays quiet — the tags beside it are
    about whether the lap counts, which is a louder thing to say. */
 .ses-lap .tag.fuel { color: var(--muted); border-color: var(--line); }
+
+/* Race pace. A lap that wasn't running a pace keeps its row and loses its
+   weight: dropping it would draw a stint one lap shorter than the one you
+   drove, and the point of the list is that you recognise the run in it. */
+.ses-lap.not-pace { opacity: .48; }
+.ses-lap.not-pace .bar i { background: var(--muted); }
+.ses-lap .tag.tyre { color: var(--muted); border-color: var(--line); }
+
+/* The caveats, and they are not a footnote: every number on this tab is the
+   net of the tank emptying and the tyres giving up, so the paragraph that says
+   so has to read like part of the answer. */
+.stint-notes { margin: 8px 0 28px; }
+.stint-notes h3 {
+  margin: 0 0 10px; font-size: 13px; font-weight: 600; color: var(--text);
+}
+.stint-notes .note {
+  margin: 0 0 8px; padding: 10px 14px; border-left: 3px solid var(--line);
+  background: var(--inset); border-radius: 0 6px 6px 0;
+  color: var(--muted); font-size: 13px; line-height: 1.55;
+}
+.stint-notes .note b { color: var(--text); font-weight: 600; }
 
 .session-changed h4 {
   margin: 16px 0 8px; font-size: 13px; font-weight: 600; color: var(--text);

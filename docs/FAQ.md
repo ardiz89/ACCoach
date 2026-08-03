@@ -181,6 +181,22 @@ of showing you a wrong scale.
   ones that don't count — you still drove them), your best, consistency, track
   temperature, **fuel per lap** (measured from the tank, on laps recorded from
   v11 onwards), and **what changed since last time** on that car and track.
+- **Race pace** — how the pace holds up over **one tank**. A different cut from
+  Session, and a measured one: a sitting is inferred from timestamps and can
+  contain a **refuel**, so a pace averaged across it averages two fuel loads. A
+  stint is cut where the tank goes back *up*. You get the pace (the median of
+  the laps that were actually running one — a spin stays on the list but can't
+  move the median), the spread, litres per lap, laps left in the tank, the pace
+  lap by lap, and the tyres across the stint.
+  And then what those numbers **don't** say, which matters more than the numbers.
+  The pace trend is a **net** figure — a stint speeds up as the tank empties and
+  slows down as the tyres give up — and telling the two apart needs a
+  seconds-per-litre figure we do not have yet (it has to be measured on a stint
+  driven at a deliberately constant pace). So the slope comes with its own error
+  bar, and when it is smaller than that bar the tab says **"no measurable
+  drift"** rather than inventing a degradation figure for you. It is not tyre
+  wear either: neither sim publishes a wear number we record, so what you see is
+  temperature.
 - **Compare** — two laps, aligned on track position: time delta, speed,
   throttle/brake, steering, with a shared crosshair. Exports to CSV/JSON.
 - **Map** — your line coloured by where you gained and lost, your braking points
@@ -211,9 +227,11 @@ of showing you a wrong scale.
   along the lap, and the handling ribbon (blue understeer, red oversteer).
 - **Trends** — lap times over time, consistency, your weak points corner by
   corner (systematic or one-off) and recurring mistakes. It is the working; the
-  plan that comes out of it lives under **Training**.
+  plan that comes out of it lives under **Training**, and the tyre charts under
+  **Race pace** — here the series covered your whole archive while calling
+  itself a stint.
 
-Keyboard: **1-9** switch tabs, **[** and **]** step through laps.
+Keyboard: **1-9** and **0** switch tabs, **[** and **]** step through laps.
 
 ## Free vs Pro
 

@@ -180,6 +180,76 @@ def test_the_corner_is_turned_by_its_real_shape_not_by_the_stretched_one():
     assert "for (const p of draw)" in body
 
 
+# --- race pace is wired ----------------------------------------------------
+
+@pytest.mark.parametrize("el", ("st-when", "st-sub", "st-select", "st-numbers",
+                                "st-laps", "st-notes", "c-stint"))
+def test_the_stint_view_has_the_elements_its_code_reaches_for(el):
+    assert f'id="{el}"' in _HTML
+    assert f'"{el}"' in _APPJS
+
+
+def test_the_stint_tab_exists_and_owns_its_panel():
+    assert 'data-view="stint"' in _HTML
+    assert _view_of_ids()["st-numbers"] == "stint"
+
+
+def test_the_stint_tab_refetches_rather_than_repainting():
+    """The notes strip is written by the backend in the requested language, so a
+    cached payload would leave that paragraph in the language you left."""
+    block = _APPJS.split("function redrawCurrentView()")[1].split("\n}")[0]
+    assert 'VIEW === "stint"' in block
+    assert "loadStint(CURRENT" in block
+
+
+def test_changing_car_and_track_forgets_the_stint_it_was_showing():
+    """Stints belong to a car, a track and a tank. Keeping the payload across a
+    combo change shows one car's fuel load under another car's name."""
+    block = _APPJS.split("sel.onchange = ")[1].split("\n  };")[0]
+    assert "STINT = null;" in block
+    assert "STINT_I = 0;" in block
+
+
+def test_the_tyre_charts_live_on_exactly_one_tab():
+    """They were on Trends under a heading that said "across the stint", drawn
+    over every lap ever recorded for the combo. One panel, one span."""
+    assert _view_of_ids()["tyres"] == "stint"
+    block = _APPJS.split("async function loadProgress(")[1].split("\n}")[0]
+    assert "drawTyres" not in block, "Trends is still drawing the tyres"
+
+
+def test_trends_says_where_the_tyre_charts_went():
+    """A panel that vanishes without a pointer reads as a feature that broke."""
+    assert 'id="go-stint"' in _HTML
+    assert _view_of_ids()["go-stint"] == "progress"
+    assert 'showView("stint")' in _APPJS
+
+
+def test_a_drift_the_numbers_called_flat_is_not_drawn_as_a_line():
+    """The regression line is the picture of the finding. Drawing it under a
+    slope that failed its own significance test would put on the canvas exactly
+    what the readout refused to put in words."""
+    block = _APPJS.split("function drawStintPace(")[1].split("\n}")[0]
+    assert "cur.trend.significant" in block
+
+
+def test_the_pace_chart_is_scaled_to_the_laps_that_were_a_pace():
+    """One 3:25 spin in the middle squashes eight laps of racing into a flat
+    line at the top of the canvas."""
+    block = _APPJS.split("function drawStintPace(")[1].split("\n}")[0]
+    assert "l.counted" in block
+
+
+def test_every_tab_on_the_row_has_a_keyboard_shortcut():
+    """The digits were [1-9] and the row grew to ten when Race pace arrived, so
+    the last tab silently lost its shortcut. Nothing breaks, nothing logs, and
+    the only way to notice is to press 0 and watch nothing happen."""
+    tabs = len(re.findall(r'class="tab[ "]', _HTML))
+    assert 0 < tabs <= 10, f"{tabs} tabs, more than the digit row can reach"
+    block = _APPJS.split("function wireKeys()")[1].split("\n}")[0]
+    assert "/^[0-9]$/" in block
+
+
 def test_printing_hides_every_view_without_naming_them():
     """The print sheet is the braking cheat sheet and nothing else.
 

@@ -20,8 +20,12 @@ librerie JS). Il differenziatore già in mano è il **debrief causale per curva*
 | **Sectors** | barre delta per settore + giro ideale ricucito |
 | **Trends** | tempi nel tempo, consistenza globale, gomme (medie per giro), punti deboli sistematici, errori ricorrenti |
 
-> Aggiornata dopo: le schede oggi sono nove. Vedi in fondo gli aggiornamenti del
-> 2026-07-30 (Traiettoria, asse in metri, layout) e del 2026-07-31 (Allenamento).
+> Aggiornata dopo: le schede oggi sono **dieci**. Vedi in fondo gli aggiornamenti
+> del 2026-07-30 (Traiettoria, asse in metri, layout), del 2026-07-31
+> (Allenamento) e del 2026-08-03 (**Passo gara**). Con quest'ultima le gomme
+> hanno lasciato Trends: la riga qui sopra dice «gomme (medie per giro)» e per
+> tutto quel tempo la serie copriva l'archivio intero sotto un titolo che diceva
+> «lungo lo stint».
 
 ## Il dato chiave
 
@@ -589,3 +593,56 @@ lessico, e i dati per farlo ci sono già (`classify()`, `abs_level`, `tc_level`,
   visivo.
 
 Suite **1287**.
+
+---
+
+## Aggiornamento 2026-08-03 — «Passo gara», e uno span sbagliato che era lì da settimane
+
+Voce 18 della roadmap, metà scrivania. La domanda che il prodotto non sapeva
+porre: **come regge il passo su un pieno solo**.
+
+**Il taglio.** Una sessione non è uno stint, e la differenza si misura. Le
+sessioni le deduciamo dai buchi fra le registrazioni: sanno quando ti sei alzato
+dal volante e niente di cosa è successo all'auto. Sull'archivio (720S/Monza) una
+sessione da dieci giri è uno stint vero — il serbatoio scende 59.25 → 27.78 L
+senza mai risalire — e una da sei giri della stessa sera ha un **rifornimento da
++3.18 L** fra il primo e il secondo giro. Quel confine `fuel_used` non lo vede:
+un rifornimento *fra* due giri lascia normali entrambe le bruciature. Si trova
+confrontando il serbatoio a fine giro con quello a inizio del successivo →
+catalogo v6 (`fuel_start` / `fuel_end`). Dentro uno stint quel salto misura
+**±0.01 L**, quindi la soglia non è tarata, è scelta in mezzo a due popolazioni
+lontanissime.
+
+**Il rifiuto.** La pendenza del passo è **netta** e non viene attribuita: lo
+stint accelera perché il serbatoio si svuota e rallenta perché le gomme mollano,
+e il coefficiente secondi/litro non è estraibile da quest'archivio. Quindi esce
+con la barra d'errore, e sotto il valore critico di Student la scheda scrive
+«nessuna deriva misurabile». Sull'unico stint lungo in archivio: +0.26 s/giro con
+errore standard 0.22, cioè **piatta**. È l'esito giusto, ed è anche il motivo per
+cui la scheda non si poteva scrivere senza guardare i giri veri.
+
+**Lo span sbagliato.** Costruendo la vista è saltato fuori che il pannello gomme
+di Trends si intitolava «lungo lo stint» e disegnava **ogni giro mai registrato**
+per quella auto e quella pista — sere diverse, temperature d'asfalto diverse,
+rifornimenti in mezzo. Il titolo e i dati non parlavano della stessa cosa da
+quando il pannello esiste. Spostato dove uno stint c'è, con il rimando lasciato
+in Andamento (stessa forma del trasloco del piano) e il pezzo di `/api/progress`
+che nessuno leggeva più tolto con lui.
+
+**Difetti che ha pescato solo lo schermo**, come al solito:
+
+- `.session-shell` nomina quattro aree e questa scheda ha sei figli: il browser
+  ha appaiato una fascia di numeri alta 72 px a un grafico alto 296, con **224 px
+  di vuoto** sotto i numeri. Template suo.
+- Il grafico è in scala sui giri *a passo* (deve esserlo: un 3:25 schiaccia otto
+  giri di gara in una riga piatta), ma il testacoda finiva sotto il fondo della
+  tela e la spezzata **precipitava fuori dal riquadro e risaliva** — due righe
+  verticali verso il nulla, nessun punto. Ora è agganciato al bordo e disegnato
+  **vuoto**: pieno direbbe di essere una lettura.
+- Le barre della lista, in scala su tutti i giri, davano la larghezza intera al
+  testacoda e nove monconi identici ai giri di gara.
+- **La scorciatoia da tastiera arrivava a 9** e le schede sono diventate dieci:
+  l'ultima non si apriva più. Non rompe niente e non logga niente — ci si accorge
+  solo premendo lo zero. Ora c'è un test che lega le due cose.
+
+Suite **1522**.
