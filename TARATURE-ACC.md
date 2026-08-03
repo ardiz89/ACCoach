@@ -239,19 +239,54 @@ hai appena misurato un falso positivo che nessun test avrebbe trovato.
 *(da riempire in sessione — una sezione per auto/pista, come in
 `PIANO-CALIBRAZIONI.md`)*
 
-### Sessione — data · auto · pista · ACC
+### Sessione 2026-08-02 · McLaren 720S GT3 Evo · Monza · ACC
 
 | # | Voce | Verdetto | Evidenza |
 |---|---|---|---|
-| 0.1 | livelli aiuti (offset struct) | | |
-| 0.2 | assi G | | |
-| 0.3 | settori reali | | |
-| 0.4 | `isValidLap` + `lost_at` | | |
-| 0.5 | temperature freni vive | | |
-| 1.1 | `_LOCK_RATIO` su slip nativo ACC | | |
-| 1.1 | `spin_ratio` GT3 su slip nativo ACC | | |
-| 1.1 | `yaw_baseline` GT3 | | |
-| 1.2 | falsi positivi su giro pulito | | |
-| 1.3 | gas parziale | | |
-| 1.4 | il coach parla al primo giro lanciato | | |
-| 1.5 | riferimenti visivi Monza | | |
+| 0.1 | livelli aiuti (offset struct) | **fidato** | TC 6→5→4 e ABS 6→5→4 seguono il HUD tacca per tacca; mappa 0→1 (HUD +1, atteso); `brake_bias` segue nei due versi, 1 click = 0.002 (0.750→0.760→0.746). Corroborato una seconda volta: ad ABS spento `abs_active` = 0.000 su 7307 frame |
+| 0.2 | assi G | **fidato** | picco in frenata `g_long=-1.91` / `g_lat=-0.01`; picco in curva `g_lat=-1.28` / `g_long=-0.39` |
+| 0.3 | settori reali | **fidato** | 3 settori dichiarati e 3 visti, confini a 0.337 e 0.665, in ordine crescente |
+| 0.4 | `isValidLap` + `lost_at` | **fidato** | taglio deliberato: il gioco invalida a `pos 0.451`, l'archivio scrive `lost_at=0.4512` e `clean=False`. La catena completa (con controllo del verso) chiama quel punto **Lesmo 1**, e i 7 nomi di Monza escono in ordine senza doppioni |
+| 0.5 | temperature freni vive | **vive** | anteriori 125→**317 °C**, posteriori 108→**189 °C**, picco dentro la staccata su 4 ruote su 4. Su AC misurate ferme a 16 °C (ambiente) lo stesso giorno: la differenza fra i due giochi è confermata |
+| 1.1 | `_LOCK_RATIO` su slip nativo ACC | **fidato** | ad ABS **spento**: frenata non bloccata p90 `-0.074`, bloccaggio vero p50 `-1.000` (ruota ferma). La soglia `-0.15` sta nel vuoto, con margine più largo che su AC (dove il lock vero misurava -0.417) |
+| 1.1 | `spin_ratio` GT3 su slip nativo ACC | **fidato** | uscite pulite p99 `0.077`–`0.080`, pattinamenti veri `0.253`–`0.326`. Su AC il tetto pulito GT3 era 0.12 contro soglia 0.13: qui il margine è cinque volte tanto |
+| 1.1 | `yaw_baseline` GT3 | **fidato** | mediana `\|yaw\|/\|steer\|` in curva pulita = **1.849** su 1682 frame, contro 1.95 dichiarato (−5%) |
+| 1.2 | falsi positivi su giro pulito | **fidato, con un difetto** | 9 cue in ~1.7 giri (veleggiamento ×5, trail brake ×3, limitatore ×1), sopra il criterio «uno ogni 2-3 curve» — **ma non sono falsi**: misurato sui 4 giri archiviati, il vuoto fra rilascio freno e apertura gas è di **0.87–2.35 s** ad Ascari, Roggia e Rettifilo, tutti i giri. Il pilota conferma («non le sto sfruttando appieno»). **Difetto vero**: ad Ascari `trail_brake` e `coasting` scattano sullo stesso vuoto a 0.5 s di distanza — due frasi per un errore solo |
+| 1.3 | gas parziale | non provato | |
+| 1.4 | il coach parla al primo giro lanciato | non verificato | `live` ha girato tutta la sessione, ma il primo giro lanciato non è stato osservato apposta |
+| 1.5 | riferimenti visivi Monza | non provato | serve un giro con staccate volutamente anticipate |
+
+**Il fatto che non ci aspettavamo.** Su ACC con l'ABS acceso il bloccaggio
+fisico **non avviene**: in 11 690 frame lo slip anteriore non è mai sceso sotto
+`-0.106`. Non è un difetto della soglia — è l'ABS che fa il suo mestiere. Quindi
+su ACC le due vie di `_lock_spin_segments` si dividono il lavoro in modo netto:
+**con gli aiuti accesi decide il flag, con gli aiuti spenti decide lo slip**, e
+oggi sono state misurate valide tutte e due (zero falsi bloccaggi sui giri
+puliti).
+
+### Sessione 2026-08-02 · SF25 (`gp_2025_sf25`) · Red Bull Ring · AC
+
+Fuori piano — la sessione è proseguita su AC con una Formula, che è la classe
+dove restavano aperte due voci da `PIANO-CALIBRAZIONI.md`.
+
+| Voce | Verdetto | Evidenza |
+|---|---|---|
+| classe riconosciuta | **fidato** | `gp_2025_sf25` → `CarClass.FORMULA` via `_FORMULA_MARKERS` |
+| `spin_ratio` Formula (0.15) | **fidato, margine stretto** | uscite pulite p99 `0.114`, pattinamenti veri fino a `0.612`. Separa, ma il margine è metà di quello GT3 |
+| `yaw_baseline` Formula (2.50) | **misurato 2.749** (+10%) | mediana su 1900 frame di curva pulita. **Non corretto**: un'auto sola su una pista sola non muove una costante di classe, e l'errore è nel verso prudente (baseline più bassa = sottosterzo dichiarato più tardi, semmai ne perde, non ne inventa) |
+| `_LOCK_RATIO` / burst lock su Formula | **non misurato** | in 4 minuti senza ABS l'anteriore non è mai sceso sotto `-0.107`: nessun bloccaggio è avvenuto. Non è un esito, è un evento mancato. Il burst lock resta aperto |
+| `grip` per gioco | **confermato** | `surface_grip` = **1.000** su AC contro **0.000** su ACC, misurato lo stesso giorno sulle due sessioni |
+
+### Come è stata condotta (vale per la prossima)
+
+Le istruzioni al pilota sono arrivate **a voce** e i check si sono accorti da
+soli delle manovre, invece di chiedere conferma. Non è una comodità: la prima
+mezz'ora è stata condotta in chat, il pilota leggeva il telefono guidando ed
+**è andato a sbattere**. Da lì la regola: tutto ciò che serve mentre l'auto si
+muove si dice a voce, tutto ciò che richiede una risposta si fa a macchina
+ferma.
+
+Il riconoscimento vocale (vosk, modello italiano piccolo, tutto in locale)
+prende bene le **frasi intere** e male le **parole singole**: «continua» e
+«basta» sono stati sbagliati due volte di fila, mentre una risposta lunga è
+passata. Chiedere «sì o no» è la domanda peggiore da fargli.

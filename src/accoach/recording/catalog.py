@@ -24,7 +24,10 @@ from pathlib import Path
 # v2: added clean (-1 unknown / 0 dirty / 1 clean) + track-condition columns,
 # so the reference query can exclude dirty laps and prefer confirmed-clean ones.
 # v3: added `source` ("own"/"pro") so a PRO benchmark lap can be found cheaply.
-_DB_VERSION = 4
+# v5: `clean` is re-derived on index — a pre-v8 ACC lap's "clean" is demoted to
+# unknown (see `_clean_to_int`). The bump matters: without it, every catalog
+# already on disk keeps the old verdict and the fix ships to nobody.
+_DB_VERSION = 5
 
 # How far the track temperature may differ before a lap stops being a fair
 # benchmark. Wide on purpose: the point is to rule out the morning-vs-evening
@@ -95,6 +98,17 @@ CREATE TABLE IF NOT EXISTS plan (
     goals_json  TEXT NOT NULL,
     PRIMARY KEY (car_key, track_key)
 );
+-- Where a track's pit lane begins, as a normalized lap position. No telemetry
+-- field publishes it, so it is MEASURED: the last on-track position before the
+-- car enters the lane, one sample per visit (see coaching/pitcall.py). Keyed on
+-- the track alone — the pit entry belongs to the circuit, not to the car — and
+-- kept as several samples rather than one number so a rejoin or an aborted
+-- entry can be outvoted instead of overwriting the truth. Survives a lap-table
+-- rebuild for the same reason as the two above (`_migrate` only drops `lap`).
+CREATE TABLE IF NOT EXISTS pit_entry (
+    track_key  TEXT PRIMARY KEY,
+    samples    TEXT NOT NULL DEFAULT ''    -- comma-separated positions, 0..1
+);
 """
 
 
@@ -111,11 +125,19 @@ def _join_indices(idx: set[int]) -> str:
     return ",".join(str(i) for i in sorted(idx))
 
 
-def _clean_to_int(value: object) -> int:
-    """Lap JSON ``clean`` (true/false/null/absent) -> -1 unknown / 0 dirty / 1 clean."""
-    if value is None:
-        return -1
-    return 1 if value else 0
+def _clean_to_int(value: object, schema: int = 0, compound: str = "",
+                  recorded_utc: str = "") -> int:
+    """Lap JSON ``clean`` -> -1 unknown / 0 dirty / 1 clean.
+
+    A thin seam over :func:`accoach.recording.lap.clean_verdict`, which holds the
+    rule (and the measurement behind it). Kept as a name because the catalog's
+    three-state encoding is a catalog concern; the *policy* is shared with the
+    catalog-less fallback scan, and having it in two places is how the two once
+    disagreed.
+    """
+    from .lap import clean_verdict
+
+    return clean_verdict(value, schema, compound, recorded_utc)
 
 
 
@@ -171,7 +193,9 @@ def _read_meta(path: Path) -> dict | None:
         "session": int(d.get("session", -1)),
         "lap_time_ms": int(d.get("lap_time_ms", 0)),
         "valid": 1 if d.get("valid") else 0,
-        "clean": _clean_to_int(d.get("clean")),
+        "clean": _clean_to_int(d.get("clean"), int(d.get("schema", 1)),
+                               str(d.get("tyre_compound", "") or ""),
+                               str(d.get("recorded_utc", "") or "")),
         "air_temp": float(d.get("air_temp", 0.0) or 0.0),
         "road_temp": float(d.get("road_temp", 0.0) or 0.0),
         "grip": float(d.get("grip", 0.0) or 0.0),
@@ -434,6 +458,39 @@ class LapCatalog:
                DO UPDATE SET mastered=excluded.mastered, parked=excluded.parked""",
             (self._slug(car_model), self._slug(track),
              _join_indices(mastered), _join_indices(parked)),
+        )
+        self._conn.commit()
+
+    # --- Learned pit entry (per track) ------------------------------------
+
+    def load_pit_entry(self, track: str) -> list[float]:
+        """The measured pit-entry positions for this track, oldest first.
+
+        A list and not an average on purpose: the caller takes the median, and a
+        median needs the samples. Anything unparseable is dropped rather than
+        raising — this is a convenience memory, and a corrupt row must cost at
+        most one silent pit call, never a session.
+        """
+        row = self._conn.execute(
+            "SELECT samples FROM pit_entry WHERE track_key=?", (self._slug(track),)
+        ).fetchone()
+        if row is None:
+            return []
+        out: list[float] = []
+        for part in (row["samples"] or "").split(","):
+            try:
+                v = float(part)
+            except ValueError:
+                continue
+            if 0.0 < v < 1.0:
+                out.append(v)
+        return out
+
+    def save_pit_entry(self, track: str, samples: list[float]) -> None:
+        self._conn.execute(
+            """INSERT INTO pit_entry(track_key, samples) VALUES(?,?)
+               ON CONFLICT(track_key) DO UPDATE SET samples=excluded.samples""",
+            (self._slug(track), ",".join(f"{v:.5f}" for v in samples)),
         )
         self._conn.commit()
 

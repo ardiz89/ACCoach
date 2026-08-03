@@ -419,7 +419,17 @@ main { padding: 16px var(--gut); display: grid; gap: 18px; }
 }
 
 .empty { display: none; padding: 60px 24px; text-align: center; color: var(--muted); }
-body.no-data main, body.no-data .summary, body.no-data .debrief { display: none; }
+/* Senza nemmeno un giro, il messaggio deve essere l'unica cosa a schermo.
+   Nascondeva solo `main`, e restavano: otto schede che al clic non fanno niente
+   (l'`init()` esce prima di collegarle), tre tendine vuote, la fascia del giro,
+   e `#view-flow` — che sopra i 1180 px ha `display:grid` con `min-height:
+   calc(100vh - 190px)`, regola scritta apposta per battere `.hidden`, quindi
+   riempiva la finestra di una card vuota con due canvas neri. Per leggere
+   «ancora nessun giro» bisognava **scorrere**. È la prima schermata dell'app di
+   analisi, e si legge come un guasto. */
+body.no-data main, body.no-data .summary, body.no-data .debrief,
+body.no-data nav.tabs, body.no-data #lapbar, body.no-data header .controls,
+body.no-data #view-flow { display: none; }
 body.no-data .empty { display: block; }
 .empty-title { font-size: 22px; color: var(--text); margin: 0 0 16px; }
 .empty-steps { display: inline-block; text-align: left; margin: 0 auto; padding-left: 22px; line-height: 1.9; max-width: 560px; }

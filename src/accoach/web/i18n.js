@@ -448,6 +448,13 @@
     // wrong target for a cold morning - the coach has always known this, the
     // report used to ignore it.
     "sum.cond":        { en: `Chosen for conditions`, it: `Scelto per le condizioni` },
+    // The other reason a slower lap is the benchmark: the faster one was never
+    // checked for track limits. Its own label, because "chosen for conditions"
+    // over a sentence about track limits would be a confident wrong answer —
+    // the thing this whole note exists to avoid.
+    "sum.cond.unj":    { en: `Chosen as the judged lap`, it: `Scelto perché verificato` },
+    "sum.cond.unjt":   { en: `your {time} is faster but nothing ever checked it for track limits`,
+                         it: `il tuo {time} è più veloce ma nessuno ne ha mai verificato i limiti di pista` },
     "sum.cond.v":      { en: `track {temp}° · your {time} was at {ftemp}°`,
                          it: `asfalto {temp}° · il tuo {time} era a {ftemp}°` },
     "sum.cond.vx":     { en: `track {temp}° · your {time} has no recorded temperature`,
@@ -593,8 +600,13 @@
     "eng.onfly":       { en: `On the fly:`, it: `Al volo:` },
     "eng.engPrefix":   { en: `Engineer `, it: `Ingegnere ` },
 
-    "eng.hint":        { en: `The diagnosis comes from the coach in real time (start <b>Coach Live</b> or the <b>backend</b>). The changes on the right apply to the setup file: they must be <b>loaded in the pits</b>, they don't change the car while you drive.`,
-                         it: `La diagnosi arriva dal coach in tempo reale (avvia <b>Coach Live</b> o il <b>backend</b>). Le modifiche a destra agiscono sul file di setup: vanno <b>caricate ai box</b>, non cambiano l'auto mentre guidi.` },
+    // Diceva «avvia Coach Live **o** il backend». Falso: `live` è un processo
+    // unico senza WebSocket, quindi non alimenta questa pagina — e chi lo aveva
+    // acceso restava su «in attesa di telemetria» per sempre mentre il coach gli
+    // parlava nelle cuffie. I due non possono nemmeno convivere: registrano
+    // entrambi, e insieme salverebbero ogni giro due volte.
+    "eng.hint":        { en: `This page is fed by the <b>live backend</b> — hub → <b>Devices</b> → 📡 Live backend. Coach Live does not feed it, and the two can't run together (they'd both record). The changes on the right apply to the setup file: they must be <b>loaded in the pits</b>, they don't change the car while you drive.`,
+                         it: `Questa pagina la alimenta il <b>backend live</b> — hub → <b>Dispositivi</b> → 📡 Backend live. Coach Live non la alimenta, e i due non possono stare accesi insieme (registrano entrambi). Le modifiche a destra agiscono sul file di setup: vanno <b>caricate ai box</b>, non cambiano l'auto mentre guidi.` },
 
     "setup.title":     { en: `Setup`, it: `Setup` },
     "legend2.click":   { en: `<b>click</b> = game step`, it: `<b>click</b> = scatto di gioco` },
@@ -640,9 +652,17 @@
                          it: `Nessun backup da ripristinare per questo setup.` },
     "eng.restoreErr":  { en: `Restore error: `, it: `Errore ripristino: ` },
     "eng.corners":     { en: `Corners `, it: `Curve ` },
+    // The verdict, after the re-test laps. The words are short because the
+    // sentence that explains it is written server-side, next to the rule.
+    "eng.oc.kept":     { en: `kept`, it: `tenuta` },
+    "eng.oc.reverted": { en: `put back`, it: `rimessa com'era` },
+    "eng.oc.laps":     { en: `over`, it: `su` },
+    "eng.oc.side":     { en: `Also moved, unasked:`, it: `Si è mosso anche:` },
     "eng.lowConf":     { en: `Low confidence — based on little data. Gather a few more clean laps before applying.`,
                          it: `Confidenza bassa — pochi dati. Raccogli qualche altro giro pulito prima di applicare.` },
     "eng.dash":        { en: `—`, it: `—` },
+    "eng.warmup":      { en: `I need 3 clean laps for a baseline — I'm watching.`,
+                         it: `Servono 3 giri puliti per una base — sto guardando.` },
     // What to do in the current setup phase — persistent guidance so "phase done →
     // moving to X" is always followed by a concrete instruction.
     "eng.phaseNow":    { en: `Phase`, it: `Fase` },
@@ -666,7 +686,36 @@
                          it: `🅿️ Sei ai box: MFD → <b>Setup</b> → carica <b>` },
     "eng.pit2":        { en: `</b> → leave the pits to apply it.`,
                          it: `</b> → esci dai box per applicarlo.` },
+    // Shown while stopped in the box with a garage change still unwritten —
+    // the screen half of the spoken briefing (coaching/pitcall.py). The voice
+    // sends you to this page; arriving to no instructions would waste the trip.
+    "eng.pitTodo":     { en: `🅿️ You're in the box with a change waiting: click the proposal above, then <b>Prepare change</b> → <b>Write</b>, and load the setup from the garage before you go out.`,
+                         it: `🅿️ Sei ai box e c'è una modifica in attesa: clicca la proposta qui sopra, poi <b>Prepara modifica</b> → <b>Scrivi</b>, e ricarica il setup dal garage prima di uscire.` },
     "eng.loadErr":     { en: `Setup loading error: `, it: `Errore caricamento setup: ` },
+
+    // --- il registro dell'ingegnere -----------------------------------------
+    // Presentato a CONTEGGI, non a percentuali, finché le prove non sono
+    // abbastanza: un tasso di successo su tre campioni è rumore travestito da
+    // percentuale, e il modulo che lo calcola lo dice per primo.
+    "rec.title":       { en: `📒 Track record`, it: `📒 Registro` },
+    "rec.none":        { en: `No test finished yet on this car and track. The engineer proposes a change, you drive it, and the verdict lands here — including the ones that didn't work.`,
+                         it: `Nessuna prova ancora conclusa su questa auto e questa pista. L'ingegnere propone una modifica, tu la guidi, e il verdetto finisce qui — comprese quelle che non hanno funzionato.` },
+    "rec.counts":      { en: `<b>{kept}</b> kept out of <b>{tests}</b> tested`,
+                         it: `<b>{kept}</b> tenute su <b>{tests}</b> provate` },
+    "rec.rate":        { en: ` · {rate}% hit rate`, it: ` · {rate}% di riuscita` },
+    "rec.gain":        { en: ` · median {gain}s on the lap`,
+                         it: ` · mediana {gain}s sul giro` },
+    "rec.thin":        { en: `Too few tests to publish a percentage — a hit rate over a handful of samples is noise wearing a percent sign. The counts are above.`,
+                         it: `Troppo poche prove per pubblicare una percentuale: un tasso di riuscita su una manciata di campioni è rumore travestito da percentuale. I conteggi sono qui sopra.` },
+    "rec.byparam":     { en: `Which levers earn their place`, it: `Quali leve si guadagnano il posto` },
+    "rec.byrank":      { en: `Does "most effective first" hold up?`,
+                         it: `Regge il «prima il rimedio più efficace»?` },
+    "rec.rank":        { en: `remedy #{n}`, it: `rimedio n.{n}` },
+    "rec.side":        { en: `Side effects seen (never predicted)`,
+                         it: `Effetti collaterali visti (mai predetti)` },
+    "rec.kept_of":     { en: `{kept}/{tests} kept`, it: `{kept}/{tests} tenute` },
+    "rec.seen":        { en: `{n}×`, it: `{n}×` },
+    "eng.avDone":      { en: `Done — I've made it`, it: `Fatto — l'ho cambiato` },
 
     // engineer tour
     "tour.e1.t": { en: `Live diagnosis`, it: `Diagnosi live` },
@@ -684,6 +733,9 @@
     "tour.e5.t": { en: `Setup editor`, it: `Editor setup` },
     "tour.e5.x": { en: `Adjust by game clicks, then “Write setup” saves a new file to load in the pits.`,
                    it: `Regola con i click di gioco, poi “Scrivi setup” salva un nuovo file da caricare ai box.` },
+    "tour.e6.t": { en: `Change it now, at the wheel`, it: `Cambiala adesso, al volante` },
+    "tour.e6.x": { en: `A dial you turn on the straight — no pit stop, no lap lost. On ACC there is nothing to confirm: HONE reads the level live and sees it move. On AC those levels aren't published, so use the button.`,
+                   it: `Una manopola che giri sul rettilineo: niente sosta, niente giro perso. Su ACC non devi confermare nulla, HONE legge il livello dal vivo e si accorge da solo che si è mosso. Su AC quei livelli non sono leggibili: usa il pulsante.` },
   };
 
   // ---- core ---------------------------------------------------------------

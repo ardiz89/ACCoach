@@ -32,8 +32,8 @@ dall'exe sia da sorgente), così l'analisi li ritrova sempre.
    fullscreen esclusivo. L'overlay trasparente non si disegna sopra un fullscreen
    esclusivo: con borderless lo vedi, con fullscreen no.
 3. **Apri HONE.** Si apre l'**hub**: una finestra con sei sezioni nella barra
-   laterale — **Home · Guida · Analisi · Setup · Dispositivi · Impostazioni**.
-   Vai su **Guida** e premi **▶ Coach Live**.
+   laterale — **Home · In pista · Analisi · Setup · Dispositivi · Impostazioni**.
+   Vai su **In pista** e premi **▶ Coach Live**.
 
 > La Home ti mostra l'ultima sessione già analizzata, quindi dopo la prima volta
 > è lì che arrivi per sapere com'è andata.
@@ -91,6 +91,54 @@ Tra un giro e l'altro, quando un sintomo si ripete, ti suggerisce una regolazion
 (pressioni gomme, livelli TC/ABS dove regolabili, bilanciamento freni). Le
 pressioni vengono giudicate solo a gomme in temperatura, sul target GT3 (~27.5 psi).
 
+Le modifiche sono di due tipi, e si chiudono in modo diverso.
+
+- **Al volo** — una manopola che giri sul rettilineo (TC, ABS, bilanciamento
+  freni). Non devi confermare niente: HONE **guarda il canale** e si accorge da
+  solo quando la manopola si muove, così la prova può cominciare senza che tu
+  tolga le mani dal volante. Su AC quei livelli non sono leggibili, quindi lì
+  trovi un pulsante **«Fatto — l'ho cambiato»** nella pagina Ingegnere.
+- **Da box** — un file di setup da scrivere. Qui non basta dirti *cosa*
+  cambiare, e infatti ti dice anche **quando rientrare**.
+
+### c-ter) Il registro: quante modifiche hanno funzionato davvero
+
+Nella pagina **Ingegnere**, sotto la proposta, c'è il **registro**: quante delle
+modifiche che ti ha proposto sono state **tenute** dopo la misura, e quante
+annullate. È l'unico numero di quella pagina che non è una nostra affermazione —
+è contato su prove che hai guidato tu, e può darci torto.
+
+Ci trovi anche **quali leve si guadagnano il posto**, se regge l'ordine «prima il
+rimedio più efficace», e gli **effetti collaterali** osservati (una modifica che
+sistemava il sottosterzo in ingresso e ne portava uno in uscita). Quelli non li
+prevediamo mai: si vedono e si scrivono.
+
+Finché le prove sono poche **non trovi nessuna percentuale**, solo i conteggi. Un
+tasso di riuscita su tre campioni è rumore travestito da percentuale.
+
+### c-bis) Il rientro ai box
+
+Quando c'è una modifica che richiede il garage, senti tre cose:
+
+1. **All'inizio dell'ultimo settore** (o ~20 s prima dell'ingresso corsia, quello
+   che viene prima): *«Modifica pronta: rientra ai box a fine giro»*. Il secondo
+   criterio non è un doppione: su certi circuiti la corsia box si stacca dalla
+   curva **prima** dell'ultimo settore, e lì una chiamata legata al settore
+   arriverebbe con l'ingresso già alle spalle.
+2. **Poco prima dell'ingresso**: *«Ingresso box qui davanti, rientra»*.
+3. **Da fermo nel box**: cosa fare con la modifica, perché vive in una pagina del
+   browser che mentre guidavi non stavi guardando.
+
+Una cosa da sapere: **l'ingresso della corsia box nessun gioco lo pubblica**. Lo
+imparo guardando dove lasci la pista la prima volta che rientri davvero, e ne
+tengo la mediana su più visite. Quindi su una pista dove non sei mai rientrato
+l'avviso numero 2 **non esiste**: preferisco tacere che indicarti una corsia
+indovinata, per cui alzeresti il piede. Dalla seconda visita in poi c'è.
+
+Rientrare col menu di gioco («torna ai box») non insegna niente, ed è voluto:
+l'auto sparisce da metà pista e riappare in garage, e prendere per buono quel
+salto vorrebbe dire piazzare l'ingresso box in mezzo a un rettilineo.
+
 ### d) Come vengono registrati i giri (e se parti dai box)
 Non devi fare nulla di speciale: avvia la sessione (Pratica, Hotlap, Gara) e guida.
 
@@ -132,6 +180,35 @@ Non devi fare nulla di speciale: avvia la sessione (Pratica, Hotlap, Gara) e gui
   distanza, perché dieci metri sono 0,14 s a 250 km/h e mezzo secondo in una
   curva lenta.
 - Una **pastiglia** mostra l'ultimo consiglio pronunciato, e sfuma da sola.
+
+### La traccia dei pedali (per il trail braking)
+
+Si accende da **Impostazioni → Mostra la traccia dei pedali**, ed è **spenta di
+default** perché allunga l'overlay: tienila accesa quando stai lavorando sul
+rilascio del freno, spenta quando vuoi lo schermo pulito.
+
+È una striscia sotto l'HUD con il tuo **gas in verde** e il tuo **freno in
+rosso** mentre succedono, negli ultimi secondi. Sotto le due tracce c'è un
+nastro che si colora da solo:
+
+| Nastro | Cosa stai facendo |
+|---|---|
+| **ambra** | premi tutti e due i pedali → **stai trailando** |
+| **grigio** | non ne premi nessuno → **tempo morto**, tempo regalato |
+| niente | rilascio pulito: hai mollato il freno e ripreso il gas senza vuoto |
+
+In alto a destra la stessa cosa in una parola — **TRAIL**, oppure **COAST** col
+cronometro di quanto stai veleggiando.
+
+Serve per una ragione precisa: il coach il trail braking te lo **dice**, ma te lo
+dice a cose fatte. Qui lo **vedi mentre lo fai**, che è l'unico modo di correggere
+un rilascio — la sovrapposizione fra le due curve è, letteralmente, il tuo trail
+braking disegnato.
+
+> Il consiglio a voce sul trail braking è **spento sulle stradali**: lì portare
+> il freno fino all'inserimento fa girare l'auto, e su una macchina senza carico
+> aerodinamico mollarlo tardi la fa partire. La traccia invece resta, perché
+> guardare non è farsi dire cosa fare.
 
 ### Quando il delta non c'è
 
@@ -383,6 +460,16 @@ col bordo azzurro. Sono osservazioni **sull'intero giro**, non su una curva:
 
 - **I giri sporchi non sono mai candidabili.** Un giro tagliato è più veloce per
   un motivo.
+- **Un giro che nessuno ha giudicato non batte un giro giudicato.** Su ACC il
+  «pulito» dei giri registrati **prima del 21 luglio 2026** veniva da un campo
+  che quel gioco dichiara e non riempie mai: dice pulito perché nessuno ha
+  guardato, non perché lo fosse. Quei giri non vengono buttati — restano il tuo
+  riferimento se non hai altro, perché un bersaglio dubbio batte nessun
+  bersaglio — ma perdono contro qualunque giro verificato davvero. È nato da un
+  caso vero: a Monza il riferimento era un 1:53.712 che **tagliava la Variante
+  della Roggia** per metà curva, ed era il più veloce *proprio per quello*.
+  Quando succede il riepilogo te lo dice: «scelto perché verificato — il tuo
+  1:53.712 è più veloce ma nessuno ne ha mai verificato i limiti di pista».
 - **Le condizioni contano**, e sono tre: la **gomma**, la **temperatura
   dell'asfalto** e il **grip della pista**. Un giro fatto in condizioni simili a
   oggi batte uno un po' più veloce fatto in condizioni molto diverse. La gomma
@@ -481,6 +568,24 @@ Quelli che potresti volere davvero:
 | `setup show <file>` | Legge un setup ACC senza avviare il gioco |
 | `selftest` | Controlla che la voce/TTS funzioni, e scrive un report |
 | `logs` | Apre la cartella di log e crash report |
+| `find-rain` | Trova i campi pioggia di ACC misurandoli (serve una sessione con meteo variabile) |
+
+### Il file di configurazione
+
+Quasi tutto si regola da **Impostazioni**. Il resto sta in
+`Documenti/ACCoach/config.toml`, che HONE crea al primo avvio con dentro un
+commento per ogni voce. Si modifica a app chiusa: **i valori si leggono
+all'avvio**.
+
+Le voci che esistono *solo* lì:
+
+| Voce | A cosa serve |
+|---|---|
+| `data.laps_dir` | Sposta la cartella dei giri (un altro disco, una cartella sincronizzata). Vuota = `Documenti/ACCoach/laps` |
+| `acquire.hz` | Quanti campioni al secondo legge il registratore |
+| `server.host` · `server.port` · `server.hz` | Interfaccia, porta e ritmo del backend live |
+| `web.port` | Porta dell'app di analisi |
+| `logging.level` · `logging.console` | Quanto scrivono i log |
 
 ---
 

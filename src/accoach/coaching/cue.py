@@ -41,6 +41,16 @@ class CueCategory(Enum):
     LIMITER = "limiter"
     GEAR_TOO_TALL = "gear_too_tall"
     FUEL = "fuel"
+    # Pit strategy — not about how you drive, about where you are on the lap.
+    PIT_IN = "pit_in"                 # come in: a garage change is waiting
+    # Its own category and not a second PIT_IN, which is what it was for half a
+    # day. `dedup_key` is (category, segment), so sharing both made the approach
+    # a repeat of the call: suppressed for 20 s, then dropped as stale. Measured
+    # consequence — on the lead path the two are exactly 15 s apart, so the
+    # warning that exists to stop you missing the entry was spoken *at* the
+    # entry, or never.
+    PIT_APPROACH = "pit_approach"     # the pit entry is right there
+    PIT_BRIEFING = "pit_briefing"     # you're stopped: here's what to do with it
 
 
 class CueTier:
@@ -67,10 +77,16 @@ def _init_tiers() -> None:
         CueCategory.LOCKED, CueCategory.WHEELSPIN,
         CueCategory.UNDERSTEER, CueCategory.OVERSTEER,
         CueCategory.FUEL,
+        # Time-critical rather than a fault: said late, the pit entry is behind
+        # you and the change costs another lap. Same band as FUEL, and for the
+        # same reason — both are "act now or lose the chance".
+        CueCategory.PIT_IN, CueCategory.PIT_APPROACH,
     }
     advisory = {
         CueCategory.TC_UP, CueCategory.ABS_UP, CueCategory.BRAKE_BIAS,
         CueCategory.TYRE_PRESSURE, CueCategory.TYRE_TEMP,
+        # Spoken standing still in the garage: nothing competes with it there.
+        CueCategory.PIT_BRIEFING,
     }
     for c in acute:
         _TIER[c] = CueTier.ACUTE

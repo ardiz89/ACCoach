@@ -38,11 +38,13 @@ from .coaching import (
 from .coaching.cue import CueCategory
 from .coaching.debrief import build_lap_debrief
 from .coaching.diagnosis import build_lap_stats
+from .coaching.atwheel import WheelWatch
 from .coaching.focus import FocusCoach, FocusReport
+from .coaching.pitcall import PitCall
 from .i18n import cue_text, current_language
 from .comparison import DeltaState, LapComparator, Reference
 from .engineer import RaceEngineer, classify, engineer_for
-from .recording import DEFAULT_LAPS_DIR, Lap, LapRecorder, find_reference_lap, save_lap
+from .recording import Lap, LapRecorder, find_reference_lap, laps_root, save_lap
 from .recording.recorder import StartLineWatcher
 from .telemetry import SharedMemoryReader, TelemetrySnapshot
 from .telemetry.snapshot import ACStatus
@@ -62,6 +64,12 @@ _GATE_DELTA_MS = 3000.0
 # lock-up or wheelspin still gets called.
 _SAFETY_CATEGORIES = {
     CueCategory.LOCKED, CueCategory.WHEELSPIN, CueCategory.FUEL,
+    # The pit calls pass every gate by construction. The gate's job is to stop
+    # driving advice on a lap it can't apply to; these two are the opposite —
+    # PIT_BRIEFING is spoken *because* the car is stopped in the box, which is
+    # exactly the state `quiet == "pit"` describes, and gating it would make the
+    # one cue that only makes sense there the one cue that never arrives.
+    CueCategory.PIT_IN, CueCategory.PIT_APPROACH, CueCategory.PIT_BRIEFING,
 }
 
 # A spoken alert prefix for an engineer proposal, by confidence-tone × tag ×
@@ -84,6 +92,19 @@ _ENG_VOICE_PREFIX = {
                "en": "Engineer, worth trying at the wheel:"},
     },
 }
+
+
+def _decision_sig(decision) -> tuple | None:
+    """Identity of an engineer proposal, for "have we already handled this one".
+
+    Same shape the spoken-once latch uses: the kind plus the rationale, which is
+    what actually distinguishes two proposals to a driver. ``None`` for anything
+    carrying no change (COLLECT / EVALUATING / …) so those can never match a real
+    proposal's signature.
+    """
+    if decision is None or decision.change is None:
+        return None
+    return (decision.kind.value, decision.change.rationale or "")
 
 
 def _voice_clean(text: str) -> str:
@@ -137,7 +158,7 @@ class CoachEngine:
         reader: SharedMemoryReader | None = None,
         voice: Voice | None = None,
         num_segments: int = 24,
-        laps_dir: Path | str = DEFAULT_LAPS_DIR,
+        laps_dir: Path | str | None = None,
         feed: TelemetryFeed | None = None,
         acquire_hz: float | None = None,
         engineer_voice: bool = True,
@@ -147,7 +168,7 @@ class CoachEngine:
         # Whether to speak the race engineer's proposals (the per-cue coaching
         # voice is governed by ``voice`` itself; this gates only the engineer).
         self.engineer_voice = engineer_voice
-        self.laps_dir = laps_dir
+        self.laps_dir = Path(laps_dir) if laps_dir else laps_root()
         self.recorder = LapRecorder()   # used only on the legacy inline path
 
         # High-fidelity acquisition: a background thread reads + records at a
@@ -173,6 +194,10 @@ class CoachEngine:
         self.advisor = SetupAdvisor()
         self.pressure = PressureAdvisor()
         self.tyretemp = TyreTempAdvisor()
+        self.pitcall = PitCall()
+        # Watches the dials so an "al volo" change can finish by being *done*
+        # rather than by being clicked on a web page (see coaching/atwheel.py).
+        self.wheelwatch = WheelWatch()
         self.scheduler = CueScheduler()
 
         self._comparator: LapComparator | None = None
@@ -204,6 +229,11 @@ class CoachEngine:
         # engine re-emits every lap (until the driver applies it) is announced
         # once, not on a loop. Reset when the engineer is rebuilt.
         self._engineer_spoken_sig: tuple | None = None
+        # …and the proposal the driver has already written at the box, so the pit
+        # calls go quiet for it (see _garage_change_pending).
+        self._engineer_done_sig: tuple | None = None
+        # …and the "al volo" proposal the dial watch is currently armed on.
+        self._armed_sig: tuple | None = None
 
         # Focus/Lesson coach: the driver's twin of the engineer. Fed a per-lap
         # debrief (vs the reference), it picks one recurring weakness at a time and
@@ -249,6 +279,7 @@ class CoachEngine:
             stats = build_lap_stats(lap, self._corners or None)
             self._engineer_decision = self._engineer.observe(stats)
             self._announce_engineer(self._engineer_decision)
+            self._log_engineer_outcome(lap, self._engineer_decision)
 
         # The Focus coach needs a reference to know where time was lost.
         if self._focus is not None and self._reference is not None and self._corners:
@@ -289,6 +320,73 @@ class CoachEngine:
                                      self._focus.mastered, self._focus.parked)
         except Exception:
             pass   # persistence is a convenience; never let it break a lap
+
+    def _watch_at_wheel(self, snap: TelemetrySnapshot) -> None:
+        """Close the loop on an "al volo" proposal by watching the dial move.
+
+        Without this an ``AV`` change could never be marked applied: the only
+        caller of ``mark_applied`` was the setup-file writer, which exists only
+        for ``BOX`` changes. So the engineer re-proposed the same click every
+        lap and its phase never closed — two phases out of five on the GT3
+        profile. See coaching/atwheel.py for why the answer is the car and not
+        a button.
+        """
+        d = self._engineer_decision
+        sig = _decision_sig(d)
+        if (self._engineer is None or d is None or d.change is None
+                or d.change.tag != "AV" or sig == self._engineer_done_sig):
+            self.wheelwatch.disarm()
+            self._armed_sig = None
+            return
+        if sig != self._armed_sig:
+            self._armed_sig = sig
+            atom = d.change.changes[0] if d.change.changes else None
+            if atom is not None:
+                self.wheelwatch.arm(atom.param, atom.delta_clicks, snap)
+        if self.wheelwatch.update(snap):
+            self._engineer.mark_applied()
+            self._engineer_done_sig = sig
+
+    def _garage_change_pending(self) -> bool:
+        """Is there a setup change waiting that can only be made in the garage?
+
+        Only ``BOX`` changes count. Something the driver can dial at the wheel is
+        not a reason to give up a lap, and the engineer already separates the two
+        — so this reads its answer rather than inventing a second rule.
+        """
+        d = self._engineer_decision
+        if d is None or d.change is None or d.change.tag != "BOX":
+            return False
+        return _decision_sig(d) != self._engineer_done_sig
+
+    def _load_pit_entry(self, track: str) -> list[float]:
+        """This track's measured pit-entry positions; empty if never measured.
+
+        Best-effort like the Focus memory next to it: no catalog means no
+        approach call, never a failure.
+        """
+        try:
+            from .recording.catalog import LapCatalog
+            from .recording.storage import _catalog_path
+
+            with LapCatalog(_catalog_path(Path(self.laps_dir))) as cat:
+                return cat.load_pit_entry(track)
+        except Exception:
+            return []
+
+    def _save_pit_entry(self, track: str) -> None:
+        try:
+            from .recording.catalog import LapCatalog
+            from .recording.storage import _catalog_path
+
+            with LapCatalog(_catalog_path(Path(self.laps_dir))) as cat:
+                cat.save_pit_entry(track, self.pitcall.samples())
+        except Exception:
+            pass    # a convenience memory; never let it break a lap
+        finally:
+            # Cleared either way: a catalog we can't write must not make every
+            # subsequent frame retry the write.
+            self.pitcall.mark_entry_saved()
 
     def _update_wean(self) -> None:
         """Retire the braking countdown at corners the Focus coach has cleared.
@@ -334,6 +432,54 @@ class CoachEngine:
         prefix = prefixes.get(lang) or prefixes["en"]
         self.voice.say(f"{prefix} {_voice_clean(rationale)}")
 
+    def _log_engineer_outcome(self, lap, decision) -> None:
+        """Write a finished test to the engineer's ledger.
+
+        The one thing this app can prove that a setup generator can't is that a
+        change was measured after it was made. That verdict used to exist for as
+        long as the message was on screen; now it is kept, and after enough laps
+        it answers the only question worth asking a setup tool — how many of its
+        changes actually worked. Best-effort: a ledger that can't be written must
+        never cost the driver a setup change (see engineer/ledger.py).
+        """
+        out = getattr(decision, "outcome", None)
+        if out is None:
+            return
+        from datetime import datetime, timezone
+
+        from .engineer.ledger import Record, append
+        change = decision.change
+        # On a REVERTED the decision carries the *reversal*, so its clicks are
+        # the opposite of the change that was actually tested.
+        atom = change.changes[0] if (change and change.changes) else None
+        delta = -atom.delta_clicks if (atom and not out.kept) else (
+            atom.delta_clicks if atom else 0)
+        try:
+            append(Record(
+                when_utc=datetime.now(timezone.utc).isoformat(),
+                car=getattr(lap, "car_model", "") or "",
+                track=getattr(lap, "track", "") or "",
+                car_class=classify(getattr(lap, "car_model", "") or "").value,
+                phase=change.phase_label if change else "",
+                symptom=str(out.prediction.symptom) if out.prediction.symptom else "",
+                param=atom.param if atom else "",
+                slot=atom.slot if atom else None,
+                delta_clicks=delta,
+                remedy_rank=out.remedy_rank,
+                kept=out.kept,
+                laps=out.laps,
+                score_before=out.prediction.score_now,
+                score_after=out.score_after,
+                time_before_ms=out.time_before_ms,
+                time_after_ms=out.time_after_ms,
+                fuel_before_l=out.fuel_before_l,
+                fuel_after_l=out.fuel_after_l,
+                time_confounded=out.time_confounded,
+                side_effects={str(sym): d for sym, d in out.side_effects},
+            ))
+        except Exception:  # noqa: BLE001 - evidence for us, never a live failure
+            pass
+
     def _engineer_block(self) -> dict | None:
         """The latest engineer decision, in the shape the setup UI consumes."""
         d = self._engineer_decision
@@ -355,9 +501,42 @@ class CoachEngine:
             "change": d.change.as_setup_payload() if d.change else None,
             "rationale": d.change.rationale if d.change else None,
             "tag": d.change.tag if d.change else None,
+            # Has this exact proposal already been written to the setup file?
+            # The engineer keeps re-emitting it until the next completed lap, so
+            # without this the page can't tell "still to do" from "done, go load
+            # it" — and both the pit calls and the on-screen reminder need to.
+            "applied": _decision_sig(d) == self._engineer_done_sig,
+            # Is the engine watching the dial for this one? Answered here rather
+            # than worked out again in the browser, so there is one place that
+            # knows which parameters are readable on which game. False on an AV
+            # proposal means the page has to offer a "done" button, or the change
+            # can never be finished (AC reports every aid level as -1).
+            "watched": self.wheelwatch.armed,
             "confidence": d.confidence,
             # 1-based corner labels the proposal is anchored to ("Corners 7, 9").
             "corners": [i + 1 for i in corners],
+            # The bar the change will be judged against, so the driver reads it
+            # *before* the re-test laps instead of only hearing the verdict.
+            "prediction": (None if d.prediction is None else {
+                "text": d.prediction.text,
+                "score_now": d.prediction.score_now,
+                "score_below": d.prediction.score_below,
+                "time_band_ms": round(d.prediction.time_band_ms, 1),
+            }),
+            # …and what actually happened, on the lap the verdict lands.
+            "outcome": (None if d.outcome is None else {
+                "kept": d.outcome.kept,
+                "laps": d.outcome.laps,
+                "score_before": d.outcome.prediction.score_now,
+                "score_after": d.outcome.score_after,
+                "time_before_ms": d.outcome.time_before_ms,
+                "time_after_ms": d.outcome.time_after_ms,
+                "fuel_before_l": d.outcome.fuel_before_l,
+                "fuel_after_l": d.outcome.fuel_after_l,
+                "time_confounded": d.outcome.time_confounded,
+                "side_effects": [{"symptom": str(s), "delta": v}
+                                 for s, v in d.outcome.side_effects],
+            }),
         }
 
     def _focus_block(self) -> dict | None:
@@ -410,10 +589,24 @@ class CoachEngine:
             self.events.set_car_class(car_class)
             self.braking.set_car_class(car_class)
             self.balance.set_car_class(car_class)
+            # …e le due finestre gomme, che fuori dalla GT3 non le conosciamo e
+            # quindi lì si tace (vedi il blocco in coaching/tuning.py).
+            self.pressure.set_car_class(car_class)
+            self.tyretemp.set_car_class(car_class)
             # A new car/track is a new setup problem: start a fresh engineer.
             self._engineer = engineer_for(snap.car_model, snap.track)
             self._engineer_decision = None
             self._engineer_spoken_sig = None
+            self._engineer_done_sig = None
+            self._armed_sig = None
+            self.wheelwatch.disarm()
+            # The pit calls: fresh latches, and this track's measured pit entry
+            # (see coaching/pitcall.py — it's learned, so a track never visited
+            # simply has no approach call until the first time you come in).
+            self.pitcall.reset()
+            for pos in self._load_pit_entry(snap.track):
+                self.pitcall.note_pit_entry(pos)
+            self.pitcall.mark_entry_saved()
             # …and the lesson plan, restored from last session's memory for this
             # car+track so a mastered corner stays mastered across restarts.
             self._focus_key = (snap.car_model, snap.track)
@@ -427,6 +620,11 @@ class CoachEngine:
             self._applied_pending = False
         if apply_setup and self._engineer is not None:
             self._engineer.mark_applied()
+            # The change has been written: stop calling the driver in for it.
+            # Without this the proposal — which the engineer keeps re-emitting
+            # until the next completed lap — would call them back to the box on
+            # the out-lap they just left it on.
+            self._engineer_done_sig = _decision_sig(self._engineer_decision)
 
         if self._feed is None:
             lap = self.recorder.update(snap)
@@ -443,6 +641,8 @@ class CoachEngine:
                 continue                                            # not this session
             self._observe_lap(lap)
             self._rebuild_reference(lap.car_model, lap.track)        # chase the new best
+
+        self._watch_at_wheel(snap)
 
         delta = self._comparator.compare(snap) if self._comparator else None
         # On an abnormal lap (out of the pits, no comparison, or delta blown out)
@@ -482,7 +682,17 @@ class CoachEngine:
         _submit(self.pressure.update(snap, now))
         _submit(self.tyretemp.update(snap, now))
         _submit(self.fuel.update(snap, now))
+        self.pitcall.set_pending(self._garage_change_pending())
+        _submit(self.pitcall.update(snap, now))
+        if self.pitcall.entry_dirty and snap.track:
+            self._save_pit_entry(snap.track)
         spoken = self.scheduler.poll(now)
+        if spoken is not None and spoken.category is CueCategory.PIT_BRIEFING:
+            # Latch on the *spoken*, not on the emitted. The scheduler is allowed
+            # to drop a cue, and this one used to be emitted once in the life of
+            # a setup change — so a drop left the driver sitting in the garage
+            # with nothing said and no second chance.
+            self.pitcall.mark_briefed()
         if spoken is not None:
             # Cues are authored in Italian (so the neural WAVs match); render them
             # in the active language for both the voice and the on-screen text.

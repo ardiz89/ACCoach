@@ -93,8 +93,21 @@ _DARK = QColor(0x0B, 0x0E, 0x12, 165)  # Ink, semi-transparent backing pill
 
 class Overlay(QWidget):
     def __init__(self, url: str | None = None, interactive: bool = False,
-                 pedals: bool = False) -> None:
+                 pedals: bool | None = None) -> None:
+        """``pedals=None`` (il caso normale) legge l'impostazione salvata.
+
+        Era un parametro con default ``False``, e chi costruiva l'overlay doveva
+        ricordarsi di passarlo. Il comando `overlay` se lo ricordava; **`live`
+        no** — cioè proprio il processo che il wizard e la guida dicono di
+        avviare. Risultato: la spunta si poteva mettere, salvare e rileggere, e
+        su Coach Live non succedeva niente. Scala, posizione e ancoraggio li
+        legge già di suo qui sotto: anche questa lo fa, e il parametro resta
+        solo per l'opzione `--pedals` da riga di comando.
+        """
         super().__init__()
+        if pedals is None:
+            from .config import load_config
+            pedals = load_config().overlay.pedals
         self._state: dict = {}
         self._cue: dict | None = None
         self._cue_at: float = -1e9
@@ -679,9 +692,9 @@ def main(argv: list[str] | None = None) -> None:
         if a.startswith("ws://") or a.startswith("wss://"):
             url = a
 
-    # Pedal strip: CLI flag wins, else the persisted config toggle.
-    from .config import load_config
-    pedals = "--pedals" in argv or load_config().overlay.pedals
+    # Il flag da riga di comando accende e basta; spento, decide l'impostazione
+    # salvata (che l'overlay legge da solo).
+    pedals = True if "--pedals" in argv else None
 
     app = QApplication(sys.argv)
     load_fonts()                     # the overlay paints in the brand face too

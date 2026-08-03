@@ -29,7 +29,7 @@ import time
 from pathlib import Path
 
 from ..logging_setup import get_logger
-from ..recording import DEFAULT_LAPS_DIR, LapRecorder, save_lap
+from ..recording import LapRecorder, laps_root, save_lap
 from ..recording.lap import Lap
 from .reader import SharedMemoryReader
 from .snapshot import TelemetrySnapshot
@@ -50,7 +50,7 @@ class TelemetryFeed:
         self,
         reader: SharedMemoryReader,
         hz: float = 60.0,
-        laps_dir: Path | str = DEFAULT_LAPS_DIR,
+        laps_dir: Path | str | None = None,
     ) -> None:
         self._reader = reader
         self._interval = 1.0 / hz if hz > 0 else 1.0 / 60.0

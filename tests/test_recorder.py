@@ -4,18 +4,27 @@ from accoach.recording.recorder import LapRecorder
 import synth
 
 
+_LAP_MS = 89000
+
+
 def _drive_lap(rec, completed, n=30, current_base=0):
     """Feed one lap's worth of frames at the given completed-laps count.
 
     Returns the finished lap emitted on the *first* frame (the crossing), if any.
+
+    The frame clock is spread across the whole 89 seconds the lap claims to take.
+    It used to tick 100 ms a frame, so the samples said 2.9 s while the lap said
+    89 — a lap contradicting itself, which no real lap can do. Since
+    `trusted_lap_ms` started checking the two against each other, that fixture is
+    the exact shape of the defect it hunts.
     """
     finished = None
     for i in range(n):
         pos = i / n
         out = rec.update(synth.snap(
             pos=pos, completed_laps=completed,
-            current_lap_ms=current_base + i * 100,
-            last_lap_ms=89000, speed_kmh=150.0,
+            current_lap_ms=current_base + i * (_LAP_MS // n),
+            last_lap_ms=_LAP_MS, speed_kmh=150.0,
         ))
         if out is not None:
             finished = out
@@ -38,7 +47,7 @@ def test_finished_lap_carries_last_lap_time_and_samples():
     rec = LapRecorder()
     _drive_lap(rec, completed=0)
     lap = _drive_lap(rec, completed=1)
-    assert lap.lap_time_ms == 89000
+    assert lap.lap_time_ms == _LAP_MS
     assert lap.car_model == "ferrari_488_gt3" and lap.track == "monza"
     assert len(lap.samples) > 1
 

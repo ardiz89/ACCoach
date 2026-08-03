@@ -170,7 +170,10 @@ _UI: dict[str, dict[str, str]] = {
     "btn.overlay": {"en": "🖥  Overlay only", "it": "🖥  Solo overlay"},
     # hub — sidebar navigation
     "nav.home": {"en": "  Home", "it": "  Home"},
-    "nav.live": {"en": "  Drive", "it": "  Guida"},
+    # "In pista" e non "Guida": in italiano collideva con «❓ Guida — come si
+    # usa», e chi cercava il manuale finiva sui pulsanti di Coach Live. In
+    # inglese la collisione non c'era mai stata (Drive / Guide).
+    "nav.live": {"en": "  Drive", "it": "  In pista"},
     "nav.analysis": {"en": "  Analysis", "it": "  Analisi"},
     "nav.setup": {"en": "  Setup", "it": "  Setup"},
     "nav.devices": {"en": "  Devices", "it": "  Dispositivi"},
@@ -180,6 +183,19 @@ _UI: dict[str, dict[str, str]] = {
     # hub — Home (last session)
     "home.loading": {"en": "Loading your last session…",
                      "it": "Carico l'ultima sessione…"},
+    # Terzo stato accanto a "vuoto" e "nessun riferimento": l'archivio non si
+    # legge. Prima finiva su "vuoto", cioè si diceva «non hai mai guidato» a chi
+    # aveva appena finito una sessione — che manda a guidare di più invece che a
+    # guardare i log.
+    "home.error_title": {"en": "I can't read your laps",
+                         "it": "Non riesco a leggere i tuoi giri"},
+    "home.error_body": {
+        "en": "The lap archive didn't open — another HONE window may be using "
+              "it, or a file is damaged. Settings → Logs has the details. Your "
+              "laps are still on disk.",
+        "it": "L'archivio dei giri non si è aperto — può usarlo un'altra "
+              "finestra di HONE, o un file è danneggiato. I dettagli sono in "
+              "Impostazioni → Log. I tuoi giri sono ancora sul disco."},
     "home.empty_title": {"en": "No sessions yet",
                          "it": "Nessuna sessione ancora"},
     "home.empty_body": {"en": "Get on track and drive two laps — I'll listen and "
@@ -315,6 +331,32 @@ _UI: dict[str, dict[str, str]] = {
               "frenata smette di comparire lì — come togli la traiettoria e i "
               "cartelli di frenata uno alla volta quando impari un tracciato. "
               "Spento li tiene a ogni curva per sempre."},
+    # Un pulsante spento senza motivo si legge come un guasto. Questo compare
+    # come suggerimento su tutto ciò che registra, quando qualcos'altro già lo fa.
+    "btn.busy_recording": {
+        "en": "Something is already recording this session. Two recorders save "
+              "every lap twice, and the copy looks exactly like a real extra lap "
+              "— stop the one that's running first.",
+        "it": "Qualcosa sta già registrando questa sessione. Due registratori "
+              "salvano ogni giro due volte, e la copia è identica a un giro vero "
+              "in più — ferma prima quello acceso."},
+    "set.pedals": {"en": "Show the pedal trace", "it": "Mostra la traccia dei pedali"},
+    "set.pedals.help": {
+        "en": "A strip under the overlay with your throttle (green) and brake "
+              "(red) as they happen. The ribbon under it turns amber while both "
+              "pedals are down — that's trail braking — and grey while neither "
+              "is, which is time you're giving away. It's the only place you "
+              "can watch your brake release as you do it, instead of being told "
+              "about it afterwards.",
+        "it": "Una striscia sotto l'overlay col tuo gas (verde) e il tuo freno "
+              "(rosso) mentre succedono. Il nastro sotto diventa ambra finché "
+              "premi tutti e due i pedali — è il trail braking — e grigio "
+              "quando non ne premi nessuno, che è tempo regalato. È l'unico "
+              "posto dove vedi il rilascio del freno **mentre** lo fai, invece "
+              "di sentirtelo raccontare dopo."},
+    "set.pedals_hint": {
+        "en": "Makes the overlay taller. Applies on the next Coach Live start.",
+        "it": "Allunga l'overlay. Attivo al prossimo avvio di Coach Live."},
     "set.scale.help": {
         "en": "How big the overlay is drawn on screen. 1.0 is the design size; "
               "raise it on a 4K monitor or if you sit far from the screen, "
@@ -374,6 +416,14 @@ _CUE_EN: dict[str, str] = {
     "Porta più velocità in curva": "Carry more speed through the corner",
     # fuel.py
     "Ultimo giro di benzina, rientra ai box!": "Last lap of fuel — box now!",
+    # pitcall.py
+    "Modifica pronta: rientra ai box a fine giro":
+        "Change ready — box this lap",
+    "Ingresso box qui davanti, rientra": "Pit entry just ahead — come in",
+    "Sei ai box. Apri la pagina Ingegnere nel browser: applica la "
+    "proposta, scrivi il setup e ricaricalo dal garage prima di uscire":
+        "You're in the box. Open the Engineer page in the browser: apply the "
+        "proposal, write the setup, and load it from the garage before you go out",
 }
 
 def _axle_en(it: str) -> str:

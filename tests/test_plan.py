@@ -5,6 +5,8 @@ and they are what the tests below are about: it stays put once accepted, it
 carries a target you can check, and it judges itself only on the laps driven
 *after* you agreed to it.
 """
+from datetime import datetime, timedelta, timezone
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -220,7 +222,14 @@ def test_an_accepted_plan_does_not_move_when_new_laps_land(tmp_path):
     before = _plan(c)["goals"][0]
     for i in range(3):                       # three much better laps
         lap = synth.build_lap(slow_corner=0, amt=2)
-        lap.recorded_utc = f"2026-08-{i + 1:02d}T18:00:00+00:00"
+        # Dated relative to *now*, never to a fixed day. Progress counts only
+        # laps recorded after the plan was accepted (which happens at test time),
+        # so a hard-coded date is a test with an expiry: this one was written on
+        # 2026-08-01 and started failing on 2026-08-03, when the calendar walked
+        # past two of its three laps and left one "after".
+        lap.recorded_utc = (
+            datetime.now(timezone.utc) + timedelta(minutes=i + 1)
+        ).isoformat()
         save_lap(lap, tmp_path)
     after = _plan(c)["goals"][0]
     assert after["baseline_s"] == before["baseline_s"]

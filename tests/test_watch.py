@@ -147,16 +147,29 @@ def test_the_hub_wires_the_silent_recorder_and_never_the_voice():
     assert "live" not in block and "coach" not in block
 
 
-def test_the_hub_counts_coach_live_as_already_recording():
-    """Coach Live records too; starting a recorder next to it would duplicate
-    every lap of the session."""
-    from pathlib import Path
+def test_the_hub_knows_everything_that_records():
+    """Ogni processo che apre un motore o un registratore va contato: due che
+    registrano la stessa sessione salvano ogni giro due volte, e la copia è
+    identica a un giro vero in più.
 
-    src = (Path(__file__).resolve().parents[1] / "src" / "accoach"
-           / "launcher.py").read_text(encoding="utf-8")
-    block = src.split("def _is_recording")[1].split("def ")[0]
-    for cmd in ("recorder", "live", "coach"):
-        assert f'"{cmd}"' in block
+    Letto dall'attributo vero e non dal sorgente: la versione a grep guardava
+    dentro il corpo di `_is_recording`, e ha smesso di vedere l'elenco appena è
+    stato spostato di tre righe — restando verde.
+    """
+    from accoach.launcher import MainWindow
+
+    cmds = set(MainWindow._RECORDING_CMDS)
+    assert {"recorder", "live", "coach"} <= cmds
+    # `server` istanzia un CoachEngine suo (server.py) e registra come gli altri.
+    # Non era elencato, e la pagina Ingegnere spinge attivamente a premerlo.
+    assert "server" in cmds
+
+
+def test_the_backend_button_is_not_clickable_during_coach_live():
+    """Era nell'elenco dei «sicuri durante il live», e non poteva esserlo."""
+    from accoach.launcher import _LIVE_SAFE_KEYS
+
+    assert ("server",) not in _LIVE_SAFE_KEYS
 
 
 def test_it_is_off_in_a_fresh_config():

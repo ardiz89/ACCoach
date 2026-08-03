@@ -120,15 +120,36 @@ pubblico, stesso problema, reazione opposta a seconda di come è presentato.**
 
 ## Cosa resta aperto
 
-Due voci su diciassette, e **nessuna delle due si chiude da scrivania**: sono le
-uniche del documento il cui costo non è codice ma tempo in pista (o, per la 2,
-qualcuno che quelle piste le abbia davanti agli occhi).
+Tre voci, e **nessuna si chiude da scrivania**: sono le uniche del documento il
+cui costo non è codice ma tempo in pista (o, per la 2, qualcuno che quelle piste
+le abbia davanti agli occhi). La 18 è nuova e ha una proprietà che le altre non
+hanno — la misura che le serve **non aspetta il meteo né la fortuna**.
 
 | # | Voce | Origine | Cosa manca davvero |
 |---|---|---|---|
 | 2 | **Riferimenti visivi** («al cordolo», «al cartello») | richiesta esplicita | Il meccanismo **funziona end-to-end**: verificato il 31/07 sui giri Monza in archivio, la scheda frenate stampa *«Parabolica — alla fine del verde sulla sinistra»*. Manca la **copertura**, e il 31/07 si è capito che non si chiude da scrivania: a Imola due fonti indipendenti **si contraddicono su quasi ogni curva** (cartelli contro flag-light), e la distanza stacco→apex misurata non arbitra fra un cartello dei 50 e uno dei 100. Le posizioni sono già misurate, le parole no. Spa e Suzuka hanno un ostacolo in più: i riferimenti in archivio sono una monoposto e una stradale, e i cartelli delle guide sono tarati sulle GT3 |
-| 11 | **Tarature su ACC** | mai fatte | Serve pista. Piano pronto in [`TARATURE-ACC.md`](TARATURE-ACC.md). Il pezzo scomodo è noto: lo **slip ratio ha sorgente diversa fra AC e ACC**, quindi le soglie non si trasportano |
+| 18 | **Passo gara: stint, degrado, benzina** | difetto trovato in casa (03/08) | Tutto il prodotto ha ancora la forma del giro secco. Manca la vista che risponde a «come cala il passo su 25 giri e quando cadono le gomme», e manca per un motivo preciso: **il coefficiente secondi/litro non è estraibile da questo archivio** — provato il 03/08, il rumore di guida (115→221 s sugli stessi 15 giri) domina il peso della benzina di due ordini di grandezza. Senza quel numero i tempi di due stint non sono confrontabili, ed è la stessa ragione per cui il **veto sul tempo dell'ingegnere è di fatto spento**: consumo misurato 3.1-3.3 L/giro (720S/Monza), quindi bastano **0.6 giri** di disallineamento per superare `_FUEL_BIAS_L`. Serve una prova corta: **uno stint di giri il più costanti possibile a setup fisso, dal pieno fino a scendere**. Da lì la pendenza esce pulita, la scheda si fa in una settimana, e l'ingegnere recupera metà del suo criterio di accettazione |
+| ~~11~~ | ~~**Tarature su ACC**~~ | mai fatte | **Chiusa il 02/08**, in pista (720S GT3/Monza, poi SF25/Red Bull Ring su AC). Tutte e tre le soglie **promosse senza correzioni** e i cinque controlli strutturali passati; risultati in [`TARATURE-ACC.md`](TARATURE-ACC.md). Il pezzo non ovvio: **con l'ABS acceso il bloccaggio fisico non avviene** (mai sotto `-0.106` in 11 690 frame), quindi flag e slip si dividono il lavoro — per vedere il fondo dello slip è servito **spegnere l'ABS**. Restano fuori dal conteggio tre righe del piano (gas parziale, coach al primo giro lanciato, riferimenti visivi di Monza) e il **burst lock**, che in quattro minuti di Formula senza ABS non è mai avvenuto |
 | ~~12~~ | ~~**Documentazione allineata**~~ | segnalazione utente | **Chiusa il 31/07.** `GUIDA.md` e `docs/FAQ.md` il 30/07; `docs/index.html` (la pagina pubblica, ferma al 29/06) riscritta il 31/07 con quello che l'app fa davvero, e con la sola differenza fra i due giochi dichiarata invece che taciuta. L'**aiuto contestuale nelle impostazioni** risulta fatto e testato da prima (un «?» per riga, `tests/test_settings_help.py` verifica pure che righe e testi coincidano) |
+
+## La prossima sessione in pista (pianificata il 2026-08-03)
+
+Cinque misure, tutte bloccate sulla stessa risorsa scarsa: **il tempo al
+volante**. Sono qui insieme perché è più economico prenderle in una sessione
+sola che tornare cinque volte, e in quest'ordine perché le prime due sbloccano
+del codice già scritto.
+
+| Cosa | Perché è bloccata | Il protocollo, in una frase | Costo |
+|---|---|---|---|
+| **Stint per la benzina** (voce 18) | Il coefficiente s/litro non si estrae dall'archivio: il rumore di guida domina di due ordini di grandezza | Uno stint di giri il più costanti possibile **a setup fisso, dal pieno fino a scendere** | ~20 min |
+| **Campi pioggia ACC** | Gli offset del tail si misurano, non si indovinano — `isValidLap` sta a 1408 perché qualcuno l'ha visto muoversi | `python -m accoach find-rain`, poi **alzare la pioggia dal menu** senza fermarlo: `rainIntensity` sale, `trackGripStatus` scende | ~10 min |
+| **`yaw_baseline` Formula** | Il 2.50 fu tarato il 27/06 su SF25/Nürburgring, che è una delle sessioni col **canale sterzo tosato**: quel numero non è confermato | Tre giri SF25 **con la periferica delle sessioni del 02/08** (passo sterzo 0.0004, non 0.009) | ~10 min |
+| **Burst lock** | In quattro minuti di Formula senza ABS non è avvenuto **nessun** bloccaggio: resta aperta per evento mancato, non per soglia | Tre frenate volutamente bloccate, ABS a 0 | ~5 min |
+| **Parola di attivazione** | La sintesi vocale serve a **bocciare**, non a promuovere: «ehi copilota» torna esatta con una dizione perfetta, non è detto con la voce del pilota in abitacolo | Dieci risvegli a motore acceso, poi si guarda `assistente-udito.jsonl` | ~5 min |
+
+Le prime due sbloccano codice che esiste già e non fa niente: la finestra
+pressioni sul bagnato (`engineer/pressures.py`, scritta e mai raggiunta) e il
+veto sul tempo dell'ingegnere, oggi sospeso praticamente sempre.
 
 ## Cosa è stato chiuso, e da cosa
 

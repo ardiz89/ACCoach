@@ -22,7 +22,7 @@ CAR, TRACK = "ferrari_488_gt3", "monza"
 
 def _save(tmp_path, ms, road_temp, day, clean=True):
     lap = synth.build_lap(clean=clean)
-    lap.lap_time_ms = ms
+    synth.retime(lap, ms)
     lap.road_temp = road_temp
     lap.recorded_utc = f"{day}T18:00:00+00:00"
     save_lap(lap, tmp_path)
@@ -108,7 +108,7 @@ def test_an_archive_with_no_temperatures_behaves_as_it_always_did(tmp_path):
     """Most archives predate the field: the outright fastest, and no note."""
     for ms, day in ((99_000, "2026-06-20"), (101_000, "2026-06-21")):
         lap = synth.build_lap()
-        lap.lap_time_ms = ms
+        synth.retime(lap, ms)
         lap.recorded_utc = f"{day}T18:00:00+00:00"
         save_lap(lap, tmp_path)
     c = TestClient(create_api(tmp_path))
@@ -129,6 +129,42 @@ def test_a_faster_lap_passed_over_for_being_dirty_is_not_blamed_on_the_weather(t
     a = _analysis(c, lap=p[102_000])
     assert a["reference"]["lap_time_ms"] == 101_000
     assert a["reference"]["by_conditions"] is None
+
+
+def test_the_page_says_when_your_best_was_simply_never_judged(tmp_path):
+    """The other reason a slower lap is the benchmark, and the newest one.
+
+    Since pre-v8 ACC laps stopped being trusted (catalog._clean_to_int) a driver
+    can open this page and find their personal best demoted with no explanation
+    — the exact "the app looks broken" failure this note exists to prevent. The
+    reason is named `unjudged` and not `temp`: the conditions here are
+    identical, and blaming the weather would be a confident wrong answer.
+    """
+    import gzip
+    import json
+
+    _save(tmp_path, 99_000, 12.0, "2026-06-20")                # faster, and old
+    _save(tmp_path, 101_000, 12.0, "2026-06-21")
+    _save(tmp_path, 102_000, 12.0, "2026-06-22")
+    # Make the fast one look like what it would be on disk: an ACC lap from
+    # before the track-limits rule existed. Patched after saving because
+    # `Lap.to_dict` always stamps the current schema.
+    old = next(f for f in tmp_path.glob("*.lap.json.gz") if "1m39s000" in f.name)
+    d = json.loads(gzip.decompress(old.read_bytes()).decode("utf-8"))
+    d["schema"], d["tyre_compound"] = 7, "dry_compound"
+    old.write_bytes(gzip.compress(json.dumps(d).encode("utf-8")))
+    # Throw the catalog away so it re-reads the patched file: `sync` skips paths
+    # it already knows, and `save_lap` indexed this one before the patch. On a
+    # real machine the `_DB_VERSION` bump does exactly this.
+    for db in tmp_path.glob("catalog.db*"):
+        db.unlink()
+
+    c = TestClient(create_api(tmp_path))
+    a = _analysis(c, lap=_paths(c)[102_000])
+    assert a["reference"]["lap_time_ms"] == 101_000, "the judged lap is the target"
+    note = a["reference"]["by_conditions"]
+    assert note and note["reason"] == "unjudged"
+    assert note["faster_lap_time"] == "1:39.000"
 
 
 def test_sectors_agree_with_compare_about_the_benchmark(tmp_path):
@@ -157,7 +193,7 @@ def test_the_lap_dropdown_gets_the_track_temperature_it_is_written_to_show(tmp_p
 
 def _save_full(tmp_path, ms, day, road_temp=0.0, grip=0.0, compound=""):
     lap = synth.build_lap(clean=True, compound=compound)
-    lap.lap_time_ms = ms
+    synth.retime(lap, ms)
     lap.road_temp = road_temp
     lap.grip = grip
     lap.recorded_utc = f"{day}T18:00:00+00:00"

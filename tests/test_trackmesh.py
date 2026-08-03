@@ -247,3 +247,36 @@ def test_every_class_has_a_place_in_the_drawing_order():
     assert set(tm.DRAW_ORDER) == set(tm._CLASSES)
     assert tm.DRAW_ORDER[-1] == "kerb", "i cordoli stanno sopra tutto"
     assert tm.DRAW_ORDER.index("road") > tm.DRAW_ORDER.index("grass")
+
+
+def test_the_pit_lane_is_ground_and_gets_its_own_colour():
+    """`PITS` / `PITLANE` / `PITSPA` finivano scartati, ma sono terreno vero —
+    Monza 599 triangoli per 6280 m² in pianta, la stessa densità dell'asfalto.
+    Classe propria e non `road` perché la corsia box **non è pista**: dipinta
+    uguale farebbe sembrare il tracciato largo il doppio dove si stacca."""
+    assert tm._class_of("01PITLANE") == "pitlane"
+    assert tm._class_of("12PITS003") == "pitlane"
+    assert "pitlane" in tm.DRAW_ORDER
+    assert tm.DRAW_ORDER.index("pitlane") < tm.DRAW_ORDER.index("road")
+
+
+def test_rumble_strips_are_kerbs_under_another_name():
+    """Al Red Bull Ring i cordoli si chiamano così, e venivano buttati."""
+    assert tm._class_of("03RUMBLE") == "kerb"
+
+
+def test_the_drawing_order_is_the_same_on_both_sides():
+    """`DRAW_ORDER` è ricopiato a mano in `web/app.js` (`SURFACE_PAINT`): due
+    copie della stessa decisione in due linguaggi. Finché è così, chi cambia
+    solo quella Python crede di aver cambiato il disegno e non ha cambiato
+    niente."""
+    import re
+    from pathlib import Path
+
+    js = (Path(__file__).resolve().parent.parent / "src" / "accoach" / "web"
+          / "app.js").read_text(encoding="utf-8")
+    block = js[js.index("const SURFACE_PAINT = ["):]
+    block = block[:block.index("];")]
+    painted = re.findall(r'\["(\w+)"', block)
+    assert painted == list(tm.DRAW_ORDER), \
+        f"il disegno usa {painted}, il modello {list(tm.DRAW_ORDER)}"

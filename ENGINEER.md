@@ -230,3 +230,214 @@ Si parte da **ACC** (JSON, dove abbiamo già brake_bias/TC/ABS/EngineMap come st
 5. **Qualità della diagnosi** dipende dal layer `coaching/` → siamo il vettore di presentazione.
 6. **Online/anti-cheat** — scrivere setup in garage è lecito; qualsiasi "live" sconfina nel cheat.
 7. **AC vs ACC** — formati diversi: partire solo da ACC.
+
+---
+
+## 7. Aggiornamento 2026-07-31 — la previsione dichiarata e il registro delle prove
+
+Nato da un giro di analisi della concorrenza. Da giugno il campo si è riempito:
+[Full Grip Vision](https://www.fullgripmotorsport.com/about/fullgripvision) gira
+**interamente offline, senza account**, legge la telemetria live e **scrive il
+file di setup** per cinque simulatori (ACC, AC, ACE, LMU, RaceRoom), asciutto e
+bagnato, a 9.99 $/mese; [ACCELX](https://accelxsim.com/) legge la shared memory
+di AC *e* ACC, 45 canali, e genera un setup completo con motivazione in ~7
+secondi. «Offline» e «scriviamo il file anche su AC» erano nostri a giugno:
+adesso sono il prezzo del biglietto.
+
+Quello che **non** ho trovato descritto da nessuno è la cosa che il nostro
+motore fa già: propone **una** modifica, aspetta che venga applicata, la
+**misura sui giri successivi** e su un plateau **la annulla**. Tutti gli altri
+*generano* un setup. Noi siamo gli unici in condizione di **dimostrare che la
+modifica ha funzionato** — e fino a oggi quel verdetto durava quanto il
+messaggio a schermo.
+
+### 7.1 La previsione (`core.Prediction`)
+
+Prima dei giri di ri-test il pilota legge il metro con cui sarà giudicato: *«il
+sintomo deve scendere da 0.60 sotto 0.50 in 3 giri puliti, senza che il tempo
+peggiori di più di 150 ms. Se non succede, la rimetto com'era.»*
+
+**Va detto cosa non è.** Quel metro è *esattamente* la regola di accettazione
+che il motore sta per applicare, quindi una previsione che «si avvera» è per
+costruzione una modifica accettata: **non è un secondo test indipendente**, e il
+docstring lo dichiara perché nessuno la legga come tale. Il suo valore è
+l'ordine in cui il pilota viene a sapere le cose — prima il metro, poi il voto —
+che è la differenza fra essere giudicati e poter controllare il giudice. Un test
+verifica che il numero annunciato sia *lo stesso* che decide: una previsione che
+divergesse dalla regola sarebbe peggio di nessuna previsione.
+
+### 7.2 Il registro (`engineer/ledger.py`)
+
+JSONL in append sotto `Documenti/ACCoach/engineer_log.jsonl`, una riga per test
+concluso, più `GET /api/setup/record` che la riassume. Scrittura **best-effort**:
+un registro che non si scrive non deve costare al pilota una modifica di setup.
+
+Tre cose registrate, e il motivo di ognuna:
+
+1. **L'esito** — tenuta o rimessa com'era, coi numeri da entrambe le parti. Dopo
+   qualche sessione è un tasso di riuscita per auto, sintomo e leva, **misurato
+   sui giri del pilota** invece che affermato in una pagina di marketing.
+2. **Il rango del rimedio.** I profili dichiarano le loro liste ordinate «per
+   efficacia decrescente». È un'affermazione falsificabile e non l'ha mai
+   verificata nessuno: se il rango 0 viene ripristinato mentre il rango 2 viene
+   tenuto, per quell'auto la tabella è sbagliata e il dato lo dice.
+3. **I sintomi che nessuno stava cercando.** Il verdetto guarda solo il bersaglio.
+   Una barra anteriore più morbida che risolve il sottosterzo all'apex può
+   costare in uscita, e finora succedeva in silenzio. Sono **misurati, mai
+   predetti**: questo file non affermerà mai un effetto collaterale che non ha
+   osservato.
+
+Sul ciclo simulato completo il registro produce già: *«1 modifica su 2 ha
+funzionato (50%), guadagno mediano −500 ms»*, con `preload` 0/1 e `aRBFront`
+1/1, e l'effetto collaterale `oversteer exit low +0.35` attribuito alla leva che
+l'ha prodotto.
+
+E `hit_rate` resta **`None`** finché non c'è niente: zero per cento e «non
+abbiamo ancora misurato niente» sono risposte diverse, e il primo giorno solo
+una delle due è vera.
+
+### 7.3 Cosa resta aperto (dall'analisi concorrenza, in ordine)
+
+1. ~~**Verdetto su uno stint, non su tre giri.**~~ **Rivista, non chiusa** —
+   vedi §7.4: allungare la finestra non era la correzione.
+2. ~~**La pioggia: buco totale.**~~ **Chiuso il rifiuto, non la funzione** —
+   vedi §7.5.
+3. ~~**Il setup di partenza.**~~ **Ritirata** — vedi §7.6: poggiava su dati che
+   non abbiamo, e il problema che doveva risolvere è già risolto altrove.
+
+### 7.4 La benzina: la voce di roadmap era posta male
+
+Il punto 1 era *«giudica su uno stint invece che su tre giri, come fa la guida
+di Coach Dave»*. Implementandolo è venuto fuori che **allungare la finestra non
+è la correzione, ed è anzi il contrario**.
+
+Il confronto del motore è fra **due finestre**: i giri prima della modifica e
+quelli dopo. In mezzo il pilota va in garage a caricare il setup — e in garage
+quasi sempre si rifornisce. Le due finestre sono quindi guidate di routine **con
+pesi diversi**, in una direzione che non è prevedibile: i giri dopo possono
+essere più **pesanti** (serbatoio fresco) o più **leggeri** (primo stint lungo).
+Non è un caso limite, è la forma normale del ciclo. E una finestra più lunga
+brucia più benzina, cioè **peggiora** il problema invece di diluirlo.
+
+Quindi non correggiamo: **ci accorgiamo**. `LapStats.fuel_l` (litri medi nel
+serbatoio, schema v11) arriva fino al verdetto; se le due finestre distano più
+di `_FUEL_BIAS_L = 2.0` litri — circa un giro di benzina per una GT3 — il
+confronto sul tempo **viene sospeso e dichiarato**:
+
+> *«Tenuta: sottosterzo all'apex risolto (0.60→0.20). Il tempo sul giro l'ho
+> lasciato fuori: 20 L nel serbatoio prima, 60 L dopo — non è la stessa
+> macchina.»*
+
+**Perché sospendere e non correggere.** Convertire litri in secondi richiede una
+sensibilità al peso per auto e per pista che non abbiamo **mai misurato**, e un
+coefficiente inventato qui finirebbe per essere la cosa che decide se una
+modifica di setup sopravvive. Il punteggio del sintomo, che non sa quanto pesa
+la macchina, resta il giudice — ed era già lui a decidere: il tempo è sempre
+stato solo un veto.
+
+Tre conseguenze di dettaglio, tutte con un test:
+
+- **niente lettura ≠ pesi uguali.** Sui giri anteriori alla v11 il carburante è
+  0.0, e quello vuol dire *non lo sappiamo*: il veto resta armato com'era, non
+  viene sospeso su prove che non abbiamo;
+- **le modifiche strutturali** (pressioni) non hanno un sintomo su cui ripiegare.
+  Se il tempo non è giudicabile la modifica viene **tenuta e dichiarata tale**,
+  e decide l'obiettivo di fase. Ripristinarla rimetterebbe il gate a proporre la
+  stessa modifica all'infinito;
+- **il registro annota i litri da entrambe le parti** anche quando non hanno
+  rotto il confronto, perché il senso di un registro è poter chiedere *dopo* se
+  quella differenza di tempo era solo benzina.
+
+Resta fuori il **degrado gomma**, che ha lo stesso difetto e per cui non abbiamo
+una misura diretta: nessuna riga lo affermerà finché non ce l'avremo.
+
+### 7.5 La pioggia: prima il rifiuto, la funzione poi
+
+Due misure fatte sull'archivio **prima** di scrivere una riga, ed entrambe hanno
+cambiato il piano:
+
+- **`surface_grip` è 0.0 su tutti e 39 i giri**, su AC *e* su ACC. Non è «basso»:
+  non è un segnale. Qualsiasi rilevamento del bagnato costruito su quel campo
+  sarebbe stato codice morto;
+- **nell'archivio non esiste un solo giro sul bagnato.** Quindi niente di ciò che
+  riguarda il setup in pioggia poteva essere validato, e questo progetto non
+  scrive numeri che non ha misurato.
+
+Il segnale che invece c'è è la **mescola**: ACC dice `dry_compound` /
+`wet_compound`, AC dà il nome della gomma, ed è popolata su 23 giri su 39. È
+anche il testimone migliore, perché è **la decisione del pilota** sulle
+condizioni, non una stima. I 16 giri senza mescola restano `None` — *non lo
+sappiamo*, che non è «asciutto».
+
+Quello che è stato fatto è quindi **un rifiuto**, e vale più di come suona: senza,
+l'ingegnere in pioggia giudica le tue pressioni contro il bersaglio
+dell'asciutto, che su una GT3 sta **2.5 psi dalla parte sbagliata**.
+
+> *«Hai le gomme da bagnato. Sul bagnato il setup non lo tocco: ogni rimedio che
+> ho è stato ricavato sull'asciutto, e con la pioggia più d'uno punta dalla parte
+> opposta. Tolte le pressioni, quello che ti direi sarebbe un'ipotesi travestita
+> da numero.»*
+
+Non è una funzione che aspetta un interruttore: le 12 celle della tabella GT3
+sono tarate sull'asciutto e alcune **si invertono** con la pioggia (meno ala per
+il sottosterzo all'apex veloce è esattamente il contrario di quello che si fa su
+pista bagnata).
+
+**Il pezzo che vale anche sull'asciutto.** Un passaggio asciutto↔bagnato *durante*
+una prova adesso **la fa abbandonare invece di leggerla**: una base su slick e un
+ri-test su gomme da pioggia sono due macchine su due circuiti, e un verdetto
+calcolato attraverso un acquazzone è un numero senza significato presentato come
+se ne avesse uno. Il giro che annuncia il cambio non viene buttato: è il primo
+delle nuove condizioni, e apre la nuova base.
+
+**Pronto per il passo dopo**: `wet_pressure_window()` con la finestra ACC del
+bagnato (30.0 psi, banda 29.5-31.0), sourced da più guide indipendenti
+([simracingsetup](https://simracingsetup.com/assetto-corsa/acc-tyre-pressure-guide/),
+Coach Dave, ACC wiki) e **solo per le GT3**: monoposto e stradali non hanno una
+cifra pubblicata né un giro in archivio, e lì la funzione torna `None`. `None`
+deve restare `None` — ripiegare sull'asciutto non sarebbe una risposta degradata,
+sarebbe una risposta sbagliata.
+
+Cosa serve per andare oltre: **una sessione vera sul bagnato**, come per le
+tarature ACC. Fino ad allora questa è la posizione onesta.
+
+### 7.6 Il setup di partenza: voce ritirata
+
+L'avevo proposta io, guardando la concorrenza: *«una base conservativa generata
+dai range della vettura, dichiarata per quello che è — un punto di partenza
+sicuro, non un setup veloce»*. Andando a implementarla, il codice ha detto due
+cose che la smontano. Entrambe verificate, non ricordate.
+
+**1. I range non esistono.** Il piano §1 elenca `setup/params.py` —
+*«capability/range/passo per carModel»* — fra i pezzi della fondazione. **Non è
+mai stato scritto**: in `setup/` ci sono `acc_format`, `ac_format`, `cli`,
+`diff`, `labels`, `loader`, `store`, `web_api`, e basta. `acc_format.py` espone
+la conversione click→fisico *solo per il display*, e lo dichiara: «le conversioni
+sono riempite solo dove ragionevolmente affidabili; altrove restiamo in
+click/livelli **apposta**, invece di spedire un numero sbagliato in psi o gradi».
+
+Un setup «a metà range» richiede quindi di **inventare il minimo e il massimo di
+ogni parametro per ogni auto**. È esattamente ciò che quel file si rifiuta di
+fare, e sarebbe la prima volta che scriviamo su disco numeri che non abbiamo
+misurato.
+
+**2. Il problema che doveva risolvere è già risolto.** L'argomento era «chi
+comincia non ha una base da correggere». Ma la pagina Ingegnere ha già uno stato
+vuoto dedicato (`noSetupHTML`, con `eng.noSetupBody`) che spiega dove HONE cerca
+i setup — scritto proprio per togliere la contraddizione fra «scegli un setup» e
+una tendina vuota. E il coach in tempo reale non ha mai avuto bisogno del file:
+propone la modifica a voce, il pilota la applica dalla schermata setup del gioco.
+Il file serve alla scrittura automatica, non al consiglio.
+
+**Cosa la sostituisce nella lista.** Il limite **inferiore** dei click è già
+protetto (`AccSetup.set_click` rifiuta i negativi); quello **superiore** no, e
+non è protetto da niente: l'ingegnere può proporre `+1` su un parametro già al
+massimo, la scrittura riesce, e **il gioco tronca al caricamento**. Il setup che
+crediamo di aver scritto non è quello caricato, e il verdetto successivo viene
+misurato su una modifica avvenuta a metà. Oggi il sistema degrada con grazia (il
+plateau fa ripristinare, il tetto di rimedi fa passare oltre), ma è degrado, non
+correttezza.
+
+Quel buco si chiude **solo** con la tabella dei range per auto — cioè con
+`params.py`, che è lavoro di **contenuti e verifica per vettura**, non di codice,
+e va aperto come tale. È la voce vera; il «setup di partenza» era la sua ombra.

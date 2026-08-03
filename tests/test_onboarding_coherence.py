@@ -58,16 +58,18 @@ def test_the_guide_describes_the_hub_not_the_old_launcher():
 def test_the_guide_calls_the_product_by_its_name():
     """La finestra dice HONE, la guida diceva ACCoach."""
     assert _GUIDA.startswith("# Guida a HONE")
-    # Il percorso dei giri su disco resta ACCoach: è la cartella vera.
+    # I percorsi su disco restano ACCoach: è la cartella vera.
     stray = [ln for ln in _GUIDA.splitlines()
-             if "ACCoach" in ln and "Documenti/ACCoach/laps" not in ln]
+             if "ACCoach" in ln and "Documenti/ACCoach/" not in ln]
     assert not stray, f"nome vecchio rimasto: {stray}"
 
 
 def _guide_commands() -> set[str]:
     """I comandi che la guida elenca nelle sue tabelle, senza gli argomenti."""
-    rows = re.findall(r"^\|\s*`([a-z-]+)[^`]*`\s*\|", _GUIDA, re.M)
-    return set(rows)
+    rows = re.findall(r"^\|\s*`([a-z-]+[^`]*)`\s*\|", _GUIDA, re.M)
+    # Le voci di `config.toml` stanno in una tabella con la stessa forma, ma sono
+    # chiavi puntate (`data.laps_dir`), non comandi. Il punto le distingue.
+    return {r.split()[0] for r in rows if "." not in r.split()[0]}
 
 
 def test_the_guide_does_not_send_you_to_deleted_wrappers():
@@ -123,3 +125,79 @@ def test_the_tour_explains_the_temperature_in_the_lap_list():
     l'asfalto o l'aria?"""
     assert "tour.a8.t" in _APPJS
     assert "asfalto" in _I18NJS and "not the air" in _I18NJS
+
+
+# --- la guida racconta il rientro ai box -----------------------------------
+
+def _flat(text: str) -> str:
+    """Il testo senza gli a capo del sorgente.
+
+    Le frasi della guida sono mandate a capo a 80 colonne, quindi cercarle come
+    sottostringa fallisce a seconda di dove cade l'a capo — cioè il test
+    fallirebbe per la formattazione invece che per il contenuto.
+    """
+    return re.sub(r"\s+", " ", text)
+
+
+def test_the_guide_explains_being_called_into_the_pits():
+    """Una voce nuova che ti parla mentre guidi, e che ti chiede di perdere un
+    giro: se la guida non la nomina, la prima volta sembra un guasto."""
+    assert "rientra ai box a fine giro" in _flat(_GUIDA)
+    assert "Ingresso box qui davanti" in _flat(_GUIDA)
+
+
+def test_the_guide_says_why_the_pit_entry_warning_can_be_missing():
+    """È l'unica parte del coach che tace **di proposito** su una pista nuova.
+    Non spiegarlo lo fa sembrare rotto proprio dove è più prudente."""
+    assert "nessun gioco lo pubblica" in _flat(_GUIDA)
+    assert "mediana" in _GUIDA
+
+
+def test_the_guide_says_the_menu_teleport_teaches_nothing():
+    """È la domanda che ha posto il pilota, ed è comportamento voluto."""
+    assert "torna ai box" in _flat(_GUIDA) and "non insegna niente" in _flat(_GUIDA)
+
+
+def test_the_guide_explains_that_a_dial_needs_no_confirmation():
+    """Il ciclo dell'ingegnere si chiude da solo su ACC e con un pulsante su AC:
+    due comportamenti diversi sullo stesso schermo vanno detti, o il pulsante
+    che non compare sembra un pezzo mancante."""
+    assert "Al volo" in _flat(_GUIDA) and "guarda il canale" in _flat(_GUIDA)
+    assert "eng.avDone" in _I18NJS
+
+
+def test_the_engineer_tour_introduces_the_at_the_wheel_panel():
+    engjs = (_ROOT / "src" / "accoach" / "web" / "engineer.js").read_text(
+        encoding="utf-8")
+    assert "tour.e6.t" in engjs and '"tour.e6.t"' in _I18NJS
+
+
+# --- e la regola nuova su chi diventa il riferimento ------------------------
+
+def test_both_guides_explain_the_lap_nobody_judged():
+    """Il pilota apre il report, trova il proprio record personale scavalcato da
+    un giro più lento e non trova scritto perché da nessuna parte: è la stessa
+    cosa di un'app rotta. La frase è sullo schermo — deve esserci anche qui."""
+    assert "nessuno ha guardato" in _flat(_GUIDA)
+    assert "1:53.712" in _GUIDA, "il caso vero da cui è nata la regola"
+    assert "nothing looked" in _flat(_FAQ)
+    assert "1:53.712" in _FAQ
+
+
+def test_the_screen_and_the_guide_use_the_same_words():
+    """Se il riepilogo dice una cosa e la guida un'altra, il driver non collega
+    le due e cerca un guasto."""
+    assert "verificato i limiti di pista" in _flat(_I18NJS)
+    assert "verificato i limiti di pista" in _flat(_GUIDA)
+    assert "checked it for track limits" in _flat(_I18NJS)
+    assert "checked it for track limits" in _flat(_FAQ)
+
+
+def test_the_guide_names_the_sidebar_sections_as_the_app_does():
+    """La guida dice al nuovo utente in quale sezione premere Coach Live: se
+    quel nome cambia nell'app e non qui, la prima istruzione che esegue punta a
+    una voce che non esiste. È già successo rinominando «Guida» → «In pista»,
+    che serviva proprio a togliere una collisione di nomi."""
+    for key in ("nav.home", "nav.live", "nav.analysis", "nav.setup",
+                "nav.devices", "nav.settings"):
+        assert t(key, lang="it").strip() in _flat(_GUIDA), key

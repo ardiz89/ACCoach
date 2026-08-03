@@ -43,7 +43,7 @@ def test_every_dispatched_command_is_documented_somewhere():
     documented = cli._HELP + cli._HELP_TOOLS
     # Aliases and help flags are dispatch targets but not commands to advertise.
     aliases = {"gui", "help", "-h", "--help", "all", "tools", "gaxis", "yaw",
-               "aids", "sectors", "diag", "import-ref", "dry", "stat"}
+               "aids", "sectors", "diag", "import-ref", "dry", "stat", "rain"}
     for cmd in _dispatched_commands() - aliases:
         assert re.search(rf"^  {re.escape(cmd)}\b", documented, re.M), cmd
 

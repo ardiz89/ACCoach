@@ -5,10 +5,13 @@ from accoach.coaching.pressure import PressureAdvisor, _COOLDOWN_LAPS
 from accoach.coaching.cue import CueCategory
 from accoach.telemetry.snapshot import ACStatus, SessionType, TelemetrySnapshot
 
+# `is_acc=True` non è decorazione: la finestra 27.5 psi è stata misurata su una
+# GT3 di ACC, e fuori da lì il consiglio tace apposta (vedi coaching/tuning.py).
+# Questi test descrivono proprio quel caso, quindi il titolo va detto.
 _BASE = replace(
     TelemetrySnapshot.disconnected(),
     connected=True, status=ACStatus.LIVE, session=SessionType.PRACTICE,
-    speed_kmh=180.0,
+    speed_kmh=180.0, is_acc=True,
 )
 _FRAMES = 50   # comfortably above PressureAdvisor._MIN_SAMPLES
 
@@ -94,3 +97,62 @@ def test_slow_lap_no_samples():
     adv = PressureAdvisor()
     out, _ = _drive_lap(adv, (29.2, 29.0, 27.4, 27.5), speed=40.0)
     assert out == []
+
+
+# --- la finestra vale dov'è stata misurata, e altrove si tace ---------------
+#
+# 27.5 psi è la GT3 di ACC all'asciutto. Applicata altrove non è una stima
+# approssimativa: è un'altra auto. Misurato sui giri d'archivio il 03/08 —
+# la SF25 gira a 12.9 psi e si sentiva dire «alza 14.6 psi»; la BMW M3 E92 a
+# 34.7, che è la sua pressione di progetto, «cala 7.2». Rigiocando l'archivio
+# col gate: ACC GT3 24 cue → 24, tutto il resto 27 → 0.
+
+def _advisor_for(cls):
+    from accoach.coaching.pressure import PressureAdvisor as P
+    adv = P()
+    adv.set_car_class(cls)
+    return adv
+
+
+def test_a_formula_car_is_not_told_to_double_its_pressures():
+    from accoach.engineer import CarClass
+
+    adv = _advisor_for(CarClass.FORMULA)
+    out, now = _drive_lap(adv, (13.0,) * 4, temp=90.0)
+    more, _ = _drive_lap(adv, (13.0,) * 4, now=now, temp=90.0)
+    assert not out + more
+
+
+def test_a_road_car_at_its_own_design_pressure_is_left_alone():
+    from accoach.engineer import CarClass
+
+    adv = _advisor_for(CarClass.ROAD)
+    out, now = _drive_lap(adv, (34.7,) * 4, temp=85.0)
+    more, _ = _drive_lap(adv, (34.7,) * 4, now=now, temp=85.0)
+    assert not out + more
+
+
+def test_a_gt3_on_acc_still_gets_the_advice():
+    """Il gate deve togliere i falsi positivi e **non** il consiglio che
+    funziona: 26 psi su un 720S è la cosa che vale la pena sentirsi dire."""
+    from accoach.engineer import CarClass
+
+    adv = _advisor_for(CarClass.GT3)
+    out, _ = _drive_lap(adv, (26.0,) * 4)
+    assert any(c.category is CueCategory.TYRE_PRESSURE for c in out)
+    assert "1.5 psi" in out[0].message, "e con la correzione giusta"
+
+
+def test_a_gt3_mod_on_ac_is_not_judged_by_accs_window():
+    """La classe non basta: il M4 GT3 **mod su AC** è classe GT3 e legge 63 °C
+    di gomma — il modello del mod non è quello su cui 27.5 psi è stato
+    misurato."""
+    from accoach.engineer import CarClass
+
+    adv = _advisor_for(CarClass.GT3)
+    ac = lambda *a, **k: replace(_snap(*a, **k), is_acc=False)   # noqa: E731
+    out = []
+    for lap_no in range(2):
+        for i in range(_FRAMES):
+            out += adv.update(ac(i / _FRAMES + 0.001, (22.0,) * 4), lap_no * 10.0)
+    assert not out

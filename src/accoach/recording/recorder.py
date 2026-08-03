@@ -33,7 +33,7 @@ from dataclasses import dataclass
 
 from ..logging_setup import get_logger
 from ..telemetry.snapshot import ACStatus, TelemetrySnapshot
-from .lap import Lap, LapSample
+from .lap import _OPEN_CLOCK_MAX_MS, Lap, LapSample, trusted_lap_ms
 
 _log = get_logger("recorder")
 
@@ -324,6 +324,17 @@ class LapRecorder:
         # collapsing the lap to one point). Drop it — the next frame has wrapped.
         if not buf.samples and buf.is_full and s.lap_position > 0.5:
             return
+        # …and the same frame can also arrive the other way round: position
+        # already wrapped to ~0.000 while the lap TIMER still holds the previous
+        # lap's elapsed time, because the sim resets the two on different frames.
+        # The guard above only watches position, so that frame got in — measured
+        # in the archive on four laps, opening with clocks from 69.6 s to 189.2 s
+        # at pos 0.000. Kept, it makes the reference believe it took 70 seconds to
+        # reach the start line. A lap that opens at the line has a clock of about
+        # nothing; anything else is last lap's.
+        if (not buf.samples and buf.is_full
+                and int(s.current_lap_ms) > _OPEN_CLOCK_MAX_MS):
+            return
         t = int(s.current_lap_ms)
         moved = abs(s.lap_position - buf.last_pos) >= _MIN_POS_DELTA
         waited = (t - buf.last_t_ms) >= _MIN_DT_MS
@@ -343,7 +354,15 @@ class LapRecorder:
         # out lap carries at its own crossing, now that the position wrap closes
         # laps the counter never counted. A lap we can't put a time on isn't a
         # timed lap, whatever the buffer thinks.
-        lap_ms = int(s.last_lap_ms)
+        # `last_lap_ms` is read on the crossing frame and the sim doesn't always
+        # publish the new value by then, so a lap can be stamped with the time of
+        # the lap *before* — measured: a 224-second Monza lap filed as a 1:55.902,
+        # an identical twin of the real one. The lap's own clock is the check.
+        lap_ms = trusted_lap_ms(int(s.last_lap_ms), buf.samples)
+        if lap_ms != int(s.last_lap_ms):
+            _log.warning("lap time %.3fs contradicted by its own samples (%.3fs);"
+                         " trusting the samples",
+                         int(s.last_lap_ms) / 1000.0, lap_ms / 1000.0)
         timed = _LAP_MS_MIN <= lap_ms <= _LAP_MS_MAX
         if buf.is_full and len(buf.samples) < _MIN_SAMPLES:
             # Don't just drop it quietly — that's how the empty files got made in

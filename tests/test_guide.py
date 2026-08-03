@@ -59,9 +59,9 @@ def test_the_italian_guide_keeps_its_structure():
     """Counts, so that a block type silently ceasing to parse shows up here."""
     body, headings = render_markdown(_DOCS["it"])
     assert len([h for h in headings if h[0] == 2]) == 9      # the nine sections
-    assert body.count("<table>") == 3                        # delta + 2 commands
+    assert body.count("<table>") == 5   # pedali + delta + 2 di comandi + config
     assert body.count("<pre>") >= 3                          # the shell examples
-    assert body.count("<blockquote>") == 3
+    assert body.count("<blockquote>") == 4   # +1: il trail sulle stradali
 
 
 def test_a_command_inside_a_bullet_stays_a_code_block():

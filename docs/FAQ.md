@@ -85,6 +85,36 @@ clicks from the game).
   Crew Chief.
 - **Move or close it:** start it with `--interactive`, or close the terminal that
   launched it (`Ctrl+C`).
+- **Watching your own trail braking:** turn on **Settings → Show the pedal
+  trace**. It adds a strip under the HUD with your throttle (green) and brake
+  (red) over the last few seconds. The ribbon below them goes **amber** while
+  both pedals are down — that's trail braking — **grey** while neither is, which
+  is time you're giving away, and stays blank on a clean release. The coach
+  *tells* you about your brake release after the fact; this is the only place
+  you can watch it as you do it. Off by default because it makes the overlay
+  taller.
+
+## Being called into the pits
+
+When the race engineer proposes a change that needs the garage, it doesn't just
+tell you *what* to change — it tells you *when to come in*. You'll hear it at the
+start of the final sector (or about 20 s before the pit entry, whichever comes
+first), again just before the entry, and once more standing in the box, telling
+you what to do with the change.
+
+**No game publishes where the pit lane begins**, so HONE learns it: it watches
+where you leave the track the first time you actually drive in, and keeps the
+median across visits. On a track you've never pitted at, the second call simply
+doesn't exist — a guessed pit entry spoken with confidence is worse than
+silence, because you'd lift for it. Returning to the garage from the game menu
+teaches it nothing, deliberately: the car vanishes from mid-track and reappears
+in the box, and taking that jump at face value would put the pit entry in the
+middle of a straight.
+
+Changes you can make **at the wheel** (TC, ABS, brake bias) need no confirmation
+at all: HONE reads those channels live and sees the dial move by itself. On AC
+those levels aren't published, so the Engineer page offers a "Done" button
+instead.
 
 ## What the analysis app shows
 
@@ -234,6 +264,16 @@ The reference is the fastest lap you've driven on that car and track — with tw
 rules on top:
 
 - **Dirty laps are never eligible.** A cut lap is faster for a reason.
+- **A lap nobody judged doesn't beat a lap that was judged.** On ACC, the
+  "clean" flag on laps recorded **before 21 July 2026** came from a field that
+  game declares and never fills: it says clean because nothing looked, not
+  because it was. Those laps aren't discarded — they still become your reference
+  if you have nothing else, since a doubtful target beats no target — but they
+  lose to any lap that was really checked. It came from a real case: at Monza
+  the reference was a 1:53.712 that **cut the Variante della Roggia** for half
+  the corner, and was the fastest lap precisely because of that. When it
+  happens the summary says so: "chosen as the judged lap — your 1:53.712 is
+  faster but nothing ever checked it for track limits".
 - **Track temperature is taken into account.** Braking points move 10-20 m
   between a cold track and a hot one, so a lap driven in comparable conditions
   wins over a slightly faster one driven in very different ones. It's a

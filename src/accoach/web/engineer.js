@@ -6,6 +6,14 @@ const WS_PORT = 8777;            // the live backend; the page itself is on 8778
 const $ = (id) => document.getElementById(id);
 // i18n: translate a chrome string (defensive if i18n.js failed to load).
 const t = (k) => (window.HoneI18n ? window.HoneI18n.t(k) : k);
+// …e la stessa con i segnaposto riempiti. Gemella di quella in app.js: le due
+// pagine hanno script separati e ognuna si porta il proprio `t`, quindi anche
+// questa. Quattro righe duplicate costano meno di un modulo condiviso per due.
+const tf = (k, vals) => {
+  let s = t(k);
+  for (const n in vals) s = s.split("{" + n + "}").join(vals[n]);
+  return s;
+};
 const LANG = () => (window.HoneI18n ? window.HoneI18n.lang : "en");
 
 const state = {
@@ -45,6 +53,13 @@ async function loadCombos() {
   sel.innerHTML = "";
   if (!combos.length) {
     sel.innerHTML = `<option value="">${t("eng.noSetupOpt")}</option>`;
+    // Il `return` salta `onComboChange()`, quindi saltava anche `noSetupHTML()`
+    // — che esiste apposta per questo caso — e restava il testo statico
+    // dell'HTML: «Scegli un'auto/pista qui sopra», sotto una tendina che dice
+    // «(nessun setup trovato)». Una contraddizione, e proprio al primo avvio:
+    // un'installazione ACC nuova ha la cartella dei setup **vuota** finché non
+    // ne salvi uno dal gioco.
+    $("setup-body").innerHTML = noSetupHTML();
     return;
   }
   // Group the (potentially many) cars by engineer class for a usable dropdown.
@@ -91,6 +106,58 @@ async function onComboChange() {
     sel.appendChild(o);
   }
   await onSetupChange();
+  loadRecord();                 // best-effort: il registro non blocca la pagina
+}
+
+// ---- il registro: quante modifiche hanno davvero funzionato ---------------
+//
+// L'unico numero di questa pagina che non è una nostra affermazione: è contato
+// su prove che il pilota ha guidato, e può darci torto. Restava su disco, dietro
+// un endpoint che nessuno chiamava.
+
+// Sotto questa soglia si mostrano solo i conteggi. Un tasso di riuscita su tre
+// campioni è rumore travestito da percentuale — lo dice il modulo che lo calcola.
+const REC_MIN_TESTS = 8;
+
+async function loadRecord() {
+  const box = $("eng-record");
+  let r;
+  try {
+    r = await api(`/api/setup/record?car=${encodeURIComponent(state.car)}` +
+                  `&track=${encodeURIComponent(state.track)}`);
+  } catch (e) { box.hidden = true; return; }
+  box.hidden = false;
+  if (!r.tests) {
+    $("rec-head").textContent = "";
+    $("rec-note").textContent = t("rec.none");
+    $("rec-tables").innerHTML = "";
+    return;
+  }
+  let head = tf("rec.counts", { kept: r.kept, tests: r.tests });
+  if (r.tests >= REC_MIN_TESTS && r.hit_rate != null) {
+    head += tf("rec.rate", { rate: Math.round(r.hit_rate * 100) });
+  }
+  if (r.median_gain_ms != null) {
+    head += tf("rec.gain", { gain: (r.median_gain_ms / 1000).toFixed(3) });
+  }
+  $("rec-head").innerHTML = head;
+  $("rec-note").textContent = r.tests < REC_MIN_TESTS ? t("rec.thin") : "";
+
+  const rows = (title, entries) => {
+    if (!entries.length) return "";
+    const li = entries.map(([k, v]) =>
+      `<div class="rec-row"><span>${k}</span><span>${v}</span></div>`).join("");
+    return `<div class="rec-block"><div class="rec-sub">${title}</div>${li}</div>`;
+  };
+  const kept = (o) => Object.entries(o).map(
+    ([k, v]) => [k, tf("rec.kept_of", { kept: v.kept, tests: v.tests })]);
+  $("rec-tables").innerHTML =
+    rows(t("rec.byparam"), kept(r.by_param || {})) +
+    rows(t("rec.byrank"), Object.entries(r.by_rank || {}).map(
+      ([n, v]) => [tf("rec.rank", { n: Number(n) + 1 }),
+                   tf("rec.kept_of", { kept: v.kept, tests: v.tests })])) +
+    rows(t("rec.side"), (r.side_effects || []).map(
+      (s) => [`${s.param} → ${s.symptom}`, tf("rec.seen", { n: s.seen })]));
 }
 
 async function loadClass(car) {
@@ -624,6 +691,13 @@ function renderEngineer(st) {
   if (eng && eng.tag === "AV" && eng.change) {
     av.hidden = false;
     $("av-msg").textContent = eng.rationale || eng.message || "";
+    // The button is the fallback, not the route. Where the game publishes the
+    // dial (ACC) the engine sees it move and closes the loop by itself, and
+    // asking a driver to click something at 250 km/h would be the wrong answer.
+    // Where it doesn't (AC: every aid level reads -1) this is the only way an
+    // "al volo" change can ever be marked applied — without it the engineer
+    // re-proposes the same click every lap and the phase never closes.
+    $("av-done").hidden = !!eng.watched || !!eng.applied;
   } else {
     av.hidden = true;
   }
@@ -649,6 +723,8 @@ function renderEngineer(st) {
   // Default: no low-confidence caution; the proposal branch re-arms it.
   hint.hidden = true;
   says.removeAttribute("data-conf");
+  renderPrediction(eng);
+  renderOutcome(eng);
 
   if (boxProposal) {
     $("es-msg").textContent = eng.rationale || eng.message;
@@ -679,10 +755,57 @@ function renderEngineer(st) {
     conf.hidden = true; prep.hidden = true;
     says.classList.add("active");
   } else {
-    $("es-msg").textContent = t("eng.dash"); $("es-cat").textContent = "";
+    // Un trattino è un silenzio che non dice perché tace, dentro un riquadro
+    // intitolato «Il tecnico suggerisce». Nei primi giri l'ingegnere non ha
+    // ancora una base e lo dice benissimo da solo appena il primo giro si
+    // chiude («servono 3 giri puliti, ne ho 1»): mancava solo prima.
+    $("es-msg").textContent = st.connected ? t("eng.warmup") : t("eng.dash");
+    $("es-cat").textContent = "";
     conf.hidden = true; prep.hidden = true;
     says.classList.remove("active");
   }
+}
+
+// The acceptance bar, shown while the change is still a proposal and while it
+// is being re-tested. It is the engine's own rule said out loud (see
+// engineer/core.py `Prediction`): not a second test, but the difference between
+// being judged and being able to check the judge.
+function renderPrediction(eng) {
+  const el = $("es-predict");
+  if (!el) return;
+  const p = eng && eng.prediction;
+  const show = p && p.text && (eng.kind === "propose" || eng.kind === "evaluating");
+  el.hidden = !show;
+  el.textContent = show ? p.text : "";
+}
+
+// The verdict, with the numbers on both sides — and the symptoms that moved
+// while nobody was looking at them. Those are measured, never predicted.
+function renderOutcome(eng) {
+  const el = $("es-outcome");
+  if (!el) return;
+  const o = eng && eng.outcome;
+  if (!o) { el.hidden = true; el.innerHTML = ""; return; }
+  const dt = (o.time_after_ms - o.time_before_ms) / 1000;
+  const bits = [
+    `<span class="oc-verdict" data-kept="${o.kept}">` +
+    `${o.kept ? t("eng.oc.kept") : t("eng.oc.reverted")}</span>`,
+    `<span class="oc-num">${t("eng.oc.laps")} ${o.laps}</span>`,
+    `<span class="oc-num">${dt >= 0 ? "+" : ""}${dt.toFixed(2)}s</span>`,
+  ];
+  if (o.score_before || o.score_after) {
+    bits.splice(1, 0, `<span class="oc-num">${o.score_before.toFixed(2)}` +
+      ` → ${o.score_after.toFixed(2)}</span>`);
+  }
+  let side = "";
+  if (Array.isArray(o.side_effects) && o.side_effects.length) {
+    side = `<div class="oc-side">${t("eng.oc.side")} ` +
+      o.side_effects.map((s) =>
+        `${s.symptom} ${s.delta >= 0 ? "+" : ""}${s.delta.toFixed(2)}`).join(" · ") +
+      `</div>`;
+  }
+  el.innerHTML = bits.join("") + side;
+  el.hidden = false;
 }
 
 // Render the Focus/Lesson block (st.focus) — the driving coach working one
@@ -727,12 +850,26 @@ function renderFocus(st) {
 
 function renderPitReminder(st) {
   const el = $("pit-reminder");
-  if (state.lastWritten && st.in_pit) {
+  if (!st.in_pit) { el.hidden = true; return; }
+  // Stopped in the box with a garage change still unwritten. The voice has just
+  // sent the driver to this page (coaching/pitcall.py); the page has to say what
+  // to do here, or the trip in was for nothing. Checked BEFORE the "go load it"
+  // reminder because a proposal that arrived after the last write is the newer
+  // instruction — `applied` is what tells the two apart (the engineer re-emits
+  // the same proposal until the next completed lap, so its mere presence
+  // doesn't).
+  const e = st.engineer;
+  if (e && e.change && e.tag === "BOX" && !e.applied) {
+    el.hidden = false;
+    el.innerHTML = t("eng.pitTodo");
+    return;
+  }
+  if (state.lastWritten) {
     el.hidden = false;
     el.innerHTML = t("eng.pit1") + state.lastWritten + t("eng.pit2");
-  } else {
-    el.hidden = true;
+    return;
   }
+  el.hidden = true;
 }
 
 function maybeAutoSelect(car, track) {
@@ -765,6 +902,16 @@ function connectWS() {
 
 $("combo").onchange = () => { state.autoSelected = true; onComboChange(); };
 $("setup").onchange = onSetupChange;
+// "I've turned the dial." Same endpoint the setup writer calls, because it is
+// the same event: the change the engineer proposed is now on the car, so the
+// re-test window can start. Best-effort like the other one — a backend that
+// isn't running just means the engineer keeps proposing.
+$("av-done").onclick = () => {
+  $("av-done").hidden = true;
+  fetch(`http://${location.hostname}:${WS_PORT}/engineer/applied`,
+        { method: "POST" }).catch(() => { /* backend off — keeps proposing */ });
+};
+
 $("btn-reset").onclick = () => { state.pending = {};
   renderSetup({ groups: groupsOf(state.params), params: state.params }); renderTray(); };
 $("btn-write").onclick = openWriteModal;
@@ -780,6 +927,9 @@ function tourSteps() {
   return [
     { sel: "#gauges", title: t("tour.e1.t"), text: t("tour.e1.x") },
     { sel: "#tyres", title: t("tour.e2.t"), text: t("tour.e2.x") },
+    // Only appears when there IS an "al volo" proposal — the tour engine skips
+    // hidden targets, so it costs nothing on the sessions without one.
+    { sel: "#av-now", title: t("tour.e6.t"), text: t("tour.e6.x") },
     { sel: "#engineer-says", title: t("tour.e3.t"), text: t("tour.e3.x") },
     { sel: "#focus-says", title: t("tour.e4.t"), text: t("tour.e4.x") },
     { sel: ".eng-setup", title: t("tour.e5.t"), text: t("tour.e5.x") },

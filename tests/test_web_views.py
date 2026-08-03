@@ -157,6 +157,29 @@ def test_an_exaggerated_gap_says_so_on_the_canvas():
     assert "line.mag.note" in _APPJS
 
 
+def test_the_corner_is_turned_by_its_real_shape_not_by_the_stretched_one():
+    """×1 e ×3 devono essere la stessa curva, vista uguale.
+
+    L'inquadratura sceglie **l'angolo** che fa stare la curva più grande nel
+    riquadro. Se quell'angolo lo decide anche la linea gonfiata, passando a ×3
+    la curva viene pure **ruotata** — e siccome a ×3 il fondo sparisce di
+    proposito, non resta nessun appiglio per riconoscerla. Due disegni della
+    stessa curva che non si somigliano, in un pulsante che serve a confrontarli.
+
+    Quindi: l'angolo dal materiale **vero** (`pool = real`, che non contiene mai
+    punti gonfiati), lo zoom da quello **disegnato**, perché a ×3 la tua linea
+    non deve uscire dal bordo.
+    """
+    body = _APPJS[_APPJS.index("  const real = []"):]
+    body = body[:body.index("const turn = (")]
+    assert "const pool = real;" in body, "l'angolo si sceglie sulla curva vera"
+    # `real` prende la tua linea NON gonfiata; `draw` quella gonfiata.
+    assert "real.push([you.x[i], you.z[i]])" in body
+    assert "draw.push([yx[i], yz[i]])" in body
+    # e il riquadro si riallarga su `draw` dopo aver fissato l'angolo
+    assert "for (const p of draw)" in body
+
+
 def test_printing_hides_every_view_without_naming_them():
     """The print sheet is the braking cheat sheet and nothing else.
 
@@ -387,7 +410,14 @@ def test_no_id_rule_can_outrank_the_hidden_class():
     """
     for m in re.finditer(r"(#view-[\w-]+)([^{]*)\{([^}]*)\}", _screen_css()):
         sel, rest, body = m.group(1), m.group(2), m.group(3)
-        if "display" not in body:
+        decl = re.search(r"display\s*:\s*([\w-]+)", body)
+        if decl is None:
+            continue
+        # `display: none` è l'opposto del pericolo: non può lasciare un pannello
+        # a schermo, può solo toglierlo. Serve per lo stato «ancora nessun giro»,
+        # dove `#view-flow` riempiva la finestra di una card vuota e spingeva il
+        # messaggio sotto la piega. Il divieto vale per chi lo rende visibile.
+        if decl.group(1) == "none":
             continue
         assert ":not(.hidden)" in sel + rest, f"{sel}{rest} sets display"
 

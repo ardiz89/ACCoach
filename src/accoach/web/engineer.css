@@ -71,6 +71,24 @@
    cautionary note, so a tentative call gets a second look before writing. */
 .engineer-says[data-conf="low"] { border-left-color: var(--red); border-left-style: dashed; }
 .es-hint { color: var(--amber); font-size: 12px; margin: 2px 0 4px; }
+
+/* The acceptance bar, before the laps. Quiet on purpose: it is the small print
+   of the proposal above it, not a second headline. */
+.es-predict {
+  margin: 6px 0 2px; padding-left: 9px;
+  border-left: 2px solid var(--line);
+  color: var(--muted); font-size: 12px; line-height: 1.55;
+}
+/* The verdict, after them. */
+.es-outcome { display: flex; gap: 10px; flex-wrap: wrap; align-items: baseline;
+              margin: 6px 0 2px; font-size: 12px; }
+.oc-verdict { font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+              font-size: 11px; }
+.oc-verdict[data-kept="true"] { color: var(--green); }
+.oc-verdict[data-kept="false"] { color: var(--amber); }
+.oc-num { color: var(--muted); font-family: var(--font-mono);
+          font-variant-numeric: tabular-nums; }
+.oc-side { flex: 1 1 100%; color: var(--amber); font-size: 12px; margin-top: 2px; }
 /* Persistent "what to do in this phase" guidance line. */
 .es-phase { font-size: 12.5px; line-height: 1.45; margin: 2px 0 6px; padding: 6px 9px;
   background: rgba(255,255,255,.03); border-radius: 7px; color: var(--muted); }
@@ -126,6 +144,9 @@ button.small { padding: 7px 12px; font-size: 13px; margin-top: 8px; }
   border-radius: 12px; padding: 10px 12px; margin-bottom: 12px; background: #241a08;
 }
 .av-msg { font-size: 15px; font-weight: 600; margin-top: 4px; }
+/* Deliberately quiet: on ACC this button never appears (the engine watches the
+   dial), and where it does appear it is a confirmation, not the main action. */
+.av-done { border-color: var(--amber); color: var(--amber); }
 
 .pit-reminder {
   margin-top: 12px; padding: 10px 12px; border-radius: 12px;
@@ -241,3 +262,19 @@ button.ghost:hover { color: var(--text); border-color: var(--muted); }
   .param { grid-template-columns: 1fr; gap: 4px; }
   .tray { padding: 12px 14px; }
 }
+
+/* Il registro: conteggi, non un cruscotto. Deve leggersi come un verbale — e
+   deve poter dare torto a chi l'ha scritto. */
+.eng-record {
+  margin-top: 12px; padding: 10px 12px; border-radius: 12px;
+  background: #0e1620; border: 1px solid var(--line);
+}
+.rec-head { font-size: 15px; margin-top: 4px; }
+.rec-note { font-size: 12px; color: var(--muted); margin-top: 4px; line-height: 1.5; }
+.rec-block { margin-top: 10px; }
+.rec-sub { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+.rec-row {
+  display: flex; justify-content: space-between; gap: 12px;
+  font-size: 13px; padding: 2px 0; border-bottom: 1px solid var(--line);
+}
+.rec-row span:last-child { font-family: var(--font-mono); color: var(--muted); }

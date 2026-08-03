@@ -43,7 +43,7 @@ from .coaching import (
 from .coaching.training import MIN_LAPS as _TRAIN_MIN_LAPS, assess as _assess_training
 from .comparison import Reference
 from .i18n import current_language
-from .recording import DEFAULT_LAPS_DIR, load_lap
+from .recording import laps_root, load_lap
 from .recording.catalog import LapCatalog, _GRIP_BAND, _TEMP_BAND_C
 from .recording.lap import SAMPLE_FIELDS
 from .recording.storage import _catalog_path, _slug, list_lap_files
@@ -474,6 +474,17 @@ def _conditions_note(elected: dict | None, fastest: dict | None,
         return {**out, "reason": "grip",
                 "grip": round(e["grip"], 2),
                 "faster_grip": round(f["grip"], 2) if f["grip"] else None}
+
+    # Nothing about the weather explains it, so it's the other axis of the
+    # election: the faster lap was never judged for track limits and this one
+    # was. Added the day pre-v8 ACC laps stopped being trusted (see
+    # catalog._clean_to_int) — without it the driver opens the page, finds their
+    # personal best demoted with no explanation, and the app looks broken in
+    # exactly the way this function exists to prevent. Note the wording the UI
+    # gives it: "never checked", not "cut the corner". We don't know that it
+    # cut; we know nothing looked.
+    if elected.get("clean") == 1 and fastest.get("clean") == -1:
+        return {**out, "reason": "unjudged"}
     return None
 
 
@@ -640,7 +651,7 @@ class _RevalidatingStatic(StaticFiles):
 
 
 def create_api(
-    laps_dir: Path | str = DEFAULT_LAPS_DIR,
+    laps_dir: Path | str | None = None,
     setups_root: Path | str | None = None,
     demo: bool = False,
 ) -> FastAPI:

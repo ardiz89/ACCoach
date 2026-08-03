@@ -131,7 +131,14 @@ class LapComparator:
         """Return the live delta, or ``None`` when no meaningful comparison exists."""
         if not self.reference.usable:
             return None
-        if not (s.connected and s.status == ACStatus.LIVE) or s.in_pit:
+        # The whole pit lane, not just the box. `normalizedCarPosition` keeps
+        # advancing down the lane and the lap clock keeps running, so a delta
+        # computed there is a number that grows while the driver crawls at the
+        # limiter — and the `quiet` gate silences the *cues*, not the readout, so
+        # the overlay showed it. It is the same reason the recorder stops at
+        # `in_pit_lane` and not at `in_pit` (see SharedMemoryReader._in_pit_lane:
+        # an in-lap read as a timed lap once tripled a session's sigma).
+        if not (s.connected and s.status == ACStatus.LIVE) or s.in_pit or s.in_pit_lane:
             return None
 
         # At the start/finish line the sim resets the position and the lap timer on

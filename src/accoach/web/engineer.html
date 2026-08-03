@@ -62,6 +62,12 @@
       <div class="av-now" id="av-now" hidden>
         <div class="es-label" data-i18n="eng.avNow">⚡ Right now, in the car</div>
         <div class="av-msg" id="av-msg"></div>
+        <!-- Only shown where the car doesn't publish the dial. On ACC the
+             engine sees the knob move and closes this itself (atwheel.py);
+             on AC the levels read -1, and without this button an "al volo"
+             change could never be finished at all. -->
+        <button class="ghost small av-done" id="av-done" hidden
+                data-i18n="eng.avDone">Done — I've made it</button>
       </div>
 
       <div class="engineer-says" id="engineer-says">
@@ -72,6 +78,14 @@
         <div class="es-phase" id="es-phase" hidden></div>
         <div class="es-msg" id="es-msg">—</div>
         <div class="es-cat" id="es-cat"></div>
+        <!-- The bar this change will be judged against, before the re-test laps.
+             Until now the loop took the car away for three laps and came back
+             with a verdict the driver had no way to argue with, because they
+             were never told what was being measured. -->
+        <div class="es-predict" id="es-predict" hidden></div>
+        <!-- …and the verdict, with the numbers on both sides plus whatever moved
+             that nobody was aiming at. -->
+        <div class="es-outcome" id="es-outcome" hidden></div>
         <div class="es-hint" id="es-hint" hidden></div>
         <button id="es-prepare" class="primary small" type="button" hidden
           data-i18n="eng.prepare">Prepare change in the editor →</button>
@@ -88,6 +102,18 @@
       </div>
 
       <div class="pit-reminder" id="pit-reminder" hidden></div>
+
+      <!-- Il registro: quante delle modifiche proposte hanno davvero funzionato
+           sui tuoi giri. È l'unico numero di questa pagina che non è una nostra
+           affermazione — è contato su prove che hai guidato tu, e può darci
+           torto. Restava scritto su disco e letto da un endpoint che nessuno
+           chiamava. -->
+      <div class="eng-record" id="eng-record" hidden>
+        <div class="es-label" data-i18n="rec.title">📒 Track record</div>
+        <div class="rec-head" id="rec-head"></div>
+        <div class="rec-note" id="rec-note"></div>
+        <div class="rec-tables" id="rec-tables"></div>
+      </div>
 
       <div class="eng-profile" id="eng-profile" hidden>
         <div class="es-label" data-i18n="eng.profile">Engineer profile</div>
