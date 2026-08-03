@@ -10,8 +10,18 @@ count: each detected corner takes the nearest curated name within a tolerance,
 and anything unmatched falls back to ``Curva N``.
 
 The curated positions are this sim's ``normalizedCarPosition`` (0..1 from the
-start/finish line). They were anchored to a real recorded reference lap; once the
-track map exists they can be refined visually. Unknown tracks just get T-numbers.
+start/finish line). The oldest tables were anchored to a real recorded reference
+lap; from 2026-08-03 they can also be read off the bundled centrelines, which
+start at the start/finish line and reproduce the lap-anchored positions to 12-33 m
+(``tools/corner_atlas.py``). Unknown tracks just get numbers.
+
+**A circuit is not a layout, and this table is about layouts.** Barcelona has
+fourteen corners since 2021 and sixteen before that, with a chicane where the
+last third of the lap now runs free; Spa's 1998 version is a different track
+wearing the same name. A table applied across that boundary does not degrade
+gracefully — it puts a name in the middle of a straight. So a circuit whose
+sources and geometry disagree about how many corners it has is left out rather
+than approximated, and the alias map only ever joins spellings of *one* layout.
 """
 
 from __future__ import annotations

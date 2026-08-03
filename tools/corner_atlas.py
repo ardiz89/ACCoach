@@ -29,6 +29,22 @@ against it, and a name that lands on a corner turning the wrong way is caught
 before it ships (see ``trackdata._DIRECTIONS``, which exists because two names
 reached the corner next door on 2026-07-30).
 
+**The trap this tool cannot see, and the reason some circuits are not curated.**
+A centreline describes *a* layout, and circuits have several. Barcelona caught
+it: the bundled trace has no chicane in the last third (five right-handers and
+no left), so it is the 2021-on 14-turn layout — while the ACC track guides for
+the same circuit describe 16 turns with a left-right chicane at T14-T15. Curating
+positions off the wrong one would put the last third of the lap in the wrong
+place, confidently. So a circuit whose source and centreline disagree about how
+many corners it has does not get a table, and ``spa1998`` is kept out of the
+alias map for the same reason.
+
+The corner *count* is the cheapest way to notice. ``--count`` sweeps the radius
+threshold and reports how many apexes survive: where a plateau lands exactly on
+a circuit's published turn count, the trace is describing that layout. COTA
+settles on **20** for every threshold from 300 m up, which is its published
+number.
+
 Not part of the app: a developer tool for building the table, kept out of the
 bundle like the other tools here.
 
@@ -305,12 +321,37 @@ def fit(csv_name: str, wanted: list[tuple[str, str]], flip: bool) -> None:
               f"# {direction}, r={radius:.0f} m, {pos * total:.0f} m{flag}")
 
 
+def count(csv_name: str, flip: bool) -> None:
+    """How many corners this trace has, as the "what counts as a corner"
+    threshold is relaxed. A plateau that sits on a circuit's published turn
+    count is evidence the trace describes that layout — and a plateau that sits
+    somewhere else is a warning not to curate it."""
+    global MAX_RADIUS_M
+    keep = MAX_RADIUS_M
+    xs, zs = centreline(TRACKS / csv_name)
+    print(f"\n## {Path(csv_name).stem}")
+    try:
+        for r in (150, 200, 220, 250, 300, 400, 500, 600, 800):
+            MAX_RADIUS_M = r
+            found, _ = analyse(xs, zs, flip=flip)
+            seq = "".join(d[0].upper() for _, _, d in found)
+            print(f"   radius <= {r:4d} m -> {len(found):3d} corners  {seq}")
+    finally:
+        MAX_RADIUS_M = keep
+
+
 def main() -> None:
     args = sys.argv[1:]
     if not args:
         raise SystemExit(__doc__)
     if args[0] == "--check":
         check()
+        return
+    if args[0] == "--count":
+        flip = _handedness()
+        rest = args[1:] or [p.name for p in sorted(TRACKS.glob("*.csv"))]
+        for a in rest:
+            count(a if a.endswith(".csv") else a + ".csv", flip)
         return
     flip = _handedness()
     names = ([p.name for p in sorted(TRACKS.glob("*.csv"))] if args[0] == "--all"
