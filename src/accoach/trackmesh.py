@@ -60,8 +60,11 @@ _VERTEX = 44
 #: una distinzione esplicita — l'asfalto di fuga di La Source e' `ASPH` come la
 #: pista, ma l'erba e la ghiaia che lo circondano no.
 #:
-#: Fuori restano i muri (geometria verticale: in pianta sono un filo) e `OUT` /
-#: `OFFTRACK`, che non sono materiali ma verdetti, e si sovrappongono agli altri.
+#: Fuori restano i muri e `OUT` / `OFFTRACK`. I secondi non sono materiali ma
+#: verdetti, e si sovrappongono agli altri. I primi sono geometria verticale, e
+#: la frase «in pianta sono un filo» adesso ha un numero dietro: **2 m² su 4043
+#: triangoli** a Monza, 0.00 m²/tri contro 0.19 dell'asfalto (misurato il 03/08
+#: provando ad aggiungerli). Riempirli non disegnerebbe niente.
 _CLASSES = {
     # "ASP" e non "ASPH": la chiave non e' una parola nostra, la **dichiara la
     # pista** nel suo `surfaces.ini`, e ognuna se la sceglie. Il Red Bull Ring
@@ -72,15 +75,36 @@ _CLASSES = {
     # si disegnava nera mentre cordoli ed erba, che hanno chiavi standard,
     # c'erano. Questo prefisso e' la toppa; la cura e' leggere `surfaces.ini`.
     "road": ("ASP", "ROAD", "TARMAC"),
-    "kerb": ("CURB", "KERB"),
+    # "RUMBLE" e' un cordolo con un altro nome: al Red Bull Ring si chiamano
+    # cosi' e finivano scartati.
+    "kerb": ("CURB", "KERB", "RUMBLE"),
     "grass": ("GRASS", "CARPET"),
     "gravel": ("SAND", "GRAVEL", "DIRT"),
     "concrete": ("CONCRETE", "ILLCONC", "CNC"),
+    # La corsia box, che ha un nome suo su ogni pista (`PITS`, `PITLANE`,
+    # `PITSPA`) e non e' asfalto normale: disegnarla come strada farebbe
+    # sembrare la pista larga il doppio dove si stacca la corsia. Misurata il
+    # 03/08 ed e' terreno vero — Monza 599 triangoli per 6280 m² in pianta, Spa
+    # 829 per 9767 — cioe' la stessa densita' dell'asfalto, non un filo.
+    #
+    # I MURI no, e la misura ha confermato la scelta di chi li aveva esclusi
+    # prima: `WALL*` sono 10-17 mesh per pista, ma sono geometria **verticale**,
+    # e in pianta l'area e' **2 m² su 4043 triangoli** a Monza (0.00 m²/tri,
+    # contro 0.19 dell'asfalto). Proiettati da sopra collassano su una retta:
+    # riempirli non disegnerebbe niente. Per averli servirebbe tracciarli come
+    # **linea**, che e' un percorso di disegno diverso da questo — vale la pena,
+    # ma e' un'altra cosa, non una voce in questa tabella.
+    "pitlane": ("PIT",),
 }
 
 #: L'ordine in cui vanno disegnate: quello in cui stanno per terra. La pista
 #: sopra le sue vie di fuga, i cordoli sopra la pista.
-DRAW_ORDER = ("grass", "gravel", "concrete", "road", "kerb")
+#:
+#: ATTENZIONE: l'ordine vero del disegno e' ricopiato a mano in `web/app.js`
+#: (`SURFACE_PAINT`). Questa costante non e' morta, e' **scollegata**: chi
+#: cambiasse solo questa crederebbe di aver cambiato il disegno. Un test tiene
+#: allineate le due liste.
+DRAW_ORDER = ("grass", "gravel", "concrete", "pitlane", "road", "kerb")
 
 #: Quante mesh nominate come superfici servono perche' il file sia quello buono.
 #:

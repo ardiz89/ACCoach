@@ -756,10 +756,16 @@ function balanceColor(v) {
 // al Red Bull Ring non si capiva dove finisse la strada. Adesso è un grigio
 // neutro abbastanza sostenuto da leggersi come suolo, e resta comunque sotto la
 // linea guidata e il riferimento, che sono opachi.
+// L'ordine è quello in cui le superfici stanno per terra, e deve combaciare con
+// `trackmesh.DRAW_ORDER` — un test tiene allineate le due liste, perché sono
+// due copie della stessa decisione in due linguaggi.
 const SURFACE_PAINT = [
   ["grass",    "rgba(74,124,89,0.30)"],
   ["gravel",   "rgba(176,146,96,0.30)"],
   ["concrete", "rgba(150,155,165,0.20)"],
+  // Più spenta dell'asfalto: la corsia box è accanto alla pista, non è pista, e
+  // dipinta uguale farebbe sembrare il tracciato largo il doppio dove si stacca.
+  ["pitlane",  "rgba(150,155,165,0.16)"],
   ["road",     "rgba(188,196,208,0.34)"],
   ["kerb",     "rgba(226,86,96,0.55)"],
 ];
@@ -2701,18 +2707,35 @@ function drawCornerZoom(L, c, cx) {
 
   // Everything that has to fit inside the box.
   let shapes = LINE_MAG > 1 ? null : c.line.road;
-  const pool = [];
-  for (let i = 0; i < yx.length; i++) pool.push([yx[i], yz[i]]);
-  for (let i = 0; i < ref.x.length; i++) pool.push([ref.x[i], ref.z[i]]);
-  if (road) for (const r of road.runs) for (const side of [r.left, r.right]) {
-    for (const p of side) pool.push([p[0], p[1]]);
+
+  // DUE insiemi, e la distinzione è il punto.
+  //
+  // `real` è la curva com'è davvero: la tua linea non gonfiata, il riferimento,
+  // l'asfalto. Decide **l'angolo**, cioè come la curva viene girata per stare
+  // grande nel riquadro. `draw` è ciò che finisce a schermo, linea gonfiata
+  // compresa, e decide solo **quanto** zoomare perché nulla resti fuori.
+  //
+  // Prima l'angolo lo decideva `draw`. Effetto: passando da ×1 a ×3 la curva
+  // veniva anche **ruotata**, e siccome a ×3 il fondo sparisce (vedi sopra) non
+  // restava un solo appiglio per riconoscerla — due disegni della stessa curva
+  // che non si somigliano. E il pulsante serve proprio a confrontare i due.
+  const real = [];
+  const draw = [];
+  for (let i = 0; i < you.x.length; i++) real.push([you.x[i], you.z[i]]);
+  for (let i = 0; i < yx.length; i++) draw.push([yx[i], yz[i]]);
+  for (let i = 0; i < ref.x.length; i++) { real.push([ref.x[i], ref.z[i]]); draw.push([ref.x[i], ref.z[i]]); }
+  const ground = c.line.edges;
+  if (ground) for (const r of ground.runs) for (const side of [r.left, r.right]) {
+    for (const p of side) { real.push([p[0], p[1]]); if (road) draw.push([p[0], p[1]]); }
   }
   // Solo pista e cordoli entrano nell'inquadratura: l'erba attorno a una curva
   // arriva fin dove le si e' chiesto, e farla decidere il riquadro vorrebbe dire
   // rimpicciolire la curva per mostrare del prato.
-  if (shapes) for (const k of ["road", "kerb"]) for (const ring of (shapes[k] || [])) {
-    for (const p of ring) pool.push([p[0], p[1]]);
+  const groundShapes = c.line.road;
+  if (groundShapes) for (const k of ["road", "kerb"]) for (const ring of (groundShapes[k] || [])) {
+    for (const p of ring) { real.push([p[0], p[1]]); if (shapes) draw.push([p[0], p[1]]); }
   }
+  const pool = real;
 
   // The box is wide and short; a corner is whatever shape it is. Drawn in the
   // world's own axes, a corner that happens to run north-south uses a fifth of
@@ -2739,6 +2762,22 @@ function drawCornerZoom(L, c, cx) {
     const sX = (hx - lx) || 1, sZ = (hz - lz) || 1;
     const scale = Math.min((w - 2 * m) / sX, (h - 2 * m) / sZ);
     if (!best || scale > best.scale) best = { ca, sa, lx, hx, lz, hz, scale };
+  }
+
+  // Scelto l'angolo sulla curva vera, il riquadro si allarga su ciò che verrà
+  // davvero disegnato — altrimenti a ×3 la tua linea uscirebbe dal bordo.
+  // L'angolo resta quello: è la parte che rende i due disegni confrontabili.
+  {
+    let lx = Infinity, hx = -Infinity, lz = Infinity, hz = -Infinity;
+    for (const p of draw) {
+      const dx = p[0] - cx0, dz = p[1] - cz0;
+      const rx = dx * best.ca - dz * best.sa, rz = dx * best.sa + dz * best.ca;
+      if (rx < lx) lx = rx; if (rx > hx) hx = rx;
+      if (rz < lz) lz = rz; if (rz > hz) hz = rz;
+    }
+    const sX = (hx - lx) || 1, sZ = (hz - lz) || 1;
+    best = { ...best, lx, hx, lz, hz,
+             scale: Math.min((w - 2 * m) / sX, (h - 2 * m) / sZ) };
   }
 
   // The turn is applied to the DATA, once, so everything downstream — the

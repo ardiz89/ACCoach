@@ -157,6 +157,29 @@ def test_an_exaggerated_gap_says_so_on_the_canvas():
     assert "line.mag.note" in _APPJS
 
 
+def test_the_corner_is_turned_by_its_real_shape_not_by_the_stretched_one():
+    """×1 e ×3 devono essere la stessa curva, vista uguale.
+
+    L'inquadratura sceglie **l'angolo** che fa stare la curva più grande nel
+    riquadro. Se quell'angolo lo decide anche la linea gonfiata, passando a ×3
+    la curva viene pure **ruotata** — e siccome a ×3 il fondo sparisce di
+    proposito, non resta nessun appiglio per riconoscerla. Due disegni della
+    stessa curva che non si somigliano, in un pulsante che serve a confrontarli.
+
+    Quindi: l'angolo dal materiale **vero** (`pool = real`, che non contiene mai
+    punti gonfiati), lo zoom da quello **disegnato**, perché a ×3 la tua linea
+    non deve uscire dal bordo.
+    """
+    body = _APPJS[_APPJS.index("  const real = []"):]
+    body = body[:body.index("const turn = (")]
+    assert "const pool = real;" in body, "l'angolo si sceglie sulla curva vera"
+    # `real` prende la tua linea NON gonfiata; `draw` quella gonfiata.
+    assert "real.push([you.x[i], you.z[i]])" in body
+    assert "draw.push([yx[i], yz[i]])" in body
+    # e il riquadro si riallarga su `draw` dopo aver fissato l'angolo
+    assert "for (const p of draw)" in body
+
+
 # --- the comparison lap is only forwarded when it was actually chosen ------
 
 def test_the_comparison_lap_is_only_forwarded_when_the_driver_picked_it():
