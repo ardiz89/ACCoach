@@ -46,3 +46,8 @@ tools/voce/vosk-model-*/
 tools/voce/*.zip
 tools/voce/parla.lock
 tools/voce/assistente-udito.jsonl
+
+# Il diario di bordo della voce: lo riscrive ogni avvio, non e' storia.
+tools/voce/voce.log
+tools/voce/voce.err.log
+tools/voce/assistente.pid
