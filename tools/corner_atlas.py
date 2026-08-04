@@ -239,7 +239,11 @@ HELD: dict[str, str] = {
     "redbullring":
         "Settles on 15; the Red Bull Ring has 10. Its corner names are "
         "sponsorships (Castrol Edge, Remus, Schlossgold), which is what put the "
-        "Nürburgring in numbers — so there is no name-based route round it.",
+        "Nürburgring in numbers — so there is no name-based route round it. "
+        "The only held circuit the archive could have arbitrated, and it does "
+        "not: four real laps detect 7-8 corners each, and their union is 9 "
+        "features carrying TWO lefts where the trace shows four. Driving it "
+        "would not have closed this one either.",
     "moscowraceway": "19 corners, rock-solid from 200 m to 600 m, and no "
                      "published turn count found to hold it against.",
     "ims": "Published count not reachable at any threshold.",
