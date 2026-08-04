@@ -120,14 +120,27 @@ pubblico, stesso problema, reazione opposta a seconda di come è presentato.**
 
 ## Cosa resta aperto
 
-Tre voci, e **nessuna si chiude da scrivania**: sono le uniche del documento il
-cui costo non è codice ma tempo in pista (o, per la 2, qualcuno che quelle piste
-le abbia davanti agli occhi). La 18 è nuova e ha una proprietà che le altre non
-hanno — la misura che le serve **non aspetta il meteo né la fortuna**.
+**Una sola**, la 18, e le serve tempo al volante. La misura che le manca ha una
+proprietà che le altre non avevano: **non aspetta il meteo né la fortuna**.
+
+La 2 è stata chiusa il 04/08 dal lato che mancava — le parole le scrive il
+pilota — e con lei è caduto l'ultimo pezzo che dipendeva da «qualcuno che quelle
+piste le abbia davanti agli occhi».
+
+Fuori da questa tabella restano aperte due cose che **non** sono tempo in pista,
+e vale la pena non confonderle con la sessione qui sotto:
+
+- **Le clip recitate per la voce di marca** ([[voice-naturalness-todo]]): 2-3
+  registrazioni da 10-15 s (neutra / severa / calda), da cui Chatterbox clona la
+  voce del coach a *build time*. Ferma dal 02/07 sul **casting**, non sul codice.
+- **I 12 circuiti senza tabella curva** (`corner_atlas.HELD`): fermi per fonti
+  che si contraddicono o conteggi che non tornano, e **non si chiudono
+  guidandoli** — misurato il 04/08 sul Red Bull Ring, l'unico dei dodici su cui
+  ci sono giri in archivio.
 
 | # | Voce | Origine | Cosa manca davvero |
 |---|---|---|---|
-| 2 | **Riferimenti visivi** («al cordolo», «al cartello») | richiesta esplicita | Il meccanismo **funziona end-to-end**: verificato il 31/07 sui giri Monza in archivio, la scheda frenate stampa *«Parabolica — alla fine del verde sulla sinistra»*. Manca la **copertura**, e il 31/07 si è capito che non si chiude da scrivania: a Imola due fonti indipendenti **si contraddicono su quasi ogni curva** (cartelli contro flag-light), e la distanza stacco→apex misurata non arbitra fra un cartello dei 50 e uno dei 100. Le posizioni sono già misurate, le parole no. Spa e Suzuka hanno un ostacolo in più: i riferimenti in archivio sono una monoposto e una stradale, e i cartelli delle guide sono tarati sulle GT3. **Chiusa il 04/08** dalla parte che mancava: la colonna «Riferimento visivo» della scheda frenate si scrive, e quello che scrivi finisce anche nella frase del coach (`POST /api/braking-reference`, stesso file dei nomi curva). Non è una rinuncia alla curatela — è che l'arbitro giusto è chi ha la curva davanti, e le fonti non lo erano |
+| ~~2~~ | ~~**Riferimenti visivi**~~ («al cordolo», «al cartello») | richiesta esplicita | Il meccanismo **funziona end-to-end**: verificato il 31/07 sui giri Monza in archivio, la scheda frenate stampa *«Parabolica — alla fine del verde sulla sinistra»*. Manca la **copertura**, e il 31/07 si è capito che non si chiude da scrivania: a Imola due fonti indipendenti **si contraddicono su quasi ogni curva** (cartelli contro flag-light), e la distanza stacco→apex misurata non arbitra fra un cartello dei 50 e uno dei 100. Le posizioni sono già misurate, le parole no. Spa e Suzuka hanno un ostacolo in più: i riferimenti in archivio sono una monoposto e una stradale, e i cartelli delle guide sono tarati sulle GT3. **Chiusa il 04/08** dalla parte che mancava: la colonna «Riferimento visivo» della scheda frenate si scrive, e quello che scrivi finisce anche nella frase del coach (`POST /api/braking-reference`, stesso file dei nomi curva). Non è una rinuncia alla curatela — è che l'arbitro giusto è chi ha la curva davanti, e le fonti non lo erano |
 | 18 | **Passo gara: stint, degrado, benzina** | difetto trovato in casa (03/08) | **Metà fatta il 03/08**: la scheda «Passo gara» esiste (`stints.py` + `/api/stint`), taglia gli stint dove il serbatoio **risale** — cosa che `fuel_used` non può vedere, perché un rifornimento *fra* due giri lascia normali le due bruciature — e riporta passo, dispersione, consumo, autonomia e gomme su **un pieno solo**. Resta aperta perché la domanda vera è ancora senza risposta: **il coefficiente secondi/litro non è estraibile da questo archivio** (il rumore di guida, 115→221 s sugli stessi 15 giri, domina il peso della benzina di due ordini di grandezza), quindi la pendenza del passo esce **netta e non attribuita**, con la sua barra d'errore — e sull'unico stint lungo in archivio è +0.26 s/giro con errore standard 0.22, cioè la scheda dichiara «nessuna deriva misurabile». È anche la ragione per cui il **veto sul tempo dell'ingegnere è di fatto spento**: consumo misurato 3.1-3.3 L/giro (720S/Monza), quindi bastano **0.6 giri** di disallineamento per superare `_FUEL_BIAS_L`. Serve la prova corta qui sotto: da lì la pendenza si separa in benzina e gomme, e l'ingegnere recupera metà del criterio di accettazione |
 | ~~11~~ | ~~**Tarature su ACC**~~ | mai fatte | **Chiusa il 02/08**, in pista (720S GT3/Monza, poi SF25/Red Bull Ring su AC). Tutte e tre le soglie **promosse senza correzioni** e i cinque controlli strutturali passati; risultati in [`TARATURE-ACC.md`](TARATURE-ACC.md). Il pezzo non ovvio: **con l'ABS acceso il bloccaggio fisico non avviene** (mai sotto `-0.106` in 11 690 frame), quindi flag e slip si dividono il lavoro — per vedere il fondo dello slip è servito **spegnere l'ABS**. Restano fuori dal conteggio tre righe del piano (gas parziale, coach al primo giro lanciato, riferimenti visivi di Monza) e il **burst lock**, che in quattro minuti di Formula senza ABS non è mai avvenuto |
 | ~~12~~ | ~~**Documentazione allineata**~~ | segnalazione utente | **Chiusa il 31/07.** `GUIDA.md` e `docs/FAQ.md` il 30/07; `docs/index.html` (la pagina pubblica, ferma al 29/06) riscritta il 31/07 con quello che l'app fa davvero, e con la sola differenza fra i due giochi dichiarata invece che taciuta. L'**aiuto contestuale nelle impostazioni** risulta fatto e testato da prima (un «?» per riga, `tests/test_settings_help.py` verifica pure che righe e testi coincidano) |
