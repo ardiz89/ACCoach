@@ -19,9 +19,17 @@ start at the start/finish line and reproduce the lap-anchored positions to 12-33
 fourteen corners since 2021 and sixteen before that, with a chicane where the
 last third of the lap now runs free; Spa's 1998 version is a different track
 wearing the same name. A table applied across that boundary does not degrade
-gracefully — it puts a name in the middle of a straight. So a circuit whose
-sources and geometry disagree about how many corners it has is left out rather
-than approximated, and the alias map only ever joins spellings of *one* layout.
+gracefully — it puts a name in the middle of a straight. So the alias map only
+ever joins spellings of *one* layout, and a circuit whose trace describes a
+different one is left out rather than approximated.
+
+**But a different corner COUNT is not a different layout**, and reading it as
+one cost seven circuits until 2026-08-04. Official numbering merges complexes —
+Sepang's own guide calls Turns 7 and 8 "a long double-apex right hander" — so a
+detector finding eighteen apexes where the FIA counts fifteen is the same road
+counted two ways. What settles it is the **sequence of directions**: fifteen
+lefts and rights in order, agreeing all the way down, is evidence no coincidence
+supplies. The count is a hint; the sequence is the proof.
 """
 
 from __future__ import annotations
@@ -455,6 +463,60 @@ _CORNERS: dict[str, list[tuple[str | int, float]]] = {
     "mexicocity": [
         ("Peraltada", 0.936),        # right, r=169 m, banked, onto the straight
     ],
+    # Sepang, e il circuito che ha mandato in pensione una nostra regola.
+    #
+    # Era fermo perché il rilevatore trova 18 apici e il circuito ha 15 curve, e
+    # la regola diceva: conteggi diversi, niente tabella. Sbagliata — la
+    # numerazione ufficiale **fonde i complessi**, e la fonte lo dice da sola
+    # chiamando le T7-T8 «un lungo destro a doppio apex». Diciotto rilievi per
+    # quindici curve non è un altro tracciato: è la stessa strada contata in due
+    # modi. Il criterio buono era già qui e non lo stavo usando: la **sequenza
+    # dei versi**, che una fonte non può azzeccare per caso quindici volte.
+    #
+    # Il verso di ogni curva è **forzato**, non dedotto: la fonte dichiara «5
+    # sinistre e 10 destre» e ne nomina a parole esattamente cinque (T2, T6, T9,
+    # T12, T15). Le restanti dieci sono destre per aritmetica, non per fiducia.
+    # Sulla geometria l'allineamento dà **15 su 15**.
+    #
+    # E tre corroborazioni che nessuna guida può fabbricare: la traccia misura
+    # 5535 m contro i 5543 pubblicati; il rettilineo principale esce 968 m; e
+    # fra T14 e T15 ci sono 950 m di niente — che è il rettilineo posteriore in
+    # cui la fonte dice che la T14 ti lancia.
+    #
+    # Per numero: i nomi di Sepang sono la KLIA curve (l'aeroporto), Berjaya
+    # Tioman (un resort) e Sunway Lagoon (un parco). Sponsorizzazioni, come al
+    # Nürburgring — e un numero è un fatto.
+    "sepang": [(n, p) for n, p in enumerate([
+        0.114, 0.144, 0.165, 0.201, 0.290, 0.347, 0.467, 0.488,
+        0.571, 0.601, 0.637, 0.702, 0.725, 0.768, 0.939], start=1)],
+    # Red Bull Ring. Anche questo era fermo per il conteggio (15 rilievi contro
+    # 10 curve), e anche questo si scioglie con la sequenza dei versi: una guida
+    # le dichiara tutte e dieci a parole — R L R R R L L R R R — e l'allineamento
+    # dà **10 su 10**.
+    #
+    # La conferma più bella non viene da una fonte. È l'unico dei circuiti fermi
+    # su cui esistono **giri veri in archivio**, e quei giri trovano **nove**
+    # curve: manca la T2, che un'altra guida liquida in parole sue come «un kink
+    # a sinistra tutto gas — non è una curva vera, ma la includiamo per far
+    # contenti i signori in giacca». Il rilevatore, che non ha letto la guida, è
+    # d'accordo. E la geometria le dà r=172 m, cioè la misura di quella frase.
+    #
+    # **Ancorata ai giri, non alla traccia**, e qui c'è la scoperta che vale
+    # oltre questo circuito: le due sorgenti concordano sulla forma e non
+    # sull'origine. Su tutte e otto le curve che i giri vedono, la traccia è
+    # avanti di 0.019-0.043 (mediana **0.027**, cioè 116 m). È uno scarto
+    # *costante*, quindi non è l'apex guidato che anticipa quello geometrico —
+    # quello varierebbe col tipo di curva — è lo zero della traccia che non è il
+    # traguardo del gioco. Sulle piste dove avevamo entrambi (Monza, Spa,
+    # Suzuka) lo scarto era 12-33 m; qui è quattro volte tanto. Le tabelle
+    # derivate dalla sola traccia restano dentro _NAME_TOL, ma questo è il
+    # margine che consumano.
+    #
+    # T2 e T8 non hanno una posizione misurata dai giri (l'una non è una curva,
+    # l'altra l'ha vista un giro solo) e sono la traccia meno quello scarto.
+    "redbullring": [(n, p) for n, p in enumerate([
+        0.076, 0.221, 0.297, 0.486, 0.532,
+        0.616, 0.674, 0.719, 0.854, 0.895], start=1)],
 }
 
 
@@ -698,6 +760,15 @@ _DIRECTIONS: dict[str, dict[str, str]] = {
         "Europcar": "right",
     },
     "mexicocity": {"Peraltada": "right"},
+    "sepang": {
+        1: "right", 2: "left", 3: "right", 4: "right", 5: "right", 6: "left",
+        7: "right", 8: "right", 9: "left", 10: "right", 11: "right",
+        12: "left", 13: "right", 14: "right", 15: "left",
+    },
+    "redbullring": {
+        1: "right", 2: "left", 3: "right", 4: "right", 5: "right",
+        6: "left", 7: "left", 8: "right", 9: "right", 10: "right",
+    },
 }
 
 

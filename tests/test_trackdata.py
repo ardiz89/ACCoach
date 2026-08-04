@@ -524,3 +524,63 @@ def test_mexico_city_gets_one_row_and_that_is_the_honest_number():
     assert trackdata.has_names("autodromohermanosrodriguez")
     corners = [_corner(0, 0.230), _corner(1, 0.936)]
     assert name_corners("mexicocity", corners, "it") == ["Curva 1", "Peraltada"]
+
+
+# --- i due circuiti che la regola sbagliata teneva fermi (2026-08-04) -------
+
+def test_sepang_is_numbered_all_fifteen():
+    """Era fermo perché il rilevatore trova 18 apici e il circuito ha 15 curve.
+    La regola («conteggi diversi, niente tabella») era sbagliata: la numerazione
+    ufficiale fonde i complessi, e la guida di Sepang lo dice da sola chiamando
+    le T7-T8 «un lungo destro a doppio apex»."""
+    assert [n for n, _p in trackdata._CORNERS["sepang"]] == list(range(1, 16))
+
+
+def test_sepang_directions_are_five_lefts_and_ten_rights():
+    """Il vincolo che ha forzato la sequenza: la fonte dichiara «5 sinistre e 10
+    destre» e ne nomina a parole esattamente cinque. Le altre dieci sono destre
+    per aritmetica, non per fiducia — e sulla geometria l'allineamento dà 15/15."""
+    d = trackdata._DIRECTIONS["sepang"]
+    assert sum(v == "left" for v in d.values()) == 5
+    assert sum(v == "right" for v in d.values()) == 10
+    assert [n for n, v in sorted(d.items()) if v == "left"] == [2, 6, 9, 12, 15]
+
+
+def test_sepangs_back_straight_survives_in_the_table():
+    """Fra T14 e T15 non c'è niente per 950 m: è il rettilineo posteriore in cui
+    la fonte dice che la T14 ti lancia. È l'ancoraggio che dice che le quindici
+    posizioni stanno sul circuito vero e non su uno scorrimento plausibile."""
+    pos = dict(trackdata._CORNERS["sepang"])
+    assert 850 < (pos[15] - pos[14]) * 5535.0 < 1050
+
+
+def test_the_red_bull_ring_is_numbered_all_ten():
+    assert [n for n, _p in trackdata._CORNERS["redbullring"]] == list(range(1, 11))
+
+
+def test_the_red_bull_ring_answers_to_both_spellings():
+    assert trackdata.has_names("ks_red_bull_ring") and trackdata.has_names("Spielberg")
+
+
+def test_turn_two_is_the_kink_the_drivers_laps_never_saw():
+    """La conferma più forte non viene da una fonte: quattro giri veri in
+    archivio trovano NOVE curve, e quella che manca è la T2 — che una guida
+    liquida come «un kink a sinistra tutto gas, non è una curva vera». La
+    geometria le dà r=172 m, cioè la misura di quella frase.
+
+    Quindi la T2 c'è nella tabella (la numerazione è tutto o niente) ma sta fra
+    la T1 e la T3, dove il rilevatore non la cerca."""
+    pos = dict(trackdata._CORNERS["redbullring"])
+    assert pos[1] < pos[2] < pos[3]
+    assert trackdata._DIRECTIONS["redbullring"][2] == "left"
+
+
+def test_the_red_bull_ring_is_anchored_to_the_drivers_own_laps():
+    """Le otto curve che i giri vedono hanno la LORO posizione, non quella della
+    traccia: le due sorgenti concordano sulla forma e non sull'origine, e fra
+    loro ci sono 105 m costanti. Misurato beats derivato.
+
+    T1 sta a 0.076 nei giri e a 0.104 nella traccia. Se un giorno qualcuno
+    riscrive la tabella dalla traccia, questo test lo dice."""
+    pos = dict(trackdata._CORNERS["redbullring"])
+    assert pos[1] == pytest.approx(0.076, abs=0.005)
