@@ -23,7 +23,7 @@ from ..engineer import Balance, Phase, Speed, Symptom
 from ..recording.lap import Lap
 from ..telemetry.snapshot import format_lap_time
 from ..track import Corner
-from ..cornernames import for_track
+from ..cornernames import for_track, marks_for
 from ..trackdata import corner_name, landmark_at
 from .analyzer import _BRAKE_ON, _LOSS_MS, CornerStats, _braked_early, classify_corner
 from .chain import link_corners
@@ -351,7 +351,8 @@ _BRAKE_PEAK = {"en": " Peak brake {pl:.0f}% vs {pr:.0f}%: press harder.",
 
 
 def _braking_detail(lap: Lap, reference: Reference, inside: list,
-                    refs: list, category: CueCategory, lang: str | None = None) -> str:
+                    refs: list, category: CueCategory,
+                    lang: str | None = None, marks=None) -> str:
     """Decompose the braking phase: how much earlier you brake (m, interpolated)
     and whether you reach the reference's peak pressure."""
     lg = _lang(lang)
@@ -363,7 +364,7 @@ def _braking_detail(lap: Lap, reference: Reference, inside: list,
             m = _metres_between(lap, live, ref)
             if m >= 2.0:
                 extra += _BRAKE_EARLY.get(lg, _BRAKE_EARLY["en"]).format(m=m)
-                lm = landmark_at(lap.track, ref, lg)
+                lm = landmark_at(lap.track, ref, lg, marks)
                 if lm is not None:
                     extra += _BRAKE_LANDMARK.get(lg, _BRAKE_LANDMARK["en"]).format(lm=lm)
     if category in (CueCategory.BRAKE_LATER, CueCategory.LESS_BRAKE):
@@ -590,6 +591,7 @@ def build_lap_debrief(lap: Lap, reference: Reference, corners: list[Corner],
     # Read once for the whole debrief, not once per corner: the same JSON, and
     # this runs on every lap the live coach closes.
     typed = for_track(lap.track)
+    typed_marks = marks_for(lap.track)
     titles = _CATEGORY_TITLE.get(lg, _CATEGORY_TITLE["en"])
     tuning = tuning_for_car(lap.car_model)      # class-dependent symptom bands
     envelope = _grip_envelope(lap, reference)   # this car's grip, measured
@@ -653,7 +655,8 @@ def build_lap_debrief(lap: Lap, reference: Reference, corners: list[Corner],
             detail = f"{cause} {detail}"
 
         # Braking decomposition (earliness in metres + peak pressure).
-        detail += _braking_detail(lap, reference, inside, refs, cue.category, lg)
+        detail += _braking_detail(lap, reference, inside, refs, cue.category,
+                                  lg, typed_marks)
         # …and whether there was any grip left to do it with.
         detail += _grip_detail(inside, envelope, cue.category, lg)
 

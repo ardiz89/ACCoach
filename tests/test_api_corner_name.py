@@ -162,3 +162,53 @@ def test_a_curated_name_is_not_reported_as_typed(client):
                    params={"car": CAR, "track": TRACK, "lang": "it"}).json()
     ascari = [c for c in j["corners"] if c["name"] == "Variante Ascari"]
     assert ascari and ascari[0]["typed"] is False
+
+
+# --- POST /api/braking-reference (roadmap item 2) --------------------------
+
+def _mark(c, **body):
+    return c.post("/api/braking-reference", json={"track": TRACK, **body})
+
+
+def test_a_braking_reference_is_stored(client, store):
+    r = _mark(client, pos=0.12, text="alla fine del verde")
+    assert r.status_code == 200 and r.json()["marks"] == 1
+    assert cornernames.marks_for(TRACK, store).of(0.12) == "alla fine del verde"
+
+
+def test_it_reaches_the_braking_sheet(client):
+    """Where it was typed, and it has to arrive as the row's own wording.
+
+    Keyed on the row's braking ONSET and not on the apex — those are different
+    positions (0.19 against 0.31 on this lap), which is the whole reason a
+    braking reference has its own tolerance."""
+    sheet = client.get("/api/braking",
+                       params={"car": CAR, "track": TRACK, "lang": "it"}).json()
+    at = sheet["rows"][0]["pos"]
+    _mark(client, pos=at, text="dove finisce la riga blu")
+    j = client.get("/api/braking",
+                   params={"car": CAR, "track": TRACK, "lang": "it"}).json()
+    assert j["rows"][0]["landmark"] == "dove finisce la riga blu"
+    assert j["rows"][0]["typed"] is True
+
+
+def test_a_row_says_when_the_wording_is_ours_and_not_theirs(client):
+    j = client.get("/api/braking",
+                   params={"car": CAR, "track": TRACK, "lang": "it"}).json()
+    assert all(r["typed"] is False for r in j["rows"])
+
+
+@pytest.mark.parametrize("body", [
+    {"pos": "here", "text": "x"},
+    {"pos": 2.0, "text": "x"},
+    {"text": "x"},
+])
+def test_a_reference_with_no_usable_position_is_refused(client, body):
+    assert client.post("/api/braking-reference",
+                       json={"track": TRACK, **body}).status_code == 422
+
+
+def test_a_reference_longer_than_a_table_cell_is_refused(client):
+    long = "x" * (cornernames.MAX_MARK + 1)
+    assert _mark(client, pos=0.12, text=long).status_code == 422
+    assert _mark(client, pos=0.12, text="x" * cornernames.MAX_MARK).status_code == 200

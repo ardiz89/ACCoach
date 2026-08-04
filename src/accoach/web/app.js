@@ -2797,7 +2797,16 @@ function renderBrakeSheet(b) {
       `<td class="vc">${r.name}</td>` +
       `<td class="vn big">${r.speed_kmh}<span class="muted"> km/h</span></td>` +
       `<td class="vn">${r.gear}</td>` +
-      `<td class="ref">${r.landmark || "<span class=\"muted\">–</span>"}</td>` +
+      // Editable, and this is roadmap item 2 arriving from the only place it
+      // could. The positions have been measured for a while; the words could
+      // not be sourced — two guides contradict each other on almost every Imola
+      // corner, and no measurement arbitrates between a 50 m board and a 100 m
+      // one. The driver is looking at the thing.
+      `<td class="ref"><button type="button" class="mark" data-pos="${r.pos}" ` +
+      `data-typed="${r.typed ? 1 : 0}" title="${escAttr(t("brk.mark.edit"))}">` +
+      (r.landmark ? escAttr(r.landmark)
+                  : `<span class="muted">– <span class="pencil">✎</span></span>`) +
+      `</button></td>` +
       `<td class="vn">${r.distance_m ? r.distance_m + " m" : "–"}</td>` +
       `<td class="vn">${r.vmin_kmh}<span class="muted"> / ${r.gear_min}</span></td>` +
       `<td class="vn">${spread}</td></tr>`;
@@ -2815,6 +2824,9 @@ function renderBrakeSheet(b) {
     `</tr></thead><tbody>${body}</tbody></table>` +
     `<p class="sheet-note">${t("brk.note")}</p>`;
 
+  for (const btn of el.querySelectorAll("button.mark")) {
+    btn.onclick = () => editMark(btn);
+  }
   $("brk-csv").onclick = () => {
     const q = new URLSearchParams({ car: CURRENT.car, track: CURRENT.track,
                                     fmt: "csv", lang: LANG() });
@@ -2823,6 +2835,49 @@ function renderBrakeSheet(b) {
   // Printing is the point: the sheet people shared was printed and taped up.
   // The print stylesheet hides everything but this section.
   $("brk-print").onclick = () => window.print();
+}
+
+// One cell of the braking sheet, turned into a field. The row already knows
+// where it brakes; what it is missing is what you look at when you do.
+function editMark(btn) {
+  const cell = btn.parentElement;
+  const pos = btn.dataset.pos;
+  const typed = btn.dataset.typed === "1";
+  // Pre-filled only with a phrase the driver typed, never with one we ship:
+  // otherwise one Save with nothing changed adopts our wording as theirs, where
+  // it then outranks the table it came from. Same rule as the corner names.
+  const now = typed ? btn.textContent.trim() : "";
+  cell.innerHTML =
+    `<input type="text" class="mark-in" maxlength="80" value="${escAttr(now)}" ` +
+    `placeholder="${escAttr(t("brk.mark.hint"))}">` +
+    `<button type="button" class="chip on save">${t("line.name.save")}</button>` +
+    (typed ? `<button type="button" class="chip drop">${t("line.name.drop")}</button>` : "");
+  const box = cell.querySelector("input");
+  box.focus(); box.select();
+  const send = async (text) => {
+    try {
+      const r = await fetch("/api/braking-reference", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ track: CURRENT.track, pos: parseFloat(pos), text }),
+      });
+      if (!r.ok) throw new Error(r.status);
+    } catch (e) {
+      cell.innerHTML = `<span class="warn">${t("line.name.err")}</span>`;
+      return;
+    }
+    // Re-fetch the sheet rather than patch the cell: the same phrase is spoken
+    // by the debrief, so a screen where only this cell changed is the app
+    // disagreeing with itself.
+    SHEET = null;
+    await loadBraking();
+  };
+  box.onkeydown = (e) => {
+    if (e.key === "Enter") { e.preventDefault(); send(box.value); }
+    if (e.key === "Escape") renderBrakeSheet(SHEET);
+  };
+  cell.querySelector(".save").onclick = () => send(box.value);
+  const drop = cell.querySelector(".drop");
+  if (drop) drop.onclick = () => send("");
 }
 
 // --- the line you drove ---------------------------------------------------

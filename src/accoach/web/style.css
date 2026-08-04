@@ -335,6 +335,24 @@ main { padding: 16px var(--gut); display: grid; gap: 18px; }
 .map-legend .marker.thr { color: #3EE08A; }
 .map-legend .marker.lost { color: #FF4D5E; }
 
+/* The visual-reference cell is a button so it can be typed into. It has to keep
+   reading as a table cell until it is pressed — a row of outlined controls down
+   a column that is empty on most circuits looks like a form to fill in, and
+   this sheet is meant to be printed and taped up. */
+.vmin-table td.ref button.mark {
+  background: none; border: 0; padding: 0; font: inherit; color: inherit;
+  text-align: left; cursor: pointer;
+}
+.vmin-table td.ref button.mark:hover { color: var(--cyan); }
+.vmin-table td.ref .pencil { opacity: .55; }
+.vmin-table td.ref input.mark-in {
+  background: var(--inset); color: var(--text);
+  border: 1px solid var(--cyan); border-radius: 6px;
+  padding: 3px 7px; font: inherit; width: 60%; min-width: 140px;
+}
+.vmin-table td.ref .chip { margin-left: 6px; }
+
+
 /* Min speed per corner table (Compare view) */
 .vmin { padding: 8px var(--gut) 0; }
 .vmin:empty { display: none; }
@@ -948,6 +966,9 @@ body.no-data .empty { display: block; }
    shares is a printed page taped next to the wheel — so the print button has to
    produce that, not a screenshot of a dark web app. */
 @media print {
+  /* The sheet is paper here: a pencil drawn on paper is a smudge. */
+  .vmin-table td.ref .pencil { display: none; }
+
   body { background: #fff; color: #000; }
   /* Every view panel, derived rather than listed. It used to be eight ids
      written out by hand, so a new tab printed itself under the sheet until

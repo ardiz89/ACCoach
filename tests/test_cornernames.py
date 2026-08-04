@@ -41,7 +41,8 @@ def test_the_file_is_something_a_person_can_read_and_edit(store):
     put("zolder", 0.31, "Sacramento", store)
     raw = store.read_text(encoding="utf-8")
     assert raw.endswith("\n") and "\n  " in raw
-    assert json.loads(raw)["zolder"] == [{"pos": 0.31, "name": "Sacramento"}]
+    assert json.loads(raw)["zolder"] == {
+        "corners": [{"pos": 0.31, "name": "Sacramento"}]}
 
 
 def test_it_is_keyed_on_the_circuit_and_not_on_the_sims_spelling(store):
@@ -185,3 +186,76 @@ def test_the_single_corner_lookup_honours_it_too():
     names = CustomNames(((0.169, "La mia"),))
     assert corner_name("monza", 0, 0.169, "en", "", names) == "La mia"
     assert corner_name("monza", 0, 0.169, "en") == "Variante del Rettifilo"
+
+
+# --- braking references: the other half of roadmap item 2 ------------------
+#
+# The positions were measured long ago; the *words* could not be sourced. Two
+# independent guides contradict each other on almost every corner at Imola —
+# boards against flag-lights — and no measurement arbitrates between a 50 m
+# board and a 100 m one. The driver is looking at the thing.
+
+from accoach.cornernames import CustomMarks, marks_for, put_mark
+from accoach.trackdata import landmark_at
+
+
+def test_a_braking_reference_survives_the_round_trip(store):
+    put_mark("zolder", 0.31, "alla fine del verde", store)
+    assert marks_for("zolder", store).of(0.31) == "alla fine del verde"
+
+
+def test_names_and_references_live_in_one_file_without_treading_on_each_other(store):
+    put("zolder", 0.31, "Sacramento", store)
+    put_mark("zolder", 0.31, "al cartello dei 100", store)
+    assert for_track("zolder", store).of(0.31) == "Sacramento"
+    assert marks_for("zolder", store).of(0.31) == "al cartello dei 100"
+
+
+def test_a_file_written_before_references_existed_still_reads(store):
+    """The file shipped earlier the same day as a bare list per circuit. Nobody
+    should have to convert one — including the one on this machine."""
+    store.write_text(json.dumps({"monza": [{"pos": 0.169, "name": "Mia"}]}),
+                     encoding="utf-8")
+    assert for_track("monza", store).of(0.169) == "Mia"
+    assert len(marks_for("monza", store)) == 0
+    # …and writing a reference onto it keeps the name.
+    put_mark("monza", 0.12, "al cartello dei 150", store)
+    assert for_track("monza", store).of(0.169) == "Mia"
+
+
+def test_an_empty_reference_takes_it_back_off(store):
+    put_mark("zolder", 0.31, "alla fine del verde", store)
+    put_mark("zolder", 0.31, "", store)
+    assert marks_for("zolder", store).of(0.31) is None
+
+
+def test_a_reference_reaches_as_far_as_a_braking_zone_not_an_apex():
+    """MARK_TOL is `trackdata._LANDMARK_TOL`, not the corner-name tolerance: the
+    question here is "is the car braking here", and 0.02 is about 116 m at
+    Monza — the length of a braking zone."""
+    marks = CustomMarks(((0.400, "al cartello"),))
+    assert marks.of(0.415) == "al cartello"
+    assert marks.of(0.430) is None
+
+
+def test_the_driver_beats_the_shipped_landmark():
+    """Monza's landmarks came from published GT3 guides. The driver's own words
+    outrank them for the same reason their corner names do."""
+    assert landmark_at("monza", 0.122, "it") == "al cartello dei 150 m"
+    mine = CustomMarks(((0.122, "dove finisce la riga blu"),))
+    assert landmark_at("monza", 0.122, "it", mine) == "dove finisce la riga blu"
+
+
+def test_a_phrase_is_not_translated_because_it_is_not_a_string_with_a_twin():
+    """"alla fine del verde" has no English equivalent to look up — it is what
+    the driver sees out of the window. Same words in both languages."""
+    mine = CustomMarks(((0.122, "dove finisce la riga blu"),))
+    assert landmark_at("monza", 0.122, "en", mine) == "dove finisce la riga blu"
+
+
+def test_a_circuit_with_no_shipped_landmarks_can_still_get_one():
+    """The point of the feature: Imola ships none, on purpose, because the
+    sources contradict each other."""
+    assert landmark_at("imola", 0.143, "it") is None
+    mine = CustomMarks(((0.143, "al secondo cartello"),))
+    assert landmark_at("imola", 0.143, "it", mine) == "al secondo cartello"
