@@ -271,7 +271,6 @@ HELD: dict[str, str] = {
     "ims": "Published count not reachable at any threshold.",
     "norisring": "Published count not reachable at any threshold.",
     "oschersleben": "Published count not reachable at any threshold.",
-    "shanghai": "Published count not reachable at any threshold.",
 }
 
 
