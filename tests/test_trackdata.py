@@ -584,3 +584,34 @@ def test_the_red_bull_ring_is_anchored_to_the_drivers_own_laps():
     riscrive la tabella dalla traccia, questo test lo dice."""
     pos = dict(trackdata._CORNERS["redbullring"])
     assert pos[1] == pytest.approx(0.076, abs=0.005)
+
+
+def test_shanghai_is_numbered_all_sixteen():
+    assert [n for n, _p in trackdata._CORNERS["shanghai"]] == list(range(1, 17))
+
+
+def test_shanghais_back_straight_is_where_the_hairpin_was_found():
+    """L'ancoraggio che ha corretto il solutore, e il motivo per cui la T13 non
+    sta dove l'aveva messa lui.
+
+    Fra la T12 e il tornante ci sono quattro destre di fila e il criterio della
+    prominenza tira su quelle strette: il solutore ha allungato, per la quarta
+    volta. La fonte però dice che il lungo rettilineo sta **fra T13 e T14**, e
+    nella geometria c'è un solo vuoto di quella taglia."""
+    pos = dict(trackdata._CORNERS["shanghai"])
+    assert 1150 < (pos[14] - pos[13]) * 5440.0 < 1450
+
+
+def test_shanghais_hairpin_complex_stays_one_complex():
+    """La T15 è «parte del complesso del tornante»: 109 m dopo la T14, non
+    dall'altra parte del circuito."""
+    pos = dict(trackdata._CORNERS["shanghai"])
+    assert 0 < (pos[15] - pos[14]) * 5440.0 < 200
+
+
+def test_shanghai_turn_five_has_no_direction_because_nobody_stated_one():
+    """Quindici versi su sedici sono dichiarati a parole da una fonte. La T5 no,
+    e resta fuori dal controllo invece di essere dedotta: un verso indovinato
+    passerebbe il test e potrebbe spostare un nome."""
+    assert 5 not in trackdata._DIRECTIONS["shanghai"]
+    assert len(trackdata._DIRECTIONS["shanghai"]) == 15

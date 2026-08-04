@@ -517,6 +517,30 @@ _CORNERS: dict[str, list[tuple[str | int, float]]] = {
     "redbullring": [(n, p) for n, p in enumerate([
         0.076, 0.221, 0.297, 0.486, 0.532,
         0.616, 0.674, 0.719, 0.854, 0.895], start=1)],
+    # Shanghai. Era fermo per «conteggio irraggiungibile», che era un modo
+    # elegante di dire che il rilevatore ne trova 20 e il circuito ne ha 16. La
+    # traccia però è la strada giusta — 5440 m contro 5451 pubblicati — e i
+    # tredici versi che una fonte dichiara **a parole** tornano tutti e tredici.
+    #
+    # Il solutore automatico ha allungato, per la quarta volta e per il motivo
+    # di sempre: fra la T12 e il tornante ci sono quattro destre e la prominenza
+    # lo tira su quelle strette. L'ancoraggio giusto è il **buco**, come a COTA
+    # e a Interlagos: la fonte dice che il lungo rettilineo sta fra T13 e T14, e
+    # nella geometria c'è un solo vuoto da **1284 m**, fra 0.647 e 0.883. Quindi
+    # T13 sta prima e T14 dopo, e il resto viene di conseguenza.
+    #
+    # Quattro conferme che nessuna guida può fabbricare:
+    #   il tornante  è l'apice più stretto del giro (r=8 m) ed è **alla fine**
+    #                di quel rettilineo, che è dove la fonte lo mette
+    #   la T15       «parte del complesso del tornante» esce a 0.903, 109 m
+    #                dopo, con r=143 m: l'apertura del tornante
+    #   la lumaca    T1-T2, «una lunghissima curva a destra», si legge come tre
+    #                apici a raggio **calante** (81→68→41 m)
+    #   la T13       «diventa sempre meno stretta» → 78→86 m, e la posizione qui
+    #                è il punto di mezzo fra i suoi due apici
+    "shanghai": [(n, p) for n, p in enumerate([
+        0.114, 0.137, 0.163, 0.193, 0.249, 0.296, 0.366, 0.434,
+        0.473, 0.493, 0.578, 0.599, 0.633, 0.883, 0.903, 0.952], start=1)],
 }
 
 
@@ -768,6 +792,14 @@ _DIRECTIONS: dict[str, dict[str, str]] = {
     "redbullring": {
         1: "right", 2: "left", 3: "right", 4: "right", 5: "right",
         6: "left", 7: "left", 8: "right", 9: "right", 10: "right",
+    },
+    # T5 non e' dichiarata da nessuna fonte trovata: resta fuori dal controllo
+    # invece di essere dedotta. Un verso indovinato passerebbe il test e
+    # sposterebbe un nome, che e' il modo peggiore di sbagliare qui.
+    "shanghai": {
+        1: "right", 2: "right", 3: "left", 4: "left", 6: "right",
+        7: "left", 8: "right", 9: "left", 10: "left", 11: "left",
+        12: "right", 13: "right", 14: "right", 15: "right", 16: "left",
     },
 }
 
