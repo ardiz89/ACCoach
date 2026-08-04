@@ -116,9 +116,14 @@ def load_home_data(laps_dir: Path | str | None = None,
             review_lap = load_lap(review_path)
             corners = detect_corners(reference_lap.samples)
             debrief = build_lap_debrief(review_lap, reference, corners, lang)
-            # Friendly corner names — set on the losses exactly like the API does.
+            # Friendly corner names — set on the losses exactly like the API
+            # does, including the ones the driver typed: the Home saying
+            # "Corner 7" where the report says "Sacramento" is the same app
+            # contradicting itself, and that is how `laps_dir` went wrong.
+            from .cornernames import for_track
             names = {c.index: n
-                     for c, n in zip(corners, name_corners(track, corners, lang))}
+                     for c, n in zip(corners, name_corners(track, corners, lang,
+                                                           None, for_track(track)))}
             for loss in debrief.losses:
                 loss.name = names.get(loss.index, loss.name)
 

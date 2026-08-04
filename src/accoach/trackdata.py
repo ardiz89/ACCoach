@@ -568,7 +568,7 @@ def render(label: str | int, lang: str | None = None) -> str:
 
 
 def corner_name(track: str, index: int, apex_pos: float,
-                lang: str | None = None, direction: str = "") -> str:
+                lang: str | None = None, direction: str = "", custom=None) -> str:
     """Name for a detected corner, by nearest curated apex, else ``Corner N`` /
     ``Curva N`` per language.
 
@@ -583,6 +583,11 @@ def corner_name(track: str, index: int, apex_pos: float,
     corner next door — this function names one corner at a time and has none of
     the once-each protection ``name_corners`` uses.
     """
+    if custom is not None:
+        typed = custom.of(apex_pos)
+        if typed:
+            return typed
+
     table = _CORNERS.get(_key(track))
     if table:
         usable = [t for t in table if _direction_ok(track, t[0], direction)]
@@ -694,8 +699,16 @@ def _direction_ok(track: str, name: str | int, direction: str) -> bool:
 
 
 def name_corners(track: str, corners, lang: str | None = None,
-                 learned=None) -> list[str]:
+                 learned=None, custom=None) -> list[str]:
     """Names for a list of detected corners (objects with ``index``/``apex_pos``).
+
+    ``custom`` is what the driver typed (:mod:`accoach.cornernames`) and it wins
+    outright — over the curated table, over the learned number, over everything.
+    That is not politeness: on the twelve bundled circuits we could not curate
+    and the ten ACC circuits with no geometry at all, the driver is the only
+    source there is. And where a table *does* exist, being told the name is
+    wrong is information, not vandalism — it is stored in a file they can read,
+    and taking it back off is the same gesture as putting it on.
 
     Each curated name is handed out **once**. Naming corner-by-corner is fine in
     isolation but wrong for a set: the detector's corner count is not fixed, and
@@ -707,6 +720,23 @@ def name_corners(track: str, corners, lang: str | None = None,
     vague but at least tells them apart.
     """
     named: list[str | int | None] = [None] * len(corners)
+
+    # The driver's own names go on first, so the curated pass below — which
+    # skips anything already named — cannot take a corner back off them. Each is
+    # handed out once for the same reason a curated name is: a complex the
+    # detector split into three parts would otherwise print one name three times.
+    if custom is not None and len(custom):
+        for pos, label in custom.names:
+            best, best_d = None, custom.tol
+            for i, c in enumerate(corners):
+                if named[i] is not None:
+                    continue
+                d = abs(c.apex_pos - pos)
+                if d <= best_d:
+                    best, best_d = i, d
+            if best is not None:
+                named[best] = label
+
     table = _CORNERS.get(_key(track))
     if table:
         for label, pos in table:

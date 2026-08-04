@@ -522,3 +522,65 @@ def test_every_surface_the_backend_extracts_is_painted():
     block = js[js.index("const SURFACE_PAINT"):js.index("];", js.index("const SURFACE_PAINT"))]
     painted = set(re.findall(r'\["(\w+)"', block))
     assert painted == set(tm._CLASSES), (sorted(painted), sorted(tm._CLASSES))
+
+
+# --- naming a corner from the screen (2026-08-04) --------------------------
+
+_I18NJS = (WEB / "i18n.js").read_text(encoding="utf-8")
+_CSS = (WEB / "style.css").read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize("key", ["line.name.edit", "line.name.hint",
+                                 "line.name.save", "line.name.drop",
+                                 "line.name.err"])
+def test_the_rename_control_speaks_both_languages(key):
+    """Every string the driver sees while naming a corner. A missing key does
+    not raise here — it renders as the key itself, on screen, in production."""
+    m = re.search(r'"' + re.escape(key) + r'":\s*\{([^}]*)\}', _I18NJS)
+    assert m, f"{key} is missing from i18n.js"
+    assert "en:" in m.group(1) and "it:" in m.group(1)
+
+
+def test_the_typed_name_is_bounded_by_the_same_number_on_both_sides():
+    """The input's maxlength and the server's limit have to agree, or the
+    driver types a name the page accepts and the endpoint refuses."""
+    from accoach.cornernames import MAX_NAME
+    assert f'maxlength="{MAX_NAME}"' in _APPJS
+
+
+def test_the_name_field_cannot_push_its_own_buttons_off_the_card():
+    """It sits in a heading beside Save and Remove, inside a 300 px-wide
+    column on the narrow layout. A field with no bound is how that heading
+    stops fitting."""
+    assert re.search(r"#corner-name\s*\{[^}]*max-width", _CSS, re.S)
+
+
+def test_saving_a_name_refetches_instead_of_patching_the_label():
+    """The name is used by the debrief, the losses, the braking sheet and the
+    coach's voice. A screen where only the title changed is the app
+    disagreeing with itself."""
+    fn = _APPJS[_APPJS.index("async function saveCornerName"):]
+    fn = fn[:fn.index("\n}\n")]
+    assert "loadLine()" in fn and "loadCombo(" in fn and "SHEET = null" in fn
+
+
+def test_the_rename_box_only_prefills_a_name_the_driver_typed():
+    """The screen caught this and the tests did not: pre-filled with "Corner 1"
+    — the detector's count, not a name — one Save with nothing changed stores
+    that number as a name, outranking every curated table."""
+    fn = _APPJS[_APPJS.index("function renderCornerTitle"):]
+    fn = fn[:fn.index("\n}\n")]
+    assert "c.typed ? escAttr(c.name)" in fn
+    # And "Remove" is only offered where there is something to remove.
+    assert re.search(r"c\.typed[^;]*corner-drop", fn, re.S)
+
+
+def test_the_way_in_is_visible_without_hovering_for_it():
+    """Also from the screen. The pencil was hidden until the title was hovered,
+    which looked tidy and meant nobody would ever find the only route onto the
+    circuits we could not curate."""
+    m = re.search(r"\.chart\.corner-map h3 \.rename\s*\{([^}]*)\}", _CSS, re.S)
+    assert m, "the rename control lost its own rule"
+    opacity = re.search(r"opacity:\s*([\d.]+)", m.group(1))
+    assert opacity and float(opacity.group(1)) > 0.3, \
+        "a control at opacity 0 is a feature nobody finds"

@@ -42,6 +42,7 @@ from .coaching import (
 )
 from .coaching.training import MIN_LAPS as _TRAIN_MIN_LAPS, assess as _assess_training
 from .comparison import Reference
+from . import cornernames
 from .cornermap import learn_from
 from .i18n import current_language
 from .recording import laps_root, load_lap
@@ -764,7 +765,8 @@ def _history(valid: list[dict], chrono: list[dict], track: str,
         # unnamed ones are numbered against.
         h.corner_map = learn_from(h.lap_objs.values())
         h.names = {c.index: n for c, n in
-                   zip(h.corners, name_corners(track, h.corners, lg, h.corner_map))}
+                   zip(h.corners, name_corners(track, h.corners, lg, h.corner_map,
+                                               cornernames.for_track(track)))}
         tally: dict[str, dict] = {}
         for r in chrono[-_RECENT_LAPS:]:
             if r["path"] == h.fastest:
@@ -884,6 +886,42 @@ def create_api(
         with _catalog() as cat:
             return cat.load_corner_map(car, track)
 
+    def _typed(track: str):
+        """The names this driver typed for this circuit.
+
+        Re-read per request rather than cached: it is one small JSON file, and
+        the alternative is a rename that does not show up until the app is
+        restarted — which reads as "it didn't save".
+        """
+        return cornernames.for_track(track)
+
+    @app.post("/api/corner-name")
+    def corner_name_set(body: dict = Body(...)) -> dict:
+        """Name a corner, or hand the name back.
+
+        An empty name is the *undo*, and it is the same gesture as naming: the
+        driver who typed "Parabolica" onto the wrong apex has to be able to take
+        it off without going to look for a JSON file.
+        """
+        track = str(body.get("track") or "").strip()
+        name = str(body.get("name") or "").strip()
+        try:
+            pos = float(body.get("pos"))
+        except (TypeError, ValueError):
+            raise HTTPException(422, "pos must be a number")
+        if not track:
+            raise HTTPException(422, "track is required")
+        if not 0.0 <= pos <= 1.0:
+            raise HTTPException(422, "pos must be between 0 and 1")
+        if len(name) > cornernames.MAX_NAME:
+            raise HTTPException(422, "name too long")
+        try:
+            cornernames.put(track, pos, name)
+        except OSError:
+            raise HTTPException(500, "could not write the names file")
+        return {"track": track, "pos": pos, "name": name,
+                "names": len(cornernames.for_track(track))}
+
     @app.get("/api/combos")
     def combos() -> list[dict]:
         """Every car+track that has laps, with its best time."""
@@ -978,7 +1016,8 @@ def create_api(
             corners = detect_corners(baseline_lap.samples)
             names = {c.index: n for c, n in
                      zip(corners, name_corners(track, corners, lg,
-                                               _corner_map(car, track)))}
+                                               _corner_map(car, track),
+                                               _typed(track)))}
             debrief = build_lap_debrief(review, reference, corners, lg)
             consistency = lap_time_consistency([r["lap_time_ms"] for r in valid])
         except Exception:  # noqa: BLE001 - a degenerate lap shouldn't 500 the UI
@@ -1151,14 +1190,21 @@ def create_api(
             corners = detect_corners(base.samples)
             names = {c.index: n
                      for c, n in zip(corners, name_corners(track, corners, lg,
-                                                           _corner_map(car, track)))}
+                                                           _corner_map(car, track),
+                                                           _typed(track)))}
             report = build_line_report(review, base, corners, names)
         except Exception:  # noqa: BLE001 - a degenerate lap shouldn't 500 the UI
             raise HTTPException(422, "lap could not be analysed")
 
         you_pts, ref_pts = line_points(review), line_points(base)
+        # Whether *this* name was typed by the driver. The rename box needs it:
+        # pre-filled with a fallback like "Corner 1", one Save with nothing
+        # changed freezes the detector's count into a name that then outranks
+        # every table — the driver would have named a corner "Corner 1" without
+        # meaning to, and taking it off is not obvious once it looks identical.
+        typed = _typed(track)
         rows = [{
-            "index": c.index, "name": c.name,
+            "index": c.index, "name": c.name, "typed": bool(typed.of(c.apex)),
             "direction": c.direction, "kind": c.kind, "sided": c.sided,
             "entry": c.entry, "apex": c.apex, "exit": c.exit,
             "apex_you": c.apex_pos_you, "apex_ref": c.apex_pos_ref,
@@ -1303,7 +1349,8 @@ def create_api(
             corners = detect_corners(load_lap(elected).samples)
             names = {c.index: n
                      for c, n in zip(corners, name_corners(track, corners, lg,
-                                                           _corner_map(car, track)))}
+                                                           _corner_map(car, track),
+                                                           _typed(track)))}
             sheet = build_sheet(objs, corners, names, track, lg,
                                 road_temps=[r["road_temp"] for r in pool])
         except (OSError, ValueError):

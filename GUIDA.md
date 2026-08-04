@@ -376,6 +376,16 @@ Cosa trovi:
   tornanti della stessa pista fanno la stessa immagine, e senza quello dovevi
   ricordarti tu quale avevi aperto. In alto, la **frase del debrief** per quella
   curva — la stessa, presa di peso: non è una seconda opinione.
+
+  **Il nome lo puoi dare tu.** Accanto al titolo della curva c'è una matita: ci
+  scrivi come la chiami, e da lì in poi quel nome compare *ovunque* — nel
+  debrief, nelle perdite, nella scheda frenate e nella voce del coach. Serve
+  perché HONE conosce i nomi di **14 circuiti su 26**, e altri dieci circuiti
+  ACC non hanno nemmeno la geometria: su quelli l'unico che sa come si chiama
+  quella curva sei tu. Il tuo nome batte anche il nostro, se il nostro non ti
+  piace, e si toglie con lo stesso gesto con cui si mette. Stanno in
+  `Documenti/ACCoach/corner-names.json`, in chiaro: si leggono, si copiano e si
+  correggono a mano.
   Sotto le due linee vedi **la pista vista dall'alto**: l'asfalto, i cordoli, e
   di fianco l'erba, la ghiaia e il cemento. Non è un disegno nostro — è la
   geometria con cui il gioco decide dove sei, letta dal suo modello delle

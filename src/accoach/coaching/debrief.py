@@ -23,6 +23,7 @@ from ..engineer import Balance, Phase, Speed, Symptom
 from ..recording.lap import Lap
 from ..telemetry.snapshot import format_lap_time
 from ..track import Corner
+from ..cornernames import for_track
 from ..trackdata import corner_name, landmark_at
 from .analyzer import _BRAKE_ON, _LOSS_MS, CornerStats, _braked_early, classify_corner
 from .chain import link_corners
@@ -494,7 +495,7 @@ def _grip_detail(inside: list, envelope: float, category: CueCategory,
 
 
 def _lift_notes(lap: Lap, reference: Reference, corners: list[Corner],
-                lg: str) -> list[LapNote]:
+                lg: str, typed=None) -> list[LapNote]:
     """Stretches where the reference is pinned flat and you weren't.
 
     A human coach opens with this — "that little lift cost you three tenths, and
@@ -515,7 +516,7 @@ def _lift_notes(lap: Lap, reference: Reference, corners: list[Corner],
             run.append(s)
             continue
         if run:
-            note = _lift_note(lap, reference, corners, run, s.pos, lg)
+            note = _lift_note(lap, reference, corners, run, s.pos, lg, typed)
             if note is not None:
                 out.append(note)
             run = []
@@ -524,7 +525,7 @@ def _lift_notes(lap: Lap, reference: Reference, corners: list[Corner],
 
 
 def _lift_note(lap: Lap, reference: Reference, corners: list[Corner],
-               run: list, end_pos: float, lg: str) -> LapNote | None:
+               run: list, end_pos: float, lg: str, typed=None) -> LapNote | None:
     first, last = run[0], run[-1]
     secs = (last.t_ms - first.t_ms) / 1000.0
     if secs < _LIFT_MIN_S:
@@ -539,7 +540,7 @@ def _lift_note(lap: Lap, reference: Reference, corners: list[Corner],
     name = ""
     for c in corners:
         if c.entry_pos <= first.pos <= c.exit_pos:
-            name = corner_name(lap.track, c.index, c.apex_pos, lg)
+            name = corner_name(lap.track, c.index, c.apex_pos, lg, "", typed)
             break
     where = f" ({name})" if name else ""
     detail = _LIFT_DETAIL.get(lg, _LIFT_DETAIL["en"]).format(
@@ -586,6 +587,9 @@ def build_lap_debrief(lap: Lap, reference: Reference, corners: list[Corner],
                       lang: str | None = None) -> LapDebrief:
     """Break ``lap`` down against ``reference`` over the given ``corners``."""
     lg = _lang(lang)
+    # Read once for the whole debrief, not once per corner: the same JSON, and
+    # this runs on every lap the live coach closes.
+    typed = for_track(lap.track)
     titles = _CATEGORY_TITLE.get(lg, _CATEGORY_TITLE["en"])
     tuning = tuning_for_car(lap.car_model)      # class-dependent symptom bands
     envelope = _grip_envelope(lap, reference)   # this car's grip, measured
@@ -667,7 +671,8 @@ def build_lap_debrief(lap: Lap, reference: Reference, corners: list[Corner],
             # report for the same lap said "Variante Ascari".
             # The direction comes along: it is what keeps a curated name from
             # reaching the corner next door (see trackdata._DIRECTIONS).
-            name=corner_name(lap.track, c.index, c.apex_pos, lg, c.direction),
+            name=corner_name(lap.track, c.index, c.apex_pos, lg, c.direction,
+                             typed),
         ))
 
     losses.sort(key=lambda x: x.lost_ms, reverse=True)
@@ -680,7 +685,7 @@ def build_lap_debrief(lap: Lap, reference: Reference, corners: list[Corner],
         if target is not None:
             target.inherited = link.message
             target.inherited_from = link.from_index
-    notes = _lift_notes(lap, reference, corners, lg)
+    notes = _lift_notes(lap, reference, corners, lg, typed)
     top = _top_speed_note(lap, reference, corners, lg)
     if top is not None:
         notes.append(top)

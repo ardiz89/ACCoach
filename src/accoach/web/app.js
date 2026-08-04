@@ -2893,8 +2893,7 @@ function renderLine(cx) {
   const c = L.corners[LINE_I];
   const shape = [c.direction ? t("line.dir." + c.direction) : "",
                  c.kind ? t("line.kind." + c.kind) : ""].filter(Boolean).join(" · ");
-  $("line-corner-title").innerHTML =
-    `<b>${c.name}</b>${shape ? ` <small>${shape}</small>` : ""}`;
+  renderCornerTitle(L, c, shape);
 
   // The road is in the legend only when it is on the drawing — and it is named
   // "asphalt", never "track limits": a clean lap uses the kerbs and sits a
@@ -2920,6 +2919,82 @@ function renderLine(cx) {
   drawOffsetTrace(L, c, cx);
   drawCurvature(L, c, cx);
   updateLineReadout(L, cx);
+}
+
+// Naming a corner, which is the only route onto the circuits nobody could
+// curate. Fourteen of the twenty-six bundled circuits have a name table, and
+// ten ACC circuits have no bundled geometry at all — on those, the driver is
+// the only source there is.
+//
+// It lives HERE, on the zoomed corner, and not in a settings page with a list
+// of positions: you are looking at the corner's shape while you name it, so
+// there is no way to name the wrong one by mistyping a number.
+let LINE_EDIT = -1;     // which corner is being renamed, -1 for none
+
+function renderCornerTitle(L, c, shape) {
+  const el = $("line-corner-title");
+  if (!el) return;
+  if (LINE_EDIT !== LINE_I) {
+    el.innerHTML =
+      `<b>${escAttr(c.name)}</b>${shape ? ` <small>${shape}</small>` : ""}` +
+      `<button type="button" class="rename" id="corner-rename" ` +
+      `title="${escAttr(t("line.name.edit"))}" ` +
+      `aria-label="${escAttr(t("line.name.edit"))}">✎</button>`;
+    $("corner-rename").onclick = () => { LINE_EDIT = LINE_I; renderLine(null); };
+    return;
+  }
+  // Pre-filled only when the name on screen is one the driver typed. Filling it
+  // with "Corner 1" — the detector's count, not a name — means one Save with
+  // nothing changed stores that number *as* a name, where it then outranks
+  // every curated table and looks identical to the fallback it replaced.
+  el.innerHTML =
+    `<input type="text" id="corner-name" maxlength="40" ` +
+    `value="${c.typed ? escAttr(c.name) : ""}" ` +
+    `placeholder="${escAttr(t("line.name.hint"))}">` +
+    `<button type="button" class="chip on" id="corner-save">${t("line.name.save")}</button>` +
+    // "Remove" only where there is something to remove: on a corner still
+    // called "Corner 1" it offers to undo a thing that never happened.
+    (c.typed
+      ? `<button type="button" class="chip" id="corner-drop">${t("line.name.drop")}</button>`
+      : "");
+  const box = $("corner-name");
+  box.focus();
+  box.select();
+  // Enter saves and Escape gives up, because a two-button row that only works
+  // with the mouse is a form, and this is a caption.
+  box.onkeydown = (e) => {
+    if (e.key === "Enter") { e.preventDefault(); saveCornerName(box.value); }
+    if (e.key === "Escape") { LINE_EDIT = -1; renderLine(null); }
+  };
+  $("corner-save").onclick = () => saveCornerName(box.value);
+  // "Remove" is the undo, and it is the same gesture as naming: whoever typed
+  // a name onto the wrong apex must not have to go and find a JSON file.
+  if ($("corner-drop")) $("corner-drop").onclick = () => saveCornerName("");
+}
+
+async function saveCornerName(name) {
+  const L = LINE;
+  if (!L || !L.corners[LINE_I]) return;
+  const c = L.corners[LINE_I];
+  try {
+    const r = await fetch("/api/corner-name", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ track: L.track, pos: c.apex, name: name }),
+    });
+    if (!r.ok) throw new Error(r.status);
+  } catch (e) {
+    $("line-readout").innerHTML = `<span class="warn">${t("line.name.err")}</span>`;
+    return;
+  }
+  LINE_EDIT = -1;
+  // Re-fetch rather than patch the one label on screen. The name is used by the
+  // debrief, the losses, the braking sheet and the coach's voice, and a screen
+  // where only the title changed is an app disagreeing with itself — the
+  // failure `laps_dir` already shipped once.
+  SHEET = null;                       // the braking sheet re-fetches on its tab
+  await loadLine();
+  if (CURRENT) await loadCombo(CURRENT, $("lap").value, pinnedBaseline());
 }
 
 // Where your apex is against the reference's — or why that question has no

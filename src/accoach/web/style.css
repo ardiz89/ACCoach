@@ -555,6 +555,27 @@ body.no-data .empty { display: block; }
 .chart.corner-map canvas { height: 46vh; min-height: 320px; }
 .chart.corner-map h3 { font-size: 15px; font-weight: 600; }
 .chart.corner-map h3 small { color: var(--muted); font-weight: 400; font-size: 12px; margin-left: 6px; }
+/* Naming a corner. The pencil was hidden until the title was hovered, which
+   looked tidy on screen and was wrong: this control is the only route onto the
+   twelve circuits nobody could curate and the ten with no geometry at all, and
+   a heading that is read on every corner and hovered on almost none is exactly
+   where a feature goes to never be found. So it is always there, just quiet. */
+.chart.corner-map h3 { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.chart.corner-map h3 .rename {
+  background: none; border: 0; color: var(--muted); cursor: pointer;
+  font-size: 13px; line-height: 1; padding: 2px 4px; opacity: .55;
+  transition: opacity .12s ease, color .12s ease;
+}
+.chart.corner-map h3:hover .rename, .chart.corner-map h3 .rename:focus { opacity: 1; }
+.chart.corner-map h3 .rename:hover { color: var(--cyan); }
+.chart.corner-map h3 #corner-name {
+  background: var(--inset); color: var(--text);
+  border: 1px solid var(--cyan); border-radius: 6px;
+  padding: 4px 8px; font-size: 14px; font-family: inherit;
+  /* Bounded, not fluid: the field sits in a heading beside two buttons, and a
+     100% width pushes them off the card in the narrow column. */
+  min-width: 0; flex: 1 1 auto; max-width: 320px;
+}
 /* Legend swatches that are lines, not squares: the difference between your line
    and the reference's IS the dash pattern, so the key has to show it. */
 .map-legend .sw-line { width: 20px; height: 0; border-top: 3px solid var(--cyan); display: inline-block; }

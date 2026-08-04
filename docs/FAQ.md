@@ -208,7 +208,13 @@ of showing you a wrong scale.
   at entry, apex and exit, the arc you drove, and the extra metres you covered.
   Where a corner's speed minimum is flat it says "same place" instead of
   inventing an apex shift, and where the car went off it says so instead of
-  reading the geometry as a choice. Under both lines it draws **the track seen
+  reading the geometry as a choice. Beside the corner's title there is a pencil:
+  **you can name the corner yourself**, and that name then appears everywhere —
+  the debrief, the losses, the braking sheet, the coach's voice. HONE knows the
+  corner names of 14 of the 26 circuits it ships, and ten more ACC circuits have
+  no bundled geometry at all; on those you are the only source there is. Your
+  name outranks ours, and comes off the same way it went on. They live in
+  `Documents\ACCoach\corner-names.json` in plain text. Under both lines it draws **the track seen
   from above** — the asphalt, its kerbs, and the grass, gravel and concrete
   beside it. That is not a drawing of ours: it is the geometry the game itself
   uses to decide where you are, read from its surface model with the surface
