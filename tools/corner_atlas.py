@@ -204,6 +204,16 @@ PARAMS: dict[str, tuple[float, float]] = {          # key -> (max radius, min se
 #: getting to "yes", and without a record it gets paid again every time. Both
 #: entries below took an hour to reach and neither leaves a trace in the table.
 #:
+#: **Seven of these were held for a reason that turned out to be wrong**, and
+#: Sepang is the one that proved it: it settled on 18 apexes against a published
+#: 15, and the rule said "different counts, no table". But official numbering
+#: merges complexes — Sepang's own guide calls Turns 7 and 8 "a long double-apex
+#: right hander" — so eighteen rilievi for fifteen turns is one road counted two
+#: ways. The count is a hint. The **sequence of directions** is the proof, and
+#: for Sepang it came out 15 out of 15. The entries below that still say only
+#: "settles on N, the circuit has M" are therefore worth re-attacking with a
+#: sourced direction list before believing them.
+#:
 #: It is also a list that **rots**, which is the other reason it is checked
 #: rather than just written down. Catalunya sat here from 2026-08-03 with a
 #: sound-looking reason — the trace has 14 turns and the ACC guides describe 16
@@ -235,15 +245,6 @@ HELD: dict[str, str] = {
     "yasmarina":
         "Settles on 18, and neither layout is 18 — 21 before the 2021 rebuild, "
         "16 after. The trace is probably mid-rebuild or a variant of one.",
-    "sepang": "Settles on 18 from 150 m to 400 m; the circuit has 15.",
-    "redbullring":
-        "Settles on 15; the Red Bull Ring has 10. Its corner names are "
-        "sponsorships (Castrol Edge, Remus, Schlossgold), which is what put the "
-        "Nürburgring in numbers — so there is no name-based route round it. "
-        "The only held circuit the archive could have arbitrated, and it does "
-        "not: four real laps detect 7-8 corners each, and their union is 9 "
-        "features carrying TWO lefts where the trace shows four. Driving it "
-        "would not have closed this one either.",
     "moscowraceway": "19 corners, rock-solid from 200 m to 600 m, and no "
                      "published turn count found to hold it against.",
     "ims": "Published count not reachable at any threshold.",
@@ -305,9 +306,24 @@ def check() -> None:
         found, total = analyse(*centreline(TRACKS / csv), flip=flip)
         MAX_RADIUS_M, MIN_SEP = keep
         want = _DIRECTIONS.get(track, {})
-        print(f"\n## {track}: {len(table)} curated, {len(found)} geometric, {total:.0f} m")
+        # A table anchored to real laps and a trace read off OpenStreetMap do not
+        # share an origin, and the difference is a CONSTANT: the trace's zero is
+        # not exactly the sim's start/finish line. Measured at 12-33 m on Monza,
+        # Spa and Suzuka — but **116 m** at the Red Bull Ring, where every one of
+        # the eight corners the laps see is off by 0.019 to 0.043.
+        #
+        # A constant shift is a change of frame, not an error, so it comes off
+        # before distances are judged. Otherwise this checker calls a perfectly
+        # placed lap-anchored table wrong and — worse — compares each name
+        # against the direction of the corner NEXT DOOR. What it cannot hide is
+        # a *varying* offset, which is what a genuinely misplaced row looks like.
+        shift = _frame_shift(table, found)
+        note = f", frame {shift * total:+.0f} m" if abs(shift) * total >= 20 else ""
+        print(f"\n## {track}: {len(table)} curated, {len(found)} geometric, "
+              f"{total:.0f} m{note}")
         worst = 0.0
-        for label, pos in table:
+        for label, pos0 in table:
+            pos = pos0 + shift
             near = min(found, key=lambda a: min(abs(a[0] - pos), 1.0 - abs(a[0] - pos)))
             d = min(abs(near[0] - pos), 1.0 - abs(near[0] - pos))
             worst = max(worst, d)
@@ -317,7 +333,7 @@ def check() -> None:
             if label in want and want[label] != near[2]:
                 flags.append(f"DIRECTION: table says {want[label]}, geometry {near[2]}")
             bad += bool(flags)
-            print(f"   {render(label, 'en'):26s} {pos:.3f} -> {near[0]:.3f}  "
+            print(f"   {render(label, 'en'):26s} {pos0:.3f} -> {near[0]:.3f}  "
                   f"{near[2]:5s} r={near[1]:4.0f} m  {'  '.join(flags)}")
         print(f"   worst {worst * total:.0f} m (tolerance {_NAME_TOL_M(total):.0f} m)")
 
@@ -325,6 +341,28 @@ def check() -> None:
     if stale:
         print(f"\nHELD but curated — the note is out of date: {', '.join(stale)}")
     print(f"\n{'OK' if not bad and not stale else str(bad) + ' ROWS TO LOOK AT'}")
+
+
+def _frame_shift(table, found) -> float:
+    """The constant offset between a curated table and the trace.
+
+    The median of each row's signed distance to its nearest apex. Median and not
+    mean for the usual reason: one row that genuinely sits on the wrong corner
+    must not be allowed to drag the frame across to meet it.
+    """
+    offs = []
+    for _label, pos in table:
+        near = min(found, key=lambda a: min(abs(a[0] - pos), 1.0 - abs(a[0] - pos)))
+        d = near[0] - pos
+        if d > 0.5:
+            d -= 1.0
+        elif d < -0.5:
+            d += 1.0
+        offs.append(d)
+    if not offs:
+        return 0.0
+    offs.sort()
+    return offs[len(offs) // 2]
 
 
 def _NAME_TOL_M(total: float) -> float:
