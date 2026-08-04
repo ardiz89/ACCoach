@@ -236,15 +236,36 @@ HELD: dict[str, str] = {
         "Turn 14', and the geometry puts 790 m of straight between the last "
         "two rights. One of them is not where the numbering says it is.",
     "melbourne":
-        "No plateau in the corner count at any threshold (16/18/19/20/22...), "
-        "so the trace cannot be pinned to a published layout.",
+        "The trace is the right layout (5294 m against a published 5303), so "
+        "the problem is not the road: it is that the corner count never settles "
+        "(16/18/19/20/22... as the threshold relaxes) and the guide found in "
+        "2026-08-03 contradicts itself. Nothing here has been held against a "
+        "sourced direction list yet — this one is worth another attempt.",
     "budapest":
-        "Settles on 17 corners; the Hungaroring has 14. Not the same layout, "
-        "or not the same idea of what counts as a corner.",
-    "sochi": "Settles on 24; the circuit has 18.",
+        "The trace is the right layout — 4372 m against a published 4381 — so "
+        "the 17 apexes against 14 turns is just the merging, as at Sepang. What "
+        "stops it is that the two guides **contradict each other**: one reads "
+        "Turns 2-5 as left-right-left-right and 10-13 as right-...; the other "
+        "has T3 a 180-degree left, T4 a right and 10-13 as left-right-left-"
+        "right. And the geometry cannot arbitrate — both score **14/14**, "
+        "because with five directions unstated the solver has room to satisfy "
+        "either. Under-determined is not close: it is a coin toss in a "
+        "measurement's clothing.",
+    "sochi":
+        "Right layout too (5836 m against 5848). A source gives the global "
+        "constraint — 12 rights and 6 lefts — and names five lefts, so the "
+        "sixth was the only unknown; the geometry ties three candidates and the "
+        "source rules one out. Then the tie-break killed it: a second source "
+        "makes **both** survivors left-handers, which would be seven lefts, and "
+        "the two sources put the famous 180-degree left at different numbers "
+        "(T3 against T4). One of them also describes a 'Turn 19' on an "
+        "eighteen-turn circuit.",
     "yasmarina":
-        "Settles on 18, and neither layout is 18 — 21 before the 2021 rebuild, "
-        "16 after. The trace is probably mid-rebuild or a variant of one.",
+        "Settled by the tape measure, not by the corner count: the trace is "
+        "**5542 m** and *both* published layouts are 5281 — the 2021 rebuild "
+        "kept the length. 261 m is 5%, where Sepang's trace came within 0.14% "
+        "and Monza, Spa and Suzuka within 1%. So this is neither layout, and "
+        "no direction list can rescue a road that isn't the road.",
     "moscowraceway": "19 corners, rock-solid from 200 m to 600 m, and no "
                      "published turn count found to hold it against.",
     "ims": "Published count not reachable at any threshold.",
