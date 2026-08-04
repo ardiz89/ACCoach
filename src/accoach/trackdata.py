@@ -383,6 +383,78 @@ _CORNERS: dict[str, list[tuple[str | int, float]]] = {
         ("Variante Ascari", 0.686),          # triple, detected as one corner
         ("Parabolica", 0.888),               # onto the main straight
     ],
+    # Hockenheimring, GP layout. Curated by NAME and not by number, and this is
+    # the circuit that shows why the distinction pays: the one guide that laid
+    # out all seventeen turns in order **invented most of them** — it calls the
+    # Parabolika a "very long, constant-radius left" (it is a straight) and the
+    # Spitzkehre an "extremely tight hairpin left". A prose source states the
+    # Spitzkehre is "a 170-degree right-hander", and the geometry's tightest
+    # apex of the lap (r=13 m) is a right, sitting exactly there. Two against
+    # one, and the two are the ones that were not generated.
+    #
+    # So only corners whose name is tied to a distinctive feature went in, each
+    # confirmed by where it falls rather than by a turn number:
+    #   Nordkurve   first apex after the line (265 m), the only corner up there
+    #   Spitzkehre  the tightest apex of the whole lap, at the end of the
+    #               Parabolika straight
+    #   Sachskurve  the only 180° left, which a source places "in front of the
+    #               Mercedes Grandstand"; read as two peaks 174 m apart, so the
+    #               position below is between them, where the apex actually is
+    #   Elf-Kurve + Südkurve  the same source's "flowing right and right twin
+    #               corner" that follows the Sachskurve — and the geometry has
+    #               exactly two rights left before the line
+    "hockenheim": [
+        ("Nordkurve", 0.058),        # right, r=25 m, off the pit straight
+        ("Spitzkehre", 0.462),       # RIGHT hairpin, r=13 m — tightest of the lap
+        ("Sachskurve", 0.848),       # left, 180°, read as two apexes
+        ("Elf-Kurve", 0.907),        # right, r=34 m
+        ("Südkurve", 0.938),         # right, onto the start-finish straight
+    ],
+    # Circuit de Barcelona-Catalunya. Held back on 2026-08-03 because the
+    # bundled trace has no chicane in the last third and the ACC guides describe
+    # one — and that hold was **right about the numbers and wrong about the
+    # names**. The chicane changed the turn count (14 against 16) and therefore
+    # every number after Turn 13, but it changed no name: Campsa is Campsa in
+    # both. Names are anchored to the corner, numbers to the layout.
+    #
+    # The last corner is left out anyway. New Holland is the one name that sits
+    # *after* where the chicane was, so it is the one whose position genuinely
+    # moves between the two layouts, and a driver on either one loses nothing by
+    # its absence.
+    #
+    # Two independent guides, one written for each layout, agree on every
+    # direction below. The alignment is pinned by three things a source cannot
+    # fake: Repsol reads as an increasing-radius 180° right (r=45→81→138 m),
+    # which is the phrase both sources use for it; La Caixa is the tightest left
+    # of the lap (r=14 m) at the end of the longest straight after the pit
+    # straight (558 m); and Seat is the first slow left after the long run of
+    # rights. Where a corner is read as several apexes the name sits on the
+    # tightest of them, which is where the driver is slowest.
+    "catalunya": [
+        ("Elf", 0.180),              # right, r=30 m — first corner off the straight
+        ("Renault", 0.252),          # long right, r=78 m
+        ("Repsol", 0.366),           # right, 180°, opening radius
+        ("Seat", 0.463),             # LEFT, r=29 m, downhill
+        ("Campsa", 0.634),           # right, fast, blind over the crest
+        ("La Caixa", 0.754),         # LEFT, r=14 m — tightest of the lap
+        ("Banc Sabadell", 0.804),    # right, long U
+        ("Europcar", 0.865),         # right, r=24 m
+    ],
+    # Autódromo Hermanos Rodríguez, and it gets **one row**, which is the honest
+    # size of what could be established. Everything else this circuit is famous
+    # for is a *section* and not a corner — the Foro Sol is a stadium the track
+    # runs through, the Esses are Turns 7 to 11 — and a section has no apex to
+    # anchor. The rest of the lap keeps its numbers.
+    #
+    # The Peraltada is the banked 180° right that used to close the lap; since
+    # the 2015 rebuild only its second half is driven, and the circuit renamed
+    # that half after Nigel Mansell. The older name is kept here because it is
+    # the one the sims, the guides and the drivers use, and because a corner
+    # renamed once can be renamed again — the same reasoning that put the
+    # Nürburgring in numbers.
+    "mexicocity": [
+        ("Peraltada", 0.936),        # right, r=169 m, banked, onto the straight
+    ],
 }
 
 
@@ -597,6 +669,16 @@ _DIRECTIONS: dict[str, dict[str, str]] = {
         "Arquibancadas": "left",
         # S do Senna is a left-right chicane: not checked.
     },
+    "hockenheim": {
+        "Nordkurve": "right", "Spitzkehre": "right", "Sachskurve": "left",
+        "Elf-Kurve": "right", "Südkurve": "right",
+    },
+    "catalunya": {
+        "Elf": "right", "Renault": "right", "Repsol": "right", "Seat": "left",
+        "Campsa": "right", "La Caixa": "left", "Banc Sabadell": "right",
+        "Europcar": "right",
+    },
+    "mexicocity": {"Peraltada": "right"},
 }
 
 

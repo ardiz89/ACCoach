@@ -198,6 +198,56 @@ PARAMS: dict[str, tuple[float, float]] = {          # key -> (max radius, min se
     "austin": (240.0, 0.014),
 }
 
+#: Circuits looked at properly and **not** curated, with what stopped each one.
+#:
+#: This exists because the work of getting to "no" costs the same as the work of
+#: getting to "yes", and without a record it gets paid again every time. Both
+#: entries below took an hour to reach and neither leaves a trace in the table.
+#:
+#: It is also a list that **rots**, which is the other reason it is checked
+#: rather than just written down. Catalunya sat here from 2026-08-03 with a
+#: sound-looking reason — the trace has 14 turns and the ACC guides describe 16
+#: — and the reason turned out to be about the numbering, not the names, so it
+#: is curated now. ``--check`` fails loudly if a circuit is in both places.
+HELD: dict[str, str] = {
+    "montreal":
+        "14 turns published, 16 features in the trace, and the two guides that "
+        "describe it contradict each other exactly at T5-T7 (one has L,R,L "
+        "where the other has R,L,R). The ends are certain — T1 left, T2 Senna "
+        "right, T10 the hairpin, T11 the left kink, T12 the right kink before "
+        "the Casino straight, T13/T14 the final right-left — but a numbered "
+        "circuit is all-or-nothing, and the middle will not resolve.",
+    "sakhir":
+        "The closest miss here. 15 apexes for 15 published turns and 14 of the "
+        "15 directions agree with a guide that states all of them; the one "
+        "mismatch is explained (T5 is a gentle kink the detector reads only "
+        "above 220 m, and T11 is read as two apexes). What stops it is the end "
+        "of the lap: two independent sources call T15 'effectively the exit of "
+        "Turn 14', and the geometry puts 790 m of straight between the last "
+        "two rights. One of them is not where the numbering says it is.",
+    "melbourne":
+        "No plateau in the corner count at any threshold (16/18/19/20/22...), "
+        "so the trace cannot be pinned to a published layout.",
+    "budapest":
+        "Settles on 17 corners; the Hungaroring has 14. Not the same layout, "
+        "or not the same idea of what counts as a corner.",
+    "sochi": "Settles on 24; the circuit has 18.",
+    "yasmarina":
+        "Settles on 18, and neither layout is 18 — 21 before the 2021 rebuild, "
+        "16 after. The trace is probably mid-rebuild or a variant of one.",
+    "sepang": "Settles on 18 from 150 m to 400 m; the circuit has 15.",
+    "redbullring":
+        "Settles on 15; the Red Bull Ring has 10. Its corner names are "
+        "sponsorships (Castrol Edge, Remus, Schlossgold), which is what put the "
+        "Nürburgring in numbers — so there is no name-based route round it.",
+    "moscowraceway": "19 corners, rock-solid from 200 m to 600 m, and no "
+                     "published turn count found to hold it against.",
+    "ims": "Published count not reachable at any threshold.",
+    "norisring": "Published count not reachable at any threshold.",
+    "oschersleben": "Published count not reachable at any threshold.",
+    "shanghai": "Published count not reachable at any threshold.",
+}
+
 
 #: circuit key in ``_CORNERS`` -> the centreline that describes it.
 CSV_FOR = {
@@ -266,7 +316,11 @@ def check() -> None:
             print(f"   {render(label, 'en'):26s} {pos:.3f} -> {near[0]:.3f}  "
                   f"{near[2]:5s} r={near[1]:4.0f} m  {'  '.join(flags)}")
         print(f"   worst {worst * total:.0f} m (tolerance {_NAME_TOL_M(total):.0f} m)")
-    print(f"\n{'OK' if not bad else str(bad) + ' ROWS TO LOOK AT'}")
+
+    stale = sorted(set(HELD) & set(_CORNERS))
+    if stale:
+        print(f"\nHELD but curated — the note is out of date: {', '.join(stale)}")
+    print(f"\n{'OK' if not bad and not stale else str(bad) + ' ROWS TO LOOK AT'}")
 
 
 def _NAME_TOL_M(total: float) -> float:
