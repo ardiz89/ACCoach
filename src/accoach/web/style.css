@@ -317,11 +317,23 @@ main { padding: 16px var(--gut); display: grid; gap: 18px; }
   display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px;
   margin-top: 8px; color: var(--muted); font-size: 12px;
 }
-.map-legend .swatch {
+/* `:not(.hidden)` is not decoration. Two classes beat one, so this rule outranks
+   `.hidden { display: none }` and every legend entry meant to appear only
+   sometimes appeared always: the asphalt swatch showed on laps with no road
+   under them, and the "where the lap was lost" cross showed on laps that were
+   never lost. Same specificity trap the view panels hit when an id rule set
+   display, one rung lower — which is why the test that used to check only id
+   rules now checks anything that sets display. */
+.map-legend .swatch:not(.hidden) {
   display: inline-flex; align-items: center; gap: 7px;
 }
 .map-legend .marker { color: var(--amber); font-weight: 700; }
 .map-legend .marker.ring { color: var(--cyan); }
+/* The two pedals, coloured as they are drawn: amber for the brake, green for
+   the throttle. Same hues as the delta scale on purpose — slow and fast. */
+.map-legend .marker.brk { color: #FFB020; }
+.map-legend .marker.thr { color: #3EE08A; }
+.map-legend .marker.lost { color: #FF4D5E; }
 
 /* Min speed per corner table (Compare view) */
 .vmin { padding: 8px var(--gut) 0; }

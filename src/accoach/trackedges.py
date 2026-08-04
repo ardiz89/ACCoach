@@ -624,6 +624,29 @@ def crop(edges: TrackEdges, xz: list[tuple[float, float]],
     return _shape(edges, idx)
 
 
+def whole(edges: TrackEdges, max_points: int = 900) -> dict | None:
+    """The asphalt all the way round, for drawing under a whole-lap map.
+
+    Separate from :func:`crop` rather than a special case of it, because crop
+    *refuses* a stretch longer than half the track on purpose: two ends matching
+    in the wrong order look exactly like a lap-length corner, and that check
+    earns its place. Here the whole circuit is the request, so there is no
+    ordering to get wrong.
+
+    Decimated harder than a crop, and it can afford to be: a whole lap is drawn
+    at a hundredth of the zoom, where a point every ten metres and a point every
+    metre are the same picture. Monza's 3750 edge points come down to 900.
+    """
+    n = len(edges)
+    if n < 2:
+        return None
+    idx = list(range(n))
+    if n > max_points:
+        step = n / max_points
+        idx = [int(k * step) for k in range(max_points)]
+    return _shape(edges, idx)
+
+
 def _shape(edges: TrackEdges, idx: list[int], places: int = 2) -> dict | None:
     """Index walk -> the polylines to draw, one entry per unbroken stretch."""
     left, right = edges.edge_points()
