@@ -922,6 +922,35 @@ def create_api(
         return {"track": track, "pos": pos, "name": name,
                 "names": len(cornernames.for_track(track))}
 
+    @app.post("/api/braking-reference")
+    def braking_reference_set(body: dict = Body(...)) -> dict:
+        """What you look at when you brake here — roadmap item 2, from the one
+        source that can settle it.
+
+        The positions have been measured for a while; the *words* could not be
+        sourced. Two independent guides contradict each other on almost every
+        corner at Imola, boards against flag-lights, and no measurement arbitrates
+        between a 50 m board and a 100 m one. The driver is looking at the thing.
+        """
+        track = str(body.get("track") or "").strip()
+        text = str(body.get("text") or "").strip()
+        try:
+            pos = float(body.get("pos"))
+        except (TypeError, ValueError):
+            raise HTTPException(422, "pos must be a number")
+        if not track:
+            raise HTTPException(422, "track is required")
+        if not 0.0 <= pos <= 1.0:
+            raise HTTPException(422, "pos must be between 0 and 1")
+        if len(text) > cornernames.MAX_MARK:
+            raise HTTPException(422, "reference too long")
+        try:
+            cornernames.put_mark(track, pos, text)
+        except OSError:
+            raise HTTPException(500, "could not write the names file")
+        return {"track": track, "pos": pos, "text": text,
+                "marks": len(cornernames.marks_for(track))}
+
     @app.get("/api/combos")
     def combos() -> list[dict]:
         """Every car+track that has laps, with its best time."""
@@ -1347,12 +1376,14 @@ def create_api(
         try:
             ref_lap = next((o for o in objs if o.lap_time_ms), objs[0])
             corners = detect_corners(load_lap(elected).samples)
+            typed_marks = cornernames.marks_for(track)
             names = {c.index: n
                      for c, n in zip(corners, name_corners(track, corners, lg,
                                                            _corner_map(car, track),
                                                            _typed(track)))}
             sheet = build_sheet(objs, corners, names, track, lg,
-                                road_temps=[r["road_temp"] for r in pool])
+                                road_temps=[r["road_temp"] for r in pool],
+                                marks=typed_marks)
         except (OSError, ValueError):
             raise HTTPException(404, "lap file unreadable")
         except Exception:  # noqa: BLE001 - a degenerate lap shouldn't 500 the UI
@@ -1366,6 +1397,11 @@ def create_api(
             "vmin_kmh": r.vmin_kmh, "gear_min": r.gear_min,
             "peak_brake": r.peak_brake, "laps": r.laps,
             "landmark": r.landmark,
+            # Whether that phrase is the driver's own, so the cell can offer to
+            # take it back off — and so one Save with nothing changed cannot
+            # freeze a shipped phrase into a typed one. Same reason the corners
+            # carry `typed`.
+            "typed": bool(typed_marks.of(r.onset_pos)),
         } for r in sheet.rows]
 
         if fmt == "csv":

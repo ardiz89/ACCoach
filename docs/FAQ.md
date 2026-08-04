@@ -214,7 +214,11 @@ of showing you a wrong scale.
   corner names of 14 of the 26 circuits it ships, and ten more ACC circuits have
   no bundled geometry at all; on those you are the only source there is. Your
   name outranks ours, and comes off the same way it went on. They live in
-  `Documents\ACCoach\corner-names.json` in plain text. Under both lines it draws **the track seen
+  `Documents\ACCoach\corner-names.json` in plain text — along with the
+  **braking references** you type into the braking sheet ("at the end of the
+  green on the left"), which is the other half of the same idea: the positions
+  were measured long ago, the words could not be sourced, and you are the one
+  looking at the corner. Under both lines it draws **the track seen
   from above** — the asphalt, its kerbs, and the grass, gravel and concrete
   beside it. That is not a drawing of ours: it is the geometry the game itself
   uses to decide where you are, read from its surface model with the surface

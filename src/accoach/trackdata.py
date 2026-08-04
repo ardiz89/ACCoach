@@ -531,7 +531,8 @@ _LANDMARKS: dict[str, list[tuple[str, str, float]]] = {
 _LANDMARK_TOL = 0.02
 
 
-def landmark_at(track: str, pos: float, lang: str | None = None) -> str | None:
+def landmark_at(track: str, pos: float, lang: str | None = None,
+                typed=None) -> str | None:
     """Visual description of the braking landmark nearest ``pos``, or ``None`` if
     the track has no verified landmark within tolerance.
 
@@ -540,6 +541,19 @@ def landmark_at(track: str, pos: float, lang: str | None = None) -> str | None:
     bianco-rosso") rather than an abstract distance. The returned string carries
     its own preposition, ready to drop after a verb ("il riferimento frena …").
     """
+    # What the driver typed wins, and here it wins harder than it does for a
+    # corner name. Roadmap item 2 stalled because the *words* cannot be sourced
+    # from a desk: two independent guides contradicted each other on almost
+    # every Imola corner, and no measurement arbitrates between a 50 m board and
+    # a 100 m one. The person looking out of the window settles it.
+    #
+    # Their phrase is returned in whichever language the page is in, unchanged.
+    # It is not a string with a translation — it is what they see.
+    if typed is not None:
+        mine = typed.of(pos)
+        if mine:
+            return mine
+
     table = _LANDMARKS.get(_key(track))
     if not table:
         return None

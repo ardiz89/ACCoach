@@ -495,18 +495,26 @@ def test_no_id_rule_can_outrank_the_hidden_class():
 def _screen_css() -> str:
     """The stylesheet without its print block — printing deliberately forces
     every panel visible, which is the opposite rule and not a mistake."""
-    i = _CSS.find("@media print")
-    if i == -1:
-        return _CSS
-    depth, j = 0, _CSS.index("{", i)
-    for k in range(j, len(_CSS)):
-        if _CSS[k] == "{":
-            depth += 1
-        elif _CSS[k] == "}":
-            depth -= 1
-            if depth == 0:
-                return _CSS[:i] + _CSS[k + 1:]
-    return _CSS[:i]
+    css = _CSS
+    # EVERY print block, not just the first: a second one added higher up the
+    # file used to be the one that got stripped, leaving the real print rules in
+    # the "screen" text and failing two tests for a reason that had nothing to
+    # do with either.
+    while True:
+        i = css.find("@media print")
+        if i == -1:
+            return css
+        depth, j = 0, css.index("{", i)
+        cut = None
+        for k in range(j, len(css)):
+            if css[k] == "{":
+                depth += 1
+            elif css[k] == "}":
+                depth -= 1
+                if depth == 0:
+                    cut = k
+                    break
+        css = css[:i] + (css[cut + 1:] if cut is not None else "")
 
 
 def test_every_surface_the_backend_extracts_is_painted():
@@ -698,3 +706,42 @@ def test_the_whole_lap_map_draws_no_road_under_the_lines():
     fn = fn[:fn.index("\n}\n")]
     assert "drawRoad(" not in fn, (
         "the whole-lap map is drawing a road again — read the comment above it")
+
+
+# --- braking references typed from the sheet (roadmap item 2) --------------
+
+@pytest.mark.parametrize("key", ["brk.mark.edit", "brk.mark.hint"])
+def test_the_braking_reference_cell_speaks_both_languages(key):
+    m = re.search(r'"' + re.escape(key) + r'":\s*\{([^}]*)\}', _I18NJS)
+    assert m and "en:" in m.group(1) and "it:" in m.group(1)
+
+
+def test_the_reference_cell_only_prefills_what_the_driver_typed():
+    """Pre-filled with a phrase we ship, one Save with nothing changed adopts
+    our wording as theirs — where it then outranks the table it came from."""
+    fn = _APPJS[_APPJS.index("function editMark"):]
+    fn = fn[:fn.index("\n}\n")]
+    assert "typed ? btn.textContent.trim() : \"\"" in fn
+    assert re.search(r"typed\s*\?[^;]*drop", fn, re.S)
+
+
+def test_saving_a_reference_refetches_the_sheet():
+    """The same phrase is spoken by the debrief; a screen where only this cell
+    changed is the app disagreeing with itself."""
+    fn = _APPJS[_APPJS.index("function editMark"):]
+    fn = fn[:fn.index("\n}\n")]
+    assert "SHEET = null" in fn and "loadBraking()" in fn
+
+
+def test_the_reference_length_agrees_on_both_sides():
+    from accoach.cornernames import MAX_MARK
+    fn = _APPJS[_APPJS.index("function editMark"):]
+    assert f'maxlength="{MAX_MARK}"' in fn[:fn.index("\n}\n")]
+
+
+def test_the_pencil_does_not_print():
+    """The sheet is meant to be printed and taped up, and a pencil drawn on
+    paper is a smudge."""
+    i = _CSS.find("@media print")
+    block = _CSS[i:_CSS.index("\n}", i)]
+    assert ".pencil" in block

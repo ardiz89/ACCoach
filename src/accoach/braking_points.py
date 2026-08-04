@@ -168,7 +168,8 @@ def brake_points_of_lap(lap, corners) -> list[BrakePoint]:
 
 def build_sheet(laps, corners, names: dict[int, str] | None = None,
                 track: str = "", lang: str | None = None,
-                road_temps: list[float] | None = None) -> BrakingSheet:
+                road_temps: list[float] | None = None,
+                marks=None) -> BrakingSheet:
     """The braking sheet for a set of laps of the same car and track.
 
     ``laps`` should already be the laps you want pooled — the caller decides
@@ -178,6 +179,9 @@ def build_sheet(laps, corners, names: dict[int, str] | None = None,
     a mean by 20 km/h, and the sheet would then teach that number.
     """
     names = names or {}
+    # The braking references the driver typed (:mod:`accoach.cornernames`).
+    # Passed in rather than read here for the same reason `names` is: this
+    # function is given everything it needs and touches no files.
     per_corner: dict[int, list[BrakePoint]] = {}
     for lap in laps:
         for bp in brake_points_of_lap(lap, corners):
@@ -211,7 +215,7 @@ def build_sheet(laps, corners, names: dict[int, str] | None = None,
             laps=len(found),
             # The landmark is looked up at the median onset, so the phrase
             # describes where *you* brake and not where the curated apex is.
-            landmark=landmark_at(track, onset, lang) if track else None,
+            landmark=landmark_at(track, onset, lang, marks) if track else None,
         ))
 
     temps = [t for t in (road_temps or []) if t]
