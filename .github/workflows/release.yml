@@ -27,19 +27,19 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt pyinstaller
 
+      # Dal file .spec, non da una riga di comando. La riga di comando qui
+      # elencava i --add-data a mano ed era DERIVATA: ne spediva quattro dei
+      # sei, e i due che mancavano degradavano in silenzio -- niente
+      # docs/FAQ.md, quindi chi metteva l'inglese leggeva la guida italiana
+      # (guide.py ripiega apposta, ma qui ripiegava sempre); e niente
+      # voice_cues_male, quindi la voce maschile suonava SAPI5 invece dei cue
+      # neurali gia' renderizzati e gia' in repo.
+      #
+      # Il .spec c'era e li aveva tutti e sei. Il problema erano DUE fonti di
+      # verita' per la stessa lista, e quella che spediva era quella che nessuno
+      # apriva. docs/FAQ.md era gia' stato dimenticato una volta il 28/07.
       - name: Build HONE.exe
-        run: >
-          python -m PyInstaller --noconfirm --windowed --name HONE
-          --icon hone.ico --paths src
-          --add-data "src/accoach/web;accoach/web"
-          --add-data "src/accoach/voice_cues;accoach/voice_cues"
-          --add-data "src/accoach/tracks;accoach/tracks"
-          --add-data "GUIDA.md;."
-          --collect-submodules uvicorn
-          --hidden-import pyttsx3.drivers
-          --hidden-import pyttsx3.drivers.sapi5
-          --collect-all comtypes
-          accoach_main.py
+        run: python -m PyInstaller --noconfirm HONE.spec
 
       - name: Package + checksum
         id: pack
