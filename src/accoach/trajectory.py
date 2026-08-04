@@ -101,6 +101,7 @@ class LinePoint:
     z: float
     speed_kmh: float
     brake: float
+    throttle: float = 0.0
 
 
 @dataclass(slots=True)
@@ -188,7 +189,8 @@ def line_points(lap_or_samples) -> list[LinePoint]:
         if s.pos <= last:
             continue
         last = s.pos
-        out.append(LinePoint(s.pos, s.car_x, s.car_z, s.speed_kmh, s.brake))
+        out.append(LinePoint(s.pos, s.car_x, s.car_z, s.speed_kmh,
+                             s.brake, s.throttle))
     return out
 
 
@@ -586,7 +588,12 @@ def corner_path(points: list[LinePoint], lo: float, hi: float,
         "x": [round(p.x, 2) for p in sel],
         "z": [round(p.z, 2) for p in sel],
         "speed": [round(p.speed_kmh, 1) for p in sel],
+        # The two pedals, so the drawing can mark where the braking started and
+        # where the power came back on. Without them the zoomed corner says
+        # where you went and not what you were doing — and "you are wider at
+        # entry" only becomes a diagnosis next to "and you braked 15 m later".
         "brake": [round(p.brake, 2) for p in sel],
+        "throttle": [round(p.throttle, 2) for p in sel],
     }
 
 

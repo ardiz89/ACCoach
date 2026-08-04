@@ -994,6 +994,19 @@ function drawRoad(ctx, road, X, Y, hair) {
 function drawMap(a, cx) {
   const hit = drawMapTo($("c-map"), $("map-missing"), a, cx);
   if (hit) MAP_HIT = hit;
+  // Both of these are on the drawing only sometimes — the road when the circuit
+  // installed here matches the lap, the cross only on a lap that was actually
+  // thrown away. A legend entry for a mark that isn't there sends the reader
+  // hunting for it, so the entries come and go with the marks.
+  const lost = $("leg-lost");
+  if (lost) lost.classList.toggle("hidden", a.review.lost_at == null);
+  const legRoad = $("leg-map-road");
+  if (legRoad) {
+    legRoad.classList.toggle("hidden", !a.road);
+    if (a.road) {
+      $("leg-map-road-text").textContent = tf("line.leg.road", { m: a.road.width_m });
+    }
+  }
 }
 
 // Mini map shown inside the Compare view, driven by the shared crosshair so it
@@ -1035,6 +1048,13 @@ function drawMapTo(canvas, missing, a, cx, mode) {
     }
   };
   scan(rv.x, rv.z); scan(rf.x, rf.z);
+  // The road joins the fit, exactly as it does on the zoomed corner: a lap that
+  // ran wide should show the edge it ran past, not have it cropped away.
+  if (a.road) {
+    for (const r of a.road.runs) for (const side of [r.left, r.right]) {
+      scan(side.map((p) => p[0]), side.map((p) => p[1]));
+    }
+  }
   const m = 24, spanX = maxX - minX || 1, spanZ = maxZ - minZ || 1;
   const s = Math.min((w - 2 * m) / spanX, (h - 2 * m) / spanZ);
   const offX = (w - spanX * s) / 2, offZ = (h - spanZ * s) / 2;
@@ -1044,6 +1064,15 @@ function drawMapTo(canvas, missing, a, cx, mode) {
   // and the hover marker all go through X()/Y(), so they stay in register.
   const X = (x) => (maxX - x) * s + offX;
   const Y = (z) => h - ((z - minZ) * s + offZ);   // flip so +z is up
+
+  // The asphalt first, so both lines are drawn ON the road rather than floating
+  // over nothing. The zoomed corner has had this since the surface model
+  // arrived; the whole-lap map it zooms into had not, which made the two views
+  // of one lap look like two different products.
+  //
+  // It also fixes the frame: without it the picture is fitted to the two lines,
+  // so a lap that ran wide cropped out the very edge it ran past.
+  if (a.road) drawRoad(ctx, a.road, X, Y, 1);
 
   // Reference racing line: faint dashed.
   ctx.save();
@@ -1117,11 +1146,36 @@ function drawMapTo(canvas, missing, a, cx, mode) {
     }
   }
 
-  // Corner labels at each apex.
+  // Where the lap stopped counting. The page already says *which corner* it was
+  // and has never shown *where*, which on a map is the one thing a map is for:
+  // "off track at Ascari" is a sentence, a cross on the drawing is a place.
+  // Only ever drawn from a recorded position — laps before schema v8 carry
+  // none, and never recorded is not "at the start line".
+  if (a.review.lost_at != null && Array.isArray(rv.pos)) {
+    const i = nearest(rv.pos, a.review.lost_at);
+    const px = X(rv.x[i]), py = Y(rv.z[i]);
+    ctx.save();
+    ctx.strokeStyle = "#FF4D5E"; ctx.lineWidth = 2.5; ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(px - 6, py - 6); ctx.lineTo(px + 6, py + 6);
+    ctx.moveTo(px + 6, py - 6); ctx.lineTo(px - 6, py + 6);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // Corner labels at each apex — by NAME, which is what the corner is called
+  // everywhere else on this page.
+  //
+  // This drew "T" + the detector's index, and both halves of that were wrong.
+  // The name was ignored outright, so the map said "T1" while hovering the very
+  // same apex said "Curva Niki Lauda" — one screen contradicting itself. And
+  // the number was the detector's count of what it found on *this* lap, which
+  // is exactly the sliding number `cornermap` exists to stop: a lap that
+  // detected one corner fewer renumbered every label after it.
   ctx.fillStyle = "rgba(255,255,255,0.85)"; ctx.font = "11px " + UI_FONT;
   for (const c of a.corners || []) {
     const i = nearest(rv.pos, c.apex);
-    ctx.fillText("T" + (c.index + 1), X(rv.x[i]) + 6, Y(rv.z[i]) - 4);
+    ctx.fillText(c.name || ("T" + (c.index + 1)), X(rv.x[i]) + 6, Y(rv.z[i]) - 4);
   }
 
   // Start/finish + direction of travel. A white dot with an "S/F" label (kept
@@ -2798,6 +2852,16 @@ let LINE_HIT = null;    // screen transform of the zoomed corner, for its hover
 // can read. So the gap can be blown up — and when it is, the canvas says so and
 // the scale bar keeps measuring real ground, because an unlabelled exaggeration
 // is just a wrong drawing.
+//
+// ×5 was here too and was removed on 2026-08-04, measured on 293 corner-lap
+// pairs in the archive. The widest gap inside a corner is 0.02 m at the 25th
+// percentile, 1.00 m at the median and 2.54 m at the 75th, and a typical corner
+// crop is 124 m across — 5.75 px/m. So ×3 is what earns its place: it takes the
+// median from 6 px, a thread, to 17, which is where a shape reads. ×5 helped
+// neither end. On the laps too close together to see it was still invisible
+// (0.6 px — no magnification saves 2 cm), and on an ordinary lap it drew 2.5 m
+// as 73 px, a quarter of the canvas: past there the picture stops resembling
+// the corner, and both settings pay the same price of hiding the road.
 let LINE_MAG = 1;
 
 async function loadLine() {
@@ -2880,7 +2944,7 @@ function renderLine(cx) {
       `<button type="button" class="chip${i === LINE_I ? " on" : ""}" data-i="${i}">` +
       `T${c.index + 1}</button>`).join("") +
     `<span class="chip-group"><span class="chip-label">${t("line.mag")}</span>` +
-    [1, 3, 5].map((z) =>
+    [1, 3].map((z) =>
       `<button type="button" class="chip mag${z === LINE_MAG ? " on" : ""}" ` +
       `data-mag="${z}">×${z}</button>`).join("") + `</span>`;
   for (const b of $("line-chips").querySelectorAll(".chip[data-i]")) {
@@ -3305,22 +3369,65 @@ function drawCornerZoom(L, c, cx) {
   }
   ctx.stroke();
 
-  // Braking points, same encoding as the track map: yours a filled triangle,
-  // the reference's a hollow ring. On a zoomed corner this is where "brake
-  // later" stops being an abstraction.
-  const onset = (s, i) => s.brake[i] >= 0.3 && s.brake[i - 1] < 0.3;
-  ctx.fillStyle = "#FFB020";
-  for (let i = 1; i < you.brake.length; i++) {
-    if (!onset(you, i)) continue;
-    const px = X(yx[i]), py = Y(yz[i]);
+  // The two pedals, same encoding as the track map: yours filled, the
+  // reference's a hollow ring. On a zoomed corner this is where "brake later"
+  // stops being an abstraction — and it is what turns "your line is wider at
+  // entry" into a diagnosis, because a wider entry next to a later brake point
+  // is a different mistake from a wider entry next to the same one.
+  //
+  // The thresholds are the ones the rest of the app already measures with:
+  // BRAKE_ON is `coaching.analyzer._BRAKE_ON` and THROTTLE_ON is
+  // `coaching.diagnosis._THROTTLE_ON`, which is where the exit phase begins.
+  // This drew at 0.3, a number from nowhere, so the triangle could sit some way
+  // from the "brakes at" row of the braking sheet on this same page — two
+  // answers to one question. `test_web_views` pins the two sides together.
+  // ONE of each per corner, not every crossing. Drawn per crossing first, and
+  // the screen said no: three green triangles appeared in one Red Bull Ring
+  // corner because the throttle is modulated through it and crosses 20% three
+  // times. All three were true and the picture was unreadable — "where you got
+  // back on the power" is one place.
+  //
+  // So: the first braking of the corner, and the first throttle *after the
+  // apex*. Those are not new definitions — they are the ones the braking sheet
+  // and the phase split already use, which is also why they line up with the
+  // numbers under this drawing.
+  // …and it is the first sample OVER the threshold, not the first rising edge
+  // through it. The rising edge was tried and drew nothing at all on a corner
+  // taken with the throttle never below 20%: there is no edge to cross, and
+  // "you were already on the power at the apex" is an answer, not an absence.
+  // Both channels use the same test the Python side uses (`braking_points`
+  // takes the first sample above `_BRAKE_ON` inside the corner).
+  const BRAKE_ON = 0.15, THROTTLE_ON = 0.20;
+  const firstAt = (s, chan, lim, from) => {
+    const v = s[chan];
+    if (!v) return -1;
+    for (let i = 0; i < v.length; i++) {
+      if (from != null && s.pos[i] < from) continue;
+      if (v[i] >= lim) return i;
+    }
+    return -1;
+  };
+  const tri = (px, py, up) => {
     ctx.beginPath();
-    ctx.moveTo(px, py - 6); ctx.lineTo(px - 5, py - 14); ctx.lineTo(px + 5, py - 14);
+    if (up) { ctx.moveTo(px, py + 6); ctx.lineTo(px - 5, py + 14); ctx.lineTo(px + 5, py + 14); }
+    else { ctx.moveTo(px, py - 6); ctx.lineTo(px - 5, py - 14); ctx.lineTo(px + 5, py - 14); }
     ctx.closePath(); ctx.fill();
+  };
+  const ring = (px, py) => {
+    ctx.beginPath(); ctx.arc(px, py, 4.5, 0, 6.283); ctx.stroke();
+  };
+  const yb = firstAt(you, "brake", BRAKE_ON, null);
+  const yt = firstAt(you, "throttle", THROTTLE_ON, c.apex_you || c.apex);
+  const rb = firstAt(ref, "brake", BRAKE_ON, null);
+  const rt = firstAt(ref, "throttle", THROTTLE_ON, c.apex_ref || c.apex);
+  if (yb >= 0) { ctx.fillStyle = "#FFB020"; tri(X(yx[yb]), Y(yz[yb]), false); }
+  if (yt >= 0) { ctx.fillStyle = "#3EE08A"; tri(X(yx[yt]), Y(yz[yt]), true); }
+  ctx.lineWidth = 2;
+  if (rb >= 0) {
+    ctx.strokeStyle = "rgba(255,176,32,0.85)"; ring(X(ref.x[rb]), Y(ref.z[rb]));
   }
-  ctx.strokeStyle = "rgba(255,255,255,0.8)"; ctx.lineWidth = 2;
-  for (let i = 1; i < ref.brake.length; i++) {
-    if (!onset(ref, i)) continue;
-    ctx.beginPath(); ctx.arc(X(ref.x[i]), Y(ref.z[i]), 4.5, 0, 6.283); ctx.stroke();
+  if (rt >= 0) {
+    ctx.strokeStyle = "rgba(62,224,138,0.85)"; ring(X(ref.x[rt]), Y(ref.z[rt]));
   }
 
   // The two apexes (slowest point of each line through this corner).

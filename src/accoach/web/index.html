@@ -243,6 +243,12 @@
           </span>
           <span class="swatch"><span class="marker">▽</span> <span data-i18n="map.leg.you">your braking</span></span>
           <span class="swatch"><span class="marker ring">○</span> <span data-i18n="map.leg.ref">reference braking</span></span>
+          <!-- Only ever shown when the lap actually carries one: a legend entry
+               for a mark that isn't on the drawing sends you looking for it. -->
+          <span class="swatch hidden" id="leg-lost"><span class="marker lost">✕</span>
+            <span data-i18n="map.leg.lost">where the lap was lost</span></span>
+          <span class="swatch hidden" id="leg-map-road"><span class="sw-road"></span>
+            <span id="leg-map-road-text"></span></span>
         </div>
       </div>
     </main>
@@ -272,6 +278,11 @@
           <span class="swatch"><span class="sw-band"></span> <span data-i18n="line.leg.band">the gap between them</span></span>
           <span class="swatch"><span class="marker">●</span> <span data-i18n="line.leg.apex">your slowest point</span></span>
           <span class="swatch"><span class="marker ring">○</span> <span data-i18n="line.leg.apexref">the reference's</span></span>
+          <!-- The two pedals were already drawn here and were in no legend at
+               all: a marker nobody can name is a decoration. Filled = you,
+               hollow ring = the reference, on both. -->
+          <span class="swatch"><span class="marker brk">▼</span> <span data-i18n="line.leg.brake">braking starts</span></span>
+          <span class="swatch"><span class="marker thr">▲</span> <span data-i18n="line.leg.throttle">back on the power</span></span>
           <!-- Only when the game's track data could be read AND matched to this
                lap; the wording says asphalt, because that is what it is. -->
           <span class="swatch hidden" id="leg-road"><span class="sw-road"></span>

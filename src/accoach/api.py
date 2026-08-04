@@ -54,7 +54,8 @@ from .sessions import group_sessions, parse_utc
 from .stints import MIN_TREND_LAPS, pace_of, split_stints, tyre_trace
 from .telemetry.snapshot import format_lap_time
 from .track import detect_corners
-from .trackedges import crop as crop_edges, edges_and_fit, edges_for
+from .trackedges import (crop as crop_edges, edges_and_fit, edges_for,
+                         whole as whole_edges)
 from .trackdata import name_corners
 from .trackmesh import road_shapes
 from .trajectory import (
@@ -1041,9 +1042,23 @@ def create_api(
                 "delta": round(vmin_live - vmin_ref, 0),
             })
 
+        # The asphalt, all the way round, so the whole-lap map is drawn ON the
+        # track instead of beside it — the zoomed corner has had it for a while
+        # and the map it zooms into had not. Same rule as everywhere else: only
+        # when the circuit installed here is the one this lap was driven on, or
+        # the ribbon lands 187 m from the car and no ribbon is the better answer.
+        road = None
+        if _has_map(review):
+            try:
+                found, _fit = edges_and_fit(track, line_points(review))
+                road = whole_edges(found) if found is not None else None
+            except (OSError, ValueError):
+                road = None
+
         return {
             "car": car, "track": track,
             "has_map": _has_map(review) and _has_map(baseline_lap),
+            "road": road,
             # The elected reference, regardless of what the user is comparing
             # against right now — that's what the dropdown's ★ marks.
             "best_path": elected,

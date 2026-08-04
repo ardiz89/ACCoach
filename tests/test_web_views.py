@@ -584,3 +584,97 @@ def test_the_way_in_is_visible_without_hovering_for_it():
     opacity = re.search(r"opacity:\s*([\d.]+)", m.group(1))
     assert opacity and float(opacity.group(1)) > 0.3, \
         "a control at opacity 0 is a feature nobody finds"
+
+
+def test_the_map_labels_corners_by_the_name_everything_else_uses():
+    """It drew "T" + the detector's index, and both halves were wrong. The name
+    was ignored, so the map read "T1" where hovering the same apex read "Curva
+    Niki Lauda" — one screen contradicting itself. And the number was the
+    detector's count on *this* lap, which is the sliding number `cornermap`
+    exists to stop."""
+    fn = _APPJS[_APPJS.index("function drawMapTo"):]
+    fn = fn[:fn.index("\n}\n")]
+    loop = fn[fn.index("for (const c of a.corners"):]
+    loop = loop[:loop.index("\n  }")]
+    assert "c.name" in loop, "the map is labelling corners by index again"
+
+
+# --- the two pedals on the zoomed corner (2026-08-04) ----------------------
+
+def test_the_corner_drawing_uses_the_thresholds_the_rest_of_the_app_measures_with():
+    """It drew the brake marker at 0.3, a number from nowhere, while the braking
+    sheet on the same page measures onset at `_BRAKE_ON`. Two answers to one
+    question, on one screen. Pinned to the Python constants so they cannot drift
+    apart again."""
+    from accoach.coaching.analyzer import _BRAKE_ON
+    from accoach.coaching.diagnosis import _THROTTLE_ON
+    fn = _APPJS[_APPJS.index("function drawCornerZoom"):]
+    fn = fn[:fn.index("\n}\n")]
+    m = re.search(r"const BRAKE_ON = ([\d.]+), THROTTLE_ON = ([\d.]+);", fn)
+    assert m, "the corner drawing lost its named thresholds"
+    assert float(m.group(1)) == _BRAKE_ON
+    assert float(m.group(2)) == _THROTTLE_ON
+
+
+def test_the_corner_crop_carries_both_pedals():
+    """The throttle marker needs the channel, and the crop is the only place it
+    can come from."""
+    from accoach.trajectory import corner_path
+    import inspect
+    src = inspect.getsource(corner_path)
+    assert '"brake"' in src and '"throttle"' in src
+
+
+@pytest.mark.parametrize("key", ["line.leg.brake", "line.leg.throttle"])
+def test_every_marker_on_the_corner_drawing_is_named_in_the_legend(key):
+    """The braking markers were drawn for weeks and were in no legend at all.
+    A marker nobody can name is a decoration."""
+    assert f'data-i18n="{key}"' in _HTML
+    m = re.search(r'"' + re.escape(key) + r'":\s*\{([^}]*)\}', _I18NJS)
+    assert m and "en:" in m.group(1) and "it:" in m.group(1)
+
+
+def test_the_gap_magnifier_no_longer_offers_a_setting_that_overstates():
+    """×5 drew a 2.5 m excursion — the 75th percentile of the archive — as 73 px,
+    a quarter of the canvas, and still could not show the laps that are too
+    close together to see (0.6 px). ×3 is the one that earns its place."""
+    assert "[1, 3].map((z) =>" in _APPJS
+    assert "[1, 3, 5]" not in _APPJS
+
+
+def test_no_rule_at_all_can_outrank_the_hidden_class(): 
+    """The wider version of the test above, and it is wider because the trap
+    sprang again one rung lower.
+
+    `.map-legend .swatch { display: inline-flex }` is two classes against
+    `.hidden`'s one, so every legend entry meant to appear only sometimes
+    appeared always — the asphalt swatch on laps with no road under them, and
+    the "where the lap was lost" cross on laps nobody lost. An ID was never the
+    point: **anything** that sets `display` on an element that also carries
+    `hidden` wins, so the rule is now checked on every selector that could
+    match a hideable element.
+    """
+    hideable = set(re.findall(r'class="([^"]*\bhidden\b[^"]*)"', _HTML))
+    classes = {c for group in hideable for c in group.split() if c != "hidden"}
+    ids = set(re.findall(r'id="([\w-]+)"[^>]*class="[^"]*\bhidden\b', _HTML))
+    ids |= set(re.findall(r'class="[^"]*\bhidden\b[^"]*"[^>]*id="([\w-]+)"', _HTML))
+
+    for m in re.finditer(r"([^{}]+)\{([^}]*)\}", _screen_css()):
+        sel, body = m.group(1).strip(), m.group(2)
+        decl = re.search(r"display\s*:\s*([\w-]+)", body)
+        if decl is None or decl.group(1) == "none" or ":not(.hidden)" in sel:
+            continue
+        # A rule scoped to a page STATE on <body> is the deliberate exception:
+        # `body.no-data .empty { display: block }` exists to bring the "no laps
+        # yet" messages forward, and everything around them is switched off by
+        # the same block. The hazard is a component rule that quietly outranks
+        # `hidden` wherever that component appears.
+        if sel.startswith("body."):
+            continue
+        last = sel.split(",")[-1].strip()
+        target = last.split()[-1] if last.split() else last
+        names = set(re.findall(r"[.#]([\w-]+)", target))
+        clash = (names & classes) or (names & ids)
+        assert not clash, (
+            f"{sel!r} sets display on something that is hidden by class "
+            f"({sorted(clash)}) — qualify it with :not(.hidden)")

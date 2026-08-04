@@ -352,7 +352,11 @@ Cosa trovi:
   (tu vs riferimento), **gas/freno** — con le bande delle curve. Passa il mouse:
   un mirino ti dà i valori puntuali. Esporti il giro in **CSV/JSON**.
 - **Mappa**: la traiettoria colorata sul distacco, i punti di frenata tuoi e del
-  riferimento, e sotto **«Le tue frenate»**: la scheda dei tuoi punti di frenata,
+  riferimento, e le curve **chiamate per nome** (non più «T1, T2»: sono gli stessi
+  nomi del resto della pagina, compresi quelli che hai scritto tu). Il giro è
+  disegnato **sull'asfalto**, dove il circuito installato combacia con quello che
+  hai guidato, e se il giro è stato buttato c'è una **✕ nel punto in cui l'hai
+  perso**. Sotto, **«Le tue frenate»**: la scheda dei tuoi punti di frenata,
   curva per curva. Per ognuna: **a che velocità stacchi** (è il riferimento che
   ogni auto ti dà gratis, ce l'hai sul cruscotto), in che marcia, quanto è lunga
   la staccata, la minima che porti, il **riferimento visivo** dove la pista ce
@@ -366,12 +370,18 @@ Cosa trovi:
 - **Traiettoria**: dove sei passato, curva per curva. La curva ingrandita con la
   tua linea e quella di riferimento, e **la fascia colorata fra le due è lo
   scarto**; se a scala vera è troppo sottile per vedersi, il selettore «scarto
-  ×3 / ×5» la ingrandisce (il grafico lo dichiara, e la barra di scala resta
+  ×3» la ingrandisce (il grafico lo dichiara, e la barra di scala resta
   reale). Accanto, la stessa curva in numeri: quanto eri **dentro o fuori** in
   ingresso, all'apex e in uscita, se il tuo punto più lento cade **prima o dopo**
   di quello del riferimento, quanto stretto è l'**arco** che hai percorso e
   quanti **metri di strada in più** hai fatto. Sotto, la tabella di tutte le
   curve, scaricabile in **CSV**.
+  Sulle due linee trovi anche **dove stacchi e dove riapri il gas** (triangolo
+  pieno il tuo, anello quello del riferimento): è quello che trasforma «sei più
+  largo in ingresso» in una diagnosi, perché largo *con la stessa staccata* e
+  largo *staccando 15 m dopo* sono due errori diversi. Le soglie sono le stesse
+  con cui misura la scheda frenate, quindi il triangolo e la riga «Freni a»
+  parlano dello stesso punto.
   In basso a destra del disegno c'è **il giro intero con la curva cerchiata**: due
   tornanti della stessa pista fanno la stessa immagine, e senza quello dovevi
   ricordarti tu quale avevi aperto. In alto, la **frase del debrief** per quella
@@ -404,7 +414,7 @@ Cosa trovi:
   * compare **solo se la pista trovata è davvero quella su cui hai guidato**. Di
     uno stesso circuito girano versioni diverse, e una che non combacia
     disegnerebbe la strada nel posto sbagliato;
-  * **sparisce se ingrandisci lo scarto ×3/×5**, perché lì la linea disegnata non
+  * **sparisce se ingrandisci lo scarto ×3**, perché lì la linea disegnata non
     è più dove sei passato e sembreresti fuori strada senza esserlo.
 
   E il disegno **si gira** per riempire il riquadro: una rotazione non muove un
