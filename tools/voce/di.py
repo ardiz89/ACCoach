@@ -4,15 +4,16 @@ Meta' del canale a due vie. `assistente.py` ascolta, questo risponde.
 
 **Voce neurale (Piper), non SAPI5.** La sintesi e' la stessa con cui sono
 renderizzati i cue del coach — voce italiana `it_IT-paola-medium` — e costa
-640 ms misurati per una frase intera, in locale e senza rete. SAPI5 resta come
+**561 ms misurati** per una frase intera, abbassamento di tono compreso, in
+locale e senza rete. SAPI5 resta come
 ripiego dove Piper non c'e', cosi' su una macchina appena clonata lo strumento
 parla lo stesso, solo peggio.
 
-Un avvertimento che vale la pena tenere: questa e' **la stessa voce del coach**.
-Piper ha due voci italiane e l'altra e' `riccardo-x_low`, che e' `x_low` e si
-sente. Quindi in pista, con il coach acceso, io e lui suoniamo uguali — prima
-qui c'era una voce SAPI maschile proprio per distinguerci a orecchio, e quella
-distinzione ora non c'e' piu'.
+Ma **abbassata**, e non per gusto: Paola e' la voce con cui sono renderizzati
+i cue del coach, quindi usarla tale e quale vorrebbe dire che in pista io e lui
+siamo la stessa persona. Piper ha due voci italiane e l'altra (`riccardo-x_low`)
+e' x_low, si sente, e costa 1.8 s contro 0.5. Quindi si ricampiona: stessa
+qualita', stesso mezzo secondo, un'altra persona.
 
 Il lucchetto (`parla.lock`) non e' un dettaglio: gli altoparlanti e il
 microfono sono nella stessa stanza, quindi senza di lui la mia risposta rientra
@@ -41,11 +42,13 @@ Uso:
 
 from __future__ import annotations
 
+import array
 import re
 import subprocess
 import sys
 import tempfile
 import threading
+import wave
 from pathlib import Path
 
 HERE = Path(__file__).parent
@@ -63,13 +66,18 @@ MODELLO = REPO / "tools" / "piper" / "voices" / "it_IT-paola-medium.onnx"
 def _piper(testo: str) -> Path | None:
     """La frase come WAV, o None se Piper non c'e' o non ce la fa.
 
-    Misurato su questa macchina: **640 ms** per una frase intera, in locale e
-    senza rete. SAPI5 e' istantaneo e sembra un navigatore del 2005; questo
+    Misurato su questa macchina: **524 ms** di sintesi, **561 ms** col tono
+    abbassato. SAPI5 e' istantaneo e sembra un navigatore del 2005; questo
     costa mezzo secondo e sembra una persona. Su un canale dove si fa una
     domanda e si aspetta la risposta, mezzo secondo non lo nota nessuno.
 
-    L'altra voce italiana di Piper e' `it_IT-riccardo-x_low`, maschile: e'
-    `x_low`, si sente che lo e', e ci mette 1.8 s. La scelta e' Paola.
+    **Chatterbox no, e il numero e' quello che decide.** E' la voce di marca
+    scelta il 02/07 e resta giusta per i cue del coach, che si renderizzano in
+    *build*: li' venti secondi a frase si pagano una volta sola. Qui si
+    sintetizza mentre l'altro aspetta, e misurato il 04/08 su questa macchina
+    fa 7 s di caricamento modello piu' 13.6 s per tre secondi di parlato —
+    3-5 volte il tempo reale. Una risposta breve arriverebbe dopo venti
+    secondi di silenzio.
     """
     if not (PIPER.exists() and MODELLO.exists()):
         return None
@@ -83,7 +91,56 @@ def _piper(testo: str) -> Path | None:
         )
     except (OSError, subprocess.SubprocessError):
         return None
-    return out if out.exists() and out.stat().st_size > 44 else None
+    if not (out.exists() and out.stat().st_size > 44):
+        return None
+    _abbassa(out)
+    return out
+
+
+#: Di quanto abbassare il tono rispetto a Paola. Non e' un gusto: le voci
+#: italiane di Piper sono due, e Paola e' **quella con cui sono renderizzati i
+#: cue del coach** — usarla tale e quale vuol dire che in pista io e lui siamo
+#: la stessa persona. L'altra (`riccardo-x_low`) e' x_low, si sente, e costa
+#: 1.8 s contro 0.5.
+#:
+#: Scelto ascoltando: a -10% si distingue troppo poco per un abitacolo col
+#: motore acceso, a -15% e' un'altra persona e la voce regge ancora.
+TONO = 0.85
+
+
+def _abbassa(wav: Path, fattore: float = TONO) -> None:
+    """Abbassa il tono ricampionando, sul posto.
+
+    Ricampionamento lineare più sample rate riscritto: sposta tono **e** durata
+    insieme, che è il trucco più vecchio del mondo e qui basta — non serve
+    preservare le formanti, serve che non sembri la stessa persona. Su una
+    frase da 3 secondi costa qualche millisecondo, quindi non tocca i 500 ms.
+
+    Solo `wave` e `array`: uno strumento di `tools/` non deve tirarsi dietro
+    numpy per abbassare una voce di tre semitoni.
+    """
+    try:
+        with wave.open(str(wav)) as w:
+            if w.getnchannels() != 1 or w.getsampwidth() != 2:
+                return                      # non è il PCM che scrive Piper
+            sr, n = w.getframerate(), w.getnframes()
+            a = array.array("h")
+            a.frombytes(w.readframes(n))
+        m = int(len(a) / fattore)
+        out = array.array("h", bytes(2 * m))
+        for i in range(m):
+            p = i * fattore
+            k = int(p)
+            s0 = a[k] if k < len(a) else 0
+            s1 = a[k + 1] if k + 1 < len(a) else s0
+            out[i] = int(s0 + (s1 - s0) * (p - k))
+        with wave.open(str(wav), "wb") as o:
+            o.setnchannels(1)
+            o.setsampwidth(2)
+            o.setframerate(int(sr / fattore))
+            o.writeframes(out.tobytes())
+    except (OSError, wave.Error, ValueError):
+        return                              # meglio la voce alta che nessuna
 
 
 def _voce():
