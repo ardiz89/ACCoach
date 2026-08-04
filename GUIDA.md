@@ -353,10 +353,9 @@ Cosa trovi:
   un mirino ti dà i valori puntuali. Esporti il giro in **CSV/JSON**.
 - **Mappa**: la traiettoria colorata sul distacco, i punti di frenata tuoi e del
   riferimento, e le curve **chiamate per nome** (non più «T1, T2»: sono gli stessi
-  nomi del resto della pagina, compresi quelli che hai scritto tu). Il giro è
-  disegnato **sull'asfalto**, dove il circuito installato combacia con quello che
-  hai guidato, e se il giro è stato buttato c'è una **✕ nel punto in cui l'hai
-  perso**. Sotto, **«Le tue frenate»**: la scheda dei tuoi punti di frenata,
+  nomi del resto della pagina, compresi quelli che hai scritto tu). Se il giro è
+  stato buttato c'è una **✕ nel punto in cui l'hai perso**. Sotto,
+  **«Le tue frenate»**: la scheda dei tuoi punti di frenata,
   curva per curva. Per ognuna: **a che velocità stacchi** (è il riferimento che
   ogni auto ti dà gratis, ce l'hai sul cruscotto), in che marcia, quanto è lunga
   la staccata, la minima che porti, il **riferimento visivo** dove la pista ce
