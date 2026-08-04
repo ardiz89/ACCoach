@@ -2,6 +2,18 @@
 
 Meta' del canale a due vie. `assistente.py` ascolta, questo risponde.
 
+**Voce neurale (Piper), non SAPI5.** La sintesi e' la stessa con cui sono
+renderizzati i cue del coach — voce italiana `it_IT-paola-medium` — e costa
+640 ms misurati per una frase intera, in locale e senza rete. SAPI5 resta come
+ripiego dove Piper non c'e', cosi' su una macchina appena clonata lo strumento
+parla lo stesso, solo peggio.
+
+Un avvertimento che vale la pena tenere: questa e' **la stessa voce del coach**.
+Piper ha due voci italiane e l'altra e' `riccardo-x_low`, che e' `x_low` e si
+sente. Quindi in pista, con il coach acceso, io e lui suoniamo uguali — prima
+qui c'era una voce SAPI maschile proprio per distinguerci a orecchio, e quella
+distinzione ora non c'e' piu'.
+
 Il lucchetto (`parla.lock`) non e' un dettaglio: gli altoparlanti e il
 microfono sono nella stessa stanza, quindi senza di lui la mia risposta rientra
 dal microfono, viene trascritta, e il turno dopo l'assistente sta rispondendo a
@@ -18,8 +30,9 @@ un lucchetto abbandonato: successo davvero il 2026-08-04, con l'assistente che
 ha ripreso ad ascoltare a meta' della mia frase e ha sentito se stesso. Ora il
 file dice «sto parlando **adesso**» e non «ho cominciato a parlare allora».
 
-Voce maschile senza effetto radio, la stessa dell'istruttore: durante una
-sessione parlano anche il coach e l'ingegnere, e vanno distinti a orecchio.
+Niente effetto radio, e non e' una dimenticanza: il filtro pit-to-car e' la
+persona del *coach*, e questo non e' il coach — e' una conversazione con chi
+sta scrivendo il programma.
 
 Uso:
     python di.py "il riferimento e' il giro del ventuno luglio"
@@ -29,7 +42,9 @@ Uso:
 from __future__ import annotations
 
 import re
+import subprocess
 import sys
+import tempfile
 import threading
 from pathlib import Path
 
@@ -37,6 +52,38 @@ HERE = Path(__file__).parent
 LOCK = HERE / "parla.lock"
 REPO = HERE.parent.parent          # tools/voce -> la radice del repo
 sys.path.insert(0, str(REPO / "src"))
+
+#: Piper, la stessa sintesi neurale con cui sono renderizzati i cue del coach.
+#: Vive in `tools/piper/` ed e' roba da build, non spedita — e va benissimo,
+#: perche' anche questo e' uno strumento di `tools/` e non entra nel pacchetto.
+PIPER = REPO / "tools" / "piper" / "piper.exe"
+MODELLO = REPO / "tools" / "piper" / "voices" / "it_IT-paola-medium.onnx"
+
+
+def _piper(testo: str) -> Path | None:
+    """La frase come WAV, o None se Piper non c'e' o non ce la fa.
+
+    Misurato su questa macchina: **640 ms** per una frase intera, in locale e
+    senza rete. SAPI5 e' istantaneo e sembra un navigatore del 2005; questo
+    costa mezzo secondo e sembra una persona. Su un canale dove si fa una
+    domanda e si aspetta la risposta, mezzo secondo non lo nota nessuno.
+
+    L'altra voce italiana di Piper e' `it_IT-riccardo-x_low`, maschile: e'
+    `x_low`, si sente che lo e', e ci mette 1.8 s. La scelta e' Paola.
+    """
+    if not (PIPER.exists() and MODELLO.exists()):
+        return None
+    out = Path(tempfile.gettempdir()) / "hone_di.wav"
+    try:
+        subprocess.run(
+            [str(PIPER), "-m", str(MODELLO), "-f", str(out)],
+            input=testo.encode("utf-8"),
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            timeout=30, check=True,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return out if out.exists() and out.stat().st_size > 44 else None
 
 
 def _voce():
@@ -100,9 +147,17 @@ def di(testo: str) -> None:
     fermo = threading.Event()
     threading.Thread(target=_tieni_vivo, args=(fermo,), daemon=True).start()
     try:
-        eng = _voce()
-        eng.say(testo)
-        eng.runAndWait()
+        wav = _piper(testo)
+        if wav is not None:
+            # winsound e' nella libreria standard, quindi la voce neurale non
+            # aggiunge una dipendenza: la stessa scelta gia' fatta da
+            # `coaching/voice.py` per i cue pre-renderizzati.
+            import winsound
+            winsound.PlaySound(str(wav), winsound.SND_FILENAME)
+        else:
+            eng = _voce()
+            eng.say(testo)
+            eng.runAndWait()
     except Exception as e:                              # noqa: BLE001
         print(f"(voce non disponibile: {e})", flush=True)
     finally:
