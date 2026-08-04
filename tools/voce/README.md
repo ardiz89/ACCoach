@@ -11,9 +11,13 @@ che serve in movimento si dice a voce.
 ## Avviare
 
 ```powershell
-pip install vosk sounddevice pyttsx3        # una volta
-python tools/voce/assistente.py
+.venv\Scripts\python.exe toolsocessistente.py
 ```
+
+**Con il python del venv, non con `python` e basta.** Su questa macchina il
+Python di sistema non ha `vosk` né `sounddevice` (il venv sì), e il modo in cui
+sbaglia è un `ModuleNotFoundError` letto mentre sei già in macchina. Se il venv
+non c'è: `pip install vosk sounddevice pyttsx3`, una volta.
 
 Poi: **«ehi copilota»**, pausa breve, la domanda. Riserva: **«ehi tecnico»**.
 
