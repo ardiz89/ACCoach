@@ -59,7 +59,18 @@ Opzioni che contano:
 | `--mic brio` | quale microfono |
 | `--tutto` | **vedi l'avvertenza in fondo** |
 
-Claude risponde con `di.py`, che crea `parla.lock` mentre parla. Finché quel
+Claude risponde con `di.py`, che parla con la **voce neurale Piper**
+(`it_IT-paola-medium`, la stessa dei cue del coach): **~500 ms** misurati di
+sintesi per frase, in locale, contro SAPI5 che è istantaneo e sembra un
+navigatore del 2005. Su un canale dove fai una domanda e aspetti la risposta,
+mezzo secondo non lo nota nessuno. Se Piper non c'è si ripiega su SAPI5, così
+su una macchina appena clonata parla lo stesso.
+
+**Nota:** è la *stessa voce del coach*. Piper ha due voci italiane e l'altra
+(`riccardo-x_low`) è x_low e si sente. Quindi in pista, col coach acceso, non si
+distinguono a orecchio — prima qui c'era una voce SAPI maschile apposta.
+
+`di.py` crea `parla.lock` mentre parla. Finché quel
 file esiste l'assistente butta via l'audio: senza, la risposta rientra dal
 microfono e il turno dopo l'assistente risponde a se stesso.
 
