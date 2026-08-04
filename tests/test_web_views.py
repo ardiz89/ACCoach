@@ -584,3 +584,16 @@ def test_the_way_in_is_visible_without_hovering_for_it():
     opacity = re.search(r"opacity:\s*([\d.]+)", m.group(1))
     assert opacity and float(opacity.group(1)) > 0.3, \
         "a control at opacity 0 is a feature nobody finds"
+
+
+def test_the_map_labels_corners_by_the_name_everything_else_uses():
+    """It drew "T" + the detector's index, and both halves were wrong. The name
+    was ignored, so the map read "T1" where hovering the same apex read "Curva
+    Niki Lauda" — one screen contradicting itself. And the number was the
+    detector's count on *this* lap, which is the sliding number `cornermap`
+    exists to stop."""
+    fn = _APPJS[_APPJS.index("function drawMapTo"):]
+    fn = fn[:fn.index("\n}\n")]
+    loop = fn[fn.index("for (const c of a.corners"):]
+    loop = loop[:loop.index("\n  }")]
+    assert "c.name" in loop, "the map is labelling corners by index again"

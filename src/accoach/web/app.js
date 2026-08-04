@@ -1117,11 +1117,19 @@ function drawMapTo(canvas, missing, a, cx, mode) {
     }
   }
 
-  // Corner labels at each apex.
+  // Corner labels at each apex — by NAME, which is what the corner is called
+  // everywhere else on this page.
+  //
+  // This drew "T" + the detector's index, and both halves of that were wrong.
+  // The name was ignored outright, so the map said "T1" while hovering the very
+  // same apex said "Curva Niki Lauda" — one screen contradicting itself. And
+  // the number was the detector's count of what it found on *this* lap, which
+  // is exactly the sliding number `cornermap` exists to stop: a lap that
+  // detected one corner fewer renumbered every label after it.
   ctx.fillStyle = "rgba(255,255,255,0.85)"; ctx.font = "11px " + UI_FONT;
   for (const c of a.corners || []) {
     const i = nearest(rv.pos, c.apex);
-    ctx.fillText("T" + (c.index + 1), X(rv.x[i]) + 6, Y(rv.z[i]) - 4);
+    ctx.fillText(c.name || ("T" + (c.index + 1)), X(rv.x[i]) + 6, Y(rv.z[i]) - 4);
   }
 
   // Start/finish + direction of travel. A white dot with an "S/F" label (kept
