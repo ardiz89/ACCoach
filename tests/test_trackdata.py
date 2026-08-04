@@ -341,6 +341,11 @@ _SOURCED = {
     "zandvoort": ["Tarzanbocht", "Gerlachbocht", "Hugenholtzbocht", "Hunserug",
                   "Slotemakerbocht", "Scheivlak", "Mastersbocht", "Hans Ernst",
                   "Arie Luyendijkbocht"],
+    "hockenheim": ["Nordkurve", "Spitzkehre", "Sachskurve", "Elf-Kurve",
+                   "Südkurve"],
+    "catalunya": ["Elf", "Renault", "Repsol", "Seat", "Campsa", "La Caixa",
+                  "Banc Sabadell", "Europcar"],
+    "mexicocity": ["Peraltada"],
 }
 
 
@@ -450,3 +455,72 @@ def test_cotas_back_straight_survives_in_the_table():
     pos = dict((n, p) for n, p in trackdata._CORNERS["austin"])
     gap_m = (pos[12] - pos[11]) * 5503.0
     assert 1100 < gap_m < 1300
+
+
+# --- circuits curated by name on 2026-08-04 --------------------------------
+#
+# Three more, and each one is here because of a different failure it survived.
+
+def test_the_spitzkehre_is_a_right_because_the_only_full_guide_was_invented():
+    """A guide laid out all seventeen Hockenheim turns and got them wrong: it
+    calls the Parabolika — a straight — "a very long, constant-radius left" and
+    the Spitzkehre "an extremely tight hairpin left". A prose source says
+    "170-degree right-hander" and the tightest apex of the lap turns right.
+
+    This is the fourth time a generated turn-by-turn has invented a direction,
+    so the outcome is pinned rather than trusted to the comment beside it."""
+    assert trackdata._DIRECTIONS["hockenheim"]["Spitzkehre"] == "right"
+    wrong = [_corner(0, 0.462)]
+    wrong[0].direction = "left"
+    assert name_corners("hockenheim", wrong, "en") == ["Corner 1"]
+
+
+def test_hockenheims_hairpin_is_the_tightest_thing_on_the_lap():
+    """The Spitzkehre was placed by *character*, not by turn number: it is the
+    slowest corner of the circuit at the end of the Parabolika. The position
+    below must therefore sit in the second half of the lap's longest gap."""
+    pos = dict(trackdata._CORNERS["hockenheim"])
+    assert 0.40 < pos["Spitzkehre"] < 0.50
+    assert pos["Nordkurve"] < 0.10           # first corner off the pit straight
+    assert pos["Südkurve"] > 0.90            # last one before the line
+
+
+def test_barcelona_keeps_the_name_the_chicane_could_not_move():
+    """Catalunya was held back on 03/08 because the bundled trace has 14 turns
+    and the ACC guides describe 16. That was right about the *numbers* and
+    wrong about the *names*: the chicane renumbered everything after Turn 13
+    and renamed nothing, so Campsa is Campsa on both layouts.
+
+    New Holland is the exception and is deliberately absent — it is the only
+    name that sits after where the chicane was, so it is the only one whose
+    position genuinely moves."""
+    names = [n for n, _p in trackdata._CORNERS["catalunya"]]
+    assert "Campsa" in names and "La Caixa" in names
+    assert "New Holland" not in names
+    assert max(p for _n, p in trackdata._CORNERS["catalunya"]) < 0.90
+
+
+def test_barcelona_answers_to_both_games_spellings():
+    assert trackdata.has_names("barcelona") and trackdata.has_names("kscatalunya")
+
+
+def test_la_caixa_is_a_left_and_will_not_take_a_right():
+    """La Caixa is the tightest left of the lap at the end of the longest
+    straight after the pit straight — the pin the whole alignment hangs on."""
+    right = [_corner(0, 0.754)]
+    right[0].direction = "right"
+    assert name_corners("catalunya", right, "en") == ["Corner 1"]
+    left = [_corner(0, 0.754)]
+    left[0].direction = "left"
+    assert name_corners("catalunya", left, "en") == ["La Caixa"]
+
+
+def test_mexico_city_gets_one_row_and_that_is_the_honest_number():
+    """Everything else this circuit is known for is a *section* — the Foro Sol
+    is a stadium, the Esses are Turns 7 to 11 — and a section has no apex to
+    anchor a name to. One name beats five invented ones, and the rest of the
+    lap keeps its numbers."""
+    assert [n for n, _p in trackdata._CORNERS["mexicocity"]] == ["Peraltada"]
+    assert trackdata.has_names("autodromohermanosrodriguez")
+    corners = [_corner(0, 0.230), _corner(1, 0.936)]
+    assert name_corners("mexicocity", corners, "it") == ["Curva 1", "Peraltada"]
