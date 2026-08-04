@@ -9,6 +9,15 @@ se stesso. Il file esiste per tutta la durata della frase e viene tolto **in
 `finally`**, cosi' un errore di sintesi non lascia l'assistente sordo per il
 resto della sessione.
 
+E viene **ritoccato mentre parlo**, il che sembra un dettaglio e non lo e'.
+`assistente.py` considera orfano un lucchetto piu' vecchio di 30 secondi e lo
+rimuove — regola giusta, perche' un lucchetto rimasto da un processo ucciso
+renderebbe l'assistente sordo per sempre. Ma l'eta' si leggeva dalla data di
+*creazione*, quindi una risposta lunga piu' di mezzo minuto veniva scambiata per
+un lucchetto abbandonato: successo davvero il 2026-08-04, con l'assistente che
+ha ripreso ad ascoltare a meta' della mia frase e ha sentito se stesso. Ora il
+file dice «sto parlando **adesso**» e non «ho cominciato a parlare allora».
+
 Voce maschile senza effetto radio, la stessa dell'istruttore: durante una
 sessione parlano anche il coach e l'ingegnere, e vanno distinti a orecchio.
 
@@ -21,6 +30,7 @@ from __future__ import annotations
 
 import re
 import sys
+import threading
 from pathlib import Path
 
 HERE = Path(__file__).parent
@@ -84,6 +94,11 @@ def di(testo: str) -> None:
     if not testo:
         return
     LOCK.write_text("", encoding="utf-8")
+    # `runAndWait()` blocca fino all'ultima sillaba, quindi il rinfresco va su un
+    # thread: e' l'unico modo di dire "sto ancora parlando" mentre si parla.
+    # Daemon, cosi' non tiene in vita il processo se la sintesi muore male.
+    fermo = threading.Event()
+    threading.Thread(target=_tieni_vivo, args=(fermo,), daemon=True).start()
     try:
         eng = _voce()
         eng.say(testo)
@@ -91,7 +106,23 @@ def di(testo: str) -> None:
     except Exception as e:                              # noqa: BLE001
         print(f"(voce non disponibile: {e})", flush=True)
     finally:
+        fermo.set()
         LOCK.unlink(missing_ok=True)
+
+
+#: Ogni quanto ritoccare il lucchetto. Deve stare comodamente sotto i 30 s di
+#: `assistente._LOCK_MAX_S` senza rasentarli: a 25 s un rallentamento della
+#: sintesi basterebbe a far scadere il lucchetto un istante prima del ritocco,
+#: che e' il difetto di oggi con un margine piu' stretto.
+_RINFRESCO_S = 5.0
+
+
+def _tieni_vivo(fermo: threading.Event) -> None:
+    while not fermo.wait(_RINFRESCO_S):
+        try:
+            LOCK.touch()
+        except OSError:
+            return          # tolto da qualcun altro: non e' piu' affar nostro
 
 
 if __name__ == "__main__":
