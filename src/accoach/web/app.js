@@ -994,19 +994,11 @@ function drawRoad(ctx, road, X, Y, hair) {
 function drawMap(a, cx) {
   const hit = drawMapTo($("c-map"), $("map-missing"), a, cx);
   if (hit) MAP_HIT = hit;
-  // Both of these are on the drawing only sometimes — the road when the circuit
-  // installed here matches the lap, the cross only on a lap that was actually
-  // thrown away. A legend entry for a mark that isn't there sends the reader
-  // hunting for it, so the entries come and go with the marks.
+  // The cross is on the drawing only on a lap that was actually thrown away. A
+  // legend entry for a mark that isn't there sends the reader hunting for it,
+  // so the entry comes and goes with the mark.
   const lost = $("leg-lost");
   if (lost) lost.classList.toggle("hidden", a.review.lost_at == null);
-  const legRoad = $("leg-map-road");
-  if (legRoad) {
-    legRoad.classList.toggle("hidden", !a.road);
-    if (a.road) {
-      $("leg-map-road-text").textContent = tf("line.leg.road", { m: a.road.width_m });
-    }
-  }
 }
 
 // Mini map shown inside the Compare view, driven by the shared crosshair so it
@@ -1048,13 +1040,6 @@ function drawMapTo(canvas, missing, a, cx, mode) {
     }
   };
   scan(rv.x, rv.z); scan(rf.x, rf.z);
-  // The road joins the fit, exactly as it does on the zoomed corner: a lap that
-  // ran wide should show the edge it ran past, not have it cropped away.
-  if (a.road) {
-    for (const r of a.road.runs) for (const side of [r.left, r.right]) {
-      scan(side.map((p) => p[0]), side.map((p) => p[1]));
-    }
-  }
   const m = 24, spanX = maxX - minX || 1, spanZ = maxZ - minZ || 1;
   const s = Math.min((w - 2 * m) / spanX, (h - 2 * m) / spanZ);
   const offX = (w - spanX * s) / 2, offZ = (h - spanZ * s) / 2;
@@ -1065,14 +1050,19 @@ function drawMapTo(canvas, missing, a, cx, mode) {
   const X = (x) => (maxX - x) * s + offX;
   const Y = (z) => h - ((z - minZ) * s + offZ);   // flip so +z is up
 
-  // The asphalt first, so both lines are drawn ON the road rather than floating
-  // over nothing. The zoomed corner has had this since the surface model
-  // arrived; the whole-lap map it zooms into had not, which made the two views
-  // of one lap look like two different products.
+  // NO ASPHALT HERE, and it is a decision rather than an omission. Drawing the
+  // road under the whole lap was tried on 2026-08-04 and taken straight back
+  // out: at this zoom the fit is 0.869 px per metre, so the Red Bull Ring's
+  // 11.9 m of track is 10.3 px — and the reviewed line is 2 to 7 px wide,
+  // because its thickness carries the speed gap. A line two thirds as wide as
+  // the road, centred on a racing line that uses the kerb, spills past a road
+  // drawn to scale, and the picture says the car was off the track on corners
+  // where it measurably was not (0-2% of samples outside the ribbon, worst
+  // 0.4 m).
   //
-  // It also fixes the frame: without it the picture is fitted to the two lines,
-  // so a lap that ran wide cropped out the very edge it ran past.
-  if (a.road) drawRoad(ctx, a.road, X, Y, 1);
+  // The zoomed corner keeps its asphalt because there the scale is real: a
+  // corner fills the box and the line is a thread across it. Same rule as the
+  // magnified gap — a drawing that overstates is worse than one that omits.
 
   // Reference racing line: faint dashed.
   ctx.save();

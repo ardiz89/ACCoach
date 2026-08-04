@@ -678,3 +678,23 @@ def test_no_rule_at_all_can_outrank_the_hidden_class():
         assert not clash, (
             f"{sel!r} sets display on something that is hidden by class "
             f"({sorted(clash)}) — qualify it with :not(.hidden)")
+
+
+def test_the_whole_lap_map_draws_no_road_under_the_lines():
+    """Added on 2026-08-04 and taken back out the same day, so the reason is
+    kept where the next person will look.
+
+    At whole-lap zoom the fit is 0.869 px per metre: the Red Bull Ring's 11.9 m
+    of asphalt is 10.3 px, and the reviewed line is 2-7 px because its thickness
+    carries the speed gap. A line two thirds as wide as the road, centred on a
+    racing line that uses the kerb, spills past a road drawn to scale — so the
+    picture claimed the car was off the track on corners where it measurably was
+    not (0-2% of samples outside the ribbon, worst case 0.4 m).
+
+    The zoomed corner keeps its asphalt: there the corner fills the box and the
+    line is a thread across it.
+    """
+    fn = _APPJS[_APPJS.index("function drawMapTo"):]
+    fn = fn[:fn.index("\n}\n")]
+    assert "drawRoad(" not in fn, (
+        "the whole-lap map is drawing a road again — read the comment above it")
