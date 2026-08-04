@@ -11,13 +11,37 @@ che serve in movimento si dice a voce.
 ## Avviare
 
 ```powershell
-.venv\Scripts\python.exe toolsocessistente.py
+tools\voce\voce.bat            # avvia
+tools\voce\voce.bat stato      # sta girando?
+tools\voce\voce.bat stop       # ferma
 ```
 
-**Con il python del venv, non con `python` e basta.** Su questa macchina il
-Python di sistema non ha `vosk` né `sounddevice` (il venv sì), e il modo in cui
-sbaglia è un `ModuleNotFoundError` letto mentre sei già in macchina. Se il venv
-non c'è: `pip install vosk sounddevice pyttsx3`, una volta.
+Il `.bat` esiste per due motivi, e nessuno dei due è la comodità.
+
+Il primo: il comando giusto usa il python del **venv**, e quello di sistema qui
+non ha `vosk` né `sounddevice` — sbagliarlo dà un `ModuleNotFoundError` che
+leggi quando sei già seduto in macchina. Il secondo: **due assistenti accesi si
+contendono il microfono** e nessuno dei due sente bene, quindi c'è un solo posto
+e non si parte due volte. Un PID rimasto da un processo morto non blocca
+l'avvio: quello sarebbe il modo peggiore di fallire, cioè lasciarti senza
+assistente e convinto di averlo.
+
+A mano, se serve: `.venv\Scripts\python.exe tools\voce\assistente.py`.
+
+## Come mi arriva, e perché passa da un file
+
+`Monitor` osserva lo **stdout di un comando che lancio io**, quindi un processo
+avviato dal `.bat` in una finestra sua sarebbe muto per me. Per questo il `.bat`
+gli redirige l'uscita su `tools/voce/voce.log`, e io leggo quello:
+
+```
+tail -F tools/voce/voce.log | grep -E --line-buffered "DOMANDA|ERRORE|PRONTO"
+```
+
+I due pezzi diventano così indipendenti, che è il punto: l'assistente sopravvive
+a un `Monitor` fermato, e un `Monitor` può attaccarsi a un assistente già
+acceso. `tail -F` e non `-f` perché il log si riscrive a ogni avvio — provato:
+con `-F` la riga `PRONTO` del riavvio arriva lo stesso.
 
 Poi: **«ehi copilota»**, pausa breve, la domanda. Riserva: **«ehi tecnico»**.
 
