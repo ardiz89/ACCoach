@@ -66,9 +66,14 @@ navigatore del 2005. Su un canale dove fai una domanda e aspetti la risposta,
 mezzo secondo non lo nota nessuno. Se Piper non c'è si ripiega su SAPI5, così
 su una macchina appena clonata parla lo stesso.
 
-**Nota:** è la *stessa voce del coach*. Piper ha due voci italiane e l'altra
-(`riccardo-x_low`) è x_low e si sente. Quindi in pista, col coach acceso, non si
-distinguono a orecchio — prima qui c'era una voce SAPI maschile apposta.
+È la stessa voce con cui sono renderizzati i cue del coach, quindi viene
+**abbassata del 15%** per non essere la stessa persona in pista. Costa 37 ms.
+
+**Chatterbox no, per questo canale.** È la voce di marca scelta il 02/07 e resta
+giusta per i cue del coach, che si renderizzano *in build*. Qui si sintetizza
+mentre aspetti la risposta, e misurato: 7 s di caricamento modello + 13.6 s per
+tre secondi di parlato, 3-5× il tempo reale. Una risposta breve arriverebbe dopo
+venti secondi di silenzio.
 
 `di.py` crea `parla.lock` mentre parla. Finché quel
 file esiste l'assistente butta via l'audio: senza, la risposta rientra dal
