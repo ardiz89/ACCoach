@@ -774,5 +774,23 @@ def test_the_rail_is_declared_once_and_only_for_views_that_exist():
 
 
 def test_switching_tab_says_whether_this_one_has_a_rail():
+    """La classe si applica anche al primo paint (vedi il test sotto), quindi
+    la logica vive in `applyRailed`, non più inline qui — ma `showView` deve
+    comunque richiamarla a ogni cambio di scheda."""
     block = _APPJS.split("function showView(")[1].split("\n}")[0]
-    assert 'classList.toggle("railed"' in block
+    assert "applyRailed(" in block
+
+
+def test_the_starting_tab_gets_the_rail_class_without_a_click():
+    """`showView` mette la classe `railed` solo quando viene chiamata, e
+    `init()` la chiama solo se la vista salvata in localStorage è diversa da
+    quella già `active` in HTML. Con localStorage vuoto — la prima visita, il
+    caso più comune — o con una vista salvata uguale a quella di partenza,
+    `showView` non scattava mai: il rail restava nascosto sulla prima
+    schermata anche su una scheda che lo prevede, finché non si cliccava un
+    tab qualsiasi. Il difetto era invisibile perché nessuno guarda la pagina
+    appena caricata senza toccarla — la scheda di partenza va trattata come
+    tutte le altre nove."""
+    block = _APPJS.split("async function init(")[1].split("\n}")[0]
+    assert "applyRailed(" in block, \
+        "init() non applica mai la classe railed sulla scheda di partenza"

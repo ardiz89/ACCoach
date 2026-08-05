@@ -142,6 +142,10 @@ async function init() {
   await loadCombo(JSON.parse(sel.value));
   const view = savedView();
   if (view && view !== VIEW) showView(view);
+  // Se non è scattato lo showView qui sopra, VIEW è ancora quella di partenza
+  // marcata `active` in HTML: la scheda iniziale merita lo stesso trattamento
+  // di ogni altra, non un rail che appare solo dal secondo click in poi.
+  else applyRailed(VIEW);
   // First visit: pop the tour once data is on screen (so #vmin/#debrief exist).
   if (window.HoneTour) window.HoneTour.auto(tourSteps(), "hone_tour_analysis");
 }
@@ -250,6 +254,15 @@ function wireCbToggle() {
 // peggio di un comando assente.
 const RAIL_VIEWS = ["flow", "compare", "map", "line", "sectors", "dynamics"];
 
+// Non dentro `showView` da sola: al primo caricamento `init()` non ci passa
+// affatto quando la vista salvata coincide con quella già attiva in HTML (o
+// non ce n'è una salvata), quindi la scheda di partenza — spesso `flow`, che
+// ha il rail — restava senza la classe finché non si cliccava un tab
+// qualsiasi. Estratta così la chiamano sia `showView` sia `init`.
+function applyRailed(name) {
+  document.body.classList.toggle("railed", RAIL_VIEWS.indexOf(name) >= 0);
+}
+
 // Switch to a view by name, as if its tab had been clicked. Used by the tabs
 // themselves and by the "show me the whole chart" button in the guided flow.
 function showView(name) {
@@ -263,7 +276,7 @@ function showView(name) {
   for (const p of document.querySelectorAll("[id^='view-']")) {
     p.classList.toggle("hidden", p.id !== "view-" + name);
   }
-  document.body.classList.toggle("railed", RAIL_VIEWS.indexOf(name) >= 0);
+  applyRailed(name);
   redrawCurrentView();
 }
 
