@@ -137,8 +137,10 @@ e vale la pena non confonderle con la sessione qui sotto:
   Erano tredici: il 04/08 ne sono caduti tre — Sepang, il Red Bull Ring e Shanghai —
   perché la regola «conteggi diversi, niente tabella» era **sbagliata** (la
   numerazione ufficiale fonde i complessi) e quello che decide è la **sequenza
-  dei versi**. Il 05/08 è caduto **Melbourne**, che era l'ultimo dichiarato
-  «vale un altro tentativo». Gli altri sono stati riattaccati con lo stesso
+  dei versi**. Il 05/08 è caduto **Melbourne**, e a farlo cadere è stato
+  accorgersi che il conteggio degli apici **coincideva** con quello pubblicato e
+  quella coincidenza era falsa. Il metodo che ne esce è: **il conteggio non
+  è mai una conferma, nemmeno quando torna**. Gli altri sono stati riattaccati con lo stesso
   metodo e i motivi ora sono **misurati**, non contati: Yas Marina è chiuso dal
   metro (la traccia fa 5542 m e tutti e due i tracciati pubblicati ne fanno
   5281), Budapest e Sochi da fonti che si contraddicono e da una geometria che
@@ -147,8 +149,10 @@ e vale la pena non confonderle con la sessione qui sotto:
   mancava ora c'è (il metro sceglie il «Full Circuit», 4058 m di traccia contro
   4.070 km, e la variante successiva delle diciotto sta quattro volte più
   lontano), ma quel tracciato è dato a **21 curve** e il rilevatore ne trova 19
-  da 150 a 600 m — e soprattutto **nessuna fonte descrive quella strada curva
-  per curva**: le guide che percorrono il giro sono tutte scritte per il Grand
+  da 200 a 600 m (18 a 150) — e quel 21 sta su una riga **senza citazione**, con
+  una lunghezza che altrove la stessa pagina dichiara «di progetto» e una tabella
+  che si contraddice da sola su un'altra variante. Soprattutto, **nessuna fonte
+  descrive quella strada curva per curva**: le guide che percorrono il giro sono tutte scritte per il Grand
   Prix #1 corso in gara, 3.955 km e 15 curve, che è una strada diversa.
 
 | # | Voce | Origine | Cosa manca davvero |
@@ -198,7 +202,7 @@ Riverificato aprendo il codice il 2026-07-31, non a memoria: le voci 3, 5, 6, 7,
 | 14 | **Piano di allenamento** | 30/07 | `coaching/plan.py`: obiettivi dai punti deboli **sistematici**, accettati (quindi con una data), misurati **solo sui giri successivi** |
 | 15 | **Avvio automatico col gioco** | 30/07 | `watch.py`: parte il **solo registratore silenzioso**, spento di default, mai la voce |
 | 16 | **Tempo perso per fase in curva** | 30/07 | `coaching/phases.py`: ingresso / apex / uscita / tratto dopo, pezzi che **risommano** al totale — scomposizione, non stima |
-| 17 | **Nomi curva oltre Monza e Imola** | 30/07 | Spa e Suzuka, misurati dai giri in archivio e confermati su tre letture concordi. Il difetto trovato: un nome raggiungeva la curva accanto, e la leva non era la tolleranza ma il **verso** della curva. Portato a **18 circuiti curati** fra il 03/08 e il 05/08 senza guidarne nessuno: le linee centrali in bundle partono dal traguardo, quindi la frazione d'arco *è* una posizione (12-33 m di errore contro 290 di tolleranza), e `tools/corner_atlas.py` le misura. I nove che restano non sono lavoro non fatto: sono in `corner_atlas.HELD` con scritto cosa li ferma, e `--check` protesta se uno di loro viene curato senza aggiornare la nota. Melbourne, chiuso il 05/08, è il caso che insegna di più: a soglia 150 m il conteggio cade **esattamente sulle 16 curve pubblicate**, e quell'assegnazione è **falsa** (mette T9 e T10 entrambe a sinistra, dove la fonte dice destra-sinistra). A sbloccarlo non è stata una lista di versi ma **due frasi sulla struttura** più l'aritmetica: delle cinque coppie destra-poi-sinistra della traccia, quattro non lasciano spazio a 8 curve davanti e 6 dietro, quindi il complesso T9-T10 è **forzato**. Fissate 13 righe così, le sei sinistre sono esaurite e le tre rimaste sono destre per necessità — il verso non può sbagliare. La conferma è arrivata dopo: la ricostruzione prevedeva 6 sinistre e 10 destre, e la fonte trovata in seguito lo dice testualmente. **Chiusa il 04/08** con l'unica strada che copre anche i dieci circuiti ACC senza geometria: il nome lo dà il pilota, dalla matita accanto al titolo della curva in Traiettoria (`cornernames.py`, `POST /api/corner-name`). Il suo nome batte il nostro, si toglie con lo stesso gesto e sta in `Documenti/ACCoach/corner-names.json` — **fuori dal catalogo**, che è una cache ricostruibile mentre questo è l'unica copia |
+| 17 | **Nomi curva oltre Monza e Imola** | 30/07 | Spa e Suzuka, misurati dai giri in archivio e confermati su tre letture concordi. Il difetto trovato: un nome raggiungeva la curva accanto, e la leva non era la tolleranza ma il **verso** della curva. Portato a **18 circuiti curati** fra il 03/08 e il 05/08 senza guidarne nessuno: le linee centrali in bundle partono dal traguardo, quindi la frazione d'arco *è* una posizione (12-33 m di errore contro 290 di tolleranza), e `tools/corner_atlas.py` le misura. I nove che restano non sono lavoro non fatto: sono in `corner_atlas.HELD` con scritto cosa li ferma, e `--check` protesta se uno di loro viene curato senza aggiornare la nota. Melbourne, chiuso il 05/08, è il caso che insegna di più: a soglia 150 m il conteggio cade **esattamente sulle 16 curve pubblicate**, e quell'assegnazione è **falsa** (mette T9 e T10 entrambe a sinistra, dove la fonte dice destra-sinistra). A sbloccarlo non è stata una lista di versi ma **due frasi sulla struttura** più l'aritmetica: delle cinque coppie destra-poi-sinistra della traccia, quattro non lasciano spazio a 8 curve davanti e 6 dietro, quindi il complesso T9-T10 è **forzato**. Attenzione a non raccontarla più grossa di com'è, e una verifica del 05/08 ha dovuto correggere proprio questo: l'eliminazione fissa **quattro righe, non tredici**, e da sola lascia **otto** sequenze ammissibili. A chiudere la sequenza sono le fonti — una guida che percorre il tracciato di oggi curva per curva e dichiara lei stessa la rinumerazione del 2022 («now designated Turns 9 and 10, formerly 11 and 12»), quindi tradotta all'indietro dà tutti e sedici i versi. La corroborazione più bella resta però il vincolo globale, perché è stato **previsto prima di essere letto**: la ricostruzione dava 6 sinistre e 10 destre, e la fonte trovata in seguito lo dice testualmente. **Chiusa il 04/08** con l'unica strada che copre anche i dieci circuiti ACC senza geometria: il nome lo dà il pilota, dalla matita accanto al titolo della curva in Traiettoria (`cornernames.py`, `POST /api/corner-name`). Il suo nome batte il nostro, si toglie con lo stesso gesto e sta in `Documenti/ACCoach/corner-names.json` — **fuori dal catalogo**, che è una cache ricostruibile mentre questo è l'unica copia |
 
 ## Arrivato fuori tabella
 

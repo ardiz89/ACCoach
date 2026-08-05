@@ -559,29 +559,55 @@ _CORNERS: dict[str, list[tuple[str | int, float]]] = {
     #     ci sono cinque coppie destra-poi-sinistra consecutive; quattro
     #     lascerebbero meno di 8 curve davanti o meno di 6 dietro, e muoiono di
     #     aritmetica. Resta 0.484/0.505. **Forzata, non scelta.**
-    #   - «The chicanes at turns 11 and 12». Dopo la T10 resta una sola chicane
-    #     che lasci quattro curve in coda: 0.635/0.658. Forzata anche questa.
+    #   - «a high-speed left-hander followed by a right-hander, now designated
+    #     Turns 9 and 10 (**formerly 11 and 12**)». Quindi la vecchia T11 è una
+    #     sinistra e la T12 la destra che la segue. E l'aritmetica la inchioda
+    #     da sola: dopo la T10 restano otto apici, fra cui **esattamente due
+    #     sinistre**, e servono esattamente due sinistre per T11-T16 — quindi
+    #     vanno prese entrambe, e la prima delle due *è* la T11. 0.635/0.658.
     #
-    # Fissate quelle 13 righe, **tutte e sei le sinistre sono esaurite**, quindi
-    # le tre rimaste (T8, T13, T14) sono per forza destre — e ogni apice
-    # candidato è destro. Il verso qui non può sbagliare: è il modo di sbagliare
-    # che ci ha morso due volte il 30/07, e su questo circuito è chiuso a chiave.
+    # **Una prova è stata scartata in verifica (05/08)**, ed è il caso che vale
+    # la pena non dimenticare. Al primo giro avevo inchiodato la T11-T12 con
+    # «The chicanes at turns 11 and 12», che è una frase vera e inutilizzabile:
+    # sta nella sezione «Everyday access», descrive le strade **aperte al
+    # pubblico** e si contrappone da sola a «that used in the Grand Prix». La
+    # conclusione non cambia — la frase sopra è migliore perché parla del
+    # tracciato da gara — ma la citazione sbagliata sarebbe rimasta a fare da
+    # garanzia a un risultato che in realtà regge su altro.
     #
-    # Il vincolo globale è stato **previsto prima di essere letto**: la
-    # ricostruzione dà 6 sinistre e 10 destre, e una fonte dice testualmente
-    # «A total of 16 corners with 10 right turns and 6 left turns». La stessa
-    # pagina dà il tracciato attuale a 14 curve, **5L/9R** — cioè 6L/10R meno
-    # una destra e una sinistra, che sono esattamente la T9 e la T10 rimosse.
-    # Tre numeri che si incastrano da soli.
+    # **Quanto fissa davvero l'eliminazione: quattro righe, non tredici.** La
+    # prima stesura diceva che, inchiodate T9-T12, le sei sinistre erano
+    # esaurite e quindi il verso «non poteva sbagliare». Era **circolare**, e la
+    # verifica del 05/08 l'ha smontata contandole: con la sola eliminazione più
+    # il totale 6L/10R restano **otto** sequenze ammissibili, non una — la T15
+    # può essere sinistra o destra, e la T13 può stare in tre posti diversi.
+    # Il test che segue quel conto lo rifà, così la storia sbagliata non può
+    # tornare.
     #
-    # T13 la decidono due frasi indipendenti: F1 dice che fu modificata «to
+    # A chiudere la sequenza sono **le fonti, non l'aritmetica**, e per fortuna
+    # ce n'è una che percorre il tracciato di oggi curva per curva *e* dichiara
+    # da sé la regola di traduzione (gpfans.com/en/f1-news/1015879/):
+    # «a high-speed left-hander followed by a right-hander, now designated
+    # Turns 9 and 10 (formerly 11 and 12)». Tolte due curve, la numerazione
+    # scala di due da lì in poi e T1-T8 restano intatte; applicata all'indietro,
+    # la sua passeggiata dà i sedici versi di allora tutti quanti. La T7, che
+    # quella pagina non dichiara, la dice si.com — «a right-left at 6 and 7» —
+    # ed è anche l'unica che possa far tornare il 5L/9R di oggi.
+    #
+    # Il vincolo globale resta la corroborazione più bella, perché è stato
+    # **previsto prima di essere letto**: la ricostruzione dava 6 sinistre e 10
+    # destre, e solo dopo si è trovato «A total of 16 corners with 10 right
+    # turns and 6 left turns» (f1mix.com/circuits/albert-park). La stessa pagina
+    # dà il tracciato attuale a 14 curve, **5L/9R** — cioè 6L/10R meno una
+    # destra e una sinistra, che sono esattamente la T9 e la T10 rimosse.
+    #
+    # T13 la decidono tre frasi indipendenti: F1 dice che fu modificata «to
     # widen and move the apex, to provide increased overtaking opportunities on
-    # the approach and **under brakes**», e una guida del tracciato attuale
-    # mette la sua erede (T11 di oggi = T13 di allora) «at the end of the
-    # second-longest straight». Dei quattro candidati solo 0.788 soddisfa
-    # entrambe: r=13 m, la curva più stretta del giro, in fondo a ~690 m rotti
-    # solo da due kink con r>130 m. Gli altri tre hanno 225-350 m di rincorsa.
-    # T6 e T7 arrivano gratis da una terza guida: «a right-left at 6 and 7».
+    # the approach and **under brakes**»; una guida del tracciato attuale mette
+    # la sua erede (T11 di oggi) «at the end of the second-longest straight»; e
+    # gpfans la chiama «the once-tight entry of Turn 11». Dei quattro candidati
+    # solo 0.788 le soddisfa: r=13 m, la curva più stretta del giro, in fondo a
+    # 688 m rotti solo da due kink con r>130 m, contro i 228-349 m degli altri.
     #
     # **Una riga non è risolta e sta scritto qui**: la T8 è uno di due kink
     # piatti a destra distanti 165 m (0.399 con r=194 m, 0.430 con r=174 m), e
