@@ -228,13 +228,6 @@ PARAMS: dict[str, tuple[float, float]] = {          # key -> (max radius, min se
 #: — and the reason turned out to be about the numbering, not the names, so it
 #: is curated now. ``--check`` fails loudly if a circuit is in both places.
 HELD: dict[str, str] = {
-    "montreal":
-        "14 turns published, 16 features in the trace, and the two guides that "
-        "describe it contradict each other exactly at T5-T7 (one has L,R,L "
-        "where the other has R,L,R). The ends are certain — T1 left, T2 Senna "
-        "right, T10 the hairpin, T11 the left kink, T12 the right kink before "
-        "the Casino straight, T13/T14 the final right-left — but a numbered "
-        "circuit is all-or-nothing, and the middle will not resolve.",
     "budapest":
         "The trace is the right layout — 4372 m against a published 4381 — so "
         "the 17 apexes against 14 turns is just the merging, as at Sepang. What "

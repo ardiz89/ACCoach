@@ -910,3 +910,85 @@ def test_a_circuit_is_never_both_curated_and_held():
     fermi = {corner_atlas.CSV_FOR[k][:-4] for k in corner_atlas.HELD}
     assert curati | fermi == tracce, f"tracce senza destino: {tracce - curati - fermi}"
     assert not (curati & fermi)
+
+
+def test_montreal_is_numbered_thirteen_of_fourteen():
+    """La T14 manca apposta, come la T15 in Bahrain: è «the left-hand exit of
+    the final chicane», e la chicane finale è più corta della separazione
+    minima (87 m qui), quindi dei suoi due elementi sopravvive un picco solo."""
+    assert [n for n, _p in trackdata._CORNERS["montreal"]] == list(range(1, 14))
+    assert 14 not in trackdata._DIRECTIONS["montreal"]
+
+
+def test_montreal_geometry_arbitrates_the_contradiction_that_held_it():
+    """Il perno, e la differenza esatta con Budapest.
+
+    Montreal era fermo perché due guide si contraddicono a T5-T7: una legge
+    L,R,L dove l'altra legge R,L,R. A Budapest una contraddizione così non si
+    poteva arbitrare — le due letture opposte facevano **entrambe** 14/14. Qui
+    no: presi per buoni la T3 destra e la T4 sinistra (che la guida contesa
+    dichiara lei stessa) e la coda forzata, la lettura con la **T7 sinistra non
+    ha nemmeno un'assegnazione ammissibile**. Non è meno probabile: è
+    impossibile su questa strada. E la seconda fonte lo dice poi a parole."""
+    from itertools import combinations
+    from pathlib import Path
+    import sys
+    root = Path(__file__).resolve().parent.parent
+    sys.path.insert(0, str(root / "tools"))
+    import corner_atlas
+
+    found, _t = corner_atlas.analyse(
+        *corner_atlas.centreline(corner_atlas.TRACKS / "Montreal.csv"), flip=True)
+    versi = [a[2][0].upper() for a in found]
+
+    def ammissibili(t5, t6, t7):
+        voluti = ["L", "R", "R", "L", t5, t6, t7, "", "", "", "", "", "R"]
+        return sum(
+            all(not voluti[k] or voluti[k] == versi[i] for k, i in enumerate(sc))
+            for sc in combinations(range(len(versi)), len(voluti)))
+
+    assert ammissibili("R", "R", "L") == 0, "la lettura con la T7 sinistra deve morire"
+    assert ammissibili("R", "L", "R") > 0, "quella scelta deve restare possibile"
+    scelta = [trackdata._DIRECTIONS["montreal"][n] for n in (5, 6, 7)]
+    assert scelta == ["right", "left", "right"]
+
+
+def test_montreals_tail_is_forced_by_counting_alone():
+    """Sei curve, sei apici: da 0.464 alla fine non c'è margine di scelta, ed è
+    l'estremo che rende arbitrabile il centro. Il tornante è la T10, e la
+    geometria lo conferma da sola: r=16 m, il più stretto di quel tratto."""
+    from pathlib import Path
+    import sys
+    root = Path(__file__).resolve().parent.parent
+    sys.path.insert(0, str(root / "tools"))
+    import corner_atlas
+
+    found, _t = corner_atlas.analyse(
+        *corner_atlas.centreline(corner_atlas.TRACKS / "Montreal.csv"), flip=True)
+    coda = [(round(f, 3), r) for f, r, _d in found if f >= 0.46]
+    assert len(coda) == 6, "sei apici per le sei curve da T8 a T13"
+    pos = dict(trackdata._CORNERS["montreal"])
+    assert [p for p, _r in coda] == [pos[n] for n in range(8, 14)]
+    assert min(coda, key=lambda x: x[1])[0] in (pos[8], pos[10])
+
+
+def test_montreals_extra_apex_is_the_kink_the_source_refuses_to_number():
+    """Quattordici apici per tredici righe: quello che avanza non e' un difetto
+    del rilevatore, e' una curva che la fonte esclude a parole — «A rise up a
+    hill and **another right kink** leads into a tricky right-left chicane».
+
+    Il risolutore lo scarta da solo, senza aver letto la frase."""
+    from pathlib import Path
+    import sys
+    root = Path(__file__).resolve().parent.parent
+    sys.path.insert(0, str(root / "tools"))
+    import corner_atlas
+
+    found, _t = corner_atlas.analyse(
+        *corner_atlas.centreline(corner_atlas.TRACKS / "Montreal.csv"), flip=True)
+    posizioni = {p for _n, p in trackdata._CORNERS["montreal"]}
+    avanzo = [(round(f, 3), r, d) for f, r, d in found if round(f, 3) not in posizioni]
+    assert len(avanzo) == 1
+    pos, raggio, verso = avanzo[0]
+    assert (pos, verso) == (0.125, "right")
+    assert raggio > 150.0, "un kink, non una curva da numerare"
