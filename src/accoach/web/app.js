@@ -139,13 +139,19 @@ async function init() {
   // archive (a lap store can be moved or cleared between two runs).
   const combo = savedCombo();
   if (combo) sel.value = combo;
+  // Prima di `loadCombo`, non dopo: `loadCombo` disegna `renderFlow`/`redraw`
+  // in modo sincrono appena il fetch risponde, e quei disegni leggono
+  // `cv.clientWidth` — che dipende dalla classe `railed` su <body>. Se
+  // scattasse dopo, il primo disegno che un pilota vede (VIEW è ancora
+  // quella di partenza marcata `active` in HTML: il caso più comune, prima
+  // visita, localStorage vuoto) sarebbe a larghezza piena, senza che nessun
+  // ridisegno lo seguisse. Se poi `showView(view)` qui sotto porta su
+  // un'altra scheda, richiama da sé `applyRailed` seguita da
+  // `redrawCurrentView()`, quindi non va ripetuta dopo.
+  applyRailed(VIEW);
   await loadCombo(JSON.parse(sel.value));
   const view = savedView();
   if (view && view !== VIEW) showView(view);
-  // Se non è scattato lo showView qui sopra, VIEW è ancora quella di partenza
-  // marcata `active` in HTML: la scheda iniziale merita lo stesso trattamento
-  // di ogni altra, non un rail che appare solo dal secondo click in poi.
-  else applyRailed(VIEW);
   // First visit: pop the tour once data is on screen (so #vmin/#debrief exist).
   if (window.HoneTour) window.HoneTour.auto(tourSteps(), "hone_tour_analysis");
 }

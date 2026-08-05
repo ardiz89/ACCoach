@@ -794,3 +794,26 @@ def test_the_starting_tab_gets_the_rail_class_without_a_click():
     block = _APPJS.split("async function init(")[1].split("\n}")[0]
     assert "applyRailed(" in block, \
         "init() non applica mai la classe railed sulla scheda di partenza"
+
+
+def test_apply_railed_toggles_the_class_it_is_named_for():
+    """L'estrazione ha spostato la verifica su "chi chiama `applyRailed`" e ha
+    lasciato scoperto il meccanismo stesso: nulla controllava più che il suo
+    corpo faccia davvero il toggle su `RAIL_VIEWS`, invece di essere una
+    funzione vuota chiamata da entrambi i posti giusti."""
+    block = _APPJS.split("function applyRailed(")[1].split("\n}")[0]
+    assert 'classList.toggle("railed", RAIL_VIEWS.indexOf(name) >= 0)' in block
+
+
+def test_init_applies_the_rail_before_the_first_draw():
+    """Il bug critico dopo il primo fix: `applyRailed` scattava in `init()`,
+    ma DOPO `await loadCombo(...)`. `loadCombo` disegna `renderFlow`/`redraw`
+    in modo sincrono non appena il fetch risponde, e quei disegni leggono
+    `cv.clientWidth` — che dipende dalla classe `railed` su <body>. Con quella
+    ancora assente il primo disegno usciva a larghezza piena; poi il rail
+    compariva senza che nulla lo seguisse a ridisegnare. Succede proprio sulla
+    prima schermata: quando la vista salvata coincide con quella di partenza
+    (o non c'è), `showView` — che ha l'ordine giusto — non scatta affatto."""
+    block = _APPJS.split("async function init(")[1].split("\n}")[0]
+    assert block.index("applyRailed(") < block.index("await loadCombo("), \
+        "applyRailed deve scattare prima del primo loadCombo, non dopo"
