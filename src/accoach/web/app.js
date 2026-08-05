@@ -1719,7 +1719,8 @@ function drawFlowChart(a, step) {
   const { ctx, w, h } = setup(cv);
   const lo = step.from, hi = step.to;
   const span = (hi - lo) || 1;
-  const X = (p) => ((p - lo) / span) * w;
+  // La proiezione condivisa, con la finestra del passo invece di `RANGE`.
+  const X = (p) => projX(p, w, { from: lo, to: hi });
 
   // The corners inside the window, so the stretch is placeable on the track.
   // The label degrades with the room available — full name, then "T7", then
@@ -2166,11 +2167,14 @@ function setup(cv) {
 // Questa è la versione del flusso, promossa a unica.
 function cornerBands(ctx, w, h, corners) {
   ctx.fillStyle = "rgba(120,140,170,0.10)";
-  for (const c of corners) ctx.fillRect(c.entry * w, 0, (c.exit - c.entry) * w, h);
+  for (const c of corners) {
+    const x0 = projX(c.entry, w);
+    ctx.fillRect(x0, 0, projX(c.exit, w) - x0, h);
+  }
   ctx.fillStyle = "rgba(255,255,255,0.35)";
   ctx.font = "10px " + UI_FONT;
   for (const c of corners) {
-    const x0 = c.entry * w, band = (c.exit - c.entry) * w;
+    const x0 = projX(c.entry, w), band = projX(c.exit, w) - x0;
     const full = c.name || "T" + (c.index + 1);
     const short = "T" + (c.index + 1);
     const label = ctx.measureText(full).width + 6 <= band ? full
@@ -2276,10 +2280,17 @@ function distanceTicks() {
   // i 100 m nessuna — e allora il `return out.length ? out : null` qui sotto
   // ricadeva sui decimi del GIRO INTERO, disegnando tacche fuori dalla finestra.
   // Sul giro intero non cambia niente: nessun giro reale sta sotto gli 800 m.
+  // I metri agli estremi della finestra, non del giro: con `RANGE` nullo sono
+  // 0 e la lunghezza, cioè esattamente il comportamento di prima.
+  const from = RANGE ? metresAt(RANGE.from) : 0;
+  const to = RANGE ? metresAt(RANGE.to) : DIST.total;
+  if (from == null || to == null || !(to > from)) return null;
+  const span = to - from;
   const step = [10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000, 5000]
-    .find((s) => DIST.total / s <= 8) || 5000;
+    .find((s) => span / s <= 8) || 5000;
   const out = [];
-  for (let v = step; v < DIST.total - step * 0.3; v += step) {
+  const first = Math.ceil((from + step * 0.3) / step) * step;
+  for (let v = first; v < to - step * 0.3; v += step) {
     out.push({ at: posAtMetres(v), m: v });
   }
   // A lap too short for even one mark keeps the tenths of a lap: a chart with no
@@ -2293,6 +2304,84 @@ function posLabel(p) {
   return m == null ? Math.round(p * 100) + "%" : Math.round(m) + " m";
 }
 
+// --- la finestra ------------------------------------------------------------
+//
+// **Una finestra, non una curva selezionata**, ed è la differenza che decide se
+// questo lavoro va rifatto o no. Modellare «la curva 4 è selezionata» come un
+// indice sembra più semplice e chiude la porta a tutto il resto: il trascinamento
+// su un tratto, un settore, «i 400 m prima della staccata». Sono tutti produttori
+// della stessa cosa — un intervallo — e se l'intervallo è il modello, ognuno di
+// loro costa mezza giornata invece di una riscrittura.
+//
+// `source` non è decorazione: serve a intitolare la finestra. «Curva 4» quando
+// arriva da un chip, «1240-1480 m» quando arriva da un trascinamento.
+//
+// La proiezione ritagliata non è nuova: era già scritta, verificata a schermo e
+// chiusa dentro `drawFlowChart`, che ritaglia da mesi per mostrare un passo alla
+// volta. Qui viene **promossa**, non riscritta, e il flusso resta il suo primo
+// consumatore — così se si rompe si rompe subito, in una vista che si guarda.
+let RANGE = null;     // {from, to, source} — null = giro intero
+
+// Con `RANGE` nullo deve dare **esattamente** `p * w`: nessun ramo separato,
+// nessuna deriva possibile sul percorso normale, che è quello che vedono tutti.
+// `win` esplicita per chi ha una finestra propria che non è `RANGE`: è il caso
+// del grafico del flusso, che ritaglia sul passo che sta spiegando. Passandogliela
+// resta il primo consumatore di questa proiezione invece di averne una sua — che
+// era il punto: se si rompe, si rompe subito e in una vista che si guarda.
+function projX(p, w, win) {
+  const r = win === undefined ? RANGE : win;
+  return r ? ((p - r.from) / ((r.to - r.from) || 1)) * w : p * w;
+}
+
+// L'inversa, per gli hover. Senza, il mirino si stacca dal dito appena zoomi:
+// sintomo confuso, causa ovvia.
+function posAtX(x, w) {
+  const q = Math.max(0, Math.min(1, x / (w || 1)));
+  return RANGE ? RANGE.from + q * (RANGE.to - RANGE.from) : q;
+}
+
+// L'unico modo di cambiare finestra, perché c'è una cosa da non dimenticare:
+// il mirino **non sopravvive** al cambio. `LAST_HOVER` è pensato per durare fra
+// un ridisegno e l'altro (ed è giusto così, vedi `redrawCurrentView`), ma se la
+// finestra si stringe attorno a un punto che ne sta fuori il mirino resta
+// incollato al bordo, indicando un posto che non è più sotto al dito.
+// La finestra di una curva, con un margine per lato.
+//
+// Il margine non è estetica: senza, l'ingresso e l'uscita cadono esattamente sul
+// bordo della tela e quello che il pilota deve giudicare — dove comincia a
+// frenare, dove riapre — resta tagliato a metà. Un quarto della curva per lato
+// tiene dentro la staccata e il tratto di lancio senza far rientrare la curva
+// accanto.
+function cornerWindow(c) {
+  if (!c) return null;
+  const pad = Math.max(0.004, (c.exit - c.entry) * 0.25);
+  return { from: Math.max(0, c.entry - pad), to: Math.min(1, c.exit + pad),
+           source: "corner", label: c.name || ("T" + (c.index + 1)) };
+}
+
+function setRange(r) {
+  RANGE = r || null;
+  if (LAST_HOVER != null && RANGE
+      && (LAST_HOVER < RANGE.from || LAST_HOVER > RANGE.to)) {
+    LAST_HOVER = null;
+  }
+}
+
+// I valori dentro la finestra, per l'autoscala.
+//
+// È il passo che porta il valore analitico: senza, zoomare su una curva lascia
+// il delta piatto in mezzo a una scala da giro intero e non hai guadagnato
+// niente. Se la finestra non contiene campioni si torna alla serie intera — una
+// scala degenere è peggio di una scala larga.
+function winVals(pos, vals) {
+  if (!RANGE || !pos) return vals;
+  const out = [];
+  for (let i = 0; i < pos.length; i++) {
+    if (pos[i] >= RANGE.from && pos[i] <= RANGE.to) out.push(vals[i]);
+  }
+  return out.length ? out : vals;
+}
+
 // Vertical hairlines along the lap, so a feature can be placed on the track
 // without counting corner bands. Where the distance is known they fall on round
 // metre marks instead of every 10%, so the gridlines and the labels agree. Only
@@ -2303,19 +2392,25 @@ function gridX(ctx, w, h, labels) {
   ctx.strokeStyle = "rgba(255,255,255,0.05)";
   ctx.lineWidth = 1;
   const ticks = distanceTicks();
+  // Il ripiego in percentuale è **del giro**: sotto finestra andrebbe fuori
+  // schermo, quindi lì si ripiega su frazioni della finestra stessa.
+  const frac = (q) => (RANGE ? RANGE.from + q * (RANGE.to - RANGE.from) : q);
   const xs = ticks ? ticks.map((k) => k.at)
-                   : [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9];
+                   : [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9].map(frac);
   for (const p of xs) {
-    const x = Math.round(p * w) + 0.5;
+    const x = Math.round(projX(p, w)) + 0.5;
     ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
   }
   if (labels) {
     ctx.font = "10px " + MONO;
     ctx.fillStyle = "rgba(255,255,255,0.4)";
     const marks = ticks ? ticks.map((k) => ({ at: k.at, s: k.m + " m" }))
-                        : [0.25, 0.5, 0.75].map((q) => ({ at: q, s: Math.round(q * 100) + "%" }));
+                        : [0.25, 0.5, 0.75].map((q) => ({
+                            at: frac(q),
+                            s: RANGE ? Math.round(frac(q) * 100) + "%"
+                                     : Math.round(q * 100) + "%" }));
     for (const k of marks) {
-      ctx.fillText(k.s, k.at * w - ctx.measureText(k.s).width / 2, h - 4);
+      ctx.fillText(k.s, projX(k.at, w) - ctx.measureText(k.s).width / 2, h - 4);
     }
   }
   ctx.restore();
@@ -2324,16 +2419,38 @@ function gridX(ctx, w, h, labels) {
 function line(ctx, w, h, pos, vals, lo, hi, color, lw) {
   ctx.beginPath();
   const span = hi - lo || 1;
+  // I punti fuori finestra si proiettano comunque e finiscono fuori dalla tela,
+  // che li ritaglia da sola: la traccia resta continua ai bordi invece di
+  // interrompersi al primo campione dentro. Ritagliare la serie serve alla
+  // *scala* (vedi `winVals`), non al disegno.
   for (let i = 0; i < pos.length; i++) {
-    const x = pos[i] * w, y = h - ((vals[i] - lo) / span) * h;
+    const x = projX(pos[i], w), y = h - ((vals[i] - lo) / span) * h;
     i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
   }
   ctx.strokeStyle = color; ctx.lineWidth = lw || 1.5; ctx.stroke();
 }
 
+// La curva in esame, accesa sopra la traccia — ma **solo se aggiunge qualcosa**.
+//
+// Quando la finestra contiene già soltanto quella curva, il velo non dice niente
+// di nuovo e non è nemmeno neutro: un ciano al 10% steso su tutta la tela sposta
+// ogni colore del grafico, e lo fa esattamente quando sei zoomato al massimo e
+// stai giudicando una sfumatura.
+//
+// La condizione è sulla **geometria**, non sull'origine della finestra: un
+// trascinamento che finisce sopra una curva riceverebbe comunque il velo se
+// guardassimo solo `source`.
+function cornerVeil(ctx, w, h, corner) {
+  if (!corner) return;
+  if (RANGE && corner.entry <= RANGE.from && corner.exit >= RANGE.to) return;
+  const x0 = projX(corner.entry, w);
+  ctx.fillStyle = "rgba(34,211,206,0.10)";
+  ctx.fillRect(x0, 0, projX(corner.exit, w) - x0, h);
+}
+
 function crosshair(ctx, w, h, cx) {
   if (cx == null) return;
-  const x = cx * w;
+  const x = projX(cx, w);
   ctx.strokeStyle = "rgba(255,255,255,0.55)"; ctx.lineWidth = 1;
   ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
 }
@@ -2362,7 +2479,7 @@ function drawDelta(a, cx) {
   const { ctx, w, h } = setup($("c-delta"));
   const d = a.review.delta;
   let m = 0.05;
-  for (const v of d.delta_s) m = Math.max(m, Math.abs(v));
+  for (const v of winVals(d.pos, d.delta_s)) m = Math.max(m, Math.abs(v));
   const tint = (c) => `rgba(${c[0]},${c[1]},${c[2]},0.10)`;
   ctx.fillStyle = tint(PAL.slow); ctx.fillRect(0, 0, w, h / 2);
   ctx.fillStyle = tint(PAL.fast); ctx.fillRect(0, h / 2, w, h / 2);
@@ -2379,7 +2496,7 @@ function drawSpeed(a, cx) {
   const { ctx, w, h } = setup($("c-speed"));
   const rv = a.review.channels, rf = a.reference.channels;
   let lo = Infinity, hi = -Infinity;
-  for (const v of rv.speed.concat(rf.speed)) { lo = Math.min(lo, v); hi = Math.max(hi, v); }
+  for (const v of winVals(rv.pos, rv.speed).concat(winVals(rf.pos, rf.speed))) { lo = Math.min(lo, v); hi = Math.max(hi, v); }
   lo = Math.floor(lo - 5); hi = Math.ceil(hi + 5);
   cornerBands(ctx, w, h, a.corners);
   gridX(ctx, w, h);
@@ -2618,7 +2735,7 @@ function electronicsBand(ctx, w, h, pos, ch, y, colour) {
   let drawing = false;
   for (let i = 0; i < ch.length; i++) {
     const on = ch[i] > 0.05;
-    const x = pos[i] * w;
+    const x = projX(pos[i], w);
     if (on && !drawing) { ctx.moveTo(x, y); drawing = true; }
     else if (on) ctx.lineTo(x, y);
     else drawing = false;
@@ -2634,8 +2751,8 @@ function drawSlip(a, cx) {
   const c = a.review.channels;
   const sf = c.slip_front || [], sr = c.slip_rear || [], pos = c.pos || [];
   let m = 0.15;
-  for (const v of sf) m = Math.max(m, Math.abs(v));
-  for (const v of sr) m = Math.max(m, Math.abs(v));
+  for (const v of winVals(pos, sf)) m = Math.max(m, Math.abs(v));
+  for (const v of winVals(pos, sr)) m = Math.max(m, Math.abs(v));
   cornerBands(ctx, w, h, a.corners);
   gridX(ctx, w, h);
   gridY(ctx, w, h, -m, m, (v) => (Math.abs(v) < 1e-9 ? "0" : v.toFixed(2)));
@@ -2680,8 +2797,8 @@ function drawYaw(a, cx) {
   // l'ampiezza che manca. Il fattore è dichiarato sotto, perché una scala
   // implicita è la stessa bugia di prima detta più piano.
   let ms = 1e-6, my = 1e-6;
-  for (const v of st) ms = Math.max(ms, Math.abs(v));
-  for (const v of yw) my = Math.max(my, Math.abs(v));
+  for (const v of winVals(pos, st)) ms = Math.max(ms, Math.abs(v));
+  for (const v of winVals(pos, yw)) my = Math.max(my, Math.abs(v));
   const k = ms / my;                       // yaw -> unità di sterzo
   cornerBands(ctx, w, h, a.corners);
   gridX(ctx, w, h);
@@ -2704,7 +2821,7 @@ function drawShift(a, cx) {
   const pos = c.pos, rpm = c.rpm || [], gear = c.gear || [];
   if (!rpm.length) return;
   let lo = Infinity, hi = -Infinity;
-  for (const v of rpm) { lo = Math.min(lo, v); hi = Math.max(hi, v); }
+  for (const v of winVals(pos, rpm)) { lo = Math.min(lo, v); hi = Math.max(hi, v); }
   if (hi === lo) hi = lo + 1;
   const pad = (hi - lo) * 0.1; lo -= pad; hi += pad;
   cornerBands(ctx, w, h, a.corners);
@@ -2715,7 +2832,7 @@ function drawShift(a, cx) {
   for (let i = 1; i < gear.length; i++) {
     const g0 = gnum(gear[i - 1]), g1 = gnum(gear[i]);
     if (g0 == null || g1 == null || g0 === g1) continue;
-    const x = pos[i] * w, up = g1 > g0, y = up ? 10 : h - 4;
+    const x = projX(pos[i], w), up = g1 > g0, y = up ? 10 : h - 4;
     ctx.fillStyle = up ? "#22D3CE" : "#FFB020";
     ctx.beginPath();
     if (up) { ctx.moveTo(x, y - 6); ctx.lineTo(x - 4, y); ctx.lineTo(x + 4, y); }
@@ -3043,17 +3160,28 @@ function renderLine(cx) {
     item(t("line.worst"), `${lap.max_off_m.toFixed(1)} m`, lap.max_off_where) +
     item(t("line.corners"), L.corners.length);
 
+  // «Tutto il giro» è il primo chip e non uno stato assente: finché la finestra
+  // non esiste il pilota deve poterci tornare con lo stesso gesto con cui ne è
+  // uscito, e uno stato che si raggiunge solo deselezionando non si trova.
   $("line-chips").innerHTML =
+    `<button type="button" class="chip${RANGE ? "" : " on"}" data-whole="1">` +
+    `${t("line.whole")}</button>` +
     L.corners.map((c, i) =>
-      `<button type="button" class="chip${i === LINE_I ? " on" : ""}" data-i="${i}">` +
+      `<button type="button" class="chip${RANGE && i === LINE_I ? " on" : ""}" data-i="${i}">` +
       `T${c.index + 1}</button>`).join("") +
     `<span class="chip-group"><span class="chip-label">${t("line.mag")}</span>` +
     [1, 3].map((z) =>
       `<button type="button" class="chip mag${z === LINE_MAG ? " on" : ""}" ` +
       `data-mag="${z}">×${z}</button>`).join("") + `</span>`;
   for (const b of $("line-chips").querySelectorAll(".chip[data-i]")) {
-    b.onclick = () => { LINE_I = parseInt(b.dataset.i, 10); renderLine(null); };
+    b.onclick = () => {
+      LINE_I = parseInt(b.dataset.i, 10);
+      setRange(cornerWindow(L.corners[LINE_I]));
+      renderLine(null);
+    };
   }
+  const whole = $("line-chips").querySelector(".chip[data-whole]");
+  if (whole) whole.onclick = () => { setRange(null); renderLine(null); };
   for (const b of $("line-chips").querySelectorAll(".chip[data-mag]")) {
     b.onclick = () => { LINE_MAG = parseInt(b.dataset.mag, 10); renderLine(null); };
   }
@@ -3724,11 +3852,9 @@ function drawOffsetTrace(L, corner, cx) {
   const pos = DATA && DATA.review && DATA.review.channels.pos;
   if (!Array.isArray(off) || !off.length) return;
   let m = 1.0;
-  for (const v of off) m = Math.max(m, Math.abs(v));
+  for (const v of winVals(pos, off)) m = Math.max(m, Math.abs(v));
   cornerBands(ctx, w, h, (DATA && DATA.corners) || []);
-  // The corner on screen, lit up: the trace and the zoom are the same corner.
-  ctx.fillStyle = "rgba(34,211,206,0.10)";
-  ctx.fillRect(corner.entry * w, 0, (corner.exit - corner.entry) * w, h);
+  cornerVeil(ctx, w, h, corner);
   gridX(ctx, w, h);
   gridY(ctx, w, h, -m, m, (v) => fixz(v, 1) + " m");
   ctx.strokeStyle = "rgba(255,255,255,0.3)";
@@ -3751,8 +3877,7 @@ function drawCurvature(L, corner, cx) {
   const all = you.k.concat(ref.k).map(Math.abs).sort((a, b) => a - b);
   const m = Math.max(0.002, all[Math.floor(all.length * 0.98)] || 0.01);
   cornerBands(ctx, w, h, (DATA && DATA.corners) || []);
-  ctx.fillStyle = "rgba(34,211,206,0.10)";
-  ctx.fillRect(corner.entry * w, 0, (corner.exit - corner.entry) * w, h);
+  cornerVeil(ctx, w, h, corner);
   gridX(ctx, w, h, true);   // the bottom chart of the Trajectory stack: label it
   // Gridlines with no scale on purpose: curvature is in 1/m, which nobody feels,
   // and labelling the ticks with the radius they stand for prints the same two
@@ -3813,7 +3938,11 @@ function readoutHTML(a, p) {
   const iv = nearest(rv.pos, p), ir = nearest(rf.pos, p), id = nearest(d.pos, p);
   const yv = rv.speed[iv], rfv = rf.speed[ir], dv = yv - rfv, dl = d.delta_s[id];
   const corner = (a.corners || []).find((c) => p >= c.entry && p <= c.exit);
-  const where = corner ? `<b class="muted">${corner.name}</b> &nbsp;·&nbsp; ` : "";
+  // Non ripetere il nome che la pastiglia della finestra ha già detto due
+  // centimetri più a sinistra: «Curva 1 ✕ · Curva 1 · Pos 1294 m» è esattamente
+  // il tipo di eco che rende la pagina più lunga senza dire niente di nuovo.
+  const named = RANGE && RANGE.label && corner && RANGE.label === corner.name;
+  const where = corner && !named ? `<b class="muted">${corner.name}</b> &nbsp;·&nbsp; ` : "";
   return where +
     `<b>${t("ro.pos")} ${posLabel(p)}</b> &nbsp;·&nbsp; ` +
     `${t("ro.speed")} <b>${yv.toFixed(0)}</b> <span class="muted">(${t("ro.ref")} ${rfv.toFixed(0)}, ${dv >= 0 ? "+" : ""}${dv.toFixed(0)})</span> &nbsp;·&nbsp; ` +
@@ -3832,16 +3961,42 @@ function readoutHTML(a, p) {
 // È il comportamento di i2: l'ultimo punto resta, smorzato, finché non ne
 // scegli un altro. Il suggerimento si vede solo finché non hai mai passato il
 // mouse, che è l'unico momento in cui serve davvero.
+// L'etichetta della finestra, con la via d'uscita accanto.
+//
+// Serve perché la finestra è **globale**: la imposti in Traiettoria e anche
+// Confronto e Dinamica si ritagliano. Senza un'etichetta il pilota si ritrova i
+// grafici zoomati su una scheda dove non ha toccato niente, e senza il bottone
+// non ha modo di tornare indietro se non ripassando da dove era partito. Una
+// modalità che non si annuncia e non si annulla è una trappola, non una
+// funzione.
+function rangeChip() {
+  if (!RANGE) return "";
+  const from = metresAt(RANGE.from), to = metresAt(RANGE.to);
+  const what = RANGE.source === "corner" && RANGE.label ? RANGE.label
+             : from != null && to != null
+               ? `${Math.round(from)}–${Math.round(to)} m`
+               : `${Math.round(RANGE.from * 100)}–${Math.round(RANGE.to * 100)}%`;
+  return `<span class="range-chip"><b>${what}</b>` +
+         `<button type="button" id="range-clear" title="${t("range.clear")}">✕</button>` +
+         `</span> &nbsp;·&nbsp; `;
+}
+
 function updateReadout(a, p) {
   const el = $("readout");
+  const chip = rangeChip();
+  const wire = () => {
+    const b = $("range-clear");
+    if (b) b.onclick = () => { setRange(null); redrawCurrentView(); };
+  };
   if (p == null) {
-    if (LAST_HOVER == null) { el.innerHTML = t("readout.hint"); return; }
+    if (LAST_HOVER == null) { el.innerHTML = chip + t("readout.hint"); wire(); return; }
     el.classList.add("frozen");           // il valore resta, spento
     return;
   }
   LAST_HOVER = p;
   el.classList.remove("frozen");
-  el.innerHTML = readoutHTML(a, p);
+  el.innerHTML = chip + readoutHTML(a, p);
+  wire();
 }
 
 function wireHover() {
@@ -3850,7 +4005,7 @@ function wireHover() {
   const canvases = ["c-delta", "c-speed", "c-inputs", "c-steer"].map($);
   const onMove = (e) => {
     const rect = canvases[0].getBoundingClientRect();
-    const p = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    const p = posAtX(e.clientX - rect.left, rect.width);
     redraw(p);
   };
   const onLeave = () => redraw(null);
@@ -3917,7 +4072,7 @@ function wireHover() {
     cv.addEventListener("mousemove", (e) => {
       if (!DATA) return;
       const rect = cv.getBoundingClientRect();
-      const p = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+      const p = posAtX(e.clientX - rect.left, rect.width);
       drawDynamics(p);
     });
     cv.addEventListener("mouseleave", () => { if (DATA) drawDynamics(null); });
@@ -3963,7 +4118,7 @@ function wireHover() {
     cv.addEventListener("mousemove", (e) => {
       if (!LINE) return;
       const rect = cv.getBoundingClientRect();
-      renderLine(Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width)));
+      renderLine(posAtX(e.clientX - rect.left, rect.width));
     });
     cv.addEventListener("mouseleave", () => { if (LINE) renderLine(null); });
   }

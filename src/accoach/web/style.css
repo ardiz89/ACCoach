@@ -233,6 +233,22 @@ select {
 /* Il valore congelato quando il mouse esce dal grafico: c'è ancora, ma dice
    che non è più il punto sotto al dito. */
 .readout.frozen { opacity: 0.6; }
+/* La finestra attiva, con la sua via d'uscita. Sta nella barra readout perché è
+   l'unica fascia presente su tutte le schede che hanno un asse posizione — e
+   perché la finestra è globale: senza un'etichetta qui, un pilota che l'ha
+   impostata in Traiettoria trova Confronto zoomato e non sa da dove. */
+.range-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 1px 4px 1px 8px; border-radius: 999px;
+  border: 1px solid var(--cyan); color: var(--cyan);
+  background: color-mix(in srgb, var(--cyan) 12%, transparent);
+}
+.range-chip b { color: var(--cyan); font-weight: 600; }
+.range-chip button {
+  background: transparent; border: 0; color: inherit; cursor: pointer;
+  font-size: 12px; line-height: 1; padding: 2px 4px; border-radius: 999px;
+}
+.range-chip button:hover { background: color-mix(in srgb, var(--cyan) 25%, transparent); }
 .readout b { color: var(--text); }
 .readout .muted { color: var(--muted); }
 .readout .slower { color: var(--red); }
