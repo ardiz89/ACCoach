@@ -1117,3 +1117,35 @@ def test_the_rail_is_hidden_when_printing():
     assert "#rail" in block, "il rail non è fra gli elementi nascosti in stampa"
     assert ".stage { display: block; }" in block, \
         "senza .stage a blocco il resto della pagina resta stretto in stampa"
+
+
+# --- la pastiglia mancava a riposo sulla Mappa (2026-08-05, seconda ondata) -
+
+def test_the_map_readout_legend_is_never_written_without_its_chip():
+    """`MAP_READOUT_DEFAULT()` è la legenda a riposo della Mappa. Prima di
+    questo fix veniva anteposta a mano dalla pastiglia (`rangeChip()`) in ogni
+    chiamante — e un chiamante l'aveva dimenticata (vedi il test sotto): la
+    finestra restava accesa ma la pastiglia spariva finché non si muoveva il
+    mouse. Un solo punto della chiama (`mapReadoutHTML`, che antepone sempre
+    `rangeChip()`) rende impossibile scrivere la legenda senza la pastiglia,
+    invece di fidarsi che ogni chiamante se ne ricordi."""
+    assert _APPJS.count("MAP_READOUT_DEFAULT()") == 1, \
+        "MAP_READOUT_DEFAULT() dev'essere chiamata da un solo posto (mapReadoutHTML)"
+    wrapper = _APPJS.split("function mapReadoutHTML(")[1].split("\n}")[0]
+    assert "MAP_READOUT_DEFAULT()" in wrapper
+    assert "rangeChip()" in wrapper
+
+
+def test_the_map_readout_is_written_only_inside_drawMap():
+    """`drawMap` è chiamata da tre posti (`loadCombo`, `redrawCurrentView` sul
+    ramo Mappa, `hoverTo`): prima di questo fix ognuno scriveva anche
+    `#map-readout` per conto proprio, e bastava che uno se ne dimenticasse —
+    `redrawCurrentView` disegnava la mappa al cambio scheda senza mai toccare
+    il readout, quindi la pastiglia non compariva finché non si passava da
+    `loadCombo` o da un hover vero. Scritto una sola volta, dentro `drawMap`
+    stessa, nessuno dei tre chiamanti può più dimenticarlo."""
+    assert _APPJS.count("mapReadoutHTML(") == 2, \
+        "una definizione e una sola chiamata: mapReadoutHTML deve restare interna a drawMap"
+    block = _APPJS.split("function drawMap(a, cx)")[1].split("\n}")[0]
+    assert "mapReadoutHTML(cx)" in block, \
+        "drawMap deve scrivere #map-readout da sé, non lasciarlo ai chiamanti"
