@@ -599,12 +599,16 @@ def test_the_map_labels_corners_by_the_name_everything_else_uses():
     was ignored, so the map read "T1" where hovering the same apex read "Curva
     Niki Lauda" — one screen contradicting itself. And the number was the
     detector's count on *this* lap, which is the sliding number `cornermap`
-    exists to stop."""
+    exists to stop.
+
+    The loop grew a neighbour-distance scan on 2026-08-05 (see
+    `test_the_map_label_degrades_with_the_canvas_it_is_drawn_to`), so this only
+    pins the surviving half of the original bug: the label still has to start
+    from the corner's name, not just its index."""
     fn = _APPJS[_APPJS.index("function drawMapTo"):]
     fn = fn[:fn.index("\n}\n")]
-    loop = fn[fn.index("for (const c of a.corners"):]
-    loop = loop[:loop.index("\n  }")]
-    assert "c.name" in loop, "the map is labelling corners by index again"
+    block = fn[fn.index("// Corner labels at each apex"):fn.index("// Start/finish")]
+    assert "c.name" in block, "the map is labelling corners by index again"
 
 
 # --- the two pedals on the zoomed corner (2026-08-04) ----------------------
@@ -865,3 +869,49 @@ def test_clicking_a_corner_moves_the_shared_window():
     block = _APPJS.split("function drawRailList()")[1].split("\n\nfunction")[0]
     assert "setRange(cornerWindow(" in block
     assert "setRange(null)" in block, "manca «Tutto il giro»"
+
+
+# --- il rail su un giro vero: barra e nomi (2026-08-05) ---------------------
+# Trovati misurando nel DOM un giro vero (Monza, McLaren 720S GT3, 7 curve):
+# nessuno dei due era visibile a un test statico prima che qualcuno guardasse
+# lo schermo.
+
+def test_the_rail_bar_spans_the_full_row_width():
+    """Misurato su quel giro: una colonna da 34px per una barra che rappresenta
+    un rapporto 20:1 (−4.72s contro −0.24s) lasciava quattro righe su cinque
+    sotto gli 8px, indistinguibili l'una dall'altra e dai numeri già scritti
+    accanto. Deve stare sotto il nome, a piena larghezza di riga — niente
+    scala non lineare per farcela stare in una colonna stretta."""
+    row = _rule(".rail-row {")
+    assert "34px" not in row, "la barra non deve più avere una colonna fissa stretta"
+    bar = _rule(".rail-row .bar {")
+    assert "grid-column: 1 / -1" in bar
+
+
+def test_the_rail_list_scrolls_on_its_own():
+    """`.rail` è `position: sticky`, non `fixed`: con 16-20 curve la lista
+    supera l'altezza dello schermo, e senza un proprio scorrimento le ultime
+    righe smetterebbero di essere raggiungibili una volta che la pagina ha
+    finito di scorrere."""
+    block = _rule(".rail-list {")
+    assert "overflow-y: auto" in block
+
+
+def test_the_map_label_degrades_with_the_canvas_it_is_drawn_to():
+    """`drawMapTo` scriveva sempre il nome intero accanto all'apice: sulla
+    mappa grande va bene, sul rail (220×150) sette nomi lunghi (Monza) si
+    scrivevano uno sopra l'altro. Deve degradare con lo spazio sulla tela,
+    come `cornerBands` — non ignorare la convenzione già in casa."""
+    block = _APPJS.split("function drawMapTo(")[1].split("\nfunction ")[0]
+    assert "degradeLabel(ctx, c.name" in block
+    assert 'ctx.fillText(c.name || ("T" + (c.index + 1)), X(rv.x[i]) + 6, Y(rv.z[i]) - 4)' \
+        not in block, "il fillText incondizionato non deve tornare"
+
+
+def test_corner_bands_and_the_map_share_one_label_threshold():
+    """Due soglie diverse per «nome intero, poi T7, poi niente» divergerebbero
+    silenziosamente il giorno che una delle due cambia margine. `cornerBands`
+    e `drawMapTo` devono chiamare la stessa funzione, non una copia."""
+    assert "function degradeLabel(" in _APPJS
+    bands = _APPJS.split("function cornerBands(")[1].split("\n}")[0]
+    assert "degradeLabel(ctx" in bands

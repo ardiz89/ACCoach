@@ -291,10 +291,18 @@ body:not(.railed) .rail { display: none; }
 .rail-map canvas { width: 100%; height: 150px; cursor: crosshair; display: block; }
 .rail-nomap { font-size: 11px; color: var(--muted); line-height: 1.5; padding: 8px 0; }
 
-.rail-list { display: flex; flex-direction: column; gap: 2px; margin-top: 10px; }
+/* Con 16-20 curve la lista supera l'altezza dello schermo, e `.rail` è
+   `position: sticky` — non `fixed`: senza un proprio scorrimento le ultime
+   righe smetterebbero di raggiungersi appena la pagina finisce di scorrere.
+   La mappa sopra resta sempre intera; è solo la lista sotto a scorrere, cosí
+   il "dove sono" non sparisce mai dallo schermo. */
+.rail-list {
+  display: flex; flex-direction: column; gap: 2px; margin-top: 10px;
+  max-height: calc(100vh - 220px); overflow-y: auto;
+}
 .rail-row {
-  display: grid; grid-template-columns: 26px 1fr 34px auto;
-  align-items: center; gap: 6px;
+  display: grid; grid-template-columns: 26px 1fr auto;
+  align-items: center; gap: 2px 6px;
   background: transparent; border: 0; border-radius: 8px;
   padding: 5px 6px; text-align: left; cursor: pointer;
   color: var(--muted); font-family: var(--font-ui); font-size: 12px;
@@ -303,11 +311,20 @@ body:not(.railed) .rail { display: none; }
 .rail-row.on { background: var(--inset); color: var(--text); }
 .rail-row.whole { grid-template-columns: 1fr; font-weight: 600; margin-bottom: 4px; }
 .rail-row.cold { grid-template-columns: 26px 1fr; }
-.rail-row .n { font-family: var(--font-mono); font-size: 11px; opacity: .7; }
-.rail-row .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.rail-row .bar { height: 6px; background: var(--inset); border-radius: 999px; overflow: hidden; }
+.rail-row .n { grid-column: 1; grid-row: 1; font-family: var(--font-mono); font-size: 11px; opacity: .7; }
+.rail-row .nm { grid-column: 2; grid-row: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rail-row .s { grid-column: 3; grid-row: 1; font-family: var(--font-mono); font-size: 11px; }
+/* La barra a piena riga (~200px), non più in una colonna da 34px: lì un
+   rapporto 20:1 fra la curva peggiore e la più piccola perdita visibile
+   finiva tutto sotto gli 8px e il confronto spariva — misurato su un giro
+   vero (Monza, McLaren 720S GT3). Nessuna scala non lineare per farcelo
+   stare: l'onestà è nella larghezza disponibile, non in una formula che
+   comprime i numeri piccoli verso i grandi. */
+.rail-row .bar {
+  grid-column: 1 / -1; grid-row: 2; height: 6px; margin-top: 2px;
+  background: var(--inset); border-radius: 999px; overflow: hidden;
+}
 .rail-row .fill { display: block; height: 100%; border-radius: 999px; }
-.rail-row .s { font-family: var(--font-mono); font-size: 11px; }
 .rail-sep {
   font-size: 10px; text-transform: uppercase; letter-spacing: .06em;
   color: var(--muted); opacity: .7; padding: 10px 6px 4px;

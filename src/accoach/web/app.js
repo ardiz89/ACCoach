@@ -1299,10 +1299,27 @@ function drawMapTo(canvas, missing, a, cx, mode) {
   // the number was the detector's count of what it found on *this* lap, which
   // is exactly the sliding number `cornermap` exists to stop: a lap that
   // detected one corner fewer renumbered every label after it.
+  //
+  // Qui degrada come `cornerBands` (stessa `degradeLabel`), ma lo spazio non è
+  // una fascia lungo un asse: è la distanza sullo schermo al vicino più
+  // vicino. Sul rail (220×150) quella distanza crolla a pochi pixel — sette
+  // nomi di Monza si scrivevano uno sopra l'altro — mentre sulla mappa grande
+  // e su quella del flusso resta larga e la regola non tocca nulla: degrada
+  // in base allo SPAZIO sulla tela, non in base a quale canvas l'ha chiamata.
   ctx.fillStyle = "rgba(255,255,255,0.85)"; ctx.font = "11px " + UI_FONT;
-  for (const c of a.corners || []) {
+  const _corners = a.corners || [];
+  const _apex = _corners.map((c) => {
     const i = nearest(rv.pos, c.apex);
-    ctx.fillText(c.name || ("T" + (c.index + 1)), X(rv.x[i]) + 6, Y(rv.z[i]) - 4);
+    return { x: X(rv.x[i]), y: Y(rv.z[i]) };
+  });
+  for (let ci = 0; ci < _corners.length; ci++) {
+    const c = _corners[ci], p = _apex[ci];
+    let room = Infinity;
+    for (let cj = 0; cj < _apex.length; cj++) {
+      if (cj !== ci) room = Math.min(room, Math.hypot(_apex[cj].x - p.x, _apex[cj].y - p.y));
+    }
+    const label = degradeLabel(ctx, c.name || ("T" + (c.index + 1)), "T" + (c.index + 1), room);
+    if (label) ctx.fillText(label, p.x + 6, p.y - 4);
   }
 
   // Start/finish + direction of travel. A white dot with an "S/F" label (kept
@@ -2295,7 +2312,17 @@ function setup(cv) {
 // del flusso scrive il nome degradandolo. Tre convenzioni per la stessa curva
 // sulla stessa schermata: il pilota leggeva «Variante Ascari» su un disegno e
 // «T7» su quello sotto, e doveva dedurre da solo che fossero la stessa cosa.
-// Questa è la versione del flusso, promossa a unica.
+// Questa è la versione del flusso, promossa a unica — fattorizzata in
+// `degradeLabel` perché la mappa (coordinate 2D) misura lo spazio in un modo
+// diverso da un grafico lineare (una fascia lungo un asse), ma la SOGLIA con
+// cui si decide fra nome intero, «T7» e niente dev'essere la stessa soglia,
+// non una sua copia con margini propri che un domani divergono.
+function degradeLabel(ctx, full, short, avail) {
+  if (ctx.measureText(full).width + 6 <= avail) return full;
+  if (ctx.measureText(short).width + 4 <= avail) return short;
+  return null;
+}
+
 function cornerBands(ctx, w, h, corners) {
   ctx.fillStyle = "rgba(120,140,170,0.10)";
   for (const c of corners) {
@@ -2306,10 +2333,7 @@ function cornerBands(ctx, w, h, corners) {
   ctx.font = "10px " + UI_FONT;
   for (const c of corners) {
     const x0 = projX(c.entry, w), band = projX(c.exit, w) - x0;
-    const full = c.name || "T" + (c.index + 1);
-    const short = "T" + (c.index + 1);
-    const label = ctx.measureText(full).width + 6 <= band ? full
-                : ctx.measureText(short).width + 4 <= band ? short : null;
+    const label = degradeLabel(ctx, c.name || "T" + (c.index + 1), "T" + (c.index + 1), band);
     if (label) ctx.fillText(label, x0 + (band - ctx.measureText(label).width) / 2, 11);
   }
 }
