@@ -226,8 +226,8 @@ function redrawCurrentView() {
   else if (DATA) redraw(LAST_HOVER);   // compare
   // Il rail non appartiene a nessuna vista, quindi non sta in nessun ramo. Fuori
   // dallo switch è l'unico posto dove il cambio scheda e il resize lo trovano
-  // entrambi: `redrawCurrentView` è ciò che il resize chiama (debounced, riga
-  // ~4144) e ciò che `showView` chiama in coda.
+  // entrambi: `redrawCurrentView` è ciò che il gestore di resize (debounced,
+  // in fondo al file) chiama, e ciò che `showView` chiama in coda.
   drawRail();
   drawRailList();
 }
@@ -1053,7 +1053,14 @@ let RAIL_HIT = null;   // {rv, X, Y}, il trasformo schermo, per l'hover
 function drawRail(p = LAST_HOVER) {
   // Su una scheda senza rail il canvas ha larghezza zero e `setup` disegnerebbe
   // su una tela di 0 px: lavoro sprecato, e un hit test tarato su niente.
+  //
+  // La classe `railed` da sola non basta a saperlo: sotto i 1100px
+  // (style.css) `.rail` torna `display: none` per un vincolo di spazio, ma la
+  // classe sul <body> resta — dipende dalla scheda, non dalla finestra. Senza
+  // il controllo sulla larghezza vera, ogni cambio scheda e ogni resize sotto
+  // quella soglia disegnavano comunque, su una tela 0×0.
   if (!DATA || !document.body.classList.contains("railed")) return;
+  if (!$("rail") || !$("rail").offsetWidth) return;
   RAIL_HIT = drawMapTo($("c-rail"), $("rail-nomap"), DATA, p);
   if (RAIL_HIT && RANGE) railWindow(RAIL_HIT);
 }
@@ -1432,7 +1439,8 @@ async function loadCombo(combo, lapPath, baselinePath) {
   // The sheet is per car+track, not per lap: it survives a lap change and is
   // only dropped when the combo does (see the combo picker).
   if (VIEW === "map") {
-    $("map-readout").innerHTML = MAP_READOUT_DEFAULT();
+    $("map-readout").innerHTML = mapReadoutHTML(null);
+    wireRangeClear($("map-readout"));
     drawMap(a, null);
     if (!SHEET) loadBraking();
   }
@@ -3099,11 +3107,18 @@ function dynReadoutHTML(a, p) {
 }
 
 function updateDynReadout(a, p) {
-  LAST_HOVER = p;
   const el = $("dyn-readout");
   if (!el) return;
-  if (p == null) { el.innerHTML = t("dyn.readout"); return; }
-  el.innerHTML = dynReadoutHTML(a, p);
+  const chip = rangeChip();
+  // Guardia `p != null`, come in `hoverTo`: `drawDynamics(cx)` la richiama con
+  // `cx` nullo a ogni ridisegno di vista intera (cambio scheda, resize), e
+  // un'assegnazione incondizionata qui azzererebbe `LAST_HOVER` un attimo dopo
+  // che quella guardia l'aveva protetto — la scheda Dinamica non manterrebbe
+  // mai il mirino congelato.
+  if (p != null) LAST_HOVER = p;
+  if (p == null) { el.innerHTML = chip + t("dyn.readout"); wireRangeClear(el); return; }
+  el.innerHTML = chip + dynReadoutHTML(a, p);
+  wireRangeClear(el);
 }
 
 // --- your braking points --------------------------------------------------
@@ -3330,6 +3345,19 @@ function renderLine(cx) {
   if (charts) charts.classList.remove("hidden");
   LINE_I = Math.max(0, Math.min(LINE_I, L.corners.length - 1));
 
+  // Il rail sceglie una curva per NUMERO (`RANGE.corner`, il campo `index` di
+  // `/api/analysis`), la Traiettoria per POSIZIONE nel proprio elenco
+  // (`LINE_I`, indice dentro `L.corners`, da `/api/trajectory` — un elenco che
+  // può essere diverso). Quando la finestra arriva da fuori questa vista (dal
+  // rail, non da un chip qui sotto) va tradotta cercando la curva con lo
+  // stesso `index`; se non c'è — le due liste possono divergere — nessun chip
+  // finge di seguirla: la finestra resta accesa, la Traiettoria resta dov'era.
+  let railSynced = false;
+  if (RANGE && RANGE.corner != null) {
+    const pos = L.corners.findIndex((cc) => cc.index === RANGE.corner);
+    if (pos >= 0) { LINE_I = pos; railSynced = true; }
+  }
+
   const lap = L.lap;
   const item = (k, v, sub, cls) =>
     `<div class="item"><div class="k">${k}</div><div class="v ${cls || ""}">${v}</div>` +
@@ -3350,7 +3378,7 @@ function renderLine(cx) {
     `<button type="button" class="chip${RANGE ? "" : " on"}" data-whole="1">` +
     `${t("line.whole")}</button>` +
     L.corners.map((c, i) =>
-      `<button type="button" class="chip${RANGE && i === LINE_I ? " on" : ""}" data-i="${i}">` +
+      `<button type="button" class="chip${railSynced && i === LINE_I ? " on" : ""}" data-i="${i}">` +
       `T${c.index + 1}</button>`).join("") +
     `<span class="chip-group"><span class="chip-label">${t("line.mag")}</span>` +
     [1, 3].map((z) =>
@@ -3360,11 +3388,15 @@ function renderLine(cx) {
     b.onclick = () => {
       LINE_I = parseInt(b.dataset.i, 10);
       setRange(cornerWindow(L.corners[LINE_I]));
-      renderLine(null);
+      // Non renderLine(null) diretto: questa scelta aggiorna anche RANGE, e il
+      // rail — fuori da questa vista — deve accorgersene (riga accesa, mirino
+      // sulla mappa). redrawCurrentView ridisegna la Traiettoria come prima E
+      // poi il rail, invece di lasciarlo con la riga di un'altra curva accesa.
+      redrawCurrentView();
     };
   }
   const whole = $("line-chips").querySelector(".chip[data-whole]");
-  if (whole) whole.onclick = () => { setRange(null); renderLine(null); };
+  if (whole) whole.onclick = () => { setRange(null); redrawCurrentView(); };
   for (const b of $("line-chips").querySelectorAll(".chip[data-mag]")) {
     b.onclick = () => { LINE_MAG = parseInt(b.dataset.mag, 10); renderLine(null); };
   }
@@ -4083,7 +4115,8 @@ function drawCurvature(L, corner, cx) {
 function updateLineReadout(L, p) {
   const el = $("line-readout");
   if (!el) return;
-  if (p == null) { el.innerHTML = t("line.readout"); return; }
+  const chip = rangeChip();
+  if (p == null) { el.innerHTML = chip + t("line.readout"); wireRangeClear(el); return; }
   LAST_HOVER = p;
   const c = L.corners[LINE_I];
   const off = DATA && DATA.review && DATA.review.line_offset;
@@ -4103,7 +4136,8 @@ function updateLineReadout(L, p) {
     bits += ` &nbsp;·&nbsp; ${t("ro.speed")} <b>${rv.speed[iv].toFixed(0)}</b> ` +
             `<span class="muted">(${t("ro.ref")} ${rf.speed[ir].toFixed(0)})</span>`;
   }
-  el.innerHTML = bits;
+  el.innerHTML = chip + bits;
+  wireRangeClear(el);
 }
 
 // --- hover / readout ------------------------------------------------------
@@ -4160,26 +4194,39 @@ function rangeChip() {
                ? `${Math.round(from)}–${Math.round(to)} m`
                : `${Math.round(RANGE.from * 100)}–${Math.round(RANGE.to * 100)}%`;
   return `<span class="range-chip"><b>${what}</b>` +
-         `<button type="button" id="range-clear" title="${t("range.clear")}">✕</button>` +
+         `<button type="button" class="range-clear" title="${t("range.clear")}">✕</button>` +
          `</span> &nbsp;·&nbsp; `;
+}
+
+// La ✕ della pastiglia vive ora su quattro readout (Confronto, Mappa,
+// Traiettoria, Dinamica: vedi `rangeChip`). Un `id="range-clear"` ripetuto
+// funzionerebbe solo per il primo che `getElementById` incontra — gli altri
+// tre bottoni resterebbero muti. Il bottone si cerca dentro il contenitore
+// appena scritto, non con un id globale condiviso.
+function wireRangeClear(el) {
+  const b = el && el.querySelector(".range-clear");
+  if (b) b.onclick = () => { setRange(null); redrawCurrentView(); };
+}
+
+// Il readout della Mappa scrive il proprio HTML in due punti (il default al
+// caricamento del giro, l'hover) — un `mapReadoutHTML` unico evita che i due
+// finiscano per divergere su chi porta la pastiglia della finestra.
+function mapReadoutHTML(p) {
+  return rangeChip() + (p == null ? MAP_READOUT_DEFAULT() : readoutHTML(DATA, p));
 }
 
 function updateReadout(a, p) {
   const el = $("readout");
   const chip = rangeChip();
-  const wire = () => {
-    const b = $("range-clear");
-    if (b) b.onclick = () => { setRange(null); redrawCurrentView(); };
-  };
   if (p == null) {
-    if (LAST_HOVER == null) { el.innerHTML = chip + t("readout.hint"); wire(); return; }
+    if (LAST_HOVER == null) { el.innerHTML = chip + t("readout.hint"); wireRangeClear(el); return; }
     el.classList.add("frozen");           // il valore resta, spento
     return;
   }
   LAST_HOVER = p;
   el.classList.remove("frozen");
   el.innerHTML = chip + readoutHTML(a, p);
-  wire();
+  wireRangeClear(el);
 }
 
 // Il punto unico di ingresso per OGNI hover della pagina, non solo quello del
@@ -4207,7 +4254,8 @@ function hoverTo(p) {
   else if (VIEW === "line") { if (LINE) renderLine(p); }
   else if (VIEW === "map") {
     drawMap(DATA, p);
-    $("map-readout").innerHTML = p == null ? MAP_READOUT_DEFAULT() : readoutHTML(DATA, p);
+    $("map-readout").innerHTML = mapReadoutHTML(p);
+    wireRangeClear($("map-readout"));
   }
   drawRail(p);
 }

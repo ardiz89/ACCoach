@@ -905,7 +905,15 @@ body.no-data .empty { display: block; }
 }
 
 /* --- One run of laps, as it was driven ----------------------------------- */
-.session-shell { max-width: 900px; margin: 0 auto; padding: 8px 0 40px; }
+/* `--gut` qui non è il gutter di pagina: `.session-shell` è un guscio stretto
+   e centrato (900px), e i suoi figli (`.summary` per i numeri di Sessione e
+   Passo gara, `.debrief` per le gomme di Passo gara) lo usano come scorciatoia
+   per il PAVIMENTO di quella formula — `max(24px, …)` risolve sempre a 24px
+   dentro un contenitore così stretto. `.stage > .views` azzera `--gut` per il
+   gutter di pagina vero (sopra), e lo azzererebbe anche qui per eredità: senza
+   questa riga il testo di Sessione e Passo gara si allarga di 48px, perché
+   quei figli restano senza inset locale. */
+.session-shell { max-width: 900px; margin: 0 auto; padding: 8px 0 40px; --gut: 24px; }
 
 /* Same move as the flow view: on a wide screen the laps you drove and what
    changed since last time are read together, not one under the other. */
@@ -1075,11 +1083,17 @@ body.no-data .empty { display: block; }
   body { background: #fff; color: #000; }
   /* Every view panel, derived rather than listed. It used to be eight ids
      written out by hand, so a new tab printed itself under the sheet until
-     someone noticed — the same failure `showView` was already fixed for. */
+     someone noticed — the same failure `showView` was already fixed for.
+     Il rail è l'eccezione: vive fuori da ogni `[id^="view-"]` apposta (vedi il
+     commento su `.stage`), quindi la derivazione non lo trova e va spento a
+     mano — senza, la scheda frenate stampava anche la colonna da 220px con la
+     mappa e i sette bottoni, e il resto della pagina restava stretto perché
+     `.stage` è ancora `display: flex` in stampa. */
   header, .tabs, .readout, .demo-banner, .summary, .map-legend,
-  #charts, [id^="view-"], #view-map main,
+  #charts, [id^="view-"], #view-map main, #rail,
   #map-missing, .tour-help, .cb-toggle, .mini-btn { display: none !important; }
   #view-map { display: block !important; }
+  .stage { display: block; }
   #brakesheet { padding: 0; }
   #brakesheet h3 { font-size: 18px; }
   .sheet-sub, .sheet-note, .vmin-table td .muted { color: #444; }
@@ -1107,7 +1121,15 @@ body.no-data .empty { display: block; }
 
    The plan's strip sits between the gap and the steps — it is the thing that
    turns the steps from a suggestion into something with a date on it. */
-.train-shell { max-width: 820px; margin: 0 auto; padding: 8px 0 40px; }
+/* Stessa storia di `.session-shell` sopra: `--gut` qui è il pavimento locale
+   da 24px per le sette bande di questa scheda (`.plan`, `.plan-elsewhere`,
+   `.train-intro`, `.train-gap`, `.train-steps`, `.train-words`,
+   `.train-session`), non il gutter di pagina — `.stage > .views` lo
+   azzererebbe per eredità e il testo di Allenamento si allargherebbe di 48px.
+   La prova che l'inset era voluto: più avanti in questo file, sotto i 700px,
+   una media query rimette a mano `padding-left/right: 16px` proprio su
+   quelle sette classi. */
+.train-shell { max-width: 820px; margin: 0 auto; padding: 8px 0 40px; --gut: 24px; }
 .plan { padding: 12px var(--gut) 0; }
 .plan h3 { font-size: 13px; margin: 0 0 10px; display: flex; align-items: center; gap: 10px; }
 .plan-since { color: var(--muted); font-size: 12px; font-weight: 400; font-family: var(--font-ui); }
