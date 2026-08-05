@@ -4228,9 +4228,10 @@ function wireHover() {
     cv.addEventListener("mouseleave", onLeave);
   }
 
-  // Map / rail hover: the x-axis isn't position, so find the nearest track
-  // sample in screen space (transform captured when the map was drawn) and reuse
-  // its pos to drive the shared crosshair + readout.
+  // Hover di mappa e rail: l'asse x non è la posizione in pista, quindi si
+  // cerca il campione più vicino nello spazio schermo (la trasformazione
+  // catturata quando la mappa è stata disegnata) e si riusa il suo `pos` per
+  // pilotare mirino e readout condivisi.
   function nearestPos(hit, canvas, e) {
     if (!hit) return null;
     const rect = canvas.getBoundingClientRect();

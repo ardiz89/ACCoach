@@ -1040,15 +1040,16 @@ body.no-data .empty { display: block; }
 .chip-label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
 .chip.mag { padding: 5px 9px; }
 
-/* Compare's top row: the summary numbers. It used to share this row with a
-   mini-map drawn at true scale, in a second column that the map filled and the
-   summary didn't; the map lives in the rail now, so the row is the summary
-   alone, and there's no second column left to size around it. */
+/* La riga in cima a Confronto: solo il riepilogo. Divideva questo spazio con
+   una minimappa in scala reale, in una seconda colonna che la mappa riempiva
+   e il riepilogo no; la mappa vive nel rail adesso, quindi qui resta il solo
+   riepilogo — niente più seconda colonna da dimensionare intorno a qualcosa
+   che non c'è. */
 .hero { border-bottom: 1px solid var(--line); }
-/* The page gutter is paid by the row, not by `.summary` inside it: `.summary`
-   carries its own padding (var(--gut)) for the places it stands alone, and
-   applying both here would double it and misalign this band from every other
-   full-width one. */
+/* Il gutter della pagina lo paga la riga, non `.summary` al suo interno:
+   `.summary` porta già il proprio padding (var(--gut)) per quando sta da
+   sola altrove, e applicarlo anche qui lo raddoppierebbe disallineando
+   questa fascia da ogni altra a piena larghezza. */
 .hero { padding-left: var(--gut); padding-right: var(--gut); }
 .hero .summary { border-bottom: 0; padding-left: 0; padding-right: 0; }
 
