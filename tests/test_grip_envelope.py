@@ -8,6 +8,14 @@ girare — freno e curva attingono a un budget solo, non a due.
 
 L'inviluppo è misurato dal giro di riferimento, non assunto: nessuna costante per
 auto, e si adatta a mescola, benzina e stato della pista.
+
+**Revisione del 2026-08-05.** Un ingegnere di pista ha bocciato la frase, non la
+misura: diceva «non c'è una frenata più tarda da trovare», che è
+un'affermazione sul limite della *gomma* ricavata da un confronto con il
+*riferimento*. Se il riferimento non è al limite — la norma — il margine c'è e
+noi avevamo detto al pilota di smettere di cercarlo. La misura è rimasta, la
+frase è diventata condizionale, e i tre fatti che ne escono ora scelgono anche
+l'esercizio: vedi `test_training_grip_gate.py`.
 """
 import math
 from dataclasses import replace
@@ -21,6 +29,7 @@ from accoach.coaching.debrief import (
     _combined_g,
     _grip_detail,
     _grip_envelope,
+    _grip_state,
 )
 from accoach.comparison import Reference
 
@@ -28,47 +37,82 @@ import synth
 
 
 class _S:
-    """Un campione con le sole G che servono qui."""
+    """Un campione con le sole G che servono qui.
 
-    def __init__(self, g_lat, g_long):
+    `brake`/`throttle`/`t_ms` hanno un default che descrive un campione **in
+    frenata**: è il caso di cui parla questo file, e lasciarli a zero
+    significherebbe misurare la saturazione di una curva in cui nessuno frena.
+    """
+
+    def __init__(self, g_lat, g_long, brake=1.0, throttle=0.0, t_ms=0):
         self.g_lat, self.g_long = g_lat, g_long
+        self.brake, self.throttle, self.t_ms = brake, throttle, t_ms
+
+
+def _detail(inside, envelope, category, lg="it"):
+    return _grip_detail(_grip_state(inside, envelope), category, lg)
 
 
 def test_combined_g_is_the_radius_on_the_friction_circle():
     assert _combined_g(3.0, 4.0) == pytest.approx(5.0)
 
 
-def test_at_the_limit_it_says_there_is_no_later_braking_to_find():
-    """La frase che cambia il consiglio: se la gomma è satura, «frena più tardi»
-    è un'istruzione che porta nella ghiaia."""
+def test_at_the_limit_the_claim_is_relative_and_conditional():
+    """La frase che cambia il consiglio, senza promettere più della misura.
+
+    Dice che una staccata più tarda **dovrebbe uscire** dall'aderenza già
+    spesa — condizionale — e confronta con i picchi del riferimento, che è
+    quello che l'inviluppo misura davvero.
+    """
     inside = [_S(1.9, 0.4)]           # |g| ≈ 1.94 su un inviluppo di 2.0
-    out = _grip_detail(inside, 2.0, CueCategory.BRAKE_LATER, "it")
-    assert "non c'è una frenata più tarda" in out
+    out = _detail(inside, 2.0, CueCategory.BRAKE_LATER)
+    assert "riferimento nei suoi punti di picco" in out
+    assert "dovrebbe uscire" in out
+
+
+def test_it_no_longer_denies_that_a_later_brake_exists():
+    """Il difetto corretto, fissato perché non torni.
+
+    Era un salto da una misura relativa a un'affermazione assoluta sul limite
+    della gomma. Nessuna delle due lingue deve tornare a negare.
+    """
+    inside = [_S(1.9, 0.4)]
+    assert "non c'è una frenata più tarda" not in _detail(
+        inside, 2.0, CueCategory.BRAKE_LATER, "it")
+    assert "no later braking to find" not in _detail(
+        inside, 2.0, CueCategory.BRAKE_LATER, "en")
+
+
+def test_it_does_not_claim_the_reference_was_measured_here():
+    """L'inviluppo è il percentile del riferimento su **tutto il giro** (vedi
+    `_grip_envelope`), non in questa curva: la vecchia frase diceva «qui»."""
+    out = _detail([_S(1.9, 0.4)], 2.0, CueCategory.BRAKE_LATER)
+    assert "usa qui" not in out
 
 
 def test_well_below_the_limit_it_says_there_is_grip_left():
     inside = [_S(1.2, 0.3)]           # |g| ≈ 1.24 su 2.0 → 62%
-    out = _grip_detail(inside, 2.0, CueCategory.BRAKE_LATER, "it")
+    out = _detail(inside, 2.0, CueCategory.BRAKE_LATER)
     assert "rimasto carico" in out
 
 
 def test_in_between_it_claims_nothing():
     """Fra l'85% e il 95% non c'è niente di onesto da dire, quindi si tace."""
     inside = [_S(1.8, 0.0)]           # 90%
-    assert _grip_detail(inside, 2.0, CueCategory.BRAKE_LATER, "it") == ""
+    assert _detail(inside, 2.0, CueCategory.BRAKE_LATER) == ""
 
 
 def test_it_only_speaks_where_it_changes_the_advice():
     """Su «più gas in uscita» l'aderenza combinata non decide niente."""
     inside = [_S(1.95, 0.2)]
-    assert _grip_detail(inside, 2.0, CueCategory.MORE_THROTTLE, "it") == ""
-    assert _grip_detail(inside, 2.0, CueCategory.CARRY_SPEED, "it") != ""
+    assert _detail(inside, 2.0, CueCategory.MORE_THROTTLE) == ""
+    assert _detail(inside, 2.0, CueCategory.CARRY_SPEED) != ""
 
 
 def test_a_lap_without_g_data_says_nothing():
     """I giri vecchi hanno le G a zero: assenza di dato, assenza di frase."""
-    assert _grip_detail([_S(0.0, 0.0)], 2.0, CueCategory.BRAKE_LATER, "it") == ""
-    assert _grip_detail([_S(1.9, 0.4)], 0.0, CueCategory.BRAKE_LATER, "it") == ""
+    assert _detail([_S(0.0, 0.0)], 2.0, CueCategory.BRAKE_LATER) == ""
+    assert _detail([_S(1.9, 0.4)], 0.0, CueCategory.BRAKE_LATER) == ""
 
 
 # --- l'inviluppo -----------------------------------------------------------
@@ -112,7 +156,7 @@ def test_it_never_claims_more_than_all_the_grip():
     è una frase la cui risposta onesta è «il limite è approssimato».
     """
     inside = [_S(3.0, 3.0)] * 10          # ben oltre l'inviluppo
-    out = _grip_detail(inside, 2.0, CueCategory.BRAKE_LATER, "it")
+    out = _detail(inside, 2.0, CueCategory.BRAKE_LATER)
     assert "100%" in out
     for impossible in ("103%", "104%", "120%"):
         assert impossible not in out
@@ -122,5 +166,35 @@ def test_a_single_spike_in_the_corner_does_not_decide_it():
     """Stessa robustezza su entrambi i lati: un cordolo preso dentro la curva non
     deve far dire «sei al limite» a chi al limite non c'era."""
     inside = [_S(0.9, 0.1)] * 30 + [_S(3.0, 3.0)]
-    assert "non c'è una frenata più tarda" not in _grip_detail(
-        inside, 2.0, CueCategory.BRAKE_LATER, "it")
+    assert not _grip_state(inside, 2.0).at_limit
+
+
+# --- i tre fatti che scelgono l'esercizio -----------------------------------
+
+def test_saturation_is_measured_where_the_brake_bites_too():
+    """Il p95 di tutta la curva è dominato dai metri di rotazione: un pilota può
+    stare al soffitto lì e all'80% nei primi metri della staccata, e in quel caso
+    una frenata più tarda c'è eccome. Da qui il secondo fatto."""
+    # primo terzo scarico, resto al limite
+    inside = ([_S(1.0, 0.2)] * 10) + ([_S(1.9, 0.4)] * 20)
+    st = _grip_state(inside, 2.0)
+    assert st.at_limit and not st.saturated_early
+
+
+def test_saturated_from_the_first_metres_is_flagged():
+    inside = [_S(1.9, 0.4)] * 30
+    assert _grip_state(inside, 2.0).saturated_early
+
+
+def test_the_coast_before_the_brake_is_measured_and_the_one_after_is_not():
+    """Un veleggio prima del freno vuol dire che la gomma è satura *quando la
+    usi* ma non la usi abbastanza presto — lì «frena più tardi» è giusto. Un
+    sollevamento in uscita è un altro difetto con un altro esercizio, e contarlo
+    qui bloccherebbe l'esercizio su curve il cui ingresso andava bene."""
+    prima = ([_S(1.0, 0.0, brake=0.0, throttle=0.0, t_ms=t) for t in (0, 100, 200, 300, 400)]
+             + [_S(1.9, 0.4, brake=1.0, t_ms=500)])
+    assert _grip_state(prima, 2.0).coast_s == pytest.approx(0.4)
+
+    dopo = ([_S(1.9, 0.4, brake=1.0, t_ms=0)]
+            + [_S(1.0, 0.0, brake=0.0, throttle=0.0, t_ms=t) for t in (100, 200, 300, 400)])
+    assert _grip_state(dopo, 2.0).coast_s == 0.0

@@ -408,3 +408,19 @@ def test_every_side_phrase_exists_in_both_languages():
         for lang in ("en", "it"):
             got = tag_text(key, {"m": 1.4}, lang)
             assert key not in got and "1.4" in got, f"{key}/{lang}: {got!r}"
+
+
+def test_the_server_rounds_the_way_the_browser_does():
+    """Lo stesso metro non deve avere due cifre a otto righe di distanza.
+
+    `round()` di Python arrotonda alla cifra pari, `toFixed()` del browser no:
+    su un giro reale il chip diceva «5,2 m largo in uscita» e la tabella sotto
+    «Uscita 5,3 m fuori». Il numero era lo stesso (5.25), i due formattatori no.
+    """
+    from accoach.trajectory import _round_half_up
+
+    assert _round_half_up(5.25, 1) == 5.3
+    assert round(5.25, 1) == 5.2, "se questo cambia, il motivo del helper è caduto"
+    assert _round_half_up(-5.25, 1) == -5.3
+    assert _round_half_up(5.24, 1) == 5.2
+    assert _round_half_up(0.0, 1) == 0.0

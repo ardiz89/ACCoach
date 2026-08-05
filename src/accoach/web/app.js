@@ -127,6 +127,14 @@ async function init() {
     rememberView("stint");
     showView("stint");
   };
+  // E lo stesso per lo scostamento dalla traiettoria, che era disegnato due
+  // volte: qui e in Traiettoria, stesso canale e stessa scala, ma solo là la
+  // didascalia dice da che parte.
+  const goLine = $("go-line");
+  if (goLine) goLine.onclick = () => {
+    rememberView("line");
+    showView("line");
+  };
   // Pick up where you left off — but only if that car+track is still in the
   // archive (a lap store can be moved or cleared between two runs).
   const combo = savedCombo();
@@ -1586,6 +1594,14 @@ let FLOW_STEP = 0;
 
 function tf(key, vals) {
   let s = t(key);
+  // `{chiave|singolare|plurale}` sceglie la forma in base al valore di `chiave`.
+  // Serve perché senza si legge «1 giri · 1 che contano», e una sessione da un
+  // giro solo è il caso normale, non il caso limite: capita a ogni out-lap.
+  // Una chiave non passata resta tale e quale, così un errore di battitura si
+  // vede invece di scegliere in silenzio il plurale.
+  s = s.replace(/\{(\w+)\|([^|{}]*)\|([^{}]*)\}/g,
+                (whole, k, one, many) =>
+                  (k in vals ? (Number(vals[k]) === 1 ? one : many) : whole));
   for (const k in vals) s = s.split("{" + k + "}").join(vals[k]);
   return s;
 }
@@ -1812,7 +1828,7 @@ function renderSession(s) {
   if (!cur) {
     $("ses-when").textContent = "";
     $("ses-sub").textContent = "";
-    $("ses-numbers").innerHTML = `<div class="empty">${t("ses.none")}</div>`;
+    $("ses-numbers").innerHTML = `<div class="nothing">${t("ses.none")}</div>`;
     $("ses-laps").innerHTML = "";
     $("ses-changed").innerHTML = "";
     pick.innerHTML = "";
@@ -1856,7 +1872,7 @@ function renderSession(s) {
       numbers += item(t("ses.fuel"), `${cur.fuel_per_lap.toFixed(2)} L`);
     }
   } else {
-    numbers = `<div class="empty">${t("ses.nobest")}</div>`;
+    numbers = `<div class="nothing">${t("ses.nobest")}</div>`;
   }
   $("ses-numbers").innerHTML = numbers;
 
@@ -1891,7 +1907,7 @@ function renderSession(s) {
   // different evening from one where everything crept forward.
   if (!prev) {
     $("ses-changed").innerHTML =
-      `<h3>${t("ses.changed")}</h3><div class="empty">${t("ses.first")}</div>`;
+      `<h3>${t("ses.changed")}</h3><div class="nothing">${t("ses.first")}</div>`;
   } else {
     const rows = (list, cls) => list.map((x) =>
       `<div class="move ${cls}"><span class="corner">${x.label}</span>` +
@@ -1901,7 +1917,7 @@ function renderSession(s) {
     $("ses-changed").innerHTML = `<h3>${t("ses.changed")}</h3>` + (any
       ? (prev.improved.length ? `<h4>${t("ses.improved")}</h4>` + rows(prev.improved, "up") : "") +
         (prev.regressed.length ? `<h4>${t("ses.regressed")}</h4>` + rows(prev.regressed, "down") : "")
-      : `<div class="empty">${t("ses.nomoves")}</div>`);
+      : `<div class="nothing">${t("ses.nomoves")}</div>`);
   }
 }
 
@@ -1935,7 +1951,7 @@ function renderStint(s) {
   if (!cur) {
     $("st-when").textContent = "";
     $("st-sub").textContent = "";
-    $("st-numbers").innerHTML = `<div class="empty">${t("st.none")}</div>`;
+    $("st-numbers").innerHTML = `<div class="nothing">${t("st.none")}</div>`;
     $("st-laps").innerHTML = "";
     $("st-notes").innerHTML = "";
     $("tyres").classList.add("hidden");
@@ -1988,7 +2004,7 @@ function renderStint(s) {
       numbers += item(t("st.range"), String(cur.fuel.range_laps));
     }
   } else {
-    numbers = `<div class="empty">${t("st.nopace")}</div>`;
+    numbers = `<div class="nothing">${t("st.nopace")}</div>`;
   }
   $("st-numbers").innerHTML = numbers;
 
@@ -2447,7 +2463,6 @@ function drawDynamics(cx) {
   drawCoasting(DATA);
   DYN_GG = drawGG(DATA, cx);
   drawSlip(DATA, cx);
-  drawLineOffset(DATA, cx);
   drawYaw(DATA, cx);
   drawShift(DATA, cx);
   drawDynTyres(DATA, cx);
@@ -2568,6 +2583,31 @@ function drawGG(a, cx) {
 // around zero. Below zero = the axle is locking (braking); above = spinning
 // (power). Shares the position x-axis, so the crosshair lines up with the map
 // and the other traces.
+// Una barretta continua nei tratti in cui un aiuto elettronico sta intervenendo.
+// Disegnata e non scritta: la domanda a cui risponde è «dove», e un tratto
+// evidenziato la risponde senza far leggere una percentuale al pilota. Se il
+// canale non c'è (giri anteriori alla v6, o un gioco che non lo espone) non
+// disegna niente — meglio l'assenza di una barra sempre spenta, che si
+// leggerebbe come «l'elettronica non è mai intervenuta».
+function electronicsBand(ctx, w, h, pos, ch, y, colour) {
+  if (!ch || !ch.length || !pos || pos.length !== ch.length) return;
+  ctx.save();
+  ctx.strokeStyle = colour;
+  ctx.globalAlpha = 0.55;
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  let drawing = false;
+  for (let i = 0; i < ch.length; i++) {
+    const on = ch[i] > 0.05;
+    const x = pos[i] * w;
+    if (on && !drawing) { ctx.moveTo(x, y); drawing = true; }
+    else if (on) ctx.lineTo(x, y);
+    else drawing = false;
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
 function drawSlip(a, cx) {
   const cv = $("c-slip");
   if (!cv) return;
@@ -2580,34 +2620,19 @@ function drawSlip(a, cx) {
   cornerBands(ctx, w, h, a.corners);
   gridX(ctx, w, h);
   gridY(ctx, w, h, -m, m, (v) => (Math.abs(v) < 1e-9 ? "0" : v.toFixed(2)));
+  // Dove l'elettronica sta lavorando, PRIMA delle tracce, così la barretta sta
+  // sotto e non le copre. Senza, questo grafico mente per omissione: col TC
+  // attivo lo slip posteriore resta piatto perché è il TC a tenercelo, e un
+  // pilota che vede la traccia a zero conclude che ha trazione da vendere.
+  // Non è una diagnosi, è il contesto senza cui l'altra non si legge.
+  electronicsBand(ctx, w, h, pos, c.tc, h - 6, "#FFB020");
+  electronicsBand(ctx, w, h, pos, c.abs, h - 11, "#22D3CE");
   // Zero line.
   ctx.strokeStyle = "rgba(255,255,255,0.25)";
   ctx.beginPath(); ctx.moveTo(0, h / 2); ctx.lineTo(w, h / 2); ctx.stroke();
   line(ctx, w, h, pos, sr, -m, m, "#FFB020", 1.4);   // rear
   line(ctx, w, h, pos, sf, -m, m, "#22D3CE", 1.5);   // front
   axisLabel(ctx, w, h, t("dyn.slip.spin"), t("dyn.slip.lock"));
-  crosshair(ctx, w, h, cx);
-}
-
-// Line deviation: signed metres off the reference line, over the position axis.
-// Above zero = one side, below = the other — where you run wide or tight. Hidden
-// when the lap (or its reference) has no map coordinates.
-function drawLineOffset(a, cx) {
-  const wrap = $("lineoff-wrap");
-  const off = a.review.line_offset;
-  if (!wrap) return;
-  if (!Array.isArray(off) || !off.length) { wrap.classList.add("hidden"); return; }
-  wrap.classList.remove("hidden");
-  const { ctx, w, h } = setup($("c-lineoff"));
-  const pos = a.review.channels.pos;
-  let m = 1.0;
-  for (const v of off) m = Math.max(m, Math.abs(v));
-  cornerBands(ctx, w, h, a.corners);
-  gridX(ctx, w, h);
-  gridY(ctx, w, h, -m, m, (v) => fixz(v, 1) + " m");
-  ctx.strokeStyle = "rgba(255,255,255,0.25)";
-  ctx.beginPath(); ctx.moveTo(0, h / 2); ctx.lineTo(w, h / 2); ctx.stroke();
-  line(ctx, w, h, pos, off, -m, m, "#c58cff", 1.6);
   crosshair(ctx, w, h, cx);
 }
 
@@ -2621,15 +2646,30 @@ function drawYaw(a, cx) {
   const { ctx, w, h } = setup(cv);
   const c = a.review.channels;
   const pos = c.pos, st = c.steer || [], yw = c.yaw || [];
-  let ms = 0.1, my = 0.1;
+  // **Una scala sola per due tracce che il titolo dice di confrontare.**
+  //
+  // Prima ognuna era normalizzata al proprio picco. Sembra ragionevole e
+  // distrugge esattamente l'unica cosa che questo grafico esiste per mostrare:
+  // normalizzando separatamente, un giro con sottosterzo cronico — sterzo molto
+  // più grande della rotazione che ne segue — disegna due curve che si seguono
+  // benissimo. Sopravviveva solo lo sfasamento, e la frase «dovrebbero
+  // seguirsi» era falsa per costruzione.
+  //
+  // Lo sterzo è la grandezza di riferimento perché è l'input: la rotazione è
+  // portata sulla sua scala dal rapporto fra i due picchi, così a
+  // proporzionalità perfetta le tracce coincidono e ogni scostamento è
+  // l'ampiezza che manca. Il fattore è dichiarato sotto, perché una scala
+  // implicita è la stessa bugia di prima detta più piano.
+  let ms = 1e-6, my = 1e-6;
   for (const v of st) ms = Math.max(ms, Math.abs(v));
   for (const v of yw) my = Math.max(my, Math.abs(v));
+  const k = ms / my;                       // yaw -> unità di sterzo
   cornerBands(ctx, w, h, a.corners);
   gridX(ctx, w, h);
-  gridY(ctx, w, h, -my, my, () => "");
+  gridY(ctx, w, h, -ms, ms, (v) => (Math.abs(v) < 1e-9 ? "0" : v.toFixed(2)));
   ctx.strokeStyle = "rgba(255,255,255,0.25)";
   ctx.beginPath(); ctx.moveTo(0, h / 2); ctx.lineTo(w, h / 2); ctx.stroke();
-  line(ctx, w, h, pos, yw.map((v) => -v), -my, my, "#FFB020", 1.4);
+  line(ctx, w, h, pos, yw.map((v) => -v * k), -ms, ms, "#FFB020", 1.4);
   line(ctx, w, h, pos, st, -ms, ms, "#ffffff", 1.5);
   axisLabel(ctx, w, h, "left", "right");
   crosshair(ctx, w, h, cx);
@@ -3833,15 +3873,20 @@ function wireHover() {
   // Dynamics tab: the slip trace is on the position axis (same as the Compare
   // charts), the G-G scatter isn't — so slip hover reads cursor→position, while
   // G-G hover finds the nearest dot in screen space and reuses its position.
-  const slip = $("c-slip");
-  if (slip) {
-    slip.addEventListener("mousemove", (e) => {
+  // Tutte le tracce di questa scheda che stanno sull'asse posizione, non solo
+  // lo slip: `yaw` e `rpm` erano disegnate con il mirino addosso (`style.css`
+  // dà `cursor: crosshair` a ogni canvas) e non rispondevano al mouse. Una
+  // pagina che promette un gesto e non lo fa insegna a non provarlo più.
+  for (const id of ["c-slip", "c-yaw", "c-rpm"]) {
+    const cv = $(id);
+    if (!cv) continue;
+    cv.addEventListener("mousemove", (e) => {
       if (!DATA) return;
-      const rect = slip.getBoundingClientRect();
+      const rect = cv.getBoundingClientRect();
       const p = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
       drawDynamics(p);
     });
-    slip.addEventListener("mouseleave", () => { if (DATA) drawDynamics(null); });
+    cv.addEventListener("mouseleave", () => { if (DATA) drawDynamics(null); });
   }
   const gg = $("c-gg");
   if (gg) {
@@ -3876,14 +3921,17 @@ function wireHover() {
     });
     corner.addEventListener("mouseleave", () => { if (LINE) renderLine(null); });
   }
-  const offset = $("c-offset");
-  if (offset) {
-    offset.addEventListener("mousemove", (e) => {
+  // Le due tracce di questa scheda condividono l'asse posizione: erano cablate
+  // a metà, e la curvatura restava muta col mirino disegnato sopra.
+  for (const id of ["c-offset", "c-curv"]) {
+    const cv = $(id);
+    if (!cv) continue;
+    cv.addEventListener("mousemove", (e) => {
       if (!LINE) return;
-      const rect = offset.getBoundingClientRect();
+      const rect = cv.getBoundingClientRect();
       renderLine(Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width)));
     });
-    offset.addEventListener("mouseleave", () => { if (LINE) renderLine(null); });
+    cv.addEventListener("mouseleave", () => { if (LINE) renderLine(null); });
   }
 
   const ribbon = $("c-balance");

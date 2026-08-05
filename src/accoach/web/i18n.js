@@ -50,8 +50,8 @@
     "ses.which":       { en: `Session`, it: `Sessione` },
     "ses.none":        { en: `No laps recorded for this car and track yet.`,
                          it: `Nessun giro registrato per questa auto e questa pista.` },
-    "ses.sub":         { en: `{laps} laps · {valid} that count · {mins} min`,
-                         it: `{laps} giri · {valid} che contano · {mins} min` },
+    "ses.sub":         { en: `{laps} {laps|lap|laps} · {valid} that {valid|counts|count} · {mins} min`,
+                         it: `{laps} {laps|giro|giri} · {valid} che {valid|conta|contano} · {mins} min` },
     "ses.sub_temp":    { en: `track {from}° → {to}°`, it: `asfalto {from}° → {to}°` },
     "ses.best":        { en: `Best`, it: `Migliore` },
     "ses.mean":        { en: `Average`, it: `Media` },
@@ -81,8 +81,8 @@
                          it: `Nessun giro registrato per questa auto e questa pista.` },
     "st.chart":        { en: `Pace across the stint <small>(each point = a lap · faded = not running pace · the line is the fitted drift)</small>`,
                          it: `Il passo lungo lo stint <small>(ogni punto è un giro · sbiaditi = non a passo · la retta è la deriva misurata)</small>` },
-    "st.sub":          { en: `{laps} laps · {counted} at pace · {mins} min`,
-                         it: `{laps} giri · {counted} a passo · {mins} min` },
+    "st.sub":          { en: `{laps} {laps|lap|laps} · {counted} at pace · {mins} min`,
+                         it: `{laps} {laps|giro|giri} · {counted} a passo · {mins} min` },
     "st.sub_fuel":     { en: `{from} → {to} L`, it: `{from} → {to} L` },
     "st.pace":         { en: `Pace`, it: `Passo` },
     "st.best":         { en: `Best`, it: `Migliore` },
@@ -126,11 +126,15 @@
                          it: `Passa il mouse sui grafici per i valori punto per punto…` },
     "chart.gg":        { en: `Grip usage · G-G <small>(each dot = a moment · far from centre = more grip used · the ring = your peak)</small>`,
                          it: `Uso del grip · G-G <small>(ogni punto = un istante · lontano dal centro = più grip usato · l'anello = il tuo picco)</small>` },
-    "chart.slip":      { en: `Lock &amp; spin <small>(slip ratio · cyan = front, amber = rear · below 0 = locking, above = spinning)</small>`,
-                         it: `Bloccaggio e pattinamento <small>(slip ratio · ciano = ant, arancio = post · sotto 0 = bloccaggio, sopra = pattinamento)</small>` },
+    "chart.slip":      { en: `Lock &amp; spin <small>(slip ratio · cyan = front, amber = rear · below 0 = locking, above = spinning · the bar underneath = ABS/TC working)</small>`,
+                         it: `Bloccaggio e pattinamento <small>(slip ratio · ciano = ant, arancio = post · sotto 0 = bloccaggio, sopra = pattinamento · la barretta in basso = ABS/TC che intervengono)</small>` },
     "dyn.missing":     { en: `This lap has no dynamics data (G / slip were recorded from v6). Drive and record a new lap to see it here.`,
                          it: `Questo giro non ha dati di dinamica (G / slip registrati dalla v6). Guida e registra un nuovo giro per vederli qui.` },
-    "dyn.coasting":    { en: `Coasting`, it: `In folle (coasting)` },
+    // NON «in folle»: in italiano vuol dire cambio in posizione neutra, che è
+    // un'altra cosa da quella che il canale misura (né gas né freno, marcia
+    // inserita). Il termine inglese resta perché è quello che il pilota sente
+    // dire, con la glossa che dice cosa significa davvero.
+    "dyn.coasting":    { en: `Coasting`, it: `Coasting (né gas né freno)` },
     "dyn.trail":       { en: `Trail-braking`, it: `Trail-braking` },
     "dyn.gmax":        { en: `Peak grip`, it: `Grip di picco` },
     "dyn.ofLap":       { en: `of the lap`, it: `del giro` },
@@ -146,8 +150,12 @@
     "dyn.ro.lon":      { en: `lon`, it: `lon` },
     "dyn.ro.slipF":    { en: `Slip front`, it: `Slip ant` },
     "dyn.ro.slipR":    { en: `Slip rear`, it: `Slip post` },
-    "chart.lineoff":   { en: `Line deviation <small>(m off the reference line · above = one side, below = the other)</small>`,
-                         it: `Scostamento traiettoria <small>(m dalla linea di riferimento · sopra = un lato, sotto = l'altro)</small>` },
+    // Il grafico che stava in Dinamica è stato rimosso il 05/08: era lo
+    // stesso canale della Traiettoria, con una didascalia che si rifiutava
+    // di dire da che parte. Restano il rimando e il bottone.
+    "lineoff.elsewhere": { en: `Line deviation lives under Line, which also says which side.`,
+                         it: `Lo scostamento dalla traiettoria vive sotto Traiettoria, che dice anche da che parte.` },
+    "lineoff.goto":    { en: `Open Line`, it: `Apri Traiettoria` },
     "dyn.tyre.header": { en: `Tyres across this lap <small>(core temp &amp; pressure corner by corner · dashed = right side)</small>`,
                          it: `Gomme lungo questo giro <small>(temp mescola e pressione curva per curva · tratteggio = lato destro)</small>` },
     "chart.balance":   { en: `Balance ribbon <small>(racing line coloured by handling · blue = understeer, red = oversteer)</small>`,
@@ -166,7 +174,9 @@
     "chart.yaw":       { en: `Rotation vs steering <small>(orange = yaw/rotation, white = steering · they should track together)</small>`,
                          it: `Rotazione vs sterzo <small>(arancio = imbardata/rotazione, bianco = sterzo · dovrebbero seguirsi)</small>` },
     "chart.rpm":       { en: `Revs &amp; shift points <small>(rpm across the lap · ▲ = upshift, ▼ = downshift)</small>`,
-                         it: `Giri motore e cambiate <small>(rpm lungo il giro · ▲ = scalata su, ▼ = scalata giù)</small>` },
+                         // «scalata su» è una contraddizione: in italiano
+                         // scalare vuol dire già scendere di marcia.
+                         it: `Giri motore e cambiate <small>(rpm lungo il giro · ▲ = cambiata su, ▼ = scalata)</small>` },
     "wf.title":        { en: `Where the lap went <small>(time lost per corner, biggest first)</small>`,
                          it: `Dov'è finito il giro <small>(tempo perso per curva, dal peggiore)</small>` },
     "dyn.smooth":      { en: `Steering reversals`, it: `Correzioni sterzo` },
@@ -202,8 +212,8 @@
     // static sheets going round the forums don't: how many laps, which asphalt
     // temperature, and that the metres are an approximation.
     "brk.title":       { en: `Your braking points`, it: `Le tue frenate` },
-    "brk.sub":         { en: `measured on your last {laps} laps`,
-                         it: `misurate sui tuoi ultimi {laps} giri` },
+    "brk.sub":         { en: `measured on your last {laps} {laps|lap|laps}`,
+                         it: `misurate sui tuoi ultimi {laps} {laps|giro|giri}` },
     "brk.temp":        { en: `track {from}° → {to}°`, it: `asfalto {from}° → {to}°` },
     "brk.temp1":       { en: `track {from}°`, it: `asfalto {from}°` },
     "brk.noTemp":      { en: `track temperature not recorded on these laps`,
@@ -411,7 +421,7 @@
     "plan.proposed":   { en: `proposed from your recent laps — not started yet`,
                          it: `proposto dai tuoi ultimi giri — non ancora avviato` },
     "plan.since":      { en: `since {when}`, it: `dal {when}` },
-    "plan.laps_since": { en: `{n} laps since`, it: `{n} giri da allora` },
+    "plan.laps_since": { en: `{n} {n|lap|laps} since`, it: `{n} {n|giro|giri} da allora` },
     "plan.start":      { en: `Start this plan`, it: `Inizia questo piano` },
     "plan.change":     { en: `Change target`, it: `Cambia obiettivo` },
     "plan.hits":       { en: `{hits} of the {needed} laps it takes`,
@@ -431,8 +441,8 @@
     // because the wording and the rule that decides it belong together.
     "tab.training":    { en: `Training`, it: `Allenamento` },
     "train.locked":    { en: `Not enough laps yet`, it: `Non ci sono ancora abbastanza giri` },
-    "train.countdown": { en: `{n} more valid laps and this opens.`,
-                         it: `Ancora {n} giri validi e questa scheda si apre.` },
+    "train.countdown": { en: `{n} more valid {n|lap|laps} and this opens.`,
+                         it: `Ancora {n} {n|giro valido|giri validi} e questa scheda si apre.` },
     // The last lap before it opens is the one the driver is most likely to be
     // looking at, and it is exactly the one the plural got wrong.
     "train.countdown1": { en: `One more valid lap and this opens.`,
@@ -449,7 +459,7 @@
     "train.status.later": { en: `later`, it: `dopo` },
     "train.status.done":  { en: `✓ done`, it: `✓ fatto` },
     "train.session":   { en: `Your next session`, it: `La tua prossima sessione` },
-    "train.session.laps": { en: `({n} laps)`, it: `({n} giri)` },
+    "train.session.laps": { en: `({n} {n|lap|laps})`, it: `({n} {n|giro|giri})` },
     // Not "Glossary": that label tells the reader they don't know things, and
     // gets skipped by the people it exists for. The words themselves are the
     // invitation.

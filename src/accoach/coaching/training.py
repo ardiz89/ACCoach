@@ -112,6 +112,13 @@ class CornerFacts:
     # throws away the half it does have.
     brake_spread_kmh: float = 0.0
     landmark: str = ""               # something you can see, when we know one
+    # Come sta la curva contro l'inviluppo di aderenza del riferimento, così
+    # com'è misurato dal debrief (``debrief.GripState``). Non serve a stampare
+    # una riga: serve a **non prescrivere** l'esercizio sbagliato. Lasciato a
+    # ``None`` quando il giro è anteriore ai canali G, e in quel caso il
+    # cancello non scatta — che è la scelta giusta: si torna al comportamento
+    # di prima invece di bloccare un esercizio su un dato che non c'è.
+    grip: object | None = None
 
 
 # --- what the section says --------------------------------------------------
@@ -1097,7 +1104,38 @@ _BY_CATEGORY = {
 }
 
 
-def drill_key(category: str, phase: str, *, trail_brake: bool = True) -> str:
+#: Sotto questa finestra di gas-e-freno chiusi, prima della staccata, non c'è
+#: veleggio da recuperare: è il passaggio di consegne fra i due pedali.
+_COAST_BLOCKS_S = 0.2
+
+
+def brake_later_is_blocked(grip) -> bool:
+    """Se «frena più tardi» sia l'esercizio sbagliato per questa curva.
+
+    Tre condizioni insieme, e nessuna delle tre da sola basta — è il motivo per
+    cui il debrief manda tre numeri invece di un booleano (vedi
+    ``debrief.GripState``):
+
+    1. il picco di questa curva è al livello dell'inviluppo del riferimento;
+    2. **e** lo è già dove il freno morde, non solo nei metri di rotazione. Un
+       p95 su tutta la curva è dominato dalla parte laterale: un pilota può
+       stare al soffitto lì e all'80% nei primi metri della staccata, e in quel
+       caso una frenata più tarda c'è eccome;
+    3. **e** non c'è veleggio prima del freno. Se il pilota alza il gas e
+       aspetta, la gomma è satura *quando la usa* ma non la usa abbastanza
+       presto: lì «frena più tardi» è proprio il consiglio giusto.
+
+    Non implementata la quarta guardia suggerita in revisione — «il punto di
+    stacco non è già più tardi di quello del riferimento» — perché la scheda
+    curva porta la distanza di frenata del pilota e non quella del riferimento,
+    e inventarla qui significherebbe ricavare un fatto in un secondo posto.
+    """
+    return bool(grip and grip.at_limit and grip.saturated_early
+                and grip.coast_s < _COAST_BLOCKS_S)
+
+
+def drill_key(category: str, phase: str, *, trail_brake: bool = True,
+              brake_later_blocked: bool = False) -> str:
     """Which exercise this corner gets.
 
     Phase first, category second, and that order is the point: *where in the
@@ -1118,6 +1156,13 @@ def drill_key(category: str, phase: str, *, trail_brake: bool = True) -> str:
     """
     if phase == "entry":
         if category in (_C.LESS_BRAKE.value, _C.BRAKE_EARLIER.value):
+            return "brake_release" if trail_brake else "brake_straight"
+        # Con la gomma già impegnata, «frena più tardi» è l'unico dei tre
+        # esercizi d'ingresso che chiede **più aderenza totale**: gli altri due
+        # chiedono la stessa aderenza spesa meglio, che è l'unica leva che resta
+        # a saturazione. Chi trail-braina lavora sulla forma del rilascio, chi
+        # non lo fa sposta dove finisce la frenata — stessa fisica, due gesti.
+        if brake_later_blocked:
             return "brake_release" if trail_brake else "brake_straight"
         return "brake_move_later"
     if phase == "apex":
@@ -1290,7 +1335,8 @@ _BUILDERS = {
 def build_drill(category: str, phase: str, facts: CornerFacts,
                 lang: str = "it", *, trail_brake: bool = True) -> Drill:
     """The exercise for one corner, filled with that corner's own numbers."""
-    key = drill_key(category, phase, trail_brake=trail_brake)
+    key = drill_key(category, phase, trail_brake=trail_brake,
+                    brake_later_blocked=brake_later_is_blocked(facts.grip))
     return _BUILDERS[key](facts, _s(lang))
 
 

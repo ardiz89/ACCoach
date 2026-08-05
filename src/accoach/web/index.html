@@ -364,10 +364,15 @@
         <h3 data-i18n-html="chart.slip">Lock &amp; spin <small>(slip ratio · cyan = front, amber = rear · below 0 = locking, above = spinning)</small></h3>
         <canvas id="c-slip"></canvas>
       </div>
-      <div id="lineoff-wrap" class="chart hidden">
-        <h3 data-i18n-html="chart.lineoff">Line deviation <small>(m off the reference line · above = one side, below = the other)</small></h3>
-        <canvas id="c-lineoff"></canvas>
-      </div>
+      <!-- Lo scostamento dalla traiettoria stava qui, ed era lo STESSO canale
+           disegnato dalla Traiettoria con la stessa scala e lo stesso colore:
+           un duplicato letterale. Con una differenza che decideva quale
+           tenere — là la didascalia dice da che parte («sopra = alla sua
+           destra»), qui diceva «sopra = un lato, sotto = l'altro», cioè si
+           rifiutava di rispondere alla sola domanda che il grafico pone. E la
+           Traiettoria accende anche la curva selezionata. Rimosso, con il
+           rimando qui sotto: un pannello che sparisce senza puntatore si legge
+           come una funzione rotta. -->
       <div class="chart">
         <h3 data-i18n-html="chart.yaw">Rotation vs steering <small>(orange = yaw/rotation, white = steering · they should track together)</small></h3>
         <canvas id="c-yaw"></canvas>
@@ -377,6 +382,10 @@
         <canvas id="c-rpm"></canvas>
       </div>
     </main>
+    <p class="plan-elsewhere"><span data-i18n="lineoff.elsewhere">Lo scostamento
+      dalla traiettoria vive sotto Traiettoria, che dice anche da che parte.</span>
+      <button type="button" id="go-line" class="mini-btn"
+              data-i18n="lineoff.goto">Apri Traiettoria</button></p>
     <section id="dyn-tyres" class="debrief tyres hidden">
       <h3 data-i18n-html="dyn.tyre.header">Tyres across this lap <small>(core temp &amp; pressure corner by corner · dashed = right side)</small></h3>
       <div id="dyn-tyre-legend" class="tyre-legend"></div>

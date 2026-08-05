@@ -248,6 +248,13 @@ select {
 
 main { padding: 16px var(--gut); display: grid; gap: 18px; }
 .chart canvas { cursor: crosshair; }
+/* …tranne dove il mirino non c'è. Il puntatore è una promessa: darlo a un
+   grafico che non risponde al mouse insegna al pilota che il gesto non
+   funziona, e glielo insegna anche per i grafici dove funziona. Questi cinque
+   non stanno sull'asse posizione (l'ascissa è il giro, o il tempo dello stint),
+   quindi non condividono il mirino e non lo fingono. */
+#c-stint, #c-progress, #c-tyre-temp, #c-tyre-press,
+#c-dtyre-temp, #c-dtyre-press { cursor: default; }
 .chart canvas.tall { height: 240px; }
 .chart.map canvas { height: 60vh; min-height: 380px; }
 /* G-G scatter: taller and capped in width so it reads as a square-ish plot;
@@ -449,6 +456,16 @@ main { padding: 16px var(--gut); display: grid; gap: 18px; }
 }
 
 .empty { display: none; padding: 60px 24px; text-align: center; color: var(--muted); }
+/* «Qui non c'è ancora niente» DENTRO un pannello, che è un'altra cosa dal
+   «non c'è ancora niente» di tutta la pagina qui sopra.
+   Serve una classe sua e non `.empty` per il motivo scritto a `.train-gate`:
+   `.empty` è `display: none` finché la pagina intera non è senza dati, quindi
+   riusarla in un pannello **nasconde la spiegazione e lascia il titolo con il
+   vuoto sotto**. Era già successo una volta ed era già stato corretto lì; il
+   difetto è sopravvissuto in sei punti fra Sessione e Passo gara — «cosa è
+   cambiato dall'ultima volta» con niente sotto, mentre la frase che dice
+   perché stava nel DOM. Un pannello che tace si legge come rotto. */
+.nothing { padding: 4px 0; color: var(--muted); }
 /* Senza nemmeno un giro, il messaggio deve essere l'unica cosa a schermo.
    Nascondeva solo `main`, e restavano: otto schede che al clic non fanno niente
    (l'`init()` esce prima di collegarle), tre tendine vuote, la fascia del giro,
@@ -495,9 +512,18 @@ body.no-data .empty { display: block; }
 .secbar .fill { position: absolute; top: 3px; bottom: 3px; border-radius: 3px; }
 .secbar .fill.slow { background: var(--red); }
 .secbar .fill.fast { background: var(--green); }
+/* La pastiglia scura non è decorazione: senza, questo numero è illeggibile
+   ESATTAMENTE sul settore che conta. Le barre sono scalate al delta peggiore
+   (`app.js`, `w = min(|d|/mx, 1) * 50`), quindi la barra del settore peggiore
+   arriva sempre al bordo destro — e la cifra sta a `right: 8px` colorata come
+   il riempimento che ha sotto. Rosso su rosso, per costruzione, sempre sul
+   settore dove hai perso di più. Stessa soluzione già usata dalle etichette
+   dell'asse y nei grafici. */
 .secbar .secd {
   position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
   font-size: 12px; font-family: var(--font-mono); font-variant-numeric: tabular-nums;
+  background: color-mix(in srgb, var(--bg) 82%, transparent);
+  padding: 1px 5px; border-radius: 4px;
 }
 .secbar .secd.slower { color: var(--red); }
 .secbar .secd.faster { color: var(--green); }
@@ -914,7 +940,9 @@ body.no-data .empty { display: block; }
 .move.up .amount { color: var(--green); }
 .move.down .amount { color: var(--red); }
 .move .why { color: var(--muted); font-size: 13px; }
-.session-changed .empty, .session-shell .empty { color: var(--muted); padding: 4px 0; }
+/* Restava a puntare `.empty`, che in un pannello non si vede mai: ora la regola
+   è dentro `.nothing` e questa serve solo se una di quelle frasi cresce. */
+.session-changed .nothing, .session-shell .nothing { padding: 4px 0; }
 
 @media (max-width: 700px) {
   .ses-lap { grid-template-columns: 76px 1fr; }

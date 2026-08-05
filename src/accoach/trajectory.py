@@ -396,6 +396,26 @@ def apex_plateau(points: list[LinePoint], lo: float, hi: float,
     return (min(inside), max(inside)) if inside else None
 
 
+def _round_half_up(value: float, digits: int = 1) -> float:
+    """Arrotonda come fa il browser, non come fa Python.
+
+    `round()` in Python arrotonda alla cifra pari: `round(5.25, 1)` dà **5.2**.
+    `toFixed(1)` in JavaScript dà **5.3**. Sulla stessa schermata la Traiettoria
+    scriveva «5,2 m largo in uscita» nel chip (scritto qui) e «Uscita 5,3 m
+    fuori» nella tabella otto righe sotto (formattata nel browser): due valori
+    per lo stesso metro, e il pilota che se ne accorge smette di fidarsi anche
+    dei numeri giusti.
+
+    Il verso della correzione è quello: il server si allinea al browser, perché
+    metà dei numeri di questa pagina sono formattati là e non hanno un
+    equivalente qui.
+    """
+    from decimal import ROUND_HALF_UP, Decimal
+
+    q = Decimal(1).scaleb(-digits)
+    return float(Decimal(repr(value)).quantize(q, rounding=ROUND_HALF_UP))
+
+
 def _tags(c: CornerLine) -> list[tuple[str, dict]]:
     """Geometric facts about this corner, biggest first, at most three.
 
@@ -429,7 +449,8 @@ def _tags(c: CornerLine) -> list[tuple[str, dict]]:
         else:
             # Nessun interno da nominare: il segno grezzo è il lato della linea.
             word = "right_" if value > 0 else "left_"
-        add(abs(value) / _MIN_OFFSET_M, word + where, m=abs(round(value, 1)))
+        add(abs(value) / _MIN_OFFSET_M, word + where,
+            m=abs(_round_half_up(value, 1)))
     if abs(c.extra_m) >= _MIN_EXTRA_M:
         add(abs(c.extra_m) / _MIN_EXTRA_M,
             "longer_line" if c.extra_m > 0 else "shorter_line",
