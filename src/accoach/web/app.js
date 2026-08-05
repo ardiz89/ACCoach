@@ -1046,11 +1046,15 @@ function drawMap(a, cx) {
 // grafico che stai già guardando. La finestra si legge come un tratto acceso.
 let RAIL_HIT = null;   // {rv, X, Y}, il trasformo schermo, per l'hover
 
-function drawRail() {
+// `p` di default è `LAST_HOVER`: chi ridisegna la vista intera (cambio scheda,
+// resize, nuovo giro) non ha un punto fresco in mano e vuole l'ultimo noto. Chi
+// invece risponde a un hover vero (`hoverTo`) passa il punto esplicito — così il
+// mirino del rail non dipende dall'ordine in cui `LAST_HOVER` viene scritto.
+function drawRail(p = LAST_HOVER) {
   // Su una scheda senza rail il canvas ha larghezza zero e `setup` disegnerebbe
   // su una tela di 0 px: lavoro sprecato, e un hit test tarato su niente.
   if (!DATA || !document.body.classList.contains("railed")) return;
-  RAIL_HIT = drawMapTo($("c-rail"), $("rail-nomap"), DATA, LAST_HOVER);
+  RAIL_HIT = drawMapTo($("c-rail"), $("rail-nomap"), DATA, p);
   if (RAIL_HIT && RANGE) railWindow(RAIL_HIT);
 }
 
@@ -4178,10 +4182,13 @@ function updateReadout(a, p) {
   wire();
 }
 
-// Dove va a finire un mirino mosso dal rail. Il rail vive su sei schede e ognuna
-// ha un modo diverso di mostrare «sei qui»; senza questo instradamento servirebbe
-// un `if` per scheda dentro l'handler, ed è così che l'hover della minimappa era
-// finito cablato alla sola vista Confronto.
+// Il punto unico di ingresso per OGNI hover della pagina, non solo quello del
+// rail: ogni scheda ha un modo diverso di mostrare «sei qui», e con un rail che
+// vive su sei schede senza questo instradamento servirebbe un `if` per scheda
+// dentro ciascun gestore. Così era nata la minimappa cablata alla sola vista
+// Confronto — e così, se un gestore chiamasse di nuovo la funzione di vista
+// direttamente invece che passare da qui, il rail tornerebbe a essere a senso
+// unico: sorgente di mirino ma mai destinazione.
 //
 // Le schede senza un consumatore di mirino (il flusso guidato, i settori) non
 // fanno NIENTE, di proposito: il rail muove il proprio marcatore e basta. Meglio
@@ -4189,7 +4196,12 @@ function updateReadout(a, p) {
 // schermo.
 function hoverTo(p) {
   if (!DATA) return;
-  LAST_HOVER = p;
+  // Solo su un punto vero: `updateReadout` (vista Confronto) confronta
+  // `LAST_HOVER` con `null` per decidere se il readout va congelato (l'ultimo
+  // valore, spento) o svuotato al suggerimento — e quel confronto vale solo se
+  // qui non lo si azzera già in anticipo. Uscire dal rail deve congelare il
+  // readout esattamente come uscire dai grafici, non cancellarlo.
+  if (p != null) LAST_HOVER = p;
   if (VIEW === "compare") redraw(p);
   else if (VIEW === "dynamics") drawDynamics(p);
   else if (VIEW === "line") { if (LINE) renderLine(p); }
@@ -4197,7 +4209,7 @@ function hoverTo(p) {
     drawMap(DATA, p);
     $("map-readout").innerHTML = p == null ? MAP_READOUT_DEFAULT() : readoutHTML(DATA, p);
   }
-  drawRail();
+  drawRail(p);
 }
 
 function wireHover() {
@@ -4207,16 +4219,16 @@ function wireHover() {
   const onMove = (e) => {
     const rect = canvases[0].getBoundingClientRect();
     const p = posAtX(e.clientX - rect.left, rect.width);
-    redraw(p);
+    hoverTo(p);
   };
-  const onLeave = () => redraw(null);
+  const onLeave = () => hoverTo(null);
   for (const cv of canvases) {
     if (!cv) continue;
     cv.addEventListener("mousemove", onMove);
     cv.addEventListener("mouseleave", onLeave);
   }
 
-  // Map / mini-map hover: the x-axis isn't position, so find the nearest track
+  // Map / rail hover: the x-axis isn't position, so find the nearest track
   // sample in screen space (transform captured when the map was drawn) and reuse
   // its pos to drive the shared crosshair + readout.
   function nearestPos(hit, canvas, e) {
@@ -4238,14 +4250,9 @@ function wireHover() {
     map.addEventListener("mousemove", (e) => {
       if (!DATA) return;
       const p = nearestPos(MAP_HIT, map, e);
-      if (p == null) return;
-      drawMap(DATA, p);
-      $("map-readout").innerHTML = readoutHTML(DATA, p);
+      if (p != null) hoverTo(p);
     });
-    map.addEventListener("mouseleave", () => {
-      $("map-readout").innerHTML = MAP_READOUT_DEFAULT();
-      if (DATA) drawMap(DATA, null);
-    });
+    map.addEventListener("mouseleave", () => hoverTo(null));
   }
 
   // Il rail: stesso gesto della vecchia minimappa di Confronto, ma su sei schede
@@ -4274,9 +4281,9 @@ function wireHover() {
       if (!DATA) return;
       const rect = cv.getBoundingClientRect();
       const p = posAtX(e.clientX - rect.left, rect.width);
-      drawDynamics(p);
+      hoverTo(p);
     });
-    cv.addEventListener("mouseleave", () => { if (DATA) drawDynamics(null); });
+    cv.addEventListener("mouseleave", () => { if (DATA) hoverTo(null); });
   }
   const gg = $("c-gg");
   if (gg) {
@@ -4290,9 +4297,9 @@ function wireHover() {
         const dx = pts[i].px - mx, dy = pts[i].py - my, dd = dx * dx + dy * dy;
         if (dd < bd) { bd = dd; best = i; }
       }
-      if (best >= 0) drawDynamics(pts[best].pos);
+      if (best >= 0) hoverTo(pts[best].pos);
     });
-    gg.addEventListener("mouseleave", () => { if (DATA) drawDynamics(null); });
+    gg.addEventListener("mouseleave", () => { if (DATA) hoverTo(null); });
   }
   // The zoomed corner: x isn't track position, so find the nearest point of
   // your line in screen space and reuse its position, like the map does.
@@ -4307,9 +4314,9 @@ function wireHover() {
         const dx = LINE_HIT.X(i) - mx, dy = LINE_HIT.Y(i) - my, dd = dx * dx + dy * dy;
         if (dd < bd) { bd = dd; best = i; }
       }
-      if (best >= 0) renderLine(LINE_HIT.pos[best]);
+      if (best >= 0) hoverTo(LINE_HIT.pos[best]);
     });
-    corner.addEventListener("mouseleave", () => { if (LINE) renderLine(null); });
+    corner.addEventListener("mouseleave", () => { if (LINE) hoverTo(null); });
   }
   // Le due tracce di questa scheda condividono l'asse posizione: erano cablate
   // a metà, e la curvatura restava muta col mirino disegnato sopra.
@@ -4319,9 +4326,9 @@ function wireHover() {
     cv.addEventListener("mousemove", (e) => {
       if (!LINE) return;
       const rect = cv.getBoundingClientRect();
-      renderLine(posAtX(e.clientX - rect.left, rect.width));
+      hoverTo(posAtX(e.clientX - rect.left, rect.width));
     });
-    cv.addEventListener("mouseleave", () => { if (LINE) renderLine(null); });
+    cv.addEventListener("mouseleave", () => { if (LINE) hoverTo(null); });
   }
 
   const ribbon = $("c-balance");
@@ -4329,9 +4336,9 @@ function wireHover() {
     ribbon.addEventListener("mousemove", (e) => {
       if (!DATA) return;
       const p = nearestPos(DYN_BAL_HIT, ribbon, e);
-      if (p != null) drawDynamics(p);
+      if (p != null) hoverTo(p);
     });
-    ribbon.addEventListener("mouseleave", () => { if (DATA) drawDynamics(null); });
+    ribbon.addEventListener("mouseleave", () => { if (DATA) hoverTo(null); });
   }
 }
 

@@ -1040,24 +1040,17 @@ body.no-data .empty { display: block; }
 .chip-label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
 .chip.mag { padding: 5px 9px; }
 
-/* Compare's top row: the numbers on the left, the shape of the lap on the right.
-   The mini-map is drawn to true proportions, so on a full-width row a track that
-   isn't square leaves most of it empty — beside the summary it fills its box and
-   the fold gets one screen more of the charts people came for. */
-.hero {
-  display: grid; grid-template-columns: minmax(0, 1fr) 360px;
-  gap: 18px; align-items: center;
-  border-bottom: 1px solid var(--line);
-}
-/* The page gutter is paid by the row, not by the mini map inside it: --gut is a
-   percentage of the element's own containing block, so on a 360px column it
-   collapses to the 24px floor and the map hangs off the edge of the column every
-   other band lines up with. Full-width parent, correct gutter. */
+/* Compare's top row: the summary numbers. It used to share this row with a
+   mini-map drawn at true scale, in a second column that the map filled and the
+   summary didn't; the map lives in the rail now, so the row is the summary
+   alone, and there's no second column left to size around it. */
+.hero { border-bottom: 1px solid var(--line); }
+/* The page gutter is paid by the row, not by `.summary` inside it: `.summary`
+   carries its own padding (var(--gut)) for the places it stands alone, and
+   applying both here would double it and misalign this band from every other
+   full-width one. */
 .hero { padding-left: var(--gut); padding-right: var(--gut); }
 .hero .summary { border-bottom: 0; padding-left: 0; padding-right: 0; }
-@media (max-width: 860px) {
-  .hero { grid-template-columns: 1fr; gap: 0; }
-}
 
 /* --- Your braking points (under the track map) ---------------------------
    A sheet, not a chart: it is read at a glance before going out, and printed.

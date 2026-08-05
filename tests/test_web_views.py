@@ -841,7 +841,7 @@ def test_a_lap_without_coordinates_still_has_a_rail():
     questo caso, e col rail persistente diventerebbero una colonna vuota su tutte
     le schede."""
     assert 'id="rail-nomap"' in _HTML
-    block = _APPJS.split("function drawRail()")[1].split("\n}")[0]
+    block = _APPJS.split("function drawRail(")[1].split("\n}")[0]
     assert '$("rail-nomap")' in block, "il segnaposto non viene passato a drawMapTo"
 
 
@@ -964,3 +964,60 @@ def test_the_compare_minimap_is_gone_now_that_the_rail_is_the_map():
     assert "c-minimap" not in _HTML
     assert "drawMiniMap" not in _APPJS
     assert "MINI_HIT" not in _APPJS
+
+
+def test_all_hover_sources_route_through_hoverTo_not_the_view_function():
+    """Il rail funzionava solo come sorgente: i gestori dei grafici (Confronto,
+    Dinamica, Traiettoria) e della mappa grande chiamavano `redraw`/
+    `drawDynamics`/`renderLine`/`drawMap` DIRETTAMENTE — `hoverTo` è l'unica
+    funzione che aggiorna anche il rail. Se un gestore futuro richiama di nuovo
+    la funzione di vista invece di `hoverTo`, il rail torna a essere a senso
+    unico: sorgente di mirino, mai destinazione — esattamente come nacque la
+    minimappa cablata alla sola vista Confronto."""
+    block = _APPJS.split("function wireHover()")[1].split("\n}\n")[0]
+    for direct in ("redraw(", "drawDynamics(", "renderLine(", "drawMap("):
+        assert direct not in block, f"{direct} bypassa hoverTo dentro wireHover"
+    # Otto sorgenti di hover (grafici Confronto, mappa grande, rail, tracce
+    # Dinamica, G-G, curva ingrandita, offset/curvatura, nastro bilanciamento)
+    # per due eventi (move, leave) = almeno 16 chiamate a hoverTo.
+    assert block.count("hoverTo(") >= 16
+
+
+def test_drawRail_takes_an_explicit_point_instead_of_only_reading_LAST_HOVER():
+    """`drawRail` leggeva `LAST_HOVER` da sé; chiamata da dentro `hoverTo` in un
+    punto dove quella variabile non fosse ancora aggiornata, avrebbe disegnato
+    il mirino di un istante prima. Un parametro esplicito — con `LAST_HOVER`
+    come default per chi ridisegna la vista intera senza un punto fresco in
+    mano — toglie la dipendenza dall'ordine delle righe."""
+    assert "function drawRail(p = LAST_HOVER)" in _APPJS
+    block = _APPJS.split("function drawRail(")[1].split("\n}")[0]
+    assert 'drawMapTo($("c-rail"), $("rail-nomap"), DATA, p)' in block
+    hover_block = _APPJS.split("function hoverTo(")[1].split("\n}\n")[0]
+    assert "drawRail(p);" in hover_block
+
+
+def test_the_hero_row_has_no_orphaned_minimap_column():
+    """La seconda colonna della griglia (360px) era per la minimappa; rimossa
+    lei dal markup, un `.hero` ancora a due colonne lascerebbe quello spazio
+    riservato e vuoto invece di far respirare il riepilogo a piena larghezza."""
+    hero_block = _CSS[_CSS.index(".hero {"):_CSS.index("/* --- Your braking points")]
+    assert "grid-template-columns" not in hero_block
+    assert "360px" not in hero_block
+    assert "minimap" not in hero_block.lower()
+    assert "padding-left: var(--gut)" in hero_block
+
+
+def test_hoverTo_never_nulls_last_hover_on_mouse_leave():
+    """`updateReadout` (vista Confronto) confronta `LAST_HOVER` con `null` per
+    decidere se congelare il readout (l'ultimo valore, spento) o svuotarlo al
+    suggerimento — un confronto valido solo se `hoverTo` non lo azzera già in
+    anticipo. Uscire dal rail deve congelare il readout esattamente come uscire
+    dai grafici, non cancellarlo all'istante."""
+    block = _APPJS.split("function hoverTo(")[1].split("\n}\n")[0]
+    assert re.search(r"if\s*\(\s*p\s*!=\s*null\s*\)\s*LAST_HOVER\s*=\s*p;", block), \
+        "LAST_HOVER va scritto solo quando p è un punto vero, mai azzerato qui"
+    # Ogni occorrenza dell'assegnazione dev'essere dietro quella guardia — non
+    # deve restarne una incondizionata, eseguita anche quando p è null.
+    assert block.count("LAST_HOVER = p;") == len(
+        re.findall(r"if\s*\(\s*p\s*!=\s*null\s*\)\s*LAST_HOVER\s*=\s*p;", block)
+    ), "trovata un'assegnazione a LAST_HOVER non protetta dalla guardia p != null"
