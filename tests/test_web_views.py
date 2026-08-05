@@ -897,21 +897,29 @@ def test_the_rail_list_scrolls_on_its_own():
     assert "overflow-y: auto" in block
 
 
-def test_the_map_label_degrades_with_the_canvas_it_is_drawn_to():
-    """`drawMapTo` scriveva sempre il nome intero accanto all'apice: sulla
-    mappa grande va bene, sul rail (220×150) sette nomi lunghi (Monza) si
-    scrivevano uno sopra l'altro. Deve degradare con lo spazio sulla tela,
-    come `cornerBands` — non ignorare la convenzione già in casa."""
-    block = _APPJS.split("function drawMapTo(")[1].split("\nfunction ")[0]
-    assert "degradeLabel(ctx, c.name" in block
+def test_the_map_label_avoids_real_text_collisions_not_apex_distance():
+    """Trovato il 2026-08-05 guardando la mappa grande vera (Monza, tela
+    1036px): la prima versione decideva sulla distanza fra gli APICI, e su
+    quella tela scartava un nome («Variante del Rettifilo») che non avrebbe
+    mai toccato nulla — il vicino più vicino stava a un centinaio di pixel.
+    Quello che collide sono i RETTANGOLI di testo, non i punti: `drawMapTo`
+    deve confrontare le etichette già scritte, non una distanza a soglia."""
+    fn = _APPJS[_APPJS.index("function drawMapTo"):]
+    fn = fn[:fn.index("\n}\n")]
+    block = fn[fn.index("// Corner labels at each apex"):fn.index("// Start/finish")]
+    assert "measureText(" in block
+    assert "overlaps(" in block
+    assert "Math.hypot" not in block, \
+        "la distanza fra apici non deve tornare a decidere l'etichetta"
     assert 'ctx.fillText(c.name || ("T" + (c.index + 1)), X(rv.x[i]) + 6, Y(rv.z[i]) - 4)' \
         not in block, "il fillText incondizionato non deve tornare"
 
 
-def test_corner_bands_and_the_map_share_one_label_threshold():
-    """Due soglie diverse per «nome intero, poi T7, poi niente» divergerebbero
-    silenziosamente il giorno che una delle due cambia margine. `cornerBands`
-    e `drawMapTo` devono chiamare la stessa funzione, non una copia."""
+def test_corner_bands_still_uses_the_shared_threshold():
+    """`degradeLabel` resta la soglia di `cornerBands`, che ha uno spazio
+    lineare (una fascia lungo un asse) su cui un singolo numero funziona. La
+    mappa non la usa più — lì collidono rettangoli veri, non un numero — ed è
+    corretto che restino due meccanismi diversi per due geometrie diverse."""
     assert "function degradeLabel(" in _APPJS
     bands = _APPJS.split("function cornerBands(")[1].split("\n}")[0]
     assert "degradeLabel(ctx" in bands

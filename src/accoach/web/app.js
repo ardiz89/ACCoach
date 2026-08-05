@@ -1300,26 +1300,45 @@ function drawMapTo(canvas, missing, a, cx, mode) {
   // is exactly the sliding number `cornermap` exists to stop: a lap that
   // detected one corner fewer renumbered every label after it.
   //
-  // Qui degrada come `cornerBands` (stessa `degradeLabel`), ma lo spazio non è
-  // una fascia lungo un asse: è la distanza sullo schermo al vicino più
-  // vicino. Sul rail (220×150) quella distanza crolla a pochi pixel — sette
-  // nomi di Monza si scrivevano uno sopra l'altro — mentre sulla mappa grande
-  // e su quella del flusso resta larga e la regola non tocca nulla: degrada
-  // in base allo SPAZIO sulla tela, non in base a quale canvas l'ha chiamata.
+  // Degrada come `cornerBands` (nome intero, poi «T7», poi niente), ma qui
+  // NON con la distanza fra gli apici — trovata sbagliata il 2026-08-05
+  // guardando la mappa grande vera (1036px, Monza): un apice a un centinaio
+  // di pixel dal vicino faceva scartare un nome che non avrebbe mai toccato
+  // nulla, perché quello che collide non sono i punti, sono i RETTANGOLI di
+  // testo. La verifica è quella vera: il rettangolo del nome intero contro i
+  // rettangoli già scritti; se ne tocca uno, la forma corta; se non ci sta
+  // nemmeno quella, niente.
+  //
+  // Due cose da tenere a mente:
+  // - il risultato dipende dall'ORDINE in cui le curve vengono scritte (la
+  //   prima etichetta arrivata si prende il posto): qui è l'ordine di
+  //   `a.corners`, cioè l'ordine di pista — una scelta, non un caso.
+  // - il confronto è in coordinate schermo (dopo X()/Y()), le stesse in cui
+  //   `fillText` scrive: un confronto in metri o in `pos` normalizzato
+  //   ignorerebbe lo zoom del canvas.
   ctx.fillStyle = "rgba(255,255,255,0.85)"; ctx.font = "11px " + UI_FONT;
-  const _corners = a.corners || [];
-  const _apex = _corners.map((c) => {
+  const placedLabels = [];
+  for (const c of a.corners || []) {
     const i = nearest(rv.pos, c.apex);
-    return { x: X(rv.x[i]), y: Y(rv.z[i]) };
-  });
-  for (let ci = 0; ci < _corners.length; ci++) {
-    const c = _corners[ci], p = _apex[ci];
-    let room = Infinity;
-    for (let cj = 0; cj < _apex.length; cj++) {
-      if (cj !== ci) room = Math.min(room, Math.hypot(_apex[cj].x - p.x, _apex[cj].y - p.y));
+    const lx = X(rv.x[i]) + 6, ly = Y(rv.z[i]) - 4;
+    // Il rettangolo del testo così come `fillText` lo scrive: da (lx, ly) in
+    // avanti in larghezza, e verso l'alto in altezza (`textBaseline` è quello
+    // di default, "alphabetic": il testo sta SOPRA `ly`, non sotto).
+    const rectOf = (text) => {
+      const w = ctx.measureText(text).width;
+      return { x0: lx, y0: ly - 11, x1: lx + w, y1: ly + 3 };
+    };
+    const overlaps = (r) => placedLabels.some((p) =>
+      r.x0 < p.x1 && p.x0 < r.x1 && r.y0 < p.y1 && p.y0 < r.y1);
+    const full = c.name || ("T" + (c.index + 1)), short = "T" + (c.index + 1);
+    const rFull = rectOf(full);
+    let label = null, rect = null;
+    if (!overlaps(rFull)) { label = full; rect = rFull; }
+    else {
+      const rShort = rectOf(short);
+      if (!overlaps(rShort)) { label = short; rect = rShort; }
     }
-    const label = degradeLabel(ctx, c.name || ("T" + (c.index + 1)), "T" + (c.index + 1), room);
-    if (label) ctx.fillText(label, p.x + 6, p.y - 4);
+    if (label) { ctx.fillText(label, lx, ly); placedLabels.push(rect); }
   }
 
   // Start/finish + direction of travel. A white dot with an "S/F" label (kept
