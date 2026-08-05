@@ -687,6 +687,49 @@ _CORNERS: dict[str, list[tuple[str | int, float]]] = {
     "sakhir": [(n, p) for n, p in enumerate([
         0.137, 0.157, 0.178, 0.283, 0.322, 0.348, 0.377,
         0.424, 0.483, 0.506, 0.638, 0.696, 0.767, 0.913], start=1)],
+    # Montreal. Era fermo perché «due guide si contraddicono esattamente a
+    # T5-T7, una legge L,R,L dove l'altra legge R,L,R», e un circuito numerato
+    # è tutto o niente. Vero, e la conclusione sbagliata: **quella
+    # contraddizione la geometria la arbitra**, ed è la differenza esatta con
+    # Budapest, dove le due letture opposte facevano entrambe 14/14.
+    #
+    # La strada è quella giusta: **4353 m** contro i 4361 pubblicati (0.18%).
+    #
+    # L'arbitrato, e non è una preferenza ma un conto. La coda è **forzata**:
+    # T8-T13 sono sei curve e fra 0.464 e 0.898 ci sono sei apici, uno per uno.
+    # Davanti, la stessa guida che litiga dichiara la T3 destra e la T4 sinistra
+    # («a tricky right-left chicane»). Con quei due estremi inchiodati restano
+    # sei apici per cinque curve, e delle sei scelte possibili **solo due**
+    # sopravvivono — che danno entrambe T5,T6,T7 = destra,sinistra,destra. La
+    # lettura con la T7 sinistra ha **zero** assegnazioni: non è meno probabile,
+    # è impossibile su questa strada.
+    #
+    # Poi la seconda fonte ha detto la stessa cosa a parole, il che rende
+    # l'arbitrato una conferma invece che un azzardo. Dichiara tutti e
+    # quattordici i versi (si.com/onsi/f1/guides/f1-canadian-grand-prix-circuit-
+    # gilles-villeneuve-track-guide) e sulla coppia contesa è esplicita: «Turns
+    # 6/7: **This time, to the left and then the right**». Tredici su tredici
+    # con la geometria.
+    #
+    # **E spiega l'apice di troppo**, che è la parte che nessun conteggio poteva
+    # dare: «A rise up a hill and **another right kink** leads into a tricky
+    # right-left chicane». Quel kink è 0.125 con r=166 m, e non è una curva
+    # numerata — il risolutore lo scarta da solo, senza averlo letto.
+    #
+    # **La T14 non c'è, come la T15 in Bahrain.** È «the left-hand exit of the
+    # final chicane», e la chicane finale è più corta della separazione minima
+    # (87 m qui), quindi dei due elementi ne sopravvive un picco solo: 0.898,
+    # r=16 m, in fondo ai 685 m di rettilineo che la fonte descrive. Darle una
+    # posizione vorrebbe dire inventarla.
+    #
+    # Una fonte è stata **smentita dalla strada**, e vale registrarlo: la guida
+    # corner-by-corner di total-motorsport dice «Turn 7: The left-hand exit of
+    # the chicane», e quella lettura non ha nemmeno un'assegnazione ammissibile
+    # una volta accettati la sua stessa T3/T4 e la coda forzata. Sulla T6-T7 si
+    # smentisce contro la geometria, non contro di noi.
+    "montreal": [(n, p) for n, p in enumerate([
+        0.060, 0.080, 0.170, 0.211, 0.232, 0.290, 0.311,
+        0.464, 0.484, 0.619, 0.650, 0.740, 0.898], start=1)],
 }
 
 
@@ -970,6 +1013,16 @@ _DIRECTIONS: dict[str, dict[str, str]] = {
         1: "right", 2: "left", 3: "right", 4: "right", 5: "left",
         6: "right", 7: "left", 8: "right", 9: "left", 10: "left",
         11: "left", 12: "right", 13: "right", 14: "right",
+    },
+    # Montreal. Tutti e tredici dichiarati a parole da una guida, e la coppia
+    # che due fonti si contendevano — T6 e T7 — è quella su cui la geometria
+    # non lascia scelta: con la T7 sinistra non esiste **nessuna** assegnazione
+    # ammissibile. La T14 non compare perché non ha una posizione: è l'uscita
+    # della chicane finale, più corta della separazione minima.
+    "montreal": {
+        1: "left", 2: "right", 3: "right", 4: "left", 5: "right",
+        6: "left", 7: "right", 8: "right", 9: "left", 10: "right",
+        11: "left", 12: "right", 13: "right",
     },
 }
 
