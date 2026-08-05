@@ -2791,7 +2791,15 @@ function drawDynamics(cx) {
     if (coast) coast.innerHTML = "";
     $("dyn-tyres").classList.add("hidden");
     $("dyn-balance-wrap").classList.add("hidden");
-    $("dyn-readout").innerHTML = t("dyn.readout");
+    // Stesso principio appena applicato alla Mappa: un solo punto scrive
+    // #dyn-readout (`updateDynReadout`, che antepone sempre `rangeChip()`),
+    // non la pastiglia ripetuta a mano in ogni ramo di `drawDynamics`. Prima
+    // di questo fix questo ramo — un giro senza canali di dinamica, con la
+    // finestra accesa — mostrava la sola frase di default: nessuna pastiglia,
+    // nessuna ✕ per annullarla. `null`, non `cx`: senza grafici in vista non
+    // c'è un punto per-campione da leggere, a costo di ignorare un hover sul
+    // rail mentre la scheda è in questo stato.
+    updateDynReadout(DATA, null);
     DYN_GG = null; DYN_BAL_HIT = null;
     return;
   }
