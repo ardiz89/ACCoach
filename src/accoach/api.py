@@ -255,6 +255,15 @@ def _channels(lap) -> dict:
         # Rotation vs input (yaw trace) and engine revs (shift-point view).
         "yaw": [round(x.yaw_rate, 4) for x in s],
         "rpm": [int(x.rpm) for x in s],
+        # Quando l'elettronica sta lavorando. Registrati dalla v6 e serviti mai,
+        # ed è il canale che rende leggibile quello sopra: **col TC attivo la
+        # traccia di slip posteriore resta a zero perché è il TC a tenercela**,
+        # quindi il grafico «Bloccaggio e pattinamento» diceva «tutto a posto»
+        # esattamente nel caso in cui c'era qualcosa da dire. Lo stesso vale per
+        # l'ABS sul davanti: le tarature del 02/08 hanno misurato che con l'ABS
+        # acceso il bloccaggio fisico non avviene proprio.
+        "abs": [round(x.abs_active, 3) for x in s],
+        "tc": [round(x.tc_active, 3) for x in s],
     }
 
 
@@ -2001,6 +2010,17 @@ def create_api(
                 out[i].min_speed_kmh = round(statistics.median(live), 1)
             if ref:
                 out[i].min_speed_ref_kmh = round(statistics.median(ref), 1)
+            # Lo stato di aderenza della curva, dal reperto più recente che ne
+            # abbia uno. Non una mediana: `saturated_early` e `coast_s` sono
+            # fatti di un giro, e mediarli fra sere diverse fabbricherebbe un
+            # giro che nessuno ha guidato. L'ultimo è quello che il pilota ha
+            # appena letto nel debrief, ed è con quello che l'esercizio non
+            # deve litigare.
+            grips = [x.grip for d in h.debriefs for x in d.losses
+                     if x.index == i and getattr(x, "grip", None)
+                     and x.grip.ratio > 0]
+            if grips:
+                out[i].grip = grips[-1]
             corner = next((c for c in h.corners if c.index == i), None)
             if corner is not None:
                 vmins = _corner_vmins(corner, chrono, h.lap_objs)

@@ -167,6 +167,12 @@ class CornerLoss:
     min_speed_live: float = 0.0
     min_speed_ref: float = 0.0
     name: str = ""             # friendly corner name (set by the API layer)
+    # Come sta questa curva rispetto all'inviluppo di aderenza del riferimento.
+    # Viaggia col reperto perché a valle serve a **scegliere l'esercizio**: senza,
+    # la scheda Allenamento prescriveva otto giri di «frena più tardi» sulla
+    # stessa curva in cui il debrief aveva appena spiegato che la gomma è già
+    # impegnata. Vedi `GripState` per perché sono tre numeri e non un booleano.
+    grip: "GripState" = field(default_factory=lambda: GripState())
 
     @property
     def label(self) -> str:
@@ -326,12 +332,30 @@ _GRIP_AT_LIMIT = 0.95     # this close to the envelope = nothing left to ask for
 _GRIP_SPARE = 0.85        # this far below it = grip the driver isn't using
 _GRIP_MIN_G = 0.3         # below this the lap has no usable G data at all
 
+# **Relativa, non assoluta**, e la differenza non è pedanteria.
+#
+# La versione precedente diceva «non c'è una frenata più tarda da trovare»: una
+# frase sul limite della GOMMA, ricavata da una misura che confronta con il
+# RIFERIMENTO. Se il riferimento non è al limite — ed è la norma, un giro veloce
+# non è al 100% dell'ellisse in ogni punto — allora un margine vero c'è e noi
+# avevamo appena detto al pilota di smettere di cercarlo. È lo stesso errore di
+# categoria del sottosterzo che misurava la sbarra del canale sterzo: misura
+# buona, frase sopra sbagliata.
+#
+# Secondo motivo, geografico: l'inviluppo è il 95° percentile del riferimento su
+# **tutto il giro** (vedi `_grip_envelope`), non in questa curva. Dire «qui» era
+# sbagliato anche a voler difendere il resto.
+#
+# Quello che resta è ciò che la misura dimostra davvero: a parità di gomma, una
+# staccata più tarda dovrebbe uscire dall'aderenza che stai già spendendo.
+# Condizionale, non negazione.
 _GRIP_LIMITED = {
-    "en": " You're already at {pct:.0f}% of the grip the reference uses here, so "
-          "there is no later braking to find — the tyre is spending it on turning.",
-    "it": " Sei già al {pct:.0f}% dell'aderenza che il riferimento usa qui, quindi "
-          "non c'è una frenata più tarda da trovare: la gomma la sta spendendo "
-          "per girare."}
+    "en": " You are already using as much grip as the reference uses at its own "
+          "peaks ({pct:.0f}%), so a later brake here would have to come out of "
+          "what the tyre is already spending on turning.",
+    "it": " Stai già usando tanta aderenza quanta ne usa il riferimento nei suoi "
+          "punti di picco ({pct:.0f}%), quindi una staccata più tarda dovrebbe "
+          "uscire da quella che la gomma sta già spendendo per girare."}
 _GRIP_UNUSED = {
     "en": " You only reach {pct:.0f}% of the grip the reference uses here: there "
           "is load left on the tyre, not just time.",
@@ -465,33 +489,97 @@ def _grip_envelope(lap: Lap, reference: Reference) -> float:
                         for s in lap.samples], _GRIP_PCTL)
 
 
-def _grip_detail(inside: list, envelope: float, category: CueCategory,
-                 lg: str) -> str:
-    """Was there grip left in this corner, or was the driver already at the limit?
+#: Both pedals off for longer than this, before the brake, is a real coast and
+#: not the brake-to-throttle handover. Same numbers the live coach uses
+#: (``coaching/braking.py``) rather than a second opinion about the same thing.
+_PEDAL_OFF = 0.05
+_COAST_MIN_S = 0.2
 
-    Only said where it changes the advice. On "brake later" and "carry more
-    speed" it is the difference between an instruction the driver can follow and
-    one that would put them in the gravel: if the tyre is already saturated, the
-    honest answer is that the time is somewhere else.
+
+@dataclass(frozen=True, slots=True)
+class GripState:
+    """How the corner sits against the reference's grip envelope.
+
+    Three facts and not one boolean, and the reason is a door that a boolean
+    would have shut. "Saturated" is a good reason to stop telling a driver to
+    brake later — but only when the saturation is where the braking is. Two real
+    cases where a later brake is still the right answer and a flat "at the
+    limit" would have hidden them:
+
+    * the p95 over the whole corner is dominated by the metres of rotation,
+      where lateral g is high. A driver can sit at the ceiling there and at 80%
+      through the first metres of the stop, because the pedal never really bites
+      at once. That braking *is* there to be found.
+    * a coast before the brake throws away time with the tyre untouched. The
+      grip is saturated when it is finally used — just not used soon enough.
+
+    So the physics is measured here, where the samples are, and the decision is
+    taken where the drill is chosen (``coaching/training.py``).
     """
-    if envelope < _GRIP_MIN_G or category not in (
-            CueCategory.BRAKE_LATER, CueCategory.CARRY_SPEED):
-        return ""
+
+    ratio: float = 0.0            # this corner's peak / the reference's envelope
+    saturated_early: bool = False  # …and already at the ceiling as the brake bites
+    coast_s: float = 0.0          # both pedals off, before the brake
+
+    @property
+    def at_limit(self) -> bool:
+        return self.ratio >= _GRIP_AT_LIMIT
+
+
+def _grip_state(inside: list, envelope: float) -> GripState:
+    """Measure the corner against the envelope. No wording, no decisions."""
+    if envelope < _GRIP_MIN_G or not inside:
+        return GripState()
     # The SAME percentile as the envelope, not the raw maximum. Comparing a peak
     # against a 95th percentile is comparing two different statistics: on real
     # laps it produced "you're at 120% of the grip", which is nonsense on its
     # face and would have cost the driver their trust in the whole line.
     peak = _percentile([_combined_g(s.g_lat, s.g_long) for s in inside], _GRIP_PCTL)
     if peak <= 0.0:
-        return ""                      # lap recorded before the G channels
+        return GripState()             # lap recorded before the G channels
     # The envelope is an estimate, so a corner can still read slightly over it.
     # Clamp the number rather than print an impossible one: "at 104% of the grip"
     # invites a question whose honest answer is "the limit is approximate".
     ratio = min(1.0, peak / envelope)
-    if ratio >= _GRIP_AT_LIMIT:
-        return _GRIP_LIMITED.get(lg, _GRIP_LIMITED["en"]).format(pct=ratio * 100)
-    if ratio <= _GRIP_SPARE:
-        return _GRIP_UNUSED.get(lg, _GRIP_UNUSED["en"]).format(pct=ratio * 100)
+
+    braking = [s for s in inside if s.brake > _PEDAL_OFF]
+    early = braking[:max(1, len(braking) // 3)]
+    early_peak = _percentile([_combined_g(s.g_lat, s.g_long) for s in early],
+                             _GRIP_PCTL) if early else 0.0
+    saturated_early = bool(early) and min(1.0, early_peak / envelope) >= _GRIP_AT_LIMIT
+
+    # The coast is the one *before* the brake: a lift on the way out is a
+    # different fault with a different drill, and counting it here would block
+    # "brake later" on corners where the entry was fine.
+    coast_s = 0.0
+    if braking:
+        first_brake = inside.index(braking[0])
+        run_start = None
+        for s in inside[:first_brake]:
+            if s.throttle < _PEDAL_OFF and s.brake < _PEDAL_OFF:
+                run_start = s.t_ms if run_start is None else run_start
+                coast_s = max(coast_s, (s.t_ms - run_start) / 1000.0)
+            else:
+                run_start = None
+    return GripState(ratio=ratio, saturated_early=saturated_early, coast_s=coast_s)
+
+
+def _grip_detail(state: GripState, category: CueCategory, lg: str) -> str:
+    """Was there grip left in this corner, or was the driver already at the limit?
+
+    Only said where it changes the advice. On "brake later" and "carry more
+    speed" it is the difference between an instruction the driver can follow and
+    one that would put them in the gravel.
+    """
+    if not state.ratio or category not in (
+            CueCategory.BRAKE_LATER, CueCategory.CARRY_SPEED):
+        return ""
+    if state.at_limit:
+        return _GRIP_LIMITED.get(lg, _GRIP_LIMITED["en"]).format(
+            pct=state.ratio * 100)
+    if state.ratio <= _GRIP_SPARE:
+        return _GRIP_UNUSED.get(lg, _GRIP_UNUSED["en"]).format(
+            pct=state.ratio * 100)
     return ""                          # in between: nothing worth claiming
 
 
@@ -657,8 +745,11 @@ def build_lap_debrief(lap: Lap, reference: Reference, corners: list[Corner],
         # Braking decomposition (earliness in metres + peak pressure).
         detail += _braking_detail(lap, reference, inside, refs, cue.category,
                                   lg, typed_marks)
-        # …and whether there was any grip left to do it with.
-        detail += _grip_detail(inside, envelope, cue.category, lg)
+        # …and whether there was any grip left to do it with. Misurato una volta
+        # sola: la stessa cosa scrive la frase e sceglie l'esercizio, così le due
+        # metà dell'app non possono più dire il contrario l'una dell'altra.
+        grip = _grip_state(inside, envelope)
+        detail += _grip_detail(grip, cue.category, lg)
 
         losses.append(CornerLoss(
             index=c.index, entry_pos=c.entry_pos, apex_pos=c.apex_pos,
@@ -676,6 +767,7 @@ def build_lap_debrief(lap: Lap, reference: Reference, corners: list[Corner],
             # reaching the corner next door (see trackdata._DIRECTIONS).
             name=corner_name(lap.track, c.index, c.apex_pos, lg, c.direction,
                              typed),
+            grip=grip,
         ))
 
     losses.sort(key=lambda x: x.lost_ms, reverse=True)
