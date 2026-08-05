@@ -844,3 +844,24 @@ def test_a_lap_without_coordinates_still_has_a_rail():
 def test_the_rail_is_drawn_when_a_lap_loads():
     block = _APPJS.split("async function loadCombo")[1].split("\n}")[0]
     assert "drawRail();" in block
+
+
+def test_the_rail_lists_the_clean_corners_too():
+    """La classifica dice da dove cominciare; il selettore deve poter aprire
+    anche una curva dove non hai perso niente — è lì che si va a vedere cosa hai
+    fatto giusto."""
+    block = _APPJS.split("function railRows(")[1].split("\n}")[0]
+    assert "cold" in block and "hot" in block
+
+
+def test_the_selected_corner_is_remembered_by_number_not_by_name():
+    """Due curve possono chiamarsi uguale: su ogni pista senza nomi curati si
+    chiamano tutte `Corner N`, e la riga accesa sarebbe la prima delle due."""
+    block = _APPJS.split("function cornerWindow(")[1].split("\n}")[0]
+    assert "corner: c.index" in block
+
+
+def test_clicking_a_corner_moves_the_shared_window():
+    block = _APPJS.split("function drawRailList()")[1].split("\n\nfunction")[0]
+    assert "setRange(cornerWindow(" in block
+    assert "setRange(null)" in block, "manca «Tutto il giro»"

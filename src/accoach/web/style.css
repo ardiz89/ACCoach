@@ -291,6 +291,29 @@ body:not(.railed) .rail { display: none; }
 .rail-map canvas { width: 100%; height: 150px; cursor: crosshair; display: block; }
 .rail-nomap { font-size: 11px; color: var(--muted); line-height: 1.5; padding: 8px 0; }
 
+.rail-list { display: flex; flex-direction: column; gap: 2px; margin-top: 10px; }
+.rail-row {
+  display: grid; grid-template-columns: 26px 1fr 34px auto;
+  align-items: center; gap: 6px;
+  background: transparent; border: 0; border-radius: 8px;
+  padding: 5px 6px; text-align: left; cursor: pointer;
+  color: var(--muted); font-family: var(--font-ui); font-size: 12px;
+}
+.rail-row:hover { background: var(--panel); color: var(--text); }
+.rail-row.on { background: var(--inset); color: var(--text); }
+.rail-row.whole { grid-template-columns: 1fr; font-weight: 600; margin-bottom: 4px; }
+.rail-row.cold { grid-template-columns: 26px 1fr; }
+.rail-row .n { font-family: var(--font-mono); font-size: 11px; opacity: .7; }
+.rail-row .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rail-row .bar { height: 6px; background: var(--inset); border-radius: 999px; overflow: hidden; }
+.rail-row .fill { display: block; height: 100%; border-radius: 999px; }
+.rail-row .s { font-family: var(--font-mono); font-size: 11px; }
+.rail-sep {
+  font-size: 10px; text-transform: uppercase; letter-spacing: .06em;
+  color: var(--muted); opacity: .7; padding: 10px 6px 4px;
+  border-top: 1px solid var(--line); margin-top: 6px;
+}
+
 /* Il tablet accanto al volante: sotto i 1100 px la colonna mangerebbe un quinto
    della larghezza. Il rail sparisce e i chip della Traiettoria restano il modo
    di scegliere una curva. */

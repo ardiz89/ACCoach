@@ -230,6 +230,7 @@ function redrawCurrentView() {
   // entrambi: `redrawCurrentView` è ciò che il resize chiama (debounced, riga
   // ~4144) e ciò che `showView` chiama in coda.
   drawRail();
+  drawRailList();
 }
 
 // Colour-blind palette toggle, dropped next to the tour "?" button. Persisted in
@@ -1088,6 +1089,66 @@ function railWindow(hit) {
   ctx.restore();
 }
 
+// Le curve del rail in due gruppi. Sopra la classifica — chi è costato di più,
+// per primo: è il waterfall promosso a navigazione, l'unica cosa in tutta l'app
+// che mostri la DISTRIBUZIONE della perdita invece di una conclusione. Sotto, in
+// ordine di pista e senza barretta, le curve dove non hai perso niente: un
+// selettore che non le elenca non è un selettore, è una classifica.
+function railRows(a) {
+  const byIndex = new Map();
+  for (const l of (a.losses || [])) if (l.lost_s > 0) byIndex.set(l.index, l);
+  const hot = Array.from(byIndex.values()).sort((x, y) => y.lost_s - x.lost_s);
+  const cold = (a.corners || []).filter((c) => !byIndex.has(c.index));
+  return { hot: hot, cold: cold };
+}
+
+function drawRailList() {
+  const el = $("rail-list");
+  if (!el || !DATA) return;
+  const corners = DATA.corners || [];
+  const at = (i) => corners.filter((c) => c.index === i)[0];
+  const rows = railRows(DATA);
+  let mx = 0.05;
+  for (const l of rows.hot) mx = Math.max(mx, l.lost_s);
+  const sel = RANGE && RANGE.corner != null ? RANGE.corner : null;
+
+  // «Tutto il giro» è il primo elemento e non uno stato assente: finché non è
+  // scritto, tornare indietro dalla curva sembra impossibile.
+  let html = `<button type="button" class="rail-row whole${RANGE ? "" : " on"}" data-whole="1">` +
+             `${t("rail.whole")}</button>`;
+  for (const l of rows.hot) {
+    const w = (Math.min(l.lost_s / mx, 1) * 100).toFixed(0);
+    const sev = Math.min(1, l.lost_s / Math.max(mx, 0.3));
+    html += `<button type="button" class="rail-row${sel === l.index ? " on" : ""}" ` +
+            `data-i="${l.index}" title="${escAttr(l.message || "")}">` +
+            `<span class="n">T${l.index + 1}</span>` +
+            `<span class="nm">${l.label}</span>` +
+            `<span class="bar"><span class="fill" style="width:${w}%;` +
+            `background:${lossColor(sev)}"></span></span>` +
+            `<span class="s">−${l.lost_s.toFixed(2)}</span></button>`;
+  }
+  if (rows.cold.length && rows.hot.length) {
+    html += `<div class="rail-sep">${t("rail.clean")}</div>`;
+  }
+  for (const c of rows.cold) {
+    html += `<button type="button" class="rail-row cold${sel === c.index ? " on" : ""}" ` +
+            `data-i="${c.index}"><span class="n">T${c.index + 1}</span>` +
+            `<span class="nm">${c.name}</span></button>`;
+  }
+  el.innerHTML = html;
+
+  for (const b of el.querySelectorAll(".rail-row[data-i]")) {
+    b.onclick = () => {
+      const c = at(parseInt(b.dataset.i, 10));
+      if (!c) return;
+      setRange(cornerWindow(c));
+      redrawCurrentView();
+    };
+  }
+  const whole = el.querySelector(".rail-row[data-whole]");
+  if (whole) whole.onclick = () => { setRange(null); redrawCurrentView(); };
+}
+
 // Render the delta-coloured racing line + braking points to ``canvas``; returns
 // the screen transform {rv, X, Y} so a hover can map cursor → nearest sample,
 // or null when there's no map. ``missing`` (optional) is a placeholder element
@@ -1324,6 +1385,7 @@ async function loadCombo(combo, lapPath, baselinePath) {
   renderFlow(a);
   redraw(null);
   drawRail();
+  drawRailList();
   // The sheet is per car+track, not per lap: it survives a lap change and is
   // only dropped when the combo does (see the combo picker).
   if (VIEW === "map") {
@@ -2425,7 +2487,10 @@ function cornerWindow(c) {
   if (!c) return null;
   const pad = Math.max(0.004, (c.exit - c.entry) * 0.25);
   return { from: Math.max(0, c.entry - pad), to: Math.min(1, c.exit + pad),
-           source: "corner", label: c.name || ("T" + (c.index + 1)) };
+           source: "corner", label: c.name || ("T" + (c.index + 1)),
+           // Il numero, non il nome: il rail deve accendere LA riga giusta, e su
+           // una pista senza nomi curati le curve si chiamano tutte «Corner N».
+           corner: c.index };
 }
 
 function setRange(r) {
