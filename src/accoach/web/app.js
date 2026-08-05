@@ -1309,7 +1309,19 @@ function drawMapTo(canvas, missing, a, cx, mode) {
   // rettangoli già scritti; se ne tocca uno, la forma corta; se non ci sta
   // nemmeno quella, niente.
   //
-  // Due cose da tenere a mente:
+  // Tre cose da tenere a mente:
+  // - la collisione da sola non basta. Misurato il 2026-08-05 sul rail
+  //   (220px): «Variante della Roggia» (109px) non toccava nessun'altra
+  //   etichetta e passava il test — ma da sola copriva METÀ della tela,
+  //   cancellando il disegno del giro che il rail esiste per mostrare. La
+  //   proporzione è una condizione IN PIÙ, verificata PRIMA: se il nome
+  //   intero sfora una frazione della larghezza della tela, non si prova
+  //   nemmeno a scriverlo — si passa dritti alla forma corta. Una frazione,
+  //   non un numero di pixel fisso: la stessa funzione disegna una mappa da
+  //   220px e una da quasi 1000, e un valore assoluto sarebbe tarato su una
+  //   delle due (a 1/4 di tela, il nome più lungo di Monza è al 50% sul
+  //   rail e all'11% sulla mappa grande — la soglia degrada solo dove
+  //   serve).
   // - il risultato dipende dall'ORDINE in cui le curve vengono scritte (la
   //   prima etichetta arrivata si prende il posto): qui è l'ordine di
   //   `a.corners`, cioè l'ordine di pista — una scelta, non un caso.
@@ -1318,6 +1330,7 @@ function drawMapTo(canvas, missing, a, cx, mode) {
   //   ignorerebbe lo zoom del canvas.
   ctx.fillStyle = "rgba(255,255,255,0.85)"; ctx.font = "11px " + UI_FONT;
   const placedLabels = [];
+  const maxLabelW = w * 0.25;
   for (const c of a.corners || []) {
     const i = nearest(rv.pos, c.apex);
     const lx = X(rv.x[i]) + 6, ly = Y(rv.z[i]) - 4;
@@ -1325,16 +1338,18 @@ function drawMapTo(canvas, missing, a, cx, mode) {
     // avanti in larghezza, e verso l'alto in altezza (`textBaseline` è quello
     // di default, "alphabetic": il testo sta SOPRA `ly`, non sotto).
     const rectOf = (text) => {
-      const w = ctx.measureText(text).width;
-      return { x0: lx, y0: ly - 11, x1: lx + w, y1: ly + 3 };
+      const tw = ctx.measureText(text).width;
+      return { x0: lx, y0: ly - 11, x1: lx + tw, y1: ly + 3 };
     };
     const overlaps = (r) => placedLabels.some((p) =>
       r.x0 < p.x1 && p.x0 < r.x1 && r.y0 < p.y1 && p.y0 < r.y1);
     const full = c.name || ("T" + (c.index + 1)), short = "T" + (c.index + 1);
-    const rFull = rectOf(full);
     let label = null, rect = null;
-    if (!overlaps(rFull)) { label = full; rect = rFull; }
-    else {
+    if (ctx.measureText(full).width < maxLabelW) {
+      const rFull = rectOf(full);
+      if (!overlaps(rFull)) { label = full; rect = rFull; }
+    }
+    if (!label) {
       const rShort = rectOf(short);
       if (!overlaps(rShort)) { label = short; rect = rShort; }
     }

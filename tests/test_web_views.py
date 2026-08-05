@@ -923,3 +923,26 @@ def test_corner_bands_still_uses_the_shared_threshold():
     assert "function degradeLabel(" in _APPJS
     bands = _APPJS.split("function cornerBands(")[1].split("\n}")[0]
     assert "degradeLabel(ctx" in bands
+
+
+def test_the_map_label_also_checks_its_share_of_the_canvas():
+    """Trovato il 2026-08-05, un giro dopo il fix della collisione: la
+    collisione da sola non basta. Sul rail (220px) «Variante della Roggia»
+    (109px) non toccava nessun'altra etichetta e passava il test — ma da
+    sola copriva metà della larghezza della mappa, cancellando il disegno
+    del giro che il rail esiste per mostrare. Serve una condizione di
+    proporzione, verificata PRIMA della collisione sul nome intero, ed
+    espressa come FRAZIONE della tela — non un numero di pixel fisso: la
+    stessa funzione disegna una mappa da 220px e una da quasi 1000, e un
+    valore assoluto sarebbe tarato sull'una o sull'altra."""
+    fn = _APPJS[_APPJS.index("function drawMapTo"):]
+    fn = fn[:fn.index("\n}\n")]
+    block = fn[fn.index("// Corner labels at each apex"):fn.index("// Start/finish")]
+    m = re.search(r"maxLabelW\s*=\s*w\s*\*\s*([\d.]+)", block)
+    assert m, "la soglia dev'essere una frazione di w (la tela), non un pixel fisso"
+    frac = float(m.group(1))
+    assert 0 < frac <= 0.5, f"{frac} non è 'una frazione ragionevole' della tela"
+    gate = "ctx.measureText(full).width < maxLabelW"
+    assert gate in block
+    assert block.index(gate) < block.index("rectOf(full)"), \
+        "la proporzione va verificata prima di provare la collisione sul nome intero"
