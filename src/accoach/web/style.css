@@ -389,15 +389,6 @@ body:not(.railed) .rail { display: none; }
 .chart h3 small { color: var(--muted); font-weight: 400; }
 .chart canvas { width: 100%; height: 150px; display: block; background: var(--inset); border: 1px solid var(--line); border-radius: 12px; }
 
-/* Mini track-map in the Compare view: hovering any chart highlights the same
-   point here (and hovering the mini-map drives the chart crosshairs), so the
-   lap's geometry sits next to the traces without leaving the tab. */
-.minimap { padding: 8px var(--gut) 0; }
-.minimap canvas {
-  width: 100%; height: 160px; display: block; cursor: crosshair;
-  background: var(--inset); border: 1px solid var(--line); border-radius: 12px;
-}
-
 /* Tyres over time (Trends): two small line charts + wheel legend + drift. */
 .tyres .tyre-legend {
   display: flex; flex-wrap: wrap; gap: 6px 18px;
@@ -1064,11 +1055,8 @@ body.no-data .empty { display: block; }
    other band lines up with. Full-width parent, correct gutter. */
 .hero { padding-left: var(--gut); padding-right: var(--gut); }
 .hero .summary { border-bottom: 0; padding-left: 0; padding-right: 0; }
-.hero .minimap { padding: 10px 0 10px 0; }
-.hero .minimap canvas { height: 150px; }
 @media (max-width: 860px) {
   .hero { grid-template-columns: 1fr; gap: 0; }
-  .hero .minimap { padding: 0 16px 12px; }
 }
 
 /* --- Your braking points (under the track map) ---------------------------

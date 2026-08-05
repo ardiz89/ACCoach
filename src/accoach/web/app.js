@@ -21,7 +21,6 @@ let HOVER_WIRED = false;
 // showing the elected lap, it also swallowed the note explaining why.
 let BASELINE_PINNED = false;
 let MAP_HIT = null;   // {rv, X, Y} screen transform captured by drawMap, for map hover
-let MINI_HIT = null;  // same, for the Compare-view mini map
 let DYN_GG = null;    // {pts:[{px,py,pos}]} screen points captured by drawGG, for its hover
 let DYN_BAL_HIT = null; // {rv, X, Y} transform captured by the balance ribbon, for its hover
 const MAP_READOUT_DEFAULT = () => t("map.readout");
@@ -1040,17 +1039,6 @@ function drawMap(a, cx) {
   // so the entry comes and goes with the mark.
   const lost = $("leg-lost");
   if (lost) lost.classList.toggle("hidden", a.review.lost_at == null);
-}
-
-// Mini map shown inside the Compare view, driven by the shared crosshair so it
-// highlights wherever you're hovering on the traces (and vice versa).
-function drawMiniMap(a, cx) {
-  const wrap = $("minimap-wrap");
-  if (!wrap) return;
-  if (!a || !a.has_map) { wrap.classList.add("hidden"); return; }
-  wrap.classList.remove("hidden");
-  const hit = drawMapTo($("c-minimap"), null, a, cx);
-  if (hit) MINI_HIT = hit;
 }
 
 // La mappa del rail. Sempre a GIRO INTERO, anche con la finestra accesa: il rail
@@ -2663,7 +2651,6 @@ function redraw(cx) {
   drawSpeed(DATA, cx);
   drawInputs(DATA, cx);
   drawSteer(DATA, cx);
-  drawMiniMap(DATA, cx);
   updateReadout(DATA, cx);
 }
 
@@ -4191,6 +4178,28 @@ function updateReadout(a, p) {
   wire();
 }
 
+// Dove va a finire un mirino mosso dal rail. Il rail vive su sei schede e ognuna
+// ha un modo diverso di mostrare «sei qui»; senza questo instradamento servirebbe
+// un `if` per scheda dentro l'handler, ed è così che l'hover della minimappa era
+// finito cablato alla sola vista Confronto.
+//
+// Le schede senza un consumatore di mirino (il flusso guidato, i settori) non
+// fanno NIENTE, di proposito: il rail muove il proprio marcatore e basta. Meglio
+// un gesto che non risponde di un gesto che ridisegna una vista che non è a
+// schermo.
+function hoverTo(p) {
+  if (!DATA) return;
+  LAST_HOVER = p;
+  if (VIEW === "compare") redraw(p);
+  else if (VIEW === "dynamics") drawDynamics(p);
+  else if (VIEW === "line") { if (LINE) renderLine(p); }
+  else if (VIEW === "map") {
+    drawMap(DATA, p);
+    $("map-readout").innerHTML = p == null ? MAP_READOUT_DEFAULT() : readoutHTML(DATA, p);
+  }
+  drawRail();
+}
+
 function wireHover() {
   if (HOVER_WIRED) return;
   HOVER_WIRED = true;
@@ -4239,16 +4248,16 @@ function wireHover() {
     });
   }
 
-  // Mini-map (Compare view) hover drives the chart crosshairs + readout too, so
-  // it's bidirectional with the traces.
-  const mini = $("c-minimap");
-  if (mini) {
-    mini.addEventListener("mousemove", (e) => {
+  // Il rail: stesso gesto della vecchia minimappa di Confronto, ma su sei schede
+  // — quindi instradato invece che cablato a una.
+  const rail = $("c-rail");
+  if (rail) {
+    rail.addEventListener("mousemove", (e) => {
       if (!DATA) return;
-      const p = nearestPos(MINI_HIT, mini, e);
-      if (p != null) redraw(p);
+      const p = nearestPos(RAIL_HIT, rail, e);
+      if (p != null) hoverTo(p);
     });
-    mini.addEventListener("mouseleave", () => redraw(null));
+    rail.addEventListener("mouseleave", () => hoverTo(null));
   }
 
   // Dynamics tab: the slip trace is on the position axis (same as the Compare

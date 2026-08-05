@@ -946,3 +946,21 @@ def test_the_map_label_also_checks_its_share_of_the_canvas():
     assert gate in block
     assert block.index(gate) < block.index("rectOf(full)"), \
         "la proporzione va verificata prima di provare la collisione sul nome intero"
+
+
+def test_the_rail_hover_is_routed_per_view_not_wired_to_one():
+    """L'hover della minimappa chiamava `redraw`, che è la funzione della sola
+    vista Confronto. Su un rail che vive su sei schede sarebbe muto sulle altre
+    cinque — o peggio, ridisegnerebbe una vista che non è sullo schermo."""
+    assert "function hoverTo(" in _APPJS
+    block = _APPJS.split("function hoverTo(")[1].split("\n}\n")[0]
+    for view in ("map", "dynamics", "line", "compare"):
+        assert f'"{view}"' in block, view
+
+
+def test_the_compare_minimap_is_gone_now_that_the_rail_is_the_map():
+    """La stessa figura due volte a venti centimetri: è la ripetizione che il
+    panel ha misurato come causa della «mancanza di logica» percepita."""
+    assert "c-minimap" not in _HTML
+    assert "drawMiniMap" not in _APPJS
+    assert "MINI_HIT" not in _APPJS
