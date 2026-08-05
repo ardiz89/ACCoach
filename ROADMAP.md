@@ -157,7 +157,15 @@ e vale la pena non confonderle con la sessione qui sotto:
   220 m la lettura "destra" ha zero assegnazioni e quella "sinistra" ne ha 18,
   a 300 m ne hanno 48 e 108**: quale guida vince dipende da una manopola
   nostra. Un circuito la cui risposta si muove con le nostre impostazioni non è
-  misurato, è tarato.
+  misurato, è tarato. **Sochi**, riattaccato lo stesso giorno, dà la misura
+  dell'indeterminazione invece di raccontarla: il vincolo globale 12 destre / 6
+  sinistre — quello che sbloccò Catalunya lasciandone **una** — qui lascia
+  **168** letture ammissibili, perché le sinistre di Sochi sono lunghe e
+  rilette (il gruppo di quattro apici fra 0.248 e 0.318 è un'unica curva da
+  410 m, la 180° famosa). Con in più due avvertimenti: le fonti continuano a
+  numerare quella curva in modo diverso (T3 contro T4), e il «grid to turn one
+  890.6 m» pubblicato cade a **295 m** dall'apice più vicino, più di qualunque
+  scarto di origine misurato sui circuiti curati (12-116 m).
   **Moscow Raceway** ha cambiato motivo il 05/08: il conteggio pubblicato che
   mancava ora c'è (il metro sceglie il «Full Circuit», 4058 m di traccia contro
   4.070 km, e la variante successiva delle diciotto sta quattro volte più
