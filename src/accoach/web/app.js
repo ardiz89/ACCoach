@@ -2157,12 +2157,26 @@ function setup(cv) {
   return { ctx, w, h };
 }
 
+// L'etichetta degrada con lo spazio: nome intero, poi «T7», poi niente.
+//
+// Prima scriveva sempre e solo «T7», mentre la mappa scrive il nome e il grafico
+// del flusso scrive il nome degradandolo. Tre convenzioni per la stessa curva
+// sulla stessa schermata: il pilota leggeva «Variante Ascari» su un disegno e
+// «T7» su quello sotto, e doveva dedurre da solo che fossero la stessa cosa.
+// Questa è la versione del flusso, promossa a unica.
 function cornerBands(ctx, w, h, corners) {
   ctx.fillStyle = "rgba(120,140,170,0.10)";
   for (const c of corners) ctx.fillRect(c.entry * w, 0, (c.exit - c.entry) * w, h);
   ctx.fillStyle = "rgba(255,255,255,0.35)";
   ctx.font = "10px " + UI_FONT;
-  for (const c of corners) ctx.fillText("T" + (c.index + 1), c.apex * w - 6, 11);
+  for (const c of corners) {
+    const x0 = c.entry * w, band = (c.exit - c.entry) * w;
+    const full = c.name || "T" + (c.index + 1);
+    const short = "T" + (c.index + 1);
+    const label = ctx.measureText(full).width + 6 <= band ? full
+                : ctx.measureText(short).width + 4 <= band ? short : null;
+    if (label) ctx.fillText(label, x0 + (band - ctx.measureText(label).width) / 2, 11);
+  }
 }
 
 // Horizontal reference lines with their value, drawn INSIDE the plot against the
@@ -2257,7 +2271,12 @@ function posAtMetres(v) {
 // lap has no coordinates, and the axis falls back to per cent.
 function distanceTicks() {
   if (!DIST) return null;
-  const step = [100, 200, 250, 500, 1000, 2000, 5000]
+  // I passi fini in testa servono alla finestra ritagliata che sta arrivando: su
+  // 200 m di curva il passo più corto era 100 m, cioè **una tacca sola**, e sotto
+  // i 100 m nessuna — e allora il `return out.length ? out : null` qui sotto
+  // ricadeva sui decimi del GIRO INTERO, disegnando tacche fuori dalla finestra.
+  // Sul giro intero non cambia niente: nessun giro reale sta sotto gli 800 m.
+  const step = [10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000, 5000]
     .find((s) => DIST.total / s <= 8) || 5000;
   const out = [];
   for (let v = step; v < DIST.total - step * 0.3; v += step) {
@@ -3803,10 +3822,25 @@ function readoutHTML(a, p) {
     `${t("ro.gear")} <b>${rv.gear[iv]}</b>`;
 }
 
+// Uscendo dal grafico il valore si **congela**, non si azzera.
+//
+// Prima tornava al suggerimento «passa il mouse sui grafici…», che è la frase
+// che nessuno legge dopo il primo giorno e che cancellava il numero appena
+// letto. Il gesto in cui fa più male è proprio quello utile: sposti il mouse
+// fuori dalla tela per andare a cliccare qualcos'altro — un chip, una riga di
+// tabella — e perdi il valore nel gesto stesso di cambiare inquadratura.
+// È il comportamento di i2: l'ultimo punto resta, smorzato, finché non ne
+// scegli un altro. Il suggerimento si vede solo finché non hai mai passato il
+// mouse, che è l'unico momento in cui serve davvero.
 function updateReadout(a, p) {
-  LAST_HOVER = p;
   const el = $("readout");
-  if (p == null) { el.innerHTML = t("readout.hint"); return; }
+  if (p == null) {
+    if (LAST_HOVER == null) { el.innerHTML = t("readout.hint"); return; }
+    el.classList.add("frozen");           // il valore resta, spento
+    return;
+  }
+  LAST_HOVER = p;
+  el.classList.remove("frozen");
   el.innerHTML = readoutHTML(a, p);
 }
 

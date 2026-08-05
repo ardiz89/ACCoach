@@ -230,6 +230,9 @@ select {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums; font-size: 13px; color: var(--muted);
 }
+/* Il valore congelato quando il mouse esce dal grafico: c'è ancora, ma dice
+   che non è più il punto sotto al dito. */
+.readout.frozen { opacity: 0.6; }
 .readout b { color: var(--text); }
 .readout .muted { color: var(--muted); }
 .readout .slower { color: var(--red); }
