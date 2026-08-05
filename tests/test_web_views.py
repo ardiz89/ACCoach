@@ -759,6 +759,14 @@ def test_the_rail_lives_outside_every_view_panel():
     where = _view_of_ids()
     assert "rail" in where, "manca #rail in index.html"
     assert where["rail"] == "", "il rail sta dentro un pannello di vista"
+    # `_view_of_ids` lavora per ordine nel documento: gli basta che nessun
+    # `id="view-…` preceda `id="rail"`. Un rail spostato DENTRO `.views`, sopra
+    # `#view-flow` (il primo pannello), passerebbe comunque quell'assert — e il
+    # layout sarebbe rotto lo stesso, perché `.stage > .views` azzera `--gut`
+    # per i discendenti di `.views`, rail compreso. La verifica vera è
+    # strutturale: il rail dev'essere un FRATELLO di `.views`, non un figlio.
+    assert _HTML.index('id="rail"') < _HTML.index('class="views"'), \
+        "il rail dev'essere un fratello di .views, non un discendente"
 
 
 def test_every_view_panel_lives_inside_the_stage():
@@ -775,6 +783,21 @@ def test_the_rail_is_declared_once_and_only_for_views_that_exist():
     body = _APPJS.split("const RAIL_VIEWS = [")[1].split("]")[0]
     for name in re.findall(r'"([\w-]+)"', body):
         assert name in _TABS, name
+
+
+def test_rail_views_is_exactly_the_six_views_about_one_lap():
+    """Il test sopra verifica solo la metà positiva (ogni nome elencato è una
+    scheda vera) — passerebbe anche con cinque nomi, o con sette se qualcuno
+    aggiungesse "session" per sbaglio. Le quattro schede sopra il giro
+    (Allenamento, Sessione, Passo gara, Andamento) non hanno un giro da
+    ritagliare, quindi un rail lì risponderebbe a un clic senza cambiare
+    niente — «peggio di un comando assente», dice il commento sopra
+    RAIL_VIEWS. Qui si fissa il numero e l'assenza di quelle quattro."""
+    body = _APPJS.split("const RAIL_VIEWS = [")[1].split("]")[0]
+    names = re.findall(r'"([\w-]+)"', body)
+    assert len(names) == 6, names
+    for excluded in ("training", "session", "stint", "progress"):
+        assert excluded not in names, f"{excluded} non dovrebbe avere un rail"
 
 
 def test_switching_tab_says_whether_this_one_has_a_rail():
@@ -846,8 +869,25 @@ def test_a_lap_without_coordinates_still_has_a_rail():
 
 
 def test_the_rail_is_drawn_when_a_lap_loads():
+    """Un nuovo giro cambia le curve e le perdite che il rail elenca (nome,
+    numero, quanto è costata ciascuna): senza questa chiamata la colonna
+    resterebbe quella del giro precedente finché non si cambia scheda o non
+    si ridimensiona la finestra — nessuno dei due gesti segue automaticamente
+    un cambio di giro dal menu a tendina."""
     block = _APPJS.split("async function loadCombo")[1].split("\n}")[0]
     assert "drawRail();" in block
+
+
+def test_the_rail_list_is_drawn_outside_the_per_view_switch():
+    """`drawRail()` (la mappa) è ancorato fuori dallo switch di
+    `redrawCurrentView` — vedi il test sopra — ma `drawRailList()` (la
+    classifica delle curve sotto la mappa) non lo era: se finisse dentro un
+    ramo per-vista, la lista invecchierebbe in silenzio al cambio scheda
+    (nuovo giro caricato mentre si è su Allenamento, poi si passa a Confronto)
+    e dopo un cambio lingua, esattamente come per `drawRail()`."""
+    block = _APPJS.split("function redrawCurrentView()")[1].split("\n}")[0]
+    assert re.search(r"^  drawRailList\(\);$", block, re.M), \
+        "drawRailList() dev'essere una riga a sé, fuori dallo switch per-vista"
 
 
 def test_the_rail_lists_the_clean_corners_too():
@@ -1021,3 +1061,59 @@ def test_hoverTo_never_nulls_last_hover_on_mouse_leave():
     assert block.count("LAST_HOVER = p;") == len(
         re.findall(r"if\s*\(\s*p\s*!=\s*null\s*\)\s*LAST_HOVER\s*=\s*p;", block)
     ), "trovata un'assegnazione a LAST_HOVER non protetta dalla guardia p != null"
+
+
+# --- correzioni della revisione finale (2026-08-05) -------------------------
+
+def test_the_gutter_moved_from_main_to_the_stage():
+    """Lo spec della revisione lo chiama il rischio di regressione principale
+    della spedizione del rail, e non aveva un test: il gutter di pagina si è
+    spostato da `main` (una banda per vista) a `.stage` (l'intero palco a due
+    colonne), e `.stage > .views` lo azzera per i propri discendenti così non
+    si applica due volte. Se `.stage` smettesse di pagarlo, o `.views`
+    smettesse di azzerarlo, il commento sopra la regola dice cosa succede su
+    un monitor largo: 480px di vuoto fra il rail e i grafici."""
+    stage = _rule(".stage {")
+    assert "padding: 0 var(--gut)" in stage
+    views = _rule(".stage > .views {")
+    assert "--gut: 0px" in views
+
+
+def test_line_chip_click_also_refreshes_the_rail():
+    """Chip e rail scelgono la stessa finestra condivisa (`RANGE`) ma la
+    leggono con due chiavi diverse — posizione nell'array di Traiettoria
+    contro numero di curva — e prima di questo fix non si parlavano affatto:
+    un clic sul chip aggiornava `RANGE` e richiamava `renderLine(null)` da
+    solo, senza mai passare da `redrawCurrentView`, quindi il rail — che vive
+    fuori da questa vista — restava con la riga della curva precedente ancora
+    accesa. Trovato guardando lo schermo in entrambi i versi, non da un test."""
+    handler = _APPJS.split("setRange(cornerWindow(L.corners[LINE_I]));")[1].split("};")[0]
+    assert "redrawCurrentView();" in handler
+    assert "renderLine(null);" not in handler
+
+
+def test_the_line_view_translates_the_rails_corner_number_into_its_own_index():
+    """Il rail sceglie una curva per NUMERO (`RANGE.corner`, il campo `index`
+    di `/api/analysis`); la Traiettoria naviga per POSIZIONE nel proprio
+    elenco (`LINE_I`, indice dentro `L.corners`, da `/api/trajectory` — un
+    elenco che può avere curve diverse). Prima di questo fix un clic su una
+    riga del rail cambiava `RANGE` senza mai toccare `LINE_I`: il disegno
+    ingrandito, il titolo, la tabella e il chip acceso restavano sulla curva
+    di prima. Una ricerca per `index` — non un'assegnazione diretta fra le due
+    chiavi — è ciò che li fa concordare."""
+    block = _APPJS.split("function renderLine(cx)")[1].split("\n}\n\n")[0]
+    assert "L.corners.findIndex((cc) => cc.index === RANGE.corner)" in block
+    assert "LINE_I = pos;" in block
+
+
+def test_the_rail_is_hidden_when_printing():
+    """La derivazione di stampa (`[id^="view-"]`, vedi il test sui pannelli)
+    non prende `#rail`: vive apposta fuori da ogni pannello di vista, quindi
+    senza un'eccezione esplicita la scheda frenate — pensata per essere
+    stampata e attaccata al volante — usciva con la colonna del rail (mappa
+    su fondo scuro, sette bottoni) e il resto della pagina compresso, perché
+    `.stage` restava `display: flex` anche in stampa."""
+    block = _CSS.split("@media print {")[1].split("\n}\n")[0]
+    assert "#rail" in block, "il rail non è fra gli elementi nascosti in stampa"
+    assert ".stage { display: block; }" in block, \
+        "senza .stage a blocco il resto della pagina resta stretto in stampa"
