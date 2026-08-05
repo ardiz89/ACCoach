@@ -628,6 +628,65 @@ _CORNERS: dict[str, list[tuple[str | int, float]]] = {
     "melbourne": [(n, p) for n, p in enumerate([
         0.071, 0.101, 0.210, 0.236, 0.277, 0.358, 0.379, 0.430,
         0.484, 0.505, 0.635, 0.658, 0.788, 0.834, 0.885, 0.908], start=1)],
+    # Sakhir. Era «il quasi-centro più vicino»: 15 apici per 15 curve
+    # pubblicate, e 14 versi su 15 concordi. **Quella corrispondenza era una
+    # coincidenza**, la seconda in due giorni dopo Melbourne, e riconoscerlo è
+    # ciò che ha sciolto il nodo.
+    #
+    # A soglia 220 m gli apici sono quindici come le curve, ma non sono quelle:
+    # ne manca una (la T5, r=352 m, che il rilevatore vede solo sopra i 300 m) e
+    # due curve sono lette due volte. 15 = 14 curve con apice − 1 mancante + 2
+    # doppie. Alzata la soglia a 400 m — l'unico apice che si aggiunge è proprio
+    # la T5 — la sequenza geometrica diventa la sequenza della fonte con una
+    # sola sinistra di troppo.
+    #
+    # La strada è quella giusta: **5401 m** contro i 5412 pubblicati (0.21%).
+    #
+    # Le due letture doppie sono descritte dalle fonti prima ancora che dalla
+    # geometria: la T11 è «a long but widening turn» e infatti esce come due
+    # apici a 145 m (r=18 m in ingresso, r=105 m in uscita); la T12 è «fast and
+    # wide... over a blind crest» e ne dà due a 170 m con raggi simili (70 e
+    # 82 m). Prese le più strette, che è la regola di spareggio dello strumento.
+    #
+    # **Ciò che bloccava era la coda, e non era un verso: era un vuoto.** Le
+    # ultime quattro destre della geometria combaciano con T12-T15 una a una, e
+    # quell'allineamento mette 790 m di rettilineo fra la T14 e la T15 — assurdo
+    # per una curva che due fonti indipendenti chiamano «l'uscita della T14». La
+    # fonte però dice dove sta il rettilineo: «Turn 13 ... before a long,
+    # undulating straight towards ... Turn 14». Fra due curve in tabella il
+    # vuoto più grande è **789 m** ed è prima di 0.913 — con il secondo a 713 m
+    # (T10-T11), quindi il margine è del 10% e non un abisso: è un indizio
+    # forte, non una dimostrazione. Quindi **T13 = 0.767 e T14 = 0.913**, ed è
+    # la stessa correzione che a Shanghai e a COTA: la sequenza dei versi non
+    # arbitra fra destre consecutive, il buco sì. (Il rettilineo dei box, 1210 m,
+    # è più lungo di tutti e due e non c'entra: non sta *fra* due curve in
+    # tabella, ci passa in mezzo il traguardo.)
+    #
+    # **La T15 non c'è, di proposito.** Non è una curva che questa geometria
+    # possa vedere e non è una curva che si guida a parte: una fonte la dice
+    # «officially a right-handed kink, though it is really just the exit of
+    # Turn 14», l'altra intitola la sezione «Final Corner (Turn 14 - 15)» e
+    # avverte che col gas di troppo «you will run wide through the last bend
+    # (T15)». Darle una posizione significherebbe inventarla; lasciarla fuori
+    # significa solo che nessuno sentirà mai dire «curva 15» in Bahrain, che è
+    # la cosa giusta.
+    #
+    # Una discrepanza registrata invece che nascosta: la seconda fonte chiama la
+    # T8 «Tight left-hand corner» nella sua sezione GT3 e «Tight right-hander»
+    # in quella Hypercar — **si contraddice da sola**. L'altra fonte dice destra
+    # e la geometria pure (r=19 m). Nota per chi rilegge: una prima stesura la
+    # chiamava «la staccata più lenta del giro», e la geometria citata nella
+    # stessa parentesi la smentiva — di apici più stretti ce ne sono quattro.
+    #
+    # Fonti: total-motorsport.com/bahrain-grand-prix-track-guide-bahrain-
+    # international-circuit/ (l'elenco corner by corner e la frase sul
+    # rettilineo) e lemansultimate.wiki.gg/wiki/Track_Guide:_Bahrain (la
+    # sezione «Final Corner (Turn 14 - 15)» e la T5 «isnt really
+    # recognizable»). La seconda è un wiki editabile e si contraddice sulla T8:
+    # vale come conferma dove concorda, mai come arbitro.
+    "sakhir": [(n, p) for n, p in enumerate([
+        0.137, 0.157, 0.178, 0.283, 0.322, 0.348, 0.377,
+        0.424, 0.483, 0.506, 0.638, 0.696, 0.767, 0.913], start=1)],
 }
 
 
@@ -899,6 +958,18 @@ _DIRECTIONS: dict[str, dict[str, str]] = {
         6: "right", 7: "left", 8: "right", 9: "right", 10: "left",
         11: "left", 12: "right", 13: "right", 14: "right", 15: "left",
         16: "right",
+    },
+    # Sakhir. Tutti e quattordici dichiarati a parole da una guida corner by
+    # corner. La terzina 5-6-7 la conferma anche una seconda fonte, che la
+    # chiama «fast left-right-left direction change» — ma quella fonte è un wiki
+    # editabile che sulla T8 si contraddice fra due sue sezioni, quindi conta
+    # come riscontro dove concorda e non come voce indipendente a pari titolo.
+    # La T15 non compare perché non ha una posizione (vedi il commento in
+    # _CORNERS): un verso senza una riga non serve a niente.
+    "sakhir": {
+        1: "right", 2: "left", 3: "right", 4: "right", 5: "left",
+        6: "right", 7: "left", 8: "right", 9: "left", 10: "left",
+        11: "left", 12: "right", 13: "right", 14: "right",
     },
 }
 

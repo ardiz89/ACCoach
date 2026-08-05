@@ -773,6 +773,119 @@ def test_melbourne_turn_eight_is_the_one_row_that_is_not_settled():
     assert trackdata._DIRECTIONS["melbourne"][8] == "right"
 
 
+def test_sakhir_is_numbered_fourteen_of_fifteen_and_that_is_the_honest_number():
+    """La T15 manca apposta. Due fonti indipendenti dicono la stessa cosa con
+    parole diverse — «officially a right-handed kink, though it is really just
+    the exit of Turn 14» e una sezione intitolata «Final Corner (Turn 14 - 15)»
+    che avverte «you will run wide through the last bend (T15)».
+
+    Non è una curva che la geometria possa vedere né una che si guidi a parte:
+    darle una posizione vorrebbe dire inventarla."""
+    assert [n for n, _p in trackdata._CORNERS["sakhir"]] == list(range(1, 15))
+    assert 15 not in trackdata._DIRECTIONS["sakhir"]
+
+
+def test_sakhirs_fifteen_apexes_for_fifteen_turns_were_a_coincidence():
+    """Il motivo per cui questo circuito è rimasto fermo, e la seconda volta in
+    due giorni che un conteggio azzeccato è un falso amico (l'altra è Melbourne).
+
+    A 220 m gli apici sono quindici come le curve pubblicate — ma fra loro non
+    c'è la T5, che entrambe le guide descrivono come impercettibile («T5 isnt
+    really recognizable») e che la geometria misura a r=352 m. Alzando il tetto
+    l'apice che si aggiunge è **esattamente uno**, ed è quello."""
+    from pathlib import Path
+    import sys
+    root = Path(__file__).resolve().parent.parent
+    sys.path.insert(0, str(root / "tools"))
+    import corner_atlas
+
+    def apici(raggio):
+        keep = corner_atlas.MAX_RADIUS_M
+        try:
+            corner_atlas.MAX_RADIUS_M = raggio
+            found, _t = corner_atlas.analyse(
+                *corner_atlas.centreline(corner_atlas.TRACKS / "Sakhir.csv"),
+                flip=True)
+        finally:
+            corner_atlas.MAX_RADIUS_M = keep
+        return found
+
+    stretto, largo = apici(220.0), apici(400.0)
+    assert len(stretto) == 15, "la coincidenza che rende utile questo test"
+    assert len(largo) == 16, "e alzando il tetto ne entra uno solo"
+
+    nuovi = [a for a in largo if all(abs(a[0] - b[0]) > 1e-9 for b in stretto)]
+    assert len(nuovi) == 1
+    posizione, raggio, verso = nuovi[0]
+    assert round(posizione, 3) == dict(trackdata._CORNERS["sakhir"])[5]
+    assert verso == "left" and raggio > 300.0
+
+
+def test_sakhirs_long_straight_sits_between_thirteen_and_fourteen():
+    """L'ancoraggio che ha corretto l'allineamento, ed è un vuoto e non un verso.
+
+    Le ultime quattro destre della geometria combaciano una a una con T12-T15,
+    e quell'assegnazione mette 790 m di rettilineo fra la T14 e la T15 — cioè
+    fra una curva e la sua stessa uscita. La fonte dice dove sta davvero quel
+    rettilineo: «Turn 13 ... before a long, undulating straight towards ...
+    Turn 14». Fra due curve in tabella è il vuoto più grande, ed è lì.
+
+    Il messaggio di questo test diceva «il vuoto più grande del giro», che è
+    **falso**: il rettilineo dei box misura 1210 m contro 789. Corretto in
+    verifica il 05/08, e messo il confronto giusto — che comunque vince per il
+    10%, non per un abisso, quindi resta un indizio forte e non una prova."""
+    pos = dict(trackdata._CORNERS["sakhir"])
+    vuoto = (pos[14] - pos[13]) * 5401.0
+    assert 700 < vuoto < 900
+    fra_curve = [(pos[n + 1] - pos[n]) * 5401.0 for n in range(1, 13)]
+    assert vuoto > max(fra_curve), "il vuoto più grande FRA DUE CURVE in tabella"
+    rettilineo_box = (1.0 - pos[14] + pos[1]) * 5401.0
+    assert rettilineo_box > vuoto, "il traguardo ci passa in mezzo: non è un vuoto fra curve"
+
+
+def test_sakhir_turn_eight_is_a_right_and_the_source_that_says_left_fights_itself():
+    """Una discrepanza registrata invece che nascosta. La seconda fonte chiama
+    la T8 «Tight left-hand corner» nella sezione GT3 e «Tight right-hander» in
+    quella Hypercar: si contraddice da sola. L'altra fonte dice destra, e la
+    geometria pure — r=19 m, la staccata più lenta del giro."""
+    assert trackdata._DIRECTIONS["sakhir"][8] == "right"
+    pos = dict(trackdata._CORNERS["sakhir"])
+    assert pos[8] == 0.424
+
+
+def test_sakhirs_two_double_reads_are_the_ones_the_guides_describe():
+    """Sedici apici per quattordici curve con apice: due sono letture doppie, e
+    le fonti le annunciano prima della geometria. La T11 è «a long but widening
+    turn» (r=18 m in ingresso, r=105 m in uscita) e la T12 «fast and wide ...
+    over a blind crest» (due raggi simili). Prese le più strette, che è la
+    regola di spareggio dello strumento — e resta comunque dentro tolleranza.
+
+    La prima stesura asseriva `pos < gemello` col messaggio «presa la più
+    stretta»: verificava l'ordine, non il raggio, cioè non la proprietà che
+    dichiarava. Ora misura il raggio."""
+    from pathlib import Path
+    import sys
+    root = Path(__file__).resolve().parent.parent
+    sys.path.insert(0, str(root / "tools"))
+    import corner_atlas
+
+    keep = corner_atlas.MAX_RADIUS_M
+    try:
+        corner_atlas.MAX_RADIUS_M = 400.0
+        found, _t = corner_atlas.analyse(
+            *corner_atlas.centreline(corner_atlas.TRACKS / "Sakhir.csv"), flip=True)
+    finally:
+        corner_atlas.MAX_RADIUS_M = keep
+    raggio = {round(f, 3): r for f, r, _d in found}
+
+    pos = dict(trackdata._CORNERS["sakhir"])
+    for numero, gemello in ((11, 0.665), (12, 0.727)):
+        assert gemello in raggio, "la lettura doppia deve esistere nella geometria"
+        assert gemello not in pos.values(), "e non deve essere in tabella"
+        assert abs(pos[numero] - gemello) * 5401.0 < trackdata._NAME_TOL * 5401.0
+        assert raggio[pos[numero]] < raggio[gemello], "presa la lettura più stretta"
+
+
 def test_a_circuit_is_never_both_curated_and_held():
     """La lista dei fermi **marcisce**, ed è il motivo per cui `--check` la
     riverifica invece di limitarsi a scriverla. Ma quel controllo protesta solo

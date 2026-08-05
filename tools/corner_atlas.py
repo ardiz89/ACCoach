@@ -194,8 +194,16 @@ def report(csv_name: str, flip: bool) -> None:
 #: fourteen agree, with T6 showing up as the two apexes of one long corner,
 #: which is exactly what the source calls "a long, sweeping right-hander". The
 #: conflict was this tool's resolution, not a disagreement about the circuit.
+#:
+#: Sakhir: read at the default 220 m the trace gives 15 apexes for 15 published
+#: turns, and that agreement is a coincidence worth distrusting — the T5 is
+#: missing from it. Both guides say why in their own words ("T5 isnt really
+#: recognizable", "a gentle left-hand kink taken at full throttle"), and the
+#: geometry agrees: r=352 m. Raising the ceiling to 400 m adds **exactly one**
+#: apex, and it is that one — it is the trace's only apex between 220 and 400 m.
 PARAMS: dict[str, tuple[float, float]] = {          # key -> (max radius, min sep)
     "austin": (240.0, 0.014),
+    "sakhir": (400.0, 0.02),
 }
 
 #: Circuits looked at properly and **not** curated, with what stopped each one.
@@ -227,14 +235,6 @@ HELD: dict[str, str] = {
         "right, T10 the hairpin, T11 the left kink, T12 the right kink before "
         "the Casino straight, T13/T14 the final right-left — but a numbered "
         "circuit is all-or-nothing, and the middle will not resolve.",
-    "sakhir":
-        "The closest miss here. 15 apexes for 15 published turns and 14 of the "
-        "15 directions agree with a guide that states all of them; the one "
-        "mismatch is explained (T5 is a gentle kink the detector reads only "
-        "above 220 m, and T11 is read as two apexes). What stops it is the end "
-        "of the lap: two independent sources call T15 'effectively the exit of "
-        "Turn 14', and the geometry puts 790 m of straight between the last "
-        "two rights. One of them is not where the numbering says it is.",
     "budapest":
         "The trace is the right layout — 4372 m against a published 4381 — so "
         "the 17 apexes against 14 turns is just the merging, as at Sepang. What "
