@@ -1039,6 +1039,16 @@ function drawMap(a, cx) {
   // so the entry comes and goes with the mark.
   const lost = $("leg-lost");
   if (lost) lost.classList.toggle("hidden", a.review.lost_at == null);
+  // Il readout si scrive QUI, non in ognuno dei chiamanti (`loadCombo`,
+  // `redrawCurrentView`, `hoverTo`): la pastiglia della finestra mancava a
+  // riposo sulla scheda Mappa perché due dei tre la anteponevano da soli e il
+  // terzo — il cambio scheda, che passa da `redrawCurrentView` a `drawMap`
+  // senza toccare il readout — no. La stessa forma del difetto già chiuso per
+  // `hoverTo`: se la pastiglia va scritta a mano in N punti, il punto N+1 se
+  // la dimentica. Scritta una sola volta, dentro la funzione che disegna la
+  // mappa, nessun chiamante può più dimenticarla.
+  const ro = $("map-readout");
+  if (ro) { ro.innerHTML = mapReadoutHTML(cx); wireRangeClear(ro); }
 }
 
 // La mappa del rail. Sempre a GIRO INTERO, anche con la finestra accesa: il rail
@@ -1439,8 +1449,8 @@ async function loadCombo(combo, lapPath, baselinePath) {
   // The sheet is per car+track, not per lap: it survives a lap change and is
   // only dropped when the combo does (see the combo picker).
   if (VIEW === "map") {
-    $("map-readout").innerHTML = mapReadoutHTML(null);
-    wireRangeClear($("map-readout"));
+    // Il readout lo scrive `drawMap` stessa (vedi il commento lì): niente da
+    // duplicare qui.
     drawMap(a, null);
     if (!SHEET) loadBraking();
   }
@@ -4208,9 +4218,12 @@ function wireRangeClear(el) {
   if (b) b.onclick = () => { setRange(null); redrawCurrentView(); };
 }
 
-// Il readout della Mappa scrive il proprio HTML in due punti (il default al
-// caricamento del giro, l'hover) — un `mapReadoutHTML` unico evita che i due
-// finiscano per divergere su chi porta la pastiglia della finestra.
+// Testo del readout della Mappa, a riposo (`p` nullo, la legenda) o sotto il
+// mouse (`p`, punto per punto) — sempre con la pastiglia della finestra
+// davanti. Chiamata da un solo posto, `drawMap` (vedi il suo commento): prima
+// ogni chiamante di `drawMap` scriveva anche il readout per conto proprio, e
+// il cambio scheda — che disegna la mappa senza passare da nessuno degli
+// altri due — se n'era dimenticato.
 function mapReadoutHTML(p) {
   return rangeChip() + (p == null ? MAP_READOUT_DEFAULT() : readoutHTML(DATA, p));
 }
@@ -4253,9 +4266,9 @@ function hoverTo(p) {
   else if (VIEW === "dynamics") drawDynamics(p);
   else if (VIEW === "line") { if (LINE) renderLine(p); }
   else if (VIEW === "map") {
+    // Il readout lo scrive `drawMap` stessa (vedi il commento lì): niente da
+    // duplicare qui.
     drawMap(DATA, p);
-    $("map-readout").innerHTML = mapReadoutHTML(p);
-    wireRangeClear($("map-readout"));
   }
   drawRail(p);
 }
