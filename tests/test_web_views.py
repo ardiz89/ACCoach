@@ -1149,3 +1149,32 @@ def test_the_map_readout_is_written_only_inside_drawMap():
     block = _APPJS.split("function drawMap(a, cx)")[1].split("\n}")[0]
     assert "mapReadoutHTML(cx)" in block, \
         "drawMap deve scrivere #map-readout da sé, non lasciarlo ai chiamanti"
+
+
+# --- il gemello: la pastiglia mancava anche su Dinamica senza dati ----------
+
+def test_the_dyn_readout_is_written_only_inside_updateDynReadout():
+    """Stesso difetto della Mappa, sull'altra scheda: `drawDynamics` ha due
+    rami — canali di dinamica presenti o assenti — e prima di questo fix solo
+    il primo passava da `updateDynReadout` (che antepone sempre
+    `rangeChip()`). Il ramo "nessun dato" (un giro senza canali di dinamica)
+    scriveva `#dyn-readout` a mano, con la sola frase di default: nessuna
+    pastiglia, nessuna ✕ per annullare la finestra. Un solo punto d'accesso
+    al readout — `$("dyn-readout")`, dentro `updateDynReadout` — rende
+    impossibile ripetere l'errore in un ramo futuro di `drawDynamics`."""
+    assert _APPJS.count('$("dyn-readout")') == 1, \
+        "dyn-readout deve avere un solo punto d'accesso: dentro updateDynReadout"
+    block = _APPJS.split("function drawDynamics(cx)")[1].split("\n}")[0]
+    assert block.count("updateDynReadout(DATA,") == 2, \
+        "entrambi i rami di drawDynamics (dati presenti e assenti) devono passare da updateDynReadout"
+    assert 't("dyn.readout")' not in block, \
+        "drawDynamics non deve più scrivere la frase di default a mano: solo updateDynReadout lo fa"
+
+
+def test_the_dyn_readout_default_text_always_carries_the_chip():
+    """`updateDynReadout` è il solo punto che scrive `#dyn-readout` (vedi il
+    test sopra): se il suo stesso ramo "a riposo" dimenticasse `rangeChip()`,
+    nessun chiamante potrebbe più rimediarlo."""
+    block = _APPJS.split("function updateDynReadout(a, p)")[1].split("\n}")[0]
+    assert "rangeChip()" in block
+    assert 'chip + t("dyn.readout")' in block
