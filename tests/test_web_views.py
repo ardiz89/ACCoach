@@ -817,3 +817,30 @@ def test_init_applies_the_rail_before_the_first_draw():
     block = _APPJS.split("async function init(")[1].split("\n}")[0]
     assert block.index("applyRailed(") < block.index("await loadCombo("), \
         "applyRailed deve scattare prima del primo loadCombo, non dopo"
+
+
+def test_the_rail_is_drawn_outside_the_per_view_switch():
+    """`redrawCurrentView` è uno switch per-vista e il rail non appartiene a
+    nessuna vista. Dentro un ramo, al cambio scheda resterebbe fermo all'ultimo
+    giro e dopo un resize l'hover punterebbe al posto sbagliato.
+
+    Il criterio è l'indentazione: una riga a sé, ai due spazi del corpo della
+    funzione, non può stare dentro un `if` — un ramo la indenterebbe di più o se
+    la porterebbe sulla propria riga."""
+    block = _APPJS.split("function redrawCurrentView()")[1].split("\n}")[0]
+    assert re.search(r"^  drawRail\(\);$", block, re.M), \
+        "drawRail() dev'essere una riga a sé, fuori dallo switch per-vista"
+
+
+def test_a_lap_without_coordinates_still_has_a_rail():
+    """I giri ACC registrati prima dello schema con le coordinate sono esattamente
+    questo caso, e col rail persistente diventerebbero una colonna vuota su tutte
+    le schede."""
+    assert 'id="rail-nomap"' in _HTML
+    block = _APPJS.split("function drawRail()")[1].split("\n}")[0]
+    assert '$("rail-nomap")' in block, "il segnaposto non viene passato a drawMapTo"
+
+
+def test_the_rail_is_drawn_when_a_lap_loads():
+    block = _APPJS.split("async function loadCombo")[1].split("\n}")[0]
+    assert "drawRail();" in block

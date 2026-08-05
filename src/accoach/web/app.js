@@ -225,6 +225,11 @@ function redrawCurrentView() {
   // paragraph on the tab in the language you just left.
   else if (VIEW === "stint") { if (CURRENT) loadStint(CURRENT, STINT_I); }
   else if (DATA) redraw(LAST_HOVER);   // compare
+  // Il rail non appartiene a nessuna vista, quindi non sta in nessun ramo. Fuori
+  // dallo switch è l'unico posto dove il cambio scheda e il resize lo trovano
+  // entrambi: `redrawCurrentView` è ciò che il resize chiama (debounced, riga
+  // ~4144) e ciò che `showView` chiama in coda.
+  drawRail();
 }
 
 // Colour-blind palette toggle, dropped next to the tour "?" button. Persisted in
@@ -1047,6 +1052,42 @@ function drawMiniMap(a, cx) {
   if (hit) MINI_HIT = hit;
 }
 
+// La mappa del rail. Sempre a GIRO INTERO, anche con la finestra accesa: il rail
+// è il «dove sono», e uno zoom lo trasformerebbe in una seconda copia del
+// grafico che stai già guardando. La finestra si legge come un tratto acceso.
+let RAIL_HIT = null;   // {rv, X, Y}, il trasformo schermo, per l'hover
+
+function drawRail() {
+  // Su una scheda senza rail il canvas ha larghezza zero e `setup` disegnerebbe
+  // su una tela di 0 px: lavoro sprecato, e un hit test tarato su niente.
+  if (!DATA || !document.body.classList.contains("railed")) return;
+  RAIL_HIT = drawMapTo($("c-rail"), $("rail-nomap"), DATA, LAST_HOVER);
+  if (RAIL_HIT && RANGE) railWindow(RAIL_HIT);
+}
+
+// Il tratto scelto, acceso sopra la mappa già disegnata. Ridisegnare con lo
+// stesso contesto è legittimo: `setup` lascia sul canvas la trasformazione del
+// device pixel ratio, e `X`/`Y` restituiti da `drawMapTo` sono in pixel CSS —
+// gli stessi in cui si ragiona qui.
+function railWindow(hit) {
+  const ctx = $("c-rail").getContext("2d");
+  const rv = hit.rv;
+  ctx.save();
+  ctx.strokeStyle = "#22D3CE"; ctx.lineWidth = 4;
+  ctx.lineCap = "round"; ctx.lineJoin = "round";
+  ctx.beginPath();
+  let started = false;
+  for (let i = 0; i < rv.x.length; i++) {
+    const p = rv.pos[i];
+    if (p < RANGE.from || p > RANGE.to) { started = false; continue; }
+    const px = hit.X(rv.x[i]), py = hit.Y(rv.z[i]);
+    started ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+    started = true;
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
 // Render the delta-coloured racing line + braking points to ``canvas``; returns
 // the screen transform {rv, X, Y} so a hover can map cursor → nearest sample,
 // or null when there's no map. ``missing`` (optional) is a placeholder element
@@ -1282,6 +1323,7 @@ async function loadCombo(combo, lapPath, baselinePath) {
   drawDebrief(a);
   renderFlow(a);
   redraw(null);
+  drawRail();
   // The sheet is per car+track, not per lap: it survives a lap change and is
   // only dropped when the combo does (see the combo picker).
   if (VIEW === "map") {
