@@ -745,3 +745,34 @@ def test_the_pencil_does_not_print():
     i = _CSS.find("@media print")
     block = _CSS[i:_CSS.index("\n}", i)]
     assert ".pencil" in block
+
+
+# --- il rail -----------------------------------------------------------------
+
+def test_the_rail_lives_outside_every_view_panel():
+    """Un rail dentro un pannello sarebbe sei rail: sei canvas, sei hover da
+    cablare e sei posti dove ricordarsi di ridisegnare. Fuori da tutti, è uno."""
+    where = _view_of_ids()
+    assert "rail" in where, "manca #rail in index.html"
+    assert where["rail"] == "", "il rail sta dentro un pannello di vista"
+
+
+def test_every_view_panel_lives_inside_the_stage():
+    """Il palco è la griglia a due colonne: un pannello fuori tornerebbe a
+    larghezza piena e finirebbe sotto il rail."""
+    stage = _HTML.split('<div class="stage">')[1].split('<!-- /stage -->')[0]
+    for panel in _PANELS:
+        assert f'id="view-{panel}"' in stage, panel
+
+
+def test_the_rail_is_declared_once_and_only_for_views_that_exist():
+    """Un elenco scritto due volte è un elenco che diverge."""
+    assert _APPJS.count("const RAIL_VIEWS") == 1
+    body = _APPJS.split("const RAIL_VIEWS = [")[1].split("]")[0]
+    for name in re.findall(r'"([\w-]+)"', body):
+        assert name in _TABS, name
+
+
+def test_switching_tab_says_whether_this_one_has_a_rail():
+    block = _APPJS.split("function showView(")[1].split("\n}")[0]
+    assert 'classList.toggle("railed"' in block

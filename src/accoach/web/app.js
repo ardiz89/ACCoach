@@ -243,6 +243,13 @@ function wireCbToggle() {
   help.parentNode.insertBefore(btn, help.nextSibling);
 }
 
+// Le sei schede che parlano di UN GIRO, e quindi di una curva. Le altre quattro
+// stanno sopra il giro nella gerarchia (una sessione, uno stint, lo storico, un
+// piano): lì il rail mostrerebbe un giro che non c'entra con quello che leggi, e
+// cliccare una curva non cambierebbe niente. Un comando che non risponde è
+// peggio di un comando assente.
+const RAIL_VIEWS = ["flow", "compare", "map", "line", "sectors", "dynamics"];
+
 // Switch to a view by name, as if its tab had been clicked. Used by the tabs
 // themselves and by the "show me the whole chart" button in the guided flow.
 function showView(name) {
@@ -256,6 +263,7 @@ function showView(name) {
   for (const p of document.querySelectorAll("[id^='view-']")) {
     p.classList.toggle("hidden", p.id !== "view-" + name);
   }
+  document.body.classList.toggle("railed", RAIL_VIEWS.indexOf(name) >= 0);
   redrawCurrentView();
 }
 

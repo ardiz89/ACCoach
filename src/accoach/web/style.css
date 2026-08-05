@@ -266,6 +266,40 @@ select {
 .hidden { display: none; }
 
 main { padding: 16px var(--gut); display: grid; gap: 18px; }
+
+/* Il palco a due colonne. Il gutter — che cresce con la finestra invece che con
+   un wrapper, vedi il commento a --page — si sposta QUI, e dentro `.views` viene
+   azzerato: le venticinque bande che scrivono `padding: … var(--gut)` ereditano
+   la variabile e si allineano da sole, senza toccarne nemmeno una. Senza questo
+   azzeramento, su un 2560 il gutter si applicherebbe due volte e fra il rail e i
+   grafici resterebbero 480 px di vuoto. */
+.stage { display: flex; align-items: flex-start; gap: 16px; padding: 0 var(--gut); }
+.stage > .views { flex: 1 1 auto; min-width: 0; --gut: 0px; }
+
+/* Sticky: scorrendo un debrief lungo la mappa resta dov'è. `top` sotto le
+   schede, che non sono sticky, quindi basta un filo d'aria. */
+.rail {
+  flex: 0 0 220px; position: sticky; top: 8px;
+  padding: 16px 0 24px; align-self: flex-start;
+}
+/* Sulle quattro schede che stanno SOPRA il giro (Sessione, Passo gara,
+   Andamento, Allenamento) l'oggetto è un altro e una curva non significa
+   niente: meglio niente colonna che una colonna che non risponde. */
+body:not(.railed) .rail { display: none; }
+
+.rail-map { position: relative; }
+.rail-map canvas { width: 100%; height: 150px; cursor: crosshair; display: block; }
+.rail-nomap { font-size: 11px; color: var(--muted); line-height: 1.5; padding: 8px 0; }
+
+/* Il tablet accanto al volante: sotto i 1100 px la colonna mangerebbe un quinto
+   della larghezza. Il rail sparisce e i chip della Traiettoria restano il modo
+   di scegliere una curva. */
+@media (max-width: 1100px) {
+  .rail { display: none; }
+  .stage { display: block; }
+  .stage > .views { --gut: max(24px, calc((100% - var(--page)) / 2)); }
+  .stage { padding: 0; }
+}
 .chart canvas { cursor: crosshair; }
 /* …tranne dove il mirino non c'è. Il puntatore è una promessa: darlo a un
    grafico che non risponde al mouse insegna al pilota che il gesto non
