@@ -147,7 +147,17 @@ e vale la pena non confonderle con la sessione qui sotto:
   metodo e i motivi ora sono **misurati**, non contati: Yas Marina è chiuso dal
   metro (la traccia fa 5542 m e tutti e due i tracciati pubblicati ne fanno
   5281), Budapest e Sochi da fonti che si contraddicono e da una geometria che
-  **non arbitra** — a Budapest le due letture opposte fanno entrambe 14/14.
+  **non arbitra**. **Budapest** è stato riattaccato il 05/08 con il metodo che
+  aveva appena liberato Montreal, e ne è uscito **un no più fermo**: trovata una
+  terza guida che dichiara nove versi su quattordici più un ancoraggio suo (il
+  rettilineo T11-T12 è il secondo del giro), le letture ammissibili scendono a
+  16 e **tutte e sedici concordano su T4-T12**, nove righe di fila. Ma una
+  quarta guida chiama la T10 «an easy flat-out **left**-hand kink» dove l'altra
+  la dice destra, e sopravvivono entrambe. Il colpo di grazia è che **a soglia
+  220 m la lettura "destra" ha zero assegnazioni e quella "sinistra" ne ha 18,
+  a 300 m ne hanno 48 e 108**: quale guida vince dipende da una manopola
+  nostra. Un circuito la cui risposta si muove con le nostre impostazioni non è
+  misurato, è tarato.
   **Moscow Raceway** ha cambiato motivo il 05/08: il conteggio pubblicato che
   mancava ora c'è (il metro sceglie il «Full Circuit», 4058 m di traccia contro
   4.070 km, e la variante successiva delle diciotto sta quattro volte più
