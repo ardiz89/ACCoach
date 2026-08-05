@@ -615,3 +615,103 @@ def test_shanghai_turn_five_has_no_direction_because_nobody_stated_one():
     passerebbe il test e potrebbe spostare un nome."""
     assert 5 not in trackdata._DIRECTIONS["shanghai"]
     assert len(trackdata._DIRECTIONS["shanghai"]) == 15
+
+
+def test_melbourne_is_numbered_all_sixteen():
+    """La traccia è il tracciato 1996-2020, non quello di oggi: 5294 m contro i
+    5303 pubblicati (0.17%), mentre l'Albert Park attuale fa 5278 m e ha 14
+    curve. Quindi sedici, con la chicane T9-T10 ancora al suo posto."""
+    assert [n for n, _p in trackdata._CORNERS["melbourne"]] == list(range(1, 17))
+
+
+def test_melbourne_directions_are_six_lefts_and_ten_rights():
+    """Il vincolo globale, e qui vale doppio perché è stato **previsto prima di
+    essere letto**: la ricostruzione geometrica dava 6 sinistre e 10 destre, e
+    solo dopo si è trovata la fonte che dice «16 corners with 10 right turns and
+    6 left turns».
+
+    La controprova sta nella stessa pagina: il tracciato di oggi è dato a 14
+    curve e 5L/9R, cioè questo meno una destra e una sinistra — che sono
+    esattamente la T9 e la T10 rimosse nel 2022."""
+    d = trackdata._DIRECTIONS["melbourne"]
+    assert sum(v == "left" for v in d.values()) == 6
+    assert sum(v == "right" for v in d.values()) == 10
+    assert [n for n, v in sorted(d.items()) if v == "left"] == [2, 4, 7, 10, 11, 15]
+
+
+def test_melbournes_nine_ten_complex_is_forced_and_not_chosen():
+    """Il perno di tutta la tabella, e non è una lettura: è un'eliminazione.
+
+    L'unica frase strutturale disponibile dice che il complesso T9-T10 era «a
+    heavy right-left corner». Nella traccia ci sono cinque coppie consecutive
+    destra-poi-sinistra, ma otto curve devono starci davanti e sei dietro:
+    quattro delle cinque non ce la fanno per aritmetica. Ne resta **una**, e da
+    lì scende tutto il resto della numerazione."""
+    from pathlib import Path
+    import sys
+    root = Path(__file__).resolve().parent.parent
+    sys.path.insert(0, str(root / "tools"))
+    import corner_atlas
+
+    found, _total = corner_atlas.analyse(
+        *corner_atlas.centreline(corner_atlas.TRACKS / "Melbourne.csv"), flip=True)
+    survivors = [i for i, (a, b) in enumerate(zip(found, found[1:]))
+                 if a[2] == "right" and b[2] == "left"
+                 and i >= 8 and len(found) - (i + 2) >= 6]
+    assert len(survivors) == 1, "il complesso T9-T10 non è più forzato"
+
+    pos = dict(trackdata._CORNERS["melbourne"])
+    assert pos[9] == round(found[survivors[0]][0], 3)
+    assert pos[10] == round(found[survivors[0] + 1][0], 3)
+
+
+def test_melbourne_shows_that_a_matching_count_is_not_a_matching_layout():
+    """Il controesempio che questo circuito regala, e che vale oltre Melbourne.
+
+    A soglia 150 m il rilevatore trova **esattamente sedici** apici, che è il
+    numero pubblicato — la coincidenza che invita a fidarsi del conteggio. E
+    quell'assegnazione è falsa: mette la nona e la decima curva entrambe a
+    sinistra, mentre la fonte dice che erano una destra e una sinistra."""
+    from pathlib import Path
+    import sys
+    root = Path(__file__).resolve().parent.parent
+    sys.path.insert(0, str(root / "tools"))
+    import corner_atlas
+
+    keep = corner_atlas.MAX_RADIUS_M
+    try:
+        corner_atlas.MAX_RADIUS_M = 150.0
+        found, _t = corner_atlas.analyse(
+            *corner_atlas.centreline(corner_atlas.TRACKS / "Melbourne.csv"),
+            flip=True)
+    finally:
+        corner_atlas.MAX_RADIUS_M = keep
+
+    assert len(found) == 16, "la coincidenza che rende utile questo test"
+    assert [found[8][2], found[9][2]] == ["left", "left"]
+    assert [trackdata._DIRECTIONS["melbourne"][9],
+            trackdata._DIRECTIONS["melbourne"][10]] == ["right", "left"]
+
+
+def test_melbourne_turn_thirteen_is_the_one_at_the_end_of_the_long_run():
+    """Delle quattro destre in coda al giro, la T13 è decisa da due frasi
+    indipendenti: F1 dice che fu allargata «under brakes», e una guida del
+    tracciato di oggi mette la sua erede «at the end of the second-longest
+    straight». Una sola candidata soddisfa entrambe — la curva più stretta del
+    giro, in fondo a ~690 m rotti solo da kink piatti."""
+    pos = dict(trackdata._CORNERS["melbourne"])
+    assert 600 < (pos[13] - pos[12]) * 5294.0 < 800
+    assert trackdata._DIRECTIONS["melbourne"][13] == "right"
+
+
+def test_melbourne_turn_eight_is_the_one_row_that_is_not_settled():
+    """L'unica riga non risolta, e sta scritta invece che nascosta.
+
+    La T8 è uno di due kink piatti a destra distanti 165 m, e la fonte li
+    descrive entrambi allo stesso modo. Scelto il più stretto — la regola di
+    spareggio già scritta nello strumento. Il test fissa il costo massimo
+    dell'errore: dentro la tolleranza dei nomi, e dallo stesso lato."""
+    pos = dict(trackdata._CORNERS["melbourne"])
+    altra = 0.399
+    assert abs(pos[8] - altra) * 5294.0 < trackdata._NAME_TOL * 5294.0
+    assert trackdata._DIRECTIONS["melbourne"][8] == "right"

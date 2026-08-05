@@ -235,12 +235,6 @@ HELD: dict[str, str] = {
         "of the lap: two independent sources call T15 'effectively the exit of "
         "Turn 14', and the geometry puts 790 m of straight between the last "
         "two rights. One of them is not where the numbering says it is.",
-    "melbourne":
-        "The trace is the right layout (5294 m against a published 5303), so "
-        "the problem is not the road: it is that the corner count never settles "
-        "(16/18/19/20/22... as the threshold relaxes) and the guide found in "
-        "2026-08-03 contradicts itself. Nothing here has been held against a "
-        "sourced direction list yet — this one is worth another attempt.",
     "budapest":
         "The trace is the right layout — 4372 m against a published 4381 — so "
         "the 17 apexes against 14 turns is just the merging, as at Sepang. What "
@@ -266,8 +260,21 @@ HELD: dict[str, str] = {
         "kept the length. 261 m is 5%, where Sepang's trace came within 0.14% "
         "and Monza, Spa and Suzuka within 1%. So this is neither layout, and "
         "no direction list can rescue a road that isn't the road.",
-    "moscowraceway": "19 corners, rock-solid from 200 m to 600 m, and no "
-                     "published turn count found to hold it against.",
+    "moscowraceway":
+        "The published count exists now, and it made things worse rather than "
+        "better. The tape measure picks the layout cleanly: the trace is "
+        "4058 m, the 'Full Circuit' is 4.070 km (0.29%), and the next candidate "
+        "of the circuit's **eighteen** variations is four times further away "
+        "(4.009 km, 1.2%) — outside the band every curated trace has landed in. "
+        "That layout is published at **21 corners**; the detector gives 19 from "
+        "150 m all the way to 600 m and 20 at 800 m, so two turns are merged "
+        "somewhere, which after Sepang is not by itself a reason to stop. What "
+        "stops it is that no source describes *this* road turn by turn: the "
+        "guides that walk the lap are all written for the raced Grand Prix #1 "
+        "layout — 3.955 km, 15 turns, 103 m and four variations away — and one "
+        "of them states a single direction ('the quick Turn 1 left-hander') "
+        "for a corner the two layouts need not even share. A direction list "
+        "for the wrong configuration is the Barcelona trap with extra steps.",
     "ims": "Published count not reachable at any threshold.",
     "norisring": "Published count not reachable at any threshold.",
     "oschersleben": "Published count not reachable at any threshold.",

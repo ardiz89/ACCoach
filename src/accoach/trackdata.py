@@ -541,6 +541,67 @@ _CORNERS: dict[str, list[tuple[str | int, float]]] = {
     "shanghai": [(n, p) for n, p in enumerate([
         0.114, 0.137, 0.163, 0.193, 0.249, 0.296, 0.366, 0.434,
         0.473, 0.493, 0.578, 0.599, 0.633, 0.883, 0.903, 0.952], start=1)],
+    # Melbourne. Era fermo perché «il conteggio non si stabilizza mai»
+    # (16/18/19/20/22 al rilassarsi della soglia). Vero, e la domanda sbagliata:
+    # a 150 m il conteggio cade **esattamente su 16**, che è il numero
+    # pubblicato — e quell'assegnazione è **falsa**. Ci mette la T9 e la T10
+    # entrambe a sinistra, mentre la fonte dice che erano una destra e una
+    # sinistra. È il controesempio pulito alla tentazione di fidarsi del
+    # conteggio: un numero che torna non è un tracciato che torna.
+    #
+    # La strada è quella giusta e lo dice il metro: **5294 m** contro i 5303
+    # pubblicati del tracciato 1996-2020 (0.17%), non i 5278 delle 14 curve di
+    # oggi. Quindi è il vecchio Albert Park, quello con la chicane T9-T10.
+    #
+    # Ciò che lo sblocca non è una lista di versi ma **due frasi sulla
+    # struttura**, e l'eliminazione fa il resto:
+    #   - «the turn 9-10 complex [was] a heavy right-left corner». Nella traccia
+    #     ci sono cinque coppie destra-poi-sinistra consecutive; quattro
+    #     lascerebbero meno di 8 curve davanti o meno di 6 dietro, e muoiono di
+    #     aritmetica. Resta 0.484/0.505. **Forzata, non scelta.**
+    #   - «The chicanes at turns 11 and 12». Dopo la T10 resta una sola chicane
+    #     che lasci quattro curve in coda: 0.635/0.658. Forzata anche questa.
+    #
+    # Fissate quelle 13 righe, **tutte e sei le sinistre sono esaurite**, quindi
+    # le tre rimaste (T8, T13, T14) sono per forza destre — e ogni apice
+    # candidato è destro. Il verso qui non può sbagliare: è il modo di sbagliare
+    # che ci ha morso due volte il 30/07, e su questo circuito è chiuso a chiave.
+    #
+    # Il vincolo globale è stato **previsto prima di essere letto**: la
+    # ricostruzione dà 6 sinistre e 10 destre, e una fonte dice testualmente
+    # «A total of 16 corners with 10 right turns and 6 left turns». La stessa
+    # pagina dà il tracciato attuale a 14 curve, **5L/9R** — cioè 6L/10R meno
+    # una destra e una sinistra, che sono esattamente la T9 e la T10 rimosse.
+    # Tre numeri che si incastrano da soli.
+    #
+    # T13 la decidono due frasi indipendenti: F1 dice che fu modificata «to
+    # widen and move the apex, to provide increased overtaking opportunities on
+    # the approach and **under brakes**», e una guida del tracciato attuale
+    # mette la sua erede (T11 di oggi = T13 di allora) «at the end of the
+    # second-longest straight». Dei quattro candidati solo 0.788 soddisfa
+    # entrambe: r=13 m, la curva più stretta del giro, in fondo a ~690 m rotti
+    # solo da due kink con r>130 m. Gli altri tre hanno 225-350 m di rincorsa.
+    # T6 e T7 arrivano gratis da una terza guida: «a right-left at 6 and 7».
+    #
+    # **Una riga non è risolta e sta scritto qui**: la T8 è uno di due kink
+    # piatti a destra distanti 165 m (0.399 con r=194 m, 0.430 con r=174 m), e
+    # la fonte li descrive entrambi — «a flat-out kink, hardly a corner».
+    # Nessun documento li separa. Scelto il più stretto, che è la regola di
+    # spareggio già scritta in corner_atlas.fit. Il costo massimo dell'errore è
+    # una riga spostata di 165 m dentro una tolleranza di 265 m, sulla curva
+    # accanto che gira dallo stesso lato.
+    #
+    # **Per numero, e di proposito.** Una prosa che nomina queste curve esiste
+    # (Jones, Brabham, Sports Centre, Hellas, Whiteford, Marina, Lauda, Clark,
+    # Fittipaldi, Waite, Hill, Ascari, Stewart, Senna, Prost) e il suo 16 è una
+    # coincidenza: contata contro il complesso T9-T10 nomina una curva **in meno**
+    # davanti e una **in più** dietro. È un racconto, non un'enumerazione. E i
+    # nomi da campione ad Albert Park sono delle **tribune** — la Hill sta
+    # all'uscita della 3, la Stewart all'uscita della 5 — quindi non arbitrano.
+    # Un numero è un fatto.
+    "melbourne": [(n, p) for n, p in enumerate([
+        0.071, 0.101, 0.210, 0.236, 0.277, 0.358, 0.379, 0.430,
+        0.484, 0.505, 0.635, 0.658, 0.788, 0.834, 0.885, 0.908], start=1)],
 }
 
 
@@ -800,6 +861,18 @@ _DIRECTIONS: dict[str, dict[str, str]] = {
         1: "right", 2: "right", 3: "left", 4: "left", 6: "right",
         7: "left", 8: "right", 9: "left", 10: "left", 11: "left",
         12: "right", 13: "right", 14: "right", 15: "right", 16: "left",
+    },
+    # Melbourne, tracciato 1996-2020. Tutti e sedici i versi sono dichiarati,
+    # ma non tutti dalla stessa frase: sei sinistre e dieci destre le dice il
+    # totale pubblicato, e quali siano le sei sinistre lo forza la geometria
+    # (vedi il commento in _CORNERS). Le tre destre non ancorate a una frase
+    # singola — 8, 13, 14 — restano comunque destre per esaurimento, quindi
+    # entrano nel controllo invece di essere taciute come la T5 di Shanghai.
+    "melbourne": {
+        1: "right", 2: "left", 3: "right", 4: "left", 5: "right",
+        6: "right", 7: "left", 8: "right", 9: "right", 10: "left",
+        11: "left", 12: "right", 13: "right", 14: "right", 15: "left",
+        16: "right",
     },
 }
 
