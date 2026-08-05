@@ -301,6 +301,10 @@
     "line.name.save":  { en: `Save`, it: `Salva` },
     "line.name.drop":  { en: `Remove`, it: `Togli` },
     "line.name.err":   { en: `couldn't save the name`, it: `il nome non si è salvato` },
+    // Il primo chip della Traiettoria: lo stato di partenza, non l'assenza
+    // di una selezione.
+    "range.clear":     { en: `Back to the whole lap`, it: `Torna al giro intero` },
+    "line.whole":      { en: `Whole lap`, it: `Tutto il giro` },
     "line.mag":        { en: `gap`, it: `scarto` },
     "line.mag.note":   { en: `gap shown ×{n} — the scale bar is still real ground`,
                          it: `scarto mostrato ×{n} — la barra di scala resta reale` },
