@@ -38,10 +38,18 @@ def _texts(app, state) -> list:
             return orig(*a, **kw)
 
         p.drawText = grab
-        return real(p, w)
+        try:
+            return real(p, w)
+        finally:
+            # Senza questo, `grab` tiene un riferimento al painter che lo tiene:
+            # il QPainter sopravvive a paintEvent e la gc ciclica lo distrugge
+            # più tardi, su un device già morto — un access violation dentro un
+            # test che non c'entra niente.
+            del p.drawText
 
     o._draw_corner_card = spy
     o.render(QPixmap(o.size()))
+    del o._draw_corner_card
     o.deleteLater()
     return drawn
 
