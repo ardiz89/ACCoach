@@ -7,9 +7,11 @@ from accoach.coaching.trends import (
     session_recap,
     session_series,
 )
-from accoach.coaching.phases import lap_time_split
+from accoach.coaching.phases import PHASES, lap_time_split
 from accoach.comparison import Reference
 from accoach.track import detect_corners
+
+import pytest
 
 import synth
 
@@ -196,9 +198,12 @@ def _recap(amts):
 
 
 def test_the_families_add_up_to_the_average_gap():
+    """Con i float pieni la media delle somme È la somma delle medie: nessun
+    margine largo qui, solo il rumore in virgola mobile (misurato: 0.0 su
+    diverse combinazioni di giri e griglie, vedi il report)."""
     r = _recap([10, 20, 30])
     total = sum(r.by_phase.values()) + r.launch_ms
-    assert abs(total - r.gain_avg_ms) < 0.5     # media di somme esatte
+    assert abs(total - r.gain_avg_ms) < 1e-6
 
 
 def test_one_row_per_lap_with_its_worst_corner():
@@ -221,14 +226,24 @@ def test_no_laps_no_recap():
 
 def test_a_lap_the_split_cannot_read_is_skipped_not_faked():
     """Un giro senza abbastanza campioni non entra: meglio due righe vere che
-    tre con una inventata."""
+    tre con una inventata. ``len(r.laps) == 1`` da solo non basta a provarlo:
+    il giro scartato potrebbe restare dentro i denominatori delle medie senza
+    comparire in ``laps``. Il confronto con una sessione che contiene SOLO il
+    giro leggibile chiude anche quel buco."""
     ref_lap = synth.build_lap()
     corners = detect_corners(ref_lap.samples)
+    readable = synth.build_lap(slow_corner=0, amt=20)
     short = synth.build_lap()
     short.samples = short.samples[:2]
-    r = session_recap([synth.build_lap(slow_corner=0, amt=20), short],
-                      Reference(ref_lap), corners)
+    reference = Reference(ref_lap)
+
+    r = session_recap([readable, short], reference, corners)
+    solo = session_recap([readable], reference, corners)
+
     assert len(r.laps) == 1
+    assert r.gain_avg_ms == solo.gain_avg_ms
+    assert r.launch_ms == solo.launch_ms
+    assert r.by_phase == solo.by_phase
 
 
 def test_worst_ms_is_not_rounded_and_reference_is_the_sessions_best():
@@ -253,3 +268,37 @@ def test_worst_ms_is_not_rounded_and_reference_is_the_sessions_best():
     r = session_recap([lap], reference, corners)
     assert r.reference_ms == reference.lap_time_ms
     assert r.laps[0].worst_ms == expected_worst
+
+
+def test_by_phase_launch_and_gain_avg_are_not_rounded():
+    """I restanti tre siti di ``round(...)`` del piano originale: ``by_phase``
+    (4 valori), ``launch_ms`` e ``gain_avg_ms``.
+
+    Un margine largo come ``< 0.5`` su "la somma delle famiglie torna alla
+    media del gap" NON può rilevare un arrotondamento reintrodotto qui, con
+    NESSUN fixture: arrotondare in modo indipendente 4 famiglie + launch (un
+    lato della somma) e gain_avg_ms (l'altro lato) sposta il confronto di al
+    più 5*0.05 + 0.05 = 0.3ms per disuguaglianza triangolare, sempre sotto
+    0.5ms. Serve un confronto diretto col valore medio ricalcolato a mano dai
+    float pieni di ``lap_time_split``, non una verifica di somma.
+    """
+    ref_lap = synth.build_lap(n=397)
+    reference = Reference(ref_lap)
+    corners = detect_corners(ref_lap.samples)
+    laps = [synth.build_lap(slow_corner=0, amt=a) for a in (10, 20, 30)]
+    splits = [lap_time_split(lap, reference, corners) for lap in laps]
+    n = len(splits)
+
+    raw = ([s.launch_ms for s in splits] + [s.gap_ms for s in splits] +
+           [v for s in splits for v in s.by_phase().values()])
+    assert any(v != int(v) for v in raw), "il fixture deve dare valori frazionari"
+
+    expected_launch = sum(s.launch_ms for s in splits) / n
+    expected_gain = sum(s.gap_ms for s in splits) / n
+    expected_by_phase = {p: sum(s.by_phase()[p] for s in splits) / n for p in PHASES}
+
+    r = session_recap(laps, reference, corners)
+    assert r.launch_ms == pytest.approx(expected_launch, abs=1e-6)
+    assert r.gain_avg_ms == pytest.approx(expected_gain, abs=1e-6)
+    for p in PHASES:
+        assert r.by_phase[p] == pytest.approx(expected_by_phase[p], abs=1e-6)
