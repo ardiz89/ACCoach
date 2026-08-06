@@ -31,7 +31,7 @@ import math
 import statistics
 from dataclasses import asdict, dataclass, field
 
-from .debrief import LapDebrief
+from .debrief import LapDebrief, loss_at
 from .thresholds import RECUR_FRAC, SIGNIF_LOSS_MS
 from .trends import LossTrend
 
@@ -176,7 +176,7 @@ def measure(plan: TrainingPlan, debriefs_since: list[LapDebrief]) -> list[GoalPr
     n = len(debriefs_since)
     out: list[GoalProgress] = []
     for g in plan.goals:
-        losses = [_loss_at(d, g.corner_index) for d in debriefs_since]
+        losses = [loss_at(d, g.corner_index) for d in debriefs_since]
         hits = sum(1 for v in losses if v <= g.target_ms)
         needed = max(2, math.ceil(RECUR_FRAC * n)) if n else 0
         out.append(GoalProgress(
@@ -187,16 +187,3 @@ def measure(plan: TrainingPlan, debriefs_since: list[LapDebrief]) -> list[GoalPr
             done=n >= _MIN_LAPS_TO_JUDGE and hits >= needed,
         ))
     return out
-
-
-def _loss_at(debrief: LapDebrief, index: int) -> float:
-    """Time lost at one corner on one lap; 0.0 when it wasn't a loss at all.
-
-    Zero is the right answer for "the debrief found nothing here": a corner that
-    doesn't appear in the losses is a corner that cost nothing worth naming, and
-    that is a hit, not missing data.
-    """
-    for loss in debrief.losses:
-        if loss.index == index:
-            return loss.lost_ms
-    return 0.0

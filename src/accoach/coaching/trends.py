@@ -144,43 +144,43 @@ def benchmark_levels(
 
 @dataclass(slots=True)
 class SessionPoint:
-    """Come è andata quella curva in una sessione."""
+    """How that corner went in one session."""
 
-    started: str        # ISO UTC del primo giro della sessione
-    laps: int           # giri di questa sessione che portavano un debrief
-    median_ms: float    # perdita tipica lì, contando come 0.0 i giri presi bene
+    started: str        # ISO UTC of the session's first lap
+    laps: int           # laps in this session that carried a debrief
+    median_ms: float    # typical loss there, counting laps taken well as 0.0
 
 
-#: Sotto questo numero di giri una mediana non è una mediana, è l'ultimo giro con
-#: un nome più serio. È lo stesso minimo che la scheda Andamento usa già per la
-#: costanza per curva (`/api/progress`, `len(vmins) >= 3`).
+#: Below this many laps a median isn't a median, it's the last lap with a
+#: fancier name. Same minimum the Trends tab already uses for per-corner
+#: consistency (`/api/progress`, `len(vmins) >= 3`).
 _MIN_SESSION_LAPS = 3
 
 
 def session_series(dated: list[tuple[str, LapDebrief]], corner_index: int, *,
                    min_laps: int = _MIN_SESSION_LAPS) -> list[SessionPoint]:
-    """La perdita tipica a una curva, sessione per sessione, dalla più vecchia.
+    """The typical loss at a corner, session by session, oldest first.
 
-    La sessione è l'unità in cui ci si allena davvero, e due uscite nello stesso
-    pomeriggio restano due punti: se cambi qualcosa fra l'una e l'altra, lo
-    vedi. Il raggruppamento **non è riscritto qui**: passa da
-    :func:`accoach.sessions.group_sessions`, che è l'unico posto che sa cosa sia
-    una sessione (e che tratta la regola dei 20 minuti come l'euristica che è).
+    The session is the unit you actually train in, and two runs in the same
+    afternoon stay two points: if you change something between them, you get
+    to see it. The grouping **is not reimplemented here**: it goes through
+    :func:`accoach.sessions.group_sessions`, the one place that knows what a
+    session is (and treats the 20-minute rule as the heuristic it is).
 
-    Una sessione in cui quella curva non ha abbastanza giri non produce un punto
-    a zero: sparisce. Uno zero significa «presa bene», e disegnarlo dove manca il
-    dato è la bugia più facile di tutto il grafico.
+    A session where that corner doesn't have enough laps does not produce a
+    point at zero: it disappears. A zero means "taken well", and drawing it
+    where the data is missing is the easiest lie on the whole chart.
     """
     from ..sessions import group_sessions
     from .debrief import loss_at
 
-    # group_sessions legge solo `recorded_utc`: le passiamo righe finte che
-    # portano il debrief accanto al timestamp. Riusare la funzione invece di
-    # ricopiarne il ciclo è il punto — un secondo `if gap > 20 min` è una
-    # seconda definizione di sessione che un giorno divergerà dalla prima.
+    # group_sessions only reads `recorded_utc`: we pass it fake rows that carry
+    # the debrief alongside the timestamp. Reusing the function instead of
+    # copying its loop is the point — a second `if gap > 20 min` would be a
+    # second definition of "session" that will one day disagree with the first.
     rows = [{"recorded_utc": ts, "debrief": deb} for ts, deb in dated]
     out: list[SessionPoint] = []
-    for ses in reversed(group_sessions(rows)):     # group_sessions torna la più recente per prima
+    for ses in reversed(group_sessions(rows)):     # group_sessions returns newest first
         vals = [loss_at(r["debrief"], corner_index) for r in ses.laps]
         if len(vals) < min_laps:
             continue
