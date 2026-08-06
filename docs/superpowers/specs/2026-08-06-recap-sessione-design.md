@@ -51,8 +51,21 @@ riga sua, il **lancio**. Allora:
 
     entrata + apice + uscita + dopo + lancio  =  gap del giro
 
-esatto, per costruzione e non per fortuna. La media per giro è la media di quei
-numeri, e somma alla media dei gap.
+esatto — ma solo se i tratti **condividono gli estremi**. Nel debrief la finestra
+di una curva è `entry <= pos < entrata successiva`: le posizioni sono contigue, i
+**campioni no**, e fra un tratto e il successivo resta fuori un intervallo di
+campionamento. La somma sarebbe *quasi* esatta, e «quasi» qui non serve a niente.
+
+Quindi la scomposizione non riusa quel ciclo: calcola **una volta sola** gli
+indici dei confini su tutto il giro — traguardo, poi per ogni curva entrata,
+apice−, apice+, uscita, e infine fine giro — e ogni tratto finisce sull'indice da
+cui parte il successivo. Allora il telescopio è esatto per costruzione.
+
+**Cos'è «il gap», con precisione:** è la differenza di ritardo fra l'**ultimo e
+il primo campione** del giro, che è la stessa quantità che i tratti sommano. Non
+coincide al millisecondo con `tempo giro − tempo riferimento`, perché il primo e
+l'ultimo campione non cadono esattamente sul traguardo. La differenza è di
+pochi millisecondi e va **misurata in un test**, non assunta.
 
 **Il segno si tiene.** Una fase in cui sei stato più veloce del tuo miglior giro
 è una perdita negativa: «perdo quattro decimi in entrata e ne riprendo uno in
@@ -154,10 +167,12 @@ solo giro valido** non ha un gap (il migliore è l'unico), e la scheda lo scrive
 
 ## Costo
 
-`build_lap_debrief` costa **7,4 ms** su un giro ACC vero (Imola, 871 campioni, 7
-curve) — misurato il 06/08. Un'uscita da 18 giri costa ~0,13 s coi giri già
-caricati da disco. La scomposizione completa gira sulle stesse finestre e non
-aggiunge un secondo passaggio sui campioni.
+La scomposizione **non chiama `build_lap_debrief`**: le serve solo il ritardo a
+una manciata di posizioni, non i sintomi, non l'inviluppo di aderenza, non la
+scomposizione della frenata. È un passaggio solo sui campioni, quindi costa una
+**frazione** dei 7,4 ms che un debrief costa su un giro ACC vero (misurato il
+06/08, Imola, 871 campioni, 7 curve). Quanto esattamente **va misurato**, non
+stimato: è un passo del piano, non una riga di questo spec.
 
 ## Test
 
