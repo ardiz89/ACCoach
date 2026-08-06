@@ -44,15 +44,27 @@
     // against the best lap of THIS run, not the elected reference, and is not
     // the gap the timing screen publishes: it is the sum of its own parts.
     "tab.recap":       { en: `How it went`, it: `Com'è andata` },
-    "recap.where":     { en: `Where the time went <small>(average per lap · the parts add up to the gap)</small>`,
-                         it: `Dove è finito il tempo <small>(media per giro · le parti sommano al gap)</small>` },
+    // "gap" is deliberately never used here: it's the word a driver checks
+    // against the timing screen, and this number is not that (see the recap
+    // spec — up to a tenth apart). It points at the total above it instead.
+    "recap.where":     { en: `Where the time went <small>(average per lap · the parts add up to the number above)</small>`,
+                         it: `Dove è finito il tempo <small>(media per giro · le parti sommano al numero qui sopra)</small>` },
     "recap.laps":      { en: `Lap by lap <small>(against your best lap of this run)</small>`,
                          it: `Giro per giro <small>(contro il tuo miglior giro di questa uscita)</small>` },
     "recap.best":      { en: `Best lap of this run`, it: `Miglior giro di questa uscita` },
     "recap.gain":      { en: `To gain, on average`, it: `Da guadagnare, in media` },
     "recap.yardstick": { en: `your yardstick`, it: `il tuo metro` },
-    "recap.none":      { en: `One valid lap in this run — nothing to compare it against yet.`,
-                         it: `Un solo giro valido in questa uscita: non c'è ancora niente contro cui confrontarlo.` },
+    // `!cur`: no session at all for this car+track (or the fetch failed) —
+    // same fact the Session tab states about the very same payload.
+    "recap.nolaps":    { en: `No laps recorded for this car and track yet.`,
+                         it: `Nessun giro registrato per questa auto e questa pista.` },
+    // `cur` exists but `cur.recap` doesn't: `_recap_of` (api.py) returns None
+    // for seven different reasons — a single valid lap is only one of them
+    // (an unreadable best lap, a best lap the reference can't use, no lap
+    // that could be cut into phases, ...). Naming "one valid lap" here would
+    // often be naming the wrong cause, which is worse than a generic one.
+    "recap.none":      { en: `Not enough in this run to measure yet.`,
+                         it: `Non c'è ancora abbastanza in questa uscita per misurarlo.` },
     "recap.phase.entry":  { en: `Entry`, it: `Entrata` },
     "recap.phase.apex":   { en: `Apex`, it: `Apice` },
     "recap.phase.exit":   { en: `Exit`, it: `Uscita` },
@@ -60,9 +72,15 @@
     "recap.phase.launch": { en: `Launch`, it: `Lancio` },
 
     "tab.flow":        { en: `Lap explained`, it: `Il giro spiegato` },
-    "tour.a9.t":       { en: `Start here`, it: `Parti da qui` },
+    // "Start here" moved to tour.a12 when the recap became the landing tab —
+    // this step still opens Flow, so its own title now names what it is
+    // rather than claiming to be the door.
+    "tour.a9.t":       { en: `Lap explained`, it: `Il giro spiegato` },
     "tour.a9.x":       { en: `The lap, explained one thing at a time: what cost you the most, why, and what to do about it — with the chart that shows it. The other tabs are the same findings, laid out for you to read yourself.`,
                          it: `Il giro spiegato una cosa alla volta: cosa ti è costato di più, perché, e cosa farci — col grafico che lo mostra. Le altre schede sono gli stessi dati, messi lì perché te li legga da solo.` },
+    "tour.a12.t":      { en: `Start here`, it: `Parti da qui` },
+    "tour.a12.x":      { en: `How the run went, before it's forgotten: where you left time on average, and lap by lap against your own best of the day — not a score, five numbers that add back up to the one above them. The tabs after this go deeper, one lap at a time.`,
+                         it: `Com'è andata l'uscita, prima di dimenticarla: dove hai lasciato tempo in media, e giro per giro contro il tuo stesso migliore di oggi — non un voto, cinque numeri che sommano al numero sopra di loro. Le schede dopo entrano nel dettaglio, un giro alla volta.` },
     "tab.session":     { en: `Session`, it: `Sessione` },
     "tab.compare":     { en: `Compare`, it: `Confronto` },
     // One run of laps, as it was driven.

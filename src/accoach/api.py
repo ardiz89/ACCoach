@@ -1560,13 +1560,25 @@ def create_api(
             return None
         if recap is None:
             return None
+        phases = [{"phase": p, "avg_s": round(recap.by_phase[p] / 1000.0, 3)}
+                  for p in PHASES] + [{"phase": "launch",
+                                       "avg_s": round(recap.launch_ms / 1000.0, 3)}]
+        # The total is the sum of these same six rounded numbers, not a
+        # SEPARATE rounding of the full-precision average. `recap.gain_avg_ms`
+        # and `by_phase`/`launch_ms` are exactly consistent before rounding
+        # (session_recap's own guarantee — nothing in there is rounded), but
+        # six independent `round(x, 3)` calls can each move by up to 0.5 ms in
+        # either direction, so a total rounded on its own can land a full
+        # millisecond away from what the six displayed rows add up to. That
+        # shows at three decimals, and `recap.where` tells the driver on
+        # screen that the parts sum to the number above. Summing what is
+        # actually printed makes that true by construction, independent of
+        # which way any single value happened to round.
+        gain_avg_s = round(sum(p["avg_s"] for p in phases), 3)
         return {
-            "gain_avg_s": round(recap.gain_avg_ms / 1000.0, 3),
+            "gain_avg_s": gain_avg_s,
             "reference": format_lap_time(recap.reference_ms),
-            "phases": [{"phase": p, "avg_s": round(recap.by_phase[p] / 1000.0, 3)}
-                       for p in PHASES]
-                      + [{"phase": "launch",
-                          "avg_s": round(recap.launch_ms / 1000.0, 3)}],
+            "phases": phases,
             "laps": [{
                 "path": kept[r.source_index]["path"],
                 "lap_time": format_lap_time(r.lap_time_ms),

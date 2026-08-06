@@ -37,6 +37,25 @@ def test_the_families_add_up_to_the_average(tmp_path):
         ["entry", "apex", "exit", "after", "launch"]
 
 
+def test_the_displayed_total_matches_the_displayed_parts_exactly(tmp_path):
+    """The check above tolerates 0.01s of drift, wide enough to hide the
+    ±0.001s this produces: `gain_avg_s` and the five phases are each rounded
+    to three decimals *independently*, and six separate roundings against one
+    on the total can land a full millisecond apart even though the
+    full-precision numbers behind them are exactly consistent (session_recap's
+    own guarantee). (0, 29, 32) is a real repro — found by search, not by
+    hand — where the un-fixed endpoint answers gain_avg_s=0.533 against a
+    phase sum of 0.534. Pinned with no tolerance, on the digits actually
+    shown, because `recap.where` promises on screen that they add up and a
+    driver checks that by hand."""
+    _lap(tmp_path, "2026-08-01T18:00:00+00:00")            # il migliore
+    _lap(tmp_path, "2026-08-01T18:02:00+00:00", amt=29)
+    _lap(tmp_path, "2026-08-01T18:04:00+00:00", amt=32)
+    r = _get(tmp_path)["current"]["recap"]
+    assert r is not None
+    assert r["gain_avg_s"] == round(sum(p["avg_s"] for p in r["phases"]), 3)
+
+
 def test_every_lap_but_the_best_has_a_row_with_a_named_corner(tmp_path):
     _lap(tmp_path, "2026-08-01T18:00:00+00:00")
     _lap(tmp_path, "2026-08-01T18:02:00+00:00", amt=20)

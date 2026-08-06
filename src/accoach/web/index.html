@@ -83,10 +83,13 @@
   <div id="view-recap">
     <section id="recap-head" class="summary"></section>
     <section class="debrief">
-      <h3 data-i18n-html="recap.where">Where the time went <small>(average per lap · the parts add up to the gap)</small></h3>
+      <h3 data-i18n-html="recap.where">Where the time went <small>(average per lap · the parts add up to the number above)</small></h3>
       <div id="recap-phases"></div>
     </section>
-    <section class="debrief">
+    <!-- Hidden as a whole, not just its list, when there is no recap: a
+         heading over an empty div reads as broken (see the `.nothing` CSS
+         comment — a panel that goes silent under its own title). -->
+    <section id="recap-laps-sec" class="debrief">
       <h3 data-i18n-html="recap.laps">Lap by lap <small>(against your best lap of this run)</small></h3>
       <div id="recap-laps"></div>
     </section>

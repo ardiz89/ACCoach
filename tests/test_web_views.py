@@ -244,13 +244,31 @@ def test_every_tab_on_the_row_has_a_keyboard_shortcut():
     """The digits were [1-9] and the row grew to ten when Race pace arrived, then
     to eleven when the recap became the landing tab. Nothing breaks, nothing
     logs, and the only way to notice a tab fell off the end is to press its key
-    and watch nothing happen — so the ceiling here has to track the real count,
-    and the row of keys that answers it (1-9, then 0, then -) has to keep pace
-    with it, one key further along the same row each time."""
+    and watch nothing happen.
+
+    Pinning the ceiling as a bare number (`<= 11`) is exactly the mistake that
+    caused this twice already: it and the real tab count are two hand-kept
+    numbers that only happen to agree today. The ceiling here is derived from
+    `KEY_ROW` itself, so a twelfth tab with no wider row fails this test on
+    the actual property (every tab reachable by one key) instead of on a
+    number someone forgot to bump.
+    """
     tabs = len(re.findall(r'class="tab[ "]', _HTML))
-    assert 0 < tabs <= 11, f"{tabs} tabs, more than the keyboard row can reach"
-    block = _APPJS.split("function wireKeys()")[1].split("\n}")[0]
-    assert '"1234567890-"' in block
+    m = re.search(r'const KEY_ROW = "([^"]+)"', _APPJS)
+    assert m, "wireKeys()/wireTabs() lost their shared KEY_ROW constant"
+    assert 0 < tabs <= len(m.group(1)), \
+        f"{tabs} tabs, more than KEY_ROW ({m.group(1)!r}) can reach"
+
+
+def test_every_reachable_tab_gets_its_shortcut_shown():
+    """`wireTabs()` used to stop labelling tooltips at the ninth tab
+    (`i <= 9`), so the tenth tab's shortcut (kbd `0`) worked but nobody could
+    find it — and an eleventh would have inherited the same silent gap. It has
+    to label every tab `KEY_ROW` can reach, derived the same way, not a second
+    hand-kept number."""
+    block = _APPJS.split("function wireTabs()")[1].split("\n}")[0]
+    assert "i <= 9" not in block
+    assert "KEY_ROW.length" in block
 
 
 def test_printing_hides_every_view_without_naming_them():
@@ -1217,16 +1235,84 @@ def test_the_recap_has_a_home_and_it_is_the_landing_view():
     assert 'id="view-flow" class="hidden"' in html
 
 
-def test_the_recap_is_rendered_when_the_session_loads():
-    js = (WEB / "app.js").read_text(encoding="utf-8")
-    assert "renderRecap(" in js
-
-
 def test_the_recap_call_is_wired_not_just_declared():
-    """The check above passes even with `renderRecap` fully written and never
-    called — the substring is right there in its own `function renderRecap(`
-    line. The call has to live inside `renderSession`, which is what actually
-    runs when the shared /api/sessions payload lands."""
+    """A bare `"renderRecap(" in js` check (the brief's original Step 1 test)
+    is incapable of failing: the substring is right there in its own
+    `function renderRecap(` line even if nothing ever calls it. The call has
+    to live inside `renderSession`, which is what actually runs when the
+    shared /api/sessions payload lands — verified by mutation: moving the
+    call out of `renderSession` turns this red and leaves the bare check
+    green."""
     js = (WEB / "app.js").read_text(encoding="utf-8")
     block = js.split("function renderSession(s)")[1].split("\n}")[0]
     assert "renderRecap(" in block
+
+
+def _recap_render_body() -> str:
+    return _APPJS.split("function renderRecap(")[1].split("\n}")[0]
+
+
+def test_the_total_and_the_five_parts_share_one_sign_convention():
+    """`gain_avg_s` used to print with a literal `"+"`, while the five phases
+    below it — and each lap's own gap — went through `fmtLoss`, which prints
+    a loss as `"−"`. `gain_avg_s` is always positive (it IS a loss, averaged),
+    so every full screen showed a `+` total over five `−` rows: adding the
+    five by hand gave the total's exact opposite. One call, one convention."""
+    block = _recap_render_body()
+    assert "fmtLoss(r.gain_avg_s)" in block
+    assert '"+" + r.gain_avg_s' not in block
+
+
+def test_the_empty_recap_distinguishes_no_session_from_nothing_measurable():
+    """`_recap_of` (api.py) returns `None` for seven different reasons — "one
+    valid lap" is only one of them. `!cur` is a different fact altogether (no
+    session at all, or the fetch failed): naming the single-lap cause there
+    would often be naming the wrong one, which is worse than a generic
+    message."""
+    block = _recap_render_body()
+    assert 'cur ? "recap.none" : "recap.nolaps"' in block
+
+
+def test_the_empty_recap_is_muted_not_green():
+    """`.clean` is `var(--green)` — this report's colour for "no problem
+    here". A run with nothing measurable is not that; it's the project's own
+    `.nothing` (muted), the same class the Session panel uses for "no laps"
+    on this exact payload."""
+    block = _recap_render_body()
+    assert "clean" not in block
+    assert '"nothing"' in block
+
+
+def test_the_lap_by_lap_heading_hides_with_its_own_empty_list():
+    """A heading left on screen over an empty div reads as broken (see the
+    `.nothing` CSS comment: a panel that goes silent under its own title).
+    The whole section has to go, not just the list inside it."""
+    assert 'id="recap-laps-sec"' in _HTML
+    block = _recap_render_body()
+    assert 'lpSec.classList.add("hidden")' in block
+    assert 'lpSec.classList.remove("hidden")' in block
+
+
+def test_the_yardstick_key_is_actually_shown():
+    """Declared in i18n.js and never read anywhere would be dead weight — or
+    worse, a sign the screen forgot to say why the best lap has no gap of its
+    own next to it."""
+    assert 't("recap.yardstick")' in _APPJS
+
+
+def test_the_recap_where_heading_does_not_promise_the_timing_screens_gap():
+    """The spec is explicit: this number differs from the timing screen's own
+    gap by up to a tenth, so the one word a driver would go check it against
+    must never be the word used to describe it."""
+    assert "gap" not in _I18NJS[_I18NJS.index('"recap.where"'):
+                                _I18NJS.index('"recap.laps"')]
+
+
+def test_the_tour_start_here_step_points_at_the_new_landing_tab():
+    """The door moved from Flow to the recap; the "Start here" coachmark has
+    to move with it, or a first-time driver's very first tour step points at
+    a tab that is no longer where they landed."""
+    block = _APPJS.split("function tourSteps()")[1].split("\n}")[0]
+    m = re.search(r'sel:\s*"([^"]+)"[^}]*title:\s*t\("tour\.a12\.t"\)', block)
+    assert m, "no tour step uses tour.a12.t (\"Start here\")"
+    assert _view_of_ids().get(m.group(1).lstrip("#"), "") == "recap"

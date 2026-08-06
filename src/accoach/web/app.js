@@ -186,9 +186,14 @@ function tourSteps() {
   // steps that happened to still be visible.
   const flow = () => showView("flow");
   const compare = () => showView("compare");
+  const recap = () => showView("recap");
   return [
     { sel: "#combo", title: t("tour.a1.t"), text: t("tour.a1.x") },
     { sel: ".tabs", title: t("tour.a2.t"), text: t("tour.a2.x") },
+    // "Start here" now belongs to the door, not the guided flow — targeted at
+    // #recap-phases rather than #recap-head because the head goes empty (and
+    // therefore invisible to the tour) on a run with nothing measurable yet.
+    { sel: "#recap-phases", title: t("tour.a12.t"), text: t("tour.a12.x"), before: recap },
     { sel: "#flow-card", title: t("tour.a9.t"), text: t("tour.a9.x"), before: flow },
     { sel: "#train-steps", title: t("tour.a11.t"), text: t("tour.a11.x"),
       before: () => showView("training") },
@@ -272,6 +277,18 @@ function wireCbToggle() {
 // peggio di un comando assente.
 const RAIL_VIEWS = ["flow", "compare", "map", "line", "sectors", "dynamics"];
 
+// The characters `e.key` reports for the row above the letters, in the order
+// a tab picks them — NOT their physical position, which moves between
+// keyboard layouts (on IT, for instance, "'" sits where "-" does on US/UK,
+// and "-" itself lives elsewhere on the board). Every one of these keys sends
+// its printed character regardless of layout, with no modifier, so all eleven
+// tabs stay reachable everywhere; the string is just wrong as a claim about
+// where any later key "physically" continues the row. One shared constant —
+// `wireKeys()` reads it to route the keypress, `wireTabs()` reads it to show
+// the tooltip — so the two cannot drift the way the tab count and this row's
+// length silently did before.
+const KEY_ROW = "1234567890-";
+
 // Non dentro `showView` da sola: al primo caricamento `init()` non ci passa
 // affatto quando la vista salvata coincide con quella già attiva in HTML (o
 // non ce n'è una salvata), quindi la scheda di partenza — spesso `flow`, che
@@ -324,11 +341,14 @@ function savedCombo() {
 }
 
 function wireTabs() {
-  for (const b of document.querySelectorAll(".tab")) {
+  const tabs = [...document.querySelectorAll(".tab")];
+  for (const b of tabs) {
     // The shortcut is on the tooltip because a keyboard shortcut nobody can find
-    // is the same as no shortcut.
-    const i = [...document.querySelectorAll(".tab")].indexOf(b) + 1;
-    if (i <= 9) b.title = `${t("kbd.tab")} ${i}`;
+    // is the same as no shortcut. Every tab KEY_ROW can reach gets one shown —
+    // it used to stop at the ninth, which silently left the tenth tab's real,
+    // working shortcut with no tooltip; now the eleventh would have repeated it.
+    const i = tabs.indexOf(b);
+    if (i < KEY_ROW.length) b.title = `${t("kbd.tab")} ${KEY_ROW[i]}`;
     b.onclick = () => { rememberView(b.dataset.view); showView(b.dataset.view); };
   }
 }
@@ -349,11 +369,8 @@ function wireKeys() {
     if (el && el.matches("input, select, textarea")) return;
     if (document.querySelector(".tour-pop")) return;   // the tour owns the keys
     const tabs = [...document.querySelectorAll(".tab")];
-    // The row of keys above the letters, left to right: 1-9, then 0, then -.
-    // This ceiling has moved once before (Race pace pushed the row to ten and
-    // 0 took over from a bare [1-9]); "Com'è andata" becoming the landing tab
-    // pushed it to eleven, and - is the next key on the same row.
-    const KEY_ROW = "1234567890-";
+    // KEY_ROW (module scope, see its own comment) is shared with wireTabs()'s
+    // tooltip so the two cannot name two different keys for the same tab.
     if (e.key.length === 1 && KEY_ROW.indexOf(e.key) >= 0) {
       const b = tabs[KEY_ROW.indexOf(e.key)];
       if (b) { e.preventDefault(); b.click(); }
@@ -2164,24 +2181,37 @@ function renderSession(s) {
 }
 
 // --- "How it went": the door onto the report -----------------------------
-// Dove è finito il tempo di un'uscita, in decimi che sommano al gap. Le barre
-// sono in scala sulla fase peggiore di QUESTA sessione: non c'è nessuna soglia,
-// e nessun colore che voglia dire "bravo". `cur` è `current` da /api/sessions;
-// `cur.recap` è `null` quando c'è un solo giro valido nell'uscita — niente
-// contro cui confrontarlo — e la scheda scrive perché, non uno zero.
+// Dove è finito il tempo di un'uscita, in decimi che sommano al numero in
+// testa. Le barre sono in scala sulla fase peggiore di QUESTA sessione: non
+// c'è nessuna soglia, e nessun colore che voglia dire "bravo". `cur` è
+// `current` da /api/sessions.
 function renderRecap(cur) {
   const head = $("recap-head"), ph = $("recap-phases"), lp = $("recap-laps");
+  const lpSec = $("recap-laps-sec");
   if (!head || !ph || !lp) return;
   const r = cur && cur.recap;
   if (!r) {
     head.innerHTML = "";
-    ph.innerHTML = `<div class="clean">${t("recap.none")}</div>`;
+    // Due cause diverse, due frasi diverse: `!cur` è lo stesso fatto che il
+    // pannello Sessione scrive sullo stesso payload ("nessun giro
+    // registrato"); `cur && !cur.recap` è `_recap_of` (api.py) che torna
+    // None per sette motivi possibili — "un solo giro" ne è solo uno, e
+    // nominarlo qui sarebbe spesso nominare la causa sbagliata.
+    ph.innerHTML = `<div class="nothing">${t(cur ? "recap.none" : "recap.nolaps")}</div>`;
     lp.innerHTML = "";
+    // Un titolo («Giro per giro») sopra il vuoto si legge come rotto: la
+    // sezione sparisce con lui, non solo la lista sotto.
+    if (lpSec) lpSec.classList.add("hidden");
     return;
   }
+  if (lpSec) lpSec.classList.remove("hidden");
   const item = (k, v) => `<div class="item"><div class="k">${k}</div><div class="v">${v}</div></div>`;
-  head.innerHTML = item(t("recap.best"), r.reference) +
-                   item(t("recap.gain"), "+" + r.gain_avg_s.toFixed(3) + "s");
+  // Una sola convenzione di segno su tutta la scheda: `fmtLoss` gira il segno
+  // una volta sola, qui, per il totale come per le cinque fasi sotto e per il
+  // gap di ogni riga giro — sommare le cinque righe a mano deve ridare questo
+  // numero, segno compreso, non il suo opposto.
+  head.innerHTML = item(t("recap.best"), `${r.reference} <small>(${t("recap.yardstick")})</small>`) +
+                   item(t("recap.gain"), fmtLoss(r.gain_avg_s));
 
   let mx = 0.05;
   for (const p of r.phases) mx = Math.max(mx, p.avg_s);
