@@ -140,3 +140,51 @@ def benchmark_levels(
         levels.append(BenchmarkLevel("pro", lab["pro"], pro_ms,
                                      best_ms - pro_ms))
     return levels
+
+
+@dataclass(slots=True)
+class SessionPoint:
+    """Come è andata quella curva in una sessione."""
+
+    started: str        # ISO UTC del primo giro della sessione
+    laps: int           # giri di questa sessione che portavano un debrief
+    median_ms: float    # perdita tipica lì, contando come 0.0 i giri presi bene
+
+
+#: Sotto questo numero di giri una mediana non è una mediana, è l'ultimo giro con
+#: un nome più serio. È lo stesso minimo che la scheda Andamento usa già per la
+#: costanza per curva (`/api/progress`, `len(vmins) >= 3`).
+_MIN_SESSION_LAPS = 3
+
+
+def session_series(dated: list[tuple[str, LapDebrief]], corner_index: int, *,
+                   min_laps: int = _MIN_SESSION_LAPS) -> list[SessionPoint]:
+    """La perdita tipica a una curva, sessione per sessione, dalla più vecchia.
+
+    La sessione è l'unità in cui ci si allena davvero, e due uscite nello stesso
+    pomeriggio restano due punti: se cambi qualcosa fra l'una e l'altra, lo
+    vedi. Il raggruppamento **non è riscritto qui**: passa da
+    :func:`accoach.sessions.group_sessions`, che è l'unico posto che sa cosa sia
+    una sessione (e che tratta la regola dei 20 minuti come l'euristica che è).
+
+    Una sessione in cui quella curva non ha abbastanza giri non produce un punto
+    a zero: sparisce. Uno zero significa «presa bene», e disegnarlo dove manca il
+    dato è la bugia più facile di tutto il grafico.
+    """
+    from ..sessions import group_sessions
+    from .debrief import loss_at
+
+    # group_sessions legge solo `recorded_utc`: le passiamo righe finte che
+    # portano il debrief accanto al timestamp. Riusare la funzione invece di
+    # ricopiarne il ciclo è il punto — un secondo `if gap > 20 min` è una
+    # seconda definizione di sessione che un giorno divergerà dalla prima.
+    rows = [{"recorded_utc": ts, "debrief": deb} for ts, deb in dated]
+    out: list[SessionPoint] = []
+    for ses in reversed(group_sessions(rows)):     # group_sessions torna la più recente per prima
+        vals = [loss_at(r["debrief"], corner_index) for r in ses.laps]
+        if len(vals) < min_laps:
+            continue
+        started = ses.laps[0]["recorded_utc"]
+        out.append(SessionPoint(started=started, laps=len(vals),
+                                median_ms=statistics.median(vals)))
+    return out

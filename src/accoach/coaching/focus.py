@@ -158,11 +158,11 @@ class FocusReport:
 # --- helpers ---------------------------------------------------------------
 
 def _loss_at(debrief: LapDebrief, idx: int) -> float:
-    """Time lost at corner ``idx`` this lap (0.0 if it wasn't a loss = good)."""
-    for loss in debrief.losses:
-        if loss.index == idx:
-            return loss.lost_ms
-    return 0.0
+    """Tempo perso alla curva ``idx`` (0.0 se non è una perdita). Vedi
+    :func:`accoach.coaching.debrief.loss_at` — la definizione vive lì, accanto
+    a `LapDebrief`, perché adesso ha due lettori."""
+    from .debrief import loss_at
+    return loss_at(debrief, idx)
 
 
 @dataclass
