@@ -1185,8 +1185,19 @@ def test_the_dyn_readout_default_text_always_carries_the_chip():
 def test_the_session_series_has_a_home_on_the_trends_tab():
     html = (WEB / "index.html").read_text(encoding="utf-8")
     assert 'id="corner-sessions"' in html
+    # Presente non basta: deve stare sulla scheda Andamento, non su una a caso
+    # — una `id="corner-sessions"` incollata altrove nel file passerebbe la
+    # sola ricerca di stringa qui sopra.
+    assert _view_of_ids()["corner-sessions"] == "progress"
 
 
 def test_the_series_is_rendered_when_the_tab_loads():
     js = (WEB / "app.js").read_text(encoding="utf-8")
     assert "renderCornerSessions(p.corner_sessions)" in js
+    # La sola ricerca di stringa sopra passerebbe anche con la chiamata dentro
+    # un commento, o con la funzione mai definita: qui si verifica che sia
+    # dichiarata davvero e che la chiamata viva nel corpo di `loadProgress`,
+    # non altrove nel file.
+    assert "function renderCornerSessions(rows)" in js
+    block = js.split("async function loadProgress(")[1].split("\n}")[0]
+    assert "renderCornerSessions(p.corner_sessions)" in block
