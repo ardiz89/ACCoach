@@ -42,7 +42,7 @@ def test_a_corner_that_improves_gives_a_falling_series(tmp_path):
     pts = series[0]["points"]
     assert len(pts) == 2
     assert pts[0]["median_s"] == 0.68 and pts[1]["median_s"] == 0.34
-    assert pts[0]["laps"] == 4
+    assert pts[0]["laps"] == 4 and pts[1]["laps"] == 4
 
 
 def test_only_systematic_corners_get_a_series(tmp_path):
@@ -54,3 +54,40 @@ def test_only_systematic_corners_get_a_series(tmp_path):
     systematic = {t["corner_index"] for t in j["trends"] if t["systematic"]}
     assert systematic, "il test non vale niente se nessuna curva è sistematica"
     assert {s["corner_index"] for s in j["corner_sessions"]} <= systematic
+
+
+def test_the_series_reaches_past_the_trends_window(tmp_path):
+    """corner_sessions must read the 60-lap window, not the 15-lap trends one.
+
+    Three evenings of 7 laps each (21 laps) plus the reference make 22 laps in
+    total. ``_RECENT_LAPS`` (15) only reaches 1 lap deep into the oldest
+    evening: chrono[-15:] drops the 7 oldest rows (22 - 15 = 7 — the reference
+    plus the oldest evening's first 6 laps), leaving just 1 lap of that
+    evening in the narrow window. `session_series` needs at least 3 laps to
+    turn a session into a point, so a 15-lap window could produce at most
+    *two* session points here (evening 2 and evening 3) — the oldest evening
+    would never clear the minimum. All three evenings fit inside
+    ``_SERIES_LAPS`` (60) uncut, so the wide window `corner_sessions` actually
+    reads must show three. If the window narrowed back to 15, this test would
+    drop to `len(pts) == 2` and fail — the other three tests in this file
+    would not notice, because none of them has more than 9 laps.
+    """
+    _lap(tmp_path, "2026-07-31T18:00:00+00:00")            # reference, fastest
+    for day, amt in ((1, 60), (2, 40), (3, 20)):            # oldest to newest
+        for i in range(7):
+            _lap(tmp_path, f"2026-08-0{day}T18:{2 * i:02d}:00+00:00", amt=amt)
+    j = _progress(tmp_path)
+
+    # classify_losses runs on the narrow (15-lap) window and is untouched by
+    # this task — corner 0 must still come out systematic there, or the test
+    # below would pass for the wrong reason (no series at all, rather than a
+    # series that's the wrong length).
+    trends = {t["corner_index"]: t for t in j["trends"]}
+    assert trends[0]["systematic"], "corner 0 must be systematic on the narrow window"
+
+    series = {s["corner_index"]: s for s in j["corner_sessions"]}
+    pts = series[0]["points"]
+    assert len(pts) == 3, "a 15-lap window could reach at most 2 of the 3 evenings"
+    assert pts[0]["median_s"] == 1.02 and pts[0]["laps"] == 7   # oldest evening, amt=60
+    assert pts[1]["median_s"] == 0.68 and pts[1]["laps"] == 7   # amt=40
+    assert pts[2]["median_s"] == 0.34 and pts[2]["laps"] == 7   # newest evening, amt=20
