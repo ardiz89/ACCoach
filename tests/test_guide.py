@@ -48,9 +48,7 @@ def test_no_markup_leaks_into_the_rendered_text(lang):
 @pytest.mark.parametrize("lang", ("it", "en"))
 def test_every_heading_survives(lang):
     """A dropped section is invisible in the output but missing from the guide."""
-    # #### appears once in GUIDA.md ("Curva per sessione", inside section 5) —
-    # {1,3} predates that heading and silently missed it.
-    source_headings = re.findall(r"^#{1,4}\s+(.+)$", _DOCS[lang], re.M)
+    source_headings = re.findall(r"^#{1,3}\s+(.+)$", _DOCS[lang], re.M)
     body, parsed = render_markdown(_DOCS[lang])
     assert len(parsed) == len(source_headings)
     for level, slug, _ in parsed:

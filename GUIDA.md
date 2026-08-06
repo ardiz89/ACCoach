@@ -483,17 +483,22 @@ Cosa trovi:
   stanno in **Passo gara** — qui la serie copriva tutto l'archivio pur
   chiamandosi «lungo lo stint».
 
-#### Curva per sessione
+### Curva per sessione
 
 Sotto i punti deboli, per ogni curva **sistematica**: la perdita mediana in
 quella curva, **una barra per sessione**. Due uscite nello stesso pomeriggio
 restano due barre — è lì che si vede se la cosa che hai cambiato fra l'una e
 l'altra ha funzionato.
 
-Una sessione in cui hai fatto **meno di tre giri** su quella curva non compare:
-una mediana su due giri è l'ultimo giro con un nome più serio. E una sessione
-assente **non** viene disegnata a zero, perché lo zero qui vuol dire «l'hai
-presa bene» — che è un'altra cosa dal non avere il dato.
+Due soglie, e si compongono: una sessione in cui hai fatto **meno di tre
+giri** su quella curva non compare — una mediana su due giri è l'ultimo giro
+con un nome più serio — e una sessione assente **non** viene disegnata a
+zero, perché lo zero qui vuol dire «l'hai presa bene», che è un'altra cosa
+dal non avere il dato. E la curva **intera** compare solo con **almeno due
+sessioni** che superano quella prima soglia: un punto solo non è un
+andamento, è un giro fortunato. Una curva appena diventata sistematica può
+non avere ancora un grafico qui: prima le servono due sessioni buone, non una
+sola.
 
 Nella tendina dei giri, accanto al tempo, trovi **i gradi dell'asfalto** (es.
 `2:03.732 · 37.8°`). Non è un dettaglio: fra pista fredda e pista calda i punti
