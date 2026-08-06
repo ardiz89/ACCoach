@@ -48,7 +48,9 @@ def test_no_markup_leaks_into_the_rendered_text(lang):
 @pytest.mark.parametrize("lang", ("it", "en"))
 def test_every_heading_survives(lang):
     """A dropped section is invisible in the output but missing from the guide."""
-    source_headings = re.findall(r"^#{1,3}\s+(.+)$", _DOCS[lang], re.M)
+    # #### appears once in GUIDA.md ("Curva per sessione", inside section 5) —
+    # {1,3} predates that heading and silently missed it.
+    source_headings = re.findall(r"^#{1,4}\s+(.+)$", _DOCS[lang], re.M)
     body, parsed = render_markdown(_DOCS[lang])
     assert len(parsed) == len(source_headings)
     for level, slug, _ in parsed:
@@ -59,7 +61,7 @@ def test_the_italian_guide_keeps_its_structure():
     """Counts, so that a block type silently ceasing to parse shows up here."""
     body, headings = render_markdown(_DOCS["it"])
     assert len([h for h in headings if h[0] == 2]) == 9      # the nine sections
-    assert body.count("<table>") == 5   # pedali + delta + 2 di comandi + config
+    assert body.count("<table>") == 6   # pedali + delta + colori curva + 2 di comandi + config
     assert body.count("<pre>") >= 3                          # the shell examples
     assert body.count("<blockquote>") == 4   # +1: il trail sulle stradali
 
