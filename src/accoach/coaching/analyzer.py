@@ -204,10 +204,14 @@ class CoachAnalyzer:
 
     def reset(self) -> None:
         # Keep the learned advice (same track); just drop in-progress lap state.
+        # La carta NON è stato del giro in corso: sopravvive al traguardo di
+        # proposito (vedi `last_corner` in `__init__`). Azzerarla qui rendeva il
+        # riquadro assente dal traguardo alla prima curva su OGNI giro — il
+        # motore ricostruisce il riferimento dopo ogni giro salvato e passa di
+        # qui — cioè proprio sul rettilineo dove il pilota ha occhi per leggerlo.
         self._seg = None
         self._last_pos = -1.0
         self._announced.clear()
-        self.last_corner = None
 
     def drop_last_corner(self) -> None:
         """Butta la carta. La chiama chi sa che il giro non è rappresentativo:
@@ -217,6 +221,7 @@ class CoachAnalyzer:
 
     def set_corners(self, corners: list[Corner]) -> None:
         """Use detected corners as the zones (or fall back to fixed segments)."""
+        previous = self._zones
         if corners:
             zones = sorted(
                 (c.entry_pos, c.exit_pos, c.apex_pos) for c in corners
@@ -235,7 +240,15 @@ class CoachAnalyzer:
         self._advice.clear()
         self._announced.clear()
         self._faults.clear()
-        self.last_corner = None
+        # La carta invece si butta solo se il layout è cambiato DAVVERO. Questa
+        # invalidazione è portante: con zone diverse un `index` conservato
+        # significa un'altra curva, e un nome sulla curva sbagliata manda il
+        # pilota a lavorare su quella accanto. Ma `set_corners` viene richiamata
+        # a ogni giro salvato con lo stesso identico layout (il motore rincorre
+        # il nuovo miglior giro), e lì azzerare cancellava il riquadro su tutto
+        # il rettilineo del traguardo, a ogni giro, per sempre.
+        if self._zones != previous:
+            self.last_corner = None
         self._seg = None
 
     def _set_fixed_zones(self) -> None:

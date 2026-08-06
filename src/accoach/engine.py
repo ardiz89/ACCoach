@@ -651,6 +651,11 @@ class CoachEngine:
             self._grip = snap.surface_grip or None
             self._compound = snap.tyre_compound or None
             self._rebuild_reference(snap.car_model, snap.track)
+            # Auto o pista nuove: la carta della curva precedente parla di
+            # un'altra sessione. `set_corners` butta da sé quando il layout
+            # delle zone cambia, ma due auto sulla stessa pista hanno lo stesso
+            # layout — lì solo il cambio di chiave sa che è un'altra cosa.
+            self.analyzer.drop_last_corner()
             # Retune the class-dependent live thresholds (wheelspin, trail-brake
             # coaching) for this car.
             car_class = classify(snap.car_model)

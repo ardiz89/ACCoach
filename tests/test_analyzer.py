@@ -145,16 +145,40 @@ def test_the_card_follows_the_corner_you_just_left():
 
 
 def test_set_corners_clears_the_card():
-    """Un layout di zone nuovo invalida gli indici: la carta vecchia mente."""
+    """Un layout di zone nuovo invalida gli indici: la carta vecchia mente.
+
+    Il layout dev'essere davvero un altro: ripassare le curve della stessa pista
+    non è un layout nuovo. Qui si passa al ripiego a segmenti fissi, che è la
+    differenza più netta possibile.
+    """
+    an, _ = _replay()
+    assert an.last_corner is not None
+    an.set_corners([])
+    assert an.last_corner is None
+
+
+def test_the_same_layout_recomputed_keeps_the_card():
+    """Il motore richiama `set_corners` a ogni giro salvato, con le stesse zone.
+
+    Se azzerasse comunque, il riquadro sparirebbe dal traguardo alla prima
+    curva su ogni giro — il rettilineo dove il pilota ha davvero il tempo di
+    leggerlo.
+    """
     an, _ = _replay()
     an.set_corners(detect_corners(synth.build_lap().samples))
-    assert an.last_corner is None
+    assert an.last_corner is not None
 
 
-def test_reset_clears_the_card():
+def test_reset_keeps_the_card():
+    """`reset()` butta lo stato del giro in corso; la carta non lo è.
+
+    Era il contrario, e si contraddiceva col commento della carta stessa
+    («sopravvive al traguardo di proposito»): `_rebuild_reference` chiama
+    `reset()` dopo ogni giro salvato, quindi il riquadro spariva a ogni giro.
+    """
     an, _ = _replay()
     an.reset()
-    assert an.last_corner is None
+    assert an.last_corner is not None
 
 
 def test_drop_last_corner_clears_the_card():
