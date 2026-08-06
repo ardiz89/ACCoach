@@ -35,6 +35,7 @@ from .coaching import (
     TyreTempAdvisor,
     Voice,
 )
+from .coaching.analyzer import corner_level
 from .coaching.cue import CueCategory
 from .coaching.debrief import build_lap_debrief
 from .coaching.diagnosis import build_lap_stats
@@ -127,6 +128,11 @@ class EngineState:
     history: list[str]           # recent spoken cue messages, newest last
     engineer: dict | None = None  # latest race-engineer decision (setup advice)
     focus: dict | None = None     # latest Focus/Lesson report (driver coaching)
+    # L'ultima curva chiusa: indice, nome, millisecondi persi, semaforo. Un
+    # consuntivo muto — la voce resta invariata e arriva al giro dopo, che è
+    # quando può ancora cambiare qualcosa. I due non si pestano i piedi: questo
+    # è informazione, quello è un consiglio.
+    corner: dict | None = None
     # Why the coach is holding back, "" when it's coaching normally. Every gate
     # has to say so: a silent gate reads as a broken app (the driver's own words
     # after a calibration session were "I drove and nothing happened").
@@ -148,6 +154,38 @@ def _load_reference(car: str, track: str, laps_dir: Path | str,
         return None
     ref = Reference(lap)
     return ref if ref.usable else None
+
+
+def _corner_labels(car: str, track: str, corners: list[Corner],
+                   laps_dir: Path | str) -> dict[int, str]:
+    """Nome di ogni **zona** dell'analyzer, nell'ordine in cui l'analyzer le indicizza.
+
+    L'ordinamento è ripetuto qui apposta: `CoachAnalyzer.set_corners` ordina le
+    zone per `entry_pos` e l'indice di zona è la posizione in quella lista, che
+    non è per costruzione `Corner.index`. Chiamare `name_corners` sulla stessa
+    lista ordinata toglie l'assunzione invece di fidarsene — e un nome sbagliato
+    qui non è un dettaglio estetico: manda il pilota a lavorare sulla curva
+    accanto.
+
+    Best-effort come `_load_focus_state`: un catalogo illeggibile vale «nessun
+    nome», mai un'eccezione che ferma un giro.
+    """
+    if not corners:
+        return {}
+    ordered = sorted(corners, key=lambda c: c.entry_pos)
+    try:
+        from . import cornernames
+        from .recording.catalog import LapCatalog
+        from .recording.storage import _catalog_path
+        from .trackdata import name_corners
+
+        with LapCatalog(_catalog_path(Path(laps_dir))) as cat:
+            learned = cat.load_corner_map(car, track)
+        names = name_corners(track, ordered, current_language(), learned,
+                             cornernames.for_track(track))
+    except Exception:
+        return {}
+    return dict(enumerate(names))
 
 
 class CoachEngine:
@@ -203,6 +241,7 @@ class CoachEngine:
         self._comparator: LapComparator | None = None
         self._reference: Reference | None = None
         self._corners: list[Corner] = []
+        self._corner_names: dict[int, str] = {}
         self._key: tuple[str, str] = ("", "")
         self.saved_laps = 0
         self.history: list[str] = []
@@ -259,6 +298,7 @@ class CoachEngine:
         self._comparator = LapComparator(self._reference) if self._reference else None
         corners = detect_corners(self._reference.lap.samples) if self._reference else []
         self._corners = corners
+        self._corner_names = _corner_labels(car, track, corners, self.laps_dir)
         self.analyzer.set_corners(corners)
         self.analyzer.reset()
         self.advisor.reset()
@@ -559,6 +599,25 @@ class CoachEngine:
             },
         }
 
+    def _corner_block(self) -> dict | None:
+        """L'ultima curva chiusa, nella forma che overlay e web consumano.
+
+        `None` in tre casi, e sono tre assenze diverse che qui collassano nella
+        stessa risposta: nessun riferimento (l'analyzer non produce carte senza
+        delta), giro non rappresentativo (la carta è già stata buttata in
+        `tick`), e prima della prima curva chiusa. Assente, non un trattino: un
+        valore che non abbiamo non si finge.
+        """
+        card = self.analyzer.last_corner
+        if card is None:
+            return None
+        return {
+            "index": card.index,
+            "name": self._corner_names.get(card.index, f"Curva {card.index + 1}"),
+            "lost_ms": round(card.lost_ms, 1),
+            "level": corner_level(card.lost_ms),
+        }
+
     def mark_setup_applied(self) -> None:
         """Request that the engineer mark its proposal applied. Thread-safe: only
         sets a flag here; the actual mutation runs on the tick thread (drained in
@@ -674,6 +733,9 @@ class CoachEngine:
         # the same zone (e.g. don't say "carry more speed" where you understeered).
         self.analyzer.note_faults(event_cues + balance_cues)
         _submit(self.analyzer.update(snap, delta))
+        if unrepresentative:
+            # Nascondere e basta la farebbe riapparire identica dopo il pit stop.
+            self.analyzer.drop_last_corner()
         _submit(event_cues)
         _submit(balance_cues)
         _submit(self.braking.update(snap, now))
@@ -711,6 +773,7 @@ class CoachEngine:
             history=list(self.history),
             engineer=self._engineer_block(),
             focus=self._focus_block(),
+            corner=self._corner_block(),
             quiet=quiet,
             # Only on a lap that actually started at the line: on ACC the flag is
             # 0 for the whole out-lap too, and answering "invalidated" there would
