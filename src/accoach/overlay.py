@@ -90,6 +90,11 @@ _GREY = QColor(0x8A, 0x95, 0xA3)     # muted text
 _LINE = QColor(0x23, 0x2B, 0x35)     # bar track / hairlines
 _DARK = QColor(0x0B, 0x0E, 0x12, 165)  # Ink, semi-transparent backing pill
 
+# Il semaforo della curva. Le soglie stanno in coaching/analyzer.py e arrivano
+# qui già risolte in un livello: l'overlay non ha nessuna soglia da riscrivere,
+# ed è così che colore e voce non possono divergere.
+_CARD_COLOUR = {"gain": _CYAN, "ok": _GREEN, "warn": _AMBER, "bad": _RED}
+
 
 class Overlay(QWidget):
     def __init__(self, url: str | None = None, interactive: bool = False,
@@ -334,6 +339,7 @@ class Overlay(QWidget):
         self._draw_green_flag(p, w, quiet)
         self._draw_cue(p, w)
         self._draw_focus(p, w)
+        self._draw_corner_card(p, w)
 
     def _draw_green_flag(self, p: QPainter, w: int, quiet: str) -> None:
         """Flash "green — flying lap" the moment the coach starts working.
@@ -527,6 +533,34 @@ class Overlay(QWidget):
         p.setPen(_GREY)
         p.drawText(42, y, w - 60, 20, Qt.AlignVCenter,
                    f"{t('overlay.focus')} · {theme} · {name}{gap}")
+
+    def _draw_corner_card(self, p: QPainter, w: int) -> None:
+        """L'ultima curva chiusa: nome a sinistra, decimi misurati a destra.
+
+        Resta finché non chiudi la curva successiva. Niente dissolvenza e
+        nessun timer: una durata sarebbe un numero tarato da noi, e un
+        consuntivo che sparisce da solo costringe a guardarlo in fretta proprio
+        mentre stai guidando. Non compete con la voce perché non parla — è
+        l'unico posto dove anche la curva presa bene dice qualcosa.
+        """
+        card = self._state.get("corner")
+        if not card:
+            return
+        colour = _CARD_COLOUR.get(card.get("level", "ok"), _GREY)
+        y = 188
+        p.setPen(Qt.NoPen)
+        p.setBrush(colour)
+        p.drawEllipse(26, y + 6, 7, 7)
+        self._set_font(p, 11, bold=True)
+        p.setPen(_GREY)
+        p.drawText(42, y, w - 220, 20, Qt.AlignVCenter, str(card.get("name", "")))
+        # Il segno è dal punto di vista del pilota: perdere è meno tempo tuo.
+        # Meno tipografico (U+2212), come il resto dell'HUD.
+        tenths = -float(card.get("lost_ms", 0.0)) / 1000.0
+        text = f"{'+' if tenths >= 0 else '−'}{abs(tenths):.2f}"
+        self._set_font(p, 13, bold=True, mono=True)
+        p.setPen(colour)
+        p.drawText(w - 190, y, 164, 20, Qt.AlignRight | Qt.AlignVCenter, text)
 
     # --- live pedal trace --------------------------------------------------
     def _draw_pedals(self, p: QPainter, w: int) -> None:

@@ -210,6 +210,35 @@ braking disegnato.
 > aerodinamico mollarlo tardi la fa partire. La traccia invece resta, perché
 > guardare non è farsi dire cosa fare.
 
+### Il numero della curva
+
+In basso, dopo ogni curva: **quanto ti è costata quella curva** rispetto al tuo
+riferimento, e un pallino colorato. Resta lì finché non chiudi la curva dopo.
+
+| Colore | Cosa dice |
+|---|---|
+| **ciano** | hai guadagnato **almeno 0,25 s**: è la stessa soglia con cui il coach ti fa i complimenti |
+| **verde** | sei nella norma: fra 0,25 s di guadagno e 0,12 s di perdita |
+| **giallo** | perdi **da 0,12 a 0,25 s**: 0,12 è la soglia con cui il coach apre bocca |
+| **rosso** | perdi **più di 0,25 s** |
+
+Tre cose da sapere, perché sembrano guasti e non lo sono:
+
+- **Il numero è misurato, il colore è tarato.** I decimi li puoi rifare a mano;
+  le soglie dei colori le abbiamo scelte noi — sono le stesse due con cui il
+  coach decide se parlare, così colore e voce non possono dirti cose diverse.
+- **È relativo al *tuo* riferimento**, quello eletto per le condizioni di oggi.
+  Se il tuo miglior giro è lento, il verde non dice che sei veloce: dice che sei
+  **costante**.
+- **Alla prima sessione su un'auto o una pista nuova il riquadro non c'è**, e
+  non c'è nemmeno un trattino: senza un giro tuo completo non c'è niente contro
+  cui misurare, e un numero inventato sarebbe peggio di nessun numero. Sparisce
+  anche ai box, in ricognizione e sui giri fuori ritmo.
+
+Il consiglio a voce **non cambia**: arriva sempre all'*ingresso* della stessa
+curva al giro successivo, dove puoi ancora farci qualcosa. Il numero è un
+consuntivo, e per questo può stare zitto.
+
 ### Quando il delta non c'è
 
 Il delta compare **solo sui giri che possono contare**, cioè quelli cominciati
@@ -498,6 +527,23 @@ col bordo azzurro. Sono osservazioni **sull'intero giro**, non su una curva:
 - *«Ti mancano N km/h di punta»* — e qui la parte che conta: se in curva vai come
   il riferimento non è l'auto a essere lenta, guarda ala e rapporti; se sei più
   lento anche in curva, è velocità in uscita e l'assetto non c'entra.
+
+### Curva per sessione
+
+Sotto i punti deboli, per ogni curva **sistematica**: la perdita mediana in
+quella curva, **una barra per sessione**. Due uscite nello stesso pomeriggio
+restano due barre — è lì che si vede se la cosa che hai cambiato fra l'una e
+l'altra ha funzionato.
+
+Due soglie, e si compongono: una sessione in cui hai fatto **meno di tre
+giri** su quella curva non compare — una mediana su due giri è l'ultimo giro
+con un nome più serio — e una sessione assente **non** viene disegnata a
+zero, perché lo zero qui vuol dire «l'hai presa bene», che è un'altra cosa
+dal non avere il dato. E la curva **intera** compare solo con **almeno due
+sessioni** che superano quella prima soglia: un punto solo non è un
+andamento, è un giro fortunato. Una curva appena diventata sistematica può
+non avere ancora un grafico qui: prima le servono due sessioni buone, non una
+sola.
 
 ### Chi diventa il riferimento
 

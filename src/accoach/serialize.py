@@ -93,6 +93,7 @@ def state_to_dict(st: EngineState) -> dict:
         "history": st.history,
         "engineer": st.engineer,
         "focus": st.focus,
+        "corner": st.corner,
         "quiet": st.quiet,
         "lap_invalid": st.lap_invalid,
     }

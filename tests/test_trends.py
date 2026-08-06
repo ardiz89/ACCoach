@@ -4,6 +4,7 @@ from accoach.coaching.debrief import CornerLoss, LapDebrief
 from accoach.coaching.trends import (
     benchmark_levels,
     classify_losses,
+    session_series,
 )
 
 
@@ -119,3 +120,60 @@ def test_level_labels_translate():
     it = {lv.key: lv.label for lv in benchmark_levels(90000, ideal_ms=89000, lang="it")}
     assert en["best"] == "Your best lap" and it["best"] == "Tuo miglior giro"
     assert it["ideal"] == "Ideale teorico"
+
+
+# --- la serie per sessione -------------------------------------------------
+
+_T = "2026-08-0{d}T{h}:{m}:00+00:00"
+
+
+def _deb(lost_ms):
+    """Un giro: con una perdita alla curva 0, oppure preso bene (lost_ms = 0)."""
+    return _debrief(_loss(0, lost_ms)) if lost_ms else _debrief()
+
+
+def _evening(day, hour, losses):
+    """Una sessione: giri a due minuti l'uno dall'altro."""
+    return [(_T.format(d=day, h=hour, m=f"{2 * i:02d}"), _deb(v))
+            for i, v in enumerate(losses)]
+
+
+def test_three_sessions_that_improve_read_as_a_falling_series():
+    dated = (_evening(1, "18", [400, 380, 420]) +
+             _evening(2, "18", [250, 230, 270]) +
+             _evening(3, "18", [120, 100, 140]))
+    pts = session_series(dated, 0)
+    assert [p.median_ms for p in pts] == [400.0, 250.0, 120.0]
+    assert pts[0].started < pts[-1].started        # dal più vecchio al più recente
+
+
+def test_two_runs_the_same_afternoon_stay_two_points():
+    """Se cambi qualcosa fra l'una e l'altra, lo devi poter vedere."""
+    dated = _evening(1, "15", [400, 400, 400]) + _evening(1, "18", [200, 200, 200])
+    assert len(session_series(dated, 0)) == 2
+
+
+def test_a_session_without_that_corner_is_absent_not_a_zero():
+    """Il buco a zero direbbe 'curva perfetta' dove invece non c'è il dato."""
+    dated = _evening(1, "18", [400, 400, 400]) + _evening(2, "18", [0, 0])
+    pts = session_series(dated, 0)
+    assert len(pts) == 1                     # la seconda ha solo 2 giri: sotto min_laps
+    dated2 = _evening(1, "18", [400, 400, 400]) + _evening(2, "18", [0, 0, 0])
+    pts2 = session_series(dated2, 0)
+    assert [p.median_ms for p in pts2] == [400.0, 0.0]   # tre giri buoni SONO un dato
+
+
+def test_a_good_lap_counts_as_zero_not_as_missing():
+    """Migliorare vuol dire anche sbagliare quella curva meno spesso."""
+    dated = _evening(1, "18", [400, 0, 0])
+    assert session_series(dated, 0)[0].median_ms == 0.0
+
+
+def test_a_session_below_the_minimum_is_dropped():
+    assert session_series(_evening(1, "18", [400, 400]), 0) == []
+
+
+def test_undated_laps_are_dropped_not_guessed_into_a_session():
+    dated = [("", _deb(400))] + _evening(1, "18", [200, 200, 200])
+    pts = session_series(dated, 0)
+    assert len(pts) == 1 and pts[0].median_ms == 200.0

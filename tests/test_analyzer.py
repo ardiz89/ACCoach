@@ -1,5 +1,7 @@
 """CoachAnalyzer: corner cause attribution + feed-forward cue lifecycle."""
-from accoach.coaching.analyzer import CoachAnalyzer, CornerStats, classify_corner
+from accoach.coaching.analyzer import (
+    CoachAnalyzer, CornerStats, classify_corner, corner_level, _GAIN_MS, _LOSS_MS,
+)
 from accoach.coaching.cue import CueCategory
 from accoach.comparison import LapComparator, Reference
 from accoach.track import detect_corners
@@ -107,3 +109,113 @@ def test_feed_forward_announces_corner_advice_on_next_lap():
 def test_no_cues_when_delta_is_none():
     an = CoachAnalyzer()
     assert an.update(synth.snap(pos=0.3), None) == []
+
+
+# --- la carta della curva: il dato che oggi viene buttato -------------------
+
+def _replay(review=None):
+    """Guida un giro contro se stesso (o contro `review`); torna (analyzer, cues)."""
+    ref = Reference(synth.build_lap())
+    an = CoachAnalyzer()
+    an.set_corners(detect_corners(ref.lap.samples))
+    cmp = LapComparator(ref)
+    cues = _drive(an, cmp, review if review is not None else synth.build_lap())
+    return an, cues
+
+
+def test_no_card_before_the_first_corner_closes():
+    an = CoachAnalyzer()
+    an.set_corners(detect_corners(synth.build_lap().samples))
+    assert an.last_corner is None
+
+
+def test_a_corner_taken_well_still_leaves_a_card():
+    """Il caso che oggi si perde: classify_corner torna None e il dato sparisce."""
+    an, cues = _replay()
+    assert cues == [], "un giro contro se stesso non deve produrre cue"
+    assert an.last_corner is not None
+    assert an.last_corner.index == 1            # l'ultima curva chiusa del giro
+    assert abs(an.last_corner.lost_ms) < _LOSS_MS  # dentro la norma, e comunque misurata
+
+
+def test_the_card_follows_the_corner_you_just_left():
+    an, _ = _replay(synth.build_lap(slow_corner=0, amt=30))
+    assert an.last_corner is not None
+    assert an.last_corner.index == 1
+
+
+def test_set_corners_clears_the_card():
+    """Un layout di zone nuovo invalida gli indici: la carta vecchia mente.
+
+    Il layout dev'essere davvero un altro: ripassare le curve della stessa pista
+    non è un layout nuovo. Qui si passa al ripiego a segmenti fissi, che è la
+    differenza più netta possibile.
+    """
+    an, _ = _replay()
+    assert an.last_corner is not None
+    an.set_corners([])
+    assert an.last_corner is None
+
+
+def test_the_same_layout_recomputed_keeps_the_card():
+    """Il motore richiama `set_corners` a ogni giro salvato, con le stesse zone.
+
+    Se azzerasse comunque, il riquadro sparirebbe dal traguardo alla prima
+    curva su ogni giro — il rettilineo dove il pilota ha davvero il tempo di
+    leggerlo.
+    """
+    an, _ = _replay()
+    an.set_corners(detect_corners(synth.build_lap().samples))
+    assert an.last_corner is not None
+
+
+def test_reset_keeps_the_card():
+    """`reset()` butta lo stato del giro in corso; la carta non lo è.
+
+    Era il contrario, e si contraddiceva col commento della carta stessa
+    («sopravvive al traguardo di proposito»): `_rebuild_reference` chiama
+    `reset()` dopo ogni giro salvato, quindi il riquadro spariva a ogni giro.
+    """
+    an, _ = _replay()
+    an.reset()
+    assert an.last_corner is not None
+
+
+def test_drop_last_corner_clears_the_card():
+    an, _ = _replay()
+    an.drop_last_corner()
+    assert an.last_corner is None
+
+
+# --- il semaforo: stesse soglie della voce, o si contraddicono --------------
+
+def test_a_clear_gain_is_the_bright_end():
+    assert corner_level(-_GAIN_MS) == "gain"
+    assert corner_level(-_GAIN_MS - 1) == "gain"
+
+
+def test_inside_the_band_is_green():
+    assert corner_level(0.0) == "ok"
+    assert corner_level(-_GAIN_MS + 1) == "ok"
+    assert corner_level(_LOSS_MS - 1) == "ok"
+
+
+def test_the_colour_turns_exactly_where_the_coach_speaks():
+    """La soglia del giallo È la soglia della voce: se il coach parla, non è verde."""
+    assert corner_level(_LOSS_MS) == "warn"
+    assert corner_level(_GAIN_MS) == "warn"
+
+
+def test_past_the_praise_threshold_the_other_way_is_red():
+    assert corner_level(_GAIN_MS + 1) == "bad"
+
+
+def test_the_level_never_contradicts_the_voice():
+    """Ogni perdita che merita un cue è almeno gialla; ogni lode è 'gain'."""
+    for lost in (_LOSS_MS, _LOSS_MS + 50, _GAIN_MS, _GAIN_MS + 500):
+        st = CornerStats(lost_ms=lost, throttle_live=1.0, throttle_ref=1.0,
+                         brake_live=0.0, brake_ref=0.0, min_speed_live=100.0,
+                         min_speed_ref=100.0, braking_early=False)
+        assert classify_corner(st, 0, 0.3) is not None
+        assert corner_level(lost) in ("warn", "bad")
+    assert corner_level(-_GAIN_MS) == "gain"

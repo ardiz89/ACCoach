@@ -227,6 +227,20 @@ class LapDebrief:
         return not self.losses
 
 
+def loss_at(debrief: LapDebrief, index: int) -> float:
+    """Tempo perso alla curva ``index`` in questo giro (0.0 se non è una perdita).
+
+    Lo zero è deliberato e va letto: «quella curva l'hai presa bene», non «non
+    lo so». È il denominatore giusto per una mediana, perché migliorare vuol
+    dire anche sbagliare quella curva meno spesso — su una mediana dei soli
+    giri sbagliati, prenderla bene più spesso non si vede.
+    """
+    for loss in debrief.losses:
+        if loss.index == index:
+            return loss.lost_ms
+    return 0.0
+
+
 def _mean(xs: list[float]) -> float:
     return sum(xs) / len(xs) if xs else 0.0
 

@@ -140,3 +140,51 @@ def benchmark_levels(
         levels.append(BenchmarkLevel("pro", lab["pro"], pro_ms,
                                      best_ms - pro_ms))
     return levels
+
+
+@dataclass(slots=True)
+class SessionPoint:
+    """How that corner went in one session."""
+
+    started: str        # ISO UTC of the session's first lap
+    laps: int           # laps in this session that carried a debrief
+    median_ms: float    # typical loss there, counting laps taken well as 0.0
+
+
+#: Below this many laps a median isn't a median, it's the last lap with a
+#: fancier name. Same minimum the Trends tab already uses for per-corner
+#: consistency (`/api/progress`, `len(vmins) >= 3`).
+_MIN_SESSION_LAPS = 3
+
+
+def session_series(dated: list[tuple[str, LapDebrief]], corner_index: int, *,
+                   min_laps: int = _MIN_SESSION_LAPS) -> list[SessionPoint]:
+    """The typical loss at a corner, session by session, oldest first.
+
+    The session is the unit you actually train in, and two runs in the same
+    afternoon stay two points: if you change something between them, you get
+    to see it. The grouping **is not reimplemented here**: it goes through
+    :func:`accoach.sessions.group_sessions`, the one place that knows what a
+    session is (and treats the 20-minute rule as the heuristic it is).
+
+    A session where that corner doesn't have enough laps does not produce a
+    point at zero: it disappears. A zero means "taken well", and drawing it
+    where the data is missing is the easiest lie on the whole chart.
+    """
+    from ..sessions import group_sessions
+    from .debrief import loss_at
+
+    # group_sessions only reads `recorded_utc`: we pass it fake rows that carry
+    # the debrief alongside the timestamp. Reusing the function instead of
+    # copying its loop is the point — a second `if gap > 20 min` would be a
+    # second definition of "session" that will one day disagree with the first.
+    rows = [{"recorded_utc": ts, "debrief": deb} for ts, deb in dated]
+    out: list[SessionPoint] = []
+    for ses in reversed(group_sessions(rows)):     # group_sessions returns newest first
+        vals = [loss_at(r["debrief"], corner_index) for r in ses.laps]
+        if len(vals) < min_laps:
+            continue
+        started = ses.laps[0]["recorded_utc"]
+        out.append(SessionPoint(started=started, laps=len(vals),
+                                median_ms=statistics.median(vals)))
+    return out
