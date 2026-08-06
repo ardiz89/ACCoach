@@ -71,3 +71,21 @@ def test_state_to_dict_is_json_serializable():
     assert back["reference_ms"] == 99000
     assert back["history"] == ["a", "b"]
     assert back["delta"] is None and back["cue"] is None
+
+
+def _state(**kw) -> EngineState:
+    return EngineState(
+        snapshot=TelemetrySnapshot.disconnected(),
+        delta=None, spoken=None, saved_laps=0, reference_ms=0, history=[], **kw)
+
+
+def test_the_corner_card_reaches_the_frontends():
+    st = _state(corner={"index": 3, "name": "Variante Ascari",
+                        "lost_ms": 310.0, "level": "bad"})
+    d = json.loads(json.dumps(state_to_dict(st)))    # deve passare da JSON
+    assert d["corner"]["name"] == "Variante Ascari"
+    assert d["corner"]["level"] == "bad"
+
+
+def test_no_card_is_null_not_a_dash():
+    assert state_to_dict(_state())["corner"] is None
