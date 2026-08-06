@@ -37,7 +37,8 @@
   </header>
 
   <nav class="tabs">
-    <button class="tab active" data-view="flow" data-i18n="tab.flow">Lap explained</button>
+    <button class="tab active" data-view="recap" data-i18n="tab.recap">How it went</button>
+    <button class="tab" data-view="flow" data-i18n="tab.flow">Lap explained</button>
     <button class="tab" data-view="training" data-i18n="tab.training">Training</button>
     <button class="tab" data-view="session" data-i18n="tab.session">Session</button>
     <button class="tab" data-view="stint" data-i18n="tab.stint">Race pace</button>
@@ -72,9 +73,28 @@
     </aside>
     <div class="views">
 
+  <!-- How the run went, before it's forgotten: the door onto the report. Reads
+       current.recap (coaching/session recap — Task 3) — a debrief for the whole
+       outing, not one lap. The gain is measured against the best lap of THIS
+       run, not the elected reference, and it is not the gap the timing screen
+       publishes (the two differ by up to a tenth): it is how much you were
+       leaving out there on average, as the sum of its own parts — the five
+       phase numbers below add up to it exactly (see app.js renderRecap). -->
+  <div id="view-recap">
+    <section id="recap-head" class="summary"></section>
+    <section class="debrief">
+      <h3 data-i18n-html="recap.where">Where the time went <small>(average per lap · the parts add up to the gap)</small></h3>
+      <div id="recap-phases"></div>
+    </section>
+    <section class="debrief">
+      <h3 data-i18n-html="recap.laps">Lap by lap <small>(against your best lap of this run)</small></h3>
+      <div id="recap-laps"></div>
+    </section>
+  </div>
+
   <!-- The lap explained one step at a time. Same findings as the debrief below,
        edited server-side into what to look at first (see coaching/flow.py). -->
-  <div id="view-flow">
+  <div id="view-flow" class="hidden">
     <div class="flow-shell">
       <header class="flow-head">
         <span id="flow-count" class="flow-count"></span>

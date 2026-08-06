@@ -241,13 +241,16 @@ def test_the_pace_chart_is_scaled_to_the_laps_that_were_a_pace():
 
 
 def test_every_tab_on_the_row_has_a_keyboard_shortcut():
-    """The digits were [1-9] and the row grew to ten when Race pace arrived, so
-    the last tab silently lost its shortcut. Nothing breaks, nothing logs, and
-    the only way to notice is to press 0 and watch nothing happen."""
+    """The digits were [1-9] and the row grew to ten when Race pace arrived, then
+    to eleven when the recap became the landing tab. Nothing breaks, nothing
+    logs, and the only way to notice a tab fell off the end is to press its key
+    and watch nothing happen — so the ceiling here has to track the real count,
+    and the row of keys that answers it (1-9, then 0, then -) has to keep pace
+    with it, one key further along the same row each time."""
     tabs = len(re.findall(r'class="tab[ "]', _HTML))
-    assert 0 < tabs <= 10, f"{tabs} tabs, more than the digit row can reach"
+    assert 0 < tabs <= 11, f"{tabs} tabs, more than the keyboard row can reach"
     block = _APPJS.split("function wireKeys()")[1].split("\n}")[0]
-    assert "/^[0-9]$/" in block
+    assert '"1234567890-"' in block
 
 
 def test_printing_hides_every_view_without_naming_them():
@@ -1201,3 +1204,29 @@ def test_the_series_is_rendered_when_the_tab_loads():
     assert "function renderCornerSessions(rows)" in js
     block = js.split("async function loadProgress(")[1].split("\n}")[0]
     assert "renderCornerSessions(p.corner_sessions)" in block
+
+
+# --- "Com'è andata": the recap, and the door onto the report (2026-08-06) ---
+
+def test_the_recap_has_a_home_and_it_is_the_landing_view():
+    html = (WEB / "index.html").read_text(encoding="utf-8")
+    assert 'id="view-recap"' in html
+    assert 'data-view="recap"' in html
+    # la vista d'ingresso è l'unica senza `hidden`
+    assert 'id="view-recap" class="hidden"' not in html
+    assert 'id="view-flow" class="hidden"' in html
+
+
+def test_the_recap_is_rendered_when_the_session_loads():
+    js = (WEB / "app.js").read_text(encoding="utf-8")
+    assert "renderRecap(" in js
+
+
+def test_the_recap_call_is_wired_not_just_declared():
+    """The check above passes even with `renderRecap` fully written and never
+    called — the substring is right there in its own `function renderRecap(`
+    line. The call has to live inside `renderSession`, which is what actually
+    runs when the shared /api/sessions payload lands."""
+    js = (WEB / "app.js").read_text(encoding="utf-8")
+    block = js.split("function renderSession(s)")[1].split("\n}")[0]
+    assert "renderRecap(" in block

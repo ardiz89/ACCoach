@@ -40,6 +40,25 @@
     "ctl.baseline":    { en: `Compare with`, it: `Confronta con` },
     "ctl.export":      { en: `Export`, it: `Esporta` },
 
+    // How the run went — the door onto the report. `gain_avg_s` is measured
+    // against the best lap of THIS run, not the elected reference, and is not
+    // the gap the timing screen publishes: it is the sum of its own parts.
+    "tab.recap":       { en: `How it went`, it: `Com'è andata` },
+    "recap.where":     { en: `Where the time went <small>(average per lap · the parts add up to the gap)</small>`,
+                         it: `Dove è finito il tempo <small>(media per giro · le parti sommano al gap)</small>` },
+    "recap.laps":      { en: `Lap by lap <small>(against your best lap of this run)</small>`,
+                         it: `Giro per giro <small>(contro il tuo miglior giro di questa uscita)</small>` },
+    "recap.best":      { en: `Best lap of this run`, it: `Miglior giro di questa uscita` },
+    "recap.gain":      { en: `To gain, on average`, it: `Da guadagnare, in media` },
+    "recap.yardstick": { en: `your yardstick`, it: `il tuo metro` },
+    "recap.none":      { en: `One valid lap in this run — nothing to compare it against yet.`,
+                         it: `Un solo giro valido in questa uscita: non c'è ancora niente contro cui confrontarlo.` },
+    "recap.phase.entry":  { en: `Entry`, it: `Entrata` },
+    "recap.phase.apex":   { en: `Apex`, it: `Apice` },
+    "recap.phase.exit":   { en: `Exit`, it: `Uscita` },
+    "recap.phase.after":  { en: `After`, it: `Dopo` },
+    "recap.phase.launch": { en: `Launch`, it: `Lancio` },
+
     "tab.flow":        { en: `Lap explained`, it: `Il giro spiegato` },
     "tour.a9.t":       { en: `Start here`, it: `Parti da qui` },
     "tour.a9.x":       { en: `The lap, explained one thing at a time: what cost you the most, why, and what to do about it — with the chart that shows it. The other tabs are the same findings, laid out for you to read yourself.`,

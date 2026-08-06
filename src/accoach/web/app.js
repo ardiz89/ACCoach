@@ -11,7 +11,7 @@ let DATA = null;      // last /api/analysis payload
 let DIST = null;      // {pos[], m[], total} — the reviewed lap in metres (see buildDistance)
 let COMBOS = [];      // last /api/combos payload (kept for re-labelling on lang switch)
 let LAST_HOVER = null; // last hover position, so a re-render keeps the readout
-let VIEW = "flow";    // whichever tab is `active` in index.html
+let VIEW = "recap";   // whichever tab is `active` in index.html
 let HOVER_WIRED = false;
 // Did the driver pick the comparison lap by hand, or is it just whatever the
 // page elected last time? The difference matters now that the election depends
@@ -100,7 +100,7 @@ async function init() {
     TRAINING = null;      // and its own plan, drills and readiness
     loadCombo(combo);
     if (VIEW === "progress") loadProgress(combo);
-    if (VIEW === "session") loadSession(combo, 0);
+    if (VIEW === "session" || VIEW === "recap") loadSession(combo, 0);
     if (VIEW === "stint") loadStint(combo, 0);
     if (VIEW === "training") loadTraining(combo);
   };
@@ -151,6 +151,11 @@ async function init() {
   await loadCombo(JSON.parse(sel.value));
   const view = savedView();
   if (view && view !== VIEW) showView(view);
+  // No saved view (first visit) or the saved view IS the landing tab: neither
+  // branch of `showView` above runs, so nothing else has fetched the session
+  // this landing tab depends on. `loadCombo` renders "flow" unconditionally
+  // for the same reason — a landing view can't wait for a tab click to load.
+  else loadSession(CURRENT, SESSION_I);
   // First visit: pop the tour once data is on screen (so #vmin/#debrief exist).
   if (window.HoneTour) window.HoneTour.auto(tourSteps(), "hone_tour_analysis");
 }
@@ -218,7 +223,9 @@ function redrawCurrentView() {
   // the backend, so a cached payload would still be in the language you left.
   else if (VIEW === "training") { if (CURRENT) loadTraining(CURRENT); }
   else if (VIEW === "flow") { if (DATA) renderFlow(DATA); }
-  else if (VIEW === "session") { if (CURRENT) loadSession(CURRENT, SESSION_I); }
+  // "recap" shares this fetch with "session" — same /api/sessions payload,
+  // one carries current.recap and the other carries everything below it.
+  else if (VIEW === "session" || VIEW === "recap") { if (CURRENT) loadSession(CURRENT, SESSION_I); }
   // Refetched, like Training: the notes strip is written by the backend in the
   // requested language, so repainting a cached payload would leave the one
   // paragraph on the tab in the language you just left.
@@ -342,11 +349,13 @@ function wireKeys() {
     if (el && el.matches("input, select, textarea")) return;
     if (document.querySelector(".tour-pop")) return;   // the tour owns the keys
     const tabs = [...document.querySelectorAll(".tab")];
-    // 1-9 then 0 for the tenth, the usual row-of-digits convention. Adding the
-    // Race pace tab pushed Trends to position ten, and with a bare [1-9] the
-    // last tab on the row silently stopped having a shortcut.
-    if (/^[0-9]$/.test(e.key)) {
-      const b = tabs[(parseInt(e.key, 10) + 9) % 10];
+    // The row of keys above the letters, left to right: 1-9, then 0, then -.
+    // This ceiling has moved once before (Race pace pushed the row to ten and
+    // 0 took over from a bare [1-9]); "Com'è andata" becoming the landing tab
+    // pushed it to eleven, and - is the next key on the same row.
+    const KEY_ROW = "1234567890-";
+    if (e.key.length === 1 && KEY_ROW.indexOf(e.key) >= 0) {
+      const b = tabs[KEY_ROW.indexOf(e.key)];
       if (b) { e.preventDefault(); b.click(); }
       return;
     }
@@ -2053,6 +2062,10 @@ function fmtWhen(iso) {
 
 function renderSession(s) {
   const cur = s && s.current;
+  // One fetch, two tabs: `current.recap` rides on the same /api/sessions
+  // payload as everything below, so the door screen and the Session tab never
+  // disagree about which run they're describing.
+  renderRecap(cur);
   const pick = $("ses-select");
   if (!cur) {
     $("ses-when").textContent = "";
@@ -2148,6 +2161,54 @@ function renderSession(s) {
         (prev.regressed.length ? `<h4>${t("ses.regressed")}</h4>` + rows(prev.regressed, "down") : "")
       : `<div class="nothing">${t("ses.nomoves")}</div>`);
   }
+}
+
+// --- "How it went": the door onto the report -----------------------------
+// Dove è finito il tempo di un'uscita, in decimi che sommano al gap. Le barre
+// sono in scala sulla fase peggiore di QUESTA sessione: non c'è nessuna soglia,
+// e nessun colore che voglia dire "bravo". `cur` è `current` da /api/sessions;
+// `cur.recap` è `null` quando c'è un solo giro valido nell'uscita — niente
+// contro cui confrontarlo — e la scheda scrive perché, non uno zero.
+function renderRecap(cur) {
+  const head = $("recap-head"), ph = $("recap-phases"), lp = $("recap-laps");
+  if (!head || !ph || !lp) return;
+  const r = cur && cur.recap;
+  if (!r) {
+    head.innerHTML = "";
+    ph.innerHTML = `<div class="clean">${t("recap.none")}</div>`;
+    lp.innerHTML = "";
+    return;
+  }
+  const item = (k, v) => `<div class="item"><div class="k">${k}</div><div class="v">${v}</div></div>`;
+  head.innerHTML = item(t("recap.best"), r.reference) +
+                   item(t("recap.gain"), "+" + r.gain_avg_s.toFixed(3) + "s");
+
+  let mx = 0.05;
+  for (const p of r.phases) mx = Math.max(mx, p.avg_s);
+  ph.innerHTML = r.phases.map((p) => {
+    const w = (Math.min(Math.max(p.avg_s, 0) / mx, 1) * 100).toFixed(0);
+    return `<div class="ses-row">` +
+      `<span class="ses-when">${t("recap.phase." + p.phase)}</span>` +
+      `<span class="ses-track"><span class="ses-fill" style="width:${w}%"></span></span>` +
+      `<span class="ses-nums">${fmtLoss(p.avg_s)}</span></div>`;
+  }).join("");
+
+  lp.innerHTML = r.laps.map((l) =>
+    `<div class="recap-lap" data-path="${l.path}">` +
+    `<span class="lap-time">${l.lap_time}</span>` +
+    `<span class="lap-gap">${fmtLoss(l.gap_s)}</span>` +
+    `<span class="corner">${l.corner}</span></div>`).join("");
+  // A click opens the lap in Compare — same mechanism the Session tab's own
+  // lap rows already use, not a second way to jump to a lap.
+  for (const el of lp.querySelectorAll(".recap-lap")) {
+    el.onclick = () => openLapInCompare(el.dataset.path);
+  }
+}
+
+// Il segno dal punto di vista del pilota: perdere è meno tempo tuo. Meno
+// tipografico, come il resto del report.
+function fmtLoss(s) {
+  return (s > 0 ? "−" : s < 0 ? "+" : "") + Math.abs(s).toFixed(3) + "s";
 }
 
 // --- race pace: one run on one tank --------------------------------------
@@ -4486,7 +4547,7 @@ window.HoneI18nRerender = function () {
   TRAINING = null;       // the drills are prose, written server-side
   reloadSelection();
   if (VIEW === "progress") loadProgress(CURRENT);
-  if (VIEW === "session") loadSession(CURRENT, SESSION_I);
+  if (VIEW === "session" || VIEW === "recap") loadSession(CURRENT, SESSION_I);
   if (VIEW === "training") loadTraining(CURRENT);
 };
 
