@@ -40,8 +40,9 @@ from .coaching import (
     propose as propose_plan,
     trail_brake_for,
 )
+from .coaching.phases import PHASES, lap_time_split
 from .coaching.training import MIN_LAPS as _TRAIN_MIN_LAPS, assess as _assess_training
-from .coaching.trends import session_series
+from .coaching.trends import session_recap, session_series
 from .comparison import Reference
 from . import cornernames
 from .cornermap import learn_from
@@ -1499,6 +1500,81 @@ def create_api(
         return {"improved": _rows(better, advice=False),
                 "regressed": _rows(worse, advice=True)}
 
+    def _recap_of(cur, track: str, car: str, lg: str) -> dict | None:
+        """The run's recap, or None when there is nothing measurable in it.
+
+        ``session_recap`` (Task 2) drops any lap it cannot cut into phases —
+        too few samples, most often — rather than count it as a zero. That
+        means its ``laps`` list can come back shorter than the laps we handed
+        it, and a plain ``zip(others, recap.laps)`` would then pair each
+        surviving row with whichever lap happens to sit at the same list
+        position once the drop shifts everything left: one lap's gap and
+        worst corner, printed under a different lap's path.
+
+        So ``others`` is filtered down to exactly the laps that will survive
+        *before* calling ``session_recap``, using the identical test it uses
+        internally (``lap_time_split(...) is not None``, applied in the same
+        order). That keeps ``kept`` and ``recap.laps`` the same length by
+        construction, so ``zip(kept, recap.laps)`` cannot misalign — there is
+        no position for a lap to drift into.
+        """
+        best = cur.best
+        if best is None:
+            return None
+        others = [l for l in cur.valid_laps if l["path"] != best["path"]]
+        if not others:
+            return None                     # the best lap is the only lap
+        try:
+            best_lap = load_lap(best["path"])
+            reference = Reference(best_lap)
+            if not reference.usable:
+                return None
+            corners = detect_corners(best_lap.samples)
+            names = {c.index: n for c, n in
+                     zip(corners, name_corners(track, corners, lg,
+                                               _corner_map(car, track),
+                                               _typed(track)))}
+        except Exception:  # noqa: BLE001 - a session view must not 500 on one bad lap
+            return None
+
+        kept: list[dict] = []
+        lap_objs = []
+        for row in others:
+            try:
+                lap_obj = load_lap(row["path"])
+                dropped = lap_time_split(lap_obj, reference, corners) is None
+            except Exception:  # noqa: BLE001 - one bad lap should not sink the run
+                continue
+            if dropped:
+                continue                    # same drop rule session_recap uses
+            kept.append(row)
+            lap_objs.append(lap_obj)
+        if not lap_objs:
+            return None
+
+        try:
+            recap = session_recap(lap_objs, reference, corners)
+        except Exception:  # noqa: BLE001 - same guarantee as the block above
+            return None
+        if recap is None:
+            return None
+        return {
+            "gain_avg_s": round(recap.gain_avg_ms / 1000.0, 3),
+            "reference": format_lap_time(recap.reference_ms),
+            "phases": [{"phase": p, "avg_s": round(recap.by_phase[p] / 1000.0, 3)}
+                       for p in PHASES]
+                      + [{"phase": "launch",
+                          "avg_s": round(recap.launch_ms / 1000.0, 3)}],
+            "laps": [{
+                "path": row["path"],
+                "lap_time": format_lap_time(r.lap_time_ms),
+                "gap_s": round(r.gap_ms / 1000.0, 3),
+                "corner_index": r.worst_index,
+                "corner": names.get(r.worst_index, ""),
+                "corner_s": round(r.worst_ms / 1000.0, 3),
+            } for row, r in zip(kept, recap.laps)],
+        }
+
     @app.get("/api/sessions")
     def sessions(
         car: str = Query(...),
@@ -1551,6 +1627,7 @@ def create_api(
                 "road_temp_from": min(temps) if temps else None,
                 "road_temp_to": max(temps) if temps else None,
                 "consistency": lap_time_consistency(valid_ms),
+                "recap": _recap_of(cur, track, car, lg),
                 # Every lap of the run, in the order driven — cut and invalid
                 # ones included. They can't set the numbers, but leaving them out
                 # would show a session you didn't have.
