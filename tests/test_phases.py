@@ -281,6 +281,45 @@ def test_gap_ms_is_the_exact_telescoped_sum_not_the_published_lap_gap():
     assert abs(total - split.gap_ms) < 1e-6
 
 
+def test_the_sum_holds_even_off_the_shared_position_grid():
+    """Ogni altro fixture di questo file mette giro e riferimento sulla STESSA
+    griglia di posizioni (``synth.build_lap`` e la ``_lap`` locale usano
+    entrambi ``int(pos * 100000) + offset``), quindi ``Reference.time_at``
+    non interpola mai davvero: cade esatta su un campione, frazione zero, e
+    ogni delta risulta un float a valore intero. Su un intero
+    ``round(x, 1)`` è un'operazione nulla — quindi le altre asserzioni di
+    somma resterebbero verdi anche se l'arrotondamento tornasse dentro
+    ``lap_time_split``. Qui il riferimento è costruito con un ``n`` diverso
+    (397 campioni contro i 401 di default del riveduto), così l'interpolazione
+    è reale e i ritardi sono genuinamente frazionari.
+
+    Verificato a mano (vedi il report): il livello launch+curve=gap da solo
+    NON basta come guardia — su questo stesso fixture l'errore di
+    arrotondamento di un corner si compensa con quello di un altro e il totale
+    torna comunque. È il livello curva=somma-delle-sue-quattro-fasi a
+    smascherare la regressione, quindi lo si pinna esplicitamente qui insieme
+    agli altri due."""
+    ref_lap = synth.build_lap(n=397)
+    reference = Reference(ref_lap)
+    corners = detect_corners(ref_lap.samples)
+    review = synth.build_lap(slow_corner=0, amt=30)          # n=401 di default
+    split = lap_time_split(review, reference, corners)
+
+    values = ([split.launch_ms, split.gap_ms]
+              + [c.lost_ms for c in split.corners]
+              + [p.lost_ms for c in split.corners for p in c.phases])
+    assert any(v != int(v) for v in values), "il fixture deve dare ritardi non interi"
+
+    for c in split.corners:
+        assert abs(sum(p.lost_ms for p in c.phases) - c.lost_ms) < 1e-6
+
+    total = split.launch_ms + sum(c.lost_ms for c in split.corners)
+    assert abs(total - split.gap_ms) < 1e-6
+
+    by = split.by_phase()
+    assert abs(sum(by.values()) + split.launch_ms - split.gap_ms) < 1e-6
+
+
 def test_no_corners_no_split():
     ref_lap = synth.build_lap()
     assert lap_time_split(synth.build_lap(), Reference(ref_lap), []) is None
