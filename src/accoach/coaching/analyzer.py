@@ -85,6 +85,21 @@ class CornerStats:
     braking_early: bool
 
 
+@dataclass(slots=True)
+class CornerCard:
+    """L'ultima curva chiusa: quale era, e quanto è costata.
+
+    `classify_corner` risponde a «vale la pena dire qualcosa?» e sotto i 120 ms
+    la risposta è no — giustamente, per la voce. Ma il numero che ha usato per
+    rispondere è misurato ed è la metà buona della funzione: la curva presa bene
+    è l'unica informazione che il pilota oggi non riceve mai. La carta la
+    trattiene per chi mostra, non per chi parla.
+    """
+
+    index: int
+    lost_ms: float
+
+
 def _braked_early(live_onset: float, ref_onset: float, ref_brake_at_onset: float) -> bool:
     """Did you get on the brakes meaningfully earlier than the reference?
 
@@ -160,6 +175,10 @@ class CoachAnalyzer:
         self._announced: set[int] = set()     # zones announced this lap
         # (zone index, live fault category) -> laps since last seen there.
         self._faults: dict[tuple[int, CueCategory], int] = {}
+        # L'ultima curva chiusa, comunque sia andata. Non è uno stato del giro:
+        # sopravvive al traguardo di proposito, così il riquadro resta finché non
+        # chiudi la curva dopo — nessun timer da tarare.
+        self.last_corner: CornerCard | None = None
         self._set_fixed_zones()
 
     def reset(self) -> None:
@@ -167,6 +186,13 @@ class CoachAnalyzer:
         self._seg = None
         self._last_pos = -1.0
         self._announced.clear()
+        self.last_corner = None
+
+    def drop_last_corner(self) -> None:
+        """Butta la carta. La chiama chi sa che il giro non è rappresentativo:
+        nascondere e basta la farebbe riapparire identica dopo il pit stop, con
+        addosso un numero di dieci minuti fa."""
+        self.last_corner = None
 
     def set_corners(self, corners: list[Corner]) -> None:
         """Use detected corners as the zones (or fall back to fixed segments)."""
@@ -188,6 +214,7 @@ class CoachAnalyzer:
         self._advice.clear()
         self._announced.clear()
         self._faults.clear()
+        self.last_corner = None
         self._seg = None
 
     def _set_fixed_zones(self) -> None:
@@ -321,6 +348,7 @@ class CoachAnalyzer:
             braking_early=_braked_early(
                 seg.live_brake_onset, seg.ref_brake_onset, seg.ref_brake_at_onset),
         )
+        self.last_corner = CornerCard(index=seg.index, lost_ms=st.lost_ms)
         return classify_corner(st, seg.index, _seg_pos(seg, self))
 
 

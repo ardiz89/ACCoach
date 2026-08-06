@@ -107,3 +107,55 @@ def test_feed_forward_announces_corner_advice_on_next_lap():
 def test_no_cues_when_delta_is_none():
     an = CoachAnalyzer()
     assert an.update(synth.snap(pos=0.3), None) == []
+
+
+# --- la carta della curva: il dato che oggi viene buttato -------------------
+
+def _replay(review=None):
+    """Guida un giro contro se stesso (o contro `review`); torna (analyzer, cues)."""
+    ref = Reference(synth.build_lap())
+    an = CoachAnalyzer()
+    an.set_corners(detect_corners(ref.lap.samples))
+    cmp = LapComparator(ref)
+    cues = _drive(an, cmp, review if review is not None else synth.build_lap())
+    return an, cues
+
+
+def test_no_card_before_the_first_corner_closes():
+    an = CoachAnalyzer()
+    an.set_corners(detect_corners(synth.build_lap().samples))
+    assert an.last_corner is None
+
+
+def test_a_corner_taken_well_still_leaves_a_card():
+    """Il caso che oggi si perde: classify_corner torna None e il dato sparisce."""
+    an, cues = _replay()
+    assert cues == [], "un giro contro se stesso non deve produrre cue"
+    assert an.last_corner is not None
+    assert an.last_corner.index == 1            # l'ultima curva chiusa del giro
+    assert abs(an.last_corner.lost_ms) < 120.0  # dentro la norma, e comunque misurata
+
+
+def test_the_card_follows_the_corner_you_just_left():
+    an, _ = _replay(synth.build_lap(slow_corner=0, amt=30))
+    assert an.last_corner is not None
+    assert an.last_corner.index == 1
+
+
+def test_set_corners_clears_the_card():
+    """Un layout di zone nuovo invalida gli indici: la carta vecchia mente."""
+    an, _ = _replay()
+    an.set_corners(detect_corners(synth.build_lap().samples))
+    assert an.last_corner is None
+
+
+def test_reset_clears_the_card():
+    an, _ = _replay()
+    an.reset()
+    assert an.last_corner is None
+
+
+def test_drop_last_corner_clears_the_card():
+    an, _ = _replay()
+    an.drop_last_corner()
+    assert an.last_corner is None
