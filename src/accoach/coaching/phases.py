@@ -162,6 +162,20 @@ class LapSplit:
     # small sample of real laps). This is the number the parts of this split
     # add back up to; the published lap-time gap is a different, looser
     # question and callers must not conflate the two labels on screen.
+    #
+    # A note for whoever next needs a fixture with a genuinely fractional
+    # value to catch a reintroduced round(): unlike the internal cuts (entry /
+    # apex- / apex+ / exit), gap_ms is read at samples[0] and samples[-1]
+    # against Reference.time_at(pos=0.0) / time_at(pos=1.0) — and Reference
+    # pins those two positions EXACTLY (t=0 and t=lap_time_ms, see
+    # ``Reference._anchor_endpoints``), regardless of the reference's own
+    # sampling grid. Mismatching the reference's ``n`` against the lap's (the
+    # trick that makes the interior cuts fractional) does nothing here: the
+    # endpoints never interpolate, so gap_ms — and any average taken over
+    # several gap_ms values — stays suspiciously round-number-friendly even
+    # off-grid. A fixture meant to defeat rounding on gap_ms (or on an
+    # average of it) needs sample counts/offsets that make the underlying lap
+    # times themselves not divide evenly, not a grid mismatch.
     gap_ms: float
 
     def by_phase(self) -> dict[str, float]:

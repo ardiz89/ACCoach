@@ -282,10 +282,18 @@ def test_by_phase_launch_and_gain_avg_are_not_rounded():
     0.5ms. Serve un confronto diretto col valore medio ricalcolato a mano dai
     float pieni di ``lap_time_split``, non una verifica di somma.
     """
+    # amt=(10, 20, 30) would NOT do here: gap_ms is read at the anchored
+    # endpoints (pos 0.0 / 1.0), which Reference pins exactly no matter the
+    # grid mismatch (see the comment on LapSplit.gap_ms in phases.py) — so a
+    # gap_ms average, unlike the interior cuts, stays a round number even
+    # off-grid whenever the amounts are evenly spaced (194/388/582 average to
+    # exactly 388.0). An IRREGULAR amt sequence is what makes the three gaps
+    # not divide evenly, and that is what makes gain_avg_ms itself fractional
+    # — checked below, not assumed.
     ref_lap = synth.build_lap(n=397)
     reference = Reference(ref_lap)
     corners = detect_corners(ref_lap.samples)
-    laps = [synth.build_lap(slow_corner=0, amt=a) for a in (10, 20, 30)]
+    laps = [synth.build_lap(slow_corner=0, amt=a) for a in (10, 17, 30)]
     splits = [lap_time_split(lap, reference, corners) for lap in laps]
     n = len(splits)
 
@@ -296,6 +304,16 @@ def test_by_phase_launch_and_gain_avg_are_not_rounded():
     expected_launch = sum(s.launch_ms for s in splits) / n
     expected_gain = sum(s.gap_ms for s in splits) / n
     expected_by_phase = {p: sum(s.by_phase()[p] for s in splits) / n for p in PHASES}
+
+    # The canary that matters is on the AVERAGED quantity being asserted, not
+    # on its raw per-lap components: a component can be fractional while the
+    # mean of several of them still lands on a clean tenth (exactly the trap
+    # amt=(10, 20, 30) fell into for gain_avg_ms). round(x, 1) == x is a
+    # no-op and would let a reintroduced round() through undetected.
+    for name, value in [("launch", expected_launch), ("gain", expected_gain),
+                        *expected_by_phase.items()]:
+        assert round(value, 1) != value, \
+            f"expected_{name} == its own round(x, 1): il fixture non prova nulla qui"
 
     r = session_recap(laps, reference, corners)
     assert r.launch_ms == pytest.approx(expected_launch, abs=1e-6)
