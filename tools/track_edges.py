@@ -1,7 +1,7 @@
 """Read the track edges out of an Assetto Corsa AI spline, and check them.
 
-Spike tool, deliberately outside the shipped package (like ``gaze_spike.py``):
-nothing in HONE imports it, and running it needs an AC installation. What it is
+Spike tool, deliberately outside the shipped package: nothing in HONE imports
+it, and running it needs an AC installation. What it is
 for is answering one question with evidence instead of opinion — *can we draw the
 edges of the road under the driven line?* — and leaving behind the numbers that
 answer it.
