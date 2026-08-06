@@ -377,6 +377,27 @@ body:not(.railed) .rail { display: none; }
   .cons-nums { white-space: normal; text-align: right; }
 }
 
+/* Curva per sessione: stessa griglia della costanza per curva, perché è la
+   stessa domanda letta nel tempo invece che fra i giri. */
+.ses-row { display: grid; grid-template-columns: 130px 1fr auto; align-items: center;
+  gap: 12px; padding: 5px 12px; }
+.ses-when { font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
+.ses-track { position: relative; height: 10px; background: var(--inset);
+  border-radius: 999px; overflow: hidden; }
+.ses-fill { position: absolute; top: 0; left: 0; height: 100%; border-radius: 999px;
+  background: var(--amber); }
+.ses-nums { font-family: var(--font-mono); font-size: 12px; color: var(--muted);
+  white-space: nowrap; }
+.ses-verdict { font-size: 12px; }
+.ses-verdict.better { color: var(--green); }
+.ses-verdict.worse { color: var(--red); }
+
+@media (max-width: 640px) {
+  .ses-row { grid-template-columns: 1fr auto; }
+  .ses-row .ses-track { grid-column: 1 / -1; }
+  .ses-nums { white-space: normal; text-align: right; }
+}
+
 .recur {
   display: flex; align-items: center; gap: 14px;
   padding: 10px 14px; margin: 8px 0;

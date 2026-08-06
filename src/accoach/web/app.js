@@ -369,6 +369,7 @@ async function loadProgress(combo) {
   catch (e) {
     $("prog-summary").innerHTML = "";
     $("levels").innerHTML = ""; $("trends").innerHTML = "";
+    const cs = $("corner-sessions"); if (cs) cs.innerHTML = "";
     $("recurring").innerHTML =
       `<div class="clean">${t("err.progress")}</div>`;
     return;
@@ -389,6 +390,7 @@ async function loadProgress(combo) {
   // temperatures, refuels in between.
   renderLevels(p.levels);
   renderTrends(p.trends);
+  renderCornerSessions(p.corner_sessions);
   renderCornerConsistency(p.corner_consistency);
 
   const el = $("recurring");
@@ -642,6 +644,40 @@ function renderTrends(trends) {
       `<div class="detail">${tag} · ` +
       `${t("trends.median")} −${w.median_s.toFixed(3)}s · ${w.occurrences}/${w.laps} ${t("lbl.laps")}</div>` +
       `</div>`;
+  }).join("");
+}
+
+// La stessa curva, sessione per sessione: dove stavi e dove sei. Ogni punto è
+// una mediana su un'uscita — le sessioni senza abbastanza giri su quella curva
+// non ci sono, invece di essere disegnate a zero (uno zero vuol dire "presa
+// bene", ed è la bugia più facile da disegnare qui).
+function renderCornerSessions(rows) {
+  const el = $("corner-sessions");
+  if (!el) return;
+  if (!rows || !rows.length) {
+    el.innerHTML = `<div class="clean">${t("ses.none")}</div>`;
+    return;
+  }
+  el.innerHTML = rows.map((r) => {
+    let mx = 0.05;
+    for (const p of r.points) mx = Math.max(mx, p.median_s);
+    const first = r.points[0].median_s, last = r.points[r.points.length - 1].median_s;
+    const delta = first - last;
+    const verdict = delta === 0 ? "" :
+      `<span class="ses-verdict ${delta > 0 ? "better" : "worse"}">` +
+      `${Math.abs(delta).toFixed(3)}s ${delta > 0 ? t("ses.better") : t("ses.worse")}</span>`;
+    const bars = r.points.map((p) => {
+      const w = (Math.min(p.median_s / mx, 1) * 100).toFixed(0);
+      const day = (p.started || "").slice(0, 10);
+      const hm = (p.started || "").slice(11, 16);
+      return `<div class="ses-row">` +
+        `<span class="ses-when">${day} ${hm}</span>` +
+        `<span class="ses-track"><span class="ses-fill" style="width:${w}%"></span></span>` +
+        `<span class="ses-nums">−${p.median_s.toFixed(3)}s · ${p.laps} ${t("ses.laps")}</span>` +
+        `</div>`;
+    }).join("");
+    return `<div class="weak sys"><div class="weak-head">` +
+      `<span class="corner">${r.name}</span>${verdict}</div>${bars}</div>`;
   }).join("");
 }
 

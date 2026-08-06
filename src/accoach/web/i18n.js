@@ -490,6 +490,16 @@
     "trends.oneOff":   { en: `one-off`, it: `episodico` },
     "trends.median":   { en: `median`, it: `mediana` },
 
+    "prog.sessions":   { en: `Corner by session <small>(median loss per session · each point = one run)</small>`,
+                         it: `Curva per sessione <small>(perdita mediana per sessione · ogni punto è un'uscita)</small>` },
+    "ses.none":        { en: `No corner has enough sessions yet — keep driving.`,
+                         it: `Nessuna curva ha ancora abbastanza sessioni — continua a girare.` },
+    "ses.laps":        { en: `laps`, it: `giri` },
+    "ses.better":      { en: `better than the first session`,
+                         it: `meglio della prima sessione` },
+    "ses.worse":       { en: `worse than the first session`,
+                         it: `peggio della prima sessione` },
+
     "lbl.comparison":  { en: `Comparison`, it: `Confronto` },
     "lbl.lap":         { en: `Lap`, it: `Giro` },
     "lbl.gap":         { en: `Gap`, it: `Gap` },

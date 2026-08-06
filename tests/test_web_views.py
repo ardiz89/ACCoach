@@ -1178,3 +1178,15 @@ def test_the_dyn_readout_default_text_always_carries_the_chip():
     block = _APPJS.split("function updateDynReadout(a, p)")[1].split("\n}")[0]
     assert "rangeChip()" in block
     assert 'chip + t("dyn.readout")' in block
+
+
+# --- la curva per sessione, sotto i punti deboli (2026-08-06) ---------------
+
+def test_the_session_series_has_a_home_on_the_trends_tab():
+    html = (WEB / "index.html").read_text(encoding="utf-8")
+    assert 'id="corner-sessions"' in html
+
+
+def test_the_series_is_rendered_when_the_tab_loads():
+    js = (WEB / "app.js").read_text(encoding="utf-8")
+    assert "renderCornerSessions(p.corner_sessions)" in js
