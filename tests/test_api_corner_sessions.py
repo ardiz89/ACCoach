@@ -9,10 +9,17 @@ import synth
 CAR, TRACK = "ferrari_488_gt3", "monza"
 
 
-def _lap(tmp_path, when, *, amt=0):
-    lap = synth.build_lap(slow_corner=0, amt=amt) if amt else synth.build_lap()
+def _lap(tmp_path, when, *, amt=0, corner=0):
+    lap = synth.build_lap(slow_corner=corner, amt=amt) if amt else synth.build_lap()
     lap.recorded_utc = when
     save_lap(lap, tmp_path)
+
+
+def _session(tmp_path, day, laps):
+    """Una sera: `laps` è la lista `(curva, amt)` di ogni giro, a 2 minuti l'uno."""
+    for i, (corner, amt) in enumerate(laps):
+        _lap(tmp_path, f"2026-08-0{day}T18:{2 * i:02d}:00+00:00",
+             corner=corner, amt=amt)
 
 
 def _progress(tmp_path):
@@ -46,14 +53,36 @@ def test_a_corner_that_improves_gives_a_falling_series(tmp_path):
 
 
 def test_only_systematic_corners_get_a_series(tmp_path):
-    """Un errore episodico non è una cosa su cui misurare un andamento."""
+    """Un errore episodico non è una cosa su cui misurare un andamento.
+
+    Serve una curva episodica **che ci sia**, altrimenti il filtro non filtra
+    niente: prima qui c'era una sola curva con perdite, ed era sistematica, così
+    togliere `if not t.systematic: continue` da `api.py` non cambiava una virgola
+    e il test restava verde.
+
+    Il fixture ne costruisce due, sopra `SIGNIF_LOSS_MS` tutt'e due (amt=40 vale
+    680 ms):
+    - curva 0 sbagliata in 7 giri su 10 → sopra `RECUR_FRAC` = 0,5, sistematica;
+    - curva 1 sbagliata in 3 giri su 10 → sotto, episodica.
+
+    E la curva 1 avrebbe la sua serie di due punti, se il filtro non ci fosse:
+    `session_series` conta *tutti* i giri della sessione (una curva presa bene
+    vale 0,0, non «dato mancante»), quindi le stesse due sere che fanno due punti
+    per la curva 0 li farebbero per la curva 1.
+    """
     _lap(tmp_path, "2026-07-31T18:00:00+00:00")
-    _evening(tmp_path, 1, 40)
-    _evening(tmp_path, 2, 20)
+    _session(tmp_path, 1, [(1, 40), (1, 40), (1, 40), (0, 40), (0, 40)])
+    _session(tmp_path, 2, [(0, 40)] * 5)
     j = _progress(tmp_path)
-    systematic = {t["corner_index"] for t in j["trends"] if t["systematic"]}
-    assert systematic, "il test non vale niente se nessuna curva è sistematica"
-    assert {s["corner_index"] for s in j["corner_sessions"]} <= systematic
+
+    trends = {t["corner_index"]: t for t in j["trends"]}
+    assert trends[0]["systematic"], "il test non vale niente senza una sistematica"
+    assert 1 in trends, "la curva episodica deve comunque comparire fra i trend"
+    assert not trends[1]["systematic"], "…e deve essere episodica, o non filtra nulla"
+
+    series = {s["corner_index"]: s for s in j["corner_sessions"]}
+    assert len(series[0]["points"]) == 2, "due sere sopra il minimo di tre giri"
+    assert 1 not in series, "la curva episodica non deve avere una serie"
 
 
 def test_the_series_reaches_past_the_trends_window(tmp_path):
