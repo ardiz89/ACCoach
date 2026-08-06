@@ -150,9 +150,19 @@ class CornerSplit:
 class LapSplit:
     """Where a whole lap's gap went, in parts that add back up to it."""
 
-    launch_ms: float                 # start line to the first braking zone
+    # From the first sample (a hair after the line, ~pos 0.003 on a real lap)
+    # to the first corner's entry_pos (which already reaches back over that
+    # corner's braking zone) — the stretch no corner claims.
+    launch_ms: float
     corners: list[CornerSplit]
-    gap_ms: float                    # delta at the last sample minus the first
+    # delta at the last sample minus delta at the first, NOT the gap the
+    # cockpit clock publishes (lap_time - reference_time): first and last
+    # sample don't sit on the start/finish line, so on real laps the two
+    # differ by more than a tenth (measured: from -123 ms to +100 ms across a
+    # small sample of real laps). This is the number the parts of this split
+    # add back up to; the published lap-time gap is a different, looser
+    # question and callers must not conflate the two labels on screen.
+    gap_ms: float
 
     def by_phase(self) -> dict[str, float]:
         """Totals per phase across every corner of the lap."""
@@ -160,7 +170,7 @@ class LapSplit:
         for c in self.corners:
             for p in c.phases:
                 out[p.phase] += p.lost_ms
-        return {k: round(v, 1) for k, v in out.items()}
+        return out
 
 
 def lap_time_split(lap, reference, corners) -> LapSplit | None:
@@ -210,13 +220,17 @@ def lap_time_split(lap, reference, corners) -> LapSplit | None:
         # to the corner that caused it.
         end = base + 4 if k + 1 < len(ordered) else len(edges) - 1
         bounds = [base, base + 1, base + 2, base + 3, end]
-        phases = [PhaseLoss(phase=name,
-                            lost_ms=round(delta[b] - delta[a], 1))
+        phases = [PhaseLoss(phase=name, lost_ms=delta[b] - delta[a])
                   for name, a, b in zip(PHASES, bounds, bounds[1:])]
         out.append(CornerSplit(index=c.index,
-                               lost_ms=round(delta[end] - delta[base], 1),
+                               lost_ms=delta[end] - delta[base],
                                phases=phases))
 
-    return LapSplit(launch_ms=round(delta[1] - delta[0], 1),
+    # Not rounded: rounding each part independently (and gap_ms separately)
+    # would let the sum drift off gap_ms by up to 0.05 ms per rounded value —
+    # measured up to ~0.3 ms on a real 10-corner lap. Full floats keep the
+    # telescope exact; rounding is a presentation decision for whoever
+    # serializes this at the boundary.
+    return LapSplit(launch_ms=delta[1] - delta[0],
                     corners=out,
-                    gap_ms=round(delta[-1] - delta[0], 1))
+                    gap_ms=delta[-1] - delta[0])

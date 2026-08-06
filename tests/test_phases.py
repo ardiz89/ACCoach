@@ -214,16 +214,21 @@ def _split(review=None):
 
 
 def test_the_parts_add_back_up_to_the_gap_exactly():
-    """La promessa centrale: se questa somma non torna, la scheda mente."""
+    """La promessa centrale: se questa somma non torna, la scheda mente.
+
+    Niente arrotondamento dentro ``lap_time_split`` (i valori restano float
+    pieni), quindi il telescopio è esatto: il residuo tollerato qui è solo il
+    rumore in virgola mobile, non lo 0,05 ms per parte che l'arrotondamento
+    indipendente introdurrebbe."""
     split, _ = _split(synth.build_lap(slow_corner=0, amt=30))
     total = split.launch_ms + sum(c.lost_ms for c in split.corners)
-    assert abs(total - split.gap_ms) < 0.1          # solo arrotondamento
+    assert abs(total - split.gap_ms) < 1e-6
 
 
 def test_each_corner_is_the_sum_of_its_four_phases():
     split, _ = _split(synth.build_lap(slow_corner=0, amt=30))
     for c in split.corners:
-        assert abs(sum(p.lost_ms for p in c.phases) - c.lost_ms) < 0.1
+        assert abs(sum(p.lost_ms for p in c.phases) - c.lost_ms) < 1e-6
 
 
 def test_every_corner_is_there_even_the_ones_taken_well():
@@ -234,41 +239,46 @@ def test_every_corner_is_there_even_the_ones_taken_well():
 
 
 def test_a_phase_you_were_quicker_in_reads_negative():
-    """synth.build_lap's ``off`` only ever grows (never falls back), so a review
-    built with ``slow_corner`` is never faster than a *plain* reference anywhere
-    on track — there is no phase to read negative. Putting the slowdown in the
-    reference instead and comparing a plain lap against it exercises the same
-    sign-preservation property with a fixture that can actually produce it."""
-    ref_lap = synth.build_lap(slow_corner=0, amt=30)
-    reference = Reference(ref_lap)
-    corners = detect_corners(ref_lap.samples)
-    split = lap_time_split(synth.build_lap(), reference, corners)
-    values = [p.lost_ms for c in split.corners for p in c.phases]
-    assert any(v < 0 for v in values), "un giro diverso guadagna da qualche parte"
+    """Un giro solo, coi segni misti su due curve diverse: la curva 1 costa nel
+    giro di riferimento invece che in quello riveduto, quindi rispetto al
+    riferimento il riveduto la guadagna. Pinna il segno in entrambe le
+    direzioni sullo stesso giro (non "esiste un valore negativo da qualche
+    parte"), ed è anche il caso «gap quasi zero ma le parti non lo sono» —
+    perso e guadagnato si compensano quasi esattamente."""
+    ref = _lap(penalty_zones=((0.60, 0.75),))
+    review = _lap(penalty_zones=((0.20, 0.35),))
+    reference = Reference(ref)
+    corners = detect_corners(ref.samples)
+    split = lap_time_split(review, reference, corners)
+    assert split.corners[0].lost_ms > 0
+    assert split.corners[1].lost_ms < 0
+    assert abs(split.gap_ms) < 1.0
 
 
 def test_the_launch_is_the_stretch_before_the_first_corner():
     split, corners = _split()
     first = min(c.entry_pos for c in corners)
     assert first > 0.0                      # c'è davvero un tratto scoperto
-    assert isinstance(split.launch_ms, float)
+    assert split.launch_ms == 0.0           # riveduto identico al riferimento
 
 
 def test_by_phase_totals_the_same_number():
     split, _ = _split(synth.build_lap(slow_corner=0, amt=30))
     by = split.by_phase()
     assert set(by) == {"entry", "apex", "exit", "after"}
-    assert abs(sum(by.values()) + split.launch_ms - split.gap_ms) < 0.1
+    assert abs(sum(by.values()) + split.launch_ms - split.gap_ms) < 1e-6
 
 
-def test_the_gap_is_close_to_lap_time_minus_reference():
-    """Non identico: primo e ultimo campione non cadono sul traguardo. Il test
-    misura quella differenza invece di assumerla."""
-    review = synth.build_lap(slow_corner=0, amt=30)
-    ref_lap = synth.build_lap()
-    split = lap_time_split(review, Reference(ref_lap), detect_corners(ref_lap.samples))
-    published = review.lap_time_ms - ref_lap.lap_time_ms
-    assert abs(split.gap_ms - published) < 50.0
+def test_gap_ms_is_the_exact_telescoped_sum_not_the_published_lap_gap():
+    """``gap_ms`` è delta(ultimo campione) - delta(primo campione), non
+    tempo_giro - tempo_riferimento: nessuno dei due giri, sintetico o vero,
+    parte/finisce i propri campioni esattamente sulla linea, quindi sui giri
+    veri le due quantità differiscono di oltre un decimo (misurato: da -123 ms
+    a +100 ms). Quello che è vero, e va pinnato, è il telescopio: gap_ms è
+    esattamente la somma di launch_ms e di ogni perdita di curva."""
+    split, _ = _split(synth.build_lap(slow_corner=0, amt=30))
+    total = split.launch_ms + sum(c.lost_ms for c in split.corners)
+    assert abs(total - split.gap_ms) < 1e-6
 
 
 def test_no_corners_no_split():
