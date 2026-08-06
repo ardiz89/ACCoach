@@ -21,7 +21,6 @@ let HOVER_WIRED = false;
 // showing the elected lap, it also swallowed the note explaining why.
 let BASELINE_PINNED = false;
 let MAP_HIT = null;   // {rv, X, Y} screen transform captured by drawMap, for map hover
-let MINI_HIT = null;  // same, for the Compare-view mini map
 let DYN_GG = null;    // {pts:[{px,py,pos}]} screen points captured by drawGG, for its hover
 let DYN_BAL_HIT = null; // {rv, X, Y} transform captured by the balance ribbon, for its hover
 const MAP_READOUT_DEFAULT = () => t("map.readout");
@@ -139,6 +138,16 @@ async function init() {
   // archive (a lap store can be moved or cleared between two runs).
   const combo = savedCombo();
   if (combo) sel.value = combo;
+  // Prima di `loadCombo`, non dopo: `loadCombo` disegna `renderFlow`/`redraw`
+  // in modo sincrono appena il fetch risponde, e quei disegni leggono
+  // `cv.clientWidth` — che dipende dalla classe `railed` su <body>. Se
+  // scattasse dopo, il primo disegno che un pilota vede (VIEW è ancora
+  // quella di partenza marcata `active` in HTML: il caso più comune, prima
+  // visita, localStorage vuoto) sarebbe a larghezza piena, senza che nessun
+  // ridisegno lo seguisse. Se poi `showView(view)` qui sotto porta su
+  // un'altra scheda, richiama da sé `applyRailed` seguita da
+  // `redrawCurrentView()`, quindi non va ripetuta dopo.
+  applyRailed(VIEW);
   await loadCombo(JSON.parse(sel.value));
   const view = savedView();
   if (view && view !== VIEW) showView(view);
@@ -215,6 +224,12 @@ function redrawCurrentView() {
   // paragraph on the tab in the language you just left.
   else if (VIEW === "stint") { if (CURRENT) loadStint(CURRENT, STINT_I); }
   else if (DATA) redraw(LAST_HOVER);   // compare
+  // Il rail non appartiene a nessuna vista, quindi non sta in nessun ramo. Fuori
+  // dallo switch è l'unico posto dove il cambio scheda e il resize lo trovano
+  // entrambi: `redrawCurrentView` è ciò che il gestore di resize (debounced,
+  // in fondo al file) chiama, e ciò che `showView` chiama in coda.
+  drawRail();
+  drawRailList();
 }
 
 // Colour-blind palette toggle, dropped next to the tour "?" button. Persisted in
@@ -243,6 +258,22 @@ function wireCbToggle() {
   help.parentNode.insertBefore(btn, help.nextSibling);
 }
 
+// Le sei schede che parlano di UN GIRO, e quindi di una curva. Le altre quattro
+// stanno sopra il giro nella gerarchia (una sessione, uno stint, lo storico, un
+// piano): lì il rail mostrerebbe un giro che non c'entra con quello che leggi, e
+// cliccare una curva non cambierebbe niente. Un comando che non risponde è
+// peggio di un comando assente.
+const RAIL_VIEWS = ["flow", "compare", "map", "line", "sectors", "dynamics"];
+
+// Non dentro `showView` da sola: al primo caricamento `init()` non ci passa
+// affatto quando la vista salvata coincide con quella già attiva in HTML (o
+// non ce n'è una salvata), quindi la scheda di partenza — spesso `flow`, che
+// ha il rail — restava senza la classe finché non si cliccava un tab
+// qualsiasi. Estratta così la chiamano sia `showView` sia `init`.
+function applyRailed(name) {
+  document.body.classList.toggle("railed", RAIL_VIEWS.indexOf(name) >= 0);
+}
+
 // Switch to a view by name, as if its tab had been clicked. Used by the tabs
 // themselves and by the "show me the whole chart" button in the guided flow.
 function showView(name) {
@@ -256,6 +287,7 @@ function showView(name) {
   for (const p of document.querySelectorAll("[id^='view-']")) {
     p.classList.toggle("hidden", p.id !== "view-" + name);
   }
+  applyRailed(name);
   redrawCurrentView();
 }
 
@@ -1007,17 +1039,123 @@ function drawMap(a, cx) {
   // so the entry comes and goes with the mark.
   const lost = $("leg-lost");
   if (lost) lost.classList.toggle("hidden", a.review.lost_at == null);
+  // Il readout si scrive QUI, non in ognuno dei chiamanti (`loadCombo`,
+  // `redrawCurrentView`, `hoverTo`): la pastiglia della finestra mancava a
+  // riposo sulla scheda Mappa perché due dei tre la anteponevano da soli e il
+  // terzo — il cambio scheda, che passa da `redrawCurrentView` a `drawMap`
+  // senza toccare il readout — no. La stessa forma del difetto già chiuso per
+  // `hoverTo`: se la pastiglia va scritta a mano in N punti, il punto N+1 se
+  // la dimentica. Scritta una sola volta, dentro la funzione che disegna la
+  // mappa, nessun chiamante può più dimenticarla.
+  const ro = $("map-readout");
+  if (ro) { ro.innerHTML = mapReadoutHTML(cx); wireRangeClear(ro); }
 }
 
-// Mini map shown inside the Compare view, driven by the shared crosshair so it
-// highlights wherever you're hovering on the traces (and vice versa).
-function drawMiniMap(a, cx) {
-  const wrap = $("minimap-wrap");
-  if (!wrap) return;
-  if (!a || !a.has_map) { wrap.classList.add("hidden"); return; }
-  wrap.classList.remove("hidden");
-  const hit = drawMapTo($("c-minimap"), null, a, cx);
-  if (hit) MINI_HIT = hit;
+// La mappa del rail. Sempre a GIRO INTERO, anche con la finestra accesa: il rail
+// è il «dove sono», e uno zoom lo trasformerebbe in una seconda copia del
+// grafico che stai già guardando. La finestra si legge come un tratto acceso.
+let RAIL_HIT = null;   // {rv, X, Y}, il trasformo schermo, per l'hover
+
+// `p` di default è `LAST_HOVER`: chi ridisegna la vista intera (cambio scheda,
+// resize, nuovo giro) non ha un punto fresco in mano e vuole l'ultimo noto. Chi
+// invece risponde a un hover vero (`hoverTo`) passa il punto esplicito — così il
+// mirino del rail non dipende dall'ordine in cui `LAST_HOVER` viene scritto.
+function drawRail(p = LAST_HOVER) {
+  // Su una scheda senza rail il canvas ha larghezza zero e `setup` disegnerebbe
+  // su una tela di 0 px: lavoro sprecato, e un hit test tarato su niente.
+  //
+  // La classe `railed` da sola non basta a saperlo: sotto i 1100px
+  // (style.css) `.rail` torna `display: none` per un vincolo di spazio, ma la
+  // classe sul <body> resta — dipende dalla scheda, non dalla finestra. Senza
+  // il controllo sulla larghezza vera, ogni cambio scheda e ogni resize sotto
+  // quella soglia disegnavano comunque, su una tela 0×0.
+  if (!DATA || !document.body.classList.contains("railed")) return;
+  if (!$("rail") || !$("rail").offsetWidth) return;
+  RAIL_HIT = drawMapTo($("c-rail"), $("rail-nomap"), DATA, p);
+  if (RAIL_HIT && RANGE) railWindow(RAIL_HIT);
+}
+
+// Il tratto scelto, acceso sopra la mappa già disegnata. Ridisegnare con lo
+// stesso contesto è legittimo: `setup` lascia sul canvas la trasformazione del
+// device pixel ratio, e `X`/`Y` restituiti da `drawMapTo` sono in pixel CSS —
+// gli stessi in cui si ragiona qui.
+function railWindow(hit) {
+  const ctx = $("c-rail").getContext("2d");
+  const rv = hit.rv;
+  ctx.save();
+  ctx.strokeStyle = "#22D3CE"; ctx.lineWidth = 4;
+  ctx.lineCap = "round"; ctx.lineJoin = "round";
+  ctx.beginPath();
+  let started = false;
+  for (let i = 0; i < rv.x.length; i++) {
+    const p = rv.pos[i];
+    if (p < RANGE.from || p > RANGE.to) { started = false; continue; }
+    const px = hit.X(rv.x[i]), py = hit.Y(rv.z[i]);
+    started ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+    started = true;
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
+// Le curve del rail in due gruppi. Sopra la classifica — chi è costato di più,
+// per primo: è il waterfall promosso a navigazione, l'unica cosa in tutta l'app
+// che mostri la DISTRIBUZIONE della perdita invece di una conclusione. Sotto, in
+// ordine di pista e senza barretta, le curve dove non hai perso niente: un
+// selettore che non le elenca non è un selettore, è una classifica.
+function railRows(a) {
+  const byIndex = new Map();
+  for (const l of (a.losses || [])) if (l.lost_s > 0) byIndex.set(l.index, l);
+  const hot = Array.from(byIndex.values()).sort((x, y) => y.lost_s - x.lost_s);
+  const cold = (a.corners || []).filter((c) => !byIndex.has(c.index));
+  return { hot: hot, cold: cold };
+}
+
+function drawRailList() {
+  const el = $("rail-list");
+  if (!el || !DATA) return;
+  const corners = DATA.corners || [];
+  const at = (i) => corners.filter((c) => c.index === i)[0];
+  const rows = railRows(DATA);
+  let mx = 0.05;
+  for (const l of rows.hot) mx = Math.max(mx, l.lost_s);
+  const sel = RANGE && RANGE.corner != null ? RANGE.corner : null;
+
+  // «Tutto il giro» è il primo elemento e non uno stato assente: finché non è
+  // scritto, tornare indietro dalla curva sembra impossibile.
+  let html = `<button type="button" class="rail-row whole${RANGE ? "" : " on"}" data-whole="1">` +
+             `${t("rail.whole")}</button>`;
+  for (const l of rows.hot) {
+    const w = (Math.min(l.lost_s / mx, 1) * 100).toFixed(0);
+    const sev = Math.min(1, l.lost_s / Math.max(mx, 0.3));
+    html += `<button type="button" class="rail-row${sel === l.index ? " on" : ""}" ` +
+            `data-i="${l.index}" title="${escAttr(l.message || "")}">` +
+            `<span class="n">T${l.index + 1}</span>` +
+            `<span class="nm">${l.label}</span>` +
+            `<span class="bar"><span class="fill" style="width:${w}%;` +
+            `background:${lossColor(sev)}"></span></span>` +
+            `<span class="s">−${l.lost_s.toFixed(2)}</span></button>`;
+  }
+  if (rows.cold.length && rows.hot.length) {
+    html += `<div class="rail-sep">${t("rail.clean")}</div>`;
+  }
+  for (const c of rows.cold) {
+    html += `<button type="button" class="rail-row cold${sel === c.index ? " on" : ""}" ` +
+            `data-i="${c.index}"><span class="n">T${c.index + 1}</span>` +
+            `<span class="nm">${c.name}</span></button>`;
+  }
+  el.innerHTML = html;
+
+  for (const b of el.querySelectorAll(".rail-row[data-i]")) {
+    b.onclick = () => {
+      const c = at(parseInt(b.dataset.i, 10));
+      if (!c) return;
+      setRange(cornerWindow(c));
+      redrawCurrentView();
+    };
+  }
+  const whole = el.querySelector(".rail-row[data-whole]");
+  if (whole) whole.onclick = () => { setRange(null); redrawCurrentView(); };
 }
 
 // Render the delta-coloured racing line + braking points to ``canvas``; returns
@@ -1170,10 +1308,61 @@ function drawMapTo(canvas, missing, a, cx, mode) {
   // the number was the detector's count of what it found on *this* lap, which
   // is exactly the sliding number `cornermap` exists to stop: a lap that
   // detected one corner fewer renumbered every label after it.
+  //
+  // Degrada come `cornerBands` (nome intero, poi «T7», poi niente), ma qui
+  // NON con la distanza fra gli apici — trovata sbagliata il 2026-08-05
+  // guardando la mappa grande vera (1036px, Monza): un apice a un centinaio
+  // di pixel dal vicino faceva scartare un nome che non avrebbe mai toccato
+  // nulla, perché quello che collide non sono i punti, sono i RETTANGOLI di
+  // testo. La verifica è quella vera: il rettangolo del nome intero contro i
+  // rettangoli già scritti; se ne tocca uno, la forma corta; se non ci sta
+  // nemmeno quella, niente.
+  //
+  // Tre cose da tenere a mente:
+  // - la collisione da sola non basta. Misurato il 2026-08-05 sul rail
+  //   (220px): «Variante della Roggia» (109px) non toccava nessun'altra
+  //   etichetta e passava il test — ma da sola copriva METÀ della tela,
+  //   cancellando il disegno del giro che il rail esiste per mostrare. La
+  //   proporzione è una condizione IN PIÙ, verificata PRIMA: se il nome
+  //   intero sfora una frazione della larghezza della tela, non si prova
+  //   nemmeno a scriverlo — si passa dritti alla forma corta. Una frazione,
+  //   non un numero di pixel fisso: la stessa funzione disegna una mappa da
+  //   220px e una da quasi 1000, e un valore assoluto sarebbe tarato su una
+  //   delle due (a 1/4 di tela, il nome più lungo di Monza è al 50% sul
+  //   rail e all'11% sulla mappa grande — la soglia degrada solo dove
+  //   serve).
+  // - il risultato dipende dall'ORDINE in cui le curve vengono scritte (la
+  //   prima etichetta arrivata si prende il posto): qui è l'ordine di
+  //   `a.corners`, cioè l'ordine di pista — una scelta, non un caso.
+  // - il confronto è in coordinate schermo (dopo X()/Y()), le stesse in cui
+  //   `fillText` scrive: un confronto in metri o in `pos` normalizzato
+  //   ignorerebbe lo zoom del canvas.
   ctx.fillStyle = "rgba(255,255,255,0.85)"; ctx.font = "11px " + UI_FONT;
+  const placedLabels = [];
+  const maxLabelW = w * 0.25;
   for (const c of a.corners || []) {
     const i = nearest(rv.pos, c.apex);
-    ctx.fillText(c.name || ("T" + (c.index + 1)), X(rv.x[i]) + 6, Y(rv.z[i]) - 4);
+    const lx = X(rv.x[i]) + 6, ly = Y(rv.z[i]) - 4;
+    // Il rettangolo del testo così come `fillText` lo scrive: da (lx, ly) in
+    // avanti in larghezza, e verso l'alto in altezza (`textBaseline` è quello
+    // di default, "alphabetic": il testo sta SOPRA `ly`, non sotto).
+    const rectOf = (text) => {
+      const tw = ctx.measureText(text).width;
+      return { x0: lx, y0: ly - 11, x1: lx + tw, y1: ly + 3 };
+    };
+    const overlaps = (r) => placedLabels.some((p) =>
+      r.x0 < p.x1 && p.x0 < r.x1 && r.y0 < p.y1 && p.y0 < r.y1);
+    const full = c.name || ("T" + (c.index + 1)), short = "T" + (c.index + 1);
+    let label = null, rect = null;
+    if (ctx.measureText(full).width < maxLabelW) {
+      const rFull = rectOf(full);
+      if (!overlaps(rFull)) { label = full; rect = rFull; }
+    }
+    if (!label) {
+      const rShort = rectOf(short);
+      if (!overlaps(rShort)) { label = short; rect = rShort; }
+    }
+    if (label) { ctx.fillText(label, lx, ly); placedLabels.push(rect); }
   }
 
   // Start/finish + direction of travel. A white dot with an "S/F" label (kept
@@ -1255,10 +1444,13 @@ async function loadCombo(combo, lapPath, baselinePath) {
   drawDebrief(a);
   renderFlow(a);
   redraw(null);
+  drawRail();
+  drawRailList();
   // The sheet is per car+track, not per lap: it survives a lap change and is
   // only dropped when the combo does (see the combo picker).
   if (VIEW === "map") {
-    $("map-readout").innerHTML = MAP_READOUT_DEFAULT();
+    // Il readout lo scrive `drawMap` stessa (vedi il commento lì): niente da
+    // duplicare qui.
     drawMap(a, null);
     if (!SHEET) loadBraking();
   }
@@ -2164,7 +2356,17 @@ function setup(cv) {
 // del flusso scrive il nome degradandolo. Tre convenzioni per la stessa curva
 // sulla stessa schermata: il pilota leggeva «Variante Ascari» su un disegno e
 // «T7» su quello sotto, e doveva dedurre da solo che fossero la stessa cosa.
-// Questa è la versione del flusso, promossa a unica.
+// Questa è la versione del flusso, promossa a unica — fattorizzata in
+// `degradeLabel` perché la mappa (coordinate 2D) misura lo spazio in un modo
+// diverso da un grafico lineare (una fascia lungo un asse), ma la SOGLIA con
+// cui si decide fra nome intero, «T7» e niente dev'essere la stessa soglia,
+// non una sua copia con margini propri che un domani divergono.
+function degradeLabel(ctx, full, short, avail) {
+  if (ctx.measureText(full).width + 6 <= avail) return full;
+  if (ctx.measureText(short).width + 4 <= avail) return short;
+  return null;
+}
+
 function cornerBands(ctx, w, h, corners) {
   ctx.fillStyle = "rgba(120,140,170,0.10)";
   for (const c of corners) {
@@ -2175,10 +2377,7 @@ function cornerBands(ctx, w, h, corners) {
   ctx.font = "10px " + UI_FONT;
   for (const c of corners) {
     const x0 = projX(c.entry, w), band = projX(c.exit, w) - x0;
-    const full = c.name || "T" + (c.index + 1);
-    const short = "T" + (c.index + 1);
-    const label = ctx.measureText(full).width + 6 <= band ? full
-                : ctx.measureText(short).width + 4 <= band ? short : null;
+    const label = degradeLabel(ctx, c.name || "T" + (c.index + 1), "T" + (c.index + 1), band);
     if (label) ctx.fillText(label, x0 + (band - ctx.measureText(label).width) / 2, 11);
   }
 }
@@ -2356,7 +2555,10 @@ function cornerWindow(c) {
   if (!c) return null;
   const pad = Math.max(0.004, (c.exit - c.entry) * 0.25);
   return { from: Math.max(0, c.entry - pad), to: Math.min(1, c.exit + pad),
-           source: "corner", label: c.name || ("T" + (c.index + 1)) };
+           source: "corner", label: c.name || ("T" + (c.index + 1)),
+           // Il numero, non il nome: il rail deve accendere LA riga giusta, e su
+           // una pista senza nomi curati le curve si chiamano tutte «Corner N».
+           corner: c.index };
 }
 
 function setRange(r) {
@@ -2471,7 +2673,6 @@ function redraw(cx) {
   drawSpeed(DATA, cx);
   drawInputs(DATA, cx);
   drawSteer(DATA, cx);
-  drawMiniMap(DATA, cx);
   updateReadout(DATA, cx);
 }
 
@@ -2590,7 +2791,15 @@ function drawDynamics(cx) {
     if (coast) coast.innerHTML = "";
     $("dyn-tyres").classList.add("hidden");
     $("dyn-balance-wrap").classList.add("hidden");
-    $("dyn-readout").innerHTML = t("dyn.readout");
+    // Stesso principio appena applicato alla Mappa: un solo punto scrive
+    // #dyn-readout (`updateDynReadout`, che antepone sempre `rangeChip()`),
+    // non la pastiglia ripetuta a mano in ogni ramo di `drawDynamics`. Prima
+    // di questo fix questo ramo — un giro senza canali di dinamica, con la
+    // finestra accesa — mostrava la sola frase di default: nessuna pastiglia,
+    // nessuna ✕ per annullarla. `null`, non `cx`: senza grafici in vista non
+    // c'è un punto per-campione da leggere, a costo di ignorare un hover sul
+    // rail mentre la scheda è in questo stato.
+    updateDynReadout(DATA, null);
     DYN_GG = null; DYN_BAL_HIT = null;
     return;
   }
@@ -2916,11 +3125,18 @@ function dynReadoutHTML(a, p) {
 }
 
 function updateDynReadout(a, p) {
-  LAST_HOVER = p;
   const el = $("dyn-readout");
   if (!el) return;
-  if (p == null) { el.innerHTML = t("dyn.readout"); return; }
-  el.innerHTML = dynReadoutHTML(a, p);
+  const chip = rangeChip();
+  // Guardia `p != null`, come in `hoverTo`: `drawDynamics(cx)` la richiama con
+  // `cx` nullo a ogni ridisegno di vista intera (cambio scheda, resize), e
+  // un'assegnazione incondizionata qui azzererebbe `LAST_HOVER` un attimo dopo
+  // che quella guardia l'aveva protetto — la scheda Dinamica non manterrebbe
+  // mai il mirino congelato.
+  if (p != null) LAST_HOVER = p;
+  if (p == null) { el.innerHTML = chip + t("dyn.readout"); wireRangeClear(el); return; }
+  el.innerHTML = chip + dynReadoutHTML(a, p);
+  wireRangeClear(el);
 }
 
 // --- your braking points --------------------------------------------------
@@ -3147,6 +3363,19 @@ function renderLine(cx) {
   if (charts) charts.classList.remove("hidden");
   LINE_I = Math.max(0, Math.min(LINE_I, L.corners.length - 1));
 
+  // Il rail sceglie una curva per NUMERO (`RANGE.corner`, il campo `index` di
+  // `/api/analysis`), la Traiettoria per POSIZIONE nel proprio elenco
+  // (`LINE_I`, indice dentro `L.corners`, da `/api/trajectory` — un elenco che
+  // può essere diverso). Quando la finestra arriva da fuori questa vista (dal
+  // rail, non da un chip qui sotto) va tradotta cercando la curva con lo
+  // stesso `index`; se non c'è — le due liste possono divergere — nessun chip
+  // finge di seguirla: la finestra resta accesa, la Traiettoria resta dov'era.
+  let railSynced = false;
+  if (RANGE && RANGE.corner != null) {
+    const pos = L.corners.findIndex((cc) => cc.index === RANGE.corner);
+    if (pos >= 0) { LINE_I = pos; railSynced = true; }
+  }
+
   const lap = L.lap;
   const item = (k, v, sub, cls) =>
     `<div class="item"><div class="k">${k}</div><div class="v ${cls || ""}">${v}</div>` +
@@ -3167,7 +3396,7 @@ function renderLine(cx) {
     `<button type="button" class="chip${RANGE ? "" : " on"}" data-whole="1">` +
     `${t("line.whole")}</button>` +
     L.corners.map((c, i) =>
-      `<button type="button" class="chip${RANGE && i === LINE_I ? " on" : ""}" data-i="${i}">` +
+      `<button type="button" class="chip${railSynced && i === LINE_I ? " on" : ""}" data-i="${i}">` +
       `T${c.index + 1}</button>`).join("") +
     `<span class="chip-group"><span class="chip-label">${t("line.mag")}</span>` +
     [1, 3].map((z) =>
@@ -3177,11 +3406,15 @@ function renderLine(cx) {
     b.onclick = () => {
       LINE_I = parseInt(b.dataset.i, 10);
       setRange(cornerWindow(L.corners[LINE_I]));
-      renderLine(null);
+      // Non renderLine(null) diretto: questa scelta aggiorna anche RANGE, e il
+      // rail — fuori da questa vista — deve accorgersene (riga accesa, mirino
+      // sulla mappa). redrawCurrentView ridisegna la Traiettoria come prima E
+      // poi il rail, invece di lasciarlo con la riga di un'altra curva accesa.
+      redrawCurrentView();
     };
   }
   const whole = $("line-chips").querySelector(".chip[data-whole]");
-  if (whole) whole.onclick = () => { setRange(null); renderLine(null); };
+  if (whole) whole.onclick = () => { setRange(null); redrawCurrentView(); };
   for (const b of $("line-chips").querySelectorAll(".chip[data-mag]")) {
     b.onclick = () => { LINE_MAG = parseInt(b.dataset.mag, 10); renderLine(null); };
   }
@@ -3900,7 +4133,8 @@ function drawCurvature(L, corner, cx) {
 function updateLineReadout(L, p) {
   const el = $("line-readout");
   if (!el) return;
-  if (p == null) { el.innerHTML = t("line.readout"); return; }
+  const chip = rangeChip();
+  if (p == null) { el.innerHTML = chip + t("line.readout"); wireRangeClear(el); return; }
   LAST_HOVER = p;
   const c = L.corners[LINE_I];
   const off = DATA && DATA.review && DATA.review.line_offset;
@@ -3920,7 +4154,8 @@ function updateLineReadout(L, p) {
     bits += ` &nbsp;·&nbsp; ${t("ro.speed")} <b>${rv.speed[iv].toFixed(0)}</b> ` +
             `<span class="muted">(${t("ro.ref")} ${rf.speed[ir].toFixed(0)})</span>`;
   }
-  el.innerHTML = bits;
+  el.innerHTML = chip + bits;
+  wireRangeClear(el);
 }
 
 // --- hover / readout ------------------------------------------------------
@@ -3977,26 +4212,73 @@ function rangeChip() {
                ? `${Math.round(from)}–${Math.round(to)} m`
                : `${Math.round(RANGE.from * 100)}–${Math.round(RANGE.to * 100)}%`;
   return `<span class="range-chip"><b>${what}</b>` +
-         `<button type="button" id="range-clear" title="${t("range.clear")}">✕</button>` +
+         `<button type="button" class="range-clear" title="${t("range.clear")}">✕</button>` +
          `</span> &nbsp;·&nbsp; `;
+}
+
+// La ✕ della pastiglia vive ora su quattro readout (Confronto, Mappa,
+// Traiettoria, Dinamica: vedi `rangeChip`). Un `id="range-clear"` ripetuto
+// funzionerebbe solo per il primo che `getElementById` incontra — gli altri
+// tre bottoni resterebbero muti. Il bottone si cerca dentro il contenitore
+// appena scritto, non con un id globale condiviso.
+function wireRangeClear(el) {
+  const b = el && el.querySelector(".range-clear");
+  if (b) b.onclick = () => { setRange(null); redrawCurrentView(); };
+}
+
+// Testo del readout della Mappa, a riposo (`p` nullo, la legenda) o sotto il
+// mouse (`p`, punto per punto) — sempre con la pastiglia della finestra
+// davanti. Chiamata da un solo posto, `drawMap` (vedi il suo commento): prima
+// ogni chiamante di `drawMap` scriveva anche il readout per conto proprio, e
+// il cambio scheda — che disegna la mappa senza passare da nessuno degli
+// altri due — se n'era dimenticato.
+function mapReadoutHTML(p) {
+  return rangeChip() + (p == null ? MAP_READOUT_DEFAULT() : readoutHTML(DATA, p));
 }
 
 function updateReadout(a, p) {
   const el = $("readout");
   const chip = rangeChip();
-  const wire = () => {
-    const b = $("range-clear");
-    if (b) b.onclick = () => { setRange(null); redrawCurrentView(); };
-  };
   if (p == null) {
-    if (LAST_HOVER == null) { el.innerHTML = chip + t("readout.hint"); wire(); return; }
+    if (LAST_HOVER == null) { el.innerHTML = chip + t("readout.hint"); wireRangeClear(el); return; }
     el.classList.add("frozen");           // il valore resta, spento
     return;
   }
   LAST_HOVER = p;
   el.classList.remove("frozen");
   el.innerHTML = chip + readoutHTML(a, p);
-  wire();
+  wireRangeClear(el);
+}
+
+// Il punto unico di ingresso per OGNI hover della pagina, non solo quello del
+// rail: ogni scheda ha un modo diverso di mostrare «sei qui», e con un rail che
+// vive su sei schede senza questo instradamento servirebbe un `if` per scheda
+// dentro ciascun gestore. Così era nata la minimappa cablata alla sola vista
+// Confronto — e così, se un gestore chiamasse di nuovo la funzione di vista
+// direttamente invece che passare da qui, il rail tornerebbe a essere a senso
+// unico: sorgente di mirino ma mai destinazione.
+//
+// Le schede senza un consumatore di mirino (il flusso guidato, i settori) non
+// fanno NIENTE, di proposito: il rail muove il proprio marcatore e basta. Meglio
+// un gesto che non risponde di un gesto che ridisegna una vista che non è a
+// schermo.
+function hoverTo(p) {
+  if (!DATA) return;
+  // Solo su un punto vero: `updateReadout` (vista Confronto) confronta
+  // `LAST_HOVER` con `null` per decidere se il readout va congelato (l'ultimo
+  // valore, spento) o svuotato al suggerimento — e quel confronto vale solo se
+  // qui non lo si azzera già in anticipo. Uscire dal rail deve congelare il
+  // readout esattamente come uscire dai grafici, non cancellarlo.
+  if (p != null) LAST_HOVER = p;
+  if (VIEW === "compare") redraw(p);
+  else if (VIEW === "dynamics") drawDynamics(p);
+  else if (VIEW === "line") { if (LINE) renderLine(p); }
+  else if (VIEW === "map") {
+    // Il readout lo scrive `drawMap` stessa (vedi il commento lì): niente da
+    // duplicare qui.
+    drawMap(DATA, p);
+  }
+  drawRail(p);
 }
 
 function wireHover() {
@@ -4006,18 +4288,19 @@ function wireHover() {
   const onMove = (e) => {
     const rect = canvases[0].getBoundingClientRect();
     const p = posAtX(e.clientX - rect.left, rect.width);
-    redraw(p);
+    hoverTo(p);
   };
-  const onLeave = () => redraw(null);
+  const onLeave = () => hoverTo(null);
   for (const cv of canvases) {
     if (!cv) continue;
     cv.addEventListener("mousemove", onMove);
     cv.addEventListener("mouseleave", onLeave);
   }
 
-  // Map / mini-map hover: the x-axis isn't position, so find the nearest track
-  // sample in screen space (transform captured when the map was drawn) and reuse
-  // its pos to drive the shared crosshair + readout.
+  // Hover di mappa e rail: l'asse x non è la posizione in pista, quindi si
+  // cerca il campione più vicino nello spazio schermo (la trasformazione
+  // catturata quando la mappa è stata disegnata) e si riusa il suo `pos` per
+  // pilotare mirino e readout condivisi.
   function nearestPos(hit, canvas, e) {
     if (!hit) return null;
     const rect = canvas.getBoundingClientRect();
@@ -4037,26 +4320,21 @@ function wireHover() {
     map.addEventListener("mousemove", (e) => {
       if (!DATA) return;
       const p = nearestPos(MAP_HIT, map, e);
-      if (p == null) return;
-      drawMap(DATA, p);
-      $("map-readout").innerHTML = readoutHTML(DATA, p);
+      if (p != null) hoverTo(p);
     });
-    map.addEventListener("mouseleave", () => {
-      $("map-readout").innerHTML = MAP_READOUT_DEFAULT();
-      if (DATA) drawMap(DATA, null);
-    });
+    map.addEventListener("mouseleave", () => hoverTo(null));
   }
 
-  // Mini-map (Compare view) hover drives the chart crosshairs + readout too, so
-  // it's bidirectional with the traces.
-  const mini = $("c-minimap");
-  if (mini) {
-    mini.addEventListener("mousemove", (e) => {
+  // Il rail: stesso gesto della vecchia minimappa di Confronto, ma su sei schede
+  // — quindi instradato invece che cablato a una.
+  const rail = $("c-rail");
+  if (rail) {
+    rail.addEventListener("mousemove", (e) => {
       if (!DATA) return;
-      const p = nearestPos(MINI_HIT, mini, e);
-      if (p != null) redraw(p);
+      const p = nearestPos(RAIL_HIT, rail, e);
+      if (p != null) hoverTo(p);
     });
-    mini.addEventListener("mouseleave", () => redraw(null));
+    rail.addEventListener("mouseleave", () => hoverTo(null));
   }
 
   // Dynamics tab: the slip trace is on the position axis (same as the Compare
@@ -4073,9 +4351,9 @@ function wireHover() {
       if (!DATA) return;
       const rect = cv.getBoundingClientRect();
       const p = posAtX(e.clientX - rect.left, rect.width);
-      drawDynamics(p);
+      hoverTo(p);
     });
-    cv.addEventListener("mouseleave", () => { if (DATA) drawDynamics(null); });
+    cv.addEventListener("mouseleave", () => { if (DATA) hoverTo(null); });
   }
   const gg = $("c-gg");
   if (gg) {
@@ -4089,9 +4367,9 @@ function wireHover() {
         const dx = pts[i].px - mx, dy = pts[i].py - my, dd = dx * dx + dy * dy;
         if (dd < bd) { bd = dd; best = i; }
       }
-      if (best >= 0) drawDynamics(pts[best].pos);
+      if (best >= 0) hoverTo(pts[best].pos);
     });
-    gg.addEventListener("mouseleave", () => { if (DATA) drawDynamics(null); });
+    gg.addEventListener("mouseleave", () => { if (DATA) hoverTo(null); });
   }
   // The zoomed corner: x isn't track position, so find the nearest point of
   // your line in screen space and reuse its position, like the map does.
@@ -4106,9 +4384,9 @@ function wireHover() {
         const dx = LINE_HIT.X(i) - mx, dy = LINE_HIT.Y(i) - my, dd = dx * dx + dy * dy;
         if (dd < bd) { bd = dd; best = i; }
       }
-      if (best >= 0) renderLine(LINE_HIT.pos[best]);
+      if (best >= 0) hoverTo(LINE_HIT.pos[best]);
     });
-    corner.addEventListener("mouseleave", () => { if (LINE) renderLine(null); });
+    corner.addEventListener("mouseleave", () => { if (LINE) hoverTo(null); });
   }
   // Le due tracce di questa scheda condividono l'asse posizione: erano cablate
   // a metà, e la curvatura restava muta col mirino disegnato sopra.
@@ -4118,9 +4396,9 @@ function wireHover() {
     cv.addEventListener("mousemove", (e) => {
       if (!LINE) return;
       const rect = cv.getBoundingClientRect();
-      renderLine(posAtX(e.clientX - rect.left, rect.width));
+      hoverTo(posAtX(e.clientX - rect.left, rect.width));
     });
-    cv.addEventListener("mouseleave", () => { if (LINE) renderLine(null); });
+    cv.addEventListener("mouseleave", () => { if (LINE) hoverTo(null); });
   }
 
   const ribbon = $("c-balance");
@@ -4128,9 +4406,9 @@ function wireHover() {
     ribbon.addEventListener("mousemove", (e) => {
       if (!DATA) return;
       const p = nearestPos(DYN_BAL_HIT, ribbon, e);
-      if (p != null) drawDynamics(p);
+      if (p != null) hoverTo(p);
     });
-    ribbon.addEventListener("mouseleave", () => { if (DATA) drawDynamics(null); });
+    ribbon.addEventListener("mouseleave", () => { if (DATA) hoverTo(null); });
   }
 }
 

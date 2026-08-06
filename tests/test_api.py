@@ -384,3 +384,15 @@ def test_static_files_are_always_revalidated(tmp_path):
     r = TestClient(create_api(tmp_path)).get("/static/app.js")
     assert r.status_code == 200
     assert r.headers.get("cache-control") == "no-cache", r.headers
+
+
+def test_every_loss_points_at_a_corner_that_exists(tmp_path):
+    """Il rail aggancia la perdita alla curva per numero (mai per nome: due curve
+    possono chiamarsi uguale, e su una pista senza nomi curati si chiamano tutte
+    `Corner N`). Un indice che non esiste sarebbe una riga che non risponde."""
+    c = _client(tmp_path)
+    data = c.get("/api/analysis", params={"car": CAR, "track": TRACK}).json()
+    known = {cc["index"] for cc in data["corners"]}
+    assert data["losses"], "il giro sintetico ha una curva lenta apposta"
+    for loss in data["losses"]:
+        assert loss["index"] in known, loss

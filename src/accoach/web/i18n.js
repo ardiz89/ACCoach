@@ -206,6 +206,10 @@
     "map.leg.ref":     { en: `reference braking`, it: `frenata di riferimento` },
     "map.missing":     { en: `This lap has no coordinates (recorded before the map update). Drive and record a new lap to see it here.`,
                          it: `Questo giro non ha coordinate (registrato prima dell'aggiornamento mappa). Guida e registra un nuovo giro per vederlo qui.` },
+    "rail.nomap":      { en: `This lap has no map (recorded before the coordinates arrived). The corners below still work.`,
+                         it: `Questo giro non ha mappa (registrato prima delle coordinate). Le curve qui sotto funzionano lo stesso.` },
+    "rail.whole":      { en: `Whole lap`, it: `Tutto il giro` },
+    "rail.clean":      { en: `nothing lost here`, it: `qui non hai perso niente` },
 
     // ---- braking sheet (under the track map) ----
     // Your own braking points, measured. The wording carries the caveats the

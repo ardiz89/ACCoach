@@ -55,6 +55,23 @@
        which lap it was explaining. -->
   <section id="lapbar" class="lapbar"></section>
 
+  <!-- Il palco: il rail a sinistra, le dieci viste a destra. Il rail sta qui e
+       non dentro i pannelli perché non appartiene a nessuna vista — è il livello
+       «curva» dell'architettura a oggetti annidati, e deve sopravvivere al
+       cambio di scheda. Un rail per pannello sarebbe sei canvas e sei hover. -->
+  <div class="stage">
+    <aside id="rail" class="rail">
+      <div class="rail-map">
+        <canvas id="c-rail"></canvas>
+        <!-- I giri registrati prima dello schema con le coordinate non hanno una
+             mappa. Il rail non diventa per questo una colonna vuota: il disegno
+             lascia il posto a questa riga e la lista curve sotto resta viva. -->
+        <div id="rail-nomap" class="rail-nomap hidden" data-i18n="rail.nomap">This lap has no map.</div>
+      </div>
+      <nav id="rail-list" class="rail-list"></nav>
+    </aside>
+    <div class="views">
+
   <!-- The lap explained one step at a time. Same findings as the debrief below,
        edited server-side into what to look at first (see coaching/flow.py). -->
   <div id="view-flow">
@@ -188,14 +205,8 @@
   </div>
 
   <div id="view-compare" class="hidden">
-    <!-- The numbers and the shape of the lap side by side. The mini-map used to
-         sit on its own full-width row, where a track drawn to true proportions
-         filled a fifth of it and left the rest empty. -->
     <div class="hero">
       <section id="summary" class="summary"></section>
-      <div id="minimap-wrap" class="minimap hidden">
-        <canvas id="c-minimap"></canvas>
-      </div>
     </div>
 
     <div id="readout" class="readout" data-i18n="readout.hint">Hover over the charts for point-by-point values…</div>
@@ -404,6 +415,9 @@
     </div>
     <div id="dyn-missing" class="empty hidden" data-i18n="dyn.missing">This lap has no dynamics data (G / slip were recorded from v6). Drive and record a new lap to see it here.</div>
   </div>
+
+    </div><!-- /views -->
+  </div><!-- /stage -->
 
   <div id="empty" class="empty">
     <h2 class="empty-title" data-i18n="empty.title">No laps yet</h2>

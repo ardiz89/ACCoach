@@ -266,6 +266,80 @@ select {
 .hidden { display: none; }
 
 main { padding: 16px var(--gut); display: grid; gap: 18px; }
+
+/* Il palco a due colonne. Il gutter — che cresce con la finestra invece che con
+   un wrapper, vedi il commento a --page — si sposta QUI, e dentro `.views` viene
+   azzerato: le venticinque bande che scrivono `padding: … var(--gut)` ereditano
+   la variabile e si allineano da sole, senza toccarne nemmeno una. Senza questo
+   azzeramento, su un 2560 il gutter si applicherebbe due volte e fra il rail e i
+   grafici resterebbero 480 px di vuoto. */
+.stage { display: flex; align-items: flex-start; gap: 16px; padding: 0 var(--gut); }
+.stage > .views { flex: 1 1 auto; min-width: 0; --gut: 0px; }
+
+/* Sticky: scorrendo un debrief lungo la mappa resta dov'è. `top` sotto le
+   schede, che non sono sticky, quindi basta un filo d'aria. */
+.rail {
+  flex: 0 0 220px; position: sticky; top: 8px;
+  padding: 16px 0 24px; align-self: flex-start;
+}
+/* Sulle quattro schede che stanno SOPRA il giro (Sessione, Passo gara,
+   Andamento, Allenamento) l'oggetto è un altro e una curva non significa
+   niente: meglio niente colonna che una colonna che non risponde. */
+body:not(.railed) .rail { display: none; }
+
+.rail-map { position: relative; }
+.rail-map canvas { width: 100%; height: 150px; cursor: crosshair; display: block; }
+.rail-nomap { font-size: 11px; color: var(--muted); line-height: 1.5; padding: 8px 0; }
+
+/* Con 16-20 curve la lista supera l'altezza dello schermo, e `.rail` è
+   `position: sticky` — non `fixed`: senza un proprio scorrimento le ultime
+   righe smetterebbero di raggiungersi appena la pagina finisce di scorrere.
+   La mappa sopra resta sempre intera; è solo la lista sotto a scorrere, cosí
+   il "dove sono" non sparisce mai dallo schermo. */
+.rail-list {
+  display: flex; flex-direction: column; gap: 2px; margin-top: 10px;
+  max-height: calc(100vh - 220px); overflow-y: auto;
+}
+.rail-row {
+  display: grid; grid-template-columns: 26px 1fr auto;
+  align-items: center; gap: 2px 6px;
+  background: transparent; border: 0; border-radius: 8px;
+  padding: 5px 6px; text-align: left; cursor: pointer;
+  color: var(--muted); font-family: var(--font-ui); font-size: 12px;
+}
+.rail-row:hover { background: var(--panel); color: var(--text); }
+.rail-row.on { background: var(--inset); color: var(--text); }
+.rail-row.whole { grid-template-columns: 1fr; font-weight: 600; margin-bottom: 4px; }
+.rail-row.cold { grid-template-columns: 26px 1fr; }
+.rail-row .n { grid-column: 1; grid-row: 1; font-family: var(--font-mono); font-size: 11px; opacity: .7; }
+.rail-row .nm { grid-column: 2; grid-row: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rail-row .s { grid-column: 3; grid-row: 1; font-family: var(--font-mono); font-size: 11px; }
+/* La barra a piena riga (~200px), non più in una colonna da 34px: lì un
+   rapporto 20:1 fra la curva peggiore e la più piccola perdita visibile
+   finiva tutto sotto gli 8px e il confronto spariva — misurato su un giro
+   vero (Monza, McLaren 720S GT3). Nessuna scala non lineare per farcelo
+   stare: l'onestà è nella larghezza disponibile, non in una formula che
+   comprime i numeri piccoli verso i grandi. */
+.rail-row .bar {
+  grid-column: 1 / -1; grid-row: 2; height: 6px; margin-top: 2px;
+  background: var(--inset); border-radius: 999px; overflow: hidden;
+}
+.rail-row .fill { display: block; height: 100%; border-radius: 999px; }
+.rail-sep {
+  font-size: 10px; text-transform: uppercase; letter-spacing: .06em;
+  color: var(--muted); opacity: .7; padding: 10px 6px 4px;
+  border-top: 1px solid var(--line); margin-top: 6px;
+}
+
+/* Il tablet accanto al volante: sotto i 1100 px la colonna mangerebbe un quinto
+   della larghezza. Il rail sparisce e i chip della Traiettoria restano il modo
+   di scegliere una curva. */
+@media (max-width: 1100px) {
+  .rail { display: none; }
+  .stage { display: block; }
+  .stage > .views { --gut: max(24px, calc((100% - var(--page)) / 2)); }
+  .stage { padding: 0; }
+}
 .chart canvas { cursor: crosshair; }
 /* …tranne dove il mirino non c'è. Il puntatore è una promessa: darlo a un
    grafico che non risponde al mouse insegna al pilota che il gesto non
@@ -314,15 +388,6 @@ main { padding: 16px var(--gut); display: grid; gap: 18px; }
 .chart h3 { margin: 0 0 6px; font-size: 13px; font-weight: 600; }
 .chart h3 small { color: var(--muted); font-weight: 400; }
 .chart canvas { width: 100%; height: 150px; display: block; background: var(--inset); border: 1px solid var(--line); border-radius: 12px; }
-
-/* Mini track-map in the Compare view: hovering any chart highlights the same
-   point here (and hovering the mini-map drives the chart crosshairs), so the
-   lap's geometry sits next to the traces without leaving the tab. */
-.minimap { padding: 8px var(--gut) 0; }
-.minimap canvas {
-  width: 100%; height: 160px; display: block; cursor: crosshair;
-  background: var(--inset); border: 1px solid var(--line); border-radius: 12px;
-}
 
 /* Tyres over time (Trends): two small line charts + wheel legend + drift. */
 .tyres .tyre-legend {
@@ -840,7 +905,15 @@ body.no-data .empty { display: block; }
 }
 
 /* --- One run of laps, as it was driven ----------------------------------- */
-.session-shell { max-width: 900px; margin: 0 auto; padding: 8px 0 40px; }
+/* `--gut` qui non è il gutter di pagina: `.session-shell` è un guscio stretto
+   e centrato (900px), e i suoi figli (`.summary` per i numeri di Sessione e
+   Passo gara, `.debrief` per le gomme di Passo gara) lo usano come scorciatoia
+   per il PAVIMENTO di quella formula — `max(24px, …)` risolve sempre a 24px
+   dentro un contenitore così stretto. `.stage > .views` azzera `--gut` per il
+   gutter di pagina vero (sopra), e lo azzererebbe anche qui per eredità: senza
+   questa riga il testo di Sessione e Passo gara si allarga di 48px, perché
+   quei figli restano senza inset locale. */
+.session-shell { max-width: 900px; margin: 0 auto; padding: 8px 0 40px; --gut: 24px; }
 
 /* Same move as the flow view: on a wide screen the laps you drove and what
    changed since last time are read together, not one under the other. */
@@ -975,27 +1048,18 @@ body.no-data .empty { display: block; }
 .chip-label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
 .chip.mag { padding: 5px 9px; }
 
-/* Compare's top row: the numbers on the left, the shape of the lap on the right.
-   The mini-map is drawn to true proportions, so on a full-width row a track that
-   isn't square leaves most of it empty — beside the summary it fills its box and
-   the fold gets one screen more of the charts people came for. */
-.hero {
-  display: grid; grid-template-columns: minmax(0, 1fr) 360px;
-  gap: 18px; align-items: center;
-  border-bottom: 1px solid var(--line);
-}
-/* The page gutter is paid by the row, not by the mini map inside it: --gut is a
-   percentage of the element's own containing block, so on a 360px column it
-   collapses to the 24px floor and the map hangs off the edge of the column every
-   other band lines up with. Full-width parent, correct gutter. */
+/* La riga in cima a Confronto: solo il riepilogo. Divideva questo spazio con
+   una minimappa in scala reale, in una seconda colonna che la mappa riempiva
+   e il riepilogo no; la mappa vive nel rail adesso, quindi qui resta il solo
+   riepilogo — niente più seconda colonna da dimensionare intorno a qualcosa
+   che non c'è. */
+.hero { border-bottom: 1px solid var(--line); }
+/* Il gutter della pagina lo paga la riga, non `.summary` al suo interno:
+   `.summary` porta già il proprio padding (var(--gut)) per quando sta da
+   sola altrove, e applicarlo anche qui lo raddoppierebbe disallineando
+   questa fascia da ogni altra a piena larghezza. */
 .hero { padding-left: var(--gut); padding-right: var(--gut); }
 .hero .summary { border-bottom: 0; padding-left: 0; padding-right: 0; }
-.hero .minimap { padding: 10px 0 10px 0; }
-.hero .minimap canvas { height: 150px; }
-@media (max-width: 860px) {
-  .hero { grid-template-columns: 1fr; gap: 0; }
-  .hero .minimap { padding: 0 16px 12px; }
-}
 
 /* --- Your braking points (under the track map) ---------------------------
    A sheet, not a chart: it is read at a glance before going out, and printed.
@@ -1019,11 +1083,17 @@ body.no-data .empty { display: block; }
   body { background: #fff; color: #000; }
   /* Every view panel, derived rather than listed. It used to be eight ids
      written out by hand, so a new tab printed itself under the sheet until
-     someone noticed — the same failure `showView` was already fixed for. */
+     someone noticed — the same failure `showView` was already fixed for.
+     Il rail è l'eccezione: vive fuori da ogni `[id^="view-"]` apposta (vedi il
+     commento su `.stage`), quindi la derivazione non lo trova e va spento a
+     mano — senza, la scheda frenate stampava anche la colonna da 220px con la
+     mappa e i sette bottoni, e il resto della pagina restava stretto perché
+     `.stage` è ancora `display: flex` in stampa. */
   header, .tabs, .readout, .demo-banner, .summary, .map-legend,
-  #charts, [id^="view-"], #view-map main,
+  #charts, [id^="view-"], #view-map main, #rail,
   #map-missing, .tour-help, .cb-toggle, .mini-btn { display: none !important; }
   #view-map { display: block !important; }
+  .stage { display: block; }
   #brakesheet { padding: 0; }
   #brakesheet h3 { font-size: 18px; }
   .sheet-sub, .sheet-note, .vmin-table td .muted { color: #444; }
@@ -1051,7 +1121,15 @@ body.no-data .empty { display: block; }
 
    The plan's strip sits between the gap and the steps — it is the thing that
    turns the steps from a suggestion into something with a date on it. */
-.train-shell { max-width: 820px; margin: 0 auto; padding: 8px 0 40px; }
+/* Stessa storia di `.session-shell` sopra: `--gut` qui è il pavimento locale
+   da 24px per le sette bande di questa scheda (`.plan`, `.plan-elsewhere`,
+   `.train-intro`, `.train-gap`, `.train-steps`, `.train-words`,
+   `.train-session`), non il gutter di pagina — `.stage > .views` lo
+   azzererebbe per eredità e il testo di Allenamento si allargherebbe di 48px.
+   La prova che l'inset era voluto: più avanti in questo file, sotto i 700px,
+   una media query rimette a mano `padding-left/right: 16px` proprio su
+   quelle sette classi. */
+.train-shell { max-width: 820px; margin: 0 auto; padding: 8px 0 40px; --gut: 24px; }
 .plan { padding: 12px var(--gut) 0; }
 .plan h3 { font-size: 13px; margin: 0 0 10px; display: flex; align-items: center; gap: 10px; }
 .plan-since { color: var(--muted); font-size: 12px; font-weight: 400; font-family: var(--font-ui); }

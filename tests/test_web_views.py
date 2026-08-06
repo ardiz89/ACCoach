@@ -599,12 +599,16 @@ def test_the_map_labels_corners_by_the_name_everything_else_uses():
     was ignored, so the map read "T1" where hovering the same apex read "Curva
     Niki Lauda" — one screen contradicting itself. And the number was the
     detector's count on *this* lap, which is the sliding number `cornermap`
-    exists to stop."""
+    exists to stop.
+
+    The loop grew a neighbour-distance scan on 2026-08-05 (see
+    `test_the_map_label_degrades_with_the_canvas_it_is_drawn_to`), so this only
+    pins the surviving half of the original bug: the label still has to start
+    from the corner's name, not just its index."""
     fn = _APPJS[_APPJS.index("function drawMapTo"):]
     fn = fn[:fn.index("\n}\n")]
-    loop = fn[fn.index("for (const c of a.corners"):]
-    loop = loop[:loop.index("\n  }")]
-    assert "c.name" in loop, "the map is labelling corners by index again"
+    block = fn[fn.index("// Corner labels at each apex"):fn.index("// Start/finish")]
+    assert "c.name" in block, "the map is labelling corners by index again"
 
 
 # --- the two pedals on the zoomed corner (2026-08-04) ----------------------
@@ -745,3 +749,432 @@ def test_the_pencil_does_not_print():
     i = _CSS.find("@media print")
     block = _CSS[i:_CSS.index("\n}", i)]
     assert ".pencil" in block
+
+
+# --- il rail -----------------------------------------------------------------
+
+def test_the_rail_lives_outside_every_view_panel():
+    """Un rail dentro un pannello sarebbe sei rail: sei canvas, sei hover da
+    cablare e sei posti dove ricordarsi di ridisegnare. Fuori da tutti, è uno."""
+    where = _view_of_ids()
+    assert "rail" in where, "manca #rail in index.html"
+    assert where["rail"] == "", "il rail sta dentro un pannello di vista"
+    # `_view_of_ids` lavora per ordine nel documento: gli basta che nessun
+    # `id="view-…` preceda `id="rail"`. Un rail spostato DENTRO `.views`, sopra
+    # `#view-flow` (il primo pannello), passerebbe comunque quell'assert — e il
+    # layout sarebbe rotto lo stesso, perché `.stage > .views` azzera `--gut`
+    # per i discendenti di `.views`, rail compreso. La verifica vera è
+    # strutturale: il rail dev'essere un FRATELLO di `.views`, non un figlio.
+    assert _HTML.index('id="rail"') < _HTML.index('class="views"'), \
+        "il rail dev'essere un fratello di .views, non un discendente"
+
+
+def test_every_view_panel_lives_inside_the_stage():
+    """Il palco è la griglia a due colonne: un pannello fuori tornerebbe a
+    larghezza piena e finirebbe sotto il rail."""
+    stage = _HTML.split('<div class="stage">')[1].split('<!-- /stage -->')[0]
+    for panel in _PANELS:
+        assert f'id="view-{panel}"' in stage, panel
+
+
+def test_the_rail_is_declared_once_and_only_for_views_that_exist():
+    """Un elenco scritto due volte è un elenco che diverge."""
+    assert _APPJS.count("const RAIL_VIEWS") == 1
+    body = _APPJS.split("const RAIL_VIEWS = [")[1].split("]")[0]
+    for name in re.findall(r'"([\w-]+)"', body):
+        assert name in _TABS, name
+
+
+def test_rail_views_is_exactly_the_six_views_about_one_lap():
+    """Il test sopra verifica solo la metà positiva (ogni nome elencato è una
+    scheda vera) — passerebbe anche con cinque nomi, o con sette se qualcuno
+    aggiungesse "session" per sbaglio. Le quattro schede sopra il giro
+    (Allenamento, Sessione, Passo gara, Andamento) non hanno un giro da
+    ritagliare, quindi un rail lì risponderebbe a un clic senza cambiare
+    niente — «peggio di un comando assente», dice il commento sopra
+    RAIL_VIEWS. Qui si fissa il numero e l'assenza di quelle quattro."""
+    body = _APPJS.split("const RAIL_VIEWS = [")[1].split("]")[0]
+    names = re.findall(r'"([\w-]+)"', body)
+    assert len(names) == 6, names
+    for excluded in ("training", "session", "stint", "progress"):
+        assert excluded not in names, f"{excluded} non dovrebbe avere un rail"
+
+
+def test_switching_tab_says_whether_this_one_has_a_rail():
+    """La classe si applica anche al primo paint (vedi il test sotto), quindi
+    la logica vive in `applyRailed`, non più inline qui — ma `showView` deve
+    comunque richiamarla a ogni cambio di scheda."""
+    block = _APPJS.split("function showView(")[1].split("\n}")[0]
+    assert "applyRailed(" in block
+
+
+def test_the_starting_tab_gets_the_rail_class_without_a_click():
+    """`showView` mette la classe `railed` solo quando viene chiamata, e
+    `init()` la chiama solo se la vista salvata in localStorage è diversa da
+    quella già `active` in HTML. Con localStorage vuoto — la prima visita, il
+    caso più comune — o con una vista salvata uguale a quella di partenza,
+    `showView` non scattava mai: il rail restava nascosto sulla prima
+    schermata anche su una scheda che lo prevede, finché non si cliccava un
+    tab qualsiasi. Il difetto era invisibile perché nessuno guarda la pagina
+    appena caricata senza toccarla — la scheda di partenza va trattata come
+    tutte le altre nove."""
+    block = _APPJS.split("async function init(")[1].split("\n}")[0]
+    assert "applyRailed(" in block, \
+        "init() non applica mai la classe railed sulla scheda di partenza"
+
+
+def test_apply_railed_toggles_the_class_it_is_named_for():
+    """L'estrazione ha spostato la verifica su "chi chiama `applyRailed`" e ha
+    lasciato scoperto il meccanismo stesso: nulla controllava più che il suo
+    corpo faccia davvero il toggle su `RAIL_VIEWS`, invece di essere una
+    funzione vuota chiamata da entrambi i posti giusti."""
+    block = _APPJS.split("function applyRailed(")[1].split("\n}")[0]
+    assert 'classList.toggle("railed", RAIL_VIEWS.indexOf(name) >= 0)' in block
+
+
+def test_init_applies_the_rail_before_the_first_draw():
+    """Il bug critico dopo il primo fix: `applyRailed` scattava in `init()`,
+    ma DOPO `await loadCombo(...)`. `loadCombo` disegna `renderFlow`/`redraw`
+    in modo sincrono non appena il fetch risponde, e quei disegni leggono
+    `cv.clientWidth` — che dipende dalla classe `railed` su <body>. Con quella
+    ancora assente il primo disegno usciva a larghezza piena; poi il rail
+    compariva senza che nulla lo seguisse a ridisegnare. Succede proprio sulla
+    prima schermata: quando la vista salvata coincide con quella di partenza
+    (o non c'è), `showView` — che ha l'ordine giusto — non scatta affatto."""
+    block = _APPJS.split("async function init(")[1].split("\n}")[0]
+    assert block.index("applyRailed(") < block.index("await loadCombo("), \
+        "applyRailed deve scattare prima del primo loadCombo, non dopo"
+
+
+def test_the_rail_is_drawn_outside_the_per_view_switch():
+    """`redrawCurrentView` è uno switch per-vista e il rail non appartiene a
+    nessuna vista. Dentro un ramo, al cambio scheda resterebbe fermo all'ultimo
+    giro e dopo un resize l'hover punterebbe al posto sbagliato.
+
+    Il criterio è l'indentazione: una riga a sé, ai due spazi del corpo della
+    funzione, non può stare dentro un `if` — un ramo la indenterebbe di più o se
+    la porterebbe sulla propria riga."""
+    block = _APPJS.split("function redrawCurrentView()")[1].split("\n}")[0]
+    assert re.search(r"^  drawRail\(\);$", block, re.M), \
+        "drawRail() dev'essere una riga a sé, fuori dallo switch per-vista"
+
+
+def test_a_lap_without_coordinates_still_has_a_rail():
+    """I giri ACC registrati prima dello schema con le coordinate sono esattamente
+    questo caso, e col rail persistente diventerebbero una colonna vuota su tutte
+    le schede."""
+    assert 'id="rail-nomap"' in _HTML
+    block = _APPJS.split("function drawRail(")[1].split("\n}")[0]
+    assert '$("rail-nomap")' in block, "il segnaposto non viene passato a drawMapTo"
+
+
+def test_the_rail_is_drawn_when_a_lap_loads():
+    """Un nuovo giro cambia le curve e le perdite che il rail elenca (nome,
+    numero, quanto è costata ciascuna): senza questa chiamata la colonna
+    resterebbe quella del giro precedente finché non si cambia scheda o non
+    si ridimensiona la finestra — nessuno dei due gesti segue automaticamente
+    un cambio di giro dal menu a tendina."""
+    block = _APPJS.split("async function loadCombo")[1].split("\n}")[0]
+    assert "drawRail();" in block
+
+
+def test_the_rail_list_is_drawn_outside_the_per_view_switch():
+    """`drawRail()` (la mappa) è ancorato fuori dallo switch di
+    `redrawCurrentView` — vedi il test sopra — ma `drawRailList()` (la
+    classifica delle curve sotto la mappa) non lo era: se finisse dentro un
+    ramo per-vista, la lista invecchierebbe in silenzio al cambio scheda
+    (nuovo giro caricato mentre si è su Allenamento, poi si passa a Confronto)
+    e dopo un cambio lingua, esattamente come per `drawRail()`."""
+    block = _APPJS.split("function redrawCurrentView()")[1].split("\n}")[0]
+    assert re.search(r"^  drawRailList\(\);$", block, re.M), \
+        "drawRailList() dev'essere una riga a sé, fuori dallo switch per-vista"
+
+
+def test_the_rail_lists_the_clean_corners_too():
+    """La classifica dice da dove cominciare; il selettore deve poter aprire
+    anche una curva dove non hai perso niente — è lì che si va a vedere cosa hai
+    fatto giusto."""
+    block = _APPJS.split("function railRows(")[1].split("\n}")[0]
+    assert "cold" in block and "hot" in block
+
+
+def test_the_selected_corner_is_remembered_by_number_not_by_name():
+    """Due curve possono chiamarsi uguale: su ogni pista senza nomi curati si
+    chiamano tutte `Corner N`, e la riga accesa sarebbe la prima delle due."""
+    block = _APPJS.split("function cornerWindow(")[1].split("\n}")[0]
+    assert "corner: c.index" in block
+
+
+def test_clicking_a_corner_moves_the_shared_window():
+    block = _APPJS.split("function drawRailList()")[1].split("\n\nfunction")[0]
+    assert "setRange(cornerWindow(" in block
+    assert "setRange(null)" in block, "manca «Tutto il giro»"
+
+
+# --- il rail su un giro vero: barra e nomi (2026-08-05) ---------------------
+# Trovati misurando nel DOM un giro vero (Monza, McLaren 720S GT3, 7 curve):
+# nessuno dei due era visibile a un test statico prima che qualcuno guardasse
+# lo schermo.
+
+def test_the_rail_bar_spans_the_full_row_width():
+    """Misurato su quel giro: una colonna da 34px per una barra che rappresenta
+    un rapporto 20:1 (−4.72s contro −0.24s) lasciava quattro righe su cinque
+    sotto gli 8px, indistinguibili l'una dall'altra e dai numeri già scritti
+    accanto. Deve stare sotto il nome, a piena larghezza di riga — niente
+    scala non lineare per farcela stare in una colonna stretta."""
+    row = _rule(".rail-row {")
+    assert "34px" not in row, "la barra non deve più avere una colonna fissa stretta"
+    bar = _rule(".rail-row .bar {")
+    assert "grid-column: 1 / -1" in bar
+
+
+def test_the_rail_list_scrolls_on_its_own():
+    """`.rail` è `position: sticky`, non `fixed`: con 16-20 curve la lista
+    supera l'altezza dello schermo, e senza un proprio scorrimento le ultime
+    righe smetterebbero di essere raggiungibili una volta che la pagina ha
+    finito di scorrere."""
+    block = _rule(".rail-list {")
+    assert "overflow-y: auto" in block
+
+
+def test_the_map_label_avoids_real_text_collisions_not_apex_distance():
+    """Trovato il 2026-08-05 guardando la mappa grande vera (Monza, tela
+    1036px): la prima versione decideva sulla distanza fra gli APICI, e su
+    quella tela scartava un nome («Variante del Rettifilo») che non avrebbe
+    mai toccato nulla — il vicino più vicino stava a un centinaio di pixel.
+    Quello che collide sono i RETTANGOLI di testo, non i punti: `drawMapTo`
+    deve confrontare le etichette già scritte, non una distanza a soglia."""
+    fn = _APPJS[_APPJS.index("function drawMapTo"):]
+    fn = fn[:fn.index("\n}\n")]
+    block = fn[fn.index("// Corner labels at each apex"):fn.index("// Start/finish")]
+    assert "measureText(" in block
+    assert "overlaps(" in block
+    assert "Math.hypot" not in block, \
+        "la distanza fra apici non deve tornare a decidere l'etichetta"
+    assert 'ctx.fillText(c.name || ("T" + (c.index + 1)), X(rv.x[i]) + 6, Y(rv.z[i]) - 4)' \
+        not in block, "il fillText incondizionato non deve tornare"
+
+
+def test_corner_bands_still_uses_the_shared_threshold():
+    """`degradeLabel` resta la soglia di `cornerBands`, che ha uno spazio
+    lineare (una fascia lungo un asse) su cui un singolo numero funziona. La
+    mappa non la usa più — lì collidono rettangoli veri, non un numero — ed è
+    corretto che restino due meccanismi diversi per due geometrie diverse."""
+    assert "function degradeLabel(" in _APPJS
+    bands = _APPJS.split("function cornerBands(")[1].split("\n}")[0]
+    assert "degradeLabel(ctx" in bands
+
+
+def test_the_map_label_also_checks_its_share_of_the_canvas():
+    """Trovato il 2026-08-05, un giro dopo il fix della collisione: la
+    collisione da sola non basta. Sul rail (220px) «Variante della Roggia»
+    (109px) non toccava nessun'altra etichetta e passava il test — ma da
+    sola copriva metà della larghezza della mappa, cancellando il disegno
+    del giro che il rail esiste per mostrare. Serve una condizione di
+    proporzione, verificata PRIMA della collisione sul nome intero, ed
+    espressa come FRAZIONE della tela — non un numero di pixel fisso: la
+    stessa funzione disegna una mappa da 220px e una da quasi 1000, e un
+    valore assoluto sarebbe tarato sull'una o sull'altra."""
+    fn = _APPJS[_APPJS.index("function drawMapTo"):]
+    fn = fn[:fn.index("\n}\n")]
+    block = fn[fn.index("// Corner labels at each apex"):fn.index("// Start/finish")]
+    m = re.search(r"maxLabelW\s*=\s*w\s*\*\s*([\d.]+)", block)
+    assert m, "la soglia dev'essere una frazione di w (la tela), non un pixel fisso"
+    frac = float(m.group(1))
+    assert 0 < frac <= 0.5, f"{frac} non è 'una frazione ragionevole' della tela"
+    gate = "ctx.measureText(full).width < maxLabelW"
+    assert gate in block
+    assert block.index(gate) < block.index("rectOf(full)"), \
+        "la proporzione va verificata prima di provare la collisione sul nome intero"
+
+
+def test_the_rail_hover_is_routed_per_view_not_wired_to_one():
+    """L'hover della minimappa chiamava `redraw`, che è la funzione della sola
+    vista Confronto. Su un rail che vive su sei schede sarebbe muto sulle altre
+    cinque — o peggio, ridisegnerebbe una vista che non è sullo schermo."""
+    assert "function hoverTo(" in _APPJS
+    block = _APPJS.split("function hoverTo(")[1].split("\n}\n")[0]
+    for view in ("map", "dynamics", "line", "compare"):
+        assert f'"{view}"' in block, view
+
+
+def test_the_compare_minimap_is_gone_now_that_the_rail_is_the_map():
+    """La stessa figura due volte a venti centimetri: è la ripetizione che il
+    panel ha misurato come causa della «mancanza di logica» percepita."""
+    assert "c-minimap" not in _HTML
+    assert "drawMiniMap" not in _APPJS
+    assert "MINI_HIT" not in _APPJS
+
+
+def test_all_hover_sources_route_through_hoverTo_not_the_view_function():
+    """Il rail funzionava solo come sorgente: i gestori dei grafici (Confronto,
+    Dinamica, Traiettoria) e della mappa grande chiamavano `redraw`/
+    `drawDynamics`/`renderLine`/`drawMap` DIRETTAMENTE — `hoverTo` è l'unica
+    funzione che aggiorna anche il rail. Se un gestore futuro richiama di nuovo
+    la funzione di vista invece di `hoverTo`, il rail torna a essere a senso
+    unico: sorgente di mirino, mai destinazione — esattamente come nacque la
+    minimappa cablata alla sola vista Confronto."""
+    block = _APPJS.split("function wireHover()")[1].split("\n}\n")[0]
+    for direct in ("redraw(", "drawDynamics(", "renderLine(", "drawMap("):
+        assert direct not in block, f"{direct} bypassa hoverTo dentro wireHover"
+    # Otto sorgenti di hover (grafici Confronto, mappa grande, rail, tracce
+    # Dinamica, G-G, curva ingrandita, offset/curvatura, nastro bilanciamento)
+    # per due eventi (move, leave) = almeno 16 chiamate a hoverTo.
+    assert block.count("hoverTo(") >= 16
+
+
+def test_drawRail_takes_an_explicit_point_instead_of_only_reading_LAST_HOVER():
+    """`drawRail` leggeva `LAST_HOVER` da sé; chiamata da dentro `hoverTo` in un
+    punto dove quella variabile non fosse ancora aggiornata, avrebbe disegnato
+    il mirino di un istante prima. Un parametro esplicito — con `LAST_HOVER`
+    come default per chi ridisegna la vista intera senza un punto fresco in
+    mano — toglie la dipendenza dall'ordine delle righe."""
+    assert "function drawRail(p = LAST_HOVER)" in _APPJS
+    block = _APPJS.split("function drawRail(")[1].split("\n}")[0]
+    assert 'drawMapTo($("c-rail"), $("rail-nomap"), DATA, p)' in block
+    hover_block = _APPJS.split("function hoverTo(")[1].split("\n}\n")[0]
+    assert "drawRail(p);" in hover_block
+
+
+def test_the_hero_row_has_no_orphaned_minimap_column():
+    """La seconda colonna della griglia (360px) era per la minimappa; rimossa
+    lei dal markup, un `.hero` ancora a due colonne lascerebbe quello spazio
+    riservato e vuoto invece di far respirare il riepilogo a piena larghezza."""
+    hero_block = _CSS[_CSS.index(".hero {"):_CSS.index("/* --- Your braking points")]
+    assert "grid-template-columns" not in hero_block
+    assert "360px" not in hero_block
+    assert "minimap" not in hero_block.lower()
+    assert "padding-left: var(--gut)" in hero_block
+
+
+def test_hoverTo_never_nulls_last_hover_on_mouse_leave():
+    """`updateReadout` (vista Confronto) confronta `LAST_HOVER` con `null` per
+    decidere se congelare il readout (l'ultimo valore, spento) o svuotarlo al
+    suggerimento — un confronto valido solo se `hoverTo` non lo azzera già in
+    anticipo. Uscire dal rail deve congelare il readout esattamente come uscire
+    dai grafici, non cancellarlo all'istante."""
+    block = _APPJS.split("function hoverTo(")[1].split("\n}\n")[0]
+    assert re.search(r"if\s*\(\s*p\s*!=\s*null\s*\)\s*LAST_HOVER\s*=\s*p;", block), \
+        "LAST_HOVER va scritto solo quando p è un punto vero, mai azzerato qui"
+    # Ogni occorrenza dell'assegnazione dev'essere dietro quella guardia — non
+    # deve restarne una incondizionata, eseguita anche quando p è null.
+    assert block.count("LAST_HOVER = p;") == len(
+        re.findall(r"if\s*\(\s*p\s*!=\s*null\s*\)\s*LAST_HOVER\s*=\s*p;", block)
+    ), "trovata un'assegnazione a LAST_HOVER non protetta dalla guardia p != null"
+
+
+# --- correzioni della revisione finale (2026-08-05) -------------------------
+
+def test_the_gutter_moved_from_main_to_the_stage():
+    """Lo spec della revisione lo chiama il rischio di regressione principale
+    della spedizione del rail, e non aveva un test: il gutter di pagina si è
+    spostato da `main` (una banda per vista) a `.stage` (l'intero palco a due
+    colonne), e `.stage > .views` lo azzera per i propri discendenti così non
+    si applica due volte. Se `.stage` smettesse di pagarlo, o `.views`
+    smettesse di azzerarlo, il commento sopra la regola dice cosa succede su
+    un monitor largo: 480px di vuoto fra il rail e i grafici."""
+    stage = _rule(".stage {")
+    assert "padding: 0 var(--gut)" in stage
+    views = _rule(".stage > .views {")
+    assert "--gut: 0px" in views
+
+
+def test_line_chip_click_also_refreshes_the_rail():
+    """Chip e rail scelgono la stessa finestra condivisa (`RANGE`) ma la
+    leggono con due chiavi diverse — posizione nell'array di Traiettoria
+    contro numero di curva — e prima di questo fix non si parlavano affatto:
+    un clic sul chip aggiornava `RANGE` e richiamava `renderLine(null)` da
+    solo, senza mai passare da `redrawCurrentView`, quindi il rail — che vive
+    fuori da questa vista — restava con la riga della curva precedente ancora
+    accesa. Trovato guardando lo schermo in entrambi i versi, non da un test."""
+    handler = _APPJS.split("setRange(cornerWindow(L.corners[LINE_I]));")[1].split("};")[0]
+    assert "redrawCurrentView();" in handler
+    assert "renderLine(null);" not in handler
+
+
+def test_the_line_view_translates_the_rails_corner_number_into_its_own_index():
+    """Il rail sceglie una curva per NUMERO (`RANGE.corner`, il campo `index`
+    di `/api/analysis`); la Traiettoria naviga per POSIZIONE nel proprio
+    elenco (`LINE_I`, indice dentro `L.corners`, da `/api/trajectory` — un
+    elenco che può avere curve diverse). Prima di questo fix un clic su una
+    riga del rail cambiava `RANGE` senza mai toccare `LINE_I`: il disegno
+    ingrandito, il titolo, la tabella e il chip acceso restavano sulla curva
+    di prima. Una ricerca per `index` — non un'assegnazione diretta fra le due
+    chiavi — è ciò che li fa concordare."""
+    block = _APPJS.split("function renderLine(cx)")[1].split("\n}\n\n")[0]
+    assert "L.corners.findIndex((cc) => cc.index === RANGE.corner)" in block
+    assert "LINE_I = pos;" in block
+
+
+def test_the_rail_is_hidden_when_printing():
+    """La derivazione di stampa (`[id^="view-"]`, vedi il test sui pannelli)
+    non prende `#rail`: vive apposta fuori da ogni pannello di vista, quindi
+    senza un'eccezione esplicita la scheda frenate — pensata per essere
+    stampata e attaccata al volante — usciva con la colonna del rail (mappa
+    su fondo scuro, sette bottoni) e il resto della pagina compresso, perché
+    `.stage` restava `display: flex` anche in stampa."""
+    block = _CSS.split("@media print {")[1].split("\n}\n")[0]
+    assert "#rail" in block, "il rail non è fra gli elementi nascosti in stampa"
+    assert ".stage { display: block; }" in block, \
+        "senza .stage a blocco il resto della pagina resta stretto in stampa"
+
+
+# --- la pastiglia mancava a riposo sulla Mappa (2026-08-05, seconda ondata) -
+
+def test_the_map_readout_legend_is_never_written_without_its_chip():
+    """`MAP_READOUT_DEFAULT()` è la legenda a riposo della Mappa. Prima di
+    questo fix veniva anteposta a mano dalla pastiglia (`rangeChip()`) in ogni
+    chiamante — e un chiamante l'aveva dimenticata (vedi il test sotto): la
+    finestra restava accesa ma la pastiglia spariva finché non si muoveva il
+    mouse. Un solo punto della chiama (`mapReadoutHTML`, che antepone sempre
+    `rangeChip()`) rende impossibile scrivere la legenda senza la pastiglia,
+    invece di fidarsi che ogni chiamante se ne ricordi."""
+    assert _APPJS.count("MAP_READOUT_DEFAULT()") == 1, \
+        "MAP_READOUT_DEFAULT() dev'essere chiamata da un solo posto (mapReadoutHTML)"
+    wrapper = _APPJS.split("function mapReadoutHTML(")[1].split("\n}")[0]
+    assert "MAP_READOUT_DEFAULT()" in wrapper
+    assert "rangeChip()" in wrapper
+
+
+def test_the_map_readout_is_written_only_inside_drawMap():
+    """`drawMap` è chiamata da tre posti (`loadCombo`, `redrawCurrentView` sul
+    ramo Mappa, `hoverTo`): prima di questo fix ognuno scriveva anche
+    `#map-readout` per conto proprio, e bastava che uno se ne dimenticasse —
+    `redrawCurrentView` disegnava la mappa al cambio scheda senza mai toccare
+    il readout, quindi la pastiglia non compariva finché non si passava da
+    `loadCombo` o da un hover vero. Scritto una sola volta, dentro `drawMap`
+    stessa, nessuno dei tre chiamanti può più dimenticarlo."""
+    assert _APPJS.count("mapReadoutHTML(") == 2, \
+        "una definizione e una sola chiamata: mapReadoutHTML deve restare interna a drawMap"
+    block = _APPJS.split("function drawMap(a, cx)")[1].split("\n}")[0]
+    assert "mapReadoutHTML(cx)" in block, \
+        "drawMap deve scrivere #map-readout da sé, non lasciarlo ai chiamanti"
+
+
+# --- il gemello: la pastiglia mancava anche su Dinamica senza dati ----------
+
+def test_the_dyn_readout_is_written_only_inside_updateDynReadout():
+    """Stesso difetto della Mappa, sull'altra scheda: `drawDynamics` ha due
+    rami — canali di dinamica presenti o assenti — e prima di questo fix solo
+    il primo passava da `updateDynReadout` (che antepone sempre
+    `rangeChip()`). Il ramo "nessun dato" (un giro senza canali di dinamica)
+    scriveva `#dyn-readout` a mano, con la sola frase di default: nessuna
+    pastiglia, nessuna ✕ per annullare la finestra. Un solo punto d'accesso
+    al readout — `$("dyn-readout")`, dentro `updateDynReadout` — rende
+    impossibile ripetere l'errore in un ramo futuro di `drawDynamics`."""
+    assert _APPJS.count('$("dyn-readout")') == 1, \
+        "dyn-readout deve avere un solo punto d'accesso: dentro updateDynReadout"
+    block = _APPJS.split("function drawDynamics(cx)")[1].split("\n}")[0]
+    assert block.count("updateDynReadout(DATA,") == 2, \
+        "entrambi i rami di drawDynamics (dati presenti e assenti) devono passare da updateDynReadout"
+    assert 't("dyn.readout")' not in block, \
+        "drawDynamics non deve più scrivere la frase di default a mano: solo updateDynReadout lo fa"
+
+
+def test_the_dyn_readout_default_text_always_carries_the_chip():
+    """`updateDynReadout` è il solo punto che scrive `#dyn-readout` (vedi il
+    test sopra): se il suo stesso ramo "a riposo" dimenticasse `rangeChip()`,
+    nessun chiamante potrebbe più rimediarlo."""
+    block = _APPJS.split("function updateDynReadout(a, p)")[1].split("\n}")[0]
+    assert "rangeChip()" in block
+    assert 'chip + t("dyn.readout")' in block
