@@ -611,9 +611,18 @@ class CoachEngine:
         card = self.analyzer.last_corner
         if card is None:
             return None
+        name = self._corner_names.get(card.index)
+        if name is None:
+            # Same fallback `name_corners` itself uses for an unnamed corner —
+            # an empty track finds no curated table, so this is just "Corner N"
+            # / "Curva N" in the active language. A hardcoded Italian string
+            # here would be a second naming path: the one thing the plan's
+            # global constraints forbid outright.
+            from .trackdata import corner_name
+            name = corner_name("", card.index, 0.0)
         return {
             "index": card.index,
-            "name": self._corner_names.get(card.index, f"Curva {card.index + 1}"),
+            "name": name,
             "lost_ms": round(card.lost_ms, 1),
             "level": corner_level(card.lost_ms),
         }
