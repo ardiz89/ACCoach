@@ -1,5 +1,7 @@
 """CoachAnalyzer: corner cause attribution + feed-forward cue lifecycle."""
-from accoach.coaching.analyzer import CoachAnalyzer, CornerStats, classify_corner, _LOSS_MS
+from accoach.coaching.analyzer import (
+    CoachAnalyzer, CornerStats, classify_corner, corner_level, _GAIN_MS, _LOSS_MS,
+)
 from accoach.coaching.cue import CueCategory
 from accoach.comparison import LapComparator, Reference
 from accoach.track import detect_corners
@@ -159,3 +161,37 @@ def test_drop_last_corner_clears_the_card():
     an, _ = _replay()
     an.drop_last_corner()
     assert an.last_corner is None
+
+
+# --- il semaforo: stesse soglie della voce, o si contraddicono --------------
+
+def test_a_clear_gain_is_the_bright_end():
+    assert corner_level(-_GAIN_MS) == "gain"
+    assert corner_level(-_GAIN_MS - 1) == "gain"
+
+
+def test_inside_the_band_is_green():
+    assert corner_level(0.0) == "ok"
+    assert corner_level(-_GAIN_MS + 1) == "ok"
+    assert corner_level(_LOSS_MS - 1) == "ok"
+
+
+def test_the_colour_turns_exactly_where_the_coach_speaks():
+    """La soglia del giallo È la soglia della voce: se il coach parla, non è verde."""
+    assert corner_level(_LOSS_MS) == "warn"
+    assert corner_level(_GAIN_MS) == "warn"
+
+
+def test_past_the_praise_threshold_the_other_way_is_red():
+    assert corner_level(_GAIN_MS + 1) == "bad"
+
+
+def test_the_level_never_contradicts_the_voice():
+    """Ogni perdita che merita un cue è almeno gialla; ogni lode è 'gain'."""
+    for lost in (_LOSS_MS, _LOSS_MS + 50, _GAIN_MS, _GAIN_MS + 500):
+        st = CornerStats(lost_ms=lost, throttle_live=1.0, throttle_ref=1.0,
+                         brake_live=0.0, brake_ref=0.0, min_speed_live=100.0,
+                         min_speed_ref=100.0, braking_early=False)
+        assert classify_corner(st, 0, 0.3) is not None
+        assert corner_level(lost) in ("warn", "bad")
+    assert corner_level(-_GAIN_MS) == "gain"

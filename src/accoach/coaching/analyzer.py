@@ -144,6 +144,27 @@ def classify_corner(st: CornerStats, index: int, pos: float) -> Cue | None:
                priority=lost, segment=index, pos=pos)
 
 
+def corner_level(lost_ms: float) -> str:
+    """Il semaforo di una curva chiusa: "gain" | "ok" | "warn" | "bad".
+
+    Non introduce soglie: usa le due che il coach già usa per decidere se
+    parlare, misurate in pista. `_LOSS_MS` è «hai perso qualcosa che vale
+    dirtelo», `_GAIN_MS` è «questa è una lode» — e la stessa entità in senso
+    opposto è ciò che fa passare il giallo al rosso. Riusarle è l'unica cosa che
+    garantisce che colore e voce non si contraddicano: se il coach parla, il
+    colore non può essere verde. Un terzo numero qui sarebbe una taratura nostra
+    che nessuno ha misurato, e questo progetto ha già pagato due volte per due
+    metà dell'app che dicevano cose diverse.
+    """
+    if lost_ms <= -_GAIN_MS:
+        return "gain"
+    if lost_ms < _LOSS_MS:
+        return "ok"
+    if lost_ms <= _GAIN_MS:
+        return "warn"
+    return "bad"
+
+
 @dataclass(slots=True)
 class _Seg:
     """Running comparison for the segment currently being driven."""
