@@ -6,6 +6,7 @@ il coach non ha niente da dire. Quest'ultimo è il punto di tutta la feature.
 """
 from dataclasses import replace
 
+from accoach import engine as engine_mod
 from accoach.coaching.analyzer import _LOSS_MS
 from accoach.engine import CoachEngine
 from accoach.recording.storage import save_lap
@@ -213,4 +214,20 @@ def test_the_card_is_dropped_on_an_unrepresentative_lap(tmp_path):
     assert st.quiet == "pit"
     assert st.corner is None
     assert eng.analyzer.last_corner is None
+    eng.close()
+
+
+def test_no_card_when_no_corner_was_detected(tmp_path, monkeypatch):
+    """Riferimento sì, curve no: il numero ci sarebbe, il nome no.
+
+    Su un giro corto o senza coordinate `detect_corners` torna vuoto:
+    `set_corners([])` ripiega su 24 segmenti fissi mentre `_corner_labels` torna
+    `{}`, e il riquadro finiva per chiamare «Curva 7» un ventiquattresimo di
+    pista. Il numero resta misurato — ma un nome che non abbiamo non si finge, e
+    mezzo riquadro vero e mezzo inventato è peggio di nessun riquadro.
+    """
+    monkeypatch.setattr(engine_mod, "detect_corners", lambda samples: [])
+    eng, st = _run(tmp_path, _three_laps())
+    assert eng.analyzer.last_corner is not None, "il dato misurato c'è comunque"
+    assert st.corner is None
     eng.close()

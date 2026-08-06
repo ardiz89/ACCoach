@@ -483,23 +483,6 @@ Cosa trovi:
   stanno in **Passo gara** — qui la serie copriva tutto l'archivio pur
   chiamandosi «lungo lo stint».
 
-### Curva per sessione
-
-Sotto i punti deboli, per ogni curva **sistematica**: la perdita mediana in
-quella curva, **una barra per sessione**. Due uscite nello stesso pomeriggio
-restano due barre — è lì che si vede se la cosa che hai cambiato fra l'una e
-l'altra ha funzionato.
-
-Due soglie, e si compongono: una sessione in cui hai fatto **meno di tre
-giri** su quella curva non compare — una mediana su due giri è l'ultimo giro
-con un nome più serio — e una sessione assente **non** viene disegnata a
-zero, perché lo zero qui vuol dire «l'hai presa bene», che è un'altra cosa
-dal non avere il dato. E la curva **intera** compare solo con **almeno due
-sessioni** che superano quella prima soglia: un punto solo non è un
-andamento, è un giro fortunato. Una curva appena diventata sistematica può
-non avere ancora un grafico qui: prima le servono due sessioni buone, non una
-sola.
-
 Nella tendina dei giri, accanto al tempo, trovi **i gradi dell'asfalto** (es.
 `2:03.732 · 37.8°`). Non è un dettaglio: fra pista fredda e pista calda i punti
 di frenata si spostano di 10-20 metri, quindi due giri con temperature molto
@@ -544,6 +527,23 @@ col bordo azzurro. Sono osservazioni **sull'intero giro**, non su una curva:
 - *«Ti mancano N km/h di punta»* — e qui la parte che conta: se in curva vai come
   il riferimento non è l'auto a essere lenta, guarda ala e rapporti; se sei più
   lento anche in curva, è velocità in uscita e l'assetto non c'entra.
+
+### Curva per sessione
+
+Sotto i punti deboli, per ogni curva **sistematica**: la perdita mediana in
+quella curva, **una barra per sessione**. Due uscite nello stesso pomeriggio
+restano due barre — è lì che si vede se la cosa che hai cambiato fra l'una e
+l'altra ha funzionato.
+
+Due soglie, e si compongono: una sessione in cui hai fatto **meno di tre
+giri** su quella curva non compare — una mediana su due giri è l'ultimo giro
+con un nome più serio — e una sessione assente **non** viene disegnata a
+zero, perché lo zero qui vuol dire «l'hai presa bene», che è un'altra cosa
+dal non avere il dato. E la curva **intera** compare solo con **almeno due
+sessioni** che superano quella prima soglia: un punto solo non è un
+andamento, è un giro fortunato. Una curva appena diventata sistematica può
+non avere ancora un grafico qui: prima le servono due sessioni buone, non una
+sola.
 
 ### Chi diventa il riferimento
 

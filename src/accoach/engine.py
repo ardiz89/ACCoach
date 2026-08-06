@@ -172,7 +172,12 @@ def _corner_labels(car: str, track: str, corners: list[Corner],
     """
     if not corners:
         return {}
-    ordered = sorted(corners, key=lambda c: c.entry_pos)
+    # La chiave è la stessa tupla di `set_corners`, non il solo `entry_pos`: le
+    # due liste divergerebbero solo su un pareggio esatto fra float, ma è
+    # esattamente il caso in cui questo docstring esiste per non far finire un
+    # nome sulla curva accanto. Ordinare in due modi diversi «quasi uguali» è il
+    # modo classico di pagarlo una volta sola, molto dopo.
+    ordered = sorted(corners, key=lambda c: (c.entry_pos, c.exit_pos, c.apex_pos))
     try:
         from . import cornernames
         from .recording.catalog import LapCatalog
@@ -610,6 +615,13 @@ class CoachEngine:
         """
         card = self.analyzer.last_corner
         if card is None:
+            return None
+        if not self._corners:
+            # Riferimento c'è ma `detect_corners` non ha trovato niente (giro
+            # corto o strano, o senza coordinate): l'analyzer ripiega su 24
+            # segmenti fissi e il numero resta misurato, ma il *nome* no —
+            # «Curva 7» sarebbe il nome di un ventiquattresimo di pista. Un
+            # valore che non abbiamo non si finge, nemmeno per metà riquadro.
             return None
         name = self._corner_names.get(card.index)
         if name is None:
