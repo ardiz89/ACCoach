@@ -41,6 +41,7 @@ from .coaching import (
     trail_brake_for,
 )
 from .coaching.training import MIN_LAPS as _TRAIN_MIN_LAPS, assess as _assess_training
+from .coaching.trends import session_series
 from .comparison import Reference
 from . import cornernames
 from .cornermap import learn_from
@@ -719,6 +720,13 @@ def _tyre_means(samples, attr: str, ndigits: int) -> list[float] | None:
 #: recent laps" over different numbers of laps would disagree about what recurs.
 _RECENT_LAPS = 15
 
+#: Quanti giri risale la serie per sessione. Più larga della finestra dei trend
+#: apposta: dentro quindici giri c'è di solito una sola sessione, e una serie di
+#: un punto non è una serie. Costa 7,4 ms a giro (misurato su un giro ACC vero,
+#: 871 campioni, 7 curve) e i giri sono già in memoria — i debrief dei quindici
+#: recenti sono gli stessi oggetti, costruiti una volta sola.
+_SERIES_LAPS = 60
+
 
 @dataclass(slots=True)
 class _History:
@@ -742,6 +750,10 @@ class _History:
     corner_map: object = None
     debriefs: list = field(default_factory=list)
     dated: list = field(default_factory=list)   # (recorded_utc, LapDebrief)
+    #: (recorded_utc, LapDebrief) sulla finestra larga — solo per la serie per
+    #: sessione. `dated` resta la finestra dei trend e del piano: allargarla
+    #: cambierebbe cosa vuol dire "recentemente" per il piano di allenamento.
+    session_dated: list = field(default_factory=list)
     trends: list = field(default_factory=list)  # LossTrend, worst total first
     recurring: list = field(default_factory=list)
     lap_objs: dict = field(default_factory=dict)
@@ -777,13 +789,17 @@ def _history(valid: list[dict], chrono: list[dict], track: str,
                    zip(h.corners, name_corners(track, h.corners, lg, h.corner_map,
                                                cornernames.for_track(track)))}
         tally: dict[str, dict] = {}
-        for r in chrono[-_RECENT_LAPS:]:
+        recent = {r["path"] for r in chrono[-_RECENT_LAPS:]}
+        for r in chrono[-_SERIES_LAPS:]:
             if r["path"] == h.fastest:
                 continue
             lp = h.lap_objs.get(r["path"])
             if lp is None:
                 continue
             deb = build_lap_debrief(lp, reference, h.corners, lg)
+            h.session_dated.append((r["recorded_utc"] or "", deb))
+            if r["path"] not in recent:
+                continue          # sotto: solo la finestra dei trend, invariata
             h.debriefs.append(deb)
             h.dated.append((r["recorded_utc"] or "", deb))
             for loss in deb.losses:
@@ -799,6 +815,7 @@ def _history(valid: list[dict], chrono: list[dict], track: str,
         h.trends = classify_losses(h.debriefs)
     except (OSError, ValueError):
         h.debriefs, h.dated, h.trends, h.recurring = [], [], [], []
+        h.session_dated = []
     return h
 
 
@@ -1712,7 +1729,7 @@ def create_api(
             return {"car": car, "track": track, "laps": [], "pb_trend": [],
                     "consistency": lap_time_consistency([]), "levels": [],
                     "trends": [], "recurring": [],
-                    "corner_consistency": []}
+                    "corner_consistency": [], "corner_sessions": []}
 
         # Chronological (oldest first) for the trend.
         chrono = sorted(valid, key=lambda r: r["recorded_utc"] or "")
@@ -1758,6 +1775,24 @@ def create_api(
                 "median_s": round(t.median_ms / 1000.0, 3),
                 "total_s": round(t.total_ms / 1000.0, 3),
             } for t in loss_trends]
+
+        # La stessa mediana dei punti deboli, ma sessione per sessione: dove
+        # stavi, dove sei. Solo per le curve sistematiche — su un errore
+        # episodico un andamento misura il caso.
+        corner_sessions = []
+        for t in loss_trends:
+            if not t.systematic:
+                continue
+            pts = session_series(h.session_dated, t.corner_index)
+            if len(pts) < 2:
+                continue        # un punto solo non è un andamento
+            corner_sessions.append({
+                "corner_index": t.corner_index,
+                "name": cnames.get(t.corner_index, t.name),
+                "points": [{"started": p.started, "laps": p.laps,
+                            "median_s": round(p.median_ms / 1000.0, 3)}
+                           for p in pts],
+            })
 
         # The per-lap tyre temps and pressures used to be built here and drawn on
         # this tab, under a heading that said "across the stint" over a series
@@ -1820,6 +1855,7 @@ def create_api(
             "trends": trends,
             "recurring": recurring,
             "corner_consistency": corner_consistency,
+            "corner_sessions": corner_sessions,
         }
 
     def _plan_for(car: str, track: str, dated: list, trends: list,
