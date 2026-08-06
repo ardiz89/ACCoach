@@ -731,13 +731,32 @@ git commit -m "Com'è andata: la scheda che apre il report"
 
 ---
 
-### Task 5: La guida
+### Task 5: La guida, e le scorciatoie che sono invecchiate
 
 **Files:**
-- Modify: `GUIDA.md` (§5, come prima sottosezione delle schede del report)
-- Test: `tests/test_guide.py` (tienilo verde; se conta intestazioni o tabelle, aggiorna e dichiara)
+- Modify: `GUIDA.md` (§5: la sezione nuova, **e** la riga delle scorciatoie)
+- Modify: `src/accoach/web/i18n.js` (il testo del passo «Le altre viste» della visita guidata, in **entrambe** le lingue)
+- Test: `tests/test_guide.py`, `tests/test_web_i18n_keys.py` (tienili verdi; se `test_guide.py` conta intestazioni o tabelle, aggiorna e dichiara)
 
-- [ ] **Step 1: Scrivi la sezione**
+**Perché le scorciatoie stanno in questo task.** Il conteggio delle schede si muove **due volte** in questi tre lavori: oggi 10, il recap le porta a 11, e il piano della mappa ne toglie una tornando a 10. Una guida che **elenca i tasti** va riscritta a ogni giro e la seconda volta ci si dimentica. Quindi la guida descrive la **regola**, non i tasti.
+
+- [ ] **Step 0: La riga delle scorciatoie in guida, e il passo della visita**
+
+`GUIDA.md:502` dice oggi:
+
+> Due scorciatoie: **1-9** e **0** aprono le schede in ordine, **[** e **]** scorrono i giri.
+
+È già falsa con undici schede. Riscrivila perché dica la regola e resti vera a
+qualunque conteggio — qualcosa come: *la **fila dei numeri sopra le lettere**
+apre le schede da sinistra a destra, **[** e **]** scorrono i giri, e il tasto di
+ogni scheda lo vedi passandoci sopra il mouse*. Nessun elenco di tasti.
+
+Poi, nel passo **«Le altre viste»** della visita guidata (chiave `tour.a2.x` in
+`src/accoach/web/i18n.js`), aggiungi una frase con la stessa regola: è il momento
+in cui il pilota guarda le schede, ed è l'unico punto in cui le scoprirebbe senza
+cercarle. Entrambe le lingue, e **non** enumerare i tasti nemmeno lì.
+
+- [ ] **Step 1: Scrivi la sezione del recap**
 
 In §5, prima delle altre schede, un `###` (non un `####`: `guide.py` non ha CSS per l'h4):
 
