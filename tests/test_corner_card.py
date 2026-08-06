@@ -7,9 +7,10 @@ il coach non ha niente da dire. Quest'ultimo è il punto di tutta la feature.
 from dataclasses import replace
 
 from accoach import engine as engine_mod
-from accoach.coaching.analyzer import _LOSS_MS
+from accoach.coaching.analyzer import CoachAnalyzer, _LOSS_MS
 from accoach.engine import CoachEngine
 from accoach.recording.storage import save_lap
+from accoach.track import detect_corners
 
 import synth
 
@@ -192,13 +193,36 @@ def test_the_card_survives_the_finish_line(tmp_path):
 def test_a_new_car_on_the_same_track_blanks_the_card(tmp_path):
     """Cambio auto: stesse curve, altra sessione — il numero di prima non vale.
 
-    `set_corners` da sola non basterebbe: due auto sulla stessa pista hanno lo
-    stesso layout di zone, quindi qui a buttare la carta è il cambio di chiave.
+    Il punto è isolare la **quarta** via per cui la carta sparisce: il cambio di
+    chiave auto+pista in `tick`. Le altre tre vanno tutte messe fuori gioco, e
+    per farlo la seconda auto deve avere un riferimento suo **sulla stessa
+    pista**, salvato qui prima di partire. Senza, `find_reference_lap` filtra
+    per auto+pista e non trova niente: `_rebuild_reference` finirebbe con
+    `corners = []`, cioè il ripiego a segmenti fissi — un layout davvero
+    diverso, che `set_corners` azzera da sé — e per giunta `_corner_block`
+    tornerebbe `None` per la guardia «senza curve rilevate non c'è un nome». Con
+    entrambe quelle strade aperte il test restava verde anche neutralizzando
+    `drop_last_corner`: cioè non provava niente.
+
+    Le due asserzioni sulle zone e su `_corners` sono lì per tenere chiusa quella
+    porta: se un domani il riferimento della seconda auto sparisse, il test
+    fallirebbe **lì**, dicendo il vero motivo, invece di continuare a passare.
     """
+    other_car = "porsche_991ii_gt3_r"
+    save_lap(synth.build_lap(car=other_car, clean=True), tmp_path)
+
+    # Il layout che l'analyzer avrà dopo il cambio: identico a quello di prima,
+    # perché i due riferimenti hanno la stessa forma.
+    same_layout = CoachAnalyzer()
+    same_layout.set_corners(detect_corners(_reference_lap().samples))
+
     frames = _three_laps()
-    other = [replace(f, car_model="porsche_991ii_gt3_r") for f in _lap_frames(3)]
+    other = [replace(f, car_model=other_car) for f in _lap_frames(3)]
     eng, trace = _trace(tmp_path, frames + other[:1])
+
     assert trace[len(frames) - 1][1] is not None, "prima del cambio la carta c'era"
+    assert eng._corners, "la seconda auto deve avere un riferimento, o il test è vuoto"
+    assert eng.analyzer._zones == same_layout._zones, "stesso layout: set_corners non butta"
     assert trace[-1][1] is None
     assert eng.analyzer.last_corner is None
     eng.close()
