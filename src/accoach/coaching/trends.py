@@ -188,3 +188,81 @@ def session_series(dated: list[tuple[str, LapDebrief]], corner_index: int, *,
         out.append(SessionPoint(started=started, laps=len(vals),
                                 median_ms=statistics.median(vals)))
     return out
+
+
+# --- the recap of one session ------------------------------------------------
+
+# The whole-lap split (Task 1, ``phases.lap_time_split``) gives one lap's gap
+# in parts that add back up to it, exactly. A recap is the same question asked
+# of a whole run: not "where did this lap lose time" but "where did the seconds
+# of this outing go, on average" — measured in tenths that sum, not a score.
+
+
+@dataclass(slots=True)
+class RecapLap:
+    """One lap of the run, as the recap shows it."""
+
+    lap_time_ms: int
+    gap_ms: float
+    worst_index: int          # -1 when no corner cost anything
+    worst_ms: float
+
+
+@dataclass(slots=True)
+class SessionRecap:
+    """Where a run's time went, averaged over its laps."""
+
+    gain_avg_ms: float                 # average gap to the run's own best lap
+    by_phase: dict[str, float]         # entry / apex / exit / after, averaged
+    launch_ms: float                   # start line to the first braking zone
+    laps: list[RecapLap]
+    reference_ms: int                  # the run's best lap, the yardstick
+
+
+def session_recap(laps, reference, corners) -> SessionRecap | None:
+    """How a run went, measured against its own best lap.
+
+    The yardstick is deliberately the best lap of THIS run, not the reference
+    elected for the conditions: the question is "how much was I leaving out
+    there today", and a lap from a colder evening would answer it with weather.
+    The best lap itself is not in ``laps`` — it would be a row of zeros.
+
+    Returns None when nothing can be measured. A lap the split cannot read is
+    dropped rather than counted as a zero: a row that says "no time lost here"
+    where we simply could not look is the easiest lie on the screen.
+
+    Nothing here is rounded: full floats throughout, same discipline as
+    ``lap_time_split`` itself, because an average of exact sums is only an
+    exact sum when nothing in between has been rounded off. Rounding, if
+    wanted, belongs where the caller renders this on screen.
+    """
+    from .phases import PHASES, lap_time_split
+
+    splits = [(lap, s) for lap in laps
+              if (s := lap_time_split(lap, reference, corners)) is not None]
+    if not splits:
+        return None
+
+    n = len(splits)
+    by_phase = {p: 0.0 for p in PHASES}
+    launch = 0.0
+    rows: list[RecapLap] = []
+    for lap, s in splits:
+        for phase, value in s.by_phase().items():
+            by_phase[phase] += value
+        launch += s.launch_ms
+        worst = max(s.corners, key=lambda c: c.lost_ms, default=None)
+        rows.append(RecapLap(
+            lap_time_ms=lap.lap_time_ms,
+            gap_ms=s.gap_ms,
+            worst_index=worst.index if worst and worst.lost_ms > 0 else -1,
+            worst_ms=worst.lost_ms if worst and worst.lost_ms > 0 else 0.0,
+        ))
+
+    return SessionRecap(
+        gain_avg_ms=sum(r.gap_ms for r in rows) / n,
+        by_phase={k: v / n for k, v in by_phase.items()},
+        launch_ms=launch / n,
+        laps=rows,
+        reference_ms=reference.lap_time_ms,
+    )

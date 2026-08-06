@@ -4,8 +4,14 @@ from accoach.coaching.debrief import CornerLoss, LapDebrief
 from accoach.coaching.trends import (
     benchmark_levels,
     classify_losses,
+    session_recap,
     session_series,
 )
+from accoach.coaching.phases import lap_time_split
+from accoach.comparison import Reference
+from accoach.track import detect_corners
+
+import synth
 
 
 def _loss(index: int, ms: float, category: CueCategory = CueCategory.BRAKE_LATER) -> CornerLoss:
@@ -177,3 +183,73 @@ def test_undated_laps_are_dropped_not_guessed_into_a_session():
     dated = [("", _deb(400))] + _evening(1, "18", [200, 200, 200])
     pts = session_series(dated, 0)
     assert len(pts) == 1 and pts[0].median_ms == 200.0
+
+
+# --- il recap di una sessione ----------------------------------------------
+
+
+def _recap(amts):
+    ref_lap = synth.build_lap()
+    corners = detect_corners(ref_lap.samples)
+    laps = [synth.build_lap(slow_corner=0, amt=a) for a in amts]
+    return session_recap(laps, Reference(ref_lap), corners)
+
+
+def test_the_families_add_up_to_the_average_gap():
+    r = _recap([10, 20, 30])
+    total = sum(r.by_phase.values()) + r.launch_ms
+    assert abs(total - r.gain_avg_ms) < 0.5     # media di somme esatte
+
+
+def test_one_row_per_lap_with_its_worst_corner():
+    r = _recap([10, 20, 30])
+    assert len(r.laps) == 3
+    assert all(l.worst_index >= 0 for l in r.laps)
+    assert r.laps[2].gap_ms > r.laps[0].gap_ms  # amt=30 perde più di amt=10
+
+
+def test_the_worst_corner_is_the_one_that_cost_most():
+    r = _recap([30])
+    assert r.laps[0].worst_index == 0           # synth rallenta la curva 0
+
+
+def test_no_laps_no_recap():
+    ref_lap = synth.build_lap()
+    assert session_recap([], Reference(ref_lap),
+                         detect_corners(ref_lap.samples)) is None
+
+
+def test_a_lap_the_split_cannot_read_is_skipped_not_faked():
+    """Un giro senza abbastanza campioni non entra: meglio due righe vere che
+    tre con una inventata."""
+    ref_lap = synth.build_lap()
+    corners = detect_corners(ref_lap.samples)
+    short = synth.build_lap()
+    short.samples = short.samples[:2]
+    r = session_recap([synth.build_lap(slow_corner=0, amt=20), short],
+                      Reference(ref_lap), corners)
+    assert len(r.laps) == 1
+
+
+def test_worst_ms_is_not_rounded_and_reference_is_the_sessions_best():
+    """Stessa trappola del Task 1: sulla griglia condivisa (stesso ``n`` per
+    riferimento e giro) i ritardi tornano interi e ``round(x, 1)`` sarebbe
+    un'operazione nulla, incapace di rilevare una regressione. Uno scarto fra
+    l'``n`` del riferimento e quello del giro rompe la griglia e rende i
+    ritardi genuinamente frazionari, così un ``round`` reintrodotto nel
+    calcolo si vede.
+
+    ``reference_ms`` deve essere il tempo del MIGLIOR giro della sessione (il
+    riferimento passato), non quello di uno dei giri della lista.
+    """
+    ref_lap = synth.build_lap(n=397)
+    reference = Reference(ref_lap)
+    corners = detect_corners(ref_lap.samples)
+    lap = synth.build_lap(slow_corner=0, amt=17)          # n=401 di default
+    split = lap_time_split(lap, reference, corners)
+    expected_worst = max(c.lost_ms for c in split.corners)
+    assert expected_worst != int(expected_worst), "il fixture deve dare un valore frazionario"
+
+    r = session_recap([lap], reference, corners)
+    assert r.reference_ms == reference.lap_time_ms
+    assert r.laps[0].worst_ms == expected_worst
