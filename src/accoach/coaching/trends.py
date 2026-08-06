@@ -206,6 +206,16 @@ class RecapLap:
     gap_ms: float
     worst_index: int          # -1 when no corner cost anything
     worst_ms: float
+    # Position of this lap in the `laps` list the caller passed to
+    # `session_recap` — NOT a position in `laps`, since this list has already
+    # had unreadable laps dropped. A caller that wants to know which of ITS
+    # laps this row is about reads `original_laps[source_index]`, where
+    # `original_laps` is the exact list it handed to `session_recap`. This is
+    # what makes the pairing correct by construction rather than by the
+    # caller re-deriving (and hoping to match) the drop rule itself: whatever
+    # reason a future version of this function has for dropping a lap, the
+    # index of whatever survives is still exactly where it was.
+    source_index: int
 
 
 @dataclass(slots=True)
@@ -231,6 +241,14 @@ def session_recap(laps, reference, corners) -> SessionRecap | None:
     dropped rather than counted as a zero: a row that says "no time lost here"
     where we simply could not look is the easiest lie on the screen.
 
+    A dropped lap is not merely absent from ``.laps`` — a caller that needs to
+    know which of ITS laps a returned row is about cannot re-derive that from
+    position alone once laps are missing. So every :class:`RecapLap` carries
+    ``source_index``, its index in the exact ``laps`` list passed in here,
+    captured at the moment of filtering rather than reconstructed afterwards.
+    That is what lets a caller pair a row back to its file without knowing —
+    or guessing, or reimplementing — why any other lap was left out.
+
     Nothing here is rounded: full floats throughout, same discipline as
     ``lap_time_split`` itself, because an average of exact sums is only an
     exact sum when nothing in between has been rounded off. Rounding, if
@@ -238,7 +256,7 @@ def session_recap(laps, reference, corners) -> SessionRecap | None:
     """
     from .phases import PHASES, lap_time_split
 
-    splits = [(lap, s) for lap in laps
+    splits = [(i, lap, s) for i, lap in enumerate(laps)
               if (s := lap_time_split(lap, reference, corners)) is not None]
     if not splits:
         return None
@@ -247,7 +265,7 @@ def session_recap(laps, reference, corners) -> SessionRecap | None:
     by_phase = {p: 0.0 for p in PHASES}
     launch = 0.0
     rows: list[RecapLap] = []
-    for lap, s in splits:
+    for i, lap, s in splits:
         for phase, value in s.by_phase().items():
             by_phase[phase] += value
         launch += s.launch_ms
@@ -257,6 +275,7 @@ def session_recap(laps, reference, corners) -> SessionRecap | None:
             gap_ms=s.gap_ms,
             worst_index=worst.index if worst and worst.lost_ms > 0 else -1,
             worst_ms=worst.lost_ms if worst and worst.lost_ms > 0 else 0.0,
+            source_index=i,
         ))
 
     return SessionRecap(

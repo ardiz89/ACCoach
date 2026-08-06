@@ -246,6 +246,41 @@ def test_a_lap_the_split_cannot_read_is_skipped_not_faked():
     assert r.by_phase == solo.by_phase
 
 
+def test_source_index_survives_a_drop_reason_that_does_not_exist_yet(monkeypatch):
+    """A caller must be able to pair a ``RecapLap`` back to the lap it came
+    from without knowing *why* any other lap was dropped — today that reason
+    is "too few samples", but the contract (``source_index`` = position in
+    the exact list passed in) cannot depend on that being the only reason.
+
+    There is no second drop rule to reach for today, so this stands one up
+    with a monkeypatch on ``lap_time_split`` (the drop is decided by identity,
+    nothing about sample count) and checks ``source_index`` still points every
+    surviving row at its true position in ``laps`` — including the positions
+    that shift once an EARLIER lap is the one dropped, which a naive "count
+    from the front" would get wrong.
+    """
+    from accoach.coaching import phases as phases_mod
+
+    ref_lap = synth.build_lap()
+    corners = detect_corners(ref_lap.samples)
+    reference = Reference(ref_lap)
+    laps = [synth.build_lap(slow_corner=0, amt=a) for a in (10, 20, 30, 40)]
+    real_split = phases_mod.lap_time_split
+
+    def _fake_split(lap, ref, corns):
+        if lap is laps[1]:            # a rule with nothing to do with length
+            return None
+        return real_split(lap, ref, corns)
+
+    monkeypatch.setattr(phases_mod, "lap_time_split", _fake_split)
+
+    r = session_recap(laps, reference, corners)
+
+    assert [row.source_index for row in r.laps] == [0, 2, 3]
+    for row in r.laps:
+        assert row.lap_time_ms == laps[row.source_index].lap_time_ms
+
+
 def test_worst_ms_is_not_rounded_and_reference_is_the_sessions_best():
     """Stessa trappola del Task 1: sulla griglia condivisa (stesso ``n`` per
     riferimento e giro) i ritardi tornano interi e ``round(x, 1)`` sarebbe

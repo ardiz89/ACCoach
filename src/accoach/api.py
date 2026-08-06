@@ -40,7 +40,7 @@ from .coaching import (
     propose as propose_plan,
     trail_brake_for,
 )
-from .coaching.phases import PHASES, lap_time_split
+from .coaching.phases import PHASES
 from .coaching.training import MIN_LAPS as _TRAIN_MIN_LAPS, assess as _assess_training
 from .coaching.trends import session_recap, session_series
 from .comparison import Reference
@@ -1511,12 +1511,15 @@ def create_api(
         position once the drop shifts everything left: one lap's gap and
         worst corner, printed under a different lap's path.
 
-        So ``others`` is filtered down to exactly the laps that will survive
-        *before* calling ``session_recap``, using the identical test it uses
-        internally (``lap_time_split(...) is not None``, applied in the same
-        order). That keeps ``kept`` and ``recap.laps`` the same length by
-        construction, so ``zip(kept, recap.laps)`` cannot misalign — there is
-        no position for a lap to drift into.
+        This does not predict which laps ``session_recap`` will keep — that
+        would just move the disagreement to whenever its drop rule changes and
+        this file doesn't. Instead every :class:`RecapLap` carries
+        ``source_index``, its position in the exact list handed to
+        ``session_recap`` (``lap_objs`` below). ``kept`` is built in lockstep
+        with ``lap_objs`` — same loop, same append — so ``kept[i]`` is always
+        the row ``lap_objs[i]`` came from, and ``kept[r.source_index]`` is
+        therefore always the row a given result row is about, whatever
+        ``session_recap`` did or didn't drop and however that rule evolves.
         """
         best = cur.best
         if best is None:
@@ -1537,18 +1540,17 @@ def create_api(
         except Exception:  # noqa: BLE001 - a session view must not 500 on one bad lap
             return None
 
+        # Laps this endpoint itself could not even load are dropped here, one
+        # at a time and in lockstep with `kept` — the only filtering this
+        # function does. Everything past this point is session_recap's call.
         kept: list[dict] = []
         lap_objs = []
         for row in others:
             try:
-                lap_obj = load_lap(row["path"])
-                dropped = lap_time_split(lap_obj, reference, corners) is None
+                lap_objs.append(load_lap(row["path"]))
             except Exception:  # noqa: BLE001 - one bad lap should not sink the run
                 continue
-            if dropped:
-                continue                    # same drop rule session_recap uses
             kept.append(row)
-            lap_objs.append(lap_obj)
         if not lap_objs:
             return None
 
@@ -1566,13 +1568,13 @@ def create_api(
                       + [{"phase": "launch",
                           "avg_s": round(recap.launch_ms / 1000.0, 3)}],
             "laps": [{
-                "path": row["path"],
+                "path": kept[r.source_index]["path"],
                 "lap_time": format_lap_time(r.lap_time_ms),
                 "gap_s": round(r.gap_ms / 1000.0, 3),
                 "corner_index": r.worst_index,
                 "corner": names.get(r.worst_index, ""),
                 "corner_s": round(r.worst_ms / 1000.0, 3),
-            } for row, r in zip(kept, recap.laps)],
+            } for r in recap.laps],
         }
 
     @app.get("/api/sessions")
