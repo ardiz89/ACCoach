@@ -1,5 +1,5 @@
 """CoachAnalyzer: corner cause attribution + feed-forward cue lifecycle."""
-from accoach.coaching.analyzer import CoachAnalyzer, CornerStats, classify_corner
+from accoach.coaching.analyzer import CoachAnalyzer, CornerStats, classify_corner, _LOSS_MS
 from accoach.coaching.cue import CueCategory
 from accoach.comparison import LapComparator, Reference
 from accoach.track import detect_corners
@@ -133,7 +133,7 @@ def test_a_corner_taken_well_still_leaves_a_card():
     assert cues == [], "un giro contro se stesso non deve produrre cue"
     assert an.last_corner is not None
     assert an.last_corner.index == 1            # l'ultima curva chiusa del giro
-    assert abs(an.last_corner.lost_ms) < 120.0  # dentro la norma, e comunque misurata
+    assert abs(an.last_corner.lost_ms) < _LOSS_MS  # dentro la norma, e comunque misurata
 
 
 def test_the_card_follows_the_corner_you_just_left():
