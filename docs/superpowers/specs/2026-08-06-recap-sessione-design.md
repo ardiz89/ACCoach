@@ -62,10 +62,24 @@ apice−, apice+, uscita, e infine fine giro — e ogni tratto finisce sull'indi
 cui parte il successivo. Allora il telescopio è esatto per costruzione.
 
 **Cos'è «il gap», con precisione:** è la differenza di ritardo fra l'**ultimo e
-il primo campione** del giro, che è la stessa quantità che i tratti sommano. Non
-coincide al millisecondo con `tempo giro − tempo riferimento`, perché il primo e
-l'ultimo campione non cadono esattamente sul traguardo. La differenza è di
-pochi millisecondi e va **misurata in un test**, non assunta.
+il primo campione** del giro, che è la stessa quantità che i tratti sommano.
+
+**Non è il gap del cronometro, e la differenza non è trascurabile.** Il primo e
+l'ultimo campione non cadono sul traguardo, e su giri veri `tempo giro − tempo
+riferimento` si scosta da questo numero **da −123 a +100 ms** (misurato il 06/08
+sull'archivio). Più di un decimo: quindi a schermo quel numero **non si etichetta
+come «il gap del giro»**, si etichetta per quello che è — quanto lasciavi per
+strada in media, misurato come la somma delle sue parti. Chiamarlo col nome
+sbagliato lo renderebbe controllabile col cronometro, e non tornerebbe.
+
+**E l'arrotondamento va fatto una volta sola, alla fine.** Se ogni parte si
+arrotonda per conto suo, la somma ricomposta deriva di `0,05·(numero di parti)`:
+misurato **0,3 ms su una pista da 10 curve** e circa 1 ms su una da 20. Dentro il
+calcolo si tengono i float pieni — così il telescopio è esatto davvero, non a
+meno di un errore che cresce coi tratti — e si arrotonda solo dove il numero
+diventa testo. Attenzione: sul **giro sintetico dei test** questo difetto non si
+vede, perché i suoi ritardi sono interi e arrotondano esatti. Va pinnato con una
+tolleranza da float (1e-6), non con un decimo.
 
 **Il segno si tiene.** Una fase in cui sei stato più veloce del tuo miglior giro
 è una perdita negativa: «perdo quattro decimi in entrata e ne riprendo uno in
@@ -169,10 +183,11 @@ solo giro valido** non ha un gap (il migliore è l'unico), e la scheda lo scrive
 
 La scomposizione **non chiama `build_lap_debrief`**: le serve solo il ritardo a
 una manciata di posizioni, non i sintomi, non l'inviluppo di aderenza, non la
-scomposizione della frenata. È un passaggio solo sui campioni, quindi costa una
-**frazione** dei 7,4 ms che un debrief costa su un giro ACC vero (misurato il
-06/08, Imola, 871 campioni, 7 curve). Quanto esattamente **va misurato**, non
-stimato: è un passo del piano, non una riga di questo spec.
+scomposizione della frenata.
+
+**Misurato il 06/08 su giri veri: 0,058 ms per giro** — lo **0,8%** dei 7,4 ms
+che costa un debrief. Un'uscita da 18 giri costa circa un millisecondo. Il costo
+non è un argomento contro niente, qui.
 
 ## Test
 
