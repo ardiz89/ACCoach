@@ -61,6 +61,7 @@ _UI: dict[str, dict[str, str]] = {
     "overlay.lap_invalid": {"en": "Lap invalidated — keep driving, no delta",
                             "it": "Giro invalidato — continua, niente delta"},
     "overlay.brake": {"en": "BRAKE", "it": "FRENA"},
+    "overlay.pit_due": {"en": "▶ BOX THIS LAP", "it": "▶ RIENTRA AI BOX"},
     "overlay.focus": {"en": "FOCUS", "it": "FOCUS"},
     "overlay.throttle_pedal": {"en": "THR", "it": "GAS"},
     "overlay.brake_pedal": {"en": "BRK", "it": "FRENO"},
