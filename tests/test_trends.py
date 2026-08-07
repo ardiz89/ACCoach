@@ -279,8 +279,19 @@ def _shortfall(lap) -> float:
 #: sa già essere sbagliati (a 0.003 la guardia scarta il giro sano 3:09/70608 e
 #: nomina una causa che non c'è; a 0.012 il metro rotto del Red Bull Ring, il
 #: giro per cui la guardia esiste, torna a passare) e che nessun test vedeva.
+#:
+#: Il difetto vero è tenuto nelle sue **due** unità, non solo in frazione: la
+#: soglia è ``max(pavimento_ms, giro × frazione)`` e una sola delle due metà si
+#: pina con una frazione. Un fixture espresso solo in frazione di giro, su un
+#: giro sintetico da ~100 s, porta 1015 ms di scarto e non mette mai alla prova
+#: il pavimento: con ``_CLOCK_TOL_MS`` fra 695 e 1014 la suite restava tutta
+#: verde mentre il metro del Red Bull Ring — l'unico giro per cui la guardia
+#: esiste — ripassava per sano. Il giro rotto è quindi ``retime``-ato alla
+#: durata vera del caso reale, così i suoi 694 ms sono 694 ms davvero.
 _WORST_HEALTHY = 0.00462
-_REAL_DEFECT_FRAC = 694 / 68_369          # 0.010151
+_REAL_DEFECT_MS = 694                     # Red Bull Ring, 02/08
+_REAL_DEFECT_LAP_MS = 68_369              # il giro su cui erano misurati
+_REAL_DEFECT_FRAC = _REAL_DEFECT_MS / _REAL_DEFECT_LAP_MS      # 0.010151
 
 
 def _healthy_long_lap(ms: int, **kw):
@@ -323,10 +334,15 @@ def _broken_lap(*, sign: int = 1, **kw):
 
     Lo scarto è preso come **frazione** del giro, non come millisecondi fissi,
     perché è così che la soglia è costruita: un valore in ms non direbbe niente
-    su un giro di durata diversa.
+    su un giro di durata diversa. Ma la soglia ha due metà, e il pavimento in
+    millisecondi una frazione non lo tocca: il giro è quindi portato prima alla
+    **durata vera** del caso reale (68.369 s), così la stessa frazione vale
+    anche 694 ms tondi e chiude tutt'e due le metà dove sono state misurate.
+    Su un giro sintetico da ~100 s lo scarto sarebbe stato di 1015 ms e il
+    pavimento avrebbe potuto salire fino a 1014 senza che niente si accorgesse.
     """
-    lap = synth.build_lap(**kw)
-    return synth.skew_clock(lap, sign * round(lap.lap_time_ms * _REAL_DEFECT_FRAC))
+    lap = synth.retime(synth.build_lap(**kw), _REAL_DEFECT_LAP_MS)
+    return synth.skew_clock(lap, sign * _REAL_DEFECT_MS)
 
 
 def test_a_lap_whose_clock_does_not_cover_it_leaves_the_averages_too():
@@ -340,11 +356,17 @@ def test_a_lap_whose_clock_does_not_cover_it_leaves_the_averages_too():
     reference = Reference(ref_lap)
     readable = synth.build_lap(slow_corner=0, amt=20)
     broken = _broken_lap(slow_corner=0, amt=40)
-    # Il fixture dice *contro cosa* è rotto, e lo dice in frazione di giro
-    # perché è quella la forma della soglia: 0.0102, il difetto vero, contro
-    # 0.007 di tolleranza. Non un multiplo comodo — il bordo misurato.
+    # Il fixture dice *contro cosa* è rotto, e lo dice in tutt'e due le unità
+    # della soglia. In frazione di giro: 0.0102, il difetto vero, contro 0.007
+    # di tolleranza — non un multiplo comodo, il bordo misurato. E in
+    # millisecondi su un giro della durata vera: 694 ms contro 250 di
+    # pavimento, che è l'altra metà della soglia e che una frazione da sola non
+    # metterebbe mai alla prova.
     assert _shortfall(broken) / broken.lap_time_ms == \
         pytest.approx(_REAL_DEFECT_FRAC, rel=1e-3), "il fixture non ha rotto niente"
+    assert broken.lap_time_ms == _REAL_DEFECT_LAP_MS
+    assert _shortfall(broken) == pytest.approx(_REAL_DEFECT_MS, abs=1), \
+        "il pavimento in millisecondi resta senza un caso che lo tenga"
     assert _shortfall(readable) / readable.lap_time_ms < _WORST_HEALTHY, \
         "il giro sano deve restare sano"
 

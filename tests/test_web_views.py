@@ -559,6 +559,27 @@ _I18NJS = (WEB / "i18n.js").read_text(encoding="utf-8")
 _CSS = (WEB / "style.css").read_text(encoding="utf-8")
 
 
+def _i18n_between(first: str, last: str) -> str:
+    """La fetta di ``i18n.js`` fra due chiavi, con l'ordine verificato.
+
+    Ritagliare fra due `index()` è comodo per isolare una voce e chiedere che
+    NON contenga qualcosa. Ma se un giorno le due chiavi vengono scambiate di
+    posto in ``i18n.js`` — un riordino innocuo, che nessuno viene a rileggere
+    qui — la fetta esce **vuota**, e ogni ``assert x not in fetta`` passa per
+    sempre su qualunque testo. La difesa si spegnerebbe in silenzio proprio
+    mentre resta verde. Dimostrato per mutazione: invertendo le due voci e
+    rimettendo il difetto originale in piedi, la suite non se ne accorgeva.
+
+    Quindi l'ordine è un'asserzione, non un'assunzione.
+    """
+    i, j = _I18NJS.index(first), _I18NJS.index(last)
+    assert i < j, (
+        f"{first} non viene più prima di {last} in i18n.js: la fetta fra le due "
+        f"sarebbe vuota e il test passerebbe su qualunque testo"
+    )
+    return _I18NJS[i:j]
+
+
 @pytest.mark.parametrize("key", ["line.name.edit", "line.name.hint",
                                  "line.name.save", "line.name.drop",
                                  "line.name.err"])
@@ -1318,8 +1339,7 @@ def test_the_where_heading_keeps_its_promise_out_of_the_static_markup():
 
     Verificato per mutazione: rimetti il `<small>(...)</small>` dentro
     `recap.where` e questo diventa rosso."""
-    where = _I18NJS[_I18NJS.index('"recap.where"'):
-                    _I18NJS.index('"recap.wherenote"')]
+    where = _i18n_between('"recap.where"', '"recap.wherenote"')
     for promise in ("add up", "sommano", "average per lap", "media per giro"):
         assert promise not in where, f"la promessa è tornata nel titolo statico: {promise}"
     sec = re.search(r'<section id="recap-phases-sec".*?</section>', _HTML, re.S)
@@ -1378,7 +1398,7 @@ def test_the_start_here_step_does_not_count_what_may_not_be_on_screen():
     loro», e al primo avvio puntava su un pannello che quei numeri non li
     aveva. Un passo della visita può dire *cosa fa* la scheda; non può contare
     quello che c'è sopra, perché non lo sa."""
-    x = _I18NJS[_I18NJS.index('"tour.a12.x"'):_I18NJS.index('"tab.session"')]
+    x = _i18n_between('"tour.a12.x"', '"tab.session"')
     bad = re.search(r"\b(two|three|four|five|six|due|tre|quattro|cinque|sei)"
                     r"\s+(numbers|numeri)\b", x)
     assert not bad, f"il passo conta le parti a schermo: {bad.group(0) if bad else ''}"
@@ -1395,8 +1415,7 @@ def test_the_recap_where_heading_does_not_promise_the_timing_screens_gap():
     """The spec is explicit: this number differs from the timing screen's own
     gap by up to a tenth, so the one word a driver would go check it against
     must never be the word used to describe it."""
-    assert "gap" not in _I18NJS[_I18NJS.index('"recap.where"'):
-                                _I18NJS.index('"recap.laps"')]
+    assert "gap" not in _i18n_between('"recap.where"', '"recap.laps"')
 
 
 def test_the_tour_start_here_step_points_at_the_new_landing_tab():
