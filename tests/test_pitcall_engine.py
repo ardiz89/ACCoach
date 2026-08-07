@@ -142,3 +142,33 @@ def test_the_engine_tells_the_pit_call_the_briefing_was_heard(tmp_path):
     assert eng.pitcall._briefed_spoken, "the engine heard it and said so"
     later = [eng.tick(20.0 + i * 0.05).spoken for i in range(40)]
     assert [s for s in later if s is not None] == [], "and then it stops asking"
+
+
+# --- the state's own memory of the call, past the one instant it is spoken ---
+
+def test_the_state_says_you_are_due_in(tmp_path):
+    """Dopo il richiamo lo stato lo dice, e continua a dirlo il giro dopo.
+
+    ``_armed`` itself burns the first frame on a warm-up tick (pending is still
+    False there, before the decision is assigned) — so frame 0 here is that
+    warm-up, and the ticks below line up with frames 1, 2, 3.
+    """
+    frames = [synth.snap(pos=0.50), synth.snap(pos=0.70), synth.snap(pos=0.95),
+              synth.snap(pos=0.05)]
+    eng = _armed(tmp_path, _change("BOX"), frames=frames)
+    st1 = eng.tick(1.0)                        # last sector: the call fires
+    assert st1.spoken is not None and st1.spoken.category is CueCategory.PIT_IN
+    assert st1.pit_due is True
+    eng.tick(1.05)                             # still lap 0, approaching the line
+    st3 = eng.tick(1.10)                       # position wrapped: a new lap now
+    assert st3.pit_due is True, "the call was for a lap, not an instant"
+
+
+def test_the_state_stops_saying_it_in_the_lane(tmp_path):
+    frames = [synth.snap(pos=0.50), synth.snap(pos=0.70),
+              synth.snap(pos=0.96, in_pit_lane=True)]
+    eng = _armed(tmp_path, _change("BOX"), frames=frames)
+    st1 = eng.tick(1.0)
+    assert st1.pit_due is True, "setup: the call must have fired first"
+    st2 = eng.tick(1.05)
+    assert st2.pit_due is False

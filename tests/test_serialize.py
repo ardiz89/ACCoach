@@ -89,3 +89,11 @@ def test_the_corner_card_reaches_the_frontends():
 
 def test_no_card_is_null_not_a_dash():
     assert state_to_dict(_state())["corner"] is None
+
+
+def test_pit_due_reaches_the_frontends():
+    assert state_to_dict(_state(pit_due=True))["pit_due"] is True
+
+
+def test_pit_due_defaults_to_false():
+    assert state_to_dict(_state())["pit_due"] is False
