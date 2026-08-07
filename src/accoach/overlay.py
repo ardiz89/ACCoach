@@ -337,7 +337,8 @@ class Overlay(QWidget):
                 p.setPen(_GREY)
                 p.drawText(0, 108, w, 16, Qt.AlignHCenter, t(f"quiet.{quiet}"))
         self._draw_green_flag(p, w, quiet)
-        self._draw_cue(p, w)
+        if not self._draw_pit_due(p, w):
+            self._draw_cue(p, w)
         self._draw_focus(p, w)
         self._draw_corner_card(p, w)
 
@@ -477,6 +478,42 @@ class Overlay(QWidget):
             arrow = "▲" if losing else "▼"
             p.drawText(0, y + bar_h + 38, w, 16, Qt.AlignHCenter,
                        f"now {arrow} {local:+.2f}")
+
+    def _draw_pit_due(self, p: QPainter, w: int) -> bool:
+        """L'avviso di rientro, nella banda della pastiglia. Torna True se ha
+        preso la riga.
+
+        Non sfuma e non ha un timer: è una condizione, non un evento, e finisce
+        quando entri in corsia.
+
+        La banda viene tolta a **ogni** cue, non solo ai consigli su come
+        prendere una curva: `paintEvent` non guarda la categoria. Ci finiscono
+        dentro anche bloccaggio e pattinamento, che consigli di guida non sono e
+        che a voce hanno priorità *superiore* alla chiamata ai box: la fonte
+        vera sono le costanti, `_PRIORITY_BASE = 300.0` in `events.py:74`
+        contro `_PRIORITY = 290.0` in `pitcall.py:99` (il test
+        `test_the_call_outranks_technique_advice_but_not_a_lock_up` in
+        `tests/test_pitcall.py` copre solo i *tier* — ACUTE batte ADVISORY —
+        non questi numeri). La benzina, a voce, è alla pari (290 anche in
+        `fuel.py:29`).
+
+        Non si perde informazione, perché la voce non cambia: i cue continuano a
+        essere pronunciati tutti, cedono solo la riga. A schermo però la
+        chiamata vince anche su di loro, ed è voluto: un bloccaggio lo correggi
+        al prossimo giro, un serbatoio vuoto no.
+        """
+        if not self._state.get("pit_due"):
+            return False
+        x, y, h = 20, 126, 36
+        p.setPen(Qt.NoPen)
+        p.setBrush(_DARK)
+        p.drawRoundedRect(x, y, w - 2 * x, h, 8, 8)
+        p.setBrush(_AMBER)
+        p.drawRoundedRect(x, y, 4, h, 2, 2)
+        self._set_font(p, 14, bold=True)
+        p.setPen(_AMBER)
+        p.drawText(x + 16, y, w - 2 * x - 28, h, Qt.AlignVCenter, t("overlay.pit_due"))
+        return True
 
     def _draw_cue(self, p: QPainter, w: int) -> None:
         if self._cue is None:

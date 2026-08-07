@@ -134,6 +134,12 @@ class PitCall:
         self._last_track_t = -1e9
         self._was_in_lane = False
         self._entry_dirty = False
+        # Armed when the call goes out, disarmed only when you are in the lane
+        # or the stop is no longer needed. Deliberately NOT per-lap like
+        # `_called_lap`: a driver who stays out another lap still has to come
+        # in, and an on-screen warning that expires with the lap is a warning
+        # that expires exactly when it is still true.
+        self._calling = False
 
     # --- what the engine tells us ----------------------------------------
 
@@ -149,6 +155,7 @@ class PitCall:
             self._briefed_spoken = False
             self._called_lap = -1
             self._approached_lap = -1
+            self._calling = False
 
     def mark_briefed(self) -> None:
         """The briefing was actually **spoken** — stop repeating it.
@@ -177,6 +184,7 @@ class PitCall:
         self._was_in_lane = False
         self._samples = []
         self._entry_dirty = False
+        self._calling = False
 
     # --- the learned pit entry -------------------------------------------
 
@@ -184,6 +192,15 @@ class PitCall:
     def pit_entry(self) -> float | None:
         """Normalized position where this track's pit lane begins, if measured."""
         return statistics.median(self._samples) if self._samples else None
+
+    @property
+    def calling(self) -> bool:
+        """Has the driver been called in and not reached the lane yet?
+
+        A condition, not an event: the cue that announces it fires once a lap,
+        this stays true in between.
+        """
+        return self._calling
 
     @property
     def entry_dirty(self) -> bool:
@@ -213,6 +230,9 @@ class PitCall:
         if not self._pending:
             return []
 
+        if s.in_pit_lane or s.in_pit:
+            self._calling = False
+
         # Stopped in the box: the one place the briefing belongs. Note this runs
         # while the engine's `quiet` gate says "pit" — that gate exists to stop
         # *driving* advice being spoken where it can't be used, and this is the
@@ -238,6 +258,7 @@ class PitCall:
 
         if self._called_lap != lap and self._due_to_call(s, gap):
             self._called_lap = lap
+            self._calling = True
             out.append(self._cue(CueCategory.PIT_IN, _CALL, s.lap_position))
             # The call landed inside the approach window — on a circuit whose
             # pit entry sits early in the last sector, the two moments are the

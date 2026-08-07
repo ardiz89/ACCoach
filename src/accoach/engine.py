@@ -133,6 +133,10 @@ class EngineState:
     # quando può ancora cambiare qualcosa. I due non si pestano i piedi: questo
     # è informazione, quello è un consiglio.
     corner: dict | None = None
+    # Sei stato richiamato ai box e non sei ancora in corsia. Una condizione,
+    # non un evento: il cue che la annuncia scatta una volta per giro, questa
+    # resta vera in mezzo — ed è per questo che l'overlay può tenerla accesa.
+    pit_due: bool = False
     # Why the coach is holding back, "" when it's coaching normally. Every gate
     # has to say so: a silent gate reads as a broken app (the driver's own words
     # after a calibration session were "I drove and nothing happened").
@@ -800,6 +804,7 @@ class CoachEngine:
             engineer=self._engineer_block(),
             focus=self._focus_block(),
             corner=self._corner_block(),
+            pit_due=self.pitcall.calling,
             quiet=quiet,
             # Only on a lap that actually started at the line: on ACC the flag is
             # 0 for the whole out-lap too, and answering "invalidated" there would
