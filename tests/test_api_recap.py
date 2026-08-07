@@ -76,10 +76,12 @@ def test_a_best_lap_with_a_broken_clock_voids_the_run_and_says_which_cause(tmp_p
 
     Il flag NON è ricalcolato qui: arriva da ``session_recap``, l'unico posto
     dove quel criterio è scritto. Il giro sopravvive a ``trusted_lap_ms`` (uno
-    scarto di 0.9 s contro una tolleranza di 5 s), quindi quello che il recap
-    riceve è davvero un metro con l'orologio corto, non un giro riparato.
+    scarto di 1.5 s contro una tolleranza di 10 s su un giro da 100 s), quindi
+    quello che il recap riceve è davvero un metro con l'orologio che non chiude,
+    non un giro riparato. 1.5 s è il doppio della tolleranza della guardia su un
+    giro di questa durata (max(250, 100_000 × 0.007) = 700 ms).
     """
-    best = synth.skew_clock(synth.build_lap(), 900)
+    best = synth.skew_clock(synth.build_lap(), 1500)
     best.recorded_utc = "2026-08-01T18:00:00+00:00"
     save_lap(best, tmp_path)
     _lap(tmp_path, "2026-08-01T18:02:00+00:00", amt=20)

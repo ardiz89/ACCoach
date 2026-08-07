@@ -263,6 +263,27 @@ def _shortfall(lap) -> float:
                - lap.lap_time_ms * (ss[-1].pos - ss[0].pos))
 
 
+def _healthy_long_lap(ms: int, **kw):
+    """Un giro **lungo** e **sano**, con la copertura di un giro vero.
+
+    Serve perché la tolleranza non è più un numero fisso: lo scarto cresce col
+    giro, quindi un giro da otto minuti deve avere la stessa generosità di uno
+    da uno. Il fixture riproduce il caso peggiore *sano*: l'ultimo campione
+    cade prima della linea (``samples[:-1]`` → copertura 0.9975, cioè
+    ``1 − copertura = 0.0025``, fra il p90 0.00244 e il massimo 0.00462
+    dell'archivio vero) e l'orologio non ha **nessun** errore, perché
+    ``retime`` gli dà uno span esattamente pari a ``lap_time_ms`` — che è
+    letteralmente ciò che succede a un giro il cui tempo è stato sostituito da
+    ``trusted_lap_ms``, e due dei 59 giri veri sono già così.
+
+    Quindi tutto lo scarto che questo giro mostra è **fabbricato dalla
+    correzione per copertura**, non misurato: ``ms × 0.0025``.
+    """
+    lap = synth.build_lap(**kw)
+    lap.samples = lap.samples[:-1]
+    return synth.retime(lap, ms)
+
+
 def test_a_lap_whose_clock_does_not_cover_it_leaves_the_averages_too():
     """Un giro con l'orologio rotto non è un giro lento: è una registrazione
     con un buco, e il buco finisce tutto sul suo gap. Esce dalle righe **e**
@@ -273,8 +294,11 @@ def test_a_lap_whose_clock_does_not_cover_it_leaves_the_averages_too():
     corners = detect_corners(ref_lap.samples)
     reference = Reference(ref_lap)
     readable = synth.build_lap(slow_corner=0, amt=20)
-    broken = synth.skew_clock(synth.build_lap(slow_corner=0, amt=40), 900)
-    assert _shortfall(broken) > 250, "il fixture non ha rotto niente"
+    broken = synth.skew_clock(synth.build_lap(slow_corner=0, amt=40), 1500)
+    # Su un giro da ~100 s la tolleranza è max(250, 100_000 × 0.007) = ~700 ms:
+    # 1500 la supera del doppio, e i numeri sono scritti qui perché il fixture
+    # deve dire *contro cosa* è rotto.
+    assert _shortfall(broken) > 1400, "il fixture non ha rotto niente"
     assert _shortfall(readable) < 250, "il giro sano deve restare sano"
 
     # Il canarino che rende il confronto capace di fallire: se il giro rotto
@@ -296,10 +320,10 @@ def test_a_reference_whose_clock_does_not_cover_it_voids_the_whole_run():
     """Se a non chiudere è il metro non è storta una riga, è storta l'uscita:
     ogni riga si misura contro di lui. Nessun recap, e il motivo torna dalla
     funzione che ha applicato la guardia — non lo ricava il chiamante."""
-    ref_lap = synth.skew_clock(synth.build_lap(), -800)
+    ref_lap = synth.skew_clock(synth.build_lap(), -1500)
     corners = detect_corners(ref_lap.samples)
     reference = Reference(ref_lap)
-    assert _shortfall(ref_lap) > 250, "il fixture non ha rotto il metro"
+    assert _shortfall(ref_lap) > 1400, "il fixture non ha rotto il metro"
     laps = [synth.build_lap(slow_corner=0, amt=a) for a in (10, 20)]
     assert all(_shortfall(l) < 250 for l in laps), "i giri sono sani: è il metro a non esserlo"
 
@@ -308,22 +332,80 @@ def test_a_reference_whose_clock_does_not_cover_it_voids_the_whole_run():
     assert out.reference_clock_broken is True
 
 
-def test_a_lap_just_inside_the_tolerance_stays_and_stays_counted():
-    """La guardia non deve mangiare i giri normali: 56 dei 59 giri veri stanno
-    sotto i 155 ms e devono restare. Un giro a 200 ms — dentro, ma di poco —
-    resta nelle righe e resta nella media, che qui è ricalcolata a mano dai
-    due split invece di essere confrontata con se stessa."""
+def test_the_guard_emptying_every_lap_still_does_not_blame_the_yardstick():
+    """L'altro modo di restare senza recap per colpa della guardia: il metro è
+    sano, ma la guardia scarta **tutti** i giri. Il recap è vuoto — e il motivo
+    resta **falso**, perché quella frase parla solo del metro. Se un giorno
+    l'uscita vuota di ``splits`` cominciasse a inoltrare il motivo, la
+    schermata direbbe al pilota che il suo miglior giro è rotto quando l'unica
+    cosa rotta sono gli altri: la causa sbagliata, affermata con sicurezza."""
     ref_lap = synth.build_lap()
     corners = detect_corners(ref_lap.samples)
     reference = Reference(ref_lap)
-    readable = synth.build_lap(slow_corner=0, amt=20)
-    near = synth.skew_clock(synth.build_lap(slow_corner=0, amt=40), 200)
-    assert 150 < _shortfall(near) < 250, "il fixture deve stare dentro, ma di poco"
+    assert _shortfall(ref_lap) < 250, "il metro deve essere sano"
+    laps = [synth.skew_clock(synth.build_lap(slow_corner=0, amt=a), 1500)
+            for a in (10, 20)]
+    assert all(_shortfall(l) > 1400 for l in laps), "i giri devono essere rotti"
+
+    out = session_recap(laps, reference, corners)
+    assert out.recap is None
+    assert out.reference_clock_broken is False
+
+
+def test_a_short_lap_just_inside_the_floor_stays_and_stays_counted():
+    """Il **pavimento** dei 250 ms, cioè l'unico regime in cui vale ancora un
+    numero fisso: sotto i 250/0.007 = 36 s di giro la frazione diventa più
+    stretta del rumore, e su un giro da 25 s varrebbe 175 ms. Un giro a 200 ms
+    di scarto — sopra la frazione, sotto il pavimento — resta nelle righe e
+    resta nella media, che qui è ricalcolata a mano dai due split invece di
+    essere confrontata con se stessa.
+
+    È questo test che tiene fermo il numero 250: abbassarlo lo fa diventare
+    rosso, mentre ogni giro di lunghezza normale è governato dalla frazione e
+    non se ne accorgerebbe."""
+    ref_lap = synth.retime(synth.build_lap(), 25_000)
+    corners = detect_corners(ref_lap.samples)
+    reference = Reference(ref_lap)
+    readable = synth.retime(synth.build_lap(slow_corner=0, amt=20), 25_000)
+    near = synth.skew_clock(synth.retime(synth.build_lap(slow_corner=0, amt=40),
+                                         25_000), 200)
+    assert _shortfall(near) == pytest.approx(200, abs=2)
+    assert _shortfall(near) > 25_000 * 0.007, "la frazione da sola lo scarterebbe"
+    assert _shortfall(near) < 250, "il fixture deve stare dentro, ma di poco"
 
     splits = [lap_time_split(l, reference, corners) for l in (readable, near)]
     r = session_recap([readable, near], reference, corners).recap
     assert [row.source_index for row in r.laps] == [0, 1]
     assert r.gain_avg_ms == pytest.approx(sum(s.gap_ms for s in splits) / 2, abs=1e-6)
+
+
+def test_a_long_healthy_lap_is_not_judged_broken_by_a_flat_millisecond_count():
+    """Un giro da otto minuti (Nordschleife su AC) con la copertura di un giro
+    normale **non** è una registrazione rotta, e la tolleranza deve crescere
+    col giro perché lo scarto cresce col giro.
+
+    Il fixture non ha nessun errore d'orologio: il suo span è esattamente
+    ``lap_time_ms``. Tutto il suo scarto — 480 s × 0.0025 = 1200 ms, dieci
+    volte quello del giro rotto vero rapportato alla durata — è **fabbricato**
+    dalla correzione per copertura che applichiamo noi. Con una tolleranza in
+    millisecondi fissi questo giro sarebbe scartato quattro volte sopra la
+    soglia, l'uscita perderebbe il recap e la schermata affermerebbe una causa
+    che lì non esiste: il falso positivo che *parla*, il peggiore.
+
+    Provato su tutt'e due i rami della guardia — come metro e come riga —
+    perché è il ramo del metro quello che fa comparire la frase."""
+    ref_lap = _healthy_long_lap(480_000)
+    corners = detect_corners(ref_lap.samples)
+    reference = Reference(ref_lap)
+    slower = _healthy_long_lap(486_000, slow_corner=0, amt=20)
+    assert _shortfall(ref_lap) == pytest.approx(1200, abs=5)
+    assert _shortfall(ref_lap) > 250, "senza frazione questo metro sarebbe scartato"
+    assert _shortfall(slower) > 250, "e questa riga con lui"
+
+    out = session_recap([slower], reference, corners)
+    assert out.reference_clock_broken is False
+    assert out.recap is not None
+    assert [row.source_index for row in out.recap.laps] == [0]
 
 
 def test_a_lap_simply_not_recorded_end_to_end_is_not_a_broken_lap():

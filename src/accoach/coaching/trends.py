@@ -256,26 +256,49 @@ class RecapOutcome:
 # --- does a lap's own clock account for the lap? -----------------------------
 
 #: How far a lap's sample clock may sit from the stretch of lap those samples
-#: cover before the lap stops being a measurement at all. Measured over the
-#: whole real archive (59 laps, 07/08/2026) as
-#: ``|span - lap_time_ms * (pos[-1] - pos[0])|``, with
-#: ``span = samples[-1].t_ms - samples[0].t_ms``:
+#: cover before the lap stops being a measurement at all. The residual is
+#: ``|span - lap_time_ms * (pos[-1] - pos[0])|`` with
+#: ``span = samples[-1].t_ms - samples[0].t_ms``, and it is compared against
+#: ``max(_CLOCK_TOL_MS, lap_time_ms * _CLOCK_TOL_FRAC)`` — the same shape as
+#: ``recording.lap._TIME_TOL_MS`` / ``_TIME_TOL_FRAC``, and for the same reason:
+#: the residual grows with the lap, so a flat number of milliseconds is a much
+#: harsher rule on an eight-minute circuit than on a one-minute one.
 #:
-#:     median 34 ms · p90 72 ms · the three worst 326, 694 and 1140 ms
+#: Measured over the whole real archive (59 laps, 07/08/2026), percentiles by
+#: ``statistics.quantiles(n=10)`` so they can be reproduced:
 #:
-#: Fifty-six of the fifty-nine sit at 155 ms or below, then nothing at all up
-#: to 326 — more than double. 250 ms sits in the middle of that void; whoever
-#: moves it should move it against those numbers, not against a taste.
+#:     residual, ms      median 34 · p90 86.5 · the three worst 326, 694, 1140
+#:     1 - coverage      median 0.00088 · p90 0.00244 · max 0.00462
 #:
-#: Correcting for the fraction of the lap the samples cover is what opens the
-#: void, and is not a nicety. In the plain absolute form (``|span -
-#: lap_time_ms|``) the same archive gives median 102 ms, p90 167 ms and a first
-#: broken lap at 212 — healthy and broken overlap, and there is nowhere left to
-#: put a threshold.
+#: THE FRACTION is chosen against the second row, not the first. A lap whose
+#: declared time has already been replaced by ``trusted_lap_ms`` has ``span ==
+#: lap_time_ms`` exactly, so its residual is ``lap_time_ms * (1 - coverage)``
+#: with no clock error in it at all — pure coverage, fabricated by this very
+#: correction. Two of the 59 are already like that. At the median coverage a
+#: 285-second lap clears 250 ms on coverage alone, and an eight-minute lap
+#: (Nordschleife on AC) clears it at 1 - coverage = 0.0005, i.e. BELOW the
+#: median: a flat 250 ms would void a healthy run on a long circuit and then
+#: name a cause that isn't there, which is the worst way this guard can be
+#: wrong. 0.007 sits 1.5x above the worst coverage in the archive (0.00462) and
+#: 1.45x below the defect it exists to catch — the Red Bull Ring yardstick,
+#: 694 ms on 68.369 s = 0.0102, and the lap beside it, 1140 ms on 70.849 s =
+#: 0.0161.
+#:
+#: THE FLOOR only binds below 250/0.007 = 36 s of lap, where the fraction gets
+#: tighter than the plain noise: on a lap that short coverage cannot fabricate
+#: more than ~165 ms, and 56 of the 59 real laps sit at 155 ms of total residual
+#: or below, then nothing at all up to 326 — more than double.
+#:
+#: Correcting for the fraction of the lap the samples cover is not a nicety
+#: either. In the plain form (``|span - lap_time_ms|``) the same archive gives
+#: median 102 ms and p90 167 ms against a first broken lap at 212 — healthy and
+#: broken overlap, and there is nowhere left to put a threshold at all.
 _CLOCK_TOL_MS = 250.0
+_CLOCK_TOL_FRAC = 0.007
 
 
-def clock_covers_lap(lap, *, tol_ms: float = _CLOCK_TOL_MS) -> bool:
+def clock_covers_lap(lap, *, tol_ms: float = _CLOCK_TOL_MS,
+                     tol_frac: float = _CLOCK_TOL_FRAC) -> bool:
     """Whether ``lap``'s own clock accounts for the lap it says it drove.
 
     A lap whose samples span noticeably less (or more) time than the stretch of
@@ -284,9 +307,12 @@ def clock_covers_lap(lap, *, tol_ms: float = _CLOCK_TOL_MS) -> bool:
     ``lap_time_split`` reads ``gap_ms`` at the first and last sample against
     :class:`Reference`, which pins t=0 at pos 0.0 and t=lap_time_ms at pos 1.0,
     so a clock that does not cover the lap gets stretched over it. Measured on
-    a real pair (Red Bull Ring, 02/08): a reference short by 694 ms and a lap
-    long by 1140 ms, whose errors add, put ``−0.641s`` on screen next to two
-    lap times 2.480 s apart.
+    a real pair (Red Bull Ring, 02/08): a reference whose clock runs 694 ms
+    LONG (it accounts for more time than the fraction of lap it covers) and a
+    lap whose clock falls 1140 ms SHORT, whose errors add, put ``−0.641s`` on
+    screen next to two lap times 2.480 s apart. The check is symmetric because
+    neither direction is a lap time: both are a recording that doesn't line up
+    with the lap it claims.
 
     This is stricter and differently shaped than
     :func:`accoach.recording.lap.trusted_lap_ms`, and does not replace it: that
@@ -303,7 +329,7 @@ def clock_covers_lap(lap, *, tol_ms: float = _CLOCK_TOL_MS) -> bool:
         return True
     span = samples[-1].t_ms - samples[0].t_ms
     covered = lap.lap_time_ms * (samples[-1].pos - samples[0].pos)
-    return abs(span - covered) <= tol_ms
+    return abs(span - covered) <= max(tol_ms, lap.lap_time_ms * tol_frac)
 
 
 def session_recap(laps, reference, corners) -> RecapOutcome:
