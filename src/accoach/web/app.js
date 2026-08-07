@@ -11,7 +11,7 @@ let DATA = null;      // last /api/analysis payload
 let DIST = null;      // {pos[], m[], total} — the reviewed lap in metres (see buildDistance)
 let COMBOS = [];      // last /api/combos payload (kept for re-labelling on lang switch)
 let LAST_HOVER = null; // last hover position, so a re-render keeps the readout
-let VIEW = "flow";    // whichever tab is `active` in index.html
+let VIEW = "recap";   // whichever tab is `active` in index.html
 let HOVER_WIRED = false;
 // Did the driver pick the comparison lap by hand, or is it just whatever the
 // page elected last time? The difference matters now that the election depends
@@ -100,7 +100,7 @@ async function init() {
     TRAINING = null;      // and its own plan, drills and readiness
     loadCombo(combo);
     if (VIEW === "progress") loadProgress(combo);
-    if (VIEW === "session") loadSession(combo, 0);
+    if (VIEW === "session" || VIEW === "recap") loadSession(combo, 0);
     if (VIEW === "stint") loadStint(combo, 0);
     if (VIEW === "training") loadTraining(combo);
   };
@@ -151,6 +151,11 @@ async function init() {
   await loadCombo(JSON.parse(sel.value));
   const view = savedView();
   if (view && view !== VIEW) showView(view);
+  // No saved view (first visit) or the saved view IS the landing tab: neither
+  // branch of `showView` above runs, so nothing else has fetched the session
+  // this landing tab depends on. `loadCombo` renders "flow" unconditionally
+  // for the same reason — a landing view can't wait for a tab click to load.
+  else loadSession(CURRENT, SESSION_I);
   // First visit: pop the tour once data is on screen (so #vmin/#debrief exist).
   if (window.HoneTour) window.HoneTour.auto(tourSteps(), "hone_tour_analysis");
 }
@@ -181,9 +186,20 @@ function tourSteps() {
   // steps that happened to still be visible.
   const flow = () => showView("flow");
   const compare = () => showView("compare");
+  const recap = () => showView("recap");
   return [
     { sel: "#combo", title: t("tour.a1.t"), text: t("tour.a1.x") },
     { sel: ".tabs", title: t("tour.a2.t"), text: t("tour.a2.x") },
+    // "Start here" now belongs to the door, not the guided flow — targeted at
+    // #recap-phases-sec (the static <section>, not #recap-head or the
+    // #recap-phases div it wraps). #recap-head goes empty on a run with
+    // nothing measurable yet; #recap-phases starts empty on EVERY run, filled
+    // only once loadSession's fetch resolves — and tour.js checks visibility
+    // synchronously right after `before()` runs, before that fetch can ever
+    // land, so a step pointed at a JS-filled div is always invisible and
+    // silently ends the tour. #recap-phases-sec has the h3 already in the
+    // markup, so it has height before any JS runs.
+    { sel: "#recap-phases-sec", title: t("tour.a12.t"), text: t("tour.a12.x"), before: recap },
     { sel: "#flow-card", title: t("tour.a9.t"), text: t("tour.a9.x"), before: flow },
     { sel: "#train-steps", title: t("tour.a11.t"), text: t("tour.a11.x"),
       before: () => showView("training") },
@@ -218,7 +234,9 @@ function redrawCurrentView() {
   // the backend, so a cached payload would still be in the language you left.
   else if (VIEW === "training") { if (CURRENT) loadTraining(CURRENT); }
   else if (VIEW === "flow") { if (DATA) renderFlow(DATA); }
-  else if (VIEW === "session") { if (CURRENT) loadSession(CURRENT, SESSION_I); }
+  // "recap" shares this fetch with "session" — same /api/sessions payload,
+  // one carries current.recap and the other carries everything below it.
+  else if (VIEW === "session" || VIEW === "recap") { if (CURRENT) loadSession(CURRENT, SESSION_I); }
   // Refetched, like Training: the notes strip is written by the backend in the
   // requested language, so repainting a cached payload would leave the one
   // paragraph on the tab in the language you just left.
@@ -264,6 +282,18 @@ function wireCbToggle() {
 // cliccare una curva non cambierebbe niente. Un comando che non risponde è
 // peggio di un comando assente.
 const RAIL_VIEWS = ["flow", "compare", "map", "line", "sectors", "dynamics"];
+
+// The characters `e.key` reports for the row above the letters, in the order
+// a tab picks them — NOT their physical position, which moves between
+// keyboard layouts (on IT, for instance, "'" sits where "-" does on US/UK,
+// and "-" itself lives elsewhere on the board). Every one of these keys sends
+// its printed character regardless of layout, with no modifier, so all eleven
+// tabs stay reachable everywhere; the string is just wrong as a claim about
+// where any later key "physically" continues the row. One shared constant —
+// `wireKeys()` reads it to route the keypress, `wireTabs()` reads it to show
+// the tooltip — so the two cannot drift the way the tab count and this row's
+// length silently did before.
+const KEY_ROW = "1234567890-";
 
 // Non dentro `showView` da sola: al primo caricamento `init()` non ci passa
 // affatto quando la vista salvata coincide con quella già attiva in HTML (o
@@ -317,11 +347,14 @@ function savedCombo() {
 }
 
 function wireTabs() {
-  for (const b of document.querySelectorAll(".tab")) {
+  const tabs = [...document.querySelectorAll(".tab")];
+  for (const b of tabs) {
     // The shortcut is on the tooltip because a keyboard shortcut nobody can find
-    // is the same as no shortcut.
-    const i = [...document.querySelectorAll(".tab")].indexOf(b) + 1;
-    if (i <= 9) b.title = `${t("kbd.tab")} ${i}`;
+    // is the same as no shortcut. Every tab KEY_ROW can reach gets one shown —
+    // it used to stop at the ninth, which silently left the tenth tab's real,
+    // working shortcut with no tooltip; now the eleventh would have repeated it.
+    const i = tabs.indexOf(b);
+    if (i < KEY_ROW.length) b.title = `${t("kbd.tab")} ${KEY_ROW[i]}`;
     b.onclick = () => { rememberView(b.dataset.view); showView(b.dataset.view); };
   }
 }
@@ -342,11 +375,10 @@ function wireKeys() {
     if (el && el.matches("input, select, textarea")) return;
     if (document.querySelector(".tour-pop")) return;   // the tour owns the keys
     const tabs = [...document.querySelectorAll(".tab")];
-    // 1-9 then 0 for the tenth, the usual row-of-digits convention. Adding the
-    // Race pace tab pushed Trends to position ten, and with a bare [1-9] the
-    // last tab on the row silently stopped having a shortcut.
-    if (/^[0-9]$/.test(e.key)) {
-      const b = tabs[(parseInt(e.key, 10) + 9) % 10];
+    // KEY_ROW (module scope, see its own comment) is shared with wireTabs()'s
+    // tooltip so the two cannot name two different keys for the same tab.
+    if (e.key.length === 1 && KEY_ROW.indexOf(e.key) >= 0) {
+      const b = tabs[KEY_ROW.indexOf(e.key)];
       if (b) { e.preventDefault(); b.click(); }
       return;
     }
@@ -2053,6 +2085,10 @@ function fmtWhen(iso) {
 
 function renderSession(s) {
   const cur = s && s.current;
+  // One fetch, two tabs: `current.recap` rides on the same /api/sessions
+  // payload as everything below, so the door screen and the Session tab never
+  // disagree about which run they're describing.
+  renderRecap(cur);
   const pick = $("ses-select");
   if (!cur) {
     $("ses-when").textContent = "";
@@ -2148,6 +2184,89 @@ function renderSession(s) {
         (prev.regressed.length ? `<h4>${t("ses.regressed")}</h4>` + rows(prev.regressed, "down") : "")
       : `<div class="nothing">${t("ses.nomoves")}</div>`);
   }
+}
+
+// --- "How it went": the door onto the report -----------------------------
+// Dove è finito il tempo di un'uscita, in decimi che sommano al numero in
+// testa. Le barre sono in scala sulla fase peggiore di QUESTA sessione: non
+// c'è nessuna soglia, e nessun colore che voglia dire "bravo". `cur` è
+// `current` da /api/sessions.
+function renderRecap(cur) {
+  const head = $("recap-head"), ph = $("recap-phases"), lp = $("recap-laps");
+  const lpSec = $("recap-laps-sec");
+  const note = $("recap-where-note");
+  if (!head || !ph || !lp) return;
+  const r = cur && cur.recap;
+  if (!r) {
+    head.innerHTML = "";
+    // La promessa del titolo — «media per giro · le parti sommano al numero
+    // qui sopra» — se ne va col recap. Qui sopra non c'è nessun numero
+    // (`#recap-head` resta vuoto e `.summary:empty` lo toglie) e qui sotto non
+    // c'è nessuna parte: la frase nominerebbe due cose che non ci sono. Se ne
+    // va la promessa, non la sezione: nasconderla — come si fa con
+    // `#recap-laps-sec`, che di statico non ha niente da mostrare — ucciderebbe
+    // la visita guidata, che su questa sezione ha il suo «Parti da qui» e su un
+    // bersaglio invisibile chiama `finish()`, non «salta».
+    if (note) note.textContent = "";
+    // Tre casi, tre frasi: `!cur` è lo stesso fatto che il pannello Sessione
+    // scrive sullo stesso payload ("nessun giro registrato");
+    // `recap_clock_broken` è l'unica delle sette cause che sia MISURATA (la
+    // guardia in trends.py: l'orologio del miglior giro non copre il giro), e
+    // arriva già decisa dal payload — qui non si rifà nessun controllo; tutto
+    // il resto resta la frase generica, perché nominare una causa fra le altre
+    // sei sarebbe quasi sempre nominare quella sbagliata.
+    // Le tre chiamate restano scritte per esteso, con la chiave letterale
+    // dentro, perché è così che test_web_i18n_keys le vede: una chiave a pezzi non
+    // la controlla nessuno, ed è come i pulsanti del tour sono rimasti in
+    // inglese per mesi.
+    const msg = !cur ? t("recap.nolaps")
+              : cur.recap_clock_broken ? t("recap.clock") : t("recap.none");
+    ph.innerHTML = `<div class="nothing">${msg}</div>`;
+    lp.innerHTML = "";
+    // Un titolo («Giro per giro») sopra il vuoto si legge come rotto: la
+    // sezione sparisce con lui, non solo la lista sotto.
+    if (lpSec) lpSec.classList.add("hidden");
+    return;
+  }
+  if (lpSec) lpSec.classList.remove("hidden");
+  // C'è un recap: il titolo può promettere. La chiave sta scritta per esteso
+  // dentro la chiamata, come le tre frasi del vuoto qui sopra, perché è così
+  // che test_web_i18n_keys la vede.
+  if (note) note.textContent = t("recap.wherenote");
+  const item = (k, v) => `<div class="item"><div class="k">${k}</div><div class="v">${v}</div></div>`;
+  // Una sola convenzione di segno su tutta la scheda: `fmtLoss` gira il segno
+  // una volta sola, qui, per il totale come per le cinque fasi sotto e per il
+  // gap di ogni riga giro — sommare le cinque righe a mano deve ridare questo
+  // numero, segno compreso, non il suo opposto.
+  head.innerHTML = item(t("recap.best"), `${r.reference} <small>(${t("recap.yardstick")})</small>`) +
+                   item(t("recap.gain"), fmtLoss(r.gain_avg_s));
+
+  let mx = 0.05;
+  for (const p of r.phases) mx = Math.max(mx, p.avg_s);
+  ph.innerHTML = r.phases.map((p) => {
+    const w = (Math.min(Math.max(p.avg_s, 0) / mx, 1) * 100).toFixed(0);
+    return `<div class="ses-row">` +
+      `<span class="ses-when">${t("recap.phase." + p.phase)}</span>` +
+      `<span class="ses-track"><span class="ses-fill" style="width:${w}%"></span></span>` +
+      `<span class="ses-nums">${fmtLoss(p.avg_s)}</span></div>`;
+  }).join("");
+
+  lp.innerHTML = r.laps.map((l) =>
+    `<div class="recap-lap" data-path="${l.path}">` +
+    `<span class="lap-time">${l.lap_time}</span>` +
+    `<span class="lap-gap">${fmtLoss(l.gap_s)}</span>` +
+    `<span class="corner">${l.corner}</span></div>`).join("");
+  // A click opens the lap in Compare — same mechanism the Session tab's own
+  // lap rows already use, not a second way to jump to a lap.
+  for (const el of lp.querySelectorAll(".recap-lap")) {
+    el.onclick = () => openLapInCompare(el.dataset.path);
+  }
+}
+
+// Il segno dal punto di vista del pilota: perdere è meno tempo tuo. Meno
+// tipografico, come il resto del report.
+function fmtLoss(s) {
+  return (s > 0 ? "−" : s < 0 ? "+" : "") + Math.abs(s).toFixed(3) + "s";
 }
 
 // --- race pace: one run on one tank --------------------------------------
@@ -4486,7 +4605,7 @@ window.HoneI18nRerender = function () {
   TRAINING = null;       // the drills are prose, written server-side
   reloadSelection();
   if (VIEW === "progress") loadProgress(CURRENT);
-  if (VIEW === "session") loadSession(CURRENT, SESSION_I);
+  if (VIEW === "session" || VIEW === "recap") loadSession(CURRENT, SESSION_I);
   if (VIEW === "training") loadTraining(CURRENT);
 };
 

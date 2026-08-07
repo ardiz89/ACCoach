@@ -398,6 +398,21 @@ body:not(.railed) .rail { display: none; }
   .ses-nums { white-space: normal; text-align: right; }
 }
 
+/* "How it went": the phase bars above reuse .ses-row/.ses-track/.ses-fill/
+   .ses-nums as-is (same shape, same narrow-screen rule already above). Only
+   the lap-by-lap row is new. */
+.recap-lap { display: grid; grid-template-columns: 96px 88px 1fr; align-items: center;
+  gap: 12px; padding: 7px 12px; margin: 6px 0; background: var(--panel);
+  border: 1px solid var(--line); border-radius: 10px; cursor: pointer; }
+.recap-lap .lap-time { font-family: var(--font-mono); }
+.recap-lap .lap-gap { font-family: var(--font-mono); color: var(--muted); }
+.recap-lap .corner { font-weight: 600; }
+
+@media (max-width: 640px) {
+  .recap-lap { grid-template-columns: 1fr auto; }
+  .recap-lap .corner { grid-column: 1 / -1; }
+}
+
 .recur {
   display: flex; align-items: center; gap: 14px;
   padding: 10px 14px; margin: 8px 0;

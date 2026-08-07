@@ -276,8 +276,36 @@ Finita la sessione, rivedi tutto con calma:
   ```
   Si apre da solo `http://127.0.0.1:8778`.
 
-Cosa trovi:
-- **Il giro spiegato** (è dove atterri): il giro una cosa alla volta invece di
+### Com'è andata (la prima schermata)
+
+Apri il report e la prima cosa che vedi è **l'ultima uscita**: quanto lasciavi
+per strada in media, e dove.
+
+Le cinque righe — **entrata, apice, uscita, dopo, lancio** — non sono un voto:
+sono i **secondi** che quella parte del giro ti è costata, e sommano **al
+numero grande in alto**. Quel numero non è il distacco che leggi a cronometro:
+è misurato sull'orologio della telemetria, che sui giri veri si scosta anche
+di un decimo da quello del gioco. Se sommi le cinque righe a mano ti torna
+comunque lui: è fatto apposta, ed è la differenza fra un dato e una pagella.
+
+Tre cose da sapere:
+
+- **Il metro è il tuo miglior giro di quell'uscita**, non il tuo record. Quindi
+  misura la **costanza** di quel pomeriggio: numeri piccoli non vogliono dire
+  che eri veloce, vogliono dire che eri ripetibile — un pomeriggio lento ma
+  costante mostra numeri piccoli lo stesso. Ed è per questo che il tuo giro
+  migliore **non compare nell'elenco dei giri**: è lui il metro, e mostrarlo
+  sarebbe una riga di zeri.
+- **«Lancio» non è una fase di guida.** È il tratto dal traguardo alla prima
+  staccata, che non appartiene a nessuna curva. Ha una riga sua perché senza di
+  lui la somma non tornerebbe, e una somma che non torna è una somma che non
+  puoi controllare.
+- **Quando in quell'uscita non c'è ancora abbastanza per misurarlo, la
+  schermata lo dice** invece di mostrarti uno zero: un dato mancante dichiarato
+  tale è meglio di un numero che sembra vero e non lo è.
+
+Cosa trovi nelle altre schede:
+- **Il giro spiegato** (la seconda scheda): il giro una cosa alla volta invece di
   cinque grafici insieme. Ti dice cosa ti è costato di più, perché, e cosa farci,
   col grafico ritagliato sul tratto di cui sta parlando. Al massimo tre passi: se
   sei lontano dal passo apre col tema generale e si ferma lì, perché a quella
@@ -499,8 +527,9 @@ lunghezza della pista`; se un giro non ha coordinate, o se le sue coordinate non
 tornano con velocità e tempo, l'asse torna in percentuale invece di darti una
 scala sbagliata.
 
-Due scorciatoie: **1-9** e **0** aprono le schede in ordine, **[** e **]** scorrono i
-giri. (Le trovi anche passando il mouse sulle schede e sulla tendina.)
+Due scorciatoie: **ogni scheda ha un tasto che la apre**, in ordine da
+sinistra a destra, e lo vedi passandoci sopra il mouse (vale anche per la
+tendina dei giri); **[** e **]** scorrono i giri.
 
 Sotto ogni curva c'è anche **dove, dentro la curva, è finito il tempo**: una
 barra divisa in *ingresso · apex · uscita · tratto dopo* (passa il mouse per i

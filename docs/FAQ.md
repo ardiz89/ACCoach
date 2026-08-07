@@ -241,7 +241,9 @@ of showing you a wrong scale.
   **Race pace** — here the series covered your whole archive while calling
   itself a stint.
 
-Keyboard: **1-9** and **0** switch tabs, **[** and **]** step through laps.
+Keyboard: **every tab has a key that opens it**, in the order they sit left to
+right — hover a tab to see which one it is (the lap picker says so too). **[**
+and **]** step through laps.
 
 ## Free vs Pro
 

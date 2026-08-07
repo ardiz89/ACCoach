@@ -37,7 +37,8 @@
   </header>
 
   <nav class="tabs">
-    <button class="tab active" data-view="flow" data-i18n="tab.flow">Lap explained</button>
+    <button class="tab active" data-view="recap" data-i18n="tab.recap">How it went</button>
+    <button class="tab" data-view="flow" data-i18n="tab.flow">Lap explained</button>
     <button class="tab" data-view="training" data-i18n="tab.training">Training</button>
     <button class="tab" data-view="session" data-i18n="tab.session">Session</button>
     <button class="tab" data-view="stint" data-i18n="tab.stint">Race pace</button>
@@ -50,12 +51,16 @@
   </nav>
 
   <!-- Which lap you are looking at, on every tab. These four numbers used to
-       live only inside Compare's own summary, so the landing view — the first
-       thing the page shows, and the one that explains the lap — never said
-       which lap it was explaining. -->
+       live only inside Compare's own summary, so every tab that explains the
+       lap — Flow, Map, Line, Sectors — showed its analysis without ever
+       saying which lap it was analysing. (The landing view is the recap now,
+       and that one is about a whole run, not this lap.) -->
   <section id="lapbar" class="lapbar"></section>
 
-  <!-- Il palco: il rail a sinistra, le dieci viste a destra. Il rail sta qui e
+  <!-- Il palco: il rail a sinistra, le viste a destra. Quante siano non è
+       scritto qui: un numero a mano invecchia al primo pannello aggiunto, ed
+       è già successo alle scorciatoie da tastiera (vedi wireTabs in app.js).
+       Il rail sta qui e
        non dentro i pannelli perché non appartiene a nessuna vista — è il livello
        «curva» dell'architettura a oggetti annidati, e deve sopravvivere al
        cambio di scheda. Un rail per pannello sarebbe sei canvas e sei hover. -->
@@ -72,9 +77,47 @@
     </aside>
     <div class="views">
 
+  <!-- How the run went, before it's forgotten: the door onto the report. Reads
+       current.recap (coaching/session recap — Task 3) — a debrief for the whole
+       outing, not one lap. The gain is measured against the best lap of THIS
+       run, not the elected reference, and it is not the gap the timing screen
+       publishes (the two differ by up to a tenth): it is how much you were
+       leaving out there on average, as the sum of its own parts — the five
+       phase numbers below add up to it exactly (see app.js renderRecap). -->
+  <div id="view-recap">
+    <section id="recap-head" class="summary"></section>
+    <!-- This section, alone among the two, stays on screen when there is no
+         recap — and that is why its heading is split in two. The <h3> is a
+         plain label, true whatever the panel holds; the promise ("the parts
+         add up to the number above") lives in the <small>, which renderRecap
+         fills only once there IS a recap. Without the split the heading
+         announced an average per lap and five parts summing to a total, over
+         a run that has none of the three: #recap-head goes empty (and
+         `.summary:empty` removes it), #recap-laps-sec hides itself, and the
+         only thing left under the promise is the "can't measure this" line.
+         Six of the seventeen real sessions in the archive land there, one of
+         them the first combo /api/combos returns.
+         Hiding this section like #recap-laps-sec does is NOT the fix: it is
+         the tour's "Start here" target (tour.a12, app.js tourSteps), and
+         tour.js calls finish() — not skip() — on a step whose target isn't
+         visible, so hiding it would end the guided tour at step 3 of 12, in
+         silence, on every run without a recap. -->
+    <section id="recap-phases-sec" class="debrief">
+      <h3><span data-i18n="recap.where">Where the time went</span> <small id="recap-where-note"></small></h3>
+      <div id="recap-phases"></div>
+    </section>
+    <!-- Hidden as a whole, not just its list, when there is no recap: a
+         heading over an empty div reads as broken (see the `.nothing` CSS
+         comment — a panel that goes silent under its own title). -->
+    <section id="recap-laps-sec" class="debrief">
+      <h3 data-i18n-html="recap.laps">Lap by lap <small>(against your best lap of this run)</small></h3>
+      <div id="recap-laps"></div>
+    </section>
+  </div>
+
   <!-- The lap explained one step at a time. Same findings as the debrief below,
        edited server-side into what to look at first (see coaching/flow.py). -->
-  <div id="view-flow">
+  <div id="view-flow" class="hidden">
     <div class="flow-shell">
       <header class="flow-head">
         <span id="flow-count" class="flow-count"></span>

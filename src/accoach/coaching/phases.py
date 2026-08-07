@@ -135,3 +135,116 @@ def phase_note(phases: list[PhaseLoss], lost_ms: float,
         text += w["gain"].format(s=f"{abs(best.lost_ms) / 1000.0:.2f}",
                                  phase=w[best.phase])
     return text
+
+
+@dataclass(slots=True)
+class CornerSplit:
+    """One corner's loss and the four stretches it is made of."""
+
+    index: int
+    lost_ms: float
+    phases: list[PhaseLoss]
+
+
+@dataclass(slots=True)
+class LapSplit:
+    """Where a whole lap's gap went, in parts that add back up to it."""
+
+    # From the first sample (a hair after the line, ~pos 0.003 on a real lap)
+    # to the first corner's entry_pos (which already reaches back over that
+    # corner's braking zone) — the stretch no corner claims.
+    launch_ms: float
+    corners: list[CornerSplit]
+    # delta at the last sample minus delta at the first, NOT the gap the
+    # cockpit clock publishes (lap_time - reference_time): first and last
+    # sample don't sit on the start/finish line, so on real laps the two
+    # differ by more than a tenth (measured: from -123 ms to +100 ms across a
+    # small sample of real laps). This is the number the parts of this split
+    # add back up to; the published lap-time gap is a different, looser
+    # question and callers must not conflate the two labels on screen.
+    #
+    # A note for whoever next needs a fixture with a genuinely fractional
+    # value to catch a reintroduced round(): unlike the internal cuts (entry /
+    # apex- / apex+ / exit), gap_ms is read at samples[0] and samples[-1]
+    # against Reference.time_at(pos=0.0) / time_at(pos=1.0) — and Reference
+    # pins those two positions EXACTLY (t=0 and t=lap_time_ms, see
+    # ``Reference._anchor_endpoints``), regardless of the reference's own
+    # sampling grid. Mismatching the reference's ``n`` against the lap's (the
+    # trick that makes the interior cuts fractional) does nothing here: the
+    # endpoints never interpolate, so gap_ms — and any average taken over
+    # several gap_ms values — stays suspiciously round-number-friendly even
+    # off-grid. A fixture meant to defeat rounding on gap_ms (or on an
+    # average of it) needs sample counts/offsets that make the underlying lap
+    # times themselves not divide evenly, not a grid mismatch.
+    gap_ms: float
+
+    def by_phase(self) -> dict[str, float]:
+        """Totals per phase across every corner of the lap."""
+        out = {p: 0.0 for p in PHASES}
+        for c in self.corners:
+            for p in c.phases:
+                out[p.phase] += p.lost_ms
+        return out
+
+
+def lap_time_split(lap, reference, corners) -> LapSplit | None:
+    """Cut a whole lap into stretches whose losses add back up to its gap.
+
+    The debrief measures a corner over ``entry <= pos < next entry``, so two
+    consecutive windows do NOT share a sample: telescoping across them leaves
+    one sampling interval out per corner. Close enough to look right and not
+    close enough to be true, which is the worst kind of number.
+
+    So the cuts are computed once for the whole lap — start, then entry /
+    apex- / apex+ / exit for every corner, then the lap's end — mapped to
+    sample indices that only ever move forward, and every stretch ENDS on the
+    index the next one STARTS from. Then the sum telescopes to
+    ``delta(last) - delta(first)`` by construction, and that is what ``gap_ms``
+    is: measured the same way as its own parts, not borrowed from the lap time.
+
+    Unlike the debrief this keeps **every** corner, including the ones taken
+    well. A corner that cost nothing contributes 0.0 — leaving it out is what
+    would make the sum stop adding up.
+    """
+    samples = lap.samples
+    if len(samples) < 4 or not corners:
+        return None
+    positions = [s.pos for s in samples]
+    ordered = sorted(corners, key=lambda c: (c.entry_pos, c.exit_pos, c.apex_pos))
+
+    cuts = [positions[0]]
+    for c in ordered:
+        cuts += [c.entry_pos, c.apex_pos - _APEX_HALF,
+                 c.apex_pos + _APEX_HALF, c.exit_pos]
+    cuts.append(positions[-1])
+
+    edges: list[int] = []
+    for p in cuts:
+        p = min(max(p, positions[0]), positions[-1])
+        i = min(len(samples) - 1, max(0, bisect.bisect_left(positions, p)))
+        edges.append(i if not edges else max(i, edges[-1]))
+
+    delta = [samples[i].t_ms - reference.time_at(samples[i].pos) for i in edges]
+
+    out: list[CornerSplit] = []
+    for k, c in enumerate(ordered):
+        base = 1 + 4 * k                     # entry / apex- / apex+ / exit
+        # "after" runs to the NEXT corner's entry, or to the lap's end for the
+        # last one — the same rule the debrief uses, so a poor exit is charged
+        # to the corner that caused it.
+        end = base + 4 if k + 1 < len(ordered) else len(edges) - 1
+        bounds = [base, base + 1, base + 2, base + 3, end]
+        phases = [PhaseLoss(phase=name, lost_ms=delta[b] - delta[a])
+                  for name, a, b in zip(PHASES, bounds, bounds[1:])]
+        out.append(CornerSplit(index=c.index,
+                               lost_ms=delta[end] - delta[base],
+                               phases=phases))
+
+    # Not rounded: rounding each part independently (and gap_ms separately)
+    # would let the sum drift off gap_ms by up to 0.05 ms per rounded value —
+    # measured up to ~0.3 ms on a real 10-corner lap. Full floats keep the
+    # telescope exact; rounding is a presentation decision for whoever
+    # serializes this at the boundary.
+    return LapSplit(launch_ms=delta[1] - delta[0],
+                    corners=out,
+                    gap_ms=delta[-1] - delta[0])

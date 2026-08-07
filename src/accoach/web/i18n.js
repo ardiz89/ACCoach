@@ -40,10 +40,75 @@
     "ctl.baseline":    { en: `Compare with`, it: `Confronta con` },
     "ctl.export":      { en: `Export`, it: `Esporta` },
 
+    // How the run went — the door onto the report. `gain_avg_s` is measured
+    // against the best lap of THIS run, not the elected reference, and is not
+    // the gap the timing screen publishes: it is the sum of its own parts.
+    "tab.recap":       { en: `How it went`, it: `Com'è andata` },
+    // "gap" is deliberately never used here: it's the word a driver checks
+    // against the timing screen, and this number is not that (see the recap
+    // spec — up to a tenth apart). It points at the total above it instead.
+    // Two keys, not one, because the heading has to stay true in both states.
+    // `recap.where` is the static label in index.html and says only what the
+    // panel is about. `recap.wherenote` is the promise, and renderRecap writes
+    // it into the <small> only when there is a recap to keep it: on a run with
+    // nothing measurable there is no number above and no parts below, so the
+    // promise would be naming two things that are not on screen.
+    "recap.where":     { en: `Where the time went`,
+                         it: `Dove è finito il tempo` },
+    "recap.wherenote": { en: `(average per lap · the parts add up to the number above)`,
+                         it: `(media per giro · le parti sommano al numero qui sopra)` },
+    "recap.laps":      { en: `Lap by lap <small>(against your best lap of this run)</small>`,
+                         it: `Giro per giro <small>(contro il tuo miglior giro di questa uscita)</small>` },
+    "recap.best":      { en: `Best lap of this run`, it: `Miglior giro di questa uscita` },
+    "recap.gain":      { en: `To gain, on average`, it: `Da guadagnare, in media` },
+    "recap.yardstick": { en: `your yardstick`, it: `il tuo metro` },
+    // `!cur`: no session at all for this car+track (or the fetch failed) —
+    // same fact the Session tab states about the very same payload.
+    "recap.nolaps":    { en: `No laps recorded for this car and track yet.`,
+                         it: `Nessun giro registrato per questa auto e questa pista.` },
+    // `cur` exists but `cur.recap` doesn't: `_recap_of` (api.py) returns None
+    // for seven different reasons — a single valid lap is only one of them
+    // (an unreadable best lap, a best lap the reference can't use, no lap
+    // that could be cut into phases, ...). Naming "one valid lap" here would
+    // often be naming the wrong cause, which is worse than a generic one.
+    "recap.none":      { en: `Not enough in this run to measure yet.`,
+                         it: `Non c'è ancora abbastanza in questa uscita per misurarlo.` },
+    // The one cause of an empty recap that is measured rather than guessed
+    // (`recap_clock_broken` in the payload, decided by the guard in trends.py):
+    // the run's own best lap — the yardstick every row would be measured
+    // against — carries a clock that doesn't account for the lap it drove, so
+    // every gap taken against it would be wrong by that much.
+    // No direction in the wording, on purpose: the criterion in trends.py is
+    // symmetric, and the real yardstick that trips it (Red Bull Ring, 02/08)
+    // has its clock running 694 ms LONG, not short. "Missing part of the lap"
+    // would send the driver hunting a gap in the recording that isn't there.
+    // And it says the recording doesn't line up, not that the driver did
+    // anything.
+    "recap.clock":     { en: `This run can't be measured: the recorded time of your best lap doesn't match the stretch of lap it covers, so every gap measured against it would be wrong.`,
+                         it: `Questa uscita non si può misurare: il tempo registrato del tuo miglior giro non corrisponde al giro che copre, e ogni distacco misurato su di lui sarebbe sbagliato.` },
+    "recap.phase.entry":  { en: `Entry`, it: `Entrata` },
+    "recap.phase.apex":   { en: `Apex`, it: `Apice` },
+    "recap.phase.exit":   { en: `Exit`, it: `Uscita` },
+    "recap.phase.after":  { en: `After`, it: `Dopo` },
+    "recap.phase.launch": { en: `Launch`, it: `Lancio` },
+
     "tab.flow":        { en: `Lap explained`, it: `Il giro spiegato` },
-    "tour.a9.t":       { en: `Start here`, it: `Parti da qui` },
+    // "Start here" moved to tour.a12 when the recap became the landing tab —
+    // this step still opens Flow, so its own title now names what it is
+    // rather than claiming to be the door.
+    "tour.a9.t":       { en: `Lap explained`, it: `Il giro spiegato` },
     "tour.a9.x":       { en: `The lap, explained one thing at a time: what cost you the most, why, and what to do about it — with the chart that shows it. The other tabs are the same findings, laid out for you to read yourself.`,
                          it: `Il giro spiegato una cosa alla volta: cosa ti è costato di più, perché, e cosa farci — col grafico che lo mostra. Le altre schede sono gli stessi dati, messi lì perché te li legga da solo.` },
+    "tour.a12.t":      { en: `Start here`, it: `Parti da qui` },
+    // Says what the tab IS, not what is on it right now. The tour can be
+    // started on any run, and on a run with nothing measurable this step lands
+    // on a panel holding one sentence — six of the seventeen real sessions are
+    // like that, and so was every session of the demo until the demo grew a
+    // measurable one. "Five numbers that add up" was therefore false at the
+    // exact moment a first-time driver read it. The property is still stated,
+    // as what the tab does when it can measure, and the empty case is named.
+    "tour.a12.x":      { en: `How the run went, before it's forgotten: where you left time on average, and lap by lap against your own best of the day — not a score but time, split into parts that add back up. When a run has too little in it to measure, this tab says so instead of guessing. The tabs after this go deeper, one lap at a time.`,
+                         it: `Com'è andata l'uscita, prima di dimenticarla: dove hai lasciato tempo in media, e giro per giro contro il tuo stesso migliore di oggi — non un voto ma tempo, diviso in parti che risommano. Quando in un'uscita non c'è abbastanza da misurare, questa scheda lo dice invece di tirare a indovinare. Le schede dopo entrano nel dettaglio, un giro alla volta.` },
     "tab.session":     { en: `Session`, it: `Sessione` },
     "tab.compare":     { en: `Compare`, it: `Confronto` },
     // One run of laps, as it was driven.
@@ -606,8 +671,8 @@
     // tabs, and six the moment the guided flow landed. A number here is a
     // promise the tab bar keeps breaking.
     "tour.a2.t": { en: `The other views`, it: `Le altre viste` },
-    "tour.a2.x": { en: `The same laps seen other ways: traces side by side in Compare, the racing line on the Map, corner by corner in Line, split times in Sectors, grip and slip in Dynamics, and where you're heading in Trends.`,
-                   it: `Gli stessi giri visti in altri modi: le tracce affiancate in Confronto, la traiettoria sulla Mappa, curva per curva in Traiettoria, gli split nei Settori, aderenza e slittamenti in Dinamica, e dove stai andando in Andamento.` },
+    "tour.a2.x": { en: `The same laps seen other ways: traces side by side in Compare, the racing line on the Map, corner by corner in Line, split times in Sectors, grip and slip in Dynamics, and where you're heading in Trends. Each tab has a key that opens it, left to right — hover a tab to see which one.`,
+                   it: `Gli stessi giri visti in altri modi: le tracce affiancate in Confronto, la traiettoria sulla Mappa, curva per curva in Traiettoria, gli split nei Settori, aderenza e slittamenti in Dinamica, e dove stai andando in Andamento. Ogni scheda ha un tasto che la apre, da sinistra a destra — passa il mouse su una scheda per vedere qual è.` },
     "tour.a3.t": { en: `Delta`, it: `Delta` },
     "tour.a3.x": { en: `Where you're gaining or losing vs your reference, across the lap. Green (below the line) is faster.`,
                    it: `Dove guadagni o perdi rispetto al riferimento, lungo il giro. Verde (sotto la linea) è più veloce.` },

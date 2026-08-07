@@ -40,8 +40,9 @@ from .coaching import (
     propose as propose_plan,
     trail_brake_for,
 )
+from .coaching.phases import PHASES
 from .coaching.training import MIN_LAPS as _TRAIN_MIN_LAPS, assess as _assess_training
-from .coaching.trends import session_series
+from .coaching.trends import session_recap, session_series
 from .comparison import Reference
 from . import cornernames
 from .cornermap import learn_from
@@ -1499,6 +1500,104 @@ def create_api(
         return {"improved": _rows(better, advice=False),
                 "regressed": _rows(worse, advice=True)}
 
+    def _recap_of(cur, track: str, car: str, lg: str) -> tuple[dict | None, bool]:
+        """The run's recap, or None when there is nothing measurable in it.
+
+        Second element: the run's yardstick lap has a clock that does not cover
+        it, so nothing here could be measured against it. It is the one cause
+        of an empty recap this endpoint may state on screen, and it is *not*
+        computed here — it is forwarded from ``RecapOutcome``, the only place
+        that criterion lives. Every other empty answer, including all the ones
+        this function decides on its own below, comes back False and leaves the
+        screen with its generic sentence.
+
+        ``session_recap`` (Task 2) drops any lap it cannot cut into phases —
+        too few samples, most often — rather than count it as a zero. That
+        means its ``laps`` list can come back shorter than the laps we handed
+        it, and a plain ``zip(others, recap.laps)`` would then pair each
+        surviving row with whichever lap happens to sit at the same list
+        position once the drop shifts everything left: one lap's gap and
+        worst corner, printed under a different lap's path.
+
+        This does not predict which laps ``session_recap`` will keep — that
+        would just move the disagreement to whenever its drop rule changes and
+        this file doesn't. Instead every :class:`RecapLap` carries
+        ``source_index``, its position in the exact list handed to
+        ``session_recap`` (``lap_objs`` below). ``kept`` is built in lockstep
+        with ``lap_objs`` — same loop, same append — so ``kept[i]`` is always
+        the row ``lap_objs[i]`` came from, and ``kept[r.source_index]`` is
+        therefore always the row a given result row is about, whatever
+        ``session_recap`` did or didn't drop and however that rule evolves.
+        """
+        best = cur.best
+        if best is None:
+            return None, False
+        others = [l for l in cur.valid_laps if l["path"] != best["path"]]
+        if not others:
+            return None, False              # the best lap is the only lap
+        try:
+            best_lap = load_lap(best["path"])
+            reference = Reference(best_lap)
+            if not reference.usable:
+                return None, False
+            corners = detect_corners(best_lap.samples)
+            names = {c.index: n for c, n in
+                     zip(corners, name_corners(track, corners, lg,
+                                               _corner_map(car, track),
+                                               _typed(track)))}
+        except Exception:  # noqa: BLE001 - a session view must not 500 on one bad lap
+            return None, False
+
+        # Laps this endpoint itself could not even load are dropped here, one
+        # at a time and in lockstep with `kept` — the only filtering this
+        # function does. Everything past this point is session_recap's call.
+        kept: list[dict] = []
+        lap_objs = []
+        for row in others:
+            try:
+                lap_objs.append(load_lap(row["path"]))
+            except Exception:  # noqa: BLE001 - one bad lap should not sink the run
+                continue
+            kept.append(row)
+        if not lap_objs:
+            return None, False
+
+        try:
+            outcome = session_recap(lap_objs, reference, corners)
+        except Exception:  # noqa: BLE001 - same guarantee as the block above
+            return None, False
+        recap = outcome.recap
+        if recap is None:
+            return None, outcome.reference_clock_broken
+        phases = [{"phase": p, "avg_s": round(recap.by_phase[p] / 1000.0, 3)}
+                  for p in PHASES] + [{"phase": "launch",
+                                       "avg_s": round(recap.launch_ms / 1000.0, 3)}]
+        # The total is the sum of these same six rounded numbers, not a
+        # SEPARATE rounding of the full-precision average. `recap.gain_avg_ms`
+        # and `by_phase`/`launch_ms` are exactly consistent before rounding
+        # (session_recap's own guarantee — nothing in there is rounded), but
+        # six independent `round(x, 3)` calls can each move by up to 0.5 ms in
+        # either direction, so a total rounded on its own can land a full
+        # millisecond away from what the six displayed rows add up to. That
+        # shows at three decimals, and `recap.where` tells the driver on
+        # screen that the parts sum to the number above. Summing what is
+        # actually printed makes that true by construction, independent of
+        # which way any single value happened to round.
+        gain_avg_s = round(sum(p["avg_s"] for p in phases), 3)
+        return {
+            "gain_avg_s": gain_avg_s,
+            "reference": format_lap_time(recap.reference_ms),
+            "phases": phases,
+            "laps": [{
+                "path": kept[r.source_index]["path"],
+                "lap_time": format_lap_time(r.lap_time_ms),
+                "gap_s": round(r.gap_ms / 1000.0, 3),
+                "corner_index": r.worst_index,
+                "corner": names.get(r.worst_index, ""),
+                "corner_s": round(r.worst_ms / 1000.0, 3),
+            } for r in recap.laps],
+        }, False
+
     @app.get("/api/sessions")
     def sessions(
         car: str = Query(...),
@@ -1540,6 +1639,8 @@ def create_api(
                 "best": format_lap_time(b["lap_time_ms"]) if b else None,
             }
 
+        recap, recap_clock_broken = _recap_of(cur, track, car, lg)
+
         return {
             "sessions": [_summary(s) for s in runs],
             "index": index,
@@ -1551,6 +1652,14 @@ def create_api(
                 "road_temp_from": min(temps) if temps else None,
                 "road_temp_to": max(temps) if temps else None,
                 "consistency": lap_time_consistency(valid_ms),
+                "recap": recap,
+                # Why there is no recap — but only when the answer is verified.
+                # True means the run's own best lap has a clock that doesn't
+                # cover it, so nothing could be measured against it; False
+                # covers every other empty answer and leaves the screen its
+                # generic sentence, because naming one cause out of six guessed
+                # ones would usually be naming the wrong one.
+                "recap_clock_broken": recap_clock_broken,
                 # Every lap of the run, in the order driven — cut and invalid
                 # ones included. They can't set the numbers, but leaving them out
                 # would show a session you didn't have.
@@ -2381,11 +2490,28 @@ def _seed_demo() -> str:
     ref.recorded_utc = "2026-06-19T18:00:00+00:00"
     save_lap(ref, d)
     # A few laps getting better over successive days (less time lost each time).
-    specs = [(0, 30, "2026-06-20"), (0, 24, "2026-06-21"), (1, 20, "2026-06-22"),
-             (0, 16, "2026-06-23"), (1, 12, "2026-06-24"), (0, 8, "2026-06-25")]
-    for k, (sc, amt, day) in enumerate(specs, start=1):
+    #
+    # L'ultima giornata non è un giro, è un'**uscita**: tre giri a pochi minuti
+    # l'uno dall'altro, che è ciò che `group_sessions` chiama una sessione (20
+    # minuti di stacco). Prima ogni sessione della demo ne conteneva uno solo:
+    # `_recap_of` toglie il migliore — è il metro — e restava a mani vuote, così
+    # la prima schermata di `--demo`, cioè la vetrina della funzionalità, diceva
+    # «non c'è ancora abbastanza in questa uscita» su tutte e sette le sessioni.
+    #
+    # E non sono tre giri quasi uguali. Un'uscita i cui giri si somigliano dà un
+    # recap di cinque zeri: tecnicamente valido, senza niente dentro da guardare
+    # (è la lezione «la demo non ha perdite», già pagata su questo ramo). Qui
+    # perdono tempo in curve diverse e di quantità diverse, così le cinque righe
+    # per fase escono con dei numeri veri e il «giro per giro» ha due righe che
+    # si distinguono.
+    specs = [(0, 30, "2026-06-20T18:00:00"), (0, 24, "2026-06-21T18:00:00"),
+             (1, 20, "2026-06-22T18:00:00"), (0, 16, "2026-06-23T18:00:00"),
+             (1, 12, "2026-06-24T18:00:00"),
+             (0, 20, "2026-06-25T18:00:00"), (1, 16, "2026-06-25T18:04:00"),
+             (0, 8, "2026-06-25T18:08:00")]
+    for k, (sc, amt, stamp) in enumerate(specs, start=1):
         lap = build(sc, amt, stint=k)
-        lap.recorded_utc = f"{day}T18:00:00+00:00"
+        lap.recorded_utc = f"{stamp}+00:00"
         save_lap(lap, d)
     return d
 
