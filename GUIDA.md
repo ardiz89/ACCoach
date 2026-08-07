@@ -291,8 +291,9 @@ comunque lui: è fatto apposta, ed è la differenza fra un dato e una pagella.
 Tre cose da sapere:
 
 - **Il metro è il tuo miglior giro di quell'uscita**, non il tuo record. Quindi
-  misura la **costanza** di quel pomeriggio: tutto verde non vuol dire che sei
-  veloce, vuol dire che eri ripetibile. Ed è per questo che il tuo giro
+  misura la **costanza** di quel pomeriggio: numeri piccoli non vogliono dire
+  che eri veloce, vogliono dire che eri ripetibile — un pomeriggio lento ma
+  costante mostra numeri piccoli lo stesso. Ed è per questo che il tuo giro
   migliore **non compare nell'elenco dei giri**: è lui il metro, e mostrarlo
   sarebbe una riga di zeri.
 - **«Lancio» non è una fase di guida.** È il tratto dal traguardo alla prima
@@ -526,9 +527,9 @@ lunghezza della pista`; se un giro non ha coordinate, o se le sue coordinate non
 tornano con velocità e tempo, l'asse torna in percentuale invece di darti una
 scala sbagliata.
 
-Due scorciatoie: la **fila dei numeri** apre le schede da sinistra a destra,
-**[** e **]** scorrono i giri, e il tasto di ogni scheda lo vedi passandoci
-sopra il mouse (vale anche per la tendina dei giri).
+Due scorciatoie: **ogni scheda ha un tasto che la apre**, in ordine da
+sinistra a destra, e lo vedi passandoci sopra il mouse (vale anche per la
+tendina dei giri); **[** e **]** scorrono i giri.
 
 Sotto ogni curva c'è anche **dove, dentro la curva, è finito il tempo**: una
 barra divisa in *ingresso · apex · uscita · tratto dopo* (passa il mouse per i

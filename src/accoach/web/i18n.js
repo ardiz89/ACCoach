@@ -643,8 +643,8 @@
     // tabs, and six the moment the guided flow landed. A number here is a
     // promise the tab bar keeps breaking.
     "tour.a2.t": { en: `The other views`, it: `Le altre viste` },
-    "tour.a2.x": { en: `The same laps seen other ways: traces side by side in Compare, the racing line on the Map, corner by corner in Line, split times in Sectors, grip and slip in Dynamics, and where you're heading in Trends. The number row opens them left to right — hover a tab to see which one.`,
-                   it: `Gli stessi giri visti in altri modi: le tracce affiancate in Confronto, la traiettoria sulla Mappa, curva per curva in Traiettoria, gli split nei Settori, aderenza e slittamenti in Dinamica, e dove stai andando in Andamento. La fila dei numeri le apre da sinistra a destra — passa il mouse su una scheda per vedere qual è.` },
+    "tour.a2.x": { en: `The same laps seen other ways: traces side by side in Compare, the racing line on the Map, corner by corner in Line, split times in Sectors, grip and slip in Dynamics, and where you're heading in Trends. Each tab has a key that opens it, left to right — hover a tab to see which one.`,
+                   it: `Gli stessi giri visti in altri modi: le tracce affiancate in Confronto, la traiettoria sulla Mappa, curva per curva in Traiettoria, gli split nei Settori, aderenza e slittamenti in Dinamica, e dove stai andando in Andamento. Ogni scheda ha un tasto che la apre, da sinistra a destra — passa il mouse su una scheda per vedere qual è.` },
     "tour.a3.t": { en: `Delta`, it: `Delta` },
     "tour.a3.x": { en: `Where you're gaining or losing vs your reference, across the lap. Green (below the line) is faster.`,
                    it: `Dove guadagni o perdi rispetto al riferimento, lungo il giro. Verde (sotto la linea) è più veloce.` },
