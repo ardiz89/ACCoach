@@ -2490,11 +2490,28 @@ def _seed_demo() -> str:
     ref.recorded_utc = "2026-06-19T18:00:00+00:00"
     save_lap(ref, d)
     # A few laps getting better over successive days (less time lost each time).
-    specs = [(0, 30, "2026-06-20"), (0, 24, "2026-06-21"), (1, 20, "2026-06-22"),
-             (0, 16, "2026-06-23"), (1, 12, "2026-06-24"), (0, 8, "2026-06-25")]
-    for k, (sc, amt, day) in enumerate(specs, start=1):
+    #
+    # L'ultima giornata non è un giro, è un'**uscita**: tre giri a pochi minuti
+    # l'uno dall'altro, che è ciò che `group_sessions` chiama una sessione (20
+    # minuti di stacco). Prima ogni sessione della demo ne conteneva uno solo:
+    # `_recap_of` toglie il migliore — è il metro — e restava a mani vuote, così
+    # la prima schermata di `--demo`, cioè la vetrina della funzionalità, diceva
+    # «non c'è ancora abbastanza in questa uscita» su tutte e sette le sessioni.
+    #
+    # E non sono tre giri quasi uguali. Un'uscita i cui giri si somigliano dà un
+    # recap di cinque zeri: tecnicamente valido, senza niente dentro da guardare
+    # (è la lezione «la demo non ha perdite», già pagata su questo ramo). Qui
+    # perdono tempo in curve diverse e di quantità diverse, così le cinque righe
+    # per fase escono con dei numeri veri e il «giro per giro» ha due righe che
+    # si distinguono.
+    specs = [(0, 30, "2026-06-20T18:00:00"), (0, 24, "2026-06-21T18:00:00"),
+             (1, 20, "2026-06-22T18:00:00"), (0, 16, "2026-06-23T18:00:00"),
+             (1, 12, "2026-06-24T18:00:00"),
+             (0, 20, "2026-06-25T18:00:00"), (1, 16, "2026-06-25T18:04:00"),
+             (0, 8, "2026-06-25T18:08:00")]
+    for k, (sc, amt, stamp) in enumerate(specs, start=1):
         lap = build(sc, amt, stint=k)
-        lap.recorded_utc = f"{day}T18:00:00+00:00"
+        lap.recorded_utc = f"{stamp}+00:00"
         save_lap(lap, d)
     return d
 

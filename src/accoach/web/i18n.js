@@ -47,8 +47,16 @@
     // "gap" is deliberately never used here: it's the word a driver checks
     // against the timing screen, and this number is not that (see the recap
     // spec — up to a tenth apart). It points at the total above it instead.
-    "recap.where":     { en: `Where the time went <small>(average per lap · the parts add up to the number above)</small>`,
-                         it: `Dove è finito il tempo <small>(media per giro · le parti sommano al numero qui sopra)</small>` },
+    // Two keys, not one, because the heading has to stay true in both states.
+    // `recap.where` is the static label in index.html and says only what the
+    // panel is about. `recap.wherenote` is the promise, and renderRecap writes
+    // it into the <small> only when there is a recap to keep it: on a run with
+    // nothing measurable there is no number above and no parts below, so the
+    // promise would be naming two things that are not on screen.
+    "recap.where":     { en: `Where the time went`,
+                         it: `Dove è finito il tempo` },
+    "recap.wherenote": { en: `(average per lap · the parts add up to the number above)`,
+                         it: `(media per giro · le parti sommano al numero qui sopra)` },
     "recap.laps":      { en: `Lap by lap <small>(against your best lap of this run)</small>`,
                          it: `Giro per giro <small>(contro il tuo miglior giro di questa uscita)</small>` },
     "recap.best":      { en: `Best lap of this run`, it: `Miglior giro di questa uscita` },
@@ -92,8 +100,15 @@
     "tour.a9.x":       { en: `The lap, explained one thing at a time: what cost you the most, why, and what to do about it — with the chart that shows it. The other tabs are the same findings, laid out for you to read yourself.`,
                          it: `Il giro spiegato una cosa alla volta: cosa ti è costato di più, perché, e cosa farci — col grafico che lo mostra. Le altre schede sono gli stessi dati, messi lì perché te li legga da solo.` },
     "tour.a12.t":      { en: `Start here`, it: `Parti da qui` },
-    "tour.a12.x":      { en: `How the run went, before it's forgotten: where you left time on average, and lap by lap against your own best of the day — not a score, five numbers that add back up to the one above them. The tabs after this go deeper, one lap at a time.`,
-                         it: `Com'è andata l'uscita, prima di dimenticarla: dove hai lasciato tempo in media, e giro per giro contro il tuo stesso migliore di oggi — non un voto, cinque numeri che sommano al numero sopra di loro. Le schede dopo entrano nel dettaglio, un giro alla volta.` },
+    // Says what the tab IS, not what is on it right now. The tour can be
+    // started on any run, and on a run with nothing measurable this step lands
+    // on a panel holding one sentence — six of the seventeen real sessions are
+    // like that, and so was every session of the demo until the demo grew a
+    // measurable one. "Five numbers that add up" was therefore false at the
+    // exact moment a first-time driver read it. The property is still stated,
+    // as what the tab does when it can measure, and the empty case is named.
+    "tour.a12.x":      { en: `How the run went, before it's forgotten: where you left time on average, and lap by lap against your own best of the day — not a score but time, split into parts that add back up. When a run has too little in it to measure, this tab says so instead of guessing. The tabs after this go deeper, one lap at a time.`,
+                         it: `Com'è andata l'uscita, prima di dimenticarla: dove hai lasciato tempo in media, e giro per giro contro il tuo stesso migliore di oggi — non un voto ma tempo, diviso in parti che risommano. Quando in un'uscita non c'è abbastanza da misurare, questa scheda lo dice invece di tirare a indovinare. Le schede dopo entrano nel dettaglio, un giro alla volta.` },
     "tab.session":     { en: `Session`, it: `Sessione` },
     "tab.compare":     { en: `Compare`, it: `Confronto` },
     // One run of laps, as it was driven.

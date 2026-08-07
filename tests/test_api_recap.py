@@ -166,3 +166,42 @@ def test_a_dropped_lap_does_not_shift_the_row_next_to_it(tmp_path):
     assert len(r["laps"]) == 1
     assert r["laps"][0]["path"] == path_b
     assert r["laps"][0]["path"] != path_a
+
+
+def test_the_demo_opens_on_a_recap_with_real_numbers_in_it():
+    """`python -m accoach web --demo` è la vetrina, e la prima schermata che
+    apre è «Com'è andata» sulla prima combo che `/api/combos` restituisce.
+
+    Fino a ieri quella schermata diceva «non c'è ancora abbastanza in questa
+    uscita per misurarlo», su tutte e sette le sessioni: `_seed_demo` metteva
+    un giro per giornata, `_recap_of` toglieva il migliore perché è il metro,
+    e non restava niente da misurare. La vetrina mostrava lo stato vuoto.
+
+    Non basta però che il recap **esista**: un'uscita di giri quasi identici
+    ne produce uno tecnicamente valido con cinque zeri dentro, che è la stessa
+    schermata vuota con più punteggiatura (la lezione «la demo non ha
+    perdite», già pagata su questo ramo). Quindi qui si guarda dentro: cinque
+    fasi con un numero sopra lo zero, almeno due righe giro, e la proprietà
+    per cui la scheda esiste — le parti sommano esattamente al totale, sulle
+    cifre mostrate.
+    """
+    from pathlib import Path
+
+    from accoach.api import _seed_demo
+
+    c = TestClient(create_api(Path(_seed_demo())))
+    combos = c.get("/api/combos").json()
+    first = (combos["combos"] if isinstance(combos, dict) else combos)[0]
+    cur = c.get("/api/sessions",
+                params={"car": first["car"], "track": first["track"]}).json()["current"]
+
+    r = cur["recap"]
+    assert r is not None, "la demo apre ancora sullo stato vuoto"
+    assert cur["recap_clock_broken"] is False
+    assert len(r["phases"]) == 5
+    assert all(p["avg_s"] > 0 for p in r["phases"]), \
+        f"una fase a zero: la demo non ha perdite da mostrare lì — {r['phases']}"
+    assert len(r["laps"]) >= 2, "una riga sola non è un «giro per giro»"
+    assert len({l["corner_index"] for l in r["laps"]}) > 1, \
+        "tutti i giri perdono nella stessa curva: niente da leggere"
+    assert r["gain_avg_s"] == round(sum(p["avg_s"] for p in r["phases"]), 3)

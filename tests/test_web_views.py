@@ -1307,6 +1307,83 @@ def test_the_lap_by_lap_heading_hides_with_its_own_empty_list():
     assert 'lpSec.classList.remove("hidden")' in block
 
 
+def test_the_where_heading_keeps_its_promise_out_of_the_static_markup():
+    """«Dove è finito il tempo» resta sempre a schermo, anche quando non c'è
+    niente da misurare: è l'unica sezione di `#view-recap` con del contenuto
+    statico, e la visita guidata ci punta sopra il suo «Parti da qui». Quindi
+    la **promessa** — media per giro, le parti che sommano al numero sopra —
+    non può stare nel titolo statico: sopra un'uscita senza recap non c'è
+    nessun numero (`#recap-head` resta vuoto e `.summary:empty` lo toglie) e
+    sotto non c'è nessuna parte. Vive in un `<small>` che il JS riempie.
+
+    Verificato per mutazione: rimetti il `<small>(...)</small>` dentro
+    `recap.where` e questo diventa rosso."""
+    where = _I18NJS[_I18NJS.index('"recap.where"'):
+                    _I18NJS.index('"recap.wherenote"')]
+    for promise in ("add up", "sommano", "average per lap", "media per giro"):
+        assert promise not in where, f"la promessa è tornata nel titolo statico: {promise}"
+    sec = re.search(r'<section id="recap-phases-sec".*?</section>', _HTML, re.S)
+    assert sec, "#recap-phases-sec non è più una sezione in index.html"
+    note = re.search(r'<small id="recap-where-note"[^>]*>(.*?)</small>',
+                     sec.group(0), re.S)
+    assert note, "manca il <small> che porta la promessa"
+    assert not note.group(1).strip(), (
+        "il <small> ha del testo scritto nel markup: sarebbe a schermo anche "
+        "senza recap, che è esattamente il difetto"
+    )
+
+
+def test_the_where_heading_promises_only_when_there_is_a_recap():
+    """Le due metà di `renderRecap`, una per volta. Nel ramo del vuoto il
+    `<small>` va svuotato (non lasciato com'era: la scheda si ridisegna a ogni
+    cambio di sessione, e la promessa della sessione prima resterebbe lì sopra
+    il messaggio del vuoto); nel ramo pieno va riempito.
+
+    Verificato per mutazione: sposta `t("recap.wherenote")` nel ramo del vuoto
+    e diventa rosso; toglilo dal ramo pieno e diventa rosso."""
+    block = _recap_render_body()
+    empty, filled = block.split('if (lpSec) lpSec.classList.remove')
+    assert 'note.textContent = ""' in empty
+    assert '"recap.wherenote"' not in empty, (
+        "la promessa è nel ramo dell'uscita non misurabile"
+    )
+    assert 't("recap.wherenote")' in filled
+
+
+def test_render_recap_never_hides_the_tour_s_start_here_target():
+    """La trappola già pagata una volta su questo ramo. `#recap-laps-sec` si
+    nasconde quando la lista è vuota, e la tentazione è fare lo stesso con la
+    sezione delle fasi. Ma `tour.js` su un bersaglio invisibile chiama
+    `finish()`, non «salta»: nascondere la sezione a cui punta `tour.a12`
+    chiuderebbe la visita guidata al terzo passo su dodici, in silenzio, su
+    ogni uscita senza recap — e nell'archivio vero sono 6 sessioni su 17, una
+    delle quali la prima combo che `/api/combos` restituisce.
+
+    Il bersaglio non è scritto a mano qui: è letto da `tourSteps()`, così il
+    test segue il passo se un giorno cambia elemento. Verificato per
+    mutazione: aggiungi `$("recap-phases-sec").classList.add("hidden")` nel
+    ramo del vuoto e diventa rosso."""
+    steps = _APPJS.split("function tourSteps()")[1].split("\n}")[0]
+    m = re.search(r'sel:\s*"#([^"]+)"[^}]*title:\s*t\("tour\.a12\.t"\)', steps)
+    assert m, "no tour step uses tour.a12.t (\"Start here\")"
+    target = m.group(1)
+    assert target not in _recap_render_body(), (
+        f"renderRecap tocca #{target}, il bersaglio di «Parti da qui»: se lo "
+        "nasconde, la visita guidata finisce lì senza dirlo"
+    )
+
+
+def test_the_start_here_step_does_not_count_what_may_not_be_on_screen():
+    """Il testo del passo diceva «cinque numeri che sommano al numero sopra di
+    loro», e al primo avvio puntava su un pannello che quei numeri non li
+    aveva. Un passo della visita può dire *cosa fa* la scheda; non può contare
+    quello che c'è sopra, perché non lo sa."""
+    x = _I18NJS[_I18NJS.index('"tour.a12.x"'):_I18NJS.index('"tab.session"')]
+    bad = re.search(r"\b(two|three|four|five|six|due|tre|quattro|cinque|sei)"
+                    r"\s+(numbers|numeri)\b", x)
+    assert not bad, f"il passo conta le parti a schermo: {bad.group(0) if bad else ''}"
+
+
 def test_the_yardstick_key_is_actually_shown():
     """Declared in i18n.js and never read anywhere would be dead weight — or
     worse, a sign the screen forgot to say why the best lap has no gap of its

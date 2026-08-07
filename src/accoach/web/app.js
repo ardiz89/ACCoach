@@ -2194,10 +2194,20 @@ function renderSession(s) {
 function renderRecap(cur) {
   const head = $("recap-head"), ph = $("recap-phases"), lp = $("recap-laps");
   const lpSec = $("recap-laps-sec");
+  const note = $("recap-where-note");
   if (!head || !ph || !lp) return;
   const r = cur && cur.recap;
   if (!r) {
     head.innerHTML = "";
+    // La promessa del titolo — «media per giro · le parti sommano al numero
+    // qui sopra» — se ne va col recap. Qui sopra non c'è nessun numero
+    // (`#recap-head` resta vuoto e `.summary:empty` lo toglie) e qui sotto non
+    // c'è nessuna parte: la frase nominerebbe due cose che non ci sono. Se ne
+    // va la promessa, non la sezione: nasconderla — come si fa con
+    // `#recap-laps-sec`, che di statico non ha niente da mostrare — ucciderebbe
+    // la visita guidata, che su questa sezione ha il suo «Parti da qui» e su un
+    // bersaglio invisibile chiama `finish()`, non «salta».
+    if (note) note.textContent = "";
     // Tre casi, tre frasi: `!cur` è lo stesso fatto che il pannello Sessione
     // scrive sullo stesso payload ("nessun giro registrato");
     // `recap_clock_broken` è l'unica delle sette cause che sia MISURATA (la
@@ -2219,6 +2229,10 @@ function renderRecap(cur) {
     return;
   }
   if (lpSec) lpSec.classList.remove("hidden");
+  // C'è un recap: il titolo può promettere. La chiave sta scritta per esteso
+  // dentro la chiamata, come le tre frasi del vuoto qui sopra, perché è così
+  // che test_web_i18n_keys la vede.
+  if (note) note.textContent = t("recap.wherenote");
   const item = (k, v) => `<div class="item"><div class="k">${k}</div><div class="v">${v}</div></div>`;
   // Una sola convenzione di segno su tutta la scheda: `fmtLoss` gira il segno
   // una volta sola, qui, per il totale come per le cinque fasi sotto e per il

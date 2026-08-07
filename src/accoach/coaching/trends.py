@@ -260,9 +260,17 @@ class RecapOutcome:
 #: ``|span - lap_time_ms * (pos[-1] - pos[0])|`` with
 #: ``span = samples[-1].t_ms - samples[0].t_ms``, and it is compared against
 #: ``max(_CLOCK_TOL_MS, lap_time_ms * _CLOCK_TOL_FRAC)`` — the same shape as
-#: ``recording.lap._TIME_TOL_MS`` / ``_TIME_TOL_FRAC``, and for the same reason:
-#: the residual grows with the lap, so a flat number of milliseconds is a much
-#: harsher rule on an eight-minute circuit than on a one-minute one.
+#: ``recording.lap._TIME_TOL_MS`` / ``_TIME_TOL_FRAC``, but read the reason
+#: carefully, because it is not the obvious one. The residual as a whole does
+#: NOT grow with the lap: by duration band the real archive gives medians of
+#: 34.3 ms (80-110 s), 31.0 ms (110-160 s) and 86.5 ms (over 160 s) — flat,
+#: then a jump on a handful of long laps. What grows with the lap is the
+#: *coverage* half of it, ``lap_time_ms * (1 - coverage)``, which is
+#: proportional to the lap by construction and is the half this correction
+#: fabricates itself. That is what the fraction is sized against, and it is
+#: argued in full two paragraphs down: a flat number of milliseconds is a much
+#: harsher rule on an eight-minute circuit than on a one-minute one *for the
+#: part of the residual we put there ourselves*.
 #:
 #: Measured over the whole real archive (59 laps, 07/08/2026), percentiles by
 #: ``statistics.quantiles(n=10)`` so they can be reproduced:
@@ -276,7 +284,7 @@ class RecapOutcome:
 #: with no clock error in it at all — pure coverage, fabricated by this very
 #: correction. Two of the 59 are already like that. At the median coverage a
 #: 285-second lap clears 250 ms on coverage alone, and an eight-minute lap
-#: (Nordschleife on AC) clears it at 1 - coverage = 0.0005, i.e. BELOW the
+#: (Nordschleife on AC) clears it at 1 - coverage = 0.00052, i.e. BELOW the
 #: median: a flat 250 ms would void a healthy run on a long circuit and then
 #: name a cause that isn't there, which is the worst way this guard can be
 #: wrong. 0.007 sits 1.5x above the worst coverage in the archive (0.00462) and
@@ -291,8 +299,14 @@ class RecapOutcome:
 #:
 #: Correcting for the fraction of the lap the samples cover is not a nicety
 #: either. In the plain form (``|span - lap_time_ms|``) the same archive gives
-#: median 102 ms and p90 167 ms against a first broken lap at 212 — healthy and
+#: median 102 ms and p90 168 ms against a first broken lap at 212 — healthy and
 #: broken overlap, and there is nowhere left to put a threshold at all.
+#:
+#: The two fixtures that hold this pair still are ``_healthy_long_lap`` (built
+#: at 1 - coverage = 0.00462, the archive max above) and ``_broken_lap`` (built
+#: at 0.0102, the Red Bull Ring defect) in ``tests/test_trends.py``. They sit on
+#: the two edges quoted here on purpose: move either one inwards and the suite
+#: goes on passing at fractions the archive already says are wrong.
 _CLOCK_TOL_MS = 250.0
 _CLOCK_TOL_FRAC = 0.007
 
