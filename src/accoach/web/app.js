@@ -1509,6 +1509,14 @@ async function loadCombo(combo, lapPath, baselinePath) {
   setPanelLoading("summary", t("load.lap"));
   $("readout").innerHTML = t("load.lap");
   if (VIEW === "compare") $("map-readout").innerHTML = t("load.lap");
+  // I tre «questo giro non ha…» parlano del giro che sta per essere sostituito:
+  // si spengono QUI, non quando il disegno nuovo arriva. Finché portavano
+  // `.empty` erano invisibili comunque e la cosa non si vedeva; ora si vede, e
+  // quello che si vedeva era una frase FALSA sopra un disegno giusto per tutta
+  // la durata della richiesta (misurato: ~1,5 s passando da un giro senza
+  // coordinate a uno che le ha, sulla Traiettoria). Nessun buco muto al loro
+  // posto: ognuna delle tre viste scrive la propria riga di caricamento.
+  for (const id of ["map-missing", "line-missing", "dyn-missing"]) $(id).classList.add("hidden");
   let a;
   try { a = await getJSON("/api/analysis?" + q.toString()); }
   catch (e) {

@@ -538,7 +538,14 @@ def test_no_id_rule_can_outrank_the_hidden_class():
 def _screen_css() -> str:
     """The stylesheet without its print block — printing deliberately forces
     every panel visible, which is the opposite rule and not a mistake."""
-    css = _CSS
+    # E senza i commenti. Questo foglio ne ha di lunghi, e finivano DENTRO il
+    # selettore di ogni regola che li segue (`[^{}]+` risale fino alla graffa
+    # precedente): un selettore così non si riconosce più, e la regola che
+    # segue un commento sfuggiva a ogni controllo. Nell'altro verso, un
+    # commento che *cita* una regola («`.empty` è `display: none`») veniva
+    # letto come una regola vera. Misurato: senza questo taglio la mutazione
+    # «una regola nuova spegne `.missing`» restava VERDE.
+    css = re.sub(r"/\*.*?\*/", "", _CSS, flags=re.S)
     # EVERY print block, not just the first: a second one added higher up the
     # file used to be the one that got stripped, leaving the real print rules in
     # the "screen" text and failing two tests for a reason that had nothing to
@@ -1769,3 +1776,165 @@ def test_the_map_tab_label_is_not_left_orphaned_in_the_catalogue():
         entry = _I18NJS[_I18NJS.index(f'"{key}"'):]
         entry = entry[:entry.index("},")]
         assert "en:" in entry and "it:" in entry, key
+
+
+# --- il gemello mancante: chi SPEGNE quel che il JS accende (2026-08-07) ------
+#
+# `test_no_rule_at_all_can_outrank_the_hidden_class` copre un verso solo: una
+# regola che lascia a schermo qualcosa che deve sparire. Il verso opposto è
+# costato tre messaggi muti — `#map-missing`, `#line-missing` e `#dyn-missing`
+# portavano `class="empty hidden"`, e `.empty { display: none }` li teneva
+# spenti anche dopo che il JS toglieva `hidden`. Il difetto è sopravvissuto
+# perché nessun test legava la classe scritta nel markup alla regola scritta nel
+# foglio: due file che si contraddicevano in silenzio, ognuno coerente con sé.
+
+
+def _compound(part: str) -> set[str] | None:
+    """Un pezzo di selettore (`aside.cmp-map`, `#c-map`) ridotto ai suoi nomi.
+
+    `None` se non è un compound semplice: pseudo-classi, attributi e `*` sono
+    condizionali o troppo larghi per essere decisi leggendo un file fermo.
+    """
+    if not re.fullmatch(r"(?:[a-zA-Z][\w-]*)?(?:[.#][\w-]+)*", part) or not part:
+        return None
+    return set(re.findall(r"[.#]?([\w-]+)", part))
+
+
+def _hits(selector: str, chain: list[set[str]]) -> bool:
+    """Vero se `selector` colpisce l'ultimo anello di `chain` (l'elemento) con i
+    suoi antenati, dal più esterno al più interno.
+
+    Solo la discendenza: un selettore con `>`, `+` o `~` viene lasciato stare
+    (dichiarato in fondo al test) perché la posizione fra fratelli non si legge
+    da qui.
+    """
+    if any(c in selector for c in ">+~") or not selector.strip():
+        return False
+    parts = selector.split()
+    compounds = [_compound(p) for p in parts]
+    if any(c is None for c in compounds):
+        return False
+    if not compounds[-1] <= chain[-1]:
+        return False
+    todo = list(compounds[:-1])
+    for names in chain[:-1]:
+        if todo and todo[0] <= names:
+            todo.pop(0)
+    return not todo
+
+
+def _hideable_chains() -> list[tuple[str, list[set[str]]]]:
+    """Ogni elemento che NASCE con `hidden` — cioè che qualcuno accende e spegne
+    a mano — con la catena dei suoi antenati, ognuno ridotto a tag, id e classi.
+
+    `hidden` è tolta da ogni insieme di proposito: la domanda non è se
+    `.hidden { display: none }` lo spegne (è il suo mestiere), ma se lo spegne
+    **qualcos'altro**, che nessun `classList.remove` potrà mai riaccendere.
+    """
+    out: list[tuple[str, list[set[str]]]] = []
+
+    def walk(el, chain: list[set[str]]) -> None:
+        names = {el.tag} | set(el.classes) | ({el.id} if el.id else set())
+        names.discard("hidden")
+        here = chain + [names]
+        if "hidden" in el.classes:
+            out.append((el.id or el.tag, here))
+        for child in el.children:
+            walk(child, here)
+
+    for child in _dom().children:
+        walk(child, [])
+    return out
+
+
+def test_nothing_switches_off_what_the_javascript_switches_on():
+    """Togliere `hidden` deve bastare a far comparire un elemento.
+
+    Il caso vero: la scatola della mappa su un giro senza coordinate mostrava il
+    titolo, nascondeva la tela e **non diceva niente** — 68 px di scatola vuota.
+    `drawMapTo` faceva la cosa giusta (`missing.classList.remove("hidden")`), ma
+    il messaggio portava anche `.empty`, che è lo stato vuoto di TUTTA la pagina
+    e vive a `display: none` finché non arriva `body.no-data`. Toglierne `hidden`
+    non lo accendeva: restava spento per costruzione, e con lui gli altri due.
+    Il vincolo del progetto è «assente, non un trattino»: dove un dato non c'è,
+    la schermata scrive perché — e uno spazio muto è peggio del trattino.
+
+    Nota su `body.no-data`: la classe di stato non è nel markup, quindi una
+    regola che la nomina non colpisce il documento a riposo e non finisce qui.
+    È giusto così — quelle regole descrivono un altro momento della pagina.
+    """
+    chains = _hideable_chains()
+    found = {name for name, _ in chains}
+    # Anti-vacuità: se il parser smette di trovare gli elementi, il ciclo qui
+    # sotto gira a vuoto e il test diventa una decorazione.
+    assert {"map-missing", "line-missing", "dyn-missing"} <= found, sorted(found)
+    assert len(chains) >= 10, f"solo {len(chains)} elementi accendibili: parser?"
+
+    # Anti-vacuità sul matcher: deve saper dire di sì a una classe che c'è e di
+    # no a una che non c'è. Senza questo, un `_hits` sempre falso passerebbe.
+    mapmiss = next(c for name, c in chains if name == "map-missing")
+    assert _hits(".missing", mapmiss), "il matcher non riconosce nemmeno la classe giusta"
+    assert not _hits(".empty", mapmiss), \
+        "i tre messaggi per-vista sono tornati sotto `.empty`, che è lo stato vuoto della pagina"
+
+    seen = 0
+    for m in re.finditer(r"([^{}]+)\{([^}]*)\}", _screen_css()):
+        decl = re.search(r"display\s*:\s*([\w-]+)", m.group(2))
+        if decl is None or decl.group(1) != "none":
+            continue
+        seen += 1
+        for part in m.group(1).split(","):
+            for name, chain in chains:
+                assert not _hits(part.strip(), chain), (
+                    f"{part.strip()!r} spegne #{name}, che il JS accende togliendo "
+                    "`hidden`: dagli una classe sua invece di una condivisa")
+    assert seen >= 5, f"solo {seen} regole `display: none` esaminate: taglio rotto?"
+
+
+def test_the_three_per_view_messages_are_not_the_page_wide_empty_state():
+    """L'altra metà, detta in positivo e senza passare dal CSS: i tre messaggi
+    portano una classe che il foglio non spegne, e lo stato vuoto della pagina
+    (`#empty`, l'unico che `body.no-data` deve accendere) resta il solo `.empty`
+    accendibile. La trappola da evitare era una regola che, aggiustando i tre,
+    accendesse anche quello fuori dal suo caso.
+    """
+    for el in ("map-missing", "line-missing", "dyn-missing"):
+        node = _dom().find(el)
+        assert node is not None, el
+        assert "missing" in node.classes, f"#{el} ha perso la sua classe"
+        assert "empty" not in node.classes, f"#{el} è tornato sullo stato vuoto globale"
+        assert "hidden" in node.classes, f"#{el} deve nascere spento"
+
+    # `.empty` resta di uno solo — `#empty`, che non nasce `hidden` — così
+    # `body.no-data .empty` non può accendere niente che qualcun altro voleva
+    # spento. È la trappola opposta, e vale la pena pinnarla qui accanto.
+    owners = [g for g in re.findall(r'class="([^"]*)"', _HTML) if "empty" in g.split()]
+    assert len(owners) == 1, owners
+    assert "hidden" not in _dom().find("empty").classes
+
+    # E la classe nuova non deve portarsi dietro un `display` di default: il suo
+    # unico stato a riposo è quello che le dà `hidden`.
+    assert "display" not in _rule(".missing"), _rule(".missing")
+
+
+def test_a_new_lap_drops_the_old_lap_s_missing_messages_before_it_fetches():
+    """Il gemello simmetrico, e si vede solo ora che i messaggi si vedono.
+
+    «Questo giro non ha coordinate» parla del giro che sta per essere
+    sostituito. Se resta acceso mentre la richiesta è in volo, la Traiettoria
+    dice per un secondo e mezzo che il giro non ha coordinate SOPRA la
+    traiettoria del giro che ce le ha: una frase falsa sopra un disegno giusto.
+    Misurato nel browser passando da `bmw_m4_gt3_acc · imola` a
+    `mclaren_720s_gt3_evo · monza`. Finché i tre portavano `.empty` erano
+    invisibili in ogni caso e il difetto non poteva mostrarsi.
+
+    «Prima della richiesta» è metà del test: spegnerli dopo l'`await` lascerebbe
+    la frase falsa esattamente per la finestra che conta.
+    """
+    body = _APPJS[_APPJS.index("async function loadCombo("):]
+    body = body[:body.index("\n}")]
+    head = body[:body.index("await getJSON(")]
+    assert "await getJSON(" in body, "loadCombo non fa più la sua richiesta: taglio rotto?"
+    for el in ("map-missing", "line-missing", "dyn-missing"):
+        assert el in head, f"{el} resta acceso durante la richiesta del giro nuovo"
+    assert 'classList.add("hidden")' in head

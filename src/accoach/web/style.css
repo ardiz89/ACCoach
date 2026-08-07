@@ -635,6 +635,19 @@ body:not(.railed) .rail { display: none; }
    cambiato dall'ultima volta» con niente sotto, mentre la frase che dice
    perché stava nel DOM. Un pannello che tace si legge come rotto. */
 .nothing { padding: 4px 0; color: var(--muted); }
+/* E il terzo della famiglia: «questa VISTA non ha i dati per disegnarsi», che
+   non è né la pagina intera senza giri né una riga dentro un pannello.
+   Stesso aspetto di `.empty` — grande, centrato, in tono spento — ma **senza il
+   suo `display: none`**, perché questi tre messaggi li accende il JS togliendo
+   `hidden`, non lo stato della pagina. Finché portavano `.empty` restavano
+   spenti per sempre: `#map-missing`, `#line-missing` e `#dyn-missing`
+   mostravano il titolo della scheda e sotto il vuoto, mentre la frase che
+   spiega perché stava nel DOM, leggibile solo dall'ispettore. È la terza volta
+   che `.empty` viene riusata per un «vuoto» che non è il suo (vedi `.nothing`
+   qui sopra e `.train-gate` più giù): la classe dice *quale* vuoto, non solo
+   che è vuoto. Nessuna regola la riaccende, di proposito — spegnere e
+   riaccendere è un duello di specificità, e questo file ne ha già uno. */
+.missing { padding: 60px 24px; text-align: center; color: var(--muted); }
 /* Senza nemmeno un giro, il messaggio deve essere l'unica cosa a schermo.
    Nascondeva solo `main`, e restavano: otto schede che al clic non fanno niente
    (l'`init()` esce prima di collegarle), tre tendine vuote, la fascia del giro,

@@ -321,7 +321,10 @@
             </div>
           </div>
         </main>
-        <div id="map-missing" class="empty hidden" data-i18n="map.missing">This lap has no coordinates (recorded before the map update). Drive and record a new lap to see it here.</div>
+        <!-- `.missing`, non `.empty`: quella è la schermata «ancora nessun giro»
+             di tutta la pagina, accesa solo da `body.no-data`, e riusarla qui
+             lasciava il messaggio a `display: none` per sempre (vedi il CSS). -->
+        <div id="map-missing" class="missing hidden" data-i18n="map.missing">This lap has no coordinates (recorded before the map update). Drive and record a new lap to see it here.</div>
         <!-- The braking sheet travelled here with the map rather than getting a
              tab of its own: the drawing above already says where you brake, and
              the sheet is the same fact as numbers. Measured across your recent
@@ -374,7 +377,7 @@
       </div>
     </main>
     <section id="line-table" class="debrief"></section>
-    <div id="line-missing" class="empty hidden" data-i18n="line.missing">These laps have no coordinates (the track map arrived with schema v3). Drive and record a new lap to see your line here.</div>
+    <div id="line-missing" class="missing hidden" data-i18n="line.missing">These laps have no coordinates (the track map arrived with schema v3). Drive and record a new lap to see your line here.</div>
   </div>
 
   <div id="view-sectors" class="hidden">
@@ -481,7 +484,7 @@
         <span class="swatch"><span class="marker" style="color:#ff5a3c">■</span> <span data-i18n="bal.over">oversteer</span></span>
       </div>
     </div>
-    <div id="dyn-missing" class="empty hidden" data-i18n="dyn.missing">This lap has no dynamics data (G / slip were recorded from v6). Drive and record a new lap to see it here.</div>
+    <div id="dyn-missing" class="missing hidden" data-i18n="dyn.missing">This lap has no dynamics data (G / slip were recorded from v6). Drive and record a new lap to see it here.</div>
   </div>
 
     </div><!-- /views -->
