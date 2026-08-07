@@ -1124,7 +1124,7 @@ function drawMap(a, cx) {
   if (lost) lost.classList.toggle("hidden", a.review.lost_at == null);
   // Il readout si scrive QUI, non in ognuno dei chiamanti (`loadCombo`,
   // `redrawCurrentView`, `hoverTo`): la pastiglia della finestra mancava a
-  // riposo sulla scheda Mappa perché due dei tre la anteponevano da soli e il
+  // riposo sul disegno del giro perché due dei tre la anteponevano da soli e il
   // terzo — il cambio scheda, che passa da `redrawCurrentView` a `drawMap`
   // senza toccare il readout — no. La stessa forma del difetto già chiuso per
   // `hoverTo`: se la pastiglia va scritta a mano in N punti, il punto N+1 se
@@ -1608,8 +1608,8 @@ function fillLaps(a, force) {
 // The identity of what's on screen — lap, reference, gap, track temperature —
 // as a strip under the tabs, on every view. It used to be three items inside
 // Compare's own summary, which meant the landing tab explained a lap without
-// ever naming it, and the Map, Trajectory and Sectors tabs showed numbers you
-// had to change tab to identify.
+// ever naming it, and the Trajectory and Sectors tabs showed numbers you had to
+// change tab to identify.
 function drawLapBar(a) {
   const el = $("lapbar");
   if (!el) return;
@@ -2966,7 +2966,7 @@ function drawDynamics(cx) {
     if (coast) coast.innerHTML = "";
     $("dyn-tyres").classList.add("hidden");
     $("dyn-balance-wrap").classList.add("hidden");
-    // Stesso principio appena applicato alla Mappa: un solo punto scrive
+    // Stesso principio appena applicato alla mappa: un solo punto scrive
     // #dyn-readout (`updateDynReadout`, che antepone sempre `rangeChip()`),
     // non la pastiglia ripetuta a mano in ogni ramo di `drawDynamics`. Prima
     // di questo fix questo ramo — un giro senza canali di dinamica, con la
@@ -4342,7 +4342,8 @@ function nearest(posArr, p) {
 }
 
 // Point-by-point readout markup at lap position p (0..1). Shared by the Compare
-// charts and the Map hover so both reuse the same nearest() lookup.
+// charts and the hover on the map beside them, so both reuse the same nearest()
+// lookup.
 function readoutHTML(a, p) {
   const rv = a.review.channels, rf = a.reference.channels, d = a.review.delta;
   const iv = nearest(rv.pos, p), ir = nearest(rf.pos, p), id = nearest(d.pos, p);
@@ -4401,7 +4402,7 @@ function wireRangeClear(el) {
   if (b) b.onclick = () => { setRange(null); redrawCurrentView(); };
 }
 
-// Testo del readout della Mappa, a riposo (`p` nullo, la legenda) o sotto il
+// Testo del readout della mappa, a riposo (`p` nullo, la legenda) o sotto il
 // mouse (`p`, punto per punto) — sempre con la pastiglia della finestra
 // davanti. Chiamata da un solo posto, `drawMap` (vedi il suo commento): prima
 // ogni chiamante di `drawMap` scriveva anche il readout per conto proprio, e
@@ -4587,9 +4588,10 @@ function wireHover() {
   }
 }
 
-// Debounced so a resize drag fires once at rest, not per pixel. Compare/Map
-// just redraw from the in-memory payload (no refetch, no flicker or response
-// race); Sectors/Progress re-run their loader once at the end.
+// Debounced so a resize drag fires once at rest, not per pixel. Compare just
+// redraws from the in-memory payload — charts AND the map beside them, which is
+// how the map's canvas picks up the column's new width (no refetch, no flicker
+// or response race); Sectors/Progress re-run their loader once at the end.
 let _resizeTimer = null;
 window.addEventListener("resize", () => {
   if (!CURRENT) return;

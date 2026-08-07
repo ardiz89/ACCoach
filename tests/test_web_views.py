@@ -1503,6 +1503,106 @@ def test_the_map_lives_in_compare_now():
     assert ids["leg-lost"] == "compare"
 
 
+# --- e le due colonne sono DAVVERO due colonne ------------------------------
+# `_view_of_ids()` sa dire una cosa sola: «questo id sta dentro view-compare».
+# Non sa niente dell'annidamento, quindi resta verde anche se la mappa finisce
+# nella colonna dei grafici — e resta verde se le tre classi dello scaffale
+# spariscono del tutto. Provato: togliendo `class="cmp-shell"`, `"cmp-charts"` e
+# `"cmp-map"` da index.html la suite intera passava. Due guasti silenziosi: le
+# colonne collassano una sotto l'altra, e la catena di stampa
+# `#view-compare > .cmp-shell > .cmp-map > #brakesheet` non aggancia più niente,
+# cioè il foglio esce BIANCO. Il CSS è pinnato dal testo di style.css; qui si
+# pinna l'altra metà, la struttura che quel testo presuppone.
+
+_VOID_TAGS = {"area", "base", "br", "col", "embed", "hr", "img", "input",
+              "link", "meta", "param", "source", "track", "wbr"}
+
+
+class _El:
+    """Un elemento di index.html: tag, id, classi, figli DIRETTI."""
+
+    def __init__(self, tag: str, attrs: dict):
+        self.tag = tag
+        self.id = attrs.get("id") or ""
+        self.classes = set((attrs.get("class") or "").split())
+        self.children: list["_El"] = []
+
+    def cols(self, cls: str) -> list["_El"]:
+        """I figli diretti con quella classe — «diretti» è il punto del test."""
+        return [c for c in self.children if cls in c.classes]
+
+    def find(self, el_id: str) -> "_El | None":
+        """Il discendente con quell'id, a qualsiasi profondità."""
+        for c in self.children:
+            if c.id == el_id:
+                return c
+            hit = c.find(el_id)
+            if hit is not None:
+                return hit
+        return None
+
+
+def _dom() -> _El:
+    from html.parser import HTMLParser
+
+    root = _El("#document", {})
+
+    class _Builder(HTMLParser):
+        def __init__(self):
+            super().__init__(convert_charrefs=True)
+            self.stack = [root]
+
+        def handle_starttag(self, tag, attrs):
+            el = _El(tag, dict(attrs))
+            self.stack[-1].children.append(el)
+            if tag not in _VOID_TAGS:
+                self.stack.append(el)
+
+        def handle_startendtag(self, tag, attrs):
+            self.stack[-1].children.append(_El(tag, dict(attrs)))
+
+        def handle_endtag(self, tag):
+            # Chiude fino al tag omonimo più interno invece di fidarsi
+            # dell'ordine: una chiusura spaiata sposterebbe tutto il resto del
+            # documento di un livello, e il test mentirebbe sull'annidamento.
+            for k in range(len(self.stack) - 1, 0, -1):
+                if self.stack[k].tag == tag:
+                    del self.stack[k:]
+                    return
+
+    p = _Builder()
+    p.feed(_HTML)
+    p.close()
+    return root
+
+
+def test_compare_is_a_shell_with_the_map_in_its_right_hand_column():
+    """L'annidamento, non l'appartenenza: `.cmp-shell` figlio di `#view-compare`,
+    e dentro di lui DUE colonne — i grafici a sinistra, la mappa a destra.
+
+    È anche la catena su cui si regge la stampa: se una delle tre classi salta,
+    `@media print` riaccende una discendenza che non esiste e il foglio frenate
+    esce bianco, senza che niente protesti fino alla carta.
+    """
+    compare = _dom().find("view-compare")
+    assert compare is not None, "index.html non ha più #view-compare"
+    shells = compare.cols("cmp-shell")
+    assert len(shells) == 1, "#view-compare deve avere un solo .cmp-shell, figlio diretto"
+    shell = shells[0]
+
+    charts, maps = shell.cols("cmp-charts"), shell.cols("cmp-map")
+    assert len(charts) == 1, ".cmp-shell ha perso la colonna dei grafici"
+    assert len(maps) == 1, ".cmp-shell ha perso la colonna della mappa"
+    assert maps[0].tag == "aside", "la colonna della mappa è un <aside>"
+    assert charts[0].find("charts") is not None, "#charts non è nella sua colonna"
+
+    # E stanno nella colonna GIUSTA. Senza il negativo, la mappa potrebbe finire
+    # in mezzo ai grafici e ogni asserzione qui sopra resterebbe verde.
+    for el in ("map-readout", "c-map", "leg-lost", "map-missing", "brakesheet"):
+        assert maps[0].find(el) is not None, f"{el} non è nella colonna della mappa"
+        assert charts[0].find(el) is None, f"{el} è finito fra i grafici"
+
+
 def test_the_rail_no_longer_lists_the_map():
     js = (WEB / "app.js").read_text(encoding="utf-8")
     rail = js[js.index("RAIL_VIEWS"):js.index("\n", js.index("RAIL_VIEWS"))]
@@ -1516,7 +1616,13 @@ def test_no_javascript_branch_still_waits_for_a_map_view():
     di caricamento che non compare. Positivo accanto: il Confronto quei rami
     li ha davvero."""
     assert 'VIEW === "map"' not in _APPJS
-    assert _APPJS.count('VIEW === "compare"') >= 2
+    # Il positivo era `count(...) >= 2`, che con quattro rami veri non oppone
+    # nessuna resistenza: sarebbe verde anche perdendone due. Ognuno dei tre
+    # punti che la vista Mappa serviva va nominato per nome.
+    for fn in ("function redrawCurrentView()", "async function loadCombo(",
+               "function hoverTo("):
+        body = _APPJS.split(fn)[1].split("\n}\n")[0]
+        assert 'VIEW === "compare"' in body, fn
 
 
 def _branch_of(fn: str, view: str) -> str:
@@ -1527,13 +1633,31 @@ def _branch_of(fn: str, view: str) -> str:
     ramo della vista Mappa — un test che non sa distinguere i due mondi è verde
     in entrambi. Il taglio verifica da sé che l'inizio venga prima della fine,
     altrimenti una fetta vuota renderebbe verde ogni `in` che la interroga.
+
+    La fine è la graffa che CHIUDE il ramo, contata, non il prossimo
+    `else if (`: il ramo del Confronto in `redrawCurrentView` è l'ultimo della
+    catena, quindi il vecchio taglio arrivava a fine funzione e si portava
+    dentro `drawRail()`/`drawRailList()`. `assert i < j` protegge dalla fetta
+    vuota; non proteggeva da quella troppo larga, che è lo stesso difetto
+    all'altro capo.
     """
     body = _APPJS.split(fn)[1].split("\n}\n")[0]
     i = body.index(f'VIEW === "{view}"')
-    j = body.find("else if (", i)
-    if j == -1:
-        j = len(body)
-    assert i < j, f"fetta vuota per il ramo {view!r} di {fn}"
+    o = body.index("{", i)
+    # Il ramo dev'essere un blocco: fra la condizione e la graffa non ci può
+    # stare un'istruzione (`else if (VIEW === "x") faiQualcosa();`), altrimenti
+    # la graffa trovata è di un ALTRO ramo e la fetta sarebbe di qualcun altro.
+    assert ";" not in body[i:o], f"il ramo {view!r} di {fn} non è un blocco"
+    depth, j = 0, None
+    for k in range(o, len(body)):
+        if body[k] == "{":
+            depth += 1
+        elif body[k] == "}":
+            depth -= 1
+            if depth == 0:
+                j = k + 1
+                break
+    assert j is not None and i < j, f"fetta senza fine per il ramo {view!r} di {fn}"
     return body[i:j]
 
 
@@ -1544,6 +1668,11 @@ def test_opening_compare_draws_the_map_and_loads_the_braking_sheet():
     assert "redraw(LAST_HOVER)" in branch
     assert "drawMap(DATA, null)" in branch
     assert "loadBraking()" in branch
+    # Che la fetta finisca dove finisce il ramo: `drawRail()` sta fuori da ogni
+    # ramo, apposta (il rail non appartiene a nessuna vista). Se compare qui
+    # dentro, il taglio ha inghiottito la coda della funzione e le tre
+    # asserzioni sopra parlano di un pezzo di codice che non è questo ramo.
+    assert "drawRail()" not in branch
 
 
 def test_a_new_lap_draws_the_map_when_compare_is_open():
@@ -1572,17 +1701,40 @@ def test_compare_is_two_columns_that_can_actually_shrink():
     assert "sticky" in _rule(".cmp-map {")
 
 
+def _media_blocks(query: str) -> list[str]:
+    """I corpi di ogni `@media <query>` dello stylesheet da SCHERMO, delimitati
+    contando le graffe.
+
+    Uno `split()` sulla stringa `@media (…)` non delimita niente: ogni fetta
+    arriva a fine file, quindi «i blocchi che nominano `.cmp-shell`» erano uno
+    solo per caso — perché `_screen_css()` toglie prima il blocco `@media print`,
+    che quella classe la nomina tre volte. Bastava una menzione qualsiasi sotto
+    l'ultimo `@media` per far fallire il test per un motivo che non c'entra.
+    """
+    css, out = _screen_css(), []
+    for m in re.finditer(re.escape(f"@media {query}") + r"\s*\{", css):
+        depth, start = 0, m.end() - 1
+        for k in range(start, len(css)):
+            if css[k] == "{":
+                depth += 1
+            elif css[k] == "}":
+                depth -= 1
+                if depth == 0:
+                    out.append(css[start + 1:k])
+                    break
+    return out
+
+
 def test_narrow_screens_stack_the_columns_with_the_map_on_top():
     """A schermo stretto due colonne da 320 px non ci stanno. Impilate, la mappa
     va SOPRA: è l'orientamento, e si legge prima del dettaglio."""
-    css = _screen_css()
     # Il blocco che parla dello scaffale, non «il primo @media a 900px»: ce n'è
     # già un altro nel file (la curva ingrandita), e prendere quello darebbe una
     # fetta che non contiene niente di ciò che si cerca — verde per il motivo
     # sbagliato o rosso per il motivo sbagliato, mai per quello giusto.
-    blocks = [b for b in css.split("@media (max-width: 900px)")[1:] if ".cmp-shell" in b]
+    blocks = [b for b in _media_blocks("(max-width: 900px)") if ".cmp-shell" in b]
     assert len(blocks) == 1, "un solo @media a 900px deve impilare lo scaffale"
-    block = blocks[0][:blocks[0].index("\n}\n")]
+    block = blocks[0]
     assert "grid-template-columns: 1fr" in block
     assert "order: -1" in block
     assert "position: static" in block

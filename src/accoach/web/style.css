@@ -402,7 +402,7 @@ body:not(.railed) .rail { display: none; }
 /* G-G scatter: taller and capped in width so it reads as a square-ish plot;
    drawGG scales the friction circle by min(w,h) so it stays circular anyway. */
 .chart.gg canvas { height: 340px; max-width: 440px; margin: 0 auto; }
-/* Balance ribbon: a moderate track map (smaller than the full Map tab). */
+/* Balance ribbon: a moderate track map (smaller than the one beside Compare). */
 .chart.ribbon canvas { height: 44vh; min-height: 300px; cursor: crosshair; }
 
 /* Corner-consistency rows: a corner label, a spread bar, and the numbers. */
