@@ -484,10 +484,20 @@ class Overlay(QWidget):
         preso la riga.
 
         Non sfuma e non ha un timer: è una condizione, non un evento, e finisce
-        quando entri in corsia. Prende il posto dei consigli di guida perché la
-        gerarchia è quella: un consiglio su come prendere una curva che copre il
-        rientro ti fa fare un giro in più col serbatoio vuoto. La voce non
-        cambia — i cue continuano a essere pronunciati, cedono solo la riga.
+        quando entri in corsia.
+
+        La banda viene tolta a **ogni** cue, non solo ai consigli su come
+        prendere una curva: `paintEvent` non guarda la categoria. Ci finiscono
+        dentro anche bloccaggio e pattinamento, che consigli di guida non sono e
+        che a voce hanno priorità *superiore* alla chiamata ai box (300 in
+        `events.py`, 290 in `pitcall.py`; il test che sancisce quella gerarchia
+        è `test_the_call_outranks_technique_advice_but_not_a_lock_up`), e la
+        benzina, che a voce è alla pari (290 anche in `fuel.py`).
+
+        Non si perde informazione, perché la voce non cambia: i cue continuano a
+        essere pronunciati tutti, cedono solo la riga. A schermo però la
+        chiamata vince anche su di loro, ed è voluto: un bloccaggio lo correggi
+        al prossimo giro, un serbatoio vuoto no.
         """
         if not self._state.get("pit_due"):
             return False

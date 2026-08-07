@@ -129,6 +129,10 @@ Quando c'è una modifica che richiede il garage, senti tre cose:
 3. **Da fermo nel box**: cosa fare con la modifica, perché vive in una pagina del
    browser che mentre guidavi non stavi guardando.
 
+E c'è una quarta cosa che non senti: la **vedi**. Dalla prima chiamata l'avviso
+di rientro resta acceso sull'overlay finché non entri in corsia — §4, «Leggere
+l'overlay».
+
 Una cosa da sapere: **l'ingresso della corsia box nessun gioco lo pubblica**. Lo
 imparo guardando dove lasci la pista la prima volta che rientri davvero, e ne
 tengo la mediana su più visite. Quindi su una pista dove non sei mai rientrato

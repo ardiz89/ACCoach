@@ -53,6 +53,17 @@ _BASE = {"connected": True, "speed_kmh": 150.0,
 
 _CUE = {"message": "Bloccaggio, alleggerisci il freno", "category": "locked"}
 
+# Il controllo interno dei test dell'assenza. Asserire che una chiave *non* c'è
+# è verde anche su un insieme vuoto: se la spia non fosse installata, o `render`
+# non dipingesse niente, quei test resterebbero verdi senza misurare più nulla.
+# Il focus si disegna **dopo** la banda della pastiglia (`paintEvent` chiama
+# `_draw_focus` subito sotto), quindi la sua chiave nello stesso frame dice che
+# la pittura è arrivata oltre il punto che quei test guardano. Sta a y 170, sotto
+# la banda: non la tocca, e i test del pixel non lo usano.
+_FOCUS = {"focus": {"focus": {"name": "Variante Ascari", "theme": "frenata",
+                              "baseline_ms": 180.0}}}
+_CONTROL_KEY = "overlay.focus"
+
 # La banda della pastiglia: la barretta d'accento sta a x 20-24, y 126-162 in
 # coordinate base. Questo punto è dentro, lontano dagli angoli arrotondati.
 _ACCENT_X, _ACCENT_Y = 22, 144
@@ -131,14 +142,33 @@ def test_the_warning_is_asked_for_while_you_are_due_in(app, monkeypatch):
 
 def test_no_warning_when_nothing_is_due(app, monkeypatch):
     """Niente segnaposto spento che occupa la riga quando il rientro non serve."""
-    assert "overlay.pit_due" not in _keys_drawn(monkeypatch, _BASE)
+    keys = _keys_drawn(monkeypatch, {**_BASE, **_FOCUS})
+    assert _CONTROL_KEY in keys, "il frame è stato dipinto davvero (vedi _FOCUS)"
+    assert "overlay.pit_due" not in keys
 
 
 def test_no_warning_when_the_call_is_over(app, monkeypatch):
     """`pit_due` falsa (sei entrato in corsia) spegne l'avviso come la chiave
     mancante: qui il difetto sarebbe un `in` al posto di un test di verità."""
-    assert "overlay.pit_due" not in _keys_drawn(
-        monkeypatch, {**_BASE, "pit_due": False})
+    keys = _keys_drawn(monkeypatch, {**_BASE, **_FOCUS, "pit_due": False})
+    assert _CONTROL_KEY in keys, "il frame è stato dipinto davvero (vedi _FOCUS)"
+    assert "overlay.pit_due" not in keys
+
+
+def test_no_warning_on_a_disconnected_hud(app, monkeypatch):
+    """Gioco chiuso, fermo ancora armato: l'avviso non deve galleggiare.
+
+    Non è un caso di scuola. Se il gioco sparisce mentre devi rientrare,
+    `PitCall.update` esce alla prima riga senza disarmare il fermo, quindi il
+    payload continua a dire `pit_due` vero con `connected` falso a tempo
+    indefinito. L'unica cosa che tiene «RIENTRA AI BOX» fuori da un HUD
+    scollegato è la **posizione del `return`** nel ramo «in attesa» di
+    `paintEvent`: nessun'altra guardia esiste, e nessun altro test la difende.
+    """
+    frame = _paint(monkeypatch, {**_BASE, "connected": False, "pit_due": True})
+    assert "overlay.waiting" in frame.keys, "il ramo scollegato è stato dipinto"
+    assert "overlay.pit_due" not in frame.keys
+    assert frame.accent != _AMBER, "e nemmeno la banda ambra è accesa"
 
 
 # --- il difetto che stiamo correggendo -------------------------------------
