@@ -102,14 +102,15 @@ start of the final sector (or about 20 s before the pit entry, whichever comes
 first), again just before the entry, and once more standing in the box, telling
 you what to do with the change.
 
-There is a fourth thing, and you don't hear it — you see it. From the call
-onwards, the pill that normally shows the last piece of advice is no longer the
-last piece of advice: it is the **pit-in warning**, in amber, and it **does not
-fade**. It stays lit until you enter the pit lane, or until the change is no
-longer pending (if it gets dropped): a call that disappears after two seconds is
-a call you miss if you happened to be looking at the corner ahead. The advice is
-still **spoken** — it only gives up that line, and takes it back as soon as the
-warning goes out.
+There is a fourth thing, and you don't hear it — you see it. The overlay has a
+**pill** that normally shows the last piece of advice spoken, and fades on its
+own. From the call onwards, that pill is no longer the last piece of advice: it
+is the **pit-in warning**, in amber, and it **does not fade**. It stays lit
+until you enter the pit lane, or until the change is no longer pending (if it
+gets dropped): a call that disappears after two seconds is a call you miss if
+you happened to be looking at the corner ahead. The advice is still **spoken**
+— it only gives up that line, and takes it back as soon as the warning goes
+out.
 
 **No game publishes where the pit lane begins**, so HONE learns it: it watches
 where you leave the track the first time you actually drive in, and keeps the

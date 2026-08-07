@@ -489,10 +489,13 @@ class Overlay(QWidget):
         La banda viene tolta a **ogni** cue, non solo ai consigli su come
         prendere una curva: `paintEvent` non guarda la categoria. Ci finiscono
         dentro anche bloccaggio e pattinamento, che consigli di guida non sono e
-        che a voce hanno priorità *superiore* alla chiamata ai box (300 in
-        `events.py`, 290 in `pitcall.py`; il test che sancisce quella gerarchia
-        è `test_the_call_outranks_technique_advice_but_not_a_lock_up`), e la
-        benzina, che a voce è alla pari (290 anche in `fuel.py`).
+        che a voce hanno priorità *superiore* alla chiamata ai box: la fonte
+        vera sono le costanti, `_PRIORITY_BASE = 300.0` in `events.py:74`
+        contro `_PRIORITY = 290.0` in `pitcall.py:99` (il test
+        `test_the_call_outranks_technique_advice_but_not_a_lock_up` in
+        `tests/test_pitcall.py` copre solo i *tier* — ACUTE batte ADVISORY —
+        non questi numeri). La benzina, a voce, è alla pari (290 anche in
+        `fuel.py:29`).
 
         Non si perde informazione, perché la voce non cambia: i cue continuano a
         essere pronunciati tutti, cedono solo la riga. A schermo però la
