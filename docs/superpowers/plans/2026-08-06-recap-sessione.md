@@ -799,6 +799,100 @@ git commit -m "La guida: cosa somma, contro cosa, e perché il tuo miglior giro 
 
 ---
 
+### Task 6: L'orologio che non chiude (aggiunto il 07/08, dopo la verifica a schermo)
+
+**Perché esiste questo task.** Guidando il report su giri veri, la prima
+schermata si contraddiceva: sul Red Bull Ring la testa diceva «metro 1:08.369»
+e la riga giro «1:10.849 · −0.641s». I due tempi stanno **sulla stessa
+schermata**, e sottraendoli vengono 2.480s: mancava il 74%.
+
+La causa è a monte: `gap_ms = delta[-1] - delta[0]` (`phases.py:250`) è la
+differenza sull'**orologio della telemetria**, e su qualche giro
+quell'orologio non copre il giro. Misurato su tutto l'archivio (59 giri), con
+la durata dei campioni corretta per la frazione di giro che coprono
+(`span − lap_time_ms × (pos[-1] − pos[0])`):
+
+| | scarto |
+|---|---|
+| mediana | 34 ms |
+| p90 | 86 ms |
+| i tre peggiori | 326, 694, **1140** ms |
+
+Cinquantasei giri stanno sotto i 160 ms, poi c'è un salto di **oltre il
+doppio**. I due peggiori sono della stessa uscita — riferimento lungo e giro
+corto — e i loro errori **si sommano**: è per questo che a schermo il divario
+era 1839 ms.
+
+**La decisione del pilota (07/08): guardia sulla validità dell'orologio.** Un
+giro il cui orologio non chiude non è una misura, è una registrazione rotta:
+esce dal recap. E se a non chiudere è il **riferimento**, non è storta una
+riga — è storta tutta l'uscita, perché il metro è lui: allora l'uscita non ha
+recap, e questa è l'unica causa che la schermata può nominare con onestà.
+
+**Files:**
+- Modify: `src/accoach/coaching/trends.py` (la guardia e il motivo), `src/accoach/api.py`, `src/accoach/web/app.js`, `src/accoach/web/i18n.js`
+- Test: `tests/test_trends_recap.py` (o dove vivono i test di `session_recap`), `tests/test_api_recap.py`
+
+- [ ] **Step 1: La guardia, e il numero che la giustifica**
+
+Un predicato in `trends.py`, accanto a `session_recap` — il criterio si scrive
+**una volta sola** e lo chiamano sia il ramo del riferimento sia quello dei
+giri (la lezione del Task 3: due chiamanti dello stesso predicato senza un
+contratto divergono in silenzio).
+
+La soglia è **250 ms**, e va scritta come costante di modulo con il perché
+accanto: sta nel vuoto misurato fra 160 e 326 ms, e la distribuzione sopra va
+nel commento — chi la rialza o la abbassa deve vedere contro cosa.
+
+La forma **corretta per copertura** non è un dettaglio: nella forma assoluta
+(`|span − lap_time_ms|`) la mediana è 102 ms, il p90 168 e il primo giro rotto
+sta a 212 — non c'è nessun vuoto in cui mettere una soglia. La correzione per
+la frazione di giro coperta apre il vuoto. Scrivilo nel commento.
+
+- [ ] **Step 2: Il motivo, e solo questo motivo**
+
+`session_recap` torna `None` per sette ragioni diverse, e per questo il
+messaggio a schermo è stato reso generico di proposito (fine Task 4): non si
+afferma una causa fra sette. Questa però è **verificabile**, quindi si può
+nominare — ma **solo lei**. Serve un canale del motivo (`None` più un motivo,
+o un motivo dentro l'oggetto) che porti a schermo la frase specifica **solo**
+quando è la guardia ad aver scartato il riferimento, e lasci il testo generico
+in tutti gli altri sei casi. Se il tuo modo di portarlo su fa comparire la
+frase specifica anche in un altro caso, è sbagliato: quello è esattamente il
+difetto che il Task 4 ha appena corretto.
+
+Chiave nuova in `i18n.js`, in **entrambe** le lingue: dice che di quell'uscita
+non ci si può fidare perché il tempo registrato non copre il giro — non che il
+pilota ha sbagliato qualcosa.
+
+- [ ] **Step 3: I test che possono fallire**
+
+Su questo ramo **nove** test scritti nei piani non potevano fallire. Qui il
+rischio è preciso: un fixture sintetico costruisce `t_ms` e `lap_time_ms`
+coerenti per costruzione, quindi la guardia non scatta mai e il test è verde
+qualunque cosa faccia il codice. Il fixture deve **rompere l'orologio a mano**
+e provare i tre casi separatamente, una mutazione per volta:
+  1. un giro (non il riferimento) con l'orologio rotto → esce dalle righe **e**
+     dalle medie (controlla `gain_avg_ms` e `by_phase`, non solo il conteggio
+     delle righe: la lezione del Task 2 è che una somma totale non prende ciò
+     che una media nasconde);
+  2. il **riferimento** con l'orologio rotto → nessun recap, e il motivo è
+     quello nuovo;
+  3. un giro appena **dentro** la soglia → resta, e resta contato.
+
+- [ ] **Step 4: Verifica**
+
+Run: `python -m pytest -q`. Poi il controllo che conta: sul Red Bull Ring la
+schermata non deve più mostrare due numeri che si contraddicono.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git commit -m "Un giro il cui orologio non chiude non è una misura"
+```
+
+---
+
 ## Chiusura
 
 - [ ] **Suite intera verde**: `python -m pytest -q`
