@@ -181,7 +181,6 @@
                            it: `Gas e freno — pieno = tu, tratteggio = riferimento` },
     "flow.chart.delta":  { en: `Gap across the lap — above the line = slower`,
                            it: `Distacco sul giro — sopra la linea = più lento` },
-    "tab.map":         { en: `Map`, it: `Mappa` },
     "tab.sectors":     { en: `Sectors`, it: `Settori` },
     "tab.dynamics":    { en: `Dynamics`, it: `Dinamica` },
     "tab.trends":      { en: `Trends`, it: `Andamento` },

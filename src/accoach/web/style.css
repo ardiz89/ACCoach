@@ -254,12 +254,24 @@ select {
 .readout .slower { color: var(--red); }
 .readout .faster { color: var(--green); }
 
-.tabs { display: flex; gap: 4px; padding: 10px var(--gut) 0; border-bottom: 1px solid var(--line); background: var(--panel); }
+/* La riga scorre da sé quando le schede non ci stanno, a QUALSIASI larghezza.
+   La stessa regola c'era solo sotto i 520 px, e nel mezzo la fila spingeva la
+   pagina intera di lato: misurato col browser su un riquadro da 768 px (un
+   tablet accanto al volante, che è un uso dichiarato di quest'app), la pagina
+   scorreva di **248 px con undici schede** e di 170 con dieci — su OGNI vista,
+   perché la fila di schede sta fuori da tutte. Non è la vista a sfondare, è la
+   navigazione: quindi la difesa va qui e non in un @media. Sotto i 520 px il
+   blocco apposito aggiunge `gap: 0` e lo scorrimento morbido di iOS. */
+.tabs { display: flex; gap: 4px; padding: 10px var(--gut) 0; border-bottom: 1px solid var(--line);
+  background: var(--panel); overflow-x: auto; }
 .tab {
   background: transparent; color: var(--muted);
   border: none; border-bottom: 2px solid transparent;
   padding: 8px 14px; font-size: 14px; cursor: pointer;
   font-family: var(--font-ui);
+  /* Una scheda non si lascia comprimere in una colonna di lettere: o ci sta,
+     o la fila scorre. */
+  flex: 0 0 auto; white-space: nowrap;
 }
 .tab:hover { color: var(--text); }
 .tab.active { color: var(--text); border-bottom-color: var(--cyan); }
@@ -340,6 +352,43 @@ body:not(.railed) .rail { display: none; }
   .stage > .views { --gut: max(24px, calc((100% - var(--page)) / 2)); }
   .stage { padding: 0; }
 }
+/* --- Il Confronto e la sua mappa, fianco a fianco -------------------------
+   I quattro grafici a sinistra, il disegno del giro a destra. Erano due schede
+   e la stessa domanda: si guardava il delta, si cliccava «Mappa», e ci si
+   ricordava a memoria dov'era il picco.
+
+   `minmax(0, 1fr)` sulla prima colonna non è ornamentale. La misura minima
+   automatica di un elemento a griglia è la sua larghezza `min-content`, e un
+   canvas la porta con sé: senza lo `0` la colonna dei grafici non scende sotto
+   quella misura, la riga sfonda il contenitore e la PAGINA scorre di lato.
+   Questa pagina ha già spedito 39 px di scroll orizzontale in un'altra riga.
+
+   `align-items: start` non è cosmetico neanche lui: serve allo sticky. Con lo
+   `stretch` di default l'elemento riempirebbe tutta la riga e non avrebbe più
+   spazio in cui scorrere dentro la propria area. */
+.cmp-shell {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 38%);
+  gap: 20px;
+  align-items: start;
+}
+/* La mappa resta ferma mentre scorri i grafici: è tutto il senso della cosa.
+   `top` sotto le schede, che non sono sticky — basta un filo d'aria. */
+.cmp-map { position: sticky; top: 12px; min-width: 0; }
+.cmp-charts { min-width: 0; }
+/* La scheda frenate è una tabella larga, e qui vive in una colonna che può
+   scendere a 320 px: la sua larghezza minima spingerebbe la pagina di lato
+   invece di scorrere per conto proprio. La regola gemella sotto i 700 px
+   (`#line-table, #brakesheet`) resta dov'è: là vale per la pagina intera. */
+.cmp-map #brakesheet { overflow-x: auto; }
+
+@media (max-width: 900px) {
+  /* Impilate, con la mappa SOPRA: è l'orientamento, e serve prima del
+     dettaglio. `order` funziona perché sono elementi di una griglia. */
+  .cmp-shell { grid-template-columns: 1fr; }
+  .cmp-map { position: static; order: -1; }
+}
+
 .chart canvas { cursor: crosshair; }
 /* …tranne dove il mirino non c'è. Il puntatore è una promessa: darlo a un
    grafico che non risponde al mouse insegna al pilota che il gesto non
@@ -1126,9 +1175,22 @@ body.no-data .empty { display: block; }
      mappa e i sette bottoni, e il resto della pagina restava stretto perché
      `.stage` è ancora `display: flex` in stampa. */
   header, .tabs, .readout, .demo-banner, .summary, .map-legend,
-  #charts, [id^="view-"], #view-map main, #rail,
-  #map-missing, .tour-help, .cb-toggle, .mini-btn { display: none !important; }
-  #view-map { display: block !important; }
+  #rail, #map-missing, .tour-help, .cb-toggle, .mini-btn { display: none !important; }
+  /* Il foglio vive ora dentro il Confronto, che è pieno di altra roba: i quattro
+     grafici, il riepilogo, la cascata, il debrief. Si spegne per DISCENDENZA —
+     i figli diretti dei tre contenitori che portano al foglio — e si riaccende
+     la sola catena `#view-compare → .cmp-shell → .cmp-map → #brakesheet`.
+     Elencare a mano le sezioni della vista è esattamente ciò che, otto id fa,
+     aveva lasciato stampare un pannello in più senza che nessuno se ne
+     accorgesse se non stampando.
+     Ogni selettore che RIACCENDE è più specifico di quello che l'ha spento —
+     `!important` non basta, fra due `!important` decide ancora la specificità,
+     e un `.cmp-shell` nudo perderebbe contro `#view-compare > *`. */
+  [id^="view-"], #view-compare > *, .cmp-shell > *, .cmp-map > * { display: none !important; }
+  #view-compare, #view-compare > .cmp-shell, .cmp-shell > .cmp-map,
+  .cmp-map > #brakesheet { display: block !important; }
+  /* Sticky su carta non ha senso e in alcuni motori sposta il blocco. */
+  .cmp-map { position: static; }
   .stage { display: block; }
   #brakesheet { padding: 0; }
   #brakesheet h3 { font-size: 18px; }

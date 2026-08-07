@@ -222,11 +222,10 @@ function wireTour() {
 }
 
 // Redraw whatever view is on screen from the in-memory payload (no refetch for
-// compare/map; sectors/progress re-run their loader). Shared by resize + the
+// compare; sectors/progress re-run their loader). Shared by resize + the
 // colour-blind toggle.
 function redrawCurrentView() {
-  if (VIEW === "map") { if (DATA) drawMap(DATA, null); SHEET ? renderBrakeSheet(SHEET) : loadBraking(); }
-  else if (VIEW === "line") { LINE ? renderLine(null) : loadLine(); }
+  if (VIEW === "line") { LINE ? renderLine(null) : loadLine(); }
   else if (VIEW === "dynamics") { if (DATA) drawDynamics(LAST_HOVER); }
   else if (VIEW === "sectors") { if (CURRENT) loadSectors(); }
   else if (VIEW === "progress") { if (CURRENT) loadProgress(CURRENT); }
@@ -241,7 +240,16 @@ function redrawCurrentView() {
   // requested language, so repainting a cached payload would leave the one
   // paragraph on the tab in the language you just left.
   else if (VIEW === "stint") { if (CURRENT) loadStint(CURRENT, STINT_I); }
-  else if (DATA) redraw(LAST_HOVER);   // compare
+  // Il Confronto: i grafici a sinistra E la mappa a destra, che stanno sullo
+  // stesso schermo e quindi si ridisegnano insieme. Il ramo è nominato invece
+  // di restare l'`else` finale muto: era l'`else` a raccogliere anche la vista
+  // Mappa quando esisteva, e un ramo senza nome è un ramo che nessuno rilegge.
+  // Il resize passa di qui, ed è così che il canvas della mappa riprende la
+  // misura della colonna: `setup()` legge `clientWidth` a ogni disegno.
+  else if (VIEW === "compare") {
+    if (DATA) { redraw(LAST_HOVER); drawMap(DATA, null); }
+    SHEET ? renderBrakeSheet(SHEET) : loadBraking();
+  }
   // Il rail non appartiene a nessuna vista, quindi non sta in nessun ramo. Fuori
   // dallo switch è l'unico posto dove il cambio scheda e il resize lo trovano
   // entrambi: `redrawCurrentView` è ciò che il gestore di resize (debounced,
@@ -276,24 +284,31 @@ function wireCbToggle() {
   help.parentNode.insertBefore(btn, help.nextSibling);
 }
 
-// Le sei schede che parlano di UN GIRO, e quindi di una curva. Le altre quattro
-// stanno sopra il giro nella gerarchia (una sessione, uno stint, lo storico, un
-// piano): lì il rail mostrerebbe un giro che non c'entra con quello che leggi, e
-// cliccare una curva non cambierebbe niente. Un comando che non risponde è
-// peggio di un comando assente.
-const RAIL_VIEWS = ["flow", "compare", "map", "line", "sectors", "dynamics"];
+// Le cinque schede che parlano di UN GIRO, e quindi di una curva. Le altre
+// cinque stanno sopra il giro nella gerarchia (una sessione, uno stint, lo
+// storico, un piano): lì il rail mostrerebbe un giro che non c'entra con quello
+// che leggi, e cliccare una curva non cambierebbe niente. Un comando che non
+// risponde è peggio di un comando assente.
+const RAIL_VIEWS = ["flow", "compare", "line", "sectors", "dynamics"];
 
 // The characters `e.key` reports for the row above the letters, in the order
 // a tab picks them — NOT their physical position, which moves between
-// keyboard layouts (on IT, for instance, "'" sits where "-" does on US/UK,
-// and "-" itself lives elsewhere on the board). Every one of these keys sends
-// its printed character regardless of layout, with no modifier, so all eleven
-// tabs stay reachable everywhere; the string is just wrong as a claim about
-// where any later key "physically" continues the row. One shared constant —
-// `wireKeys()` reads it to route the keypress, `wireTabs()` reads it to show
-// the tooltip — so the two cannot drift the way the tab count and this row's
-// length silently did before.
-const KEY_ROW = "1234567890-";
+// keyboard layouts. Every one of these keys sends its printed character
+// regardless of layout, with no modifier, so all ten tabs stay reachable
+// everywhere. One shared constant — `wireKeys()` reads it to route the
+// keypress, `wireTabs()` reads it to show the tooltip — so the two cannot
+// drift the way the tab count and this row's length silently did before.
+//
+// Lunga ESATTAMENTE quanto le schede, non «abbastanza». Il vincolo storico
+// chiedeva solo `tabs <= len(KEY_ROW)`, quindi un carattere di troppo sarebbe
+// restato verde — e non rompe niente (`wireKeys` fa `if (b)`, `wireTabs` cicla
+// sulle schede vere, quindi nessun suggerimento sballato e nessun errore): è
+// semplicemente un tasto che il pilota preme e che non fa NIENTE, in silenzio.
+// È lo stesso principio per cui il rail non vive sulle schede dove cliccare una
+// curva non cambierebbe niente. Con undici schede la riga finiva in "-"; con
+// dieci finisce in "0", che è il tasto della decima. Quando torna un'undicesima
+// scheda si rimette "-".
+const KEY_ROW = "1234567890";
 
 // Non dentro `showView` da sola: al primo caricamento `init()` non ci passa
 // affatto quando la vista salvata coincide con quella già attiva in HTML (o
@@ -1097,8 +1112,8 @@ function drawRoad(ctx, road, X, Y, hair) {
   ctx.restore();
 }
 
-// Full track map (its own tab). Wrapper around drawMapTo that also publishes the
-// screen transform for the map's own hover.
+// Full track map (the right-hand column of Compare). Wrapper around drawMapTo
+// that also publishes the screen transform for the map's own hover.
 function drawMap(a, cx) {
   const hit = drawMapTo($("c-map"), $("map-missing"), a, cx);
   if (hit) MAP_HIT = hit;
@@ -1493,7 +1508,7 @@ async function loadCombo(combo, lapPath, baselinePath) {
   if (baselinePath) q.set("baseline", baselinePath);
   setPanelLoading("summary", t("load.lap"));
   $("readout").innerHTML = t("load.lap");
-  if (VIEW === "map") $("map-readout").innerHTML = t("load.lap");
+  if (VIEW === "compare") $("map-readout").innerHTML = t("load.lap");
   let a;
   try { a = await getJSON("/api/analysis?" + q.toString()); }
   catch (e) {
@@ -1516,7 +1531,11 @@ async function loadCombo(combo, lapPath, baselinePath) {
   drawRailList();
   // The sheet is per car+track, not per lap: it survives a lap change and is
   // only dropped when the combo does (see the combo picker).
-  if (VIEW === "map") {
+  //
+  // La mappa e la scheda frenate stanno accanto ai grafici, quindi si aggiornano
+  // sulla stessa scheda e non su una loro. `redraw(a)` sopra è già passato: qui
+  // manca solo la colonna destra.
+  if (VIEW === "compare") {
     // Il readout lo scrive `drawMap` stessa (vedi il commento lì): niente da
     // duplicare qui.
     drawMap(a, null);
@@ -1929,8 +1948,9 @@ function wireFlow() {
 // The trace beside the card says what happened; it doesn't say *where*, and the
 // landing view is the one place a driver has no map to fall back on — the corner
 // name in the card is a name, not a place. This is the same delta-coloured line
-// the Map tab draws (same function, so the two can't disagree about which way
-// round the track is), with the step's own stretch traced over it in the accent.
+// the map beside Compare draws (same function, so the two can't disagree about
+// which way round the track is), with the step's own stretch traced over it in
+// the accent.
 //
 // Nothing is invented here: the colours are the speed gap the map already
 // computes, and the highlighted span is the window the step's chart is zoomed
@@ -3428,8 +3448,8 @@ function editMark(btn) {
 }
 
 // --- the line you drove ---------------------------------------------------
-// The Map tab draws two lines over a whole lap and leaves the reading to the
-// eye. This one takes a corner at a time and answers the questions the eye
+// The map beside Compare draws two lines over a whole lap and leaves the reading
+// to the eye. This one takes a corner at a time and answers the questions the eye
 // can't: how far off the reference line you were, in metres and on which side;
 // where your slowest point sits compared with the reference's; how tight an arc
 // you actually drove. Every number arrives from /api/trajectory already decided
@@ -4425,14 +4445,14 @@ function hoverTo(p) {
   // qui non lo si azzera già in anticipo. Uscire dal rail deve congelare il
   // readout esattamente come uscire dai grafici, non cancellarlo.
   if (p != null) LAST_HOVER = p;
-  if (VIEW === "compare") redraw(p);
+  // Sul Confronto il mirino attraversa lo schermo: i grafici a sinistra E il
+  // disegno a destra. Un mirino che vive su metà schermata è peggio di nessun
+  // mirino — è il difetto della minimappa cablata a una vista sola, di nuovo.
+  // Il readout della mappa lo scrive `drawMap` stessa (vedi il commento lì):
+  // niente da duplicare qui.
+  if (VIEW === "compare") { redraw(p); drawMap(DATA, p); }
   else if (VIEW === "dynamics") drawDynamics(p);
   else if (VIEW === "line") { if (LINE) renderLine(p); }
-  else if (VIEW === "map") {
-    // Il readout lo scrive `drawMap` stessa (vedi il commento lì): niente da
-    // duplicare qui.
-    drawMap(DATA, p);
-  }
   drawRail(p);
 }
 

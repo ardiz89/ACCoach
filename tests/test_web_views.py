@@ -281,7 +281,15 @@ def test_printing_hides_every_view_without_naming_them():
     block = _CSS[_CSS.index("@media print"):]
     block = block[:block.index("\n}")]
     assert '[id^="view-"]' in block
-    assert "#view-map { display: block !important; }" in block
+    # Il foglio vive dentro il Confronto, che porta con sé grafici, riepilogo,
+    # cascata e debrief: si spegne per discendenza e si riaccende la SOLA catena
+    # che arriva al foglio. Fra due `!important` decide la specificità, quindi
+    # ogni selettore che riaccende dev'essere più specifico di quello che ha
+    # spento — verificato per mutazione (accorciare `#view-compare > .cmp-shell`
+    # a `.cmp-shell` stampa una pagina vuota).
+    assert "#view-compare > *, .cmp-shell > *, .cmp-map > *" in block
+    assert ("#view-compare, #view-compare > .cmp-shell, .cmp-shell > .cmp-map,\n"
+            "  .cmp-map > #brakesheet { display: block !important; }") in block
 
 
 def test_no_two_functions_in_app_js_share_a_name():
@@ -420,6 +428,20 @@ def test_the_header_row_wraps():
     colour-blind toggle, the guide link. Unwrapped it measured 404px inside a
     390px phone and took the whole page sideways with it."""
     assert "flex-wrap: wrap" in _rule(".brand {")
+
+
+def test_the_tab_row_scrolls_itself_at_every_width():
+    """Misurato col browser in un riquadro da 768 px (un tablet accanto al
+    volante, uso dichiarato di quest'app): la fila di schede era larga 1016 px e
+    portava la PAGINA a scorrere di lato di 248 px con undici schede, 170 con
+    dieci — su **ogni** vista, perché la fila sta fuori da tutte, quindi non è
+    una vista a sfondare ma la navigazione. Lo scorrimento della fila esisteva
+    già, ma solo sotto i 520 px: fra 521 px e ~1000 px non c'era niente. La
+    regola vive quindi sul selettore base e non in un @media, e `.tab` non si
+    lascia comprimere (`flex: 0 0 auto`) invece di spezzare le etichette."""
+    assert "overflow-x: auto" in _rule(".tabs {")
+    tab = _rule("\n.tab {")
+    assert "flex: 0 0 auto" in tab and "white-space: nowrap" in tab
 
 
 def test_the_consistency_rows_stack_on_a_narrow_screen():
@@ -827,19 +849,21 @@ def test_the_rail_is_declared_once_and_only_for_views_that_exist():
         assert name in _TABS, name
 
 
-def test_rail_views_is_exactly_the_six_views_about_one_lap():
+def test_rail_views_is_exactly_the_views_about_one_lap():
     """Il test sopra verifica solo la metà positiva (ogni nome elencato è una
-    scheda vera) — passerebbe anche con cinque nomi, o con sette se qualcuno
-    aggiungesse "session" per sbaglio. Le quattro schede sopra il giro
-    (Allenamento, Sessione, Passo gara, Andamento) non hanno un giro da
+    scheda vera) — passerebbe anche con quattro nomi, o con sei se qualcuno
+    aggiungesse "session" per sbaglio. Le schede sopra il giro (Com'è andata,
+    Allenamento, Sessione, Passo gara, Andamento) non hanno un giro da
     ritagliare, quindi un rail lì risponderebbe a un clic senza cambiare
     niente — «peggio di un comando assente», dice il commento sopra
-    RAIL_VIEWS. Qui si fissa il numero e l'assenza di quelle quattro."""
+    RAIL_VIEWS. Erano sei finché la Mappa era una scheda; ora la mappa è la
+    colonna destra del Confronto e il rail la segue lì."""
     body = _APPJS.split("const RAIL_VIEWS = [")[1].split("]")[0]
     names = re.findall(r'"([\w-]+)"', body)
-    assert len(names) == 6, names
-    for excluded in ("training", "session", "stint", "progress"):
-        assert excluded not in names, f"{excluded} non dovrebbe avere un rail"
+    assert set(names) == {"flow", "compare", "line", "sectors", "dynamics"}, names
+    # Insiemistica a parte: le due metà devono partizionare le schede vere, così
+    # una scheda nuova non può restare fuori da entrambe senza che si veda.
+    assert set(names) | {"recap", "training", "session", "stint", "progress"} == set(_TABS)
 
 
 def test_switching_tab_says_whether_this_one_has_a_rail():
@@ -1036,7 +1060,10 @@ def test_the_rail_hover_is_routed_per_view_not_wired_to_one():
     cinque — o peggio, ridisegnerebbe una vista che non è sullo schermo."""
     assert "function hoverTo(" in _APPJS
     block = _APPJS.split("function hoverTo(")[1].split("\n}\n")[0]
-    for view in ("map", "dynamics", "line", "compare"):
+    # «map» non è più nell'elenco: la mappa ha smesso di essere una vista e vive
+    # accanto ai grafici del Confronto (il suo mirino si controlla nel test
+    # dedicato, che chiede `drawMap(DATA, p)` DENTRO il ramo del Confronto).
+    for view in ("dynamics", "line", "compare"):
         assert f'"{view}"' in block, view
 
 
@@ -1453,3 +1480,140 @@ def test_the_tour_start_here_step_points_at_something_with_static_content():
         f"{sel} is empty in index.html — it is filled by JS after an async "
         "fetch, so tour.js's synchronous visibility check will always miss it"
     )
+
+
+# --- la mappa entra nel Confronto, e la scheda Mappa sparisce (2026-08-07) ---
+# Undici schede diventano dieci: i quattro grafici a sinistra, la mappa (con la
+# sua legenda, il suo stato vuoto e la scheda frenate) a destra sullo stesso
+# schermo. Erano due schede per la stessa domanda — «dove ho perso» in grafico e
+# «dove ho perso» sul disegno — e si guardavano una per volta.
+
+def test_the_map_lives_in_compare_now():
+    html = (WEB / "index.html").read_text(encoding="utf-8")
+    assert 'id="view-map"' not in html
+    assert 'data-view="map"' not in html
+    # L'assenza da sola sarebbe verde anche su un file vuoto: la parte che porta
+    # il carico è questa, che il contenuto trasferito esista ANCORA e stia sulla
+    # vista giusta. `_view_of_ids` lavora per ordine nel documento.
+    ids = _view_of_ids()
+    for el in ("c-map", "map-readout", "map-missing", "brakesheet"):
+        assert ids[el] == "compare", el
+    # E che sia rimasto intero: la voce di legenda che compare solo sui giri
+    # buttati è la prima che si perde in un taglia-e-incolla.
+    assert ids["leg-lost"] == "compare"
+
+
+def test_the_rail_no_longer_lists_the_map():
+    js = (WEB / "app.js").read_text(encoding="utf-8")
+    rail = js[js.index("RAIL_VIEWS"):js.index("\n", js.index("RAIL_VIEWS"))]
+    assert '"map"' not in rail
+    assert '"compare"' in rail
+
+
+def test_no_javascript_branch_still_waits_for_a_map_view():
+    """La vista non esiste più: un `VIEW === "map"` rimasto indietro è un ramo
+    che non si esegue mai, e con lui la mappa che non si disegna o il messaggio
+    di caricamento che non compare. Positivo accanto: il Confronto quei rami
+    li ha davvero."""
+    assert 'VIEW === "map"' not in _APPJS
+    assert _APPJS.count('VIEW === "compare"') >= 2
+
+
+def _branch_of(fn: str, view: str) -> str:
+    """Il corpo del ramo `VIEW === "<view>"` dentro `<fn>`, fino al ramo dopo.
+
+    Ritagliato, non cercato in tutta la funzione: «`drawMap` compare da qualche
+    parte in `redrawCurrentView`» era vero anche PRIMA di questo lavoro, sul
+    ramo della vista Mappa — un test che non sa distinguere i due mondi è verde
+    in entrambi. Il taglio verifica da sé che l'inizio venga prima della fine,
+    altrimenti una fetta vuota renderebbe verde ogni `in` che la interroga.
+    """
+    body = _APPJS.split(fn)[1].split("\n}\n")[0]
+    i = body.index(f'VIEW === "{view}"')
+    j = body.find("else if (", i)
+    if j == -1:
+        j = len(body)
+    assert i < j, f"fetta vuota per il ramo {view!r} di {fn}"
+    return body[i:j]
+
+
+def test_opening_compare_draws_the_map_and_loads_the_braking_sheet():
+    """Il disegno stava sul ramo della vista Mappa: senza portarlo qui, aprire
+    il Confronto lascia la colonna destra bianca finché non si passa il mouse."""
+    branch = _branch_of("function redrawCurrentView()", "compare")
+    assert "redraw(LAST_HOVER)" in branch
+    assert "drawMap(DATA, null)" in branch
+    assert "loadBraking()" in branch
+
+
+def test_a_new_lap_draws_the_map_when_compare_is_open():
+    block = _APPJS.split("async function loadCombo(")[1].split("\n}\n")[0]
+    assert 'if (VIEW === "compare") {' in block
+    assert "drawMap(a, null)" in block
+    assert "loadBraking()" in block
+
+
+def test_hovering_compare_moves_the_map_crosshair_too():
+    """I grafici e la mappa sono ora sullo stesso schermo: un mirino che vive
+    solo su metà schermata è peggio di nessun mirino."""
+    branch = _branch_of("function hoverTo(", "compare")
+    assert "redraw(p)" in branch
+    assert "drawMap(DATA, p)" in branch
+
+
+def test_compare_is_two_columns_that_can_actually_shrink():
+    """`minmax(0, 1fr)` non è ornamentale: senza lo `0` la colonna dei grafici
+    non può scendere sotto la larghezza minima di un canvas, e la pagina scorre
+    di lato. Questa pagina ha già spedito 39 px di scroll orizzontale."""
+    shell = _rule(".cmp-shell {")
+    assert "grid" in shell
+    assert "minmax(0, 1fr)" in shell, shell
+    # La mappa ferma mentre scorri i grafici è tutto il senso della cosa.
+    assert "sticky" in _rule(".cmp-map {")
+
+
+def test_narrow_screens_stack_the_columns_with_the_map_on_top():
+    """A schermo stretto due colonne da 320 px non ci stanno. Impilate, la mappa
+    va SOPRA: è l'orientamento, e si legge prima del dettaglio."""
+    css = _screen_css()
+    # Il blocco che parla dello scaffale, non «il primo @media a 900px»: ce n'è
+    # già un altro nel file (la curva ingrandita), e prendere quello darebbe una
+    # fetta che non contiene niente di ciò che si cerca — verde per il motivo
+    # sbagliato o rosso per il motivo sbagliato, mai per quello giusto.
+    blocks = [b for b in css.split("@media (max-width: 900px)")[1:] if ".cmp-shell" in b]
+    assert len(blocks) == 1, "un solo @media a 900px deve impilare lo scaffale"
+    block = blocks[0][:blocks[0].index("\n}\n")]
+    assert "grid-template-columns: 1fr" in block
+    assert "order: -1" in block
+    assert "position: static" in block
+
+
+def test_the_braking_sheet_scrolls_inside_its_column():
+    """La scheda è una tabella larga; in una colonna da 320 px la sua larghezza
+    minima spingerebbe la PAGINA di lato invece di scorrere da sola."""
+    assert "overflow-x: auto" in _rule(".cmp-map #brakesheet")
+
+
+def test_the_shortcut_row_is_exactly_as_long_as_the_tabs():
+    """Il vincolo storico (`tabs <= len(KEY_ROW)`) copre solo il verso in cui si
+    aggiunge una scheda. Togliendone una, la riga resta più lunga e l'ultimo
+    carattere diventa un tasto che il pilota preme e che non fa NIENTE, in
+    silenzio: `wireKeys` fa `if (b)` e non protesta. È lo stesso «comando che
+    non risponde» per cui il rail non vive sulle schede senza giro. Con undici
+    schede la riga finiva in "-"; con dieci finisce in "0"."""
+    tabs = len(re.findall(r'class="tab[ "]', _HTML))
+    m = re.search(r'const KEY_ROW = "([^"]+)"', _APPJS)
+    assert m, "wireKeys()/wireTabs() lost their shared KEY_ROW constant"
+    assert tabs == len(m.group(1)), \
+        f"{tabs} schede contro {len(m.group(1))} tasti ({m.group(1)!r})"
+
+
+def test_the_map_tab_label_is_not_left_orphaned_in_the_catalogue():
+    """La scheda non c'è più: la sua etichetta non deve restare a catalogo in
+    nessuna delle due lingue. Positivo accanto: le chiavi del contenuto
+    trasferito devono invece esserci ancora, in entrambe."""
+    assert '"tab.map"' not in _I18NJS
+    for key in ("map.readout", "map.missing", "map.leg.lost", "map.grad.note"):
+        entry = _I18NJS[_I18NJS.index(f'"{key}"'):]
+        entry = entry[:entry.index("},")]
+        assert "en:" in entry and "it:" in entry, key
