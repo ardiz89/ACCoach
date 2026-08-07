@@ -567,6 +567,70 @@ def _screen_css() -> str:
         css = css[:i] + (css[cut + 1:] if cut is not None else "")
 
 
+def _screen_rules() -> list[tuple[str, str]]:
+    """Ogni regola del foglio da schermo come `(selettore, dichiarazioni)` —
+    **comprese quelle dentro un `@media`**.
+
+    Il taglio a espressione regolare che questo file usava
+    (`([^{}]+)\\{([^}]*)\\}`) non entra in un blocco annidato: sulla prima regola
+    dentro un `@media` cattura `@media (…)` come selettore, e `_hits` lo scarta
+    perché non è un compound. Risultato misurato: un
+    `@media (max-width: 1400px) { .missing { display: none; } }` lasciava VERDE
+    il test che esiste apposta per vederlo. Oggi nessuna regola `display` dentro
+    un `@media` non-print colpisce un elemento che il JS spegne — ma «oggi non
+    fa danno» non è una copertura, e il limite era dichiarato invece che chiuso.
+
+    Le at-rule si aprono e si scendono (`@media`, `@supports`): le regole vere
+    stanno dentro. `@media print` non arriva fin qui, `_screen_css()` lo toglie
+    prima — la stampa forza visibile ogni pannello di proposito, che è la regola
+    opposta e non uno sbaglio.
+    """
+    out: list[tuple[str, str]] = []
+
+    def scan(text: str) -> None:
+        i = 0
+        while True:
+            j = text.find("{", i)
+            if j == -1:
+                return
+            sel = text[i:j].strip()
+            depth, end = 0, None
+            for k in range(j, len(text)):
+                if text[k] == "{":
+                    depth += 1
+                elif text[k] == "}":
+                    depth -= 1
+                    if depth == 0:
+                        end = k
+                        break
+            if end is None:
+                return
+            if sel.startswith("@"):
+                scan(text[j + 1:end])
+            else:
+                out.append((sel, text[j + 1:end]))
+            i = end + 1
+
+    scan(_screen_css())
+    return out
+
+
+def _display_rules(*, none: bool) -> list[tuple[str, str]]:
+    """I selettori del foglio da schermo che dichiarano `display`, separati nei
+    due versi: chi spegne (`none=True`) e chi accende (`none=False`). Il
+    selettore è già spezzato sulle virgole, perché ogni pezzo di una lista
+    colpisce per conto suo."""
+    out: list[tuple[str, str]] = []
+    for sel, body in _screen_rules():
+        decl = re.search(r"display\s*:\s*([\w-]+)", body)
+        if decl is None or (decl.group(1) == "none") != none:
+            continue
+        for part in sel.split(","):
+            if part.strip():
+                out.append((part.strip(), decl.group(1)))
+    return out
+
+
 def test_every_surface_the_backend_extracts_is_painted():
     """Il disegno e il decodificatore devono conoscere le stesse superfici.
 
@@ -742,10 +806,8 @@ def test_no_rule_at_all_can_outrank_the_hidden_class():
     ids = set(re.findall(r'id="([\w-]+)"[^>]*class="[^"]*\bhidden\b', _HTML))
     ids |= set(re.findall(r'class="[^"]*\bhidden\b[^"]*"[^>]*id="([\w-]+)"', _HTML))
 
-    for m in re.finditer(r"([^{}]+)\{([^}]*)\}", _screen_css()):
-        sel, body = m.group(1).strip(), m.group(2)
-        decl = re.search(r"display\s*:\s*([\w-]+)", body)
-        if decl is None or decl.group(1) == "none" or ":not(.hidden)" in sel:
+    for sel, _value in _display_rules(none=False):
+        if ":not(.hidden)" in sel:
             continue
         # A rule scoped to a page STATE on <body> is the deliberate exception:
         # `body.no-data .empty { display: block }` exists to bring the "no laps
@@ -754,8 +816,7 @@ def test_no_rule_at_all_can_outrank_the_hidden_class():
         # `hidden` wherever that component appears.
         if sel.startswith("body."):
             continue
-        last = sel.split(",")[-1].strip()
-        target = last.split()[-1] if last.split() else last
+        target = sel.split()[-1] if sel.split() else sel
         names = set(re.findall(r"[.#]([\w-]+)", target))
         clash = (names & classes) or (names & ids)
         assert not clash, (
@@ -1877,18 +1938,13 @@ def test_nothing_switches_off_what_the_javascript_switches_on():
     assert not _hits(".empty", mapmiss), \
         "i tre messaggi per-vista sono tornati sotto `.empty`, che è lo stato vuoto della pagina"
 
-    seen = 0
-    for m in re.finditer(r"([^{}]+)\{([^}]*)\}", _screen_css()):
-        decl = re.search(r"display\s*:\s*([\w-]+)", m.group(2))
-        if decl is None or decl.group(1) != "none":
-            continue
-        seen += 1
-        for part in m.group(1).split(","):
-            for name, chain in chains:
-                assert not _hits(part.strip(), chain), (
-                    f"{part.strip()!r} spegne #{name}, che il JS accende togliendo "
-                    "`hidden`: dagli una classe sua invece di una condivisa")
-    assert seen >= 5, f"solo {seen} regole `display: none` esaminate: taglio rotto?"
+    rules = _display_rules(none=True)
+    for sel, _value in rules:
+        for name, chain in chains:
+            assert not _hits(sel, chain), (
+                f"{sel!r} spegne #{name}, che il JS accende togliendo "
+                "`hidden`: dagli una classe sua invece di una condivisa")
+    assert len(rules) >= 5, f"solo {len(rules)} regole `display: none` esaminate: taglio rotto?"
 
 
 def test_the_three_per_view_messages_are_not_the_page_wide_empty_state():
@@ -2026,16 +2082,11 @@ def test_hidden_actually_hides_the_map_readout_and_legend():
     assert _hits("aside.cmp-map .readout", chains["map-readout"]), \
         "il matcher non segue la discendenza vera"
 
-    seen = 0
-    for m in re.finditer(r"([^{}]+)\{([^}]*)\}", _screen_css()):
-        decl = re.search(r"display\s*:\s*([\w-]+)", m.group(2))
-        if decl is None or decl.group(1) == "none":
-            continue
-        seen += 1
-        for part in m.group(1).split(","):
-            for el_id, chain in chains.items():
-                assert not _hits(part.strip(), chain), (
-                    f"{part.strip()!r} batte `.hidden` su #{el_id}: qualificala "
-                    "con :not(.hidden), come fa già .map-legend"
-                )
-    assert seen >= 5, f"solo {seen} regole `display` esaminate: taglio rotto?"
+    rules = _display_rules(none=False)
+    for sel, _value in rules:
+        for el_id, chain in chains.items():
+            assert not _hits(sel, chain), (
+                f"{sel!r} batte `.hidden` su #{el_id}: qualificala "
+                "con :not(.hidden), come fa già .map-legend"
+            )
+    assert len(rules) >= 5, f"solo {len(rules)} regole `display` esaminate: taglio rotto?"
