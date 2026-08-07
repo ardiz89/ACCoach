@@ -71,6 +71,63 @@ def test_a_single_lap_run_has_no_recap_not_a_zero(tmp_path):
     assert _get(tmp_path)["current"]["recap"] is None
 
 
+def test_a_best_lap_with_a_broken_clock_voids_the_run_and_says_which_cause(tmp_path):
+    """Il metro con l'orologio rotto: niente recap, e il payload porta la causa.
+
+    Il flag NON è ricalcolato qui: arriva da ``session_recap``, l'unico posto
+    dove quel criterio è scritto. Il giro sopravvive a ``trusted_lap_ms`` (uno
+    scarto di 0.9 s contro una tolleranza di 5 s), quindi quello che il recap
+    riceve è davvero un metro con l'orologio corto, non un giro riparato.
+    """
+    best = synth.skew_clock(synth.build_lap(), 900)
+    best.recorded_utc = "2026-08-01T18:00:00+00:00"
+    save_lap(best, tmp_path)
+    _lap(tmp_path, "2026-08-01T18:02:00+00:00", amt=20)
+
+    cur = _get(tmp_path)["current"]
+    assert cur["best"] == "1:40.000"          # il metro è ancora lui
+    assert cur["recap"] is None
+    assert cur["recap_clock_broken"] is True
+
+
+def test_any_other_empty_recap_does_not_blame_the_clock(tmp_path):
+    """La frase specifica esce SOLO per la guardia. Qui il recap è vuoto per
+    un'altra delle sette cause (un solo giro valido): il flag resta falso e la
+    schermata torna alla frase generica, che è il difetto che il Task 4 ha
+    appena corretto e che questo test tiene chiuso."""
+    _lap(tmp_path, "2026-08-01T18:00:00+00:00")
+    cur = _get(tmp_path)["current"]
+    assert cur["recap"] is None
+    assert cur["recap_clock_broken"] is False
+
+
+def test_an_empty_recap_from_session_recap_itself_still_does_not_blame_the_clock(tmp_path):
+    """L'altro modo di restare senza recap, e quello che conta di più: qui a
+    tornare vuoto è ``session_recap`` (l'unico altro giro ha due campioni, non
+    abbastanza per tagliarlo in fasi), non uno dei rifiuti che ``_recap_of``
+    decide da sé. È la riga dove il motivo viene inoltrato: se l'endpoint lo
+    affermasse per conto suo invece di leggerlo dall'esito, questo test è
+    l'unico che se ne accorgerebbe — l'orologio di questi giri è sano.
+    """
+    _lap(tmp_path, "2026-08-01T18:00:00+00:00")            # il migliore
+    short = synth.build_lap(slow_corner=0, amt=15)
+    short.recorded_utc = "2026-08-01T18:02:00+00:00"
+    short.samples = [short.samples[0], short.samples[-1]]   # troppo corto per le fasi
+    save_lap(short, tmp_path)
+
+    cur = _get(tmp_path)["current"]
+    assert cur["recap"] is None
+    assert cur["recap_clock_broken"] is False
+
+
+def test_a_run_that_measures_fine_does_not_blame_the_clock_either(tmp_path):
+    _lap(tmp_path, "2026-08-01T18:00:00+00:00")
+    _lap(tmp_path, "2026-08-01T18:02:00+00:00", amt=20)
+    cur = _get(tmp_path)["current"]
+    assert cur["recap"] is not None
+    assert cur["recap_clock_broken"] is False
+
+
 def test_an_older_session_can_be_asked_for(tmp_path):
     _lap(tmp_path, "2026-07-20T18:00:00+00:00")
     _lap(tmp_path, "2026-07-20T18:02:00+00:00", amt=20)

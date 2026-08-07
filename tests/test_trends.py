@@ -194,7 +194,7 @@ def _recap(amts):
     ref_lap = synth.build_lap()
     corners = detect_corners(ref_lap.samples)
     laps = [synth.build_lap(slow_corner=0, amt=a) for a in amts]
-    return session_recap(laps, Reference(ref_lap), corners)
+    return session_recap(laps, Reference(ref_lap), corners).recap
 
 
 def test_the_families_add_up_to_the_average_gap():
@@ -220,8 +220,10 @@ def test_the_worst_corner_is_the_one_that_cost_most():
 
 def test_no_laps_no_recap():
     ref_lap = synth.build_lap()
-    assert session_recap([], Reference(ref_lap),
-                         detect_corners(ref_lap.samples)) is None
+    out = session_recap([], Reference(ref_lap), detect_corners(ref_lap.samples))
+    assert out.recap is None
+    # Non è l'orologio: la frase specifica non deve uscire di qui.
+    assert out.reference_clock_broken is False
 
 
 def test_a_lap_the_split_cannot_read_is_skipped_not_faked():
@@ -237,13 +239,117 @@ def test_a_lap_the_split_cannot_read_is_skipped_not_faked():
     short.samples = short.samples[:2]
     reference = Reference(ref_lap)
 
-    r = session_recap([readable, short], reference, corners)
-    solo = session_recap([readable], reference, corners)
+    r = session_recap([readable, short], reference, corners).recap
+    solo = session_recap([readable], reference, corners).recap
 
     assert len(r.laps) == 1
     assert r.gain_avg_ms == solo.gain_avg_ms
     assert r.launch_ms == solo.launch_ms
     assert r.by_phase == solo.by_phase
+
+
+# --- l'orologio che non chiude ---------------------------------------------
+
+
+def _shortfall(lap) -> float:
+    """Quanto l'orologio di un giro manca il giro che dichiara.
+
+    Ricalcolata qui a mano, non importata dalla guardia: un fixture che dice
+    «questo giro ha l'orologio rotto» deve dimostrarlo con un'aritmetica sua,
+    altrimenti sta solo ripetendo quello che il codice ha già deciso.
+    """
+    ss = lap.samples
+    return abs((ss[-1].t_ms - ss[0].t_ms)
+               - lap.lap_time_ms * (ss[-1].pos - ss[0].pos))
+
+
+def test_a_lap_whose_clock_does_not_cover_it_leaves_the_averages_too():
+    """Un giro con l'orologio rotto non è un giro lento: è una registrazione
+    con un buco, e il buco finisce tutto sul suo gap. Esce dalle righe **e**
+    dai denominatori — controllato sulle medie, non sul conteggio: le righe
+    potrebbero sparire mentre il giro resta dentro ``gain_avg_ms`` e
+    ``by_phase``, ed è esattamente l'errore che un conteggio non vede."""
+    ref_lap = synth.build_lap()
+    corners = detect_corners(ref_lap.samples)
+    reference = Reference(ref_lap)
+    readable = synth.build_lap(slow_corner=0, amt=20)
+    broken = synth.skew_clock(synth.build_lap(slow_corner=0, amt=40), 900)
+    assert _shortfall(broken) > 250, "il fixture non ha rotto niente"
+    assert _shortfall(readable) < 250, "il giro sano deve restare sano"
+
+    # Il canarino che rende il confronto capace di fallire: se il giro rotto
+    # entrasse nelle medie, le sposterebbe. Senza questo, le uguaglianze sotto
+    # passerebbero anche con la guardia inerte.
+    good, bad = (lap_time_split(l, reference, corners) for l in (readable, broken))
+    assert abs(good.gap_ms - bad.gap_ms) > 1.0
+    assert good.by_phase() != bad.by_phase()
+
+    r = session_recap([readable, broken], reference, corners).recap
+    solo = session_recap([readable], reference, corners).recap
+    assert [row.source_index for row in r.laps] == [0]
+    assert r.gain_avg_ms == solo.gain_avg_ms
+    assert r.by_phase == solo.by_phase
+    assert r.launch_ms == solo.launch_ms
+
+
+def test_a_reference_whose_clock_does_not_cover_it_voids_the_whole_run():
+    """Se a non chiudere è il metro non è storta una riga, è storta l'uscita:
+    ogni riga si misura contro di lui. Nessun recap, e il motivo torna dalla
+    funzione che ha applicato la guardia — non lo ricava il chiamante."""
+    ref_lap = synth.skew_clock(synth.build_lap(), -800)
+    corners = detect_corners(ref_lap.samples)
+    reference = Reference(ref_lap)
+    assert _shortfall(ref_lap) > 250, "il fixture non ha rotto il metro"
+    laps = [synth.build_lap(slow_corner=0, amt=a) for a in (10, 20)]
+    assert all(_shortfall(l) < 250 for l in laps), "i giri sono sani: è il metro a non esserlo"
+
+    out = session_recap(laps, reference, corners)
+    assert out.recap is None
+    assert out.reference_clock_broken is True
+
+
+def test_a_lap_just_inside_the_tolerance_stays_and_stays_counted():
+    """La guardia non deve mangiare i giri normali: 56 dei 59 giri veri stanno
+    sotto i 155 ms e devono restare. Un giro a 200 ms — dentro, ma di poco —
+    resta nelle righe e resta nella media, che qui è ricalcolata a mano dai
+    due split invece di essere confrontata con se stessa."""
+    ref_lap = synth.build_lap()
+    corners = detect_corners(ref_lap.samples)
+    reference = Reference(ref_lap)
+    readable = synth.build_lap(slow_corner=0, amt=20)
+    near = synth.skew_clock(synth.build_lap(slow_corner=0, amt=40), 200)
+    assert 150 < _shortfall(near) < 250, "il fixture deve stare dentro, ma di poco"
+
+    splits = [lap_time_split(l, reference, corners) for l in (readable, near)]
+    r = session_recap([readable, near], reference, corners).recap
+    assert [row.source_index for row in r.laps] == [0, 1]
+    assert r.gain_avg_ms == pytest.approx(sum(s.gap_ms for s in splits) / 2, abs=1e-6)
+
+
+def test_a_lap_simply_not_recorded_end_to_end_is_not_a_broken_lap():
+    """La forma del criterio, non la sua soglia. Un giro vero non comincia a
+    pos 0.000 e non finisce a 1.000: i campioni ne coprono un pezzo, e il loro
+    orologio dura di meno *per quel motivo lì*. Misurato contro il giro intero
+    (``|span − lap_time_ms|``) questo giro sembrerebbe rotto di cinque secondi
+    e sparirebbe; misurato contro la frazione che i campioni coprono è sano.
+
+    Nell'archivio vero la differenza è la stessa: nella forma assoluta mediana
+    102 ms e p90 167, senza nessun vuoto dove mettere una soglia; nella forma
+    corretta mediana 34 e p90 72, e il primo giro rotto a 326."""
+    ref_lap = synth.build_lap()
+    corners = detect_corners(ref_lap.samples)
+    reference = Reference(ref_lap)
+    partial = synth.build_lap(slow_corner=0, amt=20)
+    partial.samples = partial.samples[10:-10]          # né dalla linea né fino alla linea
+
+    naive = abs((partial.samples[-1].t_ms - partial.samples[0].t_ms)
+                - partial.lap_time_ms)
+    assert naive > 1000, "il fixture non distingue le due forme del criterio"
+    assert _shortfall(partial) < 250
+
+    r = session_recap([partial], reference, corners).recap
+    assert r is not None
+    assert [row.source_index for row in r.laps] == [0]
 
 
 def test_source_index_survives_a_drop_reason_that_does_not_exist_yet(monkeypatch):
@@ -274,7 +380,7 @@ def test_source_index_survives_a_drop_reason_that_does_not_exist_yet(monkeypatch
 
     monkeypatch.setattr(phases_mod, "lap_time_split", _fake_split)
 
-    r = session_recap(laps, reference, corners)
+    r = session_recap(laps, reference, corners).recap
 
     assert [row.source_index for row in r.laps] == [0, 2, 3]
     for row in r.laps:
@@ -300,7 +406,7 @@ def test_worst_ms_is_not_rounded_and_reference_is_the_sessions_best():
     expected_worst = max(c.lost_ms for c in split.corners)
     assert expected_worst != int(expected_worst), "il fixture deve dare un valore frazionario"
 
-    r = session_recap([lap], reference, corners)
+    r = session_recap([lap], reference, corners).recap
     assert r.reference_ms == reference.lap_time_ms
     assert r.laps[0].worst_ms == expected_worst
 
@@ -350,7 +456,7 @@ def test_by_phase_launch_and_gain_avg_are_not_rounded():
         assert round(value, 1) != value, \
             f"expected_{name} == its own round(x, 1): il fixture non prova nulla qui"
 
-    r = session_recap(laps, reference, corners)
+    r = session_recap(laps, reference, corners).recap
     assert r.launch_ms == pytest.approx(expected_launch, abs=1e-6)
     assert r.gain_avg_ms == pytest.approx(expected_gain, abs=1e-6)
     for p in PHASES:

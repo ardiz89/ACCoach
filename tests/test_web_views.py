@@ -1263,14 +1263,28 @@ def test_the_total_and_the_five_parts_share_one_sign_convention():
     assert '"+" + r.gain_avg_s' not in block
 
 
-def test_the_empty_recap_distinguishes_no_session_from_nothing_measurable():
+def test_the_empty_recap_names_only_the_cause_it_can_verify():
     """`_recap_of` (api.py) returns `None` for seven different reasons — "one
     valid lap" is only one of them. `!cur` is a different fact altogether (no
     session at all, or the fetch failed): naming the single-lap cause there
     would often be naming the wrong one, which is worse than a generic
-    message."""
+    message.
+
+    Exactly one of the seven is measured rather than guessed, and so may be
+    named: `recap_clock_broken`, decided by the guard in `trends.py` and
+    forwarded through the payload. Every other case still lands on the generic
+    sentence — that is the Task 4 correction, and this keeps it closed.
+    """
     block = _recap_render_body()
-    assert 'cur ? "recap.none" : "recap.nolaps"' in block
+    assert '!cur ? t("recap.nolaps")' in block
+    assert 'cur.recap_clock_broken ? t("recap.clock") : t("recap.none")' in block
+    # Un solo modo di far comparire la frase specifica. Se ne avesse due, uno
+    # dei due sarebbe una causa affermata senza averla misurata.
+    assert block.count('"recap.clock"') == 1
+    # E il criterio non si rifà qui: la soglia vive in trends.py, dove è stata
+    # misurata. Una copia nel frontend è la seconda definizione che un giorno
+    # dirà il contrario della prima.
+    assert "250" not in block
 
 
 def test_the_empty_recap_is_muted_not_green():

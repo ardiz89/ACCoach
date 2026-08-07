@@ -92,6 +92,32 @@ def build_lap(slow_corner: int | None = None, amt: int = 0,
                samples=samples, clean=clean, tyre_compound=compound)
 
 
+def skew_clock(lap: Lap, ms: int) -> Lap:
+    """Make the sample clock span ``ms`` more (or less) than the lap it covers.
+
+    The opposite of :func:`retime`: the declared ``lap_time_ms`` stays, the
+    samples stop agreeing with it. This is a *broken recording* — a lap whose
+    own clock does not account for the lap it says it drove — and the archive
+    has three of them (326, 694 and 1140 ms out).
+
+    It has to be done by hand: every lap :func:`build_lap` makes has
+    ``t_ms`` and ``lap_time_ms`` coherent by construction, so any guard on that
+    coherence is inert against an untouched fixture and the test stays green
+    whatever the code does. The whole clock is scaled rather than one sample
+    moved, so the samples stay ordered — a real broken lap is not a lap with a
+    step in it.
+    """
+    ss = lap.samples
+    t0 = ss[0].t_ms
+    span = ss[-1].t_ms - t0
+    if span <= 0:
+        return lap
+    f = (span + ms) / span
+    for s in ss:
+        s.t_ms = int(round(t0 + (s.t_ms - t0) * f))
+    return lap
+
+
 def retime(lap: Lap, ms: int) -> Lap:
     """Make ``lap`` a ``ms`` lap — clock included, not just the label.
 

@@ -229,7 +229,84 @@ class SessionRecap:
     reference_ms: int                  # the run's best lap, the yardstick
 
 
-def session_recap(laps, reference, corners) -> SessionRecap | None:
+@dataclass(slots=True)
+class RecapOutcome:
+    """A recap, or the absence of one — with the single cause worth naming.
+
+    ``session_recap`` comes back empty for seven different reasons and a screen
+    that picks one of them at random is worse than a screen that stays vague,
+    so the message it shows is deliberately generic. Exactly one of those seven
+    is *verified* rather than guessed: the yardstick lap's own clock does not
+    account for the lap it claims to have driven (see :func:`clock_covers_lap`),
+    which makes every gap measured against it wrong by that much. That one may
+    be named on screen, and this flag is the only way it travels.
+
+    It is a flag and not a reason string on purpose. A caller cannot spell a
+    *different* cause with a boolean, cannot invent one, and cannot re-derive
+    this one by re-running the check on its own copy of the laps (the Task 3
+    lesson: two callers of one criterion, no contract, silent divergence). And
+    a caller that forgets the field entirely falls back to the generic text —
+    the failure mode of forgetting is vagueness, never a confident wrong claim.
+    """
+
+    recap: SessionRecap | None
+    reference_clock_broken: bool = False
+
+
+# --- does a lap's own clock account for the lap? -----------------------------
+
+#: How far a lap's sample clock may sit from the stretch of lap those samples
+#: cover before the lap stops being a measurement at all. Measured over the
+#: whole real archive (59 laps, 07/08/2026) as
+#: ``|span - lap_time_ms * (pos[-1] - pos[0])|``, with
+#: ``span = samples[-1].t_ms - samples[0].t_ms``:
+#:
+#:     median 34 ms · p90 72 ms · the three worst 326, 694 and 1140 ms
+#:
+#: Fifty-six of the fifty-nine sit at 155 ms or below, then nothing at all up
+#: to 326 — more than double. 250 ms sits in the middle of that void; whoever
+#: moves it should move it against those numbers, not against a taste.
+#:
+#: Correcting for the fraction of the lap the samples cover is what opens the
+#: void, and is not a nicety. In the plain absolute form (``|span -
+#: lap_time_ms|``) the same archive gives median 102 ms, p90 167 ms and a first
+#: broken lap at 212 — healthy and broken overlap, and there is nowhere left to
+#: put a threshold.
+_CLOCK_TOL_MS = 250.0
+
+
+def clock_covers_lap(lap, *, tol_ms: float = _CLOCK_TOL_MS) -> bool:
+    """Whether ``lap``'s own clock accounts for the lap it says it drove.
+
+    A lap whose samples span noticeably less (or more) time than the stretch of
+    track they cover is not a slow lap or a fast one: it is a recording with a
+    hole in it. The hole lands squarely on the number a recap hangs from —
+    ``lap_time_split`` reads ``gap_ms`` at the first and last sample against
+    :class:`Reference`, which pins t=0 at pos 0.0 and t=lap_time_ms at pos 1.0,
+    so a clock that does not cover the lap gets stretched over it. Measured on
+    a real pair (Red Bull Ring, 02/08): a reference short by 694 ms and a lap
+    long by 1140 ms, whose errors add, put ``−0.641s`` on screen next to two
+    lap times 2.480 s apart.
+
+    This is stricter and differently shaped than
+    :func:`accoach.recording.lap.trusted_lap_ms`, and does not replace it: that
+    one catches a lap stamped with a *different lap's* time (errors of a hundred
+    seconds, tolerance 5 s) and repairs it. This one asks whether what survived
+    is fine enough to subtract two laps with.
+
+    Laps too short to have a span are left alone: ``lap_time_split`` already
+    refuses them for its own reason, and a second rule pointed at the same laps
+    is how two rules start disagreeing.
+    """
+    samples = getattr(lap, "samples", None) or []
+    if len(samples) < 2:
+        return True
+    span = samples[-1].t_ms - samples[0].t_ms
+    covered = lap.lap_time_ms * (samples[-1].pos - samples[0].pos)
+    return abs(span - covered) <= tol_ms
+
+
+def session_recap(laps, reference, corners) -> RecapOutcome:
     """How a run went, measured against its own best lap.
 
     The yardstick is deliberately the best lap of THIS run, not the reference
@@ -237,9 +314,18 @@ def session_recap(laps, reference, corners) -> SessionRecap | None:
     there today", and a lap from a colder evening would answer it with weather.
     The best lap itself is not in ``laps`` — it would be a row of zeros.
 
-    Returns None when nothing can be measured. A lap the split cannot read is
-    dropped rather than counted as a zero: a row that says "no time lost here"
-    where we simply could not look is the easiest lie on the screen.
+    Returns a :class:`RecapOutcome` whose ``recap`` is None when nothing can be
+    measured. A lap the split cannot read is dropped rather than counted as a
+    zero: a row that says "no time lost here" where we simply could not look is
+    the easiest lie on the screen.
+
+    A lap whose own clock does not cover it (:func:`clock_covers_lap`) is
+    dropped the same way — it is a broken recording, not a slow lap. When the
+    lap that fails that check is the **reference**, nothing is dropped: the
+    whole run is, because the yardstick is the one thing every row is measured
+    against. That is the single cause a caller may name on screen, and it comes
+    back on ``RecapOutcome.reference_clock_broken`` rather than being left for
+    the caller to re-derive with a second copy of the same check.
 
     A dropped lap is not merely absent from ``.laps`` — a caller that needs to
     know which of ITS laps a returned row is about cannot re-derive that from
@@ -256,10 +342,18 @@ def session_recap(laps, reference, corners) -> SessionRecap | None:
     """
     from .phases import PHASES, lap_time_split
 
+    # The yardstick first: a run measured against a broken clock has no correct
+    # row in it, so there is nothing to salvage lap by lap.
+    if not clock_covers_lap(reference.lap):
+        return RecapOutcome(None, reference_clock_broken=True)
+
+    # One criterion, two branches, written once — the reference above and every
+    # lap here call the same function, so they cannot drift apart.
     splits = [(i, lap, s) for i, lap in enumerate(laps)
-              if (s := lap_time_split(lap, reference, corners)) is not None]
+              if clock_covers_lap(lap)
+              and (s := lap_time_split(lap, reference, corners)) is not None]
     if not splits:
-        return None
+        return RecapOutcome(None)
 
     n = len(splits)
     by_phase = {p: 0.0 for p in PHASES}
@@ -278,10 +372,10 @@ def session_recap(laps, reference, corners) -> SessionRecap | None:
             source_index=i,
         ))
 
-    return SessionRecap(
+    return RecapOutcome(SessionRecap(
         gain_avg_ms=sum(r.gap_ms for r in rows) / n,
         by_phase={k: v / n for k, v in by_phase.items()},
         launch_ms=launch / n,
         laps=rows,
         reference_ms=reference.lap_time_ms,
-    )
+    ))

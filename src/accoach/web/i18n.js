@@ -65,6 +65,14 @@
     // often be naming the wrong cause, which is worse than a generic one.
     "recap.none":      { en: `Not enough in this run to measure yet.`,
                          it: `Non c'è ancora abbastanza in questa uscita per misurarlo.` },
+    // The one cause of an empty recap that is measured rather than guessed
+    // (`recap_clock_broken` in the payload, decided by the guard in trends.py):
+    // the run's own best lap — the yardstick every row would be measured
+    // against — carries a clock that doesn't account for the lap it drove, so
+    // every gap taken against it would be wrong by that much. It says the
+    // recording is short, not that the driver did anything.
+    "recap.clock":     { en: `This run can't be measured: the recording of your best lap is missing part of the lap, so every gap measured against it would be wrong.`,
+                         it: `Questa uscita non si può misurare: la registrazione del tuo miglior giro non copre tutto il giro, e ogni distacco misurato su di lui sarebbe sbagliato.` },
     "recap.phase.entry":  { en: `Entry`, it: `Entrata` },
     "recap.phase.apex":   { en: `Apex`, it: `Apice` },
     "recap.phase.exit":   { en: `Exit`, it: `Uscita` },

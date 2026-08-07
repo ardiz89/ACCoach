@@ -1500,8 +1500,16 @@ def create_api(
         return {"improved": _rows(better, advice=False),
                 "regressed": _rows(worse, advice=True)}
 
-    def _recap_of(cur, track: str, car: str, lg: str) -> dict | None:
+    def _recap_of(cur, track: str, car: str, lg: str) -> tuple[dict | None, bool]:
         """The run's recap, or None when there is nothing measurable in it.
+
+        Second element: the run's yardstick lap has a clock that does not cover
+        it, so nothing here could be measured against it. It is the one cause
+        of an empty recap this endpoint may state on screen, and it is *not*
+        computed here — it is forwarded from ``RecapOutcome``, the only place
+        that criterion lives. Every other empty answer, including all the ones
+        this function decides on its own below, comes back False and leaves the
+        screen with its generic sentence.
 
         ``session_recap`` (Task 2) drops any lap it cannot cut into phases —
         too few samples, most often — rather than count it as a zero. That
@@ -1523,22 +1531,22 @@ def create_api(
         """
         best = cur.best
         if best is None:
-            return None
+            return None, False
         others = [l for l in cur.valid_laps if l["path"] != best["path"]]
         if not others:
-            return None                     # the best lap is the only lap
+            return None, False              # the best lap is the only lap
         try:
             best_lap = load_lap(best["path"])
             reference = Reference(best_lap)
             if not reference.usable:
-                return None
+                return None, False
             corners = detect_corners(best_lap.samples)
             names = {c.index: n for c, n in
                      zip(corners, name_corners(track, corners, lg,
                                                _corner_map(car, track),
                                                _typed(track)))}
         except Exception:  # noqa: BLE001 - a session view must not 500 on one bad lap
-            return None
+            return None, False
 
         # Laps this endpoint itself could not even load are dropped here, one
         # at a time and in lockstep with `kept` — the only filtering this
@@ -1552,14 +1560,15 @@ def create_api(
                 continue
             kept.append(row)
         if not lap_objs:
-            return None
+            return None, False
 
         try:
-            recap = session_recap(lap_objs, reference, corners)
+            outcome = session_recap(lap_objs, reference, corners)
         except Exception:  # noqa: BLE001 - same guarantee as the block above
-            return None
+            return None, False
+        recap = outcome.recap
         if recap is None:
-            return None
+            return None, outcome.reference_clock_broken
         phases = [{"phase": p, "avg_s": round(recap.by_phase[p] / 1000.0, 3)}
                   for p in PHASES] + [{"phase": "launch",
                                        "avg_s": round(recap.launch_ms / 1000.0, 3)}]
@@ -1587,7 +1596,7 @@ def create_api(
                 "corner": names.get(r.worst_index, ""),
                 "corner_s": round(r.worst_ms / 1000.0, 3),
             } for r in recap.laps],
-        }
+        }, False
 
     @app.get("/api/sessions")
     def sessions(
@@ -1630,6 +1639,8 @@ def create_api(
                 "best": format_lap_time(b["lap_time_ms"]) if b else None,
             }
 
+        recap, recap_clock_broken = _recap_of(cur, track, car, lg)
+
         return {
             "sessions": [_summary(s) for s in runs],
             "index": index,
@@ -1641,7 +1652,14 @@ def create_api(
                 "road_temp_from": min(temps) if temps else None,
                 "road_temp_to": max(temps) if temps else None,
                 "consistency": lap_time_consistency(valid_ms),
-                "recap": _recap_of(cur, track, car, lg),
+                "recap": recap,
+                # Why there is no recap — but only when the answer is verified.
+                # True means the run's own best lap has a clock that doesn't
+                # cover it, so nothing could be measured against it; False
+                # covers every other empty answer and leaves the screen its
+                # generic sentence, because naming one cause out of six guessed
+                # ones would usually be naming the wrong one.
+                "recap_clock_broken": recap_clock_broken,
                 # Every lap of the run, in the order driven — cut and invalid
                 # ones included. They can't set the numbers, but leaving them out
                 # would show a session you didn't have.

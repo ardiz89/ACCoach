@@ -2198,12 +2198,20 @@ function renderRecap(cur) {
   const r = cur && cur.recap;
   if (!r) {
     head.innerHTML = "";
-    // Due cause diverse, due frasi diverse: `!cur` è lo stesso fatto che il
-    // pannello Sessione scrive sullo stesso payload ("nessun giro
-    // registrato"); `cur && !cur.recap` è `_recap_of` (api.py) che torna
-    // None per sette motivi possibili — "un solo giro" ne è solo uno, e
-    // nominarlo qui sarebbe spesso nominare la causa sbagliata.
-    ph.innerHTML = `<div class="nothing">${t(cur ? "recap.none" : "recap.nolaps")}</div>`;
+    // Tre casi, tre frasi: `!cur` è lo stesso fatto che il pannello Sessione
+    // scrive sullo stesso payload ("nessun giro registrato");
+    // `recap_clock_broken` è l'unica delle sette cause che sia MISURATA (la
+    // guardia in trends.py: l'orologio del miglior giro non copre il giro), e
+    // arriva già decisa dal payload — qui non si rifà nessun controllo; tutto
+    // il resto resta la frase generica, perché nominare una causa fra le altre
+    // sei sarebbe quasi sempre nominare quella sbagliata.
+    // Le tre chiamate restano scritte per esteso, con la chiave letterale
+    // dentro, perché è così che test_web_i18n_keys le vede: una chiave a pezzi non
+    // la controlla nessuno, ed è come i pulsanti del tour sono rimasti in
+    // inglese per mesi.
+    const msg = !cur ? t("recap.nolaps")
+              : cur.recap_clock_broken ? t("recap.clock") : t("recap.none");
+    ph.innerHTML = `<div class="nothing">${msg}</div>`;
     lp.innerHTML = "";
     // Un titolo («Giro per giro») sopra il vuoto si legge come rotto: la
     // sezione sparisce con lui, non solo la lista sotto.
