@@ -499,8 +499,9 @@ lunghezza della pista`; se un giro non ha coordinate, o se le sue coordinate non
 tornano con velocità e tempo, l'asse torna in percentuale invece di darti una
 scala sbagliata.
 
-Due scorciatoie: **1-9** e **0** aprono le schede in ordine, **[** e **]** scorrono i
-giri. (Le trovi anche passando il mouse sulle schede e sulla tendina.)
+Due scorciatoie: la **fila dei numeri** apre le schede da sinistra a destra,
+**[** e **]** scorrono i giri, e il tasto di ogni scheda lo vedi passandoci
+sopra il mouse (vale anche per la tendina dei giri).
 
 Sotto ogni curva c'è anche **dove, dentro la curva, è finito il tempo**: una
 barra divisa in *ingresso · apex · uscita · tratto dopo* (passa il mouse per i
