@@ -180,6 +180,14 @@ Non devi fare nulla di speciale: avvia la sessione (Pratica, Hotlap, Gara) e gui
   distanza, perché dieci metri sono 0,14 s a 250 km/h e mezzo secondo in una
   curva lenta.
 - Una **pastiglia** mostra l'ultimo consiglio pronunciato, e sfuma da sola.
+  Quando l'ingegnere propone una modifica che si fa **solo ai box**, il coach
+  ti richiama a fine giro — e da quel momento quella pastiglia non è più
+  quella dell'ultimo consiglio: è l'**avviso di rientro**, in ambra, e non
+  sfuma. Resta finché non entri in corsia box, o finché la modifica non è più
+  in sospeso (per esempio se viene ritirata): un richiamo che sparisce dopo
+  due secondi è un richiamo che ti perdi se in quel momento stavi guardando la
+  curva davanti. I consigli continuano a essere **detti**: cedono solo quella
+  riga, e la riprendono appena l'avviso si spegne.
 
 ### La traccia dei pedali (per il trail braking)
 
