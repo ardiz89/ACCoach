@@ -1316,3 +1316,30 @@ def test_the_tour_start_here_step_points_at_the_new_landing_tab():
     m = re.search(r'sel:\s*"([^"]+)"[^}]*title:\s*t\("tour\.a12\.t"\)', block)
     assert m, "no tour step uses tour.a12.t (\"Start here\")"
     assert _view_of_ids().get(m.group(1).lstrip("#"), "") == "recap"
+
+
+def test_the_tour_start_here_step_points_at_something_with_static_content():
+    """`before: recap` calls `showView("recap")`, which calls `loadSession` —
+    asynchronous. `tour.js`'s `render()` runs `before()` and, in the very same
+    synchronous tick, checks `visible(elFor(step))`; anything still at
+    `height: 0` at that instant fails the check and the whole tour calls
+    `finish()` in silence. `#recap-phases` is exactly that: an empty `<div>`
+    in index.html until `renderRecap` fills it after the fetch resolves, which
+    can never happen before the synchronous check runs. The step has to
+    target an element that already has content in the raw HTML — verified
+    here by mutation: point tour.a12 back at `#recap-phases` and this goes
+    red; restore `#recap-phases-sec` and it's green again."""
+    block = _APPJS.split("function tourSteps()")[1].split("\n}")[0]
+    m = re.search(r'sel:\s*"([^"]+)"[^}]*title:\s*t\("tour\.a12\.t"\)', block)
+    assert m, "no tour step uses tour.a12.t (\"Start here\")"
+    sel = m.group(1)
+    assert sel.startswith("#"), sel
+    target = sel[1:]
+    tag = re.search(rf'<(\w+)[^>]*\bid="{re.escape(target)}"[^>]*>(.*?)</\1>',
+                     _HTML, re.S)
+    assert tag, f"{sel} is not a tag with a closing pair in index.html"
+    inner = re.sub(r"\s+", "", tag.group(2))
+    assert inner, (
+        f"{sel} is empty in index.html — it is filled by JS after an async "
+        "fetch, so tour.js's synchronous visibility check will always miss it"
+    )

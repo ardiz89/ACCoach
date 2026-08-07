@@ -191,9 +191,15 @@ function tourSteps() {
     { sel: "#combo", title: t("tour.a1.t"), text: t("tour.a1.x") },
     { sel: ".tabs", title: t("tour.a2.t"), text: t("tour.a2.x") },
     // "Start here" now belongs to the door, not the guided flow — targeted at
-    // #recap-phases rather than #recap-head because the head goes empty (and
-    // therefore invisible to the tour) on a run with nothing measurable yet.
-    { sel: "#recap-phases", title: t("tour.a12.t"), text: t("tour.a12.x"), before: recap },
+    // #recap-phases-sec (the static <section>, not #recap-head or the
+    // #recap-phases div it wraps). #recap-head goes empty on a run with
+    // nothing measurable yet; #recap-phases starts empty on EVERY run, filled
+    // only once loadSession's fetch resolves — and tour.js checks visibility
+    // synchronously right after `before()` runs, before that fetch can ever
+    // land, so a step pointed at a JS-filled div is always invisible and
+    // silently ends the tour. #recap-phases-sec has the h3 already in the
+    // markup, so it has height before any JS runs.
+    { sel: "#recap-phases-sec", title: t("tour.a12.t"), text: t("tour.a12.x"), before: recap },
     { sel: "#flow-card", title: t("tour.a9.t"), text: t("tour.a9.x"), before: flow },
     { sel: "#train-steps", title: t("tour.a11.t"), text: t("tour.a11.x"),
       before: () => showView("training") },
