@@ -1938,3 +1938,104 @@ def test_a_new_lap_drops_the_old_lap_s_missing_messages_before_it_fetches():
     for el in ("map-missing", "line-missing", "dyn-missing"):
         assert el in head, f"{el} resta acceso durante la richiesta del giro nuovo"
     assert 'classList.add("hidden")' in head
+
+
+# --- lo stesso disegno assente, un piano più su (2026-08-07) ----------------
+#
+# `#map-missing` era la sola cosa a mancare quando il giro non ha coordinate:
+# sopra di lui restavano accesi `#map-readout` («Racing line · colour = speed
+# vs reference…») e `.map-legend` (la sfumatura veloce/lento, ▽ e ○) — due
+# didascalie per un disegno che non c'è, la stessa famiglia di `#leg-lost` ma
+# non lo stesso difetto: qui non c'era contraddizione fra markup e CSS, c'era
+# un ramo JS che non spegneva niente. `drawMap()` ora li spegne insieme al
+# canvas; questi due test pinnano il verso JS (la chiamata c'è, ed è un
+# `toggle` — non un `add` che resterebbe spento anche col giro giusto) e il
+# verso CSS (`hidden`, una volta scritto, VINCE davvero).
+
+
+def _draw_map_body() -> str:
+    body = _APPJS[_APPJS.index("function drawMap(a, cx) {"):]
+    return body[:body.index("\n}\n")]
+
+
+def test_the_map_readout_and_legend_are_switched_off_with_the_map():
+    """`drawMapTo` spegne solo il canvas: `#map-readout` e `.map-legend` sono
+    suoi FRATELLI nella colonna (vedi index.html), non figli, quindi il canvas
+    che sparisce non fa niente per loro. `toggle(..., !a.has_map)` — non
+    `add("hidden")` — è il punto: deve anche RIACCENDERLI quando un giro CON
+    coordinate viene disegnato, altrimenti la scatola resterebbe muta per un
+    motivo che non vale più. Una condizione scambiata (`a.has_map` invece di
+    `!a.has_map`) è lo stesso difetto sul verso opposto — spenti col giro
+    giusto — e questa stessa stringa la intercetta."""
+    body = _draw_map_body()
+    for el in ("map-readout", "map-legend"):
+        assert f'$("{el}")' in body, f"drawMap non tocca più #{el}"
+    # count, non `in`: un `toggle` solo su due elementi lascerebbe l'altro
+    # acceso per sempre, e un `in` da solo non lo vedrebbe.
+    hits = body.count('classList.toggle("hidden", !a.has_map)')
+    assert hits >= 2, f"solo {hits} toggle su has_map — readout e legend ne servono uno ciascuno"
+
+
+def _chain_to(el_id: str) -> list[set[str]]:
+    """La catena di antenati (tag/id/classi, `hidden` esclusa) fino a `el_id`,
+    dal più esterno al più interno — stessa forma di `_hideable_chains`, ma per
+    un elemento che a riposo NON porta `hidden` nel markup: lo aggiunge `drawMap`
+    solo quando il giro non ha coordinate, quindi il grep statico su
+    `class="...hidden..."` non lo troverebbe."""
+    result: list[set[str]] | None = None
+
+    def walk(el, chain):
+        nonlocal result
+        if result is not None:
+            return
+        names = {el.tag} | set(el.classes) | ({el.id} if el.id else set())
+        names.discard("hidden")
+        here = chain + [names]
+        if el.id == el_id:
+            result = here
+            return
+        for child in el.children:
+            walk(child, here)
+            if result is not None:
+                return
+
+    for child in _dom().children:
+        walk(child, [])
+        if result is not None:
+            break
+    assert result is not None, f"#{el_id} non trovato nel documento"
+    return result
+
+
+def test_hidden_actually_hides_the_map_readout_and_legend():
+    """Il verso CSS del test sopra: che `hidden`, una volta scritto da
+    `drawMap`, VINCA davvero. Non era ovvio — `.map-legend { display: flex }`
+    e `.hidden { display: none }` sono entrambe una classe sola (0,1,0), e a
+    parità di specificità decide l'ordine nel foglio: `.map-legend` viene
+    DOPO `.hidden`, quindi avrebbe vinto lei. È lo stesso duello già pagato per
+    `#view-flow` e per `.map-legend .swatch`, un'ottava più in basso — la cura
+    è la stessa, `:not(.hidden)` sulla regola che vuole mostrare la roba.
+    """
+    chains = {el_id: _chain_to(el_id) for el_id in ("map-readout", "map-legend")}
+
+    # Anti-vacuità sul matcher: deve saper dire sì a una classe che c'è davvero
+    # su questa catena, altrimenti un `_hits` sempre falso passerebbe il test
+    # sotto senza aver controllato niente.
+    assert _hits(".readout", chains["map-readout"]), "il matcher non vede nemmeno .readout"
+    assert _hits(".map-legend", chains["map-legend"]), "il matcher non vede nemmeno .map-legend"
+    assert _hits("aside.cmp-map .readout", chains["map-readout"]), \
+        "il matcher non segue la discendenza vera"
+
+    seen = 0
+    for m in re.finditer(r"([^{}]+)\{([^}]*)\}", _screen_css()):
+        decl = re.search(r"display\s*:\s*([\w-]+)", m.group(2))
+        if decl is None or decl.group(1) == "none":
+            continue
+        seen += 1
+        for part in m.group(1).split(","):
+            for el_id, chain in chains.items():
+                assert not _hits(part.strip(), chain), (
+                    f"{part.strip()!r} batte `.hidden` su #{el_id}: qualificala "
+                    "con :not(.hidden), come fa già .map-legend"
+                )
+    assert seen >= 5, f"solo {seen} regole `display` esaminate: taglio rotto?"

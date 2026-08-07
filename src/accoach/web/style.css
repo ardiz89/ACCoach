@@ -489,7 +489,12 @@ body:not(.railed) .rail { display: none; }
 @media (max-width: 720px) { .tyre-charts { grid-template-columns: 1fr; } }
 
 /* Track-map delta legend */
-.map-legend {
+/* `:not(.hidden)` here is the same guard as `#view-flow:not(.hidden)` further
+   down: `.hidden` and `.map-legend` are both a single class (0,1,0), so on
+   equal specificity the later rule in the file wins — and `.map-legend` comes
+   after `.hidden`. Without the guard, adding `hidden` to this element would
+   lose the fight and the legend would stay on screen. */
+.map-legend:not(.hidden) {
   display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px;
   margin-top: 8px; color: var(--muted); font-size: 12px;
 }

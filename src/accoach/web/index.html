@@ -298,12 +298,19 @@
       </div>
 
       <aside class="cmp-map">
+        <!-- `#map-readout` and `#map-legend` describe the drawing, not the box
+             around it: on a lap with no coordinates they follow the canvas
+             into `hidden` (drawMap() in app.js), for the same reason `#leg-lost`
+             below only shows when its mark is actually on the drawing — a
+             caption for a picture that isn't there sends you looking for it.
+             The h3 title stays: it names the column, and the reason sits right
+             under it once the readout and legend are gone. -->
         <div id="map-readout" class="readout" data-i18n="map.readout">Racing line · colour = speed vs reference (red = slower here, green = faster) · thicker line = bigger gap · ▽ your braking · ○ reference braking</div>
         <main>
           <div class="chart map">
             <h3 data-i18n-html="chart.map">Track map <small>(white dashed = reference · solid line = reviewed lap)</small></h3>
             <canvas id="c-map"></canvas>
-            <div class="map-legend">
+            <div class="map-legend" id="map-legend">
               <span class="map-grad">
                 <span class="scale">
                   <span class="cap fast" data-i18n="map.grad.fast">faster</span>

@@ -1117,6 +1117,16 @@ function drawRoad(ctx, road, X, Y, hair) {
 function drawMap(a, cx) {
   const hit = drawMapTo($("c-map"), $("map-missing"), a, cx);
   if (hit) MAP_HIT = hit;
+  // The readout and the legend describe the drawing, and they are NOT inside
+  // the canvas — they are sibling elements in the column (see index.html) —
+  // so drawMapTo() turning the canvas off does nothing for them. Without this
+  // they stayed lit above `#map-missing`, captioning a picture that wasn't
+  // there. The h3 title is left alone on purpose: it names the column, and
+  // reads as a heading with the reason underneath once these two are gone.
+  const ro = $("map-readout");
+  if (ro) ro.classList.toggle("hidden", !a.has_map);
+  const legend = $("map-legend");
+  if (legend) legend.classList.toggle("hidden", !a.has_map);
   // The cross is on the drawing only on a lap that was actually thrown away. A
   // legend entry for a mark that isn't there sends the reader hunting for it,
   // so the entry comes and goes with the mark.
@@ -1130,7 +1140,6 @@ function drawMap(a, cx) {
   // `hoverTo`: se la pastiglia va scritta a mano in N punti, il punto N+1 se
   // la dimentica. Scritta una sola volta, dentro la funzione che disegna la
   // mappa, nessun chiamante può più dimenticarla.
-  const ro = $("map-readout");
   if (ro) { ro.innerHTML = mapReadoutHTML(cx); wireRangeClear(ro); }
 }
 
