@@ -394,3 +394,61 @@ def test_the_call_outranks_technique_advice_but_not_a_lock_up():
     from accoach.coaching.cue import CueTier, tier_of
     assert tier_of(CueCategory.PIT_IN) == CueTier.ACUTE
     assert tier_of(CueCategory.PIT_BRIEFING) == CueTier.ADVISORY
+
+
+# --- the latch: the pit-in is a condition, not an event ---------------------
+
+def test_nothing_pending_nothing_calling():
+    """Senza una modifica in sospeso non c'è niente da annunciare."""
+    pc = PitCall()
+    _drive(pc, [0.10, 0.70, 0.90], completed_laps=3)
+    assert pc.calling is False
+
+
+def test_the_latch_arms_when_the_call_goes_out():
+    pc = PitCall()
+    pc.set_pending(True)
+    cues = _drive(pc, [0.10, 0.70, 0.90], completed_laps=3)
+    assert _cats(cues) == [CueCategory.PIT_IN]
+    assert pc.calling is True
+
+
+def test_the_latch_survives_the_finish_line():
+    """Il difetto che stiamo correggendo. Il cue scatta una volta per giro, ma
+    chi è rimasto fuori deve ancora rientrare: a metà del giro dopo, e ancora
+    fuori dalla corsia, l'avviso è acceso."""
+    pc = PitCall()
+    pc.set_pending(True)
+    _drive(pc, [0.70, 0.90], completed_laps=3)
+    _drive(pc, [0.20, 0.50], completed_laps=4)      # traguardo attraversato
+    assert pc.calling is True
+
+
+def test_entering_the_lane_disarms_it():
+    """Sei rientrato: l'avviso ha finito il suo lavoro."""
+    pc = PitCall()
+    pc.set_pending(True)
+    _drive(pc, [0.70, 0.90], completed_laps=3)
+    assert pc.calling is True
+    _drive(pc, [0.95], completed_laps=3, in_pit_lane=True)
+    assert pc.calling is False
+
+
+def test_dropping_the_pending_change_disarms_it():
+    """Un avviso che sopravvive alla sua ragione è peggio di nessun avviso."""
+    pc = PitCall()
+    pc.set_pending(True)
+    _drive(pc, [0.70, 0.90], completed_laps=3)
+    pc.set_pending(False)
+    assert pc.calling is False
+
+
+def test_the_cues_are_the_same_as_before():
+    """Non-regressione: il fermo è un'uscita in più, non un cambio di
+    comportamento. Stessi cue, stesso numero, stesso ordine."""
+    pc = PitCall()
+    pc.set_pending(True)
+    first = _drive(pc, [0.10, 0.70, 0.90], completed_laps=3)
+    second = _drive(pc, [0.70, 0.90], completed_laps=4)
+    assert _cats(first) == [CueCategory.PIT_IN]
+    assert _cats(second) == [CueCategory.PIT_IN]
