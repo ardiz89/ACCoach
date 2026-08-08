@@ -16,6 +16,7 @@ import pytest                                            # noqa: E402
 
 pytest.importorskip("PySide6")
 
+from PySide6.QtCore import Qt                              # noqa: E402
 from PySide6.QtGui import QColor, QPixmap                 # noqa: E402
 from PySide6.QtWidgets import QApplication                # noqa: E402
 
@@ -26,6 +27,16 @@ from accoach.testpanel import Panel, TestPanel             # noqa: E402
 @pytest.fixture(scope="module")
 def app():
     return QApplication.instance() or QApplication([])
+
+
+@pytest.fixture(autouse=True)
+def _niente_file_del_pilota(monkeypatch, tmp_path):
+    """Un `TestPanel()` senza `path` qui sotto è la norma, non l'eccezione: la
+    protezione deve valere per tutto il file, non solo per il test che se la
+    scrive da sé — o un widget di prova legge il vero
+    `~/Documents/ACCoach/test_step.json` del pilota.
+    """
+    monkeypatch.setattr(tp_mod, "step_path", lambda: tmp_path / "mai-scritto.json")
 
 
 def _texts_drawn(app, panel: Panel) -> list[tuple[int, str]]:
@@ -41,7 +52,9 @@ def _texts_drawn(app, panel: Panel) -> list[tuple[int, str]]:
         return real(p, x, y, width, height, flags, text)
 
     w._text = spy
-    w.render(QPixmap(w.size()))
+    pm = QPixmap(w.size())
+    pm.fill(Qt.transparent)  # `QPixmap` grezza è memoria non inizializzata
+    w.render(pm)
     w.deleteLater()
     return asked
 
@@ -50,6 +63,10 @@ def _pixels(app, panel: Panel) -> QPixmap:
     w = TestPanel()
     w._panel = panel
     pm = QPixmap(w.size())
+    # Senza questo fill i pixel di partenza sono spazzatura: gli angoli
+    # arrotondati, che nessuno dipinge, possono cadere per caso dentro la
+    # tolleranza di GREEN e far passare il test a vuoto.
+    pm.fill(Qt.transparent)
     w.render(pm)
     w.deleteLater()
     return pm

@@ -28,14 +28,11 @@ tradotto.
 from __future__ import annotations
 
 import json
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
-from . import paths
-
-import time
-
-from . import brand
+from . import brand, paths
 from .theme import DISPLAY, MONO, load_fonts
 
 try:
@@ -88,14 +85,22 @@ def render_step(step: dict | None, now: float) -> Panel:
     countdown = ""
     ends_at = step.get("ends_at")
     if ends_at:
-        left = float(ends_at) - now
-        if left <= 0:
-            # Un contatore che si muove da solo deve sapersi fermare da solo: a
-            # `00:00` in attesa di un aggiornamento, il riquadro sarebbe
-            # indistinguibile da un'app morta.
-            done = True
-        else:
-            countdown = f"{int(left) // 60:02d}:{int(left) % 60:02d}"
+        try:
+            left = float(ends_at) - now
+        except (TypeError, ValueError):
+            # L'errore più probabile è `ends_at` scritto come stringa ISO invece
+            # che epoch. Degrada a "nessun orologio", non a "fatto": un orologio
+            # che non si sa leggere non è una prova che il passo sia finito, e un
+            # verde comparso da solo sarebbe un giudizio che nessuno ha dato.
+            left = None
+        if left is not None:
+            if left <= 0:
+                # Un contatore che si muove da solo deve sapersi fermare da solo:
+                # a `00:00` in attesa di un aggiornamento, il riquadro sarebbe
+                # indistinguibile da un'app morta.
+                done = True
+            else:
+                countdown = f"{int(left) // 60:02d}:{int(left) % 60:02d}"
 
     if done:
         return Panel(where=where, title=title, done=True,
@@ -172,8 +177,9 @@ class StepFile:
 # Coordinate di progetto: la finestra è queste misure × la scala salvata.
 _BASE_W, _BASE_H = 440, 200
 _MARGIN = 24              # distanza dall'angolo dello schermo centrale
-_POLL_MS = 500            # ogni quanto si rilegge il file
-_TICK_MS = 250            # ogni quanto si ridisegna (l'orologio scala di 1 s)
+_POLL_MS = 500            # rileggere il file e ricalcolare l'orologio sono lo
+                          # stesso atto: un solo timer, e mezzo secondo è
+                          # impercettibile su un campo `MM:SS`.
 
 # Le righe, in coordinate di progetto. Sono costanti e non calcolate dal
 # contenuto di proposito: `_CLOCK_Y` è il punto che l'occhio cerca senza
@@ -203,6 +209,7 @@ class TestPanel(QWidget):
         self._scale = scale if (scale and scale > 0) else 1.0
         self.resize(int(_BASE_W * self._scale), int(_BASE_H * self._scale))
         self._place()
+        self._watch_screens()
 
         self._file = StepFile(path or step_path())
         self._panel = Panel(waiting=True)
@@ -210,17 +217,15 @@ class TestPanel(QWidget):
         self._poll = QTimer(self)
         self._poll.timeout.connect(self.refresh)
         self._poll.start(_POLL_MS)
-        self._tick = QTimer(self)
-        self._tick.timeout.connect(self.update)
-        self._tick.start(_TICK_MS)
 
     def _place(self) -> None:
         """L'angolo in alto a sinistra dello schermo che il pilota guarda.
 
         Lo schermo di riferimento è quello sotto il centro del desktop virtuale:
         è la stessa regola con cui l'HUD si centra (`Overlay._place_top_center`),
-        e non se ne introduce una seconda perché due finestre che decidono da
-        sole quale sia «quello di mezzo» prima o poi non sono d'accordo.
+        ricopiata qui invece che condivisa — se una delle due cambia, va
+        cambiata anche l'altra, o le due finestre smettono di essere d'accordo
+        su quale sia «quello di mezzo».
 
         Limite dichiarato: con tre monitor uniti in una superficie sola
         (Eyefinity/Surround) Windows ne riporta uno largo quanto tutti e tre, e
@@ -233,6 +238,36 @@ class TestPanel(QWidget):
         screen = QApplication.screenAt(prim.virtualGeometry().center()) or prim
         g = screen.geometry()
         self.move(g.left() + _MARGIN, g.top() + _MARGIN)
+
+    def _watch_screens(self) -> None:
+        """Ricolloca la finestra quando il desktop sotto cambia forma.
+
+        Stessa ragione di `Overlay._watch_screens`: il riquadro si accende
+        *prima* del gioco — è il primo passo del protocollo, a sim ancora
+        spento — e avviare il sim (o unire i monitor in Eyefinity) è esattamente
+        l'evento che può spostare l'origine sotto una finestra già piazzata.
+        Piazzare una volta sola e basta lascerebbe il riquadro fermo dov'era,
+        senza modo di recuperare.
+        """
+        app = QApplication.instance()
+        if app is None:
+            return
+        app.screenAdded.connect(self._on_screens_changed)
+        app.screenRemoved.connect(self._on_screens_changed)
+        app.primaryScreenChanged.connect(self._on_screens_changed)
+        for screen in app.screens():
+            screen.geometryChanged.connect(self._on_screens_changed)
+
+    def _on_screens_changed(self, *_args) -> None:
+        # Anche gli schermi nuovi vanno riascoltati, o un riordino successivo
+        # passerebbe inosservato.
+        for screen in QApplication.screens():
+            try:
+                screen.geometryChanged.disconnect(self._on_screens_changed)
+            except (RuntimeError, TypeError):
+                pass
+            screen.geometryChanged.connect(self._on_screens_changed)
+        self._place()
 
     def refresh(self) -> None:
         """Rilegge il file e ricalcola le righe. Chiamato dal timer."""

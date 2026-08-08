@@ -104,12 +104,21 @@ si spostano insieme invece di litigare su quale sia il centrale.
 
 Misurato sull'impianto del pilota l'08/08: tre display **separati** da 2560×1440,
 il centrale è il primario (X da 0 a 2560, Y 0). Il riquadro va a (24, 24) di
-quello schermo; l'HUD parte a ~1000 px, quindi non si sovrappongono.
+quello schermo; l'HUD parte a ~1000 px, quindi non si sovrappongono — **a scala
+1.0**.
 
 **Limite dichiarato:** se i tre monitor venissero uniti in una superficie sola
 (Eyefinity/Surround), Windows ne riporterebbe uno largo 7680 e questa regola
 atterrerebbe sul pannello di sinistra, fuori dal campo visivo. Non è il caso
 attuale e non viene gestito.
+
+**Limite dichiarato:** il non-sovrapporsi vale solo alla scala misurata. Le due
+finestre leggono la **stessa** manopola (`overlay.scale`): il bordo sinistro
+dell'HUD sta a `1280 − 280·s`, il bordo destro del riquadro a `24 + 440·s`, e si
+toccano oltre `s ≈ 1.74`. Un pilota che alzasse la scala oltre quella soglia si
+troverebbe il riquadro sopra il delta — il numero che questa stessa specifica
+dice non deve muoversi sotto l'occhio. Non è il caso attuale e non viene
+gestito.
 
 ## Il file di un passo
 
@@ -222,8 +231,10 @@ come fa l'HUD quando il motore non c'è.
 
 Si segue la ricetta già usata per l'avviso box (`tests/test_overlay_pit_due.py`):
 si dipinge **il widget vero** fuori schermo (`QT_QPA_PLATFORM=offscreen`) e si
-guarda cosa ha chiesto al pennello, con l'orologio del modulo sostituito da uno
-finto che si può spostare in avanti a mano.
+guarda cosa ha chiesto al pennello. L'orologio non è sostituito da un finto: in
+`render_step` `now` è un parametro esplicito, non letto da `time.time()` dentro
+la funzione, quindi il test lo sceglie passandolo — niente monkeypatch, niente
+finto che avanza, e nessun modo per un test di dimenticare di farlo avanzare.
 
 Cosa dimostrano i test:
 

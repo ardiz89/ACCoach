@@ -86,3 +86,29 @@ def test_il_corpo_si_ferma_a_due_righe():
 def test_i_campi_che_mancano_non_diventano_stringhe_none():
     p = render_step({"title": "X"}, now=1000.0)
     assert (p.body, p.specs, p.note, p.countdown, p.done_msg) == ((), "", "", "", "")
+
+
+def test_ends_at_come_stringa_iso_non_ha_countdown():
+    """L'errore più probabile: `ends_at` scritto come data invece che epoch.
+
+    Deve degradare a "nessun orologio", non a "fatto" — il resto del passo
+    (titolo, corpo, specifiche) resta comunque in piedi.
+    """
+    p = render_step({"title": "STINT", "do": "Resta a 220 in curva 1",
+                     "specs": "TC 4", "ends_at": "2026-08-08T12:00:00"},
+                    now=1000.0)
+    assert p.countdown == ""
+    assert p.done is False
+    assert p.title == "STINT"
+    assert p.body == ("Resta a 220 in curva 1",)
+    assert p.specs == "TC 4"
+
+
+def test_ends_at_come_lista_non_ha_countdown():
+    """Stesso caso, con un tipo che `float()` non converte affatto."""
+    p = render_step({"title": "STINT", "do": "Resta a 220 in curva 1",
+                     "ends_at": [1, 2, 3]}, now=1000.0)
+    assert p.countdown == ""
+    assert p.done is False
+    assert p.title == "STINT"
+    assert p.body == ("Resta a 220 in curva 1",)

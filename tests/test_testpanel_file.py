@@ -8,7 +8,10 @@ convincente, e sono l'unico motivo per cui `StepFile` esiste invece di una
 """
 import json
 import os
+import subprocess
+import sys
 import time
+from pathlib import Path
 
 from accoach.testpanel import _STALE_S, StepFile
 
@@ -92,3 +95,28 @@ def test_due_scritture_diverse_nello_stesso_istante_si_vedono_entrambe(tmp_path)
     _write(p, title="SECONDO", do="una riga in più che cambia la dimensione")
     os.utime(p, (now, now))                     # stesso mtime, di proposito
     assert sf.read(now)["title"] == "SECONDO"
+
+
+def test_il_riquadro_non_apre_la_telemetria():
+    """La ragione per cui questo è un processo a sé, resa verificabile.
+
+    Il 07/08 abbiamo sfiorato l'incidente di due `CoachEngine` accesi insieme,
+    con ogni giro salvato due volte. Un `import accoach.testpanel` che non
+    trascina dentro `accoach.engine` o `accoach.telemetry` è la prova che
+    quell'incidente non si può ripetere da qui, qualunque cosa aggiunga in
+    futuro chi ci lavora — senza questo test, un `from .engine import ...`
+    aggiunto per «mostrare il giro corrente nel riquadro» non romperebbe
+    niente finché non lo fa in pista.
+    """
+    # Il sottoprocesso non eredita il `pythonpath = ["src"]` di pytest: glielo
+    # si dà a mano, o il subprocess trova (o non trova) un `accoach` a caso
+    # invece del sorgente di questo worktree.
+    src = str(Path(__file__).resolve().parent.parent / "src")
+    out = subprocess.run(
+        [sys.executable, "-c",
+         "import sys, accoach.testpanel; "
+         "print([m for m in sys.modules if 'telemetry' in m or 'engine' in m])"],
+        capture_output=True, text=True,
+        env={**os.environ, "QT_QPA_PLATFORM": "offscreen", "PYTHONPATH": src})
+    assert out.returncode == 0, out.stderr
+    assert "[]" in out.stdout
