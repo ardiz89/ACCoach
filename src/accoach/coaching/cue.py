@@ -123,3 +123,37 @@ class Cue:
     def dedup_key(self) -> tuple:
         """Same category in the same segment is 'the same advice'."""
         return (self.category, self.segment)
+
+
+# The theme a cue belongs to — the unit a coaching session is organised around.
+# It lives here, next to the category, because two readers need it (the debrief
+# headline and the voice gate) and a second copy would be free to disagree.
+#
+# The English key is the one that travels between modules; the localized label is
+# only ever shown. A comparison that changed outcome with the interface language
+# would be a defect invisible in Italian and visible only in English.
+THEME: dict[CueCategory, dict[str, str]] = {
+    CueCategory.BRAKE_LATER: {"en": "braking", "it": "frenata"},
+    CueCategory.BRAKE_EARLIER: {"en": "braking", "it": "frenata"},
+    CueCategory.LESS_BRAKE: {"en": "braking", "it": "frenata"},
+    CueCategory.TRAIL_BRAKE: {"en": "braking", "it": "frenata"},
+    CueCategory.MORE_THROTTLE: {"en": "traction", "it": "trazione"},
+    CueCategory.PARTIAL_THROTTLE: {"en": "traction", "it": "trazione"},
+    CueCategory.COASTING: {"en": "traction", "it": "trazione"},
+    CueCategory.CARRY_SPEED: {"en": "cornering", "it": "percorrenza"},
+    CueCategory.TIME_LOSS: {"en": "line", "it": "linea"},
+    CueCategory.LIMITER: {"en": "gears", "it": "marce"},
+    CueCategory.GEAR_TOO_TALL: {"en": "gears", "it": "marce"},
+}
+THEME_DEFAULT: dict[str, str] = {"en": "driving", "it": "guida"}
+
+
+def theme_key(category: CueCategory) -> str:
+    """The English theme key, for aggregation and comparison across modules."""
+    return THEME.get(category, THEME_DEFAULT)["en"]
+
+
+def theme_label(category: CueCategory, lang: str) -> str:
+    """The theme as shown to the driver, in ``lang`` (falls back to English)."""
+    entry = THEME.get(category, THEME_DEFAULT)
+    return entry.get(lang) or entry["en"]

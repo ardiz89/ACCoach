@@ -45,24 +45,16 @@ _SOLVED_MS = 80.0        # …and below this absolute, to count as solved
 _PATIENCE = 6            # laps spent on a focus with no win → park it, move on
 
 
-# A short, driver-facing label for what to work on, by loss category. The live
-# coach already says the "what"; this names the *theme* so a session has a spine.
-# Per-language; the theme is shown in the message AND in the payload (overlay /
-# engineer page), so it follows the active app language.
-_THEME = {
-    CueCategory.BRAKE_LATER: {"en": "braking", "it": "frenata"},
-    CueCategory.BRAKE_EARLIER: {"en": "braking", "it": "frenata"},
-    CueCategory.LESS_BRAKE: {"en": "braking", "it": "frenata"},
-    CueCategory.MORE_THROTTLE: {"en": "traction", "it": "trazione"},
-    CueCategory.CARRY_SPEED: {"en": "cornering", "it": "percorrenza"},
-    CueCategory.TIME_LOSS: {"en": "line", "it": "linea"},
-}
-_THEME_DEFAULT = {"en": "driving", "it": "guida"}
+# The theme table moved to cue.py, next to the category it describes: the voice
+# gate needs it too, and scheduler.py cannot import this module without pulling
+# debrief.py in behind it.
+from .cue import THEME as _THEME            # noqa: F401 - re-export for debrief
+from .cue import THEME_DEFAULT as _THEME_DEFAULT   # noqa: F401
+from .cue import theme_label as _theme_label
 
 
 def _theme(cat: CueCategory, lang: str) -> str:
-    entry = _THEME.get(cat, _THEME_DEFAULT)
-    return entry.get(lang) or entry["en"]
+    return _theme_label(cat, lang)
 
 
 # Per-lap report messages, per language; resolved with the active language at the

@@ -472,9 +472,9 @@ def _headline(losses: list[CornerLoss], gap_ms: int, ref_ms: int,
 
 def _theme_key(cat: CueCategory) -> str:
     """The English theme key regardless of language, for aggregation."""
-    from .focus import _THEME, _THEME_DEFAULT
+    from .cue import theme_key
 
-    return _THEME.get(cat, _THEME_DEFAULT)["en"]
+    return theme_key(cat)
 
 
 def _combined_g(g_lat: float, g_long: float) -> float:
