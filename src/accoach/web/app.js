@@ -3854,8 +3854,19 @@ function renderCornerTitle(L, c, shape) {
 //   dentro, il ridisegno glielo chiude in faccia e si porta via quello che
 //   aveva digitato.
 //
-// Buttare qui non lascia buchi: il salvataggio sul server è già avvenuto, e chi
-// ha fatto salire il contatore ha già rilanciato `loadLine`/`loadCombo`.
+// Buttare qui non lascia buchi in quello che si RIDISEGNA: il salvataggio sul
+// server è già avvenuto, e chi ha fatto salire il contatore ha già rilanciato
+// `loadLine`/`loadCombo`. Non vale però per la CACHE della scheda frenate:
+// `SHEET` lo azzerano solo la tendina della combo e il cambio lingua,
+// `reloadSelection` non lo tocca, e `loadCombo` rifà la scheda solo se è vuota.
+// Quindi se il contatore sale mentre il POST è in volo — cambio di giro o di
+// riferimento sulla stessa pista — il nome nuovo entra nel debrief e nella
+// traiettoria e la scheda frenate resta su quello vecchio finché non si cambia
+// combo o lingua; riaprire la scheda non basta, a cache piena si ridisegna la
+// cache. È l'app che si contraddice da sola, la stessa che il ridisegno qui
+// sotto vuole evitare, e per molto più tempo. Per questo il ramo scartato la
+// cache la butta lo stesso: buttarne una è sicuro comunque, e chi la ricarica si
+// arbitra da sé.
 async function saveCornerName(name) {
   const L = LINE;
   if (!L || !L.corners[LINE_I]) return;
@@ -3873,7 +3884,10 @@ async function saveCornerName(name) {
     $("line-readout").innerHTML = `<span class="warn">${t("line.name.err")}</span>`;
     return;
   }
-  if (stale(seen)) return;
+  // Il disegno sì, la cache no: vedi sopra la funzione. Azzerarla anche qui è
+  // l'unico modo perché la scheda frenate veda il nome nuovo senza aspettare un
+  // cambio di combo o di lingua.
+  if (stale(seen)) { SHEET = null; return; }
   LINE_EDIT = -1;
   // Re-fetch rather than patch the one label on screen. The name is used by the
   // debrief, the losses, the braking sheet and the coach's voice, and a screen

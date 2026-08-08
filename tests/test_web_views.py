@@ -2612,6 +2612,25 @@ _WRITE = re.compile(r"""(?x)
     | \b(?:render|draw)[A-Z]\w*\(        # renderLine(…), drawSectors(…)
 """, re.M)
 
+# La guardia come ISTRUZIONE, non come nome.
+#
+# Cercare la sottostringa `stale(seen)` pinnava che la domanda fosse SCRITTA, non
+# che decidesse qualcosa: a suite intera restavano verdi due mutazioni che
+# annullano la cura in una riga sola — `if (!stale(seen)) return;` (la domanda al
+# contrario: butta le risposte buone e lascia scrivere le vecchie) e
+# `if (stale(seen)) { }` (la domanda fatta e la risposta ignorata). È la terza
+# volta su questo ramo che una difesa guarda la forma invece della sostanza.
+#
+# Qui si pretendono tutte e tre le parti: la domanda non negata, la `||`
+# facoltativa dei due selettori con indice proprio, e l'uscita — che è `return;`
+# o un blocco che finisce per uscire (il ramo scartato di `saveCornerName` butta
+# la cache della scheda frenate prima di uscire).
+_GUARD = re.compile(r"""(?x)
+    if \s* \( \s* stale\(seen\) (?: \s* \|\| [^()]* )? \s* \)
+    \s*
+    (?: return; | \{ [^{}]*? \breturn; \s* \} )
+""")
+
 
 def _brace_block(src: str, i: int) -> tuple[str, int]:
     """Il blocco che si apre a `src[i]`, e l'indice subito dopo la sua chiusura."""
@@ -2684,16 +2703,50 @@ def test_every_loader_marks_the_counter_before_it_waits(fn):
 @pytest.mark.parametrize("fn", _WAITERS)
 def test_no_loader_writes_after_its_await_without_asking(fn):
     """La cura, letta dove conta: prima di scrivere qualunque stato condiviso o
-    di disegnare, ogni ramo si chiede se il pilota sta ancora guardando."""
+    di disegnare, ogni ramo si chiede se il pilota sta ancora guardando — e se
+    la risposta è no, ESCE. Si pretende l'istruzione intera (vedi `_GUARD`), non
+    il nome `stale` scritto da qualche parte prima."""
     body = _body_of(f"async function {fn}(")
     for what, branch in _branches_after_the_await(body):
         m = _WRITE.search(branch)
         if not m:
             continue          # un ramo che scrive solo in una sua variabile
-        guard = branch.find("stale(seen)")
-        assert 0 <= guard < m.start(), (
+        guard = _GUARD.search(branch)
+        assert guard and guard.start() < m.start(), (
             f"{fn}, {what}: scrive «{branch[m.start():m.start() + 40].strip()}» "
-            "senza chiedersi se il pilota sta ancora guardando quella cosa")
+            "senza prima chiedersi se il pilota sta ancora guardando quella cosa "
+            "E uscire se non la guarda più")
+
+
+def test_a_thrown_away_rename_still_drops_the_braking_sheet_cache():
+    """Buttare un DISEGNO è gratis, buttare una INVALIDAZIONE no.
+
+    Il ramo scartato di `saveCornerName` non ridisegna, e va benissimo: chi ha
+    fatto salire il contatore ha già rilanciato `loadLine`/`loadCombo`. Ma
+    `SHEET` non lo rilancia nessuno: lo azzerano solo la tendina della combo e il
+    cambio lingua, mai `reloadSelection`. Rinominata una curva, se mentre il POST
+    è in volo si cambia giro sulla stessa pista, il nome nuovo entra nel debrief
+    e nella traiettoria e la scheda frenate mostra ancora quello vecchio — non
+    per la durata della richiesta, ma finché non si cambia combo o lingua.
+    Riaprire la scheda non basta: a cache piena si ridisegna la cache.
+    """
+    tail = _branches_after_the_await(_body_of("async function saveCornerName("))[-1][1]
+    m = re.search(r"if \(stale\(seen\)\) \{([^{}]*)\}", tail)
+    assert m, ("il ramo scartato di saveCornerName non butta più niente: se è "
+               "tornato `if (stale(seen)) return;` la scheda frenate resta sul "
+               "nome vecchio a tempo indeterminato")
+    assert "SHEET = null;" in m.group(1), (
+        f"il ramo scartato butta «{m.group(1).strip()}» ma non la cache della "
+        "scheda frenate, che è l'unica cosa che nessun altro rifà")
+
+    # Il perché delle tre righe qui sopra, letto dove sta. Se una di queste
+    # cambia, la ragione è caduta e va riletta a mano: rossa apposta.
+    assert "SHEET" not in _body_of("function reloadSelection()"), \
+        "cambiare giro adesso tocca SHEET: il ramo scartato non è più l'unico a doverlo fare"
+    assert "if (!SHEET) loadBraking();" in _body_of("async function loadCombo("), \
+        "loadCombo non rifà più la scheda solo a cache vuota"
+    assert "SHEET ? renderBrakeSheet(SHEET)" in _body_of("function redrawCurrentView()"), \
+        "riaprire la scheda non ridisegna più la cache"
 
 
 def _guard_says(seen: int, epoch: int) -> bool:
