@@ -400,13 +400,23 @@ def test_a_language_switch_also_reaches_the_per_combo_views():
     """`reloadSelection` refetches the *lap*. Trends, Session and Training are
     per car+track and it never touched them, so the page came back with its
     chrome in one language and its content in the other — caught on Training,
-    but it was never only there. Their cached payloads have to go too."""
+    but it was never only there. Their cached payloads have to go too.
+
+    Le tre chiamate a mano che stavano qui erano la stessa cosa che fa
+    `reloadViewData`, scritta due volte — e ne dimenticavano una: il Passo gara
+    restava nella lingua che avevi appena lasciato. Ora la catena è una sola e
+    questo test la segue anello per anello, che è anche l'unico modo di
+    accorgersi se un anello si stacca."""
     block = _APPJS.split("window.HoneI18nRerender")[1]
-    for call in ("loadProgress(CURRENT)", "loadSession(CURRENT",
-                 "loadTraining(CURRENT)"):
-        assert call in block, call
+    assert "reloadSelection()" in block
     for cache in ("SHEET = null", "TRAINING = null"):
         assert cache in block, cache
+    sel = _body_of("function reloadSelection()")
+    assert "reloadViewData(CURRENT)" in sel
+    view = _body_of("function reloadViewData(combo)")
+    for call in ("loadProgress(combo)", "loadSession(combo", "loadStint(combo",
+                 "loadTraining(combo)"):
+        assert call in view, call
 
 
 # --- the page must not scroll sideways on a phone --------------------------
@@ -2558,3 +2568,150 @@ def test_the_line_deviation_pointer_follows_the_line_offset_not_the_whole_tab():
     # Fuori dal ramo «niente dinamica», e prima: dentro, il verso di ritorno non
     # verrebbe mai eseguito su un giro che i dati ce li ha.
     assert body.index('$("dyn-elsewhere")') < body.index("if (!anyData)")
+
+
+# --- la corsa fra i caricatori (2026-08-08) --------------------------------
+#
+# Otto caricatori scrivevano stato condiviso DOPO un `await` senza chiedersi se
+# nel frattempo il pilota avesse cambiato combo, giro, riferimento o lingua: due
+# richieste in volo, vinceva chi rispondeva per ultima. Riprodotto nel browser
+# ritardando di 5 s la sola traiettoria di Spa — titolo `monza · 1:57.555` sopra
+# una tabella con La Source, Raidillon e Les Combes.
+#
+# **Nessun test headless può vedere quella corsa**: qui si legge il sorgente, e
+# la prova che la cura funziona resta la riproduzione col browser. Questi test
+# difendono la FORMA, e partono dall'elenco degli `async function load…` trovati
+# nel sorgente: su questo ramo una tabella scritta a mano ha già lasciato
+# passare verde l'annullamento di due cure.
+
+_LOADERS = sorted(set(re.findall(r"async function (load\w+)\s*\(", _APPJS)))
+# I quattro che stanno per car+track: la firma prende la combo e nient'altro.
+_PER_COMBO = [fn for fn in _LOADERS
+              if re.search(rf"async function {fn}\(combo(?:, index)?\)", _APPJS)]
+# I tre che stanno per giro: nessun argomento, leggono CURRENT e le tendine.
+_PER_LAP = [fn for fn in _LOADERS if f"async function {fn}()" in _APPJS]
+
+# Cosa conta come «scrivere»: lo stato condiviso di modulo, il DOM, il disegno.
+_WRITE = re.compile(r"""(?x)
+      ^\s*[A-Z][A-Z_0-9]{2,}\s*=[^=]     # DATA = a, SHEET = null, SESSION_I = …
+    | \$\("[\w-]+"\)                     # $("summary").innerHTML = …
+    | \b(?:render|draw)[A-Z]\w*\(        # renderLine(…), drawSectors(…)
+""", re.M)
+
+
+def _brace_block(src: str, i: int) -> tuple[str, int]:
+    """Il blocco che si apre a `src[i]`, e l'indice subito dopo la sua chiusura."""
+    assert src[i] == "{", src[i:i + 20]
+    depth = 0
+    for k in range(i, len(src)):
+        if src[k] == "{":
+            depth += 1
+        elif src[k] == "}":
+            depth -= 1
+            if depth == 0:
+                return src[i + 1:k], k + 1
+    raise AssertionError("graffe non bilanciate")
+
+
+def _branches_after_the_await(body: str) -> list[tuple[str, str]]:
+    """I rami che possono scrivere dopo l'attesa: ogni `catch`, e la coda.
+
+    Il `catch` è un ramo a sé e va guardato a sé: era in corsa quanto l'altro,
+    e scrive «non sono riuscito a leggere…» sopra la schermata di qualcun altro.
+    """
+    out, end = [], 0
+    for m in re.finditer(r"catch \(\w+\) \{", body):
+        blk, end = _brace_block(body, m.end() - 1)
+        out.append(("il ramo dell'errore", blk))
+    assert end, "nessun `catch`: il taglio del corpo è rotto"
+    out.append(("dopo l'attesa", body[end:]))
+    return out
+
+
+def test_the_eight_loaders_are_all_here():
+    """Anti-vacuità, in due sensi.
+
+    Se l'elenco si svuota (regex che non aggancia più, funzione rinominata) ogni
+    test parametrizzato qui sotto passa senza guardare niente. E se nasce un
+    nono caricatore questo test diventa rosso apposta: i parametrizzati lo
+    coprono da soli, ma la sua riga va guardata da un umano, perché la domanda
+    «chi lo rilancia?» non se la può fare una regex.
+    """
+    assert set(_LOADERS) == {"loadBraking", "loadCombo", "loadLine", "loadProgress",
+                             "loadSectors", "loadSession", "loadStint", "loadTraining"}
+    assert set(_PER_COMBO) == {"loadProgress", "loadSession", "loadStint", "loadTraining"}
+    assert set(_PER_LAP) == {"loadBraking", "loadLine", "loadSectors"}
+
+
+@pytest.mark.parametrize("fn", _LOADERS)
+def test_every_loader_marks_the_counter_before_it_waits(fn):
+    """Segnarselo dopo l'attesa sarebbe segnarsi il presente e confrontarlo con
+    sé stesso: la guardia direbbe sempre «va bene»."""
+    body = _body_of(f"async function {fn}(")
+    assert "await getJSON(" in body, f"{fn}: taglio rotto, l'attesa non c'è più"
+    assert "const seen = EPOCH;" in body, f"{fn} non si segna cosa stavamo guardando"
+    assert body.index("const seen = EPOCH;") < body.index("await "), \
+        f"{fn} si segna il contatore DOPO l'attesa: non arbitra niente"
+
+
+@pytest.mark.parametrize("fn", _LOADERS)
+def test_no_loader_writes_after_its_await_without_asking(fn):
+    """La cura, letta dove conta: prima di scrivere qualunque stato condiviso o
+    di disegnare, ogni ramo si chiede se il pilota sta ancora guardando."""
+    body = _body_of(f"async function {fn}(")
+    for what, branch in _branches_after_the_await(body):
+        m = _WRITE.search(branch)
+        if not m:
+            continue          # un ramo che scrive solo in una sua variabile
+        guard = branch.find("stale(seen)")
+        assert 0 <= guard < m.start(), (
+            f"{fn}, {what}: scrive «{branch[m.start():m.start() + 40].strip()}» "
+            "senza chiedersi se il pilota sta ancora guardando quella cosa")
+
+
+def test_the_counter_rises_only_where_the_requests_are_relaunched():
+    """Un contatore che sale dove nessuno rilancia butta una risposta che non
+    verrà rifatta, e il pannello resta col suo «…» per sempre — un difetto
+    peggiore di quello curato. Misurato nel browser: alzando `EPOCH` a mano
+    mentre /api/sessions è in volo, il riquadro della Sessione resta al
+    segnaposto; cambiando giro davvero, si riempie."""
+    assert _APPJS.count("EPOCH += 1;") == 2, (
+        "il contatore sale in un posto nuovo: quel posto deve rilanciare da sé "
+        "tutte le richieste che invalida, altrimenti apre un buco")
+    picker = _APPJS.split("sel.onchange = ")[1].split("\n  };")[0]
+    assert "EPOCH += 1;" in picker, "la tendina della combo non fa più salire il contatore"
+    assert "loadCombo(combo);" in picker and "reloadViewData(combo);" in picker
+    sel = _body_of("function reloadSelection()")
+    assert "EPOCH += 1;" in sel, "giro, riferimento e lingua non fanno più salire il contatore"
+    assert "loadCombo(CURRENT" in sel and "reloadViewData(CURRENT)" in sel
+
+
+def test_a_rise_relaunches_every_loader_it_invalidates():
+    """L'altra metà della regola, letta dalle firme e non da un elenco: chi
+    prende la combo sta per car+track e lo rilancia `reloadViewData`, chi non
+    prende argomenti sta per giro e lo rilancia `loadCombo`."""
+    view = _body_of("function reloadViewData(combo)")
+    for fn in _PER_COMBO:
+        assert f"{fn}(combo" in view, \
+            f"{fn} non riparte: la sua risposta buttata non tornerebbe più"
+    combo = _body_of("async function loadCombo(")
+    for fn in _PER_LAP:
+        assert f"{fn}()" in combo, f"{fn} non riparte dopo un cambio di giro"
+
+
+@pytest.mark.parametrize("fn, state", [("loadSession", "SESSION_I"),
+                                       ("loadStint", "STINT_I")])
+def test_the_two_index_pickers_arbitrate_their_own_race(fn, state):
+    """I due selettori con un indice proprio rilanciano SOLO il loro caricatore.
+    Se facessero salire il contatore globale, una traiettoria in volo verrebbe
+    buttata senza che nessuno la rifaccia: per loro la guardia è locale."""
+    body = _body_of(f"async function {fn}(")
+    assert f"{state} = want;" in body, f"{fn} non si segna l'indice con cui parte"
+    assert body.index(f"{state} = want;") < body.index("await "), \
+        "l'indice va segnato PRIMA dell'attesa, o non arbitra niente"
+    assert f"{state} !== want" in body, \
+        f"{fn} non controlla di essere ancora l'indice scelto: due cambi rapidi si sovrascrivono"
+    line = [x for x in _APPJS.splitlines() if f"pick.onchange = () => {fn}(" in x]
+    assert len(line) == 1, f"il selettore di {fn} non è più dov'era"
+    assert "EPOCH" not in line[0], \
+        "il selettore fa salire il contatore globale: butterebbe richieste che nessuno rilancia"

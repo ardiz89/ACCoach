@@ -71,6 +71,31 @@ function setPanelLoading(id, msg) {
   if (el) el.innerHTML = `<div class="item"><div class="v">…</div><div class="k">${msg}</div></div>`;
 }
 
+// «Cosa stiamo guardando»: un numero che sale ogni volta che cambia una delle
+// cose che rendono vecchia ogni risposta ancora in volo — la combo, il giro, il
+// riferimento, la lingua (`getJSON` accoda `lang`, quindi una risposta nella
+// lingua vecchia è vecchia anche lei). Ogni caricatore se lo segna PRIMA
+// dell'attesa e lo ricontrolla DOPO, prima di scrivere: due richieste in volo
+// vinceva chi rispondeva per ultima, e ritardando di 5 s la traiettoria di Spa
+// si otteneva il titolo di un giro di Monza sopra la tabella delle curve di
+// Spa — una schermata che afferma una cosa falsa con l'aria di essere giusta.
+//
+// Sale in due soli punti — la tendina della combo e `reloadSelection` (giro,
+// riferimento, cambio lingua e «apri questo giro nel Confronto» passano tutti
+// di lì) — perché entrambi RILANCIANO le richieste che invalidano. Buttare una
+// risposta senza che nessuno la rifaccia lascia il pannello col suo «…» per
+// sempre, che è un difetto peggiore di quello curato.
+let EPOCH = 0;
+
+// Vera quando la risposta che sta per essere scritta è di prima dell'ultimo
+// cambio. Sta nei chiamanti e non dentro `getJSON` per due motivi: solo il
+// chiamante sa cosa sta per scrivere (`DATA`, `SHEET`, il DOM) e in quale dei
+// suoi due rami — quello buono e il `catch`, che scrive anche lui; e da
+// `getJSON` l'unico modo di dire «vecchia» sarebbe un'eccezione o un valore
+// finto, che quegli stessi `catch` scambierebbero per un errore di rete,
+// scrivendo «non sono riuscito a leggere…» su una richiesta scartata da noi.
+function stale(seen) { return seen !== EPOCH; }
+
 async function getJSON(url) {
   // Pass the active language so backend-generated content arrives localised:
   // the debrief, the corner names and the guided flow are all written server
@@ -91,6 +116,9 @@ async function init() {
   sel.onchange = () => {
     const combo = JSON.parse(sel.value);
     try { localStorage.setItem(_COMBO_KEY, sel.value); } catch (e) {}
+    // Un'altra pista: ogni risposta ancora in volo parla di quella di prima.
+    // Sale qui, e qui sotto ripartono tutte le richieste che invalida.
+    EPOCH += 1;
     BASELINE_PINNED = false;   // a new car+track elects its own reference
     SESSION = null;
     SHEET = null;         // another car+track has other braking points
@@ -99,10 +127,9 @@ async function init() {
     STINT_I = 0;
     TRAINING = null;      // and its own plan, drills and readiness
     loadCombo(combo);
-    if (VIEW === "progress") loadProgress(combo);
-    if (VIEW === "session" || VIEW === "recap") loadSession(combo, 0);
-    if (VIEW === "stint") loadStint(combo, 0);
-    if (VIEW === "training") loadTraining(combo);
+    // Gli indici sono stati appena azzerati qui sopra, quindi questa è la
+    // stessa cosa delle quattro chiamate a mano che stavano qui.
+    reloadViewData(combo);
   };
   $("lap").onchange = reloadSelection;
   $("baseline").onchange = () => { BASELINE_PINNED = true; reloadSelection(); };
@@ -410,10 +437,12 @@ function wireKeys() {
 }
 
 async function loadProgress(combo) {
+  const seen = EPOCH;
   setPanelLoading("prog-summary", t("load.trends"));
   let p;
   try { p = await getJSON("/api/progress?" + new URLSearchParams({ car: combo.car, track: combo.track })); }
   catch (e) {
+    if (stale(seen)) return;
     $("prog-summary").innerHTML = "";
     $("levels").innerHTML = ""; $("trends").innerHTML = "";
     const cs = $("corner-sessions"); if (cs) cs.innerHTML = "";
@@ -421,6 +450,7 @@ async function loadProgress(combo) {
       `<div class="clean">${t("err.progress")}</div>`;
     return;
   }
+  if (stale(seen)) return;
 
   const c = p.consistency || {};
   const item = (k, v) => `<div class="item"><div class="k">${k}</div><div class="v">${v}</div></div>`;
@@ -463,18 +493,21 @@ async function loadProgress(combo) {
 let TRAINING = null;
 
 async function loadTraining(combo) {
+  const seen = EPOCH;
   setPanelLoading("train-gap", t("load.training"));
   let b;
   try {
     b = await getJSON("/api/training?" +
       new URLSearchParams({ car: combo.car, track: combo.track }));
   } catch (e) {
+    if (stale(seen)) return;
     TRAINING = null;
     $("train-gap").innerHTML = "";
     $("train-steps").innerHTML = `<div class="clean">${t("err.training")}</div>`;
     $("train-session").innerHTML = "";
     return;
   }
+  if (stale(seen)) return;
   TRAINING = b;
   renderTraining(b);
 }
@@ -877,6 +910,7 @@ function fmtSec(ms) {
 
 async function loadSectors() {
   if (!CURRENT) return;
+  const seen = EPOCH;
   const q = new URLSearchParams({ car: CURRENT.car, track: CURRENT.track });
   const lap = $("lap").value, base = pinnedBaseline();
   if (lap) q.set("lap", lap);
@@ -885,10 +919,12 @@ async function loadSectors() {
   let s;
   try { s = await getJSON("/api/sectors?" + q.toString()); }
   catch (e) {
+    if (stale(seen)) return;
     $("sectors").innerHTML = `<div class="muted">${e.message}</div>`;
     $("ideal").innerHTML = ""; $("sec-table").innerHTML = "";
     return;
   }
+  if (stale(seen)) return;
   drawSectors(s);
 }
 
@@ -1499,7 +1535,27 @@ function pinnedBaseline() {
 }
 
 function reloadSelection() {
+  // Un altro giro, un altro riferimento o un'altra lingua: da qui in avanti
+  // ogni risposta in volo è vecchia, e il contatore sale. Può salire perché
+  // subito sotto riparte tutto quello che invalida — `loadCombo` per il giro
+  // (e, per la vista aperta, la Traiettoria, i Settori e la scheda frenate),
+  // `reloadViewData` per le viste che stanno per car+track.
+  EPOCH += 1;
   loadCombo(CURRENT, $("lap").value, pinnedBaseline());
+  reloadViewData(CURRENT);
+}
+
+// Le viste per car+track — Trends, Sessione, Passo gara, Allenamento — quella
+// aperta. Il loro contenuto non dipende dal giro, quindi un cambio di giro non
+// le sporca: ma il contatore che sale butta anche le LORO risposte in volo, e
+// una risposta buttata che nessuno rifà lascia il pannello col suo «…» per
+// sempre. Chi fa salire il contatore passa di qui.
+function reloadViewData(combo) {
+  if (!combo) return;
+  if (VIEW === "progress") loadProgress(combo);
+  if (VIEW === "session" || VIEW === "recap") loadSession(combo, SESSION_I);
+  if (VIEW === "stint") loadStint(combo, STINT_I);
+  if (VIEW === "training") loadTraining(combo);
 }
 
 function exportData(fmt) {
@@ -1511,6 +1567,7 @@ function exportData(fmt) {
 }
 
 async function loadCombo(combo, lapPath, baselinePath) {
+  const seen = EPOCH;
   CURRENT = combo;
   const q = new URLSearchParams({ car: combo.car, track: combo.track });
   if (lapPath) q.set("lap", lapPath);
@@ -1538,10 +1595,12 @@ async function loadCombo(combo, lapPath, baselinePath) {
   let a;
   try { a = await getJSON("/api/analysis?" + q.toString()); }
   catch (e) {
+    if (stale(seen)) return;
     $("summary").innerHTML =
       `<div class="item"><div class="v">—</div><div class="k">${t("err.lap")}</div></div>`;
     return;
   }
+  if (stale(seen)) return;
   DATA = a;
   buildDistance(a);       // this lap's metres, for every chart's x-axis
   FLOW_STEP = 0;          // a new lap is a new explanation, from the top
@@ -2109,11 +2168,20 @@ let SESSION_I = 0;       // which run of that payload is on screen
 
 async function loadSession(combo, index) {
   if (!combo) return;
+  const seen = EPOCH;
+  // Il selettore delle uscite NON fa salire il contatore globale: cambiarlo
+  // rilancia solo questo caricatore, e una traiettoria in volo verrebbe buttata
+  // senza che nessuno la rifaccia. La sua corsa — due cambi rapidi di uscita —
+  // si arbitra qui, in locale: l'indice con cui siamo partiti, segnato prima
+  // dell'attesa, contro quello che risulta scelto quando la risposta arriva.
+  const want = index || 0;
+  SESSION_I = want;
   const q = new URLSearchParams({ car: combo.car, track: combo.track,
-                                  index: index || 0 });
+                                  index: want });
   let s;
   try { s = await getJSON("/api/sessions?" + q.toString()); }
   catch (e) { s = { sessions: [], current: null }; }
+  if (stale(seen) || SESSION_I !== want) return;
   SESSION = s;
   SESSION_I = s.index || 0;
   renderSession(s);
@@ -2328,11 +2396,17 @@ let STINT_I = 0;         // which stint of that payload is on screen
 
 async function loadStint(combo, index) {
   if (!combo) return;
+  const seen = EPOCH;
+  // Stessa storia del selettore delle uscite, vedi `loadSession`: l'indice non
+  // fa salire il contatore globale, quindi la sua corsa se la arbitra da sé.
+  const want = index || 0;
+  STINT_I = want;
   const q = new URLSearchParams({ car: combo.car, track: combo.track,
-                                  index: index || 0 });
+                                  index: want });
   let s;
   try { s = await getJSON("/api/stint?" + q.toString()); }
   catch (e) { s = { stints: [], current: null }; }
+  if (stale(seen) || STINT_I !== want) return;
   STINT = s;
   STINT_I = s.index || 0;
   renderStint(s);
@@ -3373,6 +3447,7 @@ let SHEET = null;       // last /api/braking payload
 
 async function loadBraking() {
   if (!CURRENT) return;
+  const seen = EPOCH;
   const q = new URLSearchParams({ car: CURRENT.car, track: CURRENT.track });
   let b;
   try { b = await getJSON("/api/braking?" + q.toString()); }
@@ -3381,7 +3456,8 @@ async function loadBraking() {
   // **silenzio assoluto** — pannello a stringa vuota, zero testo, zero motivo —
   // ed è il caso normale di chi su ACC tocca i limiti a ogni giro, perché
   // /api/braking fa 404 finché non c'è un giro valido e pulito.
-  catch (e) { SHEET = null; renderBrakeSheet(null); return; }
+  catch (e) { if (stale(seen)) return; SHEET = null; renderBrakeSheet(null); return; }
+  if (stale(seen)) return;
   SHEET = b;
   renderBrakeSheet(b);
 }
@@ -3526,6 +3602,7 @@ let LINE_MAG = 1;
 
 async function loadLine() {
   if (!CURRENT) return;
+  const seen = EPOCH;
   const q = new URLSearchParams({ car: CURRENT.car, track: CURRENT.track });
   const lap = $("lap").value, base = pinnedBaseline();
   if (lap) q.set("lap", lap);
@@ -3534,6 +3611,7 @@ async function loadLine() {
   let L;
   try { L = await getJSON("/api/trajectory?" + q.toString()); }
   catch (e) {
+    if (stale(seen)) return;
     LINE = null;
     $("line-summary").innerHTML =
       `<div class="item"><div class="v">—</div><div class="k">${t("err.line")}</div></div>`;
@@ -3541,6 +3619,7 @@ async function loadLine() {
     $("line-table").innerHTML = "";
     return;
   }
+  if (stale(seen)) return;
   LINE = L;
   if (LINE_I >= L.corners.length) LINE_I = 0;
   renderLine(null);
@@ -4707,10 +4786,12 @@ window.HoneI18nRerender = function () {
   // never only there.
   SHEET = null;          // the braking sheet carries the landmark wording
   TRAINING = null;       // the drills are prose, written server-side
+  // `reloadSelection` fa salire il contatore — una risposta nella lingua
+  // vecchia è vecchia — e rilancia entrambe le metà: il giro e, con
+  // `reloadViewData`, le viste per car+track. Le tre chiamate a mano che
+  // stavano qui erano quella seconda metà scritta due volte, e ne dimenticavano
+  // una: il Passo gara restava nella lingua che avevi appena lasciato.
   reloadSelection();
-  if (VIEW === "progress") loadProgress(CURRENT);
-  if (VIEW === "session" || VIEW === "recap") loadSession(CURRENT, SESSION_I);
-  if (VIEW === "training") loadTraining(CURRENT);
 };
 
 wireTour();
