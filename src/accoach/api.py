@@ -845,7 +845,7 @@ def _sheet_pool(valid: list[dict], ref_row: dict | None) -> list[dict]:
 
     Extracted so the sheet beside Compare's map and the braking drill quote the
     same number: a drill that told you "you brake at 214 km/h here" while the
-    sheet a tab over said 209 would be two answers to one question. The rule is the
+    sheet under Compare said 209 would be two answers to one question. The rule is the
     live coach's own — the same road-temperature band it uses to elect a
     reference, because two laps 20° apart are two circuits.
     """

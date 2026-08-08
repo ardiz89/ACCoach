@@ -382,7 +382,15 @@ body:not(.railed) .rail { display: none; }
    (`#line-table, #brakesheet`) resta dov'è: là vale per la pagina intera. */
 .cmp-map #brakesheet { overflow-x: auto; }
 
-@media (max-width: 900px) {
+/* La soglia è 1150, non 900. Fra i due numeri le due colonne ci STANNO — la
+   griglia non sfonda niente — ma la seconda resta appiccicata al pavimento dei
+   320 px per tutta la banda: 342 px di colonna a 901, 329 px a 1150, cioè il
+   `38%` non riesce mai a superare il minimo. La tela della mappa è alta 60vh
+   (538 px su uno schermo normale), quindi il disegno esce piccolo in fondo a
+   una scatola alta e sottile. Alzare la soglia non ridisegna niente: sotto,
+   la mappa va a piena larghezza col rapporto giusto, che è esattamente il
+   comportamento già verificato a 880 px. */
+@media (max-width: 1150px) {
   /* Impilate, con la mappa SOPRA: è l'orientamento, e serve prima del
      dettaglio. `order` funziona perché sono elementi di una griglia. */
   .cmp-shell { grid-template-columns: 1fr; }
@@ -1259,7 +1267,12 @@ body.no-data .empty { display: block; }
 .plan-since { color: var(--muted); font-size: 12px; font-weight: 400; font-family: var(--font-ui); }
 .mini-btn.primary { border-color: var(--cyan); color: var(--cyan); }
 /* The pointer left behind on Trends, where the plan used to live. */
-.plan-elsewhere {
+/* `:not(.hidden)` per lo stesso duello già pagato da `#view-flow`, `.map-legend`
+   e `.line-grid`: `display: flex` e `.hidden { display: none }` sono entrambe
+   una classe sola, e a parità di specificità decide chi è scritto più sotto —
+   che qui è questa, 1000 righe più giù. Da quando `drawDynamics` spegne
+   `#dyn-elsewhere`, senza la qualifica lo spegnimento non avverrebbe. */
+.plan-elsewhere:not(.hidden) {
   display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
   padding: 0 var(--gut); margin: 4px 0 12px;
   color: var(--muted); font-size: 13px;

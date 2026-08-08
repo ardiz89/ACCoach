@@ -2986,21 +2986,30 @@ function drawDynamics(cx) {
   const miss = $("dyn-missing"), main = $("dyn-charts"), coast = $("dyn-coasting");
   const hasOff = Array.isArray(DATA.review.line_offset);
   const anyData = hasDynamics(DATA) || hasOff || DATA.review.tyres || hasBalance(DATA);
+  // Il rimando «lo scostamento vive sotto Traiettoria» era figlio diretto di
+  // #view-dynamics e fratello dei grafici: nessun ramo lo toccava, quindi su un
+  // giro senza dinamica restava a schermo un bottone che manda in Traiettoria a
+  // vedere lo scostamento — su un giro pre-v6 che quasi certamente non ha
+  // nemmeno le coordinate, cioè un comando che non risponde. `toggle`, non
+  // `add`: deve tornare quando il giro i dati ce li ha.
+  $("dyn-elsewhere").classList.toggle("hidden", !anyData);
   if (!anyData) {
     if (miss) miss.classList.remove("hidden");
     if (main) main.classList.add("hidden");
     if (coast) coast.innerHTML = "";
     $("dyn-tyres").classList.add("hidden");
     $("dyn-balance-wrap").classList.add("hidden");
-    // Stesso principio appena applicato alla mappa: un solo punto scrive
-    // #dyn-readout (`updateDynReadout`, che antepone sempre `rangeChip()`),
-    // non la pastiglia ripetuta a mano in ogni ramo di `drawDynamics`. Prima
-    // di questo fix questo ramo — un giro senza canali di dinamica, con la
-    // finestra accesa — mostrava la sola frase di default: nessuna pastiglia,
-    // nessuna ✕ per annullarla. `null`, non `cx`: senza grafici in vista non
-    // c'è un punto per-campione da leggere, a costo di ignorare un hover sul
-    // rail mentre la scheda è in questo stato.
-    updateDynReadout(DATA, null);
+    // #dyn-readout passa da un solo punto, che antepone sempre `rangeChip()`.
+    // Questo ramo lo chiamava con `null` APPOSTA — non per la frase, ma per
+    // tenere raggiungibile la ✕ della finestra attiva, che altrimenti da qui
+    // non si annulla più. Il difetto era la frase che veniva con lei: «passa il
+    // mouse sui grafici per i valori punto per punto», stampata sopra la riga
+    // che dice che quei grafici non ci sono. Si spegne quindi la FRASE, non la
+    // scatola — e non scrivendo `#dyn-readout` da qui, che rifarebbe il difetto
+    // già pagato (due punti che scrivono la stessa fascia, e uno si dimentica
+    // la pastiglia): il terzo argomento dice a `updateDynReadout` che grafici
+    // da leggere non ce ne sono, e lui delega a `emptyReadout`.
+    updateDynReadout(DATA, null, true);
     DYN_GG = null; DYN_BAL_HIT = null;
     return;
   }
@@ -3325,9 +3334,16 @@ function dynReadoutHTML(a, p) {
     `${t("dyn.ro.slipF")} <b>${sf.toFixed(2)}</b>  ${t("dyn.ro.slipR")} <b>${sr.toFixed(2)}</b>` + extra;
 }
 
-function updateDynReadout(a, p) {
+function updateDynReadout(a, p, bare) {
   const el = $("dyn-readout");
   if (!el) return;
+  // `bare`: i grafici non sono in vista (il ramo «nessun dato di dinamica»).
+  // Non è `p == null`, che vuol dire «i grafici ci sono e nessuno ci sta sopra
+  // col mouse» — lì l'invito a passarci sopra è valido. Vedi `emptyReadout`.
+  if (bare) { emptyReadout(el); return; }
+  // Il verso di ritorno: qui i grafici ci sono, quindi la fascia torna accesa
+  // anche se il giro di prima l'aveva spenta.
+  el.classList.remove("hidden");
   const chip = rangeChip();
   // Guardia `p != null`, come in `hoverTo`: `drawDynamics(cx)` la richiama con
   // `cx` nullo a ogni ridisegno di vista intera (cambio scheda, resize), e
@@ -3554,6 +3570,11 @@ function renderLine(cx) {
     $("line-missing").classList.toggle("hidden", !noMap);
     if (grid) grid.classList.add("hidden");
     if (charts) charts.classList.add("hidden");
+    // La riga di lettura non era in questo elenco, e non la riscriveva nessuno:
+    // se il giro di prima aveva le coordinate e ci si era passato il mouse, i
+    // suoi numeri punto per punto restavano sopra «questi giri non hanno
+    // coordinate», veri di un altro giro e per sempre.
+    emptyReadout($("line-readout"));
     for (const el of shell) if (el) el.innerHTML = "";
     $("line-summary").innerHTML = (L && !noMap)
       ? `<div class="item"><div class="v">—</div><div class="k">${t("line.none")}</div></div>` : "";
@@ -4334,6 +4355,9 @@ function drawCurvature(L, corner, cx) {
 function updateLineReadout(L, p) {
   const el = $("line-readout");
   if (!el) return;
+  // Il verso di ritorno di `emptyReadout` (vedi il ramo «niente curve» di
+  // `renderLine`): con le curve in vista la fascia torna accesa.
+  el.classList.remove("hidden");
   const chip = rangeChip();
   if (p == null) { el.innerHTML = chip + t("line.readout"); wireRangeClear(el); return; }
   LAST_HOVER = p;
@@ -4426,6 +4450,32 @@ function rangeChip() {
 function wireRangeClear(el) {
   const b = el && el.querySelector(".range-clear");
   if (b) b.onclick = () => { setRange(null); redrawCurrentView(); };
+}
+
+// La fascia di lettura quando i grafici NON ci sono — che non è il caso `p ==
+// null`, dove i grafici ci sono e semplicemente nessuno ci sta sopra col mouse,
+// e «passa il mouse sui grafici» è un invito valido.
+//
+// Qui i grafici sono spenti, e restano due modi di mentire. Il primo: i numeri
+// del giro PRECEDENTE, veri di un altro giro e permanenti, perché nessun ramo
+// li riscrive — la Traiettoria li teneva punto per punto sopra «questi giri non
+// hanno coordinate». Il secondo: la didascalia stessa, che invita a un gesto
+// senza bersaglio sopra la frase che dice che il bersaglio non c'è.
+//
+// Resta solo la pastiglia della finestra attiva, perché la sua ✕ è l'unica via
+// per annullarla da questa scheda (è il motivo per cui il ramo senza dinamica
+// chiamava `updateDynReadout` invece di non fare niente). Senza pastiglia non
+// resta una striscia vuota: la fascia si spegne del tutto.
+function emptyReadout(el) {
+  if (!el) return;
+  const chip = rangeChip();
+  // La pastiglia finisce con « · » perché di solito ha qualcosa dopo. Qui non
+  // ha niente, e un separatore che non separa è la stessa cosa in piccolo:
+  // punteggiatura per un testo che non c'è. Misurato a schermo: «Tamburello ✕ ·».
+  el.innerHTML = chip.replace(/\s*&nbsp;·&nbsp;\s*$/, "");
+  el.classList.remove("frozen");
+  el.classList.toggle("hidden", !chip);
+  wireRangeClear(el);
 }
 
 // Testo del readout della mappa, a riposo (`p` nullo, la legenda) o sotto il

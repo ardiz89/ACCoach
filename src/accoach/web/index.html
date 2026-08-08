@@ -471,7 +471,12 @@
         <canvas id="c-rpm"></canvas>
       </div>
     </main>
-    <p class="plan-elsewhere"><span data-i18n="lineoff.elsewhere">Lo scostamento
+    <!-- L'id serve al JS: su un giro senza dinamica questo rimando si spegne
+         insieme ai grafici (drawDynamics), perché manda a vedere lo scostamento
+         di un giro che quasi certamente non ha nemmeno le coordinate. Gli altri
+         due `.plan-elsewhere` (in Progressi) non si spengono mai e non ne hanno
+         bisogno. -->
+    <p id="dyn-elsewhere" class="plan-elsewhere"><span data-i18n="lineoff.elsewhere">Lo scostamento
       dalla traiettoria vive sotto Traiettoria, che dice anche da che parte.</span>
       <button type="button" id="go-line" class="mini-btn"
               data-i18n="lineoff.goto">Apri Traiettoria</button></p>
