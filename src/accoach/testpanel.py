@@ -33,6 +33,19 @@ from pathlib import Path
 
 from . import paths
 
+import time
+
+from . import brand
+from .theme import DISPLAY, MONO, load_fonts
+
+try:
+    from PySide6.QtCore import Qt, QTimer
+    from PySide6.QtGui import QColor, QFont, QPainter
+    from PySide6.QtWidgets import QApplication, QWidget
+except ImportError:  # pragma: no cover - dipendenza opzionale
+    print("Questo riquadro ha bisogno di PySide6:  pip install PySide6")
+    raise SystemExit(1)
+
 # Due righe e non tre. Il riquadro ha altezza fissa: il testo che non ci sta
 # viene tagliato, perché un riquadro che si allunga sposta la riga dell'orologio
 # a ogni cambio di passo — e l'orologio si cerca con la coda dell'occhio, in un
@@ -154,3 +167,151 @@ class StepFile:
             return self._step
         self._stamp, self._step = stamp, data
         return data
+
+
+# Coordinate di progetto: la finestra è queste misure × la scala salvata.
+_BASE_W, _BASE_H = 440, 200
+_MARGIN = 24              # distanza dall'angolo dello schermo centrale
+_POLL_MS = 500            # ogni quanto si rilegge il file
+_TICK_MS = 250            # ogni quanto si ridisegna (l'orologio scala di 1 s)
+
+# Le righe, in coordinate di progetto. Sono costanti e non calcolate dal
+# contenuto di proposito: `_CLOCK_Y` è il punto che l'occhio cerca senza
+# guardare, e deve restare lo stesso fra un passo di una riga e uno di due.
+_WHERE_Y, _TITLE_Y, _BODY_Y, _SPECS_Y, _CLOCK_Y = 14, 34, 74, 118, 148
+_BODY_STEP = 22           # distanza fra la prima e la seconda riga del corpo
+
+
+class TestPanel(QWidget):
+    """La finestrella in alto a sinistra dello schermo centrale."""
+
+    def __init__(self, path: Path | None = None) -> None:
+        super().__init__()
+        # Stessa ricetta dell'HUD, che è già dimostrata sull'impianto del
+        # pilota. `WindowTransparentForInput` non è cosmetica: un riquadro che
+        # intercettasse un clic in staccata sarebbe peggio di non averlo.
+        self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint
+                            | Qt.Tool | Qt.WindowTransparentForInput)
+        self.setAttribute(Qt.WA_TranslucentBackground, True)
+        self.setAttribute(Qt.WA_TransparentForMouseEvents, True)
+
+        from .config import load_config
+        scale = load_config().overlay.scale
+        self._scale = scale if (scale and scale > 0) else 1.0
+        self.resize(int(_BASE_W * self._scale), int(_BASE_H * self._scale))
+        self._place()
+
+        self._file = StepFile(path or step_path())
+        self._panel = Panel(waiting=True)
+
+        self._poll = QTimer(self)
+        self._poll.timeout.connect(self.refresh)
+        self._poll.start(_POLL_MS)
+        self._tick = QTimer(self)
+        self._tick.timeout.connect(self.update)
+        self._tick.start(_TICK_MS)
+
+    def _place(self) -> None:
+        """L'angolo in alto a sinistra dello schermo che il pilota guarda.
+
+        Lo schermo di riferimento è quello sotto il centro del desktop virtuale:
+        è la stessa regola con cui l'HUD si centra (`Overlay._place_top_center`),
+        e non se ne introduce una seconda perché due finestre che decidono da
+        sole quale sia «quello di mezzo» prima o poi non sono d'accordo.
+
+        Limite dichiarato: con tre monitor uniti in una superficie sola
+        (Eyefinity/Surround) Windows ne riporta uno largo quanto tutti e tre, e
+        questa regola atterra sul pannello di sinistra. Sull'impianto del pilota,
+        misurato l'08/08, i display sono tre separati da 2560×1440.
+        """
+        prim = QApplication.primaryScreen()
+        if prim is None:                       # pragma: no cover - senza schermi
+            return
+        screen = QApplication.screenAt(prim.virtualGeometry().center()) or prim
+        g = screen.geometry()
+        self.move(g.left() + _MARGIN, g.top() + _MARGIN)
+
+    def refresh(self) -> None:
+        """Rilegge il file e ricalcola le righe. Chiamato dal timer."""
+        now = time.time()
+        self._panel = render_step(self._file.read(now), now)
+        self.update()
+
+    # --- disegno -----------------------------------------------------------
+    def _font(self, p: QPainter, size: int, bold: bool = False,
+              mono: bool = False) -> None:
+        f = QFont(MONO if mono else DISPLAY, size)
+        f.setStyleHint(QFont.Monospace if mono else QFont.SansSerif)
+        f.setBold(bold)
+        p.setFont(f)
+
+    def _text(self, p: QPainter, x: int, y: int, w: int, h: int,
+              flags, text: str) -> None:
+        """Un solo punto per tutto il testo, così i test possono spiarlo.
+
+        Senza flag di a-capo di proposito: il testo che non ci sta viene
+        tagliato, e il riquadro non cresce.
+        """
+        p.drawText(x, y, w, h, flags, text)
+
+    def paintEvent(self, _event) -> None:  # noqa: N802 (nomenclatura Qt)
+        p = QPainter(self)
+        p.setRenderHint(QPainter.Antialiasing, True)
+        if self._scale != 1.0:
+            p.scale(self._scale, self._scale)
+
+        back = QColor(brand.INK)
+        back.setAlpha(190)
+        p.setPen(Qt.NoPen)
+        p.setBrush(back)
+        p.drawRoundedRect(0, 0, _BASE_W, _BASE_H, 10, 10)
+
+        pan = self._panel
+        if pan.waiting:
+            self._font(p, 15, bold=True)
+            p.setPen(QColor(brand.MUTED))
+            self._text(p, 16, _TITLE_Y, _BASE_W - 32, 30, Qt.AlignLeft,
+                       "in attesa del prossimo passo")
+            return
+
+        if pan.where:
+            self._font(p, 11, bold=True)
+            p.setPen(QColor(brand.MUTED))
+            self._text(p, 16, _WHERE_Y, _BASE_W - 32, 16, Qt.AlignLeft, pan.where)
+
+        if pan.done:
+            self._font(p, 20, bold=True)
+            p.setPen(QColor(brand.GREEN))
+            self._text(p, 16, _TITLE_Y, _BASE_W - 32, 32, Qt.AlignLeft,
+                       f"✓ FATTO — {pan.title}")
+            if pan.done_msg:
+                self._font(p, 14)
+                p.setPen(QColor(brand.MUTED))
+                self._text(p, 16, _BODY_Y, _BASE_W - 32, 20, Qt.AlignLeft,
+                           pan.done_msg)
+            return
+
+        self._font(p, 22, bold=True)
+        p.setPen(QColor(brand.CYAN))
+        self._text(p, 16, _TITLE_Y, _BASE_W - 32, 32, Qt.AlignLeft, pan.title)
+
+        self._font(p, 14)
+        p.setPen(QColor(brand.TEXT))
+        for i, line in enumerate(pan.body):
+            self._text(p, 16, _BODY_Y + i * _BODY_STEP, _BASE_W - 32, 20,
+                       Qt.AlignLeft, line)
+
+        if pan.specs:
+            self._font(p, 12)
+            p.setPen(QColor(brand.MUTED))
+            self._text(p, 16, _SPECS_Y, _BASE_W - 32, 18, Qt.AlignLeft, pan.specs)
+
+        if pan.countdown:
+            self._font(p, 26, bold=True, mono=True)
+            p.setPen(QColor(brand.CYAN))
+            self._text(p, 16, _CLOCK_Y, _BASE_W - 32, 36, Qt.AlignLeft,
+                       pan.countdown)
+        elif pan.note:
+            self._font(p, 18, bold=True, mono=True)
+            p.setPen(QColor(brand.TEXT))
+            self._text(p, 16, _CLOCK_Y, _BASE_W - 32, 36, Qt.AlignLeft, pan.note)
