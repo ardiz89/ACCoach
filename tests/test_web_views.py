@@ -2032,35 +2032,45 @@ def test_the_map_readout_and_legend_are_switched_off_with_the_map():
     assert hits >= 2, f"solo {hits} toggle su has_map — readout e legend ne servono uno ciascuno"
 
 
-def _chain_to(el_id: str) -> list[set[str]]:
-    """La catena di antenati (tag/id/classi, `hidden` esclusa) fino a `el_id`,
-    dal più esterno al più interno — stessa forma di `_hideable_chains`, ma per
-    un elemento che a riposo NON porta `hidden` nel markup: lo aggiunge `drawMap`
-    solo quando il giro non ha coordinate, quindi il grep statico su
-    `class="...hidden..."` non lo troverebbe."""
-    result: list[set[str]] | None = None
+def _chains_where(pred) -> list[tuple[str, list[set[str]]]]:
+    """Ogni elemento del documento che soddisfa `pred(el, chain)`, con la catena
+    dei suoi antenati ridotti a tag/id/classi (`hidden` esclusa), dal più esterno
+    al più interno — stessa forma di `_hideable_chains`, ma la scelta di chi
+    entra la fa il chiamante.
 
-    def walk(el, chain):
-        nonlocal result
-        if result is not None:
-            return
+    Serve perché i bersagli che il JS spegne non si nominano tutti allo stesso
+    modo: la maggior parte è un id, ma c'è anche una classe (`.line-grid`), un
+    tag sotto un id (`#view-line main`) e due `parentNode` — il genitore di una
+    tela, che nel markup non ha né id né un nome che il JS pronunci.
+
+    `hidden` è tolta da ogni insieme di proposito, come in `_hideable_chains`: la
+    domanda non è se `.hidden { display: none }` fa il suo mestiere, ma se
+    qualcos'altro lo batte.
+    """
+    out: list[tuple[str, list[set[str]]]] = []
+
+    def walk(el, chain: list[set[str]]) -> None:
         names = {el.tag} | set(el.classes) | ({el.id} if el.id else set())
         names.discard("hidden")
         here = chain + [names]
-        if el.id == el_id:
-            result = here
-            return
+        if pred(el, here):
+            out.append((el.id or "/".join(sorted(el.classes)) or el.tag, here))
         for child in el.children:
             walk(child, here)
-            if result is not None:
-                return
 
     for child in _dom().children:
         walk(child, [])
-        if result is not None:
-            break
-    assert result is not None, f"#{el_id} non trovato nel documento"
-    return result
+    return out
+
+
+def _chain_to(el_id: str) -> list[set[str]]:
+    """La catena di antenati fino a `el_id`, per un elemento che a riposo NON
+    porta `hidden` nel markup: gliela aggiunge `drawMap` solo quando il giro non
+    ha coordinate, quindi il grep statico su `class="...hidden..."` non lo
+    troverebbe."""
+    found = _chains_where(lambda el, _chain: el.id == el_id)
+    assert found, f"#{el_id} non trovato nel documento"
+    return found[0][1]
 
 
 def test_hidden_actually_hides_the_map_readout_and_legend():
@@ -2090,3 +2100,219 @@ def test_hidden_actually_hides_the_map_readout_and_legend():
                 "con :not(.hidden), come fa già .map-legend"
             )
     assert len(rules) >= 5, f"solo {len(rules)} regole `display` esaminate: taglio rotto?"
+
+
+# --- il censimento: OGNI cosa che il JS spegne, contro OGNI regola (round 4) ---
+#
+# I due test sopra chiudono un elemento per volta, quello che il difetto del
+# giorno aveva in mano. Questa coppia chiude la FAMIGLIA: si parte da ogni sito
+# di `app.js` che scrive `hidden`, si risolve cosa colpisce nel documento, e si
+# chiede che nessuna regola del foglio da schermo lo riaccenda. La soglia è la
+# **specificità**, non l'ordine nel foglio: una regola che perde solo finché
+# `.hidden` resta scritta sopra di lei non è una regola, è una coincidenza di
+# righe — e questo file ne ha già pagate due (`#view-flow`, `.map-legend`).
+
+_HIDDEN_WRITE = re.compile(
+    r'([$\w.\[\]"\'()-]+)\.classList\.(?:add\("hidden"\)|toggle\("hidden",)')
+
+
+def _hidden_writers() -> list[str]:
+    """L'espressione a sinistra di ogni `classList.add("hidden")` /
+    `classList.toggle("hidden", …)` di `app.js`, una per sito — ripetizioni
+    comprese, perché due siti sullo stesso nome sono due posti da risolvere."""
+    return _HIDDEN_WRITE.findall(_APPJS)
+
+
+# Le espressioni del censimento risolte A MANO, una per una, in quello che
+# colpiscono davvero nel documento. La risoluzione sta qui e non in un
+# `querySelector` finto perché è l'unica parte che una macchina non può fare da
+# sola: `wrap` è tre elementi diversi in tre funzioni diverse.
+#
+#   p                       → i 10 pannelli `[id^='view-']` (showView)
+#   gate                    → #train-gate
+#   el                      → i 6 id del ciclo di renderTraining
+#   sec                     → #tyres (drawTyres) e #dyn-tyres (drawDynTyres)
+#   $("tyre-temp-wrap")     → #tyre-temp-wrap
+#   $("tyre-press-wrap")    → #tyre-press-wrap
+#   ro / legend / lost      → #map-readout / #map-legend / #leg-lost
+#   missing                 → il parametro di drawMapTo: #map-missing e
+#                             #rail-nomap (gli altri due chiamanti passano null)
+#   $(id)                   → #map-missing, #line-missing, #dyn-missing
+#   wrap                    → il genitore di #c-flow, quello di #c-flow-map, e
+#                             #dyn-balance-wrap (drawBalanceRibbon)
+#   lpSec                   → #recap-laps-sec
+#   $("tyres")              → #tyres
+#   main / miss             → #dyn-charts / #dyn-missing
+#   $("dyn-tyres")          → #dyn-tyres
+#   $("dyn-balance-wrap")   → #dyn-balance-wrap
+#   $("line-missing")       → #line-missing
+#   grid                    → .line-grid            (per classe, non per id)
+#   charts                  → #view-line main       (un tag sotto un id)
+#   legRoad                 → #leg-road
+_HIDDEN_TARGET_IDS = {
+    "view-recap", "view-flow", "view-training", "view-session", "view-stint",
+    "view-compare", "view-line", "view-sectors", "view-progress",
+    "view-dynamics",
+    "train-gate", "train-intro", "train-gap", "plan", "train-steps",
+    "train-session", "train-words",
+    "tyres", "tyre-temp-wrap", "tyre-press-wrap",
+    "map-readout", "map-legend", "leg-lost", "leg-road", "map-missing",
+    "rail-nomap", "line-missing", "dyn-missing", "recap-laps-sec",
+    "dyn-charts", "dyn-tyres", "dyn-balance-wrap",
+}
+_HIDDEN_TARGET_PARENT_OF = ("c-flow", "c-flow-map")
+
+
+def _js_hidden_targets() -> list[tuple[str, list[set[str]]]]:
+    """Ogni elemento che `app.js` può spegnere, con la sua catena di antenati."""
+
+    def pred(el, chain) -> bool:
+        if el.id in _HIDDEN_TARGET_IDS:
+            return True
+        if "line-grid" in el.classes:
+            return True
+        if el.tag == "main" and any("view-line" in names for names in chain[:-1]):
+            return True
+        return any(c.id in _HIDDEN_TARGET_PARENT_OF for c in el.children)
+
+    return _chains_where(pred)
+
+
+def _specificity(sel: str) -> tuple[int, int, int]:
+    """(id, classi, elementi) di un selettore, per confrontarlo con `.hidden`.
+
+    `:not(…)` non conta di suo ma conta il suo contenuto, ed è esattamente
+    perché `.line-grid:not(.hidden)` (0,2,0) batte `.hidden` (0,1,0) da qualunque
+    riga del foglio, mentre `.line-grid` (0,1,0) vinceva solo perché scritta più
+    sotto.
+    """
+    s = re.sub(r"::[\w-]+", "\x00", sel)          # pseudo-elemento: vale un tag
+    s = re.sub(r":not\(([^()]*)\)", r" \1 ", s)
+    ids = len(re.findall(r"#[\w-]+", s))
+    classes = (len(re.findall(r"\.[\w-]+", s))
+               + len(re.findall(r"\[[^\]]*\]", s))
+               + len(re.findall(r"(?<!:):[\w-]+", s)))
+    rest = re.sub(r"#[\w-]+|\.[\w-]+|\[[^\]]*\]|:[\w-]+(?:\([^()]*\))?", " ", s)
+    tags = len(re.findall(r"[a-zA-Z][\w-]*", rest)) + s.count("\x00")
+    return (ids, classes, tags)
+
+
+def test_the_census_of_hidden_writers_is_still_the_one_that_was_checked():
+    """Il test qui sotto vale quanto vale la lista di bersagli che gli passo, e
+    quella lista è stata risolta a mano, sito per sito. Questo è il suo allarme:
+    se `app.js` impara a spegnere qualcosa di nuovo, la risoluzione va rifatta,
+    non ereditata.
+
+    Due numeri, non uno. L'insieme delle espressioni non basta: un sito nuovo
+    che riusa `wrap` — e `wrap` sono già tre elementi diversi in tre funzioni
+    diverse — non cambia l'insieme, cambia solo il conteggio. Il conteggio da
+    solo non basta neanche: uno tolto e uno aggiunto lo lasciano fermo.
+    """
+    writers = _hidden_writers()
+    assert len(writers) == 26, (
+        f"{len(writers)} siti che scrivono `hidden` invece di 26: risolvi i "
+        "nuovi in _HIDDEN_TARGET_IDS e aggiorna il numero qui")
+    assert set(writers) == {
+        "p", "gate", "el", "sec", '$("tyre-temp-wrap")', '$("tyre-press-wrap")',
+        "ro", "legend", "lost", "missing", "$(id)", "wrap", "lpSec",
+        '$("tyres")', "main", '$("dyn-tyres")', '$("dyn-balance-wrap")', "miss",
+        '$("line-missing")', "grid", "charts", "legRoad",
+    }, sorted(set(writers))
+
+    # Il censimento passa da `classList`: se qualcuno scrivesse la classe in un
+    # altro modo (`className = "hidden"`, `setAttribute`), l'espressione regolare
+    # non lo vedrebbe e la lista sarebbe incompleta senza dirlo. Qui si chiede
+    # che ogni «hidden» del file sia una chiamata a `classList`.
+    assert len(re.findall(r'"hidden"', _APPJS)) == len(
+        re.findall(r'classList\.(?:add|toggle|remove)\("hidden"', _APPJS)), \
+        "in app.js c'è un «hidden» che non passa da classList: il censimento lo perde"
+
+    # E che `app.js` resti l'unico a scriverla: gli altri file del bundle non
+    # hanno bersagli censiti qui.
+    for name in ("tour.js", "i18n.js", "engineer.js", "test.js"):
+        other = (WEB / name).read_text(encoding="utf-8")
+        assert 'classList.add("hidden")' not in other, name
+        assert 'classList.toggle("hidden"' not in other, name
+
+
+def test_no_rule_outranks_hidden_on_anything_the_javascript_hides():
+    """La famiglia intera, in un colpo solo: per ogni elemento che `app.js`
+    spegne, nessuna regola del foglio da schermo che lo ACCENDE deve poter
+    battere `.hidden`.
+
+    Il criterio è la specificità, non l'ordine nel foglio, e la differenza è
+    tutta lì. `.line-grid { display: grid }` vinceva perché scritta 516 righe
+    più in basso di `.hidden`: la Traiettoria di un giro senza coordinate teneva
+    655 px di griglia vuota sopra il messaggio che spiegava perché non c'era
+    niente da mostrare (misurato nel browser, non dedotto). Una regola che perde
+    solo finché nessuno riordina il foglio non è a posto, è fortunata. Chi vuole
+    mostrare qualcosa a parità o più si qualifica con `:not(.hidden)`, che è
+    anche il modo in cui si disinnesca da sé.
+    """
+    targets = _js_hidden_targets()
+    found = {name for name, _ in targets}
+
+    # Anti-vacuità sulla risoluzione: se il parser o i predicati smettono di
+    # trovare i bersagli, i cicli qui sotto girano a vuoto e il test diventa una
+    # decorazione. I quattro nominati sono le quattro FORME di bersaglio: un id,
+    # una classe, un tag sotto un id, il genitore di una tela.
+    assert len(targets) == 36, f"{len(targets)} bersagli risolti invece di 36: {sorted(found)}"
+    assert {"map-readout", "line-grid", "main", "chart/flow-chart"} <= found, sorted(found)
+
+    # Anti-vacuità sul matcher e sulla misura: uno che dica sempre di no, o una
+    # specificità sempre a zero, passerebbero questo test senza guardare niente.
+    grid = next(chain for name, chain in targets if name == "line-grid")
+    assert _hits(".line-grid", grid), "il matcher non vede nemmeno la classe del bersaglio"
+    assert not _hits(".map-legend", grid), "il matcher dice di sì a una classe che non c'è"
+    assert _specificity(".hidden") == (0, 1, 0)
+    assert _specificity("main") == (0, 0, 1)
+    assert _specificity(".line-grid:not(.hidden)") == (0, 2, 0)
+
+    rules = _display_rules(none=False)
+    weighed = 0
+    for sel, _value in rules:
+        # Un selettore di soli tag (`main { display: grid }`) perde contro
+        # `.hidden` da qualunque riga: è sano per costruzione, non per fortuna.
+        if _specificity(sel) < (0, 1, 0):
+            continue
+        if ":not(.hidden)" in sel:
+            continue
+        weighed += 1
+        for name, chain in targets:
+            assert not _hits(sel, chain), (
+                f"{sel!r} accende #{name}, che il JS spegne con `hidden`, e "
+                f"pareggia o batte `.hidden` ({_specificity(sel)}): "
+                "qualificala con :not(.hidden), come fanno già .map-legend e "
+                ".line-grid")
+    assert weighed >= 10, f"solo {weighed} regole pesate: taglio o specificità rotti?"
+
+    # Il verso simmetrico, che conta quanto quello diretto: la cura non deve
+    # essere «togliere la regola». Con le coordinate la Traiettoria è ancora due
+    # colonne — qualcuno deve accendere `.line-grid` quando `hidden` non c'è.
+    lit = [sel for sel, _v in rules
+           if ":not(.hidden)" in sel and _hits(sel.replace(":not(.hidden)", ""), grid)]
+    assert lit, "nessuna regola accende più .line-grid: il giro CON coordinate resta senza griglia"
+
+
+def test_the_loading_line_is_never_written_into_a_switched_off_box():
+    """L'altra faccia del censimento, e stavolta il conflitto è dentro il solo
+    JavaScript: scrivere in un elemento che il JavaScript stesso può aver
+    spento.
+
+    `loadCombo` spegne i tre «questo giro non ha…» del giro uscente e conta sul
+    fatto che ogni vista scriva al loro posto la propria riga di caricamento. Ma
+    `#map-readout` è spento anche lui su un giro senza coordinate: la riga ci
+    finiva dentro invisibile, e per tutta la durata della richiesta il Confronto
+    mostrava il titolo «Track map» e sotto il vuoto. Chi scrive in una scatola
+    che qualcun altro può aver chiuso la riapre lì, nella stessa riga di codice.
+    """
+    head = _APPJS.split("async function loadCombo(")[1].split("\n  let a;")[0]
+    written = set(re.findall(r'\$\("([\w-]+)"\)\.innerHTML = t\("load\.lap"\)', head))
+    assert "map-readout" in written, \
+        "il Confronto non scrive più la sua riga di caricamento: il ciclo qui sotto gira a vuoto"
+
+    hideable = {name for name, _ in _js_hidden_targets()}
+    for el in sorted(written & hideable):
+        assert f'$("{el}").classList.remove("hidden")' in head, (
+            f"#{el} riceve la riga di caricamento ma può essere `hidden`: "
+            "riaccendilo qui, il disegno rimetterà la classe giusta a dati arrivati")

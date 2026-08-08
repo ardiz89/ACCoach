@@ -1517,7 +1517,16 @@ async function loadCombo(combo, lapPath, baselinePath) {
   if (baselinePath) q.set("baseline", baselinePath);
   setPanelLoading("summary", t("load.lap"));
   $("readout").innerHTML = t("load.lap");
-  if (VIEW === "compare") $("map-readout").innerHTML = t("load.lap");
+  if (VIEW === "compare") {
+    // Riaccenderlo fa parte dello scrivere dentro: dal giro della legenda
+    // `#map-readout` può essere `hidden` (giro uscente senza coordinate), e una
+    // riga di caricamento scritta in un elemento spento è un buco muto — solo
+    // il titolo «Track map» e sotto il vuoto, per tutta la durata della
+    // richiesta. `drawMap()` rimette la classe giusta a dati arrivati, quindi
+    // qui basta accendere: chi decide se il readout va mostrato resta lui.
+    $("map-readout").classList.remove("hidden");
+    $("map-readout").innerHTML = t("load.lap");
+  }
   // I tre «questo giro non ha…» parlano del giro che sta per essere sostituito:
   // si spengono QUI, non quando il disegno nuovo arriva. Finché portavano
   // `.empty` erano invisibili comunque e la cosa non si vedeva; ora si vede, e

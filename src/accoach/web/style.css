@@ -791,7 +791,15 @@ body.no-data .empty { display: block; }
 .chip:hover { border-color: var(--cyan); color: var(--text); }
 .chip.on { border-color: var(--cyan); color: var(--cyan); background: color-mix(in srgb, var(--cyan) 12%, transparent); }
 
-.line-grid {
+/* `:not(.hidden)` for the same reason as `.map-legend` above: `.line-grid` and
+   `.hidden` are both a single class (0,1,0), and this rule is written 516 lines
+   further down, so on equal specificity it won. `renderLine()` adds `hidden`
+   here when the lap has no coordinates, and the grid stayed on screen anyway —
+   655 px of empty two-column layout above the sentence explaining why there was
+   nothing to show (measured in the browser). Qualifying it is what makes the
+   JavaScript's `add("hidden")` mean what whoever reads it thinks it means, from
+   any line of this file. */
+.line-grid:not(.hidden) {
   display: grid; grid-template-columns: minmax(0, 1fr) 300px;
   gap: 18px; padding: 12px var(--gut) 0; align-items: start;
 }
