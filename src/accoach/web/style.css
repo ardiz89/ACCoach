@@ -254,12 +254,24 @@ select {
 .readout .slower { color: var(--red); }
 .readout .faster { color: var(--green); }
 
-.tabs { display: flex; gap: 4px; padding: 10px var(--gut) 0; border-bottom: 1px solid var(--line); background: var(--panel); }
+/* La riga scorre da sé quando le schede non ci stanno, a QUALSIASI larghezza.
+   La stessa regola c'era solo sotto i 520 px, e nel mezzo la fila spingeva la
+   pagina intera di lato: misurato col browser su un riquadro da 768 px (un
+   tablet accanto al volante, che è un uso dichiarato di quest'app), la pagina
+   scorreva di **248 px con undici schede** e di 170 con dieci — su OGNI vista,
+   perché la fila di schede sta fuori da tutte. Non è la vista a sfondare, è la
+   navigazione: quindi la difesa va qui e non in un @media. Sotto i 520 px il
+   blocco apposito aggiunge `gap: 0` e lo scorrimento morbido di iOS. */
+.tabs { display: flex; gap: 4px; padding: 10px var(--gut) 0; border-bottom: 1px solid var(--line);
+  background: var(--panel); overflow-x: auto; }
 .tab {
   background: transparent; color: var(--muted);
   border: none; border-bottom: 2px solid transparent;
   padding: 8px 14px; font-size: 14px; cursor: pointer;
   font-family: var(--font-ui);
+  /* Una scheda non si lascia comprimere in una colonna di lettere: o ci sta,
+     o la fila scorre. */
+  flex: 0 0 auto; white-space: nowrap;
 }
 .tab:hover { color: var(--text); }
 .tab.active { color: var(--text); border-bottom-color: var(--cyan); }
@@ -340,6 +352,57 @@ body:not(.railed) .rail { display: none; }
   .stage > .views { --gut: max(24px, calc((100% - var(--page)) / 2)); }
   .stage { padding: 0; }
 }
+/* --- Il Confronto e la sua mappa, fianco a fianco -------------------------
+   I quattro grafici a sinistra, il disegno del giro a destra. Erano due schede
+   e la stessa domanda: si guardava il delta, si cliccava «Mappa», e ci si
+   ricordava a memoria dov'era il picco.
+
+   `minmax(0, 1fr)` sulla prima colonna non è ornamentale. La misura minima
+   automatica di un elemento a griglia è la sua larghezza `min-content`, e un
+   canvas la porta con sé: senza lo `0` la colonna dei grafici non scende sotto
+   quella misura, la riga sfonda il contenitore e la PAGINA scorre di lato.
+   Questa pagina ha già spedito 39 px di scroll orizzontale in un'altra riga.
+
+   `align-items: start` non è cosmetico neanche lui: serve allo sticky. Con lo
+   `stretch` di default l'elemento riempirebbe tutta la riga e non avrebbe più
+   spazio in cui scorrere dentro la propria area. */
+.cmp-shell {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 38%);
+  gap: 20px;
+  align-items: start;
+}
+/* La mappa resta ferma mentre scorri i grafici: è tutto il senso della cosa.
+   `top` sotto le schede, che non sono sticky — basta un filo d'aria. */
+.cmp-map { position: sticky; top: 12px; min-width: 0; }
+.cmp-charts { min-width: 0; }
+/* La scheda frenate è una tabella larga, e qui vive in una colonna che può
+   scendere a 320 px: la sua larghezza minima spingerebbe la pagina di lato
+   invece di scorrere per conto proprio. La regola gemella sotto i 700 px
+   (`#line-table, #brakesheet`) resta dov'è: là vale per la pagina intera. */
+.cmp-map #brakesheet { overflow-x: auto; }
+
+/* La soglia è 1150, non 900. Fra i due numeri le due colonne ci STANNO — la
+   griglia non sfonda niente — ma la seconda resta STRETTA: 337 px a 901 e
+   324 px a 1151, misurati. Non è il pavimento dei 320 px a tenerla lì: il `38%`
+   lo supera quasi ovunque in questa banda (lo tocca solo appena sopra i 1100,
+   dove compare il rail e si prende 220 px di scaffale). È il 38% stesso a valere
+   poco più del minimo finché la finestra è piccola. Contro una tela alta 60vh —
+   538 px su uno schermo da 900 — quella colonna è una scatola alta il doppio di
+   quanto è larga, e il disegno esce piccolo in fondo.
+   Il numero non è «il primo pixel in cui il 38% supera il pavimento»: quel conto
+   dà ~1142, e sarebbe circolare citare 1151, che è solo questa media query più
+   uno. 1150 è il numero tondo scelto sopra la banda che legge male.
+   Alzare la soglia non ridisegna niente: sotto, la mappa va a piena larghezza
+   col rapporto giusto, che è esattamente il comportamento già verificato a
+   880 px. */
+@media (max-width: 1150px) {
+  /* Impilate, con la mappa SOPRA: è l'orientamento, e serve prima del
+     dettaglio. `order` funziona perché sono elementi di una griglia. */
+  .cmp-shell { grid-template-columns: 1fr; }
+  .cmp-map { position: static; order: -1; }
+}
+
 .chart canvas { cursor: crosshair; }
 /* …tranne dove il mirino non c'è. Il puntatore è una promessa: darlo a un
    grafico che non risponde al mouse insegna al pilota che il gesto non
@@ -353,7 +416,7 @@ body:not(.railed) .rail { display: none; }
 /* G-G scatter: taller and capped in width so it reads as a square-ish plot;
    drawGG scales the friction circle by min(w,h) so it stays circular anyway. */
 .chart.gg canvas { height: 340px; max-width: 440px; margin: 0 auto; }
-/* Balance ribbon: a moderate track map (smaller than the full Map tab). */
+/* Balance ribbon: a moderate track map (smaller than the one beside Compare). */
 .chart.ribbon canvas { height: 44vh; min-height: 300px; cursor: crosshair; }
 
 /* Corner-consistency rows: a corner label, a spread bar, and the numbers. */
@@ -440,7 +503,12 @@ body:not(.railed) .rail { display: none; }
 @media (max-width: 720px) { .tyre-charts { grid-template-columns: 1fr; } }
 
 /* Track-map delta legend */
-.map-legend {
+/* `:not(.hidden)` here is the same guard as `#view-flow:not(.hidden)` further
+   down: `.hidden` and `.map-legend` are both a single class (0,1,0), so on
+   equal specificity the later rule in the file wins — and `.map-legend` comes
+   after `.hidden`. Without the guard, adding `hidden` to this element would
+   lose the fight and the legend would stay on screen. */
+.map-legend:not(.hidden) {
   display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px;
   margin-top: 8px; color: var(--muted); font-size: 12px;
 }
@@ -586,6 +654,19 @@ body:not(.railed) .rail { display: none; }
    cambiato dall'ultima volta» con niente sotto, mentre la frase che dice
    perché stava nel DOM. Un pannello che tace si legge come rotto. */
 .nothing { padding: 4px 0; color: var(--muted); }
+/* E il terzo della famiglia: «questa VISTA non ha i dati per disegnarsi», che
+   non è né la pagina intera senza giri né una riga dentro un pannello.
+   Stesso aspetto di `.empty` — grande, centrato, in tono spento — ma **senza il
+   suo `display: none`**, perché questi tre messaggi li accende il JS togliendo
+   `hidden`, non lo stato della pagina. Finché portavano `.empty` restavano
+   spenti per sempre: `#map-missing`, `#line-missing` e `#dyn-missing`
+   mostravano il titolo della scheda e sotto il vuoto, mentre la frase che
+   spiega perché stava nel DOM, leggibile solo dall'ispettore. È la terza volta
+   che `.empty` viene riusata per un «vuoto» che non è il suo (vedi `.nothing`
+   qui sopra e `.train-gate` più giù): la classe dice *quale* vuoto, non solo
+   che è vuoto. Nessuna regola la riaccende, di proposito — spegnere e
+   riaccendere è un duello di specificità, e questo file ne ha già uno. */
+.missing { padding: 60px 24px; text-align: center; color: var(--muted); }
 /* Senza nemmeno un giro, il messaggio deve essere l'unica cosa a schermo.
    Nascondeva solo `main`, e restavano: otto schede che al clic non fanno niente
    (l'`init()` esce prima di collegarle), tre tendine vuote, la fascia del giro,
@@ -724,7 +805,15 @@ body.no-data .empty { display: block; }
 .chip:hover { border-color: var(--cyan); color: var(--text); }
 .chip.on { border-color: var(--cyan); color: var(--cyan); background: color-mix(in srgb, var(--cyan) 12%, transparent); }
 
-.line-grid {
+/* `:not(.hidden)` for the same reason as `.map-legend` above: `.line-grid` and
+   `.hidden` are both a single class (0,1,0), and this rule is written 516 lines
+   further down, so on equal specificity it won. `renderLine()` adds `hidden`
+   here when the lap has no coordinates, and the grid stayed on screen anyway —
+   655 px of empty two-column layout above the sentence explaining why there was
+   nothing to show (measured in the browser). Qualifying it is what makes the
+   JavaScript's `add("hidden")` mean what whoever reads it thinks it means, from
+   any line of this file. */
+.line-grid:not(.hidden) {
   display: grid; grid-template-columns: minmax(0, 1fr) 300px;
   gap: 18px; padding: 12px var(--gut) 0; align-items: start;
 }
@@ -1126,9 +1215,22 @@ body.no-data .empty { display: block; }
      mappa e i sette bottoni, e il resto della pagina restava stretto perché
      `.stage` è ancora `display: flex` in stampa. */
   header, .tabs, .readout, .demo-banner, .summary, .map-legend,
-  #charts, [id^="view-"], #view-map main, #rail,
-  #map-missing, .tour-help, .cb-toggle, .mini-btn { display: none !important; }
-  #view-map { display: block !important; }
+  #rail, #map-missing, .tour-help, .cb-toggle, .mini-btn { display: none !important; }
+  /* Il foglio vive ora dentro il Confronto, che è pieno di altra roba: i quattro
+     grafici, il riepilogo, la cascata, il debrief. Si spegne per DISCENDENZA —
+     i figli diretti dei tre contenitori che portano al foglio — e si riaccende
+     la sola catena `#view-compare → .cmp-shell → .cmp-map → #brakesheet`.
+     Elencare a mano le sezioni della vista è esattamente ciò che, otto id fa,
+     aveva lasciato stampare un pannello in più senza che nessuno se ne
+     accorgesse se non stampando.
+     Ogni selettore che RIACCENDE è più specifico di quello che l'ha spento —
+     `!important` non basta, fra due `!important` decide ancora la specificità,
+     e un `.cmp-shell` nudo perderebbe contro `#view-compare > *`. */
+  [id^="view-"], #view-compare > *, .cmp-shell > *, .cmp-map > * { display: none !important; }
+  #view-compare, #view-compare > .cmp-shell, .cmp-shell > .cmp-map,
+  .cmp-map > #brakesheet { display: block !important; }
+  /* Sticky su carta non ha senso e in alcuni motori sposta il blocco. */
+  .cmp-map { position: static; }
   .stage { display: block; }
   #brakesheet { padding: 0; }
   #brakesheet h3 { font-size: 18px; }
@@ -1171,7 +1273,12 @@ body.no-data .empty { display: block; }
 .plan-since { color: var(--muted); font-size: 12px; font-weight: 400; font-family: var(--font-ui); }
 .mini-btn.primary { border-color: var(--cyan); color: var(--cyan); }
 /* The pointer left behind on Trends, where the plan used to live. */
-.plan-elsewhere {
+/* `:not(.hidden)` per lo stesso duello già pagato da `#view-flow`, `.map-legend`
+   e `.line-grid`: `display: flex` e `.hidden { display: none }` sono entrambe
+   una classe sola, e a parità di specificità decide chi è scritto più sotto —
+   che qui è questa, 1000 righe più giù. Da quando `drawDynamics` spegne
+   `#dyn-elsewhere`, senza la qualifica lo spegnimento non avverrebbe. */
+.plan-elsewhere:not(.hidden) {
   display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
   padding: 0 var(--gut); margin: 4px 0 12px;
   color: var(--muted); font-size: 13px;

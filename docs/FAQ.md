@@ -209,10 +209,15 @@ of showing you a wrong scale.
   temperature.
 - **Compare** — two laps, aligned on track position: time delta, speed,
   throttle/brake, steering, with a shared crosshair. Exports to CSV/JSON.
-- **Map** — your line coloured by where you gained and lost, your braking points
-  against the reference's, and **Your braking points**: the cheat sheet, built
-  from *your* recent laps in one track-temperature band, with the spread that
-  says whether you have a braking point at all. Prints and exports.
+  Beside the charts, on the same screen, **the track map**: your line coloured
+  by where you gained and lost, and your braking points against the reference's.
+  It stays put while you scroll the charts, so the spike in the delta and the
+  corner it happened in are one glance apart instead of one tab apart — they
+  used to be two separate tabs answering the same question. The crosshair
+  crosses both: hover a chart and the map lights up the same point. Under the
+  map, **Your braking points**: the cheat sheet, built from *your* recent laps
+  in one track-temperature band, with the spread that says whether you have a
+  braking point at all. Prints and exports.
 - **Line** — where you actually drove, corner by corner: your line against the
   reference with the gap between them shaded, how far inside or outside you were
   at entry, apex and exit, the arc you drove, and the extra metres you covered.

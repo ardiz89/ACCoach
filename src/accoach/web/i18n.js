@@ -181,7 +181,6 @@
                            it: `Gas e freno — pieno = tu, tratteggio = riferimento` },
     "flow.chart.delta":  { en: `Gap across the lap — above the line = slower`,
                            it: `Distacco sul giro — sopra la linea = più lento` },
-    "tab.map":         { en: `Map`, it: `Mappa` },
     "tab.sectors":     { en: `Sectors`, it: `Settori` },
     "tab.dynamics":    { en: `Dynamics`, it: `Dinamica` },
     "tab.trends":      { en: `Trends`, it: `Andamento` },
@@ -304,9 +303,9 @@
     "brk.print.title": { en: `Print just this sheet`, it: `Stampa solo questa scheda` },
 
     // ---- line / trajectory tab ----
-    // The map tab shows the whole lap and leaves the reading to the eye; this one
-    // zooms one corner at a time and puts the geometry in metres. Wording for the
-    // per-corner tags is NOT here — it lives next to the numbers in trajectory.py,
+    // The map beside Compare shows the whole lap and leaves the reading to the
+    // eye; this one zooms one corner at a time and puts the geometry in metres.
+    // Wording for the per-corner tags is NOT here — it lives next to the numbers in trajectory.py,
     // so a template and its value can't drift apart.
     "tab.line":        { en: `Line`, it: `Traiettoria` },
     "line.readout":    { en: `Hover the corner to read speed and how far you were from the reference line…`,
@@ -670,9 +669,16 @@
     // Counts nothing on purpose: this said "Four views" while there were five
     // tabs, and six the moment the guided flow landed. A number here is a
     // promise the tab bar keeps breaking.
+    // Nor does it list them one by one, which is the same promise wearing
+    // another coat: the roll call outlived the Map tab by a whole release and
+    // kept sending drivers to a tab that no longer existed. Only Compare is
+    // named here, because that step's whole point is where the drawing went.
+    // Corto anche per un motivo meccanico: `test_every_tour_step_has_its_text_in
+    // _both_languages` cerca `it:` nei primi 400 caratteri dopo la chiave, e una
+    // frase inglese lunga spinge la riga italiana fuori dalla finestra.
     "tour.a2.t": { en: `The other views`, it: `Le altre viste` },
-    "tour.a2.x": { en: `The same laps seen other ways: traces side by side in Compare, the racing line on the Map, corner by corner in Line, split times in Sectors, grip and slip in Dynamics, and where you're heading in Trends. Each tab has a key that opens it, left to right — hover a tab to see which one.`,
-                   it: `Gli stessi giri visti in altri modi: le tracce affiancate in Confronto, la traiettoria sulla Mappa, curva per curva in Traiettoria, gli split nei Settori, aderenza e slittamenti in Dinamica, e dove stai andando in Andamento. Ogni scheda ha un tasto che la apre, da sinistra a destra — passa il mouse su una scheda per vedere qual è.` },
+    "tour.a2.x": { en: `The same laps seen other ways. Compare holds the most: the traces and the drawing of the lap side by side, so “where did I lose it” is answered in a chart and on the track at once; the rest zoom in on a corner or pull back to your history. Each tab has a key that opens it, left to right — hover a tab to see which one.`,
+                   it: `Gli stessi giri visti in altri modi. Il Confronto è quello che tiene di più: le tracce e il disegno del giro fianco a fianco, così «dove ho perso» ha una risposta nel grafico e una in pista insieme; le altre stringono su una curva o allargano al tuo storico. Ogni scheda ha un tasto che la apre, da sinistra a destra — passa il mouse su una scheda per vedere qual è.` },
     "tour.a3.t": { en: `Delta`, it: `Delta` },
     "tour.a3.x": { en: `Where you're gaining or losing vs your reference, across the lap. Green (below the line) is faster.`,
                    it: `Dove guadagni o perdi rispetto al riferimento, lungo il giro. Verde (sotto la linea) è più veloce.` },
