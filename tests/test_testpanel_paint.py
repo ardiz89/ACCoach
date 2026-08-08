@@ -123,6 +123,25 @@ def test_l_altezza_della_finestra_non_dipende_dal_passo(app):
     lungo = TestPanel()
     lungo._panel = Panel(title="X", body=("a", "b"), specs="ABS 0",
                          countdown="12:47")
+    # Il confronto vale solo dopo un disegno vero: prima di `render()` l'altezza
+    # è già fissata dall'`__init__` e il test non vedrebbe mai un ridimensionamento
+    # a tempo di paint (es. un `paintEvent` che si allunga col contenuto).
+    corto.render(QPixmap(corto.size()))
+    lungo.render(QPixmap(lungo.size()))
     assert corto.height() == lungo.height()
     corto.deleteLater()
     lungo.deleteLater()
+
+
+def test_refresh_porta_il_file_sullo_schermo(app, tmp_path):
+    """Il punto in cui `StepFile` e il widget si toccano davvero: `refresh()`
+    deve rileggere il file passato a `path` (non ignorarlo) e finire nello
+    stesso `Panel` che `paintEvent` disegna. Ogni altro test qui assegna
+    `_panel` a mano, scavalcando questo cablaggio — ed è il punto da cui
+    dipenderà anche il CLI del prossimo task."""
+    f = tmp_path / "test_step.json"
+    f.write_text('{"title": "BLOCCAGGI"}', encoding="utf-8")
+    w = TestPanel(f)
+    w.refresh()
+    assert w._panel.title == "BLOCCAGGI"
+    w.deleteLater()

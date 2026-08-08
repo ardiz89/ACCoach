@@ -185,6 +185,9 @@ _BODY_STEP = 22           # distanza fra la prima e la seconda riga del corpo
 class TestPanel(QWidget):
     """La finestrella in alto a sinistra dello schermo centrale."""
 
+    # pytest raccoglie per nome (`Test*`), e questa classe non è un test.
+    __test__ = False
+
     def __init__(self, path: Path | None = None) -> None:
         super().__init__()
         # Stessa ricetta dell'HUD, che è già dimostrata sull'impianto del
