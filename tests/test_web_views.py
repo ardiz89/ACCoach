@@ -2591,6 +2591,20 @@ _PER_COMBO = [fn for fn in _LOADERS
 # I tre che stanno per giro: nessun argomento, leggono CURRENT e le tendine.
 _PER_LAP = [fn for fn in _LOADERS if f"async function {fn}()" in _APPJS]
 
+# La corsa non è solo degli otto: `saveCornerName` aspetta un POST e poi scrive
+# `#line-readout`, `LINE_EDIT` e `SHEET` come loro. L'elenco è di nuovo LETTO
+# dal sorgente — tutte le `async function` di primo livello — perché il filtro
+# `load\w+` è già una tabella a mano travestita da regex, e questa qui non si
+# chiama `load…`. Le esenti sono due, ognuna col suo motivo: `init` gira una
+# volta sola all'avvio, quando non esiste ancora una tendina da cambiare, quindi
+# mentre aspetta il contatore non può essere salito; `getJSON` è la strozzatura
+# di tutti e non scrive niente — restituisce, e chi riceve arbitra (da lì
+# «vecchia» si direbbe solo con un'eccezione, che i `catch` esistenti
+# scambierebbero per un errore di rete).
+_ASYNC = sorted(set(re.findall(r"^async function (\w+)\s*\(", _APPJS, re.M)))
+_NOT_WRITERS = {"init", "getJSON"}
+_WAITERS = [fn for fn in _ASYNC if fn not in _NOT_WRITERS]
+
 # Cosa conta come «scrivere»: lo stato condiviso di modulo, il DOM, il disegno.
 _WRITE = re.compile(r"""(?x)
       ^\s*[A-Z][A-Z_0-9]{2,}\s*=[^=]     # DATA = a, SHEET = null, SESSION_I = …
@@ -2643,18 +2657,31 @@ def test_the_eight_loaders_are_all_here():
     assert set(_PER_LAP) == {"loadBraking", "loadLine", "loadSectors"}
 
 
-@pytest.mark.parametrize("fn", _LOADERS)
+def test_every_async_function_that_waits_is_accounted_for():
+    """Stessa anti-vacuità, un giro più larga.
+
+    Chi scrive dopo un'attesa corre questa corsa anche se non si chiama
+    `load…`. Se ne nasce una nuova questo test diventa rosso apposta: i
+    parametrizzati qui sotto la coprono da soli, ma «cosa scrive, e chi la
+    rilancia se la buttiamo?» è una domanda che nessuna regex si può fare.
+    """
+    assert set(_ASYNC) == set(_LOADERS) | _NOT_WRITERS | {"saveCornerName"}
+    assert not _NOT_WRITERS & set(_WAITERS) and "saveCornerName" in _WAITERS
+
+
+@pytest.mark.parametrize("fn", _WAITERS)
 def test_every_loader_marks_the_counter_before_it_waits(fn):
     """Segnarselo dopo l'attesa sarebbe segnarsi il presente e confrontarlo con
     sé stesso: la guardia direbbe sempre «va bene»."""
     body = _body_of(f"async function {fn}(")
-    assert "await getJSON(" in body, f"{fn}: taglio rotto, l'attesa non c'è più"
+    assert re.search(r"await (?:getJSON|fetch)\(", body), \
+        f"{fn}: taglio rotto, l'attesa non c'è più"
     assert "const seen = EPOCH;" in body, f"{fn} non si segna cosa stavamo guardando"
     assert body.index("const seen = EPOCH;") < body.index("await "), \
         f"{fn} si segna il contatore DOPO l'attesa: non arbitra niente"
 
 
-@pytest.mark.parametrize("fn", _LOADERS)
+@pytest.mark.parametrize("fn", _WAITERS)
 def test_no_loader_writes_after_its_await_without_asking(fn):
     """La cura, letta dove conta: prima di scrivere qualunque stato condiviso o
     di disegnare, ogni ramo si chiede se il pilota sta ancora guardando."""
@@ -2667,6 +2694,60 @@ def test_no_loader_writes_after_its_await_without_asking(fn):
         assert 0 <= guard < m.start(), (
             f"{fn}, {what}: scrive «{branch[m.start():m.start() + 40].strip()}» "
             "senza chiedersi se il pilota sta ancora guardando quella cosa")
+
+
+def _guard_says(seen: int, epoch: int) -> bool:
+    """La DECISIONE della guardia, ESEGUITA — non la sua forma, letta.
+
+    `stale` era pinnata solo come nome: i test controllavano che fosse chiamata,
+    e in che ordine, mai che rispondesse qualcosa. `function stale(seen) {
+    return false; }` annullava tutta la cura con la suite verde a 198 — la
+    difesa che verifica la forma e non la sostanza, in un vestito nuovo.
+
+    Qui il corpo si riduce a una tabella di verità e la si interroga. Non è un
+    letterale pinnato: l'ordine dei due nomi può cambiare senza che nulla
+    diventi rosso. Chi invece lo riscrive in una forma che questa riga non sa
+    eseguire trova rosso e non verde, che è il verso giusto in cui sbagliare.
+    """
+    m = re.search(r"function stale\((\w+)\) \{([^{}]*)\}", _APPJS)
+    assert m, "la guardia non è più dov'era"
+    arg, body = m.group(1), " ".join(m.group(2).split())
+    cmp = re.fullmatch(r"return (\w+) (!==|===|!=|==) (\w+);", body)
+    assert cmp, (f"il corpo della guardia non è un confronto fra due nomi ma "
+                 f"«{body}»: una guardia che risponde sempre la stessa cosa non "
+                 "arbitra niente, e ogni test che la nomina passa lo stesso")
+    vals = {arg: seen, "EPOCH": epoch}
+    left, op, right = cmp.groups()
+    assert {left, right} == set(vals), (
+        f"la guardia arbitra fra «{left}» e «{right}», non fra la marca presa "
+        "prima dell'attesa e il contatore di adesso")
+    return vals[left] != vals[right] if op.startswith("!") else vals[left] == vals[right]
+
+
+def test_the_guard_answers_instead_of_just_being_called():
+    """Le due righe della tabella di verità, che sono tutta la cura."""
+    assert _guard_says(3, 3) is False, \
+        "la guardia butta una risposta arrivata senza che fosse cambiato niente"
+    assert _guard_says(2, 3) is True, \
+        ("la guardia lascia scrivere una risposta di prima dell'ultimo cambio: "
+         "è la corsa di partenza, il titolo di un giro sopra le curve di un altro")
+    assert _guard_says(0, 7) is True, "e vale per qualunque distanza, non solo per uno"
+
+
+def test_the_counter_is_a_number_that_can_move():
+    """L'altra metà della stessa mutazione, scritta una riga più su.
+
+    `const EPOCH = 0;` non è una scelta di stile: le due righe che lo fanno
+    salire diventano un errore a runtime, il numero resta a zero per sempre e la
+    guardia — corpo intatto, chiamate intatte, ordine intatto — risponde sempre
+    «va bene». Cioè `return false;` ottenuto senza toccare `stale`.
+    """
+    m = re.search(r"^(let|const|var) EPOCH = ([^;]+);", _APPJS, re.M)
+    assert m, "la dichiarazione del contatore non è più dov'era"
+    assert m.group(1) == "let", \
+        "un contatore che non si può riassegnare non sale, e chi lo alza esplode"
+    assert re.fullmatch(r"-?\d+", m.group(2).strip()), \
+        f"il contatore parte da «{m.group(2).strip()}», che non è un numero da cui si sale"
 
 
 def test_the_counter_rises_only_where_the_requests_are_relaunched():

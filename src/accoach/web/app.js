@@ -603,6 +603,13 @@ function renderPlanBar(plan) {
       `<button type="button" id="plan-start" class="mini-btn primary">${t("plan.start")}</button>`;
   el.innerHTML = `<h3>${t("plan.title")} ${head}</h3>`;
 
+  // I due bottoni del piano aspettano anche loro, e anche loro senza guardia:
+  // dopo l'attesa non scrivono niente: nessuno stato, nessun nodo. `finally`
+  // chiama `loadTraining(CURRENT)`, che legge la combo di ADESSO e si arbitra
+  // per conto suo — se nel frattempo la combo è cambiata, quella riga rilegge
+  // il piano della combo nuova, che è la cosa giusta. Il corpo del POST invece
+  // è costruito prima dell'attesa, quindi parla della combo su cui il pilota ha
+  // premuto: è il piano che voleva salvare, non quello che sta guardando.
   const start = $("plan-start");
   if (start) start.onclick = async () => {
     start.disabled = true;
@@ -1598,6 +1605,15 @@ async function loadCombo(combo, lapPath, baselinePath) {
     if (stale(seen)) return;
     $("summary").innerHTML =
       `<div class="item"><div class="v">—</div><div class="k">${t("err.lap")}</div></div>`;
+    // Questo `return` esce da `loadCombo` PRIMA delle chiamate a `loadLine`,
+    // `loadSectors` e `loadBraking` che stanno in fondo: se `/api/analysis`
+    // fallisce, quei tre non ripartono. Vale da sempre, ma col contatore la
+    // conseguenza è cambiata di segno: una loro risposta buttata perché il
+    // pilota ha cambiato giro non torna più finché non si cambia scheda (o
+    // giro un'altra volta). Vive di un errore di rete dentro una finestra di
+    // pochi secondi, e chiuderlo vorrebbe dire rilanciarli da qui — cioè
+    // rifare le richieste della vista aperta dopo un errore, che è un'altra
+    // decisione. Se un giorno diventa un fastidio vero, è questa riga.
     return;
   }
   if (stale(seen)) return;
@@ -2183,6 +2199,10 @@ async function loadSession(combo, index) {
   catch (e) { s = { sessions: [], current: null }; }
   if (stale(seen) || SESSION_I !== want) return;
   SESSION = s;
+  // Seconda scrittura della stessa variabile su cui si è appena arbitrato: il
+  // server clampa l'indice sull'ultima uscita disponibile e qui si riallinea a
+  // quello che disegna. Innocua perché passa di qui solo la richiesta vincente
+  // — le altre sono già tornate alla riga sopra.
   SESSION_I = s.index || 0;
   renderSession(s);
 }
@@ -2408,6 +2428,8 @@ async function loadStint(combo, index) {
   catch (e) { s = { stints: [], current: null }; }
   if (stale(seen) || STINT_I !== want) return;
   STINT = s;
+  // Come in `loadSession`: il clamp del server riscrive la variabile su cui si
+  // è appena arbitrato, e non è un problema perché qui arriva solo la vincente.
   STINT_I = s.index || 0;
   renderStint(s);
 }
@@ -3545,6 +3567,14 @@ function editMark(btn) {
     (typed ? `<button type="button" class="chip drop">${t("line.name.drop")}</button>` : "");
   const box = cell.querySelector("input");
   box.focus(); box.select();
+  // Scrive dopo un'attesa come `saveCornerName`, ma senza guardia, e la
+  // differenza sta tutta in DOVE scrive. Il ramo d'errore scrive in `cell`, un
+  // nodo preso PRIMA dell'attesa: un cambio di combo azzera `SHEET` e rifà la
+  // scheda (subito se le Frenate sono aperte, all'apertura della scheda se no),
+  // e da quel momento `cell` è staccata dal documento — l'errore in ritardo
+  // finisce fuori dalla pagina invece che sopra la scheda di un'altra pista. Il
+  // ramo buono fa `SHEET = null; await loadBraking()`, cioè al peggio una
+  // richiesta in più della scheda del momento, che `loadBraking` arbitra da sé.
   const send = async (text) => {
     try {
       const r = await fetch("/api/braking-reference", {
@@ -3808,10 +3838,29 @@ function renderCornerTitle(L, c, shape) {
   if ($("corner-drop")) $("corner-drop").onclick = () => saveCornerName("");
 }
 
+// Non è un caricatore, ma scrive dopo un'attesa esattamente come loro, quindi
+// corre la stessa corsa: il nome si salva con un POST, e mentre quel POST è in
+// volo il pilota può cambiare combo. Le due scritture che arrivano dopo fanno
+// male davvero, e per due motivi diversi:
+//
+// - il `catch` scrive in `#line-readout`, che è cercato per id al momento della
+//   scrittura, quindi è sempre quello a schermo ADESSO: «non sono riuscito a
+//   salvare il nome» resta lì, sopra la traiettoria di un'altra pista, finché
+//   qualcosa non ridisegna quella riga. Il pilota perde l'avviso, sì — ma il
+//   nome non salvato lo rivede da sé tornando su quella pista, mentre una frase
+//   d'errore sopra lo schermo di un altro tracciato dice una cosa falsa;
+// - il ramo buono fa `LINE_EDIT = -1` e poi `loadLine()`: se nel frattempo il
+//   pilota ha aperto il campo del nome su UN'ALTRA curva e sta scrivendoci
+//   dentro, il ridisegno glielo chiude in faccia e si porta via quello che
+//   aveva digitato.
+//
+// Buttare qui non lascia buchi: il salvataggio sul server è già avvenuto, e chi
+// ha fatto salire il contatore ha già rilanciato `loadLine`/`loadCombo`.
 async function saveCornerName(name) {
   const L = LINE;
   if (!L || !L.corners[LINE_I]) return;
   const c = L.corners[LINE_I];
+  const seen = EPOCH;
   try {
     const r = await fetch("/api/corner-name", {
       method: "POST",
@@ -3820,9 +3869,11 @@ async function saveCornerName(name) {
     });
     if (!r.ok) throw new Error(r.status);
   } catch (e) {
+    if (stale(seen)) return;
     $("line-readout").innerHTML = `<span class="warn">${t("line.name.err")}</span>`;
     return;
   }
+  if (stale(seen)) return;
   LINE_EDIT = -1;
   // Re-fetch rather than patch the one label on screen. The name is used by the
   // debrief, the losses, the braking sheet and the coach's voice, and a screen
