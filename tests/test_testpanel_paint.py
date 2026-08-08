@@ -19,7 +19,8 @@ pytest.importorskip("PySide6")
 from PySide6.QtGui import QColor, QPixmap                 # noqa: E402
 from PySide6.QtWidgets import QApplication                # noqa: E402
 
-from accoach.testpanel import Panel, TestPanel            # noqa: E402
+from accoach import testpanel as tp_mod                    # noqa: E402
+from accoach.testpanel import Panel, TestPanel             # noqa: E402
 
 
 @pytest.fixture(scope="module")
@@ -133,14 +134,19 @@ def test_l_altezza_della_finestra_non_dipende_dal_passo(app):
     lungo.deleteLater()
 
 
-def test_refresh_porta_il_file_sullo_schermo(app, tmp_path):
+def test_refresh_porta_il_file_sullo_schermo(app, tmp_path, monkeypatch):
     """Il punto in cui `StepFile` e il widget si toccano davvero: `refresh()`
     deve rileggere il file passato a `path` (non ignorarlo) e finire nello
     stesso `Panel` che `paintEvent` disegna. Ogni altro test qui assegna
     `_panel` a mano, scavalcando questo cablaggio — ed è il punto da cui
-    dipenderà anche il CLI del prossimo task."""
+    dipenderà anche il CLI del prossimo task.
+
+    Il ripiego deve puntare nel vuoto: senza questo, un `path` ignorato
+    leggerebbe il file VERO del pilota — che durante una sessione esiste, e
+    porta proprio questo titolo."""
     f = tmp_path / "test_step.json"
     f.write_text('{"title": "BLOCCAGGI"}', encoding="utf-8")
+    monkeypatch.setattr(tp_mod, "step_path", lambda: tmp_path / "mai-scritto.json")
     w = TestPanel(f)
     w.refresh()
     assert w._panel.title == "BLOCCAGGI"
