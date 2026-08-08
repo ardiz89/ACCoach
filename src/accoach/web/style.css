@@ -383,13 +383,19 @@ body:not(.railed) .rail { display: none; }
 .cmp-map #brakesheet { overflow-x: auto; }
 
 /* La soglia è 1150, non 900. Fra i due numeri le due colonne ci STANNO — la
-   griglia non sfonda niente — ma la seconda resta appiccicata al pavimento dei
-   320 px per tutta la banda: 342 px di colonna a 901, 329 px a 1150, cioè il
-   `38%` non riesce mai a superare il minimo. La tela della mappa è alta 60vh
-   (538 px su uno schermo normale), quindi il disegno esce piccolo in fondo a
-   una scatola alta e sottile. Alzare la soglia non ridisegna niente: sotto,
-   la mappa va a piena larghezza col rapporto giusto, che è esattamente il
-   comportamento già verificato a 880 px. */
+   griglia non sfonda niente — ma la seconda resta STRETTA: 337 px a 901 e
+   324 px a 1151, misurati. Non è il pavimento dei 320 px a tenerla lì: il `38%`
+   lo supera quasi ovunque in questa banda (lo tocca solo appena sopra i 1100,
+   dove compare il rail e si prende 220 px di scaffale). È il 38% stesso a valere
+   poco più del minimo finché la finestra è piccola. Contro una tela alta 60vh —
+   538 px su uno schermo da 900 — quella colonna è una scatola alta il doppio di
+   quanto è larga, e il disegno esce piccolo in fondo.
+   Il numero non è «il primo pixel in cui il 38% supera il pavimento»: quel conto
+   dà ~1142, e sarebbe circolare citare 1151, che è solo questa media query più
+   uno. 1150 è il numero tondo scelto sopra la banda che legge male.
+   Alzare la soglia non ridisegna niente: sotto, la mappa va a piena larghezza
+   col rapporto giusto, che è esattamente il comportamento già verificato a
+   880 px. */
 @media (max-width: 1150px) {
   /* Impilate, con la mappa SOPRA: è l'orientamento, e serve prima del
      dettaglio. `order` funziona perché sono elementi di una griglia. */

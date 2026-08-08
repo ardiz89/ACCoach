@@ -2991,8 +2991,14 @@ function drawDynamics(cx) {
   // giro senza dinamica restava a schermo un bottone che manda in Traiettoria a
   // vedere lo scostamento — su un giro pre-v6 che quasi certamente non ha
   // nemmeno le coordinate, cioè un comando che non risponde. `toggle`, non
-  // `add`: deve tornare quando il giro i dati ce li ha.
-  $("dyn-elsewhere").classList.toggle("hidden", !anyData);
+  // `add`: deve tornare quando il giro il dato ce l'ha.
+  //
+  // La condizione è `hasOff`, non `anyData`. `anyData` è l'OR di quattro
+  // canali: un giro con la dinamica ma senza `line_offset` avrebbe tenuto il
+  // rimando acceso, promettendo uno scostamento che quel giro non ha — lo
+  // stesso difetto un gradino più in là. Il rimando parla di UN dato, e la
+  // condizione è quel dato.
+  $("dyn-elsewhere").classList.toggle("hidden", !hasOff);
   if (!anyData) {
     if (miss) miss.classList.remove("hidden");
     if (main) main.classList.add("hidden");

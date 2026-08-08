@@ -1721,13 +1721,29 @@ def _branch_of(fn: str, view: str) -> str:
     vuota; non proteggeva da quella troppo larga, che è lo stesso difetto
     all'altro capo.
     """
-    body = _APPJS.split(fn)[1].split("\n}\n")[0]
-    i = body.index(f'VIEW === "{view}"')
+    return _block_after(_body_of(fn), f'VIEW === "{view}"', f"il ramo {view!r} di {fn}")
+
+
+def _body_of(fn: str) -> str:
+    """Il corpo di una funzione di `app.js`, fino alla graffa a colonna zero."""
+    assert _APPJS.count(fn) == 1, f"{fn!r} compare {_APPJS.count(fn)} volte in app.js"
+    return _APPJS.split(fn)[1].split("\n}\n")[0]
+
+
+def _block_after(body: str, cond: str, what: str) -> str:
+    """La fetta che va da `cond` alla graffa che CHIUDE il blocco che la segue.
+
+    Le graffe si contano: fermarsi alla prima `}` darebbe una fetta troncata al
+    primo `if` annidato, e fermarsi al prossimo `else if (` non funziona per
+    l'ultimo ramo di una catena (il ramo del Confronto in `redrawCurrentView`
+    **è** l'ultimo, e il vecchio taglio si portava dentro `drawRail()`).
+    """
+    i = body.index(cond)
     o = body.index("{", i)
-    # Il ramo dev'essere un blocco: fra la condizione e la graffa non ci può
-    # stare un'istruzione (`else if (VIEW === "x") faiQualcosa();`), altrimenti
-    # la graffa trovata è di un ALTRO ramo e la fetta sarebbe di qualcun altro.
-    assert ";" not in body[i:o], f"il ramo {view!r} di {fn} non è un blocco"
+    # Dev'essere un blocco: fra la condizione e la graffa non ci può stare
+    # un'istruzione (`if (x) faiQualcosa();`), altrimenti la graffa trovata è di
+    # qualcun altro e la fetta parlerebbe di un pezzo di codice diverso.
+    assert ";" not in body[i:o], f"{what} non è un blocco"
     depth, j = 0, None
     for k in range(o, len(body)):
         if body[k] == "{":
@@ -1737,7 +1753,7 @@ def _branch_of(fn: str, view: str) -> str:
             if depth == 0:
                 j = k + 1
                 break
-    assert j is not None and i < j, f"fetta senza fine per il ramo {view!r} di {fn}"
+    assert j is not None and i < j, f"fetta senza fine per {what}"
     return body[i:j]
 
 
@@ -1811,11 +1827,14 @@ def test_narrow_screens_stack_the_columns_with_the_map_on_top():
 
     La soglia è 1150 e non 900 per una banda che le due colonne reggono senza
     sfondare niente e leggono male lo stesso: fra 901 e 1150 px la colonna della
-    mappa sta ferma al pavimento dei 320 px (342 px a 901, 329 px a 1150), cioè
-    il `38%` non arriva mai a superarlo, mentre la tela resta alta 60vh. Il
-    disegno esce piccolo in fondo a una scatola alta e sottile. Il numero è
-    misurato — vedi il commento in style.css — e sta qui perché è la sola cosa
-    che nessuno rileggerebbe se qualcuno lo rimettesse a 900.
+    mappa resta stretta — 337 px a 901, 324 px a 1151, misurati — contro una tela
+    alta 60vh (538 px su uno schermo da 900). Una scatola alta il doppio di
+    quanto è larga, col disegno piccolo in fondo. Non è il pavimento dei 320 px a
+    tenerla lì (il `38%` lo supera quasi ovunque in questa banda), ed è il motivo
+    per cui il numero NON è «il primo pixel in cui il 38% supera il minimo»:
+    quel conto dà ~1142. 1150 è il numero tondo scelto sopra la banda che legge
+    male — vedi il commento in style.css — e sta scritto qui perché è la sola
+    cosa che nessuno rileggerebbe se qualcuno lo rimettesse a 900.
     """
     # Il blocco che parla dello scaffale, non «il primo @media»: ce ne sono altri
     # nel file (la curva ingrandita, il rail), e prendere quello darebbe una
@@ -2265,10 +2284,18 @@ def test_the_census_of_hidden_writers_is_still_the_one_that_was_checked():
 
     # E che `app.js` resti l'unico a scriverla: gli altri file del bundle non
     # hanno bersagli censiti qui.
+    #
+    # Con `_HIDDEN_WRITE`, non con due letterali a virgolette doppie. La guardia
+    # gemella qui sopra era stata allargata e questa era rimasta indietro: un
+    # `document.getElementById('map-legend').classList.add('hidden')` in
+    # `tour.js` spegneva un bersaglio censito e tutti e tre i test del
+    # censimento restavano verdi (provato, 175 passed). Una sola espressione per
+    # tutte e due le guardie, così non possono più divergere.
     for name in ("tour.js", "i18n.js", "engineer.js", "test.js"):
         other = (WEB / name).read_text(encoding="utf-8")
-        assert 'classList.add("hidden")' not in other, name
-        assert 'classList.toggle("hidden"' not in other, name
+        assert not _HIDDEN_WRITE.findall(other), (
+            f"{name} spegne qualcosa con `hidden`: il censimento parte da "
+            f"app.js e non lo vedrebbe — {sorted(set(_HIDDEN_WRITE.findall(other)))}")
 
 
 def test_no_rule_outranks_hidden_on_anything_the_javascript_hides():
@@ -2452,3 +2479,82 @@ def test_nothing_stays_on_screen_beside_a_this_lap_has_no_message(msg):
     live = {(home, _plain_name(el)) for el, _c in kids}
     for key in [k for k in _EMPTY_STATE_SURVIVORS if k[0] == home]:
         assert key in live, f"{key} non esiste più: la sua riga in _EMPTY_STATE_SURVIVORS avanza"
+
+
+# --- e che il ramo GIUSTO ci passi davvero -----------------------------------
+#
+# Tutti e tre i test qui sopra decidono «il JS sa spegnerlo» per ID contro
+# `_HIDDEN_TARGET_IDS`, che è una tabella scritta A MANO. `line-readout` e
+# `dyn-readout` ci sono entrati insieme alla loro cura, quindi da soli quei test
+# dicono «app.js sa spegnerli da qualche parte», non «questo ramo li spegne».
+# Misurato, non dedotto: togliendo `emptyReadout($("line-readout"))` da
+# `renderLine`, oppure il terzo argomento a `updateDynReadout`, questo file
+# restava a 175 passed. Due delle tre cure dell'ondata erano coperte solo dalle
+# misure a schermo, che invecchiano appena qualcuno tocca il codice.
+#
+# Questo test segue la catena intera, anello per anello, per i due rami: dal
+# ramo «niente dati» fino al `classList.toggle("hidden", …)` che spegne davvero.
+# È il limite n.2 dichiarato dopo il giro scorso («il ramo giusto resta scoperto
+# da entrambi i censimenti») chiuso per i due casi che questo ramo ha curato —
+# non in generale: resta un test per nome, non un'enumerazione.
+def test_the_no_data_branches_really_switch_their_readout_off():
+    """La riga di lettura di Traiettoria e quella di Dinamica si spengono nel
+    ramo che dice «questo giro non ha…», non solo in astratto."""
+    line = _block_after(_body_of("function renderLine("), "if (!L || !L.corners.length)",
+                        "il ramo «niente curve» di renderLine")
+    # Anti-vacuità: che la fetta sia QUEL ramo, e non una fetta vuota o la coda
+    # della funzione — ogni `in` su una fetta sbagliata è verde per caso.
+    assert '$("line-missing").classList.toggle("hidden", !noMap)' in line
+    assert "LINE_I" not in line, "il taglio ha inghiottito il ramo CON le curve"
+    assert 'emptyReadout($("line-readout"))' in line, (
+        "il ramo «niente curve» esce senza toccare #line-readout: i numeri punto "
+        "per punto del giro PRECEDENTE restano sopra «questi giri non hanno "
+        "coordinate», veri di un altro giro e per sempre")
+
+    dyn = _block_after(_body_of("function drawDynamics("), "if (!anyData)",
+                       "il ramo «niente dinamica» di drawDynamics")
+    assert '$("dyn-tyres").classList.add("hidden")' in dyn
+    assert "drawGG(" not in dyn, "il taglio ha inghiottito il ramo CON i dati"
+    call = re.search(r"updateDynReadout\(([^()]*)\)", dyn)
+    assert call, "il ramo «niente dinamica» non tocca più #dyn-readout"
+    args = [a.strip() for a in call.group(1).split(",")]
+    assert len(args) == 3 and args[2] == "true", (
+        f"updateDynReadout chiamata con {args}: senza il terzo argomento torna "
+        "la didascalia «passa il mouse sui grafici per i valori punto per punto» "
+        "stampata sopra la riga che dice che quei grafici non ci sono")
+
+    # Che il terzo argomento faccia quel mestiere. Il nome lo legge la firma, così
+    # rinominarlo non rende rosso il test per il motivo sbagliato.
+    sig = re.search(r"function updateDynReadout\(([^)]*)\)", _APPJS).group(1)
+    names = [a.strip() for a in sig.split(",")]
+    assert len(names) == 3, f"updateDynReadout ha {len(names)} parametri: {names}"
+    bare = _block_after(_body_of("function updateDynReadout("), f"if ({names[2]})",
+                        f"il ramo {names[2]!r} di updateDynReadout")
+    assert "emptyReadout(el)" in bare and "return" in bare, (
+        f"il terzo argomento non delega più a emptyReadout: {bare!r}")
+
+    # L'ultimo anello, senza il quale i tre passaggi sopra portano a una funzione
+    # che potrebbe non spegnere niente.
+    empty = _body_of("function emptyReadout(")
+    assert 'classList.toggle("hidden", !chip)' in empty, (
+        "emptyReadout non spegne più la fascia: al posto della didascalia resta "
+        "una striscia vuota, che è lo stesso arredamento con meno parole")
+
+
+def test_the_line_deviation_pointer_follows_the_line_offset_not_the_whole_tab():
+    """«Lo scostamento dalla traiettoria vive sotto Traiettoria» è un rimando a
+    UN dato, non alla scheda: la condizione che lo accende dev'essere quel dato.
+
+    Era legato ad `anyData`, che è l'OR di quattro canali: un giro con la
+    dinamica ma senza `line_offset` teneva acceso un bottone che promette uno
+    scostamento che quel giro non ha — la stessa forma di difetto un gradino più
+    in là. In pratica quasi irraggiungibile (la dinamica è v6, le coordinate v3),
+    ma è una condizione scelta in questo ramo, quindi si sceglie giusta.
+    """
+    body = _body_of("function drawDynamics(")
+    assert "hasOff = Array.isArray(DATA.review.line_offset)" in body
+    assert '$("dyn-elsewhere").classList.toggle("hidden", !hasOff)' in body, \
+        "il rimando non segue più lo scostamento"
+    # Fuori dal ramo «niente dinamica», e prima: dentro, il verso di ritorno non
+    # verrebbe mai eseguito su un giro che i dati ce li ha.
+    assert body.index('$("dyn-elsewhere")') < body.index("if (!anyData)")
