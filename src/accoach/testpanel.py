@@ -27,7 +27,11 @@ tradotto.
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
+from pathlib import Path
+
+from . import paths
 
 # Due righe e non tre. Il riquadro ha altezza fissa: il testo che non ci sta
 # viene tagliato, perché un riquadro che si allunga sposta la riga dell'orologio
@@ -92,3 +96,61 @@ def render_step(step: dict | None, now: float) -> Panel:
     return Panel(where=where, title=title, body=body,
                  specs=str(step.get("specs") or ""),
                  countdown=countdown, note=note)
+
+
+# Dodici ore. Numero **scelto**, non misurato: nessuna sessione in pista dura
+# mezza giornata, e un riavvio a metà serata deve invece ritrovare il passo in
+# corso. Serve a un caso solo, ma è un caso che inganna: il file resta sul disco
+# a fine sessione, e senza questa regola un riquadro avviato prima del primo
+# passo mostrerebbe quello di ieri sera — col suo verde già acceso, e il pilota
+# non avrebbe motivo di dubitarne.
+_STALE_S = 12 * 3600
+
+
+def step_path() -> Path:
+    """Il file che Claude scrive e il riquadro legge."""
+    return paths.base_dir() / "test_step.json"
+
+
+class StepFile:
+    """Il file del passo, letto in modo che non possa mentire.
+
+    Due regole, e sono le uniche due ragioni per cui questa classe esiste invece
+    di una `json.loads` in linea:
+
+    * **una lettura andata storta non svuota lo schermo.** Mentre il file viene
+      riscritto, per una frazione di secondo il JSON è mezzo scritto; se il
+      riquadro lo leggesse e si svuotasse, il pilota vedrebbe il protocollo
+      sparire in curva. Il passo di prima resta finché non ne arriva uno valido.
+    * **un file vecchio vale come assente** (vedi `_STALE_S`).
+
+    Cancellare il file, invece, svuota: quello è dirglielo.
+    """
+
+    def __init__(self, path: Path) -> None:
+        self._path = path
+        self._stamp: tuple[float, int] | None = None
+        self._step: dict | None = None
+
+    def read(self, now: float) -> dict | None:
+        try:
+            st = self._path.stat()
+        except OSError:
+            self._stamp, self._step = None, None
+            return None
+        if now - st.st_mtime > _STALE_S:
+            self._stamp, self._step = None, None
+            return None
+        # La dimensione insieme al tempo: su Windows due scritture ravvicinate
+        # possono condividere lo stesso mtime, e il secondo passo non si vedrebbe.
+        stamp = (st.st_mtime, st.st_size)
+        if stamp == self._stamp:
+            return self._step
+        try:
+            data = json.loads(self._path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return self._step        # mezza scrittura: resta quello di prima
+        if not isinstance(data, dict) or not data.get("title"):
+            return self._step
+        self._stamp, self._step = stamp, data
+        return data
