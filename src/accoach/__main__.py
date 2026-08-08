@@ -59,6 +59,8 @@ Validation — these read the live game, so the sim must be running:
                              (`setup bump --help` for the arguments)
   selftest                   check the TTS voice, write a report (works windowed)
   logs                       open the folder with logs and crash reports
+  test-panel                 step-by-step panel for on-track test protocols
+                             (reads test_step.json; opens no telemetry, no socket)
 """
 
 
@@ -93,6 +95,9 @@ def main() -> None:
         run(rest)
     elif cmd == "overlay":
         from .overlay import main as run
+        run(rest)
+    elif cmd == "test-panel":
+        from .testpanel import main as run
         run(rest)
     elif cmd == "debrief":
         from .debrief_app import main as run

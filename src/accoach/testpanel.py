@@ -318,3 +318,27 @@ class TestPanel(QWidget):
             self._font(p, 18, bold=True, mono=True)
             p.setPen(QColor(brand.TEXT))
             self._text(p, 16, _CLOCK_Y, _BASE_W - 32, 36, Qt.AlignLeft, pan.note)
+
+
+def main(argv: list[str] | None = None) -> None:
+    import signal
+    import sys
+
+    app = QApplication(sys.argv)
+    load_fonts()                     # il riquadro dipinge nel carattere HONE
+    # Lascia passare Ctrl+C dal terminale che l'ha avviato: senza un timer che
+    # ogni tanto restituisce il controllo a Python, Qt resta nel suo loop e il
+    # segnale non viene mai gestito. Stessa ragione e stesso trucco dell'HUD.
+    signal.signal(signal.SIGINT, lambda *_: app.quit())
+    tick = QTimer()
+    tick.timeout.connect(lambda: None)
+    tick.start(200)
+
+    panel = TestPanel()
+    panel.refresh()                  # non aspettare mezzo secondo per il primo
+    panel.show()
+    sys.exit(app.exec())
+
+
+if __name__ == "__main__":
+    main()
