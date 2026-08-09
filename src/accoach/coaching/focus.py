@@ -48,8 +48,6 @@ _PATIENCE = 6            # laps spent on a focus with no win → park it, move o
 # The theme table moved to cue.py, next to the category it describes: the voice
 # gate needs it too, and scheduler.py cannot import this module without pulling
 # debrief.py in behind it.
-from .cue import THEME as _THEME            # noqa: F401 - re-export for debrief
-from .cue import THEME_DEFAULT as _THEME_DEFAULT   # noqa: F401
 from .cue import theme_label as _theme_label
 
 
