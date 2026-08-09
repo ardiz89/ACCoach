@@ -157,3 +157,33 @@ def theme_label(category: CueCategory, lang: str) -> str:
     """The theme as shown to the driver, in ``lang`` (falls back to English)."""
     entry = THEME.get(category, THEME_DEFAULT)
     return entry.get(lang) or entry["en"]
+
+
+# What the coach says on track when a focus is active: one to three words, always
+# the same ones for that mistake. The full sentence still goes to the screen and
+# to the debrief — the eye gets the detail, the ear gets the word.
+#
+# Only technique cues have one. An acute call is already short and must stay
+# literal ("Bloccaggio!"), and an advisory is spoken at the finish line, where
+# there is room for a sentence.
+TRIGGER: dict[CueCategory, dict[str, str]] = {
+    CueCategory.BRAKE_LATER: {"it": "più tardi", "en": "later"},
+    CueCategory.BRAKE_EARLIER: {"it": "prima", "en": "earlier"},
+    CueCategory.LESS_BRAKE: {"it": "meno freno", "en": "less brake"},
+    CueCategory.TRAIL_BRAKE: {"it": "rilascia", "en": "release"},
+    CueCategory.MORE_THROTTLE: {"it": "gas", "en": "throttle"},
+    CueCategory.PARTIAL_THROTTLE: {"it": "tutto gas", "en": "full throttle"},
+    CueCategory.COASTING: {"it": "veleggi", "en": "coasting"},
+    CueCategory.CARRY_SPEED: {"it": "porta velocità", "en": "carry speed"},
+    CueCategory.TIME_LOSS: {"it": "qui perdi", "en": "losing here"},
+    CueCategory.LIMITER: {"it": "cambia", "en": "shift"},
+    CueCategory.GEAR_TOO_TALL: {"it": "scala", "en": "downshift"},
+}
+
+
+def trigger_text(category: CueCategory, lang: str) -> str | None:
+    """The on-track trigger word for ``category``, or ``None`` if it has none."""
+    entry = TRIGGER.get(category)
+    if entry is None:
+        return None
+    return entry.get(lang) or entry["en"]
