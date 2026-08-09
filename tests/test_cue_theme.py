@@ -39,3 +39,23 @@ def test_every_theme_entry_has_both_languages():
     for cat, entry in THEME.items():
         assert entry.get("it"), f"{cat.name}: manca l'italiano"
         assert entry.get("en"), f"{cat.name}: manca l'inglese"
+
+
+def test_no_safety_category_sits_in_the_technique_tier():
+    """The premise the plan's deviation from the spec rests on.
+
+    The spec listed the categories that always speak; the plan replaced that
+    list with a rule — only TECHNIQUE cues are filtered — on the grounds that
+    the two say the same thing. True today, and nothing enforces it: `tier_of`
+    sends any unlisted category to TECHNIQUE ("the safe middle"), and that
+    default has just picked up a second meaning, "silenceable by the focus". A
+    safety category added tomorrow to `_SAFETY_CATEGORIES` but not to `_TIER`
+    would pass the quiet gate and then be swallowed by the focus gate.
+    """
+    from accoach.engine import _SAFETY_CATEGORIES
+
+    silenceable = {c for c in _SAFETY_CATEGORIES if tier_of(c) == CueTier.TECHNIQUE}
+    assert not silenceable, (
+        "categorie di sicurezza che il filtro del focus può zittire: "
+        f"{sorted(c.name for c in silenceable)}"
+    )

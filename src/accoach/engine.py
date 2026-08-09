@@ -36,7 +36,7 @@ from .coaching import (
     Voice,
 )
 from .coaching.analyzer import corner_level
-from .coaching.cue import CueCategory
+from .coaching.cue import CueCategory, theme_key, trigger_text
 from .coaching.debrief import build_lap_debrief
 from .coaching.diagnosis import build_lap_stats
 from .coaching.atwheel import WheelWatch
@@ -74,29 +74,25 @@ _SAFETY_CATEGORIES = {
 }
 
 
-def _focus_theme_key(report: "FocusReport | None") -> str | None:
+def _focus_theme_key(report: FocusReport | None) -> str | None:
     """The English theme key of the active focus, or None if there isn't one.
 
     Deliberately not `report.focus.theme`: that one is translated for the driver
     ("frenata"), and comparing it against the scheduler's key would work in
     Italian and silently stop filtering in English.
     """
-    from .coaching.cue import theme_key
-
     if report is None or report.focus is None:
         return None
     return theme_key(report.focus.category)
 
 
-def _spoken_forms(cue: "Cue", focus_theme: str | None, lang: str) -> tuple[str, str]:
+def _spoken_forms(cue: Cue, focus_theme: str | None, lang: str) -> tuple[str, str]:
     """What the ear hears and what the eye reads: (voice, screen).
 
     They are the same string until a focus is active. From then on the voice gets
     the trigger word and the screen keeps the whole sentence — the driver in a
     corner has room for three words, the debrief afterwards has room for the rest.
     """
-    from .coaching.cue import trigger_text
-
     if focus_theme is None:
         return cue.message, cue.message
     trigger = trigger_text(cue.category, lang)
@@ -844,8 +840,9 @@ class CoachEngine:
             # Cues are authored in Italian (so the neural WAVs match); render them
             # in the active language for both the voice and the on-screen text.
             spoken.message = cue_text(spoken.message)
-            voice_text, spoken.message = _spoken_forms(
+            voice_text, screen_text = _spoken_forms(
                 spoken, self.scheduler.focus_theme, current_language())
+            spoken.message = screen_text
             if self.voice is not None:
                 self.voice.say(voice_text)
             self.history.append(spoken.message)

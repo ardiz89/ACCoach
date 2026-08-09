@@ -29,7 +29,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 
 from ..i18n import current_language
-from .cue import CueCategory
+from .cue import CueCategory, trigger_text
+from .cue import theme_label as _theme_label
 from .debrief import CornerLoss, LapDebrief
 from .thresholds import RECUR_FRAC as _RECUR_FRAC
 from .thresholds import SIGNIF_LOSS_MS as _SIGNIF_MS
@@ -48,9 +49,6 @@ _PATIENCE = 6            # laps spent on a focus with no win → park it, move o
 # The theme table moved to cue.py, next to the category it describes: the voice
 # gate needs it too, and scheduler.py cannot import this module without pulling
 # debrief.py in behind it.
-from .cue import theme_label as _theme_label
-
-
 def _theme(cat: CueCategory, lang: str) -> str:
     return _theme_label(cat, lang)
 
@@ -79,8 +77,6 @@ def _brief_pact(cat: CueCategory, lang: str) -> str:
     The theme comes from the **translated** label: this sentence is read by the
     driver, unlike the key the gate compares.
     """
-    from .cue import trigger_text
-
     word = trigger_text(cat, lang)
     if not word:
         return ""

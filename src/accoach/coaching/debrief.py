@@ -28,7 +28,7 @@ from ..trackdata import corner_name, landmark_at
 from .analyzer import _BRAKE_ON, _LOSS_MS, CornerStats, _braked_early, classify_corner
 from .chain import link_corners
 from .phases import phase_note, split_loss
-from .cue import CueCategory
+from .cue import CueCategory, theme_key
 from .diagnosis import corner_symptoms, dominant_symptom
 from .tuning import tuning_for_car
 from ..i18n import current_language
@@ -472,8 +472,6 @@ def _headline(losses: list[CornerLoss], gap_ms: int, ref_ms: int,
 
 def _theme_key(cat: CueCategory) -> str:
     """The English theme key regardless of language, for aggregation."""
-    from .cue import theme_key
-
     return theme_key(cat)
 
 
