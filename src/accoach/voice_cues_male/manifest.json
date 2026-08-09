@@ -40,5 +40,16 @@
   "Stai perdendo 7 decimi qui": "cue_db1f4555ea.wav",
   "Stai perdendo 8 decimi qui": "cue_d17288b1d1.wav",
   "Stai perdendo 9 decimi qui": "cue_90ef98cdcc.wav",
-  "Stai veleggiando: riduci il tempo morto fra freno e gas": "cue_320963caba.wav"
+  "Stai veleggiando: riduci il tempo morto fra freno e gas": "cue_320963caba.wav",
+  "cambia": "cue_306d5887c3.wav",
+  "gas": "cue_facafa7487.wav",
+  "meno freno": "cue_19fcd6af44.wav",
+  "più tardi": "cue_bc159b0503.wav",
+  "porta velocità": "cue_2abd77dfea.wav",
+  "prima": "cue_cf4e9ab949.wav",
+  "qui perdi": "cue_e7f7afe9b6.wav",
+  "rilascia": "cue_e0367a7153.wav",
+  "scala": "cue_54274edafa.wav",
+  "tutto gas": "cue_6605c6e521.wav",
+  "veleggi": "cue_ec0910efa4.wav"
 }
