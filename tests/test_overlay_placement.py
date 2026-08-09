@@ -62,16 +62,54 @@ def test_un_monitor_solo_resta_un_monitor_solo():
     assert top_left_in_center_panel(screens, (0, 0, 2560, 1440), SIZE) == (24, 24)
 
 
-def test_due_pannelli_fusi_il_centrale_e_quello_di_destra():
-    """N pari non ha un centro: la scelta pinnata qui e' l'indice N//2.
+def test_5120x1440_e_ambiguo_e_si_sceglie_di_leggerlo_come_due_pannelli():
+    """Questa geometria e' AMBIGUA e la risposta e' una scelta, non una misura.
 
-    Con due pannelli fusi (5120x1440) N//2 = 1, cioe' il pannello **destro**.
-    E' una scelta, non una misura: con due monitor il pilota guarda la giunzione
-    e nessuno dei due e' "il centrale".
+    5120x1440 e' contemporaneamente due 2560x1440 fusi **e** un Samsung Odyssey
+    G9 32:9, che e' un monitor da sim-racing, non un caso di scuola. I due
+    rettangoli sono lo stesso rettangolo: nessuna geometria li distingue, e
+    l'aspetto da solo non puo' indovinare. Lo stesso vale per 3840x1080.
+
+    Qui si legge come due pannelli fusi. Conseguenza dichiarata: su un G9 vero
+    l'overlay finisce a meta' larghezza di un monitor fisico solo — non e' un
+    difetto nascosto, e' il prezzo della lettura scelta.
+
+    E con N pari il "centrale" non esiste: la scelta pinnata e' l'indice N//2,
+    cioe' il pannello **destro**.
     """
     screens = ((0, 0, 5120, 1440),)
     assert center_panel(screens, (0, 0, 5120, 1440)) == (2560, 0, 2560, 1440)
     assert top_left_in_center_panel(screens, (0, 0, 5120, 1440), SIZE) == (2584, 24)
+    # 3840x1080 (49" 32:9) e' lo stesso caso, letto allo stesso modo.
+    small = ((0, 0, 3840, 1080),)
+    assert center_panel(small, (0, 0, 3840, 1080)) == (1920, 0, 1920, 1080)
+
+
+def test_tre_ultrawide_fusi_non_diventano_quattro_pannelli_inventati():
+    """Bordo ALTO della tolleranza, misurato: 10320x1440 = tre 3440x1440 fusi.
+
+    N = round(4.031) = 4 (non 3!), 10320 % 4 == 0, e il pannello dedotto sarebbe
+    2580x1440 = 1.7917, che dista **0.78%** da 16:9. Con la vecchia tolleranza
+    dell'1% passava: pannello inventato a x=5160 e overlay a (5184, 24), cioe'
+    una risposta sbagliata data con sicurezza. E' il caso da rifiutare piu'
+    vicino alla soglia che si sia trovato.
+    """
+    screens = ((0, 0, 10320, 1440),)
+    assert center_panel(screens, (0, 0, 10320, 1440)) == (0, 0, 10320, 1440)
+    assert top_left_in_center_panel(screens, (0, 0, 10320, 1440), SIZE) == (24, 24)
+
+
+def test_un_16_9_nominale_resta_dentro_la_tolleranza():
+    """Bordo BASSO, misurato: 4080x768 = tre 1360x768, "16:9" ma in realta' 85:48.
+
+    Errore 0.39%: e' l'impianto da accettare piu' lontano da 16:9 che si sia
+    misurato. I tagli mainstream (2560x1440, 1920x1080, 3840x2160) danno errore
+    **zero esatto**, perche' con w % N == 0 la larghezza del pannello e' esatta.
+    La soglia sta nel vuoto fra questo 0.39% e lo 0.78% del test qui sopra.
+    """
+    assert center_panel(((0, 0, 4080, 768),), (0, 0, 4080, 768)) == (1360, 0, 1360, 768)
+    # e i tagli esatti, che non consumano tolleranza per niente
+    assert center_panel(((0, 0, 11520, 2160),), (0, 0, 11520, 2160)) == (3840, 0, 3840, 2160)
 
 
 def test_uno_span_che_non_torna_ricade_sullo_schermo_intero():

@@ -102,7 +102,13 @@ _CARD_COLOUR = {"gain": _CYAN, "ok": _GREEN, "warn": _AMBER, "bad": _RED}
 # _place_top_center() e non la provava niente.
 _EDGE_MARGIN = 24        # lo stacco dal bordo alto che l'overlay aveva gia'
 _PANEL_ASPECT = 16 / 9   # ASSUNZIONE, non misura — vedi center_panel()
-_ASPECT_TOL = 0.01       # quanto il pannello dedotto puo' allontanarsi da 16:9
+# SOGLIA MISURATA (non scelta a occhio, e non una taratura nostra): sta nel vuoto
+# fra l'errore d'aspetto piu' alto degli impianti da ACCETTARE — 0.391%, tre
+# 1360x768 fusi; i tagli mainstream danno **zero esatto**, perche' con w % N == 0
+# la larghezza del pannello e' esatta — e il piu' basso di quelli da RIFIUTARE:
+# 0.781%, tre ultrawide 3440x1440 fusi, che con il vecchio 1% passavano e si
+# prendevano un pannello inventato. Tabella completa delle geometrie nel rapporto.
+_ASPECT_TOL = 0.005
 # Ogni quanto si ricontrolla la geometria. Eyefinity si accende una volta sola,
 # all'avvio del gioco: un secondo di overlay nel terzo sbagliato cade sulla
 # schermata di caricamento e non si vede, mentre leggere tre rettangoli una volta
@@ -128,9 +134,19 @@ def center_panel(screens, virtual):
       16:9**. On the driver's rig that assumption is true and measured
       (7680 = 3 x 2560); elsewhere it may well not be. So the deduction is only
       trusted when the panel it implies is itself 16:9 to within ``_ASPECT_TOL``
-      and divides the span exactly — otherwise the whole screen is used as-is,
-      which is also the right answer for a single ultrawide (3440x1440 is 21:9
-      and must not be sliced into invented panels).
+      and divides the span exactly — otherwise the whole screen is used as-is.
+
+    What that guard actually saves is **21:9**: a single ultrawide (3440x1440,
+    2560x1080, 3840x1600, 5120x2160 all land on ``N <= 1``) and a fused row of
+    them (10320x1440 would imply N=4 and divides exactly, but the panel it
+    implies is 0.78% off 16:9, outside the tolerance).
+
+    What it does **not** save is **32:9**, and it can't: a single 5120x1440
+    (Samsung Odyssey G9 — a sim-racing monitor, not a curiosity) and two fused
+    2560x1440 panels are *the same rectangle*. Nothing in the geometry tells them
+    apart, and 3840x1080 and 7680x1080 are the same story. On those the fused
+    reading is **chosen**, not measured, and on a real G9 it puts the overlay at
+    half the width of one physical screen. Pinned in a test that says so by name.
 
     With an even number of merged panels there is no true middle; the pinned
     choice is index ``N // 2``, i.e. the right-hand one of two. It's a choice,
@@ -359,8 +375,17 @@ class Overlay(QWidget):
 
         Nothing here asks *why* it changed, and nothing waits to be told: a
         position computed against a desktop that no longer exists is stale, full
-        stop. Unchanged geometry means the window isn't touched — a driver who
-        dragged it in --interactive must not see it bounce back every second.
+        stop. Unchanged geometry means the window isn't touched, so nothing gets
+        yanked around once a second while the desktop sits still.
+
+        That last promise is narrower than it looks, so here is its real shape.
+        Only a position pinned in the config survives a geometry change, and only
+        while it stays on a screen (``_auto_place`` False, ``_on_a_screen()``
+        True). A drag inside ``--interactive`` does **not** pin: ``mouseReleaseEvent``
+        saves the coordinates but leaves ``_auto_place`` alone, so an overlay that
+        started automatic and was then dragged goes back to the corner at the
+        first geometry change — i.e. exactly when Eyefinity comes on. Pre-existing
+        and left alone on purpose; see the report.
         """
         snap = _screen_snapshot()
         if snap == self._placed_against:
