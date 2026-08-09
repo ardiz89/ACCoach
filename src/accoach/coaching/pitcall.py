@@ -93,6 +93,25 @@ _RATE_TAU_S = 0.5
 # place on the track — it's wherever it was parked.
 _MOVING_KMH = 25.0
 
+# Below this the car is parked, not driving slowly: the speed at which the
+# briefing is allowed to start in the pit lane.
+#
+# Honest about where the number comes from: it is NOT a measured distribution.
+# The only reading we have is 0.0 km/h, taken from the shared memory with the
+# car standing in its own box (ACC, Monza, 07/08), so this is a noise margin
+# around that single sample — wide enough that a telemetry twitch or a car
+# settling on its springs still reads as stopped, narrow enough that a car
+# still rolling does not.
+#
+# Deliberately NOT `_MOVING_KMH`, which answers a different question — "is the
+# position this frame reports a place on the track?" (see its comment above).
+# Borrowing it would start the briefing at 24 km/h, with the driver still
+# rolling down a lane whose limit is 50: and the briefing is a long sentence
+# that sends you to a browser page to rewrite a setup, which is something you
+# do stopped. For the same reason, don't reuse THIS one to mean "the car isn't
+# driving" — that is `_MOVING_KMH`'s job.
+_STOPPED_KMH = 1.0
+
 # Ranks above ordinary technique advice: missing a pit call costs a whole lap,
 # and there is no second chance at the entry. Still below the acute safety
 # events, which is what the tier does — this only breaks ties within it.
@@ -237,7 +256,20 @@ class PitCall:
         # while the engine's `quiet` gate says "pit" — that gate exists to stop
         # *driving* advice being spoken where it can't be used, and this is the
         # opposite: advice that can ONLY be used here. See engine._SAFETY_CATEGORIES.
-        if s.in_pit:
+        #
+        # "Stopped" has to be asked twice, because no single field answers it on
+        # both sims. `in_pit` is the sim saying "in the garage" — but in
+        # everything we were able to observe on ACC it never lights up: read
+        # straight from the shared memory (offset 160) with the car standing
+        # still in its box it was 0, while `isInPitLane` (offset 1236) was 1.
+        # Gated on `in_pit` alone the briefing simply never happened there, which
+        # is the last step of this whole feature. `in_pit` stays in front all the
+        # same: on AC1 it may well work, and there is no reason to break it.
+        # The second route says the same thing out of two fields that ACC does
+        # publish — in the lane, and not moving. In the lane is not enough by
+        # itself (the whole corridor reads as lane), stopped is not enough by
+        # itself (the grid, a spin), so it is the pair.
+        if s.in_pit or (s.in_pit_lane and s.speed_kmh <= _STOPPED_KMH):
             if self._briefed_spoken or now - self._briefed_at < _BRIEF_RETRY_S:
                 return []
             self._briefed_at = now
