@@ -73,6 +73,20 @@ _SAFETY_CATEGORIES = {
     CueCategory.PIT_IN, CueCategory.PIT_APPROACH, CueCategory.PIT_BRIEFING,
 }
 
+
+def _focus_theme_key(report: "FocusReport | None") -> str | None:
+    """The English theme key of the active focus, or None if there isn't one.
+
+    Deliberately not `report.focus.theme`: that one is translated for the driver
+    ("frenata"), and comparing it against the scheduler's key would work in
+    Italian and silently stop filtering in English.
+    """
+    from .coaching.cue import theme_key
+
+    if report is None or report.focus is None:
+        return None
+    return theme_key(report.focus.category)
+
 # A spoken alert prefix for an engineer proposal, by confidence-tone × tag ×
 # language. The proposal's rationale (already localized) follows it; the prefix
 # tells the driver *whether* it needs the garage (BOX) or can be dialled at the
@@ -336,6 +350,10 @@ class CoachEngine:
             stable = lap.valid and lap.clean is not False
             before = (frozenset(self._focus.mastered), frozenset(self._focus.parked))
             self._focus_report = self._focus.observe(debrief, stable=stable)
+            # Tell the voice which theme the session is on. The FocusCoach has
+            # elected one weakness at a time since it was written; until now
+            # nobody downstream was listening.
+            self.scheduler.set_focus(_focus_theme_key(self._focus_report))
             after = (frozenset(self._focus.mastered), frozenset(self._focus.parked))
             if after != before:
                 self._save_focus_state()   # a corner just changed status; persist
