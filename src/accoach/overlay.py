@@ -562,6 +562,14 @@ class Overlay(QWidget):
         theme = (target.get("theme") or "").upper()
         base = target.get("baseline_ms", 0) or 0
         gap = f"  −{base / 1000.0:.2f}s" if base else ""
+        # The word the voice will use, when it is using one. The pact that
+        # agrees it is in the focus briefing, which reaches the terminal and the
+        # web page but not here — and `python -m accoach live` is overlay plus
+        # voice, so that driver would hear "less brake" out of nowhere. Last on
+        # the line on purpose: if a long corner name ever runs the text past its
+        # box, the clipping eats the new part and not the gap.
+        trigger = (target.get("trigger") or "").upper()
+        word = f" · «{trigger}»" if trigger else ""
         y = 170
         p.setPen(Qt.NoPen)
         p.setBrush(_AMBER)
@@ -569,7 +577,7 @@ class Overlay(QWidget):
         self._set_font(p, 11, bold=True)
         p.setPen(_GREY)
         p.drawText(42, y, w - 60, 20, Qt.AlignVCenter,
-                   f"{t('overlay.focus')} · {theme} · {name}{gap}")
+                   f"{t('overlay.focus')} · {theme} · {name}{gap}{word}")
 
     def _draw_corner_card(self, p: QPainter, w: int) -> None:
         """L'ultima curva chiusa: nome a sinistra, decimi misurati a destra.

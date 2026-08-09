@@ -139,3 +139,22 @@ def test_a_lap_with_no_reference_releases_the_theme(tmp_path):
     eng._observe_lap(slow)
     assert eng.scheduler.focus_theme is None
     eng.close()
+
+
+# --- the word reaches the screen the driver is actually looking at ----------
+
+def test_the_focus_block_carries_the_word_the_voice_will_use(tmp_path):
+    """The overlay has no other way to name it: the briefing never gets there."""
+    eng, _slow = _engine_working_a_focus(tmp_path)
+    block = eng._focus_block()
+    assert block["focus"]["trigger"], "no trigger word for the elected focus"
+    eng.close()
+
+
+def test_no_word_is_promised_while_the_gate_is_off(tmp_path):
+    """A word shown but never spoken is the same broken promise, mirrored."""
+    eng, _slow = _engine_working_a_focus(tmp_path)
+    eng.scheduler.set_focus(None)           # e.g. a lap the focus can't be confirmed on
+    block = eng._focus_block()
+    assert block["focus"]["trigger"] is None
+    eng.close()

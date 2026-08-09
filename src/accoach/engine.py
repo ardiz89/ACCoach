@@ -631,11 +631,18 @@ class CoachEngine:
         }
 
     def _focus_block(self) -> dict | None:
-        """The latest Focus/Lesson report, in the shape a frontend consumes."""
+        """The latest Focus/Lesson report, in the shape a frontend consumes.
+
+        ``focus.trigger`` is the word the voice will actually use, and it is
+        filled only while the gate is really on that theme — so a frontend can
+        show the driver the word without ever promising one the coach isn't
+        going to say (the gate releases the theme on a lap it can't confirm).
+        """
         r = self._focus_report
         if r is None:
             return None
         f = r.focus
+        on_theme = self.scheduler.focus_theme is not None
         return {
             "kind": r.kind.value,
             "message": r.message,
@@ -646,6 +653,7 @@ class CoachEngine:
                 "name": f.name,
                 "theme": f.theme,
                 "category": f.category.value,
+                "trigger": trigger_text(f.category, current_language()) if on_theme else None,
                 "baseline_ms": round(f.baseline_ms, 1),
             },
         }
