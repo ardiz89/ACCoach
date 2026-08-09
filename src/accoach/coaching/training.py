@@ -332,9 +332,9 @@ _T = {
                                  "frenare: lo tocchi a {v} km/h in {g}ª, {d} m "
                                  "prima del punto più lento della curva.",
         "d.brake_move_later.s0b": "Guarda dov'è adesso il punto in cui inizi a "
-                                  "frenare: la scheda «Le tue frenate», in fondo "
-                                  "alla Mappa, dice a che velocità e in che "
-                                  "marcia lo tocchi.",
+                                  "frenare: la scheda «Le tue frenate», sotto la "
+                                  "mappa nel Confronto, dice a che velocità e in "
+                                  "che marcia lo tocchi.",
         "d.brake_move_later.s0d": "Guarda dov'è adesso il punto in cui inizi a "
                                   "frenare: lo tocchi a {v} km/h in {g}ª.",
         "d.brake_move_later.s0c": "Un punto che vedi con gli occhi, invece di un "
@@ -623,9 +623,9 @@ _T = {
                                  "hit the brakes at {v} km/h in gear {g}, {d} m "
                                  "before the slowest point of the corner.",
         "d.brake_move_later.s0b": "First, see where your braking point is now: "
-                                  "the «Your braking points» sheet at the bottom "
-                                  "of the Map tab says at what speed and in which "
-                                  "gear you hit them.",
+                                  "the «Your braking points» sheet, under the map "
+                                  "in the Compare tab, says at what speed and in "
+                                  "which gear you hit them.",
         "d.brake_move_later.s0d": "First, see where your braking point is now: "
                                   "you hit the brakes at {v} km/h in gear {g}.",
         "d.brake_move_later.s0c": "Something you can see with your eyes instead "

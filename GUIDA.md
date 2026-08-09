@@ -417,13 +417,19 @@ Cosa trovi nelle altre schede:
   Non è nemmeno usura gomme: nessuno dei due simulatori pubblica un'usura che
   registriamo, quello che vedi è la temperatura.
 - **Confronto**: scegli auto+pista e due giri (uno da rivedere, uno di confronto).
-  Tre grafici allineati alla posizione in pista — **delta sul giro**, **velocità**
-  (tu vs riferimento), **gas/freno** — con le bande delle curve. Passa il mouse:
-  un mirino ti dà i valori puntuali. Esporti il giro in **CSV/JSON**.
-- **Mappa**: la traiettoria colorata sul distacco, i punti di frenata tuoi e del
-  riferimento, e le curve **chiamate per nome** (non più «T1, T2»: sono gli stessi
-  nomi del resto della pagina, compresi quelli che hai scritto tu). Se il giro è
-  stato buttato c'è una **✕ nel punto in cui l'hai perso**. Sotto,
+  Quattro grafici allineati alla posizione in pista — **delta sul giro**,
+  **velocità** (tu vs riferimento), **gas/freno** e **sterzo** — con le bande
+  delle curve. Passa il mouse: un mirino ti dà i valori puntuali. Esporti il giro
+  in **CSV/JSON**.
+  Accanto, sullo **stesso schermo**, la **mappa del tracciato**: la traiettoria
+  colorata sul distacco, i punti di frenata tuoi e del riferimento, e le curve
+  **chiamate per nome** (non più «T1, T2»: sono gli stessi nomi del resto della
+  pagina, compresi quelli che hai scritto tu). Se il giro è stato buttato c'è una
+  **✕ nel punto in cui l'hai perso**. La mappa **resta ferma** mentre scorri i
+  grafici, e il mirino attraversa lo schermo: passi il mouse sul delta e il punto
+  si accende anche sul disegno. Erano due schede — «dove ho perso» in grafico e
+  «dove ho perso» sul disegno — e si guardavano una per volta, con un clic in
+  mezzo e la memoria a fare da collante. Sotto la mappa,
   **«Le tue frenate»**: la scheda dei tuoi punti di frenata,
   curva per curva. Per ognuna: **a che velocità stacchi** (è il riferimento che
   ogni auto ti dà gratis, ce l'hai sul cruscotto), in che marcia, quanto è lunga

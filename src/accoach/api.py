@@ -843,9 +843,9 @@ def _corner_vmins(corner, chrono: list[dict], lap_objs: dict) -> list[float]:
 def _sheet_pool(valid: list[dict], ref_row: dict | None) -> list[dict]:
     """Which of your laps a braking sheet is measured on.
 
-    Extracted so the Map tab's sheet and the braking drill quote the same
-    number: a drill that told you "you brake at 214 km/h here" while the sheet
-    two tabs over said 209 would be two answers to one question. The rule is the
+    Extracted so the sheet beside Compare's map and the braking drill quote the
+    same number: a drill that told you "you brake at 214 km/h here" while the
+    sheet under Compare said 209 would be two answers to one question. The rule is the
     live coach's own — the same road-temperature band it uses to elect a
     reference, because two laps 20° apart are two circuits.
     """
@@ -2051,8 +2051,8 @@ def create_api(
         the debriefs' phase split, the ideal lap, the braking sheet. What lives
         here is the wiring: load each of those *once*, from the same laps, so
         the programme quotes numbers that match the tab they came from. A drill
-        that says you brake at 214 km/h while the Map tab says 209 is worse than
-        a drill with no number in it.
+        that says you brake at 214 km/h while the braking sheet in Compare says
+        209 is worse than a drill with no number in it.
 
         The gate is checked before any lap is read: under the bar the whole
         answer is one sentence, and replaying fifteen laps to write it would be
@@ -2172,7 +2172,8 @@ def create_api(
                 if len(vmins) >= 3:
                     out[i].spread_kmh = round(max(vmins) - min(vmins), 1)
 
-        # The braking sheet, on exactly the laps the Map tab pools (`_sheet_pool`).
+        # The braking sheet, on exactly the laps Compare's own sheet pools
+        # (`_sheet_pool`).
         try:
             ref_row = next((r for r in clean if r["path"] == elected), None)
             pool = _sheet_pool(clean, ref_row)

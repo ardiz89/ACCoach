@@ -222,11 +222,10 @@ function wireTour() {
 }
 
 // Redraw whatever view is on screen from the in-memory payload (no refetch for
-// compare/map; sectors/progress re-run their loader). Shared by resize + the
+// compare; sectors/progress re-run their loader). Shared by resize + the
 // colour-blind toggle.
 function redrawCurrentView() {
-  if (VIEW === "map") { if (DATA) drawMap(DATA, null); SHEET ? renderBrakeSheet(SHEET) : loadBraking(); }
-  else if (VIEW === "line") { LINE ? renderLine(null) : loadLine(); }
+  if (VIEW === "line") { LINE ? renderLine(null) : loadLine(); }
   else if (VIEW === "dynamics") { if (DATA) drawDynamics(LAST_HOVER); }
   else if (VIEW === "sectors") { if (CURRENT) loadSectors(); }
   else if (VIEW === "progress") { if (CURRENT) loadProgress(CURRENT); }
@@ -241,7 +240,16 @@ function redrawCurrentView() {
   // requested language, so repainting a cached payload would leave the one
   // paragraph on the tab in the language you just left.
   else if (VIEW === "stint") { if (CURRENT) loadStint(CURRENT, STINT_I); }
-  else if (DATA) redraw(LAST_HOVER);   // compare
+  // Il Confronto: i grafici a sinistra E la mappa a destra, che stanno sullo
+  // stesso schermo e quindi si ridisegnano insieme. Il ramo è nominato invece
+  // di restare l'`else` finale muto: era l'`else` a raccogliere anche la vista
+  // Mappa quando esisteva, e un ramo senza nome è un ramo che nessuno rilegge.
+  // Il resize passa di qui, ed è così che il canvas della mappa riprende la
+  // misura della colonna: `setup()` legge `clientWidth` a ogni disegno.
+  else if (VIEW === "compare") {
+    if (DATA) { redraw(LAST_HOVER); drawMap(DATA, null); }
+    SHEET ? renderBrakeSheet(SHEET) : loadBraking();
+  }
   // Il rail non appartiene a nessuna vista, quindi non sta in nessun ramo. Fuori
   // dallo switch è l'unico posto dove il cambio scheda e il resize lo trovano
   // entrambi: `redrawCurrentView` è ciò che il gestore di resize (debounced,
@@ -276,24 +284,31 @@ function wireCbToggle() {
   help.parentNode.insertBefore(btn, help.nextSibling);
 }
 
-// Le sei schede che parlano di UN GIRO, e quindi di una curva. Le altre quattro
-// stanno sopra il giro nella gerarchia (una sessione, uno stint, lo storico, un
-// piano): lì il rail mostrerebbe un giro che non c'entra con quello che leggi, e
-// cliccare una curva non cambierebbe niente. Un comando che non risponde è
-// peggio di un comando assente.
-const RAIL_VIEWS = ["flow", "compare", "map", "line", "sectors", "dynamics"];
+// Le cinque schede che parlano di UN GIRO, e quindi di una curva. Le altre
+// cinque stanno sopra il giro nella gerarchia (una sessione, uno stint, lo
+// storico, un piano): lì il rail mostrerebbe un giro che non c'entra con quello
+// che leggi, e cliccare una curva non cambierebbe niente. Un comando che non
+// risponde è peggio di un comando assente.
+const RAIL_VIEWS = ["flow", "compare", "line", "sectors", "dynamics"];
 
 // The characters `e.key` reports for the row above the letters, in the order
 // a tab picks them — NOT their physical position, which moves between
-// keyboard layouts (on IT, for instance, "'" sits where "-" does on US/UK,
-// and "-" itself lives elsewhere on the board). Every one of these keys sends
-// its printed character regardless of layout, with no modifier, so all eleven
-// tabs stay reachable everywhere; the string is just wrong as a claim about
-// where any later key "physically" continues the row. One shared constant —
-// `wireKeys()` reads it to route the keypress, `wireTabs()` reads it to show
-// the tooltip — so the two cannot drift the way the tab count and this row's
-// length silently did before.
-const KEY_ROW = "1234567890-";
+// keyboard layouts. Every one of these keys sends its printed character
+// regardless of layout, with no modifier, so all ten tabs stay reachable
+// everywhere. One shared constant — `wireKeys()` reads it to route the
+// keypress, `wireTabs()` reads it to show the tooltip — so the two cannot
+// drift the way the tab count and this row's length silently did before.
+//
+// Lunga ESATTAMENTE quanto le schede, non «abbastanza». Il vincolo storico
+// chiedeva solo `tabs <= len(KEY_ROW)`, quindi un carattere di troppo sarebbe
+// restato verde — e non rompe niente (`wireKeys` fa `if (b)`, `wireTabs` cicla
+// sulle schede vere, quindi nessun suggerimento sballato e nessun errore): è
+// semplicemente un tasto che il pilota preme e che non fa NIENTE, in silenzio.
+// È lo stesso principio per cui il rail non vive sulle schede dove cliccare una
+// curva non cambierebbe niente. Con undici schede la riga finiva in "-"; con
+// dieci finisce in "0", che è il tasto della decima. Quando torna un'undicesima
+// scheda si rimette "-".
+const KEY_ROW = "1234567890";
 
 // Non dentro `showView` da sola: al primo caricamento `init()` non ci passa
 // affatto quando la vista salvata coincide con quella già attiva in HTML (o
@@ -1097,11 +1112,21 @@ function drawRoad(ctx, road, X, Y, hair) {
   ctx.restore();
 }
 
-// Full track map (its own tab). Wrapper around drawMapTo that also publishes the
-// screen transform for the map's own hover.
+// Full track map (the right-hand column of Compare). Wrapper around drawMapTo
+// that also publishes the screen transform for the map's own hover.
 function drawMap(a, cx) {
   const hit = drawMapTo($("c-map"), $("map-missing"), a, cx);
   if (hit) MAP_HIT = hit;
+  // The readout and the legend describe the drawing, and they are NOT inside
+  // the canvas — they are sibling elements in the column (see index.html) —
+  // so drawMapTo() turning the canvas off does nothing for them. Without this
+  // they stayed lit above `#map-missing`, captioning a picture that wasn't
+  // there. The h3 title is left alone on purpose: it names the column, and
+  // reads as a heading with the reason underneath once these two are gone.
+  const ro = $("map-readout");
+  if (ro) ro.classList.toggle("hidden", !a.has_map);
+  const legend = $("map-legend");
+  if (legend) legend.classList.toggle("hidden", !a.has_map);
   // The cross is on the drawing only on a lap that was actually thrown away. A
   // legend entry for a mark that isn't there sends the reader hunting for it,
   // so the entry comes and goes with the mark.
@@ -1109,13 +1134,12 @@ function drawMap(a, cx) {
   if (lost) lost.classList.toggle("hidden", a.review.lost_at == null);
   // Il readout si scrive QUI, non in ognuno dei chiamanti (`loadCombo`,
   // `redrawCurrentView`, `hoverTo`): la pastiglia della finestra mancava a
-  // riposo sulla scheda Mappa perché due dei tre la anteponevano da soli e il
+  // riposo sul disegno del giro perché due dei tre la anteponevano da soli e il
   // terzo — il cambio scheda, che passa da `redrawCurrentView` a `drawMap`
   // senza toccare il readout — no. La stessa forma del difetto già chiuso per
   // `hoverTo`: se la pastiglia va scritta a mano in N punti, il punto N+1 se
   // la dimentica. Scritta una sola volta, dentro la funzione che disegna la
   // mappa, nessun chiamante può più dimenticarla.
-  const ro = $("map-readout");
   if (ro) { ro.innerHTML = mapReadoutHTML(cx); wireRangeClear(ro); }
 }
 
@@ -1493,7 +1517,24 @@ async function loadCombo(combo, lapPath, baselinePath) {
   if (baselinePath) q.set("baseline", baselinePath);
   setPanelLoading("summary", t("load.lap"));
   $("readout").innerHTML = t("load.lap");
-  if (VIEW === "map") $("map-readout").innerHTML = t("load.lap");
+  if (VIEW === "compare") {
+    // Riaccenderlo fa parte dello scrivere dentro: dal giro della legenda
+    // `#map-readout` può essere `hidden` (giro uscente senza coordinate), e una
+    // riga di caricamento scritta in un elemento spento è un buco muto — solo
+    // il titolo «Track map» e sotto il vuoto, per tutta la durata della
+    // richiesta. `drawMap()` rimette la classe giusta a dati arrivati, quindi
+    // qui basta accendere: chi decide se il readout va mostrato resta lui.
+    $("map-readout").classList.remove("hidden");
+    $("map-readout").innerHTML = t("load.lap");
+  }
+  // I tre «questo giro non ha…» parlano del giro che sta per essere sostituito:
+  // si spengono QUI, non quando il disegno nuovo arriva. Finché portavano
+  // `.empty` erano invisibili comunque e la cosa non si vedeva; ora si vede, e
+  // quello che si vedeva era una frase FALSA sopra un disegno giusto per tutta
+  // la durata della richiesta (misurato: ~1,5 s passando da un giro senza
+  // coordinate a uno che le ha, sulla Traiettoria). Nessun buco muto al loro
+  // posto: ognuna delle tre viste scrive la propria riga di caricamento.
+  for (const id of ["map-missing", "line-missing", "dyn-missing"]) $(id).classList.add("hidden");
   let a;
   try { a = await getJSON("/api/analysis?" + q.toString()); }
   catch (e) {
@@ -1516,7 +1557,11 @@ async function loadCombo(combo, lapPath, baselinePath) {
   drawRailList();
   // The sheet is per car+track, not per lap: it survives a lap change and is
   // only dropped when the combo does (see the combo picker).
-  if (VIEW === "map") {
+  //
+  // La mappa e la scheda frenate stanno accanto ai grafici, quindi si aggiornano
+  // sulla stessa scheda e non su una loro. `redraw(a)` sopra è già passato: qui
+  // manca solo la colonna destra.
+  if (VIEW === "compare") {
     // Il readout lo scrive `drawMap` stessa (vedi il commento lì): niente da
     // duplicare qui.
     drawMap(a, null);
@@ -1589,8 +1634,8 @@ function fillLaps(a, force) {
 // The identity of what's on screen — lap, reference, gap, track temperature —
 // as a strip under the tabs, on every view. It used to be three items inside
 // Compare's own summary, which meant the landing tab explained a lap without
-// ever naming it, and the Map, Trajectory and Sectors tabs showed numbers you
-// had to change tab to identify.
+// ever naming it, and the Trajectory and Sectors tabs showed numbers you had to
+// change tab to identify.
 function drawLapBar(a) {
   const el = $("lapbar");
   if (!el) return;
@@ -1929,8 +1974,9 @@ function wireFlow() {
 // The trace beside the card says what happened; it doesn't say *where*, and the
 // landing view is the one place a driver has no map to fall back on — the corner
 // name in the card is a name, not a place. This is the same delta-coloured line
-// the Map tab draws (same function, so the two can't disagree about which way
-// round the track is), with the step's own stretch traced over it in the accent.
+// the map beside Compare draws (same function, so the two can't disagree about
+// which way round the track is), with the step's own stretch traced over it in
+// the accent.
 //
 // Nothing is invented here: the colours are the speed gap the map already
 // computes, and the highlighted span is the window the step's chart is zoomed
@@ -2940,21 +2986,36 @@ function drawDynamics(cx) {
   const miss = $("dyn-missing"), main = $("dyn-charts"), coast = $("dyn-coasting");
   const hasOff = Array.isArray(DATA.review.line_offset);
   const anyData = hasDynamics(DATA) || hasOff || DATA.review.tyres || hasBalance(DATA);
+  // Il rimando «lo scostamento vive sotto Traiettoria» era figlio diretto di
+  // #view-dynamics e fratello dei grafici: nessun ramo lo toccava, quindi su un
+  // giro senza dinamica restava a schermo un bottone che manda in Traiettoria a
+  // vedere lo scostamento — su un giro pre-v6 che quasi certamente non ha
+  // nemmeno le coordinate, cioè un comando che non risponde. `toggle`, non
+  // `add`: deve tornare quando il giro il dato ce l'ha.
+  //
+  // La condizione è `hasOff`, non `anyData`. `anyData` è l'OR di quattro
+  // canali: un giro con la dinamica ma senza `line_offset` avrebbe tenuto il
+  // rimando acceso, promettendo uno scostamento che quel giro non ha — lo
+  // stesso difetto un gradino più in là. Il rimando parla di UN dato, e la
+  // condizione è quel dato.
+  $("dyn-elsewhere").classList.toggle("hidden", !hasOff);
   if (!anyData) {
     if (miss) miss.classList.remove("hidden");
     if (main) main.classList.add("hidden");
     if (coast) coast.innerHTML = "";
     $("dyn-tyres").classList.add("hidden");
     $("dyn-balance-wrap").classList.add("hidden");
-    // Stesso principio appena applicato alla Mappa: un solo punto scrive
-    // #dyn-readout (`updateDynReadout`, che antepone sempre `rangeChip()`),
-    // non la pastiglia ripetuta a mano in ogni ramo di `drawDynamics`. Prima
-    // di questo fix questo ramo — un giro senza canali di dinamica, con la
-    // finestra accesa — mostrava la sola frase di default: nessuna pastiglia,
-    // nessuna ✕ per annullarla. `null`, non `cx`: senza grafici in vista non
-    // c'è un punto per-campione da leggere, a costo di ignorare un hover sul
-    // rail mentre la scheda è in questo stato.
-    updateDynReadout(DATA, null);
+    // #dyn-readout passa da un solo punto, che antepone sempre `rangeChip()`.
+    // Questo ramo lo chiamava con `null` APPOSTA — non per la frase, ma per
+    // tenere raggiungibile la ✕ della finestra attiva, che altrimenti da qui
+    // non si annulla più. Il difetto era la frase che veniva con lei: «passa il
+    // mouse sui grafici per i valori punto per punto», stampata sopra la riga
+    // che dice che quei grafici non ci sono. Si spegne quindi la FRASE, non la
+    // scatola — e non scrivendo `#dyn-readout` da qui, che rifarebbe il difetto
+    // già pagato (due punti che scrivono la stessa fascia, e uno si dimentica
+    // la pastiglia): il terzo argomento dice a `updateDynReadout` che grafici
+    // da leggere non ce ne sono, e lui delega a `emptyReadout`.
+    updateDynReadout(DATA, null, true);
     DYN_GG = null; DYN_BAL_HIT = null;
     return;
   }
@@ -3279,9 +3340,16 @@ function dynReadoutHTML(a, p) {
     `${t("dyn.ro.slipF")} <b>${sf.toFixed(2)}</b>  ${t("dyn.ro.slipR")} <b>${sr.toFixed(2)}</b>` + extra;
 }
 
-function updateDynReadout(a, p) {
+function updateDynReadout(a, p, bare) {
   const el = $("dyn-readout");
   if (!el) return;
+  // `bare`: i grafici non sono in vista (il ramo «nessun dato di dinamica»).
+  // Non è `p == null`, che vuol dire «i grafici ci sono e nessuno ci sta sopra
+  // col mouse» — lì l'invito a passarci sopra è valido. Vedi `emptyReadout`.
+  if (bare) { emptyReadout(el); return; }
+  // Il verso di ritorno: qui i grafici ci sono, quindi la fascia torna accesa
+  // anche se il giro di prima l'aveva spenta.
+  el.classList.remove("hidden");
   const chip = rangeChip();
   // Guardia `p != null`, come in `hoverTo`: `drawDynamics(cx)` la richiama con
   // `cx` nullo a ogni ridisegno di vista intera (cambio scheda, resize), e
@@ -3428,8 +3496,8 @@ function editMark(btn) {
 }
 
 // --- the line you drove ---------------------------------------------------
-// The Map tab draws two lines over a whole lap and leaves the reading to the
-// eye. This one takes a corner at a time and answers the questions the eye
+// The map beside Compare draws two lines over a whole lap and leaves the reading
+// to the eye. This one takes a corner at a time and answers the questions the eye
 // can't: how far off the reference line you were, in metres and on which side;
 // where your slowest point sits compared with the reference's; how tight an arc
 // you actually drove. Every number arrives from /api/trajectory already decided
@@ -3508,6 +3576,11 @@ function renderLine(cx) {
     $("line-missing").classList.toggle("hidden", !noMap);
     if (grid) grid.classList.add("hidden");
     if (charts) charts.classList.add("hidden");
+    // La riga di lettura non era in questo elenco, e non la riscriveva nessuno:
+    // se il giro di prima aveva le coordinate e ci si era passato il mouse, i
+    // suoi numeri punto per punto restavano sopra «questi giri non hanno
+    // coordinate», veri di un altro giro e per sempre.
+    emptyReadout($("line-readout"));
     for (const el of shell) if (el) el.innerHTML = "";
     $("line-summary").innerHTML = (L && !noMap)
       ? `<div class="item"><div class="v">—</div><div class="k">${t("line.none")}</div></div>` : "";
@@ -4288,6 +4361,9 @@ function drawCurvature(L, corner, cx) {
 function updateLineReadout(L, p) {
   const el = $("line-readout");
   if (!el) return;
+  // Il verso di ritorno di `emptyReadout` (vedi il ramo «niente curve» di
+  // `renderLine`): con le curve in vista la fascia torna accesa.
+  el.classList.remove("hidden");
   const chip = rangeChip();
   if (p == null) { el.innerHTML = chip + t("line.readout"); wireRangeClear(el); return; }
   LAST_HOVER = p;
@@ -4322,7 +4398,8 @@ function nearest(posArr, p) {
 }
 
 // Point-by-point readout markup at lap position p (0..1). Shared by the Compare
-// charts and the Map hover so both reuse the same nearest() lookup.
+// charts and the hover on the map beside them, so both reuse the same nearest()
+// lookup.
 function readoutHTML(a, p) {
   const rv = a.review.channels, rf = a.reference.channels, d = a.review.delta;
   const iv = nearest(rv.pos, p), ir = nearest(rf.pos, p), id = nearest(d.pos, p);
@@ -4381,7 +4458,33 @@ function wireRangeClear(el) {
   if (b) b.onclick = () => { setRange(null); redrawCurrentView(); };
 }
 
-// Testo del readout della Mappa, a riposo (`p` nullo, la legenda) o sotto il
+// La fascia di lettura quando i grafici NON ci sono — che non è il caso `p ==
+// null`, dove i grafici ci sono e semplicemente nessuno ci sta sopra col mouse,
+// e «passa il mouse sui grafici» è un invito valido.
+//
+// Qui i grafici sono spenti, e restano due modi di mentire. Il primo: i numeri
+// del giro PRECEDENTE, veri di un altro giro e permanenti, perché nessun ramo
+// li riscrive — la Traiettoria li teneva punto per punto sopra «questi giri non
+// hanno coordinate». Il secondo: la didascalia stessa, che invita a un gesto
+// senza bersaglio sopra la frase che dice che il bersaglio non c'è.
+//
+// Resta solo la pastiglia della finestra attiva, perché la sua ✕ è l'unica via
+// per annullarla da questa scheda (è il motivo per cui il ramo senza dinamica
+// chiamava `updateDynReadout` invece di non fare niente). Senza pastiglia non
+// resta una striscia vuota: la fascia si spegne del tutto.
+function emptyReadout(el) {
+  if (!el) return;
+  const chip = rangeChip();
+  // La pastiglia finisce con « · » perché di solito ha qualcosa dopo. Qui non
+  // ha niente, e un separatore che non separa è la stessa cosa in piccolo:
+  // punteggiatura per un testo che non c'è. Misurato a schermo: «Tamburello ✕ ·».
+  el.innerHTML = chip.replace(/\s*&nbsp;·&nbsp;\s*$/, "");
+  el.classList.remove("frozen");
+  el.classList.toggle("hidden", !chip);
+  wireRangeClear(el);
+}
+
+// Testo del readout della mappa, a riposo (`p` nullo, la legenda) o sotto il
 // mouse (`p`, punto per punto) — sempre con la pastiglia della finestra
 // davanti. Chiamata da un solo posto, `drawMap` (vedi il suo commento): prima
 // ogni chiamante di `drawMap` scriveva anche il readout per conto proprio, e
@@ -4425,14 +4528,14 @@ function hoverTo(p) {
   // qui non lo si azzera già in anticipo. Uscire dal rail deve congelare il
   // readout esattamente come uscire dai grafici, non cancellarlo.
   if (p != null) LAST_HOVER = p;
-  if (VIEW === "compare") redraw(p);
+  // Sul Confronto il mirino attraversa lo schermo: i grafici a sinistra E il
+  // disegno a destra. Un mirino che vive su metà schermata è peggio di nessun
+  // mirino — è il difetto della minimappa cablata a una vista sola, di nuovo.
+  // Il readout della mappa lo scrive `drawMap` stessa (vedi il commento lì):
+  // niente da duplicare qui.
+  if (VIEW === "compare") { redraw(p); drawMap(DATA, p); }
   else if (VIEW === "dynamics") drawDynamics(p);
   else if (VIEW === "line") { if (LINE) renderLine(p); }
-  else if (VIEW === "map") {
-    // Il readout lo scrive `drawMap` stessa (vedi il commento lì): niente da
-    // duplicare qui.
-    drawMap(DATA, p);
-  }
   drawRail(p);
 }
 
@@ -4567,9 +4670,10 @@ function wireHover() {
   }
 }
 
-// Debounced so a resize drag fires once at rest, not per pixel. Compare/Map
-// just redraw from the in-memory payload (no refetch, no flicker or response
-// race); Sectors/Progress re-run their loader once at the end.
+// Debounced so a resize drag fires once at rest, not per pixel. Compare just
+// redraws from the in-memory payload — charts AND the map beside them, which is
+// how the map's canvas picks up the column's new width (no refetch, no flicker
+// or response race); Sectors/Progress re-run their loader once at the end.
 let _resizeTimer = null;
 window.addEventListener("resize", () => {
   if (!CURRENT) return;

@@ -43,7 +43,6 @@
     <button class="tab" data-view="session" data-i18n="tab.session">Session</button>
     <button class="tab" data-view="stint" data-i18n="tab.stint">Race pace</button>
     <button class="tab" data-view="compare" data-i18n="tab.compare">Compare</button>
-    <button class="tab" data-view="map" data-i18n="tab.map">Map</button>
     <button class="tab" data-view="line" data-i18n="tab.line">Line</button>
     <button class="tab" data-view="sectors" data-i18n="tab.sectors">Sectors</button>
     <button class="tab" data-view="dynamics" data-i18n="tab.dynamics">Dynamics</button>
@@ -52,7 +51,7 @@
 
   <!-- Which lap you are looking at, on every tab. These four numbers used to
        live only inside Compare's own summary, so every tab that explains the
-       lap — Flow, Map, Line, Sectors — showed its analysis without ever
+       lap — Flow, Line, Sectors — showed its analysis without ever
        saying which lap it was analysing. (The landing view is the recap now,
        and that one is about a whole run, not this lap.) -->
   <section id="lapbar" class="lapbar"></section>
@@ -128,8 +127,9 @@
         <h3 id="flow-chart-title"></h3>
         <canvas id="c-flow"></canvas>
       </div>
-      <!-- Where on the track this step is: the delta-coloured line the Map tab
-           already draws, with the stretch under discussion lit up. -->
+      <!-- Where on the track this step is: the delta-coloured line the map
+           beside Compare already draws, with the stretch under discussion lit
+           up. -->
       <div class="chart flow-map">
         <h3 id="flow-map-title"></h3>
         <canvas id="c-flow-map"></canvas>
@@ -254,68 +254,98 @@
 
     <div id="readout" class="readout" data-i18n="readout.hint">Hover over the charts for point-by-point values…</div>
 
-    <main id="charts">
-      <div class="chart">
-        <h3 data-i18n-html="chart.delta">Lap delta <small>(s · above the line = slower, below = faster)</small></h3>
-        <canvas id="c-delta"></canvas>
-      </div>
-      <div class="chart">
-        <h3 data-i18n-html="chart.speed">Speed <small>(km/h · white = reviewed lap, cyan = comparison)</small></h3>
-        <canvas id="c-speed"></canvas>
-      </div>
-      <div class="chart">
-        <h3 data-i18n-html="chart.inputs">Throttle / Brake <small>(green = throttle, red = brake · dashed = reference)</small></h3>
-        <canvas id="c-inputs"></canvas>
-      </div>
-      <div class="chart">
-        <h3 data-i18n-html="chart.steer">Steering <small>(white = reviewed lap, cyan = comparison · left up / right down)</small></h3>
-        <canvas id="c-steer"></canvas>
-      </div>
-    </main>
+    <!-- Due colonne, una domanda sola. La mappa aveva una scheda propria e i
+         grafici un'altra: «dove ho perso» disegnato e «dove ho perso» in
+         curva erano la stessa risposta letta una per volta, con un click in
+         mezzo e la memoria a fare da collante. Ora stanno sullo stesso
+         schermo e la mappa è sticky (vedi .cmp-map in style.css): scorri i
+         grafici e il disegno resta dov'è, che è tutto il senso della cosa. -->
+    <div class="cmp-shell">
+      <div class="cmp-charts">
+        <main id="charts">
+          <div class="chart">
+            <h3 data-i18n-html="chart.delta">Lap delta <small>(s · above the line = slower, below = faster)</small></h3>
+            <canvas id="c-delta"></canvas>
+          </div>
+          <div class="chart">
+            <h3 data-i18n-html="chart.speed">Speed <small>(km/h · white = reviewed lap, cyan = comparison)</small></h3>
+            <canvas id="c-speed"></canvas>
+          </div>
+          <div class="chart">
+            <h3 data-i18n-html="chart.inputs">Throttle / Brake <small>(green = throttle, red = brake · dashed = reference)</small></h3>
+            <canvas id="c-inputs"></canvas>
+          </div>
+          <div class="chart">
+            <h3 data-i18n-html="chart.steer">Steering <small>(white = reviewed lap, cyan = comparison · left up / right down)</small></h3>
+            <canvas id="c-steer"></canvas>
+          </div>
+        </main>
 
-    <section id="vmin" class="vmin"></section>
+        <!-- Sotto i grafici e nella STESSA colonna, non a piena larghezza
+             sotto lo scaffale. Misurato a 1904×929 su Monza: la colonna della
+             mappa è alta 1383 px contro i 783 dei quattro grafici, quindi
+             lasciandole fuori restava un buco di 600 px sotto i grafici prima
+             che la pagina riprendesse. Messe dentro, la colonna sinistra
+             arriva a ~2500 px e l'avanzo passa a destra — dove non è un vuoto,
+             perché lì la mappa è sticky e ti accompagna. È anche il motivo per
+             cui la mappa sta qui: leggi la curva che è costata di più nel
+             debrief e ce l'hai davanti mentre la leggi. -->
+        <section id="vmin" class="vmin"></section>
 
-    <section id="waterfall" class="debrief"></section>
+        <section id="waterfall" class="debrief"></section>
 
-    <section id="debrief" class="debrief"></section>
+        <section id="debrief" class="debrief"></section>
+      </div>
+
+      <aside class="cmp-map">
+        <!-- `#map-readout` and `#map-legend` describe the drawing, not the box
+             around it: on a lap with no coordinates they follow the canvas
+             into `hidden` (drawMap() in app.js), for the same reason `#leg-lost`
+             below only shows when its mark is actually on the drawing — a
+             caption for a picture that isn't there sends you looking for it.
+             The h3 title stays: it names the column, and the reason sits right
+             under it once the readout and legend are gone. -->
+        <div id="map-readout" class="readout" data-i18n="map.readout">Racing line · colour = speed vs reference (red = slower here, green = faster) · thicker line = bigger gap · ▽ your braking · ○ reference braking</div>
+        <main>
+          <div class="chart map">
+            <h3 data-i18n-html="chart.map">Track map <small>(white dashed = reference · solid line = reviewed lap)</small></h3>
+            <canvas id="c-map"></canvas>
+            <div class="map-legend" id="map-legend">
+              <span class="map-grad">
+                <span class="scale">
+                  <span class="cap fast" data-i18n="map.grad.fast">faster</span>
+                  <span class="grad" aria-hidden="true"></span>
+                  <span class="cap slow" data-i18n="map.grad.slow">slower</span>
+                </span>
+                <small data-i18n="map.grad.note">line thickens with the speed gap</small>
+              </span>
+              <span class="swatch"><span class="marker">▽</span> <span data-i18n="map.leg.you">your braking</span></span>
+              <span class="swatch"><span class="marker ring">○</span> <span data-i18n="map.leg.ref">reference braking</span></span>
+              <!-- Only ever shown when the lap actually carries one: a legend entry
+                   for a mark that isn't on the drawing sends you looking for it. -->
+              <span class="swatch hidden" id="leg-lost"><span class="marker lost">✕</span>
+                <span data-i18n="map.leg.lost">where the lap was lost</span></span>
+            </div>
+          </div>
+        </main>
+        <!-- `.missing`, non `.empty`: quella è la schermata «ancora nessun giro»
+             di tutta la pagina, accesa solo da `body.no-data`, e riusarla qui
+             lasciava il messaggio a `display: none` per sempre (vedi il CSS). -->
+        <div id="map-missing" class="missing hidden" data-i18n="map.missing">This lap has no coordinates (recorded before the map update). Drive and record a new lap to see it here.</div>
+        <!-- The braking sheet travelled here with the map rather than getting a
+             tab of its own: the drawing above already says where you brake, and
+             the sheet is the same fact as numbers. Measured across your recent
+             laps in one temperature band — see braking_points.py for why it is
+             never generalised. -->
+        <section id="brakesheet" class="debrief sheet"></section>
+      </aside>
+    </div>
   </div>
 
-  <div id="view-map" class="hidden">
-    <div id="map-readout" class="readout" data-i18n="map.readout">Racing line · colour = speed vs reference (red = slower here, green = faster) · thicker line = bigger gap · ▽ your braking · ○ reference braking</div>
-    <main>
-      <div class="chart map">
-        <h3 data-i18n-html="chart.map">Track map <small>(white dashed = reference · solid line = reviewed lap)</small></h3>
-        <canvas id="c-map"></canvas>
-        <div class="map-legend">
-          <span class="map-grad">
-            <span class="scale">
-              <span class="cap fast" data-i18n="map.grad.fast">faster</span>
-              <span class="grad" aria-hidden="true"></span>
-              <span class="cap slow" data-i18n="map.grad.slow">slower</span>
-            </span>
-            <small data-i18n="map.grad.note">line thickens with the speed gap</small>
-          </span>
-          <span class="swatch"><span class="marker">▽</span> <span data-i18n="map.leg.you">your braking</span></span>
-          <span class="swatch"><span class="marker ring">○</span> <span data-i18n="map.leg.ref">reference braking</span></span>
-          <!-- Only ever shown when the lap actually carries one: a legend entry
-               for a mark that isn't on the drawing sends you looking for it. -->
-          <span class="swatch hidden" id="leg-lost"><span class="marker lost">✕</span>
-            <span data-i18n="map.leg.lost">where the lap was lost</span></span>
-        </div>
-      </div>
-    </main>
-    <div id="map-missing" class="empty hidden" data-i18n="map.missing">This lap has no coordinates (recorded before the map update). Drive and record a new lap to see it here.</div>
-    <!-- The braking sheet lives here rather than on a tab of its own: this view
-         already draws where you brake, and the sheet is the same fact as
-         numbers. Measured across your recent laps in one temperature band —
-         see braking_points.py for why it is never generalised. -->
-    <section id="brakesheet" class="debrief sheet"></section>
-  </div>
-
-  <!-- The line you drove, corner by corner. The map tab shows the whole lap and
-       leaves the reading to the eye; this one zooms into one corner at a time and
-       puts the geometry in metres (see trajectory.py — the numbers are computed
-       server-side next to their wording). -->
+  <!-- The line you drove, corner by corner. The map beside Compare shows the
+       whole lap and leaves the reading to the eye; this one zooms into one corner
+       at a time and puts the geometry in metres (see trajectory.py — the numbers
+       are computed server-side next to their wording). -->
   <div id="view-line" class="hidden">
     <div id="line-readout" class="readout" data-i18n="line.readout">Hover the corner to read speed and how far you were from the reference line…</div>
     <section id="line-summary" class="summary"></section>
@@ -354,7 +384,7 @@
       </div>
     </main>
     <section id="line-table" class="debrief"></section>
-    <div id="line-missing" class="empty hidden" data-i18n="line.missing">These laps have no coordinates (the track map arrived with schema v3). Drive and record a new lap to see your line here.</div>
+    <div id="line-missing" class="missing hidden" data-i18n="line.missing">These laps have no coordinates (the track map arrived with schema v3). Drive and record a new lap to see your line here.</div>
   </div>
 
   <div id="view-sectors" class="hidden">
@@ -441,7 +471,12 @@
         <canvas id="c-rpm"></canvas>
       </div>
     </main>
-    <p class="plan-elsewhere"><span data-i18n="lineoff.elsewhere">Lo scostamento
+    <!-- L'id serve al JS: su un giro senza dinamica questo rimando si spegne
+         insieme ai grafici (drawDynamics), perché manda a vedere lo scostamento
+         di un giro che quasi certamente non ha nemmeno le coordinate. Gli altri
+         due `.plan-elsewhere` (in Progressi) non si spengono mai e non ne hanno
+         bisogno. -->
+    <p id="dyn-elsewhere" class="plan-elsewhere"><span data-i18n="lineoff.elsewhere">Lo scostamento
       dalla traiettoria vive sotto Traiettoria, che dice anche da che parte.</span>
       <button type="button" id="go-line" class="mini-btn"
               data-i18n="lineoff.goto">Apri Traiettoria</button></p>
@@ -461,7 +496,7 @@
         <span class="swatch"><span class="marker" style="color:#ff5a3c">■</span> <span data-i18n="bal.over">oversteer</span></span>
       </div>
     </div>
-    <div id="dyn-missing" class="empty hidden" data-i18n="dyn.missing">This lap has no dynamics data (G / slip were recorded from v6). Drive and record a new lap to see it here.</div>
+    <div id="dyn-missing" class="missing hidden" data-i18n="dyn.missing">This lap has no dynamics data (G / slip were recorded from v6). Drive and record a new lap to see it here.</div>
   </div>
 
     </div><!-- /views -->

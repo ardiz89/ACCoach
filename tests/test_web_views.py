@@ -281,7 +281,15 @@ def test_printing_hides_every_view_without_naming_them():
     block = _CSS[_CSS.index("@media print"):]
     block = block[:block.index("\n}")]
     assert '[id^="view-"]' in block
-    assert "#view-map { display: block !important; }" in block
+    # Il foglio vive dentro il Confronto, che porta con sé grafici, riepilogo,
+    # cascata e debrief: si spegne per discendenza e si riaccende la SOLA catena
+    # che arriva al foglio. Fra due `!important` decide la specificità, quindi
+    # ogni selettore che riaccende dev'essere più specifico di quello che ha
+    # spento — verificato per mutazione (accorciare `#view-compare > .cmp-shell`
+    # a `.cmp-shell` stampa una pagina vuota).
+    assert "#view-compare > *, .cmp-shell > *, .cmp-map > *" in block
+    assert ("#view-compare, #view-compare > .cmp-shell, .cmp-shell > .cmp-map,\n"
+            "  .cmp-map > #brakesheet { display: block !important; }") in block
 
 
 def test_no_two_functions_in_app_js_share_a_name():
@@ -422,6 +430,20 @@ def test_the_header_row_wraps():
     assert "flex-wrap: wrap" in _rule(".brand {")
 
 
+def test_the_tab_row_scrolls_itself_at_every_width():
+    """Misurato col browser in un riquadro da 768 px (un tablet accanto al
+    volante, uso dichiarato di quest'app): la fila di schede era larga 1016 px e
+    portava la PAGINA a scorrere di lato di 248 px con undici schede, 170 con
+    dieci — su **ogni** vista, perché la fila sta fuori da tutte, quindi non è
+    una vista a sfondare ma la navigazione. Lo scorrimento della fila esisteva
+    già, ma solo sotto i 520 px: fra 521 px e ~1000 px non c'era niente. La
+    regola vive quindi sul selettore base e non in un @media, e `.tab` non si
+    lascia comprimere (`flex: 0 0 auto`) invece di spezzare le etichette."""
+    assert "overflow-x: auto" in _rule(".tabs {")
+    tab = _rule("\n.tab {")
+    assert "flex: 0 0 auto" in tab and "white-space: nowrap" in tab
+
+
 def test_the_consistency_rows_stack_on_a_narrow_screen():
     """Their third column is `auto` + `white-space: nowrap`, so it cannot shrink:
     39px of horizontal scroll on Trends, 17 on Compare. Reading the report on a
@@ -516,7 +538,14 @@ def test_no_id_rule_can_outrank_the_hidden_class():
 def _screen_css() -> str:
     """The stylesheet without its print block — printing deliberately forces
     every panel visible, which is the opposite rule and not a mistake."""
-    css = _CSS
+    # E senza i commenti. Questo foglio ne ha di lunghi, e finivano DENTRO il
+    # selettore di ogni regola che li segue (`[^{}]+` risale fino alla graffa
+    # precedente): un selettore così non si riconosce più, e la regola che
+    # segue un commento sfuggiva a ogni controllo. Nell'altro verso, un
+    # commento che *cita* una regola («`.empty` è `display: none`») veniva
+    # letto come una regola vera. Misurato: senza questo taglio la mutazione
+    # «una regola nuova spegne `.missing`» restava VERDE.
+    css = re.sub(r"/\*.*?\*/", "", _CSS, flags=re.S)
     # EVERY print block, not just the first: a second one added higher up the
     # file used to be the one that got stripped, leaving the real print rules in
     # the "screen" text and failing two tests for a reason that had nothing to
@@ -536,6 +565,70 @@ def _screen_css() -> str:
                     cut = k
                     break
         css = css[:i] + (css[cut + 1:] if cut is not None else "")
+
+
+def _screen_rules() -> list[tuple[str, str]]:
+    """Ogni regola del foglio da schermo come `(selettore, dichiarazioni)` —
+    **comprese quelle dentro un `@media`**.
+
+    Il taglio a espressione regolare che questo file usava
+    (`([^{}]+)\\{([^}]*)\\}`) non entra in un blocco annidato: sulla prima regola
+    dentro un `@media` cattura `@media (…)` come selettore, e `_hits` lo scarta
+    perché non è un compound. Risultato misurato: un
+    `@media (max-width: 1400px) { .missing { display: none; } }` lasciava VERDE
+    il test che esiste apposta per vederlo. Oggi nessuna regola `display` dentro
+    un `@media` non-print colpisce un elemento che il JS spegne — ma «oggi non
+    fa danno» non è una copertura, e il limite era dichiarato invece che chiuso.
+
+    Le at-rule si aprono e si scendono (`@media`, `@supports`): le regole vere
+    stanno dentro. `@media print` non arriva fin qui, `_screen_css()` lo toglie
+    prima — la stampa forza visibile ogni pannello di proposito, che è la regola
+    opposta e non uno sbaglio.
+    """
+    out: list[tuple[str, str]] = []
+
+    def scan(text: str) -> None:
+        i = 0
+        while True:
+            j = text.find("{", i)
+            if j == -1:
+                return
+            sel = text[i:j].strip()
+            depth, end = 0, None
+            for k in range(j, len(text)):
+                if text[k] == "{":
+                    depth += 1
+                elif text[k] == "}":
+                    depth -= 1
+                    if depth == 0:
+                        end = k
+                        break
+            if end is None:
+                return
+            if sel.startswith("@"):
+                scan(text[j + 1:end])
+            else:
+                out.append((sel, text[j + 1:end]))
+            i = end + 1
+
+    scan(_screen_css())
+    return out
+
+
+def _display_rules(*, none: bool) -> list[tuple[str, str]]:
+    """I selettori del foglio da schermo che dichiarano `display`, separati nei
+    due versi: chi spegne (`none=True`) e chi accende (`none=False`). Il
+    selettore è già spezzato sulle virgole, perché ogni pezzo di una lista
+    colpisce per conto suo."""
+    out: list[tuple[str, str]] = []
+    for sel, body in _screen_rules():
+        decl = re.search(r"display\s*:\s*([\w-]+)", body)
+        if decl is None or (decl.group(1) == "none") != none:
+            continue
+        for part in sel.split(","):
+            if part.strip():
+                out.append((part.strip(), decl.group(1)))
+    return out
 
 
 def test_every_surface_the_backend_extracts_is_painted():
@@ -713,10 +806,8 @@ def test_no_rule_at_all_can_outrank_the_hidden_class():
     ids = set(re.findall(r'id="([\w-]+)"[^>]*class="[^"]*\bhidden\b', _HTML))
     ids |= set(re.findall(r'class="[^"]*\bhidden\b[^"]*"[^>]*id="([\w-]+)"', _HTML))
 
-    for m in re.finditer(r"([^{}]+)\{([^}]*)\}", _screen_css()):
-        sel, body = m.group(1).strip(), m.group(2)
-        decl = re.search(r"display\s*:\s*([\w-]+)", body)
-        if decl is None or decl.group(1) == "none" or ":not(.hidden)" in sel:
+    for sel, _value in _display_rules(none=False):
+        if ":not(.hidden)" in sel:
             continue
         # A rule scoped to a page STATE on <body> is the deliberate exception:
         # `body.no-data .empty { display: block }` exists to bring the "no laps
@@ -725,8 +816,7 @@ def test_no_rule_at_all_can_outrank_the_hidden_class():
         # `hidden` wherever that component appears.
         if sel.startswith("body."):
             continue
-        last = sel.split(",")[-1].strip()
-        target = last.split()[-1] if last.split() else last
+        target = sel.split()[-1] if sel.split() else sel
         names = set(re.findall(r"[.#]([\w-]+)", target))
         clash = (names & classes) or (names & ids)
         assert not clash, (
@@ -827,19 +917,21 @@ def test_the_rail_is_declared_once_and_only_for_views_that_exist():
         assert name in _TABS, name
 
 
-def test_rail_views_is_exactly_the_six_views_about_one_lap():
+def test_rail_views_is_exactly_the_views_about_one_lap():
     """Il test sopra verifica solo la metà positiva (ogni nome elencato è una
-    scheda vera) — passerebbe anche con cinque nomi, o con sette se qualcuno
-    aggiungesse "session" per sbaglio. Le quattro schede sopra il giro
-    (Allenamento, Sessione, Passo gara, Andamento) non hanno un giro da
+    scheda vera) — passerebbe anche con quattro nomi, o con sei se qualcuno
+    aggiungesse "session" per sbaglio. Le schede sopra il giro (Com'è andata,
+    Allenamento, Sessione, Passo gara, Andamento) non hanno un giro da
     ritagliare, quindi un rail lì risponderebbe a un clic senza cambiare
     niente — «peggio di un comando assente», dice il commento sopra
-    RAIL_VIEWS. Qui si fissa il numero e l'assenza di quelle quattro."""
+    RAIL_VIEWS. Erano sei finché la Mappa era una scheda; ora la mappa è la
+    colonna destra del Confronto e il rail la segue lì."""
     body = _APPJS.split("const RAIL_VIEWS = [")[1].split("]")[0]
     names = re.findall(r'"([\w-]+)"', body)
-    assert len(names) == 6, names
-    for excluded in ("training", "session", "stint", "progress"):
-        assert excluded not in names, f"{excluded} non dovrebbe avere un rail"
+    assert set(names) == {"flow", "compare", "line", "sectors", "dynamics"}, names
+    # Insiemistica a parte: le due metà devono partizionare le schede vere, così
+    # una scheda nuova non può restare fuori da entrambe senza che si veda.
+    assert set(names) | {"recap", "training", "session", "stint", "progress"} == set(_TABS)
 
 
 def test_switching_tab_says_whether_this_one_has_a_rail():
@@ -1036,7 +1128,10 @@ def test_the_rail_hover_is_routed_per_view_not_wired_to_one():
     cinque — o peggio, ridisegnerebbe una vista che non è sullo schermo."""
     assert "function hoverTo(" in _APPJS
     block = _APPJS.split("function hoverTo(")[1].split("\n}\n")[0]
-    for view in ("map", "dynamics", "line", "compare"):
+    # «map» non è più nell'elenco: la mappa ha smesso di essere una vista e vive
+    # accanto ai grafici del Confronto (il suo mirino si controlla nel test
+    # dedicato, che chiede `drawMap(DATA, p)` DENTRO il ramo del Confronto).
+    for view in ("dynamics", "line", "compare"):
         assert f'"{view}"' in block, view
 
 
@@ -1216,10 +1311,22 @@ def test_the_dyn_readout_is_written_only_inside_updateDynReadout():
 def test_the_dyn_readout_default_text_always_carries_the_chip():
     """`updateDynReadout` è il solo punto che scrive `#dyn-readout` (vedi il
     test sopra): se il suo stesso ramo "a riposo" dimenticasse `rangeChip()`,
-    nessun chiamante potrebbe più rimediarlo."""
-    block = _APPJS.split("function updateDynReadout(a, p)")[1].split("\n}")[0]
+    nessun chiamante potrebbe più rimediarlo.
+
+    E i rami "a riposo" sono due, non uno. `p == null` vuol dire «i grafici ci
+    sono e nessuno ci sta sopra col mouse», e lì l'invito a passarci sopra è
+    valido. `bare` vuol dire «i grafici non ci sono»: la stessa frase, lì, è la
+    didascalia di un disegno assente, stampata sopra la riga che dice che quel
+    disegno non c'è. I due casi devono restare distinti in questa funzione,
+    altrimenti la cura si riduce a un `if` che qualcuno rifonderà.
+    """
+    block = _APPJS.split("function updateDynReadout(a, p, bare)")[1].split("\n}")[0]
     assert "rangeChip()" in block
     assert 'chip + t("dyn.readout")' in block
+    assert "if (bare) { emptyReadout(el); return; }" in block, \
+        "il ramo senza grafici deve uscire PRIMA della frase di default"
+    assert block.index("if (bare)") < block.index('t("dyn.readout")'), \
+        "la frase di default viene prima del ramo `bare`: il ramo non serve a niente"
 
 
 # --- la curva per sessione, sotto i punti deboli (2026-08-06) ---------------
@@ -1453,3 +1560,1001 @@ def test_the_tour_start_here_step_points_at_something_with_static_content():
         f"{sel} is empty in index.html — it is filled by JS after an async "
         "fetch, so tour.js's synchronous visibility check will always miss it"
     )
+
+
+# --- la mappa entra nel Confronto, e la scheda Mappa sparisce (2026-08-07) ---
+# Undici schede diventano dieci: i quattro grafici a sinistra, la mappa (con la
+# sua legenda, il suo stato vuoto e la scheda frenate) a destra sullo stesso
+# schermo. Erano due schede per la stessa domanda — «dove ho perso» in grafico e
+# «dove ho perso» sul disegno — e si guardavano una per volta.
+
+def test_the_map_lives_in_compare_now():
+    html = (WEB / "index.html").read_text(encoding="utf-8")
+    assert 'id="view-map"' not in html
+    assert 'data-view="map"' not in html
+    # L'assenza da sola sarebbe verde anche su un file vuoto: la parte che porta
+    # il carico è questa, che il contenuto trasferito esista ANCORA e stia sulla
+    # vista giusta. `_view_of_ids` lavora per ordine nel documento.
+    ids = _view_of_ids()
+    for el in ("c-map", "map-readout", "map-missing", "brakesheet"):
+        assert ids[el] == "compare", el
+    # E che sia rimasto intero: la voce di legenda che compare solo sui giri
+    # buttati è la prima che si perde in un taglia-e-incolla.
+    assert ids["leg-lost"] == "compare"
+
+
+# --- e le due colonne sono DAVVERO due colonne ------------------------------
+# `_view_of_ids()` sa dire una cosa sola: «questo id sta dentro view-compare».
+# Non sa niente dell'annidamento, quindi resta verde anche se la mappa finisce
+# nella colonna dei grafici — e resta verde se le tre classi dello scaffale
+# spariscono del tutto. Provato: togliendo `class="cmp-shell"`, `"cmp-charts"` e
+# `"cmp-map"` da index.html la suite intera passava. Due guasti silenziosi: le
+# colonne collassano una sotto l'altra, e la catena di stampa
+# `#view-compare > .cmp-shell > .cmp-map > #brakesheet` non aggancia più niente,
+# cioè il foglio esce BIANCO. Il CSS è pinnato dal testo di style.css; qui si
+# pinna l'altra metà, la struttura che quel testo presuppone.
+
+_VOID_TAGS = {"area", "base", "br", "col", "embed", "hr", "img", "input",
+              "link", "meta", "param", "source", "track", "wbr"}
+
+
+class _El:
+    """Un elemento di index.html: tag, id, classi, figli DIRETTI."""
+
+    def __init__(self, tag: str, attrs: dict):
+        self.tag = tag
+        self.id = attrs.get("id") or ""
+        self.classes = set((attrs.get("class") or "").split())
+        self.children: list["_El"] = []
+
+    def cols(self, cls: str) -> list["_El"]:
+        """I figli diretti con quella classe — «diretti» è il punto del test."""
+        return [c for c in self.children if cls in c.classes]
+
+    def find(self, el_id: str) -> "_El | None":
+        """Il discendente con quell'id, a qualsiasi profondità."""
+        for c in self.children:
+            if c.id == el_id:
+                return c
+            hit = c.find(el_id)
+            if hit is not None:
+                return hit
+        return None
+
+
+def _dom() -> _El:
+    from html.parser import HTMLParser
+
+    root = _El("#document", {})
+
+    class _Builder(HTMLParser):
+        def __init__(self):
+            super().__init__(convert_charrefs=True)
+            self.stack = [root]
+
+        def handle_starttag(self, tag, attrs):
+            el = _El(tag, dict(attrs))
+            self.stack[-1].children.append(el)
+            if tag not in _VOID_TAGS:
+                self.stack.append(el)
+
+        def handle_startendtag(self, tag, attrs):
+            self.stack[-1].children.append(_El(tag, dict(attrs)))
+
+        def handle_endtag(self, tag):
+            # Chiude fino al tag omonimo più interno invece di fidarsi
+            # dell'ordine: una chiusura spaiata sposterebbe tutto il resto del
+            # documento di un livello, e il test mentirebbe sull'annidamento.
+            for k in range(len(self.stack) - 1, 0, -1):
+                if self.stack[k].tag == tag:
+                    del self.stack[k:]
+                    return
+
+    p = _Builder()
+    p.feed(_HTML)
+    p.close()
+    return root
+
+
+def test_compare_is_a_shell_with_the_map_in_its_right_hand_column():
+    """L'annidamento, non l'appartenenza: `.cmp-shell` figlio di `#view-compare`,
+    e dentro di lui DUE colonne — i grafici a sinistra, la mappa a destra.
+
+    È anche la catena su cui si regge la stampa: se una delle tre classi salta,
+    `@media print` riaccende una discendenza che non esiste e il foglio frenate
+    esce bianco, senza che niente protesti fino alla carta.
+    """
+    compare = _dom().find("view-compare")
+    assert compare is not None, "index.html non ha più #view-compare"
+    shells = compare.cols("cmp-shell")
+    assert len(shells) == 1, "#view-compare deve avere un solo .cmp-shell, figlio diretto"
+    shell = shells[0]
+
+    charts, maps = shell.cols("cmp-charts"), shell.cols("cmp-map")
+    assert len(charts) == 1, ".cmp-shell ha perso la colonna dei grafici"
+    assert len(maps) == 1, ".cmp-shell ha perso la colonna della mappa"
+    assert maps[0].tag == "aside", "la colonna della mappa è un <aside>"
+    assert charts[0].find("charts") is not None, "#charts non è nella sua colonna"
+
+    # E stanno nella colonna GIUSTA. Senza il negativo, la mappa potrebbe finire
+    # in mezzo ai grafici e ogni asserzione qui sopra resterebbe verde.
+    for el in ("map-readout", "c-map", "leg-lost", "map-missing", "brakesheet"):
+        assert maps[0].find(el) is not None, f"{el} non è nella colonna della mappa"
+        assert charts[0].find(el) is None, f"{el} è finito fra i grafici"
+
+
+def test_the_rail_no_longer_lists_the_map():
+    js = (WEB / "app.js").read_text(encoding="utf-8")
+    rail = js[js.index("RAIL_VIEWS"):js.index("\n", js.index("RAIL_VIEWS"))]
+    assert '"map"' not in rail
+    assert '"compare"' in rail
+
+
+def test_no_javascript_branch_still_waits_for_a_map_view():
+    """La vista non esiste più: un `VIEW === "map"` rimasto indietro è un ramo
+    che non si esegue mai, e con lui la mappa che non si disegna o il messaggio
+    di caricamento che non compare. Positivo accanto: il Confronto quei rami
+    li ha davvero."""
+    assert 'VIEW === "map"' not in _APPJS
+    # Il positivo era `count(...) >= 2`, che con quattro rami veri non oppone
+    # nessuna resistenza: sarebbe verde anche perdendone due. Ognuno dei tre
+    # punti che la vista Mappa serviva va nominato per nome.
+    for fn in ("function redrawCurrentView()", "async function loadCombo(",
+               "function hoverTo("):
+        body = _APPJS.split(fn)[1].split("\n}\n")[0]
+        assert 'VIEW === "compare"' in body, fn
+
+
+def _branch_of(fn: str, view: str) -> str:
+    """Il corpo del ramo `VIEW === "<view>"` dentro `<fn>`, fino al ramo dopo.
+
+    Ritagliato, non cercato in tutta la funzione: «`drawMap` compare da qualche
+    parte in `redrawCurrentView`» era vero anche PRIMA di questo lavoro, sul
+    ramo della vista Mappa — un test che non sa distinguere i due mondi è verde
+    in entrambi. Il taglio verifica da sé che l'inizio venga prima della fine,
+    altrimenti una fetta vuota renderebbe verde ogni `in` che la interroga.
+
+    La fine è la graffa che CHIUDE il ramo, contata, non il prossimo
+    `else if (`: il ramo del Confronto in `redrawCurrentView` è l'ultimo della
+    catena, quindi il vecchio taglio arrivava a fine funzione e si portava
+    dentro `drawRail()`/`drawRailList()`. `assert i < j` protegge dalla fetta
+    vuota; non proteggeva da quella troppo larga, che è lo stesso difetto
+    all'altro capo.
+    """
+    return _block_after(_body_of(fn), f'VIEW === "{view}"', f"il ramo {view!r} di {fn}")
+
+
+def _body_of(fn: str) -> str:
+    """Il corpo di una funzione di `app.js`, fino alla graffa a colonna zero."""
+    assert _APPJS.count(fn) == 1, f"{fn!r} compare {_APPJS.count(fn)} volte in app.js"
+    return _APPJS.split(fn)[1].split("\n}\n")[0]
+
+
+def _block_after(body: str, cond: str, what: str) -> str:
+    """La fetta che va da `cond` alla graffa che CHIUDE il blocco che la segue.
+
+    Le graffe si contano: fermarsi alla prima `}` darebbe una fetta troncata al
+    primo `if` annidato, e fermarsi al prossimo `else if (` non funziona per
+    l'ultimo ramo di una catena (il ramo del Confronto in `redrawCurrentView`
+    **è** l'ultimo, e il vecchio taglio si portava dentro `drawRail()`).
+    """
+    i = body.index(cond)
+    o = body.index("{", i)
+    # Dev'essere un blocco: fra la condizione e la graffa non ci può stare
+    # un'istruzione (`if (x) faiQualcosa();`), altrimenti la graffa trovata è di
+    # qualcun altro e la fetta parlerebbe di un pezzo di codice diverso.
+    assert ";" not in body[i:o], f"{what} non è un blocco"
+    depth, j = 0, None
+    for k in range(o, len(body)):
+        if body[k] == "{":
+            depth += 1
+        elif body[k] == "}":
+            depth -= 1
+            if depth == 0:
+                j = k + 1
+                break
+    assert j is not None and i < j, f"fetta senza fine per {what}"
+    return body[i:j]
+
+
+def test_opening_compare_draws_the_map_and_loads_the_braking_sheet():
+    """Il disegno stava sul ramo della vista Mappa: senza portarlo qui, aprire
+    il Confronto lascia la colonna destra bianca finché non si passa il mouse."""
+    branch = _branch_of("function redrawCurrentView()", "compare")
+    assert "redraw(LAST_HOVER)" in branch
+    assert "drawMap(DATA, null)" in branch
+    assert "loadBraking()" in branch
+    # Che la fetta finisca dove finisce il ramo: `drawRail()` sta fuori da ogni
+    # ramo, apposta (il rail non appartiene a nessuna vista). Se compare qui
+    # dentro, il taglio ha inghiottito la coda della funzione e le tre
+    # asserzioni sopra parlano di un pezzo di codice che non è questo ramo.
+    assert "drawRail()" not in branch
+
+
+def test_a_new_lap_draws_the_map_when_compare_is_open():
+    block = _APPJS.split("async function loadCombo(")[1].split("\n}\n")[0]
+    assert 'if (VIEW === "compare") {' in block
+    assert "drawMap(a, null)" in block
+    assert "loadBraking()" in block
+
+
+def test_hovering_compare_moves_the_map_crosshair_too():
+    """I grafici e la mappa sono ora sullo stesso schermo: un mirino che vive
+    solo su metà schermata è peggio di nessun mirino."""
+    branch = _branch_of("function hoverTo(", "compare")
+    assert "redraw(p)" in branch
+    assert "drawMap(DATA, p)" in branch
+
+
+def test_compare_is_two_columns_that_can_actually_shrink():
+    """`minmax(0, 1fr)` non è ornamentale: senza lo `0` la colonna dei grafici
+    non può scendere sotto la larghezza minima di un canvas, e la pagina scorre
+    di lato. Questa pagina ha già spedito 39 px di scroll orizzontale."""
+    shell = _rule(".cmp-shell {")
+    assert "grid" in shell
+    assert "minmax(0, 1fr)" in shell, shell
+    # La mappa ferma mentre scorri i grafici è tutto il senso della cosa.
+    assert "sticky" in _rule(".cmp-map {")
+
+
+def _media_blocks(query: str) -> list[str]:
+    """I corpi di ogni `@media <query>` dello stylesheet da SCHERMO, delimitati
+    contando le graffe.
+
+    Uno `split()` sulla stringa `@media (…)` non delimita niente: ogni fetta
+    arriva a fine file, quindi «i blocchi che nominano `.cmp-shell`» erano uno
+    solo per caso — perché `_screen_css()` toglie prima il blocco `@media print`,
+    che quella classe la nomina tre volte. Bastava una menzione qualsiasi sotto
+    l'ultimo `@media` per far fallire il test per un motivo che non c'entra.
+    """
+    css, out = _screen_css(), []
+    for m in re.finditer(re.escape(f"@media {query}") + r"\s*\{", css):
+        depth, start = 0, m.end() - 1
+        for k in range(start, len(css)):
+            if css[k] == "{":
+                depth += 1
+            elif css[k] == "}":
+                depth -= 1
+                if depth == 0:
+                    out.append(css[start + 1:k])
+                    break
+    return out
+
+
+def test_narrow_screens_stack_the_columns_with_the_map_on_top():
+    """A schermo stretto due colonne da 320 px non ci stanno. Impilate, la mappa
+    va SOPRA: è l'orientamento, e si legge prima del dettaglio.
+
+    La soglia è 1150 e non 900 per una banda che le due colonne reggono senza
+    sfondare niente e leggono male lo stesso: fra 901 e 1150 px la colonna della
+    mappa resta stretta — 337 px a 901, 324 px a 1151, misurati — contro una tela
+    alta 60vh (538 px su uno schermo da 900). Una scatola alta il doppio di
+    quanto è larga, col disegno piccolo in fondo. Non è il pavimento dei 320 px a
+    tenerla lì (il `38%` lo supera quasi ovunque in questa banda), ed è il motivo
+    per cui il numero NON è «il primo pixel in cui il 38% supera il minimo»:
+    quel conto dà ~1142. 1150 è il numero tondo scelto sopra la banda che legge
+    male — vedi il commento in style.css — e sta scritto qui perché è la sola
+    cosa che nessuno rileggerebbe se qualcuno lo rimettesse a 900.
+    """
+    # Il blocco che parla dello scaffale, non «il primo @media»: ce ne sono altri
+    # nel file (la curva ingrandita, il rail), e prendere quello darebbe una
+    # fetta che non contiene niente di ciò che si cerca — verde per il motivo
+    # sbagliato o rosso per il motivo sbagliato, mai per quello giusto.
+    blocks = [b for b in _media_blocks("(max-width: 1150px)") if ".cmp-shell" in b]
+    assert len(blocks) == 1, "un solo @media a 1150px deve impilare lo scaffale"
+    block = blocks[0]
+    assert "grid-template-columns: 1fr" in block
+    assert "order: -1" in block
+    assert "position: static" in block
+
+
+def test_the_braking_sheet_scrolls_inside_its_column():
+    """La scheda è una tabella larga; in una colonna da 320 px la sua larghezza
+    minima spingerebbe la PAGINA di lato invece di scorrere da sola."""
+    assert "overflow-x: auto" in _rule(".cmp-map #brakesheet")
+
+
+def test_the_shortcut_row_is_exactly_as_long_as_the_tabs():
+    """Il vincolo storico (`tabs <= len(KEY_ROW)`) copre solo il verso in cui si
+    aggiunge una scheda. Togliendone una, la riga resta più lunga e l'ultimo
+    carattere diventa un tasto che il pilota preme e che non fa NIENTE, in
+    silenzio: `wireKeys` fa `if (b)` e non protesta. È lo stesso «comando che
+    non risponde» per cui il rail non vive sulle schede senza giro. Con undici
+    schede la riga finiva in "-"; con dieci finisce in "0"."""
+    tabs = len(re.findall(r'class="tab[ "]', _HTML))
+    m = re.search(r'const KEY_ROW = "([^"]+)"', _APPJS)
+    assert m, "wireKeys()/wireTabs() lost their shared KEY_ROW constant"
+    assert tabs == len(m.group(1)), \
+        f"{tabs} schede contro {len(m.group(1))} tasti ({m.group(1)!r})"
+
+
+def test_the_map_tab_label_is_not_left_orphaned_in_the_catalogue():
+    """La scheda non c'è più: la sua etichetta non deve restare a catalogo in
+    nessuna delle due lingue. Positivo accanto: le chiavi del contenuto
+    trasferito devono invece esserci ancora, in entrambe."""
+    assert '"tab.map"' not in _I18NJS
+    for key in ("map.readout", "map.missing", "map.leg.lost", "map.grad.note"):
+        entry = _I18NJS[_I18NJS.index(f'"{key}"'):]
+        entry = entry[:entry.index("},")]
+        assert "en:" in entry and "it:" in entry, key
+
+
+# --- il gemello mancante: chi SPEGNE quel che il JS accende (2026-08-07) ------
+#
+# `test_no_rule_at_all_can_outrank_the_hidden_class` copre un verso solo: una
+# regola che lascia a schermo qualcosa che deve sparire. Il verso opposto è
+# costato tre messaggi muti — `#map-missing`, `#line-missing` e `#dyn-missing`
+# portavano `class="empty hidden"`, e `.empty { display: none }` li teneva
+# spenti anche dopo che il JS toglieva `hidden`. Il difetto è sopravvissuto
+# perché nessun test legava la classe scritta nel markup alla regola scritta nel
+# foglio: due file che si contraddicevano in silenzio, ognuno coerente con sé.
+
+
+def _compound(part: str) -> set[str] | None:
+    """Un pezzo di selettore (`aside.cmp-map`, `#c-map`) ridotto ai suoi nomi.
+
+    `None` se non è un compound semplice: pseudo-classi, attributi e `*` sono
+    condizionali o troppo larghi per essere decisi leggendo un file fermo.
+    """
+    if not re.fullmatch(r"(?:[a-zA-Z][\w-]*)?(?:[.#][\w-]+)*", part) or not part:
+        return None
+    return set(re.findall(r"[.#]?([\w-]+)", part))
+
+
+def _hits(selector: str, chain: list[set[str]]) -> bool:
+    """Vero se `selector` colpisce l'ultimo anello di `chain` (l'elemento) con i
+    suoi antenati, dal più esterno al più interno.
+
+    Solo la discendenza: un selettore con `>`, `+` o `~` viene lasciato stare
+    (dichiarato in fondo al test) perché la posizione fra fratelli non si legge
+    da qui.
+    """
+    if any(c in selector for c in ">+~") or not selector.strip():
+        return False
+    parts = selector.split()
+    compounds = [_compound(p) for p in parts]
+    if any(c is None for c in compounds):
+        return False
+    if not compounds[-1] <= chain[-1]:
+        return False
+    todo = list(compounds[:-1])
+    for names in chain[:-1]:
+        if todo and todo[0] <= names:
+            todo.pop(0)
+    return not todo
+
+
+def _hideable_chains() -> list[tuple[str, list[set[str]]]]:
+    """Ogni elemento che NASCE con `hidden` — cioè che qualcuno accende e spegne
+    a mano — con la catena dei suoi antenati, ognuno ridotto a tag, id e classi.
+
+    `hidden` è tolta da ogni insieme di proposito: la domanda non è se
+    `.hidden { display: none }` lo spegne (è il suo mestiere), ma se lo spegne
+    **qualcos'altro**, che nessun `classList.remove` potrà mai riaccendere.
+    """
+    out: list[tuple[str, list[set[str]]]] = []
+
+    def walk(el, chain: list[set[str]]) -> None:
+        names = {el.tag} | set(el.classes) | ({el.id} if el.id else set())
+        names.discard("hidden")
+        here = chain + [names]
+        if "hidden" in el.classes:
+            out.append((el.id or el.tag, here))
+        for child in el.children:
+            walk(child, here)
+
+    for child in _dom().children:
+        walk(child, [])
+    return out
+
+
+def test_nothing_switches_off_what_the_javascript_switches_on():
+    """Togliere `hidden` deve bastare a far comparire un elemento.
+
+    Il caso vero: la scatola della mappa su un giro senza coordinate mostrava il
+    titolo, nascondeva la tela e **non diceva niente** — 68 px di scatola vuota.
+    `drawMapTo` faceva la cosa giusta (`missing.classList.remove("hidden")`), ma
+    il messaggio portava anche `.empty`, che è lo stato vuoto di TUTTA la pagina
+    e vive a `display: none` finché non arriva `body.no-data`. Toglierne `hidden`
+    non lo accendeva: restava spento per costruzione, e con lui gli altri due.
+    Il vincolo del progetto è «assente, non un trattino»: dove un dato non c'è,
+    la schermata scrive perché — e uno spazio muto è peggio del trattino.
+
+    Nota su `body.no-data`: la classe di stato non è nel markup, quindi una
+    regola che la nomina non colpisce il documento a riposo e non finisce qui.
+    È giusto così — quelle regole descrivono un altro momento della pagina.
+    """
+    chains = _hideable_chains()
+    found = {name for name, _ in chains}
+    # Anti-vacuità: se il parser smette di trovare gli elementi, il ciclo qui
+    # sotto gira a vuoto e il test diventa una decorazione.
+    assert {"map-missing", "line-missing", "dyn-missing"} <= found, sorted(found)
+    assert len(chains) >= 10, f"solo {len(chains)} elementi accendibili: parser?"
+
+    # Anti-vacuità sul matcher: deve saper dire di sì a una classe che c'è e di
+    # no a una che non c'è. Senza questo, un `_hits` sempre falso passerebbe.
+    mapmiss = next(c for name, c in chains if name == "map-missing")
+    assert _hits(".missing", mapmiss), "il matcher non riconosce nemmeno la classe giusta"
+    assert not _hits(".empty", mapmiss), \
+        "i tre messaggi per-vista sono tornati sotto `.empty`, che è lo stato vuoto della pagina"
+
+    rules = _display_rules(none=True)
+    for sel, _value in rules:
+        for name, chain in chains:
+            assert not _hits(sel, chain), (
+                f"{sel!r} spegne #{name}, che il JS accende togliendo "
+                "`hidden`: dagli una classe sua invece di una condivisa")
+    assert len(rules) >= 5, f"solo {len(rules)} regole `display: none` esaminate: taglio rotto?"
+
+
+def test_the_three_per_view_messages_are_not_the_page_wide_empty_state():
+    """L'altra metà, detta in positivo e senza passare dal CSS: i tre messaggi
+    portano una classe che il foglio non spegne, e lo stato vuoto della pagina
+    (`#empty`, l'unico che `body.no-data` deve accendere) resta il solo `.empty`
+    accendibile. La trappola da evitare era una regola che, aggiustando i tre,
+    accendesse anche quello fuori dal suo caso.
+    """
+    for el in ("map-missing", "line-missing", "dyn-missing"):
+        node = _dom().find(el)
+        assert node is not None, el
+        assert "missing" in node.classes, f"#{el} ha perso la sua classe"
+        assert "empty" not in node.classes, f"#{el} è tornato sullo stato vuoto globale"
+        assert "hidden" in node.classes, f"#{el} deve nascere spento"
+
+    # `.empty` resta di uno solo — `#empty`, che non nasce `hidden` — così
+    # `body.no-data .empty` non può accendere niente che qualcun altro voleva
+    # spento. È la trappola opposta, e vale la pena pinnarla qui accanto.
+    owners = [g for g in re.findall(r'class="([^"]*)"', _HTML) if "empty" in g.split()]
+    assert len(owners) == 1, owners
+    assert "hidden" not in _dom().find("empty").classes
+
+    # E la classe nuova non deve portarsi dietro un `display` di default: il suo
+    # unico stato a riposo è quello che le dà `hidden`.
+    assert "display" not in _rule(".missing"), _rule(".missing")
+
+
+def test_a_new_lap_drops_the_old_lap_s_missing_messages_before_it_fetches():
+    """Il gemello simmetrico, e si vede solo ora che i messaggi si vedono.
+
+    «Questo giro non ha coordinate» parla del giro che sta per essere
+    sostituito. Se resta acceso mentre la richiesta è in volo, la Traiettoria
+    dice per un secondo e mezzo che il giro non ha coordinate SOPRA la
+    traiettoria del giro che ce le ha: una frase falsa sopra un disegno giusto.
+    Misurato nel browser passando da `bmw_m4_gt3_acc · imola` a
+    `mclaren_720s_gt3_evo · monza`. Finché i tre portavano `.empty` erano
+    invisibili in ogni caso e il difetto non poteva mostrarsi.
+
+    «Prima della richiesta» è metà del test: spegnerli dopo l'`await` lascerebbe
+    la frase falsa esattamente per la finestra che conta.
+    """
+    body = _APPJS[_APPJS.index("async function loadCombo("):]
+    body = body[:body.index("\n}")]
+    head = body[:body.index("await getJSON(")]
+    assert "await getJSON(" in body, "loadCombo non fa più la sua richiesta: taglio rotto?"
+    for el in ("map-missing", "line-missing", "dyn-missing"):
+        assert el in head, f"{el} resta acceso durante la richiesta del giro nuovo"
+    assert 'classList.add("hidden")' in head
+
+
+# --- lo stesso disegno assente, un piano più su (2026-08-07) ----------------
+#
+# `#map-missing` era la sola cosa a mancare quando il giro non ha coordinate:
+# sopra di lui restavano accesi `#map-readout` («Racing line · colour = speed
+# vs reference…») e `.map-legend` (la sfumatura veloce/lento, ▽ e ○) — due
+# didascalie per un disegno che non c'è, la stessa famiglia di `#leg-lost` ma
+# non lo stesso difetto: qui non c'era contraddizione fra markup e CSS, c'era
+# un ramo JS che non spegneva niente. `drawMap()` ora li spegne insieme al
+# canvas; questi due test pinnano il verso JS (la chiamata c'è, ed è un
+# `toggle` — non un `add` che resterebbe spento anche col giro giusto) e il
+# verso CSS (`hidden`, una volta scritto, VINCE davvero).
+
+
+def _draw_map_body() -> str:
+    body = _APPJS[_APPJS.index("function drawMap(a, cx) {"):]
+    return body[:body.index("\n}\n")]
+
+
+def test_the_map_readout_and_legend_are_switched_off_with_the_map():
+    """`drawMapTo` spegne solo il canvas: `#map-readout` e `.map-legend` sono
+    suoi FRATELLI nella colonna (vedi index.html), non figli, quindi il canvas
+    che sparisce non fa niente per loro. `toggle(..., !a.has_map)` — non
+    `add("hidden")` — è il punto: deve anche RIACCENDERLI quando un giro CON
+    coordinate viene disegnato, altrimenti la scatola resterebbe muta per un
+    motivo che non vale più. Una condizione scambiata (`a.has_map` invece di
+    `!a.has_map`) è lo stesso difetto sul verso opposto — spenti col giro
+    giusto — e questa stessa stringa la intercetta."""
+    body = _draw_map_body()
+    for el in ("map-readout", "map-legend"):
+        assert f'$("{el}")' in body, f"drawMap non tocca più #{el}"
+    # count, non `in`: un `toggle` solo su due elementi lascerebbe l'altro
+    # acceso per sempre, e un `in` da solo non lo vedrebbe.
+    hits = body.count('classList.toggle("hidden", !a.has_map)')
+    assert hits >= 2, f"solo {hits} toggle su has_map — readout e legend ne servono uno ciascuno"
+
+
+def _chains_where(pred) -> list[tuple[str, list[set[str]]]]:
+    """Ogni elemento del documento che soddisfa `pred(el, chain)`, con la catena
+    dei suoi antenati ridotti a tag/id/classi (`hidden` esclusa), dal più esterno
+    al più interno — stessa forma di `_hideable_chains`, ma la scelta di chi
+    entra la fa il chiamante.
+
+    Serve perché i bersagli che il JS spegne non si nominano tutti allo stesso
+    modo: la maggior parte è un id, ma c'è anche una classe (`.line-grid`), un
+    tag sotto un id (`#view-line main`) e due `parentNode` — il genitore di una
+    tela, che nel markup non ha né id né un nome che il JS pronunci.
+
+    `hidden` è tolta da ogni insieme di proposito, come in `_hideable_chains`: la
+    domanda non è se `.hidden { display: none }` fa il suo mestiere, ma se
+    qualcos'altro lo batte.
+    """
+    out: list[tuple[str, list[set[str]]]] = []
+
+    def walk(el, chain: list[set[str]]) -> None:
+        names = {el.tag} | set(el.classes) | ({el.id} if el.id else set())
+        names.discard("hidden")
+        here = chain + [names]
+        if pred(el, here):
+            out.append((el.id or "/".join(sorted(el.classes)) or el.tag, here))
+        for child in el.children:
+            walk(child, here)
+
+    for child in _dom().children:
+        walk(child, [])
+    return out
+
+
+def _chain_to(el_id: str) -> list[set[str]]:
+    """La catena di antenati fino a `el_id`, per un elemento che a riposo NON
+    porta `hidden` nel markup: gliela aggiunge `drawMap` solo quando il giro non
+    ha coordinate, quindi il grep statico su `class="...hidden..."` non lo
+    troverebbe."""
+    found = _chains_where(lambda el, _chain: el.id == el_id)
+    assert found, f"#{el_id} non trovato nel documento"
+    return found[0][1]
+
+
+def test_hidden_actually_hides_the_map_readout_and_legend():
+    """Il verso CSS del test sopra: che `hidden`, una volta scritto da
+    `drawMap`, VINCA davvero. Non era ovvio — `.map-legend { display: flex }`
+    e `.hidden { display: none }` sono entrambe una classe sola (0,1,0), e a
+    parità di specificità decide l'ordine nel foglio: `.map-legend` viene
+    DOPO `.hidden`, quindi avrebbe vinto lei. È lo stesso duello già pagato per
+    `#view-flow` e per `.map-legend .swatch`, un'ottava più in basso — la cura
+    è la stessa, `:not(.hidden)` sulla regola che vuole mostrare la roba.
+    """
+    chains = {el_id: _chain_to(el_id) for el_id in ("map-readout", "map-legend")}
+
+    # Anti-vacuità sul matcher: deve saper dire sì a una classe che c'è davvero
+    # su questa catena, altrimenti un `_hits` sempre falso passerebbe il test
+    # sotto senza aver controllato niente.
+    assert _hits(".readout", chains["map-readout"]), "il matcher non vede nemmeno .readout"
+    assert _hits(".map-legend", chains["map-legend"]), "il matcher non vede nemmeno .map-legend"
+    assert _hits("aside.cmp-map .readout", chains["map-readout"]), \
+        "il matcher non segue la discendenza vera"
+
+    rules = _display_rules(none=False)
+    for sel, _value in rules:
+        for el_id, chain in chains.items():
+            assert not _hits(sel, chain), (
+                f"{sel!r} batte `.hidden` su #{el_id}: qualificala "
+                "con :not(.hidden), come fa già .map-legend"
+            )
+    assert len(rules) >= 5, f"solo {len(rules)} regole `display` esaminate: taglio rotto?"
+
+
+# --- il censimento: OGNI cosa che il JS spegne, contro OGNI regola (round 4) ---
+#
+# I due test sopra chiudono un elemento per volta, quello che il difetto del
+# giorno aveva in mano. Questa coppia chiude la FAMIGLIA: si parte da ogni sito
+# di `app.js` che scrive `hidden`, si risolve cosa colpisce nel documento, e si
+# chiede che nessuna regola del foglio da schermo lo riaccenda. La soglia è la
+# **specificità**, non l'ordine nel foglio: una regola che perde solo finché
+# `.hidden` resta scritta sopra di lei non è una regola, è una coincidenza di
+# righe — e questo file ne ha già pagate due (`#view-flow`, `.map-legend`).
+
+# Le due forme che l'espressione precedente NON vedeva, e che l'hanno resa un
+# allarme muto proprio sull'unica difesa costruita da questo ramo: un
+# `toggle("hidden")` a UN argomento (senza la virgola che quella pretendeva) e
+# la variante ad apici singoli. Provato per mutazione: con un sito in più scritto
+# in una di quelle due forme, tutti e tre i test del censimento restavano verdi e
+# il conteggio restava 26 — e nemmeno la seconda guardia protestava, perché lì i
+# due conteggi salgono insieme. Qui il verbo si legge (`add|toggle`), la virgola
+# è diventata «virgola o parentesi» e la virgoletta è una scelta fra due.
+_HIDDEN_WRITE = re.compile(
+    r'([$\w.\[\]"\'()-]+)\.classList\.(?:add|toggle)\(\s*["\']hidden["\']\s*[,)]')
+
+
+def _hidden_writers() -> list[str]:
+    """L'espressione a sinistra di ogni `classList.add("hidden")` /
+    `classList.toggle("hidden", …)` di `app.js`, una per sito — ripetizioni
+    comprese, perché due siti sullo stesso nome sono due posti da risolvere."""
+    return _HIDDEN_WRITE.findall(_APPJS)
+
+
+# Le espressioni del censimento risolte A MANO, una per una, in quello che
+# colpiscono davvero nel documento. La risoluzione sta qui e non in un
+# `querySelector` finto perché è l'unica parte che una macchina non può fare da
+# sola: `wrap` è tre elementi diversi in tre funzioni diverse.
+#
+#   p                       → i 10 pannelli `[id^='view-']` (showView)
+#   gate                    → #train-gate
+#   el                      → i 6 id del ciclo di renderTraining
+#   sec                     → #tyres (drawTyres) e #dyn-tyres (drawDynTyres)
+#   $("tyre-temp-wrap")     → #tyre-temp-wrap
+#   $("tyre-press-wrap")    → #tyre-press-wrap
+#   ro / legend / lost      → #map-readout / #map-legend / #leg-lost
+#   missing                 → il parametro di drawMapTo: #map-missing e
+#                             #rail-nomap (gli altri due chiamanti passano null)
+#   $(id)                   → #map-missing, #line-missing, #dyn-missing
+#   wrap                    → il genitore di #c-flow, quello di #c-flow-map, e
+#                             #dyn-balance-wrap (drawBalanceRibbon)
+#   lpSec                   → #recap-laps-sec
+#   $("tyres")              → #tyres
+#   main / miss             → #dyn-charts / #dyn-missing
+#   $("dyn-tyres")          → #dyn-tyres
+#   $("dyn-balance-wrap")   → #dyn-balance-wrap
+#   $("line-missing")       → #line-missing
+#   grid                    → .line-grid            (per classe, non per id)
+#   charts                  → #view-line main       (un tag sotto un id)
+#   legRoad                 → #leg-road
+#   el                      → ANCHE il parametro di `emptyReadout`, cioè
+#                             #line-readout e #dyn-readout (i suoi due
+#                             chiamanti: renderLine e drawDynamics)
+#   $("dyn-elsewhere")      → #dyn-elsewhere
+_HIDDEN_TARGET_IDS = {
+    "view-recap", "view-flow", "view-training", "view-session", "view-stint",
+    "view-compare", "view-line", "view-sectors", "view-progress",
+    "view-dynamics",
+    "train-gate", "train-intro", "train-gap", "plan", "train-steps",
+    "train-session", "train-words",
+    "tyres", "tyre-temp-wrap", "tyre-press-wrap",
+    "map-readout", "map-legend", "leg-lost", "leg-road", "map-missing",
+    "rail-nomap", "line-missing", "dyn-missing", "recap-laps-sec",
+    "dyn-charts", "dyn-tyres", "dyn-balance-wrap",
+    "line-readout", "dyn-readout", "dyn-elsewhere",
+}
+_HIDDEN_TARGET_PARENT_OF = ("c-flow", "c-flow-map")
+
+
+def _is_hidden_target(el, chain) -> bool:
+    """Se `app.js` sa spegnere questo elemento — per id, per classe, per tag
+    sotto un id, o perché è il genitore di una tela che il JS nomina."""
+    if el.id in _HIDDEN_TARGET_IDS:
+        return True
+    if "line-grid" in el.classes:
+        return True
+    if el.tag == "main" and any("view-line" in names for names in chain[:-1]):
+        return True
+    return any(c.id in _HIDDEN_TARGET_PARENT_OF for c in el.children)
+
+
+def _js_hidden_targets() -> list[tuple[str, list[set[str]]]]:
+    """Ogni elemento che `app.js` può spegnere, con la sua catena di antenati."""
+    return _chains_where(_is_hidden_target)
+
+
+def _specificity(sel: str) -> tuple[int, int, int]:
+    """(id, classi, elementi) di un selettore, per confrontarlo con `.hidden`.
+
+    `:not(…)` non conta di suo ma conta il suo contenuto, ed è esattamente
+    perché `.line-grid:not(.hidden)` (0,2,0) batte `.hidden` (0,1,0) da qualunque
+    riga del foglio, mentre `.line-grid` (0,1,0) vinceva solo perché scritta più
+    sotto.
+    """
+    s = re.sub(r"::[\w-]+", "\x00", sel)          # pseudo-elemento: vale un tag
+    s = re.sub(r":not\(([^()]*)\)", r" \1 ", s)
+    ids = len(re.findall(r"#[\w-]+", s))
+    classes = (len(re.findall(r"\.[\w-]+", s))
+               + len(re.findall(r"\[[^\]]*\]", s))
+               + len(re.findall(r"(?<!:):[\w-]+", s)))
+    rest = re.sub(r"#[\w-]+|\.[\w-]+|\[[^\]]*\]|:[\w-]+(?:\([^()]*\))?", " ", s)
+    tags = len(re.findall(r"[a-zA-Z][\w-]*", rest)) + s.count("\x00")
+    return (ids, classes, tags)
+
+
+def test_the_census_of_hidden_writers_is_still_the_one_that_was_checked():
+    """Il test qui sotto vale quanto vale la lista di bersagli che gli passo, e
+    quella lista è stata risolta a mano, sito per sito. Questo è il suo allarme:
+    se `app.js` impara a spegnere qualcosa di nuovo, la risoluzione va rifatta,
+    non ereditata.
+
+    Due numeri, non uno. L'insieme delle espressioni non basta: un sito nuovo
+    che riusa `wrap` — e `wrap` sono già tre elementi diversi in tre funzioni
+    diverse — non cambia l'insieme, cambia solo il conteggio. Il conteggio da
+    solo non basta neanche: uno tolto e uno aggiunto lo lasciano fermo.
+    """
+    writers = _hidden_writers()
+    assert len(writers) == 28, (
+        f"{len(writers)} siti che scrivono `hidden` invece di 28: risolvi i "
+        "nuovi in _HIDDEN_TARGET_IDS e aggiorna il numero qui")
+    assert set(writers) == {
+        "p", "gate", "el", "sec", '$("tyre-temp-wrap")', '$("tyre-press-wrap")',
+        "ro", "legend", "lost", "missing", "$(id)", "wrap", "lpSec",
+        '$("tyres")', "main", '$("dyn-tyres")', '$("dyn-balance-wrap")', "miss",
+        '$("line-missing")', "grid", "charts", "legRoad", '$("dyn-elsewhere")',
+    }, sorted(set(writers))
+
+    # Il censimento passa da `classList`: se qualcuno scrivesse la classe in un
+    # altro modo (`className = "hidden"`, `setAttribute`), l'espressione regolare
+    # non lo vedrebbe e la lista sarebbe incompleta senza dirlo. Qui si chiede
+    # che ogni «hidden» del file sia una chiamata a `classList`.
+    assert len(re.findall(r'''["']hidden["']''', _APPJS)) == len(
+        re.findall(r'''classList\.(?:add|toggle|remove)\(\s*["']hidden["']''', _APPJS)), \
+        "in app.js c'è un «hidden» che non passa da classList: il censimento lo perde"
+
+    # E che `app.js` resti l'unico a scriverla: gli altri file del bundle non
+    # hanno bersagli censiti qui.
+    #
+    # Con `_HIDDEN_WRITE`, non con due letterali a virgolette doppie. La guardia
+    # gemella qui sopra era stata allargata e questa era rimasta indietro: un
+    # `document.getElementById('map-legend').classList.add('hidden')` in
+    # `tour.js` spegneva un bersaglio censito e tutti e tre i test del
+    # censimento restavano verdi (provato, 175 passed). Una sola espressione per
+    # tutte e due le guardie, così non possono più divergere.
+    for name in ("tour.js", "i18n.js", "engineer.js", "test.js"):
+        other = (WEB / name).read_text(encoding="utf-8")
+        assert not _HIDDEN_WRITE.findall(other), (
+            f"{name} spegne qualcosa con `hidden`: il censimento parte da "
+            f"app.js e non lo vedrebbe — {sorted(set(_HIDDEN_WRITE.findall(other)))}")
+
+
+def test_no_rule_outranks_hidden_on_anything_the_javascript_hides():
+    """La famiglia intera, in un colpo solo: per ogni elemento che `app.js`
+    spegne, nessuna regola del foglio da schermo che lo ACCENDE deve poter
+    battere `.hidden`.
+
+    Il criterio è la specificità, non l'ordine nel foglio, e la differenza è
+    tutta lì. `.line-grid { display: grid }` vinceva perché scritta 516 righe
+    più in basso di `.hidden`: la Traiettoria di un giro senza coordinate teneva
+    655 px di griglia vuota sopra il messaggio che spiegava perché non c'era
+    niente da mostrare (misurato nel browser, non dedotto). Una regola che perde
+    solo finché nessuno riordina il foglio non è a posto, è fortunata. Chi vuole
+    mostrare qualcosa a parità o più si qualifica con `:not(.hidden)`, che è
+    anche il modo in cui si disinnesca da sé.
+    """
+    targets = _js_hidden_targets()
+    found = {name for name, _ in targets}
+
+    # Anti-vacuità sulla risoluzione: se il parser o i predicati smettono di
+    # trovare i bersagli, i cicli qui sotto girano a vuoto e il test diventa una
+    # decorazione. I quattro nominati sono le quattro FORME di bersaglio: un id,
+    # una classe, un tag sotto un id, il genitore di una tela.
+    assert len(targets) == 39, f"{len(targets)} bersagli risolti invece di 39: {sorted(found)}"
+    assert {"map-readout", "line-grid", "main", "chart/flow-chart"} <= found, sorted(found)
+
+    # Anti-vacuità sul matcher e sulla misura: uno che dica sempre di no, o una
+    # specificità sempre a zero, passerebbero questo test senza guardare niente.
+    grid = next(chain for name, chain in targets if name == "line-grid")
+    assert _hits(".line-grid", grid), "il matcher non vede nemmeno la classe del bersaglio"
+    assert not _hits(".map-legend", grid), "il matcher dice di sì a una classe che non c'è"
+    assert _specificity(".hidden") == (0, 1, 0)
+    assert _specificity("main") == (0, 0, 1)
+    assert _specificity(".line-grid:not(.hidden)") == (0, 2, 0)
+
+    rules = _display_rules(none=False)
+    weighed = 0
+    for sel, _value in rules:
+        # Un selettore di soli tag (`main { display: grid }`) perde contro
+        # `.hidden` da qualunque riga: è sano per costruzione, non per fortuna.
+        if _specificity(sel) < (0, 1, 0):
+            continue
+        if ":not(.hidden)" in sel:
+            continue
+        weighed += 1
+        for name, chain in targets:
+            assert not _hits(sel, chain), (
+                f"{sel!r} accende #{name}, che il JS spegne con `hidden`, e "
+                f"pareggia o batte `.hidden` ({_specificity(sel)}): "
+                "qualificala con :not(.hidden), come fanno già .map-legend e "
+                ".line-grid")
+    assert weighed >= 10, f"solo {weighed} regole pesate: taglio o specificità rotti?"
+
+    # Il verso simmetrico, che conta quanto quello diretto: la cura non deve
+    # essere «togliere la regola». Con le coordinate la Traiettoria è ancora due
+    # colonne — qualcuno deve accendere `.line-grid` quando `hidden` non c'è.
+    lit = [sel for sel, _v in rules
+           if ":not(.hidden)" in sel and _hits(sel.replace(":not(.hidden)", ""), grid)]
+    assert lit, "nessuna regola accende più .line-grid: il giro CON coordinate resta senza griglia"
+
+
+def test_the_loading_line_is_never_written_into_a_switched_off_box():
+    """L'altra faccia del censimento, e stavolta il conflitto è dentro il solo
+    JavaScript: scrivere in un elemento che il JavaScript stesso può aver
+    spento.
+
+    `loadCombo` spegne i tre «questo giro non ha…» del giro uscente e conta sul
+    fatto che ogni vista scriva al loro posto la propria riga di caricamento. Ma
+    `#map-readout` è spento anche lui su un giro senza coordinate: la riga ci
+    finiva dentro invisibile, e per tutta la durata della richiesta il Confronto
+    mostrava il titolo «Track map» e sotto il vuoto. Chi scrive in una scatola
+    che qualcun altro può aver chiuso la riapre lì, nella stessa riga di codice.
+    """
+    head = _APPJS.split("async function loadCombo(")[1].split("\n  let a;")[0]
+    written = set(re.findall(r'\$\("([\w-]+)"\)\.innerHTML = t\("load\.lap"\)', head))
+    assert "map-readout" in written, \
+        "il Confronto non scrive più la sua riga di caricamento: il ciclo qui sotto gira a vuoto"
+
+    hideable = {name for name, _ in _js_hidden_targets()}
+    for el in sorted(written & hideable):
+        assert f'$("{el}").classList.remove("hidden")' in head, (
+            f"#{el} riceve la riga di caricamento ma può essere `hidden`: "
+            "riaccendilo qui, il disegno rimetterà la classe giusta a dati arrivati")
+
+
+# --- l'altra metà della famiglia: ciò che il JS non spegne AFFATTO (round 5) -
+#
+# Il censimento qui sopra parte da «ogni sito di app.js che scrive `hidden`»:
+# per costruzione non può vedere un elemento che nessun ramo tocca. E i tre
+# difetti rimasti in piedi dopo tre giri erano esattamente quelli — la riga di
+# lettura della Traiettoria (che teneva i numeri punto per punto del giro
+# PRECEDENTE sopra «questi giri non hanno coordinate»), quella di Dinamica (la
+# didascalia «passa il mouse sui grafici» sopra la frase che dice che i grafici
+# non ci sono) e il rimando «vai in Traiettoria a vedere lo scostamento», su un
+# giro che quasi certamente non ha nemmeno le coordinate.
+#
+# Questo test parte dall'altra parte, dal DOCUMENTO. Per ognuno dei tre «questo
+# giro non ha…», tutto quello che gli sta accanto — i figli diretti del suo
+# contenitore, cioè quello che resta a schermo quando il messaggio è l'unica
+# cosa da leggere — dev'essere o qualcosa che il JS sa spegnere, o una voce
+# dichiarata qui sotto con il motivo per cui resta.
+#
+# I LIMITI, dichiarati perché il test non è generale quanto sembra:
+#  1. la generalità sta nell'enumerazione — i fratelli si contano da soli, e un
+#     elemento nuovo entra nell'elenco senza che nessuno debba ricordarsene —
+#     ma il giudizio sta nella tabella qui sotto, che è scritta a mano;
+#  2. «spegnibile» vuol dire che il JS PUÒ spegnerlo, non che lo faccia in
+#     QUESTO ramo. Un elemento censito ma dimenticato dal ramo giusto passa di
+#     qui: quello lo prendono i test per caso (`drawMap`, `drawDynamics`);
+#  3. si ferma ai figli diretti del contenitore. Un'intestazione annidata due
+#     livelli più sotto — come l'`h3` «Track map» dentro il `main` della mappa,
+#     che resta di proposito — non compare come voce propria.
+_EMPTY_STATE_SURVIVORS = {
+    ("cmp-map", "main"):
+        "porta il titolo «Track map», che nomina la COLONNA e non il disegno: "
+        "sopra il messaggio resta un'intestazione, e il motivo le sta subito "
+        "sotto (index.html lo dichiara accanto al markup)",
+    ("cmp-map", "brakesheet"):
+        "la scheda frenate è per auto+pista, non per giro: un giro senza "
+        "coordinate non la invalida, e il suo vuoto ha già le sue parole",
+    ("view-line", "line-summary"):
+        "renderLine la svuota — o ci scrive il «nessuna curva rilevata», che è "
+        "il messaggio dell'altro nulla, non l'arredamento di questo",
+    ("view-line", "line-chips"): "renderLine la svuota",
+    ("view-line", "line-table"): "renderLine la svuota",
+    ("view-dynamics", "dyn-coasting"): "drawDynamics la svuota",
+}
+
+
+def _plain_name(el) -> str:
+    """Il nome di un elemento senza `hidden`, che è uno stato e non un nome."""
+    return el.id or "/".join(sorted(el.classes - {"hidden"})) or el.tag
+
+
+def _housemates_of(el_id: str) -> tuple[str, list[tuple[object, list[set[str]]]]]:
+    """Il contenitore che ospita `el_id` e i suoi figli diretti, ognuno con la
+    catena dei propri antenati (stessa forma di `_chains_where`)."""
+    hit = []
+
+    def walk(el, chain: list[set[str]]) -> None:
+        names = {el.tag} | set(el.classes) | ({el.id} if el.id else set())
+        names.discard("hidden")
+        here = chain + [names]
+        if any(c.id == el_id for c in el.children):
+            kids = []
+            for c in el.children:
+                cn = {c.tag} | set(c.classes) | ({c.id} if c.id else set())
+                cn.discard("hidden")
+                kids.append((c, here + [cn]))
+            hit.append((_plain_name(el), kids))
+        for c in el.children:
+            walk(c, here)
+
+    for child in _dom().children:
+        walk(child, [])
+    assert len(hit) == 1, f"#{el_id} ha {len(hit)} contenitori: markup cambiato?"
+    return hit[0]
+
+
+@pytest.mark.parametrize("msg", ("map-missing", "line-missing", "dyn-missing"))
+def test_nothing_stays_on_screen_beside_a_this_lap_has_no_message(msg):
+    """Dove il dato non c'è resta la RAGIONE, non l'apparato."""
+    home, kids = _housemates_of(msg)
+    # Anti-vacuità: se il markup si annidasse diversamente e il contenitore
+    # finisse con un figlio solo (il messaggio), il ciclo girerebbe a vuoto.
+    assert len(kids) >= 4, f"solo {len(kids)} elementi accanto a #{msg} in {home}: parser?"
+
+    for el, chain in kids:
+        name = _plain_name(el)
+        if name == msg:
+            continue                       # il messaggio stesso
+        if _is_hidden_target(el, chain):
+            continue                       # il JS sa spegnerlo
+        assert (home, name) in _EMPTY_STATE_SURVIVORS, (
+            f"«{name}» resta a schermo accanto a #{msg} dentro {home} e nessun "
+            "ramo di app.js lo spegne: o lo spegni col messaggio, o lo dichiari "
+            "in _EMPTY_STATE_SURVIVORS con il motivo per cui resta")
+
+    # E il verso simmetrico: una dichiarazione che non serve più è una scusa
+    # ereditata. Ogni voce della tabella deve avere ancora il suo elemento.
+    live = {(home, _plain_name(el)) for el, _c in kids}
+    for key in [k for k in _EMPTY_STATE_SURVIVORS if k[0] == home]:
+        assert key in live, f"{key} non esiste più: la sua riga in _EMPTY_STATE_SURVIVORS avanza"
+
+
+# --- e che il ramo GIUSTO ci passi davvero -----------------------------------
+#
+# Tutti e tre i test qui sopra decidono «il JS sa spegnerlo» per ID contro
+# `_HIDDEN_TARGET_IDS`, che è una tabella scritta A MANO. `line-readout` e
+# `dyn-readout` ci sono entrati insieme alla loro cura, quindi da soli quei test
+# dicono «app.js sa spegnerli da qualche parte», non «questo ramo li spegne».
+# Misurato, non dedotto: togliendo `emptyReadout($("line-readout"))` da
+# `renderLine`, oppure il terzo argomento a `updateDynReadout`, questo file
+# restava a 175 passed. Due delle tre cure dell'ondata erano coperte solo dalle
+# misure a schermo, che invecchiano appena qualcuno tocca il codice.
+#
+# Questo test segue la catena intera, anello per anello, per i due rami: dal
+# ramo «niente dati» fino al `classList.toggle("hidden", …)` che spegne davvero.
+# È il limite n.2 dichiarato dopo il giro scorso («il ramo giusto resta scoperto
+# da entrambi i censimenti») chiuso per i due casi che questo ramo ha curato —
+# non in generale: resta un test per nome, non un'enumerazione.
+def test_the_no_data_branches_really_switch_their_readout_off():
+    """La riga di lettura di Traiettoria e quella di Dinamica si spengono nel
+    ramo che dice «questo giro non ha…», non solo in astratto."""
+    line = _block_after(_body_of("function renderLine("), "if (!L || !L.corners.length)",
+                        "il ramo «niente curve» di renderLine")
+    # Anti-vacuità: che la fetta sia QUEL ramo, e non una fetta vuota o la coda
+    # della funzione — ogni `in` su una fetta sbagliata è verde per caso.
+    assert '$("line-missing").classList.toggle("hidden", !noMap)' in line
+    assert "LINE_I" not in line, "il taglio ha inghiottito il ramo CON le curve"
+    assert 'emptyReadout($("line-readout"))' in line, (
+        "il ramo «niente curve» esce senza toccare #line-readout: i numeri punto "
+        "per punto del giro PRECEDENTE restano sopra «questi giri non hanno "
+        "coordinate», veri di un altro giro e per sempre")
+
+    dyn = _block_after(_body_of("function drawDynamics("), "if (!anyData)",
+                       "il ramo «niente dinamica» di drawDynamics")
+    assert '$("dyn-tyres").classList.add("hidden")' in dyn
+    assert "drawGG(" not in dyn, "il taglio ha inghiottito il ramo CON i dati"
+    call = re.search(r"updateDynReadout\(([^()]*)\)", dyn)
+    assert call, "il ramo «niente dinamica» non tocca più #dyn-readout"
+    args = [a.strip() for a in call.group(1).split(",")]
+    assert len(args) == 3 and args[2] == "true", (
+        f"updateDynReadout chiamata con {args}: senza il terzo argomento torna "
+        "la didascalia «passa il mouse sui grafici per i valori punto per punto» "
+        "stampata sopra la riga che dice che quei grafici non ci sono")
+
+    # Che il terzo argomento faccia quel mestiere. Il nome lo legge la firma, così
+    # rinominarlo non rende rosso il test per il motivo sbagliato.
+    sig = re.search(r"function updateDynReadout\(([^)]*)\)", _APPJS).group(1)
+    names = [a.strip() for a in sig.split(",")]
+    assert len(names) == 3, f"updateDynReadout ha {len(names)} parametri: {names}"
+    bare = _block_after(_body_of("function updateDynReadout("), f"if ({names[2]})",
+                        f"il ramo {names[2]!r} di updateDynReadout")
+    assert "emptyReadout(el)" in bare and "return" in bare, (
+        f"il terzo argomento non delega più a emptyReadout: {bare!r}")
+
+    # L'ultimo anello, senza il quale i tre passaggi sopra portano a una funzione
+    # che potrebbe non spegnere niente.
+    empty = _body_of("function emptyReadout(")
+    assert 'classList.toggle("hidden", !chip)' in empty, (
+        "emptyReadout non spegne più la fascia: al posto della didascalia resta "
+        "una striscia vuota, che è lo stesso arredamento con meno parole")
+
+
+def test_the_line_deviation_pointer_follows_the_line_offset_not_the_whole_tab():
+    """«Lo scostamento dalla traiettoria vive sotto Traiettoria» è un rimando a
+    UN dato, non alla scheda: la condizione che lo accende dev'essere quel dato.
+
+    Era legato ad `anyData`, che è l'OR di quattro canali: un giro con la
+    dinamica ma senza `line_offset` teneva acceso un bottone che promette uno
+    scostamento che quel giro non ha — la stessa forma di difetto un gradino più
+    in là. In pratica quasi irraggiungibile (la dinamica è v6, le coordinate v3),
+    ma è una condizione scelta in questo ramo, quindi si sceglie giusta.
+    """
+    body = _body_of("function drawDynamics(")
+    assert "hasOff = Array.isArray(DATA.review.line_offset)" in body
+    assert '$("dyn-elsewhere").classList.toggle("hidden", !hasOff)' in body, \
+        "il rimando non segue più lo scostamento"
+    # Fuori dal ramo «niente dinamica», e prima: dentro, il verso di ritorno non
+    # verrebbe mai eseguito su un giro che i dati ce li ha.
+    assert body.index('$("dyn-elsewhere")') < body.index("if (!anyData)")
