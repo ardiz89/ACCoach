@@ -55,6 +55,27 @@ def _theme(cat: CueCategory, lang: str) -> str:
     return _theme_label(cat, lang)
 
 
+_PACT = {
+    "it": " In pista ti dirò solo: «{word}».",
+    "en": " On track I'll only say: “{word}”.",
+}
+
+
+def _brief_pact(cat: CueCategory, lang: str) -> str:
+    """The sentence that agrees the trigger word with the driver, or "".
+
+    A trigger word only works because it was agreed beforehand — that is how every
+    coach observed introduces one. Said without the pact it is just a shout.
+    """
+    from .cue import trigger_text
+
+    word = trigger_text(cat, lang)
+    if not word:
+        return ""
+    tmpl = _PACT.get(lang) or _PACT["en"]
+    return tmpl.format(word=word)
+
+
 # Per-lap report messages, per language; resolved with the active language at the
 # moment the report is built (FocusCoach runs in the engine = config.language).
 _MSG = {
@@ -231,7 +252,8 @@ class FocusCoach:
         return FocusReport(
             FocusKind.BRIEF,
             _m("brief", lang, name=focus.name, theme=focus.theme,
-               base=_secs(focus.baseline_ms), cause=cause, drill=focus.drill),
+               base=_secs(focus.baseline_ms), cause=cause, drill=focus.drill)
+            + _brief_pact(focus.category, lang),
             focus=focus, drill=focus.drill, progress_ms=focus.baseline_ms)
 
     def _drill(self, debrief: LapDebrief) -> FocusReport:
