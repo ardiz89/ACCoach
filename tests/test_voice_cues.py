@@ -10,6 +10,8 @@ import sys
 import wave
 from pathlib import Path
 
+import pytest
+
 from accoach.coaching.voice import _load_prerendered
 
 _ROOT = Path(__file__).resolve().parent.parent
@@ -26,6 +28,31 @@ def test_every_static_cue_has_a_neural_wav():
     missing = render_cues.static_cue_messages() - set(_manifest())
     assert not missing, (
         "cue senza WAV neurale — riesegui `python tools/render_cues.py`: " + repr(missing)
+    )
+
+
+@pytest.mark.xfail(strict=False, reason="trigger words not rendered yet: Piper missing")
+def test_trigger_words_have_a_neural_wav():
+    """The trigger words still come out of SAPI5, and this is where that is written.
+
+    From the moment a focus is elected, every technique call on track is a
+    trigger word — the phrases they replace ("Puoi frenare più tardi", "Più gas
+    qui") all have their neural WAV, so as it stands electing a focus downgrades
+    the voice for the rest of the session. The coverage test above cannot see
+    it: `static_cue_messages()` walks `ast.Call` nodes and TRIGGER is a dict.
+
+    Left xfail rather than fixed because rendering needs Piper, which is not in
+    this checkout. To close it: put `piper.exe` and the Italian voice in
+    `tools/piper/` (see `tools/render_cues.py`), run `python tools/render_cues.py`,
+    and this turns XPASS. Only the Italian side: the shipped WAVs are Italian by
+    construction.
+    """
+    from accoach.coaching.cue import TRIGGER
+
+    man = _manifest()
+    missing = sorted(e["it"] for e in TRIGGER.values() if e["it"] not in man)
+    assert not missing, (
+        "parole-innesco senza WAV neurale (escono da SAPI5): " + repr(missing)
     )
 
 
