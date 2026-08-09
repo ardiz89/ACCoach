@@ -87,6 +87,23 @@ def _focus_theme_key(report: "FocusReport | None") -> str | None:
         return None
     return theme_key(report.focus.category)
 
+
+def _spoken_forms(cue: "Cue", focus_theme: str | None, lang: str) -> tuple[str, str]:
+    """What the ear hears and what the eye reads: (voice, screen).
+
+    They are the same string until a focus is active. From then on the voice gets
+    the trigger word and the screen keeps the whole sentence — the driver in a
+    corner has room for three words, the debrief afterwards has room for the rest.
+    """
+    from .coaching.cue import trigger_text
+
+    if focus_theme is None:
+        return cue.message, cue.message
+    trigger = trigger_text(cue.category, lang)
+    if trigger is None:
+        return cue.message, cue.message
+    return trigger, cue.message
+
 # A spoken alert prefix for an engineer proposal, by confidence-tone × tag ×
 # language. The proposal's rationale (already localized) follows it; the prefix
 # tells the driver *whether* it needs the garage (BOX) or can be dialled at the
@@ -816,8 +833,10 @@ class CoachEngine:
             # Cues are authored in Italian (so the neural WAVs match); render them
             # in the active language for both the voice and the on-screen text.
             spoken.message = cue_text(spoken.message)
+            voice_text, spoken.message = _spoken_forms(
+                spoken, self.scheduler.focus_theme, current_language())
             if self.voice is not None:
-                self.voice.say(spoken.message)
+                self.voice.say(voice_text)
             self.history.append(spoken.message)
             del self.history[:-20]
 
