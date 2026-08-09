@@ -362,7 +362,18 @@ class CoachEngine:
             self._log_engineer_outcome(lap, self._engineer_decision)
 
         # The Focus coach needs a reference to know where time was lost.
-        if self._focus is not None and self._reference is not None and self._corners:
+        if self._focus is None or self._reference is None or not self._corners:
+            # Fail open. Everything that could retire the theme lives inside the
+            # branch below, so a lap we can't observe is a lap on which nobody
+            # can park the focus or elect the next one — and `_rebuild_reference`
+            # runs after every saved lap and may leave no reference (nothing in
+            # today's condition band, or an unusable one) or no corners. Holding
+            # the last theme there would filter every technique cue against a
+            # theme that nothing can change again for the rest of the session:
+            # not silence, which the driver would notice, but a coach quietly
+            # wedged shut. If we can't confirm the focus, we speak.
+            self.scheduler.set_focus(None)
+        else:
             debrief = build_lap_debrief(lap, self._reference, self._corners)
             stable = lap.valid and lap.clean is not False
             before = (frozenset(self._focus.mastered), frozenset(self._focus.parked))

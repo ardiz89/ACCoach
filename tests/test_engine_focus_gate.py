@@ -10,9 +10,11 @@ possibly for the whole following session) but not on every lap on the SAME
 combination, where `_rebuild_reference` runs again to chase the new best time
 `_observe_lap` just set.
 """
+from accoach.comparison import Reference
 from accoach.coaching.cue import CueCategory
-from accoach.coaching.focus import Focus, FocusKind, FocusReport
+from accoach.coaching.focus import Focus, FocusCoach, FocusKind, FocusReport
 from accoach.engine import CoachEngine, _focus_theme_key
+from accoach.track import detect_corners
 
 import synth
 
@@ -89,4 +91,51 @@ def test_same_car_track_rebuild_does_not_clear_the_focus_theme(tmp_path):
     eng.scheduler.set_focus("braking")
     eng._rebuild_reference(*eng._key)      # same combination: the mid-lap path
     assert eng.scheduler.focus_theme == "braking"
+    eng.close()
+
+
+# --- a theme nobody can retire ---------------------------------------------
+
+class _Dummy:
+    def read(self): ...
+    def close(self): ...
+
+
+def _engine_working_a_focus(tmp_path):
+    """An engine that has elected a focus from real debriefs, as a session does."""
+    eng = CoachEngine(reader=_Dummy(), voice=None, laps_dir=tmp_path)
+    ref_lap = synth.build_lap(n=300, clean=True)
+    eng._reference = Reference(ref_lap)
+    eng._corners = detect_corners(ref_lap.samples)
+    eng._focus = FocusCoach()
+    slow = synth.build_lap(slow_corner=0, amt=30, n=300, clean=True)
+    for _ in range(3):
+        eng._observe_lap(slow)
+    assert eng.scheduler.focus_theme is not None, "no focus elected: fixture is wrong"
+    return eng, slow
+
+
+def test_a_lap_the_focus_cannot_be_confirmed_on_releases_the_theme(tmp_path):
+    """A reference that goes missing must free the theme, not freeze it.
+
+    `_rebuild_reference` runs after every saved lap and can leave no reference
+    (nothing in today's condition band, or the reference is unusable) or no
+    corners. The FocusCoach freezes in the same instant, so it can neither park
+    the focus nor elect another one: the theme would filter every technique cue
+    for the rest of the session, and on a car where trail-brake advice is off by
+    design a stuck "braking" leaves the coach nearly mute.
+    """
+    eng, slow = _engine_working_a_focus(tmp_path)
+    eng._corners = []                       # detect_corners found nothing this time
+    eng._observe_lap(slow)
+    assert eng.scheduler.focus_theme is None
+    eng.close()
+
+
+def test_a_lap_with_no_reference_releases_the_theme(tmp_path):
+    """The other half of the same hole: the reference itself is gone."""
+    eng, slow = _engine_working_a_focus(tmp_path)
+    eng._reference = None                   # no lap in today's condition band
+    eng._observe_lap(slow)
+    assert eng.scheduler.focus_theme is None
     eng.close()
