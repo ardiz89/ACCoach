@@ -55,17 +55,29 @@ def _theme(cat: CueCategory, lang: str) -> str:
     return _theme_label(cat, lang)
 
 
+# Names the theme and gives the word as an example, because the theme is what
+# the gate actually enforces: on "braking" the driver also hears "release",
+# "later", "earlier". The first wording promised the one word — a promise broken
+# on the second lap.
+#
+# The Italian reads "sulla {theme}", which fits every theme a focus can carry
+# (frenata, trazione, percorrenza, linea, guida — all feminine singular). Only
+# "marce" would need "sulle", and gear cues cannot reach a Focus: its category
+# comes from CornerLoss, which classify_corner fills from six categories only.
 _PACT = {
-    "it": " In pista ti dirò solo: «{word}».",
-    "en": " On track I'll only say: “{word}”.",
+    "it": " In pista ti dirò solo parole sulla {theme}, tipo «{word}».",
+    "en": " On track I'll only say words about {theme}, like “{word}”.",
 }
 
 
 def _brief_pact(cat: CueCategory, lang: str) -> str:
-    """The sentence that agrees the trigger word with the driver, or "".
+    """The sentence that agrees the on-track wording with the driver, or "".
 
     A trigger word only works because it was agreed beforehand — that is how every
     coach observed introduces one. Said without the pact it is just a shout.
+
+    The theme comes from the **translated** label: this sentence is read by the
+    driver, unlike the key the gate compares.
     """
     from .cue import trigger_text
 
@@ -73,7 +85,7 @@ def _brief_pact(cat: CueCategory, lang: str) -> str:
     if not word:
         return ""
     tmpl = _PACT.get(lang) or _PACT["en"]
-    return tmpl.format(word=word)
+    return tmpl.format(theme=_theme_label(cat, lang), word=word)
 
 
 # Per-lap report messages, per language; resolved with the active language at the
