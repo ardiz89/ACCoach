@@ -720,6 +720,15 @@ class CoachEngine:
             mastered, parked = self._load_focus_state(snap.car_model, snap.track)
             self._focus = FocusCoach(mastered=mastered, parked=parked)
             self._focus_report = None
+            # A focus theme belongs to one car/track combination. Left set, it
+            # would keep filtering technique advice on a theme that no longer
+            # applies — possibly for the whole session, if this combination
+            # never gets a reference to observe a lap against. NOT in
+            # `CueScheduler.reset()`: that also runs from `_rebuild_reference`
+            # after every completed lap on the SAME car/track (chasing a new
+            # best), which would erase the theme `_observe_lap` just set a few
+            # lines above.
+            self.scheduler.set_focus(None)
 
         # Drain cross-thread commands on this (the engine's) thread.
         with self._cmd_lock:
