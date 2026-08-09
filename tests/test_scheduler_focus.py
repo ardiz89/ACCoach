@@ -1,12 +1,13 @@
-"""Il budget di attenzione: con un focus attivo si parla di un tema solo.
+"""The attention budget: with a focus active, the coach speaks about one theme only.
 
-Massimo due o tre temi per sessione e' la regola su cui concordano coach
-professionisti indipendenti, per un motivo dichiarato: la banda passante del pilota
-in movimento e' finita. Qui il tetto e' uno, perche' il FocusCoach elegge un focus
-per volta.
+At most two or three themes per session is the rule independent professional
+coaches agree on, for a stated reason: the bandwidth of a driver in motion is
+finite. Here the cap is one, because the FocusCoach elects a single focus at a
+time.
 
-Restano fuori dal filtro gli acuti (sono eventi, non temi da allenare) e gli avvisi
-(si dicono al traguardo, dove c'e' spazio per una frase).
+Acute cues stay outside the filter (they're events, not themes to train) and so do
+advisories (they're spoken at the finish line, where there's room for a full
+sentence).
 """
 from accoach.coaching.cue import Cue, CueCategory
 from accoach.coaching.scheduler import CueScheduler
@@ -35,12 +36,12 @@ def test_cue_in_the_focus_theme_speaks():
 def test_cue_outside_the_focus_theme_stays_silent():
     sch = CueScheduler()
     sch.set_focus("braking")
-    sch.submit(_cue(CueCategory.MORE_THROTTLE, 900.0, segment=4))   # costa di piu'
+    sch.submit(_cue(CueCategory.MORE_THROTTLE, 900.0, segment=4))   # costs more
     assert sch.poll(now=100.0) is None
 
 
 def test_the_focus_theme_holds_everywhere_on_the_lap():
-    """I coach lavorano il pattern, non una curva sola."""
+    """Coaches work the pattern, not a single corner."""
     sch = CueScheduler()
     sch.set_focus("braking")
     sch.submit(_cue(CueCategory.LESS_BRAKE, 100.0, segment=11))
@@ -63,7 +64,7 @@ def test_acute_and_advisory_ignore_the_focus():
 
 
 def test_praise_ignores_the_focus():
-    """Aprire con qualcosa di vero che il pilota fa bene e' meta' del mestiere."""
+    """Opening with something true the driver does well is half the job."""
     sch = CueScheduler()
     sch.set_focus("braking")
     sch.submit(_cue(CueCategory.GOOD, 50.0, segment=6))
@@ -81,7 +82,7 @@ def test_clearing_the_focus_restores_everything():
 
 
 def test_an_off_theme_cue_does_not_consume_the_speaking_slot():
-    """Scartato nella scelta, non alla submit: se parla qualcos'altro, parla."""
+    """Filtered out at selection time, not at submit: if something else can speak, it speaks."""
     sch = CueScheduler()
     sch.set_focus("braking")
     sch.submit(_cue(CueCategory.MORE_THROTTLE, 900.0, segment=4))

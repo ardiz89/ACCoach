@@ -1,8 +1,8 @@
-"""Con un focus attivo la voce dice la parola, lo schermo tiene la frase.
+"""With a focus active, the voice speaks the trigger word, the screen keeps the sentence.
 
-I coach parlano in pista con una-tre parole e spiegano a monitor fermo. Qui:
-`voice.say` riceve l'innesco, mentre lo storico e lo stato del motore conservano
-il messaggio intero — l'overlay e il debrief non perdono niente.
+Coaches speak on track in one to three words and explain once the car is
+stopped. Here `voice.say` gets the trigger word, while the history and the
+engine state keep the whole message — the overlay and the debrief lose nothing.
 """
 from accoach.coaching.cue import Cue, CueCategory
 from accoach.engine import _spoken_forms

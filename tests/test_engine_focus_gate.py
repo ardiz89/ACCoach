@@ -1,14 +1,14 @@
-"""Il tema attivo arriva allo scheduler dal FocusCoach, come chiave inglese.
+"""The active theme reaches the scheduler from the FocusCoach, as an English key.
 
-`Focus.theme` e' la stringa tradotta ("frenata"): usarla per il confronto
-funzionerebbe in italiano e romperebbe il filtro in inglese. Questo test esiste per
-inchiodare quel punto.
+`Focus.theme` is the translated string ("frenata"): using it for the comparison
+would work in Italian and break the filter in English. This test exists to pin
+that down.
 
-I due test in fondo coprono un buco trovato in revisione: il tema e' per
-combinazione auto/pista, e deve essere scordato al cambio (o resterebbe
-appiccicato, magari per l'intera sessione successiva) ma non a ogni giro sulla
-STESSA combinazione, dove `_rebuild_reference` gira di nuovo per rincorrere il
-nuovo miglior tempo appena impostato da `_observe_lap`.
+The two tests at the bottom cover a gap found in review: the theme belongs to a
+car/track combination, and must be forgotten on a switch (or it would stay stuck,
+possibly for the whole following session) but not on every lap on the SAME
+combination, where `_rebuild_reference` runs again to chase the new best time
+`_observe_lap` just set.
 """
 from accoach.coaching.cue import CueCategory
 from accoach.coaching.focus import Focus, FocusKind, FocusReport
@@ -46,7 +46,7 @@ def test_active_focus_yields_the_english_key():
 
 
 def test_the_translated_label_is_not_used():
-    """Anche con l'etichetta in italiano, la chiave resta inglese."""
+    """Even with an Italian label, the key stays English."""
     rep = FocusReport(kind=FocusKind.DRILL,
                       message="",
                       focus=_focus(CueCategory.MORE_THROTTLE, "trazione"))
@@ -62,10 +62,10 @@ def test_no_focus_yields_none():
 # --- the theme belongs to a car/track, not to the session ------------------
 
 def test_car_switch_clears_the_leftover_focus_theme(tmp_path):
-    """Un tema di focus e' di una combinazione auto/pista sola: al cambio va
-    scordato, o il filtro continuerebbe a scartare consigli su un tema che non
-    c'entra piu' niente — anche per l'intera sessione successiva, se quella
-    combinazione non accumula mai un riferimento da cui nascere un focus."""
+    """A focus theme belongs to a single car/track combination: it must be
+    forgotten on a switch, or the filter would keep discarding advice about a
+    theme that no longer applies — possibly for the whole following session, if
+    that combination never accumulates a reference a focus could be born from."""
     frames = [
         synth.snap(pos=0.1, car_model="ferrari_488_gt3", track="monza"),
         synth.snap(pos=0.1, car_model="porsche_992_gt3", track="spa"),

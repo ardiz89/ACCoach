@@ -1,11 +1,11 @@
-"""Le parole-innesco: quello che il coach dice in pista quando c'e' un focus.
+"""Trigger words: what the coach says on track while a focus is active.
 
-Tre coach professionisti indipendenti usano lo stesso strumento e lo stesso nome
-(«trigger words»), per un motivo dichiarato: la banda passante del pilota che guida
-e' finita. Una-tre parole, sempre le stesse.
+Three independent professional coaches use the same tool and the same name
+("trigger words"), for a stated reason: the bandwidth of a driver who is driving
+is finite. One to three words, always the same ones.
 
-Il test sulle due lingue non e' pedanteria: l'audit del 2026-08-08 ha trovato due
-messaggi che escono in italiano quando l'interfaccia e' in inglese.
+The two-language test isn't pedantry: the 2026-08-08 audit found two messages that
+come out in Italian when the interface is set to English.
 """
 from accoach.coaching.cue import (
     TRIGGER, CueCategory, CueTier, tier_of, trigger_text,

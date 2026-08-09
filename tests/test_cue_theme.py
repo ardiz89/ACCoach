@@ -1,9 +1,9 @@
-"""Il tema di una categoria: chiave inglese per i confronti, etichetta per il pilota.
+"""A category's theme: an English key for comparisons, a label for the driver.
 
-Il test di completezza esiste perche' questo progetto ha gia' preso questa famiglia
-di difetti: una categoria con titolo, grafico ed esercizio e nessun produttore. Una
-categoria di tecnica senza tema non verrebbe mai pronunciata con un focus attivo, e
-il difetto sarebbe invisibile.
+The completeness test exists because this project has already been bitten by this
+family of bug: a category with a title, a chart and a drill, and no producer. A
+technique category with no theme would never be spoken while a focus is active,
+and the defect would be invisible.
 """
 from accoach.coaching.cue import (
     THEME, CueCategory, CueTier, theme_key, theme_label, tier_of,
@@ -20,16 +20,16 @@ def test_theme_key_is_english_regardless_of_language():
 def test_theme_label_is_translated():
     assert theme_label(CueCategory.BRAKE_LATER, "it") == "frenata"
     assert theme_label(CueCategory.BRAKE_LATER, "en") == "braking"
-    # Lingua sconosciuta: si ripiega sull'inglese, non si esplode.
+    # Unknown language: falls back to English, doesn't blow up.
     assert theme_label(CueCategory.BRAKE_LATER, "de") == "braking"
 
 
 def test_every_technique_category_has_an_explicit_theme():
-    """Fallisce quando si aggiunge una categoria di tecnica senza darle un tema."""
+    """Fails when a technique category is added without giving it a theme."""
     missing = [
         c.name for c in CueCategory
         if tier_of(c) == CueTier.TECHNIQUE
-        and c is not CueCategory.GOOD          # la lode non ha tema: vedi Task 3
+        and c is not CueCategory.GOOD          # praise has no theme: see Task 3
         and c not in THEME
     ]
     assert not missing, f"categorie di tecnica senza tema in THEME: {missing}"
