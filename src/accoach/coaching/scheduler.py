@@ -30,7 +30,7 @@ never goes stale.
 
 from __future__ import annotations
 
-from .cue import Cue, CueCategory, CueTier
+from .cue import Cue, CueCategory, CueTier, theme_key, tier_of
 
 _DEFAULT_MIN_INTERVAL_S = 4.0
 _DEFAULT_ACUTE_INTERVAL_S = 1.5      # acute cues may speak this soon after the last cue
@@ -55,6 +55,46 @@ class CueScheduler:
         self._pending: list[tuple[Cue, float | None]] = []
         self._last_spoken_at: float = -1e9
         self._recent: dict[tuple, float] = {}  # dedup_key -> last spoken time
+        # The theme the session is working on, as an English key, or None while
+        # no focus has been elected. See `set_focus`.
+        self._focus_theme: str | None = None
+
+    def set_focus(self, theme: str | None) -> None:
+        """Limit on-track technique advice to one theme — the attention budget.
+
+        Coaches cap a session at two or three themes and give the reason out
+        loud: the driver's bandwidth while driving is finite. The FocusCoach
+        already elects one weakness at a time; this is how the voice gets told.
+
+        ``theme`` is the **English** key from :func:`accoach.coaching.cue.theme_key`,
+        never the translated label — a comparison that changed outcome with the
+        interface language would be invisible in Italian.
+
+        ``None`` (no focus elected yet) restores the previous behaviour exactly:
+        the coach speaks about everything, as it did before this existed.
+        """
+        self._focus_theme = theme
+
+    @property
+    def focus_theme(self) -> str | None:
+        """The theme currently being worked, or None. Read-only for callers."""
+        return self._focus_theme
+
+    def _off_theme(self, cue: Cue) -> bool:
+        """True when this cue belongs to a theme the session isn't working on.
+
+        Only technique cues are filtered. An acute call is an event, not a theme
+        to train, and an advisory is car information spoken at the finish line.
+        Praise is exempt too: naming something the driver did well is half the
+        job, and it is never the thing that overloads them.
+        """
+        if self._focus_theme is None:
+            return False
+        if tier_of(cue.category) != CueTier.TECHNIQUE:
+            return False
+        if cue.category is CueCategory.GOOD:
+            return False
+        return theme_key(cue.category) != self._focus_theme
 
     def submit(self, cue: Cue, now: float | None = None) -> None:
         self._pending.append((cue, now))
@@ -117,6 +157,8 @@ class CueScheduler:
         chosen: Cue | None = None
         for cue, _t0 in self._pending:
             if acute_only and cue.tier != CueTier.ACUTE:
+                continue
+            if self._off_theme(cue):
                 continue
             last = self._recent.get(cue.dedup_key())
             if last is not None and now - last < self.repeat_suppress_s:
