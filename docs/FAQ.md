@@ -85,6 +85,10 @@ clicks from the game).
   Crew Chief.
 - **Move or close it:** start it with `--interactive`, or close the terminal that
   launched it (`Ctrl+C`).
+- **The thin amber line** is your focus: theme, corner and the tenths it costs.
+  Once the coach has moved to trigger words (see *One theme at a time*) it also
+  carries **the word** you'll hear, like "LESS BRAKE" — the whole sentence stays
+  in the pill above it and in the debrief.
 - **Watching your own trail braking:** turn on **Settings → Show the pedal
   trace**. It adds a strip under the HUD with your throttle (green) and brake
   (red) over the last few seconds. The ribbon below them goes **amber** while
@@ -93,6 +97,39 @@ clicks from the game).
   *tells* you about your brake release after the fact; this is the only place
   you can watch it as you do it. Off by default because it makes the overlay
   taller.
+
+## One theme at a time (and why the coach says less after a few laps)
+
+Once you've put in a few clean laps, HONE stops commenting on everything and
+**elects one weakness**: the corner where you lose the most, and why. It tells
+you ("New focus — Variante Ascari: let's work on braking…"), and **from then on
+it only talks about that theme on track**. Everywhere on the lap, not just in
+that corner: if your braking is off, it isn't off in one place only, and the
+*mistake* is what gets trained.
+
+And it says it in **one word**, not a sentence: "less brake", "later",
+"throttle". The words are agreed with you **up front**, in the message that
+announces the focus — *"On track I'll only say words about braking, like 'less
+brake'"* — and the focus line on the overlay keeps the word in front of you while
+you drive.
+
+This isn't a whim: three independent professional coaches impose the same limit
+— **two or three themes per session**, and on track **trigger words of one to
+three words**, agreed beforehand. The reason they give is always the same, and
+it's yours: a driver in motion has finite bandwidth, and by the tenth sentence in
+three laps you've stopped listening.
+
+**Nothing is lost.** Whatever the coach keeps quiet about on track is in the
+**debrief** and in the report, with its tenths: the debrief is computed from the
+lap, not from what was said, so the corners the voice skipped are all still
+there. The voice picks what to tell you *now*; the debrief picks nothing.
+
+**Events stay outside the filter**: lock-ups, wheelspin, fuel and the pit calls
+are always spoken. They aren't themes to train, they're things happening to you.
+
+Until there's a focus — the first laps, while it's still watching you drive — the
+coach talks about everything, as it always did. And when the corner improves, or
+won't budge after a few laps, it parks it and moves on: new theme, new words.
 
 ## Being called into the pits
 
@@ -336,6 +373,12 @@ button is the same thing with a file picker.)
 **The voice isn't speaking.**
 Run with the voice on (default) rather than `--silent`. Fixed phrases use a
 pre-rendered neural voice; numeric phrases fall back to the system voice.
+
+**The trigger words sound worse than the sentences.**
+They do, and we know. Fixed phrases come from a pre-rendered **neural** voice;
+the focus trigger words haven't been recorded yet, so for now they come out of
+the **system** voice, which is more robotic. Work in progress — it changes how
+it sounds, not what you're told.
 
 **Where are the logs if something breaks?**
 `python -m accoach logs` opens the folder with logs and crash reports.
