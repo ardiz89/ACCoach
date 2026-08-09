@@ -110,9 +110,9 @@ fine sessione e nel report, con i suoi decimi: il debrief è calcolato sul giro,
 non su quello che è stato detto, quindi le curve su cui la voce è rimasta zitta
 ci sono tutte. La voce sceglie cosa dirti *adesso*; il debrief non sceglie niente.
 
-Restano **fuori dal filtro gli eventi**: bloccaggio, pattinamento, benzina e le
-chiamate ai box si sentono sempre. Non sono temi da allenare, sono cose che
-stanno succedendo.
+**Fuori dal filtro resta tutto ciò che non è tecnica di guida sul tema
+attivo**: bloccaggio, pattinamento, sotto e sovrasterzo, benzina, le chiamate
+ai box, gli avvisi di assetto al traguardo, la lode — si sentono sempre.
 
 Finché un focus non c'è — i primi giri, quando ti sta ancora guardando girare —
 il coach parla di tutto, come sempre. E quando la curva migliora, o non scende
@@ -227,9 +227,10 @@ Non devi fare nulla di speciale: avvia la sessione (Pratica, Hotlap, Gara) e gui
   riga, e la riprendono appena l'avviso si spegne.
 - Sotto, una riga sottile in ambra: il **focus**, cioè su cosa stai lavorando —
   tema, curva e i decimi che ci perdi. Quando il coach è passato alle
-  parole-innesco (§3, «Un tema alla volta») lì c'è anche **la parola** che
-  sentirai, tipo «MENO FRENO»: la frase intera resta nella pastiglia e nel
-  debrief, la riga del focus ti ricorda solo cosa vuol dire quella parola.
+  parole-innesco (§3, «Un tema alla volta») lì c'è anche **una parola
+  d'esempio**, tipo «MENO FRENO»: la frase intera resta nella pastiglia e nel
+  debrief, la riga del focus ti ricorda il tema — non tutte le parole che
+  sentirai.
 
 ### La traccia dei pedali (per il trail braking)
 

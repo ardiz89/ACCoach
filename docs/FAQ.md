@@ -87,8 +87,9 @@ clicks from the game).
   launched it (`Ctrl+C`).
 - **The thin amber line** is your focus: theme, corner and the tenths it costs.
   Once the coach has moved to trigger words (see *One theme at a time*) it also
-  carries **the word** you'll hear, like "LESS BRAKE" — the whole sentence stays
-  in the pill above it and in the debrief.
+  carries **an example word**, like "LESS BRAKE" — the whole sentence stays in
+  the pill above it and in the debrief; the line names the theme, not every
+  word you'll hear.
 - **Watching your own trail braking:** turn on **Settings → Show the pedal
   trace**. It adds a strip under the HUD with your throttle (green) and brake
   (red) over the last few seconds. The ribbon below them goes **amber** while
@@ -124,8 +125,9 @@ three laps you've stopped listening.
 lap, not from what was said, so the corners the voice skipped are all still
 there. The voice picks what to tell you *now*; the debrief picks nothing.
 
-**Events stay outside the filter**: lock-ups, wheelspin, fuel and the pit calls
-are always spoken. They aren't themes to train, they're things happening to you.
+**Outside the filter is anything that isn't driving technique on the active
+theme**: lock-ups, wheelspin, understeer and oversteer, fuel, the pit calls,
+the finish-line setup advisories, praise — always spoken.
 
 Until there's a focus — the first laps, while it's still watching you drive — the
 coach talks about everything, as it always did. And when the corner improves, or
