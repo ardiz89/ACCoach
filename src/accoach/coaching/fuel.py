@@ -51,7 +51,14 @@ class FuelEngineer:
         pos = s.lap_position
         cues = self._maybe_close_lap(s, pos)
 
-        if s.in_pit:
+        # Touching the pit lane at all disqualifies the lap: the question here is
+        # not "am I stopped in the box" but "did this lap go through the pits",
+        # and a lap spent behind the limiter — in-lap, out-lap, drive-through —
+        # burns nothing like a racing lap. `in_pit` stays because AC1 may well
+        # set it; on ACC, in everything we have been able to observe, `isInPit`
+        # never comes on and only `isInPitLane` does (measured on track 07/08
+        # with the car stationary in the box: in_pit=False, in_pit_lane=True).
+        if s.in_pit or s.in_pit_lane:
             self._pit_this_lap = True
         self._pos_min = min(self._pos_min, pos)
         self._pos_max = max(self._pos_max, pos)
