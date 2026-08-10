@@ -59,8 +59,9 @@ Validation — these read the live game, so the sim must be running:
                              (`setup bump --help` for the arguments)
   selftest                   check the TTS voice, write a report (works windowed)
   logs                       open the folder with logs and crash reports
-  test-panel                 step-by-step panel for on-track test protocols
+  test-panel [--top N]       step-by-step panel for on-track test protocols
                              (reads test_step.json; opens no telemetry, no socket)
+                             --top N: pixels below the top edge, to clear the HUD
 """
 
 

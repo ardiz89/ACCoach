@@ -196,13 +196,30 @@ _WHERE_Y, _TITLE_Y, _BODY_Y, _SPECS_Y, _CLOCK_Y = 14, 34, 74, 118, 148
 _BODY_STEP = 22           # distanza fra la prima e la seconda riga del corpo
 
 
+def parse_top(argv: list[str]) -> int:
+    """`--top N`: quanti pixel sotto il bordo alto dello schermo centrale.
+
+    Pura, e con un default che vale: un valore illeggibile (`--top pippo`,
+    `--top` senza numero) torna al margine normale invece di far cadere il
+    processo. Il riquadro si accende con il pilota già seduto, e una finestra
+    che non compare è un problema peggiore di una piazzata male.
+    """
+    if "--top" not in argv:
+        return _MARGIN
+    i = argv.index("--top")
+    try:
+        return int(argv[i + 1])
+    except (IndexError, ValueError):
+        return _MARGIN
+
+
 class TestPanel(QWidget):
     """La finestrella in alto a sinistra dello schermo centrale."""
 
     # pytest raccoglie per nome (`Test*`), e questa classe non è un test.
     __test__ = False
 
-    def __init__(self, path: Path | None = None) -> None:
+    def __init__(self, path: Path | None = None, top: int | None = None) -> None:
         super().__init__()
         # Stessa ricetta dell'HUD, che è già dimostrata sull'impianto del
         # pilota. `WindowTransparentForInput` non è cosmetica: un riquadro che
@@ -215,6 +232,7 @@ class TestPanel(QWidget):
         from .config import load_config
         scale = load_config().overlay.scale
         self._scale = scale if (scale and scale > 0) else 1.0
+        self._top = _MARGIN if top is None else int(top)
         self.resize(int(_BASE_W * self._scale), int(_BASE_H * self._scale))
         self._place()
         self._watch_screens()
@@ -230,10 +248,19 @@ class TestPanel(QWidget):
         """L'angolo in alto a sinistra dello schermo che il pilota guarda.
 
         Lo schermo di riferimento è quello sotto il centro del desktop virtuale:
-        è la stessa regola con cui l'HUD si centra (`Overlay._place_top_center`),
+        è la stessa regola con cui l'HUD si piazza (`overlay.top_left_in_center_panel`),
         ricopiata qui invece che condivisa — se una delle due cambia, va
         cambiata anche l'altra, o le due finestre smettono di essere d'accordo
         su quale sia «quello di mezzo».
+
+        **Quella copia si è già rotta una volta, il 10/08.** Il riquadro era nato
+        quando l'HUD stava in alto al *centro*, quindi l'angolo a sinistra era
+        libero; poi l'HUD si è spostato in alto a sinistra con lo stesso margine
+        di 24, e le due finestre sono finite una sopra l'altra — il pilota se n'è
+        accorto perché il grafico dei pedali era sparito sotto il riquadro. Da
+        qui `top`: la regola orizzontale resta una copia, ma la quota verticale
+        si dichiara da fuori, così convivere con l'HUD non richiede di
+        ricopiarne anche l'altezza (che cambia con l'opzione `--pedals`).
 
         Limite dichiarato: con tre monitor uniti in una superficie sola
         (Eyefinity/Surround) Windows ne riporta uno largo quanto tutti e tre, e
@@ -245,7 +272,7 @@ class TestPanel(QWidget):
             return
         screen = QApplication.screenAt(prim.virtualGeometry().center()) or prim
         g = screen.geometry()
-        self.move(g.left() + _MARGIN, g.top() + _MARGIN)
+        self.move(g.left() + _MARGIN, g.top() + self._top)
 
     def _watch_screens(self) -> None:
         """Ricolloca la finestra quando il desktop sotto cambia forma.
@@ -367,6 +394,7 @@ def main(argv: list[str] | None = None) -> None:
     import signal
     import sys
 
+    top = parse_top(argv or [])
     app = QApplication(sys.argv)
     load_fonts()                     # il riquadro dipinge nel carattere HONE
     # Lascia passare Ctrl+C dal terminale che l'ha avviato: senza un timer che
@@ -377,7 +405,7 @@ def main(argv: list[str] | None = None) -> None:
     tick.timeout.connect(lambda: None)
     tick.start(200)
 
-    panel = TestPanel()
+    panel = TestPanel(top=top)
     panel.refresh()                  # non aspettare mezzo secondo per il primo
     panel.show()
     sys.exit(app.exec())

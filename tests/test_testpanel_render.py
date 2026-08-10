@@ -132,3 +132,26 @@ def test_ends_at_non_finito_non_ha_countdown(valore):
     assert p.done is False
     assert p.title == "STINT"
     assert p.body == ("Resta a 220 in curva 1",)
+
+
+# --- --top: convivere con l'HUD, che dal 10/08 sta nello stesso angolo --------
+
+@pytest.mark.parametrize("argv, atteso", [
+    ([], 24),
+    (["--top", "378"], 378),
+    (["--top", "0"], 0),
+])
+def test_parse_top_legge_il_numero(argv, atteso):
+    from accoach.testpanel import parse_top
+    assert parse_top(argv) == atteso
+
+
+@pytest.mark.parametrize("argv", [["--top"], ["--top", "pippo"], ["--top", ""]])
+def test_parse_top_torna_al_margine_se_non_e_un_numero(argv):
+    """Un argomento sbagliato non deve impedire al riquadro di comparire.
+
+    Si accende col pilota gia' seduto: una finestra che non c'e' e' peggio di
+    una piazzata male, e chi la guarda non ha modo di leggere un traceback.
+    """
+    from accoach.testpanel import parse_top
+    assert parse_top(argv) == 24
