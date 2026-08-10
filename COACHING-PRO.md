@@ -265,8 +265,21 @@ Trovati incrociando i tre audit interni con la ricerca esterna. Ognuno è verifi
 - **Temperature freni vive su ACC** (125-317 °C misurati) e mai lette dal coaching, come
   `slipAngle`, la G verticale e l'usura gomma.
 - **La guida e le FAQ promettono il briefing da fermo ai box**, che su ACC non nasce mai perché
-  `isInPit` resta 0 nella piazzola. Lo sappiamo dal 7 agosto; i due documenti non sono stati
-  corretti.
+  `isInPit` resta 0 nella piazzola. Lo sappiamo dal 7 agosto.
+
+  **Aggiornamento del 2026-08-10.** Il briefing era il sintomo, non il difetto: `isInPit` è morto su
+  ACC e **tre** posti ci si appoggiavano. La domanda giusta era già scritta in casa dal 21 luglio
+  (`reader.py:318`, «isInPit only covers standing in the garage»): **la corsia, non la piazzola**.
+  - il briefing → ramo `fix/briefing-ai-box`, non ancora fuso;
+  - **il consumo benzina mediava dentro la sosta** — una sosta gomme non alza il serbatoio, quindi
+    il ramo del rifornimento non la prende, e il giro entrava nella media come se fosse costato mezzo
+    litro: il serbatoio legge un giro più ricco di quanto sia, e un avviso benzina in ritardo non si
+    recupera. Ramo `fix/benzina-corsia-box`, non ancora fuso;
+  - **il rilevatore di bloccaggi urla «alleggerisci il freno» mentre parcheggi** — `LOCKED` e
+    `WHEELSPIN` stanno fra le categorie di sicurezza, quindi sono le uniche che sopravvivono a
+    `quiet == "pit"`, e il cancello di bassa velocità in `_is_lockup` viene saltato apposta quando un
+    aiuto sta modulando: che è ogni frenata in ABS dentro la piazzola. Questo non l'aveva visto
+    nessuno.
 - **`STRATEGIE.md` è orfano**: il suo pilastro C non è mai stato costruito e non compare in roadmap.
 
 E due cose che invece **erano già giuste**, e vale la pena saperlo perché la ricerca le indica come
