@@ -96,6 +96,124 @@ _DARK = QColor(0x0B, 0x0E, 0x12, 165)  # Ink, semi-transparent backing pill
 _CARD_COLOUR = {"gain": _CYAN, "ok": _GREEN, "warn": _AMBER, "bad": _RED}
 
 
+# --- dove va la finestra: la matematica, pura ---------------------------------
+# Sta qui fuori dal widget apposta: cosi' si rigioca contro geometrie misurate
+# senza monitor veri (tests/test_overlay_placement.py). Prima era dentro
+# _place_top_center() e non la provava niente.
+_EDGE_MARGIN = 24        # lo stacco dal bordo alto che l'overlay aveva gia'
+_PANEL_ASPECT = 16 / 9   # ASSUNZIONE, non misura — vedi center_panel()
+# SOGLIA MISURATA (non scelta a occhio, e non una taratura nostra): sta nel vuoto
+# fra l'errore d'aspetto piu' alto degli impianti da ACCETTARE — 0.391%, tre
+# 1360x768 fusi; i tagli mainstream danno **zero esatto**, perche' con w % N == 0
+# la larghezza del pannello e' esatta — e il piu' basso di quelli da RIFIUTARE:
+# 0.781%, tre ultrawide 3440x1440 fusi, che con il vecchio 1% passavano e si
+# prendevano un pannello inventato. Tabella completa delle geometrie nel rapporto.
+_ASPECT_TOL = 0.005
+# Ogni quanto si ricontrolla la geometria. Eyefinity si accende una volta sola,
+# all'avvio del gioco: un secondo di overlay nel terzo sbagliato cade sulla
+# schermata di caricamento e non si vede, mentre leggere tre rettangoli una volta
+# al secondo non costa niente. Piu' fitto non compra niente, piu' rado si vede.
+_GEOMETRY_POLL_MS = 1000
+
+
+def center_panel(screens, virtual):
+    """The rectangle of the *middle* panel of the rig — ``(x, y, w, h)``.
+
+    ``screens`` is the list of screen rectangles and ``virtual`` the whole
+    virtual-desktop rectangle, both as plain ``(x, y, w, h)`` tuples.
+
+    Two cases, and only the second one assumes anything:
+
+    * **Qt reports several screens.** No assumption needed: the middle panel is
+      the one that contains the centre of the virtual desktop. It's read, not
+      guessed. (If the centre falls in a gap — panels that aren't contiguous —
+      the screen whose own centre is nearest wins.)
+    * **Qt reports one very wide screen.** AMD Eyefinity (or NVIDIA Surround) has
+      merged the panels and Qt can't see them any more, so how many there are is
+      *deduced* from the aspect ratio, **assuming the panels are identical and
+      16:9**. On the driver's rig that assumption is true and measured
+      (7680 = 3 x 2560); elsewhere it may well not be. So the deduction is only
+      trusted when the panel it implies is itself 16:9 to within ``_ASPECT_TOL``
+      and divides the span exactly — otherwise the whole screen is used as-is.
+
+    What that guard actually saves is **21:9**: a single ultrawide (3440x1440,
+    2560x1080, 3840x1600, 5120x2160 all land on ``N <= 1``) and a fused row of
+    them (10320x1440 would imply N=4 and divides exactly, but the panel it
+    implies is 0.78% off 16:9, outside the tolerance).
+
+    What it does **not** save is **32:9**, and it can't: a single 5120x1440
+    (Samsung Odyssey G9 — a sim-racing monitor, not a curiosity) and two fused
+    2560x1440 panels are *the same rectangle*. Nothing in the geometry tells them
+    apart, and 3840x1080 and 7680x1080 are the same story. On those the fused
+    reading is **chosen**, not measured, and on a real G9 it puts the overlay at
+    half the width of one physical screen. Pinned in a test that says so by name.
+
+    With an even number of merged panels there is no true middle; the pinned
+    choice is index ``N // 2``, i.e. the right-hand one of two. It's a choice,
+    not a measurement.
+    """
+    rects = [tuple(int(v) for v in r) for r in screens]
+    if not rects:
+        return tuple(int(v) for v in virtual)
+
+    if len(rects) > 1:
+        vx, vy, vw, vh = (int(v) for v in virtual)
+        cx, cy = vx + vw // 2, vy + vh // 2
+        for x, y, w, h in rects:
+            if x <= cx < x + w and y <= cy < y + h:
+                return (x, y, w, h)
+        return min(rects, key=lambda r: (r[0] + r[2] // 2 - cx) ** 2
+                                        + (r[1] + r[3] // 2 - cy) ** 2)
+
+    x, y, w, h = rects[0]
+    if w <= 0 or h <= 0:                       # nothing to divide
+        return (x, y, w, h)
+    n = round((w / h) / _PANEL_ASPECT)
+    if n <= 1:                                 # one panel: nothing changes
+        return (x, y, w, h)
+    pw = w // n
+    if w % n or abs(pw / h - _PANEL_ASPECT) > _ASPECT_TOL * _PANEL_ASPECT:
+        return (x, y, w, h)                    # il conto non torna: non fidarsi
+    return (x + pw * (n // 2), y, pw, h)
+
+
+def top_left_in_center_panel(screens, virtual, size, margin: int = _EDGE_MARGIN):
+    """Top-left corner of the middle panel, inset by ``margin`` on both edges.
+
+    ``size`` is the overlay's ``(width, height)``: on a panel too small to hold
+    it the inset shrinks instead of pushing the window off the edge.
+    """
+    px, py, pw, ph = center_panel(screens, virtual)
+    w, h = size
+    return (px + min(margin, max(pw - w, 0)), py + min(margin, max(ph - h, 0)))
+
+
+def _overlaps(a, b) -> bool:
+    ax, ay, aw, ah = a
+    bx, by, bw, bh = b
+    return (ax < bx + bw and bx < ax + aw
+            and ay < by + bh and by < ay + ah)
+
+
+def _screen_snapshot():
+    """The desktop right now as plain numbers: ``(screens, virtual)``.
+
+    The single seam between Qt and the maths above — which is what lets the two
+    measured geometries (Eyefinity on and off) be replayed in a test.
+    """
+    app = QApplication.instance()
+    if app is None:
+        return ((), (0, 0, 0, 0))
+    screens = tuple((s.geometry().x(), s.geometry().y(),
+                     s.geometry().width(), s.geometry().height())
+                    for s in app.screens())
+    prim = app.primaryScreen()
+    if prim is None:
+        return (screens, (0, 0, 0, 0))
+    vg = prim.virtualGeometry()
+    return (screens, (vg.x(), vg.y(), vg.width(), vg.height()))
+
+
 class Overlay(QWidget):
     def __init__(self, url: str | None = None, interactive: bool = False,
                  pedals: bool | None = None) -> None:
@@ -143,12 +261,18 @@ class Overlay(QWidget):
         # the driver; otherwise we place it ourselves — and keep placing it, see
         # _watch_screens().
         self._auto_place = not (ov.x >= 0 and ov.y >= 0)
+        # The desktop geometry the current position was computed against. This is
+        # what makes the re-placement independent of Qt's signals: if what's on
+        # screen now differs from this, the position is stale by definition.
+        self._placed_against: tuple | None = None
         if self._auto_place:
-            self._place_top_center()
+            self._place_top_left()
         else:
             self.move(ov.x, ov.y)
             if not self._on_a_screen():      # saved on a monitor that's now gone
-                self._place_top_center()
+                self._place_top_left()
+        if self._placed_against is None:
+            self._placed_against = _screen_snapshot()
         self._watch_screens()
 
         # WebSocket client on the Qt event loop — only when a URL is given.
@@ -211,22 +335,30 @@ class Overlay(QWidget):
 
             Eyefinity off → three screens at x = -2560 / 0 / +2560,
                             virtual desktop starts at -2560, centre 1279
-            Eyefinity on  → one 7680-wide screen at x = 0, centre 3840
+            Eyefinity on  → one 7680-wide screen at x = 0
 
-        The overlay placed at x≈959 (dead centre of the middle panel with
-        Eyefinity off) keeps that absolute coordinate, and once the origin shifts
-        by 2560 the same x lands in the *left* third of the span. Which is exactly
-        where the driver found it. Nothing was wrong with the maths — it was
-        computed against a desktop that no longer existed.
+        The overlay placed inside the middle panel with Eyefinity off keeps that
+        absolute coordinate, and once the origin shifts by 2560 the same x lands
+        in the *left* third of the span. Which is exactly where the driver found
+        it. Nothing was wrong with the maths — it was computed against a desktop
+        that no longer existed.
+
+        This used to hang off Qt's screen signals alone, and on the driver's rig
+        that plainly wasn't enough: the bug survived. So the signals stay as a
+        shortcut, but they are **not** the mechanism. What decides is comparing
+        the geometry we placed against with the one on screen now, on a tick of
+        our own that fires no matter what Qt does or doesn't emit.
         """
         app = QApplication.instance()
-        if app is None:
-            return
-        app.screenAdded.connect(self._on_screens_changed)
-        app.screenRemoved.connect(self._on_screens_changed)
-        app.primaryScreenChanged.connect(self._on_screens_changed)
-        for screen in app.screens():
-            screen.geometryChanged.connect(self._on_screens_changed)
+        if app is not None:
+            app.screenAdded.connect(self._on_screens_changed)
+            app.screenRemoved.connect(self._on_screens_changed)
+            app.primaryScreenChanged.connect(self._on_screens_changed)
+            for screen in app.screens():
+                screen.geometryChanged.connect(self._on_screens_changed)
+        self._geometry_poll = QTimer(self)
+        self._geometry_poll.timeout.connect(self._reposition_if_geometry_changed)
+        self._geometry_poll.start(_GEOMETRY_POLL_MS)
 
     def _on_screens_changed(self, *_args) -> None:
         # New screens need watching too, or a later rearrangement goes unseen.
@@ -236,30 +368,52 @@ class Overlay(QWidget):
             except (RuntimeError, TypeError):
                 pass
             screen.geometryChanged.connect(self._on_screens_changed)
-        if self._auto_place:
-            self._place_top_center()
-        elif not self._on_a_screen():
+        self._reposition_if_geometry_changed()
+
+    def _reposition_if_geometry_changed(self) -> None:
+        """Redo the sum when the desktop underneath is no longer the same one.
+
+        Nothing here asks *why* it changed, and nothing waits to be told: a
+        position computed against a desktop that no longer exists is stale, full
+        stop. Unchanged geometry means the window isn't touched, so nothing gets
+        yanked around once a second while the desktop sits still.
+
+        That last promise is narrower than it looks, so here is its real shape.
+        Only a position pinned in the config survives a geometry change, and only
+        while it stays on a screen (``_auto_place`` False, ``_on_a_screen()``
+        True). A drag inside ``--interactive`` does **not** pin: ``mouseReleaseEvent``
+        saves the coordinates but leaves ``_auto_place`` alone, so an overlay that
+        started automatic and was then dragged goes back to the corner at the
+        first geometry change — i.e. exactly when Eyefinity comes on. Pre-existing
+        and left alone on purpose; see the report.
+        """
+        snap = _screen_snapshot()
+        if snap == self._placed_against:
+            return
+        if self._auto_place or not self._on_a_screen():
             # Even a pinned position has to stay reachable: a saved x of 5000 on a
             # desktop that just shrank is an overlay the driver reports as "gone".
-            self._place_top_center()
+            self._place_top_left()
+        else:
+            self._placed_against = snap
 
     def _on_a_screen(self) -> bool:
         """Is any part of the overlay actually on a physical screen?"""
-        return any(s.geometry().intersects(self.frameGeometry())
-                   for s in QApplication.screens())
+        screens, _virtual = _screen_snapshot()
+        fg = self.frameGeometry()
+        me = (fg.x(), fg.y(), fg.width(), fg.height())
+        return any(_overlaps(r, me) for r in screens)
 
-    def _place_top_center(self) -> None:
-        # Center on the middle of the whole desktop, not the primary screen's:
-        # on a triple / AMD Eyefinity rig the "center" the driver looks at is the
-        # middle panel. This lands there whether the driver merges the three into
-        # one wide screen (Eyefinity) or Windows keeps them as separate displays.
-        prim = QApplication.primaryScreen()
-        vg = prim.virtualGeometry()
-        center = vg.center()
-        # Use the top edge of the screen under that center point (handles panels
-        # that aren't all the same height / vertically aligned).
-        under = QApplication.screenAt(center) or prim
-        self.move(center.x() - self.width() // 2, under.geometry().top() + 24)
+    def _place_top_left(self) -> None:
+        # Top-left of the *middle* panel, which is what the driver asked for: on a
+        # triple rig the screen he's looking at is the centre one, and the corner
+        # keeps the HUD out of the way of the road. The maths lives in
+        # top_left_in_center_panel() so it can be tested without real monitors.
+        screens, virtual = _screen_snapshot()
+        self._placed_against = (screens, virtual)
+        x, y = top_left_in_center_panel(screens, virtual,
+                                        (self.width(), self.height()))
+        self.move(x, y)
 
     # --- websocket ---------------------------------------------------------
     def _connect(self) -> None:
