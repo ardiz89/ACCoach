@@ -316,6 +316,80 @@ def test_rolling_down_the_pit_lane_is_not_the_moment_to_talk():
     assert pc.update(lane, 0.0) == []
 
 
+# --- the same box, as ACC actually reports it ------------------------------
+#
+# The frame below is not invented: it was read straight out of the shared
+# memory on 07/08 (ACC, McLaren 720S GT3 Evo, Monza) with the car standing
+# still in its own pit box — `isInPit` (off 160) = 0, `isInPitLane`
+# (off 1236) = 1, speed 0.0, pos 0.040. The driver heard nothing, because
+# the briefing was hiding behind `in_pit`.
+
+def test_standing_still_in_the_box_speaks_even_when_in_pit_stays_off():
+    """The measured frame, replayed. In everything we were able to observe on
+    ACC `isInPit` never lights up, so a briefing gated on it alone is a
+    briefing that never happens — the whole feature dies at the last step."""
+    pc = PitCall()
+    pc.set_pending(True)
+    box = synth.snap(pos=0.040, speed_kmh=0.0, in_pit=False, in_pit_lane=True)
+    assert _cats(pc.update(box, 0.0)) == [CueCategory.PIT_BRIEFING]
+
+
+def test_stopped_outside_the_pit_lane_is_not_the_box():
+    """Standing on the grid, or parked at the side of the track after a spin,
+    is stopped but nowhere near the garage. Speed alone must never be enough."""
+    pc = PitCall()
+    pc.set_pending(True)
+    grid = synth.snap(pos=0.001, speed_kmh=0.0, in_pit=False, in_pit_lane=False)
+    assert pc.update(grid, 0.0) == []
+
+
+def test_the_standstill_threshold_is_pinned_where_it_was_decided():
+    """Two frames around the chosen number, so it is pinned at 1 km/h and not
+    at whatever value happens to be convenient. Below it the car is parked and
+    the briefing is due; above it the car is still creeping to its garage and
+    a long sentence about opening a browser page is the wrong thing to say."""
+    creeping = PitCall()
+    creeping.set_pending(True)
+    assert creeping.update(synth.snap(pos=0.040, speed_kmh=1.1, in_pit=False,
+                                      in_pit_lane=True), 0.0) == []
+    parked = PitCall()
+    parked.set_pending(True)
+    assert _cats(parked.update(synth.snap(pos=0.040, speed_kmh=0.9, in_pit=False,
+                                          in_pit_lane=True), 0.0)) \
+        == [CueCategory.PIT_BRIEFING]
+    edge = PitCall()
+    edge.set_pending(True)
+    assert _cats(edge.update(synth.snap(pos=0.040, speed_kmh=1.0, in_pit=False,
+                                        in_pit_lane=True), 0.0)) \
+        == [CueCategory.PIT_BRIEFING], "the number itself counts as stopped"
+
+
+def test_the_sim_saying_garage_is_believed_on_its_own():
+    """`in_pit` keeps its own route, ahead of the speed test. The frame here is
+    a design pin, not a measurement: we have never seen ACC report `in_pit` at
+    all, but on AC1 it may well work, and a sim that declares the car is in the
+    garage is not something we then second-guess with a speedometer."""
+    pc = PitCall()
+    pc.set_pending(True)
+    garage = synth.snap(pos=0.02, speed_kmh=3.0, in_pit=True, in_pit_lane=True)
+    assert _cats(pc.update(garage, 0.0)) == [CueCategory.PIT_BRIEFING]
+
+
+def test_at_a_standstill_it_is_still_said_once_and_still_retried():
+    """The latch and the retry belong to the briefing, not to `in_pit`: reached
+    by the new route they have to behave exactly as they do on AC1, or the ACC
+    driver gets the sentence on every single frame."""
+    pc = PitCall()
+    pc.set_pending(True)
+    box = synth.snap(pos=0.040, speed_kmh=0.0, in_pit=False, in_pit_lane=True)
+    burst = [c for i in range(50) for c in pc.update(box, i * 0.05)]
+    assert len(burst) == 1, "once, not every frame you sit there"
+    again = [c for i in range(400) for c in pc.update(box, 10.0 + i * 0.1)]
+    assert again, "nobody heard it; it has to ask again"
+    pc.mark_briefed()
+    assert [c for i in range(400) for c in pc.update(box, 100.0 + i * 0.1)] == []
+
+
 # --- the cues survive the engine's own gates -------------------------------
 
 def test_the_calls_are_not_gated_by_the_quiet_reasons():
