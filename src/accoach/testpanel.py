@@ -248,7 +248,7 @@ class TestPanel(QWidget):
         """L'angolo in alto a sinistra dello schermo che il pilota guarda.
 
         Lo schermo di riferimento è quello sotto il centro del desktop virtuale:
-        è la stessa regola con cui l'HUD si piazza (`overlay.top_left_in_center_panel`),
+        è la stessa regola con cui l'HUD sceglie lo schermo (`overlay.center_panel`),
         ricopiata qui invece che condivisa — se una delle due cambia, va
         cambiata anche l'altra, o le due finestre smettono di essere d'accordo
         su quale sia «quello di mezzo».

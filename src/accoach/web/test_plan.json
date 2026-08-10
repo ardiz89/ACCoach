@@ -424,7 +424,7 @@
           "n": "20",
           "what": "L'overlay parte sullo schermo centrale",
           "how": "Con i tre schermi uniti dal gioco, avvia HONE e guarda dove compare l'overlay. Poi chiudi il gioco e riaprilo: l'origine degli schermi si sposta, ed è lì che sbagliava.",
-          "expected": "L'overlay sta in alto a sinistra dello SCHERMO CENTRALE, non del monitor di sinistra, e ci torna da solo entro un secondo quando la geometria degli schermi cambia."
+          "expected": "L'overlay sta in alto al CENTRO dello schermo centrale, non sul monitor di sinistra, e ci torna da solo entro un secondo quando la geometria degli schermi cambia. Il riquadro dei test sta in alto a SINISTRA e non lo copre: sono due finestre diverse."
         },
         {
           "id": "Generale-21",

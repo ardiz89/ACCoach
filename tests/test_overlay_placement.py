@@ -1,11 +1,11 @@
-"""Dove si piazza l'overlay: in alto a sinistra dello schermo CENTRALE.
+"""Dove si piazza l'overlay: in alto al CENTRO dello schermo centrale.
 
 Il piazzamento non aveva nessun test. Il commento di ``_watch_screens``
 dichiarava di aver chiuso il difetto dell'origine che si sposta quando AMD
 Eyefinity fonde i tre monitor — e il difetto era vivo sulla macchina del pilota,
 perche' non l'aveva mai provato niente.
 
-Qui la matematica sta in una funzione pura (``top_left_in_center_panel``), quindi
+Qui la matematica sta in una funzione pura (``top_center_in_center_panel``), quindi
 si rigiocano le geometrie **misurate** senza monitor veri:
 
     Eyefinity spento → tre 2560x1440 a x = -2560 / 0 / +2560, virtual a -2560
@@ -31,7 +31,7 @@ from accoach.overlay import (                           # noqa: E402
     _EDGE_MARGIN,
     Overlay,
     center_panel,
-    top_left_in_center_panel,
+    top_center_in_center_panel,
 )
 
 # Le due geometrie misurate su questa macchina (vedi brief).
@@ -47,19 +47,19 @@ SIZE = (560, 210)   # l'overlay a scala 1.0
 def test_eyefinity_spento_il_pannello_centrale_e_quello_che_contiene_il_centro():
     """Tre schermi: nessuna assunzione, il centro del virtual cade in x=0..2560."""
     assert center_panel(OFF_SCREENS, OFF_VIRTUAL) == (0, 0, 2560, 1440)
-    assert top_left_in_center_panel(OFF_SCREENS, OFF_VIRTUAL, SIZE) == (24, 24)
+    assert top_center_in_center_panel(OFF_SCREENS, OFF_VIRTUAL, SIZE) == (1000, 24)
 
 
 def test_eyefinity_acceso_un_solo_schermo_largo_si_divide_in_tre():
     """7680/1440 = 5.33 → N = 3 → il pannello centrale parte a 2560."""
     assert center_panel(ON_SCREENS, ON_VIRTUAL) == (2560, 0, 2560, 1440)
-    assert top_left_in_center_panel(ON_SCREENS, ON_VIRTUAL, SIZE) == (2584, 24)
+    assert top_center_in_center_panel(ON_SCREENS, ON_VIRTUAL, SIZE) == (3560, 24)
 
 
 def test_un_monitor_solo_resta_un_monitor_solo():
     screens = ((0, 0, 2560, 1440),)
     assert center_panel(screens, (0, 0, 2560, 1440)) == (0, 0, 2560, 1440)
-    assert top_left_in_center_panel(screens, (0, 0, 2560, 1440), SIZE) == (24, 24)
+    assert top_center_in_center_panel(screens, (0, 0, 2560, 1440), SIZE) == (1000, 24)
 
 
 def test_5120x1440_e_ambiguo_e_si_sceglie_di_leggerlo_come_due_pannelli():
@@ -79,7 +79,7 @@ def test_5120x1440_e_ambiguo_e_si_sceglie_di_leggerlo_come_due_pannelli():
     """
     screens = ((0, 0, 5120, 1440),)
     assert center_panel(screens, (0, 0, 5120, 1440)) == (2560, 0, 2560, 1440)
-    assert top_left_in_center_panel(screens, (0, 0, 5120, 1440), SIZE) == (2584, 24)
+    assert top_center_in_center_panel(screens, (0, 0, 5120, 1440), SIZE) == (3560, 24)
     # 3840x1080 (49" 32:9) e' lo stesso caso, letto allo stesso modo.
     small = ((0, 0, 3840, 1080),)
     assert center_panel(small, (0, 0, 3840, 1080)) == (1920, 0, 1920, 1080)
@@ -96,7 +96,7 @@ def test_tre_ultrawide_fusi_non_diventano_quattro_pannelli_inventati():
     """
     screens = ((0, 0, 10320, 1440),)
     assert center_panel(screens, (0, 0, 10320, 1440)) == (0, 0, 10320, 1440)
-    assert top_left_in_center_panel(screens, (0, 0, 10320, 1440), SIZE) == (24, 24)
+    assert top_center_in_center_panel(screens, (0, 0, 10320, 1440), SIZE) == (4880, 24)
 
 
 def test_un_16_9_nominale_resta_dentro_la_tolleranza():
@@ -119,7 +119,7 @@ def test_uno_span_che_non_torna_ricade_sullo_schermo_intero():
     """
     screens = ((0, 0, 5000, 1440),)
     assert center_panel(screens, (0, 0, 5000, 1440)) == (0, 0, 5000, 1440)
-    assert top_left_in_center_panel(screens, (0, 0, 5000, 1440), SIZE) == (24, 24)
+    assert top_center_in_center_panel(screens, (0, 0, 5000, 1440), SIZE) == (2220, 24)
 
 
 def test_un_ultrawide_non_viene_spezzato_in_pannelli():
@@ -136,7 +136,7 @@ def test_tre_pannelli_fullhd_fusi():
 def test_il_bordo_alto_e_quello_del_pannello_non_quello_del_desktop():
     """Pannelli non allineati in verticale: il margine parte dal pannello scelto."""
     screens = ((0, 120, 2560, 1440), (2560, 0, 2560, 1440), (-2560, 300, 2560, 1440))
-    assert top_left_in_center_panel(screens, (-2560, 0, 7680, 1740), SIZE) == (24, 144)
+    assert top_center_in_center_panel(screens, (-2560, 0, 7680, 1740), SIZE) == (1000, 144)
 
 
 def test_se_il_centro_cade_in_un_buco_si_prende_il_pannello_piu_vicino():
@@ -149,22 +149,27 @@ def test_se_il_centro_cade_in_un_buco_si_prende_il_pannello_piu_vicino():
 def test_un_pannello_piu_stretto_dell_overlay_non_lo_butta_fuori():
     """Guardia: il margine si accorcia invece di spingere l'overlay oltre il bordo."""
     screens = ((0, 0, 400, 200),)
-    assert top_left_in_center_panel(screens, (0, 0, 400, 200), SIZE) == (0, 0)
+    assert top_center_in_center_panel(screens, (0, 0, 400, 200), SIZE) == (0, 0)
 
 
 def test_senza_schermi_si_usa_il_virtual_desktop():
     """Guardia: Qt che non riporta schermi non deve far esplodere il conto."""
-    assert top_left_in_center_panel((), (100, 50, 1920, 1080), SIZE) == (124, 74)
+    assert top_center_in_center_panel((), (100, 50, 1920, 1080), SIZE) == (780, 74)
 
 
 def test_uno_schermo_di_altezza_zero_non_divide_per_zero():
     assert center_panel(((0, 0, 1920, 0),), (0, 0, 1920, 0)) == (0, 0, 1920, 0)
 
 
-def test_il_margine_e_lo_stesso_sui_due_bordi():
-    """Il +24 dal bordo alto c'era gia'; da sinistra si usa lo stesso."""
-    x, y = top_left_in_center_panel(ON_SCREENS, ON_VIRTUAL, SIZE)
-    assert (x - 2560, y) == (_EDGE_MARGIN, _EDGE_MARGIN)
+def test_il_margine_alto_e_del_pannello_e_in_orizzontale_si_centra():
+    """Il +24 vale sul bordo alto; in orizzontale l'ancora e' il centro.
+
+    Il margine sinistro non esiste piu' di proposito: e' quello che aveva messo
+    l'HUD nello stesso angolo del riquadro dei test.
+    """
+    x, y = top_center_in_center_panel(ON_SCREENS, ON_VIRTUAL, SIZE)
+    assert y == _EDGE_MARGIN
+    assert x - 2560 == (2560 - SIZE[0]) // 2
 
 
 # --- (a) il conto rifatto quando la geometria cambia, senza segnali ---------
@@ -182,11 +187,11 @@ def test_eyefinity_che_si_accende_sposta_l_overlay_gia_piazzato(app, monkeypatch
     """
     monkeypatch.setattr(ov_mod, "_screen_snapshot", lambda: (OFF_SCREENS, OFF_VIRTUAL))
     o = Overlay()
-    assert (o.x(), o.y()) == (24, 24)          # dentro il pannello centrale, x=0..2560
+    assert (o.x(), o.y()) == (1000, 24)        # centrato nel pannello x=0..2560
 
     monkeypatch.setattr(ov_mod, "_screen_snapshot", lambda: (ON_SCREENS, ON_VIRTUAL))
     o._reposition_if_geometry_changed()
-    assert (o.x(), o.y()) == (2584, 24)        # il terzo di mezzo del nuovo span
+    assert (o.x(), o.y()) == (3560, 24)        # centrato nel terzo di mezzo
     o.deleteLater()
 
 
@@ -199,7 +204,7 @@ def test_il_riposizionamento_scatta_dal_timer_non_dai_segnali(app, monkeypatch):
 
     monkeypatch.setattr(ov_mod, "_screen_snapshot", lambda: (ON_SCREENS, ON_VIRTUAL))
     o._geometry_poll.timeout.emit()
-    assert o.x() == 2584
+    assert o.x() == 3560
     o.deleteLater()
 
 
@@ -211,9 +216,11 @@ def test_geometria_immutata_l_overlay_non_si_muove_da_solo(app, monkeypatch):
     """
     monkeypatch.setattr(ov_mod, "_screen_snapshot", lambda: (OFF_SCREENS, OFF_VIRTUAL))
     o = Overlay()
-    o.move(1000, 500)                 # come se l'avesse spostata qualcun altro
+    # Un punto che il piazzamento automatico non sceglierebbe mai su nessuno dei
+    # due assi: se il tick lo toccasse, si vedrebbe da entrambe le coordinate.
+    o.move(1234, 567)
     o._reposition_if_geometry_changed()
-    assert (o.x(), o.y()) == (1000, 500)
+    assert (o.x(), o.y()) == (1234, 567)
     o.deleteLater()
 
 
@@ -250,5 +257,5 @@ def test_una_posizione_appuntata_finita_fuori_torna_dentro(app, monkeypatch):
     small = (((0, 0, 2560, 1440),), (0, 0, 2560, 1440))
     monkeypatch.setattr(ov_mod, "_screen_snapshot", lambda: small)
     o._reposition_if_geometry_changed()
-    assert (o.x(), o.y()) == (24, 24)
+    assert (o.x(), o.y()) == (1000, 24)
     o.deleteLater()
