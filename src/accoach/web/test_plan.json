@@ -376,6 +376,62 @@
           "what": "Lingua nelle pagine web",
           "how": "Nelle pagine web usa il selettore lingua in alto e alterna EN/IT.",
           "expected": "Cambiano sia le etichette sia i contenuti (spiegazioni, livelli, nomi curva)."
+        },
+        {
+          "id": "Generale-14",
+          "n": "14",
+          "what": "Il focus si accende",
+          "how": "Serve un'auto e una pista su cui hai GIÀ dei giri salvati: senza un giro di riferimento il focus non nasce. Fai 3-4 giri puliti di fila e guarda la riga Focus nell'overlay.",
+          "expected": "Dopo il terzo giro pulito compare un focus: una curva e un tema (frenata, trazione, percorrenza, linea…). Se NON compare, fermati qui e segnalo: le prove 15, 16 e 17 vanno saltate, perché senza focus il coach parla come prima ed è giusto che lo faccia."
+        },
+        {
+          "id": "Generale-15",
+          "n": "15",
+          "what": "Il patto: il coach dice la parola che userà",
+          "how": "Quando il focus viene annunciato a voce, a fine giro, ascolta la frase per intero.",
+          "expected": "La frase nomina il TEMA e fa un esempio di parola: «In pista ti dirò solo parole sulla frenata, tipo 'meno freno'». Se annuncia il focus senza dire cosa sentirai, è un difetto."
+        },
+        {
+          "id": "Generale-16",
+          "n": "16",
+          "what": "In pista senti parole, non frasi",
+          "how": "Con il focus attivo, guida 2-3 giri normali facendo apposta anche errori di temi DIVERSI da quello del focus: se il focus è la frenata, esci male da una curva.",
+          "expected": "I consigli di tecnica che senti sono parole corte (1-3 parole) e tutte del tema del focus. Gli errori degli altri temi non vengono DETTI: li ritrovi scritti nell'overlay e nel resoconto di fine giro. Se senti frasi intere di tecnica, o una parola di un altro tema, è un difetto."
+        },
+        {
+          "id": "Generale-17",
+          "n": "17",
+          "what": "Sicurezza e box parlano comunque",
+          "how": "Con un focus attivo su un tema qualsiasi, provoca apposta un bloccaggio in staccata (freno fortissimo).",
+          "expected": "«Bloccaggio, alleggerisci il freno» lo senti lo stesso e per intero, anche se il bloccaggio non c'entra col tema del focus. Vale anche per pattinamento, benzina e chiamate ai box: il filtro non li tocca mai."
+        },
+        {
+          "id": "Generale-18",
+          "n": "18",
+          "what": "Il briefing da fermo ai box",
+          "how": "Guida finché l'Ingegnere propone una modifica che si fa SOLO in garage (prova 11), poi rientra ai box e fermati davvero nella tua piazzola, a 0 km/h. Su ACC questa prova prima non poteva riuscire.",
+          "expected": "Da fermo senti «Sei ai box. Apri la pagina Ingegnere nel browser: applica la proposta, scrivi il setup e ricaricalo dal garage prima di uscire». Se non arriva subito aspetta: si ripete ogni 8 secondi finché non viene detta."
+        },
+        {
+          "id": "Generale-19",
+          "n": "19",
+          "what": "Nessun allarme mentre parcheggi",
+          "how": "Entra in corsia box e frena deciso per fermarti nella piazzola, come faresti in gara.",
+          "expected": "Silenzio: nessun «bloccaggio», nessun «pattini in uscita». Prima gridava, perché una frenata con l'ABS a bassa velocità gli sembrava un bloccaggio."
+        },
+        {
+          "id": "Generale-20",
+          "n": "20",
+          "what": "L'overlay parte sullo schermo centrale",
+          "how": "Con i tre schermi uniti dal gioco, avvia HONE e guarda dove compare l'overlay. Poi chiudi il gioco e riaprilo: l'origine degli schermi si sposta, ed è lì che sbagliava.",
+          "expected": "L'overlay sta in alto a sinistra dello SCHERMO CENTRALE, non del monitor di sinistra, e ci torna da solo entro un secondo quando la geometria degli schermi cambia."
+        },
+        {
+          "id": "Generale-21",
+          "n": "21",
+          "what": "Il coach è assillante o assente?",
+          "how": "A fine sessione, da fermo. Non è una prova con un esito: è una domanda, e l'unico modo che abbiamo di rispondere.",
+          "expected": "Rispondi: assillante / giusto / assente. Lo stesso consiglio non si ripete prima di 20 secondi, e quel numero non è mai stato misurato su nessuno — non esiste un modo di deciderlo che non sia questa risposta."
         }
       ]
     }
@@ -468,6 +524,14 @@
     {
       "term": "Stint",
       "meaning": "Una serie di giri consecutivi con lo stesso set di gomme."
+    },
+    {
+      "term": "Focus",
+      "meaning": "La debolezza che HONE ha deciso di farti lavorare adesso: una curva e un tema. Ne tiene UNA per volta, per cinque-sei giri, poi la dichiara migliorata o la parcheggia e passa alla successiva. È lo stesso ritmo che usano i coach veri."
+    },
+    {
+      "term": "Parola-innesco",
+      "meaning": "La parola corta che senti in pista al posto della frase intera — «più tardi», «rilascia», «gas». Serve perché mentre guidi la testa è occupata: una frase la perdi, una parola no. È concordata prima, quando il coach annuncia il focus, e resta sempre la stessa per quel tema. La frase per esteso la trovi a schermo e nel resoconto."
     }
   ]
 }

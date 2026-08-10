@@ -29,6 +29,26 @@ def test_every_static_cue_has_a_neural_wav():
     )
 
 
+def test_trigger_words_have_a_neural_wav():
+    """The trigger words are neural, not SAPI5, from the moment a focus is elected.
+
+    From that moment, every technique call on track is a trigger word — the
+    phrases they replace ("Puoi frenare più tardi", "Più gas qui") already had
+    their neural WAV, so electing a focus used to downgrade the voice for the
+    rest of the session. The coverage test above cannot see it on its own:
+    `static_cue_messages()` walks `ast.Call` nodes and TRIGGER is a dict, so it
+    is folded in explicitly there. Only the Italian side: the shipped WAVs are
+    Italian by construction.
+    """
+    from accoach.coaching.cue import TRIGGER
+
+    man = _manifest()
+    missing = sorted(e["it"] for e in TRIGGER.values() if e["it"] not in man)
+    assert not missing, (
+        "parole-innesco senza WAV neurale (escono da SAPI5): " + repr(missing)
+    )
+
+
 def test_manifest_wavs_all_exist_and_are_audio():
     man = _manifest()
     assert man, "manifest vuoto"

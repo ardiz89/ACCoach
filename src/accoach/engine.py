@@ -36,7 +36,7 @@ from .coaching import (
     Voice,
 )
 from .coaching.analyzer import corner_level
-from .coaching.cue import CueCategory
+from .coaching.cue import CueCategory, theme_key, trigger_text
 from .coaching.debrief import build_lap_debrief
 from .coaching.diagnosis import build_lap_stats
 from .coaching.atwheel import WheelWatch
@@ -72,6 +72,33 @@ _SAFETY_CATEGORIES = {
     # one cue that only makes sense there the one cue that never arrives.
     CueCategory.PIT_IN, CueCategory.PIT_APPROACH, CueCategory.PIT_BRIEFING,
 }
+
+
+def _focus_theme_key(report: FocusReport | None) -> str | None:
+    """The English theme key of the active focus, or None if there isn't one.
+
+    Deliberately not `report.focus.theme`: that one is translated for the driver
+    ("frenata"), and comparing it against the scheduler's key would work in
+    Italian and silently stop filtering in English.
+    """
+    if report is None or report.focus is None:
+        return None
+    return theme_key(report.focus.category)
+
+
+def _spoken_forms(cue: Cue, focus_theme: str | None, lang: str) -> tuple[str, str]:
+    """What the ear hears and what the eye reads: (voice, screen).
+
+    They are the same string until a focus is active. From then on the voice gets
+    the trigger word and the screen keeps the whole sentence — the driver in a
+    corner has room for three words, the debrief afterwards has room for the rest.
+    """
+    if focus_theme is None:
+        return cue.message, cue.message
+    trigger = trigger_text(cue.category, lang)
+    if trigger is None:
+        return cue.message, cue.message
+    return trigger, cue.message
 
 # A spoken alert prefix for an engineer proposal, by confidence-tone × tag ×
 # language. The proposal's rationale (already localized) follows it; the prefix
@@ -331,11 +358,26 @@ class CoachEngine:
             self._log_engineer_outcome(lap, self._engineer_decision)
 
         # The Focus coach needs a reference to know where time was lost.
-        if self._focus is not None and self._reference is not None and self._corners:
+        if self._focus is None or self._reference is None or not self._corners:
+            # Fail open. Everything that could retire the theme lives inside the
+            # branch below, so a lap we can't observe is a lap on which nobody
+            # can park the focus or elect the next one — and `_rebuild_reference`
+            # runs after every saved lap and may leave no reference (nothing in
+            # today's condition band, or an unusable one) or no corners. Holding
+            # the last theme there would filter every technique cue against a
+            # theme that nothing can change again for the rest of the session:
+            # not silence, which the driver would notice, but a coach quietly
+            # wedged shut. If we can't confirm the focus, we speak.
+            self.scheduler.set_focus(None)
+        else:
             debrief = build_lap_debrief(lap, self._reference, self._corners)
             stable = lap.valid and lap.clean is not False
             before = (frozenset(self._focus.mastered), frozenset(self._focus.parked))
             self._focus_report = self._focus.observe(debrief, stable=stable)
+            # Tell the voice which theme the session is on. The FocusCoach has
+            # elected one weakness at a time since it was written; until now
+            # nobody downstream was listening.
+            self.scheduler.set_focus(_focus_theme_key(self._focus_report))
             after = (frozenset(self._focus.mastered), frozenset(self._focus.parked))
             if after != before:
                 self._save_focus_state()   # a corner just changed status; persist
@@ -589,11 +631,18 @@ class CoachEngine:
         }
 
     def _focus_block(self) -> dict | None:
-        """The latest Focus/Lesson report, in the shape a frontend consumes."""
+        """The latest Focus/Lesson report, in the shape a frontend consumes.
+
+        ``focus.trigger`` is the word the voice will actually use, and it is
+        filled only while the gate is really on that theme — so a frontend can
+        show the driver the word without ever promising one the coach isn't
+        going to say (the gate releases the theme on a lap it can't confirm).
+        """
         r = self._focus_report
         if r is None:
             return None
         f = r.focus
+        on_theme = self.scheduler.focus_theme is not None
         return {
             "kind": r.kind.value,
             "message": r.message,
@@ -604,6 +653,7 @@ class CoachEngine:
                 "name": f.name,
                 "theme": f.theme,
                 "category": f.category.value,
+                "trigger": trigger_text(f.category, current_language()) if on_theme else None,
                 "baseline_ms": round(f.baseline_ms, 1),
             },
         }
@@ -702,6 +752,15 @@ class CoachEngine:
             mastered, parked = self._load_focus_state(snap.car_model, snap.track)
             self._focus = FocusCoach(mastered=mastered, parked=parked)
             self._focus_report = None
+            # A focus theme belongs to one car/track combination. Left set, it
+            # would keep filtering technique advice on a theme that no longer
+            # applies — possibly for the whole session, if this combination
+            # never gets a reference to observe a lap against. NOT in
+            # `CueScheduler.reset()`: that also runs from `_rebuild_reference`
+            # after every completed lap on the SAME car/track (chasing a new
+            # best), which would erase the theme `_observe_lap` just set a few
+            # lines above.
+            self.scheduler.set_focus(None)
 
         # Drain cross-thread commands on this (the engine's) thread.
         with self._cmd_lock:
@@ -789,8 +848,11 @@ class CoachEngine:
             # Cues are authored in Italian (so the neural WAVs match); render them
             # in the active language for both the voice and the on-screen text.
             spoken.message = cue_text(spoken.message)
+            voice_text, screen_text = _spoken_forms(
+                spoken, self.scheduler.focus_theme, current_language())
+            spoken.message = screen_text
             if self.voice is not None:
-                self.voice.say(spoken.message)
+                self.voice.say(voice_text)
             self.history.append(spoken.message)
             del self.history[:-20]
 

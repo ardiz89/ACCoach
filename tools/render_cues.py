@@ -58,6 +58,12 @@ def static_cue_messages() -> set[str]:
                     if isinstance(a, ast.Constant) and isinstance(a.value, str) \
                             and len(a.value) > 5:
                         messages.add(a.value)
+
+    # The trigger words are a table, not a call, so the scanner above cannot see
+    # them — and they are exactly the phrases the driver hears most often. Only
+    # the Italian ones: the shipped WAVs are Italian by construction.
+    from accoach.coaching.cue import TRIGGER
+    messages.update(e["it"] for e in TRIGGER.values())
     return messages
 
 

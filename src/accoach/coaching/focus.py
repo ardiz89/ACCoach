@@ -29,7 +29,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 
 from ..i18n import current_language
-from .cue import CueCategory
+from .cue import CueCategory, trigger_text
+from .cue import theme_label as _theme_label
 from .debrief import CornerLoss, LapDebrief
 from .thresholds import RECUR_FRAC as _RECUR_FRAC
 from .thresholds import SIGNIF_LOSS_MS as _SIGNIF_MS
@@ -45,24 +46,42 @@ _SOLVED_MS = 80.0        # …and below this absolute, to count as solved
 _PATIENCE = 6            # laps spent on a focus with no win → park it, move on
 
 
-# A short, driver-facing label for what to work on, by loss category. The live
-# coach already says the "what"; this names the *theme* so a session has a spine.
-# Per-language; the theme is shown in the message AND in the payload (overlay /
-# engineer page), so it follows the active app language.
-_THEME = {
-    CueCategory.BRAKE_LATER: {"en": "braking", "it": "frenata"},
-    CueCategory.BRAKE_EARLIER: {"en": "braking", "it": "frenata"},
-    CueCategory.LESS_BRAKE: {"en": "braking", "it": "frenata"},
-    CueCategory.MORE_THROTTLE: {"en": "traction", "it": "trazione"},
-    CueCategory.CARRY_SPEED: {"en": "cornering", "it": "percorrenza"},
-    CueCategory.TIME_LOSS: {"en": "line", "it": "linea"},
-}
-_THEME_DEFAULT = {"en": "driving", "it": "guida"}
-
-
+# The theme table moved to cue.py, next to the category it describes: the voice
+# gate needs it too, and scheduler.py cannot import this module without pulling
+# debrief.py in behind it.
 def _theme(cat: CueCategory, lang: str) -> str:
-    entry = _THEME.get(cat, _THEME_DEFAULT)
-    return entry.get(lang) or entry["en"]
+    return _theme_label(cat, lang)
+
+
+# Names the theme and gives the word as an example, because the theme is what
+# the gate actually enforces: on "braking" the driver also hears "release",
+# "later", "earlier". The first wording promised the one word — a promise broken
+# on the second lap.
+#
+# The Italian reads "sulla {theme}", which fits every theme a focus can carry
+# (frenata, trazione, percorrenza, linea, guida — all feminine singular). Only
+# "marce" would need "sulle", and gear cues cannot reach a Focus: its category
+# comes from CornerLoss, which classify_corner fills from six categories only.
+_PACT = {
+    "it": " In pista ti dirò solo parole sulla {theme}, tipo «{word}».",
+    "en": " On track I'll only say words about {theme}, like “{word}”.",
+}
+
+
+def _brief_pact(cat: CueCategory, lang: str) -> str:
+    """The sentence that agrees the on-track wording with the driver, or "".
+
+    A trigger word only works because it was agreed beforehand — that is how every
+    coach observed introduces one. Said without the pact it is just a shout.
+
+    The theme comes from the **translated** label: this sentence is read by the
+    driver, unlike the key the gate compares.
+    """
+    word = trigger_text(cat, lang)
+    if not word:
+        return ""
+    tmpl = _PACT.get(lang) or _PACT["en"]
+    return tmpl.format(theme=_theme_label(cat, lang), word=word)
 
 
 # Per-lap report messages, per language; resolved with the active language at the
@@ -241,7 +260,8 @@ class FocusCoach:
         return FocusReport(
             FocusKind.BRIEF,
             _m("brief", lang, name=focus.name, theme=focus.theme,
-               base=_secs(focus.baseline_ms), cause=cause, drill=focus.drill),
+               base=_secs(focus.baseline_ms), cause=cause, drill=focus.drill)
+            + _brief_pact(focus.category, lang),
             focus=focus, drill=focus.drill, progress_ms=focus.baseline_ms)
 
     def _drill(self, debrief: LapDebrief) -> FocusReport:

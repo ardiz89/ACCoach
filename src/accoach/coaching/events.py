@@ -92,7 +92,14 @@ class EventDetector:
         self._spin = Episode()
 
     def update(self, s: TelemetrySnapshot, now: float) -> list[Cue]:
-        if not (s.connected and s.status == ACStatus.LIVE) or s.in_pit:
+        # The whole lane, not just the box. These two cues are in the engine's
+        # safety set, so they are the only driving advice that survives
+        # `quiet == "pit"` — this gate is the only thing standing between the
+        # driver and a lock-up call while they park. `in_pit` alone could not do
+        # it: ACC reads it as 0 with the car stationary in its garage (measured
+        # 2026-08-07), and the low-speed gate in `_is_lockup` is skipped exactly
+        # when an aid is modulating, which braking into a box always is.
+        if not (s.connected and s.status == ACStatus.LIVE) or s.in_pit or s.in_pit_lane:
             self.reset()
             return []
 

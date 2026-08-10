@@ -142,3 +142,32 @@ def test_engineer_voice_toggle_off_stays_silent(tmp_path):
     eng._announce_engineer(_propose("Understeer at apex: softer front anti-roll bar (−1)"))
     eng.close()
     assert voice.said == []
+
+
+# --- the voice wiring, end to end ------------------------------------------
+
+def test_a_focus_sends_the_trigger_to_the_ear_and_the_sentence_to_the_screen(tmp_path):
+    """The whole chain: poll -> cue_text -> _spoken_forms -> voice / state / history.
+
+    `_spoken_forms` is tested on its own and the engine tests stop before
+    `poll()`, so nothing covered the wiring in between — the place where the two
+    return values could be swapped and every other test would stay green.
+    """
+    from accoach.coaching.cue import Cue, CueCategory
+    from accoach.i18n import cue_text
+
+    voice = _FakeVoice()
+    eng = CoachEngine(reader=_StubReader([TelemetrySnapshot.disconnected()]),
+                      voice=voice, laps_dir=tmp_path)
+    eng.scheduler.set_focus("braking")
+    sentence = "Stai frenando troppo, alleggerisci"
+    eng.scheduler.submit(Cue(category=CueCategory.LESS_BRAKE, message=sentence,
+                             priority=300.0, segment=4, pos=0.5))
+
+    state = eng.tick(100.0)
+    eng.close()
+
+    assert voice.said == ["less brake"], "the ear should get the agreed word"
+    on_screen = cue_text(sentence)
+    assert state.spoken.message == on_screen
+    assert state.history[-1] == on_screen
