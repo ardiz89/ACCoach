@@ -99,8 +99,10 @@ hanno la stessa taglia di carattere e crescono insieme.
 
 Lo schermo di riferimento è quello **sotto il centro del desktop virtuale** —
 la stessa regola con cui `Overlay._place_top_center()` trova «quello di mezzo».
-Non se ne introduce una seconda: se i monitor vengono riordinati, le due finestre
-si spostano insieme invece di litigare su quale sia il centrale.
+La regola è la stessa, ma il codice è una **seconda copia**: il riquadro non
+importa nulla dall'HUD, perché il prezzo di questa architettura è esattamente
+non conoscerlo. Le due finestre si spostano insieme finché le due copie restano
+d'accordo — se una delle due cambia idea sul centro, l'altra non lo scopre.
 
 Misurato sull'impianto del pilota l'08/08: tre display **separati** da 2560×1440,
 il centrale è il primario (X da 0 a 2560, Y 0). Il riquadro va a (24, 24) di

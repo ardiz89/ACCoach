@@ -5,6 +5,8 @@ Pura di proposito — niente Qt, niente file. Le regole che contano davvero
 viene tagliato invece di allungare il riquadro) si verificano qui in memoria, e
 al widget resta da dimostrare solo che le disegna dove ha detto.
 """
+import pytest
+
 from accoach.testpanel import render_step
 
 
@@ -108,6 +110,24 @@ def test_ends_at_come_lista_non_ha_countdown():
     """Stesso caso, con un tipo che `float()` non converte affatto."""
     p = render_step({"title": "STINT", "do": "Resta a 220 in curva 1",
                      "ends_at": [1, 2, 3]}, now=1000.0)
+    assert p.countdown == ""
+    assert p.done is False
+    assert p.title == "STINT"
+    assert p.body == ("Resta a 220 in curva 1",)
+
+
+@pytest.mark.parametrize("valore", ["NaN", "Infinity", "-Infinity", float("nan")])
+def test_ends_at_non_finito_non_ha_countdown(valore):
+    """I due valori che `float()` accetta ma l'aritmetica dell'orologio no.
+
+    JSON li scrive come letterali senza virgolette e `json.load` li legge
+    volentieri. NaN non è mai <= 0 e `int(inf)` solleva: senza guardia
+    l'eccezione uscirebbe dalla `render_step` dentro il timer di Qt e il
+    riquadro resterebbe fermo sul passo precedente — il congelamento è peggio
+    di una caduta, perché non si vede.
+    """
+    p = render_step({"title": "STINT", "do": "Resta a 220 in curva 1",
+                     "ends_at": valore}, now=1000.0)
     assert p.countdown == ""
     assert p.done is False
     assert p.title == "STINT"

@@ -28,6 +28,7 @@ tradotto.
 from __future__ import annotations
 
 import json
+import math
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -87,6 +88,13 @@ def render_step(step: dict | None, now: float) -> Panel:
     if ends_at:
         try:
             left = float(ends_at) - now
+            if not math.isfinite(left):
+                # `float()` accetta "NaN" e "Infinity" senza protestare, ma il
+                # confronto e l'`int()` più sotto no: NaN non è mai <= 0 e int(inf)
+                # solleva. Senza questo controllo l'eccezione uscirebbe dal try e
+                # scoppierebbe dentro il timer, cioè il congelamento che vogliamo
+                # evitare. Un tempo non finito è un orologio illeggibile.
+                left = None
         except (TypeError, ValueError):
             # L'errore più probabile è `ends_at` scritto come stringa ISO invece
             # che epoch. Degrada a "nessun orologio", non a "fatto": un orologio
