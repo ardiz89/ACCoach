@@ -108,6 +108,24 @@ def test_aid_flag_without_slip_does_not_fire():
     assert all(c.category != CueCategory.WHEELSPIN for c in cues2)
 
 
+def test_silent_in_the_pit_lane_on_acc_where_is_in_pit_stays_off():
+    """Braking to a stop in your own box, ACC-style: `isInPit` 0 with the car in
+    the garage, `isInPitLane` 1 (measured in the car, 2026-08-07).
+
+    The detector stood down for the box only, so on ACC it stood down nowhere.
+    The low-speed gate that would otherwise have covered this is deliberately
+    skipped when an aid is modulating (see `_is_lockup`) — and braking hard into
+    a pit box is exactly ABS-modulated braking at low speed. The result is the
+    coach shouting "bloccaggio" at a driver who is parking.
+    """
+    det = EventDetector()
+    box = synth.snap(pos=0.02, brake=0.9, abs_active=0.6, speed_kmh=35.0,
+                     in_pit=False, in_pit_lane=True,
+                     slip_ratio=(-0.4, -0.4, 0.0, 0.0))
+    cues, _ = _hold(det, box, frames=6)
+    assert cues == []
+
+
 def test_reset_on_pit_rearms():
     det = EventDetector()
     _hold(det, _lock_frame(), frames=6)            # fires + leaves episode fired
