@@ -43,6 +43,7 @@ from .coaching.atwheel import WheelWatch
 from .coaching.focus import FocusCoach, FocusReport
 from .coaching.pitcall import PitCall
 from .i18n import cue_text, current_language
+from .logging_setup import get_logger
 from .comparison import DeltaState, LapComparator, Reference
 from .engineer import RaceEngineer, classify, engineer_for
 from .recording import Lap, LapRecorder, find_reference_lap, laps_root, save_lap
@@ -51,6 +52,8 @@ from .telemetry import SharedMemoryReader, TelemetrySnapshot
 from .telemetry.snapshot import ACStatus
 from .telemetry.feed import TelemetryFeed
 from .track import Corner, detect_corners
+
+_log = get_logger("coach")
 
 # When you're not on a representative flying lap — delta has ballooned because
 # you're crawling, recovering from an off, or parked — only acute safety cues
@@ -120,6 +123,40 @@ _ENG_VOICE_PREFIX = {
                "en": "Engineer, worth trying at the wheel:"},
     },
 }
+
+
+def _spoken_log_line(category, focus_theme: str | None,
+                     voice_text: str, screen_text: str) -> str:
+    """La riga che registra cosa il coach ha DETTO, e contro che filtro.
+
+    Pura, e con la forma decisa qui, perche' e' l'unica prova che avremo di due
+    domande che dal sedile non hanno risposta:
+
+    * **prova 16** — in pista arrivano parole corte o frasi intere? Si legge da
+      `voce=`, e il confronto con `schermo=` mostra cosa e' stato scritto e non
+      detto, che e' esattamente il comportamento da verificare;
+    * **prova 21** — i venti secondi fra due ripetizioni sono assillanti? E' una
+      domanda sui *tempi*, e le marche temporali le mette il logger.
+
+    Il 10/08 in pista tutt'e due sono rimaste indecidibili: il pilota stava
+    frenando, e a memoria non si cronometra niente.
+    """
+    tema = focus_theme or "-"
+    nome = getattr(category, "value", category)
+    return f"detto | {nome:<12} | tema={tema:<10} | voce={voice_text!r} | schermo={screen_text!r}"
+
+
+def _focus_log_line(report: FocusReport | None) -> str:
+    """Il contesto senza cui le righe `detto |` non si interpretano.
+
+    «Nessuna parola di trazione in cinque giri» significa una cosa se il focus
+    era la trazione, e un'altra se non e' mai stato eletto.
+    """
+    focus = report.focus if report else None
+    if focus is None:
+        return "focus | nessuno"
+    return (f"focus | {focus.name} | tema={_focus_theme_key(report)} "
+            f"| perdi {focus.baseline_ms:.0f} ms")
 
 
 def _decision_sig(decision) -> tuple | None:
@@ -378,6 +415,10 @@ class CoachEngine:
             # elected one weakness at a time since it was written; until now
             # nobody downstream was listening.
             self.scheduler.set_focus(_focus_theme_key(self._focus_report))
+            # Senza questa riga il log direbbe cosa e' stato detto ma non contro
+            # che cosa: «nessuna parola di trazione» significa una cosa se il
+            # focus e' la trazione e un'altra se non e' mai stato eletto.
+            _log.info("%s", _focus_log_line(self._focus_report))
             after = (frozenset(self._focus.mastered), frozenset(self._focus.parked))
             if after != before:
                 self._save_focus_state()   # a corner just changed status; persist
@@ -851,6 +892,18 @@ class CoachEngine:
             voice_text, screen_text = _spoken_forms(
                 spoken, self.scheduler.focus_theme, current_language())
             spoken.message = screen_text
+            # La traccia di cio' che il coach ha DETTO, con accanto il tema che
+            # stava filtrando. Esiste perche' il 10/08, in pista, due prove sono
+            # rimaste indecidibili: se in pista arrivino parole o frasi (prova
+            # 16) e se i 20 secondi di ripetizione siano assillanti (prova 21).
+            # Nessuna delle due si risponde a memoria — la 21 e' una domanda sui
+            # tempi, e il pilota stava frenando. Qui, e non dentro `Voice.say`,
+            # perche' solo qui si sanno anche la categoria e il tema attivo:
+            # senza quelli il log direbbe cosa e' uscito ma non se il filtro
+            # avesse ragione di farlo uscire.
+            _log.info("%s", _spoken_log_line(spoken.category,
+                                             self.scheduler.focus_theme,
+                                             voice_text, screen_text))
             if self.voice is not None:
                 self.voice.say(voice_text)
             self.history.append(spoken.message)

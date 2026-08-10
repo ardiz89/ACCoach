@@ -529,8 +529,15 @@ def run_dryrun(seconds: float | None = None) -> None:
 
     detectors = [EventDetector(), BalanceDetector(), BrakingDetector(), GearDetector()]
     counts: dict[str, int] = {}
-    print("Coach dry-run. Drive a clean lap, then provoke faults on purpose.")
-    print("Every cue the detectors raise is printed with its trigger values.\n")
+    # flush=True e non per abitudine: con lo stdout rediretto su file queste due
+    # righe restano nel buffer, e chi apre il file vede il VUOTO. Il 10/08 e'
+    # successo in pista, e un file vuoto si legge come «nessun segnale» mentre
+    # invece non dice niente — il modo peggiore in cui uno strumento di misura
+    # puo' sbagliare, perche' la risposta sbagliata arriva con l'aria di un dato.
+    print("Coach dry-run. Drive a clean lap, then provoke faults on purpose.",
+          flush=True)
+    print("Every cue the detectors raise is printed with its trigger values.\n",
+          flush=True)
 
     # Some thresholds are per-class (coaching.tuning). The engine retunes on car
     # change; do the same here or the audit would read a road car with GT3 numbers
@@ -558,12 +565,12 @@ def run_dryrun(seconds: float | None = None) -> None:
 
     seen = _sample_loop(on_sample, seconds, 0.02, wall_cap_s=240.0)
     _warn_if_no_live(seen)
-    print("\n--- cue counts ---")
+    print("\n--- cue counts ---", flush=True)
     if counts:
         for cat, n in sorted(counts.items(), key=lambda kv: -kv[1]):
-            print(f"  {cat:12} {n}")
+            print(f"  {cat:12} {n}", flush=True)
     else:
-        print("  (none fired)")
+        print("  (none fired)", flush=True)
 
 
 def run_stats(seconds: float | None = None) -> None:
