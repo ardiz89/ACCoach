@@ -247,32 +247,30 @@ class TestPanel(QWidget):
     def _place(self) -> None:
         """L'angolo in alto a sinistra dello schermo che il pilota guarda.
 
-        Lo schermo di riferimento è quello sotto il centro del desktop virtuale:
-        è la stessa regola con cui l'HUD sceglie lo schermo (`overlay.center_panel`),
-        ricopiata qui invece che condivisa — se una delle due cambia, va
-        cambiata anche l'altra, o le due finestre smettono di essere d'accordo
-        su quale sia «quello di mezzo».
+        Quale sia «lo schermo di mezzo» non lo decide più questo file: lo chiede
+        a `overlay.center_panel`, **la stessa funzione che usa l'HUD**. Prima ne
+        teneva una copia, ed è la copia che si è rotta due volte il 10/08:
 
-        **Quella copia si è già rotta una volta, il 10/08.** Il riquadro era nato
-        quando l'HUD stava in alto al *centro*, quindi l'angolo a sinistra era
-        libero; poi l'HUD si è spostato in alto a sinistra con lo stesso margine
-        di 24, e le due finestre sono finite una sopra l'altra — il pilota se n'è
-        accorto perché il grafico dei pedali era sparito sotto il riquadro. Da
-        qui `top`: la regola orizzontale resta una copia, ma la quota verticale
-        si dichiara da fuori, così convivere con l'HUD non richiede di
-        ricopiarne anche l'altezza (che cambia con l'opzione `--pedals`).
+        1. l'HUD si è spostato nell'angolo del riquadro e ci si è messo sopra —
+           il pilota se n'è accorto perché il grafico dei pedali era sparito;
+        2. col gioco acceso, che fonde i tre monitor in una superficie sola,
+           la copia atterrava sul pannello di **sinistra**: il riquadro finiva
+           su un altro monitor mentre l'HUD trovava il centro. Guardare a
+           sinistra in staccata è esattamente ciò che questo riquadro esiste
+           per non far fare.
 
-        Limite dichiarato: con tre monitor uniti in una superficie sola
-        (Eyefinity/Surround) Windows ne riporta uno largo quanto tutti e tre, e
-        questa regola atterra sul pannello di sinistra. Sull'impianto del pilota,
-        misurato l'08/08, i display sono tre separati da 2560×1440.
+        Condividere la funzione non riapre la porta che questo processo tiene
+        chiusa: `overlay` non importa né il motore né la telemetria, e il test
+        di architettura continua a dimostrarlo da fuori.
+
+        Della posizione resta qui solo ciò che è davvero diverso dall'HUD:
+        l'angolo (sinistra, non centro) e la quota verticale `top`.
         """
-        prim = QApplication.primaryScreen()
-        if prim is None:                       # pragma: no cover - senza schermi
-            return
-        screen = QApplication.screenAt(prim.virtualGeometry().center()) or prim
-        g = screen.geometry()
-        self.move(g.left() + _MARGIN, g.top() + self._top)
+        from .overlay import _screen_snapshot, center_panel
+        px, py, pw, ph = center_panel(*_screen_snapshot())
+        w, h = self.width(), self.height()
+        self.move(px + min(_MARGIN, max(pw - w, 0)),
+                  py + min(self._top, max(ph - h, 0)))
 
     def _watch_screens(self) -> None:
         """Ricolloca la finestra quando il desktop sotto cambia forma.

@@ -168,3 +168,30 @@ def test_refresh_porta_il_file_sullo_schermo(app, tmp_path, monkeypatch):
     w.refresh()
     assert w._panel.title == "BLOCCAGGI"
     w.deleteLater()
+
+
+# --- lo schermo di mezzo: la stessa funzione dell'HUD, non una copia ----------
+
+def test_il_riquadro_e_l_hud_scelgono_lo_stesso_pannello(monkeypatch):
+    """Con gli schermi fusi dal gioco le due finestre devono stare insieme.
+
+    Il 10/08, col gioco acceso, non ci stavano: l'HUD trovava il centro del
+    pannello di mezzo e il riquadro atterrava sul monitor di SINISTRA, perche'
+    teneva una copia sua della regola. Qui si rigioca la geometria misurata con
+    Eyefinity acceso e si pretende che il pannello sia lo stesso per entrambi.
+    """
+    from accoach import overlay as ov
+    from accoach import testpanel as tp
+
+    ACCESO = (((0, 0, 7680, 1440),), (0, 0, 7680, 1440))
+    monkeypatch.setattr(ov, "_screen_snapshot", lambda: ACCESO)
+
+    p = tp.TestPanel()
+    try:
+        px, _py, _pw, _ph = ov.center_panel(*ACCESO)
+        assert px == 2560                     # il terzo di mezzo, non lo zero
+        assert p.x() == px + 24               # il riquadro ci sta dentro
+        hud_x, _hud_y = ov.top_center_in_center_panel(*ACCESO, (560, 210))
+        assert p.x() < hud_x                  # a sinistra dell'HUD, non altrove
+    finally:
+        p.deleteLater()
