@@ -18,9 +18,10 @@ logic stays usable (and testable) without audio. ``enabled=False`` forces that.
 Two options shape the timbre:
 
 * ``male=True`` prefers an installed male system voice (e.g. "Cosimo" / "David")
-  and skips the shipped neural cues (rendered with a single, non-male voice) so
-  every phrase comes out in the same voice. A high-quality male cue set is a
-  future drop-in (a ``voice_cues_male/`` folder).
+  for dynamic phrases, and loads the shipped male neural cue set
+  (``voice_cues_male/``, rendered with ``tools/render_cues.py --male``) for the
+  fixed ones, so every phrase comes out male. If that folder isn't present it
+  falls back to the male SAPI5 voice for everything instead.
 * ``radio=True`` (default) runs whatever is played — neural cue or SAPI phrase —
   through :mod:`accoach.coaching.radio`, so it sounds like a pit-to-car radio
   call. Per-cue results are cached so each fixed cue is processed only once.

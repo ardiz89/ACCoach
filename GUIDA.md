@@ -86,6 +86,39 @@ riferimento** (il tuo più veloce valido). Quindi:
 > Quando NON sei sul giro buono (rientro dai box, testacoda, fuori pista) il coach
 > **tace** sui consigli tecnici e ti avvisa solo sugli eventi di sicurezza.
 
+### b-bis) Un tema alla volta — perché a un certo punto il coach dice di meno
+
+Dopo qualche giro pulito il coach smette di commentarti tutto ed **elegge una
+debolezza**: la curva dove perdi di più, e il perché. Te lo annuncia
+(«Nuovo focus — Variante Ascari: lavoriamo la frenata…»), e **da quel momento in
+pista ti parla solo di quel tema**. Su tutta la pista, non solo in quella curva:
+se stai frenando male, non lo stai facendo in un posto solo, ed è il *difetto*
+che si allena.
+
+E te ne parla **con una parola**, non con una frase: «meno freno», «più tardi»,
+«gas». Le parole te le dichiara **prima**, nel messaggio che annuncia il focus —
+*«In pista ti dirò solo parole sulla frenata, tipo «meno freno»»* — e te le
+ricorda sulla riga del focus dell'overlay, così ce l'hai davanti mentre guidi.
+
+Non è un capriccio: tre coach professionisti indipendenti impongono lo stesso
+limite — **due o tre temi per sessione**, e in pista **parole di una-tre parole**
+concordate prima. Il motivo che danno è sempre lo stesso, ed è il tuo: chi guida
+ha una banda passante finita, e alla decima frase in tre giri non la ascolti più.
+
+**Niente va perso.** Quello che il coach tace in pista lo trovi nel **debrief** di
+fine sessione e nel report, con i suoi decimi: il debrief è calcolato sul giro,
+non su quello che è stato detto, quindi le curve su cui la voce è rimasta zitta
+ci sono tutte. La voce sceglie cosa dirti *adesso*; il debrief non sceglie niente.
+
+**Fuori dal filtro resta tutto ciò che non è tecnica di guida sul tema
+attivo**: bloccaggio, pattinamento, sotto e sovrasterzo, benzina, le chiamate
+ai box, gli avvisi di assetto al traguardo, la lode — si sentono sempre.
+
+Finché un focus non c'è — i primi giri, quando ti sta ancora guardando girare —
+il coach parla di tutto, come sempre. E quando la curva migliora, o non scende
+dopo qualche giro, la parcheggia e passa alla successiva: cambia il tema, e
+cambiano le parole.
+
 ### c) Consigli di setup — a fine giro, ogni tanto
 Tra un giro e l'altro, quando un sintomo si ripete, ti suggerisce una regolazione
 (pressioni gomme, livelli TC/ABS dove regolabili, bilanciamento freni). Le
@@ -192,6 +225,12 @@ Non devi fare nulla di speciale: avvia la sessione (Pratica, Hotlap, Gara) e gui
   due secondi è un richiamo che ti perdi se in quel momento stavi guardando la
   curva davanti. I consigli continuano a essere **detti**: cedono solo quella
   riga, e la riprendono appena l'avviso si spegne.
+- Sotto, una riga sottile in ambra: il **focus**, cioè su cosa stai lavorando —
+  tema, curva e i decimi che ci perdi. Quando il coach è passato alle
+  parole-innesco (§3, «Un tema alla volta») lì c'è anche **una parola
+  d'esempio**, tipo «MENO FRENO»: la frase intera resta nella pastiglia e nel
+  debrief, la riga del focus ti ricorda il tema — non tutte le parole che
+  sentirai.
 
 ### La traccia dei pedali (per il trail braking)
 
@@ -748,6 +787,11 @@ Le voci che esistono *solo* lì:
 - **Non sento la voce** → lancia `python -m accoach selftest` (o il pulsante): scrive
   un report e prova a parlare. Da sorgente, assicurati di aver fatto
   `pip install pyttsx3`. Serve una voce italiana di sistema (es. "Microsoft Elsa").
+- **Le parole-innesco suonano peggio delle frasi** → è vero, e lo sappiamo. Le
+  frasi fisse escono da una voce **neurale** pre-registrata; le parole-innesco
+  del focus non sono ancora state registrate, quindi per ora escono dalla voce
+  **di sistema**, che è più robotica. Ci stiamo lavorando: cambia il suono, non
+  quello che ti viene detto.
 - **Nessun consiglio di curva** → ti manca il riferimento: fai 2 giri puliti
   completi. (Gli eventi acuti invece arrivano comunque.)
 - **L'analisi non mostra i giri** → guidali prima in modalità live/recorder; finiscono
