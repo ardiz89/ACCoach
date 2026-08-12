@@ -116,16 +116,25 @@ def _seg(pos: float) -> int:
 def _lock_spin_segments(samples: list[LapSample], spin_ratio: float) -> tuple[int, int]:
     """Distinct track segments with a lock-up / wheelspin (physical slip ratio).
 
-    Same thresholds as the live EventDetector; needs the v6 ``slip_ratio`` channel
-    (older laps have it zero → counts as 0, the safe default).
+    Same thresholds as the live EventDetector, but **not the same rule** — see
+    below. Needs the v6 ``slip_ratio`` channel (older laps have it zero → counts
+    as 0, the safe default).
     """
     locks: set[int] = set()
     spins: set[int] = set()
     for s in samples:
-        # Mirror the live EventDetector exactly: the aid intervention (abs/tc) is
-        # the primary signal and the physical slip ratio the fallback. On an ACC
-        # GT3 the aids hold slip low *because they're working*, so a slip-only
-        # check would miss every lock/spin and the engineer would never see them.
+        # NOT what the live EventDetector does, and the comment here used to
+        # claim it was. Live, since the 2026-07-19 audit (8 false wheelspin + 3
+        # false lock on one clean lap), the aid flag only GATES and the physical
+        # slip must confirm. Here the flag still TRIGGERS on its own — the
+        # reasoning being that on an ACC GT3 the aids hold slip low *because
+        # they're working*, so a slip-only check would show the engineer nothing.
+        #
+        # Measured 2026-08-12, Monza/720S: with ABS 6 this counts 5-7 lock
+        # segments on laps the live detector called silent, against 7 on a lap
+        # with four genuine locked-wheel events (slip -1.00). It cannot tell the
+        # two apart, so treat this count as "braking zones where an aid worked",
+        # never as "mistakes". Which of the two rules is right is still open.
         if s.brake >= _BRAKE_MIN and (
                 s.abs_active >= _ABS_LEVEL
                 or (s.speed_kmh >= _RATIO_MIN_SPEED

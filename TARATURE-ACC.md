@@ -264,6 +264,20 @@ su ACC le due vie di `_lock_spin_segments` si dividono il lavoro in modo netto:
 oggi sono state misurate valide tutte e due (zero falsi bloccaggi sui giri
 puliti).
 
+> **Correzione del 2026-08-12.** Il paragrafo qui sopra vale per
+> `_lock_spin_segments`, cioè l'analisi **dopo** il giro, e nel 2026-08-12 è
+> stato letto per errore come se valesse anche per l'allarme **dal vivo**: da
+> lì un'istruzione sbagliata data al pilota in macchina («lascia gli aiuti
+> accesi» per provocare un bloccaggio, che con l'ABS acceso non può avvenire).
+> Le due vie **non** seguono la stessa regola. Dal vivo (`events.py`), dal
+> 19/07 il flag solo *apre la porta* e lo slip deve confermare. Dopo il giro
+> (`diagnosis.py`) il flag decide da solo.
+>
+> E il «zero falsi bloccaggi sui giri puliti» non regge per la via post-giro:
+> misurato il 12/08 a Monza sul 720S, con ABS 6 conta **5-7 segmenti di
+> bloccaggio su giri che dal vivo erano silenziosi**, contro 7 su un giro con
+> quattro bloccaggi veri (slip −1.00). Non distingue i due casi.
+
 ### Sessione 2026-08-02 · SF25 (`gp_2025_sf25`) · Red Bull Ring · AC
 
 Fuori piano — la sessione è proseguita su AC con una Formula, che è la classe
