@@ -759,7 +759,15 @@
 
     "tray.pending":    { en: `Pending changes`, it: `Modifiche in sospeso` },
     "tray.reset":      { en: `Reset all`, it: `Azzera tutto` },
-    "tray.write":      { en: `Write setup…`, it: `Scrivi setup…` },
+    // Two ways out of the tray. The primary one writes straight away under an
+    // auto-numbered name, because the driver is sitting in the box with the
+    // engine running: naming a file is not what that moment is for. The other
+    // keeps the old road — a name you choose, and the physical diff (psi, mm)
+    // in front of you before anything is written.
+    "tray.write":      { en: `Name it…`, it: `Dai un nome…` },
+    "tray.apply":      { en: `Apply →`, it: `Applica →` },
+    "tray.applyTitle": { en: `Write straight away as HONE_1, HONE_2, … — no name to type`,
+                         it: `Scrive subito come HONE_1, HONE_2, … — nessun nome da digitare` },
 
     "modal.title":     { en: `Confirm setup write`, it: `Conferma scrittura setup` },
     "modal.name":      { en: `Destination file name`, it: `Nome file di destinazione` },
@@ -772,6 +780,30 @@
     "eng.noSetupOpt":  { en: `(no setup found)`, it: `(nessun setup trovato)` },
     "eng.noSetupBody": { en: `No setup files found for this car/track.<br>HONE reads setups from:<br><code>Documents/Assetto Corsa Competizione/Setups/&lt;car&gt;/&lt;track&gt;/</code> (ACC)<br><code>Documents/Assetto Corsa/setups/&lt;car&gt;/&lt;track&gt;/</code> (AC)<br>Save a setup in the game, then reload this page.`,
                          it: `Nessun file di setup trovato per questa auto/pista.<br>HONE legge i setup da:<br><code>Documents/Assetto Corsa Competizione/Setups/&lt;car&gt;/&lt;track&gt;/</code> (ACC)<br><code>Documents/Assetto Corsa/setups/&lt;car&gt;/&lt;track&gt;/</code> (AC)<br>Salva un setup nel gioco, poi ricarica questa pagina.` },
+
+    // The car/track you are actually driving has no setup folder yet. ACC only
+    // creates one when you save a setup from the garage, so this is the normal
+    // state on a circuit you have never saved on — not an error, and above all
+    // not a reason to show you another track's setup without saying so.
+    "eng.miss.title":  { en: `No setup for this track yet`,
+                         it: `Nessun assetto per questa pista` },
+    "eng.miss.driving": { en: `You're driving`, it: `Stai guidando` },
+    "eng.miss.why":    { en: `The game creates the setup folder only when you save one from the garage, so there is nothing here to edit yet.`,
+                         it: `Il gioco crea la cartella degli assetti solo quando ne salvi uno dal garage, quindi qui non c'è ancora niente da modificare.` },
+    "eng.miss.seedHead": { en: `Start from one you already have:`,
+                           it: `Parti da uno che hai già:` },
+    "eng.miss.seedBtn": { en: `Use as a base`, it: `Usa come base` },
+    "eng.miss.caveat": { en: `Pressures and aero from another circuit are <b>not</b> a setup for this one: it's a starting point, not a proposal. The engineer moves it from there, on your laps.`,
+                         it: `Pressioni e aero di un altro circuito <b>non</b> sono un assetto per questo: è un punto di partenza, non una proposta. Da lì lo muove l'ingegnere, sui tuoi giri.` },
+    "eng.miss.none":   { en: `You have no setups for this car on any track either. Save one in the game (garage → Setup → Save), then press Reload.`,
+                         it: `Non hai assetti di quest'auto nemmeno su altre piste. Salvane uno nel gioco (garage → Setup → Salva), poi premi Ricarica.` },
+    "eng.miss.reload": { en: `I've saved one — reload`, it: `Ho salvato io — ricarica` },
+    "eng.miss.optNone": { en: `no setup`, it: `nessun assetto` },
+    "eng.miss.seeded": { en: `✓ Copied from {from} — now edit it here, then write it`,
+                         it: `✓ Copiato da {from} — ora modificalo qui e poi scrivilo` },
+    "eng.miss.seedErr": { en: `Could not copy: `, it: `Non sono riuscito a copiare: ` },
+    // Where car/track came from when there's no live telemetry: the archive.
+    "eng.fromArchive": { en: `last recorded lap`, it: `ultimo giro registrato` },
 
     "eng.prepared.some": { en: `Change prepared (some parameters are not in this setup).`,
                            it: `Modifica preparata (alcuni parametri non sono in questo setup).` },

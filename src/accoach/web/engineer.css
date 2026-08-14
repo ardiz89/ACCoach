@@ -122,6 +122,39 @@ button.small { padding: 7px 12px; font-size: 13px; margin-top: 8px; }
   background: var(--inset); padding: 1px 4px; border-radius: 4px;
 }
 
+/* "Questa pista non ha assetti" — prende il posto dell'editor, non gli si
+   appoggia sopra: finché non c'è un file per l'auto/pista che stai guidando,
+   qui non c'è niente da modificare, e mostrare l'assetto di un'altra pista era
+   esattamente il difetto (2026-08-12, Monza: sullo schermo brands_hatch). */
+.miss {
+  border: 1px solid var(--amber); border-left: 4px solid var(--amber);
+  border-radius: 12px; padding: 16px 18px; background: var(--inset);
+  max-width: 640px;
+}
+.miss-title {
+  font-family: var(--font-display); font-size: 15px; color: var(--amber);
+  margin-bottom: 10px;
+}
+/* La riga che risponde a "sto guardando la macchina giusta?": in mono e
+   tabellare perché sono identificatori, non prosa, e si leggono a colpo. */
+.miss-who { font-size: 14px; margin-bottom: 10px; }
+.miss-who b { font-family: var(--font-mono); color: var(--text); }
+.miss-why { color: var(--muted); font-size: 13px; line-height: 1.5; margin: 0 0 12px; }
+.miss-seed-head { font-size: 13px; margin-bottom: 6px; }
+.miss-seeds { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
+.miss-seed {
+  display: flex; align-items: center; gap: 8px; cursor: pointer;
+  padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px;
+  font-family: var(--font-mono); font-size: 12px;
+}
+.miss-seed:hover { border-color: var(--cyan); }
+.miss-caveat {
+  color: var(--muted); font-size: 12px; line-height: 1.5;
+  margin: 10px 0 0; border-top: 1px solid var(--line); padding-top: 10px;
+}
+.miss-caveat b { color: var(--amber); }
+.miss-reload { margin-top: 12px; }
+
 /* Focus/Lesson box — twin of .engineer-says, about the driver's craft. */
 .focus-says {
   border: 1px solid var(--line); border-left: 4px solid var(--muted);
