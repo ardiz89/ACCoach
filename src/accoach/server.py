@@ -168,6 +168,26 @@ def create_app(engine: CoachEngine | None = None, hz: float = 15.0) -> FastAPI:
     return app
 
 
+def _build_voice(cfg, enabled: bool = True):
+    """The coach's voice, built exactly as ``live`` builds it (see ``app.py``).
+
+    The backend used to run **voiceless**: it broadcast a state and left
+    speaking to ``live``, whose overlay process it replaced. That is the wrong
+    default for the one session this process exists for — the race-engineer
+    loop. Its page lives on a tablet, and the two things it has to say while the
+    car is moving are *"box this lap"* and, once stopped, *"go and read it"*.
+    Neither can be delivered by a second screen the driver must not look at:
+    speaking them is the whole protocol (TARATURE-ACC.md, after the 2026-08-02
+    incident — while moving you are told, stopped you answer).
+
+    Same construction as ``live`` on purpose, so the voice is the same voice
+    whichever process is running, and ``--silent`` still buys silence.
+    """
+    from .coaching.voice import Voice  # noqa: PLC0415
+    return Voice(enabled=enabled, rate=cfg.voice.rate, language=cfg.language,
+                 male=cfg.voice.male, radio=cfg.voice.radio)
+
+
 def main(argv: list[str] | None = None) -> None:
     import sys
 
@@ -179,12 +199,19 @@ def main(argv: list[str] | None = None) -> None:
     cfg = load_config()
 
     argv = sys.argv[1:] if argv is None else argv
-    engine = None
+    voice_on = ("--silent" not in argv) and cfg.voice.enabled
+
     if "--demo" in argv:
-        from .demo import make_demo_engine
+        from .demo import make_demo_engine  # noqa: PLC0415
 
         engine = make_demo_engine()
         print("HONE backend in DEMO mode (synthetic lap, no game needed)")
+        if voice_on:
+            engine.voice = _build_voice(cfg)
+    else:
+        engine = CoachEngine(voice=_build_voice(cfg, enabled=voice_on),
+                             acquire_hz=cfg.acquire.hz,
+                             engineer_voice=cfg.voice.engineer)
 
     # LAN mode (config or --lan) binds 0.0.0.0 so a phone/tablet can reach the
     # live engineer feed; otherwise honour the configured interface.

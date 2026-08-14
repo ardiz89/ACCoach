@@ -38,7 +38,8 @@ Coaching, split up:
   monitor                    raw telemetry dashboard
 
 Multi-client (backend and clients as separate processes):
-  server [--demo]            headless backend, broadcasts over WebSocket
+  server [--demo] [--silent] headless backend, broadcasts over WebSocket AND speaks
+                             (--silent: no voice; the engineer's pit calls go with it)
   overlay [--interactive]    on-screen HUD (connects to the backend)
   web [--demo]               analysis web app (--demo: synthetic laps, no game)
 

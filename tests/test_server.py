@@ -86,3 +86,55 @@ def test_invalid_hz_does_not_crash():
         with client.websocket_connect("/ws") as ws:
             json.loads(ws.receive_text())   # a broadcast still arrives
         assert client.get("/health").status_code == 200
+
+
+# --- il backend parla ------------------------------------------------------
+# Costruiva il motore senza voce, perche' nato come "il pezzo che trasmette
+# mentre `live` parla". Ma e' il processo della fase assetto, e le due cose che
+# l'ingegnere deve dire mentre l'auto e' in movimento — «rientra ai box» e, da
+# fermo, «vai a leggerla» — non possono arrivare da un tablet che il pilota non
+# deve guardare. In silenzio, il pilota passava oltre il proprio ingresso box.
+
+def _main_with_stubs(monkeypatch, argv):
+    """Esegue `server.main(argv)` senza avviare uvicorn; torna il motore creato."""
+    import accoach.server as srv
+
+    built = {}
+
+    class _FakeVoice:
+        def __init__(self, **kw):
+            built["voice_kw"] = kw
+
+    class _FakeEngine:
+        def __init__(self, **kw):
+            built["engine_kw"] = kw
+
+    monkeypatch.setattr("accoach.coaching.voice.Voice", _FakeVoice)
+    monkeypatch.setattr(srv, "CoachEngine", _FakeEngine)
+    monkeypatch.setattr("uvicorn.run", lambda *a, **k: None)
+    monkeypatch.setattr(srv, "create_app", lambda **k: k)
+    srv.main(argv)
+    return built
+
+
+def test_il_backend_costruisce_una_voce(monkeypatch):
+    built = _main_with_stubs(monkeypatch, [])
+    assert built["voice_kw"]["enabled"] is True
+    # …e la passa al motore: una voce costruita e non collegata sarebbe muta
+    # esattamente come prima, con un test verde sopra.
+    assert built["engine_kw"]["voice"] is not None
+
+
+def test_silent_resta_silent(monkeypatch):
+    built = _main_with_stubs(monkeypatch, ["--silent"])
+    assert built["voice_kw"]["enabled"] is False
+
+
+def test_la_voce_e_quella_configurata(monkeypatch):
+    """Stessi parametri di `live`: la voce non deve cambiare timbro col processo."""
+    from accoach.config import load_config
+    cfg = load_config()
+    built = _main_with_stubs(monkeypatch, [])
+    kw = built["voice_kw"]
+    assert (kw["rate"], kw["language"], kw["male"], kw["radio"]) == (
+        cfg.voice.rate, cfg.language, cfg.voice.male, cfg.voice.radio)
