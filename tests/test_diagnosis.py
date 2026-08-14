@@ -73,21 +73,70 @@ def test_fp_rate_zero_on_neutral_lap():
     assert sum(stats.symptom_corners.values()) == 0     # no false positives
 
 
-def test_lock_spin_detected_via_aids_when_slip_is_low():
-    # On an ACC GT3 the aids hold slip near zero *because they're working*; the
-    # diagnosis must still register lock/spin from abs_active/tc_active, like the
-    # live detector — else the engineer never sees the problem.
+def test_an_aid_working_is_not_a_mistake():
+    """ABS/TC modulating with the slip low is correct technique, not a lock-up.
+
+    This test used to assert the opposite — that the flag alone was enough —
+    because the live detector worked that way too when it was written. The live
+    rule was tightened on 2026-07-19 (8 false wheelspin + 3 false lock on one
+    clean lap) and this half kept the old one, so for three weeks the same lap
+    was silent live and full of lock-ups in the engineer's eyes. Measured
+    2026-08-12 at Monza with ABS 6: 5-7 phantom lock segments per clean lap.
+    """
     press = (27.0, 27.0, 27.5, 27.5)
-    z4 = (0.0, 0.0, 0.0, 0.0)
-    lock = LapSample(0, 0.10, 200.0, 0.0, 0.9, 0.0, "4", 7000, 0.0, -1.0,
-                     abs_active=0.6, slip_ratio=z4, tyre_pressure=press)
-    spin = LapSample(1000, 0.60, 120.0, 1.0, 0.0, 0.0, "3", 7000, 0.0, 0.5,
-                     tc_active=0.6, slip_ratio=z4, tyre_pressure=press)
+    # Braking hard with ABS 6 modulating; slip stays where a working ABS keeps it.
+    abs_ok = LapSample(0, 0.10, 200.0, 0.0, 0.9, 0.0, "4", 7000, 0.0, -1.0,
+                       abs_active=0.6, slip_ratio=(-0.08, -0.07, 0.0, 0.0),
+                       tyre_pressure=press)
+    # Full throttle out of a slow corner with TC working; rear slip likewise low.
+    tc_ok = LapSample(1000, 0.60, 120.0, 1.0, 0.0, 0.0, "3", 7000, 0.0, 0.5,
+                      tc_active=0.6, slip_ratio=(0.0, 0.0, 0.06, 0.05),
+                      tyre_pressure=press)
     lap = Lap("ferrari_488_gt3", "monza", SessionType.PRACTICE, 100000, True,
-              samples=[lock, spin], clean=True)
+              samples=[abs_ok, tc_ok], clean=True)
     stats = build_lap_stats(lap)
-    assert stats.lock_segments >= 1            # from ABS, not slip
-    assert stats.spin_segments >= 1            # from TC, not slip
+    assert stats.lock_segments == 0
+    assert stats.spin_segments == 0
+    # The flag is not ignored either: with the aid modulating AND the slip
+    # confirming, it counts — and the low-speed gate is skipped (120 km/h here is
+    # above it anyway; the point is the pair, not the speed).
+    real_lock = LapSample(0, 0.10, 200.0, 0.0, 0.9, 0.0, "4", 7000, 0.0, -1.0,
+                          abs_active=0.6, slip_ratio=(-1.0, -1.0, 0.0, 0.0),
+                          tyre_pressure=press)
+    lap2 = Lap("ferrari_488_gt3", "monza", SessionType.PRACTICE, 100000, True,
+               samples=[real_lock, tc_ok], clean=True)
+    assert build_lap_stats(lap2).lock_segments == 1
+
+
+def test_dopo_il_giro_e_dal_vivo_rispondono_uguale():
+    """The post-lap count and the live detector cannot disagree on a frame.
+
+    Not a re-statement of the rule: it feeds the *same* frames to both paths and
+    demands the same answer. This is the guard that was missing — the two used to
+    hold one rule each, and nothing in the suite compared them, so the drift went
+    three weeks without a failing test.
+    """
+    from accoach.coaching.diagnosis import _lock_spin_segments
+    from accoach.coaching.events import is_lockup
+    from accoach.coaching.tuning import DEFAULT_TUNING
+
+    press = (27.0, 27.0, 27.5, 27.5)
+    frames = [
+        # (abs_active, front slip) across the interesting corners of the rule.
+        (0.6, -0.08),    # aid working, slip low      -> no
+        (0.6, -1.00),    # aid working, wheel stopped -> yes
+        (0.0, -0.30),    # no aid, real lock          -> yes
+        (0.0, -0.08),    # no aid, normal braking     -> no
+        (0.6, -0.15),    # exactly on the threshold   -> yes
+    ]
+    for i, (aid, slip) in enumerate(frames):
+        s = LapSample(i * 100, 0.05 + i * 0.15, 200.0, 0.0, 0.9, 0.0, "4", 7000,
+                      0.0, -1.0, abs_active=aid, slip_ratio=(slip, slip, 0.0, 0.0),
+                      tyre_pressure=press)
+        lap = Lap("ferrari_488_gt3", "monza", SessionType.PRACTICE, 100000, True,
+                  samples=[s], clean=True)
+        locks, _ = _lock_spin_segments(lap.samples, DEFAULT_TUNING.spin_ratio)
+        assert locks == int(is_lockup(s)), f"frame {i}: aid={aid} slip={slip}"
 
 
 def test_cold_frames_excluded_from_hot_pressures():

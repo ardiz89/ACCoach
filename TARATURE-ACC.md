@@ -278,6 +278,24 @@ puliti).
 > bloccaggio su giri che dal vivo erano silenziosi**, contro 7 su un giro con
 > quattro bloccaggi veri (slip −1.00). Non distingue i due casi.
 
+> **Chiusa il 2026-08-14: le vie sono tornate una.** `_lock_spin_segments` non
+> ha più una regola sua: chiama `events.is_lockup` / `is_wheelspin`, cioè
+> **la stessa funzione** che decide dal vivo. Quindi da qui in avanti la frase
+> «con gli aiuti accesi decide il flag» **non vale più da nessuna parte**: il
+> flag apre la porta e lo slip conferma, ovunque. Su un'auto con l'ABS acceso
+> questo conteggio ora legge ~0, che è la verità misurata qui sopra (11 690
+> frame, mai oltre `-0.106`).
+>
+> Il timore che nel 2026-06-29 aveva fatto nascere la copia — «così l'ingegnere
+> non vede più niente» — era fondato quando *anche dal vivo* decideva il flag.
+> Oggi no: quel conteggio entra solo nei cancelli di fase, e misurato prima e
+> dopo (`lock=6` contro `lock=0`, stessi giri) **le proposte dell'Ingegnere non
+> cambiano di una riga**. Cambia una parola in un messaggio: «Fase
+> "Bilanciamento freni": nulla da correggere» invece di «completata». Il
+> termine `lock_segments < 3` nei cancelli è quindi, oggi, **decorativo** —
+> l'unico ramo in cui può decidere qualcosa è quello in cui la fase avanza
+> comunque.
+
 ### Sessione 2026-08-02 · SF25 (`gp_2025_sf25`) · Red Bull Ring · AC
 
 Fuori piano — la sessione è proseguita su AC con una Formula, che è la classe

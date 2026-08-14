@@ -31,14 +31,7 @@ from .balance import (
     _YAW_SIGN,
     understeer_ratio_for,
 )
-from .events import (
-    _ABS_LEVEL,
-    _BRAKE_MIN,
-    _LOCK_RATIO,
-    _RATIO_MIN_SPEED,
-    _TC_LEVEL,
-    _THROTTLE_MIN,
-)
+from .events import is_lockup, is_wheelspin
 from .tuning import DEFAULT_TUNING, ClassTuning, tuning_for_car
 
 # Apex band half-width (normalized track position) around the speed minimum.
@@ -114,36 +107,34 @@ def _seg(pos: float) -> int:
 
 
 def _lock_spin_segments(samples: list[LapSample], spin_ratio: float) -> tuple[int, int]:
-    """Distinct track segments with a lock-up / wheelspin (physical slip ratio).
+    """Distinct track segments with a lock-up / wheelspin.
 
-    Same thresholds as the live EventDetector, but **not the same rule** — see
-    below. Needs the v6 ``slip_ratio`` channel (older laps have it zero → counts
-    as 0, the safe default).
+    The **same rule** as the live detector, because it is literally the same
+    function (:func:`accoach.coaching.events.is_lockup`). Needs the v6
+    ``slip_ratio`` channel (older laps have it zero → counts as 0, the safe
+    default).
+
+    It used to run its own copy, which triggered on the aid flag alone. The
+    reasoning at the time (review 2026-06-29, item M1) was that on an ACC GT3
+    the aids hold slip low *because they're working*, so a slip-only check would
+    show the engineer nothing — and back then the live detector fired on the
+    flag alone too, so the copy was faithful. The live rule was tightened three
+    weeks later (2026-07-19) and this half was never brought along.
+
+    What the stale copy was worth, measured 2026-08-12 at Monza on a 720S: with
+    ABS 6 it counted 5-7 lock segments on laps the live detector called silent,
+    against 7 on a lap with four genuine locked wheels (slip -1.00). It could
+    not tell those two apart, so as a signal it carried nothing. And what M1
+    feared — the engineer going blind — was not what happened: on an ABS car the
+    count now reads ~0, which is the truth, since a lock-up with ABS 6 does not
+    physically occur (11 690 frames, front slip never past -0.106).
     """
     locks: set[int] = set()
     spins: set[int] = set()
     for s in samples:
-        # NOT what the live EventDetector does, and the comment here used to
-        # claim it was. Live, since the 2026-07-19 audit (8 false wheelspin + 3
-        # false lock on one clean lap), the aid flag only GATES and the physical
-        # slip must confirm. Here the flag still TRIGGERS on its own — the
-        # reasoning being that on an ACC GT3 the aids hold slip low *because
-        # they're working*, so a slip-only check would show the engineer nothing.
-        #
-        # Measured 2026-08-12, Monza/720S: with ABS 6 this counts 5-7 lock
-        # segments on laps the live detector called silent, against 7 on a lap
-        # with four genuine locked-wheel events (slip -1.00). It cannot tell the
-        # two apart, so treat this count as "braking zones where an aid worked",
-        # never as "mistakes". Which of the two rules is right is still open.
-        if s.brake >= _BRAKE_MIN and (
-                s.abs_active >= _ABS_LEVEL
-                or (s.speed_kmh >= _RATIO_MIN_SPEED
-                    and min(s.slip_ratio[0], s.slip_ratio[1]) <= _LOCK_RATIO)):
+        if is_lockup(s):
             locks.add(_seg(s.pos))
-        if (s.throttle >= _THROTTLE_MIN and s.gear not in ("R", "N") and (
-                s.tc_active >= _TC_LEVEL
-                or (s.speed_kmh >= _RATIO_MIN_SPEED
-                    and max(s.slip_ratio[2], s.slip_ratio[3]) >= spin_ratio))):
+        if is_wheelspin(s, spin_ratio):
             spins.add(_seg(s.pos))
     return len(locks), len(spins)
 
