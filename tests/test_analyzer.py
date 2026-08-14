@@ -1,4 +1,6 @@
 """CoachAnalyzer: corner cause attribution + feed-forward cue lifecycle."""
+from types import SimpleNamespace
+
 from accoach.coaching.analyzer import (
     CoachAnalyzer, CornerStats, classify_corner, corner_level, _GAIN_MS, _LOSS_MS,
 )
@@ -219,3 +221,81 @@ def test_the_level_never_contradicts_the_voice():
         assert classify_corner(st, 0, 0.3) is not None
         assert corner_level(lost) in ("warn", "bad")
     assert corner_level(-_GAIN_MS) == "gain"
+
+
+# --- il taglio non si loda -------------------------------------------------
+# Trovato in pista dal pilota il 2026-08-12: tagliando una curva si guadagna
+# tempo, e il coach gli faceva i complimenti mentre il gioco invalidava il giro.
+
+def _drive_valid(analyzer, comparator, lap, valid):
+    """Replay ``lap`` telling the sim's verdict on it.
+
+    ``valid`` is what the game says: ``False`` from corner 0 onwards (which is
+    how ACC latches it after a cut), ``True`` for a lap gained legitimately,
+    ``None`` for a sim that has no opinion (AC).
+    """
+    cues = []
+    for smp in lap.samples:
+        lv = valid
+        if valid is False and smp.pos < 0.16:
+            lv = True                     # before the cut the lap still counts
+        s = synth.snap(pos=smp.pos, current_lap_ms=smp.t_ms,
+                       speed_kmh=smp.speed_kmh, throttle=smp.throttle,
+                       brake=smp.brake, steer_angle=smp.steer_angle,
+                       gear=smp.gear, lap_valid=lv)
+        cues += analyzer.update(s, comparator.compare(s))
+    return cues
+
+
+def _gain_setup():
+    """Reference slow in corner 0, driver normal: corner 0 is a clear gain."""
+    ref = Reference(synth.build_lap(slow_corner=0, amt=30))
+    an = CoachAnalyzer()
+    an.set_corners(detect_corners(ref.lap.samples))
+    return an, LapComparator(ref), synth.build_lap()
+
+
+def test_una_curva_guadagnata_su_un_giro_valido_e_una_lode():
+    """La metà buona: senza taglio il guadagno resta una lode. È il controllo:
+    senza questo test, il fix passerebbe anche se avesse spento la lode sempre."""
+    an, cmp, lap = _gain_setup()
+    cues = _drive_valid(an, cmp, lap, valid=True)
+    assert [c for c in cues if c.category is CueCategory.GOOD]
+    assert an.last_corner is not None
+
+
+def test_su_un_giro_invalidato_il_guadagno_non_e_una_lode():
+    an, cmp, lap = _gain_setup()
+    cues = _drive_valid(an, cmp, lap, valid=False)
+    assert not [c for c in cues if c.category is CueCategory.GOOD]
+
+
+def test_su_un_giro_invalidato_il_guadagno_non_lascia_nemmeno_la_carta():
+    """Il verde sul riquadro è la stessa bugia della voce, su un altro schermo.
+
+    Il giro si ferma **subito dopo la curva 0**: fino in fondo la carta verrebbe
+    riscritta dalla curva 1 e l'asserzione passerebbe da sola, difetto o no —
+    che è esattamente il modo in cui un test finge di sorvegliare qualcosa.
+    """
+    an, cmp, lap = _gain_setup()
+    fino_a_meta = SimpleNamespace(samples=[s for s in lap.samples if s.pos <= 0.50])
+    _drive_valid(an, cmp, fino_a_meta, valid=False)
+    assert an.last_corner is None, "la curva 0 è chiusa: se c'è una carta, è quella"
+
+
+def test_un_sim_che_non_lo_dice_non_toglie_la_lode():
+    """Su AC `lap_valid` è None: «non lo so» non è «hai tagliato»."""
+    an, cmp, lap = _gain_setup()
+    cues = _drive_valid(an, cmp, lap, valid=None)
+    assert [c for c in cues if c.category is CueCategory.GOOD]
+
+
+def test_su_un_giro_invalidato_il_consiglio_sulla_perdita_resta():
+    """Muore la lode, non il coach: su un giro buttato stai sbagliando di più."""
+    ref = Reference(synth.build_lap())
+    an = CoachAnalyzer()
+    an.set_corners(detect_corners(ref.lap.samples))
+    _drive_valid(an, LapComparator(ref),
+                 synth.build_lap(slow_corner=0, amt=30), valid=False)
+    assert 0 in an._advice, "il consiglio sulla curva persa dev'essere ricordato"
+    assert an.last_corner is not None, "una perdita l'hai fatta davvero: resta una carta"

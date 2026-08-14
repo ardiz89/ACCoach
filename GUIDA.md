@@ -311,6 +311,13 @@ Su un **giro invalidato il coach continua a parlare**: sparisce solo il
 cronometro. Un giro annullato è un giro gratis — frenate, bloccaggi, gomme e
 assetto si leggono uguale, e rientrare ai box è tempo buttato.
 
+Con una sola eccezione, ed è **la lode**. Su un giro che il gioco non conta più,
+una curva dove hai *guadagnato* tempo non ti frutta né il «Bel tratto, continua
+così» né il verde sul riquadro della curva: il tempo l'hai guadagnato uscendo di
+pista, e complimentarsi sarebbe insegnarti la scorciatoia. I consigli sulle
+curve dove hai **perso** restano tutti — su un giro buttato, di solito, è lì che
+c'è più da imparare.
+
 Senza riferimento, invece, resta acceso tutto ciò che non ne ha bisogno:
 sotto/sovrasterzo, veleggiamento, trail brake, marce, pressioni e temperature.
 Vale la pena saperlo alla prima sessione su un'auto nuova.
