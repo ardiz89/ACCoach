@@ -171,8 +171,14 @@ def classify_corner(st: CornerStats, index: int, pos: float) -> Cue | None:
     if st.min_speed_ref - st.min_speed_live >= _SPEED_MARGIN:
         return Cue(CueCategory.CARRY_SPEED, "Porta più velocità in curva",
                    priority=lost, segment=index, pos=pos)
-    tenths = lost / 100.0
-    return Cue(CueCategory.TIME_LOSS, f"Stai perdendo {tenths:.0f} decimi qui",
+    # La parola si decide sulla cifra STAMPATA, non sul numero: sono due
+    # arrotondamenti diversi e prima o poi si separano. E non e' un caso di
+    # bordo — il coach parla da 120 ms in su, quindi tutto fra 120 e 149 ms
+    # arrotonda a uno: la frase piu' piccola che dice era anche la piu'
+    # frequente, e diceva «1 decimi».
+    n = f"{lost / 100.0:.0f}"
+    unit = "decimo" if n == "1" else "decimi"
+    return Cue(CueCategory.TIME_LOSS, f"Stai perdendo {n} {unit} qui",
                priority=lost, segment=index, pos=pos)
 
 

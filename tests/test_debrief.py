@@ -198,3 +198,20 @@ def test_brake_earlier_has_its_own_words_in_both_languages():
     # Il dettaglio prova la causa coi numeri della curva, come tutti gli altri.
     assert "94" in detail_it and "100" in detail_it
     assert fix_it and fix_en
+
+
+def test_one_tenth_is_singular_in_the_debrief_too():
+    """Stessa frase del coach dal vivo, stesso plurale fisso: e il debrief la
+    scrive su ogni curva senza causa dominante, che sono le piu' numerose."""
+    st = _stats(lost_ms=130.0, throttle_live=1.0, throttle_ref=1.0,
+                brake_live=0.0, brake_ref=0.0,
+                min_speed_live=100.0, min_speed_ref=100.0)
+    it, _ = explain_loss(CueCategory.TIME_LOSS, st, "it")
+    en, _ = explain_loss(CueCategory.TIME_LOSS, st, "en")
+    assert "1 decimo " in it and "decimi" not in it
+    assert "1 tenth " in en and "tenths" not in en
+    st = _stats(lost_ms=320.0, throttle_live=1.0, throttle_ref=1.0,
+                brake_live=0.0, brake_ref=0.0,
+                min_speed_live=100.0, min_speed_ref=100.0)
+    assert "3 decimi " in explain_loss(CueCategory.TIME_LOSS, st, "it")[0]
+    assert "3 tenths " in explain_loss(CueCategory.TIME_LOSS, st, "en")[0]

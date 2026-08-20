@@ -435,8 +435,14 @@ def _axle_en(it: str) -> str:
 # regex replacement string or a callable(match) -> str for cases that remap words.
 _CUE_EN_PATTERNS: list[tuple[re.Pattern, object]] = [
     # analyzer.py / fuel.py
-    (re.compile(r"^Stai perdendo (\d+) decimi qui$"), r"Losing \1 tenths here"),
-    (re.compile(r"^Benzina per circa (\d+) giri\.$"), r"Fuel for about \1 laps."),
+    # Il singolare non e' un caso di bordo in nessuna delle due: il coach parla
+    # da 120 ms, che si arrotondano a un decimo, e il serbatoio passa da 1 giro
+    # prima di arrivare all'ultimo. Prima la tabella conosceva solo il plurale,
+    # quindi «1 giro» restava in italiano e «1 decimi» diventava «1 tenths».
+    (re.compile(r"^Stai perdendo (\d+) decim[oi] qui$"),
+     lambda m: f"Losing {m.group(1)} tenth{'' if m.group(1) == '1' else 's'} here"),
+    (re.compile(r"^Benzina per circa (\d+) gir[oi]\.$"),
+     lambda m: f"Fuel for about {m.group(1)} lap{'' if m.group(1) == '1' else 's'}."),
     # advisor.py — ABS / TC, with or without the "(dal N al N+1)" detail
     (re.compile(r"^Blocchi l'anteriore in più curve: prova ad alzare l'ABS"
                 r"(?: \(dal (\d+) al (\d+)\))?\.$"),

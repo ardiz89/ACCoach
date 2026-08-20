@@ -77,7 +77,7 @@ _LOSS = {
                         "flow toward the apex."),
         _C.CARRY_SPEED: ("Minimum speed at apex {vl:.0f} km/h vs {vr:.0f} km/h ({diff:+.0f}).",
                          "Carry more entry speed: less brake and a wider, smoother line."),
-        _C.TIME_LOSS: ("You lose ~{tenths:.0f} tenths with no dominant cause.",
+        _C.TIME_LOSS: ("You lose ~{tenths:.0f} {tenths_word} with no dominant cause.",
                        "Clean up your line and aim for consistency: review your line "
                        "and pedal timing."),
     },
@@ -97,7 +97,7 @@ _LOSS = {
         _C.CARRY_SPEED: ("Minima all'apex {vl:.0f} km/h contro {vr:.0f} km/h ({diff:+.0f}).",
                          "Porta più velocità in ingresso: meno freno e una traiettoria "
                          "più larga e fluida."),
-        _C.TIME_LOSS: ("Perdi ~{tenths:.0f} decimi senza una causa dominante.",
+        _C.TIME_LOSS: ("Perdi ~{tenths:.0f} {tenths_word} senza una causa dominante.",
                        "Pulisci la traiettoria e cerca costanza: rivedi linea e "
                        "tempi di pedale."),
     },
@@ -140,12 +140,18 @@ def explain_loss(category: CueCategory, st: CornerStats,
                  lang: str | None = None) -> tuple[str, str]:
     """Turn a corner's cause into (detail, fix): the numbers that prove it and a
     concrete, actionable correction — the 'mini-lesson' a race engineer gives."""
-    table = _LOSS.get(_lang(lang), _LOSS["en"])
+    lg = _lang(lang)
+    table = _LOSS.get(lg, _LOSS["en"])
     detail, fix = table.get(category, table[_C.TIME_LOSS])
+    # La parola si decide sulla cifra stampata, non sul numero: sotto i 150 ms
+    # — cioe' su gran parte delle curve che il debrief elenca — si stampa «1».
+    one = f"{st.lost_ms / 100:.0f}" == "1"
     kw = dict(tl=st.throttle_live * 100, tr=st.throttle_ref * 100,
               bl=st.brake_live * 100, br=st.brake_ref * 100,
               vl=st.min_speed_live, vr=st.min_speed_ref,
-              diff=st.min_speed_ref - st.min_speed_live, tenths=st.lost_ms / 100)
+              diff=st.min_speed_ref - st.min_speed_live, tenths=st.lost_ms / 100,
+              tenths_word=("decimo" if one else "decimi") if lg == "it"
+              else ("tenth" if one else "tenths"))
     return detail.format(**kw), fix
 
 
