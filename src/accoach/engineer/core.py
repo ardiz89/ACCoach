@@ -101,6 +101,15 @@ class LapStats:
     #: How heavy the car was, which is why a lap time from before a setup change
     #: and one from after may not be comparable at all — see `_fuel_gap`.
     fuel_l: float = 0.0
+    #: Quando ``stable`` e' False, quale delle due meta' e' caduta: ``"invalid"``
+    #: (il gioco non ha completato il giro) o ``"cut"`` (fuori pista). Vuoto su
+    #: un giro che sta in piedi. Non duplica ``stable`` — lo spiega: il pilota in
+    #: macchina ha bisogno di sapere QUALE dei due, perche' i due si correggono
+    #: in modi opposti.
+    unstable_why: str = ""
+    #: Dove il giro ha smesso di contare, gia' in parole («Variante Ascari»).
+    #: Vuoto quando non si sa, e non si prova a indovinare.
+    lost_where: str = ""
     #: Whether this lap was driven on wet tyres. ``None`` means the lap doesn't
     #: say — which is not the same as "dry", and is treated differently.
     #:
@@ -324,6 +333,25 @@ _DECISION_MSG = {
         "en": "Evaluating the change: {need} more clean laps.",
         "it": "Valuto la modifica: {need} giri puliti ancora.",
     },
+    # Perche' l'ultimo giro non e' entrato nel conto. Senza questa coda un
+    # contatore fermo e un motore rotto si leggono allo stesso modo — e in
+    # macchina la domanda che nasce e' «sta funzionando?», non «cosa sbaglio?».
+    "skip_cut_where": {
+        "en": " That last lap didn't count: off track at {where}.",
+        "it": " L'ultimo giro non conta: fuori pista a {where}.",
+    },
+    "skip_cut": {
+        "en": " That last lap didn't count: off track.",
+        "it": " L'ultimo giro non conta: fuori pista.",
+    },
+    "skip_invalid": {
+        "en": " That last lap didn't count: the game never completed it.",
+        "it": " L'ultimo giro non conta: il gioco non l'ha completato.",
+    },
+    "skip_cold": {
+        "en": " That last lap didn't count: tyres still cold.",
+        "it": " L'ultimo giro non conta: gomme ancora fredde.",
+    },
     "accepted_structural": {
         "en": "Change applied, moving on.",
         "it": "Modifica applicata, proseguo.",
@@ -412,6 +440,25 @@ def _msg(key: str, lang: str | None = None, **kw) -> str:
     return (entry.get(lang) or entry["en"]).format(**kw)
 
 
+def _skip_tail(stats: "LapStats | None", lang: str | None = None) -> str:
+    """Perche' l'ultimo giro non e' entrato nel conto, o "" se e' entrato.
+
+    Una riga sola, in coda al contatore, e nessuna se non c'e' niente da dire.
+    Il taglio viene prima delle gomme fredde quando valgono entrambi: e' quello
+    su cui il pilota puo' fare qualcosa nel giro che sta guidando.
+    """
+    if stats is None:
+        return ""
+    if stats.unstable_why == "invalid":
+        return _msg("skip_invalid", lang)
+    if stats.unstable_why == "cut":
+        return (_msg("skip_cut_where", lang, where=stats.lost_where)
+                if stats.lost_where else _msg("skip_cut", lang))
+    if not stats.warmed_up:
+        return _msg("skip_cold", lang)
+    return ""
+
+
 def _fuel_tail(outcome: "Outcome", lang: str) -> str:
     """Say when the lap-time half of the verdict couldn't be used.
 
@@ -498,6 +545,10 @@ class RaceEngineer:
         #: not the car" call. Recorded because it is a claim we make and have
         #: never checked (see ledger.py).
         self.exhausted_calls: list[Symptom] = []
+        #: L'ultimo giro che NON e' entrato nella finestra, tenuto solo per
+        #: poterlo spiegare. Si azzera al primo giro buono: una spiegazione che
+        #: sopravvive al giro che la smentisce e' peggio di nessuna spiegazione.
+        self._skipped: LapStats | None = None
 
     # -- public API --------------------------------------------------------
     @property
@@ -517,6 +568,9 @@ class RaceEngineer:
             self.window = self.window[-_WINDOW:]
             if self.active is not None:
                 self.active.laps_seen += 1
+            self._skipped = None
+        else:
+            self._skipped = stats
 
         if changed:
             return Decision(DecisionKind.STAND_DOWN,
@@ -537,7 +591,8 @@ class RaceEngineer:
         if len(self.window) < self.min_stable:
             return Decision(DecisionKind.COLLECT,
                             _msg("collect", n=self.min_stable,
-                                 have=len(self.window)))
+                                 have=len(self.window))
+                            + _skip_tail(self._skipped))
         return self._advance()
 
     def mark_applied(self) -> None:
@@ -752,7 +807,8 @@ class RaceEngineer:
         if a.laps_seen < self.min_stable:
             need = self.min_stable - a.laps_seen
             return Decision(DecisionKind.EVALUATING,
-                            _msg("evaluating", lang, need=need))
+                            _msg("evaluating", lang, need=need)
+                            + _skip_tail(self._skipped, lang))
 
         new_time = _median_time(self.window)
         new_score = _median_score(self.window, a.symptom)

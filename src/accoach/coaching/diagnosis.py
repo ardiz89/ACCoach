@@ -204,7 +204,29 @@ def dominant_symptom(scores: dict[Symptom, float]) -> Symptom | None:
     return max(scores, key=scores.get) if scores else None
 
 
-def build_lap_stats(lap: Lap, corners: list[Corner] | None = None) -> LapStats:
+def _lost_where(lap: Lap, corners: list[Corner],
+                corner_names: dict[int, str] | None) -> str:
+    """Il nome della curva in cui il giro ha smesso di contare, o "".
+
+    Solo la curva in cui eri **davvero**: se il fuori pista e' caduto fra due
+    curve, la piu' vicina sarebbe una bugia detta con sicurezza, e manderebbe il
+    pilota a rivedere una curva in cui non e' successo niente.
+
+    I nomi arrivano da chi chiama, mai da qui. Il motore ne ha gia' una mappa,
+    costruita coi nomi curati, quelli imparati dal catalogo e quelli che il
+    pilota ha scritto a mano — e un secondo battesimo qui darebbe alla stessa
+    curva due nomi diversi in due punti dell'app.
+    """
+    if lap.lost_at is None or not corner_names:
+        return ""
+    for c in corners:
+        if c.entry_pos <= lap.lost_at <= c.exit_pos:
+            return corner_names.get(c.index, "")
+    return ""
+
+
+def build_lap_stats(lap: Lap, corners: list[Corner] | None = None,
+                    corner_names: dict[int, str] | None = None) -> LapStats:
     """Diagnose one recorded lap into a :class:`LapStats` for the engineer."""
     if corners is None:
         corners = detect_corners(lap.samples)
@@ -226,6 +248,13 @@ def build_lap_stats(lap: Lap, corners: list[Corner] | None = None) -> LapStats:
         # no off-track. Only a complete, non-dirty lap counts toward the engine's
         # evaluation window.
         stable=lap.valid and lap.clean is not False,
+        # Perche', non solo se: `stable` collassa due fatti che il pilota
+        # corregge in modi opposti — un giro che il gioco non ha completato e un
+        # giro tagliato — e per quattro giri di fila, il 14/08, non saperlo ha
+        # reso un contatore fermo indistinguibile da un motore rotto.
+        unstable_why=("" if lap.valid and lap.clean is not False
+                      else "invalid" if not lap.valid else "cut"),
+        lost_where=_lost_where(lap, corners, corner_names),
         warmed_up=_warmed_up(lap.samples),
         symptom_scores=scores,
         symptom_corners=corner_counts,

@@ -293,3 +293,62 @@ def test_exhausting_remedies_flags_driving_issue():
         elif d.kind is DecisionKind.PHASE_DONE and "exhausted" in d.message:
             break
     assert sym in eng.exhausted
+
+
+# --- perche' quel giro non e' contato --------------------------------------
+#
+# In pista il 14/08 il pilota ha guidato quattro giri di fila e il contatore
+# dell'Ingegnere non si e' mosso di uno. Da fuori — e da dentro l'abitacolo, che
+# e' l'unico posto che conta — un contatore fermo e' indistinguibile da un
+# motore rotto: la domanda che si e' fatto e' «ma sta funzionando?», non «cosa
+# sto sbagliando». I quattro giri erano tagliati, e il coach lo sapeva: sapeva
+# anche *dove*, perche' `lost_at` e' registrato dal 22/07. Non lo diceva nessuno.
+
+def _cut(time_ms=100000, where=""):
+    st = _lap(time_ms=time_ms, stable=False)
+    st.unstable_why = "cut"
+    st.lost_where = where
+    return st
+
+
+def test_a_lap_that_did_not_count_says_so_and_says_where():
+    eng = _eng()
+    eng.observe(_lap())
+    msg = eng.observe(_cut(where="Variante Ascari")).message
+    assert "Variante Ascari" in msg
+    # …senza smettere di dire a che punto siamo.
+    assert "1" in msg
+
+
+def test_without_a_place_it_still_says_the_lap_did_not_count():
+    eng = _eng()
+    plain = eng.observe(_lap()).message
+    msg = eng.observe(_cut()).message
+    assert msg != plain and len(msg) > len(plain)
+
+
+def test_a_lap_the_game_annulled_is_not_the_same_as_going_off():
+    eng = _eng()
+    st = _lap(stable=False)
+    st.unstable_why = "invalid"
+    annulled = eng.observe(st).message
+    cut = eng.observe(_cut()).message
+    assert annulled != cut
+
+
+def test_cold_tyres_are_named_too():
+    """Confrontato con un altro giro NON contato, non con uno buono: due giri
+    che fanno avanzare il contatore in modo diverso avrebbero messaggi diversi
+    comunque, e il test passerebbe senza che nessuno nomini le gomme."""
+    eng = _eng()
+    cold = _lap()
+    cold.warmed_up = False
+    assert eng.observe(cold).message != eng.observe(_cut()).message
+
+
+def test_the_reason_does_not_stick_to_the_next_good_lap():
+    """Un giro buono cancella la spiegazione: se restasse, il pilota leggerebbe
+    «sei uscito ad Ascari» su un giro in cui non e' uscito da nessuna parte."""
+    eng = _eng()
+    eng.observe(_cut(where="Variante Ascari"))
+    assert "Ascari" not in eng.observe(_lap()).message

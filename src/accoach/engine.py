@@ -389,7 +389,12 @@ class CoachEngine:
         coach (driving). Both run on the reference that was the target *during*
         this lap — the rebuild to chase a new best happens after, in tick()."""
         if self._engineer is not None:
-            stats = build_lap_stats(lap, self._corners or None)
+            # I nomi delle curve li ha gia' il motore, e sono gli stessi che il
+            # pilota vede ovunque: passarli qui e' l'unico modo perche'
+            # l'Ingegnere possa dire DOVE hai perso il giro senza ribattezzare
+            # la curva per conto suo.
+            stats = build_lap_stats(lap, self._corners or None,
+                                    corner_names=self._corner_names)
             self._engineer_decision = self._engineer.observe(stats)
             self._announce_engineer(self._engineer_decision)
             self._log_engineer_outcome(lap, self._engineer_decision)

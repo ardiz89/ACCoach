@@ -291,3 +291,76 @@ def test_engine_surfaces_engineer_block(tmp_path):
     assert state.engineer is not None          # the bridge produced a decision
     assert "kind" in state.engineer and state.engineer["message"]
     eng.close()
+
+
+# --- il perche' e il dove di un giro che non conta -------------------------
+
+def test_a_cut_lap_carries_the_reason_and_the_place():
+    """`stable` collassa due fatti diversi — il giro incompleto e il giro
+    tagliato — e il pilota in macchina ha bisogno di sapere quale dei due. Il
+    posto lo sa gia' il file: `lost_at` e' registrato dal 22/07 e non lo mostrava
+    nessuna interfaccia."""
+    lap = synth.build_lap(clean=False)
+    lap.lost_at = 0.71                      # dentro la seconda curva sintetica
+    st = build_lap_stats(lap, corner_names={0: "Prima", 1: "Variante Ascari"})
+    assert st.stable is False
+    assert st.unstable_why == "cut"
+    assert st.lost_where == "Variante Ascari"
+
+
+def test_the_place_is_only_the_corner_you_were_actually_in():
+    """Un fuori pista sul rettilineo non ha un nome di curva, e il piu' vicino
+    sarebbe una bugia detta con sicurezza: mandare il pilota a rivedere una
+    curva in cui non e' successo niente e' peggio del silenzio."""
+    lap = synth.build_lap(clean=False)
+    lap.lost_at = 0.50                      # fra le due curve
+    st = build_lap_stats(lap, corner_names={0: "Prima", 1: "Variante Ascari"})
+    assert st.unstable_why == "cut" and st.lost_where == ""
+
+
+def test_a_lap_the_game_never_completed_says_that_instead():
+    st = build_lap_stats(synth.build_lap(valid=False))
+    assert st.stable is False and st.unstable_why == "invalid"
+
+
+def test_a_cut_lap_that_never_said_where_does_not_invent_a_place():
+    """Due modi di non sapere dove, e portano allo stesso posto: il giro non lo
+    ha registrato (i giri prima del 22/07), o chi chiama non ha i nomi."""
+    lap = synth.build_lap(clean=False)
+    assert build_lap_stats(lap, corner_names={1: "Variante Ascari"}).lost_where == ""
+    lap.lost_at = 0.71
+    assert build_lap_stats(lap).lost_where == ""
+
+
+def test_a_lap_that_counts_carries_no_excuse():
+    st = build_lap_stats(synth.build_lap(clean=True))
+    assert st.stable is True and st.unstable_why == "" and st.lost_where == ""
+
+
+def test_the_engine_hands_the_engineer_the_corner_names_it_already_has(tmp_path):
+    """La catena intera, perche' e' fatta di tre pezzi e ognuno funzionava da
+    solo: il file sa DOVE (`lost_at`), il motore sa COME SI CHIAMA (la mappa dei
+    nomi, curati + imparati + scritti dal pilota), l'Ingegnere sa DIRLO. Finche'
+    i tre non si parlano il pilota legge un contatore fermo e basta."""
+    from accoach.engineer import RaceEngineer
+    from accoach.engineer.profiles import GT3_PROFILE
+    from accoach.track import detect_corners
+
+    class _Dead:
+        def read(self):
+            return TelemetrySnapshot.disconnected()
+
+        def close(self):
+            pass
+
+    lap = synth.build_lap(clean=False)
+    lap.lost_at = 0.71
+    eng = CoachEngine(reader=_Dead(), laps_dir=tmp_path)
+    eng._engineer = RaceEngineer(GT3_PROFILE, min_stable=3)
+    eng._corners = detect_corners(lap.samples)
+    eng._corner_names = {c.index: "Variante Ascari" for c in eng._corners
+                         if c.entry_pos <= 0.71 <= c.exit_pos}
+    assert eng._corner_names, "il fixture deve avere una curva attorno a 0.71"
+    eng._observe_lap(lap)
+    assert "Variante Ascari" in eng._engineer_decision.message
+    eng.close()
