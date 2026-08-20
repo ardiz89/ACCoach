@@ -146,6 +146,20 @@ def _spoken_log_line(category, focus_theme: str | None,
     return f"detto | {nome:<12} | tema={tema:<10} | voce={voice_text!r} | schermo={screen_text!r}"
 
 
+def _reference_token(reference) -> tuple | None:
+    """Chi e' il giro di riferimento, in una forma confrontabile.
+
+    Non l'oggetto: `_rebuild_reference` ne costruisce uno nuovo dopo ogni giro
+    salvato, anche quando il giro sotto e' lo stesso, quindi l'identita'
+    dell'oggetto direbbe «cambiato» a ogni giro. Il giro invece ha un'ora e un
+    tempo, e due giri diversi non li condividono.
+    """
+    lap = getattr(reference, "lap", None)
+    if lap is None:
+        return None
+    return (lap.recorded_utc, lap.lap_time_ms)
+
+
 def _focus_log_line(report: FocusReport | None) -> str:
     """Il contesto senza cui le righe `detto |` non si interpretano.
 
@@ -363,6 +377,10 @@ class CoachEngine:
         #: Auto+pista di cui l'Ingegnere sta tenendo la memoria su disco.
         self._engineer_key: tuple[str, str] | None = None
         self._focus_report: FocusReport | None = None
+        #: Il riferimento (e le sue curve) contro cui il focus aperto ha
+        #: misurato la base, tenuto fermo finche' quel focus non si chiude.
+        #: None quando nessun focus e' aperto. Vedi `FocusCoach.observe`.
+        self._focus_ref: tuple | None = None
 
         # Commands from other threads (e.g. the server's POST /engineer/applied,
         # which runs on the asyncio loop while tick() runs in an executor) are
@@ -426,7 +444,24 @@ class CoachEngine:
             debrief = build_lap_debrief(lap, self._reference, self._corners)
             stable = lap.valid and lap.clean is not False
             before = (frozenset(self._focus.mastered), frozenset(self._focus.parked))
-            self._focus_report = self._focus.observe(debrief, stable=stable)
+            # Il focus e' un esperimento, e un esperimento tiene fermo il
+            # controllo: finche' un focus e' aperto giudica contro lo stesso
+            # riferimento con cui ha misurato la base, anche se nel frattempo il
+            # pilota ha fatto un personal best e il resto dell'app e' passato a
+            # quello. Costa un secondo debrief per giro, e solo mentre un focus
+            # e' aperto. Perche' non basti dichiararlo e' misurato sui 16 giri
+            # del 14/08: contro il metro che rincorre, la Variante della Roggia
+            # va 0 -> 280 ms; contro un metro fermo, 519 -> 190. Due risposte di
+            # verso opposto alla stessa domanda.
+            fref, fcorners = self._focus_ref or (self._reference, self._corners)
+            focus_debrief = (debrief if fref is self._reference
+                             else build_lap_debrief(lap, fref, fcorners))
+            self._focus_report = self._focus.observe(
+                focus_debrief, stable=stable, reference=_reference_token(fref))
+            if self._focus.focus is None:
+                self._focus_ref = None      # chiuso: il prossimo si elegge su oggi
+            elif self._focus_ref is None:
+                self._focus_ref = (self._reference, self._corners)
             # Tell the voice which theme the session is on. The FocusCoach has
             # elected one weakness at a time since it was written; until now
             # nobody downstream was listening.
@@ -846,6 +881,7 @@ class CoachEngine:
             mastered, parked = self._load_focus_state(snap.car_model, snap.track)
             self._focus = FocusCoach(mastered=mastered, parked=parked)
             self._focus_report = None
+            self._focus_ref = None
             # A focus theme belongs to one car/track combination. Left set, it
             # would keep filtering technique advice on a theme that no longer
             # applies — possibly for the whole session, if this combination

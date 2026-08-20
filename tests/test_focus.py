@@ -192,3 +192,96 @@ def test_engine_focus_block_from_real_debriefs(tmp_path):
     if block["kind"] == "brief":
         assert block["focus"]["theme"]
     eng.close()
+
+
+# --- un focus, un solo metro ----------------------------------------------
+#
+# Il motore rifa' il riferimento a ogni personal best, quindi la perdita a una
+# curva e' misurata contro un metro che si muove. Misurato sui 16 giri veri del
+# 14/08 (3 cambi di riferimento), le due letture della stessa curva **cambiano
+# verso**, non solo entita':
+#
+#     Variante della Roggia   metro che rincorre  0 -> 280 ms
+#                             metro fisso       519 -> 190 ms
+#
+# Nei primi giri il riferimento e' il giro lento del pilota, quindi non si perde
+# niente contro nessuno e una base misurata li' nasce piccola; poi il
+# riferimento accelera e la stessa curva "peggiora" mentre il pilota migliora.
+# Cosi' com'era, «0.49 -> 0.00» non era una misura di quanto sei migliorato.
+
+def test_a_new_reference_makes_the_focus_start_measuring_again():
+    """La finestra e' fatta di misure contro un metro: cambiato il metro, quelle
+    misure non si mediano piu' con le nuove. Si ricomincia a guardare — che e'
+    quello che il coach dice gia' quando non ha abbastanza giri."""
+    fc = FocusCoach(min_laps=3)
+    for _ in range(2):
+        fc.observe(_debrief(_loss(0, 500)), reference="giro-A")
+    assert len(fc.window) == 2
+    r = fc.observe(_debrief(_loss(0, 500)), reference="giro-B")
+    assert r.kind is FocusKind.ASSESS
+    assert len(fc.window) == 1
+
+
+def test_the_same_reference_does_not_reset_anything():
+    fc = FocusCoach(min_laps=3)
+    for _ in range(4):
+        fc.observe(_debrief(_loss(0, 500)), reference="giro-A")
+    assert len(fc.window) == 4
+
+
+def test_without_a_reference_token_nothing_changes():
+    """Chi non lo passa si comporta esattamente come prima: un metro che non si
+    dichiara e' un metro che si assume fermo."""
+    fc = FocusCoach(min_laps=3)
+    for _ in range(4):
+        fc.observe(_debrief(_loss(0, 500)))
+    assert len(fc.window) == 4
+
+
+def test_a_reference_that_moves_under_an_elected_focus_drops_it():
+    """Non dovrebbe succedere — il motore congela il riferimento finche' un
+    focus e' aperto — ma se succede il verdetto non e' piu' difendibile, e un
+    verdetto indifendibile non si da'."""
+    fc = FocusCoach(min_laps=3)
+    for _ in range(4):
+        fc.observe(_debrief(_loss(0, 500)), reference="giro-A")
+    assert fc.focus is not None
+    fc.observe(_debrief(_loss(0, 500)), reference="giro-B")
+    assert fc.focus is None
+
+
+def test_the_engine_holds_the_reference_still_under_an_open_focus(tmp_path):
+    """Il pezzo che il coach da solo non puo' provare: che il metro stia fermo.
+
+    Il motore rifa' il riferimento dopo ogni giro salvato, quindi senza questo
+    un personal best a meta' esercizio spazzerebbe via la base del focus e il
+    verdetto — che e' esattamente la cosa che il pilota aspetta."""
+    from accoach.telemetry.snapshot import TelemetrySnapshot
+
+    class _Dead:
+        def read(self):
+            return TelemetrySnapshot.disconnected()
+
+        def close(self):
+            pass
+
+    ref_a = synth.build_lap()
+    eng = CoachEngine(reader=_Dead(), laps_dir=tmp_path)
+    eng._focus = FocusCoach(min_laps=3)
+    eng._reference = Reference(ref_a)
+    eng._corners = detect_corners(ref_a.samples)
+    for _ in range(4):
+        eng._observe_lap(synth.build_lap(slow_corner=0, amt=30))
+    assert eng._focus.focus is not None, "il fixture deve eleggere un focus"
+    frozen = eng._focus_ref
+    assert frozen is not None
+
+    # Personal best a meta' esercizio: il resto dell'app passa al giro nuovo.
+    ref_b = synth.build_lap(slow_corner=1, amt=10)
+    eng._reference = Reference(ref_b)
+    eng._corners = detect_corners(ref_b.samples)
+    eng._observe_lap(synth.build_lap(slow_corner=0, amt=30))
+
+    assert eng._focus.focus is not None, "il focus non deve cadere col riferimento"
+    assert eng._focus_ref is frozen, "e il metro deve essere ancora quello"
+    eng.close()
