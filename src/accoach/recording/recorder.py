@@ -199,12 +199,19 @@ class LapRecorder:
         self._car: str = ""
         self._track: str = ""
         self._blocked_frames = 0        # consecutive frames refused while driving
+        # What the sim was answering for "the last lap" on the PREVIOUS frame.
+        # At a crossing, an answer that hasn't changed is an answer that hasn't
+        # been given yet — see `trusted_lap_ms`. None until we've seen a frame,
+        # and after every reset: nothing to compare against is not the same as
+        # a match, and guessing there would condemn a lap on no evidence.
+        self._declared: int | None = None
 
     def reset(self) -> None:
         self._buf = None
         self._line.reset()
         self._car = ""
         self._track = ""
+        self._declared = None
 
     def _recording_allowed(self, s: TelemetrySnapshot) -> bool:
         # The whole pit lane, not just the box. `in_pit` is only true standing in
@@ -245,6 +252,11 @@ class LapRecorder:
         # add up into a warning about a problem that isn't there.
         self._blocked_frames = 0
 
+        # Read before anything can return, and on EVERY frame, because the
+        # question at the crossing is what the sim was saying one frame earlier —
+        # not one lap earlier, and not one recorded frame earlier.
+        previous_declared, self._declared = self._declared, int(s.last_lap_ms)
+
         # A car or track change means a different session entirely.
         if (self._car and s.car_model != self._car) or (
             self._track and s.track != self._track
@@ -262,7 +274,7 @@ class LapRecorder:
         crossed = self._line.crossed(s.lap_position, completed)
 
         if crossed and self._buf is not None:
-            finished = self._finalize(self._buf, s)
+            finished = self._finalize(self._buf, s, previous_declared)
             self._buf = None  # the incoming sample opens the next (full) lap below
 
         if self._buf is None:
@@ -344,7 +356,8 @@ class LapRecorder:
         buf.last_pos = s.lap_position
         buf.last_t_ms = t
 
-    def _finalize(self, buf: _Buffer, s: TelemetrySnapshot) -> Lap:
+    def _finalize(self, buf: _Buffer, s: TelemetrySnapshot,
+                  previous_declared: int | None = None) -> Lap:
         # At the crossing, last_lap_ms holds the time of the lap we just closed.
         # `clean` is known only for a full lap (we watched it from the line); a
         # partial lap stays unknown (None). Conditions are ~constant over a lap,
@@ -358,7 +371,15 @@ class LapRecorder:
         # publish the new value by then, so a lap can be stamped with the time of
         # the lap *before* — measured: a 224-second Monza lap filed as a 1:55.902,
         # an identical twin of the real one. The lap's own clock is the check.
-        lap_ms = trusted_lap_ms(int(s.last_lap_ms), buf.samples)
+        #
+        # The size of that error is the gap between two consecutive laps, so on a
+        # driver lapping on the pace it is TENTHS, not minutes, and no tolerance
+        # can be both loose enough for a healthy lap and tight enough for that.
+        # Hence `previous_declared`: at the crossing, an answer the sim hasn't
+        # changed since the frame before is an answer it hasn't given yet. Only
+        # this loop can see that — a file on disk has no frame before it.
+        lap_ms = trusted_lap_ms(int(s.last_lap_ms), buf.samples,
+                                previous=previous_declared)
         if lap_ms != int(s.last_lap_ms):
             _log.warning("lap time %.3fs contradicted by its own samples (%.3fs);"
                          " trusting the samples",

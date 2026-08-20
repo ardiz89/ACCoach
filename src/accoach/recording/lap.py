@@ -231,8 +231,70 @@ def strip_stale_open(samples: list["LapSample"]) -> list["LapSample"]:
 _TIME_TOL_MS = 5_000
 _TIME_TOL_FRAC = 0.10
 
+# How much of the lap the projection below is allowed to cross. The last sample
+# lands just before the line, and across the whole real archive (99 laps) the
+# furthest one sits 0.00214 of a lap short — so 0.01 is five times the worst case
+# ever recorded. Past that we are not bridging a sliver, we are extrapolating
+# across track we never saw, and the answer stops being a measurement.
+_LINE_SLIVER_MAX = 0.01
 
-def trusted_lap_ms(declared: int, samples: list["LapSample"]) -> int:
+# How many samples back the local pace is read from. One is enough in principle;
+# three is steadier against a single decimated frame and, measured on the 91
+# healthy laps of the archive, makes no odds (median error 15 ms either way).
+_SLIVER_BACK = 3
+
+
+def clock_at_line(samples: list["LapSample"]) -> int | None:
+    """What the lap's own clock reads at the finish line, or None.
+
+    The last sample is taken a few metres before the line — the decimator keeps
+    a sample every 100 ms or 0.2 % of lap — so its clock always reads a little
+    short of the lap time. This adds back the sliver that is missing, at the pace
+    the car was actually going through it, which is not the pace it averaged over
+    the lap: at Monza the line sits at the end of a 280 km/h straight and the lap
+    averages 180.
+
+    Measured against the 91 healthy laps of the real archive (20/08/2026), the
+    projection lands within **-68 and +38 ms** of the sim's own declared time,
+    median +15. The two cruder answers are worse and biased: the last sample's
+    clock alone is short by 10 to 159 ms, and the samples' span (which also drops
+    the sliver between the line and the *first* sample) by up to 200.
+
+    None when there is nothing to project from: fewer than two samples, a lap
+    that stops too far from the line, or a clock that runs backwards across the
+    stretch we would read the pace from.
+    """
+    if len(samples) < 2:
+        return None
+    last = samples[-1]
+    if not 0.0 <= 1.0 - last.pos <= _LINE_SLIVER_MAX:
+        return None
+    back = samples[max(0, len(samples) - 1 - _SLIVER_BACK)]
+    d_pos = last.pos - back.pos
+    d_t = last.t_ms - back.t_ms
+    if d_pos <= 0 or d_t <= 0:
+        return None
+    return int(round(last.t_ms + (1.0 - last.pos) * d_t / d_pos))
+
+
+# How far the declared time may sit from that projection before we stop believing
+# it — but only once the signature below says the sim never answered. Measured
+# over the whole real archive (99 laps, 20/08/2026):
+#
+#     91 healthy laps                     -68 .. +113 ms
+#     7 laps repeating the previous time  -108546, -654, -266, -232, -175,
+#                                         +440, +2734 ms
+#
+# The two families do not overlap, but they nearly touch (113 against 175), which
+# is why this number is not asked to do the separating on its own. Its only job
+# is to keep the rare lap that genuinely repeats a time from being replaced by a
+# projection; getting that wrong costs 15 ms, so the threshold sits comfortably
+# above the healthy band rather than tightly under the defect's.
+_STALE_TOL_MS = 150
+
+
+def trusted_lap_ms(declared: int, samples: list["LapSample"], *,
+                   previous: int | None = None) -> int:
     """The lap's time: the sim's, unless the lap's own clock contradicts it.
 
     ``last_lap_ms`` is read on the crossing frame, and on some crossings the sim
@@ -247,18 +309,45 @@ def trusted_lap_ms(declared: int, samples: list["LapSample"]) -> int:
     the live delta and the predicted lap time would be nonsense — which is the
     shape of "the numbers on screen don't match the game".
 
-    When the two disagree we take the samples' own span. It comes from the same
-    clock, read repeatedly through the lap, and the alternative is a number we
-    have just proved belongs to a different lap. It understates by the sliver of
-    track between the last sample and the line (see ``_TIME_TOL_MS``) — a tenth
-    of a second against a hundred seconds of error.
+    When the two disagree we take the lap's own clock, projected to the line by
+    :func:`clock_at_line`. It comes from the same clock, read repeatedly through
+    the lap, and the alternative is a number we have just proved belongs to a
+    different lap.
+
+    ``previous`` — what the sim was answering **before** this crossing — is what
+    makes the quiet half of this defect visible. The loud half is caught by size
+    alone: a lap stamped with a time a hundred seconds out cannot hide behind any
+    tolerance. But when you are lapping on the pace, two consecutive laps differ
+    by tenths, so the same stale read puts the lap out by *tenths* — and a
+    tolerance sized for the loud half (5 s, or 10 % of the lap) never sees it.
+    Measured on the real archive: 7 laps in 99, one of them 2.75 s out, and two
+    of those seven decided an engineer verdict on a band of 173 ms.
+
+    Size cannot separate that half (see ``_STALE_TOL_MS``), and there is a second
+    family in the same range whose repair is the opposite one — a lap whose
+    SAMPLES have the hole rather than its declared time, which
+    :func:`accoach.coaching.trends.clock_covers_lap` exists to catch and which
+    must not be "repaired" here. So the quiet half is identified by its own
+    signature instead: the sim is still publishing the number it was already
+    publishing a frame ago, which is precisely what "it hasn't answered yet"
+    looks like from outside. Callers that cannot know it (the loader: a file on
+    disk carries no record of the frame before) pass nothing and get the old,
+    louder rule.
     """
+    if declared <= 0:
+        return declared
+    at_line = clock_at_line(samples)
+    if (previous is not None and declared == previous and at_line is not None
+            and abs(declared - at_line) > _STALE_TOL_MS):
+        return at_line
     span = 0 if len(samples) < 2 else int(samples[-1].t_ms - samples[0].t_ms)
-    if declared <= 0 or span <= 0:
+    if span <= 0:
         return declared
     if abs(declared - span) <= max(_TIME_TOL_MS, declared * _TIME_TOL_FRAC):
         return declared
-    return span
+    # Same defect, same answer: the projection where there is one, and the raw
+    # span where the lap stops too far from the line to project from.
+    return at_line if at_line is not None else span
 
 
 @dataclass(slots=True)
