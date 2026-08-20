@@ -78,7 +78,8 @@ riferimento** (il tuo più veloce valido). Quindi:
    viene salvato e diventa il riferimento.
 2. Dal giro successivo il coach confronta il tuo giro col riferimento e, **in
    approccio a ogni curva**, ti anticipa il consiglio per quella curva
-   («Porta più velocità in curva», «Puoi frenare più tardi», «Più gas qui»…).
+   («Porta più velocità in curva», «Puoi frenare più tardi», «Frena prima»,
+   «Più gas qui»…).
    È un coach che ti parla *prima* della curva, non che brontola dopo.
 3. Quando prendi bene quella curva, **smette di ripeterti** quel consiglio.
 4. Ogni volta che batti il tuo riferimento, da lì in poi confronti col nuovo.

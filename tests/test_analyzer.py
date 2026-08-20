@@ -15,7 +15,8 @@ import synth
 
 def _stats(lost, **kw):
     base = dict(throttle_live=1.0, throttle_ref=1.0, brake_live=0.0, brake_ref=0.0,
-                min_speed_live=100.0, min_speed_ref=100.0, braking_early=False)
+                min_speed_live=100.0, min_speed_ref=100.0, braking_early=False,
+                braking_late=False)
     base.update(kw)
     return CornerStats(lost_ms=lost, **base)
 
@@ -217,7 +218,8 @@ def test_the_level_never_contradicts_the_voice():
     for lost in (_LOSS_MS, _LOSS_MS + 50, _GAIN_MS, _GAIN_MS + 500):
         st = CornerStats(lost_ms=lost, throttle_live=1.0, throttle_ref=1.0,
                          brake_live=0.0, brake_ref=0.0, min_speed_live=100.0,
-                         min_speed_ref=100.0, braking_early=False)
+                         min_speed_ref=100.0, braking_early=False,
+                         braking_late=False)
         assert classify_corner(st, 0, 0.3) is not None
         assert corner_level(lost) in ("warn", "bad")
     assert corner_level(-_GAIN_MS) == "gain"
@@ -299,3 +301,66 @@ def test_su_un_giro_invalidato_il_consiglio_sulla_perdita_resta():
                  synth.build_lap(slow_corner=0, amt=30), valid=False)
     assert 0 in an._advice, "il consiglio sulla curva persa dev'essere ricordato"
     assert an.last_corner is not None, "una perdita l'hai fatta davvero: resta una carta"
+
+
+# --- «frena prima»: la metà mancante del consiglio sulla staccata ----------
+#
+# `BRAKE_EARLIER` esisteva da sempre come categoria — con le sue traduzioni, il
+# suo instradamento nel flusso e il suo esercizio nel piano di allenamento — e
+# **nessuno la produceva**: l'unico ramo che parlava di staccata diceva «puoi
+# frenare più tardi». Il coach sapeva premiare chi frena tardi e non sapeva
+# nominare l'errore opposto, che è quello di chi arriva lungo.
+#
+# Misurato sui 100 giri in archivio (752 curve giudicate): 25 curve in cui hai
+# frenato **dopo** il riferimento, 17 delle quali con una perdita che vale la
+# voce. Frenare tardi però non è di per sé un errore — su 3 di quelle curve hai
+# *guadagnato*. Quello che lo rende un errore è che la staccata tardiva **non ha
+# pagato**: sei arrivato lungo e all'apex sei più lento di lui. Sono 16 curve, e
+# oggi il coach ci dice «porta più velocità in curva» su 8 di loro — cioè
+# l'istruzione opposta a quella giusta — e «più gas» su 6, che è il sintomo di
+# una frenata tardiva, non la sua causa.
+#
+# La regola non porta soglie nuove: la distanza è la stessa di `braking_early`
+# (`_BRAKE_EARLY_POS`) letta dall'altro verso, e il divario di velocità è lo
+# stesso `_SPEED_MARGIN` che alimenta già `CARRY_SPEED`.
+
+def test_braking_late_that_did_not_pay_is_named():
+    cue = classify_corner(_stats(200.0, braking_late=True,
+                                 min_speed_live=94.0, min_speed_ref=100.0), 0, 0.3)
+    assert cue.category == CueCategory.BRAKE_EARLIER
+
+
+def test_and_it_wins_over_carry_speed_which_would_say_the_opposite():
+    """Lo stesso divario di velocità, letto due volte: senza sapere dove hai
+    staccato è «porta più velocità», sapendolo è «frena prima». Otto curve vere
+    dell'archivio cadono qui."""
+    hot = dict(min_speed_live=94.0, min_speed_ref=100.0)
+    assert classify_corner(_stats(200.0, **hot), 0, 0.3).category is CueCategory.CARRY_SPEED
+    assert classify_corner(_stats(200.0, braking_late=True, **hot),
+                           0, 0.3).category is CueCategory.BRAKE_EARLIER
+
+
+def test_braking_late_that_paid_off_is_not_an_error():
+    """Frenare dopo il riferimento e arrivare all'apex alla sua stessa velocità
+    è come si guadagna, non come si perde. Il tempo perso lì viene da altro."""
+    cue = classify_corner(_stats(200.0, braking_late=True, throttle_live=0.6,
+                                 throttle_ref=0.9), 0, 0.3)
+    assert cue.category is CueCategory.MORE_THROTTLE
+
+
+def test_the_two_braking_answers_cannot_both_be_given():
+    """`braking_early` resta il primo ramo: se per assurdo arrivassero insieme,
+    la risposta è una sola e non dipende dall'ordine in cui si leggono."""
+    cue = classify_corner(_stats(200.0, braking_early=True, braking_late=True,
+                                 min_speed_live=94.0, min_speed_ref=100.0), 0, 0.3)
+    assert cue.category is CueCategory.BRAKE_LATER
+
+
+def test_braked_late_needs_more_than_a_metre():
+    from accoach.coaching.analyzer import _BRAKE_EARLY_POS, _braked_late
+    assert _braked_late(0.30 + _BRAKE_EARLY_POS, 0.30) is True
+    assert _braked_late(0.30 + _BRAKE_EARLY_POS / 2, 0.30) is False
+    # Non aver frenato non è «aver frenato tardi», e non si può frenare dopo chi
+    # non frena affatto: entrambe hanno una risposta, e non è questa.
+    assert _braked_late(-1.0, 0.30) is False
+    assert _braked_late(0.30, -1.0) is False

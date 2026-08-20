@@ -25,7 +25,8 @@ from ..telemetry.snapshot import format_lap_time
 from ..track import Corner
 from ..cornernames import for_track, marks_for
 from ..trackdata import corner_name, landmark_at
-from .analyzer import _BRAKE_ON, _LOSS_MS, CornerStats, _braked_early, classify_corner
+from .analyzer import (_BRAKE_ON, _LOSS_MS, CornerStats, _braked_early,
+                       _braked_late, classify_corner)
 from .chain import link_corners
 from .phases import phase_note, split_loss
 from .cue import CueCategory, theme_key
@@ -67,6 +68,10 @@ _LOSS = {
         _C.MORE_THROTTLE: ("Average throttle {tl:.0f}% vs {tr:.0f}% of the reference.",
                            "Get back on the throttle earlier and harder on exit, "
                            "without spinning up."),
+        _C.BRAKE_EARLIER: ("You brake after the reference and are still slower at "
+                           "the apex: {vl:.0f} km/h vs {vr:.0f} km/h ({diff:+.0f}).",
+                           "Move your braking point earlier: arriving settled lets "
+                           "you turn in sooner, and the speed comes back at the apex."),
         _C.LESS_BRAKE: ("Average brake {bl:.0f}% vs {br:.0f}% of the reference.",
                         "You're braking too long: release earlier and let the car "
                         "flow toward the apex."),
@@ -82,6 +87,10 @@ _LOSS = {
                          "così entri con più velocità."),
         _C.MORE_THROTTLE: ("Gas medio {tl:.0f}% contro {tr:.0f}% del riferimento.",
                            "Riapri il gas prima e più deciso in uscita, senza pattinare."),
+        _C.BRAKE_EARLIER: ("Stacchi dopo di lui e all'apex sei comunque più lento: "
+                           "{vl:.0f} km/h contro {vr:.0f} km/h ({diff:+.0f}).",
+                           "Anticipa la staccata: arrivare composto ti fa girare "
+                           "prima, e la velocità la ritrovi all'apex."),
         _C.LESS_BRAKE: ("Freno medio {bl:.0f}% contro {br:.0f}% del riferimento.",
                         "Stai frenando troppo a lungo: rilascia prima e lascia scorrere "
                         "la vettura verso l'apex."),
@@ -733,12 +742,14 @@ def build_lap_debrief(lap: Lap, reference: Reference, corners: list[Corner],
             -1.0 if ref_onset is None else ref_onset,
             reference.point_at(live_onset).brake if live_onset is not None else -1.0,
         )
+        braking_late = _braked_late(-1.0 if live_onset is None else live_onset,
+                                    -1.0 if ref_onset is None else ref_onset)
 
         stats = CornerStats(
             lost_ms=lost, throttle_live=thr_live, throttle_ref=thr_ref,
             brake_live=brk_live, brake_ref=brk_ref,
             min_speed_live=vmin_live, min_speed_ref=vmin_ref,
-            braking_early=braking_early,
+            braking_early=braking_early, braking_late=braking_late,
         )
         cue = classify_corner(stats, c.index, c.apex_pos)
         if cue is None or cue.category == CueCategory.GOOD:
