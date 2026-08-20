@@ -110,6 +110,20 @@ CREATE TABLE IF NOT EXISTS plan (
     goals_json  TEXT NOT NULL,
     PRIMARY KEY (car_key, track_key)
 );
+-- The race engineer's memory across sessions, per car+track: which phase it had
+-- reached, which remedy is next for each symptom, which symptoms ran out of
+-- remedies, and the clicks already spent on each lever. Without it, reopening
+-- HONE re-proposes a remedy already measured and thrown away, at three laps of
+-- baseline plus three of re-test each. The lap window is deliberately NOT in
+-- here: those are measurements, and two sessions are not comparable.
+-- Same place and same reasons as `focus_state` above; survives a lap-table
+-- rebuild because `_migrate` only drops `lap`.
+CREATE TABLE IF NOT EXISTS engineer_state (
+    car_key    TEXT NOT NULL,
+    track_key  TEXT NOT NULL,
+    state_json TEXT NOT NULL,
+    PRIMARY KEY (car_key, track_key)
+);
 -- Where a track's pit lane begins, as a normalized lap position. No telemetry
 -- field publishes it, so it is MEASURED: the last on-track position before the
 -- car enters the lane, one sample per visit (see coaching/pitcall.py). Keyed on
@@ -504,6 +518,37 @@ class LapCatalog:
                DO UPDATE SET mastered=excluded.mastered, parked=excluded.parked""",
             (self._slug(car_model), self._slug(track),
              _join_indices(mastered), _join_indices(parked)),
+        )
+        self._conn.commit()
+
+    # --- Race engineer memory (per car+track) -----------------------------
+
+    def load_engineer_state(self, car_model: str, track: str) -> dict | None:
+        """What the engineer had already tried on this car+track, or None.
+
+        None for "no memory", including when the stored JSON is unreadable: a
+        broken row must cost the driver nothing more than a fresh start.
+        """
+        row = self._conn.execute(
+            "SELECT state_json FROM engineer_state WHERE car_key=? AND track_key=?",
+            (self._slug(car_model), self._slug(track)),
+        ).fetchone()
+        if row is None:
+            return None
+        try:
+            state = json.loads(row["state_json"])
+        except (ValueError, TypeError):
+            return None
+        return state if isinstance(state, dict) else None
+
+    def save_engineer_state(self, car_model: str, track: str, state: dict) -> None:
+        self._conn.execute(
+            """INSERT INTO engineer_state(car_key, track_key, state_json)
+               VALUES(?,?,?)
+               ON CONFLICT(car_key, track_key)
+               DO UPDATE SET state_json=excluded.state_json""",
+            (self._slug(car_model), self._slug(track),
+             json.dumps(state, ensure_ascii=False)),
         )
         self._conn.commit()
 

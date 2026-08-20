@@ -86,3 +86,45 @@ def test_the_engine_persists_a_change_and_restores_it(tmp_path):
     m, p = CoachEngine(reader=_StubReader([synth.snap(pos=0.5)]), voice=None,
                        laps_dir=tmp_path)._load_focus_state("ferrari_488_gt3", "monza")
     assert 2 in m
+
+
+# --- e l'Ingegnere ricorda cosa ha gia' provato ---------------------------
+#
+# Stessa storia del Focus qui sopra, sull'altra meta' dell'app: senza, riaprire
+# HONE fa riproporre il rimedio gia' misurato e scartato la volta prima, e ogni
+# rimedio costa tre giri di base piu' tre di prova. Sta nello stesso posto per
+# la stessa ragione: e' piccolo, e' per auto+pista, e senza i giri a cui si
+# riferisce non vale niente.
+
+def test_the_catalog_round_trips_engineer_state(tmp_path):
+    state = {"phase_idx": 2, "remedy_idx": {"understeer apex high": 1},
+             "exhausted": ["oversteer exit high"],
+             "applied_clicks": [["rearWing", None, -2]], "unjudged": ""}
+    with LapCatalog(tmp_path / "catalog.db") as cat:
+        cat.save_engineer_state("ferrari_488_gt3", "monza", state)
+    with LapCatalog(tmp_path / "catalog.db") as cat:
+        assert cat.load_engineer_state("ferrari_488_gt3", "monza") == state
+
+
+def test_an_unknown_combo_has_no_engineer_state(tmp_path):
+    with LapCatalog(tmp_path / "catalog.db") as cat:
+        assert cat.load_engineer_state("bmw_m4_gt3", "spa") is None
+
+
+def test_engineer_state_is_keyed_per_car_and_track(tmp_path):
+    with LapCatalog(tmp_path / "catalog.db") as cat:
+        cat.save_engineer_state("ferrari_488_gt3", "monza", {"phase_idx": 1})
+        cat.save_engineer_state("ferrari_488_gt3", "spa", {"phase_idx": 4})
+        assert cat.load_engineer_state("ferrari_488_gt3", "monza")["phase_idx"] == 1
+        assert cat.load_engineer_state("ferrari_488_gt3", "spa")["phase_idx"] == 4
+
+
+def test_a_corrupt_engineer_state_reads_as_none(tmp_path):
+    """Il file e' un file: un JSON rovinato vale «nessuna memoria», mai
+    un'eccezione che si porta via la sessione."""
+    db = tmp_path / "catalog.db"
+    with LapCatalog(db) as cat:
+        cat.save_engineer_state("ferrari_488_gt3", "monza", {"phase_idx": 1})
+        cat._conn.execute("UPDATE engineer_state SET state_json='{non json'")
+        cat._conn.commit()
+        assert cat.load_engineer_state("ferrari_488_gt3", "monza") is None

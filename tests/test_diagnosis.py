@@ -364,3 +364,30 @@ def test_the_engine_hands_the_engineer_the_corner_names_it_already_has(tmp_path)
     eng._observe_lap(lap)
     assert "Variante Ascari" in eng._engineer_decision.message
     eng.close()
+
+
+def test_the_engine_writes_the_engineer_s_memory_after_every_lap(tmp_path):
+    """La catena fino al disco: senza, il registro di cosa e' gia' stato provato
+    vive quanto il processo, ed e' quello che il 14/08 e' andato perso."""
+    from accoach.engineer import RaceEngineer
+    from accoach.engineer.profiles import GT3_PROFILE
+    from accoach.recording.catalog import LapCatalog
+    from accoach.recording.storage import _catalog_path
+
+    class _Dead:
+        def read(self):
+            return TelemetrySnapshot.disconnected()
+
+        def close(self):
+            pass
+
+    eng = CoachEngine(reader=_Dead(), laps_dir=tmp_path)
+    eng._engineer = RaceEngineer(GT3_PROFILE, min_stable=3)
+    eng._engineer_key = ("mclaren_720s_gt3_evo", "monza")
+    eng._engineer.phase_idx = 2
+    eng._observe_lap(synth.build_lap(clean=True))
+    eng.close()
+
+    with LapCatalog(_catalog_path(tmp_path)) as cat:
+        got = cat.load_engineer_state("mclaren_720s_gt3_evo", "monza")
+    assert got is not None and got["phase_idx"] == 2

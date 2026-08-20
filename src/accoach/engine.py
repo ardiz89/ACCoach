@@ -360,6 +360,8 @@ class CoachEngine:
         # coaches it. Rebuilt per car/track; needs a reference to produce debriefs.
         self._focus: FocusCoach | None = None
         self._focus_key: tuple[str, str] | None = None
+        #: Auto+pista di cui l'Ingegnere sta tenendo la memoria su disco.
+        self._engineer_key: tuple[str, str] | None = None
         self._focus_report: FocusReport | None = None
 
         # Commands from other threads (e.g. the server's POST /engineer/applied,
@@ -406,6 +408,7 @@ class CoachEngine:
             self._engineer_decision = self._engineer.observe(stats)
             self._announce_engineer(self._engineer_decision)
             self._log_engineer_outcome(lap, self._engineer_decision)
+            self._save_engineer_state()
 
         # The Focus coach needs a reference to know where time was lost.
         if self._focus is None or self._reference is None or not self._corners:
@@ -466,6 +469,34 @@ class CoachEngine:
         except Exception:
             pass   # persistence is a convenience; never let it break a lap
 
+    def _load_engineer_state(self, car: str, track: str) -> dict | None:
+        """La memoria dell'Ingegnere per questo auto+pista, o None.
+
+        Best-effort come la gemella del focus: un catalogo mancante o bloccato
+        vuol dire «riparti da zero», mai un errore che ferma la sessione.
+        """
+        try:
+            from .recording.catalog import LapCatalog
+            from .recording.storage import _catalog_path
+
+            with LapCatalog(_catalog_path(Path(self.laps_dir))) as cat:
+                return cat.load_engineer_state(car, track)
+        except Exception:
+            return None
+
+    def _save_engineer_state(self) -> None:
+        if self._engineer is None or self._engineer_key is None:
+            return
+        try:
+            from .recording.catalog import LapCatalog
+            from .recording.storage import _catalog_path
+
+            car, track = self._engineer_key
+            with LapCatalog(_catalog_path(Path(self.laps_dir))) as cat:
+                cat.save_engineer_state(car, track, self._engineer.state())
+        except Exception:
+            pass   # persistence is a convenience; never let it break a lap
+
     def _watch_at_wheel(self, snap: TelemetrySnapshot) -> None:
         """Close the loop on an "al volo" proposal by watching the dial move.
 
@@ -491,6 +522,9 @@ class CoachEngine:
         if self.wheelwatch.update(snap):
             self._engineer.mark_applied()
             self._engineer_done_sig = sig
+            # Fra «applicata» e il giro dopo ci sta un intero spegnimento, ed e'
+            # esattamente li' che il 14/08 si e' perso un ciclo.
+            self._save_engineer_state()
 
     def _garage_change_pending(self) -> bool:
         """Is there a setup change waiting that can only be made in the garage?
@@ -786,8 +820,14 @@ class CoachEngine:
             # quindi lì si tace (vedi il blocco in coaching/tuning.py).
             self.pressure.set_car_class(car_class)
             self.tyretemp.set_car_class(car_class)
-            # A new car/track is a new setup problem: start a fresh engineer.
+            # A new car/track is a new setup problem: start a fresh engineer —
+            # ma non smemorato. Quello che torna e' il registro di cosa e' gia'
+            # stato provato (fase, rimedi, click spesi), mai le misure: due
+            # sessioni non si confrontano. Vedi `RaceEngineer.state`.
             self._engineer = engineer_for(snap.car_model, snap.track)
+            self._engineer_key = (snap.car_model, snap.track)
+            self._engineer.restore(
+                self._load_engineer_state(snap.car_model, snap.track))
             self._engineer_decision = None
             self._engineer_spoken_sig = None
             self._engineer_done_sig = None
@@ -827,6 +867,8 @@ class CoachEngine:
             # until the next completed lap — would call them back to the box on
             # the out-lap they just left it on.
             self._engineer_done_sig = _decision_sig(self._engineer_decision)
+            # …e la modifica e' sulla macchina anche se il pilota chiude adesso.
+            self._save_engineer_state()
 
         if self._feed is None:
             lap = self.recorder.update(snap)
