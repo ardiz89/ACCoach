@@ -151,10 +151,18 @@ def _focus_log_line(report: FocusReport | None) -> str:
 
     «Nessuna parola di trazione in cinque giri» significa una cosa se il focus
     era la trazione, e un'altra se non e' mai stato eletto.
+
+    E «non eletto» sono a loro volta tre cose diverse, che portano a letture
+    opposte della stessa riga `detto |`: *sto ancora guardando* (non ho ancora
+    abbastanza giri), *sei pulito* (nessuna debolezza che ricorre), e *questo
+    giro non l'ho nemmeno giudicato* (senza riferimento o senza curve il coach
+    non lo vede). Il coach tace in tutti e tre, per tre motivi che non si
+    somigliano.
     """
     focus = report.focus if report else None
     if focus is None:
-        return "focus | nessuno"
+        stato = report.kind.value if report else "non valutato"
+        return f"focus | nessuno | stato={stato}"
     return (f"focus | {focus.name} | tema={_focus_theme_key(report)} "
             f"| perdi {focus.baseline_ms:.0f} ms")
 

@@ -64,9 +64,28 @@ def test_il_focus_eletto_si_legge_con_curva_tema_e_perdita():
 
 def test_nessun_focus_lo_dice_invece_di_tacere():
     """Il silenzio nel log sarebbe indistinguibile da un log non scritto."""
-    assert _focus_log_line(None) == "focus | nessuno"
+    assert _focus_log_line(None).startswith("focus | nessuno")
     assert _focus_log_line(FocusReport(kind=FocusKind.ASSESS,
-                                       message="")) == "focus | nessuno"
+                                       message="")).startswith("focus | nessuno")
+
+
+def test_e_dice_quale_dei_due_nessuno_e():
+    """«Nessun focus» vale due stati opposti: *sto ancora guardando* (non ho
+    abbastanza giri per eleggere) e *sei pulito, non ho niente da eleggere*. La
+    riga di log serve a interpretare le righe `detto |` che le stanno attorno, e
+    quelle due portano a letture opposte: nel primo caso il coach tace perche'
+    non sa ancora, nel secondo perche' non c'e' niente da dire."""
+    assesso = _focus_log_line(FocusReport(kind=FocusKind.ASSESS, message=""))
+    pulito = _focus_log_line(FocusReport(kind=FocusKind.CLEAN, message=""))
+    assert assesso != pulito
+    assert "assess" in assesso and "clean" in pulito
+
+
+def test_e_un_giro_mai_giudicato_non_si_confonde_con_un_giro_pulito():
+    """Senza riferimento o senza curve il giro non passa nemmeno dal coach: e'
+    un terzo stato, e finiva anche lui in «nessuno»."""
+    assert _focus_log_line(None) != _focus_log_line(
+        FocusReport(kind=FocusKind.CLEAN, message=""))
 
 
 # --- e che la riga esca davvero, non solo che sia formattata bene ------------
