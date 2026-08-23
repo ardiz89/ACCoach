@@ -54,6 +54,13 @@ RISPOSTE = ("1", "2", "3", "4", "5", "R")
 #: cambiate che sono guida, non parole.
 FERMO_DA_S = 1.0
 
+#: Quanto dev'essere ferma la MARCIA prima di leggerla. Il cambio e' sequenziale:
+#: per dire «quattro» si passa da uno, due e tre. Leggere il cambio invece
+#: dell'arrivo vuol dire leggere il primo scalino di un viaggio — misurato in
+#: pista il 23/08, dove tutte e quattro le risposte della serata sono tornate
+#: «1» e una era un 4.
+ASSESTA_S = 1.2
+
 #: La domanda aperta, scritta da Claude. La sua **esistenza** e' la domanda; il
 #: contenuto serve solo a rileggerla. Stesso modo del riquadro guida-test: chi
 #: sta fuori scrive un file, lo strumento lo legge e non decide niente.
@@ -62,8 +69,21 @@ DOMANDA = "domanda.json"
 
 def leggi_risposta(marcia_prima: str | None, marcia: str,
                    velocita_kmh: float, *, domanda_aperta: bool = True,
-                   fermo_da_s: float = 999.0) -> str | None:
+                   fermo_da_s: float = 999.0,
+                   marcia_da_s: float = 999.0) -> str | None:
     """La risposta appena data, o ``None``.
+
+    **La risposta e' dove ti fermi, non il primo scalino.** Il cambio di una GT3
+    e' sequenziale: per dire «quattro» si tira la paletta quattro volte e si
+    passa da uno, due e tre. Un canale che scatta al primo cambio legge la
+    partenza invece dell'arrivo. Misurato in pista il 23/08: quattro domande,
+    quattro risposte «1», e nessuna delle quattro era un uno — una era il voto
+    4 sulla leggibilita' del riquadro, un'altra una prova di controllo in cui
+    avevo chiesto la terza e l'auto era **davvero** in terza. Il canale non
+    sbagliava a leggere il cambio: sbagliava a credere che il primo cambio fosse
+    la risposta.
+
+    Da cui `marcia_da_s`: si legge la marcia che e' ancora li' dopo un attimo.
 
     **Senza una domanda non ci sono risposte.** Un canale sempre in ascolto
     trasforma ogni gesto di guida in una parola: misurato la sera del 23/08,
@@ -93,6 +113,8 @@ def leggi_risposta(marcia_prima: str | None, marcia: str,
     if fermo_da_s < FERMO_DA_S:
         return None
     if marcia == marcia_prima:
+        return None
+    if marcia_da_s < ASSESTA_S:
         return None
     if marcia not in RISPOSTE:
         return None
@@ -131,6 +153,8 @@ def main() -> None:
     stato_prima = None
     fermo_da: float | None = None
     chiesto_prima = False
+    marcia_vista = ""
+    marcia_da = 0.0
     try:
         while True:
             s = reader.read()
@@ -163,9 +187,12 @@ def main() -> None:
                     fermo_da = None
                 elif fermo_da is None:
                     fermo_da = ora
+                if s.gear != marcia_vista:
+                    marcia_vista, marcia_da = s.gear, ora
                 risposta = leggi_risposta(
                     marcia_prima, s.gear, s.speed_kmh, domanda_aperta=chiesto,
-                    fermo_da_s=(0.0 if fermo_da is None else ora - fermo_da))
+                    fermo_da_s=(0.0 if fermo_da is None else ora - fermo_da),
+                    marcia_da_s=ora - marcia_da)
                 if risposta is not None:
                     etichetta = {"1": "si'", "2": "no", "R": "ripeti"}.get(
                         risposta, f"voto {risposta}")
@@ -176,10 +203,14 @@ def main() -> None:
                     # cosa che questo strumento scrive, e scrive cancellando.
                     domanda.unlink(missing_ok=True)
                     chiesto_prima = False
-                if s.speed_kmh <= FERMO_KMH:
-                    marcia_prima = s.gear
-                else:
+                if s.speed_kmh > FERMO_KMH:
                     marcia_prima = None     # guidando non si tiene il conto
+                elif marcia_prima is None or not chiesto:
+                    # Fuori da una domanda si semina e basta. Durante una
+                    # domanda NON si insegue ogni scalino: aggiornare qui
+                    # farebbe sembrare l'arrivo «uguale a prima» e la risposta
+                    # non uscirebbe mai.
+                    marcia_prima = s.gear
 
                 if s.completed_laps != giri_prima:
                     if giri_prima >= 0:

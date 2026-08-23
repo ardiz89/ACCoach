@@ -9,7 +9,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools" / "voce"))
 
-from volante import FERMO_DA_S, FERMO_KMH, leggi_risposta  # noqa: E402
+from volante import ASSESTA_S, FERMO_DA_S, FERMO_KMH, leggi_risposta  # noqa: E402
 
 
 def test_una_marcia_inserita_da_fermo_e_una_risposta():
@@ -68,3 +68,23 @@ def test_l_istante_in_cui_ti_fermi_non_e_una_risposta():
     """Fermarsi e ripartire sono pieni di cambiate che sono guida."""
     assert leggi_risposta("N", "1", 0.0, fermo_da_s=FERMO_DA_S / 2) is None
     assert leggi_risposta("N", "1", 0.0, fermo_da_s=FERMO_DA_S + 0.1) == "1"
+
+
+def test_la_risposta_e_dove_ti_fermi_non_il_primo_scalino():
+    """Il difetto piu' istruttivo della sera del 23/08. Il cambio di una GT3 e'
+    sequenziale: per dire «quattro» si passa da uno, due e tre. Il canale
+    scattava al primo cambio, quindi quattro domande hanno dato quattro «1» e
+    nessuna delle quattro era un uno — una era il voto 4 sulla leggibilita' del
+    riquadro, un'altra una prova di controllo in cui avevo chiesto la terza e
+    l'auto era davvero in terza.
+
+    Non sbagliava a leggere il cambio: sbagliava a credere che il primo cambio
+    fosse la risposta. E la prova di controllo — una domanda la cui risposta
+    giusta non e' quella che ricevo sempre — e' cio' che l'ha smascherato, non
+    la rilettura del codice."""
+    # di passaggio verso la quarta: non e' ancora una risposta
+    assert leggi_risposta("N", "1", 0.0, marcia_da_s=0.1) is None
+    assert leggi_risposta("N", "2", 0.0, marcia_da_s=0.1) is None
+    assert leggi_risposta("N", "3", 0.0, marcia_da_s=0.1) is None
+    # ferma li' da un attimo: questa e' la risposta
+    assert leggi_risposta("N", "4", 0.0, marcia_da_s=ASSESTA_S + 0.1) == "4"
