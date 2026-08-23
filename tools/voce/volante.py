@@ -31,6 +31,7 @@ seppellirebbe la riga che conta.
 """
 from __future__ import annotations
 
+import json
 import sys
 import time
 from pathlib import Path
@@ -48,10 +49,28 @@ FERMO_KMH = 3.0
 #: risposte vorrebbe dire sentire cose mai dette.
 RISPOSTE = ("1", "2", "3", "4", "5", "R")
 
+#: Da quanto dev'essere ferma l'auto perche' una marcia sia una risposta.
+#: L'istante in cui ci si ferma e quello in cui si riparte sono pieni di
+#: cambiate che sono guida, non parole.
+FERMO_DA_S = 1.0
+
+#: La domanda aperta, scritta da Claude. La sua **esistenza** e' la domanda; il
+#: contenuto serve solo a rileggerla. Stesso modo del riquadro guida-test: chi
+#: sta fuori scrive un file, lo strumento lo legge e non decide niente.
+DOMANDA = "domanda.json"
+
 
 def leggi_risposta(marcia_prima: str | None, marcia: str,
-                   velocita_kmh: float) -> str | None:
+                   velocita_kmh: float, *, domanda_aperta: bool = True,
+                   fermo_da_s: float = 999.0) -> str | None:
     """La risposta appena data, o ``None``.
+
+    **Senza una domanda non ci sono risposte.** Un canale sempre in ascolto
+    trasforma ogni gesto di guida in una parola: misurato la sera del 23/08,
+    innestare la prima per uscire dal box e' arrivato come «si'», due volte, e
+    io non avevo chiesto niente. Non e' rumore da filtrare a valle — era una
+    risposta plausibile a una domanda che non esisteva, cioe' la forma peggiore
+    di errore che questo canale possa fare.
 
     Vale il **cambio**, non lo stato: una marcia gia' inserita e' una risposta
     gia' letta, e rileggerla a ogni frame darebbe la stessa risposta sessanta
@@ -65,9 +84,13 @@ def leggi_risposta(marcia_prima: str | None, marcia: str,
     la marcia riparte da R, quindi ogni rientro in pista mi arrivava come un
     «ripeti» — tre in un minuto, e nessuno detto da lui.
     """
+    if not domanda_aperta:
+        return None
     if marcia_prima is None:
         return None
     if velocita_kmh > FERMO_KMH:
+        return None
+    if fermo_da_s < FERMO_DA_S:
         return None
     if marcia == marcia_prima:
         return None
@@ -76,8 +99,14 @@ def leggi_risposta(marcia_prima: str | None, marcia: str,
     return marcia
 
 
+#: ACC dice «nessun tempo» con il massimo di un intero con segno. Preso alla
+#: lettera diventa un migliore di 35791:23.647, che e' un numero e sembra un
+#: tempo — il modo peggiore di non avere un dato.
+_NIENTE_MS = 2147483647
+
+
 def _tempo(ms: int) -> str:
-    if ms <= 0:
+    if ms <= 0 or ms >= _NIENTE_MS:
         return "--"
     return f"{ms // 60000}:{(ms % 60000) / 1000.0:06.3f}"
 
@@ -94,9 +123,14 @@ def main() -> None:
     print("VOLANTE pronto — 1=si' 2=no 1-5=voto R=ripeti folle=riposo",
           flush=True)
 
+    from accoach import paths
+    domanda = paths.base_dir() / DOMANDA
+
     marcia_prima: str | None = None
     giri_prima = -1
     stato_prima = None
+    fermo_da: float | None = None
+    chiesto_prima = False
     try:
         while True:
             s = reader.read()
@@ -114,12 +148,34 @@ def main() -> None:
                 # cio' che impedisce al rientro in pista di sembrare una
                 # risposta.
                 marcia_prima = None
+            chiesto = domanda.exists()
+            if chiesto and not chiesto_prima:
+                try:
+                    testo = json.loads(domanda.read_text(encoding="utf-8"))
+                    print(f"DOMANDA {testo.get('testo', '')}", flush=True)
+                except (OSError, ValueError):
+                    print("DOMANDA (illeggibile)", flush=True)
+            chiesto_prima = chiesto
+
             if vivo:
-                risposta = leggi_risposta(marcia_prima, s.gear, s.speed_kmh)
+                ora = time.monotonic()
+                if s.speed_kmh > FERMO_KMH:
+                    fermo_da = None
+                elif fermo_da is None:
+                    fermo_da = ora
+                risposta = leggi_risposta(
+                    marcia_prima, s.gear, s.speed_kmh, domanda_aperta=chiesto,
+                    fermo_da_s=(0.0 if fermo_da is None else ora - fermo_da))
                 if risposta is not None:
                     etichetta = {"1": "si'", "2": "no", "R": "ripeti"}.get(
                         risposta, f"voto {risposta}")
                     print(f"RISPOSTA {risposta} ({etichetta})", flush=True)
+                    # Una domanda, una risposta: chiudere qui il turno rende
+                    # strutturalmente impossibile che una cambiata successiva
+                    # risponda una seconda volta alla stessa domanda. E' l'unica
+                    # cosa che questo strumento scrive, e scrive cancellando.
+                    domanda.unlink(missing_ok=True)
+                    chiesto_prima = False
                 if s.speed_kmh <= FERMO_KMH:
                     marcia_prima = s.gear
                 else:

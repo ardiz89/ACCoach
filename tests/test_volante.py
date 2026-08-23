@@ -9,7 +9,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools" / "voce"))
 
-from volante import FERMO_KMH, leggi_risposta  # noqa: E402
+from volante import FERMO_DA_S, FERMO_KMH, leggi_risposta  # noqa: E402
 
 
 def test_una_marcia_inserita_da_fermo_e_una_risposta():
@@ -53,3 +53,18 @@ def test_senza_un_prima_non_c_e_un_cambio_da_leggere():
     che non c'e'."""
     assert leggi_risposta(None, "R", 0.0) is None
     assert leggi_risposta(None, "1", 0.0) is None
+
+
+def test_senza_una_domanda_non_ci_sono_risposte():
+    """Il secondo difetto della stessa sera, e il peggiore: innestare la prima
+    per uscire dal box e' arrivato come «si'», due volte, e nessuno aveva
+    chiesto niente. Un canale sempre in ascolto trasforma ogni gesto di guida in
+    una parola — ed era una risposta *plausibile* a una domanda inesistente,
+    cioe' la forma di errore che non si riconosce leggendo il risultato."""
+    assert leggi_risposta("N", "1", 0.0, domanda_aperta=False) is None
+
+
+def test_l_istante_in_cui_ti_fermi_non_e_una_risposta():
+    """Fermarsi e ripartire sono pieni di cambiate che sono guida."""
+    assert leggi_risposta("N", "1", 0.0, fermo_da_s=FERMO_DA_S / 2) is None
+    assert leggi_risposta("N", "1", 0.0, fermo_da_s=FERMO_DA_S + 0.1) == "1"
