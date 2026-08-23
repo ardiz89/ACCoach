@@ -158,7 +158,11 @@ def main() -> None:
     try:
         while True:
             s = reader.read()
-            stato = (s.connected, s.status.name, s.in_pit_lane)
+            # Auto e pista stanno QUI dentro e non e' un dettaglio: senza,
+            # cambiare circuito era l'unica cosa che succede in una sessione di
+            # prova e che non compariva da nessuna parte.
+            stato = (s.connected, s.status.name, s.in_pit_lane,
+                     s.car_model, s.track)
             if stato != stato_prima:
                 print(f"STATO connesso={s.connected} {s.status.name}"
                       f" corsia_box={s.in_pit_lane} {s.car_model}@{s.track}",
