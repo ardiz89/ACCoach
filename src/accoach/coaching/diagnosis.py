@@ -31,14 +31,7 @@ from .balance import (
     _YAW_SIGN,
     understeer_ratio_for,
 )
-from .events import (
-    _ABS_LEVEL,
-    _BRAKE_MIN,
-    _LOCK_RATIO,
-    _RATIO_MIN_SPEED,
-    _TC_LEVEL,
-    _THROTTLE_MIN,
-)
+from .events import is_lockup, is_wheelspin
 from .tuning import DEFAULT_TUNING, ClassTuning, tuning_for_car
 
 # Apex band half-width (normalized track position) around the speed minimum.
@@ -114,27 +107,34 @@ def _seg(pos: float) -> int:
 
 
 def _lock_spin_segments(samples: list[LapSample], spin_ratio: float) -> tuple[int, int]:
-    """Distinct track segments with a lock-up / wheelspin (physical slip ratio).
+    """Distinct track segments with a lock-up / wheelspin.
 
-    Same thresholds as the live EventDetector; needs the v6 ``slip_ratio`` channel
-    (older laps have it zero → counts as 0, the safe default).
+    The **same rule** as the live detector, because it is literally the same
+    function (:func:`accoach.coaching.events.is_lockup`). Needs the v6
+    ``slip_ratio`` channel (older laps have it zero → counts as 0, the safe
+    default).
+
+    It used to run its own copy, which triggered on the aid flag alone. The
+    reasoning at the time (review 2026-06-29, item M1) was that on an ACC GT3
+    the aids hold slip low *because they're working*, so a slip-only check would
+    show the engineer nothing — and back then the live detector fired on the
+    flag alone too, so the copy was faithful. The live rule was tightened three
+    weeks later (2026-07-19) and this half was never brought along.
+
+    What the stale copy was worth, measured 2026-08-12 at Monza on a 720S: with
+    ABS 6 it counted 5-7 lock segments on laps the live detector called silent,
+    against 7 on a lap with four genuine locked wheels (slip -1.00). It could
+    not tell those two apart, so as a signal it carried nothing. And what M1
+    feared — the engineer going blind — was not what happened: on an ABS car the
+    count now reads ~0, which is the truth, since a lock-up with ABS 6 does not
+    physically occur (11 690 frames, front slip never past -0.106).
     """
     locks: set[int] = set()
     spins: set[int] = set()
     for s in samples:
-        # Mirror the live EventDetector exactly: the aid intervention (abs/tc) is
-        # the primary signal and the physical slip ratio the fallback. On an ACC
-        # GT3 the aids hold slip low *because they're working*, so a slip-only
-        # check would miss every lock/spin and the engineer would never see them.
-        if s.brake >= _BRAKE_MIN and (
-                s.abs_active >= _ABS_LEVEL
-                or (s.speed_kmh >= _RATIO_MIN_SPEED
-                    and min(s.slip_ratio[0], s.slip_ratio[1]) <= _LOCK_RATIO)):
+        if is_lockup(s):
             locks.add(_seg(s.pos))
-        if (s.throttle >= _THROTTLE_MIN and s.gear not in ("R", "N") and (
-                s.tc_active >= _TC_LEVEL
-                or (s.speed_kmh >= _RATIO_MIN_SPEED
-                    and max(s.slip_ratio[2], s.slip_ratio[3]) >= spin_ratio))):
+        if is_wheelspin(s, spin_ratio):
             spins.add(_seg(s.pos))
     return len(locks), len(spins)
 
@@ -204,7 +204,29 @@ def dominant_symptom(scores: dict[Symptom, float]) -> Symptom | None:
     return max(scores, key=scores.get) if scores else None
 
 
-def build_lap_stats(lap: Lap, corners: list[Corner] | None = None) -> LapStats:
+def _lost_where(lap: Lap, corners: list[Corner],
+                corner_names: dict[int, str] | None) -> str:
+    """Il nome della curva in cui il giro ha smesso di contare, o "".
+
+    Solo la curva in cui eri **davvero**: se il fuori pista e' caduto fra due
+    curve, la piu' vicina sarebbe una bugia detta con sicurezza, e manderebbe il
+    pilota a rivedere una curva in cui non e' successo niente.
+
+    I nomi arrivano da chi chiama, mai da qui. Il motore ne ha gia' una mappa,
+    costruita coi nomi curati, quelli imparati dal catalogo e quelli che il
+    pilota ha scritto a mano — e un secondo battesimo qui darebbe alla stessa
+    curva due nomi diversi in due punti dell'app.
+    """
+    if lap.lost_at is None or not corner_names:
+        return ""
+    for c in corners:
+        if c.entry_pos <= lap.lost_at <= c.exit_pos:
+            return corner_names.get(c.index, "")
+    return ""
+
+
+def build_lap_stats(lap: Lap, corners: list[Corner] | None = None,
+                    corner_names: dict[int, str] | None = None) -> LapStats:
     """Diagnose one recorded lap into a :class:`LapStats` for the engineer."""
     if corners is None:
         corners = detect_corners(lap.samples)
@@ -226,6 +248,13 @@ def build_lap_stats(lap: Lap, corners: list[Corner] | None = None) -> LapStats:
         # no off-track. Only a complete, non-dirty lap counts toward the engine's
         # evaluation window.
         stable=lap.valid and lap.clean is not False,
+        # Perche', non solo se: `stable` collassa due fatti che il pilota
+        # corregge in modi opposti — un giro che il gioco non ha completato e un
+        # giro tagliato — e per quattro giri di fila, il 14/08, non saperlo ha
+        # reso un contatore fermo indistinguibile da un motore rotto.
+        unstable_why=("" if lap.valid and lap.clean is not False
+                      else "invalid" if not lap.valid else "cut"),
+        lost_where=_lost_where(lap, corners, corner_names),
         warmed_up=_warmed_up(lap.samples),
         symptom_scores=scores,
         symptom_corners=corner_counts,

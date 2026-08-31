@@ -157,7 +157,12 @@
     <div id="tray-list" class="tray-list"></div>
     <div class="tray-actions">
       <button id="btn-reset" type="button" class="ghost" data-i18n="tray.reset">Reset all</button>
-      <button id="btn-write" type="button" class="primary" data-i18n="tray.write">Write setup…</button>
+      <!-- The named road stays: it is the one that shows the physical diff (psi,
+           mm) before writing. It is no longer the primary, because in the box
+           the driver is choosing a file name they don't care about. -->
+      <button id="btn-write" type="button" class="ghost" data-i18n="tray.write">Name it…</button>
+      <button id="btn-apply" type="button" class="primary"
+              data-i18n="tray.apply" data-i18n-title="tray.applyTitle">Apply →</button>
     </div>
   </footer>
 

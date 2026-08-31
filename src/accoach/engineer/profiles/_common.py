@@ -30,6 +30,13 @@ LO, HI = Speed.LOW, Speed.HIGH
 
 _PSI_PER_CLICK = 0.1
 _SEG_LIMIT = 3                 # lock/spin segments that count as "recurring"
+# Quanti click di pressione al massimo in un solo passaggio ai box. Viene
+# dall'import iniziale del progetto e non e' mai stato misurato; cosi' com'e'
+# vale 0.8 psi, quindi una gomma un paio di psi fuori finestra si prende in tre
+# soste. Che il passo sia corto va bene: fra un passo e il successivo
+# l'Ingegnere MISURA, ed e' l'unico motivo per cui il suo registro vale
+# qualcosa. Tacerlo no, ed e' quello che questo modulo faceva.
+_MAX_CLICKS_PER_STOP = 8
 
 _SLOTS = {"front": FRONT, "rear": REAR, "all": ALL, None: (None,)}
 
@@ -243,15 +250,32 @@ class PressurePhase(WorkPhase):
             cur = stats.pressures_hot.get(ax)
             if cur is None or abs(cur - self.target) <= self.tol:
                 continue
-            clicks = round((self.target - cur) / _PSI_PER_CLICK)
-            clicks = max(-8, min(8, clicks)) or (1 if cur < self.target else -1)
+            wanted = round((self.target - cur) / _PSI_PER_CLICK)
+            clicks = max(-_MAX_CLICKS_PER_STOP, min(_MAX_CLICKS_PER_STOP, wanted))
+            clicks = clicks or (1 if cur < self.target else -1)
             atomics = tuple(AtomicChange("tyrePressure", s, clicks) for s in slots)
             sign = "+" if clicks > 0 else ""
+            # Dove arriva QUESTO passo, che non e' dove vorremmo arrivare appena
+            # il taglio morde: a 24.7 psi con finestra 27.5 il passo vale 25.5,
+            # e la frase prometteva 27.5. Il pilota che ricarica il setup e
+            # rimisura non aveva modo di capire se era andata come doveva.
+            reached = cur + clicks * _PSI_PER_CLICK
+            short = clicks != wanted
             if current_language() == "it":
-                why = (f"Pressione {ax} fuori finestra "
-                       f"({cur:.1f}→~{self.target} psi): {sign}{clicks} click")
+                # …e in italiano l'asse ha un nome italiano: la frase diceva
+                # "Pressione front", meta' tradotta, nell'unico punto dell'app
+                # dove il pilota legge un numero e poi va a girare una manopola.
+                axis = "anteriore" if ax == "front" else "posteriore"
+                why = (f"Pressione {axis} fuori finestra "
+                       f"({cur:.1f}→{reached:.1f} psi, finestra ~{self.target}): "
+                       f"{sign}{clicks} click")
+                if short:
+                    why += " — il massimo per sosta, il resto al prossimo box"
             else:
                 why = (f"{ax.capitalize()} pressure out of window "
-                       f"({cur:.1f}→~{self.target} psi): {sign}{clicks} clicks")
+                       f"({cur:.1f}→{reached:.1f} psi, window ~{self.target}): "
+                       f"{sign}{clicks} clicks")
+                if short:
+                    why += " — the most per stop, the rest next time in"
             return ProposedChange(atomics, why, tr(self.label), "BOX")
         return None

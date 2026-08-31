@@ -126,3 +126,53 @@ def test_engineer_for_sets_class_and_pressure_window():
     # road and gt3 differ
     assert pressure_window("dodge_char_police")[0] == 30.0
     assert pressure_window("mclaren_720s_gt3_evo") == (27.5, 0.7)
+
+
+# --- una modifica di pressione dice dove arriva, non dove vorrebbe ---------
+#
+# Misurato in pista il 14/08: anteriori a 24.7 psi, finestra GT3 ~27.5. Il passo
+# vale al massimo 8 click — 0.8 psi — quindi quel passo porta a 25.5, e servono
+# tre passaggi ai box. Il messaggio pero' diceva «24.7→~27.5 psi: +8 click»:
+# prometteva il bersaglio finale e consegnava un decimo di strada, e il pilota
+# che ricarica il setup e rimisura non ha modo di sapere se e' andata come
+# doveva o se qualcosa non ha funzionato.
+
+def _press_change(cur, target=27.5, tol=0.7):
+    from accoach.engineer.profiles._common import PressurePhase
+    ph = PressurePhase(target, tol)
+    return ph.pressure_remedy(_lap(press={"front": cur, "rear": target}))
+
+
+def test_a_clamped_pressure_step_says_the_pressure_it_actually_reaches():
+    ch = _press_change(24.7)
+    assert ch is not None
+    assert "+8" in ch.rationale
+    assert "25.5" in ch.rationale, "la pressione a cui arriva questo passo"
+    assert "27.5" in ch.rationale, "…e la finestra, che resta il bersaglio"
+
+
+def test_a_step_that_reaches_the_window_does_not_promise_a_second_trip():
+    """Quando il passo ci arriva davvero, la frase non deve crescere: la nota
+    sul passaggio in piu' esiste solo perche' qualche volta serve."""
+    full = _press_change(26.75)
+    clamped = _press_change(24.7)
+    assert full is not None and len(full.rationale) < len(clamped.rationale)
+
+
+def test_the_step_is_capped_the_same_way_in_both_directions():
+    """Sopra la finestra il taglio vale identico, e la frase pure: una pressione
+    troppo alta e' lo stesso problema visto dall'altro lato."""
+    ch = _press_change(30.0)
+    assert ch is not None and "-8" in ch.rationale and "29.2" in ch.rationale
+
+
+def test_the_italian_message_names_the_axle_in_italian(monkeypatch):
+    """«Pressione front» era meta' tradotta, nell'unico punto dell'app dove il
+    pilota legge un numero e poi va a girare una manopola."""
+    from accoach.engineer.profiles import _common
+    monkeypatch.setattr(_common, "current_language", lambda: "it")
+    ph = _common.PressurePhase(27.5, 0.7)
+    front = ph.pressure_remedy(_lap(press={"front": 24.7, "rear": 27.5})).rationale
+    rear = ph.pressure_remedy(_lap(press={"front": 27.5, "rear": 24.7})).rationale
+    assert "anteriore" in front and "front" not in front
+    assert "posteriore" in rear and "rear" not in rear

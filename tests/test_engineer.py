@@ -293,3 +293,168 @@ def test_exhausting_remedies_flags_driving_issue():
         elif d.kind is DecisionKind.PHASE_DONE and "exhausted" in d.message:
             break
     assert sym in eng.exhausted
+
+
+# --- perche' quel giro non e' contato --------------------------------------
+#
+# In pista il 14/08 il pilota ha guidato quattro giri di fila e il contatore
+# dell'Ingegnere non si e' mosso di uno. Da fuori — e da dentro l'abitacolo, che
+# e' l'unico posto che conta — un contatore fermo e' indistinguibile da un
+# motore rotto: la domanda che si e' fatto e' «ma sta funzionando?», non «cosa
+# sto sbagliando». I quattro giri erano tagliati, e il coach lo sapeva: sapeva
+# anche *dove*, perche' `lost_at` e' registrato dal 22/07. Non lo diceva nessuno.
+
+def _cut(time_ms=100000, where=""):
+    st = _lap(time_ms=time_ms, stable=False)
+    st.unstable_why = "cut"
+    st.lost_where = where
+    return st
+
+
+def test_a_lap_that_did_not_count_says_so_and_says_where():
+    eng = _eng()
+    eng.observe(_lap())
+    msg = eng.observe(_cut(where="Variante Ascari")).message
+    assert "Variante Ascari" in msg
+    # …senza smettere di dire a che punto siamo.
+    assert "1" in msg
+
+
+def test_without_a_place_it_still_says_the_lap_did_not_count():
+    eng = _eng()
+    plain = eng.observe(_lap()).message
+    msg = eng.observe(_cut()).message
+    assert msg != plain and len(msg) > len(plain)
+
+
+def test_a_lap_the_game_annulled_is_not_the_same_as_going_off():
+    eng = _eng()
+    st = _lap(stable=False)
+    st.unstable_why = "invalid"
+    annulled = eng.observe(st).message
+    cut = eng.observe(_cut()).message
+    assert annulled != cut
+
+
+def test_cold_tyres_are_named_too():
+    """Confrontato con un altro giro NON contato, non con uno buono: due giri
+    che fanno avanzare il contatore in modo diverso avrebbero messaggi diversi
+    comunque, e il test passerebbe senza che nessuno nomini le gomme."""
+    eng = _eng()
+    cold = _lap()
+    cold.warmed_up = False
+    assert eng.observe(cold).message != eng.observe(_cut()).message
+
+
+def test_the_reason_does_not_stick_to_the_next_good_lap():
+    """Un giro buono cancella la spiegazione: se restasse, il pilota leggerebbe
+    «sei uscito ad Ascari» su un giro in cui non e' uscito da nessuna parte."""
+    eng = _eng()
+    eng.observe(_cut(where="Variante Ascari"))
+    assert "Ascari" not in eng.observe(_lap()).message
+
+
+# --- la memoria dell'Ingegnere fra una sessione e l'altra -------------------
+#
+# Il 14/08 il pilota ha spento il gioco con un ciclo aperto e l'ha perso. Ma la
+# perdita piu' cara non e' la proposta in volo: e' il **registro di cosa e' gia'
+# stato provato**. Senza, alla sessione dopo il motore ripropone il rimedio che
+# ha gia' misurato e scartato, e ogni rimedio costa 3 giri di base + 3 di prova.
+#
+# Cosa NON torna, di proposito: la finestra di giri. Sono misure, e due sessioni
+# non sono confrontabili (asfalto, benzina, gomme). Un verdetto dato su una base
+# di ieri e una prova di oggi sarebbe peggio di nessun verdetto.
+
+_SYM_HI = Symptom(U, AP, HI)
+
+
+def test_the_state_is_json_and_carries_what_was_tried():
+    import json
+
+    eng = _eng()
+    eng.remedy_idx[_SYM_HI] = 2
+    eng.exhausted.add(Symptom(O, EX, HI))
+    eng.applied_clicks[("aRBFront", None)] = -3
+    eng.phase_idx = 1
+    state = eng.state()
+    json.dumps(state)                      # deve poter finire su disco cosi' com'e'
+    back = _eng()
+    back.restore(state)
+    assert back.phase_idx == 1
+    assert back.remedy_idx[_SYM_HI] == 2
+    assert Symptom(O, EX, HI) in back.exhausted
+    assert back.applied_clicks[("aRBFront", None)] == -3
+
+
+def test_a_remedy_already_tried_is_not_tried_again_next_session():
+    """Il motivo per cui questo esiste, detto come effetto e non come campo."""
+    eng = _eng()
+    first = _drive_to_aero(eng, _SYM_HI, 0.6)
+    eng.mark_applied()
+    for _ in range(4):                     # bocciata: il sintomo non si muove
+        eng.observe(_lap(symptom=_SYM_HI, score=0.6))
+    state = eng.state()
+
+    fresh = _eng()
+    fresh.restore(state)
+    again = _drive_to_aero(fresh, _SYM_HI, 0.6)
+    assert again.change.rationale != first.change.rationale
+
+
+def test_the_lap_window_does_not_come_back():
+    """Due sessioni non si confrontano: asfalto, benzina e gomme sono altri. Il
+    motore riparte raccogliendo."""
+    eng = _eng()
+    for _ in range(5):
+        eng.observe(_lap())
+    fresh = _eng()
+    fresh.restore(eng.state())
+    assert fresh.observe(_lap()).kind is DecisionKind.COLLECT
+
+
+def test_a_change_applied_and_never_judged_is_declared_not_judged():
+    """Il caso di giovedi': modifica scritta, gioco spento. Quel test non si puo'
+    chiudere — la base di confronto stava in un'altra sessione — e fingere di
+    chiuderlo sarebbe la bugia peggiore. Diventa il nuovo punto di partenza, e il
+    pilota lo legge invece di indovinarlo."""
+    eng = _eng()
+    proposed = _drive_to_aero(eng, _SYM_HI, 0.6)
+    eng.mark_applied()
+    assert eng.active is not None
+
+    fresh = _eng()
+    fresh.restore(eng.state())
+    assert fresh.active is None, "un test non giudicabile non resta aperto"
+    msg = fresh.observe(_lap()).message
+    assert proposed.change.rationale in msg
+
+
+def test_the_unjudged_note_is_said_once_not_every_lap():
+    eng = _eng()
+    _drive_to_aero(eng, _SYM_HI, 0.6)
+    eng.mark_applied()
+    fresh = _eng()
+    fresh.restore(eng.state())
+    first = fresh.observe(_lap()).message
+    second = fresh.observe(_lap()).message
+    assert first != second
+
+
+def test_a_change_still_only_proposed_does_not_come_back_as_applied():
+    """Proposta e non applicata: alla sessione dopo non si finge che sia sulla
+    macchina. Se il sintomo c'e' ancora il motore la ripropone da solo, misurando
+    oggi; se non c'e' piu', tanto meglio."""
+    eng = _eng()
+    _drive_to_aero(eng, _SYM_HI, 0.6)      # proposta, mai `mark_applied`
+    fresh = _eng()
+    fresh.restore(eng.state())
+    assert fresh.active is None and fresh._pending is None
+
+
+def test_restoring_junk_leaves_a_working_engineer():
+    """La persistenza e' una comodita': un file rovinato non deve costare al
+    pilota la sessione."""
+    eng = _eng()
+    eng.restore({"phase_idx": "nope", "remedy_idx": {"non un sintomo": 1},
+                 "exhausted": [None], "applied_clicks": "boh"})
+    assert eng.observe(_lap()).kind is DecisionKind.COLLECT

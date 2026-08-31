@@ -132,6 +132,10 @@ class Voice:
         self._radio = radio
         self._male = male
         self._radio_cache: dict[str, bytes] = {}   # cue path -> processed WAV
+        # Tenuti perché ogni frase dinamica accende un motore suo (_new_engine)
+        # e va vestito come quello iniziale: senza questi, la voce cambierebbe
+        # timbro e velocità a metà sessione, sulle frasi coi numeri.
+        self._rate, self._volume, self._language = rate, volume, language
 
         if not enabled:
             return
@@ -193,26 +197,61 @@ class Voice:
             self._radio_cache[path] = data
         winsound.PlaySound(data, winsound.SND_MEMORY)
 
-    def _play_engine(self, text: str) -> None:  # pragma: no cover - audio side effects
-        """Speak via SAPI5. With radio on, render to a WAV, process, play in memory."""
-        if not self._radio:
-            self._engine.say(text)
-            self._engine.runAndWait()
-            return
+    def _new_engine(self):  # pragma: no cover - depends on host audio stack
+        """A brand-new SAPI5 engine, deliberately bypassing pyttsx3's cache.
+
+        ``pyttsx3.init()`` keeps one engine per driver name and hands the same
+        object back, so it cannot be used here: with ``self._engine`` alive it
+        would return *that one*, and the reuse this method exists to avoid would
+        survive untouched — a fix that reads correct and changes nothing.
+        """
+        from pyttsx3.engine import Engine  # noqa: PLC0415 (optional dependency)
+        eng = Engine(driverName=None, debug=False)
+        try:
+            eng.setProperty("rate", self._rate)
+            eng.setProperty("volume", self._volume)
+            vid = _pick_voice_id(eng.getProperty("voices"), self._language, self._male)
+            if vid is not None:
+                eng.setProperty("voice", vid)
+        except Exception:  # pragma: no cover
+            pass  # keep defaults rather than lose the phrase
+        return eng
+
+    def _render_wav_bytes(self, text: str) -> bytes:
+        """Synthesize ``text`` to WAV bytes **on an engine of its own**.
+
+        A single engine reused for repeated ``save_to_file`` + ``runAndWait``
+        stops returning after the second or third phrase (measured on Windows
+        2026-08-12). It does not raise: the calling thread simply stays inside
+        the call, alive and stuck, so the queue behind it never drains again and
+        every later cue — pre-rendered ones included — goes silent with nothing
+        in the log to show for it. A fresh engine per phrase survived every run.
+        """
         import tempfile  # noqa: PLC0415
-        import winsound  # noqa: PLC0415
-        from .radio import radioize_wav  # noqa: PLC0415
+        eng = self._new_engine()
         tmp = Path(tempfile.gettempdir()) / f"hone_tts_{threading.get_ident()}.wav"
         try:
-            self._engine.save_to_file(text, str(tmp))
-            self._engine.runAndWait()
-            data = radioize_wav(tmp.read_bytes())
-            winsound.PlaySound(data, winsound.SND_MEMORY)
+            eng.save_to_file(text, str(tmp))
+            eng.runAndWait()
+            return tmp.read_bytes()
         finally:
             try:
                 tmp.unlink()
             except OSError:
                 pass
+
+    def _play_engine(self, text: str) -> None:  # pragma: no cover - audio side effects
+        """Speak via SAPI5. With radio on, render to a WAV, process, play in memory."""
+        if not self._radio:
+            # Reusing the engine is safe on this path: it is `say`, not
+            # `save_to_file`, and repeated `say` never wedged in the same test.
+            self._engine.say(text)
+            self._engine.runAndWait()
+            return
+        import winsound  # noqa: PLC0415
+        from .radio import radioize_wav  # noqa: PLC0415
+        data = radioize_wav(self._render_wav_bytes(text))
+        winsound.PlaySound(data, winsound.SND_MEMORY)
 
     def _worker(self) -> None:  # pragma: no cover - audio side effects
         while True:

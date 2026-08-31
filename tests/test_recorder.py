@@ -134,3 +134,58 @@ def test_decimation_thins_dense_samples():
                               current_lap_ms=1000, speed_kmh=100.0))
     assert rec._buf is not None
     assert len(rec._buf.samples) <= 2
+
+
+# --- l'orologio del giro, misurato invece che dedotto -----------------------
+#
+# Al traguardo `last_lap_ms` puo' ancora essere il tempo del giro prima, e il
+# tempo salvato viene riparato dai campioni del giro. Quella riparazione e'
+# argomentata su un replay dell'archivio: ricostruisce un numero che non
+# abbiamo mai visto. Il numero vero pero' esiste — il gioco lo pubblica qualche
+# frame dopo, quando non ascolta piu' nessuno. Queste righe lo ascoltano.
+
+def test_the_log_says_what_the_sim_answered_after_the_line(caplog):
+    import logging
+    rec = LapRecorder()
+    _drive_lap(rec, completed=0)
+    _drive_lap(rec, completed=1)
+    with caplog.at_level(logging.INFO, logger="accoach.recorder"):
+        # Il gioco risponde: il giro appena chiuso valeva 200 ms in meno.
+        rec.update(synth.snap(pos=0.5, completed_laps=1,
+                              current_lap_ms=1000, last_lap_ms=_LAP_MS - 200,
+                              speed_kmh=150.0))
+    msg = "\n".join(r.message for r in caplog.records)
+    assert "orologio del giro" in msg
+    assert "+200 ms" in msg, msg
+
+
+def test_a_clock_that_never_moves_is_itself_the_answer(caplog):
+    """Un tempo che non cambia mai e' l'esito buono, e va detto: senza questa
+    riga «il gioco non ha risposto» e «nessuno stava ascoltando» si leggono
+    uguali nel log."""
+    import logging
+    from accoach.recording import recorder as _rec_mod
+    rec = LapRecorder()
+    _drive_lap(rec, completed=0)
+    _drive_lap(rec, completed=1)
+    with caplog.at_level(logging.INFO, logger="accoach.recorder"):
+        for i in range(_rec_mod._SETTLE_FRAMES + 1):
+            rec.update(synth.snap(pos=0.5, completed_laps=1,
+                                  current_lap_ms=1000 + i, last_lap_ms=_LAP_MS,
+                                  speed_kmh=150.0))
+    msg = "\n".join(r.message for r in caplog.records)
+    assert "invariato" in msg, msg
+
+
+def test_the_watch_says_it_once_and_stops(caplog):
+    import logging
+    rec = LapRecorder()
+    _drive_lap(rec, completed=0)
+    _drive_lap(rec, completed=1)
+    with caplog.at_level(logging.INFO, logger="accoach.recorder"):
+        for i in range(10):
+            rec.update(synth.snap(pos=0.5, completed_laps=1,
+                                  current_lap_ms=1000 + i,
+                                  last_lap_ms=_LAP_MS - 200, speed_kmh=150.0))
+    said = [r for r in caplog.records if "orologio del giro" in r.message]
+    assert len(said) == 1, said

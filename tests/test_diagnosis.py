@@ -73,21 +73,70 @@ def test_fp_rate_zero_on_neutral_lap():
     assert sum(stats.symptom_corners.values()) == 0     # no false positives
 
 
-def test_lock_spin_detected_via_aids_when_slip_is_low():
-    # On an ACC GT3 the aids hold slip near zero *because they're working*; the
-    # diagnosis must still register lock/spin from abs_active/tc_active, like the
-    # live detector — else the engineer never sees the problem.
+def test_an_aid_working_is_not_a_mistake():
+    """ABS/TC modulating with the slip low is correct technique, not a lock-up.
+
+    This test used to assert the opposite — that the flag alone was enough —
+    because the live detector worked that way too when it was written. The live
+    rule was tightened on 2026-07-19 (8 false wheelspin + 3 false lock on one
+    clean lap) and this half kept the old one, so for three weeks the same lap
+    was silent live and full of lock-ups in the engineer's eyes. Measured
+    2026-08-12 at Monza with ABS 6: 5-7 phantom lock segments per clean lap.
+    """
     press = (27.0, 27.0, 27.5, 27.5)
-    z4 = (0.0, 0.0, 0.0, 0.0)
-    lock = LapSample(0, 0.10, 200.0, 0.0, 0.9, 0.0, "4", 7000, 0.0, -1.0,
-                     abs_active=0.6, slip_ratio=z4, tyre_pressure=press)
-    spin = LapSample(1000, 0.60, 120.0, 1.0, 0.0, 0.0, "3", 7000, 0.0, 0.5,
-                     tc_active=0.6, slip_ratio=z4, tyre_pressure=press)
+    # Braking hard with ABS 6 modulating; slip stays where a working ABS keeps it.
+    abs_ok = LapSample(0, 0.10, 200.0, 0.0, 0.9, 0.0, "4", 7000, 0.0, -1.0,
+                       abs_active=0.6, slip_ratio=(-0.08, -0.07, 0.0, 0.0),
+                       tyre_pressure=press)
+    # Full throttle out of a slow corner with TC working; rear slip likewise low.
+    tc_ok = LapSample(1000, 0.60, 120.0, 1.0, 0.0, 0.0, "3", 7000, 0.0, 0.5,
+                      tc_active=0.6, slip_ratio=(0.0, 0.0, 0.06, 0.05),
+                      tyre_pressure=press)
     lap = Lap("ferrari_488_gt3", "monza", SessionType.PRACTICE, 100000, True,
-              samples=[lock, spin], clean=True)
+              samples=[abs_ok, tc_ok], clean=True)
     stats = build_lap_stats(lap)
-    assert stats.lock_segments >= 1            # from ABS, not slip
-    assert stats.spin_segments >= 1            # from TC, not slip
+    assert stats.lock_segments == 0
+    assert stats.spin_segments == 0
+    # The flag is not ignored either: with the aid modulating AND the slip
+    # confirming, it counts — and the low-speed gate is skipped (120 km/h here is
+    # above it anyway; the point is the pair, not the speed).
+    real_lock = LapSample(0, 0.10, 200.0, 0.0, 0.9, 0.0, "4", 7000, 0.0, -1.0,
+                          abs_active=0.6, slip_ratio=(-1.0, -1.0, 0.0, 0.0),
+                          tyre_pressure=press)
+    lap2 = Lap("ferrari_488_gt3", "monza", SessionType.PRACTICE, 100000, True,
+               samples=[real_lock, tc_ok], clean=True)
+    assert build_lap_stats(lap2).lock_segments == 1
+
+
+def test_dopo_il_giro_e_dal_vivo_rispondono_uguale():
+    """The post-lap count and the live detector cannot disagree on a frame.
+
+    Not a re-statement of the rule: it feeds the *same* frames to both paths and
+    demands the same answer. This is the guard that was missing — the two used to
+    hold one rule each, and nothing in the suite compared them, so the drift went
+    three weeks without a failing test.
+    """
+    from accoach.coaching.diagnosis import _lock_spin_segments
+    from accoach.coaching.events import is_lockup
+    from accoach.coaching.tuning import DEFAULT_TUNING
+
+    press = (27.0, 27.0, 27.5, 27.5)
+    frames = [
+        # (abs_active, front slip) across the interesting corners of the rule.
+        (0.6, -0.08),    # aid working, slip low      -> no
+        (0.6, -1.00),    # aid working, wheel stopped -> yes
+        (0.0, -0.30),    # no aid, real lock          -> yes
+        (0.0, -0.08),    # no aid, normal braking     -> no
+        (0.6, -0.15),    # exactly on the threshold   -> yes
+    ]
+    for i, (aid, slip) in enumerate(frames):
+        s = LapSample(i * 100, 0.05 + i * 0.15, 200.0, 0.0, 0.9, 0.0, "4", 7000,
+                      0.0, -1.0, abs_active=aid, slip_ratio=(slip, slip, 0.0, 0.0),
+                      tyre_pressure=press)
+        lap = Lap("ferrari_488_gt3", "monza", SessionType.PRACTICE, 100000, True,
+                  samples=[s], clean=True)
+        locks, _ = _lock_spin_segments(lap.samples, DEFAULT_TUNING.spin_ratio)
+        assert locks == int(is_lockup(s)), f"frame {i}: aid={aid} slip={slip}"
 
 
 def test_cold_frames_excluded_from_hot_pressures():
@@ -242,3 +291,103 @@ def test_engine_surfaces_engineer_block(tmp_path):
     assert state.engineer is not None          # the bridge produced a decision
     assert "kind" in state.engineer and state.engineer["message"]
     eng.close()
+
+
+# --- il perche' e il dove di un giro che non conta -------------------------
+
+def test_a_cut_lap_carries_the_reason_and_the_place():
+    """`stable` collassa due fatti diversi — il giro incompleto e il giro
+    tagliato — e il pilota in macchina ha bisogno di sapere quale dei due. Il
+    posto lo sa gia' il file: `lost_at` e' registrato dal 22/07 e non lo mostrava
+    nessuna interfaccia."""
+    lap = synth.build_lap(clean=False)
+    lap.lost_at = 0.71                      # dentro la seconda curva sintetica
+    st = build_lap_stats(lap, corner_names={0: "Prima", 1: "Variante Ascari"})
+    assert st.stable is False
+    assert st.unstable_why == "cut"
+    assert st.lost_where == "Variante Ascari"
+
+
+def test_the_place_is_only_the_corner_you_were_actually_in():
+    """Un fuori pista sul rettilineo non ha un nome di curva, e il piu' vicino
+    sarebbe una bugia detta con sicurezza: mandare il pilota a rivedere una
+    curva in cui non e' successo niente e' peggio del silenzio."""
+    lap = synth.build_lap(clean=False)
+    lap.lost_at = 0.50                      # fra le due curve
+    st = build_lap_stats(lap, corner_names={0: "Prima", 1: "Variante Ascari"})
+    assert st.unstable_why == "cut" and st.lost_where == ""
+
+
+def test_a_lap_the_game_never_completed_says_that_instead():
+    st = build_lap_stats(synth.build_lap(valid=False))
+    assert st.stable is False and st.unstable_why == "invalid"
+
+
+def test_a_cut_lap_that_never_said_where_does_not_invent_a_place():
+    """Due modi di non sapere dove, e portano allo stesso posto: il giro non lo
+    ha registrato (i giri prima del 22/07), o chi chiama non ha i nomi."""
+    lap = synth.build_lap(clean=False)
+    assert build_lap_stats(lap, corner_names={1: "Variante Ascari"}).lost_where == ""
+    lap.lost_at = 0.71
+    assert build_lap_stats(lap).lost_where == ""
+
+
+def test_a_lap_that_counts_carries_no_excuse():
+    st = build_lap_stats(synth.build_lap(clean=True))
+    assert st.stable is True and st.unstable_why == "" and st.lost_where == ""
+
+
+def test_the_engine_hands_the_engineer_the_corner_names_it_already_has(tmp_path):
+    """La catena intera, perche' e' fatta di tre pezzi e ognuno funzionava da
+    solo: il file sa DOVE (`lost_at`), il motore sa COME SI CHIAMA (la mappa dei
+    nomi, curati + imparati + scritti dal pilota), l'Ingegnere sa DIRLO. Finche'
+    i tre non si parlano il pilota legge un contatore fermo e basta."""
+    from accoach.engineer import RaceEngineer
+    from accoach.engineer.profiles import GT3_PROFILE
+    from accoach.track import detect_corners
+
+    class _Dead:
+        def read(self):
+            return TelemetrySnapshot.disconnected()
+
+        def close(self):
+            pass
+
+    lap = synth.build_lap(clean=False)
+    lap.lost_at = 0.71
+    eng = CoachEngine(reader=_Dead(), laps_dir=tmp_path)
+    eng._engineer = RaceEngineer(GT3_PROFILE, min_stable=3)
+    eng._corners = detect_corners(lap.samples)
+    eng._corner_names = {c.index: "Variante Ascari" for c in eng._corners
+                         if c.entry_pos <= 0.71 <= c.exit_pos}
+    assert eng._corner_names, "il fixture deve avere una curva attorno a 0.71"
+    eng._observe_lap(lap)
+    assert "Variante Ascari" in eng._engineer_decision.message
+    eng.close()
+
+
+def test_the_engine_writes_the_engineer_s_memory_after_every_lap(tmp_path):
+    """La catena fino al disco: senza, il registro di cosa e' gia' stato provato
+    vive quanto il processo, ed e' quello che il 14/08 e' andato perso."""
+    from accoach.engineer import RaceEngineer
+    from accoach.engineer.profiles import GT3_PROFILE
+    from accoach.recording.catalog import LapCatalog
+    from accoach.recording.storage import _catalog_path
+
+    class _Dead:
+        def read(self):
+            return TelemetrySnapshot.disconnected()
+
+        def close(self):
+            pass
+
+    eng = CoachEngine(reader=_Dead(), laps_dir=tmp_path)
+    eng._engineer = RaceEngineer(GT3_PROFILE, min_stable=3)
+    eng._engineer_key = ("mclaren_720s_gt3_evo", "monza")
+    eng._engineer.phase_idx = 2
+    eng._observe_lap(synth.build_lap(clean=True))
+    eng.close()
+
+    with LapCatalog(_catalog_path(tmp_path)) as cat:
+        got = cat.load_engineer_state("mclaren_720s_gt3_evo", "monza")
+    assert got is not None and got["phase_idx"] == 2

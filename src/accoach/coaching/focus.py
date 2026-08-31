@@ -209,6 +209,9 @@ class FocusCoach:
         self.window: list[LapDebrief] = []
         self.focus: Focus | None = None
         self._focus_losses: list[float] = []     # losses at the focus since BRIEF
+        #: Il giro contro cui e' misurato tutto quello che c'e' in finestra.
+        #: None finche' nessuno lo dichiara.
+        self._reference: object = None
         # Seeded from last session's saved state (per car+track) so the coach
         # doesn't re-teach a corner you already mastered. A corner already here is
         # simply never chosen as a focus again — the same effect as mastering it
@@ -220,15 +223,48 @@ class FocusCoach:
             _m("assess", current_language(), n=0, total=min_laps))
 
     # -- public API --------------------------------------------------------
-    def observe(self, debrief: LapDebrief, *, stable: bool = True) -> FocusReport:
+    def observe(self, debrief: LapDebrief, *, stable: bool = True,
+                reference: object = None) -> FocusReport:
         """Feed one completed lap's debrief; return the next coaching report.
 
         Only *stable* laps (complete, no off) move the plan forward — an excursion
         bloats every corner's loss and would invent a weakness. On an unstable lap
         the last report stands.
+
+        ``reference`` names the lap every loss in ``debrief`` was measured
+        against. Everything in here is a *difference* from that lap, so it is a
+        measurement with a unit, and the unit is the reference: the engine
+        rebuilds it on every personal best, and mixing the two sides of that
+        change in one median is comparing centimetres with inches.
+
+        Measured on the 16 real laps of 14/08 (three rebuilds), the two readings
+        of the same corner disagree in **direction**, not just in size: Variante
+        della Roggia goes 0 -> 280 ms against the chasing reference and 519 ->
+        190 ms against a fixed one. Early in a session the reference IS the
+        driver's own slow lap, so nothing is lost against anyone and a baseline
+        taken there is born small; then the reference speeds up and the same
+        corner "gets worse" while the driver improves. So a change of reference
+        empties the window: the coach goes back to watching, which is a thing it
+        already knows how to say.
+
+        ``None`` means the caller doesn't track it, and then nothing changes —
+        a unit that isn't declared is assumed to hold still.
         """
         if not stable:
             return self._last
+
+        if reference is not None and reference != self._reference:
+            first = self._reference is None
+            self._reference = reference
+            if not first:
+                self.window = []
+                # Un focus aperto e' un esperimento a meta': la sua base sta
+                # dall'altra parte del cambio e il verdetto non sarebbe piu'
+                # difendibile. Il motore congela il riferimento finche' un focus
+                # e' aperto, quindi qui non ci si arriva — ma se ci si arriva,
+                # un verdetto indifendibile non si da'.
+                self.focus = None
+                self._focus_losses = []
 
         self.window.append(debrief)
         self.window = self.window[-_WINDOW:]

@@ -83,6 +83,11 @@ class CornerStats:
     min_speed_live: float
     min_speed_ref: float
     braking_early: bool
+    # Senza default di proposito, come il suo gemello: i due costruttori di
+    # CornerStats (qui e nel debrief) devono rispondere entrambi, altrimenti la
+    # meta' che dimentica tace invece di sbagliare, ed e' il modo in cui una
+    # regola sola torna a essere due.
+    braking_late: bool
 
 
 @dataclass(slots=True)
@@ -118,6 +123,20 @@ def _braked_early(live_onset: float, ref_onset: float, ref_brake_at_onset: float
     return live_onset <= ref_onset - _BRAKE_EARLY_POS
 
 
+def _braked_late(live_onset: float, ref_onset: float) -> bool:
+    """Did you get on the brakes meaningfully later than the reference?
+
+    The mirror of :func:`_braked_early`, and deliberately narrower: it answers
+    only where both of you braked. Not having braked at all is not "braking
+    late" — it is a different corner, taken a different way — and you cannot be
+    later than someone who never brakes. Both of those have their own answers
+    elsewhere; giving them this one would be inventing a third.
+    """
+    if live_onset < 0.0 or ref_onset < 0.0:
+        return False
+    return live_onset >= ref_onset + _BRAKE_EARLY_POS
+
+
 def classify_corner(st: CornerStats, index: int, pos: float) -> Cue | None:
     """Pick the single most likely cause of a corner's time delta (or None)."""
     lost = st.lost_ms
@@ -130,6 +149,19 @@ def classify_corner(st: CornerStats, index: int, pos: float) -> Cue | None:
     if st.braking_early:
         return Cue(CueCategory.BRAKE_LATER, "Puoi frenare più tardi",
                    priority=lost, segment=index, pos=pos)
+    # …e il suo opposto, che fino a oggi non aveva nessuno che lo dicesse.
+    # Frenare dopo il riferimento non e' un errore — e' come si guadagna, e su 3
+    # delle 25 curve misurate in archivio quella staccata ha prodotto un
+    # *guadagno*. Diventa un errore quando non ha pagato: sei arrivato lungo e
+    # all'apex sei piu' lento di lui lo stesso. Il divario di velocita' e' lo
+    # stesso che poco piu' sotto fa dire «porta piu' velocita' in curva», che
+    # su quelle curve e' l'istruzione opposta a quella giusta: e' il punto di
+    # frenata a essere a monte, e chi arriva lungo non ha bisogno di piu'
+    # velocita' d'ingresso, ha bisogno di prendersi il tempo per usarla.
+    if (st.braking_late
+            and st.min_speed_ref - st.min_speed_live >= _SPEED_MARGIN):
+        return Cue(CueCategory.BRAKE_EARLIER, "Frena prima",
+                   priority=lost, segment=index, pos=pos)
     if st.throttle_ref - st.throttle_live >= _THROTTLE_MARGIN:
         return Cue(CueCategory.MORE_THROTTLE, "Più gas qui",
                    priority=lost, segment=index, pos=pos)
@@ -139,8 +171,14 @@ def classify_corner(st: CornerStats, index: int, pos: float) -> Cue | None:
     if st.min_speed_ref - st.min_speed_live >= _SPEED_MARGIN:
         return Cue(CueCategory.CARRY_SPEED, "Porta più velocità in curva",
                    priority=lost, segment=index, pos=pos)
-    tenths = lost / 100.0
-    return Cue(CueCategory.TIME_LOSS, f"Stai perdendo {tenths:.0f} decimi qui",
+    # La parola si decide sulla cifra STAMPATA, non sul numero: sono due
+    # arrotondamenti diversi e prima o poi si separano. E non e' un caso di
+    # bordo — il coach parla da 120 ms in su, quindi tutto fra 120 e 149 ms
+    # arrotonda a uno: la frase piu' piccola che dice era anche la piu'
+    # frequente, e diceva «1 decimi».
+    n = f"{lost / 100.0:.0f}"
+    unit = "decimo" if n == "1" else "decimi"
+    return Cue(CueCategory.TIME_LOSS, f"Stai perdendo {n} {unit} qui",
                priority=lost, segment=index, pos=pos)
 
 
@@ -200,6 +238,14 @@ class CoachAnalyzer:
         # sopravvive al traguardo di proposito, così il riquadro resta finché non
         # chiudi la curva dopo — nessun timer da tarare.
         self.last_corner: CornerCard | None = None
+        # Ha il gioco smesso di contare questo giro? Non è una latch nostra: la
+        # tiene già il sim (su ACC `isValidLap` cade al taglio e resta giù fino
+        # al traguardo), quindi qui si legge e basta. Una seconda latch nostra
+        # si sarebbe azzerata su un fronte diverso dal suo — e le due metà che
+        # decidono la stessa cosa su fronti diversi le abbiamo già pagate.
+        # Su AC il campo è None e questo resta False: lì i limiti di pista si
+        # deducono da `tyres_out`, e «non lo so» non è «hai tagliato».
+        self._lap_cut = False
         self._set_fixed_zones()
 
     def reset(self) -> None:
@@ -212,6 +258,7 @@ class CoachAnalyzer:
         self._seg = None
         self._last_pos = -1.0
         self._announced.clear()
+        self._lap_cut = False
 
     def drop_last_corner(self) -> None:
         """Butta la carta. La chiama chi sa che il giro non è rappresentativo:
@@ -272,6 +319,7 @@ class CoachAnalyzer:
 
         pos = s.lap_position
         cues: list[Cue] = []
+        self._lap_cut = s.lap_valid is False
 
         # New lap (position wrapped back past the line): a fresh set of approaches.
         if self._last_pos >= 0.0 and pos < self._last_pos - 0.5:
@@ -381,9 +429,30 @@ class CoachAnalyzer:
             # point — and by a margin worth mentioning.
             braking_early=_braked_early(
                 seg.live_brake_onset, seg.ref_brake_onset, seg.ref_brake_at_onset),
+            braking_late=_braked_late(seg.live_brake_onset, seg.ref_brake_onset),
         )
+        cue = classify_corner(st, seg.index, _seg_pos(seg, self))
+        if self._lap_cut and cue is not None and cue.category is CueCategory.GOOD:
+            # Il giro non lo conta più il gioco, e in questa curva hai guadagnato
+            # tempo: le due cose insieme sono la scorciatoia, non il talento.
+            # Trovato dal pilota in pista il 2026-08-12 — tagliava e il coach gli
+            # faceva i complimenti mentre il giro veniva invalidato.
+            #
+            # Muore la lode, non il consiglio: «hai frenato troppo presto» resta
+            # vero anche su un giro buttato, e tacere tutto per un taglio
+            # spegnerebbe il coach proprio nel giro in cui stai sbagliando di più.
+            # Per lo stesso motivo il tempo *perso* resta una carta e questo
+            # *guadagno* no: una perdita l'hai fatta davvero, un guadagno preso
+            # fuori dai cordoli non è un tuo numero, e un valore che non abbiamo
+            # non si finge (stessa regola di `engine._corner_block`).
+            #
+            # Resta scoperta la curva SUBITO DOPO il taglio: ci arrivi con una
+            # velocità che il riferimento non aveva, quindi anche lì il delta è
+            # sporco. Qui non è trattata: servirebbe sapere dove il taglio è
+            # finito, e inventarlo sarebbe peggio del difetto.
+            return None
         self.last_corner = CornerCard(index=seg.index, lost_ms=st.lost_ms)
-        return classify_corner(st, seg.index, _seg_pos(seg, self))
+        return cue
 
 
 def _seg_pos(seg: _Seg, analyzer: CoachAnalyzer) -> float:

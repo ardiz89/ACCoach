@@ -101,6 +101,15 @@ class LapStats:
     #: How heavy the car was, which is why a lap time from before a setup change
     #: and one from after may not be comparable at all — see `_fuel_gap`.
     fuel_l: float = 0.0
+    #: Quando ``stable`` e' False, quale delle due meta' e' caduta: ``"invalid"``
+    #: (il gioco non ha completato il giro) o ``"cut"`` (fuori pista). Vuoto su
+    #: un giro che sta in piedi. Non duplica ``stable`` — lo spiega: il pilota in
+    #: macchina ha bisogno di sapere QUALE dei due, perche' i due si correggono
+    #: in modi opposti.
+    unstable_why: str = ""
+    #: Dove il giro ha smesso di contare, gia' in parole («Variante Ascari»).
+    #: Vuoto quando non si sa, e non si prova a indovinare.
+    lost_where: str = ""
     #: Whether this lap was driven on wet tyres. ``None`` means the lap doesn't
     #: say — which is not the same as "dry", and is treated differently.
     #:
@@ -324,6 +333,33 @@ _DECISION_MSG = {
         "en": "Evaluating the change: {need} more clean laps.",
         "it": "Valuto la modifica: {need} giri puliti ancora.",
     },
+    # Perche' l'ultimo giro non e' entrato nel conto. Senza questa coda un
+    # contatore fermo e un motore rotto si leggono allo stesso modo — e in
+    # macchina la domanda che nasce e' «sta funzionando?», non «cosa sbaglio?».
+    "skip_cut_where": {
+        "en": " That last lap didn't count: off track at {where}.",
+        "it": " L'ultimo giro non conta: fuori pista a {where}.",
+    },
+    "skip_cut": {
+        "en": " That last lap didn't count: off track.",
+        "it": " L'ultimo giro non conta: fuori pista.",
+    },
+    "skip_invalid": {
+        "en": " That last lap didn't count: the game never completed it.",
+        "it": " L'ultimo giro non conta: il gioco non l'ha completato.",
+    },
+    # Una modifica scritta sulla macchina e mai giudicata, perche' la sessione e'
+    # finita in mezzo. Detta una volta sola, all'inizio della sessione dopo.
+    "unjudged": {
+        "en": "Left unjudged from last time: {why}. It's on the car, so it's the "
+              "new starting point — I'm measuring from here.",
+        "it": "Rimasta in sospeso dall'altra volta: {why}. E' sulla macchina, "
+              "quindi diventa il nuovo punto di partenza: misuro da qui.",
+    },
+    "skip_cold": {
+        "en": " That last lap didn't count: tyres still cold.",
+        "it": " L'ultimo giro non conta: gomme ancora fredde.",
+    },
     "accepted_structural": {
         "en": "Change applied, moving on.",
         "it": "Modifica applicata, proseguo.",
@@ -406,10 +442,52 @@ _DECISION_MSG = {
 _REVERT_PREFIX = {"en": "Revert: ", "it": "Ripristino: "}
 
 
+# --- la memoria fra una sessione e l'altra ---------------------------------
+
+def _sym_key(sym: Symptom) -> str:
+    """Un sintomo come stringa stabile, che e' gia' come lo si legge a schermo."""
+    return str(sym)
+
+
+def _sym_from_key(key: str) -> Symptom | None:
+    """Il contrario, o None se la stringa non e' un sintomo.
+
+    Il file su disco lo scrive questa app e lo rilegge questa app, ma un file su
+    disco sopravvive a un cambio di enum e a un editor di testo: quello che non
+    si riconosce si butta, non si indovina.
+    """
+    parts = str(key).split()
+    if len(parts) != 3:
+        return None
+    try:
+        return Symptom(Balance(parts[0]), Phase(parts[1]), Speed(parts[2]))
+    except ValueError:
+        return None
+
+
 def _msg(key: str, lang: str | None = None, **kw) -> str:
     lang = lang or current_language()
     entry = _DECISION_MSG[key]
     return (entry.get(lang) or entry["en"]).format(**kw)
+
+
+def _skip_tail(stats: "LapStats | None", lang: str | None = None) -> str:
+    """Perche' l'ultimo giro non e' entrato nel conto, o "" se e' entrato.
+
+    Una riga sola, in coda al contatore, e nessuna se non c'e' niente da dire.
+    Il taglio viene prima delle gomme fredde quando valgono entrambi: e' quello
+    su cui il pilota puo' fare qualcosa nel giro che sta guidando.
+    """
+    if stats is None:
+        return ""
+    if stats.unstable_why == "invalid":
+        return _msg("skip_invalid", lang)
+    if stats.unstable_why == "cut":
+        return (_msg("skip_cut_where", lang, where=stats.lost_where)
+                if stats.lost_where else _msg("skip_cut", lang))
+    if not stats.warmed_up:
+        return _msg("skip_cold", lang)
+    return ""
 
 
 def _fuel_tail(outcome: "Outcome", lang: str) -> str:
@@ -498,6 +576,73 @@ class RaceEngineer:
         #: not the car" call. Recorded because it is a claim we make and have
         #: never checked (see ledger.py).
         self.exhausted_calls: list[Symptom] = []
+        #: L'ultimo giro che NON e' entrato nella finestra, tenuto solo per
+        #: poterlo spiegare. Si azzera al primo giro buono: una spiegazione che
+        #: sopravvive al giro che la smentisce e' peggio di nessuna spiegazione.
+        self._skipped: LapStats | None = None
+        #: La modifica che l'altra sessione ha scritto sulla macchina e non ha
+        #: fatto in tempo a giudicare, in attesa di essere detta una volta sola.
+        self._unjudged: str = ""
+
+    # -- memoria fra sessioni ----------------------------------------------
+    def state(self) -> dict:
+        """Cosa e' gia' stato provato, in una forma che va su disco.
+
+        **Cosa c'e'**: a che fase eravamo, quale rimedio tocca per ogni sintomo,
+        quali sintomi hanno esaurito i rimedi, e i click gia' spesi su ogni leva
+        (che e' un budget: senza, l'assetto puo' scivolare via una sessione alla
+        volta). E il nome di una modifica applicata e mai giudicata.
+
+        **Cosa NON c'e', di proposito**: la finestra di giri. Sono misure, e due
+        sessioni non sono confrontabili — asfalto, benzina e gomme sono altri.
+        Un verdetto dato su una base di ieri contro una prova di oggi sarebbe
+        peggio di nessun verdetto, ed e' esattamente il difetto che questo
+        progetto ha gia' pagato altrove (il verdetto del focus attraverso un
+        cambio di riferimento). Nemmeno `history`, che in questo modulo non la
+        rilegge nessuno: il registro delle modifiche accettate e' `ledger.py`,
+        su file, e averne due sarebbe averne zero.
+        """
+        pending = self.active.change if self.active is not None else None
+        return {
+            "phase_idx": self.phase_idx,
+            "remedy_idx": {_sym_key(k): v for k, v in self.remedy_idx.items()},
+            "exhausted": [_sym_key(s) for s in self.exhausted],
+            # Le chiavi sono coppie (parametro, slot) e JSON vuole stringhe:
+            # una lista di triple invece di inventare un separatore dentro una
+            # chiave, che e' il modo classico di romperlo su un nome con un
+            # trattino dentro.
+            "applied_clicks": [[p, slot, n]
+                               for (p, slot), n in self.applied_clicks.items()],
+            "unjudged": pending.rationale if pending is not None else "",
+        }
+
+    def restore(self, state: dict | None) -> None:
+        """Rimette la memoria dell'altra sessione, saltando quello che non torna.
+
+        Best-effort in ogni riga: la persistenza e' una comodita', e un file
+        rovinato non deve costare al pilota la sessione. Quello che non si
+        riconosce si scarta in silenzio e il motore riparte da li'.
+        """
+        if not isinstance(state, dict):
+            return
+        idx = state.get("phase_idx")
+        if isinstance(idx, int) and 0 <= idx < len(self.phases):
+            self.phase_idx = idx
+        tried = state.get("remedy_idx")
+        for key, val in (tried.items() if isinstance(tried, dict) else ()):
+            sym = _sym_from_key(key)
+            if sym is not None and isinstance(val, int):
+                self.remedy_idx[sym] = val
+        for key in state.get("exhausted") or []:
+            sym = _sym_from_key(key)
+            if sym is not None:
+                self.exhausted.add(sym)
+        for row in state.get("applied_clicks") or []:
+            if (isinstance(row, (list, tuple)) and len(row) == 3
+                    and isinstance(row[2], int)):
+                self.applied_clicks[(row[0], row[1])] = row[2]
+        why = state.get("unjudged")
+        self._unjudged = why if isinstance(why, str) else ""
 
     # -- public API --------------------------------------------------------
     @property
@@ -517,6 +662,9 @@ class RaceEngineer:
             self.window = self.window[-_WINDOW:]
             if self.active is not None:
                 self.active.laps_seen += 1
+            self._skipped = None
+        else:
+            self._skipped = stats
 
         if changed:
             return Decision(DecisionKind.STAND_DOWN,
@@ -534,10 +682,18 @@ class RaceEngineer:
         if self.active is not None:
             return self._evaluate_active()
 
+        # …e una rimasta in sospeso dall'altra sessione non lo e': la sua base di
+        # confronto e' rimasta di la'. Si dice e si chiude, una volta sola.
+        pendente, self._unjudged = self._unjudged, ""
+        if pendente:
+            return Decision(DecisionKind.COLLECT,
+                            _msg("unjudged", current_language(), why=pendente))
+
         if len(self.window) < self.min_stable:
             return Decision(DecisionKind.COLLECT,
                             _msg("collect", n=self.min_stable,
-                                 have=len(self.window)))
+                                 have=len(self.window))
+                            + _skip_tail(self._skipped))
         return self._advance()
 
     def mark_applied(self) -> None:
@@ -752,7 +908,8 @@ class RaceEngineer:
         if a.laps_seen < self.min_stable:
             need = self.min_stable - a.laps_seen
             return Decision(DecisionKind.EVALUATING,
-                            _msg("evaluating", lang, need=need))
+                            _msg("evaluating", lang, need=need)
+                            + _skip_tail(self._skipped, lang))
 
         new_time = _median_time(self.window)
         new_score = _median_score(self.window, a.symptom)

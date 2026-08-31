@@ -38,7 +38,8 @@ Coaching, split up:
   monitor                    raw telemetry dashboard
 
 Multi-client (backend and clients as separate processes):
-  server [--demo]            headless backend, broadcasts over WebSocket
+  server [--demo] [--silent] headless backend, broadcasts over WebSocket AND speaks
+                             (--silent: no voice; the engineer's pit calls go with it)
   overlay [--interactive]    on-screen HUD (connects to the backend)
   web [--demo]               analysis web app (--demo: synthetic laps, no game)
 
@@ -59,6 +60,9 @@ Validation — these read the live game, so the sim must be running:
                              (`setup bump --help` for the arguments)
   selftest                   check the TTS voice, write a report (works windowed)
   logs                       open the folder with logs and crash reports
+  test-panel [--top N]       step-by-step panel for on-track test protocols
+                             (reads test_step.json; opens no telemetry, no socket)
+                             --top N: pixels below the top edge, to clear the HUD
 """
 
 
@@ -93,6 +97,9 @@ def main() -> None:
         run(rest)
     elif cmd == "overlay":
         from .overlay import main as run
+        run(rest)
+    elif cmd == "test-panel":
+        from .testpanel import main as run
         run(rest)
     elif cmd == "debrief":
         from .debrief_app import main as run

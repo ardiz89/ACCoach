@@ -54,6 +54,12 @@ _TYRES_OUT_DIRTY = 3
 _DRIVING_KMH = 60.0
 _REFUSAL_WARN_FRAMES = 600
 
+# How long to keep watching `last_lap_ms` after a crossing, waiting for the sim
+# to publish the time of the lap we just closed. ~2 s at 60 Hz, ~9 s at 13 Hz:
+# generous, because the point is to find out how long it actually takes, and an
+# answer that never arrives is itself the answer.
+_SETTLE_FRAMES = 120
+
 # Position wrap that marks the start/finish line. Wide margins on purpose: at
 # 270 km/h a 13 Hz acquisition moves ~0.006 of a lap between frames, so the pair
 # straddling the line can sit well inside these bounds.
@@ -199,12 +205,24 @@ class LapRecorder:
         self._car: str = ""
         self._track: str = ""
         self._blocked_frames = 0        # consecutive frames refused while driving
+        # What the sim was answering for "the last lap" on the PREVIOUS frame.
+        # At a crossing, an answer that hasn't changed is an answer that hasn't
+        # been given yet — see `trusted_lap_ms`. None until we've seen a frame,
+        # and after every reset: nothing to compare against is not the same as
+        # a match, and guessing there would condemn a lap on no evidence.
+        self._declared: int | None = None
+        # After a crossing, what we read at the line and what we stored, plus how
+        # many frames we've watched since. Measurement only — nothing downstream
+        # reads it. See `_watch_settle`.
+        self._settle: tuple[int, int, int] | None = None
 
     def reset(self) -> None:
         self._buf = None
         self._line.reset()
         self._car = ""
         self._track = ""
+        self._declared = None
+        self._settle = None
 
     def _recording_allowed(self, s: TelemetrySnapshot) -> bool:
         # The whole pit lane, not just the box. `in_pit` is only true standing in
@@ -245,6 +263,12 @@ class LapRecorder:
         # add up into a warning about a problem that isn't there.
         self._blocked_frames = 0
 
+        # Read before anything can return, and on EVERY frame, because the
+        # question at the crossing is what the sim was saying one frame earlier —
+        # not one lap earlier, and not one recorded frame earlier.
+        previous_declared, self._declared = self._declared, int(s.last_lap_ms)
+        self._watch_settle(s)
+
         # A car or track change means a different session entirely.
         if (self._car and s.car_model != self._car) or (
             self._track and s.track != self._track
@@ -262,7 +286,8 @@ class LapRecorder:
         crossed = self._line.crossed(s.lap_position, completed)
 
         if crossed and self._buf is not None:
-            finished = self._finalize(self._buf, s)
+            finished = self._finalize(self._buf, s, previous_declared)
+            self._settle = (int(s.last_lap_ms), finished.lap_time_ms, 0)
             self._buf = None  # the incoming sample opens the next (full) lap below
 
         if self._buf is None:
@@ -344,7 +369,42 @@ class LapRecorder:
         buf.last_pos = s.lap_position
         buf.last_t_ms = t
 
-    def _finalize(self, buf: _Buffer, s: TelemetrySnapshot) -> Lap:
+    def _watch_settle(self, s: TelemetrySnapshot) -> None:
+        """Say in the log what the sim answers AFTER the line, and how late.
+
+        At the crossing `last_lap_ms` can still hold the previous lap's time, so
+        the stored time is repaired from the lap's own samples. That repair is
+        argued from a replay of the archive: it reproduces a time we never
+        actually saw. The true number does exist — the sim publishes it a few
+        frames later, when nobody is listening any more.
+
+        So listen. This writes no data and changes no verdict; it turns one
+        ordinary session into ground truth for `trusted_lap_ms`, which is the
+        number the Engineer accepts or reverts a setup on.
+        """
+        if self._settle is None:
+            return
+        at_line, stored, frames = self._settle
+        now = int(s.last_lap_ms)
+        frames += 1
+        if now != at_line:
+            _log.info(
+                "orologio del giro: alla linea %.3fs, dopo %d frame %.3fs;"
+                " salvato %.3fs (scarto %+d ms)",
+                at_line / 1000.0, frames, now / 1000.0, stored / 1000.0,
+                stored - now)
+            self._settle = None
+        elif frames >= _SETTLE_FRAMES:
+            _log.info(
+                "orologio del giro: %.3fs invariato per %d frame; salvato %.3fs"
+                " (scarto %+d ms)",
+                at_line / 1000.0, frames, stored / 1000.0, stored - at_line)
+            self._settle = None
+        else:
+            self._settle = (at_line, stored, frames)
+
+    def _finalize(self, buf: _Buffer, s: TelemetrySnapshot,
+                  previous_declared: int | None = None) -> Lap:
         # At the crossing, last_lap_ms holds the time of the lap we just closed.
         # `clean` is known only for a full lap (we watched it from the line); a
         # partial lap stays unknown (None). Conditions are ~constant over a lap,
@@ -358,7 +418,15 @@ class LapRecorder:
         # publish the new value by then, so a lap can be stamped with the time of
         # the lap *before* — measured: a 224-second Monza lap filed as a 1:55.902,
         # an identical twin of the real one. The lap's own clock is the check.
-        lap_ms = trusted_lap_ms(int(s.last_lap_ms), buf.samples)
+        #
+        # The size of that error is the gap between two consecutive laps, so on a
+        # driver lapping on the pace it is TENTHS, not minutes, and no tolerance
+        # can be both loose enough for a healthy lap and tight enough for that.
+        # Hence `previous_declared`: at the crossing, an answer the sim hasn't
+        # changed since the frame before is an answer it hasn't given yet. Only
+        # this loop can see that — a file on disk has no frame before it.
+        lap_ms = trusted_lap_ms(int(s.last_lap_ms), buf.samples,
+                                previous=previous_declared)
         if lap_ms != int(s.last_lap_ms):
             _log.warning("lap time %.3fs contradicted by its own samples (%.3fs);"
                          " trusting the samples",

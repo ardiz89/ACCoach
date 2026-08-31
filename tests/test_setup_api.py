@@ -210,3 +210,76 @@ def test_engineer_page_is_served(tmp_path):
     # its static assets are reachable too
     assert c.get("/static/engineer.js").status_code == 200
     assert c.get("/static/engineer.css").status_code == 200
+
+
+# --- la pista senza assetti ------------------------------------------------
+# Il caso vero del 2026-08-12: il pilota gira a Monza con la 720S e sul disco
+# esistono solo <car>/brands_hatch e <car>/Imola, perche' ACC crea la cartella
+# soltanto quando salvi un assetto da li'. La pagina sceglieva la prima voce
+# della tendina e mostrava l'assetto di un'ALTRA pista senza dirlo.
+
+def test_gli_assetti_della_stessa_auto_su_altre_piste(tmp_path):
+    c, path = _client(tmp_path)
+    rows = c.get("/api/setup/elsewhere",
+                 params={"car": CAR, "track": "monza"}).json()
+    assert [(r["track"], r["name"]) for r in rows] == [(TRACK, "base")]
+
+
+def test_la_pista_che_manca_non_e_fra_le_sorgenti(tmp_path):
+    """Chiedendo di Imola, Imola non si propone come base di se stessa."""
+    c, path = _client(tmp_path)
+    assert c.get("/api/setup/elsewhere",
+                 params={"car": CAR, "track": TRACK}).json() == []
+
+
+def test_l_auto_si_riconosce_anche_scritta_in_un_altro_modo(tmp_path):
+    """L'archivio dei giri tiene `Imola` e `Zolder` maiuscoli accanto a `monza`
+    minuscolo: il gioco e il disco non scrivono gli identificatori uguali, e da
+    quel confronto dipende se il pilota vede i propri assetti o una lista vuota.
+    """
+    c, path = _client(tmp_path)
+    rows = c.get("/api/setup/elsewhere",
+                 params={"car": CAR.upper(), "track": "monza"}).json()
+    assert len(rows) == 1
+
+
+def test_copiare_un_assetto_crea_la_pista_che_mancava(tmp_path):
+    c, path = _client(tmp_path)
+    r = c.post("/api/setup/seed", json={"source": path, "track": "monza"})
+    assert r.status_code == 200, r.text
+    out = r.json()
+    assert (out["car"], out["track"], out["from_track"]) == (CAR, "monza", TRACK)
+    # …e da quel momento la combo esiste davvero, che e' tutto il punto.
+    combos = c.get("/api/setup/combos").json()
+    assert {"car": CAR, "track": "monza", "count": 1} in combos
+    # Il file e' leggibile dall'editor come qualunque altro.
+    cur = c.get("/api/setup/current", params={"path": out["path"]}).json()
+    assert cur["car"] == CAR
+
+
+def test_la_copia_non_sovrascrive_niente(tmp_path):
+    c, path = _client(tmp_path)
+    c.post("/api/setup/seed", json={"source": path, "track": "monza"})
+    r = c.post("/api/setup/seed", json={"source": path, "track": "monza"})
+    assert r.status_code == 409
+
+
+def test_la_copia_non_puo_uscire_dalle_cartelle_degli_assetti(tmp_path):
+    """La pista arriva dal browser: se diventasse un percorso, scriveremmo fuori.
+
+    La destinazione si ricava dal percorso della SORGENTE, mai da un nome auto
+    nella richiesta — quindi anche passando un nome buono ma un `..` la copia
+    non puo' finire altrove.
+    """
+    c, path = _client(tmp_path)
+    for cattivo in ("..", "../../altrove", "C:/Windows", "mon/za", "."):
+        r = c.post("/api/setup/seed", json={"source": path, "track": cattivo})
+        assert r.status_code in (400, 403), f"{cattivo!r} -> {r.status_code}"
+
+
+def test_la_copia_non_puo_leggere_fuori_dalle_cartelle(tmp_path):
+    fuori = tmp_path / "fuori.json"
+    fuori.write_text(json.dumps(SAMPLE), encoding="utf-8")
+    c, _path = _client(tmp_path)
+    r = c.post("/api/setup/seed", json={"source": str(fuori), "track": "monza"})
+    assert r.status_code == 403

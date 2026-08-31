@@ -36,8 +36,17 @@ Definito in `src/accoach/engineer/core.py`. Campi (tutti opzionali tranne
 | `symptom_scores` | `dict[Symptom, float]` | **il cuore**: intensità ~0..1 per ogni sintomo rilevato | da `balance.py` + curve |
 | `symptom_corners` | `dict[Symptom, int]` | **necessario**: n. di curve DISTINTE in cui è apparso il sintomo (gate setup-vs-guida) | conta le curve nel giro |
 | `pressures_hot` | `dict\|None` | `{"front": psi, "rear": psi}` a caldo | media `tyre_pressure` per asse |
-| `lock_segments` | `int` | n. segmenti distinti con bloccaggio | come `advisor.py` |
-| `spin_segments` | `int` | n. segmenti distinti con pattinamento | come `advisor.py` |
+| `lock_segments` | `int` | n. segmenti distinti con bloccaggio | `events.is_lockup`, la **stessa** funzione del dal-vivo |
+| `spin_segments` | `int` | n. segmenti distinti con pattinamento | `events.is_wheelspin`, idem |
+
+> **2026-08-14.** Quei due conteggi avevano una regola propria — il flag ABS/TC
+> bastava da solo — e l'ha smentita la pista: con ABS 6 contava 5-7 bloccaggi su
+> giri che dal vivo erano silenziosi. Ora la regola è una sola e sta in
+> `events.py`. Conseguenza da sapere: su un'auto con gli aiuti accesi questi
+> numeri stanno a **~0**, perché il bloccaggio fisico non avviene (misurato:
+> 11 690 frame, slip anteriore mai oltre `-0.106`). Non è cecità, è il conteggio
+> che dice la verità; se un giorno servirà «quante volte è intervenuto un
+> aiuto», è una misura **diversa** e va chiesta con un nome diverso.
 
 Solo i giri con `stable=True and warmed_up=True` entrano nella finestra di
 valutazione del motore; gli altri sono ignorati (non serve filtrarli a monte).

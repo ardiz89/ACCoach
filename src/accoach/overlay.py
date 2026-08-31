@@ -1,4 +1,4 @@
-"""On-screen overlay — a glanceable HUD drawn over the game.
+﻿"""On-screen overlay — a glanceable HUD drawn over the game.
 
 A thin WebSocket client of :mod:`accoach.server`: it draws the HONE mark, a delta
 bar, the predicted/reference lap times and the current coaching cue, and the focus
@@ -177,15 +177,22 @@ def center_panel(screens, virtual):
     return (x + pw * (n // 2), y, pw, h)
 
 
-def top_left_in_center_panel(screens, virtual, size, margin: int = _EDGE_MARGIN):
-    """Top-left corner of the middle panel, inset by ``margin`` on both edges.
+def top_center_in_center_panel(screens, virtual, size, margin: int = _EDGE_MARGIN):
+    """Top edge of the middle panel, horizontally centred on it.
 
     ``size`` is the overlay's ``(width, height)``: on a panel too small to hold
     it the inset shrinks instead of pushing the window off the edge.
+
+    L'ancora e' il **centro**, e la storia di come non lo era spiega perche' e'
+    scritto qui. Il difetto vero era *quale schermo*: con Eyefinity acceso
+    l'overlay finiva sul monitor di sinistra. La correzione ha portato con se'
+    anche un cambio di *angolo* — da centro a sinistra — che nessuno aveva
+    chiesto, e che ha messo l'HUD sotto il riquadro dei test. Il pilota l'ha
+    visto il 10/08 perche' il grafico dei pedali era sparito.
     """
     px, py, pw, ph = center_panel(screens, virtual)
     w, h = size
-    return (px + min(margin, max(pw - w, 0)), py + min(margin, max(ph - h, 0)))
+    return (px + max((pw - w) // 2, 0), py + min(margin, max(ph - h, 0)))
 
 
 def _overlaps(a, b) -> bool:
@@ -266,11 +273,11 @@ class Overlay(QWidget):
         # screen now differs from this, the position is stale by definition.
         self._placed_against: tuple | None = None
         if self._auto_place:
-            self._place_top_left()
+            self._place_top_center()
         else:
             self.move(ov.x, ov.y)
             if not self._on_a_screen():      # saved on a monitor that's now gone
-                self._place_top_left()
+                self._place_top_center()
         if self._placed_against is None:
             self._placed_against = _screen_snapshot()
         self._watch_screens()
@@ -393,7 +400,7 @@ class Overlay(QWidget):
         if self._auto_place or not self._on_a_screen():
             # Even a pinned position has to stay reachable: a saved x of 5000 on a
             # desktop that just shrank is an overlay the driver reports as "gone".
-            self._place_top_left()
+            self._place_top_center()
         else:
             self._placed_against = snap
 
@@ -404,15 +411,15 @@ class Overlay(QWidget):
         me = (fg.x(), fg.y(), fg.width(), fg.height())
         return any(_overlaps(r, me) for r in screens)
 
-    def _place_top_left(self) -> None:
-        # Top-left of the *middle* panel, which is what the driver asked for: on a
-        # triple rig the screen he's looking at is the centre one, and the corner
-        # keeps the HUD out of the way of the road. The maths lives in
-        # top_left_in_center_panel() so it can be tested without real monitors.
+    def _place_top_center(self) -> None:
+        # Top-centre of the *middle* panel, which is what the driver asked for: on
+        # a triple rig the screen he's looking at is the centre one, and the HUD
+        # sits above the road rather than off to one side. The maths lives in
+        # top_center_in_center_panel() so it can be tested without real monitors.
         screens, virtual = _screen_snapshot()
         self._placed_against = (screens, virtual)
-        x, y = top_left_in_center_panel(screens, virtual,
-                                        (self.width(), self.height()))
+        x, y = top_center_in_center_panel(screens, virtual,
+                                          (self.width(), self.height()))
         self.move(x, y)
 
     # --- websocket ---------------------------------------------------------

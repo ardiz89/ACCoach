@@ -74,6 +74,61 @@ _MIN_HOLD_S = 0.12         # sustain time before an event fires
 _PRIORITY_BASE = 300.0     # ranks above most segment time-loss cues
 
 
+# --- the one rule -----------------------------------------------------------
+# These two live at module level, and not inside EventDetector, because the
+# post-lap diagnosis (`coaching.diagnosis._lock_spin_segments`, which is what the
+# race engineer sees) has to answer the same question about a recorded
+# `LapSample`. It used to answer it with its own copy of the rule, and the copy
+# drifted: the live rule was tightened on 2026-07-19 and nobody came back here,
+# so for three weeks "lock-up" meant two different things depending on who was
+# asking. Both callers now go through this function; there is nowhere left for
+# the two to disagree.
+#
+# The argument is duck-typed on purpose: a live `TelemetrySnapshot` and a
+# recorded `LapSample` both carry the fields read here, and requiring one to be
+# converted into the other would put a translation step between the two callers —
+# which is where a divergence would grow back.
+
+def is_lockup(s) -> bool:
+    """Is this frame a genuine front lock-up?
+
+    The aid flag (ABS ≥ level) **gates** but no longer **triggers** on its own:
+    on ACC it goes high during normal braking-into-ABS, so the flag alone nagged
+    on correct technique (audit 2026-07-19: 3 false locks on one clean GT3 lap).
+    Now the flag only says "the ABS is modulating"; the physical slip ratio has
+    to corroborate a genuine lock before this is true.
+
+    Validated live (McLaren 720S GT3, Imola): ABS-managed braking sits at front
+    slip -0.05..-0.09, inside the -0.15 threshold, while a real lock blows well
+    past it — measured at -1.00 (wheel stopped) on 2026-08-12 at Monza. With the
+    flag present the speed gate is skipped: the ACC native slip ratio is
+    trustworthy even at low v, unlike the formula that gate protects.
+    """
+    if s.brake < _BRAKE_MIN:
+        return False
+    front_ratio = min(s.slip_ratio[0], s.slip_ratio[1])  # most-negative front wheel
+    locked = front_ratio <= _LOCK_RATIO
+    if s.abs_active >= _ABS_LEVEL:               # aid modulating: slip must confirm
+        return locked
+    return s.speed_kmh >= _RATIO_MIN_SPEED and locked
+
+
+def is_wheelspin(s, spin_ratio: float) -> bool:
+    """Is this frame a genuine rear wheelspin? (Same shape as :func:`is_lockup`.)
+
+    ``spin_ratio`` is class-dependent — see :mod:`accoach.coaching.tuning`. The
+    2026-07-19 audit counted 8 false wheelspin calls on one clean lap from the
+    TC flag alone; TC-managed traction measured rear slip +0.05..+0.07.
+    """
+    if s.throttle < _THROTTLE_MIN or s.gear in ("R", "N"):
+        return False
+    rear_ratio = max(s.slip_ratio[2], s.slip_ratio[3])   # fastest-spinning rear
+    spinning = rear_ratio >= spin_ratio
+    if s.tc_active >= _TC_LEVEL:                 # aid modulating: slip must confirm
+        return spinning
+    return s.speed_kmh >= _RATIO_MIN_SPEED and spinning
+
+
 class EventDetector:
     """Stateful: fed (snapshot, now) each frame, yields lock-up/wheelspin cues."""
 
@@ -113,31 +168,12 @@ class EventDetector:
         return cues
 
     # --- conditions -------------------------------------------------------
-    # The aid flag (ABS/TC ≥ level) GATES but no longer TRIGGERS on its own: on ACC
-    # it goes high during normal braking-into-ABS / TC-managed traction, so the flag
-    # alone nagged on correct technique (audit 2026-07-19: 8 false wheelspin + 3
-    # false lock on a clean GT3 lap). Now the flag only says "an aid is modulating";
-    # the physical slip ratio must corroborate a genuine lock/spin before a cue
-    # fires. Validated live (McLaren 720S GT3, Imola): ABS-managed braking sits at
-    # front slip -0.05..-0.09 and TC-managed traction at rear +0.05..+0.07 (both
-    # inside the -0.15 / spin_ratio thresholds), while a real lock/launch-spin blows
-    # well past them. With the flag present we skip the speed gate — the ACC native
-    # slip ratio is trustworthy even at low v (unlike the formula the gate protects).
+    # Thin wrappers over the module-level rule (see `is_lockup` / `is_wheelspin`),
+    # kept as methods only because the wheelspin threshold is per-car state that
+    # lives on the detector. The rule itself is deliberately NOT duplicated here.
     @staticmethod
     def _is_lockup(s: TelemetrySnapshot) -> bool:
-        if s.brake < _BRAKE_MIN:
-            return False
-        front_ratio = min(s.slip_ratio[0], s.slip_ratio[1])  # most-negative front wheel
-        locked = front_ratio <= _LOCK_RATIO
-        if s.abs_active >= _ABS_LEVEL:               # aid modulating: slip must confirm
-            return locked
-        return s.speed_kmh >= _RATIO_MIN_SPEED and locked
+        return is_lockup(s)
 
     def _is_wheelspin(self, s: TelemetrySnapshot) -> bool:
-        if s.throttle < _THROTTLE_MIN or s.gear in ("R", "N"):
-            return False
-        rear_ratio = max(s.slip_ratio[2], s.slip_ratio[3])   # fastest-spinning rear
-        spinning = rear_ratio >= self._spin_ratio
-        if s.tc_active >= _TC_LEVEL:                 # aid modulating: slip must confirm
-            return spinning
-        return s.speed_kmh >= _RATIO_MIN_SPEED and spinning
+        return is_wheelspin(s, self._spin_ratio)

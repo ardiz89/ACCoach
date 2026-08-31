@@ -133,6 +133,16 @@ Until there's a focus — the first laps, while it's still watching you drive �
 coach talks about everything, as it always did. And when the corner improves, or
 won't budge after a few laps, it parks it and moves on: new theme, new words.
 
+## Why it went quiet after a cut
+
+On a lap the game has **invalidated** (ACC only — AC has no such flag), HONE
+keeps coaching but stops **praising**. A corner where you gained time on an
+invalidated lap earns no "Nice stretch" and no green on the corner card: you
+gained that time by leaving the track, and congratulating you for it would be
+teaching you the shortcut. Everything you *lost* is still called out, and the
+debrief still shows the whole lap — an invalidated lap is a free lap to learn
+from, and usually the one with the most in it.
+
 ## Being called into the pits
 
 When the race engineer proposes a change that needs the garage, it doesn't just

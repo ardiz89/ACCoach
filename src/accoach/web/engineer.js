@@ -25,9 +25,16 @@ const state = {
   autoSelected: false,
   lastWritten: null,             // file name written this session (box reminder)
   lastLive: null,                // last live payload, for re-render on lang switch
+  // Quale auto/pista crediamo tu stia guidando, e da dove lo sappiamo:
+  // "live" (telemetria) batte "archive" (ultimo giro registrato). Serve perché
+  // la pagina si apre spesso PRIMA del motore, e senza questo sceglieva la
+  // prima voce della tendina — cioè l'assetto di un'altra pista, senza dirlo.
+  live: null,                    // {car, track, source}
+  missing: null,                 // {car, track} quando quella combo non esiste
 };
 
 const slotKey = (param, i) => `${param}#${i}`;
+const sameName = (a, b) => (a || "").toLowerCase() === (b || "").toLowerCase();
 
 async function api(url, opts) {
   // Pass the active language so backend-generated content arrives localised.
@@ -77,7 +84,212 @@ async function loadCombos() {
     }
     sel.appendChild(og);
   }
+  await bootstrapSelection();
+}
+
+// ---- chi stai guidando ----------------------------------------------------
+//
+// Il 2026-08-12 il pilota ha aperto questa pagina girando a Monza con la 720S e
+// si è trovato davanti l'assetto di **brands_hatch**, senza un avviso. Non era
+// un difetto della preselezione: la cartella `<auto>/monza` non esisteva
+// proprio, perché ACC la crea solo quando salvi un assetto da lì, e la tendina
+// si costruisce dalle cartelle che contengono file. Non c'era niente da
+// selezionare, e la pagina è rimasta sulla prima voce in ordine alfabetico.
+//
+// Da qui in poi la pagina risponde a due domande separate, e non le confonde
+// più: *cosa stai guidando* (telemetria, oppure l'ultimo giro in archivio) e
+// *ho un assetto per quello* (le cartelle su disco). Quando la seconda dice no,
+// lo dice — non ripiega su un'altra pista.
+
+function findComboOption(car, track) {
+  for (const o of $("combo").options) {
+    if (sameName(o.dataset.car, car) && sameName(o.dataset.track, track)) return o;
+  }
+  return null;
+}
+
+async function selectCombo(car, track) {
+  const o = findComboOption(car, track);
+  if (!o) return false;
+  dropMissingOption();
+  $("combo").value = o.value;
+  state.missing = null;
   await onComboChange();
+  return true;
+}
+
+// La voce fantasma per l'auto/pista che stai guidando e che non ha assetti.
+// Non è selezionabile come le altre (non ha `dataset.car`), quindi sceglierla
+// da tastiera non apre niente: esiste solo perché l'intestazione dica la
+// stessa cosa del pannello.
+const MISSING_ID = "combo-missing";
+
+function dropMissingOption() {
+  const old = document.getElementById(MISSING_ID);
+  if (old) old.remove();
+}
+
+function showComboAsMissing(car, track) {
+  const sel = $("combo");
+  dropMissingOption();
+  const o = document.createElement("option");
+  o.id = MISSING_ID;
+  o.textContent = `${car}  ·  ${track}  — ${t("eng.miss.optNone")}`;
+  sel.insertBefore(o, sel.firstChild);
+  sel.value = o.value;
+}
+
+// L'ultimo giro registrato, per quando la telemetria è spenta. `/api/combos` è
+// già ordinato per giro più recente, quindi la prima riga è l'ultima uscita.
+async function lastDrivenCombo() {
+  try {
+    const rows = await api("/api/combos");
+    return rows.length ? { car: rows[0].car, track: rows[0].track } : null;
+  } catch (e) {
+    return null;                   // niente archivio: si ripiega sotto
+  }
+}
+
+async function bootstrapSelection() {
+  const last = await lastDrivenCombo();
+  if (!last) {
+    await onComboChange();         // nessun giro in archivio: com'era prima
+    return;
+  }
+  state.live = { car: last.car, track: last.track, source: "archive" };
+  if (!await selectCombo(last.car, last.track)) showMissingCombo(last.car, last.track);
+}
+
+// ---- la pista che non ha assetti -----------------------------------------
+
+async function showMissingCombo(car, track) {
+  state.missing = { car, track };
+  // La tendina va portata d'accordo col pannello. Lasciandola sull'ultima voce
+  // scelta, l'intestazione diceva `brands_hatch` mentre sotto c'era scritto
+  // «stai guidando monza»: cioè la stessa contraddizione di prima, ridotta a
+  // due righe che si smentiscono a mezzo schermo di distanza. Visto a schermo,
+  // non nei test — nessuna asserzione guarda cosa dice la `<select>`.
+  showComboAsMissing(car, track);
+  // L'editor non deve restare aperto su un file che non c'entra: mostrarlo
+  // sarebbe di nuovo il difetto, con sopra un cartello.
+  state.setupPath = null; state.setupName = null;
+  state.params = []; state.pending = {}; state.base = {};
+  renderTray();
+  $("setup-car").textContent = "";
+  $("setup").innerHTML = "";
+  renderMissing();
+  let sources = [];
+  try {
+    sources = await api(`/api/setup/elsewhere?car=${encodeURIComponent(car)}` +
+                        `&track=${encodeURIComponent(track)}`);
+  } catch (e) { /* niente sorgenti: resta il testo "salvane uno tu" */ }
+  if (state.missing && sameName(state.missing.car, car)) renderMissing(sources);
+}
+
+function renderMissing(sources) {
+  if (!state.missing) return;
+  const { car, track } = state.missing;
+  const body = $("setup-body");
+  body.innerHTML = "";
+  const box = document.createElement("div");
+  box.className = "miss";
+
+  const h = document.createElement("div");
+  h.className = "miss-title";
+  h.textContent = "⚠ " + t("eng.miss.title");
+  box.appendChild(h);
+
+  // I nomi vengono dal gioco e dal disco: vanno messi come testo, non come
+  // markup, e in grande — è l'unica riga che risponde a "sto guardando la
+  // macchina giusta?", che è la domanda con cui questa pagina si apre.
+  const who = document.createElement("div");
+  who.className = "miss-who";
+  const lbl = document.createElement("span");
+  lbl.className = "muted";
+  const src = state.live && state.live.source === "archive"
+    ? ` (${t("eng.fromArchive")})` : "";
+  lbl.textContent = t("eng.miss.driving") + src + ": ";
+  who.appendChild(lbl);
+  const strong = document.createElement("b");
+  strong.textContent = `${car} · ${track}`;
+  who.appendChild(strong);
+  box.appendChild(who);
+
+  const why = document.createElement("p");
+  why.className = "miss-why";
+  why.textContent = t("eng.miss.why");
+  box.appendChild(why);
+
+  if (sources === undefined) {
+    body.appendChild(box);
+    return;                        // le sorgenti stanno ancora arrivando
+  }
+
+  if (!sources.length) {
+    const none = document.createElement("p");
+    none.className = "miss-why";
+    none.textContent = t("eng.miss.none");
+    box.appendChild(none);
+  } else {
+    const head = document.createElement("div");
+    head.className = "miss-seed-head";
+    head.textContent = t("eng.miss.seedHead");
+    box.appendChild(head);
+
+    const list = document.createElement("div");
+    list.className = "miss-seeds";
+    sources.forEach((s, i) => {
+      const row = document.createElement("label");
+      row.className = "miss-seed";
+      const radio = document.createElement("input");
+      radio.type = "radio"; radio.name = "miss-seed"; radio.value = s.path;
+      if (i === 0) radio.checked = true;
+      row.appendChild(radio);
+      const txt = document.createElement("span");
+      txt.textContent = `${s.track} · ${s.name}`;
+      row.appendChild(txt);
+      list.appendChild(row);
+    });
+    box.appendChild(list);
+
+    const seedBtn = document.createElement("button");
+    seedBtn.type = "button"; seedBtn.className = "primary small";
+    seedBtn.textContent = t("eng.miss.seedBtn");
+    seedBtn.onclick = () => {
+      const picked = box.querySelector("input[name=miss-seed]:checked");
+      if (picked) seedFrom(picked.value, track);
+    };
+    box.appendChild(seedBtn);
+
+    // Detto PRIMA di premere, non dopo: un assetto di un'altra pista messo qui
+    // è un punto di partenza, e chiamarlo proposta sarebbe una bugia comoda.
+    const caveat = document.createElement("p");
+    caveat.className = "miss-caveat";
+    caveat.innerHTML = t("eng.miss.caveat");
+    box.appendChild(caveat);
+  }
+
+  const again = document.createElement("button");
+  again.type = "button"; again.className = "ghost small miss-reload";
+  again.textContent = t("eng.miss.reload");
+  again.onclick = () => loadCombos().catch((e) => showToast(e.message, true));
+  box.appendChild(again);
+
+  body.appendChild(box);
+}
+
+async function seedFrom(sourcePath, track) {
+  let res;
+  try {
+    res = await api("/api/setup/seed", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ source: sourcePath, track }),
+    });
+  } catch (e) { return showToast(t("eng.miss.seedErr") + e.message, true); }
+  state.missing = null;
+  await loadCombos();
+  await selectCombo(res.car, res.track);
+  showToast(tf("eng.miss.seeded", { from: `${res.from_track} · ${res.from_name}` }));
 }
 
 // Client-side mirror of engineer.classmap (avoids 77 API calls to group cars).
@@ -91,9 +303,16 @@ function classOf(car) {
   return "Road";
 }
 
-async function onComboChange() {
+// ``prefer`` è il nome del file su cui restare dopo aver ricostruito la lista.
+// Senza, dopo una scrittura la pagina tornava sulla PRIMA voce in ordine
+// alfabetico: scriveva HONE_2, diceva «carica HONE_2» e apriva HONE_1. La
+// modifica successiva sarebbe partita dal file sbagliato, buttando via quella
+// appena fatta. Visto a schermo alla seconda scrittura di fila — la prima non
+// poteva mostrarlo, perché HONE_1 *era* la prima voce.
+async function onComboChange(prefer) {
   const opt = $("combo").selectedOptions[0];
   if (!opt || !opt.dataset.car) return;
+  state.missing = null;            // si sta aprendo una combo che esiste
   state.car = opt.dataset.car; state.track = opt.dataset.track;
   await loadClass(state.car);   // sets state.alVolo before the setup renders
   const list = await api(`/api/setup/list?car=${encodeURIComponent(state.car)}` +
@@ -104,6 +323,7 @@ async function onComboChange() {
     const o = document.createElement("option");
     o.textContent = s.name; o.dataset.path = s.path;
     sel.appendChild(o);
+    if (prefer && s.name === prefer) sel.value = o.value;
   }
   await onSetupChange();
   loadRecord();                 // best-effort: il registro non blocca la pagina
@@ -526,6 +746,69 @@ async function openWriteModal() {
   $("modal").hidden = false;
 }
 
+// ---- la via corta: un tasto, un nome che non devi pensare ----------------
+//
+// Nel box il pilota ha il motore acceso e i secondi contati, e la via lunga gli
+// chiedeva di digitare un nome file — che poi la seconda volta era già preso e
+// glielo faceva rifare. Qui il nome è progressivo (HONE_1, HONE_2, …) e lo
+// sceglie la pagina. La via lunga resta accanto, per quando vuoi vedere il
+// diff in psi e millimetri prima di scrivere.
+
+const AUTO_PREFIX = "HONE";
+
+function nextAutoName() {
+  let max = 0;
+  for (const o of $("setup").options) {
+    const m = /^HONE_(\d+)$/i.exec(o.textContent.trim());
+    if (m) max = Math.max(max, parseInt(m[1], 10));
+  }
+  return `${AUTO_PREFIX}_${max + 1}`;
+}
+
+async function applyNow() {
+  const changes = changesPayload();
+  if (!changes.length || !state.setupPath) return;
+  // La tendina è la nostra unica idea di quali nomi sono presi; un file scritto
+  // in un'altra scheda non c'è. Un 409 quindi non è un errore da mostrare: è il
+  // disco che sa il numero meglio di noi, e si prova il successivo.
+  let name = nextAutoName();
+  for (let attempt = 0; attempt < 4; attempt++) {
+    try {
+      const res = await api("/api/setup/apply", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path: state.setupPath, as_name: name,
+                               confirm: true, changes }),
+      });
+      await afterWrite(res);
+      return;
+    } catch (e) {
+      if (!e.message.includes("already exists")) {
+        return showToast(t("eng.writeErr") + e.message, true);
+      }
+      name = `${AUTO_PREFIX}_${parseInt(name.split("_").pop(), 10) + 1}`;
+    }
+  }
+  showToast(t("eng.writeErr") + name, true);
+}
+
+// Quello che succede dopo una scrittura riuscita, per tutt'e due le vie. Vive
+// in un posto solo di proposito: la via corta che dimentica di avvisare il
+// motore lascerebbe l'ingegnere a riproporre la stessa modifica per sempre.
+async function afterWrite(res) {
+  state.pending = {};
+  state.lastWritten = res.name;         // drives the "ricarica ai box" reminder
+  // Tell the live backend the proposed setup was written, so the engineer
+  // advances its convergence re-test. Best-effort: the backend may be off.
+  // .catch handles the async rejection (a sync try/catch wouldn't), so a
+  // backend that's off doesn't raise an Uncaught (in promise).
+  fetch(`http://${location.hostname}:${WS_PORT}/engineer/applied`,
+        { method: "POST" }).catch(() => { /* backend off — keeps proposing */ });
+  // Il file appena scritto è quello che il messaggio ti dice di caricare, ed è
+  // quello su cui deve poggiare la modifica dopo.
+  await onComboChange(res.name);
+  showToast("✓ " + res.reload_hint);
+}
+
 async function confirmWrite() {
   const name = $("modal-name").value.trim();
   if (!name) { showModalError(t("eng.enterName")); return; }
@@ -537,16 +820,7 @@ async function confirmWrite() {
       body: JSON.stringify(body),
     });
     $("modal").hidden = true;
-    state.pending = {};
-    state.lastWritten = res.name;       // drives the "ricarica ai box" reminder
-    // Tell the live backend the proposed setup was written, so the engineer
-    // advances its convergence re-test. Best-effort: the backend may be off.
-    // Best-effort; .catch handles the async rejection (a sync try/catch wouldn't),
-    // so a backend that's off doesn't raise an Uncaught (in promise).
-    fetch(`http://${location.hostname}:${WS_PORT}/engineer/applied`,
-          { method: "POST" }).catch(() => { /* backend off — keeps proposing */ });
-    await onComboChange();              // refresh setup list (new file appears)
-    showToast("✓ " + res.reload_hint);
+    await afterWrite(res);
   } catch (e) {
     showModalError(e.message.includes("already exists")
       ? t("eng.exists")
@@ -872,17 +1146,21 @@ function renderPitReminder(st) {
   el.hidden = true;
 }
 
+// La telemetria batte l'archivio: quando arriva un frame, è LEI a dire cosa
+// stai guidando. Chiamata a ogni frame, quindi deve costare niente quando non
+// c'è nulla da fare — la guardia sotto è quella.
+//
+// Il confronto sull'auto era esatto sulle maiuscole mentre quello sulla pista
+// no. In archivio il gioco scrive `Zolder` e `Imola` maiuscoli accanto a
+// `monza` minuscolo: oggi le due grafie coincidono, ma è la stessa famiglia di
+// difetto — due metà che decidono la stessa cosa con due regole.
 function maybeAutoSelect(car, track) {
   if (state.autoSelected || !car) return;
-  const sel = $("combo");
-  for (const o of sel.options) {
-    if (o.dataset.car === car &&
-        (o.dataset.track || "").toLowerCase() === (track || "").toLowerCase()) {
-      sel.value = o.value; state.autoSelected = true;
-      onComboChange();
-      return;
-    }
-  }
+  const cur = state.live;
+  if (cur && cur.source === "live"
+      && sameName(cur.car, car) && sameName(cur.track, track)) return;
+  state.live = { car, track, source: "live" };
+  selectCombo(car, track).then((ok) => { if (!ok) showMissingCombo(car, track); });
 }
 
 function connectWS() {
@@ -892,7 +1170,10 @@ function connectWS() {
   ws.onmessage = (ev) => { try { applyLive(JSON.parse(ev.data)); } catch (e) {} };
   ws.onclose = () => {
     $("live-badge").dataset.state = "off";
-    $("live-text").textContent = "telemetry offline";
+    // Tradotto come tutto il resto: era l'unica scritta inglese su una pagina
+    // in italiano, e stava proprio sul distintivo che il pilota guarda per
+    // capire se il coach è acceso.
+    $("live-text").textContent = t("live.offline");
     setTimeout(connectWS, 3000);
   };
   ws.onerror = () => { try { ws.close(); } catch (e) {} };
@@ -900,7 +1181,17 @@ function connectWS() {
 
 // ---- wiring --------------------------------------------------------------
 
-$("combo").onchange = () => { state.autoSelected = true; onComboChange(); };
+$("combo").onchange = () => {
+  state.autoSelected = true;
+  // La voce fantasma ("… — nessun assetto") non apre un editor, perché non c'è
+  // niente da aprire: rimette il pannello che spiega perché.
+  if ($("combo").selectedOptions[0] === document.getElementById(MISSING_ID)) {
+    const m = state.missing || state.live;
+    if (m) showMissingCombo(m.car, m.track);
+    return;
+  }
+  onComboChange();
+};
 $("setup").onchange = onSetupChange;
 // "I've turned the dial." Same endpoint the setup writer calls, because it is
 // the same event: the change the engineer proposed is now on the car, so the
@@ -915,6 +1206,7 @@ $("av-done").onclick = () => {
 $("btn-reset").onclick = () => { state.pending = {};
   renderSetup({ groups: groupsOf(state.params), params: state.params }); renderTray(); };
 $("btn-write").onclick = openWriteModal;
+$("btn-apply").onclick = applyNow;
 $("btn-undo").onclick = undoSetup;
 $("modal-cancel").onclick = () => { $("modal").hidden = true; };
 $("modal-ok").onclick = confirmWrite;
@@ -944,6 +1236,15 @@ if (tourBtn && window.HoneTour) {
 // Live language switch: re-render the dynamic, JS-built parts in the new
 // language (i18n.js has already re-applied the static chrome).
 window.HoneI18nRerender = async function () {
+  if (state.missing) {
+    // Il pannello "questa pista non ha assetti" è testo nostro, quindi va
+    // ridisegnato: senza, cambiare lingua lasciava in piedi la pagina
+    // precedente proprio dove si spiega cosa fare.
+    showMissingCombo(state.missing.car, state.missing.track);
+    if (state.car) await loadClass(state.car);
+    applyLive(state.lastLive || { connected: false });
+    return;
+  }
   if (state.setupPath) {
     // The editor's text (group, label, note, slot) is rendered by the backend in
     // the requested language, so a switch has to RE-FETCH it — repainting

@@ -43,6 +43,7 @@ from .coaching.atwheel import WheelWatch
 from .coaching.focus import FocusCoach, FocusReport
 from .coaching.pitcall import PitCall
 from .i18n import cue_text, current_language
+from .logging_setup import get_logger
 from .comparison import DeltaState, LapComparator, Reference
 from .engineer import RaceEngineer, classify, engineer_for
 from .recording import Lap, LapRecorder, find_reference_lap, laps_root, save_lap
@@ -51,6 +52,8 @@ from .telemetry import SharedMemoryReader, TelemetrySnapshot
 from .telemetry.snapshot import ACStatus
 from .telemetry.feed import TelemetryFeed
 from .track import Corner, detect_corners
+
+_log = get_logger("coach")
 
 # When you're not on a representative flying lap — delta has ballooned because
 # you're crawling, recovering from an off, or parked — only acute safety cues
@@ -120,6 +123,62 @@ _ENG_VOICE_PREFIX = {
                "en": "Engineer, worth trying at the wheel:"},
     },
 }
+
+
+def _spoken_log_line(category, focus_theme: str | None,
+                     voice_text: str, screen_text: str) -> str:
+    """La riga che registra cosa il coach ha DETTO, e contro che filtro.
+
+    Pura, e con la forma decisa qui, perche' e' l'unica prova che avremo di due
+    domande che dal sedile non hanno risposta:
+
+    * **prova 16** — in pista arrivano parole corte o frasi intere? Si legge da
+      `voce=`, e il confronto con `schermo=` mostra cosa e' stato scritto e non
+      detto, che e' esattamente il comportamento da verificare;
+    * **prova 21** — i venti secondi fra due ripetizioni sono assillanti? E' una
+      domanda sui *tempi*, e le marche temporali le mette il logger.
+
+    Il 10/08 in pista tutt'e due sono rimaste indecidibili: il pilota stava
+    frenando, e a memoria non si cronometra niente.
+    """
+    tema = focus_theme or "-"
+    nome = getattr(category, "value", category)
+    return f"detto | {nome:<12} | tema={tema:<10} | voce={voice_text!r} | schermo={screen_text!r}"
+
+
+def _reference_token(reference) -> tuple | None:
+    """Chi e' il giro di riferimento, in una forma confrontabile.
+
+    Non l'oggetto: `_rebuild_reference` ne costruisce uno nuovo dopo ogni giro
+    salvato, anche quando il giro sotto e' lo stesso, quindi l'identita'
+    dell'oggetto direbbe «cambiato» a ogni giro. Il giro invece ha un'ora e un
+    tempo, e due giri diversi non li condividono.
+    """
+    lap = getattr(reference, "lap", None)
+    if lap is None:
+        return None
+    return (lap.recorded_utc, lap.lap_time_ms)
+
+
+def _focus_log_line(report: FocusReport | None) -> str:
+    """Il contesto senza cui le righe `detto |` non si interpretano.
+
+    «Nessuna parola di trazione in cinque giri» significa una cosa se il focus
+    era la trazione, e un'altra se non e' mai stato eletto.
+
+    E «non eletto» sono a loro volta tre cose diverse, che portano a letture
+    opposte della stessa riga `detto |`: *sto ancora guardando* (non ho ancora
+    abbastanza giri), *sei pulito* (nessuna debolezza che ricorre), e *questo
+    giro non l'ho nemmeno giudicato* (senza riferimento o senza curve il coach
+    non lo vede). Il coach tace in tutti e tre, per tre motivi che non si
+    somigliano.
+    """
+    focus = report.focus if report else None
+    if focus is None:
+        stato = report.kind.value if report else "non valutato"
+        return f"focus | nessuno | stato={stato}"
+    return (f"focus | {focus.name} | tema={_focus_theme_key(report)} "
+            f"| perdi {focus.baseline_ms:.0f} ms")
 
 
 def _decision_sig(decision) -> tuple | None:
@@ -315,7 +374,13 @@ class CoachEngine:
         # coaches it. Rebuilt per car/track; needs a reference to produce debriefs.
         self._focus: FocusCoach | None = None
         self._focus_key: tuple[str, str] | None = None
+        #: Auto+pista di cui l'Ingegnere sta tenendo la memoria su disco.
+        self._engineer_key: tuple[str, str] | None = None
         self._focus_report: FocusReport | None = None
+        #: Il riferimento (e le sue curve) contro cui il focus aperto ha
+        #: misurato la base, tenuto fermo finche' quel focus non si chiude.
+        #: None quando nessun focus e' aperto. Vedi `FocusCoach.observe`.
+        self._focus_ref: tuple | None = None
 
         # Commands from other threads (e.g. the server's POST /engineer/applied,
         # which runs on the asyncio loop while tick() runs in an executor) are
@@ -352,10 +417,16 @@ class CoachEngine:
         coach (driving). Both run on the reference that was the target *during*
         this lap — the rebuild to chase a new best happens after, in tick()."""
         if self._engineer is not None:
-            stats = build_lap_stats(lap, self._corners or None)
+            # I nomi delle curve li ha gia' il motore, e sono gli stessi che il
+            # pilota vede ovunque: passarli qui e' l'unico modo perche'
+            # l'Ingegnere possa dire DOVE hai perso il giro senza ribattezzare
+            # la curva per conto suo.
+            stats = build_lap_stats(lap, self._corners or None,
+                                    corner_names=self._corner_names)
             self._engineer_decision = self._engineer.observe(stats)
             self._announce_engineer(self._engineer_decision)
             self._log_engineer_outcome(lap, self._engineer_decision)
+            self._save_engineer_state()
 
         # The Focus coach needs a reference to know where time was lost.
         if self._focus is None or self._reference is None or not self._corners:
@@ -373,11 +444,32 @@ class CoachEngine:
             debrief = build_lap_debrief(lap, self._reference, self._corners)
             stable = lap.valid and lap.clean is not False
             before = (frozenset(self._focus.mastered), frozenset(self._focus.parked))
-            self._focus_report = self._focus.observe(debrief, stable=stable)
+            # Il focus e' un esperimento, e un esperimento tiene fermo il
+            # controllo: finche' un focus e' aperto giudica contro lo stesso
+            # riferimento con cui ha misurato la base, anche se nel frattempo il
+            # pilota ha fatto un personal best e il resto dell'app e' passato a
+            # quello. Costa un secondo debrief per giro, e solo mentre un focus
+            # e' aperto. Perche' non basti dichiararlo e' misurato sui 16 giri
+            # del 14/08: contro il metro che rincorre, la Variante della Roggia
+            # va 0 -> 280 ms; contro un metro fermo, 519 -> 190. Due risposte di
+            # verso opposto alla stessa domanda.
+            fref, fcorners = self._focus_ref or (self._reference, self._corners)
+            focus_debrief = (debrief if fref is self._reference
+                             else build_lap_debrief(lap, fref, fcorners))
+            self._focus_report = self._focus.observe(
+                focus_debrief, stable=stable, reference=_reference_token(fref))
+            if self._focus.focus is None:
+                self._focus_ref = None      # chiuso: il prossimo si elegge su oggi
+            elif self._focus_ref is None:
+                self._focus_ref = (self._reference, self._corners)
             # Tell the voice which theme the session is on. The FocusCoach has
             # elected one weakness at a time since it was written; until now
             # nobody downstream was listening.
             self.scheduler.set_focus(_focus_theme_key(self._focus_report))
+            # Senza questa riga il log direbbe cosa e' stato detto ma non contro
+            # che cosa: «nessuna parola di trazione» significa una cosa se il
+            # focus e' la trazione e un'altra se non e' mai stato eletto.
+            _log.info("%s", _focus_log_line(self._focus_report))
             after = (frozenset(self._focus.mastered), frozenset(self._focus.parked))
             if after != before:
                 self._save_focus_state()   # a corner just changed status; persist
@@ -412,6 +504,34 @@ class CoachEngine:
         except Exception:
             pass   # persistence is a convenience; never let it break a lap
 
+    def _load_engineer_state(self, car: str, track: str) -> dict | None:
+        """La memoria dell'Ingegnere per questo auto+pista, o None.
+
+        Best-effort come la gemella del focus: un catalogo mancante o bloccato
+        vuol dire «riparti da zero», mai un errore che ferma la sessione.
+        """
+        try:
+            from .recording.catalog import LapCatalog
+            from .recording.storage import _catalog_path
+
+            with LapCatalog(_catalog_path(Path(self.laps_dir))) as cat:
+                return cat.load_engineer_state(car, track)
+        except Exception:
+            return None
+
+    def _save_engineer_state(self) -> None:
+        if self._engineer is None or self._engineer_key is None:
+            return
+        try:
+            from .recording.catalog import LapCatalog
+            from .recording.storage import _catalog_path
+
+            car, track = self._engineer_key
+            with LapCatalog(_catalog_path(Path(self.laps_dir))) as cat:
+                cat.save_engineer_state(car, track, self._engineer.state())
+        except Exception:
+            pass   # persistence is a convenience; never let it break a lap
+
     def _watch_at_wheel(self, snap: TelemetrySnapshot) -> None:
         """Close the loop on an "al volo" proposal by watching the dial move.
 
@@ -437,6 +557,9 @@ class CoachEngine:
         if self.wheelwatch.update(snap):
             self._engineer.mark_applied()
             self._engineer_done_sig = sig
+            # Fra «applicata» e il giro dopo ci sta un intero spegnimento, ed e'
+            # esattamente li' che il 14/08 si e' perso un ciclo.
+            self._save_engineer_state()
 
     def _garage_change_pending(self) -> bool:
         """Is there a setup change waiting that can only be made in the garage?
@@ -732,8 +855,14 @@ class CoachEngine:
             # quindi lì si tace (vedi il blocco in coaching/tuning.py).
             self.pressure.set_car_class(car_class)
             self.tyretemp.set_car_class(car_class)
-            # A new car/track is a new setup problem: start a fresh engineer.
+            # A new car/track is a new setup problem: start a fresh engineer —
+            # ma non smemorato. Quello che torna e' il registro di cosa e' gia'
+            # stato provato (fase, rimedi, click spesi), mai le misure: due
+            # sessioni non si confrontano. Vedi `RaceEngineer.state`.
             self._engineer = engineer_for(snap.car_model, snap.track)
+            self._engineer_key = (snap.car_model, snap.track)
+            self._engineer.restore(
+                self._load_engineer_state(snap.car_model, snap.track))
             self._engineer_decision = None
             self._engineer_spoken_sig = None
             self._engineer_done_sig = None
@@ -752,6 +881,7 @@ class CoachEngine:
             mastered, parked = self._load_focus_state(snap.car_model, snap.track)
             self._focus = FocusCoach(mastered=mastered, parked=parked)
             self._focus_report = None
+            self._focus_ref = None
             # A focus theme belongs to one car/track combination. Left set, it
             # would keep filtering technique advice on a theme that no longer
             # applies — possibly for the whole session, if this combination
@@ -773,6 +903,8 @@ class CoachEngine:
             # until the next completed lap — would call them back to the box on
             # the out-lap they just left it on.
             self._engineer_done_sig = _decision_sig(self._engineer_decision)
+            # …e la modifica e' sulla macchina anche se il pilota chiude adesso.
+            self._save_engineer_state()
 
         if self._feed is None:
             lap = self.recorder.update(snap)
@@ -851,6 +983,18 @@ class CoachEngine:
             voice_text, screen_text = _spoken_forms(
                 spoken, self.scheduler.focus_theme, current_language())
             spoken.message = screen_text
+            # La traccia di cio' che il coach ha DETTO, con accanto il tema che
+            # stava filtrando. Esiste perche' il 10/08, in pista, due prove sono
+            # rimaste indecidibili: se in pista arrivino parole o frasi (prova
+            # 16) e se i 20 secondi di ripetizione siano assillanti (prova 21).
+            # Nessuna delle due si risponde a memoria — la 21 e' una domanda sui
+            # tempi, e il pilota stava frenando. Qui, e non dentro `Voice.say`,
+            # perche' solo qui si sanno anche la categoria e il tema attivo:
+            # senza quelli il log direbbe cosa e' uscito ma non se il filtro
+            # avesse ragione di farlo uscire.
+            _log.info("%s", _spoken_log_line(spoken.category,
+                                             self.scheduler.focus_theme,
+                                             voice_text, screen_text))
             if self.voice is not None:
                 self.voice.say(voice_text)
             self.history.append(spoken.message)

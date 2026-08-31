@@ -23,7 +23,8 @@ def test_debrief_content_translates_to_italian():
     assert explain_cause(sym, "it") == "L'auto sottosterza in ingresso (curva lenta)."
     st = CornerStats(lost_ms=300, throttle_live=0.5, throttle_ref=0.5,
                      brake_live=0.0, brake_ref=0.0, min_speed_live=120.0,
-                     min_speed_ref=128.0, braking_early=False)
+                     min_speed_ref=128.0, braking_early=False,
+                     braking_late=False)
     detail_it, _ = explain_loss(CueCategory.CARRY_SPEED, st, "it")
     assert "Minima all'apex" in detail_it
     detail_en, _ = explain_loss(CueCategory.CARRY_SPEED, st, "en")
@@ -49,7 +50,7 @@ def test_debrief_ranks_the_slow_corner_first():
 def _stats(**kw):
     base = dict(lost_ms=200.0, throttle_live=0.6, throttle_ref=0.9, brake_live=0.5,
                 brake_ref=0.2, min_speed_live=90.0, min_speed_ref=110.0,
-                braking_early=False)
+                braking_early=False, braking_late=False)
     base.update(kw)
     return CornerStats(**base)
 
@@ -182,3 +183,35 @@ def test_braking_detail_without_landmark_is_just_metres(monkeypatch):
     txt = _D._braking_detail(lap, ref, inside, refs, CueCategory.BRAKE_LATER, "it")
     assert "Anticipi la staccata" in txt
     assert "cordolo" not in txt
+
+
+def test_brake_earlier_has_its_own_words_in_both_languages():
+    """La categoria c'era, la riga nella tabella no: `explain_loss` cadeva sul
+    ripiego di `TIME_LOSS` — «perdi N decimi senza una causa dominante» — proprio
+    sulla curva in cui la causa l'avevamo appena nominata."""
+    st = _stats(min_speed_live=94.0, min_speed_ref=100.0)
+    fallback_it, _ = explain_loss(CueCategory.TIME_LOSS, st, "it")
+    fallback_en, _ = explain_loss(CueCategory.TIME_LOSS, st, "en")
+    detail_it, fix_it = explain_loss(CueCategory.BRAKE_EARLIER, st, "it")
+    detail_en, fix_en = explain_loss(CueCategory.BRAKE_EARLIER, st, "en")
+    assert detail_it != fallback_it and detail_en != fallback_en
+    # Il dettaglio prova la causa coi numeri della curva, come tutti gli altri.
+    assert "94" in detail_it and "100" in detail_it
+    assert fix_it and fix_en
+
+
+def test_one_tenth_is_singular_in_the_debrief_too():
+    """Stessa frase del coach dal vivo, stesso plurale fisso: e il debrief la
+    scrive su ogni curva senza causa dominante, che sono le piu' numerose."""
+    st = _stats(lost_ms=130.0, throttle_live=1.0, throttle_ref=1.0,
+                brake_live=0.0, brake_ref=0.0,
+                min_speed_live=100.0, min_speed_ref=100.0)
+    it, _ = explain_loss(CueCategory.TIME_LOSS, st, "it")
+    en, _ = explain_loss(CueCategory.TIME_LOSS, st, "en")
+    assert "1 decimo " in it and "decimi" not in it
+    assert "1 tenth " in en and "tenths" not in en
+    st = _stats(lost_ms=320.0, throttle_live=1.0, throttle_ref=1.0,
+                brake_live=0.0, brake_ref=0.0,
+                min_speed_live=100.0, min_speed_ref=100.0)
+    assert "3 decimi " in explain_loss(CueCategory.TIME_LOSS, st, "it")[0]
+    assert "3 tenths " in explain_loss(CueCategory.TIME_LOSS, st, "en")[0]

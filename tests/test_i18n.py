@@ -90,3 +90,40 @@ def test_set_language_persists_and_switches(tmp_path, monkeypatch):
     # …and a fresh load from disk keeps it.
     config.load_config(reload=True)
     assert config.load_config().language == "it"
+
+
+# --- «1 decimi» -----------------------------------------------------------
+#
+# Il plurale era fisso, e non su un caso di bordo: il coach parla da 120 ms in
+# su, quindi tutto quello che sta fra 120 e 149 ms si arrotonda a uno. La frase
+# piu' piccola che dice, e quella che dice piu' spesso, era sgrammaticata — in
+# entrambe le lingue, perche' anche la traduzione diceva «1 tenths».
+
+def test_one_tenth_is_singular_in_both_languages():
+    from accoach.coaching.analyzer import CornerStats, classify_corner
+
+    st = CornerStats(lost_ms=130.0, throttle_live=1.0, throttle_ref=1.0,
+                     brake_live=0.0, brake_ref=0.0, min_speed_live=100.0,
+                     min_speed_ref=100.0, braking_early=False, braking_late=False)
+    it = classify_corner(st, 0, 0.3).message
+    assert "1 decimo " in it and "decimi" not in it
+    assert i18n.cue_text(it, "en") == "Losing 1 tenth here"
+
+
+def test_more_than_one_tenth_stays_plural():
+    from accoach.coaching.analyzer import CornerStats, classify_corner
+
+    st = CornerStats(lost_ms=320.0, throttle_live=1.0, throttle_ref=1.0,
+                     brake_live=0.0, brake_ref=0.0, min_speed_live=100.0,
+                     min_speed_ref=100.0, braking_early=False, braking_late=False)
+    it = classify_corner(st, 0, 0.3).message
+    assert "3 decimi " in it
+    assert i18n.cue_text(it, "en") == "Losing 3 tenths here"
+
+
+def test_the_last_lap_but_one_of_fuel_is_singular_and_translated():
+    """`fuel.py` il singolare lo diceva gia' — ma la tabella di traduzione
+    conosceva solo il plurale, quindi «Benzina per circa 1 giro.» arrivava in
+    italiano a un utente inglese."""
+    assert i18n.cue_text("Benzina per circa 1 giro.", "en") == "Fuel for about 1 lap."
+    assert i18n.cue_text("Benzina per circa 3 giri.", "en") == "Fuel for about 3 laps."
