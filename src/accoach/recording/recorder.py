@@ -33,7 +33,8 @@ from dataclasses import dataclass
 
 from ..logging_setup import get_logger
 from ..telemetry.snapshot import ACStatus, TelemetrySnapshot
-from .lap import _OPEN_CLOCK_MAX_MS, Lap, LapSample, trusted_lap_ms
+from .lap import (_OPEN_CLOCK_MAX_MS, Lap, LapSample, sim_answer_pending,
+                  trusted_lap_ms)
 
 _log = get_logger("recorder")
 
@@ -213,8 +214,20 @@ class LapRecorder:
         self._declared: int | None = None
         # After a crossing, what we read at the line and what we stored, plus how
         # many frames we've watched since. Measurement only — nothing downstream
-        # reads it. See `_watch_settle`.
+        # reads it. See `_watch_settle`. Da quando i giri in attesa hanno una
+        # cura vera, questo copre solo gli ALTRI: quelli che alla linea un tempo
+        # ce l'avevano gia'. E' li' che resta da imparare qualcosa — chi aspetta
+        # la risposta la racconta da se' in `_resolve_pending`.
         self._settle: tuple[int, int, int] | None = None
+        # Un giro chiuso che aspetta la risposta del gioco: il buffer, lo scatto
+        # della linea (da cui vengono le condizioni), il numero letto alla linea
+        # e da quanti frame aspettiamo. Vedi `_resolve_pending`.
+        self._pending: tuple[_Buffer, TelemetrySnapshot, int, int] | None = None
+        # Un giro gia' pronto che non e' potuto uscire perche' `update` ne
+        # consegna uno per frame. Non dovrebbe mai riempirsi — un giro non
+        # finisce dentro la finestra d'attesa — ed esiste perche' in questo file
+        # niente si perde in silenzio.
+        self._ready: Lap | None = None
 
     def reset(self) -> None:
         self._buf = None
@@ -223,6 +236,15 @@ class LapRecorder:
         self._track = ""
         self._declared = None
         self._settle = None
+        if self._pending is not None:
+            # Il contesto della sessione se n'e' andato (box, disconnessione,
+            # cambio auto): il giro che aspettava non ha piu' un frame dopo da
+            # cui prendere il numero. Si dice, perche' un giro perso in silenzio
+            # e' il difetto che questo file esiste per non avere.
+            _log.info("orologio del giro: sessione chiusa mentre un giro"
+                      " aspettava la risposta del gioco; scartato")
+        self._pending = None
+        self._ready = None
 
     def _recording_allowed(self, s: TelemetrySnapshot) -> bool:
         # The whole pit lane, not just the box. `in_pit` is only true standing in
@@ -277,7 +299,16 @@ class LapRecorder:
         self._car, self._track = s.car_model, s.track
 
         completed = s.completed_laps
-        finished: Lap | None = None
+        # La risposta del gioco arriva su un frame **successivo** alla linea, ed
+        # e' l'unica cosa qui dentro che ha una scadenza: si guarda per prima.
+        finished: Lap | None = self._ready
+        self._ready = None
+        resolved = self._resolve_pending(s)
+        if resolved is not None:
+            if finished is None:
+                finished = resolved
+            else:
+                self._ready = resolved
 
         # With the counter alone the buffer ran straight through the out lap AND
         # the first flying lap, closed as one 128 s partial, and got thrown away:
@@ -286,8 +317,22 @@ class LapRecorder:
         crossed = self._line.crossed(s.lap_position, completed)
 
         if crossed and self._buf is not None:
-            finished = self._finalize(self._buf, s, previous_declared)
-            self._settle = (int(s.last_lap_ms), finished.lap_time_ms, 0)
+            # Il gioco puo' non aver ancora pubblicato il tempo di questo giro.
+            # Quando e' cosi' non si ricostruisce: si aspetta il suo numero, che
+            # e' esatto — la ricostruzione dai campioni arriva sempre corta, e
+            # sempre dello stesso segno (misurato il 23/08: -13..-18 ms su sei
+            # giri su sei). Vedi `sim_answer_pending` per perche' non basta la
+            # firma «stesso numero del frame prima».
+            if sim_answer_pending(int(s.last_lap_ms), self._buf.samples,
+                                  previous=previous_declared):
+                self._pending = (self._buf, s, int(s.last_lap_ms), 0)
+            else:
+                closed = self._finalize(self._buf, s, previous_declared)
+                self._settle = (int(s.last_lap_ms), closed.lap_time_ms, 0)
+                if finished is None:
+                    finished = closed
+                else:
+                    self._ready = closed
             self._buf = None  # the incoming sample opens the next (full) lap below
 
         if self._buf is None:
@@ -403,8 +448,50 @@ class LapRecorder:
         else:
             self._settle = (at_line, stored, frames)
 
+    def _resolve_pending(self, s: TelemetrySnapshot) -> Lap | None:
+        """Chiudere un giro che aspettava che il gioco dicesse il suo tempo.
+
+        Due esiti, e il codice li teneva per uno solo. Misurati il 23/08 su 21
+        giri, con la riga di diagnostica che quella sera scriveva soltanto:
+
+        * **il numero cambia** — il gioco era in ritardo di un frame, e quel
+          numero e' il tempo del giro. Sei volte su sei ha risposto al **primo**
+          frame. Prenderlo e' esatto; ricostruirlo dai campioni dava -18, -14,
+          -17, -13, -15, -15 ms: stesso segno e stessa taglia, cioe' una
+          distorsione sistematica, non rumore. Il caso peggiore della serata era
+          un personal best (1:31.317) che stava per essere archiviato come
+          1:32.822 — sbagliato il record **e** il riferimento su cui si misura
+          tutto il resto.
+        * **il numero non cambia mai** — questo giro un tempo non ce l'ha: giro
+          d'uscita, giro annullato, sentinella. Li' ricostruire non e' impreciso,
+          e' **inventare**: il 23/08 sono usciti 260.062 s per il giro d'uscita e
+          183.140 s per quello coi box, e a non farli entrare in archivio e'
+          stata una regola che parla d'altro («il primo buffer non e' mai un giro
+          intero»), non un controllo sul tempo. Un numero inventato e' peggio di
+          un numero assente: e' quello su cui l'Ingegnere accetta o annulla un
+          assetto, con una banda di 173 ms.
+        """
+        if self._pending is None:
+            return None
+        buf, at_crossing, declared, frames = self._pending
+        now = int(s.last_lap_ms)
+        frames += 1
+        if now != declared:
+            self._pending = None
+            _log.info("orologio del giro: alla linea %.3fs, dopo %d frame %.3fs"
+                      " — preso il suo", declared / 1000.0, frames, now / 1000.0)
+            return self._finalize(buf, at_crossing, lap_ms=now)
+        if frames >= _SETTLE_FRAMES:
+            self._pending = None
+            _log.info("orologio del giro: %.3fs invariato per %d frame; questo"
+                      " giro non ha un tempo", declared / 1000.0, frames)
+            return self._finalize(buf, at_crossing, lap_ms=0)
+        self._pending = (buf, at_crossing, declared, frames)
+        return None
+
     def _finalize(self, buf: _Buffer, s: TelemetrySnapshot,
-                  previous_declared: int | None = None) -> Lap:
+                  previous_declared: int | None = None, *,
+                  lap_ms: int | None = None) -> Lap:
         # At the crossing, last_lap_ms holds the time of the lap we just closed.
         # `clean` is known only for a full lap (we watched it from the line); a
         # partial lap stays unknown (None). Conditions are ~constant over a lap,
@@ -425,12 +512,18 @@ class LapRecorder:
         # Hence `previous_declared`: at the crossing, an answer the sim hasn't
         # changed since the frame before is an answer it hasn't given yet. Only
         # this loop can see that — a file on disk has no frame before it.
-        lap_ms = trusted_lap_ms(int(s.last_lap_ms), buf.samples,
-                                previous=previous_declared)
-        if lap_ms != int(s.last_lap_ms):
-            _log.warning("lap time %.3fs contradicted by its own samples (%.3fs);"
-                         " trusting the samples",
-                         int(s.last_lap_ms) / 1000.0, lap_ms / 1000.0)
+        # `lap_ms` arriva gia' deciso quando il giro ha aspettato la risposta
+        # del gioco: il suo numero, oppure 0 = «questo giro non ha un tempo».
+        # Vedi `_resolve_pending`. Senza attesa vale la regola di sempre, che
+        # resta anche quella del caricatore: un file su disco non ha un frame
+        # dopo da cui prendere il numero vero.
+        if lap_ms is None:
+            lap_ms = trusted_lap_ms(int(s.last_lap_ms), buf.samples,
+                                    previous=previous_declared)
+            if lap_ms != int(s.last_lap_ms):
+                _log.warning("lap time %.3fs contradicted by its own samples"
+                             " (%.3fs); trusting the samples",
+                             int(s.last_lap_ms) / 1000.0, lap_ms / 1000.0)
         timed = _LAP_MS_MIN <= lap_ms <= _LAP_MS_MAX
         if buf.is_full and len(buf.samples) < _MIN_SAMPLES:
             # Don't just drop it quietly — that's how the empty files got made in

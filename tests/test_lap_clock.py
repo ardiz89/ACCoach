@@ -222,14 +222,22 @@ def _drive_lap(rec, *, completed, dur_ms, last_ms, n=400):
 
 def test_the_recorder_does_not_stamp_a_lap_with_the_time_of_the_one_before():
     """End to end, the shape of the two Monza laps of 14/08: the sim is still
-    publishing 1:57.855 when the next lap closes, and that lap took 1:55.1."""
+    publishing 1:57.855 when the next lap closes, and that lap took 1:55.1.
+
+    Questo fixture e' il caso in cui il gioco **non risponde mai** — 400 frame
+    con lo stesso numero — quindi da qui in poi l'esito giusto non e' piu' la
+    ricostruzione dai campioni ma «questo giro non ha un tempo». Il caso in cui
+    il gioco risponde (sei volte su sei, al primo frame, il 23/08) e prende il
+    suo numero esatto sta in
+    `test_the_lap_takes_the_time_the_sim_publishes_a_frame_later`.
+    """
     rec = LapRecorder()
     _drive_lap(rec, completed=0, dur_ms=117_855, last_ms=117_855)   # partial
     _drive_lap(rec, completed=1, dur_ms=115_100, last_ms=117_855)
     lap = _drive_lap(rec, completed=2, dur_ms=115_000, last_ms=117_855)
     assert lap is not None
     assert lap.lap_time_ms != 117_855, "the previous lap's time, read again"
-    assert 115_000 <= lap.lap_time_ms <= 115_200
+    assert lap.lap_time_ms == 0, "e nemmeno un numero ricostruito al suo posto"
 
 
 def test_and_believes_the_sim_the_moment_it_answers_with_a_new_number():
@@ -238,3 +246,124 @@ def test_and_believes_the_sim_the_moment_it_answers_with_a_new_number():
     _drive_lap(rec, completed=1, dur_ms=115_100, last_ms=117_855)
     lap = _drive_lap(rec, completed=2, dur_ms=115_000, last_ms=115_100)
     assert lap.lap_time_ms == 115_100
+
+
+# --- aspettare un frame invece di ricostruire ------------------------------
+#
+# Verita' a terra, sessione del 23/08 (Brands Hatch + Imola, 21 giri, la riga
+# `orologio del giro:` in `Documenti/ACCoach/logs/accoach.log`):
+#
+#   6 giri  il gioco ha risposto **dopo 1 frame**, sempre 1, mai di piu';
+#           e il numero salvato era corto di -18 -14 -17 -13 -15 -15 ms
+#   12 giri il tempo alla linea era gia' quello giusto (scarto +0)
+#   2 giri  il gioco non ha mai risposto, e sono i due che non hanno un tempo:
+#           il sentinella 2147483.647s diventato 260.062s, e il giro coi box
+#           diventato 183.140s da un dichiarato di 110.392
+#
+# Cioe' la ricostruzione dai campioni non serve mai: dove il gioco risponde e'
+# corta di ~15 ms sistematici, e dove non risponde inventa un numero che non
+# esiste. La cura e' aspettare la sua risposta, e non inventarne una quando non
+# arriva.
+
+def _drive(rec, *, completed, dur_ms, last_ms, n=400, from_frame=None,
+           then_last_ms=None):
+    """Come `_drive_lap`, ma `last_lap_ms` puo' cambiare a meta' del giro.
+
+    Denso come lui, e per la stessa ragione (n=400): a 40 frame l'ultimo
+    campione resta al 2.5% dalla linea, `clock_at_line` non proietta e la firma
+    «il gioco non ha ancora risposto» non puo' nemmeno formarsi — un fixture
+    cosi' non tocca il codice che dice di provare.
+
+    `from_frame`/`then_last_ms` sono il gioco che pubblica il tempo qualche
+    frame **dopo** la linea, che e' il caso che questa cura prende.
+    """
+    finished = None
+    for i in range(n):
+        lm = last_ms if (from_frame is None or i < from_frame) else then_last_ms
+        out = rec.update(synth.snap(
+            pos=i / n, completed_laps=completed, current_lap_ms=int(i / n * dur_ms),
+            last_lap_ms=lm, speed_kmh=150.0,
+        ))
+        if out is not None:
+            finished = out
+    return finished
+
+
+def test_the_lap_takes_the_time_the_sim_publishes_a_frame_later(tmp_path):
+    """Il numero esatto, non una ricostruzione corta di 15 ms.
+
+    Sei giri su sei, il 23/08, il gioco ha risposto al primo frame dopo la
+    linea. Quel numero e' il tempo del giro: prenderlo e' esatto, ricostruirlo
+    dai campioni e' sempre corto (misurato: -13..-18 ms, tutti dello stesso
+    segno, che e' una distorsione e non rumore).
+    """
+    rec = LapRecorder()
+    _drive(rec, completed=0, dur_ms=117_855, last_ms=117_855)      # parziale
+    _drive(rec, completed=1, dur_ms=115_100, last_ms=117_855)
+    # I due numeri devono essere DIVERSI, o il test non prova niente: su campioni
+    # sintetici perfettamente lineari la proiezione cade esattamente sul numero
+    # vero (misurato: 115_100), quindi un fixture che li fa coincidere passa
+    # identico anche senza la cura. Nella realta' non coincidono mai — la
+    # proiezione arriva corta di 13..18 ms — e questi 15 ms sono quello scarto.
+    lap = _drive(rec, completed=2, dur_ms=115_000, last_ms=117_855,
+                 from_frame=1, then_last_ms=115_115)
+    assert lap is not None, "il giro deve arrivare, solo un frame piu' tardi"
+    assert lap.lap_time_ms == 115_115, (
+        "il numero del gioco, esatto — non la proiezione dai campioni (115_100)")
+
+
+def test_a_lap_the_sim_never_times_is_not_given_an_invented_one():
+    """«Invariato» non vuol dire «il tempo e' quello»: vuol dire che non c'e'.
+
+    E' il giro d'uscita e il giro coi box del 23/08. Oggi la ricostruzione dai
+    campioni ne fabbrica uno (260 s, 183 s) e il tetto a valle e' un'ora, quindi
+    ci passa. Un numero inventato e' peggio di un numero assente: su quello
+    l'Ingegnere accetta o annulla un assetto con una banda di 173 ms.
+    """
+    rec = LapRecorder()
+    # Il giro coi box e' quello di MEZZO: e' lui che chiude all'inizio della
+    # terza chiamata, ed e' li' che il gioco dice ancora 110.392 — il tempo del
+    # giro prima — per non cambiarlo mai piu'.
+    _drive(rec, completed=0, dur_ms=115_000, last_ms=110_392)
+    _drive(rec, completed=1, dur_ms=183_140, last_ms=110_392)
+    lap = _drive(rec, completed=2, dur_ms=115_000, last_ms=110_392)
+    assert lap is not None, "il giro arriva lo stesso: e' il suo tempo che non c'e'"
+    assert lap.lap_time_ms == 0, (
+        "il gioco non ha mai dato un tempo a questo giro: non se ne inventa uno")
+    assert lap.valid is False, "e senza tempo non entra in archivio"
+
+
+def test_the_out_lap_sentinel_is_not_a_time_either():
+    """ACC dice 2147483647 = «non ho ancora un tempo». Il 23/08 e' diventato
+    260.062 s, e a salvarci e' stata una regola che parla d'altro."""
+    rec = LapRecorder()
+    # Tre giri, perche' il difetto va isolato: il PRIMO buffer non e' mai un
+    # giro intero, quindi un giro d'uscita in prima posizione risulterebbe
+    # invalido per un motivo che non c'entra col suo orologio — ed e'
+    # esattamente il motivo sbagliato per cui il 23/08 non ha fatto danno.
+    _drive(rec, completed=0, dur_ms=260_000, last_ms=2_147_483_647)
+    _drive(rec, completed=1, dur_ms=260_031, last_ms=2_147_483_647)
+    lap = _drive(rec, completed=2, dur_ms=260_062, last_ms=2_147_483_647)
+    assert lap is not None
+    assert lap.lap_time_ms == 0, "«non ho un tempo» non diventa «ho un tempo»"
+    assert lap.valid is False
+
+
+def test_a_healthy_lap_is_not_held_back(tmp_path):
+    """La rete di sicurezza, e nasce da un buco nell'evidenza.
+
+    Il log non dice se sui giri sani il dichiarato coincide col frame prima:
+    quando coincide **e** il tempo e' giusto, la riparazione non scatta e la riga
+    non lo distingue. Se il gioco pubblicasse prima del nostro incrocio, un giro
+    sano avrebbe la stessa firma di uno in ritardo — e trattenerlo per poi non
+    vederlo cambiare lo butterebbe via. Percio' si trattiene solo quando la firma
+    scatta **e** il dichiarato contraddice l'orologio del giro: esattamente
+    l'insieme che oggi viene riparato, ne' uno di piu'.
+    """
+    rec = LapRecorder()
+    _drive(rec, completed=0, dur_ms=115_000, last_ms=115_000)
+    # Il gioco dice lo stesso numero del frame prima, ma e' anche il numero
+    # giusto: i campioni lo confermano. Non c'e' niente da aspettare.
+    lap = _drive(rec, completed=1, dur_ms=115_000, last_ms=115_000)
+    assert lap is not None
+    assert lap.lap_time_ms == 115_000

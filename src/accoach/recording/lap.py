@@ -293,6 +293,35 @@ def clock_at_line(samples: list["LapSample"]) -> int | None:
 _STALE_TOL_MS = 150
 
 
+def sim_answer_pending(declared: int, samples: list["LapSample"], *,
+                       previous: int | None) -> bool:
+    """True when the sim has not published this lap's time yet.
+
+    Two conditions, and it needs both. The first is the signature: the sim is
+    still answering the number it was already answering a frame ago, which from
+    outside is exactly what "it hasn't answered yet" looks like. The second is
+    that the number contradicts the lap's own clock — and that one is a **safety
+    net for a hole in the evidence**, not a refinement.
+
+    The 23/08 log (21 laps) shows six laps where the sim answered one frame after
+    the line, and twelve where the time at the line was already right. What it
+    cannot show is whether those twelve *also* had ``declared == previous``:
+    where the time is right the repair never fires, so the line looks the same
+    either way. If the sim published before our own crossing detection, a healthy
+    lap would carry the signature too — and a caller that waits on it, then never
+    sees a change, would throw a good lap away. Requiring the contradiction keeps
+    the waiting set exactly equal to the set that is repaired today, and a lap
+    whose clock agrees with itself is never held.
+
+    Callers that cannot know ``previous`` (the loader: a file on disk carries no
+    record of the frame before it) pass ``None`` and get ``False``.
+    """
+    if declared <= 0 or previous is None or declared != previous:
+        return False
+    at_line = clock_at_line(samples)
+    return at_line is not None and abs(declared - at_line) > _STALE_TOL_MS
+
+
 def trusted_lap_ms(declared: int, samples: list["LapSample"], *,
                    previous: int | None = None) -> int:
     """The lap's time: the sim's, unless the lap's own clock contradicts it.
@@ -337,8 +366,12 @@ def trusted_lap_ms(declared: int, samples: list["LapSample"], *,
     if declared <= 0:
         return declared
     at_line = clock_at_line(samples)
-    if (previous is not None and declared == previous and at_line is not None
-            and abs(declared - at_line) > _STALE_TOL_MS):
+    # Una regola sola, in un posto solo: il registratore la usa per decidere di
+    # ASPETTARE la risposta del gioco (il numero esatto), qui serve al
+    # caricatore, che una risposta non puo' piu' aspettarla — un file su disco
+    # non ha un frame dopo. Per l'archivio la proiezione resta il meglio
+    # disponibile; per un giro che sta chiudendo adesso, non lo e' piu'.
+    if sim_answer_pending(declared, samples, previous=previous):
         return at_line
     span = 0 if len(samples) < 2 else int(samples[-1].t_ms - samples[0].t_ms)
     if span <= 0:
