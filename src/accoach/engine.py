@@ -40,7 +40,7 @@ from .coaching.cue import CueCategory, theme_key, trigger_text
 from .coaching.debrief import build_lap_debrief
 from .coaching.diagnosis import build_lap_stats
 from .coaching.atwheel import WheelWatch
-from .coaching.focus import FocusCoach, FocusReport
+from .coaching.focus import FocusCoach, FocusKind, FocusReport
 from .coaching.pitcall import PitCall
 from .i18n import cue_text, current_language
 from .logging_setup import get_logger
@@ -377,9 +377,11 @@ class CoachEngine:
         #: Auto+pista di cui l'Ingegnere sta tenendo la memoria su disco.
         self._engineer_key: tuple[str, str] | None = None
         self._focus_report: FocusReport | None = None
-        #: Il riferimento (e le sue curve) contro cui il focus aperto ha
-        #: misurato la base, tenuto fermo finche' quel focus non si chiude.
-        #: None quando nessun focus e' aperto. Vedi `FocusCoach.observe`.
+        #: Il riferimento (e le sue curve) contro cui il ciclo del focus sta
+        #: misurando, tenuto fermo dal primo giro della finestra fino al
+        #: verdetto. None solo prima che un ciclo cominci e subito dopo che uno
+        #: si e' chiuso, cioe' quando il prossimo va pesato su oggi.
+        #: Vedi `FocusCoach.observe` e `_observe_lap`.
         self._focus_ref: tuple | None = None
 
         # Commands from other threads (e.g. the server's POST /engineer/applied,
@@ -458,10 +460,23 @@ class CoachEngine:
                              else build_lap_debrief(lap, fref, fcorners))
             self._focus_report = self._focus.observe(
                 focus_debrief, stable=stable, reference=_reference_token(fref))
-            if self._focus.focus is None:
-                self._focus_ref = None      # chiuso: il prossimo si elegge su oggi
-            elif self._focus_ref is None:
-                self._focus_ref = (self._reference, self._corners)
+            # Il metro si tiene fermo per **tutto** il ciclo, non da quando il
+            # focus ha un nome: la base si misura in fase di valutazione, quindi
+            # e' li' che l'esperimento comincia. Fissarlo solo alla nomina —
+            # com'era — lasciava scoperta proprio la finestra: il motore rifa' il
+            # riferimento dopo ogni giro salvato, e a Imola il 23/08 quattro
+            # personal best di fila (1:51 -> 1:47) l'hanno svuotata quattro volte.
+            # Il focus non eleggeva **mentre il pilota migliorava**.
+            #
+            # Si libera su un verdetto, e solo su quello: dato «migliorata» o
+            # «parcheggiata» il ciclo e' chiuso e il prossimo si pesa su oggi.
+            # CLEAN invece non e' un verdetto ed e' uno stato che si ripete a
+            # ogni giro: liberarlo li' rifarebbe la regressione, perche' ogni
+            # giro ributterebbe la finestra che non arriverebbe mai ai tre giri.
+            if self._focus_report.kind in (FocusKind.IMPROVED, FocusKind.STUCK):
+                self._focus_ref = None
+            else:
+                self._focus_ref = (fref, fcorners)
             # Tell the voice which theme the session is on. The FocusCoach has
             # elected one weakness at a time since it was written; until now
             # nobody downstream was listening.

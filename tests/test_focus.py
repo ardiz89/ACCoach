@@ -283,5 +283,133 @@ def test_the_engine_holds_the_reference_still_under_an_open_focus(tmp_path):
     eng._observe_lap(synth.build_lap(slow_corner=0, amt=30))
 
     assert eng._focus.focus is not None, "il focus non deve cadere col riferimento"
-    assert eng._focus_ref is frozen, "e il metro deve essere ancora quello"
+    # Il metro, non la scatola che lo contiene: la tupla si ricostruisce a ogni
+    # giro (e' l'atto di ri-appuntare quello che si e' appena usato), quindi
+    # quello che deve stare fermo e' il riferimento dentro, e le sue curve.
+    assert eng._focus_ref[0] is frozen[0], "e il metro deve essere ancora quello"
+    assert eng._focus_ref[1] is frozen[1], "con le curve con cui era stato letto"
+    eng.close()
+
+
+def test_the_engine_holds_the_reference_still_while_it_is_still_assessing(tmp_path):
+    """La regressione del 23/08, a Imola: il focus non elegge se il pilota migliora.
+
+    Il congelamento del metro c'era gia' ma partiva **troppo tardi** — solo dopo
+    che un focus era stato eletto. In fase di valutazione il metro restava quello
+    vivo, che `_rebuild_reference` rifa' dopo ogni giro salvato per inseguire il
+    nuovo migliore: 1:51 -> 1:49 -> 1:48 -> 1:47 sono quattro metri diversi,
+    quindi la finestra si svuotava quattro volte e non arrivava mai ai tre giri
+    che servono per eleggere. Cioe' il focus si spegneva **proprio mentre il
+    pilota migliora**, che e' lo scopo di una sessione di prove.
+
+    A Brands Hatch era passato inosservato solo perche' li' c'erano stati quattro
+    giri senza migliorare, e la finestra aveva fatto in tempo a riempirsi.
+    """
+    from accoach.telemetry.snapshot import TelemetrySnapshot
+
+    class _Dead:
+        def read(self):
+            return TelemetrySnapshot.disconnected()
+
+        def close(self):
+            pass
+
+    eng = CoachEngine(reader=_Dead(), laps_dir=tmp_path)
+    eng._focus = FocusCoach(min_laps=3)
+    ref = synth.build_lap()
+    eng._reference = Reference(ref)
+    eng._corners = detect_corners(ref.samples)
+
+    for i in range(4):
+        eng._observe_lap(synth.build_lap(slow_corner=0, amt=30))
+        # Personal best: il resto dell'app passa al giro nuovo, come fa il motore
+        # dopo ogni giro salvato. Ogni ricostruzione e' un metro diverso.
+        # I passi da 5 sono quello che serve perche' i quattro giri abbiano
+        # davvero quattro tempi diversi: sotto quel passo `synth.build_lap`
+        # arrotonda allo stesso `lap_time_ms` e il motore vedrebbe un metro solo
+        # (misurato: amt 4, 6 e 8 danno tutti 100089).
+        better = synth.build_lap(slow_corner=1, amt=5 * (i + 1))
+        eng._reference = Reference(better)
+        eng._corners = detect_corners(better.samples)
+
+    assert eng._focus.focus is not None, (
+        "quattro giri puliti con la stessa perdita devono eleggere un focus, "
+        "anche se il pilota ha migliorato a ogni giro")
+    eng.close()
+
+
+def test_a_closed_focus_lets_the_reference_go(tmp_path):
+    """Il metro sta fermo per la durata di un ciclo, non per sempre.
+
+    Dato un verdetto (migliorata o parcheggiata) il ciclo e' finito: il prossimo
+    si pesa su oggi, non sul giro con cui misuravamo mezz'ora fa. Lo stato
+    «nessun punto debole ricorrente» invece **non** e' un verdetto e non libera
+    niente: liberarlo li' rifarebbe la regressione, perche' quello stato si
+    ripete a ogni giro e ogni volta ributterebbe la finestra.
+    """
+    from accoach.telemetry.snapshot import TelemetrySnapshot
+    from accoach.coaching.focus import FocusKind
+
+    class _Dead:
+        def read(self):
+            return TelemetrySnapshot.disconnected()
+
+        def close(self):
+            pass
+
+    eng = CoachEngine(reader=_Dead(), laps_dir=tmp_path)
+    eng._focus = FocusCoach(min_laps=3)
+    ref = synth.build_lap()
+    eng._reference = Reference(ref)
+    eng._corners = detect_corners(ref.samples)
+
+    kinds = []
+    for _ in range(12):
+        eng._observe_lap(synth.build_lap(slow_corner=0, amt=30))
+        kinds.append(eng._focus_report.kind)
+        if eng._focus_report.kind in (FocusKind.IMPROVED, FocusKind.STUCK):
+            break
+
+    assert kinds[-1] in (FocusKind.IMPROVED, FocusKind.STUCK), (
+        f"il fixture deve arrivare a un verdetto, non a {kinds}")
+    assert eng._focus_ref is None, "dato il verdetto, il metro si libera"
+    eng.close()
+
+
+def test_no_recurring_weakness_does_not_let_the_reference_go(tmp_path):
+    """«Nessun punto debole ricorrente» non e' un verdetto: non libera il metro.
+
+    E' la trappola gemella della regressione, ed e' il motivo per cui la
+    liberazione guarda il *verdetto* e non `focus is None`: CLEAN si ripete a
+    ogni giro, quindi liberare li' rimetterebbe il metro vivo sotto la finestra e
+    ogni personal best la ributterebbe — il coach resterebbe a «valuto 0/3» per
+    tutta la sessione, che e' esattamente il difetto che questa cura chiude.
+    """
+    from accoach.telemetry.snapshot import TelemetrySnapshot
+    from accoach.coaching.focus import FocusKind
+
+    class _Dead:
+        def read(self):
+            return TelemetrySnapshot.disconnected()
+
+        def close(self):
+            pass
+
+    eng = CoachEngine(reader=_Dead(), laps_dir=tmp_path)
+    eng._focus = FocusCoach(min_laps=3)
+    ref = synth.build_lap()
+    eng._reference = Reference(ref)
+    eng._corners = detect_corners(ref.samples)
+
+    # Un pilota costante che non perde niente di ricorrente, e che migliora.
+    for i in range(5):
+        eng._observe_lap(synth.build_lap())
+        better = synth.build_lap(slow_corner=1, amt=5 * (i + 1))
+        eng._reference = Reference(better)
+        eng._corners = detect_corners(better.samples)
+
+    assert eng._focus_report.kind is FocusKind.CLEAN
+    assert len(eng._focus.window) == 5, (
+        "la finestra deve continuare a riempirsi: nessun giro e' stato buttato")
+    assert eng._focus_ref is not None, "e il metro deve essere ancora appuntato"
     eng.close()
