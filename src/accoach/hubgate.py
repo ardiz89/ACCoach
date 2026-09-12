@@ -49,6 +49,38 @@ LIVE_SAFE_KEYS = {STOP_LIVE, GUIDE, WIZARD, IMPORT_PRO,
 # avvia niente, apre la spiegazione.
 SWAP_OFFER_KEYS = frozenset({("server",), ("web", "--engineer")})
 
+# …ma i due non perdono la stessa cosa, e il dialogo non offre le stesse uscite.
+#
+# La pagina Ingegnere è **due cose in una**: la diagnosi dal vivo, che arriva dal
+# websocket del Backend live (`engineer.js`, porta 8777), e l'editor assetti col
+# registro delle prove e i setup salvati, che stanno tutti sul REST `/api/setup/*`
+# servito dall'app di analisi sulla 8778 — nessun backend di mezzo. La pagina è
+# progettata apposta per reggere a telemetria ferma (`engineer.js:142`, «L'ultimo
+# giro registrato, per quando la telemetria è spenta»). Toglierla durante Coach
+# Live costerebbe più di quanto lo scambio restituisce, quindi resta un'uscita
+# «apri comunque»: metà pagina è meglio di nessuna pagina, se si dice quale metà.
+#
+# Il Backend live non ha una metà da aprire lo stesso: o si accende, o niente.
+# Da qui l'asimmetria — che è una regola, non un `if` nel codice di disegno.
+OPEN_ANYWAY_KEYS = frozenset({("web", "--engineer")})
+
+
+def opens_anyway(key: object) -> bool:
+    """Questo bottone ha ancora qualcosa da dare senza il Backend live?
+
+    L'uscita di comodo può essere offerta **solo** a ciò che durante Coach Live
+    era già sicuro e non registra niente: aprirla non deve poter diventare, per
+    distrazione, il secondo motore che salva ogni giro due volte.
+    """
+    return key in OPEN_ANYWAY_KEYS
+
+
+# Le tre uscite del dialogo. `CANCEL` è anche quella di sicurezza: Esc, la X
+# della finestra, e qualunque modo di chiudere senza scegliere.
+SWAP = "swap"
+OPEN_ANYWAY = "open_anyway"
+CANCEL = "cancel"
+
 # I tre stati di un bottone. `EXPLAIN` è il nuovo: acceso ma non fa la sua cosa.
 CLICKABLE = "clickable"
 EXPLAIN = "explain"
@@ -114,7 +146,8 @@ def swap_is_safe(running: Iterable[Sequence[str]]) -> bool:
 # sparse nel launcher perché il test che controlla «esiste in tutte le lingue»
 # deve poterle leggere senza aprire Qt.
 SWAP_TEXT_KEYS = ("swap.title", "swap.why", "swap.warn", "swap.confirm",
-                  "swap.cancel", "swap.failed", "swap.tooltip")
+                  "swap.cancel", "swap.failed", "swap.tooltip",
+                  "swap.open_anyway", "swap.open_anyway_why")
 
 
 def swap_text(lang: str | None = None) -> dict[str, str]:

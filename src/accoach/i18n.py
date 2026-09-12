@@ -386,6 +386,23 @@ _UI: dict[str, dict[str, str]] = {
               "stato avviato — due registratori avrebbero salvato ogni giro "
               "due volte. Premi Ferma Coach Live, aspetta che la sua finestra "
               "si chiuda, e riprova."},
+    # La terza uscita. La pagina Ingegnere è due cose in una: senza il Backend
+    # live perde la diagnosi dal vivo, ma l'editor assetti, il registro delle
+    # prove e i setup salvati stanno sul REST dell'app di analisi e ci sono lo
+    # stesso — la pagina è fatta apposta per reggere a telemetria spenta. Dire
+    # «funziona a metà» non aiuta nessuno: la frase dice **quale** metà.
+    "swap.open_anyway": {"en": "Open the page anyway",
+                         "it": "Apri comunque la pagina"},
+    "swap.open_anyway_why": {
+        "en": "Open it anyway and you keep the setup editor, the engineer's "
+              "test log and every setup you've saved — the page serves those "
+              "from the analysis app on its own. What stays empty is the live "
+              "diagnosis: that half is the one the live backend feeds.",
+        "it": "Aprendola comunque hai l'editor assetti, il registro delle "
+              "prove dell'Ingegnere e tutti i setup che hai salvato — quella "
+              "parte la pagina la serve da sola, dall'app di analisi. Quello "
+              "che resta vuoto è la diagnosi dal vivo: quella metà la alimenta "
+              "il Backend live."},
     "swap.tooltip": {
         "en": "Coach Live is running. Click to read why this can't start "
               "alongside it — and to swap over in one step.",

@@ -51,14 +51,18 @@ from .watch import POLL_MS, GameWatcher, game_is_running
 from .hub_home import HomePanel
 from .hubgate import (
     BLOCKED,
+    CANCEL,
     EXPLAIN,
     GUIDE as _GUIDE,
+    OPEN_ANYWAY,
+    SWAP,
     IMPORT_PRO as _IMPORT_PRO,
     LIVE_SAFE_KEYS as _LIVE_SAFE_KEYS,
     RECORDING_CMDS,
     STOP_LIVE as _STOP_LIVE,
     WIZARD as _WIZARD,
     button_state,
+    opens_anyway,
     swap_is_safe,
     swap_plan,
     swap_text,
@@ -206,22 +210,30 @@ def _open_guide() -> None:
 
 
 class SwapToBackend(QDialog):
-    """Perché il Backend live non parte, e l'offerta di scambiarlo con un click.
+    """Perché il Backend live non parte, e le uscite che restano.
 
-    Tre blocchi, in quest'ordine, perché è l'ordine delle domande di chi ha
-    appena premuto: *perché no*, *cosa succede se accetto*, *accetto o no*.
+    I blocchi seguono l'ordine delle domande di chi ha appena premuto: *perché
+    no*, *cosa succede se scambio*, *cosa ottengo se apro lo stesso*, *scelgo*.
     L'avviso non è un dettaglio: Coach Live è un pacchetto solo, il Backend live
     sono tre processi separati e l'overlay non è fra quelli che avvia lo
     scambio. Presentare un cambio di architettura come un click è il secondo
     difetto della stessa famiglia del primo.
+
+    Le uscite sono due o tre a seconda di `open_anyway`, che il chiamante prende
+    da :func:`accoach.hubgate.opens_anyway` — la pagina Ingegnere ha una metà
+    che vive senza backend, il Backend live non ha niente da aprire lo stesso.
+    L'esito si legge in :attr:`choice`, e chiudere in qualunque altro modo
+    (Esc, la X) lascia `CANCEL`: l'uscita di sicurezza non deve avviare niente.
     """
 
-    def __init__(self, parent: QWidget | None = None) -> None:
+    def __init__(self, parent: QWidget | None = None, *,
+                 open_anyway: bool = False) -> None:
         super().__init__(parent)
         txt = swap_text()
+        self.choice = CANCEL
         self.setWindowTitle(txt["title"])
         self.setModal(True)
-        self.resize(520, 360)
+        self.resize(560, 420 if open_anyway else 360)
         lay = QVBoxLayout(self)
         lay.setContentsMargins(24, 24, 24, 20)
         lay.setSpacing(12)
@@ -239,19 +251,33 @@ class SwapToBackend(QDialog):
         warn.setWordWrap(True)
         warn.setProperty("role", "muted")
         lay.addWidget(warn)
+
+        if open_anyway:
+            half = QLabel(txt["open_anyway_why"])
+            half.setWordWrap(True)
+            half.setProperty("role", "muted")
+            lay.addWidget(half)
         lay.addStretch(1)
 
         row = QHBoxLayout()
         cancel = QPushButton(txt["cancel"])
         cancel.clicked.connect(self.reject)
+        row.addWidget(cancel)
+        row.addStretch(1)
+        if open_anyway:
+            keep = QPushButton(txt["open_anyway"])
+            keep.clicked.connect(partial(self._chose, OPEN_ANYWAY))
+            row.addWidget(keep)
         go = QPushButton(txt["confirm"])
         go.setProperty("accent", True)
         go.setDefault(True)
-        go.clicked.connect(self.accept)
-        row.addWidget(cancel)
-        row.addStretch(1)
+        go.clicked.connect(partial(self._chose, SWAP))
         row.addWidget(go)
         lay.addLayout(row)
+
+    def _chose(self, choice: str) -> None:
+        self.choice = choice
+        self.accept()
 
 
 class SwapFailed(QDialog):
@@ -845,7 +871,7 @@ class MainWindow(QWidget):
         state = button_state(key, live=self._live_running(),
                              busy=self._is_recording())
         if state == EXPLAIN:
-            self._offer_swap()
+            self._offer_swap(key, args, console)
             return
         if state == BLOCKED:
             return
@@ -855,16 +881,25 @@ class MainWindow(QWidget):
         """La pagina Ingegnere, dallo stesso cancello del bottone in Setup."""
         self._on_action(("web", "--engineer"), ["web", "--engineer"], False)
 
-    def _offer_swap(self) -> None:
-        """Spiega, chiedi, e solo se l'utente accetta fai lo scambio."""
-        if not self._ask_swap():
-            return
-        self._do_swap()
+    def _offer_swap(self, key: tuple, args: list[str], console: bool) -> None:
+        """Spiega, chiedi, e fai quello che l'utente ha scelto.
 
-    def _ask_swap(self) -> bool:
+        Tre esiti. `OPEN_ANYWAY` avvia il bottone come se niente fosse — è già
+        fra i sicuri durante Coach Live, quindi non ferma niente e non accende
+        nessun secondo motore: apre la metà di pagina che vive senza backend.
+        """
+        choice = self._ask_swap(key)
+        if choice == SWAP:
+            self._do_swap()
+        elif choice == OPEN_ANYWAY:
+            self._spawn(args, console)
+
+    def _ask_swap(self, key: tuple) -> str:
         """Il dialogo. Isolato in un metodo suo così la decisione a monte e la
         sequenza a valle si possono provare senza aprire una finestra."""
-        return SwapToBackend(self).exec() == QDialog.Accepted
+        dlg = SwapToBackend(self, open_anyway=opens_anyway(key))
+        dlg.exec()
+        return dlg.choice
 
     def _swap_failed(self) -> None:
         SwapFailed(self).exec()

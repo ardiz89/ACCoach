@@ -84,6 +84,24 @@ def test_the_swap_brings_up_the_backend_and_the_engineer_page():
     assert ("web", "--engineer") in started
 
 
+def test_only_the_engineer_page_can_be_opened_anyway():
+    """La pagina Ingegnere sono due cose in una: la diagnosi dal vivo (che senza
+    il Backend live non c'è) e l'editor assetti, il registro delle prove e i
+    setup salvati — che stanno sul REST dell'app di analisi e non hanno bisogno
+    di niente. Il Backend live invece non ha una metà da aprire lo stesso."""
+    assert hubgate.opens_anyway(("web", "--engineer")) is True
+    assert hubgate.opens_anyway(("server",)) is False
+
+
+def test_open_anyway_is_only_ever_offered_for_something_harmless():
+    """La regola, non l'elenco: si può offrire «apri comunque» solo a ciò che è
+    già sicuro durante Coach Live e non registra nulla. Se un domani qualcuno
+    aggiunge una chiave all'uscita di comodo, questo test glielo chiede."""
+    for key in hubgate.OPEN_ANYWAY_KEYS:
+        assert key in LIVE_SAFE_KEYS, key
+        assert key[0] not in RECORDING_CMDS, key
+
+
 def test_the_swap_refuses_to_start_next_to_anything_that_records():
     """La guardia vera: se Coach Live non è morto davvero, il backend non parte."""
     assert swap_is_safe([]) is True
@@ -107,6 +125,16 @@ def test_the_warning_names_the_overlay_before_it_disappears(lang):
     assert "overlay" in swap_text(lang)["warn"].lower()
 
 
+@pytest.mark.parametrize("lang", ("en", "it"))
+def test_open_anyway_says_which_half_you_get_and_which_you_lose(lang):
+    """Non «funziona a metà»: quale metà. L'editor assetti sì, la diagnosi dal
+    vivo no."""
+    line = swap_text(lang)["open_anyway_why"].lower()
+    wanted = (("setup", "live"), ("assetti", "vivo"))[lang == "it"]
+    for word in wanted:
+        assert word in line, (lang, word)
+
+
 def test_the_swap_speaks_every_language_the_app_has():
     """Una funzionalità che esiste solo in italiano è già stata un difetto."""
     from accoach.i18n import LANGUAGES, _UI
@@ -122,5 +150,6 @@ def test_the_two_languages_are_actually_two():
     passerebbe lo stesso guardando solo `t()`. Qui si controlla che siano
     testi diversi, non la stessa frase due volte."""
     en, it = swap_text("en"), swap_text("it")
-    for field in ("title", "why", "warn", "confirm", "cancel", "failed"):
+    for field in ("title", "why", "warn", "confirm", "cancel", "failed",
+                  "open_anyway", "open_anyway_why"):
         assert en[field] != it[field], field
