@@ -19,15 +19,61 @@ Da qui le tre proprietà che questi test difendono: si conta **tutto** quello
 che il payload contiene, il posto di un file conta quanto il suo nome, e
 l'elenco vive in **un** posto solo.
 """
+import re
 import sys
 from pathlib import Path
 
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
+RELEASE = ROOT / ".github" / "workflows" / "release.yml"
 sys.path.insert(0, str(ROOT / "tools"))   # come fa `test_trackdata` per l'atlante
 
 from verify_bundle import check, declared   # noqa: E402
+
+
+def _steps(path: Path) -> list[str]:
+    """Gli step del workflow, uno per blocco di testo.
+
+    Fatto a mano invece che con PyYAML di proposito: questo progetto tiene le
+    dipendenze al minimo (a runtime c'e' `rich` e poco altro), e tre asserzioni
+    su un file che scriviamo noi non valgono una libreria in piu' -- che poi
+    andrebbe installata in CI, cioe' un'altra riga da tenere allineata a mano.
+    La prima stesura la usava e la CI e' caduta con `No module named yaml`:
+    girava solo sulla mia macchina.
+
+    Si divide sul `- name:` degli step, che e' l'unico livello di indentazione
+    che ci serve distinguere.
+    """
+    testo = path.read_text(encoding="utf-8")
+    pezzi = re.split(r"\n(?=      - (?:name|uses):)", testo)
+    return pezzi[1:]          # il primo pezzo e' l'intestazione del workflow
+
+
+def _step_con(path: Path, ago: str) -> str:
+    """Lo step che contiene `ago` (es. il nome di un'action). Vuoto se nessuno."""
+    return next((s for s in _steps(path) if ago in s), "")
+
+
+def _righe_run(path: Path) -> str:
+    """Solo le righe che il runner ESEGUE, commenti esclusi.
+
+    Il testo delle note di rilascio non e' escluso per comodita': **linka**
+    `docs/FAQ.md` su GitHub, che e' un rimando a un documento, non una
+    dichiarazione di cosa entra nel pacchetto. Una regola che confonde le due
+    cose obbliga a togliere un link utile per far tacere un test.
+    """
+    fuori, dentro = [], False
+    for riga in path.read_text(encoding="utf-8").splitlines():
+        if re.match(r"\s+run: \|", riga):
+            dentro = True
+            continue
+        if dentro:
+            if riga.strip() and not riga.startswith(" " * 10):
+                dentro = False
+            elif not riga.lstrip().startswith("#"):
+                fuori.append(riga)
+    return "\n".join(fuori)
 
 
 def _fake_spec(tmp_path: Path) -> Path:
@@ -121,21 +167,7 @@ def test_il_workflow_non_tiene_una_seconda_copia_dell_elenco():
     PowerShell. Questa vieta la sostanza: nessun percorso dichiarato nel
     `.spec` può comparire nelle righe eseguibili del workflow.
     """
-    import yaml
-
-    wf = yaml.safe_load((ROOT / ".github" / "workflows" / "release.yml")
-                        .read_text(encoding="utf-8"))
-    # Solo i `run:`, cioè gli script che il runner esegue. È lì che una lista
-    # di payload può vivere e sbagliare — nelle due volte in cui è successo era
-    # una riga di comando. Il testo delle note di rilascio non è escluso per
-    # comodità: **linka** `docs/FAQ.md` su GitHub, che è un rimando a un
-    # documento, non una dichiarazione di cosa entra nel pacchetto. Una regola
-    # che confonde le due cose obbliga a togliere un link utile per far tacere
-    # un test.
-    script = "\n".join(
-        "\n".join(l for l in str(s["run"]).splitlines()
-                  if not l.lstrip().startswith("#"))
-        for s in wf["jobs"]["build-windows"]["steps"] if "run" in s)
+    script = _righe_run(RELEASE)
     for src, dest in declared(ROOT / "HONE.spec"):
         assert src not in script, (
             f"«{src}» e' riscritto negli script del workflow: e' la seconda "
@@ -178,21 +210,13 @@ def test_lo_zip_si_carica_anche_quando_il_controllo_boccia():
     dopo la verifica e senza `if: always()`: nel solo caso in cui vuoi aprire
     lo ZIP per capire cosa manca, non veniva caricato.
     """
-    import yaml
-
-    wf = yaml.safe_load((ROOT / ".github" / "workflows" / "release.yml")
-                        .read_text(encoding="utf-8"))
-    steps = wf["jobs"]["build-windows"]["steps"]
-    upload = next(s for s in steps if "upload-artifact" in str(s.get("uses", "")))
-    assert upload.get("if") == "always()"
+    upload = _step_con(RELEASE, "upload-artifact")
+    assert upload, "lo step che carica l'artifact non c'e' piu'"
+    assert "if: always()" in upload
 
 
 def test_la_pubblicazione_resta_appesa_al_tag():
     """La differenza fra provare e spedire è una riga, e va difesa."""
-    import yaml
-
-    wf = yaml.safe_load((ROOT / ".github" / "workflows" / "release.yml")
-                        .read_text(encoding="utf-8"))
-    steps = wf["jobs"]["build-windows"]["steps"]
-    publish = next(s for s in steps if "gh-release" in str(s.get("uses", "")))
-    assert "refs/tags/" in publish.get("if", "")
+    publish = _step_con(RELEASE, "gh-release")
+    assert publish, "lo step che pubblica la release non c'e' piu'"
+    assert "if: startsWith(github.ref, 'refs/tags/')" in publish
