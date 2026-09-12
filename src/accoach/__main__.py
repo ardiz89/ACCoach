@@ -107,7 +107,9 @@ Validation — these read the live game, so the sim must be running:
   setup <list|show|bump|undo>  read and edit an ACC setup file, no game running
                              (`{prog} setup bump --help` for the arguments)
   selftest                   check the TTS voice, write a report (works windowed)
-  logs                       open the folder with logs and crash reports
+  logs [--zip]               open the folder with logs and crash reports
+                             --zip: one file to attach to a bug report (logs +
+                             version, commit, python/OS, last cars and tracks)
   test-panel [--top N]       step-by-step panel for on-track test protocols
                              (reads test_step.json; opens no telemetry, no socket)
                              --top N: pixels below the top edge, to clear the HUD
@@ -201,6 +203,12 @@ def main() -> None:
     elif cmd == "logs":
         import os
         from .paths import logs_dir
+        if any(a.lower() in ("--zip", "-z", "zip") for a in rest):
+            # Impacchetta invece di aprire: e' cio' che si allega a una
+            # segnalazione. `logs` da solo continua a fare quello di sempre.
+            from .support import build_log_zip
+            print(f"Log bundle: {build_log_zip()}")
+            return
         d = logs_dir()
         d.mkdir(parents=True, exist_ok=True)
         print(f"Logs: {d}")

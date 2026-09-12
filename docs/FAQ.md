@@ -398,7 +398,15 @@ the **system** voice, which is more robotic. Work in progress — it changes how
 it sounds, not what you're told.
 
 **Where are the logs if something breaks?**
-`python -m accoach logs` opens the folder with logs and crash reports.
+`logs` opens the folder with logs and crash reports. To send them to us, `logs
+--zip` packages them into a single file in `Documents\ACCoach\`, together with
+the version, the commit, your Python/Windows versions and the last cars and
+tracks you drove — nothing else, no paths and no account details. It writes the
+zip even when there are no logs at all, and says so inside: "no logs" and "I
+didn't collect them" are different answers.
+
+(Type the command the way `help` shows it: `HONE.exe logs --zip` from the
+packaged app, `python accoach_main.py logs --zip` from a source checkout.)
 
 ---
 
