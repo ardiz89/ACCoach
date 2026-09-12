@@ -415,15 +415,36 @@ def test_no_recurring_weakness_does_not_let_the_reference_go(tmp_path):
     eng.close()
 
 
-# --- i giri scartati si contano --------------------------------------------
+# --- i giri scartati si contano, e si contano sulla finestra ----------------
 #
 # Il coach scarta i giri non puliti (un'escursione gonfia la perdita di OGNI
 # curva e inventerebbe una debolezza) e finora lo faceva in silenzio. Il 01/09,
 # su 14 giri 6 erano sporchi — i due piu' veloci compresi — e il focus e' rimasto
-# in `assess` per tutta la sessione senza che nessuno potesse dire perche'. Il
-# conto e' l'unica cosa che rende leggibile quella sessione dopo.
+# in `assess` per tutta la sessione senza che nessuno potesse dire perche'.
+#
+# Il conto esiste solo per essere letto, e chi lo legge lo divide per i giri che
+# il coach ha in mano: deve percio' misurare lo STESSO span della finestra. La
+# prima versione contava di sessione mentre la finestra scorreva in silenzio
+# (`self.window[-_WINDOW:]`): su 60 giri alternati stampava «scartati=30» accanto
+# a una finestra di 6, e i 20 giri buttati prima che la finestra cominciasse si
+# trascinavano dietro per sempre. Non era un difetto di comportamento — il conto
+# non entra in nessuna decisione — era un numero che mentiva a chi lo leggeva.
 #
 # Quali giri contano non cambia: qui si conta soltanto.
+
+def _scarti_veri(fc: FocusCoach, dati) -> int:
+    """L'oracolo: quanti sporchi sono passati DOPO il giro piu' vecchio che il
+    coach ha ancora in finestra.
+
+    Ricavato dalla sequenza davvero somministrata e da `fc.window`, non dalla
+    formula del contatore: se domani la formula si stacca di nuovo dalla
+    finestra, questo numero resta quello giusto e il confronto cade.
+    """
+    if not fc.window:
+        return sum(1 for _, pulito in dati if not pulito)
+    primo = next(i for i, (d, _) in enumerate(dati) if d is fc.window[0])
+    return sum(1 for _, pulito in dati[primo + 1:] if not pulito)
+
 
 def test_un_giro_non_pulito_si_conta_fra_gli_scartati():
     fc = FocusCoach(min_laps=3)
@@ -435,35 +456,121 @@ def test_un_giro_non_pulito_si_conta_fra_gli_scartati():
     assert len(fc.window) == 1, "e restano scartati davvero"
 
 
-def test_il_conto_si_azzera_quando_il_ciclo_si_chiude():
-    """Il ciclo si chiude su un verdetto, e gli scartati sono di quel ciclo."""
-    fc = FocusCoach(min_laps=3)
-    _feed(fc, _debrief(_loss(0, 300)), 3)              # BRIEF
-    fc.observe(_debrief(_loss(0, 9000)), stable=False)
-    assert fc.discarded == 1
-    report = _feed(fc, _debrief(_loss(0, 20)), 3)      # IMPROVED
-    assert report.kind is FocusKind.IMPROVED
-    assert fc.discarded == 0
+def test_su_sessanta_giri_alternati_il_conto_e_quello_della_finestra():
+    """Lo scenario che ha smascherato la prima versione: 30 contro 6.
 
-
-def test_il_conto_si_azzera_anche_sul_focus_parcheggiato():
-    fc = FocusCoach(min_laps=3)
-    _feed(fc, _debrief(_loss(0, 300)), 3)              # BRIEF
-    fc.observe(_debrief(_loss(0, 9000)), stable=False)
-    assert fc.discarded == 1
-    report = _feed(fc, _debrief(_loss(0, 300)), 6)     # STUCK
-    assert report.kind is FocusKind.STUCK
-    assert fc.discarded == 0
-
-
-def test_su_pulito_il_conto_non_si_azzera():
-    """La trappola gemella della regressione del metro (PR #92).
-
-    CLEAN non e' un verdetto: e' uno stato che si ripete a ogni giro. Azzerare
-    li' vorrebbe dire che il pilota che gira sporco meta' delle volte e non ha
-    debolezze ricorrenti legge sempre «scartati=1» e non sa mai quanti giri ha
-    buttato — cioe' esattamente la domanda a cui questa riga deve rispondere.
+    Il confronto non e' con un numero atteso a mano ma con la finestra vera:
+    l'oracolo va a vedere qual e' il giro piu' vecchio che il coach ha ancora, e
+    conta gli sporchi da li' in poi.
     """
+    fc = FocusCoach(min_laps=3)
+    dati = []
+    for i in range(60):
+        pulito = (i % 2 == 0)
+        d = _debrief(_loss(0, 300))
+        dati.append((d, pulito))
+        fc.observe(d, stable=pulito)
+    assert len(fc.window) == 6
+    assert fc.discarded == _scarti_veri(fc, dati)
+    assert fc.discarded != 30, "il conto e' tornato a essere quello di sessione"
+
+
+def test_gli_scarti_di_prima_della_finestra_non_la_seguono():
+    """Venti giri buttati, poi sei puliti: quei venti non dicono piu' niente su
+    cio' che il coach ha in mano, e restarci attaccati e' l'unico modo che il
+    numero ha di mentire senza sembrare sbagliato."""
+    fc = FocusCoach(min_laps=3)
+    dati = []
+
+    def _giro(pulito: bool):
+        d = _debrief(_loss(0, 300))
+        dati.append((d, pulito))
+        fc.observe(d, stable=pulito)
+
+    for _ in range(20):
+        _giro(False)
+    assert fc.discarded == 20, "finestra vuota: non c'e' niente da cui contare"
+    for _ in range(6):
+        _giro(True)
+    _giro(False)
+    assert fc.discarded == _scarti_veri(fc, dati)
+    assert fc.discarded == 1
+
+
+def test_gli_scarti_della_valutazione_non_seguono_dentro_il_ciclo():
+    """Il caso che attraversa il BRIEF.
+
+    Sette giri buttati mentre valutavo non sono sette giri buttati
+    sull'esercizio che sto assegnando adesso: la riga li mostrerebbe accanto a
+    nome, tema e perdita di un focus appena aperto.
+    """
+    fc = FocusCoach(min_laps=3)
+    dati = []
+    for _ in range(7):
+        d = _debrief(_loss(0, 9000))
+        dati.append((d, False))
+        fc.observe(d, stable=False)
+    report = None
+    for _ in range(3):
+        d = _debrief(_loss(0, 300))
+        dati.append((d, True))
+        report = fc.observe(d)
+    assert report.kind is FocusKind.BRIEF
+    d = _debrief(_loss(0, 9000))
+    dati.append((d, False))
+    fc.observe(d, stable=False)
+    assert fc.discarded == _scarti_veri(fc, dati)
+    assert fc.discarded == 1
+
+
+def test_un_verdetto_non_azzera_il_conto_perche_non_azzera_la_finestra():
+    """Il conto non e' un contatore che qualcuno deve ricordarsi di azzerare al
+    momento giusto: e' una lettura della finestra, e la finestra un verdetto non
+    la tocca. Il giro sporco di meta' esercizio e' ancora dentro lo span dei sei
+    giri su cui il prossimo focus verra' scelto, quindi si vede ancora."""
+    fc = FocusCoach(min_laps=3)
+    dati = []
+
+    def _giro(pulito: bool, ms: float):
+        d = _debrief(_loss(0, ms))
+        dati.append((d, pulito))
+        return fc.observe(d, stable=pulito)
+
+    for _ in range(3):
+        report = _giro(True, 300)
+    assert report.kind is FocusKind.BRIEF
+    _giro(False, 9000)
+    for _ in range(3):
+        report = _giro(True, 20)
+    assert report.kind is FocusKind.IMPROVED
+    assert fc.discarded == _scarti_veri(fc, dati) == 1
+
+
+def test_e_se_ne_va_quando_la_finestra_gli_scorre_oltre():
+    """L'altra faccia: il giro sporco sparisce dal conto quando la finestra lo
+    supera, non quando un verdetto lo dichiara chiuso."""
+    fc = FocusCoach(min_laps=3)
+    dati = []
+
+    def _giro(pulito: bool, ms: float):
+        d = _debrief(_loss(0, ms))
+        dati.append((d, pulito))
+        return fc.observe(d, stable=pulito)
+
+    for _ in range(3):
+        _giro(True, 300)                    # BRIEF
+    _giro(False, 9000)
+    for _ in range(6):
+        report = _giro(True, 300)           # STUCK
+    assert report.kind is FocusKind.STUCK
+    assert fc.discarded == _scarti_veri(fc, dati) == 0
+
+
+def test_su_pulito_il_conto_non_riparte():
+    """CLEAN non e' un verdetto ed e' uno stato che si ripete a ogni giro: se il
+    conto ripartisse li', chi gira sporco meta' delle volte leggerebbe sempre
+    «scartati=1». Ora non puo' per costruzione — non c'e' nessun azzeramento da
+    piazzare nel posto sbagliato — e questa prova lo tiene fermo."""
     fc = FocusCoach(min_laps=3)
     for _ in range(3):
         fc.observe(_debrief())                         # niente da eleggere
@@ -475,8 +582,8 @@ def test_su_pulito_il_conto_non_si_azzera():
     assert fc.discarded == 2
 
 
-def test_un_metro_nuovo_azzera_anche_il_conto():
-    """Gli scartati sono scartati *da questa finestra*, e la finestra e' andata."""
+def test_un_metro_nuovo_si_porta_via_anche_il_conto():
+    """Gli scartati descrivono una finestra, e quella finestra non c'e' piu'."""
     fc = FocusCoach(min_laps=3)
     fc.observe(_debrief(_loss(0, 500)), reference="giro-A")
     fc.observe(_debrief(_loss(0, 9000)), stable=False, reference="giro-A")

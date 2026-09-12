@@ -181,8 +181,16 @@ def _focus_log_line(report: FocusReport | None, *, counted: bool = True,
     usciva identica a quella del giro prima. Il 01/09 su 14 giri 6 erano sporchi,
     i due piu' veloci compresi: dieci righe «valuto 2/3» di fila, e nessun modo
     di sapere se il coach stava aspettando o era rotto. ``counted=False`` lo
-    dice, e ``discarded`` dice quanti ne ha buttati in questa finestra — perche'
-    un giro solo e' sfortuna, sei su quattordici sono la sessione.
+    dice, e ``discarded`` dice quanti ne ha buttati — perche' un giro solo e'
+    sfortuna, meta' dei giri e' la sessione.
+
+    Quel numero e' misurato sulla **finestra**, non sulla sessione: sono i
+    giri buttati da quando e' stato contato il piu' vecchio dei giri su cui il
+    coach sta decidendo (vedi :attr:`FocusCoach.discarded`). E' la lettura che
+    un numero accanto a `stato=assess` invita comunque a fare — dividerlo per i
+    giri che il coach ha in mano — e per reggerla dev'essere lo stesso span.
+    Il totale di sessione resta leggibile lo stesso: c'e' una riga per ogni
+    giro scartato, e si contano.
     """
     focus = report.focus if report else None
     if focus is None:
