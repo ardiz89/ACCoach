@@ -45,14 +45,50 @@ jobs:
         id: pack
         shell: pwsh
         run: |
-          $zip = "HONE-${{ github.ref_name }}-windows.zip"
+          # Il ref finisce nel NOME di un file: su un tag e' `v0.1.0`, ma sul giro
+          # a vuoto e' un ramo, e un ramo qui si chiama `fix/prova-di-build`. La
+          # barra e' un separatore di cartelle, non un carattere: senza questa
+          # riga la prova cadeva sul nome dello ZIP invece che sul build.
+          $ref = "${{ github.ref_name }}" -replace '[^A-Za-z0-9._-]', '-'
+          $zip = "HONE-$ref-windows.zip"
           Compress-Archive -Path dist/HONE/* -DestinationPath $zip
           $sha = (Get-FileHash $zip -Algorithm SHA256).Hash
           "zip=$zip"   | Out-File -FilePath $env:GITHUB_OUTPUT -Append
           "sha=$sha"   | Out-File -FilePath $env:GITHUB_OUTPUT -Append
           Write-Host "SHA256  $sha  $zip"
 
+      # PyInstaller perde un payload in silenzio: il build resta verde e a
+      # degradare e' una funzione (senza docs/FAQ.md la guida inglese diventa
+      # italiana, senza voice_cues_male la voce maschile torna robotica). E'
+      # gia' successo due volte.
+      #
+      # Il controllo NON ha una lista sua: legge i payload dal .spec, che e' la
+      # lista da cui l'EXE e' appena stato costruito. Riscriverli qui sarebbe la
+      # terza copia, cioe' il difetto che questo step esiste per chiudere -- ed
+      # e' quello che la prima stesura di questo step aveva fatto.
+      - name: Verify the bundle carries what the spec declares
+        run: python tools/verify_bundle.py dist/HONE HONE.spec
+
+      # Sempre, anche sul giro a vuoto: e' il senso della prova. Da qui lo ZIP si
+      # scarica e si apre senza che niente sia stato pubblicato fuori dal repo.
+      # `always()` non e' un dettaglio: il pacchetto che vuoi davvero aprire e'
+      # quello che il controllo ha appena bocciato. Senza, l'unico caso in cui
+      # lo ZIP serve e' l'unico in cui non lo trovi.
+      - name: Upload the build for inspection
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: HONE-build-${{ github.sha }}
+          path: ${{ steps.pack.outputs.zip }}
+          retention-days: 14
+
+      # SOLO sui tag. Senza questa guardia il `workflow_dispatch` dichiarato qui
+      # sopra -- che esiste apposta per provare il build senza spedire niente --
+      # arrivava fin qui con `github.ref_name` uguale al RAMO, e pubblicava una
+      # release pubblica intitolata «HONE main». Un giro di prova non deve poter
+      # spedire: la differenza fra provare e pubblicare e' questa riga.
       - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           files: ${{ steps.pack.outputs.zip }}
