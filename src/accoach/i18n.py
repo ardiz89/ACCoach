@@ -341,6 +341,76 @@ _UI: dict[str, dict[str, str]] = {
         "it": "Qualcosa sta già registrando questa sessione. Due registratori "
               "salvano ogni giro due volte, e la copia è identica a un giro vero "
               "in più — ferma prima quello acceso."},
+    # --- lo scambio Coach Live → Backend live ------------------------------
+    # Il briefing ai box manda il pilota sulla pagina Ingegnere, che è alimentata
+    # solo dal Backend live; e il Backend live non può stare acceso insieme a
+    # Coach Live. Finché queste frasi non c'erano, il bottone era spento e muto:
+    # il coach mandava l'utente contro un muro e il muro non diceva niente.
+    "swap.title": {
+        "en": "The live backend can't run next to Coach Live",
+        "it": "Il Backend live non può girare insieme a Coach Live"},
+    "swap.why": {
+        "en": "The Engineer page is fed by the live backend, and the live "
+              "backend records laps exactly like Coach Live does. With both of "
+              "them running, every lap you drive is saved twice — and the copy "
+              "looks exactly like a real extra lap, so afterwards there is no "
+              "telling them apart. That's why this button isn't simply there "
+              "for the taking.",
+        "it": "La pagina Ingegnere la alimenta il Backend live, e il Backend "
+              "live registra i giri esattamente come fa Coach Live. Accesi "
+              "tutti e due, ogni giro che guidi viene salvato due volte — e la "
+              "copia è identica a un giro vero in più, quindi dopo non si "
+              "distinguono. Per questo il bottone non è lì da premere e basta."},
+    "swap.warn": {
+        "en": "Swapping stops Coach Live and starts the live backend in its "
+              "place: the coach still talks and the Engineer page comes alive, "
+              "but the overlay closes with Coach Live — no HUD on track. The "
+              "live backend is three separate pieces (backend, overlay, web "
+              "page), not one package: you can bring the overlay back from "
+              "Devices, on its own.",
+        "it": "Lo scambio ferma Coach Live e avvia al suo posto il Backend "
+              "live: il coach parla lo stesso e la pagina Ingegnere si "
+              "alimenta, ma l'overlay si spegne insieme a Coach Live — in "
+              "pista niente HUD. Il Backend live sono tre pezzi separati "
+              "(backend, overlay, pagina web), non un pacchetto solo: "
+              "l'overlay lo riaccendi da Dispositivi, per conto suo."},
+    # Senza glifo: `⇄` (U+21C4) non c'è nei font del brand né nel ripiego di
+    # sistema, e a schermo usciva come un rettangolo vuoto davanti alla frase.
+    "swap.confirm": {"en": "Stop Coach Live and switch",
+                     "it": "Ferma Coach Live e passa"},
+    # Etichette corte di proposito: tre bottoni con frasi intere spingevano la
+    # finestra a 685 px in italiano, cioè righe lunghe e faticose. Cosa fa
+    # ciascuna uscita lo dicono i paragrafi sopra, non il bottone.
+    "swap.cancel": {"en": "Cancel", "it": "Annulla"},
+    "swap.failed": {
+        "en": "Coach Live is still running, so the live backend was NOT "
+              "started — two recorders would have saved every lap twice. Press "
+              "Stop Coach Live, wait for its window to close, and try again.",
+        "it": "Coach Live sta ancora girando, quindi il Backend live NON è "
+              "stato avviato — due registratori avrebbero salvato ogni giro "
+              "due volte. Premi Ferma Coach Live, aspetta che la sua finestra "
+              "si chiuda, e riprova."},
+    # La terza uscita. La pagina Ingegnere è due cose in una: senza il Backend
+    # live perde la diagnosi dal vivo, ma l'editor assetti, il registro delle
+    # prove e i setup salvati stanno sul REST dell'app di analisi e ci sono lo
+    # stesso — la pagina è fatta apposta per reggere a telemetria spenta. Dire
+    # «funziona a metà» non aiuta nessuno: la frase dice **quale** metà.
+    "swap.open_anyway": {"en": "Open anyway", "it": "Apri comunque"},
+    "swap.open_anyway_why": {
+        "en": "Open it anyway and you keep the setup editor, the engineer's "
+              "test log and every setup you've saved — the page serves those "
+              "from the analysis app on its own. What stays empty is the live "
+              "diagnosis: that half is the one the live backend feeds.",
+        "it": "Aprendola comunque hai l'editor assetti, il registro delle "
+              "prove dell'Ingegnere e tutti i setup che hai salvato — quella "
+              "parte la pagina la serve da sola, dall'app di analisi. Quello "
+              "che resta vuoto è la diagnosi dal vivo: quella metà la alimenta "
+              "il Backend live."},
+    "swap.tooltip": {
+        "en": "Coach Live is running. Click to read why this can't start "
+              "alongside it — and to swap over in one step.",
+        "it": "Coach Live è acceso. Premi per leggere perché questo non può "
+              "partirgli accanto — e per fare lo scambio in un passo."},
     "set.pedals": {"en": "Show the pedal trace", "it": "Mostra la traccia dei pedali"},
     "set.pedals.help": {
         "en": "A strip under the overlay with your throttle (green) and brake "
