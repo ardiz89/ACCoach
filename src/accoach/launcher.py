@@ -49,6 +49,20 @@ from . import brand
 from .config import load_config, save_config, set_language
 from .watch import POLL_MS, GameWatcher, game_is_running
 from .hub_home import HomePanel
+from .hubgate import (
+    BLOCKED,
+    EXPLAIN,
+    GUIDE as _GUIDE,
+    IMPORT_PRO as _IMPORT_PRO,
+    LIVE_SAFE_KEYS as _LIVE_SAFE_KEYS,
+    RECORDING_CMDS,
+    STOP_LIVE as _STOP_LIVE,
+    WIZARD as _WIZARD,
+    button_state,
+    swap_is_safe,
+    swap_plan,
+    swap_text,
+)
 from .i18n import LANGUAGES, language_name, t
 from .netinfo import device_urls, port_open, qr_png
 from .paths import base_dir
@@ -56,27 +70,15 @@ from .theme import load_fonts, qss, window_icon
 
 _SRC = Path(__file__).resolve().parents[1]   # .../src
 
-# Sentinels: buttons that do something other than spawn an accoach command.
-_GUIDE = "__guide__"
-_STOP_LIVE = "__stop_live__"
-_WIZARD = "__wizard__"
-_IMPORT_PRO = "__import_pro__"
+# Le sentinelle dei bottoni, l'elenco di chi registra e la regola che decide
+# quali chiavi sono premibili stanno in :mod:`accoach.hubgate` — importati qui
+# sopra sotto i nomi di sempre. Sono usciti da questo file perché una regola che
+# vive accanto al codice di disegno si prova solo accendendo Qt, e un pulsante
+# grigio non si interroga in un test headless.
 
 # Commands that run a speaking coach. Only one may run at a time — two voice
 # engines talking together sound like an echo — so starting one stops the other.
 _VOICE_CMDS = {"live", "coach"}
-
-# While Coach Live is running these action keys stay clickable; all other action
-# buttons are disabled so you can't stack a second coach/telemetry reader on top
-# of it. (The sidebar itself always stays navigable.)
-# NOTA: `("server",)` NON è qui, e non deve tornarci. Il backend live istanzia un
-# `CoachEngine` suo (server.py:97) che registra i giri come chiunque altro, quindi
-# acceso insieme a Coach Live **salva ogni giro due volte** — e la copia è
-# indistinguibile da un giro vero in più. È lo stesso incidente del 22/07 («il mio
-# fix del traguardo contava ogni giro due volte») da un'altra porta, reso più
-# probabile dal fatto che la pagina Ingegnere chiede proprio quel bottone.
-_LIVE_SAFE_KEYS = {_STOP_LIVE, _GUIDE, _WIZARD, _IMPORT_PRO,
-                   ("web",), ("web", "--engineer")}
 
 
 # --- first-run "getting started" wizard ------------------------------------
@@ -201,6 +203,85 @@ def _open_guide() -> None:
             subprocess.Popen(["xdg-open", str(path)])
     except Exception as exc:  # pragma: no cover - best-effort
         print(f"Cannot open the guide ({path}): {exc}")
+
+
+class SwapToBackend(QDialog):
+    """Perché il Backend live non parte, e l'offerta di scambiarlo con un click.
+
+    Tre blocchi, in quest'ordine, perché è l'ordine delle domande di chi ha
+    appena premuto: *perché no*, *cosa succede se accetto*, *accetto o no*.
+    L'avviso non è un dettaglio: Coach Live è un pacchetto solo, il Backend live
+    sono tre processi separati e l'overlay non è fra quelli che avvia lo
+    scambio. Presentare un cambio di architettura come un click è il secondo
+    difetto della stessa famiglia del primo.
+    """
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        txt = swap_text()
+        self.setWindowTitle(txt["title"])
+        self.setModal(True)
+        self.resize(520, 360)
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(24, 24, 24, 20)
+        lay.setSpacing(12)
+
+        title = QLabel(txt["title"])
+        title.setProperty("role", "title")
+        title.setWordWrap(True)
+        lay.addWidget(title)
+
+        why = QLabel(txt["why"])
+        why.setWordWrap(True)
+        lay.addWidget(why)
+
+        warn = QLabel(txt["warn"])
+        warn.setWordWrap(True)
+        warn.setProperty("role", "muted")
+        lay.addWidget(warn)
+        lay.addStretch(1)
+
+        row = QHBoxLayout()
+        cancel = QPushButton(txt["cancel"])
+        cancel.clicked.connect(self.reject)
+        go = QPushButton(txt["confirm"])
+        go.setProperty("accent", True)
+        go.setDefault(True)
+        go.clicked.connect(self.accept)
+        row.addWidget(cancel)
+        row.addStretch(1)
+        row.addWidget(go)
+        lay.addLayout(row)
+
+
+class SwapFailed(QDialog):
+    """Lo stop non ha preso, quindi il backend non è partito — e lo diciamo.
+
+    Un'azione che si annulla da sola in silenzio è indistinguibile da un
+    guasto: il pilota resterebbe a fissare una pagina Ingegnere vuota
+    convinto di aver fatto lo scambio.
+    """
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        txt = swap_text()
+        self.setWindowTitle(txt["title"])
+        self.setModal(True)
+        self.resize(460, 200)
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(24, 24, 24, 20)
+        lay.setSpacing(12)
+        body = QLabel(txt["failed"])
+        body.setWordWrap(True)
+        lay.addWidget(body)
+        lay.addStretch(1)
+        row = QHBoxLayout()
+        row.addStretch(1)
+        close = QPushButton(t("btn.close"))
+        close.setDefault(True)
+        close.clicked.connect(self.accept)
+        row.addWidget(close)
+        lay.addLayout(row)
 
 
 def _section(title_key: str) -> tuple[QWidget, QVBoxLayout]:
@@ -587,7 +668,10 @@ class MainWindow(QWidget):
         # Home first — it's page 0 and the landing section.
         self._home = HomePanel(
             on_analysis=partial(self._spawn, ["web"], False),
-            on_setup=partial(self._spawn, ["web", "--engineer"], False),
+            # Non `_spawn` diretto: questa scorciatoia apre la stessa pagina
+            # Ingegnere del bottone in Setup, e saltava ogni controllo — durante
+            # Coach Live apriva una pagina che nessuno alimenta, in silenzio.
+            on_setup=self._open_engineer,
         )
         self._stack.addWidget(self._home)
         self._stack.addWidget(self._build_live_page())
@@ -731,7 +815,9 @@ class MainWindow(QWidget):
         btn.setMinimumHeight(40)
         if accent:
             btn.setProperty("accent", True)
-        btn.clicked.connect(partial(self._spawn, args, console))
+        # Passa da `_on_action` e non da `_spawn`: alcuni bottoni, in certi
+        # stati, sono accesi ma non devono avviare niente — devono spiegarsi.
+        btn.clicked.connect(partial(self._on_action, tuple(args), args, console))
         self._actions.append((tuple(args), label_key, btn))
         return btn
 
@@ -745,6 +831,84 @@ class MainWindow(QWidget):
         btn.clicked.connect(lambda: handler())
         self._actions.append((key, label_key, btn))
         return btn
+
+    # --- what a click actually does ----------------------------------------
+    def _on_action(self, key: tuple, args: list[str], console: bool) -> None:
+        """Il click di un bottone d'azione, filtrato dallo stato del momento.
+
+        Un bottone che non può fare la sua cosa non resta muto: se lo stato è
+        `EXPLAIN` il click apre la spiegazione e l'offerta di scambio, e **non**
+        avvia niente. `BLOCKED` non arriva mai qui (il bottone è spento), ma il
+        controllo c'è lo stesso: fra il poll di un secondo e un click c'è tutto
+        il tempo perché lo stato cambi sotto le dita.
+        """
+        state = button_state(key, live=self._live_running(),
+                             busy=self._is_recording())
+        if state == EXPLAIN:
+            self._offer_swap()
+            return
+        if state == BLOCKED:
+            return
+        self._spawn(args, console)
+
+    def _open_engineer(self) -> None:
+        """La pagina Ingegnere, dallo stesso cancello del bottone in Setup."""
+        self._on_action(("web", "--engineer"), ["web", "--engineer"], False)
+
+    def _offer_swap(self) -> None:
+        """Spiega, chiedi, e solo se l'utente accetta fai lo scambio."""
+        if not self._ask_swap():
+            return
+        self._do_swap()
+
+    def _ask_swap(self) -> bool:
+        """Il dialogo. Isolato in un metodo suo così la decisione a monte e la
+        sequenza a valle si possono provare senza aprire una finestra."""
+        return SwapToBackend(self).exec() == QDialog.Accepted
+
+    def _swap_failed(self) -> None:
+        SwapFailed(self).exec()
+
+    def _do_swap(self) -> None:
+        """Ferma Coach Live, poi avvia il Backend live. Mai il contrario.
+
+        Il piano arriva da `hubgate.swap_plan()` — è un dato, quindi l'ordine si
+        legge in un test senza avviare processi. La guardia sta fra lo stop e il
+        primo avvio, e non dentro `_spawn`: `taskkill` torna prima che il
+        processo sia morto, quindi il momento in cui si può sbagliare è
+        esattamente questo. Se Coach Live è ancora vivo non si avvia niente e lo
+        si dice, perché due motori insieme salvano ogni giro due volte.
+        """
+        for step in swap_plan():
+            if step.action == "stop":
+                self._stop_live_and_wait()
+                if not swap_is_safe([a for _p, a in self._children]):
+                    self._swap_failed()
+                    return
+            else:
+                self._spawn(list(step.args), step.console)
+
+    def _stop_live_and_wait(self, timeout: float = 5.0) -> bool:
+        """Ferma Coach Live e **aspetta** che sia finito davvero.
+
+        `_stop_live` chiedeva la morte e tornava subito: va bene per un pulsante
+        Stop (al giro dopo il poll se ne accorge), non va bene per chi deve
+        accendere qualcos'altro nella riga successiva.
+        """
+        for proc, args in list(self._children):
+            if args and args[0] == "live":
+                self._kill(proc)
+                try:
+                    proc.wait(timeout=timeout)
+                except Exception:   # timeout, o un figlio che non sa aspettare
+                    pass
+        self._prune()
+        self._refresh_buttons()
+        return not self._live_running()
+
+    def _live_running(self) -> bool:
+        self._prune()
+        return any(a and a[0] == "live" for _p, a in self._children)
 
     # --- process management ----------------------------------------------
     def _spawn(self, args: list[str], new_console: bool) -> None:
@@ -771,11 +935,10 @@ class MainWindow(QWidget):
         self._children.append((proc, args))
         self._refresh_buttons()
 
-    # Tutto ciò che apre un `CoachEngine` o un `LapRecorder` finisce qui. `server`
-    # ci è arrivato tardi: il suo motore (server.py:97) registra come gli altri,
-    # ma non essendo elencato il watcher poteva accendergli accanto il registratore
-    # silenzioso, e il pulsante del backend restava premibile durante Coach Live.
-    _RECORDING_CMDS = ("recorder", "live", "coach", "compare", "server")
+    # Tutto ciò che apre un `CoachEngine` o un `LapRecorder`. L'elenco vive in
+    # `hubgate` con il suo perché; resta esposto qui perché è da qui che il
+    # resto del programma (e i test) hanno sempre chiesto «chi registra?».
+    _RECORDING_CMDS = RECORDING_CMDS
 
     def _is_recording(self) -> bool:
         """Is anything of ours already writing laps?
@@ -792,25 +955,24 @@ class MainWindow(QWidget):
         self._settings.show_watch_state(self._watcher.state)
 
     def _refresh_buttons(self) -> None:
-        """Disable every action but the live-safe ones while Coach Live runs.
+        """Disegna lo stato che `hubgate.button_state` ha deciso.
 
-        E, simmetricamente, qualunque cosa registri mentre qualcos'altro sta già
-        registrando. La regola guardava solo `live`, quindi bastava accendere
-        prima il backend per poterci mettere sopra Coach Live e salvare ogni giro
-        due volte. Un pulsante spento senza motivo però si legge come un guasto,
-        quindi il perché finisce nel suggerimento.
+        Tre stati e non due: spento (con il perché nel suggerimento, perché un
+        pulsante grigio senza motivo si legge come un guasto), acceso, e acceso
+        **ma non fa la sua cosa** — il Backend live e la pagina Ingegnere
+        durante Coach Live, che invece di restare muti offrono lo scambio.
         """
-        self._prune()
-        live = any(a and a[0] == "live" for _p, a in self._children)
+        live = self._live_running()
         busy = self._is_recording()
         for key, _label, btn in self._actions:
-            records = isinstance(key, tuple) and key and key[0] in self._RECORDING_CMDS
-            if live:
-                ok = key in _LIVE_SAFE_KEYS
+            state = button_state(key, live=live, busy=busy)
+            btn.setEnabled(state != BLOCKED)
+            if state == BLOCKED:
+                btn.setToolTip(t("btn.busy_recording"))
+            elif state == EXPLAIN:
+                btn.setToolTip(t("swap.tooltip"))
             else:
-                ok = not (busy and records)
-            btn.setEnabled(ok)
-            btn.setToolTip("" if ok else t("btn.busy_recording"))
+                btn.setToolTip("")
             # "Stop Coach Live" is meaningless before there's one to stop, and a
             # disabled Stop sitting next to Start reads as "something is already
             # running" — the opposite of the truth. Hide it instead: the panel
