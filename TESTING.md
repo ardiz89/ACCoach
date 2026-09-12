@@ -1,113 +1,168 @@
-# ACCoach — Piano di test
+# HONE — la prova a mano, prima di dare l'app a qualcuno
 
-Guida pratica per testare tutto. Spunta man mano. Per ogni problema annota:
-**cosa facevi**, **cosa è successo**, **cosa ti aspettavi** (e auto/pista se live).
+Questo è il giro di controllo veloce: si fa **senza pista**, in mezz'ora, e serve
+a scoprire se l'installazione è sana prima di far salire qualcuno in macchina.
+
+**Non è il piano delle prove in pista.** Quello vive dentro l'app, alla pagina
+`/test` (Analisi & Report → `localhost:8778/test`): sono 58 prove divise in GT3,
+Formula, Stradali e Generale, pensate per essere spuntate da un tablet mentre
+guidi, e si salvano da sole in `Documenti/ACCoach/test_runs/`.
+
+Per ogni problema annota **cosa facevi**, **cosa è successo** e **cosa ti
+aspettavi** — e se eri in macchina, auto e pista. Poi manda il pacchetto dei log
+(§8): senza quello, «non ho sentito niente» e «era rotto e non l'ha detto» si
+leggono uguali.
 
 ---
 
 ## 0. Prerequisiti
 
-- [ ] Gioco impostato in **Borderless / Windowed** (NON fullscreen esclusivo),
-      altrimenti l'overlay non si disegna sopra (la voce funziona comunque).
-- [ ] Volume di sistema su (la voce del coach è già al massimo).
-- [ ] I dati vivono in **`C:\Users\<tu>\Documents\ACCoach\laps`** (creata al 1° giro salvato).
+- [ ] Gioco in **Borderless / Windowed**, non fullscreen esclusivo, altrimenti
+      l'overlay non si disegna sopra (la voce funziona lo stesso).
+- [ ] Volume di sistema acceso.
+- [ ] I dati vivono in **`Documenti\ACCoach\`** — la cartella nasce al primo
+      giro salvato, quindi al primo avvio è normale che non ci sia.
 
-## 1. Avvio / Launcher
+## 1. Avvio
 
-- [ ] Doppio click su **`ACCoach.bat`** (o `dist\ACCoach\ACCoach.exe`).
-- [ ] Si apre la finestra **Launcher** con i pulsanti: Coach Live, Coach Live DEMO,
-      Analisi & Report, Debrief, Monitor, Coach vocale, Verifica assi G.
-- [ ] Atteso: finestra leggibile, pulsanti cliccabili.
+- [ ] Doppio click su **`HONE.bat`** (dal sorgente: al primo avvio si crea da
+      sola la `.venv` e installa tutto, ci mette qualche minuto) oppure su
+      **`dist\HONE\HONE.exe`** se hai costruito l'eseguibile.
+- [ ] Si apre il **Launcher** con sei sezioni nella barra a sinistra: *Home*,
+      *In pista*, *Analisi*, *Setup*, *Dispositivi*, *Impostazioni*.
+- [ ] Al primo avvio in assoluto compare la finestrella «Come si comincia».
+- [ ] Atteso: finestra leggibile, testi non troncati, pulsanti cliccabili.
 
-## 2. Demo senza gioco (verifica veloce overlay + voce)
+## 2. Demo senza gioco — la verifica più veloce che esista
 
-- [ ] Launcher → **Coach Live — DEMO**.
-- [ ] Atteso: overlay in alto-centro con **delta bar** che si muove (~+0.4s),
-      header PB/PRED, e **voce** che dice cue ("Bloccaggio…", "Porta più velocità…").
-- [ ] Verifica che la voce suoni **neurale** (più umana), non robotica.
-- [ ] Chiudi la finestra/overlay quando hai visto.
+- [ ] *In pista* → **Coach Live — DEMO (senza gioco)**.
+- [ ] Atteso: overlay in alto sullo schermo centrale, con la **barra del delta**
+      che si muove, l'intestazione PB/PRED, e la **voce** che dice i cue
+      («Bloccaggio…», «Porta più velocità…»).
+- [ ] La voce deve suonare **neurale**, non robotica. Se suona robotica su
+      *tutte* le frasi, i cue pre-registrati non sono stati caricati → §3.
 
 ## 3. Voce — self test
 
-- [ ] Da terminale: `dist\ACCoach\ACCoach.exe selftest` (o `python -m accoach selftest`).
-- [ ] Ascolta: prima frase **neurale** ("Puoi frenare più tardi"), poi SAPI5 ("Self test completato").
-- [ ] Il report è in `%TEMP%\accoach_selftest.json`: deve avere `is_audio: true`,
-      `prerendered_cues: 41`.
+- [ ] Da terminale: `python accoach_main.py selftest` (o `HONE.exe selftest`).
+- [ ] Ascolta: prima una frase **neurale**, poi una SAPI5 («Self test
+      completato»). Due voci diverse: è così apposta, sta provando due strade.
+- [ ] Il report è in `%TEMP%\accoach_selftest.json`. Deve avere `is_audio: true`
+      e **`prerendered_cues: 54`**.
+- [ ] Se `prerendered_cues` è **0**, il pacchetto ha perso i cue: è il difetto
+      che degrada in silenzio, non ignorarlo. Se è un numero diverso da 54,
+      confrontalo con i file in `src/accoach/voice_cues/` — devono coincidere.
 
-## 4. Coach Live — il cuore (con AC o ACC)
+## 4. Coach Live — il cuore (serve AC o ACC)
 
-**Setup:** avvia il gioco, Launcher → **Coach Live**, entra in una sessione (Practice/Hotlap).
+Avvia il gioco, poi *In pista* → **Coach Live**, ed entra in una sessione.
 
-### 4a. Eventi immediati (anche al 1° giro, senza riferimento)
-Fai **apposta** questi errori e verifica che il coach parli (voce + pillola overlay):
-- [ ] **Bloccaggio**: frena fortissimo → "Bloccaggio, alleggerisci il freno".
-- [ ] **Pattinamento**: gas brusco in uscita lenta → "Pattini in uscita, meno gas".
-- [ ] **Sottosterzo**: entra troppo forte, l'anteriore scivola → "L'anteriore scivola, entra più piano".
-- [ ] **Sovrasterzo**: fai scivolare il posteriore → "Sovrasterzo, sii più dolce col gas". ⚠️ vedi §8.
-- [ ] **Marcia lunga / limiter**: tieni una marcia troppo alta / resta sul limitatore.
-- [ ] **Coasting**: lascia un buco tra freno e gas → "Stai veleggiando…".
+### 4a. Eventi immediati (già al primo giro, senza riferimento)
+Sbaglia **apposta** e verifica che il coach parli (voce + pastiglia sull'overlay):
+- [ ] **Bloccaggio**: frenata fortissima → «Bloccaggio, alleggerisci il freno».
+      ⚠️ Con l'**ABS acceso il bloccaggio fisico non avviene**: per provarlo
+      davvero l'ABS va messo a 0 (misurato il 02/08 su 11 690 frame).
+- [ ] **Pattinamento**: gas brusco in uscita lenta.
+- [ ] **Sottosterzo** / **Sovrasterzo** (vedi §9: sono le due soglie più fragili).
+- [ ] **Coasting**: lascia un buco fra freno e gas → «Stai veleggiando…».
 
-### 4b. Stato overlay senza riferimento
-- [ ] Overlay mostra "REC ● sto imparando il riferimento…" finché non completi un giro.
+### 4b. Senza riferimento
+- [ ] L'overlay mostra «REC ● sto imparando il riferimento…» finché non chiudi
+      un giro valido.
 
 ### 4c. Coaching per curva (dal 2° giro)
-- [ ] **Completa un giro valido** (intero, senza tagli) → diventa il riferimento.
-- [ ] Da lì la **delta bar si muove** (rosso = più lento, verde = più veloce).
-- [ ] Cue di curva **anticipati prima della curva**: "Puoi frenare più tardi",
-      "Più gas qui", "Porta più velocità in curva", "Stai perdendo N decimi qui".
-- [ ] Quando **sistemi** una curva, il coach **smette** di ripeterti quel consiglio.
+- [ ] Chiudi un giro valido → diventa il riferimento, e la **barra del delta si
+      muove** (rosso = più lento, verde = più veloce).
+- [ ] I consigli di curva arrivano **prima** della curva, non dentro.
+- [ ] Quando **sistemi** una curva, il coach smette di ripetertelo.
 
-### 4d. Carburante (giri lunghi)
-- [ ] Con poca benzina: "Benzina per circa N giri." → "Ultimo giro, rientra ai box!".
+### 4d. Il focus — un tema alla volta
+- [ ] Dopo tre giri **puliti** il coach elegge un tema e da lì parla quasi solo
+      di quello (è il budget di attenzione: accorcia, non dirada).
+- [ ] Se giri sporco, il focus **non elegge** — e ora lo dice: nel log trovi
+      `focus | nessuno | stato=assess | non contato: giro non pulito | scartati=N`.
+      Se resti in `assess` senza capire perché, la risposta è lì.
 
-### 4e. Stati / robustezza
-- [ ] **Box**: entra ai box → il coach tace, overlay si calma.
-- [ ] **Disconnessione**: chiudi/esci dalla sessione → overlay "in attesa del gioco…".
-- [ ] Riconnessione automatica quando rientri in pista.
+### 4e. Carburante e box
+- [ ] Con poca benzina: «Benzina per circa N giri» → «Ultimo giro, rientra ai box!».
+- [ ] Rientra ai box e **fermati**: arriva il briefing, che ti manda sulla pagina
+      Ingegnere. Da Coach Live quella pagina va aperta come descritto in §5.
 
-## 5. App Analisi & Report (browser)
+### 4f. Robustezza
+- [ ] Esci dalla sessione → overlay «in attesa del gioco…», e riconnessione
+      automatica quando rientri.
 
-Dopo aver registrato **qualche giro reale**:
-- [ ] Launcher → **Analisi & Report** → si apre il browser su `localhost:8778`.
-- [ ] Menu **Auto / Pista**: mostra le tue combo coi giri registrati.
-- [ ] **Tab Confronto**: seleziona "Giro da rivedere" e "Confronta con"; verifica
-      grafici **delta / velocità (tu vs confronto) / gas-freno** con bande curva.
-- [ ] **Crosshair**: muovi il mouse sui grafici → barra coi valori punto-per-punto.
-- [ ] **Export**: pulsanti ⬇ CSV / ⬇ JSON → scaricano il file del giro selezionato.
-- [ ] **Tab Andamento**: trend tempi nel tempo, costanza (σ/spread), errori ricorrenti.
+## 5. Lo scambio al Backend live — **da guardare a occhio, è nuovo**
 
-## 6. Debrief
+La pagina Ingegnere la alimenta solo il **Backend live**, che non può girare
+insieme a Coach Live (due motori salverebbero ogni giro due volte).
 
-- [ ] Launcher → **Debrief** (o `ACCoach.exe debrief`) → riepilogo testuale
-      dell'ultimo giro: curve peggiori + causa + costanza.
+- [ ] Con Coach Live acceso, premi **Ingegnere di pista**: il bottone **non**
+      deve essere spento e muto. Si apre una finestra che spiega perché, e offre
+      tre strade: *Ferma Coach Live e passa* · *Apri comunque la pagina* ·
+      *Lascia acceso Coach Live*.
+- [ ] Verifica che il testo si legga tutto, senza troncature, anche in italiano.
+- [ ] **Apri comunque**: la pagina si apre, Coach Live **resta acceso** e
+      l'overlay resta al suo posto. Hai l'editor assetti e i setup salvati; la
+      diagnosi dal vivo resta vuota, ed è quello che la finestra ti ha detto.
+- [ ] **Ferma e passa**: Coach Live si chiude, parte il Backend live e si apre
+      la pagina. ⚠️ **L'overlay si spegne**: si riaccende da *Dispositivi* →
+      *Solo overlay*. Se compare invece «Coach Live è ancora acceso», nessun
+      backend è partito — è la protezione che ha funzionato, riprova dopo che la
+      finestra si è chiusa.
 
-## 7. Multi-gioco
+## 6. Analisi & Report (browser)
 
-- [ ] Ripeti il §4 con **Assetto Corsa Competizione** (oltre ad AC) — stessa
-      shared memory, dovrebbe funzionare uguale; in ACC compaiono anche i dati TC/ABS.
-- [ ] (Altri giochi: non supportati ancora.)
+Dopo aver registrato qualche giro vero: *Analisi* → **Analisi & Report**, si apre
+`localhost:8778`.
 
-## 8. Calibrazioni ancora da validare ⚠️ (annota i falsi positivi)
+- [ ] Il menu **Auto / Pista** mostra le tue combo.
+- [ ] Le dieci schede si aprono tutte: *Com'è andata*, *Il giro spiegato*,
+      *Allenamento*, *Sessione*, *Passo gara*, *Confronto*, *Traiettoria*,
+      *Settori*, *Dinamica*, *Andamento*. Si aprono anche coi tasti **1-9 e 0**.
+- [ ] In *Confronto*: grafici delta / velocità / gas-freno, il **crosshair** che
+      segue il mouse, e i pulsanti **⬇ CSV / ⬇ JSON**.
+- [ ] Una scheda senza abbastanza dati deve **dire quanti giri mancano**, mai
+      restare vuota.
 
-Queste soglie/segni sono **provvisori**: durante i test §4, segnala se senti
-allarmi **sbagliati** — sono il feedback per tararli.
-- [ ] **Sovrasterzo**: se in una curva **pulita** (senza scivolare) dice "Sovrasterzo",
-      annotalo (il segno yaw o la soglia vanno aggiustati).
-- [ ] **Sottosterzo**: se dice "entra più piano" mentre sei al limite e vai bene, annotalo.
-- [ ] **Pressioni / temperature gomme**: i target di default sono da **GT3** → su
-      altre auto i consigli psi/°C possono essere sbagliati; annota.
-- [ ] **Assi G** (`Verifica assi G` / `verify-g`): rifallo in **ACC** se testi ACC
-      (in AC è già confermato).
-- [ ] **Livelli aid TC/ABS**: vanno validati in **ACC con una GT3** (l'HUD mostra i
-      livelli) — chiedimi la cattura `calib_yaw_aids` quando sei pronto.
+## 7. Ingegnere di pista
+
+- [ ] *Setup* → **Ingegnere di pista** (o §5 se Coach Live è acceso).
+- [ ] La pagina sa dirti auto e pista anche a gioco spento.
+- [ ] ⚠️ ACC crea la cartella degli assetti **solo quando ne salvi uno**: se la
+      pagina dice che non trova setup, salvane uno dal gioco e riprova. Non è un
+      difetto dell'app.
+
+## 8. Il pacchetto dei log — fallo sempre, prima di segnalare
+
+- [ ] `python accoach_main.py logs --zip` (o `HONE.exe logs --zip`).
+- [ ] Stampa il percorso dello ZIP **e** un riassunto di cosa c'è dentro.
+- [ ] **Leggi quel riassunto prima di mandarlo a qualcuno.** I log entrano non
+      filtrati: contengono percorsi col tuo nome utente di Windows, una riga
+      datata per ogni volta che hai avviato HONE, i tuoi tempi sul giro e i
+      rapporti di crash. È scritto anche in `contesto.txt` dentro lo ZIP.
+- [ ] `logs` senza `--zip` continua ad aprire solo la cartella.
+
+## 9. Le soglie ancora fragili — annota i falsi allarmi
+
+Queste non sono ancora tarate su tutto. Durante il §4, segnala quando il coach
+si sbaglia: è l'unico modo per tararle.
+
+- [ ] **Sovrasterzo** su una curva pulita, senza scivolare.
+- [ ] **Sottosterzo** («entra più piano») mentre sei al limite e vai bene.
+- [ ] **Pressioni / temperature gomme**: i bersagli di default sono da **GT3**,
+      su altre auto i consigli psi/°C possono essere sbagliati.
+- [ ] **Assi G**: `verify-g` è confermato su AC; in ACC va rifatto.
+- [ ] **Formula e Stradali**: 24 delle 58 prove del piano `/test` non hanno
+      ancora un esito, e sono tutte lì. Se guidi quelle classi, sei tu il primo.
 
 ---
 
-## Riepilogo rapido (ordine consigliato)
+## L'ordine consigliato
 
-1. Demo (§2) → 2. Self test voce (§3) → 3. Coach Live eventi (§4a) →
-4. Giro completo + coaching curva (§4c) → 5. Analisi web (§5) → 6. Debrief (§6) →
-7. ACC (§7) → 8. Annota i falsi positivi (§8).
+Demo (§2) → self test voce (§3) → eventi (§4a) → giro completo e coaching di
+curva (§4c) → focus (§4d) → scambio al backend (§5) → analisi web (§6) →
+pacchetto log (§8).
 
-Riportami cosa funziona e cosa no: per i problemi di coaching, dimmi auto/pista,
-il cue sbagliato e cosa stavi facendo.
+Se una cosa non funziona, la domanda utile non è «funziona?» ma **«cosa hai
+visto e cosa ti aspettavi di vedere?»** — con il pacchetto dei log allegato.
