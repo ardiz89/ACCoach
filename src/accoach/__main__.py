@@ -15,11 +15,57 @@ and none of them is. They live behind ``help --all``.
 from __future__ import annotations
 
 import sys
+from pathlib import Path
+
+#: Come si scrive un comando, in funzione di come e' partito *questo* processo.
+#: I due testi di aiuto sono modelli con ``{prog}``; :func:`invocation` decide
+#: cosa ci va dentro e :func:`_render` li riempie.
+_EXE_FALLBACK = "HONE.exe"
+_SOURCE_SCRIPT = "accoach_main.py"
+
+
+def invocation(argv0: str | None, frozen: bool) -> str:
+    """La riga di comando che *da qui* funziona davvero, senza il comando.
+
+    Funzione pura apposta: l'aiuto annunciava ``python -m accoach <command>``
+    come uso principale, e da un checkout col venv del progetto quella riga
+    fallisce con «No module named accoach» — il pacchetto non e' installato in
+    editable, e il ``pythonpath = ["src"]`` di ``pyproject.toml`` vale solo
+    sotto pytest. Ci si arriva solo via ``accoach_main.py``, che e' anche il
+    punto d'ingresso dell'exe impacchettato (vedi ``HONE.spec``). Misurato in
+    pista il 01/09: e' la riga che un beta tester copia da ``help --all``.
+
+    Tre casi, tre stringhe diverse:
+
+    * impacchettato con PyInstaller → il nome dell'eseguibile (``HONE.exe``)
+    * lanciato da ``accoach_main.py`` in un checkout → ``python accoach_main.py``
+    * lanciato come modulo installato (``python -m accoach``: ``argv[0]`` e' il
+      percorso di ``__main__.py``) → ``python -m accoach``
+
+    Il nome dell'exe si legge da ``argv[0]`` invece di essere scritto qui: se un
+    giorno l'eseguibile cambia nome (``ACCoach.spec`` lo chiama ancora
+    ``ACCoach``), l'aiuto lo segue da solo.
+    """
+    name = Path(argv0).name if argv0 else ""
+    if frozen:
+        return name or _EXE_FALLBACK
+    if name == _SOURCE_SCRIPT:
+        return f"python {_SOURCE_SCRIPT}"
+    return "python -m accoach"
+
+
+def _render(template: str, prog: str) -> str:
+    return template.replace("{prog}", prog)
+
+
+def _prog() -> str:
+    argv0 = sys.argv[0] if sys.argv else ""
+    return invocation(argv0, bool(getattr(sys, "frozen", False)))
+
 
 _HELP = """HONE — know why you're slow. Real-time driving coach for Assetto Corsa / ACC
 
-Usage:  python -m accoach <command> [options]
-        python accoach_main.py <command>       (from a source checkout)
+Usage:  {prog} <command> [options]
 
   live [--silent] [--demo]   coach + on-screen overlay while you drive  (default)
   web                        review your saved laps in the browser
@@ -29,6 +75,8 @@ Nothing else is needed to drive.  `help --all` lists the tools.
 """
 
 _HELP_TOOLS = """Tools — development, live validation, second-screen setups.
+
+Usage:  {prog} <command> [options]
 
 Coaching, split up:
   coach [--silent]           voice coach in the terminal (no overlay)
@@ -57,7 +105,7 @@ Validation — these read the live game, so the sim must be running:
 
   import-reference <file>    import a lap as a clean reference (cold-start seed)
   setup <list|show|bump|undo>  read and edit an ACC setup file, no game running
-                             (`setup bump --help` for the arguments)
+                             (`{prog} setup bump --help` for the arguments)
   selftest                   check the TTS voice, write a report (works windowed)
   logs                       open the folder with logs and crash reports
   test-panel [--top N]       step-by-step panel for on-track test protocols
@@ -72,9 +120,10 @@ def main() -> None:
     rest = args[1:]
 
     if cmd in ("", "-h", "--help", "help"):
-        print(_HELP)
+        prog = _prog()
+        print(_render(_HELP, prog))
         if any(a.lower() in ("--all", "-a", "all", "tools") for a in rest):
-            print(_HELP_TOOLS)
+            print(_render(_HELP_TOOLS, prog))
         return
 
     from .logging_setup import setup_logging
@@ -162,9 +211,10 @@ def main() -> None:
     else:
         # Everything on an unknown command: whoever typed one knows what a
         # command is, and the tool they meant is probably in the long list.
+        prog = _prog()
         print(f"Unknown command: {cmd!r}\n")
-        print(_HELP)
-        print(_HELP_TOOLS)
+        print(_render(_HELP, prog))
+        print(_render(_HELP_TOOLS, prog))
         raise SystemExit(2)
 
 
