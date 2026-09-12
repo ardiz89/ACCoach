@@ -184,5 +184,26 @@ def test_both_documents_are_shipped_in_the_exe(build):
     file can't fail loudly here, so it has to fail here instead.
     """
     text = (_ROOT / build).read_text(encoding="utf-8")
+    # Uno script di build può non elencare niente e delegare a un `.spec`: è la
+    # forma **giusta**, perché la lista dei payload deve stare in un posto solo
+    # (`test_verify_bundle.py` la pretende, dopo che una copia dimenticata in
+    # `build_exe.bat` ha spedito quattro payload su sei). Allora il test segue
+    # la delega invece di pretendere la duplicazione che l'altro test vieta —
+    # due difese che si contraddicono lasciano passare quello che vogliono
+    # entrambe fermare.
+    if not build.endswith(".spec"):
+        # Solo la riga che COSTRUISCE. Due trappole, incontrate scrivendo
+        # questo test e tutte e due scoperte mutando: il commento che spiega
+        # perché la lista non c'è più nomina il `.spec` (e un test che accetta
+        # quella menzione crede alla spiegazione invece che al comando), e lo
+        # stesso `.spec` è nominato dalla riga che *verifica* il pacchetto —
+        # che non dice niente su cosa PyInstaller ci ha messo dentro.
+        costruisce = next(
+            (l for l in text.splitlines()
+             if not l.lstrip().lower().startswith("rem") and "PyInstaller" in l), "")
+        delega = re.search(r"([A-Za-z0-9_.-]+\.spec)", costruisce)
+        assert delega, (f"{build} non elenca i dati e non chiama nessun .spec: "
+                        f"non si capisce cosa spedisce")
+        text = (_ROOT / delega.group(1)).read_text(encoding="utf-8")
     assert "GUIDA.md" in text
     assert "docs/FAQ.md" in text
