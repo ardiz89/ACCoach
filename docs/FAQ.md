@@ -398,7 +398,37 @@ the **system** voice, which is more robotic. Work in progress — it changes how
 it sounds, not what you're told.
 
 **Where are the logs if something breaks?**
-`python -m accoach logs` opens the folder with logs and crash reports.
+`logs` opens the folder with logs and crash reports. To send them to us, `logs
+--zip` packages them into a single file in `Documents\ACCoach\`. It writes the
+zip even when there are no logs at all, and says so inside: "no logs" and "I
+didn't collect them" are different answers.
+
+**What is in that zip, exactly?**
+Two things, and they are not the same.
+
+`contesto.txt`, which we write: the version, the commit, your Python/Windows
+versions and the last cars and tracks you drove — no paths, no machine name, no
+account name, because none of that would help us.
+
+Your log files, which go in **exactly as they are, not filtered**. At least all
+of this is in them:
+
+- paths that include your Windows account name (`C:\Users\<account>\...`), and
+  any network location you set as your laps folder;
+- one dated line every time you started HONE — together, a record of when you
+  sat down to drive, going back as far as your oldest log;
+- your lap times, the tracks and cars you drove, and the names of files you
+  opened;
+- crash reports (`crash-*.log`), each with a full traceback, the paths of our
+  source files, and whatever value the error carried with it.
+
+We leave all of it in on purpose — a log with the interesting parts taken out
+cannot diagnose anything, and quietly censoring one would be worse than the
+path. The zip is an ordinary file on your disk, and the command prints a short
+version of this when it finishes: open it and look before you send it.
+
+(Type the command the way `help` shows it: `HONE.exe logs --zip` from the
+packaged app, `python accoach_main.py logs --zip` from a source checkout.)
 
 ---
 

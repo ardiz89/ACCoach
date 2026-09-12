@@ -15,11 +15,85 @@ and none of them is. They live behind ``help --all``.
 from __future__ import annotations
 
 import sys
+from pathlib import Path
+
+#: Come si scrive un comando, in funzione di come e' partito *questo* processo.
+#: I due testi di aiuto sono modelli con ``{prog}``; :func:`invocation` decide
+#: cosa ci va dentro e :func:`_render` li riempie.
+_EXE_FALLBACK = "HONE.exe"
+_SOURCE_SCRIPT = "accoach_main.py"
+
+
+def invocation(argv0: str | None, frozen: bool,
+               *, sibling_script: Path | str | None = None) -> str:
+    """La riga di comando che *da qui* funziona davvero, senza il comando.
+
+    Funzione pura apposta: l'aiuto annunciava ``python -m accoach <command>``
+    come uso principale, e da un checkout col venv del progetto quella riga
+    fallisce con «No module named accoach» — il pacchetto non e' installato in
+    editable, e il ``pythonpath = ["src"]`` di ``pyproject.toml`` vale solo
+    sotto pytest. Ci si arriva solo via ``accoach_main.py``, che e' anche il
+    punto d'ingresso dell'exe impacchettato (vedi ``HONE.spec``). Misurato in
+    pista il 01/09: e' la riga che un beta tester copia da ``help --all``.
+
+    Tre casi, tre stringhe diverse:
+
+    * impacchettato con PyInstaller → il nome dell'eseguibile (``HONE.exe``)
+    * lanciato da ``accoach_main.py`` in un checkout → ``python accoach_main.py``
+    * lanciato come modulo con un ``accoach_main.py`` accanto → il percorso
+      **assoluto** di quello script
+    * lanciato come modulo installato, senza script accanto → ``python -m accoach``
+
+    Il nome dell'exe si legge da ``argv[0]`` invece di essere scritto qui: se un
+    giorno l'eseguibile cambia nome (``ACCoach.spec`` lo chiama ancora
+    ``ACCoach``), l'aiuto lo segue da solo.
+
+    **Perche' il percorso assoluto e non ``python -m accoach``.** Il ripiego
+    consigliava il modulo, e il modulo puo' eseguire un albero che non e'
+    questo: su questa macchina un ``.pth`` in user-site mette
+    ``progetti/ACCoach/src`` in ``sys.path``, quindi da un worktree
+    ``python -m accoach`` non fallisce — gira sul checkout sbagliato e stampa
+    l'aiuto di un altro albero. E' peggio di un errore, perche' e' silenzioso
+    (gia' successo il 10/08). Se ``accoach_main.py`` sta accanto a noi, quella
+    e' la sola risposta che non puo' eseguire altro; e va dato per intero,
+    perche' ``python accoach_main.py`` da un'altra cartella non parte.
+    """
+    name = Path(argv0).name if argv0 else ""
+    if frozen:
+        return name or _EXE_FALLBACK
+    if name == _SOURCE_SCRIPT:
+        return f"python {_SOURCE_SCRIPT}"
+    if sibling_script:
+        return f"python {sibling_script}"
+    return "python -m accoach"
+
+
+def _checkout_script() -> Path | None:
+    """``accoach_main.py`` dell'albero da cui *questo* modulo e' stato caricato.
+
+    Risolto da ``__file__``, non dalla cartella corrente: e' l'albero che sta
+    girando quello a cui il comando deve puntare.
+    """
+    try:
+        p = Path(__file__).resolve().parents[2] / _SOURCE_SCRIPT
+        return p if p.is_file() else None
+    except (OSError, IndexError):
+        return None
+
+
+def _render(template: str, prog: str) -> str:
+    return template.replace("{prog}", prog)
+
+
+def _prog() -> str:
+    argv0 = sys.argv[0] if sys.argv else ""
+    return invocation(argv0, bool(getattr(sys, "frozen", False)),
+                      sibling_script=_checkout_script())
+
 
 _HELP = """HONE — know why you're slow. Real-time driving coach for Assetto Corsa / ACC
 
-Usage:  python -m accoach <command> [options]
-        python accoach_main.py <command>       (from a source checkout)
+Usage:  {prog} <command> [options]
 
   live [--silent] [--demo]   coach + on-screen overlay while you drive  (default)
   web                        review your saved laps in the browser
@@ -29,6 +103,8 @@ Nothing else is needed to drive.  `help --all` lists the tools.
 """
 
 _HELP_TOOLS = """Tools — development, live validation, second-screen setups.
+
+Usage:  {prog} <command> [options]
 
 Coaching, split up:
   coach [--silent]           voice coach in the terminal (no overlay)
@@ -57,9 +133,11 @@ Validation — these read the live game, so the sim must be running:
 
   import-reference <file>    import a lap as a clean reference (cold-start seed)
   setup <list|show|bump|undo>  read and edit an ACC setup file, no game running
-                             (`setup bump --help` for the arguments)
+                             (`{prog} setup bump --help` for the arguments)
   selftest                   check the TTS voice, write a report (works windowed)
-  logs                       open the folder with logs and crash reports
+  logs [--zip]               open the folder with logs and crash reports
+                             --zip: one file to attach to a bug report (logs +
+                             version, commit, python/OS, last cars and tracks)
   test-panel [--top N]       step-by-step panel for on-track test protocols
                              (reads test_step.json; opens no telemetry, no socket)
                              --top N: pixels below the top edge, to clear the HUD
@@ -72,9 +150,10 @@ def main() -> None:
     rest = args[1:]
 
     if cmd in ("", "-h", "--help", "help"):
-        print(_HELP)
+        prog = _prog()
+        print(_render(_HELP, prog))
         if any(a.lower() in ("--all", "-a", "all", "tools") for a in rest):
-            print(_HELP_TOOLS)
+            print(_render(_HELP_TOOLS, prog))
         return
 
     from .logging_setup import setup_logging
@@ -152,6 +231,16 @@ def main() -> None:
     elif cmd == "logs":
         import os
         from .paths import logs_dir
+        if any(a.lower() in ("--zip", "-z", "zip") for a in rest):
+            # Impacchetta invece di aprire: e' cio' che si allega a una
+            # segnalazione. `logs` da solo continua a fare quello di sempre.
+            from .support import build_log_zip, short_notice
+            bundle = build_log_zip()
+            print(f"Log bundle: {bundle}")
+            # La dichiarazione arriva dove arriva il comando: leggerla solo
+            # aprendo l'archivio vuol dire leggerla dopo aver deciso.
+            print(short_notice(bundle))
+            return
         d = logs_dir()
         d.mkdir(parents=True, exist_ok=True)
         print(f"Logs: {d}")
@@ -162,9 +251,10 @@ def main() -> None:
     else:
         # Everything on an unknown command: whoever typed one knows what a
         # command is, and the tool they meant is probably in the long list.
+        prog = _prog()
         print(f"Unknown command: {cmd!r}\n")
-        print(_HELP)
-        print(_HELP_TOOLS)
+        print(_render(_HELP, prog))
+        print(_render(_HELP_TOOLS, prog))
         raise SystemExit(2)
 
 
