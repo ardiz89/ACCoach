@@ -374,10 +374,14 @@ _UI: dict[str, dict[str, str]] = {
               "pista niente HUD. Il Backend live sono tre pezzi separati "
               "(backend, overlay, pagina web), non un pacchetto solo: "
               "l'overlay lo riaccendi da Dispositivi, per conto suo."},
-    "swap.confirm": {"en": "⇄  Stop Coach Live and switch",
-                     "it": "⇄  Ferma Coach Live e passa al Backend live"},
-    "swap.cancel": {"en": "Leave Coach Live running",
-                    "it": "Lascia acceso Coach Live"},
+    # Senza glifo: `⇄` (U+21C4) non c'è nei font del brand né nel ripiego di
+    # sistema, e a schermo usciva come un rettangolo vuoto davanti alla frase.
+    "swap.confirm": {"en": "Stop Coach Live and switch",
+                     "it": "Ferma Coach Live e passa"},
+    # Etichette corte di proposito: tre bottoni con frasi intere spingevano la
+    # finestra a 685 px in italiano, cioè righe lunghe e faticose. Cosa fa
+    # ciascuna uscita lo dicono i paragrafi sopra, non il bottone.
+    "swap.cancel": {"en": "Cancel", "it": "Annulla"},
     "swap.failed": {
         "en": "Coach Live is still running, so the live backend was NOT "
               "started — two recorders would have saved every lap twice. Press "
@@ -391,8 +395,7 @@ _UI: dict[str, dict[str, str]] = {
     # prove e i setup salvati stanno sul REST dell'app di analisi e ci sono lo
     # stesso — la pagina è fatta apposta per reggere a telemetria spenta. Dire
     # «funziona a metà» non aiuta nessuno: la frase dice **quale** metà.
-    "swap.open_anyway": {"en": "Open the page anyway",
-                         "it": "Apri comunque la pagina"},
+    "swap.open_anyway": {"en": "Open anyway", "it": "Apri comunque"},
     "swap.open_anyway_why": {
         "en": "Open it anyway and you keep the setup editor, the engineer's "
               "test log and every setup you've saved — the page serves those "

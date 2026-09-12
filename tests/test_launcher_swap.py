@@ -171,6 +171,83 @@ def test_the_dialog_grows_the_third_exit_only_when_asked(hub, monkeypatch):
     assert t("swap.confirm") in without and t("swap.cancel") in without
 
 
+# --- la finestra e quello che ha da dire ------------------------------------
+#
+# La tipografia non si testa. Questa proprietà sì: **il contenuto non deve
+# chiedere più spazio di quanto la finestra gliene dia**, e non deve avercene
+# molto di meno — un dialogo con 140 px di vuoto fra l'ultimo paragrafo e i
+# bottoni si legge come una finestra che non ha finito di caricare. Misurata in
+# tutte e due le lingue perché l'italiano è più lungo dell'inglese: era proprio
+# lì che la finestra chiedeva 584 px per un contenuto che ne voleva 681.
+
+@pytest.fixture
+def styled(app):
+    """Il dialogo misurato com'è davvero: font del brand e stylesheet veri.
+
+    Senza, le metriche sono quelle di un altro carattere e la misura non dice
+    niente. Lo stylesheet torna com'era in uscita: l'app di Qt è condivisa da
+    tutti i test della sessione.
+    """
+    from accoach.theme import load_fonts, qss
+
+    old = app.styleSheet()
+    load_fonts()
+    app.setStyleSheet(qss())
+    yield app
+    app.setStyleSheet(old)
+
+
+def _measure(app, monkeypatch, lang, **kw):
+    from accoach import hubgate, launcher
+
+    monkeypatch.setattr(launcher, "swap_text", lambda: hubgate.swap_text(lang))
+    dlg = launcher.SwapToBackend(**kw)
+    dlg.show()
+    app.processEvents()
+    size, hint = dlg.size(), dlg.sizeHint()
+    dlg.close()
+    return size, hint
+
+
+@pytest.mark.parametrize("open_anyway", (False, True))
+@pytest.mark.parametrize("lang", ("en", "it"))
+def test_the_window_gives_the_text_all_the_room_it_asks_for(styled, monkeypatch,
+                                                            lang, open_anyway):
+    size, hint = _measure(styled, monkeypatch, lang, open_anyway=open_anyway)
+    assert size.width() >= hint.width(), f"{lang}: {size.width()} < {hint.width()}"
+    assert size.height() >= hint.height(), f"{lang}: {size.height()} < {hint.height()}"
+
+
+@pytest.mark.parametrize("open_anyway", (False, True))
+@pytest.mark.parametrize("lang", ("en", "it"))
+def test_the_window_has_no_dead_space_under_the_text(styled, monkeypatch,
+                                                     lang, open_anyway):
+    size, hint = _measure(styled, monkeypatch, lang, open_anyway=open_anyway)
+    assert size.height() - hint.height() <= 16, \
+        f"{lang}: {size.height() - hint.height()} px di vuoto"
+
+
+@pytest.mark.parametrize("open_anyway", (False, True))
+@pytest.mark.parametrize("lang", ("en", "it"))
+def test_the_lines_do_not_run_away_in_the_longer_language(styled, monkeypatch,
+                                                          lang, open_anyway):
+    """Niente costringeva i paragrafi a mandare a capo, quindi l'italiano
+    sfondava a 790 px di righe lunghe e faticose."""
+    size, _hint = _measure(styled, monkeypatch, lang, open_anyway=open_anyway)
+    assert size.width() <= 620, f"{lang}: {size.width()} px di larghezza"
+
+
+def test_the_failure_dialog_also_fits_what_it_says(styled, monkeypatch):
+    from accoach import launcher
+
+    dlg = launcher.SwapFailed()
+    dlg.show()
+    styled.processEvents()
+    size, hint = dlg.size(), dlg.sizeHint()
+    dlg.close()
+    assert size.width() >= hint.width() and size.height() >= hint.height()
+
+
 def test_accepting_stops_coach_live_before_starting_anything(hub, live, monkeypatch):
     from accoach.hubgate import SWAP
 

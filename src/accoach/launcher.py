@@ -209,6 +209,26 @@ def _open_guide() -> None:
         print(f"Cannot open the guide ({path}): {exc}")
 
 
+# Il tetto alla riga di testo dei dialoghi dello scambio, in pixel.
+#
+# Senza, niente costringe i paragrafi a mandare a capo: l'italiano — che è più
+# lungo dell'inglese — sfondava a 790 px di righe lunghe e faticose, e nella
+# variante corta chiedeva 681 px dentro una finestra da 584, cioè o si allargava
+# o tagliava. Il numero è una misura di leggibilità, non di layout: intorno alle
+# 80-90 battute per riga con il corpo del testo a 14 px.
+_PARA_PX = 520
+
+
+def _para(text: str, *, muted: bool = False) -> QLabel:
+    """Un paragrafo del dialogo: va a capo, e non più largo di `_PARA_PX`."""
+    lbl = QLabel(text)
+    lbl.setWordWrap(True)
+    lbl.setMaximumWidth(_PARA_PX)
+    if muted:
+        lbl.setProperty("role", "muted")
+    return lbl
+
+
 class SwapToBackend(QDialog):
     """Perché il Backend live non parte, e le uscite che restano.
 
@@ -233,31 +253,27 @@ class SwapToBackend(QDialog):
         self.choice = CANCEL
         self.setWindowTitle(txt["title"])
         self.setModal(True)
-        self.resize(560, 420 if open_anyway else 360)
         lay = QVBoxLayout(self)
         lay.setContentsMargins(24, 24, 24, 20)
         lay.setSpacing(12)
 
-        title = QLabel(txt["title"])
+        title = _para(txt["title"])
         title.setProperty("role", "title")
-        title.setWordWrap(True)
         lay.addWidget(title)
 
-        why = QLabel(txt["why"])
-        why.setWordWrap(True)
-        lay.addWidget(why)
+        lay.addWidget(_para(txt["why"]))
 
-        warn = QLabel(txt["warn"])
-        warn.setWordWrap(True)
-        warn.setProperty("role", "muted")
-        lay.addWidget(warn)
+        # L'overlay che si spegne NON è una nota a piè di pagina. Il paragrafo
+        # sopra è una nostra spiegazione tecnica; questo è quello che il pilota
+        # si ritrova addosso, ed è metà del motivo per cui questa finestra
+        # esiste (era il secondo difetto trovato in pista il 01/09). Stava in
+        # grigio a 12 px, cioè si saltava: adesso ha lo stesso corpo e lo stesso
+        # colore del testo principale. Non un colore d'allarme — il peso che ha.
+        lay.addWidget(_para(txt["warn"]))
 
         if open_anyway:
-            half = QLabel(txt["open_anyway_why"])
-            half.setWordWrap(True)
-            half.setProperty("role", "muted")
-            lay.addWidget(half)
-        lay.addStretch(1)
+            # Questa invece è la didascalia di un'uscita secondaria, e resta tale.
+            lay.addWidget(_para(txt["open_anyway_why"], muted=True))
 
         row = QHBoxLayout()
         cancel = QPushButton(txt["cancel"])
@@ -274,6 +290,24 @@ class SwapToBackend(QDialog):
         go.clicked.connect(partial(self._chose, SWAP))
         row.addWidget(go)
         lay.addLayout(row)
+
+        # L'altezza la decide il contenuto, non un numero scritto a mano: 420 px
+        # per un testo che ne chiedeva 281 lasciavano 140 px di vuoto fra
+        # l'ultimo paragrafo e i bottoni, e una finestra mezza vuota si legge
+        # come una finestra che non ha finito di caricare.
+        # La misura la decide il contenuto, non due numeri scritti a mano: 420
+        # px per un testo che ne chiedeva 281 lasciavano 140 px di vuoto fra
+        # l'ultimo paragrafo e i bottoni, e una finestra mezza vuota si legge
+        # come una finestra che non ha finito di caricare.
+        #
+        # `activate()` prima, perché il `sizeHint` di un layout appena montato è
+        # ancora quello vuoto. E `resize(sizeHint())` invece di `adjustSize()`:
+        # su una finestra con etichette che vanno a capo, `adjustSize()` non si
+        # limita a prendere il `sizeHint` — cerca una proporzione gradevole e la
+        # stringe, dando 533 px a un contenuto che ne chiedeva 560. La misura
+        # buona la sa già il layout; qui va solo presa senza ritoccarla.
+        lay.activate()
+        self.resize(self.sizeHint())
 
     def _chose(self, choice: str) -> None:
         self.choice = choice
