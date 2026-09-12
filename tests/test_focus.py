@@ -413,3 +413,74 @@ def test_no_recurring_weakness_does_not_let_the_reference_go(tmp_path):
         "la finestra deve continuare a riempirsi: nessun giro e' stato buttato")
     assert eng._focus_ref is not None, "e il metro deve essere ancora appuntato"
     eng.close()
+
+
+# --- i giri scartati si contano --------------------------------------------
+#
+# Il coach scarta i giri non puliti (un'escursione gonfia la perdita di OGNI
+# curva e inventerebbe una debolezza) e finora lo faceva in silenzio. Il 01/09,
+# su 14 giri 6 erano sporchi — i due piu' veloci compresi — e il focus e' rimasto
+# in `assess` per tutta la sessione senza che nessuno potesse dire perche'. Il
+# conto e' l'unica cosa che rende leggibile quella sessione dopo.
+#
+# Quali giri contano non cambia: qui si conta soltanto.
+
+def test_un_giro_non_pulito_si_conta_fra_gli_scartati():
+    fc = FocusCoach(min_laps=3)
+    fc.observe(_debrief(_loss(0, 300)))
+    assert fc.discarded == 0
+    fc.observe(_debrief(_loss(0, 9000)), stable=False)
+    fc.observe(_debrief(_loss(0, 9000)), stable=False)
+    assert fc.discarded == 2
+    assert len(fc.window) == 1, "e restano scartati davvero"
+
+
+def test_il_conto_si_azzera_quando_il_ciclo_si_chiude():
+    """Il ciclo si chiude su un verdetto, e gli scartati sono di quel ciclo."""
+    fc = FocusCoach(min_laps=3)
+    _feed(fc, _debrief(_loss(0, 300)), 3)              # BRIEF
+    fc.observe(_debrief(_loss(0, 9000)), stable=False)
+    assert fc.discarded == 1
+    report = _feed(fc, _debrief(_loss(0, 20)), 3)      # IMPROVED
+    assert report.kind is FocusKind.IMPROVED
+    assert fc.discarded == 0
+
+
+def test_il_conto_si_azzera_anche_sul_focus_parcheggiato():
+    fc = FocusCoach(min_laps=3)
+    _feed(fc, _debrief(_loss(0, 300)), 3)              # BRIEF
+    fc.observe(_debrief(_loss(0, 9000)), stable=False)
+    assert fc.discarded == 1
+    report = _feed(fc, _debrief(_loss(0, 300)), 6)     # STUCK
+    assert report.kind is FocusKind.STUCK
+    assert fc.discarded == 0
+
+
+def test_su_pulito_il_conto_non_si_azzera():
+    """La trappola gemella della regressione del metro (PR #92).
+
+    CLEAN non e' un verdetto: e' uno stato che si ripete a ogni giro. Azzerare
+    li' vorrebbe dire che il pilota che gira sporco meta' delle volte e non ha
+    debolezze ricorrenti legge sempre «scartati=1» e non sa mai quanti giri ha
+    buttato — cioe' esattamente la domanda a cui questa riga deve rispondere.
+    """
+    fc = FocusCoach(min_laps=3)
+    for _ in range(3):
+        fc.observe(_debrief())                         # niente da eleggere
+    assert fc._last.kind is FocusKind.CLEAN
+    fc.observe(_debrief(), stable=False)
+    fc.observe(_debrief())
+    assert fc._last.kind is FocusKind.CLEAN
+    fc.observe(_debrief(), stable=False)
+    assert fc.discarded == 2
+
+
+def test_un_metro_nuovo_azzera_anche_il_conto():
+    """Gli scartati sono scartati *da questa finestra*, e la finestra e' andata."""
+    fc = FocusCoach(min_laps=3)
+    fc.observe(_debrief(_loss(0, 500)), reference="giro-A")
+    fc.observe(_debrief(_loss(0, 9000)), stable=False, reference="giro-A")
+    assert fc.discarded == 1
+    fc.observe(_debrief(_loss(0, 500)), reference="giro-B")
+    assert len(fc.window) == 1
+    assert fc.discarded == 0

@@ -212,6 +212,12 @@ class FocusCoach:
         #: Il giro contro cui e' misurato tutto quello che c'e' in finestra.
         #: None finche' nessuno lo dichiara.
         self._reference: object = None
+        #: Quanti giri sono stati scartati perche' non puliti da quando questa
+        #: finestra e' cominciata. Non cambia niente di cio' che il coach
+        #: decide: e' il numero che spiega perche' non decide. Si azzera dove la
+        #: finestra si chiude — su un verdetto, o quando un metro nuovo la
+        #: svuota — mai su CLEAN, che non e' un verdetto e si ripete a ogni giro.
+        self.discarded: int = 0
         # Seeded from last session's saved state (per car+track) so the coach
         # doesn't re-teach a corner you already mastered. A corner already here is
         # simply never chosen as a focus again — the same effect as mastering it
@@ -249,8 +255,16 @@ class FocusCoach:
 
         ``None`` means the caller doesn't track it, and then nothing changes —
         a unit that isn't declared is assumed to hold still.
+
+        Un giro scartato viene **contato** (:attr:`discarded`). Scartarlo in
+        silenzio e' costato la prova del focus del 01/09: su 14 giri 6 erano
+        sporchi, i due piu' veloci compresi, e il coach e' rimasto a «valuto 2/3»
+        senza che da fuori si potesse distinguere un coach che aspetta da un
+        coach rotto. Il conto non entra in nessuna decisione — serve solo a
+        leggere il log.
         """
         if not stable:
+            self.discarded += 1
             return self._last
 
         if reference is not None and reference != self._reference:
@@ -258,6 +272,10 @@ class FocusCoach:
             self._reference = reference
             if not first:
                 self.window = []
+                # Gli scartati erano scartati *da questa* finestra, e la
+                # finestra non c'e' piu': tenerli attribuirebbe alla prossima
+                # giri che non ha mai visto.
+                self.discarded = 0
                 # Un focus aperto e' un esperimento a meta': la sua base sta
                 # dall'altra parte del cambio e il verdetto non sarebbe piu'
                 # difendibile. Il motore congela il riferimento finche' un focus
@@ -319,6 +337,11 @@ class FocusCoach:
         if current <= focus.baseline_ms * _IMPROVED_FRAC and current <= _SOLVED_MS:
             self.mastered.add(focus.corner_index)
             self.focus = None
+            # Il ciclo e' chiuso: il prossimo conta i suoi. L'azzeramento sta sui
+            # due verdetti e SOLO li', come il metro fermo del motore (PR #92) —
+            # `focus is None` e CLEAN si ripetono a ogni giro, e azzerare li'
+            # farebbe leggere «scartati=1» a chi ne ha buttati sei.
+            self.discarded = 0
             return FocusReport(
                 FocusKind.IMPROVED,
                 _m("improved", lang, name=focus.name,
@@ -328,6 +351,7 @@ class FocusCoach:
         if len(self._focus_losses) >= _PATIENCE:
             self.parked.add(focus.corner_index)
             self.focus = None
+            self.discarded = 0          # anche parcheggiare chiude il ciclo
             setup = (_m("stuck_setup", lang, cause=focus.cause)
                      if focus.cause else "")
             return FocusReport(

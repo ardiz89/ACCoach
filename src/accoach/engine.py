@@ -160,7 +160,8 @@ def _reference_token(reference) -> tuple | None:
     return (lap.recorded_utc, lap.lap_time_ms)
 
 
-def _focus_log_line(report: FocusReport | None) -> str:
+def _focus_log_line(report: FocusReport | None, *, counted: bool = True,
+                    discarded: int = 0) -> str:
     """Il contesto senza cui le righe `detto |` non si interpretano.
 
     «Nessuna parola di trazione in cinque giri» significa una cosa se il focus
@@ -172,13 +173,30 @@ def _focus_log_line(report: FocusReport | None) -> str:
     giro non l'ho nemmeno giudicato* (senza riferimento o senza curve il coach
     non lo vede). Il coach tace in tutti e tre, per tre motivi che non si
     somigliano.
+
+    E ce n'e' un quarto, che finora si travestiva da primo: *questo giro non
+    l'ho contato perche' non era pulito*. Il coach scarta i giri con
+    un'escursione apposta — gonfiano la perdita di ogni curva e inventerebbero
+    una debolezza — ma `observe` restituisce l'ultimo rapporto, quindi la riga
+    usciva identica a quella del giro prima. Il 01/09 su 14 giri 6 erano sporchi,
+    i due piu' veloci compresi: dieci righe «valuto 2/3» di fila, e nessun modo
+    di sapere se il coach stava aspettando o era rotto. ``counted=False`` lo
+    dice, e ``discarded`` dice quanti ne ha buttati in questa finestra — perche'
+    un giro solo e' sfortuna, sei su quattordici sono la sessione.
     """
     focus = report.focus if report else None
     if focus is None:
         stato = report.kind.value if report else "non valutato"
-        return f"focus | nessuno | stato={stato}"
-    return (f"focus | {focus.name} | tema={_focus_theme_key(report)} "
-            f"| perdi {focus.baseline_ms:.0f} ms")
+        riga = f"focus | nessuno | stato={stato}"
+    else:
+        riga = (f"focus | {focus.name} | tema={_focus_theme_key(report)} "
+                f"| perdi {focus.baseline_ms:.0f} ms")
+    if counted:
+        return riga
+    # Il resto della riga descrive il giro *precedente*, che sotto un focus
+    # aperto e' l'equivoco peggiore: nome, tema e progresso sembrano quelli di
+    # questo giro. La coda dice che non lo sono.
+    return f"{riga} | non contato: giro non pulito | scartati={discarded}"
 
 
 def _decision_sig(decision) -> tuple | None:
@@ -484,7 +502,11 @@ class CoachEngine:
             # Senza questa riga il log direbbe cosa e' stato detto ma non contro
             # che cosa: «nessuna parola di trazione» significa una cosa se il
             # focus e' la trazione e un'altra se non e' mai stato eletto.
-            _log.info("%s", _focus_log_line(self._focus_report))
+            # `stable` e' lo stesso valore passato a `observe`, non una seconda
+            # lettura: la riga dice del giro esattamente cio' che il coach ne ha
+            # fatto, e le due non possono divergere.
+            _log.info("%s", _focus_log_line(self._focus_report, counted=stable,
+                                            discarded=self._focus.discarded))
             after = (frozenset(self._focus.mastered), frozenset(self._focus.parked))
             if after != before:
                 self._save_focus_state()   # a corner just changed status; persist
