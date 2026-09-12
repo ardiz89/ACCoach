@@ -14,6 +14,7 @@ non ce n'erano — invece di lasciar credere che siano andati persi.
 """
 from __future__ import annotations
 
+import re
 import zipfile
 from datetime import datetime
 from pathlib import Path
@@ -44,6 +45,114 @@ def _names(zip_path: Path) -> list[str]:
 def _contesto(zip_path: Path) -> str:
     with zipfile.ZipFile(zip_path) as z:
         return z.read(support.CONTEXT_NAME).decode("utf-8")
+
+
+# --- la dichiarazione si misura sul pacchetto, non su se stessa ----------------
+# Il contesto diceva «No paths, machine name or account details are included»:
+# vero del file che la contiene, FALSO del pacchetto in cui quel file vive —
+# accanto c'e' `logs/accoach.log`, che i percorsi assoluti col nome dell'account
+# Windows ce li ha eccome, e non li filtriamo apposta (un log ripulito non
+# diagnostica niente). Un tester che legge quella riga crede di mandare un
+# pacchetto pulito.
+#
+# Questi helper NON cercano la frase: cercano la *proprieta'*. Una riscrittura
+# che torni a promettere un pacchetto senza percorsi li fa cadere comunque.
+
+#: Un percorso utente vero e proprio, quello che il nome dell'account se lo porta
+#: dietro. Il segnaposto che il contesto usa per spiegarsi (`<account>`) non e'
+#: uno di questi: qui si cerca un segmento reale.
+_USER_PATH = re.compile(r"[A-Za-z]:[\\/]Users[\\/](?!<)[^\\/\s<>]+", re.I)
+_NEGATIONS = ("no ", "not ", "never", "none", "nothing", "without", "n't")
+
+
+def _zip_carries_a_user_path(zip_path: Path) -> bool:
+    """C'e' un percorso utente in un allegato (il contesto non conta: e' lui
+    l'imputato, non la prova)."""
+    with zipfile.ZipFile(zip_path) as z:
+        for name in z.namelist():
+            if name == support.CONTEXT_NAME:
+                continue
+            if _USER_PATH.search(z.read(name).decode("utf-8", "replace")):
+                return True
+    return False
+
+
+def _sentences(text: str) -> list[str]:
+    """Frasi, per blocchi separati da riga vuota.
+
+    Prima flattenavo tutto il file in una stringa sola: il contesto e' fatto di
+    etichette senza punti fermi, quindi l'intestazione (che dice «log») finiva
+    incollata alla dichiarazione (che dice «path») e il controllo passava con la
+    frase vecchia. Un test verde che non provava niente — il secondo test della
+    coppia l'ha smascherato, non una rilettura.
+    """
+    out = []
+    for block in text.split("\n\n"):
+        flat = " ".join(block.split())
+        out += [s for s in re.split(r"(?<=[.!?])\s+", flat) if s.strip()]
+    return out
+
+
+def _discloses_that_the_logs_carry_paths(text: str) -> bool:
+    """C'e' una frase che parla dei log E dei percorsi nella stessa riga.
+
+    E' la sola cosa che un tester deve leggere per decidere in modo informato:
+    che quello che allega non e' filtrato. Non si controlla *come* e' scritta.
+    """
+    return any("log" in s.lower() and "path" in s.lower() for s in _sentences(text))
+
+
+def _unscoped_absence_claims(text: str) -> list[str]:
+    """Le frasi che negano la presenza di percorsi senza dire *di cosa* parlano.
+
+    Dentro uno ZIP con dentro altri file, «questo file» e' proprio
+    l'ambiguita' che ha creato il difetto: una negazione sui percorsi deve
+    nominare la parte del pacchetto a cui si riferisce — il file di contesto
+    per nome, oppure i log.
+    """
+    out = []
+    for s in _sentences(text):
+        low = s.lower()
+        if "path" not in low or not any(n in low for n in _NEGATIONS):
+            continue
+        if support.CONTEXT_NAME in low or "log" in low:
+            continue
+        out.append(s)
+    return out
+
+
+def test_la_dichiarazione_e_vera_del_pacchetto_non_solo_di_se_stessa(tmp_path):
+    logs = tmp_path / "logs"
+    logs.mkdir()
+    (logs / "accoach.log").write_text(
+        "2026-06-28 00:25:05 ERROR accoach: crash report written to "
+        r"C:\Users\undrg\Documents\ACCoach\logs\crash-20260628-002505.log" "\n",
+        encoding="utf-8")
+
+    z = support.build_log_zip(dest_dir=tmp_path / "out", source=logs)
+    text = _contesto(z)
+
+    # Precondizione: senza questa il test non proverebbe niente.
+    assert _zip_carries_a_user_path(z), "il fixture non allega alcun percorso utente"
+    # (a) i log allegati non sono filtrati, e lo si dice.
+    assert _discloses_that_the_logs_carry_paths(text), text
+    # (b) e nessuna frase promette un pacchetto senza percorsi.
+    assert _unscoped_absence_claims(text) == []
+
+
+def test_senza_allegati_non_c_e_nessun_percorso_da_dichiarare(tmp_path):
+    """L'altra meta' della coppia, tenuta diversa apposta: se non si allega
+    niente, non c'e' niente di non filtrato di cui avvisare. Se l'avviso
+    comparisse comunque sarebbe una formula, non una dichiarazione."""
+    vuoto = tmp_path / "logs"
+    vuoto.mkdir()
+
+    z = support.build_log_zip(dest_dir=tmp_path / "out", source=vuoto)
+    text = _contesto(z)
+
+    assert not _zip_carries_a_user_path(z)
+    assert not _discloses_that_the_logs_carry_paths(text), text
+    assert _unscoped_absence_claims(text) == []
 
 
 # --- lo ZIP -------------------------------------------------------------------

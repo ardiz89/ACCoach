@@ -753,7 +753,7 @@ Quelli che potresti volere davvero:
 | `setup show <file>` | Legge un setup ACC senza avviare il gioco |
 | `selftest` | Controlla che la voce/TTS funzioni, e scrive un report |
 | `logs` | Apre la cartella di log e crash report |
-| `logs --zip` | Fa un solo file da allegare a una segnalazione: i log più versione, commit, Python/sistema e le ultime auto/pista. Nasce anche se di log non ce n'è nessuno, e in quel caso lo dice |
+| `logs --zip` | Fa un solo file da allegare a una segnalazione: i log più versione, commit, Python/sistema e le ultime auto/pista. Nasce anche se di log non ce n'è nessuno, e in quel caso lo dice. **I log ci vanno dentro come sono, non filtrati**: contengono percorsi col nome del tuo account Windows (`C:\Users\<account>\...`) e i nomi di piste, auto e file che hai aperto. È voluto — un log ripulito non diagnostica niente — ed è scritto anche dentro lo ZIP: aprilo e guarda prima di mandarlo |
 | `find-rain` | Trova i campi pioggia di ACC misurandoli (serve una sessione con meteo variabile) |
 
 ### Il file di configurazione

@@ -21,6 +21,13 @@ nome della macchina e qualunque campo con un indirizzo: non aggiungono niente
 alla diagnosi e uscirebbero di casa insieme allo ZIP. Il catalogo si apre in
 sola lettura e solo se esiste — questo comando non deve creare niente, e non
 apre la telemetria.
+
+Il che vale per il **contesto**, non per il pacchetto: i log ci vanno dentro
+come sono, non filtrati, e i percorsi assoluti col nome dell'account Windows li
+contengono davvero. E' una scelta — un log ripulito non diagnostica niente, e
+una censura invisibile sarebbe peggio del percorso — e per questo la
+dichiarazione dentro lo ZIP tiene le due cose separate invece di promettere un
+pacchetto pulito che non e'. Vedi :func:`_disclosure`.
 """
 
 from __future__ import annotations
@@ -194,9 +201,41 @@ def context_report(*, logs: list[Path] | None = None,
     else:
         lines.append(f"         {NO_COMBOS}")
     lines.append("")
-    lines.append("No paths, machine name or account details are included: they")
-    lines.append("would leave the machine with this file and add nothing.")
+    lines += _disclosure(bool(logs))
     return "\n".join(lines) + "\n"
+
+
+def _disclosure(has_logs: bool) -> list[str]:
+    """Cosa sta per uscire di casa, detto in modo che si possa decidere.
+
+    La versione precedente diceva «No paths, machine name or account details are
+    included»: vera del file che la conteneva, **falsa del pacchetto in cui quel
+    file vive**. Accanto c'e' ``logs/accoach.log``, che i percorsi assoluti col
+    nome dell'account Windows li ha eccome. Non li filtriamo, ed e' una scelta:
+    un log ripulito non diagnostica niente, e una censura invisibile sarebbe
+    peggio del percorso. Ma allora va detto, e vanno tenute distinte le due
+    cose — cosa questo file lascia fuori, e cosa gli allegati portano dentro.
+
+    L'avviso sui log compare solo se dei log ci sono davvero: avvisare di
+    allegati che non esistono sarebbe una formula di copertura, non una
+    dichiarazione.
+    """
+    out = ["What you are about to send:",
+           f"  {CONTEXT_NAME} (this file) carries the lines above and nothing",
+           "  else: no paths, no machine name, no account name, because none of",
+           "  that would help a diagnosis."]
+    if has_logs:
+        out += [
+            "  The log files under logs/ go in exactly as they were written,",
+            "  NOT filtered: they can contain paths that include your Windows",
+            r"  account name (C:\Users\<account>\...), and the names of the",
+            "  tracks, cars and files you opened. A log with the paths taken",
+            "  out diagnoses nothing, which is why they stay in. Open them",
+            "  before you send this, if you want to see what you are sending.",
+        ]
+    else:
+        out.append("  No log files were attached, so that is all there is.")
+    return out
 
 
 def _frozen() -> bool:

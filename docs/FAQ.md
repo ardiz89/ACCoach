@@ -399,11 +399,20 @@ it sounds, not what you're told.
 
 **Where are the logs if something breaks?**
 `logs` opens the folder with logs and crash reports. To send them to us, `logs
---zip` packages them into a single file in `Documents\ACCoach\`, together with
-the version, the commit, your Python/Windows versions and the last cars and
-tracks you drove — nothing else, no paths and no account details. It writes the
+--zip` packages them into a single file in `Documents\ACCoach\`. It writes the
 zip even when there are no logs at all, and says so inside: "no logs" and "I
 didn't collect them" are different answers.
+
+**What is in that zip, exactly?**
+Two things, and they are not the same. `contesto.txt`, which we write: the
+version, the commit, your Python/Windows versions and the last cars and tracks
+you drove — no paths, no machine name, no account name, because none of that
+would help us. And your log files, which go in **exactly as they are, not
+filtered**: they can contain paths that include your Windows account name
+(`C:\Users\<account>\...`) and the names of the tracks, cars and files you
+opened. We leave them in on purpose — a log with the paths taken out cannot
+diagnose anything, and quietly censoring one would be worse than the path. The
+zip is a plain file on your disk: open it and look before you send it.
 
 (Type the command the way `help` shows it: `HONE.exe logs --zip` from the
 packaged app, `python accoach_main.py logs --zip` from a source checkout.)
