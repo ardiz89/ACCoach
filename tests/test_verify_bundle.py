@@ -145,6 +145,32 @@ def test_il_workflow_non_tiene_una_seconda_copia_dell_elenco():
             assert dest not in script, f"«{dest}» e' riscritto negli script"
 
 
+def test_nessuno_script_di_build_tiene_una_copia_dell_elenco():
+    """La stessa regola, per chi costruisce l'EXE sul suo PC.
+
+    Il difetto era vivo qui mentre lo chiudevamo altrove: `build_exe.bat`
+    elencava i `--add-data` a mano e ne aveva **quattro su sei** — senza
+    `tracks` (niente pista disegnata per chi non ha AC installato) e senza
+    `voice_cues_male` (voce maschile robotica). Chi costruiva in locale
+    otteneva un pacchetto degradato, in silenzio, esattamente come il 28/07.
+
+    La lezione è che la lista non va tolta *da un posto*: va tolta da ovunque
+    possa esistere. Questo test guarda tutti gli script di build del repo,
+    quelli che ci sono oggi e quelli che qualcuno aggiungerà.
+    """
+    script = sorted(ROOT.glob("build*.bat")) + sorted(ROOT.glob("build*.sh"))
+    assert script, "nessuno script di build trovato: il test guarda nel posto sbagliato"
+    payload = declared(ROOT / "HONE.spec")
+    for path in script:
+        righe = "\n".join(
+            l for l in path.read_text(encoding="utf-8").splitlines()
+            if not l.lstrip().lower().startswith("rem"))
+        for src, dest in payload:
+            assert src not in righe, (
+                f"{path.name} riscrive «{src}»: e' un'altra copia della lista "
+                f"del .spec, e una copia si dimentica un pezzo")
+
+
 def test_lo_zip_si_carica_anche_quando_il_controllo_boccia():
     """Il pacchetto rotto è l'unico che vale davvero la pena di scaricare.
 
