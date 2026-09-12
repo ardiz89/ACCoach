@@ -45,7 +45,12 @@ jobs:
         id: pack
         shell: pwsh
         run: |
-          $zip = "HONE-${{ github.ref_name }}-windows.zip"
+          # Il ref finisce nel NOME di un file: su un tag e' `v0.1.0`, ma sul giro
+          # a vuoto e' un ramo, e un ramo qui si chiama `fix/prova-di-build`. La
+          # barra e' un separatore di cartelle, non un carattere: senza questa
+          # riga la prova cadeva sul nome dello ZIP invece che sul build.
+          $ref = "${{ github.ref_name }}" -replace '[^A-Za-z0-9._-]', '-'
+          $zip = "HONE-$ref-windows.zip"
           Compress-Archive -Path dist/HONE/* -DestinationPath $zip
           $sha = (Get-FileHash $zip -Algorithm SHA256).Hash
           "zip=$zip"   | Out-File -FilePath $env:GITHUB_OUTPUT -Append
