@@ -52,7 +52,65 @@ jobs:
           "sha=$sha"   | Out-File -FilePath $env:GITHUB_OUTPUT -Append
           Write-Host "SHA256  $sha  $zip"
 
+      # Il .spec dichiara sei payload e il bundle li perde in silenzio: e' gia'
+      # successo due volte (docs/FAQ.md il 28/07, e i due --add-data che questo
+      # stesso workflow spediva a mano prima di passare al .spec). Un payload che
+      # manca non fa cadere il build: degrada una funzione -- la guida in inglese
+      # diventa italiana, la voce maschile torna robotica -- e te ne accorgi da
+      # utente, mesi dopo.
+      #
+      # Il conto NON e' scritto a mano qui dentro: una seconda lista sarebbe una
+      # seconda fonte di verita', cioe' lo stesso difetto da un'altra porta. Si
+      # confronta il bundle con il REPO, che e' la fonte.
+      - name: Verify the bundle carries what the spec declares
+        shell: pwsh
+        run: |
+          $root = "dist/HONE"
+          $fail = @()
+          $all  = Get-ChildItem -Path $root -Recurse -Force -ErrorAction SilentlyContinue
+          function Norm($path) { return $path.Replace([char]92, '/') }
+
+          foreach ($p in @(
+              @{ src = "src/accoach/web";             bundled = "accoach/web";             probe = "*.html" },
+              @{ src = "src/accoach/voice_cues";      bundled = "accoach/voice_cues";      probe = "*.wav"  },
+              @{ src = "src/accoach/voice_cues_male"; bundled = "accoach/voice_cues_male"; probe = "*.wav"  },
+              @{ src = "src/accoach/tracks";          bundled = "accoach/tracks";          probe = "*"      }
+          )) {
+            $dir = $all | Where-Object { $_.PSIsContainer -and (Norm $_.FullName).EndsWith($p.bundled) } | Select-Object -First 1
+            if (-not $dir) { $fail += "MISSING FOLDER  $($p.bundled)"; continue }
+            $want = @(Get-ChildItem -Path $p.src        -Recurse -File -Filter $p.probe -ErrorAction SilentlyContinue).Count
+            $got  = @(Get-ChildItem -Path $dir.FullName -Recurse -File -Filter $p.probe -ErrorAction SilentlyContinue).Count
+            if ($got -lt $want) { $fail += "SHORT  $($p.bundled): $got files against $want in the repo" }
+            else { Write-Host "ok  $($p.bundled): $got / $want" }
+          }
+
+          foreach ($f in @("GUIDA.md", "FAQ.md")) {
+            $hit = $all | Where-Object { -not $_.PSIsContainer -and $_.Name -eq $f } | Select-Object -First 1
+            if (-not $hit) { $fail += "MISSING FILE  $f" } else { Write-Host "ok  $f  ->  $(Norm $hit.FullName)" }
+          }
+
+          if ($fail.Count -gt 0) {
+            Write-Host "::error::the bundle is short of what HONE.spec declares"
+            $fail | ForEach-Object { Write-Host "::error::$_" }
+            exit 1
+          }
+
+      # Sempre, anche sul giro a vuoto: e' il senso della prova. Da qui lo ZIP si
+      # scarica e si apre senza che niente sia stato pubblicato fuori dal repo.
+      - name: Upload the build for inspection
+        uses: actions/upload-artifact@v4
+        with:
+          name: HONE-build-${{ github.sha }}
+          path: ${{ steps.pack.outputs.zip }}
+          retention-days: 14
+
+      # SOLO sui tag. Senza questa guardia il `workflow_dispatch` dichiarato qui
+      # sopra -- che esiste apposta per provare il build senza spedire niente --
+      # arrivava fin qui con `github.ref_name` uguale al RAMO, e pubblicava una
+      # release pubblica intitolata «HONE main». Un giro di prova non deve poter
+      # spedire: la differenza fra provare e pubblicare e' questa riga.
       - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           files: ${{ steps.pack.outputs.zip }}
