@@ -87,13 +87,47 @@ def test_invocation_as_an_installed_module():
     assert got == "python -m accoach"
 
 
-def test_the_three_invocations_are_three_different_strings():
-    three = {
+def test_the_four_invocations_are_four_different_strings():
+    four = {
         cli.invocation(r"C:\HONE\HONE.exe", frozen=True),
         cli.invocation(r"C:\src\ACCoach\accoach_main.py", frozen=False),
         cli.invocation(r"C:\src\ACCoach\src\accoach\__main__.py", frozen=False),
+        cli.invocation(r"C:\w\src\accoach\__main__.py", frozen=False,
+                       sibling_script=Path(r"C:\w\accoach_main.py")),
     }
-    assert len(three) == 3, three
+    assert len(four) == 4, four
+
+
+# Il ripiego era `python -m accoach`, e su questa macchina un `.pth` in
+# user-site mette `progetti/ACCoach/src` in sys.path: da un worktree quel
+# comando NON fallisce, gira sull'albero sbagliato e stampa l'aiuto di un altro
+# checkout. E' peggio di un errore perche' e' silenzioso — la stessa trappola
+# del 10/08. Se `accoach_main.py` e' accanto a noi, la risposta e' quello.
+
+def test_il_ripiego_non_consiglia_mai_un_albero_diverso_da_questo():
+    got = cli.invocation(r"C:\worktree\src\accoach\__main__.py", frozen=False,
+                         sibling_script=Path(r"C:\worktree\accoach_main.py"))
+    assert got == r"python C:\worktree\accoach_main.py"
+    # Il punto non e' la forma della stringa: e' che NON puo' eseguire altro.
+    assert "-m accoach" not in got
+
+
+def test_il_ripiego_resta_il_modulo_solo_se_non_c_e_uno_script_accanto():
+    got = cli.invocation("/usr/lib/python3.12/site-packages/accoach/__main__.py",
+                         frozen=False, sibling_script=None)
+    assert got == "python -m accoach"
+
+
+def test_lo_script_accanto_e_quello_dell_albero_in_cui_giriamo():
+    """La proprieta' vera: il comando consigliato deve stare nello stesso albero
+    del modulo che lo stampa. Qui si misura sull'albero reale, non su un finto."""
+    script = cli._checkout_script()
+    assert script is not None, "questo checkout ha accoach_main.py, va trovato"
+    assert script.is_file()
+    # Stesso albero del modulo che sta girando, non un altro checkout.
+    assert script.parent == Path(cli.__file__).resolve().parents[2]
+    assert str(script) in cli.invocation(cli.__file__, frozen=False,
+                                         sibling_script=script)
 
 
 def test_invocation_without_an_argv0_falls_back_to_the_module_form():

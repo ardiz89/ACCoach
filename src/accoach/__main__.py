@@ -24,7 +24,8 @@ _EXE_FALLBACK = "HONE.exe"
 _SOURCE_SCRIPT = "accoach_main.py"
 
 
-def invocation(argv0: str | None, frozen: bool) -> str:
+def invocation(argv0: str | None, frozen: bool,
+               *, sibling_script: Path | str | None = None) -> str:
     """La riga di comando che *da qui* funziona davvero, senza il comando.
 
     Funzione pura apposta: l'aiuto annunciava ``python -m accoach <command>``
@@ -39,19 +40,45 @@ def invocation(argv0: str | None, frozen: bool) -> str:
 
     * impacchettato con PyInstaller → il nome dell'eseguibile (``HONE.exe``)
     * lanciato da ``accoach_main.py`` in un checkout → ``python accoach_main.py``
-    * lanciato come modulo installato (``python -m accoach``: ``argv[0]`` e' il
-      percorso di ``__main__.py``) → ``python -m accoach``
+    * lanciato come modulo con un ``accoach_main.py`` accanto → il percorso
+      **assoluto** di quello script
+    * lanciato come modulo installato, senza script accanto → ``python -m accoach``
 
     Il nome dell'exe si legge da ``argv[0]`` invece di essere scritto qui: se un
     giorno l'eseguibile cambia nome (``ACCoach.spec`` lo chiama ancora
     ``ACCoach``), l'aiuto lo segue da solo.
+
+    **Perche' il percorso assoluto e non ``python -m accoach``.** Il ripiego
+    consigliava il modulo, e il modulo puo' eseguire un albero che non e'
+    questo: su questa macchina un ``.pth`` in user-site mette
+    ``progetti/ACCoach/src`` in ``sys.path``, quindi da un worktree
+    ``python -m accoach`` non fallisce — gira sul checkout sbagliato e stampa
+    l'aiuto di un altro albero. E' peggio di un errore, perche' e' silenzioso
+    (gia' successo il 10/08). Se ``accoach_main.py`` sta accanto a noi, quella
+    e' la sola risposta che non puo' eseguire altro; e va dato per intero,
+    perche' ``python accoach_main.py`` da un'altra cartella non parte.
     """
     name = Path(argv0).name if argv0 else ""
     if frozen:
         return name or _EXE_FALLBACK
     if name == _SOURCE_SCRIPT:
         return f"python {_SOURCE_SCRIPT}"
+    if sibling_script:
+        return f"python {sibling_script}"
     return "python -m accoach"
+
+
+def _checkout_script() -> Path | None:
+    """``accoach_main.py`` dell'albero da cui *questo* modulo e' stato caricato.
+
+    Risolto da ``__file__``, non dalla cartella corrente: e' l'albero che sta
+    girando quello a cui il comando deve puntare.
+    """
+    try:
+        p = Path(__file__).resolve().parents[2] / _SOURCE_SCRIPT
+        return p if p.is_file() else None
+    except (OSError, IndexError):
+        return None
 
 
 def _render(template: str, prog: str) -> str:
@@ -60,7 +87,8 @@ def _render(template: str, prog: str) -> str:
 
 def _prog() -> str:
     argv0 = sys.argv[0] if sys.argv else ""
-    return invocation(argv0, bool(getattr(sys, "frozen", False)))
+    return invocation(argv0, bool(getattr(sys, "frozen", False)),
+                      sibling_script=_checkout_script())
 
 
 _HELP = """HONE — know why you're slow. Real-time driving coach for Assetto Corsa / ACC
@@ -206,8 +234,12 @@ def main() -> None:
         if any(a.lower() in ("--zip", "-z", "zip") for a in rest):
             # Impacchetta invece di aprire: e' cio' che si allega a una
             # segnalazione. `logs` da solo continua a fare quello di sempre.
-            from .support import build_log_zip
-            print(f"Log bundle: {build_log_zip()}")
+            from .support import build_log_zip, short_notice
+            bundle = build_log_zip()
+            print(f"Log bundle: {bundle}")
+            # La dichiarazione arriva dove arriva il comando: leggerla solo
+            # aprendo l'archivio vuol dire leggerla dopo aver deciso.
+            print(short_notice(bundle))
             return
         d = logs_dir()
         d.mkdir(parents=True, exist_ok=True)

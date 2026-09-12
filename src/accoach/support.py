@@ -219,6 +219,16 @@ def _disclosure(has_logs: bool) -> list[str]:
     L'avviso sui log compare solo se dei log ci sono davvero: avvisare di
     allegati che non esistono sarebbe una formula di copertura, non una
     dichiarazione.
+
+    E **nomina le categorie, non una parte**. La prima versione parlava di
+    percorsi, piste, auto e file aperti, e lasciava fuori la meta' piu'
+    personale: le ~340 righe `=== ACCoach ... starting ===` datate, che sono il
+    registro orario di ogni volta che il pilota si e' seduto a guidare per mesi;
+    l'identificatore del giro, che contiene il **tempo sul giro**; i
+    `crash-*.log`, che `build_log_zip` prende come tutti gli altri file e che
+    portano un traceback intero; e `data.laps_dir`, che negli errori di
+    configurazione puo' essere un percorso di rete. «Decido informato» e' vero
+    solo se l'elenco e' completo.
     """
     out = ["What you are about to send:",
            f"  {CONTEXT_NAME} (this file) carries the lines above and nothing",
@@ -226,12 +236,18 @@ def _disclosure(has_logs: bool) -> list[str]:
            "  that would help a diagnosis."]
     if has_logs:
         out += [
-            "  The log files under logs/ go in exactly as they were written,",
-            "  NOT filtered: they can contain paths that include your Windows",
-            r"  account name (C:\Users\<account>\...), and the names of the",
-            "  tracks, cars and files you opened. A log with the paths taken",
-            "  out diagnoses nothing, which is why they stay in. Open them",
-            "  before you send this, if you want to see what you are sending.",
+            "  Everything under logs/ goes in exactly as it was written, NOT",
+            "  filtered - a log with the interesting parts taken out diagnoses",
+            "  nothing.",
+            "  Those files carry, at least: paths, which include your Windows",
+            r"  account name (C:\Users\<account>\...) and any network location",
+            "  you configured; one dated line for every single time you started",
+            "  HONE, which together are a record of when you sat down to drive,",
+            "  going back as far as your oldest log; your lap times, and the",
+            "  tracks and cars you drove; the names of files you opened; and",
+            "  crash reports, each with a full traceback, the paths of our",
+            "  source files, and whatever value the error carried with it.",
+            "  It is an ordinary zip: open it and read it before you send it.",
         ]
     else:
         out.append("  No log files were attached, so that is all there is.")
@@ -245,6 +261,33 @@ def _frozen() -> bool:
 
 
 # --- lo ZIP -----------------------------------------------------------------------
+
+def short_notice(zip_path: Path | str) -> str:
+    """La dichiarazione in forma breve, per il terminale.
+
+    Il comando stampava solo il percorso dello ZIP: per sapere cosa stava per
+    mandare, un tester doveva **aprire l'archivio** e trovare ``contesto.txt``.
+    Una dichiarazione che si legge solo dopo aver deciso non serve a decidere.
+
+    Si legge dal pacchetto appena scritto invece che da un flag: cosi' la nota
+    breve non puo' divergere da quello che e' finito dentro davvero.
+    """
+    try:
+        with zipfile.ZipFile(zip_path) as z:
+            has_logs = any(n != CONTEXT_NAME for n in z.namelist())
+    except (OSError, zipfile.BadZipFile):
+        has_logs = False
+    if not has_logs:
+        return ("Nothing was attached: there were no log files to collect.\n"
+                f"{CONTEXT_NAME} inside says as much.")
+    return (
+        "Inside, logs/ goes in unfiltered: paths carrying your Windows account\n"
+        "name, one dated line for every time you started HONE, your lap times,\n"
+        "the tracks and cars you drove, and crash reports with full tracebacks.\n"
+        f"Read {CONTEXT_NAME} in the zip for the whole list - and the zip\n"
+        "itself, before you send it."
+    )
+
 
 def build_log_zip(dest_dir: Path | str | None = None,
                   source: Path | str | None = None,

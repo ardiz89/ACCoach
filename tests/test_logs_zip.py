@@ -62,19 +62,51 @@ def _contesto(zip_path: Path) -> str:
 #: dietro. Il segnaposto che il contesto usa per spiegarsi (`<account>`) non e'
 #: uno di questi: qui si cerca un segmento reale.
 _USER_PATH = re.compile(r"[A-Za-z]:[\\/]Users[\\/](?!<)[^\\/\s<>]+", re.I)
-_NEGATIONS = ("no ", "not ", "never", "none", "nothing", "without", "n't")
+_TIMESTAMP = re.compile(r"\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}")
+_LAP_TIME = re.compile(r"\d+m\d+s\d+")
+
+#: Le categorie di dato che il pacchetto puo' portare fuori, e le parole con cui
+#: un testo puo' nominarle. Il difetto precedente era che il controllo guardava
+#: SOLO la parola «path»: una bugia sul nome dell'account («Your Windows account
+#: name appears nowhere in this bundle») passava con 17 test verdi. Le categorie
+#: si rilevano da cosa c'e' DAVVERO negli allegati, non da cosa dice il testo.
+_CATEGORY_WORDS = {
+    "paths": ("path", "folder", "directory", "location"),
+    "account name": ("account", "user name", "username", "who you are"),
+    "when you drove": ("dated", "when you", "you drove", "timestamp", "history"),
+    "lap times": ("lap time", "your times", "times you", "how fast"),
+    "crash reports": ("crash", "traceback", "stack trace"),
+}
+
+#: Modi di negare. Larga apposta, e la larghezza e' *provata* dalla batteria di
+#: bugie in `test_ogni_bugia_sul_contenuto_viene_intercettata`: una negazione e'
+#: per forza lessicale, quindi l'unica difesa onesta e' mutare con parole
+#: diverse e far vedere che cadono tutte.
+_NEGATIONS = ("no ", "not ", "never", "none", "nothing", "nowhere", "without",
+              "n't", "free of", "stripped", "removed", "excluded", "redact",
+              "anonymi", "anonymo", "scrub", "sanitiz", "sanitis", "zero ")
 
 
-def _zip_carries_a_user_path(zip_path: Path) -> bool:
-    """C'e' un percorso utente in un allegato (il contesto non conta: e' lui
-    l'imputato, non la prova)."""
+def _facts_in_attachments(zip_path: Path) -> set[str]:
+    """Le categorie che il pacchetto porta fuori DAVVERO, lette dagli allegati.
+
+    Il file di contesto non si conta: e' lui l'imputato, non la prova.
+    """
+    facts: set[str] = set()
     with zipfile.ZipFile(zip_path) as z:
         for name in z.namelist():
             if name == support.CONTEXT_NAME:
                 continue
-            if _USER_PATH.search(z.read(name).decode("utf-8", "replace")):
-                return True
-    return False
+            if Path(name).name.startswith("crash-"):
+                facts.add("crash reports")
+            body = z.read(name).decode("utf-8", "replace")
+            if _USER_PATH.search(body):
+                facts |= {"paths", "account name"}
+            if _TIMESTAMP.search(body):
+                facts.add("when you drove")
+            if _LAP_TIME.search(body):
+                facts.add("lap times")
+    return facts
 
 
 def _sentences(text: str) -> list[str]:
@@ -93,54 +125,145 @@ def _sentences(text: str) -> list[str]:
     return out
 
 
-def _discloses_that_the_logs_carry_paths(text: str) -> bool:
-    """C'e' una frase che parla dei log E dei percorsi nella stessa riga.
+def _is_scoped(low: str) -> bool:
+    """La frase dice di *quale parte* del pacchetto parla.
 
-    E' la sola cosa che un tester deve leggere per decidere in modo informato:
-    che quello che allega non e' filtrato. Non si controlla *come* e' scritta.
+    Dentro uno ZIP con dentro altri file, «questo file» e' proprio l'ambiguita'
+    che ha creato il difetto: non conta come ambito. Contano il nome del file di
+    contesto, oppure i log.
     """
-    return any("log" in s.lower() and "path" in s.lower() for s in _sentences(text))
+    return support.CONTEXT_NAME in low or "log" in low
 
 
-def _unscoped_absence_claims(text: str) -> list[str]:
-    """Le frasi che negano la presenza di percorsi senza dire *di cosa* parlano.
+def _declaration_block(text: str) -> str:
+    """Solo la dichiarazione: l'ultimo blocco, dopo l'ultima riga vuota.
 
-    Dentro uno ZIP con dentro altri file, «questo file» e' proprio
-    l'ambiguita' che ha creato il difetto: una negazione sui percorsi deve
-    nominare la parte del pacchetto a cui si riferisce — il file di contesto
-    per nome, oppure i log.
+    Sul testo intero il controllo passava per il motivo sbagliato — misurato:
+    tolta la categoria «crash reports» dalla dichiarazione, il test restava
+    verde perche' la parola «crash» compariva nell'ELENCO DEI FILE
+    dell'intestazione (`crash-20260628-002505.log`). Il nome di un allegato non
+    e' una dichiarazione di cosa quell'allegato contiene.
+    """
+    return text.rstrip("\n").split("\n\n")[-1]
+
+
+def _categories_declared_as_present(text: str) -> set[str]:
+    """Le categorie che la dichiarazione nomina **senza negarle**.
+
+    Una frase negativa non dichiara niente: dire «no paths» non e' dire «ci sono
+    dei percorsi». Serve la distinzione, altrimenti la riga su `contesto.txt`
+    (che nega, correttamente) verrebbe contata come dichiarazione.
+    """
+    return _categories_named_affirmatively(_declaration_block(text))
+
+
+def _categories_named_affirmatively(text: str) -> set[str]:
+    found: set[str] = set()
+    for s in _sentences(text):
+        low = s.lower()
+        if any(n in low for n in _NEGATIONS):
+            continue
+        for cat, words in _CATEGORY_WORDS.items():
+            if any(w in low for w in words):
+                found.add(cat)
+    return found
+
+
+def _denials_of_what_the_bundle_carries(text: str, facts: set[str]) -> list[str]:
+    """Frasi che negano un dato che il pacchetto porta fuori davvero.
+
+    La proprieta' difesa, e non piu' «non c'e' la parola path»: per **ogni**
+    categoria che gli allegati contengono per davvero, nessuna frase puo'
+    negarla senza dire di quale parte del pacchetto sta parlando — con qualunque
+    parola la neghi.
     """
     out = []
     for s in _sentences(text):
         low = s.lower()
-        if "path" not in low or not any(n in low for n in _NEGATIONS):
+        if not any(n in low for n in _NEGATIONS) or _is_scoped(low):
             continue
-        if support.CONTEXT_NAME in low or "log" in low:
-            continue
-        out.append(s)
+        for cat in sorted(facts):
+            if any(w in low for w in _CATEGORY_WORDS[cat]):
+                out.append(f"[{cat}] {s}")
+                break
     return out
 
 
-def test_la_dichiarazione_e_vera_del_pacchetto_non_solo_di_se_stessa(tmp_path):
+def _unscoped_negations(text: str) -> list[str]:
+    """Rete di sicurezza: qualunque negazione che non dica di cosa parla.
+
+    Prende anche le categorie che non ho previsto — il vocabolario di
+    `_CATEGORY_WORDS` e' una lista, e una lista si dimentica.
+    """
+    return [s for s in _sentences(text)
+            if any(n in s.lower() for n in _NEGATIONS) and not _is_scoped(s.lower())]
+
+
+def _con_tutto_dentro(tmp_path: Path) -> Path:
+    """Una cartella di log con dentro le quattro categorie, tenute distinte."""
     logs = tmp_path / "logs"
     logs.mkdir()
     (logs / "accoach.log").write_text(
+        "2026-06-28 00:25:05 INFO accoach: === ACCoach 0.1.0 starting ===\n"
+        "2026-06-28 00:31:12 INFO accoach.recording: saved "
+        "mclaren-720s__monza__1m54s3__20260628-003112.json.gz\n"
         "2026-06-28 00:25:05 ERROR accoach: crash report written to "
         r"C:\Users\undrg\Documents\ACCoach\logs\crash-20260628-002505.log" "\n",
         encoding="utf-8")
+    (logs / "crash-20260628-002505.log").write_text(
+        "ACCoach 0.1.0 crash\nTraceback (most recent call last):\n"
+        r"  File C:\Users\undrg\progetti\ACCoach\src\accoach\app.py, line 1" "\n",
+        encoding="utf-8")
+    return logs
 
-    z = support.build_log_zip(dest_dir=tmp_path / "out", source=logs)
+
+def test_la_dichiarazione_nomina_tutto_quello_che_il_pacchetto_porta_fuori(tmp_path):
+    z = support.build_log_zip(dest_dir=tmp_path / "out",
+                              source=_con_tutto_dentro(tmp_path))
     text = _contesto(z)
+    facts = _facts_in_attachments(z)
 
     # Precondizione: senza questa il test non proverebbe niente.
-    assert _zip_carries_a_user_path(z), "il fixture non allega alcun percorso utente"
-    # (a) i log allegati non sono filtrati, e lo si dice.
-    assert _discloses_that_the_logs_carry_paths(text), text
-    # (b) e nessuna frase promette un pacchetto senza percorsi.
-    assert _unscoped_absence_claims(text) == []
+    assert facts == {"paths", "account name", "when you drove", "lap times",
+                     "crash reports"}, facts
+    # (a) ogni categoria che esce davvero e' nominata, non solo una parte.
+    assert facts - _categories_declared_as_present(text) == set(), text
+    # (b) e nessuna frase nega un dato che invece esce.
+    assert _denials_of_what_the_bundle_carries(text, facts) == []
+    assert _unscoped_negations(text) == []
 
 
-def test_senza_allegati_non_c_e_nessun_percorso_da_dichiarare(tmp_path):
+@pytest.mark.parametrize("bugia", [
+    # Quella dimostrata dal fact-check: passava con 17 test verdi perche' il
+    # controllo scartava ogni frase senza la parola «path».
+    "Your Windows account name appears nowhere in this bundle.",
+    "This bundle is free of personal paths.",
+    "Lap times have been removed before packaging.",
+    "The crash reports are anonymised.",
+    "Nothing here identifies your account.",
+    "We never include the times you drove.",
+    "Every location has been stripped out.",
+])
+def test_ogni_bugia_sul_contenuto_viene_intercettata(tmp_path, monkeypatch, bugia):
+    """Sette modi diversi di mentire sulla stessa sostanza.
+
+    Una negazione e' per forza lessicale: l'unica difesa onesta e' mutare con
+    parole diverse e far vedere che cadono tutte, invece di proteggere una
+    parola sola.
+    """
+    vero = support._disclosure
+    monkeypatch.setattr(support, "_disclosure",
+                        lambda has_logs: vero(has_logs) + [f"  {bugia}"])
+
+    z = support.build_log_zip(dest_dir=tmp_path / "out",
+                              source=_con_tutto_dentro(tmp_path))
+    text = _contesto(z)
+    facts = _facts_in_attachments(z)
+
+    assert _denials_of_what_the_bundle_carries(text, facts) != [], bugia
+
+
+def test_senza_allegati_non_c_e_niente_da_dichiarare(tmp_path):
     """L'altra meta' della coppia, tenuta diversa apposta: se non si allega
     niente, non c'e' niente di non filtrato di cui avvisare. Se l'avviso
     comparisse comunque sarebbe una formula, non una dichiarazione."""
@@ -150,9 +273,9 @@ def test_senza_allegati_non_c_e_nessun_percorso_da_dichiarare(tmp_path):
     z = support.build_log_zip(dest_dir=tmp_path / "out", source=vuoto)
     text = _contesto(z)
 
-    assert not _zip_carries_a_user_path(z)
-    assert not _discloses_that_the_logs_carry_paths(text), text
-    assert _unscoped_absence_claims(text) == []
+    assert _facts_in_attachments(z) == set()
+    assert _categories_declared_as_present(text) == set(), text
+    assert _unscoped_negations(text) == []
 
 
 # --- lo ZIP -------------------------------------------------------------------
@@ -345,3 +468,30 @@ def test_logs_zip_impacchetta_stampa_il_percorso_e_non_apre_explorer(monkeypatch
     assert str(zips[0]) in out
     assert aperte == []
     assert "logs/accoach.log" in _names(zips[0])
+
+
+def test_logs_zip_avvisa_a_schermo_senza_far_aprire_l_archivio(monkeypatch, capsys,
+                                                               tmp_path,
+                                                               _quiet_logging):
+    """Il comando stampava solo il percorso: per sapere cosa stava per mandare,
+    un tester doveva aprire lo ZIP e leggere `contesto.txt`. La dichiarazione
+    deve arrivare dove arriva il comando."""
+    from accoach import paths
+    monkeypatch.setattr(paths, "logs_dir", lambda: _con_tutto_dentro(tmp_path))
+    monkeypatch.setattr(paths, "base_dir", lambda: tmp_path / "base")
+    monkeypatch.setattr("os.startfile", lambda p: None, raising=False)
+    monkeypatch.setattr(cli.sys, "argv", ["accoach", "logs", "--zip"])
+
+    cli.main()
+
+    out = capsys.readouterr().out
+    z = next((tmp_path / "base").glob("*.zip"))
+    facts = _facts_in_attachments(z)
+
+    assert facts, "precondizione: il pacchetto deve portare fuori qualcosa"
+    # Non muto: a schermo si nomina cio' che esce davvero.
+    assert _categories_named_affirmatively(out) & facts, out
+    # E la versione breve non puo' contraddire quella lunga.
+    assert _denials_of_what_the_bundle_carries(out, facts) == []
+    # Dove sta scritto il resto.
+    assert support.CONTEXT_NAME in out
