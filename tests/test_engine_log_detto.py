@@ -128,3 +128,120 @@ def test_il_focus_eletto_finisce_nel_log_per_davvero(tmp_path, caplog):
         assert any("tema=" in r and "nessuno" not in r for r in righe), righe
     finally:
         eng.close()
+
+
+# --- il quarto «nessuno»: il giro che non e' stato contato -------------------
+
+def test_un_giro_scartato_non_si_legge_come_uno_contato():
+    """Il 01/09, su 14 giri 6 erano sporchi e il focus non e' mai stato eletto.
+
+    Il coach li scarta apposta — un'escursione gonfia la perdita di ogni curva e
+    inventerebbe una debolezza — ma nel log un giro scartato ripeteva parola per
+    parola la riga del giro prima, perche' `observe` restituisce l'ultimo
+    rapporto. Da fuori «valuto 2/3» per dieci giri di fila era indistinguibile da
+    un coach rotto.
+    """
+    fermo = _focus_log_line(FocusReport(kind=FocusKind.ASSESS, message=""))
+    scartato = _focus_log_line(FocusReport(kind=FocusKind.ASSESS, message=""),
+                               counted=False, discarded=1)
+    assert fermo != scartato
+    assert "non contato" in scartato
+    assert "non pulito" in scartato
+
+
+def test_la_riga_dice_quanti_giri_ha_buttato_in_questa_finestra():
+    """Un giro solo e' sfortuna, sei su quattordici sono la sessione."""
+    riga = _focus_log_line(FocusReport(kind=FocusKind.ASSESS, message=""),
+                           counted=False, discarded=6)
+    assert "scartati=6" in riga
+
+
+def test_anche_sotto_un_focus_aperto_si_vede_che_il_giro_non_conta():
+    """Qui l'equivoco e' peggiore: la riga porta nome, tema e perdita del focus,
+    quindi sembra un giro di esercizio come gli altri — e invece il progresso
+    che mostra e' quello del giro prima."""
+    riga = _focus_log_line(_report("trazione", CueCategory.MORE_THROTTLE),
+                           counted=False, discarded=3)
+    assert "Variante Ascari" in riga        # il contesto resta
+    assert "non contato" in riga
+    assert "scartati=3" in riga
+
+
+def test_un_giro_contato_non_porta_la_coda():
+    """La riga normale non cambia: e' quella che si legge nove volte su dieci."""
+    riga = _focus_log_line(_report("trazione", CueCategory.MORE_THROTTLE))
+    assert "non contato" not in riga
+    assert "scartati" not in riga
+
+
+def test_la_riga_resta_una_riga_sola_nel_formato_delle_altre():
+    riga = _focus_log_line(FocusReport(kind=FocusKind.ASSESS, message=""),
+                           counted=False, discarded=2)
+    assert "\n" not in riga
+    assert riga.startswith("focus | ")
+    assert riga.count(" | ") >= 3
+
+
+def test_il_giro_scartato_finisce_nel_log_per_davvero(tmp_path, caplog):
+    """L'effetto, non la forma: un giro sporco vero, dentro il motore.
+
+    Il fixture deve *separare* cio' che la cura separa, altrimenti passa per il
+    motivo sbagliato: i giri sporchi qui perdono in una curva diversa e molto di
+    piu' dei puliti, cosi' se venissero contati la finestra e la debolezza eletta
+    sarebbero visibilmente altre.
+    """
+    import logging
+
+    from accoach.comparison import Reference
+    from accoach.coaching.debrief import build_lap_debrief
+    from accoach.coaching.focus import FocusCoach
+    from accoach.engine import CoachEngine
+    from accoach.track import detect_corners
+
+    import synth
+
+    class _Dummy:
+        def read(self): ...
+        def close(self): ...
+
+    eng = CoachEngine(reader=_Dummy(), voice=None, laps_dir=tmp_path)
+    try:
+        ref = synth.build_lap(n=300, clean=True)
+        eng._reference = Reference(ref)
+        eng._corners = detect_corners(ref.samples)
+        eng._focus = FocusCoach(min_laps=3)
+
+        pulito = synth.build_lap(slow_corner=0, amt=30, n=300, clean=True)
+        sporco = synth.build_lap(slow_corner=1, amt=60, n=300, clean=False)
+
+        # Il fixture fa davvero quello che credo: due giri diversi, e uno solo
+        # dei due e' "stabile" per il coach.
+        assert pulito.clean is True and pulito.valid
+        assert sporco.clean is False
+        d_pulito = build_lap_debrief(pulito, eng._reference, eng._corners)
+        d_sporco = build_lap_debrief(sporco, eng._reference, eng._corners)
+        perse_pulito = {loss.index for loss in d_pulito.losses}
+        perse_sporco = {loss.index for loss in d_sporco.losses}
+        print("pulito perde in", perse_pulito, "sporco perde in", perse_sporco)
+        assert perse_pulito != perse_sporco, (
+            "fixture inerte: i due giri perdono nelle stesse curve, quindi il "
+            "test passerebbe anche se i giri sporchi venissero contati")
+
+        with caplog.at_level(logging.INFO, logger="accoach.coach"):
+            for lap in (pulito, sporco, pulito, sporco, pulito):
+                eng._observe_lap(lap)
+
+        righe = [r.getMessage() for r in caplog.records
+                 if r.getMessage().startswith("focus |")]
+        print("\n".join(righe))
+        assert len(righe) == 5
+        scartate = [r for r in righe if "non contato" in r]
+        assert len(scartate) == 2, righe
+        assert "scartati=1" in scartate[0]
+        assert "scartati=2" in scartate[1]
+        # e i giri puliti restano puliti da leggere
+        assert not any("non contato" in righe[i] for i in (0, 2, 4))
+        # il comportamento non e' cambiato: solo i tre puliti sono in finestra
+        assert len(eng._focus.window) == 3
+    finally:
+        eng.close()

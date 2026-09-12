@@ -212,6 +212,13 @@ class FocusCoach:
         #: Il giro contro cui e' misurato tutto quello che c'e' in finestra.
         #: None finche' nessuno lo dichiara.
         self._reference: object = None
+        #: Quanti giri non puliti sono stati scartati subito PRIMA di ogni giro
+        #: che sta in finestra: una voce per voce, tagliato con lei. E quelli
+        #: arrivati dopo l'ultimo giro contato, che non hanno ancora un giro a
+        #: cui appoggiarsi. Insieme fanno :attr:`discarded` — vedi li' perche'
+        #: un registro e non un contatore.
+        self._discards: list[int] = []
+        self._pending_discards: int = 0
         # Seeded from last session's saved state (per car+track) so the coach
         # doesn't re-teach a corner you already mastered. A corner already here is
         # simply never chosen as a focus again — the same effect as mastering it
@@ -223,6 +230,33 @@ class FocusCoach:
             _m("assess", current_language(), n=0, total=min_laps))
 
     # -- public API --------------------------------------------------------
+    @property
+    def discarded(self) -> int:
+        """Quanti giri non puliti sono stati buttati **dentro la finestra**.
+
+        Cioe': da quando e' stato contato il giro piu' vecchio che il coach ha
+        ancora in mano. Lo stesso span dei giri su cui elegge, perche' questo
+        numero esiste solo per essere letto e chi lo legge lo divide per quelli
+        — «sei buttati mentre ne contavo sei» e' la lettura, e dev'essere vera.
+
+        Si ricava, non si accumula. Un contatore andrebbe azzerato a mano nel
+        posto giusto, e il posto giusto qui non esiste: la finestra non si
+        chiude con un evento, **scorre** (`window[-_WINDOW:]`). La prima
+        versione era un contatore di sessione con l'etichetta di una finestra:
+        su 60 giri alternati diceva 30 accanto a una finestra di 6, e 20 giri
+        buttati prima che la finestra cominciasse se li portava dietro per
+        sempre. Derivandolo dal registro non puo' piu' staccarsi.
+
+        Il primo giro in finestra non porta i suoi: gli scarti che lo
+        precedono sono di prima dello span. A finestra vuota invece contano
+        tutti — non c'e' ancora niente in mano, e «ne ho buttati venti e non
+        ho ancora un giro» e' esattamente cio' che si vuole leggere.
+
+        Il totale di sessione non si perde: il log scrive una riga per ogni
+        giro scartato, quindi si conta.
+        """
+        return sum(self._discards[1:]) + self._pending_discards
+
     def observe(self, debrief: LapDebrief, *, stable: bool = True,
                 reference: object = None) -> FocusReport:
         """Feed one completed lap's debrief; return the next coaching report.
@@ -249,8 +283,16 @@ class FocusCoach:
 
         ``None`` means the caller doesn't track it, and then nothing changes —
         a unit that isn't declared is assumed to hold still.
+
+        Un giro scartato viene **registrato** (:attr:`discarded`). Scartarlo in
+        silenzio e' costato la prova del focus del 01/09: su 14 giri 6 erano
+        sporchi, i due piu' veloci compresi, e il coach e' rimasto a «valuto 2/3»
+        senza che da fuori si potesse distinguere un coach che aspetta da un
+        coach rotto. Il registro non entra in nessuna decisione — serve solo a
+        leggere il log.
         """
         if not stable:
+            self._pending_discards += 1
             return self._last
 
         if reference is not None and reference != self._reference:
@@ -258,6 +300,9 @@ class FocusCoach:
             self._reference = reference
             if not first:
                 self.window = []
+                # Il registro degli scarti e' indicizzato sulla finestra: se
+                # la finestra se ne va, se ne va con lei.
+                self._discards = []
                 # Un focus aperto e' un esperimento a meta': la sua base sta
                 # dall'altra parte del cambio e il verdetto non sarebbe piu'
                 # difendibile. Il motore congela il riferimento finche' un focus
@@ -267,7 +312,14 @@ class FocusCoach:
                 self._focus_losses = []
 
         self.window.append(debrief)
+        # Il registro si muove insieme alla finestra — stessa append, stesso
+        # taglio — perche' e' l'unica cosa che impedisce al numero di
+        # staccarsene: `window[-_WINDOW:]` scorre in silenzio, e un contatore
+        # a parte non se ne accorge.
+        self._discards.append(self._pending_discards)
+        self._pending_discards = 0
         self.window = self.window[-_WINDOW:]
+        self._discards = self._discards[-_WINDOW:]
 
         report = self._step(debrief)
         self._last = report
