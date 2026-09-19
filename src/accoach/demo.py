@@ -8,10 +8,10 @@ zone, so a frontend shows a moving delta bar and real cues. Used by
 
 from __future__ import annotations
 
-import tempfile
 
 from .engine import CoachEngine
 from .recording.lap import Lap, LapSample
+from .paths import demo_dir
 from .recording.storage import save_lap
 from .telemetry.snapshot import ACStatus, SessionType, TelemetrySnapshot
 
@@ -110,6 +110,6 @@ class DemoReader:
 
 def make_demo_engine() -> CoachEngine:
     """A CoachEngine wired to the demo feed, with the reference seeded on disk."""
-    laps_dir = tempfile.mkdtemp(prefix="accoach_demo_")
+    laps_dir = demo_dir("accoach_demo_")
     save_lap(_reference_lap(), laps_dir)
     return CoachEngine(reader=DemoReader(), voice=None, laps_dir=laps_dir)
