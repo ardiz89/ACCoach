@@ -183,8 +183,10 @@ Due avvertenze che vengono dalla nostra esperienza, non dalle fonti:
    voce, mentre guidi.
 2. **«Freni troppo presto» con il verso prefissato.** Driver61 ha un video intero su chi frena
    troppo presto; Baldwin dice sapendolo l'opposto — *«the majority of people I see are breaking too
-   late, not too early»*. Il verso va derivato dal dato del pilota. E oggi `BRAKE_EARLIER` ha
-   titolo, grafico ed esercizio dedicato ma **nessun produttore che la emetta**.
+   late, not too early»*. Il verso va derivato dal dato del pilota. `BRAKE_EARLIER` aveva
+   titolo, grafico ed esercizio dedicato ma **nessun produttore che la emettesse**;
+   **chiuso** con `a27c4d9` («il coach sa dire anche "frena prima"»), che la emette da
+   `analyzer.py:163` quando stacchi dopo il riferimento e all'apex sei comunque più lento.
 3. **L'apex precoce come errore in assoluto.** **Ross Bentley in persona**, nei commenti al proprio
    video, difende l'apex precoce per le curve senza rettilineo dopo: *«there are corners that don't
    have much of a straight afterwards, so exit speed is not important»*. La condizione è misurabile
@@ -270,16 +272,18 @@ Trovati incrociando i tre audit interni con la ricerca esterna. Ognuno è verifi
   **Aggiornamento del 2026-08-10.** Il briefing era il sintomo, non il difetto: `isInPit` è morto su
   ACC e **tre** posti ci si appoggiavano. La domanda giusta era già scritta in casa dal 21 luglio
   (`reader.py:318`, «isInPit only covers standing in the garage»): **la corsia, non la piazzola**.
-  - il briefing → ramo `fix/briefing-ai-box`, non ancora fuso;
+  - il briefing → **fuso** in `main` con la PR #87 («il briefing ai box nasce anche
+    quando il gioco non dice "garage"»);
   - **il consumo benzina mediava dentro la sosta** — una sosta gomme non alza il serbatoio, quindi
     il ramo del rifornimento non la prende, e il giro entrava nella media come se fosse costato mezzo
     litro: il serbatoio legge un giro più ricco di quanto sia, e un avviso benzina in ritardo non si
-    recupera. Ramo `fix/benzina-corsia-box`, non ancora fuso;
+    recupera. **Fuso** con la PR #88 («un giro che ha toccato la corsia box non entra
+    più nella media dei consumi»);
   - **il rilevatore di bloccaggi urla «alleggerisci il freno» mentre parcheggi** — `LOCKED` e
     `WHEELSPIN` stanno fra le categorie di sicurezza, quindi sono le uniche che sopravvivono a
     `quiet == "pit"`, e il cancello di bassa velocità in `_is_lockup` viene saltato apposta quando un
     aiuto sta modulando: che è ogni frenata in ABS dentro la piazzola. Questo non l'aveva visto
-    nessuno.
+    nessuno. **Fuso** con la PR #86.
 - **`STRATEGIE.md` è orfano**: il suo pilastro C non è mai stato costruito e non compare in roadmap.
 
 E due cose che invece **erano già giuste**, e vale la pena saperlo perché la ricerca le indica come
