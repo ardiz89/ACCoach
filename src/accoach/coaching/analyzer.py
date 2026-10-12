@@ -282,21 +282,41 @@ class CoachAnalyzer:
             self._zones = zones
         else:
             self._set_fixed_zones()
-        # A new zone layout invalidates the old per-zone advice and fault memory
-        # (both are keyed by zone index).
-        self._advice.clear()
-        self._announced.clear()
-        self._faults.clear()
-        # La carta invece si butta solo se il layout è cambiato DAVVERO. Questa
-        # invalidazione è portante: con zone diverse un `index` conservato
-        # significa un'altra curva, e un nome sulla curva sbagliata manda il
-        # pilota a lavorare su quella accanto. Ma `set_corners` viene richiamata
-        # a ogni giro salvato con lo stesso identico layout (il motore rincorre
-        # il nuovo miglior giro), e lì azzerare cancellava il riquadro su tutto
-        # il rettilineo del traguardo, a ogni giro, per sempre.
+        # Consigli e difetti sono indicizzati per zona, e un layout nuovo sposta
+        # gli indici: con zone diverse un `index` conservato significa un'altra
+        # curva, e un consiglio sulla curva sbagliata manda il pilota a lavorare
+        # su quella accanto. Quindi non si tengono dove sono — ma nemmeno si
+        # buttano: **seguono la curva**. Buttarli era il difetto, due volte.
+        # Con lo stesso layout (il caso di quasi ogni giro salvato) voleva dire
+        # non dirli mai, perche' si mettono da parte a fine curva per il giro
+        # dopo. E con un layout nuovo voleva dire toglierli proprio a chi
+        # migliora, che cambia riferimento a ogni giro.
         if self._zones != previous:
+            moved = self._follow(previous)
+            self._advice = {
+                moved[i]: Cue(c.category, c.message, c.priority, moved[i], c.pos)
+                for i, c in self._advice.items() if i in moved}
+            self._announced = {moved[i] for i in self._announced if i in moved}
+            self._faults = {(moved[z], cat): age
+                            for (z, cat), age in self._faults.items() if z in moved}
+            # La carta invece porta un nome e un numero già scritti a schermo:
+            # quella si butta, com'era.
             self.last_corner = None
         self._seg = None
+
+    def _follow(self, previous: list[tuple[float, float, float]]) -> dict[int, int]:
+        """Dove è finita ogni zona di prima: indice vecchio -> indice nuovo.
+
+        Una curva è la stessa se il suo apex cade dentro una zona di adesso. Le
+        zone che non ritrovano casa mancano dal risultato, e quello che
+        portavano si perde: meglio tacere che parlare della curva sbagliata.
+        """
+        moved: dict[int, int] = {}
+        for old, (_lo, _hi, mid) in enumerate(previous):
+            new = self._zone_at(mid)
+            if new >= 0:
+                moved[old] = new
+        return moved
 
     def _set_fixed_zones(self) -> None:
         n = self.num_segments

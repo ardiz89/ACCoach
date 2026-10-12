@@ -103,3 +103,20 @@ def test_unknown_levels_directional():
     out = adv.update(replace(unknown, lap_position=0.01), [], now)
     assert len(out) == 1
     assert "dal" not in out[0].message and out[0].message.endswith("il TC.")
+
+
+def test_a_lap_out_of_the_pit_lane_is_not_judged():
+    """Il giro d'uscita, su ACC: `in_pit` non si accende mai, solo `in_pit_lane`.
+
+    In pista il 24/09: tre pattinamenti a gomme fredde uscendo dai box, e sul
+    traguardo «prova ad alzare il TC». Il giro dopo, con gli stessi sintomi, va
+    giudicato eccome — senza quel controllo questo test passerebbe anche con un
+    advisor muto.
+    """
+    adv = SetupAdvisor()
+    ev = {3: [_spin(3)], 8: [_spin(8)], 14: [_spin(14)]}
+    adv.update(replace(_snap(0.02), in_pit_lane=True), [], 0.0)
+    out, now = _drive_lap(adv, ev, now=0.1)
+    assert out == [], "consiglio d'assetto dedotto dal giro d'uscita"
+    out, _ = _drive_lap(adv, ev, now=now)
+    assert [c.category for c in out] == [CueCategory.TC_UP]

@@ -364,3 +364,45 @@ def test_braked_late_needs_more_than_a_metre():
     # non frena affatto: entrambe hanno una risposta, e non è questa.
     assert _braked_late(-1.0, 0.30) is False
     assert _braked_late(0.30, -1.0) is False
+
+
+# --- i consigli seguono la curva quando il riferimento cambia ----------------
+# Un pilota che migliora cambia riferimento a ogni giro, e ogni riferimento ha
+# le sue zone: bordi spostati di qualche metro, a volte una curva in piu'. Se un
+# layout nuovo buttasse i consigli, chi migliora non ne sentirebbe mai uno —
+# la stessa forma del focus che non eleggeva mentre il pilota andava piu' forte.
+
+from dataclasses import replace as _replace
+
+from accoach.coaching.cue import Cue
+from accoach.track import Corner
+
+
+def _con_un_consiglio_alla_seconda():
+    an = CoachAnalyzer()
+    corners = detect_corners(synth.build_lap().samples)
+    assert len(corners) == 2, "il fixture ha due curve: se cambiano, questi test non provano niente"
+    an.set_corners(corners)
+    an._advice[1] = Cue(CueCategory.CARRY_SPEED, "Porta piu' velocita' in curva", 200.0, 1, 0.8)
+    return an, corners
+
+
+def test_il_consiglio_resta_sulla_sua_curva_se_i_bordi_si_spostano():
+    an, corners = _con_un_consiglio_alla_seconda()
+    an.set_corners([_replace(c, entry_pos=c.entry_pos + 0.004, exit_pos=c.exit_pos - 0.003)
+                    for c in corners])
+    assert an._advice[1].category is CueCategory.CARRY_SPEED
+
+
+def test_il_consiglio_segue_la_curva_se_il_suo_indice_cambia():
+    """Il riferimento nuovo vede una curva in piu' prima: la seconda diventa la terza."""
+    an, corners = _con_un_consiglio_alla_seconda()
+    an.set_corners([Corner(index=0, entry_pos=0.04, apex_pos=0.06, exit_pos=0.08), *corners])
+    assert set(an._advice) == {2}, "il consiglio e' rimasto sull'indice vecchio, cioe' sulla curva prima"
+    assert an._advice[2].segment == 2
+
+
+def test_il_consiglio_di_una_curva_sparita_si_butta():
+    an, corners = _con_un_consiglio_alla_seconda()
+    an.set_corners(corners[:1])
+    assert not an._advice
