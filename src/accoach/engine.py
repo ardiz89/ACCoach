@@ -543,12 +543,30 @@ class CoachEngine:
             # personal best di fila (1:51 -> 1:47) l'hanno svuotata quattro volte.
             # Il focus non eleggeva **mentre il pilota migliorava**.
             #
-            # Si libera su un verdetto, e solo su quello: dato «migliorata» o
-            # «parcheggiata» il ciclo e' chiuso e il prossimo si pesa su oggi.
-            # CLEAN invece non e' un verdetto ed e' uno stato che si ripete a
-            # ogni giro: liberarlo li' rifarebbe la regressione, perche' ogni
-            # giro ributterebbe la finestra che non arriverebbe mai ai tre giri.
-            if self._focus_report.kind in (FocusKind.IMPROVED, FocusKind.STUCK):
+            # Si libera su un verdetto: dato «migliorata» o «parcheggiata» il
+            # ciclo e' chiuso e il prossimo si pesa su oggi.
+            #
+            # E si libera su CLEAN. Fino al 13/10 non lo faceva, per paura della
+            # regressione del 23/08. Il costo si e' visto sul log del 24/09 a
+            # Imola: il metro appuntato al primo giro della finestra era il giro
+            # lento del pilota stesso, contro cui non si perde niente da
+            # nessuno; il coach ha detto «nessun punto debole» e li' e'
+            # rimasto, mentre contro il riferimento del momento la Rivazza
+            # perdeva mezzo secondo. Un metro fermo per sempre non e' un
+            # controllo, e' un orologio fermo.
+            #
+            # Non rifa' la regressione perche' la regressione stava nel muovere
+            # il metro **mentre la finestra si riempie** (ASSESS), e quello
+            # resta vietato: liberato su CLEAN, se il riferimento nel frattempo
+            # e' cambiato il giro dopo svuota la finestra una volta, la
+            # valutazione riparte, e per i tre giri che servono il metro e' di
+            # nuovo appuntato. Chi migliora a ogni giro riceve un verdetto ogni
+            # tre giri, non «valuto 0/3» per tutta la sessione. E se il
+            # riferimento non si e' mosso, liberare non cambia niente: il giro
+            # dopo si riappunta lo stesso metro e la finestra continua a
+            # scorrere.
+            if self._focus_report.kind in (FocusKind.IMPROVED, FocusKind.STUCK,
+                                           FocusKind.CLEAN):
                 self._focus_ref = None
             else:
                 self._focus_ref = (fref, fcorners)
