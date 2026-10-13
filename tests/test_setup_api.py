@@ -283,3 +283,42 @@ def test_la_copia_non_puo_leggere_fuori_dalle_cartelle(tmp_path):
     c, _path = _client(tmp_path)
     r = c.post("/api/setup/seed", json={"source": str(fuori), "track": "monza"})
     assert r.status_code == 403
+
+
+# --- il nome del setup non e' un percorso ------------------------------------
+
+def _file_sotto(radice):
+    return sorted(str(f) for f in radice.rglob("*") if f.is_file())
+
+
+def _apply_con_nome(c, path, nome):
+    return c.post("/api/setup/apply", json={
+        "path": path, "as_name": nome, "confirm": True,
+        "changes": [{"param": "rearWing", "delta_clicks": -1}]})
+
+
+def test_as_name_cannot_leave_the_setup_folder(tmp_path):
+    """`path` passava da `_safe`; `as_name` no, e finiva dritto in `dest_dir / name`.
+
+    Riprodotto il 12/10: `../../evil` scriveva due cartelle sopra, un nome
+    assoluto scriveva dove voleva — e con `overwrite` avrebbe sovrascritto
+    qualunque .json. Il controllo guarda l'effetto, non solo il codice di
+    risposta: dopo ogni richiesta sul disco non c'e' nessun file in piu'.
+    """
+    c, path = _client(tmp_path)
+    fuori = tmp_path / "fuori"
+    fuori.mkdir()
+    prima = _file_sotto(tmp_path)
+    for nome in ("../../evil", "..\\..\\evil", "sub/x", "sub\\x", "..", ".",
+                 str(fuori / "assoluto")):
+        r = _apply_con_nome(c, path, nome)
+        assert r.status_code == 400, f"{nome!r}: {r.status_code} {r.text}"
+        assert _file_sotto(tmp_path) == prima, f"{nome!r} ha scritto un file"
+
+
+def test_a_plain_name_still_writes(tmp_path):
+    """Il controllo: un nome normale, anche con spazi e punti, si scrive."""
+    c, path = _client(tmp_path)
+    r = _apply_con_nome(c, path, "gara v1.2 bagnato")
+    assert r.status_code == 200, r.text
+    assert r.json()["name"] == "gara v1.2 bagnato"

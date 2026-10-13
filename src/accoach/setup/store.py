@@ -93,6 +93,17 @@ def save(
     overwriting, the previous file is backed up first.
     """
     dest_dir = Path(dest_dir)
+    # Il nome e' un nome, non un percorso. `dest_dir / name` lo avrebbe seguito
+    # ovunque: `../../x` due cartelle sopra, un nome assoluto dove voleva lui
+    # (su un percorso assoluto `/` butta via tutto quello che ha a sinistra).
+    # Sta qui e non nella rotta web perche' e' qui che il nome diventa percorso,
+    # e da qui passa anche la riga di comando.
+    # I separatori sono elencati a mano, tutti e due, invece di chiedere a
+    # `Path`: su Linux `sub\\x` e' un nome di file valido, e lo stesso setup
+    # copiato su Windows diventerebbe un percorso. I due punti chiudono anche
+    # `C:nome` e i flussi alternativi di NTFS.
+    if name in ("", ".", "..") or any(ch in name for ch in "/\\:"):
+        raise ValueError(f"not a plain setup name: {name!r}")
     ext = "." + getattr(setup, "ext", "json")
     if not name.endswith(ext):
         name += ext
