@@ -274,6 +274,20 @@ class WorkPhase:
         """Return a variant tuned by ``kw`` (default: unchanged)."""
         return self
 
+    def blind(self) -> str:
+        """Perche' questa fase su quest'auto non puo' giudicare niente, o "".
+
+        Una fase cieca non e' una fase completata: il motore la salta, ma lo
+        dice con le sue parole invece di scrivere «completata».
+        """
+        return ""
+
+
+#: «Quest'auto non ha una finestra pressioni che conosciamo», detto al motore.
+#: Non e' ``None``: ``None`` vuol dire «tieni quella del profilo», ed e' cosi'
+#: che un'auto mai classificata si ritrovava la finestra di una stradale.
+NO_WINDOW: tuple = (None, None)
+
 
 @dataclass
 class Profile:
@@ -947,6 +961,13 @@ class RaceEngineer:
         phase = self.phase
         if phase is None:
             return Decision(DecisionKind.DONE, _msg("done", lang))
+        blind = phase.blind()
+        if blind:
+            # Prima del cancello, non dopo: un cancello che non sa cosa guardare
+            # risponderebbe «a posto», e il pilota leggerebbe «fase completata»
+            # su una cosa che nessuno ha controllato.
+            self.phase_idx += 1
+            return Decision(DecisionKind.STAND_DOWN, blind)
         if phase.gate(self.window):
             self.phase_idx += 1
             nxt = self.phase

@@ -243,6 +243,25 @@ class PressurePhase(WorkPhase):
     def owns(self, symptom: Symptom) -> bool:
         return False
 
+    def blind(self) -> str:
+        """Senza finestra (``core.NO_WINDOW``) non c'e' niente da confrontare.
+
+        E' l'auto che il nome non ci dice cos'e'. La misura c'e', ma dire «27
+        psi» senza sapere se per quest'auto sono tanti o pochi non aiuta
+        nessuno: si dice che non lo sappiamo, e perche' non si tira a indovinare.
+        """
+        if self.target is not None:
+            return ""
+        if current_language() == "it":
+            return ("Pressioni: non so che tipo di auto e' questa, quindi non so "
+                    "che finestra hanno le sue gomme. Non le tocco: la finestra "
+                    "di un'altra categoria sarebbe un numero sbagliato detto con "
+                    "sicurezza. Vado avanti col resto.")
+        return ("Pressures: I don't know what kind of car this is, so I don't "
+                "know its tyre window. I'm leaving them alone: another class's "
+                "window would be a wrong number said with confidence. Moving on "
+                "to the rest.")
+
     def _tol(self, psi_per_click: float | None) -> float:
         """La tolleranza che quest'auto puo' davvero raggiungere.
 
@@ -255,6 +274,8 @@ class PressurePhase(WorkPhase):
 
     def _out(self, pressures: dict):
         """Gli assi fuori finestra: (nome, ruote, psi, psi per click o None)."""
+        if self.target is None:
+            return                            # nessuna finestra: vedi `blind`
         for ax, slots in (("front", FRONT), ("rear", REAR)):
             cur = pressures.get(ax)
             if cur is None:

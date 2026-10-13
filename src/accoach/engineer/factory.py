@@ -8,7 +8,7 @@ callers (live engine or debrief).
 from __future__ import annotations
 
 from .classmap import profile_for_car
-from .core import RaceEngineer
+from .core import NO_WINDOW, RaceEngineer
 from .pressures import pressure_window
 from .steps import steps_for
 
@@ -24,8 +24,12 @@ def engineer_for(car_model: str, track: str | None = None, *,
     non uno che indovina.
     """
     kw.setdefault("steps", steps_for(car_model, is_acc))
+    # Senza finestra — un'auto che non sappiamo classificare — la fase pressioni
+    # non prende quella del profilo: lo dice e passa oltre. `None` al motore
+    # vorrebbe dire «tieni quella del profilo», che e' il contrario.
+    window = pressure_window(car_model, track)
     return RaceEngineer(
         profile_for_car(car_model),
-        pressure_window=pressure_window(car_model, track),
+        pressure_window=window if window is not None else NO_WINDOW,
         **kw,
     )

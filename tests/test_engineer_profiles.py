@@ -124,8 +124,10 @@ def test_engineer_for_sets_class_and_pressure_window():
     # the formula pressure window (22.0/0.4) is applied to the pressure phase
     pp = eng.phases[0]
     assert (pp.target, pp.tol) == pressure_window("f1_1990_mclaren") == (22.0, 0.4)
-    # road and gt3 differ
-    assert pressure_window("dodge_char_police")[0] == 30.0
+    # Un'auto che il nome non dice cos'e' non ha una finestra. Qui c'era
+    # `[0] == 30.0`: era il default «stradale» fissato in un test, lo stesso che
+    # dava 30 psi a una LMP1 (vedi test_engineer_classe_ignota.py).
+    assert pressure_window("dodge_char_police") is None
     assert pressure_window("mclaren_720s_gt3_evo") == (27.5, 0.7)
 
 
