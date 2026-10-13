@@ -421,15 +421,44 @@ class CoachEngine:
         # Today's track temperature decides which past lap is a fair benchmark:
         # a personal best set on a rubbered-in evening track is the wrong target
         # for a cold morning, and every tenth in the debrief would be weather.
-        self._reference = _load_reference(car, track, self.laps_dir,
-                                          self._road_temp, self._grip,
-                                          self._compound)
+        #
+        # Questa funzione gira dopo **ogni** giro salvato, per inseguire il
+        # nuovo miglior giro, e quasi sempre scopre che il riferimento e' quello
+        # di prima. In quel caso esce subito: e' solo un risparmio (niente curve
+        # da ricalcolare, niente catalogo da aprire, a ogni giro) e non regge
+        # nessuna proprieta' — quello che il coach deve ricordare da un giro
+        # all'altro e' protetto altrove. Fino al 12/10 qui dentro si azzerava
+        # anche il coach: vedi `_forget_session`, la meta' che qui non deve stare.
+        reference = _load_reference(car, track, self.laps_dir,
+                                    self._road_temp, self._grip,
+                                    self._compound)
+        if (reference is not None and self._reference is not None
+                and _reference_token(reference) == _reference_token(self._reference)):
+            return
+        self._reference = reference
         self._comparator = LapComparator(self._reference) if self._reference else None
         corners = detect_corners(self._reference.lap.samples) if self._reference else []
         self._corners = corners
         self._corner_names = _corner_labels(car, track, corners, self.laps_dir)
+        # Butta i consigli di curva solo se le zone sono cambiate davvero: sono
+        # indicizzati per zona, e con un altro layout parlerebbero della curva
+        # accanto.
         self.analyzer.set_corners(corners)
         self.analyzer.reset()
+        # Il comparatore nuovo non sa quali staccate il pilota ha gia' imparato.
+        self._update_wean()
+
+    def _forget_session(self) -> None:
+        """Auto o pista nuove: quello che il coach sapeva riguardava altro.
+
+        Sta fuori da `_rebuild_reference` perche' quella gira anche a ogni giro
+        salvato sulla **stessa** auto e pista, e li' dimenticare e' il difetto:
+        dal 28/06 al 12/10 un giro salvato svuotava i consigli di curva (detti
+        zero volte su 24 dopo un giro salvato, 26 dopo un giro d'uscita),
+        riportava a «primo traguardo» il conto della benzina — l'avviso non
+        poteva arrivare mai — e azzerava i cooldown, cosi' le pressioni
+        tornavano a ogni giro. Nessun modulo era rotto: lo era la chiamata.
+        """
         self.advisor.reset()
         self.pressure.reset()
         self.tyretemp.reset()
@@ -884,7 +913,9 @@ class CoachEngine:
             self._road_temp = snap.road_temp or None
             self._grip = snap.surface_grip or None
             self._compound = snap.tyre_compound or None
+            self._reference = None      # un'altra auto o pista: mai «lo stesso giro»
             self._rebuild_reference(snap.car_model, snap.track)
+            self._forget_session()
             # Auto o pista nuove: la carta della curva precedente parla di
             # un'altra sessione. `set_corners` butta da sé quando il layout
             # delle zone cambia, ma due auto sulla stessa pista hanno lo stesso
@@ -927,6 +958,9 @@ class CoachEngine:
             self._focus = FocusCoach(mastered=mastered, parked=parked)
             self._focus_report = None
             self._focus_ref = None
+            # Il comparatore e' nato qualche riga sopra, quando il focus era
+            # ancora quello dell'auto di prima.
+            self._update_wean()
             # A focus theme belongs to one car/track combination. Left set, it
             # would keep filtering technique advice on a theme that no longer
             # applies — possibly for the whole session, if this combination
@@ -998,7 +1032,10 @@ class CoachEngine:
         # Let the analyzer hold feed-forward advice the live data contradicts in
         # the same zone (e.g. don't say "carry more speed" where you understeered).
         self.analyzer.note_faults(event_cues + balance_cues)
-        _submit(self.analyzer.update(snap, delta))
+        # Su un giro che non rappresenta niente l'analyzer non prende nemmeno
+        # appunti: zittire la voce non bastava, perche' quello che metteva da
+        # parte sul giro d'uscita lo leggeva sul primo giro lanciato.
+        _submit(self.analyzer.update(snap, None if unrepresentative else delta))
         if unrepresentative:
             # Nascondere e basta la farebbe riapparire identica dopo il pit stop.
             self.analyzer.drop_last_corner()
