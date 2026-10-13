@@ -13,6 +13,7 @@ from accoach.engineer import (
     profile_for_car,
 )
 from accoach.engineer.profiles import FORMULA_PROFILE, GT3_PROFILE, ROAD_PROFILE
+from accoach.engineer.steps import AccSteps
 
 U, O = Balance.UNDERSTEER, Balance.OVERSTEER
 EN, AP, EX = Phase.ENTRY, Phase.APEX, Phase.EXIT
@@ -139,7 +140,7 @@ def test_engineer_for_sets_class_and_pressure_window():
 
 def _press_change(cur, target=27.5, tol=0.7):
     from accoach.engineer.profiles._common import PressurePhase
-    ph = PressurePhase(target, tol)
+    ph = PressurePhase(target, tol, steps=AccSteps())
     return ph.pressure_remedy(_lap(press={"front": cur, "rear": target}))
 
 
@@ -171,7 +172,7 @@ def test_the_italian_message_names_the_axle_in_italian(monkeypatch):
     pilota legge un numero e poi va a girare una manopola."""
     from accoach.engineer.profiles import _common
     monkeypatch.setattr(_common, "current_language", lambda: "it")
-    ph = _common.PressurePhase(27.5, 0.7)
+    ph = _common.PressurePhase(27.5, 0.7, steps=AccSteps())
     front = ph.pressure_remedy(_lap(press={"front": 24.7, "rear": 27.5})).rationale
     rear = ph.pressure_remedy(_lap(press={"front": 27.5, "rear": 24.7})).rationale
     assert "anteriore" in front and "front" not in front
