@@ -52,7 +52,7 @@ SYM = Symptom(Balance.UNDERSTEER, Phase.APEX, Speed.HIGH)
 def _lap(time_ms=100000, score=0.6):
     return LapStats(lap_time_ms=time_ms, stable=True,
                     symptom_scores={SYM: score}, symptom_corners={SYM: 4},
-                    pressures_hot={"front": 27.5, "rear": 27.5})
+                    pressures_hot={"front": 26.9, "rear": 26.9})
 
 
 def _bocciata(eng=None):
