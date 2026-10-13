@@ -217,8 +217,8 @@ produce dipendenza e non trasferisce. Il progetto lo sa già — «il perché, n
 
 | Grandezza | Valore trovato | Fonte | Cosa ne facciamo |
 |---|---|---|---|
-| Finestra pressione GT3 ACC | 27.3–27.9 psi | Aris, Kunos, **nov 2020, v1.6** | La nostra è 27.5 ± 0.7. È centrata bene **su quella versione**. Va marcata con data e versione |
-| idem, community post-1.9 | 26.0–27.0 psi | Coach Dave (in disaccordo con sé stesso nella stessa pagina: 26–27.2, 26.5–27.5) | **Non pinnare.** Ma con quella finestra la Ferrari 488 a 26.5 psi sarebbe già dentro, e noi le diciamo «alza 1.0 psi» |
+| Finestra pressione GT3 ACC | 27.3–27.9 psi | Aris, Kunos, **nov 2020, v1.6** | La nostra **era** 27.5 ± 0.7, centrata bene **su quella versione**. Dal 13/10/2026 non lo è più: vedi la riga sotto |
+| idem, community post-1.9 | 26.0–27.0 psi | Coach Dave (in disaccordo con sé stesso nella stessa pagina: 26–27.2, 26.5–27.5) | **Adottata il 13/10/2026 come 26.5 ± 0.5**, scelta col pilota e non misurata da noi: con la vecchia la Ferrari 488 a 26.5 psi si sentiva dire «alza 1.0 psi» e la 720S a 26.6 «+8 click». La striscia 27.0–27.5 resta contesa fra le tre versioni della fonte |
 | Δ temperatura fra le tre zone | 15 °C / 9 °C / 9-5 °C | tutte e tre Coach Dave, in disaccordo | **Folklore.** Kunos ha scritto la simulazione a tre zone e non ha mai pubblicato un numero. Se ci serve, va misurato da noi |
 | σ dei tempi, GT3 professionisti in gara | 0.129–0.276 s | British GT, Donington | **Il numero che ci mancava.** Con σ≈0.15 e tre giri l'intervallo di confidenza è ±0.17 s |
 | Slip ratio ottimale in frenata | 3–10% | Driver61, con definizione operativa | Solida, ma senza ABS |
@@ -227,8 +227,8 @@ produce dipendenza e non trasferisce. Il progetto lo sa già — «il perché, n
 | Mappa motore | *nessuna regola universale* | tabelle Kunos per vettura | Sulla Huracán EVO2 i livelli 1-5 sono **freno motore**; sulla 296 nulla cambia. «Più bassa = più potente» salta su quattro famiglie |
 
 **La regola che vale più di tutte le cifre**: una soglia di pressione va legata alla **versione del
-gioco** e marcata con la **fonte**. Oggi il nostro 27.5 non ha né data né versione accanto, e la
-patch che lo invalida non ci avviserà.
+gioco** e marcata con la **fonte**. Dal 13/10/2026 il nostro numero (26.5 ± 0.5, `GT3_DRY_WINDOW`) ha data, versione e fonte accanto,
+nel codice. La patch che lo invalida continuerà a non avvisarci.
 
 ### Il differenziatore che nessuno occupa
 

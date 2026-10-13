@@ -32,7 +32,7 @@ U, O = Balance.UNDERSTEER, Balance.OVERSTEER
 EN, AP, EX = Phase.ENTRY, Phase.APEX, Phase.EXIT
 LO, HI = Speed.LOW, Speed.HIGH
 
-PRESS_OK = {"front": 27.5, "rear": 27.5}
+PRESS_OK = {"front": 26.5, "rear": 26.5}
 SYM = Symptom(U, AP, LO)
 OTHER = Symptom(O, EX, LO)
 
