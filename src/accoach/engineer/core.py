@@ -572,6 +572,10 @@ class RaceEngineer:
         self._pending: ProposedChange | None = None  # proposed, awaiting mark_applied
         self._pending_is_revert = False              # the pending change is a restore
         self._pending_prediction: Prediction | None = None
+        #: Il verdetto REVERTED ancora da eseguire, tenuto intero (messaggio,
+        #: ripristino e numeri) finche' `mark_applied` non dice che la macchina
+        #: e' tornata com'era. E' quello che `observe` ripete a ogni giro.
+        self._held_revert: Decision | None = None
         #: Symptoms whose remedies all failed — the engine's own "this is you,
         #: not the car" call. Recorded because it is a claim we make and have
         #: never checked (see ledger.py).
@@ -651,6 +655,20 @@ class RaceEngineer:
 
     def observe(self, stats: LapStats) -> Decision:
         """Feed one completed lap; return the next recommendation."""
+        # Un ripristino non ancora confermato viene prima di tutto, pioggia
+        # compresa: e' un fatto sulla macchina, non una misura. Finche' il
+        # pilota non dice di aver rimesso l'assetto di prima, la modifica
+        # bocciata e' ancora montata — e questo giro e' stato guidato con lei.
+        # Quindi non entra nella finestra (sarebbe la base del prossimo rimedio,
+        # misurata sull'assetto appena scartato) e la risposta resta quella di
+        # prima: lo STESSO oggetto, cosi' chi sta a valle distingue «te lo sto
+        # ripetendo» da «e' un verdetto nuovo» senza indovinare.
+        # Fino al 13/10 qui non c'era niente: il giro dopo rispondeva COLLECT,
+        # il ripristino spariva dallo schermo, e tre giri piu' tardi `_propose`
+        # metteva in attesa il rimedio successivo SOPRA quello bocciato.
+        if self._held_revert is not None:
+            return self._held_revert
+
         # A dry↔wet switch invalidates everything measured either side of it: a
         # baseline driven on slicks and a re-test driven on wets are two
         # different cars on two different circuits. Checked before the lap is
@@ -709,6 +727,7 @@ class RaceEngineer:
             self.window = []
             self._pending = None
             self._pending_is_revert = False
+            self._held_revert = None
             self._pending_prediction = None
             return
         sym = self._pending.symptom
@@ -849,10 +868,10 @@ class RaceEngineer:
                 outcome: "Outcome | None" = None) -> Decision:
         """Reject a change: propose its reversal AND hold it as a *pending revert*.
 
-        Resets the window so the engine returns to COLLECT — it won't propose the
-        next remedy until the driver has applied the restore and driven fresh laps,
-        and the next baseline is measured on the restored setup, not on the
-        rejected one. :meth:`mark_applied` recognises the revert and just
+        Resets the window, and the decision is *held*: :meth:`observe` keeps
+        returning it, lap after lap, until the driver has applied the restore.
+        Only then does the engine go back to COLLECT, so the next baseline is
+        measured on the restored setup, not on the rejected one. :meth:`mark_applied` recognises the revert and just
         acknowledges it (no re-test cycle, no click-budget change)."""
         rev = change.reversed()
         self._pending = rev
@@ -860,7 +879,9 @@ class RaceEngineer:
         # The outcome has to be built by the caller, before this line: the window
         # it is measured from is cleared right here.
         self.window = []
-        return Decision(DecisionKind.REVERTED, message, rev, outcome=outcome)
+        self._held_revert = Decision(DecisionKind.REVERTED, message, rev,
+                                     outcome=outcome)
+        return self._held_revert
 
     # -- internals ---------------------------------------------------------
     def _advance(self) -> Decision:

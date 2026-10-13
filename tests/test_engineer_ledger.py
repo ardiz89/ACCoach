@@ -213,7 +213,10 @@ def test_giving_up_on_a_symptom_is_recorded_as_a_claim_we_made():
     eng = _eng()
     for _ in range(40):
         d = eng.observe(_lap(100000, {SYM: 0.60}))
-        if d.kind is DecisionKind.PROPOSE:
+        # Anche il ripristino va confermato: senza, l'Ingegnere resta li' ad
+        # aspettarlo e non passa al rimedio dopo (vedi
+        # test_revert_non_sovrascritto.py).
+        if d.kind in (DecisionKind.PROPOSE, DecisionKind.REVERTED):
             eng.mark_applied()
         if eng.exhausted_calls:
             break
