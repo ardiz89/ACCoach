@@ -11,6 +11,12 @@ pilota «apri la pagina Ingegnere», ma quella pagina la alimenta **solo** il
 Backend live (`engineer.js` parla col websocket sulla porta 8777, che è
 `server`), e sotto Coach Live il bottone del Backend live era spento **e muto**.
 Il coach mandava l'utente contro un muro e il muro non diceva niente.
+
+Dal 24/09 la premessa e' cambiata: Coach Live serve lui il feed della pagina
+Ingegnere, col proprio motore (`app._serve_engineer_page`, backend spettatore).
+La pagina quindi durante Coach Live **si apre e basta**, e la spiegazione resta
+a un bottone solo — il Backend live, che accanto a Coach Live continua a non
+poter partire.
 """
 
 from __future__ import annotations
@@ -42,43 +48,21 @@ RECORDING_CMDS = ("recorder", "live", "coach", "compare", "server")
 LIVE_SAFE_KEYS = {STOP_LIVE, GUIDE, WIZARD, IMPORT_PRO,
                   ("web",), ("web", "--engineer")}
 
-# I due bottoni su cui il briefing ai box manda il pilota, e che durante Coach
-# Live non possono dare quello che promettono: il Backend live perché non si
-# accende, la pagina Ingegnere perché si apre su un feed che non esiste. Invece
-# di restare muti offrono lo scambio. Sono cliccabili di proposito: il click non
-# avvia niente, apre la spiegazione.
-SWAP_OFFER_KEYS = frozenset({("server",), ("web", "--engineer")})
-
-# …ma i due non perdono la stessa cosa, e il dialogo non offre le stesse uscite.
+# Il bottone che durante Coach Live non puo' fare la sua cosa: il Backend live
+# non si accende, perche' sarebbe il secondo motore. Invece di restare muto
+# offre lo scambio. E' cliccabile di proposito: il click non avvia niente, apre
+# la spiegazione.
 #
-# La pagina Ingegnere è **due cose in una**: la diagnosi dal vivo, che arriva dal
-# websocket del Backend live (`engineer.js`, porta 8777), e l'editor assetti col
-# registro delle prove e i setup salvati, che stanno tutti sul REST `/api/setup/*`
-# servito dall'app di analisi sulla 8778 — nessun backend di mezzo. La pagina è
-# progettata apposta per reggere a telemetria ferma (`engineer.js:142`, «L'ultimo
-# giro registrato, per quando la telemetria è spenta»). Toglierla durante Coach
-# Live costerebbe più di quanto lo scambio restituisce, quindi resta un'uscita
-# «apri comunque»: metà pagina è meglio di nessuna pagina, se si dice quale metà.
-#
-# Il Backend live non ha una metà da aprire lo stesso: o si accende, o niente.
-# Da qui l'asimmetria — che è una regola, non un `if` nel codice di disegno.
-OPEN_ANYWAY_KEYS = frozenset({("web", "--engineer")})
+# La pagina Ingegnere **non e' piu' qui**. Ci stava finche' durante Coach Live
+# si apriva su un feed che non esisteva; ora il feed lo da' Coach Live stesso,
+# e spiegare al pilota che la pagina «resta vuota» mentre funziona sarebbe il
+# difetto di prima a rovescio: non un muro muto, un cartello che mente.
+SWAP_OFFER_KEYS = frozenset({("server",)})
 
 
-def opens_anyway(key: object) -> bool:
-    """Questo bottone ha ancora qualcosa da dare senza il Backend live?
-
-    L'uscita di comodo può essere offerta **solo** a ciò che durante Coach Live
-    era già sicuro e non registra niente: aprirla non deve poter diventare, per
-    distrazione, il secondo motore che salva ogni giro due volte.
-    """
-    return key in OPEN_ANYWAY_KEYS
-
-
-# Le tre uscite del dialogo. `CANCEL` è anche quella di sicurezza: Esc, la X
+# Le due uscite del dialogo. `CANCEL` è anche quella di sicurezza: Esc, la X
 # della finestra, e qualunque modo di chiudere senza scegliere.
 SWAP = "swap"
-OPEN_ANYWAY = "open_anyway"
 CANCEL = "cancel"
 
 # I tre stati di un bottone. `EXPLAIN` è il nuovo: acceso ma non fa la sua cosa.
@@ -93,10 +77,8 @@ def button_state(key: object, *, live: bool, busy: bool) -> str:
     `live` = Coach Live sta girando; `busy` = qualcosa di nostro sta già
     registrando (che è vero anche mentre gira Coach Live).
 
-    L'ordine dei rami conta: `SWAP_OFFER_KEYS` viene guardato **prima** di
-    `LIVE_SAFE_KEYS`, perché la pagina Ingegnere sta in tutte e due — è sicura
-    da aprire, ma durante Coach Live è sicura e inutile, e mandare il pilota su
-    una pagina vuota senza dirglielo è il difetto, non la cura.
+    Durante Coach Live la pagina Ingegnere è un bottone come gli altri sicuri:
+    il suo feed lo serve Coach Live stesso.
     """
     if live:
         if key in SWAP_OFFER_KEYS:
@@ -146,8 +128,7 @@ def swap_is_safe(running: Iterable[Sequence[str]]) -> bool:
 # sparse nel launcher perché il test che controlla «esiste in tutte le lingue»
 # deve poterle leggere senza aprire Qt.
 SWAP_TEXT_KEYS = ("swap.title", "swap.why", "swap.warn", "swap.confirm",
-                  "swap.cancel", "swap.failed", "swap.tooltip",
-                  "swap.open_anyway", "swap.open_anyway_why")
+                  "swap.cancel", "swap.failed", "swap.tooltip")
 
 
 def swap_text(lang: str | None = None) -> dict[str, str]:

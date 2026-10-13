@@ -209,6 +209,20 @@ def create_app(engine: CoachEngine | None = None, hz: float = 15.0, *,
     return app
 
 
+def listen_host(cfg, argv=()) -> str:
+    """Su quale interfaccia ascolta il feed dal vivo.
+
+    In modalita' LAN (config o ``--lan``) tutte, cosi' un tablet arriva al
+    websocket; altrimenti quella configurata. Sta in una funzione perche' la
+    regola ha due chiamanti -- questo processo e Coach Live quando serve la
+    pagina Ingegnere da spettatore -- e la seconda copia l'aveva gia' persa:
+    con ``lan = true`` il tablet apriva la pagina (l'app di analisi ascolta in
+    rete) e ci leggeva «telemetria offline», perche' il feed stava solo su
+    127.0.0.1.
+    """
+    return "0.0.0.0" if (cfg.lan or "--lan" in argv) else cfg.server.host
+
+
 def _build_voice(cfg, enabled: bool = True):
     """The coach's voice, built exactly as ``live`` builds it (see ``app.py``).
 
@@ -254,9 +268,7 @@ def main(argv: list[str] | None = None) -> None:
                              acquire_hz=cfg.acquire.hz,
                              engineer_voice=cfg.voice.engineer)
 
-    # LAN mode (config or --lan) binds 0.0.0.0 so a phone/tablet can reach the
-    # live engineer feed; otherwise honour the configured interface.
-    host = "0.0.0.0" if (cfg.lan or "--lan" in argv) else cfg.server.host
+    host = listen_host(cfg, argv)
     port = cfg.server.port
     print(f"HONE backend on ws://{host}:{port}/ws  (Ctrl+C to stop)")
     uvicorn.run(create_app(engine=engine, hz=cfg.server.hz),

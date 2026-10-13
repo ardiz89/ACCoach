@@ -74,7 +74,8 @@ def _serve_engineer_page(engine):
     from . import server as _server
     from .netinfo import port_open
 
-    port = load_config().server.port
+    cfg = load_config()
+    port = cfg.server.port
     if port_open(port):
         # C'e' gia' un backend acceso: e' lui che serve la pagina, e due
         # processi sulla stessa porta non ci stanno. Nessun danno, solo niente
@@ -86,10 +87,11 @@ def _serve_engineer_page(engine):
 
         import uvicorn
 
-        api = _server.create_app(engine, hz=load_config().server.hz, spettatore=True)
-        cfg = uvicorn.Config(api, host=load_config().server.host, port=port,
-                             log_level="warning")
-        srv = uvicorn.Server(cfg)
+        api = _server.create_app(engine, hz=cfg.server.hz, spettatore=True)
+        # La stessa interfaccia del Backend live: in LAN il tablet deve
+        # arrivare al feed, non solo alla pagina.
+        srv = uvicorn.Server(uvicorn.Config(
+            api, host=_server.listen_host(cfg), port=port, log_level="warning"))
         # Uvicorn installa gestori di segnale, e fuori dal thread principale
         # Python lo vieta: senza questa riga Coach Live cade all'avvio.
         srv.install_signal_handlers = lambda: None

@@ -87,3 +87,60 @@ def test_la_pagina_riceve_lo_stato_grezzo_non_quello_impacchettato():
     step()
     assert o.ricevuti[0] == {"impacchettato": {"n": 1}}
     assert visti[0] == {"n": 1}
+
+
+# --- chi puo' arrivare al feed ----------------------------------------------
+#
+# Trovato il 13/10 rigiocando i giri del 24/09 dentro il passo vero di Coach
+# Live, con un client sull'indirizzo di rete del PC: la pagina arrivava (l'app
+# di analisi in LAN ascolta su tutte le interfacce), il feed no — connessione
+# rifiutata, perche' lo spettatore si legava a `server.host` e basta. Sul
+# tablet, che e' dove il pilota la guarda, sarebbe stato «telemetria offline»
+# come prima della cura.
+
+class _Cfg:
+    class server:
+        host = "127.0.0.1"
+        port = 8777
+        hz = 15.0
+
+    lan = False
+
+
+def test_in_lan_il_feed_ascolta_dove_arriva_il_tablet():
+    from accoach.server import listen_host
+
+    cfg = _Cfg()
+    assert listen_host(cfg) == "127.0.0.1"
+    cfg.lan = True
+    assert listen_host(cfg) == "0.0.0.0"
+    cfg.lan = False
+    assert listen_host(cfg, ["--lan"]) == "0.0.0.0"
+
+
+def test_coach_live_serve_il_feed_sulla_stessa_interfaccia_del_backend(monkeypatch):
+    """La regola ha due chiamanti, e il secondo l'aveva persa. Si guarda
+    l'effetto: l'indirizzo che arriva a uvicorn quando la config dice LAN."""
+    import uvicorn
+
+    from accoach import app as live
+    from accoach import netinfo
+
+    cfg = _Cfg()
+    cfg.lan = True
+    visti = []
+
+    class _Server:
+        def __init__(self, config):
+            visti.append(config.host)
+
+        def run(self):
+            pass
+
+    monkeypatch.setattr(live, "load_config", lambda: cfg)
+    monkeypatch.setattr(netinfo, "port_open", lambda port: False)
+    monkeypatch.setattr(uvicorn, "Server", _Server)
+
+    publish = live._serve_engineer_page(object())
+    assert visti == ["0.0.0.0"]
+    assert callable(publish)

@@ -342,35 +342,36 @@ _UI: dict[str, dict[str, str]] = {
               "salvano ogni giro due volte, e la copia è identica a un giro vero "
               "in più — ferma prima quello acceso."},
     # --- lo scambio Coach Live → Backend live ------------------------------
-    # Il briefing ai box manda il pilota sulla pagina Ingegnere, che è alimentata
-    # solo dal Backend live; e il Backend live non può stare acceso insieme a
-    # Coach Live. Finché queste frasi non c'erano, il bottone era spento e muto:
-    # il coach mandava l'utente contro un muro e il muro non diceva niente.
+    # Il Backend live non può stare acceso insieme a Coach Live. Finché queste
+    # frasi non c'erano, il bottone era spento e muto. Dal 24/09 la pagina
+    # Ingegnere la alimenta anche Coach Live, quindi le frasi dicono pure
+    # questo: chi è arrivato qui cercando la pagina non ha bisogno dello scambio.
     "swap.title": {
         "en": "The live backend can't run next to Coach Live",
         "it": "Il Backend live non può girare insieme a Coach Live"},
     "swap.why": {
-        "en": "The Engineer page is fed by the live backend, and the live "
-              "backend records laps exactly like Coach Live does. With both of "
-              "them running, every lap you drive is saved twice — and the copy "
-              "looks exactly like a real extra lap, so afterwards there is no "
-              "telling them apart. That's why this button isn't simply there "
-              "for the taking.",
-        "it": "La pagina Ingegnere la alimenta il Backend live, e il Backend "
-              "live registra i giri esattamente come fa Coach Live. Accesi "
-              "tutti e due, ogni giro che guidi viene salvato due volte — e la "
-              "copia è identica a un giro vero in più, quindi dopo non si "
-              "distinguono. Per questo il bottone non è lì da premere e basta."},
+        "en": "The live backend records laps exactly like Coach Live does. "
+              "With both of them running, every lap you drive is saved twice — "
+              "and the copy looks exactly like a real extra lap, so afterwards "
+              "there is no telling them apart. If you're here for the Engineer "
+              "page you don't need it: while Coach Live runs, Coach Live feeds "
+              "that page itself.",
+        "it": "Il Backend live registra i giri esattamente come fa Coach Live. "
+              "Accesi tutti e due, ogni giro che guidi viene salvato due volte "
+              "— e la copia è identica a un giro vero in più, quindi dopo non "
+              "si distinguono. Se sei qui per la pagina Ingegnere non ti "
+              "serve: finché Coach Live è acceso, quella pagina la alimenta "
+              "lui."},
     "swap.warn": {
         "en": "Swapping stops Coach Live and starts the live backend in its "
-              "place: the coach still talks and the Engineer page comes alive, "
+              "place: the coach still talks and the Engineer page stays fed, "
               "but the overlay closes with Coach Live — no HUD on track. The "
               "live backend is three separate pieces (backend, overlay, web "
               "page), not one package: you can bring the overlay back from "
               "Devices, on its own.",
         "it": "Lo scambio ferma Coach Live e avvia al suo posto il Backend "
-              "live: il coach parla lo stesso e la pagina Ingegnere si "
-              "alimenta, ma l'overlay si spegne insieme a Coach Live — in "
+              "live: il coach parla lo stesso e la pagina Ingegnere resta "
+              "alimentata, ma l'overlay si spegne insieme a Coach Live — in "
               "pista niente HUD. Il Backend live sono tre pezzi separati "
               "(backend, overlay, pagina web), non un pacchetto solo: "
               "l'overlay lo riaccendi da Dispositivi, per conto suo."},
@@ -390,22 +391,6 @@ _UI: dict[str, dict[str, str]] = {
               "stato avviato — due registratori avrebbero salvato ogni giro "
               "due volte. Premi Ferma Coach Live, aspetta che la sua finestra "
               "si chiuda, e riprova."},
-    # La terza uscita. La pagina Ingegnere è due cose in una: senza il Backend
-    # live perde la diagnosi dal vivo, ma l'editor assetti, il registro delle
-    # prove e i setup salvati stanno sul REST dell'app di analisi e ci sono lo
-    # stesso — la pagina è fatta apposta per reggere a telemetria spenta. Dire
-    # «funziona a metà» non aiuta nessuno: la frase dice **quale** metà.
-    "swap.open_anyway": {"en": "Open anyway", "it": "Apri comunque"},
-    "swap.open_anyway_why": {
-        "en": "Open it anyway and you keep the setup editor, the engineer's "
-              "test log and every setup you've saved — the page serves those "
-              "from the analysis app on its own. What stays empty is the live "
-              "diagnosis: that half is the one the live backend feeds.",
-        "it": "Aprendola comunque hai l'editor assetti, il registro delle "
-              "prove dell'Ingegnere e tutti i setup che hai salvato — quella "
-              "parte la pagina la serve da sola, dall'app di analisi. Quello "
-              "che resta vuoto è la diagnosi dal vivo: quella metà la alimenta "
-              "il Backend live."},
     "swap.tooltip": {
         "en": "Coach Live is running. Click to read why this can't start "
               "alongside it — and to swap over in one step.",
