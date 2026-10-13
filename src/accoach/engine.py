@@ -204,7 +204,7 @@ def _focus_log_line(report: FocusReport | None, *, counted: bool = True,
     # Il resto della riga descrive il giro *precedente*, che sotto un focus
     # aperto e' l'equivoco peggiore: nome, tema e progresso sembrano quelli di
     # questo giro. La coda dice che non lo sono.
-    return f"{riga} | non contato: giro non pulito | scartati={discarded}"
+    return f"{riga} | non contato: giro non valido | scartati={discarded}"
 
 
 def _decision_sig(decision) -> tuple | None:
@@ -499,7 +499,27 @@ class CoachEngine:
             self.scheduler.set_focus(None)
         else:
             debrief = build_lap_debrief(lap, self._reference, self._corners)
-            stable = lap.valid and lap.clean is not False
+            # Il focus conta anche i giri **sporchi**: resta fuori solo cio'
+            # che non e' un giro intero. Deciso misurando, il 09/10, sui 95 giri
+            # di Monza e Imola in archivio (26 sporchi): contandoli, il focus
+            # insegna **le stesse curve nello stesso ordine** e ci arriva da 2 a
+            # 6 giri prima (a Imola la Tosa al giro 17 invece che al 23).
+            # Divergono solo sulla quarta elezione, dove le perdite sono 73 e
+            # 101 ms, cioe' rumore. Regge perche' il focus misura **per curva**
+            # su una mediana di sei giri: una curva sbagliata avvelena se' stessa
+            # e la mediana assorbe.
+            #
+            # `valid` invece resta: un giro incompleto o di rientro ai box dura
+            # il triplo e la sua perdita per curva non vuol dire niente.
+            #
+            # E NON si allinea con l'Ingegnere, che la sua regola se la calcola
+            # da solo in `diagnosis.py` e tiene anche `clean`. Non e'
+            # un'incoerenza, e' la misura: tutti e 26 i giri sporchi cadono
+            # fuori dalla sua banda di decisione, e **sei su tredici sono piu'
+            # veloci** della mediana pulita (fino a 2.8 s) perche' tagliare la
+            # Variante fa guadagnare. Con quelli accetterebbe una modifica
+            # d'assetto sulla forza di una chicane tagliata.
+            stable = bool(lap.valid)
             before = (frozenset(self._focus.mastered), frozenset(self._focus.parked))
             # Il focus e' un esperimento, e un esperimento tiene fermo il
             # controllo: finche' un focus e' aperto giudica contro lo stesso
