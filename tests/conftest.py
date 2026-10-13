@@ -45,3 +45,37 @@ def _pretend_no_game_installed(monkeypatch):
     _te._cache.clear()
     yield
     _te._cache.clear()
+
+
+# --- i test non scrivono nella cartella dati del pilota ----------------------
+# Scoperto il 19/09 **mentre il pilota girava a Suzuka**: le righe
+# «=== ACCoach starting ===» e i «trailing garbage» che comparivano nel suo log
+# dal vivo erano le mie esecuzioni della suite. `setup_logging()` apre un
+# RotatingFileHandler su `logs_dir()`, che e' `~/Documents/ACCoach/logs`: la
+# stessa cartella che l'app vera sta scrivendo, e la stessa che `logs --zip`
+# impacchetta per una segnalazione.
+#
+# Due danni, e il secondo e' peggiore del primo: la suite sporca l'unica traccia
+# che abbiamo di una sessione in pista, e la sporca con righe che sembrano
+# l'app. Ho passato dieci minuti a chiedermi perche' il coach si riavviasse.
+#
+# La trappola da conoscere: `logging_setup` fa `from .paths import logs_dir`
+# **all'import**, quindi rimpiazzare `paths.logs_dir` non lo sposta -- il nome e'
+# gia' legato. Per questo si rimpiazza in **ogni** modulo che se l'e' portato a
+# casa, cercandoli invece di elencarli: un elenco scritto a mano si dimentica il
+# modulo aggiunto domani, ed e' la famiglia di difetto che questo progetto paga
+# piu' spesso.
+@pytest.fixture(autouse=True)
+def _logs_nella_sandbox(tmp_path_factory, monkeypatch):
+    import sys as _sys
+
+    from accoach import paths as _paths
+
+    finta = tmp_path_factory.mktemp("logs")
+    monkeypatch.setattr(_paths, "logs_dir", lambda: finta)
+    for nome, modulo in list(_sys.modules.items()):
+        if not nome.startswith("accoach") or modulo is _paths:
+            continue
+        if getattr(modulo, "logs_dir", None) is not None:
+            monkeypatch.setattr(modulo, "logs_dir", lambda: finta, raising=False)
+    yield
