@@ -16,7 +16,7 @@ cosa cambiare, valutare, accettare/ripristinare) è già fatto.
 from accoach.engineer import engineer_for, LapStats, Symptom, Balance, Phase, Speed
 
 # engineer_for sceglie profilo (GT3/Formula/Road) E la finestra pressioni dell'auto
-eng = engineer_for(snapshot.car_model, track=snapshot.track)
+eng = engineer_for(snapshot.car_model, track=snapshot.track, is_acc=snapshot.is_acc)  # senza is_acc misura ma non scrive
 ...
 # a fine giro:
 decision = eng.observe(build_lap_stats(lap, reference, corners))

@@ -13,14 +13,23 @@ applies it to the pressure phase without mutating the shared profile.
 
 from __future__ import annotations
 
-from .classmap import CarClass, classify
+from .classmap import CarClass, known_class
 from .profiles._common import GT3_DRY_WINDOW
 
 # Per-class hot-pressure window (target, tolerance) in psi.
+#
+# ``ROAD`` qui non c'e' piu', e non per dimenticanza. Nessun nome dice «questa e'
+# una stradale»: ci si arrivava per esclusione, e per esclusione ci arrivavano
+# anche le F1 senza «f1» nel nome, le LMP1 e la Huracan ST di ACC. La finestra
+# di una categoria applicata a un'altra non e' una stima approssimativa, e'
+# un'altra auto — lo dice gia' `coaching/tuning.py`, dove la voce tace fuori
+# dalla GT3. E sull'unica stradale in quella tabella (M3 E92, 34.7 psi di media,
+# «che e' la sua pressione di progetto») 30.0 ±1.5 avrebbe chiesto di toglierne
+# quasi cinque. Quel numero resta nel profilo Road come valore di partenza per chi lo
+# costruisce a mano; `pressure_window` non lo assegna piu' a nessuno.
 _CLASS_WINDOW: dict[CarClass, tuple[float, float]] = {
     CarClass.GT3: GT3_DRY_WINDOW,    # ACC Pirelli slick, dalla 1.9
     CarClass.FORMULA: (22.0, 0.4),   # open-wheel slick, tighter
-    CarClass.ROAD: (30.0, 1.5),      # street rubber, wider
 }
 
 # Wet windows, per class. Only where a number can be sourced: ACC's wet Pirelli
@@ -43,8 +52,15 @@ _CAR_WINDOW: dict[str, tuple[float, float]] = {}
 _CAR_TRACK_WINDOW: dict[tuple[str, str], tuple[float, float]] = {}
 
 
-def pressure_window(car_model: str, track: str | None = None) -> tuple[float, float]:
-    """Best-effort hot-pressure target window for a car (+ optional track)."""
+def pressure_window(car_model: str,
+                    track: str | None = None) -> tuple[float, float] | None:
+    """Hot-pressure target window for a car (+ optional track), or ``None``.
+
+    ``None`` vuol dire che non sappiamo che auto e', e chi chiama deve tacere
+    sulle pressioni invece di prendere la finestra di un'altra categoria. Usa
+    `known_class` e non `classify` apposta: `classify` risponde sempre, ed e'
+    il motivo per cui una LMP1 riceveva la finestra di una stradale.
+    """
     car = (car_model or "").strip().lower()
     if track:
         key = (car, track.strip().lower())
@@ -52,7 +68,7 @@ def pressure_window(car_model: str, track: str | None = None) -> tuple[float, fl
             return _CAR_TRACK_WINDOW[key]
     if car in _CAR_WINDOW:
         return _CAR_WINDOW[car]
-    return _CLASS_WINDOW[classify(car_model)]
+    return _CLASS_WINDOW.get(known_class(car_model))
 
 
 def wet_pressure_window(car_model: str) -> tuple[float, float] | None:
@@ -62,4 +78,4 @@ def wet_pressure_window(car_model: str) -> tuple[float, float] | None:
     target is 3.5 psi below the wet one on a GT3, so falling back to it in the
     rain would not be a degraded answer, it would be a wrong one.
     """
-    return _CLASS_WET_WINDOW.get(classify(car_model))
+    return _CLASS_WET_WINDOW.get(known_class(car_model))
