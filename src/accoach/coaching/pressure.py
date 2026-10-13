@@ -100,6 +100,7 @@ class PressureAdvisor:
     def update(self, s: TelemetrySnapshot, now: float) -> list[Cue]:
         if not (s.connected and s.status == ACStatus.LIVE) or s.in_pit:
             self._reset_lap()
+            self._pit_this_lap = True
             return []
         # La classe non basta: il **titolo** decide se la nostra misura vale. Il
         # M4 GT3 *mod su AC* è classe GT3 e legge 63 °C di gomma — il modello del
@@ -110,6 +111,15 @@ class PressureAdvisor:
 
         pos = s.lap_position
         cues = self._maybe_advise(pos)
+
+        # Un giro passato dalla corsia box non si giudica. `in_pit` qui sopra non
+        # basta: su ACC non si accende mai, nemmeno fermi nella piazzola (misurato
+        # in pista il 07/08), e solo `in_pit_lane` dice che il giro e' d'uscita.
+        # Senza questo la media prendeva tutta la rampa di riscaldamento: in
+        # pista lo stesso treno leggeva 25.1 psi sul giro d'uscita («alza 2.4») e
+        # 26.2 a regime, e chi seguiva il primo numero gonfiava un psi di troppo.
+        if s.in_pit_lane:
+            self._pit_this_lap = True
 
         if s.speed_kmh >= _MIN_SPEED_KMH and self._plausible(s.tyre_pressure):
             for i in range(4):
@@ -138,6 +148,8 @@ class PressureAdvisor:
     def _evaluate(self) -> Cue | None:
         full_lap = (self._pos_max - self._pos_min) >= _MIN_LAP_SPAN
         if not full_lap or self._samples < _MIN_SAMPLES or self._cooldown > 0:
+            return None
+        if self._pit_this_lap:
             return None
 
         psi = [self._psi_sum[i] / self._samples for i in range(4)]
@@ -192,3 +204,4 @@ class PressureAdvisor:
         self._pos_min = 1.0
         self._pos_max = 0.0
         self._prev_pos = -1.0
+        self._pit_this_lap = False

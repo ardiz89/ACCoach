@@ -63,6 +63,7 @@ class SetupAdvisor:
         self._prev_pos: float = -1.0
         self._pos_min: float = 1.0
         self._pos_max: float = 0.0
+        self._pit_this_lap = False
         # Per-category laps-of-silence remaining.
         self._cooldown: dict[CueCategory, int] = {}
 
@@ -72,6 +73,7 @@ class SetupAdvisor:
         self._prev_pos = -1.0
         self._pos_min = 1.0
         self._pos_max = 0.0
+        self._pit_this_lap = False
         self._cooldown.clear()
 
     def update(self, s: TelemetrySnapshot, event_cues: list[Cue], now: float) -> list[Cue]:
@@ -79,10 +81,18 @@ class SetupAdvisor:
         # partial lap so an out-lap or a pit visit never triggers advice.
         if not (s.connected and s.status == ACStatus.LIVE) or s.in_pit:
             self._reset_lap()
+            self._pit_this_lap = True
             return []
 
         pos = s.lap_position
         cues = self._maybe_advise(s, pos)
+
+        # Il commento qui sopra promette che un giro d'uscita non fa scattare un
+        # consiglio, ma `in_pit` su ACC non si accende mai: a dirlo e' solo
+        # `in_pit_lane`. In pista il 24/09 tre pattinamenti a gomme fredde,
+        # uscendo dai box, sono diventati «prova ad alzare il TC».
+        if s.in_pit_lane:
+            self._pit_this_lap = True
 
         # Accumulate this frame's confirmed symptoms by where they happened.
         for cue in event_cues:
@@ -107,7 +117,7 @@ class SetupAdvisor:
         lock = len(self._lock_segments)
         spin = len(self._spin_segments)
         cues: list[Cue] = []
-        if full_lap:
+        if full_lap and not self._pit_this_lap:
             cue = self._evaluate(s, lock, spin)
             if cue is not None:
                 cues.append(cue)
@@ -177,3 +187,4 @@ class SetupAdvisor:
         self._pos_min = 1.0
         self._pos_max = 0.0
         self._prev_pos = -1.0
+        self._pit_this_lap = False
