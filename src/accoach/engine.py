@@ -480,9 +480,17 @@ class CoachEngine:
             # la curva per conto suo.
             stats = build_lap_stats(lap, self._corners or None,
                                     corner_names=self._corner_names)
+            previous = self._engineer_decision
             self._engineer_decision = self._engineer.observe(stats)
             self._announce_engineer(self._engineer_decision)
-            self._log_engineer_outcome(lap, self._engineer_decision)
+            # Un ripristino non ancora eseguito torna identico a ogni giro (vedi
+            # `RaceEngineer.observe`), numeri compresi, perche' il pilota deve
+            # poterli rileggere. Ma la prova e' stata una: nel registro ci va
+            # una volta, o tre giri d'attesa diventerebbero tre bocciature e la
+            # percentuale di riuscita — l'unico numero che puo' darci torto —
+            # scenderebbe da sola.
+            if self._engineer_decision is not previous:
+                self._log_engineer_outcome(lap, self._engineer_decision)
             self._save_engineer_state()
 
         # The Focus coach needs a reference to know where time was lost.

@@ -290,6 +290,10 @@ def test_exhausting_remedies_flags_driving_issue():
             eng.mark_applied()
         elif d.kind is DecisionKind.REVERTED:
             reverts += 1
+            # Il pilota rimette l'assetto di prima. Fino al 13/10 questo test
+            # non lo faceva e arrivava in fondo lo stesso, cioe' guidava il
+            # difetto: ogni rimedio proposto sopra quello bocciato.
+            eng.mark_applied()
         elif d.kind is DecisionKind.PHASE_DONE and "exhausted" in d.message:
             break
     assert sym in eng.exhausted
