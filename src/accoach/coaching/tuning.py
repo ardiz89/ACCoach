@@ -37,6 +37,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from ..engineer import CarClass, classify
+from ..engineer.pressures import GT3_DRY_WINDOW
 
 
 @dataclass(frozen=True, slots=True)
@@ -59,14 +60,14 @@ _TUNING: dict[CarClass, ClassTuning] = {
                                   trail_brake_cue=False, yaw_baseline=1.95),
     CarClass.GT3:     ClassTuning(spin_ratio=0.13, speed_split_kmh=120.0,
                                   trail_brake_cue=True, yaw_baseline=1.95,
-                                  tyre_psi=(27.5, 0.7), tyre_c=(80.0, 12.0)),
+                                  tyre_psi=GT3_DRY_WINDOW, tyre_c=(80.0, 12.0)),
     CarClass.FORMULA: ClassTuning(spin_ratio=0.15, speed_split_kmh=140.0,
                                   trail_brake_cue=True, yaw_baseline=2.50),
 }
 
 # --- perché solo la GT3 ha una finestra gomme ------------------------------
 #
-# I due numeri (27.5 psi, 80 °C) sono la GT3 ACC all'asciutto, e i moduli che li
+# I due numeri (26.5 psi dalla 1.9 di ACC — erano 27.5 —, 80 °C) sono la GT3 ACC all'asciutto, e i moduli che li
 # usavano lo dichiaravano — ma nessuno li spegneva altrove, e la finestra di una
 # categoria applicata a un'altra non è una stima approssimativa: è un'altra auto.
 #

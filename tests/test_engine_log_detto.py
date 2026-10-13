@@ -146,7 +146,11 @@ def test_un_giro_scartato_non_si_legge_come_uno_contato():
                                counted=False, discarded=1)
     assert fermo != scartato
     assert "non contato" in scartato
-    assert "non pulito" in scartato
+    # Il MOTIVO e' cambiato il 09/10 — il focus conta anche i giri sporchi, e
+    # resta fuori solo cio' che non e' un giro intero — ma la proprieta' che
+    # questo test difende e' un'altra e non e' cambiata: un giro non contato
+    # non deve leggersi come quello contato di prima.
+    assert "non valido" in scartato
 
 
 def test_la_riga_dice_quanti_giri_ha_buttato_in_questa_finestra():
@@ -211,13 +215,18 @@ def test_il_giro_scartato_finisce_nel_log_per_davvero(tmp_path, caplog):
         eng._corners = detect_corners(ref.samples)
         eng._focus = FocusCoach(min_laps=3)
 
+        # Dal 09/10 il giro **sporco** viene contato: la cosa che il focus
+        # scarta e' il giro che non e' intero (rientro ai box, giro parziale).
+        # Il test misura la stessa proprieta' di prima — un giro scartato
+        # arriva al log — sulla cosa che oggi viene scartata davvero.
         pulito = synth.build_lap(slow_corner=0, amt=30, n=300, clean=True)
-        sporco = synth.build_lap(slow_corner=1, amt=60, n=300, clean=False)
+        sporco = synth.build_lap(slow_corner=1, amt=60, n=300, valid=False,
+                                 clean=True)
 
         # Il fixture fa davvero quello che credo: due giri diversi, e uno solo
         # dei due e' "stabile" per il coach.
         assert pulito.clean is True and pulito.valid
-        assert sporco.clean is False
+        assert sporco.valid is False
         d_pulito = build_lap_debrief(pulito, eng._reference, eng._corners)
         d_sporco = build_lap_debrief(sporco, eng._reference, eng._corners)
         perse_pulito = {loss.index for loss in d_pulito.losses}

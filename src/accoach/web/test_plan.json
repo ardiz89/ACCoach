@@ -88,7 +88,7 @@
           "n": "12",
           "what": "12) Pressioni gomme a caldo",
           "how": "Fai qualche giro finché le gomme sono in temperatura (calde), poi guarda i consigli sulle pressioni nella pagina Ingegnere.",
-          "expected": "Le pressioni sono giudicate a gomma CALDA (obiettivo ~27,5 psi a gomma calda), non sui primi giri di riscaldamento."
+          "expected": "Le pressioni sono giudicate a gomma CALDA (obiettivo ~26,5 psi a gomma calda), non sui primi giri di riscaldamento."
         },
         {
           "id": "GT3-13",

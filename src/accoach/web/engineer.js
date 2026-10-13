@@ -979,6 +979,18 @@ function renderEngineer(st) {
   const says = $("engineer-says");
   const conf = $("es-conf"), prep = $("es-prepare"), hint = $("es-hint");
   const boxProposal = eng && eng.kind === "propose" && eng.tag === "BOX" && eng.change;
+  // Una modifica bocciata è lavoro da fare ai box quanto una proposta: i click
+  // per rimetterla com'era stanno in `eng.change`, e il motore continua a
+  // mandarli finché non gli si dice che è fatto (`applied`). Fino al 13/10 qui
+  // contava solo `propose`: il pilota leggeva «ripristino» e non aveva un
+  // bottone per farlo.
+  const boxRestore = eng && eng.kind === "reverted" && eng.tag === "BOX"
+    && eng.change && !eng.applied;
+  // Chi ripristina ricaricando in gioco il file di prima non scrive niente da
+  // qui, e allora nessuno avvisa il motore — che adesso aspetta davvero.
+  const done = $("es-restored");
+  done.hidden = !boxRestore;
+  done.onclick = boxRestore ? confirmRestored : null;
 
   // Persistent "what to do in this phase" line: the decision message alone
   // ("phase done → moving to X") never says what the driver should now do.
@@ -1018,6 +1030,15 @@ function renderEngineer(st) {
     prep.hidden = false;
     prep.onclick = () => prepareChange(eng.change);
     says.classList.add("active");
+  } else if (boxRestore) {
+    // Il perché (il verdetto) e il cosa (la riga del ripristino). Niente grado
+    // di fiducia: un ripristino non è una stima.
+    $("es-msg").textContent = eng.message || eng.rationale || "";
+    $("es-cat").textContent = eng.rationale || "";
+    conf.hidden = true;
+    prep.hidden = false;
+    prep.onclick = () => prepareChange(eng.change);
+    says.classList.add("active");
   } else if (eng && eng.message) {
     $("es-msg").textContent = eng.message;      // evaluating / accepted / done…
     $("es-cat").textContent = "";
@@ -1038,6 +1059,15 @@ function renderEngineer(st) {
     conf.hidden = true; prep.hidden = true;
     says.classList.remove("active");
   }
+}
+
+// «L'ho già rimesso com'era.» Stesso endpoint della scrittura dell'assetto e di
+// `av-done`, perché è lo stesso evento: quello che l'ingegnere aveva chiesto è
+// sulla macchina. Best-effort come gli altri due.
+function confirmRestored() {
+  $("es-restored").hidden = true;
+  fetch(`http://${location.hostname}:${WS_PORT}/engineer/applied`,
+        { method: "POST" }).catch(() => { /* backend off — resta da fare */ });
 }
 
 // The acceptance bar, shown while the change is still a proposal and while it

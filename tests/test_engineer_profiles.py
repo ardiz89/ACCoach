@@ -125,7 +125,7 @@ def test_engineer_for_sets_class_and_pressure_window():
     assert (pp.target, pp.tol) == pressure_window("f1_1990_mclaren") == (22.0, 0.4)
     # road and gt3 differ
     assert pressure_window("dodge_char_police")[0] == 30.0
-    assert pressure_window("mclaren_720s_gt3_evo") == (27.5, 0.7)
+    assert pressure_window("mclaren_720s_gt3_evo") == (26.5, 0.5)
 
 
 # --- una modifica di pressione dice dove arriva, non dove vorrebbe ---------

@@ -26,7 +26,7 @@ _DI_CURVA = {CueCategory.CARRY_SPEED, CueCategory.TIME_LOSS,
              CueCategory.MORE_THROTTLE, CueCategory.LESS_BRAKE,
              CueCategory.BRAKE_LATER, CueCategory.BRAKE_EARLIER}
 
-#: Sotto la finestra GT3 (27.5 ± 0.7), a gomme in temperatura.
+#: Sotto la finestra GT3 (26.5 ± 0.5), a gomme in temperatura.
 _GOMME_BASSE = dict(tyre_pressure=(25.0,) * 4, tyre_core_temp=(85.0,) * 4)
 
 
