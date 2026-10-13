@@ -342,10 +342,7 @@ def test_a_closed_focus_lets_the_reference_go(tmp_path):
     """Il metro sta fermo per la durata di un ciclo, non per sempre.
 
     Dato un verdetto (migliorata o parcheggiata) il ciclo e' finito: il prossimo
-    si pesa su oggi, non sul giro con cui misuravamo mezz'ora fa. Lo stato
-    «nessun punto debole ricorrente» invece **non** e' un verdetto e non libera
-    niente: liberarlo li' rifarebbe la regressione, perche' quello stato si
-    ripete a ogni giro e ogni volta ributterebbe la finestra.
+    si pesa su oggi, non sul giro con cui misuravamo mezz'ora fa.
     """
     from accoach.telemetry.snapshot import TelemetrySnapshot
     from accoach.coaching.focus import FocusKind
@@ -376,17 +373,8 @@ def test_a_closed_focus_lets_the_reference_go(tmp_path):
     eng.close()
 
 
-def test_no_recurring_weakness_does_not_let_the_reference_go(tmp_path):
-    """«Nessun punto debole ricorrente» non e' un verdetto: non libera il metro.
-
-    E' la trappola gemella della regressione, ed e' il motivo per cui la
-    liberazione guarda il *verdetto* e non `focus is None`: CLEAN si ripete a
-    ogni giro, quindi liberare li' rimetterebbe il metro vivo sotto la finestra e
-    ogni personal best la ributterebbe — il coach resterebbe a «valuto 0/3» per
-    tutta la sessione, che e' esattamente il difetto che questa cura chiude.
-    """
+def _motore_fermo(tmp_path):
     from accoach.telemetry.snapshot import TelemetrySnapshot
-    from accoach.coaching.focus import FocusKind
 
     class _Dead:
         def read(self):
@@ -397,21 +385,86 @@ def test_no_recurring_weakness_does_not_let_the_reference_go(tmp_path):
 
     eng = CoachEngine(reader=_Dead(), laps_dir=tmp_path)
     eng._focus = FocusCoach(min_laps=3)
-    ref = synth.build_lap()
-    eng._reference = Reference(ref)
-    eng._corners = detect_corners(ref.samples)
+    return eng
 
-    # Un pilota costante che non perde niente di ricorrente, e che migliora.
-    for i in range(5):
+
+def _metti_riferimento(eng, lap):
+    eng._reference = Reference(lap)
+    eng._corners = detect_corners(lap.samples)
+
+
+def test_no_recurring_weakness_against_a_stale_reference_is_measured_again(tmp_path):
+    """Il 24/09 a Imola: «nessun punto debole», e la Rivazza perdeva mezzo secondo.
+
+    Il metro si appunta al primo giro della finestra. A inizio sessione quel
+    giro e' il giro lento del pilota stesso, e contro se' stessi non si perde
+    niente: il verdetto e' CLEAN. Finche' CLEAN non liberava il metro, li' si
+    restava per tutta la sessione — il riferimento del resto dell'app andava
+    avanti, il focus continuava a misurare contro un'ora prima.
+
+    Qui: il pilota gira uguale al suo riferimento lento (niente da dire), poi il
+    riferimento diventa un giro che alla prima curva va 30 km/h piu' forte. Lui
+    continua a girare come prima. Deve sentirselo dire.
+    """
+    from accoach.coaching.focus import FocusKind
+
+    eng = _motore_fermo(tmp_path)
+    lento = synth.build_lap(slow_corner=0, amt=30)
+    _metti_riferimento(eng, lento)
+    for _ in range(3):
+        eng._observe_lap(synth.build_lap(slow_corner=0, amt=30))
+    assert eng._focus_report.kind is FocusKind.CLEAN, "il fixture parte da CLEAN"
+
+    _metti_riferimento(eng, synth.build_lap())      # il nuovo migliore
+    kinds = []
+    for _ in range(5):
+        eng._observe_lap(synth.build_lap(slow_corner=0, amt=30))
+        kinds.append(eng._focus_report.kind.value)
+
+    assert eng._focus.focus is not None, (
+        f"contro il riferimento di oggi la curva perde: serve un focus, non {kinds}")
+    assert eng._focus.focus.corner_index == 0
+    eng.close()
+
+
+def test_no_recurring_weakness_keeps_the_window_when_the_reference_stood_still(tmp_path):
+    """Liberare su CLEAN non deve costare giri a chi non ha cambiato niente:
+    stesso riferimento, stessa finestra, che continua a scorrere."""
+    from accoach.coaching.focus import FocusKind
+
+    eng = _motore_fermo(tmp_path)
+    _metti_riferimento(eng, synth.build_lap())
+    for _ in range(5):
         eng._observe_lap(synth.build_lap())
-        better = synth.build_lap(slow_corner=1, amt=5 * (i + 1))
-        eng._reference = Reference(better)
-        eng._corners = detect_corners(better.samples)
 
     assert eng._focus_report.kind is FocusKind.CLEAN
-    assert len(eng._focus.window) == 5, (
-        "la finestra deve continuare a riempirsi: nessun giro e' stato buttato")
-    assert eng._focus_ref is not None, "e il metro deve essere ancora appuntato"
+    assert len(eng._focus.window) == 5, "nessun giro e' stato buttato"
+    eng.close()
+
+
+def test_a_driver_who_improves_every_lap_still_gets_a_verdict(tmp_path):
+    """La trappola gemella della regressione del 23/08, che e' il motivo per cui
+    CLEAN non liberava: se il metro si muovesse a ogni giro la finestra non
+    arriverebbe mai a tre e il coach resterebbe a «valuto 0/3».
+
+    Liberato su CLEAN, il metro si muove **una volta per verdetto**: mentre la
+    finestra si riempie resta appuntato. Quindi anche con un riferimento nuovo a
+    ogni giro la valutazione arriva in fondo, ogni tre giri.
+    """
+    from accoach.coaching.focus import FocusKind
+
+    eng = _motore_fermo(tmp_path)
+    _metti_riferimento(eng, synth.build_lap())
+    kinds = []
+    for i in range(9):
+        eng._observe_lap(synth.build_lap())
+        kinds.append(eng._focus_report.kind)
+        # un metro diverso a ogni giro (passi da 5: sotto, `build_lap`
+        # arrotonda allo stesso tempo e il motore vedrebbe un metro solo)
+        _metti_riferimento(eng, synth.build_lap(slow_corner=1, amt=5 * (i + 1)))
+
+    assert kinds.count(FocusKind.CLEAN) >= 3, (
+        f"in nove giri devono arrivare tre verdetti, non {[k.value for k in kinds]}")
     eng.close()
 
 
