@@ -45,6 +45,18 @@ _PRESENCE = 0.15
 # Mean tyre core temp above this = warmed up. Slicks read low pressure when cold,
 # so this also gates which frames count toward hot pressures — matched to the live
 # PressureAdvisor's window so the engineer never tunes pressure on a cold tyre.
+#
+# **Difetto aperto, non curato (13/10).** 75 °C e' la slick di ACC. Una stradale
+# su AC non ci arriva: la M3 E92 a Suzuka fa 60.9, 68.2, 70.2 di media in tre
+# giri di fila, quindi per lei nessun giro e' mai «caldo» e l'Ingegnere non
+# parte. Una soglia per classe non l'ho messa perche' l'archivio non la regge:
+# e' un'auto sola, tre giri, e al terzo la gomma sta ancora salendo (69.8 nel
+# primo quarto, 70.9 nell'ultimo) — il suo regime non l'abbiamo mai visto.
+# Qualunque numero fra 61 e 70 sarebbe scelto per far partire l'Ingegnere, non
+# misurato. La GT3 mod (M4 su AC) invece a regime ci arriva: 62, 69, 73, 77 e li'
+# si ferma. Passa la soglia dal quarto giro; gli altri suoi giri in archivio
+# sono uscite da due. Per chiudere serve uno stint lungo di una stradale, otto
+# o dieci giri di fila, fino a vedere dove la temperatura smette di salire.
 _WARM_C = 75.0
 _SEG_N = 20               # track segments for counting distinct lock/spin spots
 

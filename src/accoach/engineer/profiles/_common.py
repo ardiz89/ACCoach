@@ -22,6 +22,7 @@ from ..core import (
     Symptom,
     WorkPhase,
 )
+from ..steps import Steps, UnknownSteps
 
 # Short aliases used throughout the remedy tables.
 U, O = Balance.UNDERSTEER, Balance.OVERSTEER
@@ -51,16 +52,19 @@ LO, HI = Speed.LOW, Speed.HIGH
 # sarebbe un giro.
 GT3_DRY_WINDOW: tuple[float, float] = (26.5, 0.5)
 
-
-_PSI_PER_CLICK = 0.1
 _SEG_LIMIT = 3                 # lock/spin segments that count as "recurring"
-# Quanti click di pressione al massimo in un solo passaggio ai box. Viene
-# dall'import iniziale del progetto e non e' mai stato misurato; cosi' com'e'
-# vale 0.8 psi, quindi una gomma un paio di psi fuori finestra si prende in tre
+# Quanta pressione al massimo in un solo passaggio ai box. Viene dall'import
+# iniziale del progetto (erano «8 click», scritti pensando ad ACC) e non e' mai
+# stato misurato; una gomma un paio di psi fuori finestra si prende in tre
 # soste. Che il passo sia corto va bene: fra un passo e il successivo
 # l'Ingegnere MISURA, ed e' l'unico motivo per cui il suo registro vale
 # qualcosa. Tacerlo no, ed e' quello che questo modulo faceva.
-_MAX_CLICKS_PER_STOP = 8
+#
+# E' in psi e non in click perche' un click non vale uguale dappertutto: 0.1 psi
+# su ACC, 1 psi su quasi tutte le auto di Assetto Corsa. Quanti click sono lo
+# dice `engineer/steps.py`, auto per auto. Dove un solo click supera gia' questo
+# tetto (AC) il passo e' un click: meno di cosi' l'auto non si muove.
+_MAX_PSI_PER_STOP = 0.8
 
 _SLOTS = {"front": FRONT, "rear": REAR, "all": ALL, None: (None,)}
 
@@ -245,45 +249,112 @@ class PressurePhase(WorkPhase):
 
     def __init__(self, target_psi: float, tol: float,
                  key: str = "pressures", label: str = "Pressures",
-                 tag: str = "BOX") -> None:
+                 tag: str = "BOX", steps: Steps | None = None) -> None:
         super().__init__(key, label, tag)
         self.target = target_psi
         self.tol = tol
+        #: Quanto vale un click di pressione su quest'auto. Senza, la fase non
+        #: lo sa — e non propone: i profili la costruiscono cosi', e' il motore
+        #: che gliela da' (`RaceEngineer.__init__`).
+        self.steps: Steps = steps if steps is not None else UnknownSteps()
 
     def reconfigure(self, **kw) -> "PressurePhase":
-        pw = kw.get("pressure_window")
-        if not pw:
-            return self
-        return PressurePhase(pw[0], pw[1], self.key, self.label, self.tag)
+        pw = kw.get("pressure_window") or (self.target, self.tol)
+        return PressurePhase(pw[0], pw[1], self.key, self.label, self.tag,
+                             kw.get("steps") or self.steps)
 
     def owns(self, symptom: Symptom) -> bool:
         return False
+
+    def blind(self) -> str:
+        """Senza finestra (``core.NO_WINDOW``) non c'e' niente da confrontare.
+
+        E' l'auto che il nome non ci dice cos'e'. La misura c'e', ma dire «27
+        psi» senza sapere se per quest'auto sono tanti o pochi non aiuta
+        nessuno: si dice che non lo sappiamo, e perche' non si tira a indovinare.
+        """
+        if self.target is not None:
+            return ""
+        if current_language() == "it":
+            return ("Pressioni: non so che tipo di auto e' questa, quindi non so "
+                    "che finestra hanno le sue gomme. Non le tocco: la finestra "
+                    "di un'altra categoria sarebbe un numero sbagliato detto con "
+                    "sicurezza. Vado avanti col resto.")
+        return ("Pressures: I don't know what kind of car this is, so I don't "
+                "know its tyre window. I'm leaving them alone: another class's "
+                "window would be a wrong number said with confidence. Moving on "
+                "to the rest.")
+
+    def _tol(self, psi_per_click: float | None) -> float:
+        """La tolleranza che quest'auto puo' davvero raggiungere.
+
+        Con un click da 1 psi una finestra di ±0.4 non si centra: da 21.5 il
+        click porta a 22.5, e da li' indietro, per sempre. Entro mezzo click dal
+        bersaglio nessun click avvicina, quindi li' si e' arrivati. Su ACC mezzo
+        click e' 0.05 psi e non cambia niente.
+        """
+        return max(self.tol, psi_per_click / 2) if psi_per_click else self.tol
+
+    def _out(self, pressures: dict):
+        """Gli assi fuori finestra: (nome, ruote, psi, psi per click o None)."""
+        if self.target is None:
+            return                            # nessuna finestra: vedi `blind`
+        for ax, slots in (("front", FRONT), ("rear", REAR)):
+            cur = pressures.get(ax)
+            if cur is None:
+                continue
+            ppc = self.steps.psi_per_click(slots)
+            if abs(cur - self.target) > self._tol(ppc):
+                yield ax, slots, cur, ppc
 
     def gate(self, window: list[LapStats]) -> bool:
         recent = [s for s in window if s.pressures_hot]
         if not recent:
             return True                       # no pressure data → can't act, move on
-        last = recent[-1].pressures_hot
-        return all(abs(last.get(ax, self.target) - self.target) <= self.tol
-                   for ax in ("front", "rear"))
+        return next(self._out(recent[-1].pressures_hot), None) is None
+
+    def pressure_by_hand(self, stats: LapStats) -> str:
+        """Una pressione fuori finestra su un'auto di cui non sappiamo il passo.
+
+        La misura e' buona lo stesso e il pilota la puo' usare: si dice quanti
+        psi mancano, non quanti click, e si dice perche' non la scriviamo noi.
+        Vuota quando non c'e' niente da dire.
+        """
+        for ax, _slots, cur, ppc in self._out(stats.pressures_hot or {}):
+            if ppc is not None:
+                continue
+            lang = current_language()
+            gap = self.target - cur
+            if lang == "it":
+                axis = "anteriore" if ax == "front" else "posteriore"
+                return (f"Pressione {axis} {cur:.1f} psi, finestra ~{self.target}: "
+                        f"servono circa {gap:+.1f} psi. Non la scrivo io: "
+                        f"{self.steps.why(lang)}. Correggila tu dal garage e io "
+                        f"rimisuro.")
+            return (f"{ax.capitalize()} pressure {cur:.1f} psi, window "
+                    f"~{self.target}: it wants about {gap:+.1f} psi. I'm not "
+                    f"writing this one: {self.steps.why(lang)}. Change it in the "
+                    f"garage yourself and I'll measure again.")
+        return ""
 
     def pressure_remedy(self, stats: LapStats) -> ProposedChange | None:
         if not stats.pressures_hot:
             return None
-        for ax, slots in (("front", FRONT), ("rear", REAR)):
-            cur = stats.pressures_hot.get(ax)
-            if cur is None or abs(cur - self.target) <= self.tol:
-                continue
-            wanted = round((self.target - cur) / _PSI_PER_CLICK)
-            clicks = max(-_MAX_CLICKS_PER_STOP, min(_MAX_CLICKS_PER_STOP, wanted))
-            clicks = clicks or (1 if cur < self.target else -1)
+        for ax, slots, cur, ppc in self._out(stats.pressures_hot):
+            if ppc is None:
+                continue                      # vedi `pressure_by_hand`
+            # Fuori finestra vuol dire piu' di mezzo click dal bersaglio, quindi
+            # `wanted` non e' mai zero.
+            wanted = round((self.target - cur) / ppc)
+            cap = max(1, int(_MAX_PSI_PER_STOP / ppc))
+            clicks = max(-cap, min(cap, wanted))
             atomics = tuple(AtomicChange("tyrePressure", s, clicks) for s in slots)
             sign = "+" if clicks > 0 else ""
             # Dove arriva QUESTO passo, che non e' dove vorremmo arrivare appena
             # il taglio morde: a 24.7 psi con finestra 27.5 il passo vale 25.5,
             # e la frase prometteva 27.5. Il pilota che ricarica il setup e
             # rimisura non aveva modo di capire se era andata come doveva.
-            reached = cur + clicks * _PSI_PER_CLICK
+            reached = cur + clicks * ppc
             short = clicks != wanted
             if current_language() == "it":
                 # …e in italiano l'asse ha un nome italiano: la frase diceva

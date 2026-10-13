@@ -35,6 +35,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 
 from ..i18n import current_language
+from .steps import AccSteps, Steps
 
 
 # --- diagnosis vocabulary (the discilli taxonomy) --------------------------
@@ -127,6 +128,12 @@ class AtomicChange:
     param: str          # a SETUP_PARAMS key, e.g. "aRBFront", "tyrePressure"
     slot: int | None    # wheel/axle index, or None for a scalar
     delta_clicks: int
+    #: Di quanto si muove il numero NEL FILE per un click. 1 su ACC, dove il
+    #: file e' fatto di click; su Assetto Corsa lo dichiara l'auto (una barra
+    #: con ``STEP=200`` salvata in N/m: 200). Lo mette il motore quando propone
+    #: (`RaceEngineer._sized`), non chi scrive la tabella dei rimedi: e' una
+    #: proprieta' dell'auto, e la tabella vale per una classe intera.
+    units: int = 1
 
 
 @dataclass(frozen=True)
@@ -148,14 +155,21 @@ class ProposedChange:
         lang = current_language()
         prefix = _REVERT_PREFIX.get(lang) or _REVERT_PREFIX["en"]
         return ProposedChange(
-            changes=tuple(AtomicChange(c.param, c.slot, -c.delta_clicks)
+            changes=tuple(AtomicChange(c.param, c.slot, -c.delta_clicks, c.units)
                           for c in self.changes),
             rationale=prefix + self.rationale,
             phase_label=self.phase_label, tag=self.tag, symptom=self.symptom)
 
     def as_setup_payload(self) -> list[dict]:
-        """Shape accepted by ``/api/setup/preview|apply``."""
-        return [{"param": c.param, "slot": c.slot, "delta_clicks": c.delta_clicks}
+        """Shape accepted by ``/api/setup/preview|apply``.
+
+        Qui ``delta_clicks`` e' il nome che la rotta da' a «di quanto cambia il
+        numero nel file», ed e' quello che esce: i click per il loro passo. Su
+        ACC le due cose coincidono. Tutto il resto del motore — il budget, il
+        registro, la frase detta al pilota — resta in click veri.
+        """
+        return [{"param": c.param, "slot": c.slot,
+                 "delta_clicks": c.delta_clicks * c.units}
                 for c in self.changes]
 
 
@@ -259,6 +273,20 @@ class WorkPhase:
     def reconfigure(self, **kw) -> "WorkPhase":
         """Return a variant tuned by ``kw`` (default: unchanged)."""
         return self
+
+    def blind(self) -> str:
+        """Perche' questa fase su quest'auto non puo' giudicare niente, o "".
+
+        Una fase cieca non e' una fase completata: il motore la salta, ma lo
+        dice con le sue parole invece di scrivere «completata».
+        """
+        return ""
+
+
+#: «Quest'auto non ha una finestra pressioni che conosciamo», detto al motore.
+#: Non e' ``None``: ``None`` vuol dire «tieni quella del profilo», ed e' cosi'
+#: che un'auto mai classificata si ritrovava la finestra di una stradale.
+NO_WINDOW: tuple = (None, None)
 
 
 @dataclass
@@ -433,6 +461,18 @@ _DECISION_MSG = {
         "en": " Also moved, and nobody was aiming at it: {items}.",
         "it": " Si è mosso anche questo, e non lo stavamo cercando: {items}.",
     },
+    # Sa cosa proverebbe e non sa quanto vale un click di quella leva su
+    # quest'auto. Lo dice, col nome della leva, e non lo scrive.
+    "no_step": {
+        "en": "'{sym}': I'd try this — {what} — but I'm not writing it: {why}. "
+              "If you make that change by hand I can't follow it.",
+        "it": "«{sym}»: proverei questo — {what} — ma non lo scrivo: {why}. "
+              "Se lo fai tu a mano, io non riesco a seguirlo.",
+    },
+    "no_step_plain": {
+        "en": "I'd try this — {what} — but I'm not writing it: {why}.",
+        "it": "Proverei questo — {what} — ma non lo scrivo: {why}.",
+    },
     "reason_noeffect": {
         "en": "No measurable effect",
         "it": "Nessun effetto misurabile",
@@ -553,13 +593,19 @@ class RaceEngineer:
     """Deterministic convergence engine for one car-class :class:`Profile`."""
 
     def __init__(self, profile: Profile, *, min_stable: int = _MIN_STABLE,
-                 pressure_window: tuple[float, float] | None = None) -> None:
+                 pressure_window: tuple[float, float] | None = None,
+                 steps: Steps | None = None) -> None:
         self.profile = profile
         self.min_stable = min_stable
+        #: Quanto vale un click su quest'auto. Costruito a mano, il motore
+        #: ragiona come ACC — i profili sono nati li' e i test lo usano cosi'.
+        #: Chi lo costruisce per un'auto vera passa da `engineer_for`, che il
+        #: gioco lo deve sapere e altrimenti risponde «non lo so».
+        self.steps: Steps = steps if steps is not None else AccSteps()
         # Engine-local phase list, so a car/track-specific pressure window can be
         # applied without mutating the shared profile singleton.
         self.phases = [
-            p.reconfigure(pressure_window=pressure_window) if pressure_window else p
+            p.reconfigure(pressure_window=pressure_window, steps=self.steps)
             for p in profile.phases
         ]
         self.phase_idx = 0
@@ -587,6 +633,13 @@ class RaceEngineer:
         #: La modifica che l'altra sessione ha scritto sulla macchina e non ha
         #: fatto in tempo a giudicare, in attesa di essere detta una volta sola.
         self._unjudged: str = ""
+        #: Il primo rimedio saltato perche' non se ne conosce il passo, durante
+        #: l'ultima ricerca. Serve a distinguere «ho finito le leve» da «le leve
+        #: le ho, ma non le so scrivere»: la prima e' un'accusa al pilota.
+        self._blocked: ProposedChange | None = None
+        #: I sintomi gia' dichiarati non scrivibili in questa sessione. Non va
+        #: su disco: domani l'auto puo' essere leggibile.
+        self._unwritable: set[Symptom] = set()
 
     # -- memoria fra sessioni ----------------------------------------------
     def state(self) -> dict:
@@ -804,8 +857,45 @@ class RaceEngineer:
             text=_msg("predict", lang, sym=str(sym), a=now, b=bar,
                       n=self.min_stable, ms=band))
 
+    def _sized(self, change: ProposedChange) -> ProposedChange | None:
+        """La stessa modifica col passo di quest'auto, o None se non si sa.
+
+        Vale per quello che finisce in un file (``BOX``). Una leva al volante
+        (``AV``) la gira il pilota, un click alla volta, e il click li' e' il
+        suo: non c'e' niente da convertire.
+        """
+        if change.tag != "BOX":
+            return change
+        atoms = []
+        for c in change.changes:
+            units = self.steps.units(c.param, c.slot)
+            if units is None:
+                return None
+            atoms.append(AtomicChange(c.param, c.slot, c.delta_clicks, units))
+        return ProposedChange(tuple(atoms), change.rationale, change.phase_label,
+                              change.tag, change.symptom)
+
+    def _cannot_write(self, change: ProposedChange) -> Decision:
+        """Dire cosa si proverebbe, e perche' non lo si scrive."""
+        lang = current_language()
+        why = self.steps.why(lang)
+        if change.symptom is None:
+            return Decision(DecisionKind.STAND_DOWN,
+                            _msg("no_step_plain", lang, what=change.rationale,
+                                 why=why))
+        return Decision(DecisionKind.STAND_DOWN,
+                        _msg("no_step", lang, sym=str(change.symptom),
+                             what=change.rationale, why=why))
+
     def _propose(self, change: ProposedChange, confidence: str) -> Decision:
         """Hold a change as pending and hand it over with its acceptance bar."""
+        # L'unica porta da cui una modifica esce verso il setup. Chi la chiama
+        # ha gia' scartato quello che non sa scrivere; questo e' il controllo
+        # che resta se domani nasce una strada che non lo fa.
+        sized = self._sized(change)
+        if sized is None:
+            return self._cannot_write(change)
+        change = sized
         self._pending = change
         self._pending_is_revert = False
         self._pending_prediction = self._predict(change)
@@ -892,6 +982,13 @@ class RaceEngineer:
         phase = self.phase
         if phase is None:
             return Decision(DecisionKind.DONE, _msg("done", lang))
+        blind = phase.blind()
+        if blind:
+            # Prima del cancello, non dopo: un cancello che non sa cosa guardare
+            # risponderebbe «a posto», e il pilota leggerebbe «fase completata»
+            # su una cosa che nessuno ha controllato.
+            self.phase_idx += 1
+            return Decision(DecisionKind.STAND_DOWN, blind)
         if phase.gate(self.window):
             self.phase_idx += 1
             nxt = self.phase
@@ -908,12 +1005,24 @@ class RaceEngineer:
             change = self._pressure_remedy(phase)
             if change is not None:
                 return self._propose(change, "high")
+            # Fuori finestra, ma su quest'auto non sappiamo quanto vale un
+            # click di pressione: si dice la misura e si resta qui. Passare alla
+            # fase dopo sarebbe lavorare di barre su gomme sbagliate.
+            by_hand = self._pressure_by_hand(phase)
+            if by_hand:
+                return Decision(DecisionKind.STAND_DOWN, by_hand)
             # Nothing actionable here; treat the phase as done to avoid a stall.
             self.phase_idx += 1
             return Decision(DecisionKind.PHASE_DONE,
                             _msg("phase_nothing", lang, label=tr(phase.label)))
 
         change = self._remedy_for(symptom, phase)
+        if change is None and self._blocked is not None:
+            # Le leve ci sono, e' il passo che manca: non e' «rimedi esauriti,
+            # probabile questione di guida», e non va nel conto di quante volte
+            # lo diciamo. Detto una volta; poi il sintomo si lascia stare.
+            self._unwritable.add(symptom)
+            return self._cannot_write(self._blocked)
         if change is None:
             self.exhausted.add(symptom)
             # "Setup can't fix this, so it's you" is a claim, and one we have
@@ -1018,7 +1127,8 @@ class RaceEngineer:
             seen.update(s.symptom_scores.keys())
         best, best_score = None, _SYMPTOM_THRESH
         for sym in seen:
-            if sym in self.exhausted or not phase.owns(sym):
+            if (sym in self.exhausted or sym in self._unwritable
+                    or not phase.owns(sym)):
                 continue
             score = _median_score(self.window, sym)
             if score < best_score:
@@ -1032,18 +1142,28 @@ class RaceEngineer:
         return best
 
     def _remedy_for(self, symptom: Symptom, phase: WorkPhase) -> ProposedChange | None:
+        self._blocked = None
         remedies = self.profile.remedy_table.get(symptom)
         if not remedies:
             return None
-        idx = self.remedy_idx.get(symptom, 0)
+        start = idx = self.remedy_idx.get(symptom, 0)
         while idx < len(remedies) and idx < _REMEDY_CAP:
             change = remedies[idx](symptom, phase)
             if self._over_budget(change):
                 idx += 1
                 continue
+            if self._sized(change) is None:
+                # Non si sa quanto vale un click di questa leva su quest'auto:
+                # si prova la successiva, e ci si ricorda di averla saltata.
+                self._blocked = self._blocked or change
+                idx += 1
+                continue
             self.remedy_idx[symptom] = idx
             return change
-        self.remedy_idx[symptom] = idx
+        # Il punto a cui si era arrivati va su disco. Se la ricerca e' finita
+        # per un passo che manca, resta dov'era: il giorno che l'auto e'
+        # leggibile quelle leve sono ancora da provare.
+        self.remedy_idx[symptom] = start if self._blocked is not None else idx
         return None
 
     def _over_budget(self, change: ProposedChange) -> bool:
@@ -1067,4 +1187,11 @@ class RaceEngineer:
         builder = getattr(phase, "pressure_remedy", None)
         if builder is None or not self.window:
             return None
+        return builder(self.window[-1])
+
+    def _pressure_by_hand(self, phase: WorkPhase) -> str:
+        """La frase per una pressione fuori finestra che non sappiamo scrivere."""
+        builder = getattr(phase, "pressure_by_hand", None)
+        if builder is None or not self.window:
+            return ""
         return builder(self.window[-1])

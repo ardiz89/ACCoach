@@ -981,7 +981,10 @@ class CoachEngine:
             # ma non smemorato. Quello che torna e' il registro di cosa e' gia'
             # stato provato (fase, rimedi, click spesi), mai le misure: due
             # sessioni non si confrontano. Vedi `RaceEngineer.state`.
-            self._engineer = engineer_for(snap.car_model, snap.track)
+            # `is_acc` decide quanto vale un click nel file: su Assetto Corsa
+            # lo dichiara l'auto, e dove non si legge l'Ingegnere non scrive.
+            self._engineer = engineer_for(snap.car_model, snap.track,
+                                          is_acc=snap.is_acc)
             self._engineer_key = (snap.car_model, snap.track)
             self._engineer.restore(
                 self._load_engineer_state(snap.car_model, snap.track))
