@@ -29,7 +29,7 @@ U, O = Balance.UNDERSTEER, Balance.OVERSTEER
 EN, AP, EX = Phase.ENTRY, Phase.APEX, Phase.EXIT
 LO, HI = Speed.LOW, Speed.HIGH
 
-PRESS_OK = {"front": 27.5, "rear": 27.5}
+PRESS_OK = {"front": 26.5, "rear": 26.5}
 
 
 def _lap(time_ms=100000, symptom=None, score=0.0, press=PRESS_OK,
@@ -62,7 +62,7 @@ def test_unstable_laps_do_not_count():
 
 def test_pressure_phase_proposes_off_axle():
     eng = _eng()
-    off = {"front": 29.0, "rear": 27.5}      # front 1.5 psi too high
+    off = {"front": 29.0, "rear": 26.5}      # front 2.5 psi too high
     eng.observe(_lap(press=off)); eng.observe(_lap(press=off))
     d = eng.observe(_lap(press=off))
     assert d.kind is DecisionKind.PROPOSE
@@ -290,6 +290,10 @@ def test_exhausting_remedies_flags_driving_issue():
             eng.mark_applied()
         elif d.kind is DecisionKind.REVERTED:
             reverts += 1
+            # Il pilota rimette l'assetto di prima. Fino al 13/10 questo test
+            # non lo faceva e arrivava in fondo lo stesso, cioe' guidava il
+            # difetto: ogni rimedio proposto sopra quello bocciato.
+            eng.mark_applied()
         elif d.kind is DecisionKind.PHASE_DONE and "exhausted" in d.message:
             break
     assert sym in eng.exhausted

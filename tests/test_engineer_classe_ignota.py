@@ -80,7 +80,7 @@ def test_una_gt_che_lo_dice_nel_nome_resta_una_gt(car):
     """La meta' di controllo: la prudenza non deve aver zittito l'auto su cui
     la finestra e' stata misurata."""
     assert known_class(car) is CarClass.GT3
-    assert pressure_window(car) == (27.5, 0.7)
+    assert pressure_window(car) == (26.5, 0.5)
 
 
 # --- cosa fa l'Ingegnere ---------------------------------------------------
@@ -123,7 +123,7 @@ def test_una_fase_senza_finestra_non_giudica_e_non_cade():
 
 def test_la_gt3_misurata_riceve_ancora_la_sua_proposta():
     eng = engineer_for("mclaren_720s_gt3_evo", "monza", is_acc=True)
-    decisions = _laps(eng, 4, 24.7, 27.5)
+    decisions = _laps(eng, 4, 24.7, 26.5)
     assert any(d.kind is DecisionKind.PROPOSE for d in decisions)
 
 

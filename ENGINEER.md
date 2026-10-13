@@ -143,7 +143,7 @@ Ogni modifica accettata che tocca grip/aero/freni **re-invalida il giro di rifer
 
 - **Fasi**: P1 pressioni → P2 aero → P3 meccanico (molle→bump→ammortizzatori) → P4 brake bias →
   P5 elettronica (TC/ABS/mappa).
-- 4 leve forti: aero, elettronica, meccanico, gomme. Pressioni a caldo target ~27.5 ± 0.7 psi.
+- 4 leve forti: aero, elettronica, meccanico, gomme. Pressioni a caldo target ~26.5 ± 0.5 psi (ACC dalla 1.9).
 - Lock diffusi → `ABS +1` finché `abs_level<8`, poi brake bias indietro (logica `advisor`).
   Spin diffusi → `TC +1`, poi diff/molla post.
 - Asse velocità pieno (bassa = meccanico/diff; alta = aero/altezze).

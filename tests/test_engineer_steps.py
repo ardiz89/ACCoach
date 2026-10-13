@@ -218,7 +218,7 @@ def test_su_acc_non_cambia_niente_otto_click_sono_otto_decimi(tmp_path):
     """La meta' di controllo: la cura non deve aver toccato il gioco che
     funzionava. 24.7 psi con finestra 27.5 era +8 click in pista il 14/08."""
     eng = engineer_for("mclaren_720s_gt3_evo", "monza", is_acc=True)
-    d = _proposal(_drive(eng, front=24.7, rear=27.5))
+    d = _proposal(_drive(eng, front=24.7, rear=26.5))
     assert d.change.as_setup_payload() == [
         {"param": "tyrePressure", "slot": 0, "delta_clicks": 8},
         {"param": "tyrePressure", "slot": 1, "delta_clicks": 8}]
@@ -297,7 +297,7 @@ def test_chi_non_dice_che_gioco_e_ottiene_un_ingegnere_che_non_scrive():
     """Il difetto era un valore di comodo: «sara' ACC». Chi si dimentica di
     dirlo adesso ottiene la prudenza, non un'ipotesi."""
     eng = engineer_for("mclaren_720s_gt3_evo", "monza")
-    decisions = _drive(eng, n=6, front=24.7, rear=27.5)
+    decisions = _drive(eng, n=6, front=24.7, rear=26.5)
     _never_writes(decisions)
     assert decisions[-1].kind is DecisionKind.STAND_DOWN
     assert isinstance(steps_for("x", None), UnknownSteps)

@@ -29,6 +29,29 @@ U, O = Balance.UNDERSTEER, Balance.OVERSTEER
 EN, AP, EX = Phase.ENTRY, Phase.APEX, Phase.EXIT
 LO, HI = Speed.LOW, Speed.HIGH
 
+# La finestra a caldo della GT3 di ACC all'asciutto: 26.0-27.0 psi.
+#
+# Versione e fonte, perche' la patch che la invalida non ci avvisera':
+#   - fino al 13/10/2026 qui c'era (27.5, 0.7), cioe' 26.8-28.2. Era centrata
+#     sul 27.3-27.9 di Aris (Kunos, nov 2020, ACC 1.6);
+#   - col modello gomme della 1.9 l'ottimo e' sceso. Kunos non ha pubblicato un
+#     numero nuovo; la fonte e' la community, Coach Dave, che nella stessa
+#     pagina scrive 26.0-27.0, 26.0-27.2 e 26.5-27.5 (COACHING-PRO.md, §6).
+#     Le tre concordano su una cosa sola: 28 psi non e' piu' dentro.
+# Quindi il numero NON e' misurato da noi ed e' il meno solido dei tre che
+# questo profilo usa. Scelto col pilota il 13/10 perche' con quello vecchio
+# l'Ingegnere aveva portato gli anteriori della 720S da 24.7 a 27.1 e a 26.6
+# chiedeva ancora +8 click: spingeva verso l'alto una gomma che per ogni
+# fonte post-1.9 era gia' a posto. La striscia contesa e' 27.0-27.5: li' oggi
+# diciamo «cala», ed e' il primo posto da guardare se un verdetto non torna.
+#
+# Il nome e' pubblico perche' il numero aveva QUATTRO copie (`pressures.py`, il
+# profilo GT3, `coaching/tuning.py`, `coaching/pressure.py`) e una copia di una
+# regola e' un difetto che aspetta l'altra meta'. Ora si legge da qui: sta in
+# questo modulo e non in `pressures.py` perche' quello importa i profili, e
+# sarebbe un giro.
+GT3_DRY_WINDOW: tuple[float, float] = (26.5, 0.5)
+
 _SEG_LIMIT = 3                 # lock/spin segments that count as "recurring"
 # Quanta pressione al massimo in un solo passaggio ai box. Viene dall'import
 # iniziale del progetto (erano «8 click», scritti pensando ad ACC) e non e' mai

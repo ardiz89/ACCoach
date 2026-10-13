@@ -128,7 +128,7 @@ def test_engineer_for_sets_class_and_pressure_window():
     # `[0] == 30.0`: era il default «stradale» fissato in un test, lo stesso che
     # dava 30 psi a una LMP1 (vedi test_engineer_classe_ignota.py).
     assert pressure_window("dodge_char_police") is None
-    assert pressure_window("mclaren_720s_gt3_evo") == (27.5, 0.7)
+    assert pressure_window("mclaren_720s_gt3_evo") == (26.5, 0.5)
 
 
 # --- una modifica di pressione dice dove arriva, non dove vorrebbe ---------

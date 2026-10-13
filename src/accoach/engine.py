@@ -204,7 +204,7 @@ def _focus_log_line(report: FocusReport | None, *, counted: bool = True,
     # Il resto della riga descrive il giro *precedente*, che sotto un focus
     # aperto e' l'equivoco peggiore: nome, tema e progresso sembrano quelli di
     # questo giro. La coda dice che non lo sono.
-    return f"{riga} | non contato: giro non pulito | scartati={discarded}"
+    return f"{riga} | non contato: giro non valido | scartati={discarded}"
 
 
 def _decision_sig(decision) -> tuple | None:
@@ -480,9 +480,17 @@ class CoachEngine:
             # la curva per conto suo.
             stats = build_lap_stats(lap, self._corners or None,
                                     corner_names=self._corner_names)
+            previous = self._engineer_decision
             self._engineer_decision = self._engineer.observe(stats)
             self._announce_engineer(self._engineer_decision)
-            self._log_engineer_outcome(lap, self._engineer_decision)
+            # Un ripristino non ancora eseguito torna identico a ogni giro (vedi
+            # `RaceEngineer.observe`), numeri compresi, perche' il pilota deve
+            # poterli rileggere. Ma la prova e' stata una: nel registro ci va
+            # una volta, o tre giri d'attesa diventerebbero tre bocciature e la
+            # percentuale di riuscita — l'unico numero che puo' darci torto —
+            # scenderebbe da sola.
+            if self._engineer_decision is not previous:
+                self._log_engineer_outcome(lap, self._engineer_decision)
             self._save_engineer_state()
 
         # The Focus coach needs a reference to know where time was lost.
@@ -499,7 +507,27 @@ class CoachEngine:
             self.scheduler.set_focus(None)
         else:
             debrief = build_lap_debrief(lap, self._reference, self._corners)
-            stable = lap.valid and lap.clean is not False
+            # Il focus conta anche i giri **sporchi**: resta fuori solo cio'
+            # che non e' un giro intero. Deciso misurando, il 09/10, sui 95 giri
+            # di Monza e Imola in archivio (26 sporchi): contandoli, il focus
+            # insegna **le stesse curve nello stesso ordine** e ci arriva da 2 a
+            # 6 giri prima (a Imola la Tosa al giro 17 invece che al 23).
+            # Divergono solo sulla quarta elezione, dove le perdite sono 73 e
+            # 101 ms, cioe' rumore. Regge perche' il focus misura **per curva**
+            # su una mediana di sei giri: una curva sbagliata avvelena se' stessa
+            # e la mediana assorbe.
+            #
+            # `valid` invece resta: un giro incompleto o di rientro ai box dura
+            # il triplo e la sua perdita per curva non vuol dire niente.
+            #
+            # E NON si allinea con l'Ingegnere, che la sua regola se la calcola
+            # da solo in `diagnosis.py` e tiene anche `clean`. Non e'
+            # un'incoerenza, e' la misura: tutti e 26 i giri sporchi cadono
+            # fuori dalla sua banda di decisione, e **sei su tredici sono piu'
+            # veloci** della mediana pulita (fino a 2.8 s) perche' tagliare la
+            # Variante fa guadagnare. Con quelli accetterebbe una modifica
+            # d'assetto sulla forza di una chicane tagliata.
+            stable = bool(lap.valid)
             before = (frozenset(self._focus.mastered), frozenset(self._focus.parked))
             # Il focus e' un esperimento, e un esperimento tiene fermo il
             # controllo: finche' un focus e' aperto giudica contro lo stesso
@@ -523,12 +551,30 @@ class CoachEngine:
             # personal best di fila (1:51 -> 1:47) l'hanno svuotata quattro volte.
             # Il focus non eleggeva **mentre il pilota migliorava**.
             #
-            # Si libera su un verdetto, e solo su quello: dato «migliorata» o
-            # «parcheggiata» il ciclo e' chiuso e il prossimo si pesa su oggi.
-            # CLEAN invece non e' un verdetto ed e' uno stato che si ripete a
-            # ogni giro: liberarlo li' rifarebbe la regressione, perche' ogni
-            # giro ributterebbe la finestra che non arriverebbe mai ai tre giri.
-            if self._focus_report.kind in (FocusKind.IMPROVED, FocusKind.STUCK):
+            # Si libera su un verdetto: dato «migliorata» o «parcheggiata» il
+            # ciclo e' chiuso e il prossimo si pesa su oggi.
+            #
+            # E si libera su CLEAN. Fino al 13/10 non lo faceva, per paura della
+            # regressione del 23/08. Il costo si e' visto sul log del 24/09 a
+            # Imola: il metro appuntato al primo giro della finestra era il giro
+            # lento del pilota stesso, contro cui non si perde niente da
+            # nessuno; il coach ha detto «nessun punto debole» e li' e'
+            # rimasto, mentre contro il riferimento del momento la Rivazza
+            # perdeva mezzo secondo. Un metro fermo per sempre non e' un
+            # controllo, e' un orologio fermo.
+            #
+            # Non rifa' la regressione perche' la regressione stava nel muovere
+            # il metro **mentre la finestra si riempie** (ASSESS), e quello
+            # resta vietato: liberato su CLEAN, se il riferimento nel frattempo
+            # e' cambiato il giro dopo svuota la finestra una volta, la
+            # valutazione riparte, e per i tre giri che servono il metro e' di
+            # nuovo appuntato. Chi migliora a ogni giro riceve un verdetto ogni
+            # tre giri, non «valuto 0/3» per tutta la sessione. E se il
+            # riferimento non si e' mosso, liberare non cambia niente: il giro
+            # dopo si riappunta lo stesso metro e la finestra continua a
+            # scorrere.
+            if self._focus_report.kind in (FocusKind.IMPROVED, FocusKind.STUCK,
+                                           FocusKind.CLEAN):
                 self._focus_ref = None
             else:
                 self._focus_ref = (fref, fcorners)

@@ -731,6 +731,8 @@
     "eng.suggests":    { en: `🔧 The engineer suggests <span class="es-sub">(at the next pit stop)</span>`,
                          it: `🔧 L'ingegnere suggerisce <span class="es-sub">(al prossimo pit stop)</span>` },
     "eng.prepare":     { en: `Prepare change in the editor →`, it: `Prepara la modifica nell'editor →` },
+    "eng.restoredByHand": { en: `I've already restored it in the garage`,
+                            it: `L'ho già ripristinato ai box` },
 
     "eng.focusTitle":  { en: `Focus · lesson`, it: `Focus · lezione` },
     "eng.focusSub":    { en: `(your driving, one weakness at a time)`,

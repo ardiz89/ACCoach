@@ -20,7 +20,7 @@ repeating it every lap.
 Scope / calibration
 -------------------
 The default target (``target_psi`` / ``tol_psi``) is the dry **ACC GT3** window
-(~27.5 psi). Other categories and wet running want different numbers; the target
+(~26.5 psi). Other categories and wet running want different numbers; the target
 is a constructor parameter so it can be set per car/condition later. Pressures
 are only sampled once the tyres are warm (``warmup_temp_c``) so a cold out-lap
 never triggers bad advice, and implausible readings are ignored outright.
@@ -29,14 +29,14 @@ never triggers bad advice, and implausible readings are ignored outright.
 from __future__ import annotations
 
 from ..engineer import CarClass
+from ..engineer.pressures import GT3_DRY_WINDOW
 from ..telemetry.snapshot import ACStatus, TelemetrySnapshot
 from .cue import Cue, CueCategory
 from .tuning import tuning_for_class
 
 # Dry ACC GT3 hot-pressure target and the half-width of the "fine" band: an axle
 # average inside [target - tol, target + tol] gets no comment.
-_DEFAULT_TARGET_PSI = 27.5
-_DEFAULT_TOL_PSI = 0.7
+_DEFAULT_TARGET_PSI, _DEFAULT_TOL_PSI = GT3_DRY_WINDOW
 
 # Don't trust pressures until the tyres are at operating temp. A GT3 slick works
 # around ~80 C core; below that the pressure reads low and would trigger a bogus
@@ -81,7 +81,7 @@ class PressureAdvisor:
     def set_car_class(self, car_class: CarClass) -> None:
         """Prendi la finestra della classe, o **taci** se non la conosciamo.
 
-        27.5 psi è la GT3 ACC all'asciutto, e applicata altrove non è una stima
+        26.5 psi è la GT3 ACC all'asciutto, e applicata altrove non è una stima
         approssimativa: è un'altra auto. Misurato sui giri veri — una SF25 gira a
         12.9 psi e si sentiva dire «alza 14.6 psi», una stradale a 34.7 (che è la
         sua pressione di progetto) «cala 7.2». Le uniche due auto per cui il
@@ -104,7 +104,7 @@ class PressureAdvisor:
             return []
         # La classe non basta: il **titolo** decide se la nostra misura vale. Il
         # M4 GT3 *mod su AC* è classe GT3 e legge 63 °C di gomma — il modello del
-        # mod non è quello di ACC, ed è lì che 27.5 psi è stato misurato.
+        # mod non è quello di ACC, ed è lì che la finestra vale.
         if not (self._known and s.is_acc):
             self._reset_lap()
             return []
