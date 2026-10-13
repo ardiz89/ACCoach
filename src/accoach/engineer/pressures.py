@@ -14,10 +14,11 @@ applies it to the pressure phase without mutating the shared profile.
 from __future__ import annotations
 
 from .classmap import CarClass, classify
+from .profiles._common import GT3_DRY_WINDOW
 
 # Per-class hot-pressure window (target, tolerance) in psi.
 _CLASS_WINDOW: dict[CarClass, tuple[float, float]] = {
-    CarClass.GT3: (27.5, 0.7),       # ACC Pirelli slick
+    CarClass.GT3: GT3_DRY_WINDOW,    # ACC Pirelli slick, dalla 1.9
     CarClass.FORMULA: (22.0, 0.4),   # open-wheel slick, tighter
     CarClass.ROAD: (30.0, 1.5),      # street rubber, wider
 }
@@ -27,7 +28,7 @@ _CLASS_WINDOW: dict[CarClass, tuple[float, float]] = {
 # independent guides agree on it (simracingsetup, Coach Dave, the ACC wiki). The
 # open-wheel and road classes have no equivalent published figure and no wet lap
 # in our archive, so they are absent — and absent means the engineer stands down
-# rather than reaching for the dry number, which is 2.5 psi away and would be
+# rather than reaching for the dry number, which is 3.5 psi away and would be
 # advice pointing the wrong way.
 _CLASS_WET_WINDOW: dict[CarClass, tuple[float, float]] = {
     CarClass.GT3: (30.0, 0.75),
@@ -58,7 +59,7 @@ def wet_pressure_window(car_model: str) -> tuple[float, float] | None:
     """The wet window for this car, or ``None`` when we don't have one.
 
     ``None`` is a real answer and the caller must treat it as one: the dry
-    target is 2.5 psi below the wet one on a GT3, so falling back to it in the
+    target is 3.5 psi below the wet one on a GT3, so falling back to it in the
     rain would not be a degraded answer, it would be a wrong one.
     """
     return _CLASS_WET_WINDOW.get(classify(car_model))

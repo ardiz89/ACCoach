@@ -123,7 +123,7 @@ cambiano le parole.
 ### c) Consigli di setup — a fine giro, ogni tanto
 Tra un giro e l'altro, quando un sintomo si ripete, ti suggerisce una regolazione
 (pressioni gomme, livelli TC/ABS dove regolabili, bilanciamento freni). Le
-pressioni vengono giudicate solo a gomme in temperatura, sul target GT3 (~27.5 psi).
+pressioni vengono giudicate solo a gomme in temperatura, sul target GT3 (~26.5 psi).
 
 Le modifiche sono di due tipi, e si chiudono in modo diverso.
 

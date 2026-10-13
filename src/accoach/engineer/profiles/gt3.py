@@ -16,6 +16,7 @@ from __future__ import annotations
 
 from ..core import FRONT, REAR, LapStats, Profile, Symptom, WorkPhase
 from ._common import (
+    GT3_DRY_WINDOW,
     AP,
     EN,
     EX,
@@ -136,7 +137,7 @@ class _ElectronicsPhase(WorkPhase):
 GT3_PROFILE = Profile(
     name="GT3",
     phases=[
-        PressurePhase(27.5, 0.7),
+        PressurePhase(*GT3_DRY_WINDOW),
         # Mechanical grip BEFORE aero on a GT3: the car lives on mechanical grip,
         # so fix springs/bars/diff first; masking a mechanical issue with rake/wing
         # is backwards (aero-first is the Formula order, not GT3).
