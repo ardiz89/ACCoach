@@ -120,6 +120,37 @@ pubblico, stesso problema, reazione opposta a seconda di come è presentato.**
 
 ## Cosa resta aperto
 
+> **Aggiornamento del 2026-09-19.** La tabella qui sotto e le cinque misure
+> della sessione pianificata il 03/08 sono state riverificate contro il codice e
+> contro il piano di test `src/accoach/web/test_plan.json`. Cosa e' cambiato dal
+> 31/07, che questa pagina non sapeva:
+>
+> - **Burst lock: chiuso** il 12/08. Non serviva una soglia nuova, serviva
+>   l'evento: quattro bloccaggi veri con l'ABS a 0 (`freno_max=1.00`,
+>   226→100 km/h, slip `-1.001`). Era aperto da due sessioni per **evento
+>   mancato**, non per taratura sbagliata.
+> - **Parola di attivazione: di fatto validata dall'uso.** Il canale a voce
+>   `tools/voce/` guida ogni sessione dal 02/08, e dal 23/08 il pilota risponde
+>   **col cambio** quando non puo' parlare. Le dieci chiamate di prova non sono
+>   mai state fatte come protocollo a se'.
+> - **Restano davvero bloccate sul volante tre misure**: lo **stint benzina a
+>   setup fisso** (voce 18, e senza quel coefficiente il veto sul tempo
+>   dell'Ingegnere resta di fatto spento), i **campi pioggia ACC**
+>   (`find-rain`, e non abbiamo un solo giro sul bagnato in archivio), e
+>   **`yaw_baseline` su Formula**.
+> - **Il conto vero prima dei beta tester** non e' in questa tabella: **24 prove
+>   su 58 non hanno un esito**, e sono le categorie **Formula** (12) e
+>   **Stradali** (12). Le 21 Generale sono chiuse fra il 10 e il 12/08, con la
+>   14 e la 18 rifatte il 01/09.
+> - **La release**: `release.yml` non era **mai** partito. Il 12/09 la CI ha
+>   costruito l'EXE per la prima volta (due giri a vuoto, sei payload verificati
+>   contro il repo, niente pubblicato). Manca solo il tag.
+> - Fuori tabella, dal 05/08 a oggi sono stati spediti: il budget di attenzione,
+>   il riquadro per curva, il recap di sessione, l'avviso ai box, la fase
+>   assetto con l'Ingegnere che ricorda, il canale a marce, l'orologio del giro,
+>   il focus con il metro fermo, e i cinque lavori del 12/09 (#94-#98).
+
+
 **Una sola**, la 18, e le serve tempo al volante. La misura che le manca ha una
 proprietà che le altre non avevano: **non aspetta il meteo né la fortuna**.
 
