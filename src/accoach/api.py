@@ -2389,8 +2389,7 @@ def create_api(
 
 def _seed_demo() -> str:
     """Seed a temp lap store with several laps (improving over days) for a demo."""
-    import tempfile
-
+    from .paths import demo_dir
     from .recording.lap import Lap, LapSample
     from .recording.storage import save_lap
     from .telemetry.snapshot import SessionType
@@ -2484,7 +2483,7 @@ def _seed_demo() -> str:
         return Lap("HONE Demo", "Demo Circuit", SessionType.PRACTICE,
                    100000 + off, True, samples=s)
 
-    d = tempfile.mkdtemp(prefix="accoach_webdemo_")
+    d = str(demo_dir("accoach_webdemo_"))
     ref = build(None, 0)          # the fast reference lap (coolest tyres)
     # Dated before the stint laps so the "tyres over time" trend reads as a
     # coherent warm-up across the session instead of a stray cool lap at the end.
