@@ -20,6 +20,12 @@ from dataclasses import replace
 from accoach.recording.recorder import StartLineWatcher, LapRecorder
 from accoach.telemetry.snapshot import ACStatus, SessionType, TelemetrySnapshot
 
+# Il giro che chiude sulla linea esce qualche frame dopo: il registratore
+# guarda se il gioco aggiorna il tempo (vedi `_CONFIRM_FRAMES`). Il
+# fixture finiva proprio sulla linea, quindi gli si danno quei frame.
+_DOPO_LA_LINEA = 3
+
+
 _LIVE = replace(
     TelemetrySnapshot.disconnected(),
     connected=True, status=ACStatus.LIVE, session=SessionType.PRACTICE,
@@ -73,7 +79,7 @@ def test_a_lap_is_not_finished_twice():
               for p in range(0, 100, 2)]
     frames += [replace(_LIVE, lap_position=0.995, completed_laps=2),  # counter
                replace(_LIVE, lap_position=0.002, completed_laps=2)]  # then wrap
-    laps = [lap for f in frames if (lap := rec.update(f)) is not None]
+    laps = [lap for f in frames + [frames[-1]] * _DOPO_LA_LINEA if (lap := rec.update(f)) is not None]
     assert len(laps) == 1
     assert laps[0].samples, "and it's the one with the telemetry in it"
 
@@ -101,7 +107,7 @@ def test_the_crossing_frame_does_not_condemn_the_next_lap():
                for p in range(2, 100, 2)]
     frames += [replace(_LIVE, lap_position=0.995, completed_laps=3, lap_valid=True),
                replace(_LIVE, lap_position=0.002, completed_laps=3, lap_valid=True)]
-    laps = [lap for f in frames if (lap := rec.update(f)) is not None and lap.valid]
+    laps = [lap for f in frames + [frames[-1]] * _DOPO_LA_LINEA if (lap := rec.update(f)) is not None and lap.valid]
     assert len(laps) == 2
     assert (laps[0].clean, laps[0].lost_at) == (False, 0.16)
     assert laps[1].clean is True and laps[1].lost_at is None

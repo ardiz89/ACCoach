@@ -34,6 +34,7 @@ from dataclasses import dataclass
 from ..logging_setup import get_logger
 from ..telemetry.snapshot import ACStatus, TelemetrySnapshot
 from .lap import (_OPEN_CLOCK_MAX_MS, Lap, LapSample, sim_answer_pending,
+                  sim_repeats_itself,
                   trusted_lap_ms)
 
 _log = get_logger("recorder")
@@ -60,6 +61,13 @@ _REFUSAL_WARN_FRAMES = 600
 # generous, because the point is to find out how long it actually takes, and an
 # answer that never arrives is itself the answer.
 _SETTLE_FRAMES = 120
+# Quanto si aspetta un giro il cui numero ripetuto NON contraddice l'orologio.
+# Il gioco, quando e' in ritardo, risponde al primo frame: 6 volte su 6 il
+# 23/08 a Brands Hatch e Imola, 12 su 12 il 14/10 al Red Bull Ring. Tre frame
+# sono tre volte quel ritardo e 50 ms di attesa; aspettarne 120 (due secondi)
+# come per un giro che un tempo non ce l'ha avrebbe fatto arrivare in ritardo,
+# a coach e Ingegnere, anche il giro sano che ha solo la stessa firma.
+_CONFIRM_FRAMES = 3
 
 # Position wrap that marks the start/finish line. Wide margins on purpose: at
 # 270 km/h a 13 Hz acquisition moves ~0.006 of a lap between frames, so the pair
@@ -220,9 +228,11 @@ class LapRecorder:
         # la risposta la racconta da se' in `_resolve_pending`.
         self._settle: tuple[int, int, int] | None = None
         # Un giro chiuso che aspetta la risposta del gioco: il buffer, lo scatto
-        # della linea (da cui vengono le condizioni), il numero letto alla linea
-        # e da quanti frame aspettiamo. Vedi `_resolve_pending`.
-        self._pending: tuple[_Buffer, TelemetrySnapshot, int, int] | None = None
+        # della linea (da cui vengono le condizioni), il numero letto alla linea,
+        # da quanti frame aspettiamo, se quel numero contraddiceva l'orologio del
+        # giro, e cosa diceva il gioco il frame prima. Vedi `_resolve_pending`.
+        self._pending: (tuple[_Buffer, TelemetrySnapshot, int, int, bool,
+                              int | None] | None) = None
         # Un giro gia' pronto che non e' potuto uscire perche' `update` ne
         # consegna uno per frame. Non dovrebbe mai riempirsi — un giro non
         # finisce dentro la finestra d'attesa — ed esiste perche' in questo file
@@ -323,9 +333,21 @@ class LapRecorder:
             # sempre dello stesso segno (misurato il 23/08: -13..-18 ms su sei
             # giri su sei). Vedi `sim_answer_pending` per perche' non basta la
             # firma «stesso numero del frame prima».
-            if sim_answer_pending(int(s.last_lap_ms), self._buf.samples,
-                                  previous=previous_declared):
-                self._pending = (self._buf, s, int(s.last_lap_ms), 0)
+            #
+            # Si aspetta ogni volta che il gioco ripete il numero del frame
+            # prima, anche quando quel numero non contraddice l'orologio. Fino al
+            # 14/10 serviva anche la contraddizione (oltre 150 ms), e quella sera
+            # al Red Bull Ring due giri su dodici sono stati salvati col tempo
+            # del giro PRIMA: 1:34.182 invece di 1:34.055, 1:34.387 invece di
+            # 1:34.357. Il gioco ha risposto al primo frame tutte e dodici le
+            # volte; la soglia lasciava passare proprio i giri costanti, cioe'
+            # quelli su cui l'Ingegnere decide con una banda di 173 ms.
+            if sim_repeats_itself(int(s.last_lap_ms), previous=previous_declared):
+                contradicted = sim_answer_pending(
+                    int(s.last_lap_ms), self._buf.samples,
+                    previous=previous_declared)
+                self._pending = (self._buf, s, int(s.last_lap_ms), 0,
+                                 contradicted, previous_declared)
             else:
                 closed = self._finalize(self._buf, s, previous_declared)
                 self._settle = (int(s.last_lap_ms), closed.lap_time_ms, 0)
@@ -473,7 +495,7 @@ class LapRecorder:
         """
         if self._pending is None:
             return None
-        buf, at_crossing, declared, frames = self._pending
+        buf, at_crossing, declared, frames, contradicted, previous = self._pending
         now = int(s.last_lap_ms)
         frames += 1
         if now != declared:
@@ -481,12 +503,26 @@ class LapRecorder:
             _log.info("orologio del giro: alla linea %.3fs, dopo %d frame %.3fs"
                       " — preso il suo", declared / 1000.0, frames, now / 1000.0)
             return self._finalize(buf, at_crossing, lap_ms=now)
+        if not contradicted and frames >= _CONFIRM_FRAMES:
+            # Il numero ripetuto era gia' quello giusto, e l'orologio del giro
+            # lo conferma: il gioco aveva pubblicato prima del nostro incrocio.
+            # E' la rete di sicurezza di `sim_answer_pending`: un giro sano con
+            # la stessa firma si consegna col suo tempo, solo tre frame dopo.
+            self._pending = None
+            closed = self._finalize(buf, at_crossing, previous)
+            # E si continua ad ascoltare, come per ogni giro che alla linea un
+            # tempo ce l'aveva gia': se il gioco cambiasse idea piu' tardi, la
+            # riga di `_watch_settle` lo dira'. E' l'unico modo di sapere se tre
+            # frame bastano davvero.
+            self._settle = (declared, closed.lap_time_ms, frames)
+            return closed
         if frames >= _SETTLE_FRAMES:
             self._pending = None
             _log.info("orologio del giro: %.3fs invariato per %d frame; questo"
                       " giro non ha un tempo", declared / 1000.0, frames)
             return self._finalize(buf, at_crossing, lap_ms=0)
-        self._pending = (buf, at_crossing, declared, frames)
+        self._pending = (buf, at_crossing, declared, frames, contradicted,
+                         previous)
         return None
 
     def _finalize(self, buf: _Buffer, s: TelemetrySnapshot,

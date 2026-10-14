@@ -462,3 +462,260 @@ def test_restoring_junk_leaves_a_working_engineer():
     eng.restore({"phase_idx": "nope", "remedy_idx": {"non un sintomo": 1},
                  "exhausted": [None], "applied_clicks": "boh"})
     assert eng.observe(_lap()).kind is DecisionKind.COLLECT
+
+
+# --- le uscite di pista come indizio di assetto ----------------------------
+#
+# «Se non guido pulito potrebbe dipendere sempre dal setup» (il pilota, 14/10).
+# Un giro tagliato resta fuori dalla finestra — i suoi TEMPI mentono, tagliare
+# la Variante fa guadagnare — ma il COME e' un'altra cosa: se il pilota esce
+# sempre col retrotreno che scappa in uscita dalle lente, in curve diverse,
+# l'assetto e' un sospettato. Lo stesso cancello dei giri puliti: almeno tre
+# giri, almeno tre curve diverse.
+
+_OFF = Symptom(O, EX, LO)
+
+
+def _off(symptom=_OFF, corner=1, where="", time_ms=97000):
+    """Un giro tagliato, uscito in `corner` con l'auto in quel sintomo."""
+    st = _cut(time_ms=time_ms, where=where)
+    st.off_symptom = symptom
+    st.off_corner = None if symptom is None else corner
+    return st
+
+
+def test_tre_uscite_con_lo_stesso_schema_in_tre_curve_fanno_sospettare_l_assetto():
+    eng = _eng()
+    eng.observe(_off(corner=2))
+    eng.observe(_off(corner=5))
+    d = eng.observe(_off(corner=9))
+    # Lo dice, con la leva che proverebbe…
+    assert "traction control" in d.message
+    # …ma non la scrive: e' ancora la raccolta dei giri puliti.
+    assert d.kind is DecisionKind.COLLECT and d.change is None
+
+
+def test_il_pilota_legge_perche_quante_uscite_e_dove(it_lang):
+    eng = _eng()
+    eng.observe(_off(corner=2, where="Tosa"))
+    eng.observe(_off(symptom=None, where="Rivazza"))
+    eng.observe(_off(corner=5, where="Piratella"))
+    eng.observe(_off(corner=2, where="Tosa"))
+    msg = eng.observe(_off(corner=9, where="Acque Minerali")).message
+    assert "4 uscite su 5" in msg
+    assert "in 3 curve diverse" in msg
+    assert "sovrasterzo in uscita dalle curve lente" in msg
+    tail = msg.split("uscite su 5", 1)[1]
+    assert "(Tosa, Piratella, Acque Minerali)" in tail   # una volta per curva
+    # Rivazza e' un'uscita senza sintomo: conta nel totale, non fra le prove.
+    assert "Rivazza" not in tail
+    assert "controllo di trazione" in msg            # la leva, in italiano
+
+
+def test_un_giro_che_il_gioco_non_ha_completato_non_e_un_uscita(it_lang):
+    eng = _eng()
+    for c in (2, 5):
+        eng.observe(_off(corner=c))
+    annullato = _lap(stable=False)
+    annullato.unstable_why = "invalid"
+    eng.observe(annullato)
+    assert "3 uscite su 3" in eng.observe(_off(corner=9)).message
+
+
+def test_contano_solo_le_uscite_recenti():
+    """Tre uscite con lo stesso schema, poi sei tagli col muso in equilibrio:
+    le tre sono uscite dalla finestra, e il sospetto con loro."""
+    eng = _eng()
+    for c in (2, 5, 9):
+        eng.observe(_off(corner=c))
+    for c in range(6):
+        d = eng.observe(_off(symptom=None, corner=c))
+    assert "offs" not in d.message
+
+
+@pytest.mark.parametrize("chiuso", ["exhausted", "_unwritable"])
+def test_un_sintomo_che_il_motore_ha_gia_chiuso_non_torna_dalle_uscite(chiuso):
+    """Rimedi finiti («e' guida») o leve che su quest'auto non sa scrivere: le
+    uscite non riaprono quello che il motore ha gia' chiuso."""
+    eng = _eng()
+    getattr(eng, chiuso).add(_OFF)
+    for c in (2, 5, 9):
+        d = eng.observe(_off(corner=c))
+    assert "offs" not in d.message
+
+
+def test_la_leva_nominata_e_quella_a_cui_il_motore_e_arrivato():
+    """Se la prima leva per quel sintomo e' gia' stata provata e bocciata, il
+    sospetto nomina la seconda, come farebbe una proposta."""
+    eng = _eng()
+    eng.remedy_idx[_OFF] = 1
+    for c in (2, 5, 9):
+        d = eng.observe(_off(corner=c))
+    assert "softer rear anti-roll bar" in d.message
+    assert "traction control" not in d.message
+
+
+def test_senza_leve_rimaste_il_sospetto_resta_detto_senza_inventarne_una():
+    eng = _eng()
+    eng.remedy_idx[_OFF] = 9
+    for c in (2, 5, 9):
+        d = eng.observe(_off(corner=c))
+    assert "could be the setup" in d.message
+    assert "lever" not in d.message
+
+
+def test_un_uscita_sola_resta_guida():
+    eng = _eng()
+    d = eng.observe(_off(corner=2))
+    plain = _eng()
+    assert d.message == plain.observe(_cut()).message
+
+
+def test_due_uscite_non_bastano_anche_in_due_curve_diverse():
+    eng = _eng()
+    eng.observe(_off(corner=2))
+    d = eng.observe(_off(corner=5))
+    assert "traction control" not in d.message
+
+
+def test_sempre_nella_stessa_curva_resta_guida():
+    """Il principio di `test_single_corner_symptom_is_not_setup`, sulle uscite:
+    una curva sola che ti butta fuori quattro volte e' quella curva."""
+    eng = _eng()
+    for _ in range(4):
+        d = eng.observe(_off(corner=5))
+    assert "traction control" not in d.message
+
+
+def test_tre_uscite_in_due_curve_sole_restano_guida():
+    eng = _eng()
+    eng.observe(_off(corner=2))
+    eng.observe(_off(corner=5))
+    d = eng.observe(_off(corner=5))
+    assert "traction control" not in d.message
+
+
+def test_schemi_diversi_non_si_sommano():
+    """Tre uscite, tre curve, ma tre sintomi diversi: non c'e' un'auto che fa
+    sempre la stessa cosa, c'e' un pilota che sbaglia in tre modi."""
+    eng = _eng()
+    eng.observe(_off(symptom=Symptom(O, EX, LO), corner=2))
+    eng.observe(_off(symptom=Symptom(U, EN, LO), corner=5))
+    d = eng.observe(_off(symptom=Symptom(O, EX, HI), corner=9))
+    assert "offs" not in d.message
+
+
+def test_le_uscite_senza_un_sintomo_misurato_non_sono_assetto():
+    """Tutte le 38 uscite dell'archivio sono cosi': tagli con l'auto in
+    equilibrio. Quante che siano, non accusano l'assetto."""
+    eng = _eng()
+    for c in (2, 5, 9, 11):
+        st = _off(symptom=None)
+        st.off_corner = c                     # anche ancorate a curve diverse
+        d = eng.observe(st)
+    assert "offs" not in d.message
+
+
+def test_servono_tante_uscite_quanti_giri_chiede_il_motore():
+    """La persistenza e' quella del motore (`min_stable`), non un tre scritto
+    qui: chi chiede quattro giri puliti chiede anche quattro uscite."""
+    eng = RaceEngineer(GT3_PROFILE, min_stable=4)
+    for c in (2, 5, 9):
+        d = eng.observe(_off(corner=c))
+    assert "offs" not in d.message
+    d = eng.observe(_off(corner=11))
+    assert "offs share" in d.message
+
+
+def test_le_uscite_non_entrano_nella_base_dei_tempi():
+    """La regola che resta: un giro tagliato non fa tempo. Anche quando le sue
+    uscite fanno sospettare l'assetto, il contatore dei giri puliti non si
+    muove — e i tempi (piu' veloci, qui: tagliare fa guadagnare) restano fuori."""
+    eng = _eng()
+    for c in (2, 5, 9):
+        d = eng.observe(_off(corner=c, time_ms=90000))
+    assert "traction control" in d.message
+    assert "(have 0)" in d.message
+    assert eng.window == []
+
+
+def test_un_giro_tagliato_a_gomme_fredde_non_conta_come_uscita():
+    """Fuori con le gomme fredde il sospettato e' la gomma, non l'assetto."""
+    eng = _eng()
+    for c in (2, 5, 9):
+        st = _off(corner=c)
+        st.warmed_up = False
+        d = eng.observe(st)
+    assert "traction control" not in d.message
+
+
+def test_dopo_un_cambio_di_assetto_le_uscite_di_prima_non_contano_piu():
+    """Le uscite di prima sono state fatte con un'altra macchina."""
+    eng = _eng()
+    off_press = {"front": 29.0, "rear": 26.5}
+    eng.observe(_off(corner=2))
+    eng.observe(_off(corner=5))
+    for _ in range(3):
+        d = eng.observe(_lap(press=off_press))
+    assert d.kind is DecisionKind.PROPOSE
+    eng.mark_applied()
+    for _ in range(3):
+        d = eng.observe(_lap(time_ms=103000, press=off_press))
+    assert d.kind is DecisionKind.REVERTED
+    eng.mark_applied()                       # assetto rimesso com'era
+    d = eng.observe(_off(corner=9))
+    assert d.kind is DecisionKind.COLLECT
+    assert "traction control" not in d.message
+
+
+def test_un_cambio_asciutto_bagnato_dimentica_le_uscite():
+    eng = _eng()
+    dry = _lap()
+    dry.wet = False
+    eng.observe(dry)
+    for c in (2, 5):
+        st = _off(corner=c)
+        st.wet = False
+        eng.observe(st)
+    wet = _lap()
+    wet.wet = True
+    eng.observe(wet)                          # piove: si butta tutto
+    dry2 = _lap()
+    dry2.wet = False
+    eng.observe(dry2)                         # e torna asciutto: di nuovo
+    st = _off(corner=9)
+    st.wet = False
+    d = eng.observe(st)
+    assert d.kind is DecisionKind.COLLECT
+    assert "traction control" not in d.message
+
+# --- le pressioni si ricontrollano anche dopo la loro fase ------------------
+#
+# Il pilota, in pista il 14/10: il coach mi dice che le gomme sono da sistemare
+# ma non mi chiama ai box e non mi prepara la modifica. Chi chiama ai box e
+# prepara il cambio e' l'Ingegnere, e la sua fase pressioni si chiudeva una volta
+# sola: una gomma che usciva di finestra dopo non la guardava piu' nessuno.
+
+def test_a_pressure_that_drifts_out_later_is_proposed_again():
+    eng = _eng()
+    for _ in range(3):
+        d = eng.observe(_lap())
+    assert eng.phase.key != "pressures", "il fixture deve aver chiuso le pressioni"
+    low = {"front": 25.2, "rear": 26.5}
+    d = eng.observe(_lap(press=low))
+    assert d.kind is DecisionKind.PROPOSE, d
+    assert {c.param for c in d.change.changes} == {"tyrePressure"}
+    assert d.change.tag == "BOX", "si cambiano ai box: la chiamata la fa questo tag"
+    assert all(c.delta_clicks > 0 for c in d.change.changes), "e le alza"
+
+
+def test_pressures_in_the_window_do_not_hold_up_the_other_phases():
+    """Il controllo: in finestra non succede niente, le fasi vanno avanti."""
+    eng = _eng()
+    kinds = [eng.observe(_lap()).kind for _ in range(6)]
+    assert DecisionKind.PROPOSE not in kinds
+
+
+def test_the_engineer_says_whether_it_can_judge_the_pressures():
+    from accoach.engineer import engineer_for
+    assert engineer_for("mclaren_720s_gt3_evo", is_acc=True).handles_pressures() is True
