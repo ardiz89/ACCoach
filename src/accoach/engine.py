@@ -1210,6 +1210,8 @@ class CoachEngine:
             # and pressure advisors emit exactly here, and they're the one thing
             # an out-lap is good for.
             self._flying_lap = True
+            # Ogni frase di tecnica si puo' ridire una volta: il giro e' questo.
+            self.scheduler.new_lap()
 
     def _quiet_reason(self, s: TelemetrySnapshot, delta: DeltaState | None) -> str:
         """Why the coach is holding back this tick, "" if it isn't.

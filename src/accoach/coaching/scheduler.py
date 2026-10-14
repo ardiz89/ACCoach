@@ -61,6 +61,23 @@ class CueScheduler:
         # The analyzer zone of the corner the focus is working, or None. See
         # `set_focus_corner`.
         self._focus_corner: int | None = None
+        # Cosa e' gia' stato DETTO in questo giro, per categoria. Vedi `new_lap`.
+        self._said_this_lap: set[CueCategory] = set()
+
+    def new_lap(self) -> None:
+        """Il pilota ha passato il traguardo: ogni frase si puo' ridire una volta.
+
+        Il «gia' detto» di sopra (`repeat_suppress_s`) e' per *posto*: stessa
+        categoria nello stesso ventesimo di pista entro 20 secondi. Non sa cosa
+        sia un giro, quindi un veleggio in tre punti diversi erano tre consigli
+        diversi — il 14/10 a Imola tre «veleggi» in un giro, e su tutto il log
+        «stai veleggiando» e' il 30% di cio' che il coach ha detto (211 su 694). Questo e' il
+        tetto per giro: un consiglio di tecnica si dice una volta, salvo che sia
+        il focus (vedi `_repeat_this_lap`).
+
+        Lo chiama il motore sul traguardo, con la stessa regola del registratore.
+        """
+        self._said_this_lap.clear()
 
     def set_focus(self, theme: str | None) -> None:
         """Limit on-track technique advice to one theme — the attention budget.
@@ -119,6 +136,22 @@ class CueScheduler:
     def focus_theme(self) -> str | None:
         """The theme currently being worked, or None. Read-only for callers."""
         return self._focus_theme
+
+    def _repeat_this_lap(self, cue: Cue) -> bool:
+        """Un consiglio di tecnica gia' detto in questo giro, e che non e' il focus.
+
+        Solo la tecnica: un bloccaggio o un pattinamento sono eventi, ognuno e'
+        suo, e le chiamate box o le pressioni hanno gia' i loro tetti. Il tema
+        del focus e la sua curva invece si possono ripetere: sono quello che si
+        sta allenando, e ripeterli e' il metodo dei coach, non un difetto.
+        """
+        if tier_of(cue.category) != CueTier.TECHNIQUE:
+            return False
+        if cue.category not in self._said_this_lap:
+            return False
+        # Senza focus `_focus_theme` e' None, e nessun tema e' None.
+        on_theme = theme_key(cue.category) == self._focus_theme
+        return not (on_theme or self._at_focus_corner(cue))
 
     def _off_theme(self, cue: Cue) -> bool:
         """True when this cue belongs to a theme the session isn't working on.
@@ -202,6 +235,8 @@ class CueScheduler:
                 continue
             if self._off_theme(cue):
                 continue
+            if self._repeat_this_lap(cue):
+                continue
             last = self._recent.get(cue.dedup_key())
             if last is not None and now - last < self.repeat_suppress_s:
                 continue
@@ -222,6 +257,7 @@ class CueScheduler:
         ]
         self._last_spoken_at = now
         self._recent[chosen.dedup_key()] = now
+        self._said_this_lap.add(chosen.category)
         return chosen
 
     def reset(self) -> None:
