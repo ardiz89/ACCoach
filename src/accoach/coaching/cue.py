@@ -153,6 +153,47 @@ def theme_key(category: CueCategory) -> str:
     return THEME.get(category, THEME_DEFAULT)["en"]
 
 
+#: Le categorie che nascono solo come verdetto su una curva gia' chiusa: tutte e
+#: sole quelle che `analyzer.classify_corner` sa restituire (un test lo tiene
+#: vero). Per loro ``Cue.segment`` e' l'indice della curva nell'analyzer; per
+#: tutte le altre e' un ventesimo di pista, quindi lo stesso numero non vuol dire
+#: lo stesso posto.
+CORNER_CATEGORIES: frozenset[CueCategory] = frozenset({
+    CueCategory.BRAKE_LATER, CueCategory.BRAKE_EARLIER,
+    CueCategory.MORE_THROTTLE, CueCategory.LESS_BRAKE,
+    CueCategory.CARRY_SPEED, CueCategory.TIME_LOSS, CueCategory.GOOD,
+})
+
+
+def gates_voice(category: CueCategory) -> bool:
+    """Un focus su questa categoria puo' restringere la voce al suo tema?
+
+    Si', se il tema ha almeno un rilevatore che lo sa dire in **qualunque**
+    punto del giro: frenata (il rilascio del freno), trazione (il veleggio, il
+    gas a meta'). No, se il tema esiste solo come verdetto di `classify_corner`
+    su una curva gia' persa — percorrenza e linea — perche' allora il filtro
+    zittisce tutto il resto e in cambio, sul resto della pista, non ha niente da
+    dare: il 14/10 al Red Bull Ring, rigiocati, tre giri di focus «linea» hanno
+    detto una frase di tecnica in tutto («qui perdi»), due giri su tre nessuna;
+    senza il filtro sarebbero state nove. Su 60 giri veri di cinque sessioni, col filtro spento, un
+    consiglio di percorrenza e' stato proposto in 17, uno di trazione in 53.
+
+    Resta aperto: sulle stradali il rilascio del freno e' spento per classe
+    (`tuning.trail_brake_cue`), quindi li' la frenata chiude la voce senza
+    avere un rilevatore acceso. Qui non si vede, perche' la classe e' dell'auto
+    e questa tabella no.
+
+    «Linea» poi non e' nemmeno un tema: e' il nome di ``TIME_LOSS``, cioe' di
+    una perdita per cui non si e' trovata una causa, e la sua parola («qui
+    perdi») non dice cosa fare.
+
+    Si ricava dalle tabelle, non da un elenco di temi scritto a mano: un
+    rilevatore nuovo che porti un tema ne fa un tema che chiude, da solo.
+    """
+    theme = theme_key(category)
+    return any(theme_key(c) == theme and c not in CORNER_CATEGORIES for c in THEME)
+
+
 def theme_label(category: CueCategory, lang: str) -> str:
     """The theme as shown to the driver, in ``lang`` (falls back to English)."""
     entry = THEME.get(category, THEME_DEFAULT)

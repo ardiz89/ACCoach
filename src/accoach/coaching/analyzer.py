@@ -322,6 +322,14 @@ class CoachAnalyzer:
         n = self.num_segments
         self._zones = [(i / n, (i + 1) / n, (i + 0.5) / n) for i in range(n)]
 
+    def zone_at(self, pos: float) -> int:
+        """Index of the zone containing ``pos``, or -1 on a straight.
+
+        Public because the engine has to tell the scheduler which zone is the
+        focus corner, and the zone numbering is this class's own.
+        """
+        return self._zone_at(pos)
+
     def _zone_at(self, pos: float) -> int:
         """Index of the zone containing ``pos``, or -1 on a straight."""
         for i, (lo, hi, _mid) in enumerate(self._zones):
