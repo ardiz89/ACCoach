@@ -688,3 +688,34 @@ def test_un_cambio_asciutto_bagnato_dimentica_le_uscite():
     d = eng.observe(st)
     assert d.kind is DecisionKind.COLLECT
     assert "traction control" not in d.message
+
+# --- le pressioni si ricontrollano anche dopo la loro fase ------------------
+#
+# Il pilota, in pista il 14/10: il coach mi dice che le gomme sono da sistemare
+# ma non mi chiama ai box e non mi prepara la modifica. Chi chiama ai box e
+# prepara il cambio e' l'Ingegnere, e la sua fase pressioni si chiudeva una volta
+# sola: una gomma che usciva di finestra dopo non la guardava piu' nessuno.
+
+def test_a_pressure_that_drifts_out_later_is_proposed_again():
+    eng = _eng()
+    for _ in range(3):
+        d = eng.observe(_lap())
+    assert eng.phase.key != "pressures", "il fixture deve aver chiuso le pressioni"
+    low = {"front": 25.2, "rear": 26.5}
+    d = eng.observe(_lap(press=low))
+    assert d.kind is DecisionKind.PROPOSE, d
+    assert {c.param for c in d.change.changes} == {"tyrePressure"}
+    assert d.change.tag == "BOX", "si cambiano ai box: la chiamata la fa questo tag"
+    assert all(c.delta_clicks > 0 for c in d.change.changes), "e le alza"
+
+
+def test_pressures_in_the_window_do_not_hold_up_the_other_phases():
+    """Il controllo: in finestra non succede niente, le fasi vanno avanti."""
+    eng = _eng()
+    kinds = [eng.observe(_lap()).kind for _ in range(6)]
+    assert DecisionKind.PROPOSE not in kinds
+
+
+def test_the_engineer_says_whether_it_can_judge_the_pressures():
+    from accoach.engineer import engineer_for
+    assert engineer_for("mclaren_720s_gt3_evo", is_acc=True).handles_pressures() is True

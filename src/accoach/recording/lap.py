@@ -293,6 +293,21 @@ def clock_at_line(samples: list["LapSample"]) -> int | None:
 _STALE_TOL_MS = 150
 
 
+def sim_repeats_itself(declared: int, *, previous: int | None) -> bool:
+    """Alla linea il gioco dice ancora il numero del frame prima.
+
+    E' la firma di «non ha ancora risposto», ed e' quella che fa aspettare il
+    registratore. Da sola non basta a dire che il numero e' sbagliato — per
+    quello serve anche :func:`sim_answer_pending` — ma basta per decidere di
+    guardare il frame dopo, che costa un frame e dice la verita'.
+    """
+    # Lo zero conta: in gara, prima che il primo giro finisca, ACC dice 0. Il
+    # 14/10 a Bathurst il primo giro di gara e' arrivato alla linea con 0 e il
+    # tempo vero (148.636 s) un frame dopo; con `> 0` qui il giro non aspettava,
+    # veniva chiuso con 0 e buttato.
+    return declared >= 0 and previous is not None and declared == previous
+
+
 def sim_answer_pending(declared: int, samples: list["LapSample"], *,
                        previous: int | None) -> bool:
     """True when the sim has not published this lap's time yet.
@@ -316,7 +331,7 @@ def sim_answer_pending(declared: int, samples: list["LapSample"], *,
     Callers that cannot know ``previous`` (the loader: a file on disk carries no
     record of the frame before it) pass ``None`` and get ``False``.
     """
-    if declared <= 0 or previous is None or declared != previous:
+    if not sim_repeats_itself(declared, previous=previous):
         return False
     at_line = clock_at_line(samples)
     return at_line is not None and abs(declared - at_line) > _STALE_TOL_MS

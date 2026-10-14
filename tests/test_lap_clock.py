@@ -349,16 +349,15 @@ def test_the_out_lap_sentinel_is_not_a_time_either():
     assert lap.valid is False
 
 
-def test_a_healthy_lap_is_not_held_back(tmp_path):
+def test_a_healthy_lap_is_not_thrown_away(tmp_path):
     """La rete di sicurezza, e nasce da un buco nell'evidenza.
 
     Il log non dice se sui giri sani il dichiarato coincide col frame prima:
     quando coincide **e** il tempo e' giusto, la riparazione non scatta e la riga
     non lo distingue. Se il gioco pubblicasse prima del nostro incrocio, un giro
-    sano avrebbe la stessa firma di uno in ritardo — e trattenerlo per poi non
-    vederlo cambiare lo butterebbe via. Percio' si trattiene solo quando la firma
-    scatta **e** il dichiarato contraddice l'orologio del giro: esattamente
-    l'insieme che oggi viene riparato, ne' uno di piu'.
+    sano avrebbe la stessa firma di uno in ritardo. Dal 14/10 lo si aspetta lo
+    stesso (vedi il test sotto); ma se il numero non cambia mai e l'orologio del
+    giro lo conferma, si consegna col suo tempo — piu' tardi, non buttato via.
     """
     rec = LapRecorder()
     _drive(rec, completed=0, dur_ms=115_000, last_ms=115_000)
@@ -367,3 +366,68 @@ def test_a_healthy_lap_is_not_held_back(tmp_path):
     lap = _drive(rec, completed=1, dur_ms=115_000, last_ms=115_000)
     assert lap is not None
     assert lap.lap_time_ms == 115_000
+
+
+# --- il tempo del giro prima, quando i due giri sono vicini ------------------
+#
+# Red Bull Ring, 14/10, McLaren 720S: dodici giri, e tutte le dodici volte il
+# gioco ha pubblicato il tempo un frame DOPO la linea. Dieci sono stati presi
+# bene; due no, ed erano i giri costanti:
+#
+#   alla linea 94.182s, dopo 1 frame 94.055s; salvato 94.182s (scarto +127 ms)
+#   alla linea 94.387s, dopo 1 frame 94.357s; salvato 94.387s (scarto +30 ms)
+#
+# Il registratore aspettava solo se il numero ripetuto contraddiceva anche
+# l'orologio del giro di oltre 150 ms — e fra due giri vicini non succede mai.
+
+def test_two_close_laps_do_not_share_a_time():
+    """Il caso del 14/10: due giri a 127 ms l'uno dall'altro."""
+    rec = LapRecorder()
+    _drive(rec, completed=0, dur_ms=94_182, last_ms=98_032)          # parziale
+    _drive(rec, completed=1, dur_ms=94_182, last_ms=98_032,
+           from_frame=1, then_last_ms=94_182)
+    # Alla linea il gioco ripete 94.182 (il giro prima), un frame dopo dice
+    # 94.055. L'orologio del giro e' d'accordo con tutti e due entro 150 ms.
+    lap = _drive(rec, completed=2, dur_ms=94_055, last_ms=94_182,
+                 from_frame=1, then_last_ms=94_055)
+    assert lap is not None
+    assert lap.lap_time_ms == 94_055, (
+        "il tempo del giro prima (94_182), salvato una seconda volta")
+
+
+def test_even_thirty_milliseconds_apart():
+    """Il secondo caso della serata, 30 ms: piu' piccolo di qualunque soglia
+    che si possa mettere fra «sano» e «stantio»."""
+    rec = LapRecorder()
+    _drive(rec, completed=0, dur_ms=94_387, last_ms=93_672)
+    _drive(rec, completed=1, dur_ms=94_387, last_ms=93_672,
+           from_frame=1, then_last_ms=94_387)
+    lap = _drive(rec, completed=2, dur_ms=94_357, last_ms=94_387,
+                 from_frame=1, then_last_ms=94_357)
+    assert lap is not None
+    assert lap.lap_time_ms == 94_357
+
+
+def test_the_first_race_lap_waits_for_its_time_too():
+    """14/10, Bathurst, in gara: alla linea ACC diceva 0 (nessun giro finito
+    ancora), un frame dopo 148.636 s. Il giro e' stato chiuso con 0 e buttato."""
+    rec = LapRecorder()
+    # Il primo buffer e' parziale per costruzione: il giro che conta e' quello
+    # intero, che chiude alla linea della terza chiamata.
+    _drive(rec, completed=0, dur_ms=150_000, last_ms=0)
+    _drive(rec, completed=1, dur_ms=148_636, last_ms=0)
+    lap = _drive(rec, completed=2, dur_ms=145_000, last_ms=0,
+                 from_frame=1, then_last_ms=148_636)
+    assert lap is not None
+    assert lap.lap_time_ms == 148_636, "il giro di gara aveva un tempo: va preso"
+    assert lap.valid is True
+
+
+def test_a_zero_that_never_changes_is_still_no_time():
+    """Il controllo: se il gioco non risponde mai, zero resta «niente tempo»."""
+    rec = LapRecorder()
+    _drive(rec, completed=0, dur_ms=150_000, last_ms=0)
+    _drive(rec, completed=1, dur_ms=148_636, last_ms=0)
+    lap = _drive(rec, completed=2, dur_ms=145_000, last_ms=0)
+    assert lap is not None
+    assert lap.lap_time_ms == 0 and lap.valid is False
