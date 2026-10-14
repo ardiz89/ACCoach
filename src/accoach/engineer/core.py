@@ -974,12 +974,44 @@ class RaceEngineer:
         return self._held_revert
 
     # -- internals ---------------------------------------------------------
+    def handles_pressures(self) -> bool:
+        """L'Ingegnere sa giudicare le pressioni di quest'auto?
+
+        Vero quando il profilo ha una fase pressioni e quella fase conosce la
+        finestra. E' la domanda che il motore fa per decidere chi parla delle
+        gomme: se la risposta e' si', parla lui, perche' e' lui che sa chiamare
+        ai box e preparare la modifica.
+        """
+        pp = self._pressure_phase()
+        return pp is not None and not pp.blind()
+
+    def _pressure_phase(self) -> WorkPhase | None:
+        for ph in self.phases:
+            if getattr(ph, "pressure_remedy", None) is not None:
+                return ph
+        return None
+
     def _advance(self) -> Decision:
         """No active change: check the gate, else propose the next remedy."""
         # Lazy import avoids a module-level cycle (profiles import from core).
         from .profiles._common import tr
         lang = current_language()
         phase = self.phase
+        # Le pressioni si ricontrollano anche dopo la loro fase. Fino al 14/10
+        # la fase pressioni si chiudeva una volta e basta; se poi la gomma
+        # usciva di finestra (pista che si scalda, stint lungo) lo diceva solo
+        # il coach, con un numero da sistemare «a freddo» e nessuna chiamata ai
+        # box, nessuna modifica pronta sulla pagina. Il pilota l'ha chiesto in
+        # pista: se le gomme sono da sistemare, chiamami dentro e prepara il
+        # cambio. Le pressioni sono la base di tutto il resto, quindi vengono
+        # prima della fase in corso, e solo quando nessuna prova e' aperta
+        # (`_advance` non gira mentre una modifica si valuta).
+        pp = self._pressure_phase()
+        if (pp is not None and phase is not pp and not pp.blind()
+                and not pp.gate(self.window)):
+            change = self._pressure_remedy(pp)
+            if change is not None:
+                return self._propose(change, "high")
         if phase is None:
             return Decision(DecisionKind.DONE, _msg("done", lang))
         blind = phase.blind()

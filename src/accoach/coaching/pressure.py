@@ -28,6 +28,8 @@ never triggers bad advice, and implausible readings are ignored outright.
 
 from __future__ import annotations
 
+import math
+
 from ..engineer import CarClass
 from ..engineer.pressures import GT3_DRY_WINDOW
 from ..telemetry.snapshot import ACStatus, TelemetrySnapshot
@@ -181,11 +183,17 @@ class PressureAdvisor:
         # Cold and hot pressure move ~one-for-one, so the correction back to the
         # target centre is the cold-set change to call out.
         change = abs(axle_psi - self.target_psi)
+        # Il numero detto deve stare dal lato giusto del bordo. Il 14/10 il
+        # coach ha detto «a 26.0 psi, troppo basse» con la finestra che parte da
+        # 26.0: la media era sotto di pochi centesimi e l'arrotondamento la
+        # portava sul bordo. Si arrotonda verso fuori dalla finestra.
+        shown = (math.ceil(axle_psi * 10) / 10 if dev > 0
+                 else math.floor(axle_psi * 10) / 10)
         if dev > 0:
-            msg = (f"Gomme {axle} a {axle_psi:.1f} psi, troppo alte: "
+            msg = (f"Gomme {axle} a {shown:.1f} psi, troppo alte: "
                    f"cala circa {change:.1f} psi a freddo.")
         else:
-            msg = (f"Gomme {axle} a {axle_psi:.1f} psi, troppo basse: "
+            msg = (f"Gomme {axle} a {shown:.1f} psi, troppo basse: "
                    f"alza circa {change:.1f} psi a freddo.")
         self._cooldown = _COOLDOWN_LAPS
         return Cue(category=CueCategory.TYRE_PRESSURE, message=msg,
