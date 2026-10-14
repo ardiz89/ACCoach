@@ -14,6 +14,8 @@ Ogni modulo, provato da solo, era verde. Il difetto stava fra il motore e i
 moduli, quindi questi test passano **dal motore**, con un giro salvato consegnato
 come lo consegna il feed dal vivo: un paio di tick dopo la linea.
 """
+import pytest
+
 from accoach.coaching.cue import CueCategory
 from accoach.engine import CoachEngine
 from accoach.recording.storage import save_lap
@@ -152,7 +154,19 @@ def test_l_avviso_benzina_arriva_anche_se_ogni_giro_viene_salvato(tmp_path):
 
 
 # --- le pressioni -----------------------------------------------------------
+#
+# Dal 14/10, dove l'Ingegnere sa giudicare le pressioni dell'auto, il consiglio
+# del coach tace e parla lui (vedi il test in fondo). I due test qui sotto
+# provano il consigliere dove parla ancora, cioe' su un'auto che l'Ingegnere
+# non sa giudicare: lo si finge cosi'.
 
+@pytest.fixture
+def _ingegnere_senza_pressioni(monkeypatch):
+    from accoach.engineer.core import RaceEngineer
+    monkeypatch.setattr(RaceEngineer, "handles_pressures", lambda self: False)
+
+
+@pytest.mark.usefixtures("_ingegnere_senza_pressioni")
 def test_le_pressioni_si_dicono_una_volta_non_a_ogni_giro(tmp_path):
     """Le pressioni si cambiano solo ai box: il cooldown e' di cinque giri."""
     s = _Sessione(tmp_path)
@@ -165,6 +179,7 @@ def test_le_pressioni_si_dicono_una_volta_non_a_ogni_giro(tmp_path):
     s.eng.close()
 
 
+@pytest.mark.usefixtures("_ingegnere_senza_pressioni")
 def test_le_pressioni_non_si_giudicano_sul_giro_d_uscita(tmp_path):
     """In pista, quattro volte su quattro: la prima frase del coach era «gomme
     anteriori a 25.1 psi, alza 2.4» letta sul giro d'uscita, e a regime lo stesso
@@ -205,3 +220,20 @@ def test_le_staccate_imparate_restano_spente_quando_il_riferimento_cambia(tmp_pa
     assert eng._reference.lap_time_ms == 99000, "il riferimento non e' cambiato: fixture sbagliato"
     assert eng._comparator._muted_spans, "il comparatore nuovo ha riacceso le staccate imparate"
     eng.close()
+
+
+def test_dove_l_ingegnere_sa_le_pressioni_parla_solo_lui(tmp_path):
+    """14/10, Red Bull Ring: il coach diceva «anteriori a 25.8, troppo basse:
+    alza 0.7 a freddo» al primo giro lanciato, senza chiamata ai box e senza
+    modifica pronta; giri dopo l'Ingegnere le trovava in finestra. Due voci con
+    due numeri. Sulla GT3 di ACC le gomme le racconta l'Ingegnere."""
+    s = _Sessione(tmp_path)
+    lento = _lento_alla_prima()
+    s.avvicinamento()
+    for _ in range(4):
+        s.giro(lento, salva=lento, **_GOMME_BASSE)
+    assert s.eng._engineer is not None and s.eng._engineer.handles_pressures(), (
+        "il fixture deve essere un'auto di cui l'Ingegnere sa le pressioni")
+    dette = [g for g, c in s.proposti if c is CueCategory.TYRE_PRESSURE]
+    assert dette == [], f"il consiglio del coach sulle gomme e' uscito ai giri {dette}"
+    s.eng.close()
