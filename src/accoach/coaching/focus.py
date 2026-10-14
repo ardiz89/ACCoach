@@ -29,7 +29,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 
 from ..i18n import current_language
-from .cue import CueCategory, trigger_text
+from .cue import CueCategory, gates_voice, trigger_text
 from .cue import theme_label as _theme_label
 from .debrief import CornerLoss, LapDebrief
 from .thresholds import RECUR_FRAC as _RECUR_FRAC
@@ -77,7 +77,10 @@ def _brief_pact(cat: CueCategory, lang: str) -> str:
     The theme comes from the **translated** label: this sentence is read by the
     driver, unlike the key the gate compares.
     """
-    word = trigger_text(cat, lang)
+    # Un tema che non chiude la voce (percorrenza, linea: vedi `gates_voice`)
+    # non promette niente: «solo parole sulla linea» sarebbe falso al primo
+    # veleggio.
+    word = trigger_text(cat, lang) if gates_voice(cat) else None
     if not word:
         return ""
     tmpl = _PACT.get(lang) or _PACT["en"]

@@ -36,7 +36,7 @@ from .coaching import (
     Voice,
 )
 from .coaching.analyzer import corner_level
-from .coaching.cue import CueCategory, theme_key, trigger_text
+from .coaching.cue import CueCategory, gates_voice, theme_key, trigger_text
 from .coaching.debrief import build_lap_debrief
 from .coaching.diagnosis import build_lap_stats
 from .coaching.atwheel import WheelWatch
@@ -87,6 +87,22 @@ def _focus_theme_key(report: FocusReport | None) -> str | None:
     if report is None or report.focus is None:
         return None
     return theme_key(report.focus.category)
+
+
+def _gate_theme_key(report: FocusReport | None) -> str | None:
+    """Il tema a cui restringere la voce: quello del focus, se lo sa dire.
+
+    Non sempre coincide con :func:`_focus_theme_key`. Un focus sulla
+    percorrenza o sulla linea resta un focus — pannello, verdetti, la sua
+    curva — ma non chiude la voce: quei temi esistono solo come verdetto su una
+    curva gia' persa, e sul resto della pista il filtro zittirebbe tutto in
+    cambio di niente (vedi :func:`accoach.coaching.cue.gates_voice`). Il log
+    del focus continua a scrivere il tema vero, con l'altra funzione.
+    """
+    key = _focus_theme_key(report)
+    if key is None or not gates_voice(report.focus.category):
+        return None
+    return key
 
 
 def _spoken_forms(cue: Cue, focus_theme: str | None, lang: str) -> tuple[str, str]:
@@ -581,7 +597,7 @@ class CoachEngine:
             # Tell the voice which theme the session is on. The FocusCoach has
             # elected one weakness at a time since it was written; until now
             # nobody downstream was listening.
-            self.scheduler.set_focus(_focus_theme_key(self._focus_report))
+            self.scheduler.set_focus(_gate_theme_key(self._focus_report))
             # Senza questa riga il log direbbe cosa e' stato detto ma non contro
             # che cosa: «nessuna parola di trazione» significa una cosa se il
             # focus e' la trazione e un'altra se non e' mai stato eletto.
@@ -594,6 +610,27 @@ class CoachEngine:
             if after != before:
                 self._save_focus_state()   # a corner just changed status; persist
             self._update_wean()
+
+    def _focus_zone(self) -> int | None:
+        """La zona dell'analyzer in cui cade la curva del focus, o None.
+
+        Il focus conta le curve sul metro con cui le ha misurate (`_focus_ref`,
+        tenuto fermo per tutto il ciclo), la voce sulle zone del riferimento di
+        adesso: le due numerazioni possono non coincidere, quindi si passa per
+        la posizione dell'apex, che e' un punto della pista e non un indice.
+
+        None quando un focus non c'e', o quando la sua curva non cade in
+        nessuna zona di adesso: meglio nessuna curva aperta che quella accanto.
+        """
+        rep = self._focus_report
+        if rep is None or rep.focus is None:
+            return None
+        corners = self._focus_ref[1] if self._focus_ref else self._corners
+        corner = next((c for c in corners if c.index == rep.focus.corner_index), None)
+        if corner is None:
+            return None
+        zone = self.analyzer.zone_at(corner.apex_pos)
+        return zone if zone >= 0 else None
 
     def _load_focus_state(self, car: str, track: str) -> tuple[set[int], set[int]]:
         """Last session's mastered/parked corners for this car+track, or empty.
@@ -1049,6 +1086,11 @@ class CoachEngine:
                 continue                                            # not this session
             self._observe_lap(lap)
             self._rebuild_reference(lap.car_model, lap.track)        # chase the new best
+        if saved:
+            # Dopo il riferimento, non dentro `_observe_lap`: la curva si dice
+            # allo scheduler come zona dell'analyzer, e le zone le ha appena
+            # rifatte `_rebuild_reference`.
+            self.scheduler.set_focus_corner(self._focus_zone())
 
         self._watch_at_wheel(snap)
 
@@ -1180,6 +1222,8 @@ class CoachEngine:
             # and pressure advisors emit exactly here, and they're the one thing
             # an out-lap is good for.
             self._flying_lap = True
+            # Ogni frase di tecnica si puo' ridire una volta: il giro e' questo.
+            self.scheduler.new_lap()
 
     def _quiet_reason(self, s: TelemetrySnapshot, delta: DeltaState | None) -> str:
         """Why the coach is holding back this tick, "" if it isn't.
