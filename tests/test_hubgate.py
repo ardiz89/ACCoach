@@ -31,10 +31,13 @@ def test_the_backend_button_explains_itself_instead_of_going_quiet():
     assert button_state(("server",), live=True, busy=True) == EXPLAIN
 
 
-def test_the_engineer_page_offers_the_swap_too():
-    """È il bottone su cui il briefing ai box manda il pilota: aprirlo durante
-    Coach Live dà una pagina che nessuno alimenta."""
-    assert button_state(("web", "--engineer"), live=True, busy=True) == EXPLAIN
+def test_the_engineer_page_simply_opens_during_coach_live():
+    """Dal 24/09 Coach Live serve lui il feed della pagina. Finche' il bottone
+    apriva la spiegazione, l'hub diceva al pilota che la diagnosi dal vivo
+    «resta vuota» mentre la pagina la mostrava: un cartello che mente, sul
+    bottone esatto su cui il briefing ai box lo manda."""
+    assert button_state(("web", "--engineer"), live=True, busy=True) == CLICKABLE
+    assert ("web", "--engineer") not in hubgate.SWAP_OFFER_KEYS
 
 
 def test_the_backend_button_is_ordinary_when_nothing_is_running():
@@ -84,24 +87,6 @@ def test_the_swap_brings_up_the_backend_and_the_engineer_page():
     assert ("web", "--engineer") in started
 
 
-def test_only_the_engineer_page_can_be_opened_anyway():
-    """La pagina Ingegnere sono due cose in una: la diagnosi dal vivo (che senza
-    il Backend live non c'è) e l'editor assetti, il registro delle prove e i
-    setup salvati — che stanno sul REST dell'app di analisi e non hanno bisogno
-    di niente. Il Backend live invece non ha una metà da aprire lo stesso."""
-    assert hubgate.opens_anyway(("web", "--engineer")) is True
-    assert hubgate.opens_anyway(("server",)) is False
-
-
-def test_open_anyway_is_only_ever_offered_for_something_harmless():
-    """La regola, non l'elenco: si può offrire «apri comunque» solo a ciò che è
-    già sicuro durante Coach Live e non registra nulla. Se un domani qualcuno
-    aggiunge una chiave all'uscita di comodo, questo test glielo chiede."""
-    for key in hubgate.OPEN_ANYWAY_KEYS:
-        assert key in LIVE_SAFE_KEYS, key
-        assert key[0] not in RECORDING_CMDS, key
-
-
 def test_the_swap_refuses_to_start_next_to_anything_that_records():
     """La guardia vera: se Coach Live non è morto davvero, il backend non parte."""
     assert swap_is_safe([]) is True
@@ -126,13 +111,17 @@ def test_the_warning_names_the_overlay_before_it_disappears(lang):
 
 
 @pytest.mark.parametrize("lang", ("en", "it"))
-def test_open_anyway_says_which_half_you_get_and_which_you_lose(lang):
-    """Non «funziona a metà»: quale metà. L'editor assetti sì, la diagnosi dal
-    vivo no."""
-    line = swap_text(lang)["open_anyway_why"].lower()
-    wanted = (("setup", "live"), ("assetti", "vivo"))[lang == "it"]
-    for word in wanted:
-        assert word in line, (lang, word)
+def test_the_refusal_no_longer_says_the_engineer_page_needs_the_backend(lang):
+    """La frase di prima cominciava con «la pagina Ingegnere la alimenta il
+    Backend live». Non e' piu' vero durante Coach Live, e chi arriva qui
+    cercando la pagina deve leggere che lo scambio non gli serve."""
+    why = swap_text(lang)["why"]
+    assert "Coach Live" in why
+    old = ("The Engineer page is fed by the live backend",
+           "La pagina Ingegnere la alimenta il Backend live")[lang == "it"]
+    assert old not in why
+    wanted = ("feeds that page itself", "la alimenta lui")[lang == "it"]
+    assert wanted in " ".join(why.split())
 
 
 def test_the_swap_speaks_every_language_the_app_has():
@@ -150,6 +139,5 @@ def test_the_two_languages_are_actually_two():
     passerebbe lo stesso guardando solo `t()`. Qui si controlla che siano
     testi diversi, non la stessa frase due volte."""
     en, it = swap_text("en"), swap_text("it")
-    for field in ("title", "why", "warn", "confirm", "cancel", "failed",
-                  "open_anyway", "open_anyway_why"):
+    for field in ("title", "why", "warn", "confirm", "cancel", "failed"):
         assert en[field] != it[field], field

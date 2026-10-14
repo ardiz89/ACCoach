@@ -77,7 +77,7 @@ def test_the_backend_button_stays_clickable_and_says_why(hub, live):
 
 
 def _answer(monkeypatch, hub, choice, log=None):
-    """Metti in bocca all'utente una delle tre uscite del dialogo."""
+    """Metti in bocca all'utente una delle uscite del dialogo."""
     def ask(key):
         if log is not None:
             log.append(key)
@@ -96,79 +96,44 @@ def test_the_click_starts_nothing_by_itself(hub, live, monkeypatch):
     assert spawned == []
 
 
-def test_the_engineer_page_offers_the_swap_too(hub, live, monkeypatch):
-    """È il bottone che il briefing ai box nomina: da solo aprirebbe una pagina
-    senza la sua metà dal vivo."""
+def test_the_engineer_page_opens_and_leaves_coach_live_alone(hub, live,
+                                                             monkeypatch):
+    """Durante Coach Live la pagina e' viva (la alimenta lui): il click la apre,
+    senza dialoghi, senza fermare niente e senza accendere il backend."""
     from accoach.hubgate import CANCEL
 
     asked = []
     spawned = []
-    monkeypatch.setattr(hub, "_spawn", lambda args, console: spawned.append(args))
-    _answer(monkeypatch, hub, CANCEL, log=asked)
-    _button(hub, ("web", "--engineer")).click()
-    assert asked == [("web", "--engineer")]
-    assert spawned == []
-
-
-def test_open_anyway_opens_the_page_and_leaves_coach_live_alone(hub, live,
-                                                                monkeypatch):
-    """La terza uscita. La pagina Ingegnere è due cose in una: senza il Backend
-    live perde la diagnosi dal vivo, ma l'editor assetti, il registro delle
-    prove e i setup salvati stanno sul REST dell'app di analisi e restano lì.
-    Toglierla sarebbe costato più di quanto lo scambio restituisce."""
-    from accoach.hubgate import OPEN_ANYWAY
-
-    spawned = []
     killed = []
     monkeypatch.setattr(hub, "_spawn", lambda args, console: spawned.append(tuple(args)))
     monkeypatch.setattr(hub, "_kill", lambda proc: killed.append(proc))
-    _answer(monkeypatch, hub, OPEN_ANYWAY)
-    _button(hub, ("web", "--engineer")).click()
+    _answer(monkeypatch, hub, CANCEL, log=asked)
+    btn = _button(hub, ("web", "--engineer"))
+    assert btn.isEnabled() is True
+    btn.click()
 
+    assert asked == []                          # nessuna spiegazione da dare
     assert spawned == [("web", "--engineer")]   # e NON ("server",)
     assert killed == []                         # Coach Live non si tocca
     assert hub._live_running() is True
 
 
-def test_the_backend_button_has_no_open_anyway_exit(hub, live, monkeypatch):
-    """L'asimmetria arriva al dialogo: della pagina Ingegnere si apre lo stesso
-    la metà che c'è, del Backend live non c'è niente da aprire lo stesso. Chi
-    decide è `hubgate.opens_anyway`, non un `if` sepolto nel disegno."""
-    from accoach import launcher
-    from accoach.hubgate import CANCEL
+def test_the_engineer_page_does_not_wear_the_swap_tooltip(hub, live):
+    """Il tooltip dello scambio dice «questo non puo' partirgli accanto»: sulla
+    pagina Ingegnere sarebbe falso."""
+    from accoach.i18n import t
 
-    built = []
-
-    class _FakeDialog:
-        def __init__(self, parent=None, *, open_anyway=False):
-            built.append(open_anyway)
-            self.choice = CANCEL
-
-        def exec(self):
-            return 0
-
-    monkeypatch.setattr(launcher, "SwapToBackend", _FakeDialog)
-    monkeypatch.setattr(hub, "_spawn", lambda args, console: None)
-    _button(hub, ("server",)).click()
-    _button(hub, ("web", "--engineer")).click()
-    assert built == [False, True]
+    assert _button(hub, ("web", "--engineer")).toolTip() != t("swap.tooltip")
 
 
-def test_the_dialog_grows_the_third_exit_only_when_asked(hub, monkeypatch):
-    """E il dialogo lo disegna davvero: tre bottoni o due, non sempre tre."""
+def test_the_dialog_has_two_exits(hub):
     from PySide6.QtWidgets import QPushButton
 
     from accoach.i18n import t
     from accoach.launcher import SwapToBackend
 
-    def labels(dlg):
-        return [b.text() for b in dlg.findChildren(QPushButton)]
-
-    with_third = labels(SwapToBackend(open_anyway=True))
-    without = labels(SwapToBackend(open_anyway=False))
-    assert t("swap.open_anyway") in with_third
-    assert t("swap.open_anyway") not in without
-    assert t("swap.confirm") in without and t("swap.cancel") in without
+    labels = [b.text() for b in SwapToBackend().findChildren(QPushButton)]
+    assert sorted(labels) == sorted([t("swap.confirm"), t("swap.cancel")])
 
 
 # --- la finestra e quello che ha da dire ------------------------------------
@@ -209,31 +174,28 @@ def _measure(app, monkeypatch, lang, **kw):
     return size, hint
 
 
-@pytest.mark.parametrize("open_anyway", (False, True))
 @pytest.mark.parametrize("lang", ("en", "it"))
 def test_the_window_gives_the_text_all_the_room_it_asks_for(styled, monkeypatch,
-                                                            lang, open_anyway):
-    size, hint = _measure(styled, monkeypatch, lang, open_anyway=open_anyway)
+                                                            lang):
+    size, hint = _measure(styled, monkeypatch, lang)
     assert size.width() >= hint.width(), f"{lang}: {size.width()} < {hint.width()}"
     assert size.height() >= hint.height(), f"{lang}: {size.height()} < {hint.height()}"
 
 
-@pytest.mark.parametrize("open_anyway", (False, True))
 @pytest.mark.parametrize("lang", ("en", "it"))
 def test_the_window_has_no_dead_space_under_the_text(styled, monkeypatch,
-                                                     lang, open_anyway):
-    size, hint = _measure(styled, monkeypatch, lang, open_anyway=open_anyway)
+                                                     lang):
+    size, hint = _measure(styled, monkeypatch, lang)
     assert size.height() - hint.height() <= 16, \
         f"{lang}: {size.height() - hint.height()} px di vuoto"
 
 
-@pytest.mark.parametrize("open_anyway", (False, True))
 @pytest.mark.parametrize("lang", ("en", "it"))
 def test_the_lines_do_not_run_away_in_the_longer_language(styled, monkeypatch,
-                                                          lang, open_anyway):
+                                                          lang):
     """Niente costringeva i paragrafi a mandare a capo, quindi l'italiano
     sfondava a 790 px di righe lunghe e faticose."""
-    size, _hint = _measure(styled, monkeypatch, lang, open_anyway=open_anyway)
+    size, _hint = _measure(styled, monkeypatch, lang)
     assert size.width() <= 620, f"{lang}: {size.width()} px di larghezza"
 
 
@@ -334,14 +296,21 @@ def test_without_coach_live_the_button_simply_starts_the_backend(hub, monkeypatc
 
 
 def test_the_home_setup_shortcut_goes_through_the_same_gate(hub, live, monkeypatch):
-    """La scorciatoia «Setup» della Home apriva la pagina Ingegnere saltando
-    ogni controllo: stesso muro, stesso silenzio."""
+    """La scorciatoia «Setup» della Home passa dallo stesso cancello del
+    bottone: e' lui che decide, quindi qui si prova che la decisione sia la
+    stessa — durante Coach Live la pagina si apre, senza dialoghi."""
     from accoach.hubgate import CANCEL
 
     asked = []
     spawned = []
-    monkeypatch.setattr(hub, "_spawn", lambda args, console: spawned.append(args))
+    gated = []
+    real = hub._on_action
+    monkeypatch.setattr(hub, "_on_action",
+                        lambda key, args, console: (gated.append(key),
+                                                    real(key, args, console)))
+    monkeypatch.setattr(hub, "_spawn", lambda args, console: spawned.append(tuple(args)))
     _answer(monkeypatch, hub, CANCEL, log=asked)
     hub._home._cta_setup.click()
-    assert asked == [("web", "--engineer")]
-    assert spawned == []
+    assert gated == [("web", "--engineer")]
+    assert asked == []
+    assert spawned == [("web", "--engineer")]
