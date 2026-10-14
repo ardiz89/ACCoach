@@ -441,3 +441,35 @@ correttezza.
 Quel buco si chiude **solo** con la tabella dei range per auto — cioè con
 `params.py`, che è lavoro di **contenuti e verifica per vettura**, non di codice,
 e va aperto come tale. È la voce vera; il «setup di partenza» era la sua ombra.
+
+### 7.7 Le uscite di pista come indizio (14/10/2026)
+
+Il pilota: «se non guido pulito potrebbe dipendere sempre dal setup». I giri
+tagliati restano fuori dalla finestra — i loro **tempi** non entrano mai in un
+verdetto — ma da oggi l'Ingegnere ne legge il **come**: il sintomo di
+bilanciamento della curva in cui il giro si è perso, misurato solo fino a
+`lost_at` (`diagnosis._off_symptom`).
+
+**La regola.** Le uscite diventano un sospetto sull'assetto con lo stesso
+cancello dei giri puliti: almeno `min_stable` uscite (3) con lo **stesso**
+sintomo, in almeno **3 curve diverse**, dall'ultimo cambio di assetto e fra le
+ultime 6 a gomme calde. Un'uscita isolata o sempre nella stessa curva resta
+guida. Il pilota lo legge in coda al contatore: «Però 3 uscite su 4 hanno lo
+stesso schema — sovrasterzo in uscita dalle curve lente — in 3 curve diverse
+(…): potrebbe essere l'assetto, non la guida. La prima leva che proverei: …».
+
+**Un sospetto, non una proposta.** Il motore non avrebbe un metro onesto per
+giudicarla: i tempi dei giri sporchi sono esclusi, il sintomo dei giri puliti è
+misurato per costruzione sui giri in cui l'auto *non* è uscita, e il conteggio
+delle uscite prima/dopo misura soprattutto il pilota che impara la curva.
+
+**Cosa dicono i dati, e cosa no.** Sulle 38 uscite in curva dell'archivio
+(21 serate) nessuna ha un sintomo prima del punto, e la regola rigiocata non
+scatta mai. Una regola più semplice — fascia di velocità più fase letta dalla
+posizione — avrebbe accusato l'assetto in 2 serate su 21 (Imola 23/08 e 24/09),
+su uscite in curve lente senza alcun sintomo: la fase dalla posizione è quasi
+sempre «apex» (35 su 38 entro 0.02, perché ACC annulla al cordolo), e la fascia
+di velocità riflette il tracciato (6 curve su 10 di Imola sono lente). Non c'è in archivio
+nessuna serata in cui il pilota uscisse per colpa dell'assetto: il lato che
+dovrebbe far scattare la regola non è mai stato misurato, e la soglia è la più
+prudente che il motore avesse già, non una tarata.

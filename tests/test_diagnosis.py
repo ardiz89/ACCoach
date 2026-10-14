@@ -391,3 +391,64 @@ def test_the_engine_writes_the_engineer_s_memory_after_every_lap(tmp_path):
     with LapCatalog(_catalog_path(tmp_path)) as cat:
         got = cat.load_engineer_state("mclaren_720s_gt3_evo", "monza")
     assert got is not None and got["phase_idx"] == 2
+
+
+# --- un'uscita di pista come indizio, non come tempo ------------------------
+#
+# Il pilota, il 14/10: «se non guido pulito potrebbe dipendere sempre dal
+# setup». L'Ingegnere scarta i giri tagliati — giusto per i tempi — e cosi' non
+# vede mai un'auto che esce di pista PERCHE' l'assetto la rende ingestibile.
+# Qui il giro tagliato impara a dire COME si e' perso: il sintomo di
+# bilanciamento della curva in cui e' uscito, misurato solo fino al punto in
+# cui il gioco l'ha annullato.
+
+def _rear_loose_after(lap, pos_from: float):
+    """Retrotreno che scappa (controsterzo) solo oltre ``pos_from``; prima, neutro."""
+    for s in lap.samples:
+        sign = 1.0 if s.pos > pos_from else -1.0
+        ratio = 3.0 if s.pos > pos_from else 1.9
+        s.yaw_rate = sign * ratio * s.steer_angle
+    return lap
+
+
+def test_un_uscita_col_retrotreno_che_scappa_in_uscita_porta_quel_sintomo():
+    from accoach.engineer import Phase, Speed
+    lap = _rear_loose_after(synth.build_lap(clean=False), 0.735)
+    lap.lost_at = 0.78                       # seconda curva, in uscita
+    st = build_lap_stats(lap)
+    assert st.off_symptom is not None
+    assert st.off_symptom.balance is Balance.OVERSTEER
+    assert st.off_symptom.phase is Phase.EXIT
+    assert st.off_symptom.speed is Speed.LOW
+    assert st.off_corner == 1
+
+
+def test_conta_solo_quello_che_e_successo_prima_del_punto_in_cui_il_giro_e_perso():
+    """Dopo `lost_at` il giro era gia' perso: quello che fa l'auto mentre il
+    pilota rientra in pista (o gira su se stessa sull'erba) non e' la causa."""
+    lap = _rear_loose_after(synth.build_lap(clean=False), 0.735)
+    lap.lost_at = 0.735
+    assert build_lap_stats(lap).off_symptom is None
+
+
+def test_un_uscita_con_l_auto_in_equilibrio_non_inventa_un_sintomo():
+    """E' il caso di tutte e 38 le uscite in archivio: un taglio, non un'auto
+    che scappa. Il setup non lo spiega, e il giro non deve dire il contrario."""
+    lap = _with_yaw(synth.build_lap(clean=False), ratio=1.9)
+    lap.lost_at = 0.78
+    st = build_lap_stats(lap)
+    assert st.unstable_why == "cut"
+    assert st.off_symptom is None and st.off_corner is None
+
+
+def test_un_giro_pulito_non_ha_un_uscita_anche_se_l_auto_scappa():
+    lap = _rear_loose_after(synth.build_lap(clean=True), 0.735)
+    lap.lost_at = 0.78                       # un residuo nel file non basta
+    assert build_lap_stats(lap).off_symptom is None
+
+
+def test_un_uscita_fra_due_curve_non_e_attribuita_a_nessuna():
+    lap = _rear_loose_after(synth.build_lap(clean=False), 0.0)
+    lap.lost_at = 0.50                       # rettilineo
+    st = build_lap_stats(lap)
+    assert st.off_symptom is None and st.off_corner is None

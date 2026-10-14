@@ -237,6 +237,48 @@ def _lost_where(lap: Lap, corners: list[Corner],
     return ""
 
 
+def _off_symptom(lap: Lap, corners: list[Corner],
+                 tuning: ClassTuning) -> tuple[Symptom | None, int | None]:
+    """Come si e' perso un giro tagliato: (sintomo, curva), o (None, None).
+
+    Il sintomo e' quello che l'auto mostrava nella curva in cui il gioco ha
+    annullato il giro, misurato con la stessa regola di :func:`corner_symptoms`
+    ma **solo sui frame fino a** ``lost_at``: dopo, il giro era gia' perso, e
+    quello che l'auto fa mentre il pilota rientra dall'erba non e' la causa.
+
+    Un'uscita senza un sintomo misurato resta (None, None), e non e' un caso
+    raro: e' TUTTI i casi dell'archivio. Misurato il 14/10 su 38 uscite di
+    serate vere (720S a Imola, Monza, Brands Hatch, Red Bull Ring, Zolder,
+    Nurburgring; SF25 al Red Bull Ring): **0 su 38** avevano un sintomo nella
+    curva prima del punto, e 0 su 243 i confronti coi giri puliti della stessa
+    serata, stessa curva e stesso tratto. Due letture, e i dati non scelgono
+    fra le due: erano tagli con l'auto in equilibrio (il cordolo preso largo,
+    la chicane accorciata, e sei giri tagliati su tredici erano piu' veloci),
+    oppure su questa GT3 con gli aiuti la regola dei sintomi vede poco — sui
+    giri puliti della 720S, un solo giro in tutto l'archivio ha un sintomo
+    sopra soglia in tre curve. In entrambi i casi la risposta giusta oggi e'
+    «nessun sintomo», e un'uscita senza sintomo non accusa l'assetto.
+
+    Perche' non bastano tipo di curva e posizione, che erano la prima idea:
+    35 uscite su 38 cadono entro 0.02 dall'apex, quindi la «fase» letta dalla
+    posizione e' quasi sempre la stessa e non distingue niente (ACC annulla al
+    cordolo, che sta li'); e la fascia di velocita' da sola accusa il
+    tracciato, non l'auto: a Imola il 23/08 cinque uscite su cinque sono in
+    curve lente, quattro curve diverse — ma sei curve su dieci di Imola sono
+    lente, e nessuna di quelle cinque uscite aveva un sintomo. Rigiocata su
+    tutte le serate, quella regola accusava l'assetto due volte (Imola 23/08
+    e 24/09); questa, zero.
+    """
+    if lap.clean is not False or lap.lost_at is None:
+        return None, None
+    for c in corners:
+        if c.entry_pos <= lap.lost_at <= c.exit_pos:
+            before = [s for s in lap.samples if s.pos <= lap.lost_at]
+            sym = dominant_symptom(corner_symptoms(before, c, tuning))
+            return (sym, c.index) if sym is not None else (None, None)
+    return None, None
+
+
 def build_lap_stats(lap: Lap, corners: list[Corner] | None = None,
                     corner_names: dict[int, str] | None = None) -> LapStats:
     """Diagnose one recorded lap into a :class:`LapStats` for the engineer."""
@@ -254,6 +296,7 @@ def build_lap_stats(lap: Lap, corners: list[Corner] | None = None,
             corner_idx.setdefault(sym, []).append(c.index)
 
     lock_segments, spin_segments = _lock_spin_segments(lap.samples, tuning.spin_ratio)
+    off_symptom, off_corner = _off_symptom(lap, corners, tuning)
     return LapStats(
         lap_time_ms=lap.lap_time_ms,
         # `valid` means complete; `clean` (from the reference-integrity work) means
@@ -267,6 +310,8 @@ def build_lap_stats(lap: Lap, corners: list[Corner] | None = None,
         unstable_why=("" if lap.valid and lap.clean is not False
                       else "invalid" if not lap.valid else "cut"),
         lost_where=_lost_where(lap, corners, corner_names),
+        off_symptom=off_symptom,
+        off_corner=off_corner,
         warmed_up=_warmed_up(lap.samples),
         symptom_scores=scores,
         symptom_corners=corner_counts,
