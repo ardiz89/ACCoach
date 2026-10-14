@@ -17,6 +17,12 @@ from accoach.telemetry.reader import SharedMemoryReader
 from accoach.telemetry.snapshot import ACStatus, SessionType, TelemetrySnapshot
 from accoach.telemetry.structs import SPageFileGraphics
 
+# Il giro che chiude sulla linea esce qualche frame dopo: il registratore
+# guarda se il gioco aggiorna il tempo (vedi `_CONFIRM_FRAMES`). Il
+# fixture finiva proprio sulla linea, quindi gli si danno quei frame.
+_DOPO_LA_LINEA = 3
+
+
 _ON_TRACK = replace(
     TelemetrySnapshot.disconnected(),
     connected=True, status=ACStatus.LIVE, session=SessionType.PRACTICE,
@@ -34,7 +40,7 @@ def _frame(pos: float, completed: int, **kw) -> TelemetrySnapshot:
 
 def _timed(rec: LapRecorder, frames) -> list:
     """The laps a session would actually store — the engine keeps only `valid`."""
-    return [lap for f in frames
+    return [lap for f in frames + [frames[-1]] * _DOPO_LA_LINEA
             if (lap := rec.update(f)) is not None and lap.valid]
 
 
