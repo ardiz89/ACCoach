@@ -406,3 +406,28 @@ def test_even_thirty_milliseconds_apart():
                  from_frame=1, then_last_ms=94_357)
     assert lap is not None
     assert lap.lap_time_ms == 94_357
+
+
+def test_the_first_race_lap_waits_for_its_time_too():
+    """14/10, Bathurst, in gara: alla linea ACC diceva 0 (nessun giro finito
+    ancora), un frame dopo 148.636 s. Il giro e' stato chiuso con 0 e buttato."""
+    rec = LapRecorder()
+    # Il primo buffer e' parziale per costruzione: il giro che conta e' quello
+    # intero, che chiude alla linea della terza chiamata.
+    _drive(rec, completed=0, dur_ms=150_000, last_ms=0)
+    _drive(rec, completed=1, dur_ms=148_636, last_ms=0)
+    lap = _drive(rec, completed=2, dur_ms=145_000, last_ms=0,
+                 from_frame=1, then_last_ms=148_636)
+    assert lap is not None
+    assert lap.lap_time_ms == 148_636, "il giro di gara aveva un tempo: va preso"
+    assert lap.valid is True
+
+
+def test_a_zero_that_never_changes_is_still_no_time():
+    """Il controllo: se il gioco non risponde mai, zero resta «niente tempo»."""
+    rec = LapRecorder()
+    _drive(rec, completed=0, dur_ms=150_000, last_ms=0)
+    _drive(rec, completed=1, dur_ms=148_636, last_ms=0)
+    lap = _drive(rec, completed=2, dur_ms=145_000, last_ms=0)
+    assert lap is not None
+    assert lap.lap_time_ms == 0 and lap.valid is False

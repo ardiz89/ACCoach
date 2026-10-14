@@ -301,7 +301,11 @@ def sim_repeats_itself(declared: int, *, previous: int | None) -> bool:
     quello serve anche :func:`sim_answer_pending` — ma basta per decidere di
     guardare il frame dopo, che costa un frame e dice la verita'.
     """
-    return declared > 0 and previous is not None and declared == previous
+    # Lo zero conta: in gara, prima che il primo giro finisca, ACC dice 0. Il
+    # 14/10 a Bathurst il primo giro di gara e' arrivato alla linea con 0 e il
+    # tempo vero (148.636 s) un frame dopo; con `> 0` qui il giro non aspettava,
+    # veniva chiuso con 0 e buttato.
+    return declared >= 0 and previous is not None and declared == previous
 
 
 def sim_answer_pending(declared: int, samples: list["LapSample"], *,
