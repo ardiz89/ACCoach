@@ -1093,7 +1093,19 @@ class CoachEngine:
         _submit(self.braking.update(snap, now))
         _submit(self.gears.update(snap, now))
         _submit(self.advisor.update(snap, event_cues, now))
-        _submit(self.pressure.update(snap, now))
+        # Le gomme le racconta una voce sola. Dove l'Ingegnere sa giudicare le
+        # pressioni di quest'auto, il consiglio del coach («alza 0.7 psi a
+        # freddo») tace: era un giudizio su un giro solo, senza chiamata ai box
+        # e senza modifica pronta, e il 14/10 al Red Bull Ring diceva «troppo
+        # basse» al primo giro lanciato mentre l'Ingegnere, giri dopo, le
+        # trovava in finestra. Due voci con due numeri. Ora parla l'Ingegnere,
+        # che chiama dentro e prepara il cambio sulla pagina. Il consigliere
+        # continua a girare (tiene i suoi conti) ma non parla; dove l'Ingegnere
+        # non sa (auto senza finestra), resta quello di prima.
+        pressure_cues = self.pressure.update(snap, now)
+        handles = getattr(self._engineer, "handles_pressures", None)
+        if not (handles is not None and handles()):
+            _submit(pressure_cues)
         _submit(self.tyretemp.update(snap, now))
         _submit(self.fuel.update(snap, now))
         self.pitcall.set_pending(self._garage_change_pending())

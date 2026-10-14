@@ -18,6 +18,12 @@ from accoach.recording.recorder import LapRecorder
 from accoach.recording.storage import load_lap, save_lap
 from accoach.telemetry.snapshot import ACStatus, SessionType, TelemetrySnapshot
 
+# Il giro che chiude sulla linea esce qualche frame dopo: il registratore
+# guarda se il gioco aggiorna il tempo (vedi `_CONFIRM_FRAMES`). Il
+# fixture finiva proprio sulla linea, quindi gli si danno quei frame.
+_DOPO_LA_LINEA = 3
+
+
 _LIVE = replace(
     TelemetrySnapshot.disconnected(),
     connected=True, status=ACStatus.LIVE, session=SessionType.PRACTICE,
@@ -39,7 +45,8 @@ def _drive(at: dict | None = None):
                               **at.get(p, {})))
     frames += [replace(_LIVE, lap_position=0.995, completed_laps=2),
                replace(_LIVE, lap_position=0.002, completed_laps=2)]
-    laps = [lap for f in frames if (lap := rec.update(f)) is not None]
+    laps = [lap for f in frames + [frames[-1]] * _DOPO_LA_LINEA
+            if (lap := rec.update(f)) is not None]
     return laps[-1]
 
 

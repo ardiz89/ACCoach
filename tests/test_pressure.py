@@ -175,3 +175,12 @@ def test_a_gt3_mod_on_ac_is_not_judged_by_accs_window():
         for i in range(_FRAMES):
             out += adv.update(ac(i / _FRAMES + 0.001, (22.0,) * 4), lap_no * 10.0)
     assert not out
+
+
+def test_the_number_said_is_on_the_right_side_of_the_edge():
+    """14/10: «a 26.0 psi, troppo basse» con la finestra che parte da 26.0. La
+    media era sotto di pochi centesimi e l'arrotondamento la metteva sul bordo."""
+    adv = PressureAdvisor()
+    out, _ = _drive_lap(adv, (25.96, 25.96, 26.5, 26.5))
+    assert len(out) == 1
+    assert "25.9 psi" in out[0].message, out[0].message

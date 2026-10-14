@@ -111,6 +111,13 @@ class LapStats:
     #: Dove il giro ha smesso di contare, gia' in parole («Variante Ascari»).
     #: Vuoto quando non si sa, e non si prova a indovinare.
     lost_where: str = ""
+    #: Su un giro tagliato: il sintomo che l'auto mostrava nella curva in cui
+    #: e' uscita, prima del punto in cui il gioco l'ha annullato, e quella
+    #: curva. ``None`` quando l'auto era in equilibrio — un taglio, che
+    #: l'assetto non spiega. E' un indizio sul COME, mai un tempo: il giro resta
+    #: fuori dalla finestra (vedi `RaceEngineer._off_tail`).
+    off_symptom: "Symptom | None" = None
+    off_corner: int | None = None
     #: Whether this lap was driven on wet tyres. ``None`` means the lap doesn't
     #: say — which is not the same as "dry", and is treated differently.
     #:
@@ -384,6 +391,27 @@ _DECISION_MSG = {
         "it": "Rimasta in sospeso dall'altra volta: {why}. E' sulla macchina, "
               "quindi diventa il nuovo punto di partenza: misuro da qui.",
     },
+    # Le uscite che si ripetono con lo stesso schema: un sospetto sull'assetto,
+    # detto in coda al contatore. Mai una modifica scritta — vedi `_off_tail`.
+    "off_pattern": {
+        "en": " But {k} of {n} offs share one pattern — {what} — in {c} "
+              "different corners{where}: that could be the setup, not the "
+              "driving. The first lever I'd try for it: {lever}. I'm not "
+              "writing it: an off lap can't judge a setup change, so I can only "
+              "measure it on clean laps.",
+        "it": " Però {k} uscite su {n} hanno lo stesso schema — {what} — in {c} "
+              "curve diverse{where}: potrebbe essere l'assetto, non la guida. "
+              "La prima leva che proverei: {lever}. Non la scrivo: un giro fuori "
+              "pista non può giudicare una modifica, la misuro solo sui giri "
+              "puliti.",
+    },
+    "off_pattern_nolever": {
+        "en": " But {k} of {n} offs share one pattern — {what} — in {c} "
+              "different corners{where}: that could be the setup, not the "
+              "driving.",
+        "it": " Però {k} uscite su {n} hanno lo stesso schema — {what} — in {c} "
+              "curve diverse{where}: potrebbe essere l'assetto, non la guida.",
+    },
     "skip_cold": {
         "en": " That last lap didn't count: tyres still cold.",
         "it": " L'ultimo giro non conta: gomme ancora fredde.",
@@ -480,6 +508,33 @@ _DECISION_MSG = {
 }
 
 _REVERT_PREFIX = {"en": "Revert: ", "it": "Ripristino: "}
+
+# Un sintomo detto come lo direbbe un ingegnere al pilota, non come la stringa
+# tecnica «oversteer exit low» che resta nei messaggi del ciclo di prova.
+_BALANCE_WORDS = {
+    Balance.UNDERSTEER: {"en": "understeer", "it": "sottosterzo"},
+    Balance.OVERSTEER: {"en": "oversteer", "it": "sovrasterzo"},
+}
+_PLACE_WORDS = {
+    (Phase.ENTRY, Speed.LOW): {"en": "on entry to slow corners",
+                               "it": "in ingresso alle curve lente"},
+    (Phase.ENTRY, Speed.HIGH): {"en": "on entry to fast corners",
+                                "it": "in ingresso alle curve veloci"},
+    (Phase.APEX, Speed.LOW): {"en": "mid-corner in slow corners",
+                              "it": "a centro curva nelle curve lente"},
+    (Phase.APEX, Speed.HIGH): {"en": "mid-corner in fast corners",
+                               "it": "a centro curva nelle curve veloci"},
+    (Phase.EXIT, Speed.LOW): {"en": "on exit from slow corners",
+                              "it": "in uscita dalle curve lente"},
+    (Phase.EXIT, Speed.HIGH): {"en": "on exit from fast corners",
+                               "it": "in uscita dalle curve veloci"},
+}
+
+
+def _symptom_words(sym: Symptom, lang: str) -> str:
+    bal = _BALANCE_WORDS[sym.balance]
+    place = _PLACE_WORDS[(sym.phase, sym.speed)]
+    return f"{bal.get(lang) or bal['en']} {place.get(lang) or place['en']}"
 
 
 # --- la memoria fra una sessione e l'altra ---------------------------------
@@ -640,6 +695,13 @@ class RaceEngineer:
         #: I sintomi gia' dichiarati non scrivibili in questa sessione. Non va
         #: su disco: domani l'auto puo' essere leggibile.
         self._unwritable: set[Symptom] = set()
+        #: I giri tagliati (a gomme in temperatura) dall'ultimo cambio di
+        #: assetto, gli ultimi `_WINDOW`. Non sono la finestra e non lo
+        #: diventano: di loro si legge solo COME e' uscita l'auto, mai il tempo.
+        #: Come la finestra non va su disco, e si svuota quando cambia la
+        #: macchina (assetto o asciutto/bagnato): un'uscita fatta con un'altra
+        #: macchina non accusa questa.
+        self._offs: list[LapStats] = []
 
     # -- memoria fra sessioni ----------------------------------------------
     def state(self) -> dict:
@@ -736,6 +798,9 @@ class RaceEngineer:
             self._skipped = None
         else:
             self._skipped = stats
+            # Fuori con le gomme fredde il sospettato e' la gomma: non conta.
+            if stats.unstable_why == "cut" and stats.warmed_up:
+                self._offs = (self._offs + [stats])[-_WINDOW:]
 
         if changed:
             return Decision(DecisionKind.STAND_DOWN,
@@ -764,13 +829,17 @@ class RaceEngineer:
             return Decision(DecisionKind.COLLECT,
                             _msg("collect", n=self.min_stable,
                                  have=len(self.window))
-                            + _skip_tail(self._skipped))
+                            + _skip_tail(self._skipped)
+                            + self._off_tail())
         return self._advance()
 
     def mark_applied(self) -> None:
         """Tell the engine the last PROPOSE (or revert) was written to the setup."""
         if self._pending is None:
             return
+        # Sulla macchina c'e' un altro assetto (nuovo o rimesso): le uscite
+        # fatte con quello di prima non dicono niente di questo.
+        self._offs = []
         if self._pending_is_revert:
             # The driver restored the previous setup. Don't evaluate the revert or
             # bank it: the bad change was never recorded, so undoing it must not
@@ -820,6 +889,7 @@ class RaceEngineer:
         if not known or known[-1] == stats.wet:
             return False
         self.window = []
+        self._offs = []
         self.active = None
         self._pending = None
         self._pending_is_revert = False
@@ -974,12 +1044,44 @@ class RaceEngineer:
         return self._held_revert
 
     # -- internals ---------------------------------------------------------
+    def handles_pressures(self) -> bool:
+        """L'Ingegnere sa giudicare le pressioni di quest'auto?
+
+        Vero quando il profilo ha una fase pressioni e quella fase conosce la
+        finestra. E' la domanda che il motore fa per decidere chi parla delle
+        gomme: se la risposta e' si', parla lui, perche' e' lui che sa chiamare
+        ai box e preparare la modifica.
+        """
+        pp = self._pressure_phase()
+        return pp is not None and not pp.blind()
+
+    def _pressure_phase(self) -> WorkPhase | None:
+        for ph in self.phases:
+            if getattr(ph, "pressure_remedy", None) is not None:
+                return ph
+        return None
+
     def _advance(self) -> Decision:
         """No active change: check the gate, else propose the next remedy."""
         # Lazy import avoids a module-level cycle (profiles import from core).
         from .profiles._common import tr
         lang = current_language()
         phase = self.phase
+        # Le pressioni si ricontrollano anche dopo la loro fase. Fino al 14/10
+        # la fase pressioni si chiudeva una volta e basta; se poi la gomma
+        # usciva di finestra (pista che si scalda, stint lungo) lo diceva solo
+        # il coach, con un numero da sistemare «a freddo» e nessuna chiamata ai
+        # box, nessuna modifica pronta sulla pagina. Il pilota l'ha chiesto in
+        # pista: se le gomme sono da sistemare, chiamami dentro e prepara il
+        # cambio. Le pressioni sono la base di tutto il resto, quindi vengono
+        # prima della fase in corso, e solo quando nessuna prova e' aperta
+        # (`_advance` non gira mentre una modifica si valuta).
+        pp = self._pressure_phase()
+        if (pp is not None and phase is not pp and not pp.blind()
+                and not pp.gate(self.window)):
+            change = self._pressure_remedy(pp)
+            if change is not None:
+                return self._propose(change, "high")
         if phase is None:
             return Decision(DecisionKind.DONE, _msg("done", lang))
         blind = phase.blind()
@@ -1140,6 +1242,87 @@ class RaceEngineer:
                 continue
             best, best_score = sym, score
         return best
+
+    # -- le uscite di pista come indizio ------------------------------------
+    def _off_pattern(self) -> tuple[Symptom, list[LapStats]] | None:
+        """Lo schema che si ripete nelle uscite, se il setup puo' spiegarlo.
+
+        Lo STESSO cancello che separa l'assetto dalla guida sui giri puliti
+        (`_dominant_symptom`): almeno ``min_stable`` uscite con lo stesso
+        sintomo e almeno ``_MIN_CORNERS`` curve diverse. Un'uscita isolata, o
+        quattro nella stessa curva, restano guida.
+
+        Nessun numero nuovo, ed e' una scelta: sui giri veri non c'era niente
+        con cui tararne uno. Delle 38 uscite in archivio nessuna porta un
+        sintomo (`diagnosis._off_symptom`), quindi la regola su quelle serate
+        non scatta mai — e non esiste, nell'archivio, una serata in cui il
+        pilota uscisse per colpa dell'assetto, cioe' il caso che dovrebbe far
+        scattare. La soglia giusta non si puo' misurare; questa e' la piu'
+        prudente che avessimo gia', quella che il motore chiede ai giri buoni.
+        """
+        by_sym: dict[Symptom, list[LapStats]] = {}
+        for s in self._offs:
+            if s.off_symptom is not None:
+                by_sym.setdefault(s.off_symptom, []).append(s)
+        # Il primo schema che passa, non «il piu' numeroso»: con `_WINDOW` (6)
+        # uscite in tutto, due schemi che passano entrambi sono per forza tre e
+        # tre, e fra due pari non c'e' niente da scegliere.
+        for sym, laps in by_sym.items():
+            # Gia' dichiarato «e' guida» (rimedi finiti) o non scrivibile su
+            # quest'auto: le uscite non riaprono quello che il motore ha chiuso.
+            if sym in self.exhausted or sym in self._unwritable:
+                continue
+            if len(laps) < self.min_stable:
+                continue
+            if len({s.off_corner for s in laps}) < _MIN_CORNERS:
+                continue
+            return sym, laps
+        return None
+
+    def _first_lever(self, sym: Symptom) -> str:
+        """La leva che il motore proverebbe per ``sym``, in parole, o ""."""
+        remedies = self.profile.remedy_table.get(sym) or []
+        idx = self.remedy_idx.get(sym, 0)
+        phase = next((p for p in self.phases if p.owns(sym)), None)
+        if phase is None or idx >= min(len(remedies), _REMEDY_CAP):
+            return ""
+        return remedies[idx](sym, phase).rationale
+
+    def _off_tail(self) -> str:
+        """Il sospetto sull'assetto, in coda al contatore, o "".
+
+        **Perche' un sospetto e non una proposta.** Una modifica il motore la
+        scrive solo se poi sa giudicarla, e qui non saprebbe. Il tempo dei giri
+        tagliati non entra mai in un verdetto (sei su tredici erano piu' veloci
+        tagliando la Variante). E il sintomo misurato sui giri puliti non e' un
+        metro onesto per questa modifica: i giri puliti sono per costruzione
+        quelli in cui l'auto NON e' uscita, quindi il confronto «prima: le
+        uscite, dopo: i giri puliti» darebbe ragione alla modifica comunque.
+        Contare le uscite prima e dopo, infine, misura soprattutto il pilota,
+        che nel frattempo impara la curva. Un verdetto senza metro e' quello
+        che il registro (`ledger.py`) esiste per non avere.
+
+        Quindi si dice — perche', quante, dove, e quale leva proverebbe — e il
+        motore resta quello di prima: appena ci sono i giri puliti, se il
+        sintomo si vede anche li', lo propone e lo misura come tutti gli altri.
+        Solo in raccolta: quando la finestra c'e', parla il ciclo normale.
+        """
+        found = self._off_pattern()
+        if found is None:
+            return ""
+        sym, laps = found
+        lang = current_language()
+        names: list[str] = []
+        for s in laps:
+            if s.lost_where and s.lost_where not in names:
+                names.append(s.lost_where)
+        where = f" ({', '.join(names)})" if names else ""
+        kw = dict(k=len(laps), n=len(self._offs), what=_symptom_words(sym, lang),
+                  c=len({s.off_corner for s in laps}), where=where)
+        lever = self._first_lever(sym)
+        if lever:
+            return _msg("off_pattern", lang, lever=lever, **kw)
+        return _msg("off_pattern_nolever", lang, **kw)
 
     def _remedy_for(self, symptom: Symptom, phase: WorkPhase) -> ProposedChange | None:
         self._blocked = None
