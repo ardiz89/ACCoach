@@ -19,6 +19,12 @@ from accoach.telemetry.snapshot import ACStatus, SessionType, TelemetrySnapshot
 
 import synth
 
+# Il giro che chiude sulla linea esce qualche frame dopo: il registratore
+# guarda se il gioco aggiorna il tempo (vedi `_CONFIRM_FRAMES`). Il
+# fixture finiva proprio sulla linea, quindi gli si danno quei frame.
+_DOPO_LA_LINEA = 3
+
+
 _ACC = replace(
     TelemetrySnapshot.disconnected(),
     connected=True, status=ACStatus.LIVE, session=SessionType.PRACTICE,
@@ -35,7 +41,7 @@ def _record_one_lap(**setup):
     frames += [replace(base, lap_position=p / 100, completed_laps=1)
                for p in range(0, 100, 2)]
     frames += [replace(base, lap_position=0.0, completed_laps=2)]
-    laps = [lap for f in frames if (lap := rec.update(f)) is not None and lap.valid]
+    laps = [lap for f in frames + [frames[-1]] * _DOPO_LA_LINEA if (lap := rec.update(f)) is not None and lap.valid]
     return laps[-1]
 
 
@@ -57,7 +63,7 @@ def test_the_setup_is_the_value_at_the_line():
     frames += [replace(late, lap_position=p / 100, completed_laps=1)
                for p in range(50, 100, 2)]
     frames += [replace(late, lap_position=0.0, completed_laps=2)]
-    laps = [lap for f in frames if (lap := rec.update(f)) is not None and lap.valid]
+    laps = [lap for f in frames + [frames[-1]] * _DOPO_LA_LINEA if (lap := rec.update(f)) is not None and lap.valid]
     assert laps[-1].brake_bias == pytest.approx(0.53)
 
 

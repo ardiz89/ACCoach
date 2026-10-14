@@ -22,6 +22,12 @@ from accoach.telemetry.reader import SharedMemoryReader
 from accoach.telemetry.snapshot import ACStatus, SessionType, TelemetrySnapshot
 from accoach.telemetry.structs import SPageFileGraphics
 
+# Il giro che chiude sulla linea esce qualche frame dopo: il registratore
+# guarda se il gioco aggiorna il tempo (vedi `_CONFIRM_FRAMES`). Il
+# fixture finiva proprio sulla linea, quindi gli si danno quei frame.
+_DOPO_LA_LINEA = 3
+
+
 _PLAUSIBLE_EST = 142_427        # the value measured at Monza
 
 _FLOAT, _INT, _WCHAR = ctypes.c_float, ctypes.c_int, ctypes.c_wchar
@@ -224,7 +230,8 @@ def _lap(**kw):
 
 
 def _run(rec, frames):
-    return [lap for f in frames if (lap := rec.update(f)) is not None]
+    return [lap for f in frames + [frames[-1]] * _DOPO_LA_LINEA
+            if (lap := rec.update(f)) is not None]
 
 
 def test_acc_lap_is_dirty_when_the_sim_dropped_the_flag():
