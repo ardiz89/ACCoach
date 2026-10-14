@@ -30,7 +30,7 @@ never goes stale.
 
 from __future__ import annotations
 
-from .cue import Cue, CueCategory, CueTier, theme_key, tier_of
+from .cue import CORNER_CATEGORIES, Cue, CueCategory, CueTier, theme_key, tier_of
 
 _DEFAULT_MIN_INTERVAL_S = 4.0
 _DEFAULT_ACUTE_INTERVAL_S = 1.5      # acute cues may speak this soon after the last cue
@@ -58,6 +58,9 @@ class CueScheduler:
         # The theme the session is working on, as an English key, or None while
         # no focus has been elected. See `set_focus`.
         self._focus_theme: str | None = None
+        # The analyzer zone of the corner the focus is working, or None. See
+        # `set_focus_corner`.
+        self._focus_corner: int | None = None
 
     def set_focus(self, theme: str | None) -> None:
         """Limit on-track technique advice to one theme — the attention budget.
@@ -71,9 +74,46 @@ class CueScheduler:
         interface language would be invisible in Italian.
 
         ``None`` (no focus elected yet) restores the previous behaviour exactly:
-        the coach speaks about everything, as it did before this existed.
+        the coach speaks about everything, as it did before this existed. It
+        also forgets the focus corner: a focus that is gone has no corner, and a
+        corner left behind would travel with a car or track change.
         """
         self._focus_theme = theme
+        if theme is None:
+            self._focus_corner = None
+
+    def set_focus_corner(self, zone: int | None) -> None:
+        """La curva che il focus sta lavorando, come indice di zona dell'analyzer.
+
+        In quella curva un consiglio di curva passa **qualunque** sia il suo
+        tema. Il focus misura la perdita li' senza guardare la causa
+        (`debrief.loss_at`), quindi una perdita in quella curva e' il focus,
+        comunque la voce la chiami. E la voce la chiama spesso in un altro
+        modo: il focus porta la causa della perdita *peggiore* della finestra,
+        la voce quella del giro appena chiuso. Il 14/10 al Red Bull Ring il
+        focus era «frenata» sulla Curva 5, il pilota ci ha riperso tempo, la
+        voce l'ha chiamato «tempo perso» — e il filtro l'ha buttato: un giro
+        intero senza una parola, proprio dove si doveva lavorare.
+
+        Si imposta *dopo* `set_focus`, che a focus spento la azzera.
+        """
+        self._focus_corner = zone
+
+    @property
+    def focus_corner(self) -> int | None:
+        """The analyzer zone of the focus corner, or None. Read-only for callers."""
+        return self._focus_corner
+
+    def _at_focus_corner(self, cue: Cue) -> bool:
+        """Is this the corner analyzer's advice about the focus corner?
+
+        Only corner categories qualify: for them ``segment`` is the analyzer
+        zone, for the live detectors it is a twentieth of the track, and the
+        same number would be a different place.
+        """
+        return (self._focus_corner is not None
+                and cue.category in CORNER_CATEGORIES
+                and cue.segment == self._focus_corner)
 
     @property
     def focus_theme(self) -> str | None:
@@ -93,6 +133,8 @@ class CueScheduler:
         if tier_of(cue.category) != CueTier.TECHNIQUE:
             return False
         if cue.category is CueCategory.GOOD:
+            return False
+        if self._at_focus_corner(cue):
             return False
         return theme_key(cue.category) != self._focus_theme
 

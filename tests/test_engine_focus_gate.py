@@ -109,6 +109,13 @@ def _engine_working_a_focus(tmp_path):
     eng._corners = detect_corners(ref_lap.samples)
     eng._focus = FocusCoach()
     slow = synth.build_lap(slow_corner=0, amt=30, n=300, clean=True)
+    # Col gas a meta' nella curva lenta il focus e' la trazione. Lento e basta
+    # sarebbe la percorrenza, che dal 14/10 non chiude la voce
+    # (`cue.gates_voice`): questi test parlano di un tema che il filtro applica.
+    lo, hi = synth._ZONES[0]
+    for s in slow.samples:
+        if lo <= s.pos <= hi:
+            s.throttle *= 0.5
     for _ in range(3):
         eng._observe_lap(slow)
     assert eng.scheduler.focus_theme is not None, "no focus elected: fixture is wrong"
