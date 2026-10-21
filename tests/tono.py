@@ -56,6 +56,7 @@ _EMOJI = re.compile(
     "[\U0001F000-\U0001FAFF"     # pittogrammi, emoticon, trasporti, simboli
     "\u2600-\u27BF"              # simboli vari e dingbat (✓ ⚡ ☀)
     "\u2B00-\u2BFF"              # frecce e simboli vari (⭐)
+    "\u2300-\u23FF\u2139"          # tecnici (⏸ ⏱ ⌚) e ℹ; le frecce 2190-21FF restano ammesse
     "\u25A0-\u25FF"              # forme geometriche (▶ ● ▲)
     "\uFE0F\u200D]")
 
@@ -70,16 +71,21 @@ _COLON_OK = re.compile(
 _LAP_TIME = re.compile(r"\d{1,2}:\d{2}(?:\.\d+)?")
 _VERSION = re.compile(r"\d+(?:\.\d+){2,}|\b[Vv]\d+\.\d+|\bPython \d+\.\d+")
 
-_UNITS = r"(?:%|ms|s|m|km/h|km|kg|°C|°|psi|L|min|h|Hz|bar)"
+# «°» seguito da una parola è un ordinale italiano («2° giro»), non un'unità.
+_UNITS = (r"(?:%|km/h|mph|kPa|rpm|kW|Nm|ms|mm|cm|km|kg|min|psi|Hz|bar|°C"
+          r"|°(?!\s+[^\W\d_])|s|m|L|h)")
 _NUM_UNIT = re.compile(rf"(?:\d(?:[.,]\d+)?|(?<![^\W\d_]){_SENTINEL}){_UNITS}(?![\w/])")
 
 _DASH_SPACED = re.compile(r"\s[-–—]\s|[–—]")
-_VALUE = re.compile(r"[\d%°\u00a7]\s*(?:[A-Za-z°%/]{0,4})?\s*$")
+_VALUE_BEFORE = re.compile(rf"[\d%°§]\s*(?:{_UNITS})?\s*$")
+_VALUE_AFTER = re.compile(rf"\s*[\d§][\d.,]*\s*({_UNITS}(?![\w/]))?")
+# «1.000» (migliaia) e «34.512» (un tempo di settore, scritto come un tempo sul giro).
+_THOUSANDS = re.compile(r"\b[1-9]\d{0,2}(?:\.\d{3})+\b")
 
 
 def placeholders(text: str) -> set[str]:
     """I segnaposti `{nome}` di un testo, per nome (senza le specifiche di formato)."""
-    return {re.split(r"[:!]", m[1:-1], maxsplit=1)[0].strip()
+    return {re.split(r"[:!|]", m[1:-1], maxsplit=1)[0].strip()
             for m in _PLACEHOLDER.findall(text or "")}
 
 
@@ -100,10 +106,14 @@ def words(sentence: str) -> int:
 
 
 def _dash_is_between_values(text: str) -> bool:
+    """Un intervallo: da una parte e dall'altra un valore nudo, con la sua unità
+    se ce l'ha («22 °C — 30 °C»). «Curva 3 — 4 decimi persi» è enfasi."""
     for m in _DASH_SPACED.finditer(text):
         before, after = text[:m.start()], text[m.end():]
-        if _VALUE.search(before) and re.match(r"\s*[\d\u00a7]", after):
-            continue
+        v = _VALUE_AFTER.match(after)
+        if _VALUE_BEFORE.search(before) and v:
+            if v.group(1) or not re.match(r"\s*[^\W\d_]", after[v.end():]):
+                continue
         return False
     return True
 
@@ -127,7 +137,7 @@ def violations(text: str, lang: str, max_words: int = MAX_WORDS) -> list[str]:
         out.append("bang")
     if any(words(s) > max_words for s in _sentences(plain)):
         out.append("long")
-    numbers = _VERSION.sub(" ", _LAP_TIME.sub(" ", plain))
+    numbers = _THOUSANDS.sub(" ", _VERSION.sub(" ", _LAP_TIME.sub(" ", plain)))
     if lang == "it" and re.search(r"\d\.\d", numbers):
         out.append("decimal")
     elif lang == "en" and re.search(r"(?<![\d,])\d+,\d{1,2}(?!\d)", numbers):
@@ -206,6 +216,85 @@ def lang_pairs(path: Path, tree: ast.AST | None = None) -> Entries:
             entry = {lg: side[lg][sub] for lg in ("it", "en") if sub in side[lg]}
             if entry:
                 out[f"{name}:{node.lineno}{sub}"] = entry
+    out.update(_branch_pairs(tree, name))
+    return out
+
+
+_LANG_NAMES = {"lang", "lg", "language"}
+
+
+def _is_lang_expr(node: ast.AST) -> bool:
+    if isinstance(node, ast.Name):
+        return node.id in _LANG_NAMES
+    if isinstance(node, ast.Call):
+        return isinstance(node.func, ast.Name) and node.func.id == "current_language"
+    if isinstance(node, ast.BoolOp):
+        return any(_is_lang_expr(v) for v in node.values)
+    return False
+
+
+def _it_branch(test: ast.AST) -> str | None:
+    """Dei due rami di `if lang == "it"`: quale è l'italiano? 'body', 'orelse' o None."""
+    if not (isinstance(test, ast.Compare) and len(test.ops) == 1
+            and _is_lang_expr(test.left) and isinstance(test.comparators[0], ast.Constant)
+            and test.comparators[0].value in ("it", "en")
+            and isinstance(test.ops[0], (ast.Eq, ast.NotEq))):
+        return None
+    positive = isinstance(test.ops[0], ast.Eq)
+    return ("body" if positive else "orelse") if test.comparators[0].value == "it" \
+        else ("orelse" if positive else "body")
+
+
+def _branch_texts(stmts: list[ast.stmt]) -> list[str]:
+    """I testi scritti da un ramo, nell'ordine del sorgente: valori di `return`,
+    assegnazioni e `+=`. Gli `if lang` annidati li conta il loro giro."""
+    found: list[tuple[int, int, str]] = []
+
+    def visit(node: ast.AST) -> None:
+        if isinstance(node, ast.If) and _it_branch(node.test):
+            return
+        value = getattr(node, "value", None) if isinstance(
+            node, (ast.Return, ast.Assign, ast.AugAssign, ast.Expr)) else None
+        if value is not None:
+            leaves = _text_of(value)
+            if len(leaves) == 1 and not leaves[0][0]:
+                found.append((node.lineno, node.col_offset, leaves[0][1]))
+        for child in ast.iter_child_nodes(node):
+            visit(child)
+
+    for st in stmts:
+        visit(st)
+    return [t for _, _, t in sorted(found)]
+
+
+def _branch_pairs(tree: ast.AST, name: str) -> Entries:
+    """I testi scritti con `if lang == "it": … else: …` (o la stessa cosa in un
+    `x if lang == "it" else y`): i testi dei due rami in coppia per posizione. Se
+    i rami non ne scrivono lo stesso numero, i senza-compagno restano a una
+    lingua sola, così le regole si applicano comunque."""
+    out: Entries = {}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.If):
+            which = _it_branch(node.test)
+            if not which:
+                continue
+            body, orelse = _branch_texts(node.body), _branch_texts(node.orelse)
+        elif isinstance(node, ast.IfExp):
+            which = _it_branch(node.test)
+            if not which:
+                continue
+            body = [t for _, t in _text_of(node.body)]
+            orelse = [t for _, t in _text_of(node.orelse)]
+        else:
+            continue
+        it, en = (body, orelse) if which == "body" else (orelse, body)
+        for i in range(max(len(it), len(en))):
+            entry = {}
+            if i < len(it):
+                entry["it"] = it[i]
+            if i < len(en):
+                entry["en"] = en[i]
+            out[f"{name}:{node.lineno}@{i}"] = entry
     return out
 
 
@@ -337,10 +426,17 @@ _COACH_FILES = ("coaching/cue.py", "coaching/focus.py", "coaching/pitcall.py",
 
 
 def static_cue_texts(path: Path) -> set[str]:
-    """Le frasi fisse di un modulo del coach: stringhe passate a una chiamata che
-    prende anche una `CueCategory` (lo stesso criterio di `tools/render_cues.py`)."""
+    """Le frasi fisse di un modulo del coach: testi passati a una chiamata che
+    prende anche una `CueCategory` (il criterio di `tools/render_cues.py`), con
+    le f-string in forma «{nome}» e le stringhe spezzate con `+` ricomposte."""
     tree = ast.parse(path.read_text(encoding="utf-8-sig"))
     out: set[str] = set()
+    assigned: dict[str, list[ast.AST]] = {}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign) and isinstance(node.value, (ast.JoinedStr, ast.Constant, ast.BinOp)):
+            for t in node.targets:
+                if isinstance(t, ast.Name):
+                    assigned.setdefault(t.id, []).append(node.value)
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call):
             continue
@@ -348,10 +444,34 @@ def static_cue_texts(path: Path) -> set[str]:
         if not any(isinstance(a, ast.Attribute) and isinstance(a.value, ast.Name)
                    and a.value.id == "CueCategory" for a in args):
             continue
-        out.update(a.value for a in args
-                   if isinstance(a, ast.Constant) and isinstance(a.value, str)
-                   and len(a.value) > 5)
+        for a in args:
+            # Un messaggio costruito prima (`msg = f"…"`) e passato per nome.
+            leaves = [x for v in assigned.get(a.id, []) for x in _text_of(v)]                 if isinstance(a, ast.Name) else _text_of(a)
+            for sub, text in leaves:
+                if not sub and len(text) > 5:
+                    out.add(text)
     return out
+
+
+def cue_english(italian: str) -> str:
+    """L'inglese di una frase del coach, come lo darebbe `i18n.cue_text`. Per una
+    f-string («Benzina per circa {n} giri») i modelli regex vogliono cifre vere:
+    si provano con un numero finto per segnaposto, e si rimettono i segnaposti."""
+    from accoach import i18n
+    names = list(dict.fromkeys(re.findall(r"\{([^{}]*)\}", italian)))
+    if not names:
+        return i18n.cue_text(italian, "en")
+    fake = {n: str(9001 + i) for i, n in enumerate(names)}
+    rendered = _PLACEHOLDER.sub(lambda m: fake[m.group(0)[1:-1]], italian)
+    english = i18n.cue_text(rendered, "en")
+    if english == rendered:
+        return italian                      # nessuno l'ha tradotta
+    for n, num in fake.items():
+        english = english.replace(num, "{" + n + "}")
+    return english
+
+
+_COACH_ALL = sorted((SRC / "coaching").glob("*.py")) + [SRC / "engine.py"]
 
 
 def _coach() -> Entries:
@@ -362,11 +482,9 @@ def _coach() -> Entries:
     # Le frasi fisse che la tabella non conosce: l'inglese è quel che il coach
     # direbbe oggi (la frase italiana, se nessuno l'ha tradotta).
     known = {e["it"] for e in out.values() if "it" in e}
-    for name in _COACH_FILES:
-        path = SRC / name
+    for path in _COACH_ALL:
         for it in sorted(static_cue_texts(path) - known):
-            out[f"{rel(path)}:cue[{it[:40]}]"] = {
-                "it": it, "en": i18n.cue_text(it, "en")}
+            out[f"{rel(path)}:cue[{it[:40]}]"] = {"it": it, "en": cue_english(it)}
             known.add(it)
     return out
 
@@ -463,7 +581,8 @@ def surface_violations(name: str, entries: Entries) -> list[tuple[str, str, str]
 def placeholder_mismatches(entries: Entries) -> list[str]:
     """Le chiavi con entrambe le lingue ma segnaposti diversi."""
     return [k for k, e in entries.items()
-            if "it" in e and "en" in e and placeholders(e["it"]) != placeholders(e["en"])]
+            if "@" not in k      # i rami `if lang` sono f-string: i nomi sono espressioni
+            and "it" in e and "en" in e and placeholders(e["it"]) != placeholders(e["en"])]
 
 
 def _norm(sentence: str) -> str:
@@ -483,7 +602,16 @@ def duplicates(surfaces: dict[str, Entries]) -> dict[tuple[str, str], list[str]]
                         seen.setdefault((lang, s), [])
                         if where not in seen[(lang, s)]:
                             seen[(lang, s)].append(where)
-    return {k: v for k, v in seen.items() if len(v) > 1}
+    # La guida può ripetere i titoli e le etichette dell'interfaccia che cita:
+    # un doppione guida-interfaccia non conta (quelli dentro la guida, sì).
+    out = {}
+    for key, where in seen.items():
+        ui = [w for w in where if not w.startswith("guide|")]
+        guide = [w for w in where if w.startswith("guide|")]
+        kept = (ui if len(ui) > 1 else []) + (guide if len(guide) > 1 else [])
+        if kept:
+            out[key] = kept
+    return out
 
 
 def census() -> dict[str, dict[str, int]]:

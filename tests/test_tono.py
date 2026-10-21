@@ -123,6 +123,8 @@ def test_every_rule_can_be_hit_and_the_text_with_nothing_wrong_is_clean():
 def test_placeholders_are_names_without_their_format():
     assert tono.placeholders("Sotto {v:.2f} per {secs} s e {n!r}") == {"v", "secs", "n"}
     assert tono.placeholders("niente") == set()
+    # La sintassi del plurale ha lo stesso nome nelle due lingue.
+    assert tono.placeholders("{laps|giro|giri}") == tono.placeholders("{laps|lap|laps}") == {"laps"}
 
 
 # --- il raccoglitore --------------------------------------------------------
@@ -152,8 +154,12 @@ def test_static_cue_texts_see_only_calls_that_take_a_cue_category(tmp_path):
             b = self._make(1, CueCategory.GAS, "Più gas qui")
             c = other("Una stringa qualsiasi")
             d = Cue(CueCategory.GAS, f"Benzina per circa {n} giri")
+            msg = f"Gomme a {psi} psi, troppo alte"
+            e = Cue(CueCategory.GAS, msg)
     '''), encoding="utf-8")
-    assert tono.static_cue_texts(mod) == {"Frena prima della curva", "Più gas qui"}
+    assert tono.static_cue_texts(mod) == {
+        "Frena prima della curva", "Più gas qui", "Benzina per circa {n} giri",
+        "Gomme a {psi} psi, troppo alte"}
 
 
 def test_markdown_sentences_skip_code_and_keep_prose():
@@ -225,7 +231,11 @@ def test_each_surface_has_its_own_sources():
     # Le frasi di pitcall.py stanno già nella tabella inglese e portano la sua chiave.
     assert "_CUE_EN[Ingresso box qui davanti, rientra]" in s["coach"]
     coach = tono.SURFACES["coach"]()
-    assert coach["i18n.py:_CUE_EN[Ingresso box qui davanti, rientra]"]["en"] ==         "Pit entry just ahead — come in"
+    assert coach["i18n.py:_CUE_EN[Ingresso box qui davanti, rientra]"]["en"] == "Pit entry just ahead — come in"
+    # Le frasi fisse di tutti i moduli del coach, non solo dei quattro nominati:
+    assert any(v.get("it") == "Gas a metà troppo a lungo: aspetta e poi apri tutto"
+               and "braking.py" in k for k, v in coach.items())
+    assert any(v.get("it") == "Frena prima" and "analyzer.py" in k for k, v in coach.items())
     assert "GUIDA.md" in s["guide"] and "FAQ.md" in s["guide"]
     assert "guide.py:" in s["guide"]          # i testi fissi della pagina della guida
     # Nessuna chiave in due superfici.
@@ -292,3 +302,96 @@ def test_no_sentence_is_repeated_among_the_rewritten_surfaces():
     done = {n: f() for n, f in tono.SURFACES.items() if n not in tono.PENDING}
     dups = tono.duplicates(done)
     assert not dups, list(dups.items())[:10]
+
+
+# --- le correzioni del primo giro di revisione ------------------------------
+
+def test_more_emoji_blocks_are_refused_but_arrows_stay():
+    for ch in ("⏸", "⏱", "⌚", "ℹ"):
+        assert "emoji" in broken(f"{ch} Pausa"), ch
+    assert broken("Dal giro 3 → 4 ← 2") == []
+
+
+def test_ordinals_thousands_and_sector_times_are_not_violations():
+    assert broken("Il 2° giro e il 95° percentile.") == []
+    assert "unit" in broken("Sono 22° e 3°")      # un grado nudo a fine frase resta unità
+    assert broken("Sei a 12.000 giri.") == []
+    assert broken("Il tuo S1 è 34.512 oggi.") == []
+    assert broken("Perdi 0.181 s qui.") == ["decimal"]
+
+
+def test_more_units_need_their_space():
+    for text in ("a 3000rpm", "20mm", "5cm", "300Nm", "200kW", "120mph", "220kPa"):
+        assert "unit" in broken(text), text
+    for text in ("a 3000 rpm", "20 mm", "300 Nm", "220 kPa"):
+        assert broken(text) == [], text
+
+
+def test_the_dash_between_values_needs_bare_values_on_both_sides():
+    assert broken("Curva 3 — 4 decimi persi") == ["dash"]
+    assert broken("Fra 22 °C — 30 °C sei in finestra.") == []
+    assert broken("Fra 22 — 30.") == []
+    assert broken("Il 3 — è tardi") == ["dash"]
+
+
+def test_branches_on_the_language_are_collected_in_pairs(tmp_path):
+    mod = tmp_path / "b.py"
+    mod.write_text(textwrap.dedent('''
+        def why(lang, n):
+            if lang == "it":
+                axis = "anteriore" if n else "posteriore"
+                why = f"Pressione {axis} fuori finestra: {n} click"
+                why += " il massimo per sosta"
+                return why
+            else:
+                why = f"Pressure out of window: {n} clicks"
+                why += " the most per stop"
+                return why
+
+        def note():
+            if current_language() == "it":
+                return "Non so che auto è."
+            return "I don't know the car."
+
+        def pick(lang):
+            return "Curva" if lang == "it" else "Corner"
+    '''), encoding="utf-8")
+    got = tono.lang_pairs(mod)
+    flat = {k.split(":", 1)[1]: v for k, v in got.items()}
+    assert flat["3@0"] == {"it": "Pressione {axis} fuori finestra: {n} click",
+                           "en": "Pressure out of window: {n} clicks"}
+    assert flat["3@1"] == {"it": " il massimo per sosta", "en": " the most per stop"}
+    assert {"it": "Curva", "en": "Corner"} in flat.values()
+    # Un ramo senza `else` esplicito: l'inglese è il testo che segue; qui resta solo l'italiano.
+    assert {"it": "Non so che auto è."} in flat.values()
+
+
+def test_the_real_engineer_branches_are_collected():
+    engineer = tono.SURFACES["engineer"]()
+    pair = [e for k, e in engineer.items()
+            if "profiles/_common.py" in k and e.get("it", "").startswith("Pressione {axis} fuori finestra")]
+    assert pair and pair[0]["en"].endswith("{sign}{clicks} clicks")
+    # Le espressioni di un'f-string («{ax.capitalize()}» contro «{axis}») non sono
+    # confrontabili per nome: le coppie dei rami non si confrontano sui segnaposti.
+    assert tono.placeholder_mismatches(engineer) == [
+        k for k, e in engineer.items() if "@" not in k and "it" in e and "en" in e
+        and tono.placeholders(e["it"]) != tono.placeholders(e["en"])]
+    assert tono.placeholder_mismatches({"a@0": {"it": "{x}", "en": "{y}"}}) == []
+    assert tono.placeholder_mismatches({"a:0": {"it": "{x}", "en": "{y}"}}) == ["a:0"]
+
+
+def test_fstring_cues_get_an_english_side_from_the_patterns():
+    assert tono.cue_english("Benzina per circa {thresh} giri.") == "Fuel for about {thresh} laps."
+    assert tono.cue_english("Una frase mai tradotta {x}") == "Una frase mai tradotta {x}"
+    coach = tono.SURFACES["coach"]()
+    fuel = [k for k, e in coach.items() if "fuel.py" in k and e["it"].startswith("Benzina per circa")]
+    assert fuel and "{laps_left}" in coach[fuel[0]]["it"]
+
+
+def test_the_guide_may_repeat_a_ui_label_but_not_itself():
+    ui = {"a": {"it": "Apri la pagina Ingegnere nel browser."}}
+    guide = {"g1": {"it": "Apri la pagina Ingegnere nel browser."}}
+    assert tono.duplicates({"hub": ui, "guide": guide}) == {}
+    both = {"g1": guide["g1"], "g2": guide["g1"]}
+    assert list(tono.duplicates({"hub": ui, "guide": both}).values()) == [["guide|g1", "guide|g2"]]
+    assert tono.duplicates({"hub": ui, "report": {"r": ui["a"]}})
