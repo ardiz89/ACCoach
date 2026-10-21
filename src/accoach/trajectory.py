@@ -625,8 +625,8 @@ def corner_path(points: list[LinePoint], lo: float, hi: float,
 _TAGS: dict[str, dict[str, str]] = {
     # States the measurement, not a verdict: the driver knows what happened here
     # better than we do, and "no line to read" is the honest limit of this view.
-    "off_here": {"en": "Down to {v} km/h against {vr}: no line to read here",
-                 "it": "Sceso a {v} km/h contro {vr}: qui non c'è traiettoria da leggere"},
+    "off_here": {"en": "Down to {v} km/h against {vr}, so there's no line to read here",
+                 "it": "Scendi a {v} km/h contro {vr}, e qui la traiettoria non si legge"},
     "apex_early": {"en": "Apex {m} m earlier", "it": "Apex {m} m prima"},
     "apex_late": {"en": "Apex {m} m later", "it": "Apex {m} m dopo"},
     "wide_entry": {"en": "{m} m wide on entry", "it": "{m} m largo in entrata"},
@@ -651,19 +651,27 @@ _TAGS: dict[str, dict[str, str]] = {
                    "it": "{m} m a destra della linea in uscita"},
     "longer_line": {"en": "{m} m longer through here", "it": "{m} m di strada in più"},
     "shorter_line": {"en": "{m} m shorter through here", "it": "{m} m di strada in meno"},
-    "tighter_arc": {"en": "Tighter arc: {r} m vs {rr} m",
-                    "it": "Arco più stretto: {r} m contro {rr} m"},
-    "wider_arc": {"en": "Wider arc: {r} m vs {rr} m",
-                  "it": "Arco più largo: {r} m contro {rr} m"},
+    "tighter_arc": {"en": "A {r} m arc, tighter than the reference's {rr} m",
+                    "it": "Arco di {r} m, più stretto dei {rr} m del riferimento"},
+    "wider_arc": {"en": "A {r} m arc, wider than the reference's {rr} m",
+                  "it": "Arco di {r} m, più largo dei {rr} m del riferimento"},
 }
 
 
 def tag_text(key: str, values: dict, lang: str | None = None) -> str:
-    """Render one geometric tag in the requested language."""
+    """Render one geometric tag in the requested language.
+
+    I valori restano numeri nella tabella (`_tags`): il formato della lingua si
+    mette qui, così «2,5 m» in italiano e «2.5 m» in inglese escono dalla stessa
+    misura. Un intero resta intero, un decimale ne tiene uno.
+    """
     from .i18n import current_language
+    from .textfmt import fmt_num
 
     lg = lang if lang in ("en", "it") else current_language()
     entry = _TAGS.get(key)
     if entry is None:
         return key
-    return entry.get(lg, entry["en"]).format(**values)
+    shown = {k: fmt_num(v, 1, lg) if isinstance(v, float) else v
+             for k, v in values.items()}
+    return entry.get(lg, entry["en"]).format(**shown)

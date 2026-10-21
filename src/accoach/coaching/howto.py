@@ -470,7 +470,7 @@ _VERDICT = {
     "it": {
         "gap": "In media perdi {s} a giro rispetto al tuo giro di riferimento",
         "even": "In media sei sul tempo del tuo giro di riferimento",
-        "share": ", e il {p}% viene da {name}.",
+        "share": ", e il {p} % viene da {name}.",
         "top": ", e l'abitudine che pesa di più è {name}.",
         "end": ".",
         "first": "È la tua prima sessione qui. Il confronto arriva dalla prossima.",
@@ -486,7 +486,7 @@ _VERDICT = {
     "en": {
         "gap": "On average you lose {s} a lap to your reference lap",
         "even": "On average you're level with your reference lap",
-        "share": ", and {p}% of it comes from {name}.",
+        "share": ", and {p} % of it comes from {name}.",
         "top": ", and the habit that weighs most is {name}.",
         "end": ".",
         "first": "This is your first session here. The comparison starts with "

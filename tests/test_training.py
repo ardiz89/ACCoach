@@ -134,7 +134,7 @@ def test_the_two_numbers_are_never_added_together():
     """They measure the same road two ways; summing them counts time twice."""
     g = _gap(per_lap_ms=310.0)
     assert g.note, "with two real numbers on the page, the note has to be there"
-    assert "1.00" in g.note and "0.31" in g.note
+    assert "1,00 s" in g.note and "0,31 s" in g.note
     assert str(g.consistency_ms + 310) not in g.note
 
 
@@ -253,7 +253,7 @@ def test_the_printed_speed_difference_matches_the_printed_speeds():
     d = build_drill(CueCategory.CARRY_SPEED.value, "apex",
                     CornerFacts(min_speed_kmh=76.8, min_speed_ref_kmh=80.4), "en")
     line = next(s for s in d.steps if "km/h" in s)
-    assert "80 km/h" in line and "77" in line and "+3" in line
+    assert "80 km/h" in line and "77" in line and "3 km/h short" in line
 
 
 def test_a_speed_gap_inside_your_own_spread_is_not_offered_as_a_target():
@@ -420,8 +420,8 @@ def test_the_page_points_at_tabs_that_exist(lang):
     label = {"it": "Andamento", "en": "Trends"}[lang]
     assert label in _T[lang]["need_weakness"]
     assert f"`{label}`" in i18n or f"{label}<" in i18n or label in i18n
-    slip = {"it": "Bloccaggio e pattinamento", "en": "Lock &amp; spin"}[lang]
-    assert slip in _T[lang]["d.exit_throttle.s4"]
+    slip = {"it": "Bloccaggio e pattinamento", "en": "Locking and wheelspin"}[lang]
+    assert slip in _T[lang]["d.exit_throttle.s4"] and slip in i18n
 
 
 # --- the glossary -----------------------------------------------------------
@@ -687,7 +687,7 @@ def test_a_goals_target_is_the_plans_and_is_not_recomputed_here():
     """One notion of "done", and it lives in plan.py."""
     ds = [_debrief(_loss(0, 400.0)) for _ in range(4)]
     p = _run(_plan(_goal(0, baseline=437.0, target=219.0)), ds)
-    assert "0.22" in p.steps[0].target and "0.44" in p.steps[0].target
+    assert "0,22 s" in p.steps[0].target and "0,44 s" in p.steps[0].target
 
 
 def test_the_significance_floor_is_the_one_the_rest_of_the_app_uses():

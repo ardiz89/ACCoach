@@ -195,7 +195,7 @@ def test_end_to_end_the_finding_carries_the_link():
     second = next(x for x in debrief.losses if x.index == 1)
     assert second.inherited, "the second corner's loss was inherited"
     assert second.inherited_from == 0
-    assert "already there" in second.inherited
+    assert "you had lost all of it by the exit of" in second.inherited
 
 
 def test_end_to_end_a_lift_on_the_straight_does_not_blame_the_corner():

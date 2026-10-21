@@ -19,16 +19,16 @@ import synth
 
 def test_debrief_content_translates_to_italian():
     sym = Symptom(Balance.UNDERSTEER, Phase.ENTRY, Speed.LOW)
-    assert explain_cause(sym, "en") == "The car understeers on entry (slow corner)."
-    assert explain_cause(sym, "it") == "L'auto sottosterza in ingresso (curva lenta)."
+    assert explain_cause(sym, "en") == "In this slow corner the car understeers on entry."
+    assert explain_cause(sym, "it") == "In questa curva lenta l'auto sottosterza in ingresso."
     st = CornerStats(lost_ms=300, throttle_live=0.5, throttle_ref=0.5,
                      brake_live=0.0, brake_ref=0.0, min_speed_live=120.0,
                      min_speed_ref=128.0, braking_early=False,
                      braking_late=False)
     detail_it, _ = explain_loss(CueCategory.CARRY_SPEED, st, "it")
-    assert "Minima all'apex" in detail_it
+    assert "All'apex la tua velocità minima è 120 km/h" in detail_it
     detail_en, _ = explain_loss(CueCategory.CARRY_SPEED, st, "en")
-    assert "Minimum speed at apex" in detail_en
+    assert "Your minimum speed at the apex is 120 km/h" in detail_en
 
 
 def _debrief(slow_corner=0, amt=30):
@@ -133,7 +133,7 @@ def test_format_debrief_mentions_gap_and_worst_corner():
     assert "Debrief" in text
     assert "Gap" in text
     assert "Corner 1" in text
-    assert "Consistency" in text
+    assert "Over 2 laps your best is" in text
 
 
 # --- visual braking landmark in the braking detail --------------------------
@@ -173,7 +173,7 @@ def test_braking_detail_appends_landmark(monkeypatch):
                         [("al cordolo bianco-rosso", "at the white-and-red kerb", ref_onset)])
     txt = _D._braking_detail(lap, ref, inside, refs, CueCategory.BRAKE_LATER, "it")
     assert "al cordolo bianco-rosso" in txt      # visual reference present
-    assert "m." in txt                            # …and the metres stay as anchor
+    assert " m prima." in txt                     # …and the metres stay as anchor
 
 
 def test_braking_detail_without_landmark_is_just_metres(monkeypatch):
@@ -181,7 +181,7 @@ def test_braking_detail_without_landmark_is_just_metres(monkeypatch):
     lap, ref, inside, refs = _early_braking_case()
     monkeypatch.setitem(trackdata._LANDMARKS, "monza", [])
     txt = _D._braking_detail(lap, ref, inside, refs, CueCategory.BRAKE_LATER, "it")
-    assert "Anticipi la staccata" in txt
+    assert txt.startswith(" Stacchi circa ") and txt.endswith(" m prima.")
     assert "cordolo" not in txt
 
 

@@ -68,21 +68,21 @@ _STRINGS = {
         "headline": "Prima di tutto",
         "lapwide": "Sul giro intero",
         "clean": "Niente di grosso da correggere",
-        "clean_body": "Su questo giro non c'è una perdita che valga una "
-                      "correzione: le differenze col riferimento stanno dentro "
-                      "la variazione fra due giri della stessa persona.",
-        "reference_body": "Questo è il tuo giro di riferimento: non c'è niente "
-                          "di più veloce con cui confrontarlo.",
+        "clean_body": "In questo giro non ho trovato una perdita che valga "
+                      "una correzione. Le differenze col riferimento stanno "
+                      "dentro lo scarto normale fra due giri dello stesso pilota.",
+        "reference_body": "Questo è il tuo giro di riferimento e non ne hai uno "
+                          "più veloce con cui confrontarlo.",
     },
     "en": {
         "headline": "First, the big picture",
-        "lapwide": "Across the whole lap",
+        "lapwide": "Over the whole lap",
         "clean": "Nothing big to fix",
-        "clean_body": "There's no loss on this lap worth a correction: the "
-                      "differences against the reference sit inside the spread "
-                      "between two laps by the same driver.",
-        "reference_body": "This is your reference lap — there's nothing faster "
-                          "to compare it against.",
+        "clean_body": "I found no loss on this lap worth a correction. The "
+                      "differences from the reference sit inside the normal "
+                      "spread between two laps by the same driver.",
+        "reference_body": "This is your reference lap, and you have no faster "
+                          "lap to compare it with.",
     },
 }
 

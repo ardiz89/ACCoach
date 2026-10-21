@@ -55,6 +55,7 @@ from .sectors import ideal_lap, sector_spans, sector_times
 from .sessions import group_sessions, parse_utc
 from .stints import MIN_TREND_LAPS, pace_of, split_stints, tyre_trace
 from .telemetry.snapshot import format_lap_time
+from .textfmt import fmt_num
 from .track import detect_corners
 from .trackedges import crop as crop_edges, edges_and_fit, edges_for
 from .trackdata import name_corners
@@ -312,62 +313,95 @@ def _fuel_mean(rows) -> float | None:
 
 _STINT_TEXT = {
     "it": {
-        "no_fuel_corr": "Il passo qui **non è corretto per la benzina**: "
-                        "l'auto si alleggerisce di {litres} L nello stint e "
-                        "quindi guadagna da sola, ma di quanto non lo sappiamo "
-                        "ancora — il coefficiente secondi/litro va misurato su "
-                        "uno stint guidato apposta a passo costante.",
-        "no_fuel_corr_bare": "Il passo qui **non è corretto per la benzina**: "
-                             "l'auto si alleggerisce mentre giri, e il "
+        "no_fuel_corr": "Il passo qui **non è corretto per la benzina**. Nello "
+                        "stint l'auto si alleggerisce di {litres} L e guadagna "
+                        "tempo da sola, ma quanto ancora non lo sappiamo. Il "
+                        "coefficiente secondi/litro va misurato su uno stint "
+                        "guidato apposta a passo costante.",
+        "no_fuel_corr_bare": "L'auto si alleggerisce mentre giri e il passo "
+                             "qui **non è corretto per la benzina**, perché il "
                              "coefficiente secondi/litro non è ancora misurato.",
         "unverified": "Questi giri sono stati registrati prima che HONE leggesse "
-                      "il serbatoio: se hai rifornito in mezzo, qui non si vede.",
-        "few_laps": "Servono almeno {n} giri **a passo** per misurare una "
-                    "deriva; qui ce ne sono {have}.",
-        "flat": "Nessuna deriva misurabile: la pendenza ({slope:+.2f} s/giro) sta "
-                "dentro il suo stesso margine (±{err:.2f}). Su {n} giri il tuo "
-                "modo di guidare si muove più di quanto si muova il passo.",
-        "rising": "Il passo cala di **{slope:.2f} s/giro** (±{err:.2f}) su {n} "
-                  "giri a passo.",
-        "falling": "Il passo migliora di **{slope:.2f} s/giro** (±{err:.2f}) su "
-                   "{n} giri a passo — su uno stint corto è quasi sempre il "
-                   "pilota che si scalda, non l'auto.",
-        "tyres_flat": "Battistrada e pressioni non derivano in modo misurabile "
-                      "in questo stint.",
-        "tyres_rising": "Il battistrada sale di {slope:.1f} °C/giro.",
-        "tyres_falling": "Il battistrada cala di {slope:.1f} °C/giro.",
-        "no_wear": "Nessuno dei due simulatori pubblica un'usura gomme che "
-                   "registriamo: qui c'è la temperatura, che è il sintomo.",
+                      "il serbatoio. Se hai rifornito in mezzo, qui non si vede.",
+        "few_laps": "Per misurare una deriva servono almeno {n} giri **a "
+                    "passo**, e qui ce ne sono {have}.",
+        "flat": "Non c'è una deriva misurabile. La pendenza di {slope} s/giro "
+                "sta dentro il suo stesso margine di ±{err}. Su {n} giri il tuo "
+                "modo di guidare cambia più del passo.",
+        "rising": "Il passo cala di **{slope} s/giro** (±{err}) su {n} giri a "
+                  "passo.",
+        "falling": "Il passo migliora di **{slope} s/giro** (±{err}) su {n} "
+                   "giri a passo. Su uno stint corto quasi sempre è il pilota "
+                   "che si scalda, non l'auto.",
+        "tyres_flat": "In questo stint battistrada e pressioni non hanno una "
+                      "deriva misurabile.",
+        "tyres_rising": "Il battistrada sale di {slope} °C/giro.",
+        "tyres_falling": "Il battistrada cala di {slope} °C/giro.",
+        "no_wear": "Nessuno dei due simulatori pubblica un dato di usura gomme "
+                   "che possiamo registrare. Qui c'è la temperatura, che ne è "
+                   "il sintomo.",
     },
     "en": {
-        "no_fuel_corr": "This pace is **not corrected for fuel**: the car sheds "
-                        "{litres} L across the stint and gains time on its own, "
-                        "but how much is not known yet — the seconds-per-litre "
-                        "figure has to be measured on a stint driven at a "
-                        "deliberately constant pace.",
-        "no_fuel_corr_bare": "This pace is **not corrected for fuel**: the car "
-                             "gets lighter as you drive, and the "
-                             "seconds-per-litre figure is not measured yet.",
-        "unverified": "These laps were recorded before HONE read the fuel tank: "
-                      "if you refuelled part-way through, it doesn't show here.",
-        "few_laps": "A drift needs at least {n} laps **at pace**; there are "
-                    "{have} here.",
-        "flat": "No measurable drift: the slope ({slope:+.2f} s/lap) sits inside "
-                "its own margin (±{err:.2f}). Over {n} laps your driving moves "
-                "more than the pace does.",
-        "rising": "Pace drops by **{slope:.2f} s/lap** (±{err:.2f}) over {n} "
-                  "laps at pace.",
-        "falling": "Pace improves by **{slope:.2f} s/lap** (±{err:.2f}) over {n} "
-                   "laps at pace — over a short stint that is almost always the "
+        "no_fuel_corr": "This pace is **not corrected for fuel**. Across the "
+                        "stint the car sheds {litres} L and gains time on its "
+                        "own, but we don't know how much yet. The "
+                        "seconds-per-litre figure has to be measured on a stint "
+                        "driven at a deliberately steady pace.",
+        "no_fuel_corr_bare": "The car gets lighter as you drive and this pace "
+                             "is **not corrected for fuel**, because the "
+                             "seconds-per-litre figure isn't measured yet.",
+        "unverified": "These laps were recorded before HONE read the fuel tank. "
+                      "If you refuelled part-way through, it doesn't show here.",
+        "few_laps": "Measuring a drift takes at least {n} laps **at pace**, and "
+                    "there are {have} here.",
+        "flat": "There's no measurable drift. The slope of {slope} s/lap sits "
+                "inside its own margin of ±{err}. Over {n} laps your driving "
+                "changes more than the pace does.",
+        "rising": "Pace drops by **{slope} s/lap** (±{err}) over {n} laps at "
+                  "pace.",
+        "falling": "Pace improves by **{slope} s/lap** (±{err}) over {n} laps "
+                   "at pace. Over a short stint that is almost always the "
                    "driver warming up, not the car.",
-        "tyres_flat": "Tread temperature and pressures show no measurable drift "
-                      "across this stint.",
-        "tyres_rising": "Tread temperature climbs {slope:.1f} °C/lap.",
-        "tyres_falling": "Tread temperature drops {slope:.1f} °C/lap.",
-        "no_wear": "Neither sim publishes a tyre-wear figure we record: what is "
-                   "here is temperature, which is the symptom.",
+        "tyres_flat": "Across this stint tread temperature and pressures show "
+                      "no measurable drift.",
+        "tyres_rising": "Tread temperature climbs {slope} °C/lap.",
+        "tyres_falling": "Tread temperature drops {slope} °C/lap.",
+        "no_wear": "Neither sim publishes a tyre-wear figure we can record. "
+                   "What you get here is temperature, which is the symptom.",
     },
 }
+
+
+def _pace_notes(lg: str, litres: float | None, fuel_known: bool, trend,
+                counted: int, needed: int) -> list[str]:
+    """Le note sul passo e sulla benzina, coi numeri nel formato della lingua."""
+    txt = _STINT_TEXT.get(lg, _STINT_TEXT["en"])
+    notes = [txt["no_fuel_corr"].format(litres=fmt_num(litres, 1, lg)) if litres
+             else txt["no_fuel_corr_bare"]]
+    if not fuel_known:
+        notes.append(txt["unverified"])
+    if trend is None:
+        notes.append(txt["few_laps"].format(n=needed, have=counted))
+    else:
+        # Una deriva vera si dice in positivo («cala di», «migliora di»); una
+        # piatta col suo segno, perché è il segno che sta dentro il margine.
+        slope = abs(trend.slope) if trend.significant else trend.slope
+        notes.append(txt[trend.direction if trend.significant else "flat"].format(
+            slope=fmt_num(slope / 1000.0, 2, lg),
+            err=fmt_num(trend.error / 1000.0, 2, lg), n=counted))
+    return notes
+
+
+def _tyre_notes(lg: str, core_trend) -> list[str]:
+    """Le note sulle gomme: la deriva del battistrada, se c'è, e il limite."""
+    txt = _STINT_TEXT.get(lg, _STINT_TEXT["en"])
+    notes = []
+    if core_trend is not None:
+        notes.append(txt["tyres_flat"] if not core_trend.significant else
+                     txt["tyres_" + core_trend.direction].format(
+                         slope=fmt_num(abs(core_trend.slope), 1, lg)))
+    notes.append(txt["no_wear"])
+    return notes
 
 
 def _stint_summary(st) -> dict:
@@ -387,24 +421,10 @@ def _stint_summary(st) -> dict:
 
 def _stint_detail(st, lg: str) -> dict:
     """The open stint: pace, fuel, tyres, and the caveats each of them carries."""
-    txt = _STINT_TEXT.get(lg, _STINT_TEXT["en"])
     pace = pace_of(st)
-    notes: list[str] = []
-
-    litres = st.fuel_used
-    notes.append(txt["no_fuel_corr"].format(litres=f"{litres:.1f}") if litres
-                 else txt["no_fuel_corr_bare"])
-    if not st.fuel_known:
-        notes.append(txt["unverified"])
-
     trend = pace.trend
-    if trend is None:
-        notes.append(txt["few_laps"].format(n=MIN_TREND_LAPS, have=pace.counted))
-    else:
-        notes.append(txt[trend.direction if trend.significant else "flat"].format(
-            slope=abs(trend.slope) / 1000.0 if trend.significant
-            else trend.slope / 1000.0,
-            err=trend.error / 1000.0, n=pace.counted))
+    notes = _pace_notes(lg, st.fuel_used, st.fuel_known, trend,
+                        pace.counted, MIN_TREND_LAPS)
 
     # The tyres need the sample stream, so this is the one part that reads files.
     # A stint is at most a few dozen laps and the tab is opened on purpose. A
@@ -421,11 +441,7 @@ def _stint_detail(st, lg: str) -> dict:
     tyres = tyre_trace([l for l in loaded if l is not None]) \
         if any(l is not None for l in loaded) else None
     if tyres is not None:
-        ct = tyres.core_trend
-        if ct is not None:
-            notes.append(txt["tyres_flat"] if not ct.significant else
-                         txt["tyres_" + ct.direction].format(slope=abs(ct.slope)))
-        notes.append(txt["no_wear"])
+        notes += _tyre_notes(lg, tyres.core_trend)
 
     # tyre_trace only saw the laps that opened, so its series is walked with its
     # own cursor while the rows are walked with theirs.

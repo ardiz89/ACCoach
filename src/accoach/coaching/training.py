@@ -52,6 +52,7 @@ import statistics
 from dataclasses import asdict, dataclass, field
 
 from ..telemetry.snapshot import format_lap_time
+from ..textfmt import fmt_num
 from .cue import CueCategory as _C
 from .debrief import LapDebrief
 from .plan import GoalProgress, TrainingPlan
@@ -254,579 +255,576 @@ class Programme:
 
 _T = {
     "it": {
-        "need_laps": "Servono {n} giri validi su questa auto e questa pista "
-                     "prima che allenarsi voglia dire qualcosa: ne hai {have}. "
-                     "Con meno, quello che sembra un punto debole è solo quello "
-                     "che è successo in due giri.",
-        "need_weakness": "Hai giri a sufficienza, ma nessun errore si ripete "
-                         "abbastanza da chiamarsi punto debole: quello che perdi "
-                         "cambia curva da un giro all'altro. Guida ancora un "
-                         "po' — oppure guarda «Punti deboli» in Andamento per "
-                         "vedere cosa manca a poco.",
-        "gap_head": "Il tuo miglior giro è {best}. Prendendo i tuoi tempi "
-                    "migliori — uno per ognuno dei tre settori in cui è diviso "
-                    "il giro — e mettendoli insieme viene fuori {ideal}: è "
-                    "quello che qui si chiama ideale teorico, e sono {gap}s che "
-                    "hai già guidato, ma mai tutti nello stesso giro.",
-        "gap_head_tight": "Il tuo miglior giro è {best}. Prendendo i tuoi tempi "
-                          "migliori — uno per ognuno dei tre settori in cui è "
-                          "diviso il giro — e mettendoli insieme viene fuori "
-                          "{ideal}: praticamente lo stesso giro. Vuol dire che "
-                          "sei già costante, e quel poco che resta non lo prendi "
-                          "ripetendoti: lo prendi nelle curve.",
-        "gap_worst": " Il grosso — {ws}s — sta nel settore {n}.",
-        "gap_note": "Questi due numeri non si sommano. I {gap}s dicono quanto ti "
-                    "costa non ripeterti: sono i tuoi settori migliori contro il "
-                    "tuo miglior giro. I {lap}s dicono quanto perdi nelle curve "
-                    "del piano: sono i tuoi ultimi giri contro quello stesso "
-                    "giro migliore. In parte è lo stesso tempo, contato da due "
-                    "parti.",
-        "gap_pro": " Il giro veloce che hai importato è {pro}, altri {pg}s più "
-                   "in là: quello sì è tempo che non hai ancora guidato.",
-        "why_first": "Si comincia da qui: è la perdita più grande che si "
-                     "ripete ({occ} giri su {laps}).",
-        "why_chain": "Si comincia da qui anche se non è la perdita più grande: "
-                     "il tempo che perdi a {victim} nasce in questa curva. Un "
-                     "esercizio solo, due curve sistemate.",
-        "why_later": "Poi questa, che si ripete in {occ} giri su {laps}. Una "
-                     "cosa alla volta: due esercizi nella stessa sessione si "
+        "need_laps": "Per allenarti servono {n} giri validi con questa auto su "
+                     "questa pista, e ne hai {have}. Con meno giri, quello che "
+                     "sembra un punto debole è solo quello che è successo in due "
+                     "giri.",
+        "need_weakness": "Hai abbastanza giri, ma nessun errore si ripete tanto "
+                         "da essere un punto debole. Quello che perdi cambia "
+                         "curva da un giro all'altro. Guida ancora un po', "
+                         "oppure apri «Punti deboli» in Andamento per vedere "
+                         "cosa ci va vicino.",
+        "gap_head": "Il tuo giro migliore è {best}, e mettendo insieme il tuo "
+                    "tempo migliore in ognuno dei tre settori viene {ideal}. Qui "
+                    "lo chiamiamo ideale teorico. Sono {gap} s che hai già "
+                    "guidato, ma mai tutti nello stesso giro.",
+        "gap_head_tight": "Col tuo tempo migliore in ognuno dei tre settori "
+                          "viene {ideal}, quasi uguale al tuo giro migliore di "
+                          "{best}. Vuol dire che sei già costante. Il poco che "
+                          "resta non lo prendi ripetendoti, lo prendi nelle "
+                          "curve.",
+        "gap_worst": " Il grosso sta nel settore {n}, con {ws} s.",
+        "gap_note": "Questi due numeri non si sommano. Non ripeterti ti costa "
+                    "{gap} s, cioè i tuoi settori migliori contro il tuo giro "
+                    "migliore. Nelle curve del piano perdi {lap} s, cioè i tuoi "
+                    "ultimi giri contro quello stesso giro. In parte è lo stesso "
+                    "tempo, contato due volte.",
+        "gap_pro": " Il giro veloce che hai importato è {pro}, altri {pg} s più "
+                   "in là. Quello è tempo che non hai ancora guidato.",
+        "why_first": "Si comincia da qui perché è la perdita più grande che si "
+                     "ripete, in {occ} giri su {laps}.",
+        "why_chain": "Si comincia da qui anche se non è la perdita più grande, "
+                     "perché il tempo che perdi a {victim} nasce in questa "
+                     "curva. Con un esercizio solo sistemi due curve.",
+        "why_later": "Poi questa, che si ripete in {occ} giri su {laps}. Un "
+                     "esercizio per volta, perché due nella stessa sessione si "
                      "annullano a vicenda.",
-        "why_done": "Fatto: l'obiettivo è stato centrato nei giri dopo l'avvio "
-                    "del piano.",
-        "why_cons_first": "Si comincia da qui: quello che ti costa di più non è "
-                          "una curva, è che non rifai due volte lo stesso giro.",
-        "why_cons_last": "Per ultimo, quando le curve qui sopra sono entrate: "
-                         "questo passo serve a incollarle in un giro solo.",
-        "target": "in questa curva perdi {from_}s: portali sotto {to}s",
-        "target_cons": "metti insieme i tuoi settori migliori: {ideal}",
-        "done_when": "Fatto quando centri l'obiettivo in {needed} dei giri che "
+        "why_done": "Fatto. Hai centrato l'obiettivo nei giri guidati dopo "
+                    "l'avvio del piano.",
+        "why_cons_first": "Si comincia da qui perché quello che ti costa di più "
+                          "non è una curva. È che non rifai mai due volte lo "
+                          "stesso giro.",
+        "why_cons_last": "Questo passo viene per ultimo, quando le curve qui "
+                         "sopra sono entrate. Serve a metterle insieme in un "
+                         "giro solo.",
+        "target": "In questa curva perdi {from_} s. Scendi sotto {to} s.",
+        "target_cons": "Metti insieme i tuoi settori migliori e arrivi a {ideal}.",
+        "done_when": "È fatto quando centri l'obiettivo in {needed} dei giri che "
                      "guidi da qui in poi. È la stessa quota di giri che ha reso "
                      "questa curva un punto debole.",
-        "done_when_plain": "Fatto quando centri l'obiettivo in metà dei giri che "
-                           "guidi da qui in poi.",
-        "done_when_cons": "Fatto quando fra il tuo miglior giro e i tuoi settori "
-                          "migliori messi insieme restano meno di {s}s. È metà "
-                          "di quello che c'è adesso: la stessa metà che il piano "
-                          "chiede in curva.",
-        "ses_warm": "3 giri di riscaldamento. Gomme e freni in temperatura, "
-                    "cronometro spento: un giro freddo non dice niente, e nei "
-                    "primi giri l'auto cambia sotto di te.",
-        "ses_drill": "{n} giri di esercizio: {title} — {where}.",
-        "ses_drill_lap": "{n} giri di esercizio, sul giro intero: {title}.",
-        "ses_free": "3 giri liberi, guidati normale. Servono a vedere se "
+        "done_when_plain": "È fatto quando centri l'obiettivo in metà dei giri "
+                           "che guidi da qui in poi.",
+        "done_when_cons": "È fatto quando fra il tuo giro migliore e i tuoi "
+                          "settori migliori messi insieme restano meno di {s} s. "
+                          "È metà di quello che c'è adesso, la stessa metà che "
+                          "il piano chiede in curva.",
+        "ses_warm": "Fai 3 giri di riscaldamento per portare in temperatura "
+                    "gomme e freni, senza guardare il cronometro. Un giro freddo "
+                    "non dice niente, e nei primi giri l'auto cambia sotto di te.",
+        "ses_drill": "Guida {n} giri di esercizio su {where}. {title}.",
+        "ses_drill_lap": "Guida {n} giri di esercizio sul giro intero. {title}.",
+        "ses_free": "Poi guida 3 giri liberi, normalmente. Servono a vedere se "
                     "l'esercizio è entrato quando smetti di pensarci.",
-        "ses_fuel": "Falli con lo stesso carico di benzina e sullo stesso treno "
-                    "di gomme: dieci giri di fila abbassano il tempo da soli, e "
-                    "non saresti stato tu.",
-        "ses_back": "Poi torna qui: contano solo i giri che guidi da adesso in "
+        "ses_fuel": "Falli con lo stesso carico di benzina e lo stesso treno di "
+                    "gomme. Dieci giri di fila abbassano il tempo da soli, e non "
+                    "saresti stato tu.",
+        "ses_back": "Poi torna qui. Contano solo i giri che guidi da adesso in "
                     "poi.",
-        "ses_back_plan": "Poi torna qui: contano solo i giri guidati dopo il "
+        "ses_back_plan": "Poi torna qui. Contano solo i giri guidati dopo il "
                          "{when}.",
         # --- gli esercizi ---
         "d.brake_move_later.title": "Sposta il punto di frenata più avanti, "
                                     "una lunghezza d'auto per volta",
         "d.brake_move_later.watch": "la velocità minima in curva, cioè la più "
-                                    "bassa che tocchi (scheda Confronto → Velocità)",
-        "d.brake_move_later.ignore": "il tempo sul giro: in questi giri non conta",
-        "d.brake_move_later.s0": "Guarda dov'è adesso il punto in cui inizi a "
-                                 "frenare: lo tocchi a {v} km/h in {g}ª, {d} m "
+                                    "bassa che tocchi, nel grafico Velocità del "
+                                    "Confronto",
+        "d.brake_move_later.ignore": "il tempo sul giro, che in questi giri non "
+                                     "conta",
+        "d.brake_move_later.s0": "Oggi inizi a frenare a {v} km/h in {g}ª, {d} m "
                                  "prima del punto più lento della curva.",
-        "d.brake_move_later.s0b": "Guarda dov'è adesso il punto in cui inizi a "
-                                  "frenare: la scheda «Le tue frenate», sotto la "
-                                  "mappa nel Confronto, dice a che velocità e in "
-                                  "che marcia lo tocchi.",
-        "d.brake_move_later.s0d": "Guarda dov'è adesso il punto in cui inizi a "
-                                  "frenare: lo tocchi a {v} km/h in {g}ª.",
-        "d.brake_move_later.s0c": "Un punto che vedi con gli occhi, invece di un "
-                                  "numero: {lm}.",
-        "d.brake_move_later.s1": "Due giri senza cambiare niente, solo per "
+        "d.brake_move_later.s0b": "Parti da dove inizi a frenare oggi. Il "
+                                  "riquadro «Le tue frenate», sotto la mappa nel "
+                                  "Confronto, ti dice a che velocità e in che "
+                                  "marcia.",
+        "d.brake_move_later.s0d": "Oggi inizi a frenare a {v} km/h in {g}ª, e da "
+                                  "lì si parte.",
+        "d.brake_move_later.s0c": "Invece di un numero puoi guardare un punto in "
+                                  "pista, e qui il riferimento frena {lm}.",
+        "d.brake_move_later.s1": "Guida due giri senza cambiare niente, solo per "
                                  "ripetere quel punto. Adesso si sposta di {m} m "
-                                 "da un giro all'altro: un punto che non sai "
+                                 "da un giro all'altro, e un punto che non sai "
                                  "ripetere non lo puoi spostare.",
-        "d.brake_move_later.s1b": "Due giri senza cambiare niente, solo per "
-                                  "ripetere quel punto: un punto che non sai "
-                                  "ripetere non lo puoi spostare.",
-        "d.brake_move_later.s1c": "Due giri senza cambiare niente, solo per "
-                                  "ripetere quel punto. Adesso ci arrivi a una "
-                                  "velocità che balla di {k} km/h da un giro "
-                                  "all'altro: un punto che non sai ripetere non "
-                                  "lo puoi spostare.",
-        "d.brake_move_later.s2": "Poi spostalo più avanti — cioè frena più "
-                                 "tardi — di una lunghezza d'auto per giro. "
-                                 "Cinque metri, non venti: cinque metri li "
-                                 "guidi, venti li subisci.",
+        "d.brake_move_later.s1b": "Guida due giri senza cambiare niente e ripeti "
+                                  "sempre quel punto, perché se non sai ripeterlo "
+                                  "non lo puoi spostare.",
+        "d.brake_move_later.s1c": "Ripeti quel punto per due giri senza cambiare "
+                                  "niente. Adesso ci arrivi a una velocità che "
+                                  "balla di {k} km/h da un giro all'altro. Un "
+                                  "punto che non sai ripetere non lo puoi "
+                                  "spostare.",
+        "d.brake_move_later.s2": "Poi sposta il punto più avanti, cioè frena più "
+                                 "tardi, di una lunghezza d'auto a ogni giro. "
+                                 "Cinque metri e non venti, perché "
+                                 "cinque metri li guidi e venti li subisci.",
         "d.brake_move_later.s2b": "Frenare più tardi non vuol dire frenare più a "
-                                  "lungo: il colpo forte va dato subito, nel "
-                                  "primo mezzo secondo, e poi si scarica man "
-                                  "mano che rallenti. Se una ruota si blocca non "
-                                  "si blocca all'inizio, si blocca in fondo, "
-                                  "proprio dove stai girando.",
-        "d.brake_move_later.s3": "Sei andato oltre quando cominci a bloccare le "
-                                 "ruote dove prima non bloccavi — e se l'auto ha "
-                                 "l'ABS non si bloccheranno affatto: sentirai il "
-                                 "pedale vibrare sotto il piede e l'auto andare "
-                                 "dritta invece di girare — oppure quando passi "
-                                 "lontano dal bordo interno. Torna al punto di "
-                                 "prima e restaci due giri: quello giusto è "
-                                 "l'ultimo che sai ripetere, non il punto più "
+                                  "lungo. Il colpo forte va dato subito, nel "
+                                  "primo mezzo secondo, e poi lo scarichi man "
+                                  "mano che rallenti. Una ruota non si blocca "
+                                  "all'inizio ma in fondo, proprio dove stai "
+                                  "girando.",
+        "d.brake_move_later.s3": "Sei andato oltre quando blocchi le ruote dove "
+                                 "prima non bloccavi, oppure quando passi lontano "
+                                 "dal bordo interno. Con l'ABS le ruote non si "
+                                 "bloccano, ma senti il pedale vibrare e l'auto "
+                                 "che va dritta invece di girare. Allora torna al "
+                                 "punto di prima e restaci due giri. Quello "
+                                 "giusto è l'ultimo che sai ripetere, non il più "
                                  "estremo che hai provato.",
-        "d.brake_move_later.s4": "Tieni d'occhio la velocità minima, la più "
-                                 "bassa che tocchi in curva: adesso è {v} km/h. "
-                                 "Se scende mentre freni più tardi, hai "
-                                 "guadagnato in frenata e restituito dentro la "
-                                 "curva — non è un guadagno, è uno spostamento.",
+        "d.brake_move_later.s4": "Tieni d'occhio la velocità minima in curva, "
+                                 "che adesso è {v} km/h. Se scende mentre freni "
+                                 "più tardi, quello che guadagni in frenata lo "
+                                 "restituisci in curva, e hai solo spostato il "
+                                 "tempo.",
         "d.brake_release.title": "Scarica il freno, non la velocità",
-        "d.brake_release.watch": "il grafico Gas / Freno (scheda Confronto): la "
-                                 "tua linea del freno deve scendere in diagonale "
-                                 "verso la curva, non restare alta e poi cadere "
-                                 "a picco",
-        "d.brake_release.ignore": "il punto in cui inizi a frenare: in questi "
-                                  "giri non si tocca",
-        "d.brake_release.s0": "Qui il problema non è quando cominci a frenare, è "
-                              "quanto ci resti sopra mentre giri: in gergo si "
-                              "chiama trail braking. Lascia il punto dov'è.",
-        "d.brake_release.s1": "Due giri esagerando da un lato: appena giri il "
-                              "volante, il freno è già a zero. Uscirai largo e "
-                              "lento — va bene, è metà della misura.",
-        "d.brake_release.s2": "Due giri esagerando dall'altro: tieni un filo di "
-                              "freno fino al punto in cui passi più vicino al "
-                              "bordo interno (l'apex). Sentirai l'anteriore "
+        "d.brake_release.watch": "il grafico Gas e freno del Confronto. La linea "
+                                 "del tuo freno deve scendere in diagonale verso "
+                                 "la curva, non restare alta e poi cadere a picco",
+        "d.brake_release.ignore": "il punto in cui inizi a frenare, che in "
+                                  "questi giri non si tocca",
+        "d.brake_release.s0": "Qui il problema non è quando cominci a frenare, "
+                              "ma quanto resti sul freno mentre giri. Si chiama "
+                              "trail braking. Lascia il punto di frenata dov'è.",
+        "d.brake_release.s1": "Guida due giri esagerando da una parte, col freno "
+                              "già a zero appena giri il volante. Uscirai largo e "
+                              "lento, e va bene così perché è metà della misura.",
+        "d.brake_release.s2": "Poi due giri esagerando dall'altra, con un filo "
+                              "di freno fino al punto in cui passi più vicino al "
+                              "bordo interno, l'apex. Sentirai l'anteriore "
                               "mordere di più e l'auto girare di più, ma anche "
-                              "fermarsi troppo.",
+                              "rallentare troppo.",
         "d.brake_release.s2b": "Fallo in una curva lenta, mai in una veloce. Se "
                                "senti il posteriore che scappa non staccare il "
-                               "piede di colpo: molla il freno piano e "
+                               "piede di colpo, ma molla il freno piano e "
                                "raddrizza.",
         "d.brake_release.s3": "Il punto giusto sta in mezzo, e adesso lo hai "
-                              "sentito da tutti e due i lati. Due giri lì.",
-        "d.brake_release.s4": "Il giro di riferimento, quello con cui ti "
-                              "confronti, passa qui a {vr} km/h e tu a {v}: se "
-                              "lasci il freno al momento giusto, quel numero "
-                              "sale da solo.",
+                              "sentito da tutte e due le parti. Guida due giri "
+                              "lì.",
+        "d.brake_release.s4": "Il giro di riferimento passa qui a {vr} km/h e tu "
+                              "a {v}. Se lasci il freno al momento giusto, quel "
+                              "numero sale da solo.",
         "d.apex_speed.title": "Trova la velocità minima, poi difendila",
-        "d.apex_speed.watch": "la velocità minima in questa curva, cioè la più "
-                              "bassa che tocchi",
-        "d.apex_speed.ignore": "il tempo sul giro: questi giri servono a "
-                               "misurare, non a essere veloci",
-        "d.apex_speed.s0": "Il giro di riferimento, quello con cui ti confronti, "
-                           "passa qui a {vr} km/h e tu a {v}: {diff} km/h. Prima "
-                           "di inseguirlo devi sapere quanta velocità la "
-                           "macchina regge davvero.",
-        "d.apex_speed.s1": "Due giri di misura, senza togliere il freno: stesso "
-                           "punto di frenata, e ogni giro premi un filo meno — "
-                           "un decimo di pedale, non metà. Vai avanti finché la "
-                           "macchina comincia ad allargare, oppure finché il "
-                           "retro si alleggerisce: quella è la velocità che "
-                           "regge davvero.",
+        "d.apex_speed.watch": "la velocità minima in questa curva, la più bassa "
+                              "che tocchi",
+        "d.apex_speed.ignore": "il tempo sul giro, perché questi giri servono a "
+                               "misurare e non a essere veloci",
+        "d.apex_speed.s0": "Il giro di riferimento passa qui a {vr} km/h e tu a "
+                           "{v}, quindi ti mancano {diff} km/h. Prima di "
+                           "inseguirlo devi sapere quanta velocità regge davvero "
+                           "la macchina.",
+        "d.apex_speed.s1": "Guida due giri di misura senza togliere il freno. "
+                           "Tieni lo stesso punto di frenata e a ogni giro premi "
+                           "un filo meno, un decimo di pedale e non metà. Continua "
+                           "finché la macchina comincia ad allargare o il retro "
+                           "si alleggerisce. Quella è la velocità che regge "
+                           "davvero.",
         "d.apex_speed.s1b": "Se arrivi troppo forte non alzare il piede di "
-                            "scatto e non frenare in mezzo alla curva: tieni il "
-                            "gas fermo dov'è, apri il volante e accetta di "
-                            "uscire largo. È il piede alzato di colpo che manda "
-                            "il posteriore, non la velocità in sé.",
-        "d.apex_speed.s2": "Adesso rimetti il freno con un obiettivo solo: non "
-                           "scendere sotto quella velocità. Il grosso della "
-                           "frenata sta prima di girare; quello che resta lo "
-                           "scarichi poco alla volta, mai staccando il piede di "
-                           "colpo.",
+                            "scatto e non frenare in mezzo alla curva. Tieni il "
+                            "gas fermo, apri il volante e accetta di uscire "
+                            "largo. A far girare il posteriore è il piede alzato "
+                            "di colpo, non la velocità.",
+        "d.apex_speed.s2": "Adesso rimetti il freno e non scendere sotto quella "
+                           "velocità. Il grosso della frenata sta prima di "
+                           "girare, e quello che resta lo scarichi poco alla "
+                           "volta senza mai staccare il piede di colpo.",
         "d.apex_speed.s3": "Allarga l'ingresso di un paio di metri. In curva la "
                            "velocità dipende da quanto è largo l'arco che "
-                           "disegni, non dal coraggio: la stessa curva, presa "
-                           "più larga, si fa più veloce.",
-        "d.apex_speed.s3b": "Un'eccezione: se dopo questa curva c'è un "
-                            "rettilineo lungo, la velocità minima più alta non è "
-                            "per forza il giro più veloce — lì conta di più "
+                           "disegni, non dal coraggio. La stessa curva presa più "
+                           "larga si fa più veloce.",
+        "d.apex_speed.s3b": "C'è un'eccezione. Se dopo questa curva c'è un "
+                            "rettilineo lungo, la velocità minima più alta non "
+                            "dà per forza il giro più veloce. Lì conta di più "
                             "uscire dritti presto.",
         "d.apex_speed.s4": "Nella scheda Traiettoria vedi dove passi rispetto al "
                            "giro di riferimento. Se entri più stretto di quel "
                            "giro, la velocità minima non sale, per quanto "
                            "insisti.",
         "d.exit_throttle.title": "L'uscita si prepara prima, non dopo",
-        "d.exit_throttle.watch": "il gas in uscita (scheda Confronto → Gas / "
-                                 "Freno): deve solo salire — se scende e poi "
-                                 "risale, l'avevi aperto troppo presto",
-        "d.exit_throttle.ignore": "la parte iniziale della curva: qui accetti di "
-                                  "perderci qualcosa",
-        "d.exit_throttle.s0": "Scegli un punto d'uscita che vedi — un cordolo, "
-                              "una riga — e decidi che da lì in poi il gas sale "
-                              "e non torna più indietro. Non «tutto a fondo»: da "
-                              "lì in poi si apre e basta. Lo stesso punto per "
-                              "tutti i giri dell'esercizio.",
-        "d.exit_throttle.s1": "Due giri per capire cosa ti impedisce di aprirlo. "
-                              "Se devi ancora sterzare, ci sei arrivato troppo "
-                              "forte. Se le ruote motrici girano più veloci di "
-                              "quanto l'auto avanza — o se senti il controllo di "
-                              "trazione entrare, con il motore che si strozza e "
-                              "i giri che non salgono — sei arrivato al punto "
-                              "più vicino al bordo interno (l'apex) con l'auto "
-                              "ancora piegata e le ruote ancora sterzate.",
-        "d.exit_throttle.s1b": "Prova la stessa uscita con una marcia più alta: "
-                               "la stessa apertura di gas spinge meno di colpo, "
+        "d.exit_throttle.watch": "il gas in uscita nel grafico Gas e freno del "
+                                 "Confronto, che deve solo salire. Se scende e "
+                                 "poi risale, l'hai aperto troppo presto",
+        "d.exit_throttle.ignore": "la prima parte della curva, dove accetti di "
+                                  "perdere qualcosa",
+        "d.exit_throttle.s0": "Scegli un punto d'uscita che vedi, come un "
+                              "cordolo o una riga. Da lì in poi il gas sale e non "
+                              "torna più indietro, anche senza andare subito a "
+                              "fondo. Usa lo stesso punto in tutti i giri "
+                              "dell'esercizio.",
+        "d.exit_throttle.s1": "Guida due giri per capire cosa ti impedisce di "
+                              "aprirlo. Se devi ancora sterzare, ci sei arrivato "
+                              "troppo forte. Se le ruote motrici girano più "
+                              "veloci di quanto l'auto avanza, o senti il "
+                              "controllo di trazione strozzare il motore, il "
+                              "problema è un altro. Arrivi all'apex, il punto più "
+                              "vicino al bordo interno, con l'auto ancora piegata "
+                              "e le ruote ancora sterzate.",
+        "d.exit_throttle.s1b": "Prova la stessa uscita con una marcia più alta. "
+                               "La stessa apertura di gas spinge meno di colpo, "
                                "e spesso il pattinamento sparisce senza cambiare "
                                "altro.",
-        "d.exit_throttle.s2": "Rimedia prima, non dopo: entra un filo più piano "
-                              "e più largo, e arriva all'apex con la macchina "
-                              "già quasi dritta. Perdi qualcosa in ingresso e lo "
+        "d.exit_throttle.s2": "Rimedia prima, non dopo. Entra un filo più piano "
+                              "e più largo, e arriva all'apex con la macchina già "
+                              "quasi dritta. Perdi qualcosa in ingresso e lo "
                               "riprendi con gli interessi sul dritto che segue.",
         "d.exit_throttle.s3": "Apri il gas poco alla volta e continua ad aprire, "
                               "non tutto in una volta come un interruttore.",
-        "d.exit_throttle.s4": "Nella scheda Dinamica, il grafico «Bloccaggio e "
-                              "pattinamento»: la riga arancione è il posteriore, "
-                              "e in uscita deve restare quasi piatta. Ma se "
-                              "l'auto ha il controllo di trazione resterà piatta "
-                              "comunque, perché è lui a tenerla: lì il segnale "
-                              "vero è l'orecchio, il motore che si strozza.",
+        "d.exit_throttle.s4": "Nella scheda Dinamica guarda il grafico "
+                              "«Bloccaggio e pattinamento». La riga arancione è "
+                              "il posteriore, e in uscita deve restare quasi "
+                              "piatta. Se l'auto ha il controllo di trazione "
+                              "resta piatta comunque, perché la tiene lui. Lì il "
+                              "segnale vero è il motore che si strozza, e lo "
+                              "senti con l'orecchio.",
         "d.repeat.title": "Prima ripetibile, poi veloce",
         "d.repeat.watch": "quanto si somigliano due giri di fila",
         "d.repeat.ignore": "il tempo sul giro",
-        "d.repeat.s0": "Qui non c'è una causa dominante: perdi un po' "
-                       "dappertutto. Quasi sempre è un problema di ripetizione, "
-                       "non di tecnica.",
-        "d.repeat.s1": "Scegli tre punti fissi per questa curva — dove inizi a "
-                       "frenare, dove giri il volante, dove riapri il gas — e "
-                       "dilli ad alta voce mentre ci passi. Detti a voce "
-                       "diventano decisioni; pensati restano sensazioni.",
-        "d.repeat.s2": "Cinque giri con una regola sola: non cercare il tempo, "
-                       "cerca di fare due giri uguali.",
-        "d.repeat.s3": "Adesso la tua velocità minima qui — la più bassa che "
-                       "tocchi — balla di {s} km/h da un giro all'altro. Sotto i "
-                       "{r} km/h la curva è tua: scendere ancora vuol dire "
-                       "rincorrere differenze che non dipendono da te.",
+        "d.repeat.s0": "Qui nessuna causa prevale e perdi un po' dappertutto. "
+                       "Quasi sempre è un problema di ripetizione, non di "
+                       "tecnica.",
+        "d.repeat.s1": "Scegli tre punti fissi per questa curva, cioè dove inizi "
+                       "a frenare, dove giri il volante e dove riapri il gas. "
+                       "Dilli ad alta voce mentre ci passi. Detti a voce "
+                       "diventano decisioni, pensati restano sensazioni.",
+        "d.repeat.s2": "Guida cinque giri con una regola sola. Non cercare il "
+                       "tempo, cerca di fare due giri uguali.",
+        "d.repeat.s3": "Adesso la tua velocità minima qui balla di {s} km/h da "
+                       "un giro all'altro. Sotto i {r} km/h la curva è tua, e "
+                       "scendere ancora vuol dire rincorrere differenze che non "
+                       "dipendono da te.",
         "d.repeat.s4": "Solo quando riesci a ripeterla, prova a spostare uno dei "
-                       "tre punti. Uno.",
+                       "tre punti. Uno solo.",
         "d.consistency.title": "Il giro che hai già fatto, tutto insieme",
         "d.consistency.watch": "i tre settori, non il tempo sul giro",
-        "d.consistency.ignore": "il tempo sul giro — è l'unica cosa qui che si "
+        "d.consistency.ignore": "il tempo sul giro, l'unica cosa che qui si "
                                 "sistema da sola",
-        "d.consistency.s0": "Non è un tempo inventato: è il tuo tempo migliore "
-                            "in ogni settore, messo insieme. Fa {ideal}, e l'hai "
-                            "già guidato tutto — solo mai nello stesso giro.",
-        "d.consistency.s1": "Ti mancano {gap}s per metterlo insieme, e {ws}s "
-                            "stanno nel settore {n}: è lì che vai a lavorare.",
-        "d.consistency.s1b": "Ti mancano {gap}s per metterlo insieme, e sono "
-                             "sparsi: nessun settore te li tiene tutti.",
-        "d.consistency.s2": "Cinque giri in cui non cerchi il tempo: cerchi di "
-                            "ripetere. Stessa traiettoria, stessi punti, stesso "
-                            "ordine.",
-        "d.consistency.s3": "Regola per questi giri: se sbagli una curva, "
-                            "finisci lo stesso il giro senza altri errori. "
+        "d.consistency.s0": "Non è un tempo inventato. È il tuo tempo migliore "
+                            "in ogni settore messo insieme, e fa {ideal}. L'hai "
+                            "già guidato tutto, ma mai nello stesso giro.",
+        "d.consistency.s1": "Ti mancano {gap} s per metterlo insieme, e {ws} s "
+                            "stanno nel settore {n}. È lì che vai a lavorare.",
+        "d.consistency.s1b": "Ti mancano {gap} s per metterlo insieme, sparsi su "
+                             "tutti i settori.",
+        "d.consistency.s2": "Guida cinque giri senza cercare il tempo, solo "
+                            "ripetendo. Tieni la stessa traiettoria, gli stessi "
+                            "punti e lo stesso ordine.",
+        "d.consistency.s3": "In questi giri vale una regola. Se sbagli una "
+                            "curva, finisci comunque il giro senza altri errori. "
                             "Quello che costa davvero è il pezzo di giro dopo "
                             "l'errore, ed è l'unico che puoi ancora salvare.",
-        "d.consistency.s3b": "Non guardare se il tempo sul giro scende giro dopo "
-                             "giro: con la benzina che cala e le gomme che si "
+        "d.consistency.s3b": "Non guardare se il tempo sul giro scende di giro "
+                             "in giro. Con la benzina che cala e le gomme che si "
                              "consumano cambia comunque. Guarda se due giri di "
                              "fila si somigliano.",
-        "d.consistency.s4": "Guarda «Settori»: l'obiettivo è che il settore {n} "
-                            "smetta di essere il tuo peggiore, non che il tempo "
-                            "sul giro scenda. Il tempo scende dopo.",
-        "d.consistency.s4b": "Guarda «Settori»: l'obiettivo è che i tuoi tre "
-                             "settori vengano dallo stesso giro, non che il "
-                             "tempo sul giro scenda. Il tempo scende dopo.",
+        "d.consistency.s4": "Nella scheda Settori l'obiettivo è che il settore "
+                            "{n} smetta di essere il tuo peggiore. Il tempo sul "
+                            "giro scende dopo.",
+        "d.consistency.s4b": "Nella scheda Settori l'obiettivo è che i tuoi tre "
+                             "settori migliori arrivino dallo stesso giro. Il "
+                             "tempo sul giro cala di conseguenza.",
         "d.brake_straight.title": "Frena dritto, poi gira",
-        "d.brake_straight.watch": "il grafico Gas / Freno (scheda Confronto): il "
-                                  "freno deve essere finito prima che lo sterzo "
-                                  "si muova",
-        "d.brake_straight.ignore": "la velocità minima: qui sale da sola se "
+        "d.brake_straight.watch": "il grafico Gas e freno del Confronto, dove il "
+                                  "freno deve finire prima che lo sterzo si muova",
+        "d.brake_straight.ignore": "la velocità minima, che qui sale da sola se "
                                    "l'ingresso è pulito",
         "d.brake_straight.s0": "Su un'auto senza carico aerodinamico si rallenta "
                                "dritti e poi si gira. Un filo di freno mentre "
                                "sterzi alleggerisce il posteriore proprio mentre "
-                               "gli stai chiedendo di tenere.",
-        "d.brake_straight.s1": "Due giri con tutta la frenata prima, forte e "
-                               "corta, finita prima di girare il volante. "
-                               "L'auto entrerà lenta e piatta: va bene, è il "
-                               "punto di partenza.",
-        "d.brake_straight.s2": "Metti la marcia della curva prima di girare: una "
-                               "scalata fatta dentro la curva frena le ruote "
-                               "posteriori da sola, e per l'auto è la stessa "
-                               "cosa che alzare il piede di colpo.",
+                               "gli chiedi di tenere.",
+        "d.brake_straight.s1": "Guida due giri con tutta la frenata prima, forte "
+                               "e corta, finita prima di girare il volante. "
+                               "L'auto entrerà lenta e piatta, e va bene così "
+                               "perché è il punto di partenza.",
+        "d.brake_straight.s2": "Metti la marcia della curva prima di girare. Una "
+                               "scalata fatta in curva frena da sola le ruote "
+                               "posteriori, e per l'auto è come alzare il piede "
+                               "di colpo.",
         "d.brake_straight.s3": "Adesso sposta la fine della frenata un metro "
                                "alla volta verso la curva, senza mai arrivare a "
                                "sterzare col freno ancora premuto forte.",
         "d.brake_straight.s4": "Se senti il retro alleggerirsi mentre giri, sei "
-                               "andato oltre: torna al punto di prima. Su questa "
-                               "auto il margine è più corto di quanto sembri.",
+                               "andato oltre e devi tornare al punto di prima. Su "
+                               "questa auto il margine è più corto di quanto "
+                               "sembri.",
     },
     "en": {
-        "need_laps": "You need {n} valid laps on this car and track before "
-                     "training means anything, and you have {have}. Below that, "
-                     "what looks like a weak point is just what happened on two "
-                     "laps.",
-        "need_weakness": "You have the laps, but nothing repeats often enough to "
-                         "be called a weak point: what you lose moves from corner "
-                         "to corner. Drive a little more — or open Weak points "
-                         "under Trends to see what's close.",
-        "gap_head": "Your best lap is {best}. Take your best time in each of the "
-                    "three sectors the lap is split into and put them together "
-                    "and you get {ideal}: that's what's called the theoretical "
-                    "ideal, and it's {gap}s you have already driven, just never "
-                    "all on the same lap.",
-        "gap_head_tight": "Your best lap is {best}. Take your best time in each "
-                          "of the three sectors the lap is split into and put "
-                          "them together and you get {ideal} — practically the "
-                          "same lap. That means you are already consistent, and "
-                          "the little that's left isn't taken by repeating "
-                          "yourself: it's taken in the corners.",
-        "gap_worst": " Most of it — {ws}s — sits in sector {n}.",
-        "gap_note": "These two numbers don't add up. The {gap}s say what not "
-                    "repeating yourself costs: your best sectors against your "
-                    "best lap. The {lap}s say what you lose in the plan's "
-                    "corners: your recent laps against that same best lap. Part "
-                    "of it is the same time, counted from two sides.",
-        "gap_pro": " The fast lap you imported is {pro}, another {pg}s further "
-                   "on: that one is time you have never driven.",
-        "why_first": "Start here: it's the biggest loss that keeps coming back "
-                     "({occ} laps out of {laps}).",
-        "why_chain": "Start here even though it isn't the biggest loss: the time "
-                     "you lose at {victim} is made in this corner. One exercise, "
-                     "two corners fixed.",
+        "need_laps": "Training takes {n} valid laps with this car on this "
+                     "track, and you have {have}. With fewer laps, what looks "
+                     "like a weak point is just what happened on two laps.",
+        "need_weakness": "You have enough laps, but no mistake repeats often "
+                         "enough to be a weak point. What you lose moves from "
+                         "corner to corner. Drive a little more, or open Weak "
+                         "points under Trends to see what's close.",
+        "gap_head": "Your best lap is {best}, and putting together your best "
+                    "time in each of the three sectors gives {ideal}. We call "
+                    "that the theoretical ideal. It's {gap} s you have already "
+                    "driven, just never all on the same lap.",
+        "gap_head_tight": "With your best time in each of the three sectors you "
+                          "get {ideal}, almost the same as your best lap of "
+                          "{best}. That means you're already consistent. The "
+                          "little that's left doesn't come from repeating "
+                          "yourself, it comes from the corners.",
+        "gap_worst": " Most of it sits in sector {n}, with {ws} s.",
+        "gap_note": "These two numbers don't add up. Not repeating yourself "
+                    "costs you {gap} s, your best sectors against your best lap. "
+                    "In the plan's corners you lose {lap} s, your recent laps "
+                    "against that same lap. Part of it is the same time, counted "
+                    "twice.",
+        "gap_pro": " The fast lap you imported is {pro}, another {pg} s further "
+                   "on. That is time you haven't driven yet.",
+        "why_first": "Start here, because it's the biggest loss that keeps "
+                     "coming back, on {occ} laps out of {laps}.",
+        "why_chain": "Start here even though it isn't the biggest loss, because "
+                     "the time you lose at {victim} is made in this corner. One "
+                     "exercise fixes two corners.",
         "why_later": "Then this one, which repeats on {occ} laps out of {laps}. "
-                     "One at a time: two exercises in the same session cancel "
-                     "each other out.",
-        "why_done": "Done: you hit the target on the laps you drove after "
-                    "starting the plan.",
-        "why_cons_first": "Start here: what costs you most isn't a corner, it's "
-                          "that you don't drive the same lap twice.",
-        "why_cons_last": "Last, once the corners above have sunk in: this step "
-                         "is what glues them into a single lap.",
-        "target": "you lose {from_}s in this corner: get it under {to}s",
-        "target_cons": "put your best sectors together: {ideal}",
-        "done_when": "Done when you hit the target on {needed} of the laps you "
-                     "drive from here. That's the same share of laps that made "
-                     "this corner a weak point.",
-        "done_when_plain": "Done when you hit the target on half the laps you "
-                           "drive from here.",
-        "done_when_cons": "Done when less than {s}s is left between your best "
-                          "lap and your best sectors put together. That's half "
-                          "of what's there now — the same half the plan asks for "
-                          "in a corner.",
-        "ses_warm": "3 warm-up laps. Tyres and brakes up to temperature, clock "
-                    "off: a cold lap tells you nothing, and for the first few "
-                    "laps the car changes under you.",
-        "ses_drill": "{n} exercise laps: {title} — {where}.",
-        "ses_drill_lap": "{n} exercise laps, over the whole lap: {title}.",
-        "ses_free": "3 free laps, driven normally. They're there to show whether "
-                    "the exercise sunk in once you stop thinking about it.",
-        "ses_fuel": "Run them on the same fuel load and the same set of tyres: "
-                    "ten laps in a row bring the time down on their own, and "
-                    "that wouldn't have been you.",
-        "ses_back": "Then come back here: only the laps you drive from now on "
+                     "One exercise at a time, because two in the same session "
+                     "cancel each other out.",
+        "why_done": "Done. You hit the target on the laps driven after the plan "
+                    "started.",
+        "why_cons_first": "Start here, because what costs you most isn't a "
+                          "corner. It's that you never drive the same lap twice.",
+        "why_cons_last": "This step comes last, once the corners above have "
+                         "sunk in. It's what puts them together in a single lap.",
+        "target": "You lose {from_} s in this corner. Get under {to} s.",
+        "target_cons": "Put your best sectors together and you reach {ideal}.",
+        "done_when": "It's done when you hit the target on {needed} of the laps "
+                     "you drive from here. That's the same share of laps that "
+                     "made this corner a weak point.",
+        "done_when_plain": "It's done when you hit the target on half the laps "
+                           "you drive from here.",
+        "done_when_cons": "It's done when less than {s} s is left between your "
+                          "best lap and your best sectors put together. That's "
+                          "half of what's there now, the same half the plan asks "
+                          "for in a corner.",
+        "ses_warm": "Drive 3 warm-up laps to bring the tyres and brakes up to "
+                    "temperature, without watching the clock. A cold lap tells "
+                    "you nothing, and in the first laps the car changes under "
+                    "you.",
+        "ses_drill": "Drive {n} exercise laps at {where}. {title}.",
+        "ses_drill_lap": "Drive {n} exercise laps over the whole lap. {title}.",
+        "ses_free": "Then drive 3 free laps, normally. They show whether the "
+                    "exercise sunk in once you stop thinking about it.",
+        "ses_fuel": "Run them on the same fuel load and the same set of tyres. "
+                    "Ten laps in a row bring the time down on their own, and "
+                    "that wouldn't be you.",
+        "ses_back": "Then come back here. Only the laps you drive from now on "
                     "count.",
-        "ses_back_plan": "Then come back here: only laps driven after {when} "
-                         "count.",
+        "ses_back_plan": "Come back here afterwards. Only laps driven after "
+                         "{when} count.",
         # --- the exercises ---
         "d.brake_move_later.title": "Move the braking point later, one car "
                                     "length at a time",
         "d.brake_move_later.watch": "your minimum speed in the corner, the lowest "
-                                    "you touch (Compare tab → Speed)",
-        "d.brake_move_later.ignore": "the lap time: it doesn't count on these laps",
-        "d.brake_move_later.s0": "First, see where your braking point is now: you "
-                                 "hit the brakes at {v} km/h in gear {g}, {d} m "
-                                 "before the slowest point of the corner.",
-        "d.brake_move_later.s0b": "First, see where your braking point is now: "
-                                  "the «Your braking points» sheet, under the map "
-                                  "in the Compare tab, says at what speed and in "
-                                  "which gear you hit them.",
-        "d.brake_move_later.s0d": "First, see where your braking point is now: "
-                                  "you hit the brakes at {v} km/h in gear {g}.",
-        "d.brake_move_later.s0c": "Something you can see with your eyes instead "
-                                  "of a number: {lm}.",
-        "d.brake_move_later.s1": "Two laps changing nothing, just repeating that "
-                                 "point. Right now it moves {m} m from lap to lap: "
-                                 "a point you can't repeat is a point you can't move.",
-        "d.brake_move_later.s1b": "Two laps changing nothing, just repeating that "
-                                  "point: a point you can't repeat is a point you "
-                                  "can't move.",
-        "d.brake_move_later.s1c": "Two laps changing nothing, just repeating that "
-                                  "point. Right now you arrive at a speed that "
-                                  "swings {k} km/h from lap to lap: a point you "
+                                    "you touch, on the Speed chart in Compare",
+        "d.brake_move_later.ignore": "the lap time, which doesn't count on these "
+                                     "laps",
+        "d.brake_move_later.s0": "Today you start braking at {v} km/h in gear "
+                                 "{g}, {d} m before the slowest point of the "
+                                 "corner.",
+        "d.brake_move_later.s0b": "Start from where you brake today. The «Your "
+                                  "braking points» panel, under the map in "
+                                  "Compare, tells you at what speed and in which "
+                                  "gear.",
+        "d.brake_move_later.s0d": "Today you start braking at {v} km/h in gear "
+                                  "{g}, and that's where you start from.",
+        "d.brake_move_later.s0c": "Instead of a number you can watch a point on "
+                                  "the track, and here the reference brakes {lm}.",
+        "d.brake_move_later.s1": "Drive two laps changing nothing, just repeating "
+                                 "that point. Right now it moves {m} m from lap to "
+                                 "lap, and a point you can't repeat is a point "
+                                 "you can't move.",
+        "d.brake_move_later.s1b": "Drive two laps changing nothing and hit that "
+                                  "same point every time, because if you can't "
+                                  "repeat it you can't move it.",
+        "d.brake_move_later.s1c": "Repeat that point for two laps, changing "
+                                  "nothing. Right now you arrive at a speed that "
+                                  "swings {k} km/h from lap to lap. A point you "
                                   "can't repeat is a point you can't move.",
-        "d.brake_move_later.s2": "Then move it later — brake further on — one "
-                                 "car length per lap. Five metres, not twenty: "
-                                 "five metres you drive, twenty drive you.",
-        "d.brake_move_later.s2b": "Braking later doesn't mean braking longer: the "
+        "d.brake_move_later.s2": "Then brake one car length later on every lap. "
+                                 "Five metres and not twenty, because five metres "
+                                 "you drive and twenty drive you.",
+        "d.brake_move_later.s2b": "Braking later doesn't mean braking longer. The "
                                   "hard hit goes in straight away, in the first "
-                                  "half second, then bleeds off as you slow. If a "
-                                  "wheel locks it won't lock at the start, it'll "
-                                  "lock at the end, right where you're turning.",
-        "d.brake_move_later.s3": "You've gone past it when you start locking the "
-                                 "wheels where you didn't before — and if the car "
-                                 "has ABS they won't lock at all: you'll feel the "
-                                 "pedal buzz under your foot and the car run "
-                                 "straight instead of turning — or when you pass "
-                                 "wide of the inside edge. Go back to the previous "
-                                 "point and stay there two laps: the right one is "
+                                  "half second, then you bleed it off as you slow. "
+                                  "A wheel doesn't lock at the start but at the "
+                                  "end, right where you're turning.",
+        "d.brake_move_later.s3": "You've gone too far when you lock wheels where "
+                                 "you didn't before, or when you pass wide of the "
+                                 "inside edge. With ABS the wheels won't lock, but "
+                                 "you feel the pedal buzz and the car run straight "
+                                 "instead of turning. Then go back to the previous "
+                                 "point and stay there two laps. The right one is "
                                  "the last you can repeat, not the most extreme "
                                  "you tried.",
-        "d.brake_move_later.s4": "Keep an eye on your minimum speed — the lowest "
-                                 "you touch in the corner — which is {v} km/h "
-                                 "now. If it drops as you brake later, you gained "
-                                 "under braking and gave it back inside the "
-                                 "corner: that's a move, not a gain.",
+        "d.brake_move_later.s4": "Keep an eye on your minimum speed in the "
+                                 "corner, which is {v} km/h now. If it drops as "
+                                 "you brake later, what you gain under braking you "
+                                 "give back in the corner, and you've only moved "
+                                 "the time.",
         "d.brake_release.title": "Bleed the brake off, don't shed the speed",
-        "d.brake_release.watch": "the Throttle / Brake chart (Compare tab): your "
+        "d.brake_release.watch": "the Throttle and brake chart in Compare. Your "
                                  "brake line should slope down towards the "
                                  "corner, not stay high and then fall off a cliff",
-        "d.brake_release.ignore": "where you start braking: leave it alone on "
-                                  "these laps",
-        "d.brake_release.s0": "The problem here isn't when you start braking, it's "
-                              "how long you carry it while you turn: that's what's "
-                              "called trail braking. Leave the point where it is.",
-        "d.brake_release.s1": "Two laps overdoing it one way: the moment you turn "
-                              "the wheel, the brake is already at zero. You'll run "
-                              "wide and slow — good, that's half the measurement.",
-        "d.brake_release.s2": "Two laps overdoing it the other way: carry a sliver "
-                              "of brake all the way to the point where you pass "
-                              "closest to the inside edge (the apex). You'll feel "
-                              "the front grip harder and the car turn in more, but "
-                              "also stop too much.",
-        "d.brake_release.s2b": "Do this in a slow corner, never a fast one. If the "
-                               "rear starts to step out, don't snap off the pedal: "
-                               "bleed the brake off and straighten up.",
-        "d.brake_release.s3": "The right release is in between, and you've now felt "
-                              "both edges of it. Two laps there.",
-        "d.brake_release.s4": "The reference lap, the one you're compared against, "
-                              "goes through here at {vr} km/h and you at {v}: let "
-                              "the brake go at the right moment and that number "
-                              "climbs on its own.",
+        "d.brake_release.ignore": "where you start braking, which you leave "
+                                  "alone on these laps",
+        "d.brake_release.s0": "The problem here isn't when you start braking, "
+                              "it's how long you stay on the brake while you "
+                              "turn. That's called trail braking. Leave the "
+                              "braking point where it is.",
+        "d.brake_release.s1": "Drive two laps overdoing it one way, with the "
+                              "brake already at zero as soon as you turn the "
+                              "wheel. You'll run wide and slow, and that's fine "
+                              "because it's half the measurement.",
+        "d.brake_release.s2": "Then drive two laps overdoing it the other way, "
+                              "with a sliver of brake up to the apex, the point "
+                              "closest to the inside edge. You'll "
+                              "feel the front bite harder and the car turn more, "
+                              "but also slow down too much.",
+        "d.brake_release.s2b": "Do this in a slow corner, never a fast one. If "
+                               "you feel the rear step out, don't snap off the "
+                               "pedal, but ease off the brake and straighten up.",
+        "d.brake_release.s3": "The right release is in between, and now you've "
+                              "felt it from both sides. Drive two laps there.",
+        "d.brake_release.s4": "The reference lap goes through here at {vr} km/h "
+                              "and you at {v}. Let go of the brake at the right "
+                              "moment and that number climbs on its own.",
         "d.apex_speed.title": "Find the minimum speed, then defend it",
-        "d.apex_speed.watch": "your minimum speed in this corner — the lowest "
-                              "you touch",
-        "d.apex_speed.ignore": "the lap time: these laps are for measuring, not "
-                               "for being fast",
-        "d.apex_speed.s0": "The reference lap, the one you're compared against, "
-                           "goes through here at {vr} km/h and you at {v}: {diff} "
-                           "km/h. Before chasing it you need to know how much "
-                           "speed the car actually holds.",
-        "d.apex_speed.s1": "Two measuring laps, without taking the brake away: "
-                           "same braking point, and each lap press a shade less — "
-                           "a tenth of the pedal, not half. Keep going until the "
-                           "car starts running wide, or until the rear goes "
-                           "light: that's the speed it actually holds.",
+        "d.apex_speed.watch": "your minimum speed in this corner, the lowest you "
+                              "touch",
+        "d.apex_speed.ignore": "the lap time, because these laps are for "
+                               "measuring and not for being fast",
+        "d.apex_speed.s0": "The reference lap goes through here at {vr} km/h and "
+                           "you at {v}, so you're {diff} km/h short. Before "
+                           "chasing it you need to know how much speed the car "
+                           "really holds.",
+        "d.apex_speed.s1": "Drive two measuring laps without taking the brake "
+                           "away. Keep the same braking point and press a shade "
+                           "less each lap, a tenth of the pedal and not half. "
+                           "Keep going until the car starts to run wide or the "
+                           "rear goes light. That's the speed it really holds.",
         "d.apex_speed.s1b": "If you arrive too fast, don't snap off the throttle "
-                            "and don't brake mid-corner: hold the throttle where "
+                            "and don't brake mid-corner. Hold the throttle where "
                             "it is, open the steering and accept running wide. "
                             "It's the sudden lift that sends the rear round, not "
-                            "the speed itself.",
-        "d.apex_speed.s2": "Now put the brake back with one goal: don't go below "
-                           "that speed. The bulk of the braking happens before "
-                           "you turn; what's left you bleed off gradually, never "
+                            "the speed.",
+        "d.apex_speed.s2": "Now put the brake back and don't drop below that "
+                           "speed. Most of the braking happens before you turn, "
+                           "and what's left you bleed off gradually without ever "
                            "lifting off in one go.",
         "d.apex_speed.s3": "Open the entry by a couple of metres. Corner speed "
                            "comes from how wide an arc you draw, not from "
-                           "courage: the same corner taken wider is taken faster.",
-        "d.apex_speed.s3b": "One exception: if a long straight follows this "
-                            "corner, the highest minimum speed isn't necessarily "
-                            "the fastest lap — there, getting straight early "
-                            "matters more.",
+                           "courage. The same corner taken wider is taken faster.",
+        "d.apex_speed.s3b": "There's one exception. If a long straight follows "
+                            "this corner, the highest minimum speed doesn't "
+                            "always make the fastest lap, because there getting "
+                            "straight early matters more.",
         "d.apex_speed.s4": "The Line tab shows where you run against the "
                            "reference lap. Enter tighter than it and your minimum "
                            "speed won't come up, however hard you push.",
         "d.exit_throttle.title": "The exit is set up before, not after",
-        "d.exit_throttle.watch": "the throttle on exit (Compare tab → Throttle / "
-                                 "Brake): it should only ever go up — if it drops "
-                                 "and climbs again, you opened it too early",
-        "d.exit_throttle.ignore": "the first part of the corner: you're accepting "
-                                  "a loss there",
-        "d.exit_throttle.s0": "Pick an exit point you can see — a kerb, a line — "
-                              "and decide that from there the throttle only goes "
-                              "up and never comes back down. Not «flat out»: from "
-                              "there it only opens. The same point on every lap "
-                              "of the exercise.",
-        "d.exit_throttle.s1": "Two laps to find out what stops you opening it. "
-                              "Still steering means you got there too fast. If "
-                              "the driven wheels spin faster than the car is "
-                              "going — or if you feel the traction control cut "
-                              "in, the engine bogging and the revs not climbing — "
-                              "you reached the point where you pass closest to "
-                              "the inside edge (the apex) with the car still "
-                              "leaned over and the wheels still turned.",
-        "d.exit_throttle.s1b": "Try the same exit one gear higher: the same "
-                               "throttle opening arrives less abruptly, and the "
-                               "wheelspin often disappears without changing "
+        "d.exit_throttle.watch": "the throttle on exit, on the Throttle and brake "
+                                 "chart in Compare, which should only go up. If it "
+                                 "drops and climbs again, you opened it too early",
+        "d.exit_throttle.ignore": "the first part of the corner, where you accept "
+                                  "losing something",
+        "d.exit_throttle.s0": "Pick an exit point you can see, like a kerb or a "
+                              "line. From there the throttle only goes up and "
+                              "never comes back, even if it isn't flat out yet. "
+                              "Use the same point on every lap of the exercise.",
+        "d.exit_throttle.s1": "Drive two laps to find out what stops you opening "
+                              "it. If you still have to steer, you got there too "
+                              "fast. If the driven wheels spin faster than the car "
+                              "goes, or the TC cuts in and the engine "
+                              "bogs, the problem is a different one. You "
+                              "reach the apex, the point closest to the inside "
+                              "edge, with the car still leaned over and the "
+                              "wheels still turned.",
+        "d.exit_throttle.s1b": "Try the same exit one gear higher. The same "
+                               "throttle opening pushes less abruptly, and the "
+                               "wheelspin often goes away without changing "
                                "anything else.",
-        "d.exit_throttle.s2": "Fix it earlier, not later: enter slightly slower "
+        "d.exit_throttle.s2": "Fix it earlier, not later. Enter a little slower "
                               "and wider, and reach the apex with the car already "
                               "nearly straight. You lose something on entry and "
                               "take it back with interest on the straight that "
                               "follows.",
-        "d.exit_throttle.s3": "Open the throttle a bit at a time and keep opening, "
-                              "not all at once like a switch.",
-        "d.exit_throttle.s4": "In the Dynamics tab, the «Lock &amp; spin» chart: "
-                              "the amber line is the rear, and on exit it should "
-                              "stay almost flat. But if the car has traction "
-                              "control it will stay flat anyway, because the TC "
-                              "is holding it there: then the real signal is your "
-                              "ear, the engine bogging.",
+        "d.exit_throttle.s3": "Open the throttle a bit at a time and keep "
+                              "opening, not all at once like a switch.",
+        "d.exit_throttle.s4": "In the Dynamics tab, look at the «Locking and wheelspin» "
+                              "chart. The amber line is the rear, and on exit it "
+                              "should stay almost flat. If the car has traction "
+                              "control it stays flat anyway, because the TC holds "
+                              "it there. Then the real signal is the engine "
+                              "bogging, and you hear it.",
         "d.repeat.title": "Repeatable first, fast second",
-        "d.repeat.watch": "how alike two consecutive laps are",
+        "d.repeat.watch": "how alike two laps in a row are",
         "d.repeat.ignore": "the lap time",
-        "d.repeat.s0": "There's no dominant cause here: you lose a little "
-                       "everywhere. That's almost always a repetition problem, not "
-                       "a technique one.",
-        "d.repeat.s1": "Pick three fixed points for this corner — where you start "
-                       "braking, where you turn the wheel, where you get back on "
-                       "the throttle — and say them out loud as you go through. "
-                       "Said out loud they become decisions; kept in your head "
+        "d.repeat.s0": "No single cause stands out here and you lose a little "
+                       "everywhere. That's almost always a repetition problem, "
+                       "not a technique one.",
+        "d.repeat.s1": "Pick three fixed points for this corner, where you start "
+                       "braking, where you turn the wheel and where you get back "
+                       "on the throttle. Say them out loud as you go through. "
+                       "Said out loud they become decisions, kept in your head "
                        "they stay feelings.",
-        "d.repeat.s2": "Five laps with one rule: don't chase the time, chase two "
-                       "laps that look the same.",
-        "d.repeat.s3": "Right now your minimum speed here — the lowest you touch "
-                       "— swings {s} km/h from lap to lap. Under {r} km/h the "
-                       "corner is yours: going lower means chasing differences "
-                       "that aren't down to you.",
-        "d.repeat.s4": "Only once you can repeat it, move one of the three "
-                       "points. One.",
+        "d.repeat.s2": "Drive five laps with one rule. Don't chase the time, "
+                       "chase two laps that look the same.",
+        "d.repeat.s3": "Right now your minimum speed here swings {s} km/h from "
+                       "lap to lap. Under {r} km/h the corner is yours, and going "
+                       "lower means chasing differences that aren't down to you.",
+        "d.repeat.s4": "Only once you can repeat it, try moving one of the three "
+                       "points. Just one.",
         "d.consistency.title": "The lap you've already driven, all at once",
         "d.consistency.watch": "the three sectors, not the lap time",
-        "d.consistency.ignore": "the lap time — it's the one thing here that fixes "
+        "d.consistency.ignore": "the lap time, the one thing here that fixes "
                                 "itself",
-        "d.consistency.s0": "It isn't an invented time: it's your best time in "
-                            "each sector, put together. It comes to {ideal}, and "
-                            "you've driven all of it — just never on the same lap.",
-        "d.consistency.s1": "You're {gap}s off putting it together, and {ws}s of "
-                            "that sits in sector {n}: that's where you work.",
-        "d.consistency.s1b": "You're {gap}s off putting it together, and it's "
-                             "spread out: no single sector holds it.",
-        "d.consistency.s2": "Five laps where you don't chase the time, you chase "
-                            "the repeat. Same line, same points, same order.",
-        "d.consistency.s3": "Rule for these laps: if you get a corner wrong, still "
-                            "finish the lap without another mistake. What really "
-                            "costs you is the rest of the lap after the mistake — "
-                            "and it's the only part you can still save.",
+        "d.consistency.s0": "It isn't an invented time. It's your best time in "
+                            "each sector put together, and it comes to {ideal}. "
+                            "You've driven all of it, just never on the same lap.",
+        "d.consistency.s1": "You're {gap} s off putting it together, and {ws} s "
+                            "of that sits in sector {n}. That's where you work.",
+        "d.consistency.s1b": "You're {gap} s off putting it together, spread "
+                             "across all the sectors.",
+        "d.consistency.s2": "Drive five laps without chasing the time, just "
+                            "repeating. Keep the same line, the same points and "
+                            "the same order.",
+        "d.consistency.s3": "One rule holds on these laps. If you get a corner "
+                            "wrong, still finish the lap without another mistake. "
+                            "What really costs you is the rest of the lap after "
+                            "the mistake, and it's the only part you can still "
+                            "save.",
         "d.consistency.s3b": "Don't watch whether the lap time drops lap after "
-                             "lap: with fuel burning off and tyres wearing it "
-                             "moves anyway. Watch whether two consecutive laps "
-                             "look alike.",
-        "d.consistency.s4": "Watch «Sectors»: the goal is for sector {n} to stop "
-                            "being your worst, not for the lap time to drop. The "
-                            "time drops afterwards.",
-        "d.consistency.s4b": "Watch «Sectors»: the goal is for your three sectors "
-                             "to come from the same lap, not for the lap time to "
-                             "drop. The time drops afterwards.",
+                             "lap, because with fuel burning off and tyres "
+                             "wearing it moves anyway. Watch whether two laps in "
+                             "a row look alike.",
+        "d.consistency.s4": "In the Sectors tab the goal is for sector {n} to "
+                            "stop being your worst. The lap time drops afterwards.",
+        "d.consistency.s4b": "In the Sectors tab the goal is for your three best "
+                             "sectors to come from the same lap. The lap time "
+                             "follows.",
         "d.brake_straight.title": "Brake in a straight line, then turn",
-        "d.brake_straight.watch": "the Throttle / Brake chart (Compare tab): the "
-                                  "brake should be finished before the steering "
-                                  "moves",
-        "d.brake_straight.ignore": "your minimum speed: it comes up on its own "
-                                   "here if the entry is clean",
+        "d.brake_straight.watch": "the Throttle and brake chart in Compare, where "
+                                  "the brake should be finished before the "
+                                  "steering moves",
+        "d.brake_straight.ignore": "your minimum speed, which comes up on its "
+                                   "own here if the entry is clean",
         "d.brake_straight.s0": "On a car with no downforce you slow in a straight "
                                "line and then turn. A sliver of brake while you "
-                               "steer unloads the rear just as you're asking it "
-                               "to hold.",
-        "d.brake_straight.s1": "Two laps with all the braking done first, hard and "
-                               "short, finished before you turn the wheel. The car "
-                               "will go in slow and flat: that's fine, it's the "
-                               "starting point.",
-        "d.brake_straight.s2": "Select the corner's gear before you turn: a "
-                               "downshift taken inside the corner brakes the rear "
-                               "wheels on its own, and to the car that's the same "
-                               "thing as a sudden lift.",
+                               "steer unloads the rear just as you ask it to hold.",
+        "d.brake_straight.s1": "Drive two laps with all the braking done first, "
+                               "hard and short, finished before you turn the "
+                               "wheel. The car will go in slow and flat, and "
+                               "that's fine because it's the starting point.",
+        "d.brake_straight.s2": "Select the corner's gear before you turn. A "
+                               "downshift inside the corner brakes the rear "
+                               "wheels on its own, and to the car that's like a "
+                               "sudden lift.",
         "d.brake_straight.s3": "Now move the end of the braking a metre at a time "
-                               "towards the corner, without ever getting to the "
-                               "point where you steer with the brake still hard on.",
+                               "towards the corner, without ever steering with the "
+                               "brake still hard on.",
         "d.brake_straight.s4": "If you feel the rear go light as you turn, you've "
-                               "gone past it: go back to the previous point. On "
-                               "this car the margin is shorter than it looks.",
+                               "gone too far and need to go back to the previous "
+                               "point. On this car the margin is shorter than it "
+                               "looks.",
     },
 }
 
@@ -877,14 +875,14 @@ _TERM_ORDER = ("valid_lap", "sector", "ideal", "brake_point", "apex",
 _GLOSSARY = {
     "it": {
         "valid_lap": ("Giro valido",
-                      "Un giro che il gioco conta buono: non hai tagliato, non "
-                      "sei finito troppo fuori, non sei passato dai box."),
+                      "Un giro che il gioco conta buono, perché non hai tagliato, "
+                      "non sei finito troppo fuori e non sei passato dai box."),
         "sector": ("Settore",
-                   "Uno dei tre tratti in cui ogni pista è divisa: il cronometro "
-                   "prende un tempo alla fine di ognuno."),
+                   "Uno dei tre tratti in cui è divisa ogni pista, ciascuno "
+                   "col suo tempo preso dal cronometro."),
         "ideal": ("Ideale teorico",
                   "Il giro che verrebbe fuori mettendo insieme il tuo tempo "
-                  "migliore in ogni settore: l'hai già guidato a pezzi, mai "
+                  "migliore in ogni settore, che hai già guidato a pezzi ma mai "
                   "tutto di fila."),
         "brake_point": ("Punto di frenata",
                         "Il punto della pista in cui il tuo piede tocca il freno "
@@ -892,14 +890,14 @@ _GLOSSARY = {
         "apex": ("Apex",
                  "Il punto in cui passi più vicino al bordo interno della curva."),
         "min_speed": ("Velocità minima",
-                      "La velocità più bassa che tocchi dentro una curva, cioè "
-                      "quando hai finito di rallentare e non hai ancora ripreso."),
+                      "La velocità più bassa che tocchi dentro una curva, quando "
+                      "hai finito di rallentare e non hai ancora ripreso."),
         "reference": ("Giro di riferimento",
-                      "Il giro con cui HONE confronta il tuo: ogni differenza "
-                      "che leggi è misurata contro quello."),
+                      "Il giro con cui HONE confronta il tuo, e contro cui è "
+                      "misurata ogni differenza che leggi."),
         "lockup": ("Bloccaggio",
                    "Quando il freno ferma una ruota mentre l'auto va ancora "
-                   "avanti: la gomma striscia e girare il volante non serve più."),
+                   "avanti, così la gomma striscia e sterzare non serve più."),
         "wheelspin": ("Pattinamento",
                       "Quando il motore fa girare le ruote motrici più veloci di "
                       "quanto l'auto stia davvero avanzando."),
@@ -912,14 +910,14 @@ _GLOSSARY = {
     },
     "en": {
         "valid_lap": ("Valid lap",
-                      "A lap the game counts: you didn't cut, you didn't run too "
-                      "far off, you didn't go through the pits."),
+                      "A lap the game counts, because you didn't cut, didn't run "
+                      "too far off and didn't go through the pits."),
         "sector": ("Sector",
-                   "One of the three stretches every track is split into; the "
-                   "clock takes a time at the end of each."),
+                   "One of the three stretches every track is split into, each "
+                   "with its own time on the clock."),
         "ideal": ("Theoretical ideal",
                   "The lap you'd get by putting together your best time in each "
-                  "sector: you've driven it in pieces, never in one go."),
+                  "sector, which you've driven in pieces but never in one go."),
         "brake_point": ("Braking point",
                         "The point on the track where your foot touches the "
                         "brake coming into a corner."),
@@ -927,14 +925,14 @@ _GLOSSARY = {
                  "The point where you pass closest to the inside edge of the "
                  "corner."),
         "min_speed": ("Minimum speed",
-                      "The lowest speed you touch inside a corner — where you've "
+                      "The lowest speed you touch inside a corner, when you've "
                       "finished slowing and haven't picked up yet."),
         "reference": ("Reference lap",
-                      "The lap HONE compares yours against: every difference you "
-                      "read is measured against it."),
+                      "The lap HONE compares yours against, and that every "
+                      "difference you read is measured against."),
         "lockup": ("Lock-up",
-                   "When the brake stops a wheel while the car is still moving: "
-                   "the tyre scrubs and turning the wheel stops doing anything."),
+                   "When the brake stops a wheel while the car is still moving, "
+                   "so the tyre scrubs and steering stops doing anything."),
         "wheelspin": ("Wheelspin",
                       "When the engine turns the driven wheels faster than the "
                       "car is actually travelling."),
@@ -986,8 +984,9 @@ def _s(lang: str) -> dict:
     return _T.get(lang, _T["en"])
 
 
-def _sec(ms: float) -> str:
-    return f"{ms / 1000.0:.2f}"
+def _sec(ms: float, lang: str) -> str:
+    """Secondi con due decimali, nel formato della lingua («0,42» / «0.42»)."""
+    return fmt_num(ms / 1000.0, 2, lang)
 
 
 # --- the gate ---------------------------------------------------------------
@@ -1054,16 +1053,17 @@ def build_gap(best_ms: int, ideal_ms: int, your_sectors: list[int],
     else:
         head = s["gap_head"].format(best=format_lap_time(best_ms),
                                     ideal=format_lap_time(ideal_ms),
-                                    gap=_sec(consistency))
+                                    gap=_sec(consistency, lang))
         if worst_n:
-            head += s["gap_worst"].format(ws=_sec(worst_ms), n=worst_n)
+            head += s["gap_worst"].format(ws=_sec(worst_ms, lang), n=worst_n)
     pro_gap = max(0, ideal_ms - pro_ms) if pro_ms > 0 else 0
     if pro_gap:
-        head += s["gap_pro"].format(pro=format_lap_time(pro_ms), pg=_sec(pro_gap))
+        head += s["gap_pro"].format(pro=format_lap_time(pro_ms), pg=_sec(pro_gap, lang))
 
     # The note only makes sense once there are two numbers to keep apart, and
     # both have to be big enough to be worth keeping apart.
-    note = (s["gap_note"].format(gap=_sec(consistency), lap=_sec(per_lap_ms))
+    note = (s["gap_note"].format(gap=_sec(consistency, lang),
+                                  lap=_sec(per_lap_ms, lang))
             if per_lap_ms >= SIGNIF_LOSS_MS and consistency >= SIGNIF_LOSS_MS
             else "")
 
@@ -1265,7 +1265,7 @@ def _apex_speed(f: CornerFacts, s: dict) -> Drill:
         # "+4", which is a subtraction the reader can see is wrong.
         steps.append(s["d.apex_speed.s0"].format(
             vr=f"{f.min_speed_ref_kmh:.0f}", v=f"{f.min_speed_kmh:.0f}",
-            diff=f"{gain:+.0f}"))
+            diff=str(gain)))
     # `s1b` is the abort. The drill deliberately asks the driver to arrive too
     # fast at least once, and the reflex it provokes — snapping off the throttle
     # mid-corner — is the classic way to spin a road car. Asking for the edge
@@ -1312,14 +1312,14 @@ def _repeat(f: CornerFacts, s: dict) -> Drill:
                  watch=s["d.repeat.watch"], ignore=s["d.repeat.ignore"])
 
 
-def _consistency(gap: Gap, s: dict) -> Drill:
+def _consistency(gap: Gap, s: dict, lang: str) -> Drill:
     steps = [s["d.consistency.s0"].format(ideal=format_lap_time(gap.ideal_ms))]
     if gap.worst_sector:
         steps.append(s["d.consistency.s1"].format(
-            gap=_sec(gap.consistency_ms), ws=_sec(gap.worst_sector_ms),
+            gap=_sec(gap.consistency_ms, lang), ws=_sec(gap.worst_sector_ms, lang),
             n=gap.worst_sector))
     else:
-        steps.append(s["d.consistency.s1b"].format(gap=_sec(gap.consistency_ms)))
+        steps.append(s["d.consistency.s1b"].format(gap=_sec(gap.consistency_ms, lang)))
     # `s3b`: ten laps in a row burn fuel and wear tyres, and the sector times
     # this drill watches move with both. Without the warning the driver reads
     # the car getting lighter as themselves getting better.
@@ -1395,8 +1395,8 @@ def build_programme(plan: TrainingPlan, progress: list[GoalProgress],
         step = Step(
             order=0, kind="corner", corner_index=g.corner_index,
             where=g.name, what="" if generic else g.what, why="",
-            target=s["target"].format(to=_sec(g.target_ms),
-                                      from_=_sec(g.baseline_ms)),
+            target=s["target"].format(to=_sec(g.target_ms, lang),
+                                      from_=_sec(g.baseline_ms, lang)),
             done_when=(s["done_when"].format(needed=p.needed)
                        if p and p.needed else s["done_when_plain"]),
             status="done" if (p and p.done) else "later",
@@ -1463,8 +1463,9 @@ def _consistency_step(gap: Gap | None, s: dict, lang: str) -> Step | None:
         # Half the gap back, floored where the app stops calling a loss
         # significant — plan.py's own rule, imported rather than restated so a
         # corner target and a lap target can never ask for different things.
-        done_when=s["done_when_cons"].format(s=_sec(_take_back(gap.consistency_ms))),
-        status="later", drill=_consistency(gap, s),
+        done_when=s["done_when_cons"].format(
+            s=_sec(_take_back(gap.consistency_ms), lang)),
+        status="later", drill=_consistency(gap, s, lang),
     )
 
 

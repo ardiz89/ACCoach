@@ -584,7 +584,7 @@ SURFACES: dict[str, Callable[[], Entries]] = {
 }
 
 # Le superfici non ancora riscritte. Ogni task che ne riscrive una la toglie.
-PENDING: set[str] = set(SURFACES) - {"report_a", "report_b"}
+PENDING: set[str] = set(SURFACES) - {"report_a", "report_b", "report_backend"}
 
 
 # --- il conto ---------------------------------------------------------------

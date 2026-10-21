@@ -36,6 +36,7 @@ import bisect
 from dataclasses import dataclass
 
 from .diagnosis import _APEX_HALF
+from ..textfmt import fmt_num
 from .thresholds import SIGNIF_LOSS_MS
 
 #: A phase has to hold this much of the corner's loss before the report will
@@ -53,12 +54,12 @@ PHASES = ("entry", "apex", "exit", "after")
 _WORDS = {
     "it": {"entry": "in ingresso", "apex": "all'apex", "exit": "in uscita",
            "after": "nel tratto dopo",
-           "most": "Di questi, {s}s {phase}.",
-           "gain": " Ne recuperi {s}s {phase}."},
+           "most": "Di questi, {s} s li perdi {phase}.",
+           "gain": " Ne recuperi {s} s {phase}."},
     "en": {"entry": "on entry", "apex": "at the apex", "exit": "on exit",
            "after": "on the run after",
-           "most": "Of that, {s}s {phase}.",
-           "gain": " You take {s}s back {phase}."},
+           "most": "Of that, {s} s goes {phase}.",
+           "gain": " You take {s} s back {phase}."},
 }
 
 
@@ -128,11 +129,11 @@ def phase_note(phases: list[PhaseLoss], lost_ms: float,
     worst = max(phases, key=lambda p: p.lost_ms)
     if worst.lost_ms <= 0 or worst.lost_ms < _DOMINANT_SHARE * lost_ms:
         return ""
-    text = w["most"].format(s=f"{worst.lost_ms / 1000.0:.2f}", phase=w[worst.phase])
+    text = w["most"].format(s=fmt_num(worst.lost_ms / 1000.0, 2, lang), phase=w[worst.phase])
 
     best = min(phases, key=lambda p: p.lost_ms)
     if best.lost_ms <= -_GAIN_MS:
-        text += w["gain"].format(s=f"{abs(best.lost_ms) / 1000.0:.2f}",
+        text += w["gain"].format(s=fmt_num(abs(best.lost_ms) / 1000.0, 2, lang),
                                  phase=w[best.phase])
     return text
 

@@ -60,14 +60,14 @@ def test_combined_g_is_the_radius_on_the_friction_circle():
 def test_at_the_limit_the_claim_is_relative_and_conditional():
     """La frase che cambia il consiglio, senza promettere più della misura.
 
-    Dice che una staccata più tarda **dovrebbe uscire** dall'aderenza già
+    Dice che una staccata più tarda **dovrebbe prenderla** dall'aderenza già
     spesa — condizionale — e confronta con i picchi del riferimento, che è
     quello che l'inviluppo misura davvero.
     """
     inside = [_S(1.9, 0.4)]           # |g| ≈ 1.94 su un inviluppo di 2.0
     out = _detail(inside, 2.0, CueCategory.BRAKE_LATER)
-    assert "riferimento nei suoi punti di picco" in out
-    assert "dovrebbe uscire" in out
+    assert "il riferimento raggiunge nei suoi picchi" in out
+    assert "dovrebbe prenderla" in out
 
 
 def test_it_no_longer_denies_that_a_later_brake_exists():
@@ -93,7 +93,7 @@ def test_it_does_not_claim_the_reference_was_measured_here():
 def test_well_below_the_limit_it_says_there_is_grip_left():
     inside = [_S(1.2, 0.3)]           # |g| ≈ 1.24 su 2.0 → 62%
     out = _detail(inside, 2.0, CueCategory.BRAKE_LATER)
-    assert "rimasto carico" in out
+    assert "resta carico da usare" in out
 
 
 def test_in_between_it_claims_nothing():
@@ -157,7 +157,7 @@ def test_it_never_claims_more_than_all_the_grip():
     """
     inside = [_S(3.0, 3.0)] * 10          # ben oltre l'inviluppo
     out = _detail(inside, 2.0, CueCategory.BRAKE_LATER)
-    assert "100%" in out
+    assert "100 %" in out
     for impossible in ("103%", "104%", "120%"):
         assert impossible not in out
 

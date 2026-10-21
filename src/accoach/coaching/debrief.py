@@ -33,9 +33,12 @@ from .cue import CueCategory, theme_key
 from .diagnosis import corner_symptoms, dominant_symptom
 from .tuning import tuning_for_car
 from ..i18n import current_language
+from ..textfmt import fmt_num
 
 _C = CueCategory
-# Handling-cause vocabulary, per language.
+# Handling-cause vocabulary, per language. La curva apre la frase («In questa
+# curva lenta l'auto sottosterza in ingresso»): una frase sola, senza parentesi,
+# e le fasi restano le stesse parole di `phases._WORDS`.
 _CAUSE_BALANCE = {
     "en": {Balance.UNDERSTEER: "the car understeers", Balance.OVERSTEER: "the car oversteers"},
     "it": {Balance.UNDERSTEER: "l'auto sottosterza", Balance.OVERSTEER: "l'auto sovrasterza"},
@@ -45,8 +48,8 @@ _CAUSE_PHASE = {
     "it": {Phase.ENTRY: "in ingresso", Phase.APEX: "all'apex", Phase.EXIT: "in uscita"},
 }
 _CAUSE_SPEED = {
-    "en": {Speed.LOW: "slow corner", Speed.HIGH: "fast corner"},
-    "it": {Speed.LOW: "curva lenta", Speed.HIGH: "curva veloce"},
+    "en": {Speed.LOW: "In this slow corner", Speed.HIGH: "In this fast corner"},
+    "it": {Speed.LOW: "In questa curva lenta", Speed.HIGH: "In questa curva veloce"},
 }
 # Title shown in the debrief per loss category (the live cue's own message follows
 # the voice; the debrief titles each corner loss by category, per language).
@@ -59,47 +62,57 @@ _CATEGORY_TITLE = {
            _C.CARRY_SPEED: "Porta più velocità in ingresso", _C.TIME_LOSS: "Tempo perso qui"},
 }
 # (detail-template, fix) per category, per language. The detail is .format()-ed
-# with the named values below; the fix is a fixed sentence.
+# with the named values below, già scritti nel formato della lingua
+# (`textfmt.fmt_num`); the fix is a fixed sentence.
 _LOSS = {
     "en": {
-        _C.BRAKE_LATER: ("You start braking before the reference.",
-                         "Delay your braking: move the braking point later, "
-                         "so you carry more speed into the corner."),
-        _C.MORE_THROTTLE: ("Average throttle {tl:.0f}% vs {tr:.0f}% of the reference.",
+        _C.BRAKE_LATER: ("You start braking earlier than the reference.",
+                         "Move your braking point later, so you carry more speed "
+                         "into the corner."),
+        _C.MORE_THROTTLE: ("Through the corner your throttle averages {tl} %, "
+                           "against {tr} % on the reference.",
                            "Get back on the throttle earlier and harder on exit, "
-                           "without spinning up."),
-        _C.BRAKE_EARLIER: ("You brake after the reference and are still slower at "
-                           "the apex: {vl:.0f} km/h vs {vr:.0f} km/h ({diff:+.0f}).",
-                           "Move your braking point earlier: arriving settled lets "
-                           "you turn in sooner, and the speed comes back at the apex."),
-        _C.LESS_BRAKE: ("Average brake {bl:.0f}% vs {br:.0f}% of the reference.",
-                        "You're braking too long: release earlier and let the car "
-                        "flow toward the apex."),
-        _C.CARRY_SPEED: ("Minimum speed at apex {vl:.0f} km/h vs {vr:.0f} km/h ({diff:+.0f}).",
-                         "Carry more entry speed: less brake and a wider, smoother line."),
-        _C.TIME_LOSS: ("You lose ~{tenths:.0f} {tenths_word} with no dominant cause.",
-                       "Clean up your line and aim for consistency: review your line "
-                       "and pedal timing."),
+                           "without spinning the wheels."),
+        _C.BRAKE_EARLIER: ("You brake after the reference but you're {diff} km/h "
+                           "slower at the apex, {vl} km/h against {vr} km/h.",
+                           "Brake a little earlier. Arriving settled lets you turn "
+                           "in sooner, and you find the speed again at the apex."),
+        _C.LESS_BRAKE: ("Through the corner your brake averages {bl} %, against "
+                        "{br} % on the reference.",
+                        "You stay on the brake too long. Release it earlier and let "
+                        "the car roll toward the apex."),
+        _C.CARRY_SPEED: ("Your minimum speed at the apex is {vl} km/h, the "
+                         "reference's is {vr} km/h. That's {diff} km/h down.",
+                         "Use less brake and draw a wider, smoother line."),
+        _C.TIME_LOSS: ("You lose about {tenths} {tenths_word} and no single cause "
+                       "stands out.",
+                       "Tidy up your line and drive it the same way every lap. Look "
+                       "again at your line and at when you use the pedals."),
     },
     "it": {
-        _C.BRAKE_LATER: ("Inizi a frenare prima del riferimento.",
-                         "Ritarda la staccata: porta il punto di frenata più avanti, "
-                         "così entri con più velocità."),
-        _C.MORE_THROTTLE: ("Gas medio {tl:.0f}% contro {tr:.0f}% del riferimento.",
-                           "Riapri il gas prima e più deciso in uscita, senza pattinare."),
-        _C.BRAKE_EARLIER: ("Stacchi dopo di lui e all'apex sei comunque più lento: "
-                           "{vl:.0f} km/h contro {vr:.0f} km/h ({diff:+.0f}).",
-                           "Anticipa la staccata: arrivare composto ti fa girare "
+        _C.BRAKE_LATER: ("Cominci a frenare prima del riferimento.",
+                         "Sposta il punto di frenata più avanti, così entri in curva "
+                         "con più velocità."),
+        _C.MORE_THROTTLE: ("In curva il tuo gas medio è {tl} %, quello del "
+                           "riferimento {tr} %.",
+                           "Riapri il gas prima e con più decisione in uscita, senza "
+                           "far pattinare le ruote."),
+        _C.BRAKE_EARLIER: ("Stacchi dopo il riferimento ma all'apex vai {diff} km/h "
+                           "più piano, {vl} km/h contro {vr} km/h.",
+                           "Anticipa un po' la staccata. Se arrivi composto giri "
                            "prima, e la velocità la ritrovi all'apex."),
-        _C.LESS_BRAKE: ("Freno medio {bl:.0f}% contro {br:.0f}% del riferimento.",
-                        "Stai frenando troppo a lungo: rilascia prima e lascia scorrere "
-                        "la vettura verso l'apex."),
-        _C.CARRY_SPEED: ("Minima all'apex {vl:.0f} km/h contro {vr:.0f} km/h ({diff:+.0f}).",
-                         "Porta più velocità in ingresso: meno freno e una traiettoria "
-                         "più larga e fluida."),
-        _C.TIME_LOSS: ("Perdi ~{tenths:.0f} {tenths_word} senza una causa dominante.",
-                       "Pulisci la traiettoria e cerca costanza: rivedi linea e "
-                       "tempi di pedale."),
+        _C.LESS_BRAKE: ("In curva il tuo freno medio è {bl} %, quello del "
+                        "riferimento {br} %.",
+                        "Resti sul freno troppo a lungo. Rilascialo prima e lascia "
+                        "scorrere l'auto verso l'apex."),
+        _C.CARRY_SPEED: ("All'apex la tua velocità minima è {vl} km/h, quella del "
+                         "riferimento {vr} km/h. Ti mancano {diff} km/h.",
+                         "Usa meno freno e disegna una traiettoria più larga e "
+                         "fluida."),
+        _C.TIME_LOSS: ("Perdi circa {tenths} {tenths_word} e nessuna causa prevale "
+                       "sulle altre.",
+                       "Pulisci la traiettoria e guidala uguale a ogni giro. "
+                       "Riguarda la linea e il momento in cui usi i pedali."),
     },
 }
 
@@ -115,7 +128,7 @@ def explain_cause(sym: Symptom, lang: str | None = None) -> str:
     bal = _CAUSE_BALANCE.get(lg, _CAUSE_BALANCE["en"])
     pha = _CAUSE_PHASE.get(lg, _CAUSE_PHASE["en"])
     spd = _CAUSE_SPEED.get(lg, _CAUSE_SPEED["en"])
-    return f"{bal[sym.balance].capitalize()} {pha[sym.phase]} ({spd[sym.speed]})."
+    return f"{spd[sym.speed]} {bal[sym.balance]} {pha[sym.phase]}."
 
 
 def category_words(category: CueCategory, lang: str | None = None) -> tuple[str, str]:
@@ -146,10 +159,18 @@ def explain_loss(category: CueCategory, st: CornerStats,
     # La parola si decide sulla cifra stampata, non sul numero: sotto i 150 ms
     # — cioe' su gran parte delle curve che il debrief elenca — si stampa «1».
     one = f"{st.lost_ms / 100:.0f}" == "1"
-    kw = dict(tl=st.throttle_live * 100, tr=st.throttle_ref * 100,
-              bl=st.brake_live * 100, br=st.brake_ref * 100,
-              vl=st.min_speed_live, vr=st.min_speed_ref,
-              diff=st.min_speed_ref - st.min_speed_live, tenths=st.lost_ms / 100,
+    vl, vr = round(st.min_speed_live), round(st.min_speed_ref)
+
+    def n0(v: float) -> str:
+        return fmt_num(v, 0, lg)
+
+    # La differenza si fa fra le velocità *stampate*: 96,4 contro 103,8 si
+    # leggono 96 e 104, e scrivere «7 km/h» sotto sarebbe un conto sbagliato a
+    # vista. Le categorie che la citano scattano solo quando sei più lento.
+    kw = dict(tl=n0(st.throttle_live * 100), tr=n0(st.throttle_ref * 100),
+              bl=n0(st.brake_live * 100), br=n0(st.brake_ref * 100),
+              vl=n0(vl), vr=n0(vr), diff=n0(abs(vr - vl)),
+              tenths=n0(st.lost_ms / 100),
               tenths_word=("decimo" if one else "decimi") if lg == "it"
               else ("tenth" if one else "tenths"))
     return detail.format(**kw), fix
@@ -325,25 +346,46 @@ _LIFT_MIN_MS = 60.0     # …and it has to have cost something worth saying
 _VMAX_GAP_KMH = 4.0
 _VMIN_COMPARABLE_KMH = 3.0
 
-_LIFT_MSG = {"en": "You lift where the reference is flat",
-             "it": "Sollevi dove il riferimento sta in pieno"}
+_LIFT_MSG = {"en": "You lift where the reference stays flat out",
+             "it": "Alzi il gas dove il riferimento va in pieno"}
+# Il numero comprende il rettilineo che segue (vedi `_lift_notes`): la frase lo
+# dice com'è, «compreso», e non «si moltiplicano», che lo farebbe sembrare in più.
 _LIFT_DETAIL = {
-    "en": " Throttle down to {thr:.0f}% for {secs:.1f}s{where}: ~{tenths:.1f} "
-          "tenths, and it multiplies down the straight that follows.",
-    "it": " Gas giù al {thr:.0f}% per {secs:.1f}s{where}: ~{tenths:.1f} decimi, "
-          "e si moltiplicano sul rettilineo che segue."}
-_TOP_SPEED_MSG = {"en": "Down {gap:.0f} km/h on top speed",
-                  "it": "Ti mancano {gap:.0f} km/h di velocità di punta"}
+    "en": " Your throttle drops to {thr} % for {secs} s{where}. It costs you about "
+          "{tenths} tenths, counting the straight that follows.",
+    "it": " Il gas scende fino a {thr} % per {secs} s{where}. Ti costa circa {tenths} "
+          "decimi, compreso il rettilineo che segue."}
+_LIFT_WHERE = {"en": " at {name}", "it": " all'altezza di {name}"}
+_TOP_SPEED_MSG = {"en": "You're {gap} km/h down on top speed",
+                  "it": "Ti mancano {gap} km/h di velocità di punta"}
+# In curva vai come il riferimento: non sei *tu* a essere più lento, è l'auto.
+# La frase di prima diceva il contrario («non è l'auto»), e mandava poi a
+# controllare l'ala, cioè l'auto.
 _TOP_SPEED_AERO = {
-    "en": " Your corner speeds match the reference, so the car isn't slower — "
-          "check wing and gearing.",
-    "it": " Nelle curve vai come il riferimento, quindi non è l'auto a essere "
-          "più lenta: controlla ala e rapporti."}
+    "en": " Your corner speeds match the reference, so it isn't you being slower. "
+          "Check the wing and the gearing.",
+    "it": " In curva vai come il riferimento, quindi non sei tu a essere più "
+          "lento. Controlla ala e rapporti."}
 _TOP_SPEED_EXIT = {
-    "en": " You're also slower through the corners, so this is exit speed, not "
-          "setup: fix the exits first.",
-    "it": " Sei più lento anche in curva, quindi è velocità in uscita, non "
-          "assetto: prima sistema le uscite."}
+    "en": " You're slower through the corners too, so this is exit speed and not "
+          "setup. Fix the exits first.",
+    "it": " Sei più lento anche in curva, quindi è velocità d'uscita e non "
+          "assetto. Sistema prima le uscite."}
+
+
+def lift_detail(thr_pct: float, secs: float, lost_ms: float, name: str,
+                lang: str) -> str:
+    """La frase di un'alzata, coi numeri nel formato della lingua."""
+    where = _LIFT_WHERE.get(lang, _LIFT_WHERE["en"]).format(name=name) if name else ""
+    return _LIFT_DETAIL.get(lang, _LIFT_DETAIL["en"]).format(
+        thr=fmt_num(thr_pct, 0, lang), secs=fmt_num(secs, 1, lang),
+        tenths=fmt_num(lost_ms / 100.0, 1, lang), where=where)
+
+
+def top_speed_message(gap_kmh: float, lang: str) -> str:
+    return _TOP_SPEED_MSG.get(lang, _TOP_SPEED_MSG["en"]).format(
+        gap=fmt_num(gap_kmh, 0, lang))
+
 
 # --- combined grip (the friction circle) ------------------------------------
 # `g_lat`/`g_long` have been recorded in every lap file for versions and read by
@@ -379,28 +421,43 @@ _GRIP_MIN_G = 0.3         # below this the lap has no usable G data at all
 # staccata più tarda dovrebbe uscire dall'aderenza che stai già spendendo.
 # Condizionale, non negazione.
 _GRIP_LIMITED = {
-    "en": " You are already using as much grip as the reference uses at its own "
-          "peaks ({pct:.0f}%), so a later brake here would have to come out of "
-          "what the tyre is already spending on turning.",
-    "it": " Stai già usando tanta aderenza quanta ne usa il riferimento nei suoi "
-          "punti di picco ({pct:.0f}%), quindi una staccata più tarda dovrebbe "
-          "uscire da quella che la gomma sta già spendendo per girare."}
+    "en": " You already use {pct} % of the grip the reference reaches at its "
+          "peaks. A later brake would have to take grip from what the tyre already "
+          "spends on turning.",
+    "it": " La tua aderenza arriva già a {pct} % di quella che il riferimento "
+          "raggiunge nei suoi picchi. Una staccata più tarda dovrebbe prenderla da "
+          "quella che la gomma spende già per girare."}
+# «Qui» non c'è più: l'inviluppo è il picco del riferimento su tutto il giro, non
+# in questa curva (stesso motivo detto sopra per `_GRIP_LIMITED`).
 _GRIP_UNUSED = {
-    "en": " You only reach {pct:.0f}% of the grip the reference uses here: there "
-          "is load left on the tyre, not just time.",
-    "it": " Arrivi solo al {pct:.0f}% dell'aderenza che il riferimento usa qui: "
-          "sulla gomma è rimasto carico, non solo tempo."}
+    "en": " You only reach {pct} % of the grip the reference reaches at its peaks. "
+          "The tyre still has load to give, not just time.",
+    "it": " La tua aderenza arriva solo a {pct} % di quella che il riferimento "
+          "raggiunge nei suoi picchi. Sulla gomma resta carico da usare, non solo "
+          "tempo."}
 
-_BRAKE_EARLY = {"en": " You brake ~{m:.0f} m too early.",
-                "it": " Anticipi la staccata di ~{m:.0f} m."}
+_BRAKE_EARLY = {"en": " You brake about {m} m too early.",
+                "it": " Stacchi circa {m} m prima."}
 # Visual braking reference, appended *after* the metres so it augments rather than
 # replaces: even a slightly-off landmark stays anchored to the distance. Fires
 # only where the track has a verified landmark near the reference's braking onset
 # (see landmark_at); everywhere else the driver just gets the metres, as before.
 _BRAKE_LANDMARK = {"en": " The reference brakes {lm}.",
                    "it": " Il riferimento frena {lm}."}
-_BRAKE_PEAK = {"en": " Peak brake {pl:.0f}% vs {pr:.0f}%: press harder.",
-               "it": " Picco freno {pl:.0f}% contro {pr:.0f}%: premi più deciso."}
+_BRAKE_PEAK = {"en": " Your peak brake is {pl} %, the reference's {pr} %. "
+                     "Press harder.",
+               "it": " Il tuo picco di freno è {pl} %, quello del riferimento "
+                     "{pr} %. Premi più forte."}
+
+
+def brake_early_text(metres: float, lang: str) -> str:
+    return _BRAKE_EARLY.get(lang, _BRAKE_EARLY["en"]).format(m=fmt_num(metres, 0, lang))
+
+
+def brake_peak_text(peak_live: float, peak_ref: float, lang: str) -> str:
+    """I picchi del pedale, 0..1, come percentuali scritte nella lingua."""
+    return _BRAKE_PEAK.get(lang, _BRAKE_PEAK["en"]).format(
+        pl=fmt_num(peak_live * 100, 0, lang), pr=fmt_num(peak_ref * 100, 0, lang))
 
 
 def _braking_detail(lap: Lap, reference: Reference, inside: list,
@@ -416,7 +473,7 @@ def _braking_detail(lap: Lap, reference: Reference, inside: list,
         if live is not None and ref is not None and live < ref:
             m = _metres_between(lap, live, ref)
             if m >= 2.0:
-                extra += _BRAKE_EARLY.get(lg, _BRAKE_EARLY["en"]).format(m=m)
+                extra += brake_early_text(m, lg)
                 lm = landmark_at(lap.track, ref, lg, marks)
                 if lm is not None:
                     extra += _BRAKE_LANDMARK.get(lg, _BRAKE_LANDMARK["en"]).format(lm=lm)
@@ -424,8 +481,7 @@ def _braking_detail(lap: Lap, reference: Reference, inside: list,
         peak_live = max((s.brake for s in inside), default=0.0)
         peak_ref = max((r.brake for r in refs), default=0.0)
         if peak_ref - peak_live >= 0.05:
-            extra += _BRAKE_PEAK.get(lg, _BRAKE_PEAK["en"]).format(
-                pl=peak_live * 100, pr=peak_ref * 100)
+            extra += brake_peak_text(peak_live, peak_ref, lg)
     return extra
 
 
@@ -441,26 +497,37 @@ _HEADLINE_SHARE = 0.5
 
 _HEADLINE = {
     "braking": {
-        "en": "You're {pct:.0f}% off the pace, most of it in braking — before "
-              "chasing single corners, commit later and harder into the stops.",
-        "it": "Sei al {pct:.0f}% dal passo, quasi tutto in frenata — prima di "
-              "rincorrere le singole curve, frena più tardi e più deciso."},
+        "en": "You're {pct} % off the reference's pace, and most of it goes in "
+              "braking. Before looking at single corners, brake later and harder.",
+        "it": "Sei a {pct} % dal passo del riferimento e quasi tutto lo perdi in "
+              "frenata. Prima di guardare le singole curve, frena più tardi e più "
+              "forte."},
     "traction": {
-        "en": "You're {pct:.0f}% off the pace, most of it on exits — the theme is "
-              "getting back to full throttle sooner, everywhere, not one corner.",
-        "it": "Sei al {pct:.0f}% dal passo, quasi tutto in uscita — il tema è "
-              "tornare in pieno prima, dappertutto, non una curva sola."},
+        "en": "You're {pct} % off the reference's pace, and most of it goes on the "
+              "exits. The work is getting back to full throttle sooner in every "
+              "corner, not in one.",
+        "it": "Sei a {pct} % dal passo del riferimento e quasi tutto lo perdi in "
+              "uscita. Il lavoro è tornare in pieno prima in tutte le curve, non in "
+              "una sola."},
     "cornering": {
-        "en": "You're {pct:.0f}% off the pace, most of it mid-corner — carry more "
-              "speed through the apexes before fine-tuning any single one.",
-        "it": "Sei al {pct:.0f}% dal passo, quasi tutto in percorrenza — porta più "
-              "velocità agli apici prima di limare la singola curva."},
+        "en": "You're {pct} % off the reference's pace, and most of it goes "
+              "mid-corner. Carry more speed to every apex, then fine-tune single "
+              "corners.",
+        "it": "Sei a {pct} % dal passo del riferimento e quasi tutto lo perdi a "
+              "centro curva. Porta più velocità a ogni apex, poi rifinisci le "
+              "singole curve."},
     "line": {
-        "en": "You're {pct:.0f}% off the pace, spread across the lap — work on a "
-              "clean, repeatable line before corner-by-corner detail.",
-        "it": "Sei al {pct:.0f}% dal passo, sparso sul giro — lavora su una "
-              "traiettoria pulita e ripetibile prima del dettaglio per curva."},
+        "en": "You're {pct} % off the reference's pace, with the loss spread across "
+              "the lap. Work on a clean, repeatable line, then on single corners.",
+        "it": "Sei a {pct} % dal passo del riferimento, con la perdita sparsa su "
+              "tutto il giro. Lavora su una traiettoria pulita e ripetibile, poi "
+              "sulle singole curve."},
 }
+
+
+def headline_text(theme: str, pct: float, lang: str) -> str:
+    tmpl = _HEADLINE.get(theme, _HEADLINE["line"])
+    return tmpl.get(lang, tmpl["en"]).format(pct=fmt_num(pct, 0, lang))
 
 
 def _headline(losses: list[CornerLoss], gap_ms: int, ref_ms: int,
@@ -481,8 +548,7 @@ def _headline(losses: list[CornerLoss], gap_ms: int, ref_ms: int,
     theme, share = max(by_theme.items(), key=lambda kv: kv[1])
     if share / total < _HEADLINE_SHARE:
         theme = "line"                 # scattered: the honest theme is the line
-    tmpl = _HEADLINE.get(theme, _HEADLINE["line"])
-    return tmpl.get(lg, tmpl["en"]).format(pct=gap_ms / ref_ms * 100)
+    return headline_text(theme, gap_ms / ref_ms * 100, lg)
 
 
 def _theme_key(cat: CueCategory) -> str:
@@ -603,10 +669,10 @@ def _grip_detail(state: GripState, category: CueCategory, lg: str) -> str:
         return ""
     if state.at_limit:
         return _GRIP_LIMITED.get(lg, _GRIP_LIMITED["en"]).format(
-            pct=state.ratio * 100)
+            pct=fmt_num(state.ratio * 100, 0, lg))
     if state.ratio <= _GRIP_SPARE:
         return _GRIP_UNUSED.get(lg, _GRIP_UNUSED["en"]).format(
-            pct=state.ratio * 100)
+            pct=fmt_num(state.ratio * 100, 0, lg))
     return ""                          # in between: nothing worth claiming
 
 
@@ -658,10 +724,7 @@ def _lift_note(lap: Lap, reference: Reference, corners: list[Corner],
         if c.entry_pos <= first.pos <= c.exit_pos:
             name = corner_name(lap.track, c.index, c.apex_pos, lg, "", typed)
             break
-    where = f" ({name})" if name else ""
-    detail = _LIFT_DETAIL.get(lg, _LIFT_DETAIL["en"]).format(
-        thr=min(s.throttle for s in run) * 100, secs=secs,
-        tenths=lost / 100.0, where=where)
+    detail = lift_detail(min(s.throttle for s in run) * 100, secs, lost, name, lg)
     return LapNote(kind="lift", message=_LIFT_MSG.get(lg, _LIFT_MSG["en"]),
                    detail=detail, lost_ms=lost, pos=first.pos, where=name)
 
@@ -694,7 +757,7 @@ def _top_speed_note(lap: Lap, reference: Reference, corners: list[Corner],
     tail = (_TOP_SPEED_AERO if corners_match else _TOP_SPEED_EXIT)
     return LapNote(
         kind="top_speed",
-        message=_TOP_SPEED_MSG.get(lg, _TOP_SPEED_MSG["en"]).format(gap=gap),
+        message=top_speed_message(gap, lg),
         detail=tail.get(lg, tail["en"]),
     )
 
@@ -845,38 +908,44 @@ def lap_time_consistency(lap_times_ms: list[int]) -> dict:
             "spread_ms": spread, "std_ms": var ** 0.5}
 
 
+# Il blocco di testo del terminale e del log: etichette di colonna senza due
+# punti, e frasi intere sotto.
 _FMT = {
-    "en": {"lap": "Lap:", "ref": "Reference:", "is_ref":
-           "This is your reference lap (no faster lap to compare against).",
-           "gap": "Gap:", "worst": "Worst corners (of {n}):",
-           "clean": "No significant time loss per corner — clean lap.",
-           "cons": "Consistency ({n} laps): best {best}, spread {spread:.3f}s, σ {sd:.3f}s"},
-    "it": {"lap": "Giro:", "ref": "Riferimento:", "is_ref":
-           "Questo è il tuo giro di riferimento (nessuno più veloce da confrontare).",
-           "gap": "Distacco:", "worst": "Curve peggiori (su {n}):",
-           "clean": "Nessuna perdita di tempo significativa per curva — giro pulito.",
-           "cons": "Costanza ({n} giri): migliore {best}, spread {spread:.3f}s, σ {sd:.3f}s"},
+    "en": {"lap": "Lap", "ref": "Reference", "is_ref":
+           "It's your reference lap, and there is no faster one to compare.",
+           "gap": "Gap", "worst": "Where you lose most, out of {n} corners",
+           "clean": "No corner costs you enough time to flag it.",
+           "cons": "Over {n} laps your best is {best}, the spread {spread} s and "
+                   "the standard deviation {sd} s."},
+    "it": {"lap": "Giro", "ref": "Riferimento", "is_ref":
+           "È il tuo giro di riferimento, e non ce n'è uno più veloce da confrontare.",
+           "gap": "Distacco", "worst": "Dove perdi di più, su {n} curve",
+           "clean": "Nessuna curva ti costa abbastanza tempo da segnalarla.",
+           "cons": "Su {n} giri il migliore è {best}, lo scarto {spread} s e la "
+                   "deviazione standard {sd} s."},
 }
 
 
 def format_debrief(d: LapDebrief, top: int = 3, consistency: dict | None = None,
                    lang: str | None = None) -> str:
     """Render a debrief as a human-readable block (terminal / log)."""
-    f = _FMT.get(_lang(lang), _FMT["en"])
+    lg = _lang(lang)
+    f = _FMT.get(lg, _FMT["en"])
     lines = [
-        f"Debrief — {d.car_model or '?'} @ {d.track or '?'}",
+        f"Debrief · {d.car_model or '?'} @ {d.track or '?'}",
         f"  {f['lap']:11} {format_lap_time(d.lap_time_ms)}",
         f"  {f['ref']:11} {format_lap_time(d.reference_lap_ms)}",
     ]
     if d.is_reference:
         lines.append(f"  {f['is_ref']}")
     else:
-        lines.append(f"  {f['gap']:11} +{d.total_gap_ms / 1000.0:.3f}s")
+        lines.append(f"  {f['gap']:11} +{fmt_num(d.total_gap_ms / 1000.0, 3, lg, 's')}")
 
     if d.losses:
         lines.append("  " + f["worst"].format(n=len(d.losses)))
         for loss in d.losses[:top]:
-            line = f"    {loss.label:9} −{loss.lost_ms / 1000.0:.3f}s  {loss.message}"
+            lost = fmt_num(loss.lost_ms / 1000.0, 3, lg, "s")
+            line = f"    {loss.label:9} −{lost}  {loss.message}"
             if loss.cause:
                 line += f"  · {loss.cause}"   # the handling "why"
             lines.append(line)
@@ -894,5 +963,6 @@ def format_debrief(d: LapDebrief, top: int = 3, consistency: dict | None = None,
         c = consistency
         lines.append("  " + f["cons"].format(
             n=c["n"], best=format_lap_time(c["best_ms"]),
-            spread=c["spread_ms"] / 1000.0, sd=c["std_ms"] / 1000.0))
+            spread=fmt_num(c["spread_ms"] / 1000.0, 3, lg),
+            sd=fmt_num(c["std_ms"] / 1000.0, 3, lg)))
     return "\n".join(lines)

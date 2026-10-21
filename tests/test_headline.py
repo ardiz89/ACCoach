@@ -53,7 +53,7 @@ def test_scattered_losses_fall_back_to_the_line():
 def test_the_headline_states_how_far_off_the_pace():
     losses = [_loss(CueCategory.BRAKE_LATER, 3000)]
     out = _headline(losses, gap_ms=4500, ref_ms=90_000, lg="it")
-    assert "5%" in out
+    assert "5 %" in out
 
 
 def test_no_losses_no_headline():

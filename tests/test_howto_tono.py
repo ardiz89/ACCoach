@@ -238,7 +238,7 @@ def test_problem_without_a_corner_speaks_of_the_lap(lang):
 
 def test_verdict_first_session_says_so():
     text = verdict(0.62, _top(), 0.45, None, "it")
-    assert "0,62 s" in text and "45%" in text and "«Freni troppo presto»" in text
+    assert "0,62 s" in text and "45 %" in text and "«Freni troppo presto»" in text
     assert text.endswith("È la tua prima sessione qui. Il confronto arriva dalla prossima.")
 
 

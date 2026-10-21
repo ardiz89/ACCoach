@@ -220,7 +220,7 @@ def test_tags_are_capped_and_carry_their_numbers():
 
 
 def test_the_tags_speak_italian_too():
-    assert tag_text("wide_exit", {"m": 1.4}, "it") == "1.4 m largo in uscita"
+    assert tag_text("wide_exit", {"m": 1.4}, "it") == "1,4 m largo in uscita"
 
 
 def test_a_lap_without_coordinates_reports_nothing_rather_than_zeroes():
@@ -407,7 +407,7 @@ def test_every_side_phrase_exists_in_both_languages():
                 "left_exit", "right_exit"):
         for lang in ("en", "it"):
             got = tag_text(key, {"m": 1.4}, lang)
-            assert key not in got and "1.4" in got, f"{key}/{lang}: {got!r}"
+            assert key not in got and ("1,4" if lang == "it" else "1.4") in got, f"{key}/{lang}: {got!r}"
 
 
 def test_the_server_rounds_the_way_the_browser_does():

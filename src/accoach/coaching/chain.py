@@ -39,6 +39,7 @@ from __future__ import annotations
 import bisect
 from dataclasses import dataclass
 
+from ..textfmt import fmt_num
 from .analyzer import _LOSS_MS
 
 # Below this the arrival is not meaningfully slower. Corner speeds are reported
@@ -68,20 +69,27 @@ class ChainLink:
 
 _STRINGS = {
     "it": {
-        "all": "Ci arrivi già {dv} km/h sotto, e li avevi tutti all'uscita di "
-               "{prev}: qui il tempo lo perdi prima di arrivarci.",
-        "most": "Ci arrivi già {dv} km/h sotto, e quasi tutti li avevi "
-                "all'uscita di {prev}: lavora prima su quella.",
+        "all": "Ci arrivi già {dv} km/h sotto, e li avevi persi tutti "
+               "all'uscita di {prev}. Il tempo di questa curva lo perdi prima di "
+               "arrivarci.",
+        "most": "Ci arrivi già {dv} km/h sotto, e quasi tutti li avevi persi "
+                "all'uscita di {prev}. Lavora prima su quella curva.",
         "corner": "Curva {n}",
     },
     "en": {
-        "all": "You arrive {dv} km/h down, and all of it was already there at "
-               "{prev}'s exit — the time here is lost before you get here.",
-        "most": "You arrive {dv} km/h down, and most of it was already there at "
-                "{prev}'s exit — work on that one first.",
+        "all": "You arrive {dv} km/h down, and you had lost all of it by the "
+               "exit of {prev}. The time in this corner goes before you get here.",
+        "most": "You arrive {dv} km/h down, and you had lost most of it by the "
+                "exit of {prev}. Work on that corner first.",
         "corner": "Corner {n}",
     },
 }
+
+
+def chain_message(kind: str, dv: float, prev: str, lang: str) -> str:
+    """La frase del legame: «all» o «most», coi km/h nel formato della lingua."""
+    s = _STRINGS.get(lang, _STRINGS["en"])
+    return s[kind].format(dv=fmt_num(dv, 0, lang), prev=prev)
 
 
 def _label(loss, lang: str) -> str:
@@ -153,12 +161,11 @@ def link_corners(lap, reference, corners, losses, lang: str = "it") -> list[Chai
         if share < _MIN_SHARE:
             continue                             # made in between, not in the corner
 
-        s = _STRINGS.get(lang, _STRINGS["en"])
         out.append(ChainLink(
             index=cur.index, from_index=prev.index,
             arrival_dv=round(arrival, 1), carried_dv=round(carried, 1),
             share=round(share, 2),
-            message=s["all" if share >= 0.9 else "most"].format(
-                dv=round(arrival), prev=_label(prev_loss, lang)),
+            message=chain_message("all" if share >= 0.9 else "most",
+                                  round(arrival), _label(prev_loss, lang), lang),
         ))
     return out

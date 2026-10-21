@@ -139,7 +139,7 @@ def test_a_slope_inside_its_own_noise_is_told_as_flat(tmp_path):
     _stint(tmp_path, 8, step=0)
     j = _get(_client(tmp_path))
     assert j["current"]["trend"]["direction"] == "flat"
-    assert "Nessuna deriva misurabile" in _notes(j)
+    assert "Non c'è una deriva misurabile" in _notes(j)
 
 
 def test_a_real_decline_is_stated_with_its_margin(tmp_path):
@@ -155,8 +155,8 @@ def test_too_few_laps_is_a_different_answer_from_no_drift(tmp_path):
     _stint(tmp_path, 3)
     j = _get(_client(tmp_path))
     assert j["current"]["trend"] is None and j["current"]["no_trend"] == "few_laps"
-    assert "Servono almeno" in _notes(j)
-    assert "Nessuna deriva misurabile" not in _notes(j)
+    assert "servono almeno" in _notes(j)
+    assert "Non c'è una deriva misurabile" not in _notes(j)
 
 
 # --- the laps under the numbers -------------------------------------------
