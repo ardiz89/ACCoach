@@ -50,6 +50,8 @@ _MAX_MAIN = 4
 class LapDefects:
     ms: dict[str, float] = field(default_factory=dict)
     corners: dict[str, dict[int, float]] = field(default_factory=dict)
+    # Solo sulle curve con una perdita (la stessa funzione della misura di
+    # COAST_MAIN_S, quindi soglia e valori concordano).
     coast_s: float = 0.0
     total_gap_ms: int = 0
     # Perdita totale per curva, **tutte** le categorie (TIME_LOSS compreso):
