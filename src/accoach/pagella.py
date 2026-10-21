@@ -508,9 +508,6 @@ def build_pagella(cat, car: str, track: str, index: int, lang: str) -> dict:
     values = [_means(ss) for ss in sums]
     main = [s for s in summaries if s.main]
 
-    def _trend(key: str, now: float) -> str | None:
-        return trend_of(now, values[1].get(key, 0.0), _unit(key)) if prev else None
-
     for s in main:
         out["defects"].append({
             "key": s.key, "name": defect_name(s.key, lang),
@@ -519,7 +516,7 @@ def build_pagella(cat, car: str, track: str, index: int, lang: str) -> dict:
             "corners": [{"name": ctx.names.get(i, ""), "value": _r(v, s.unit)}
                         for i, v in s.corners],
             "series": _series(sums, s.key),
-            "trend": _trend(s.key, s.mean),
+            "trend": _trend_at(sums, s.key),
         })
     out["worst_corners"] = [{"name": ctx.names.get(i, ""),
                              "value_s": round(v / 1000.0, 3)}
@@ -535,7 +532,7 @@ def build_pagella(cat, car: str, track: str, index: int, lang: str) -> dict:
     cmp_ = None
     if prev:
         keys = [k for k in DEFECTS if k in values[0] or k in values[1]]
-        trends = {k: _trend(k, values[0].get(k, 0.0)) for k in keys}
+        trends = {k: _trend_at(sums, k) for k in keys}
         cmp_ = {"gap_delta_s": (gap - max(0.0, prev.mean_gap_ms or 0.0)) / 1000.0,
                 "better": [k for k in keys if trends[k] == "down"],
                 "worse": [k for k in keys if trends[k] == "up"]}
@@ -583,25 +580,40 @@ def _series(sums: list[list[DefectSummary]], key: str) -> list[float]:
     return [_r(_means(ss).get(key, 0.0), unit) for ss in reversed(sums)]
 
 
+def _trend_at(sums: list[list[DefectSummary]], key: str) -> str | None:
+    """La freccia di `key`: l'ultima sessione misurata contro quella prima, sulle
+    medie non arrotondate. Accanto a `_series` per lo stesso motivo: la freccia
+    della Pagella e quella di Andamento non devono poter divergere."""
+    if len(sums) < 2:
+        return None
+    return trend_of(_means(sums[0]).get(key, 0.0), _means(sums[1]).get(key, 0.0),
+                    _unit(key))
+
+
 # --- la storia dei difetti (Andamento) ---------------------------------------
 
 #: Sessioni della storia lunga in Andamento.
 _HISTORY = 20
 
 
-def _history_context(cat, car: str, track: str, lang: str) -> _Context:
-    """Il contesto della sessione piu' recente che fa parte dell'andamento.
+def _history_context(cat, car: str, track: str,
+                     lang: str) -> tuple[_Context, str | None]:
+    """Il contesto della sessione piu' recente che fa parte dell'andamento, e
+    la classe saltata («wet»/«dry») se per arrivarci se n'e' saltata una.
 
     Si salta una sessione senza giri validi, e quella che la Pagella lascia
     fuori perche' e' l'unica della sua classe di gomma con uno storico tutto
     dell'altra: la storia di chi ha fatto un'uscita sul bagnato resta quella
-    dell'asciutto, invece di sparire.
+    dell'asciutto, invece di sparire. Ma la pagina lo dice: una sessione che
+    non compare senza una parola sembrerebbe persa.
     """
-    i = 0
+    i, skipped = 0, None
     while True:
         ctx = _context(cat, car, track, i, lang)
         if ctx.excluded not in ("no_laps", "wet", "dry") or i + 1 >= len(ctx.runs):
-            return ctx
+            return ctx, skipped
+        if ctx.excluded in ("wet", "dry") and skipped is None:
+            skipped = ctx.excluded
         i += 1
 
 
@@ -614,9 +626,9 @@ def build_defect_history(cat, car: str, track: str, lang: str) -> dict:
     vederlo calare e' il motivo della scheda. Sola lettura: niente migrazioni
     ne' consigli, che sono affare della Pagella.
     """
-    ctx = _history_context(cat, car, track, lang)
+    ctx, skipped = _history_context(cat, car, track, lang)
     out = {"reference": _reference_info(ctx), "sessions": [], "defects": [],
-           "excluded": None}
+           "excluded": None, "skipped": skipped}
     measured = ctx.measured(_HISTORY) if ctx.ref_row is not None else []
     if not measured:
         out["excluded"] = "no_laps" if ctx.excluded == "no_laps" else "no_reference"
@@ -633,12 +645,14 @@ def build_defect_history(cat, car: str, track: str, lang: str) -> dict:
     keys = sorted(main, key=lambda k: (k not in latest,
                                        latest.index(k) if k in latest else 0,
                                        _unit(k) == "s", DEFECTS.index(k)))
+    now = {s.key for s in sums[0] if s.main}
     for key in keys:
-        means = [_means(ss).get(key, 0.0) for ss in sums[:2]]
         out["defects"].append({
             "key": key, "name": defect_name(key, lang), "unit": _unit(key),
-            "values": _series(sums, key),
-            "trend": trend_of(means[0], means[1], _unit(key)) if len(means) > 1 else None,
+            "values": _series(sums, key), "trend": _trend_at(sums, key),
+            # Ancora principale nell'ultima sessione? Se no, l'ultimo valore
+            # non e' piu' un difetto da segnare in rosso.
+            "main": key in now,
         })
     return out
 

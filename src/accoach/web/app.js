@@ -256,7 +256,12 @@ function redrawCurrentView() {
   else if (VIEW === "dynamics") { if (DATA) drawDynamics(LAST_HOVER); }
   else if (VIEW === "sectors") { if (CURRENT) loadSectors(); }
   else if (VIEW === "progress") {
-    if (CURRENT) { loadProgress(CURRENT); loadDefectHistory(CURRENT); }
+    if (CURRENT) {
+      loadProgress(CURRENT);
+      // La storia si ridisegna dalla risposta che c'è: rileggerla a ogni
+      // resize rifarebbe venti sessioni. `showView` la butta all'apertura.
+      DEFHIST ? renderDefectHistory(DEFHIST) : loadDefectHistory(CURRENT);
+    }
   }
   // Refetched rather than repainted: the verdict, the defect names and the
   // corner names are written by the backend, so a cached payload would still
@@ -374,6 +379,9 @@ function showView(name) {
     p.classList.toggle("hidden", p.id !== "view-" + name);
   }
   applyRailed(name);
+  // Aprire Andamento rilegge la storia dei difetti: nel frattempo può essere
+  // arrivata una sessione. Il resize invece la ridisegna (`redrawCurrentView`).
+  if (name === "progress") DEFHIST = null;
   redrawCurrentView();
 }
 
@@ -502,10 +510,13 @@ async function loadProgress(combo) {
 // «Come si fa», poi le barre, il valore dell'ultima sessione e la freccia. Le
 // date una volta sola, sotto, ognuna sotto la sua colonna.
 const DH_H = 44;     // px, come `.dh-bars` in style.css
+let DEFHIST = null;  // l'ultima /api/defect-history, per ridisegnare senza rileggere
 
 async function loadDefectHistory(combo) {
   const seen = EPOCH;
+  DEFHIST = null;
   $("dh-ref").textContent = "";
+  $("dh-note").textContent = "";
   $("dh-body").innerHTML = `<div class="nothing">${t("load.dh")}</div>`;
   let h;
   try {
@@ -517,15 +528,30 @@ async function loadDefectHistory(combo) {
     return;
   }
   if (stale(seen)) return;
+  DEFHIST = h;
   renderDefectHistory(h);
 }
 
-// «21» sopra «ott»: venti date in fila stanno sotto le loro barre solo su due
-// righe.
-function fmtDay(iso) {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  return `${d.getDate()}<br>${escAttr(d.toLocaleDateString(LANG(), { month: "short" }))}`;
+// Sotto ogni barra il giorno sopra il mese («21» sopra «ott»): venti date in
+// fila stanno sotto le loro barre solo su due righe. Due sessioni lo stesso
+// giorno sotto il giorno hanno l'ora, se no sarebbero due colonne uguali.
+function dhDates(sessions) {
+  const day = (iso) => (iso ? new Date(iso).toDateString() : "");
+  const count = {};
+  for (const s of sessions) count[day(s.started_utc)] = (count[day(s.started_utc)] || 0) + 1;
+  return sessions.map((s) => {
+    const iso = s.started_utc;
+    let label = "—";
+    if (iso) {
+      const d = new Date(iso);
+      const second = count[day(iso)] > 1
+        ? d.toLocaleTimeString(LANG(), { hour: "2-digit", minute: "2-digit" })
+        : d.toLocaleDateString(LANG(), { month: "short" });
+      label = `${d.getDate()}<br>${escAttr(second)}`;
+    }
+    const tip = fmtWhen(iso) + " · " + tf("dh.valid", { n: s.valid });
+    return `<span title="${escAttr(tip)}">${label}</span>`;
+  }).join("");
 }
 
 function renderDefectHistory(h) {
@@ -533,12 +559,19 @@ function renderDefectHistory(h) {
   const r = h.reference;
   if (h.excluded) {
     $("dh-ref").textContent = "";
+    $("dh-note").textContent = "";
     body.innerHTML =
       `<div class="nothing">${t(h.excluded === "no_laps" ? "dh.nolaps" : "dh.noref")}</div>`;
     return;
   }
   $("dh-ref").textContent = r
     ? tf("dh.ref", { time: r.lap_time, when: fmtWhen(r.recorded_utc) }) : "";
+  // Le frasi sopra le barre: la sessione saltata per la gomma, e una sessione
+  // sola (l'andamento, e le frecce, partono dalla prossima).
+  const notes = [];
+  if (h.skipped === "wet" || h.skipped === "dry") notes.push(t("dh.skipped." + h.skipped));
+  if ((h.sessions || []).length < 2) notes.push(t("dh.first"));
+  $("dh-note").textContent = notes.join(" ");
   const defs = h.defects || [];
   if (!defs.length) {
     body.innerHTML = `<div class="nothing">${t("dh.none")}</div>`;
@@ -554,18 +587,18 @@ function renderDefectHistory(h) {
       ? `<span class="pag-trend ${trend}" title="${escAttr(says[trend])}">${arrows[trend]}</span>`
       : "";
     const per = d.unit === "s" ? t("pag.def.coast") : t("pag.def.perlap");
+    // In rosso solo un difetto ancora principale oggi: uno sceso sotto la
+    // soglia (o a zero) è la notizia buona, non un allarme.
+    const tone = d.main ? "loss" : "ok";
     return `<div class="dh-row">` +
       `<button type="button" class="dh-name" data-howto="${escAttr(d.key)}" ` +
       `title="${escAttr(t("dh.howto"))}">${escAttr(d.name)}</button>` +
       `<span class="pag-spark dh-bars">${sparkBars(vals, d.unit, trend, DH_H)}</span>` +
-      `<span class="dh-last"><span class="num loss">${fmtSecs(last, d.unit)}</span> ` +
+      `<span class="dh-last"><span class="num ${tone}">${fmtSecs(last, d.unit)}</span> ` +
       `<span class="pag-small">${per}</span>${arrow}</span></div>`;
   }).join("");
-  const dates = (h.sessions || []).map((s) =>
-    `<span title="${escAttr(fmtWhen(s.started_utc) + " · " + tf("dh.valid", { n: s.valid }))}">` +
-    `${fmtDay(s.started_utc)}</span>`).join("");
   body.innerHTML = rows +
-    `<div class="dh-row dh-foot"><span></span><span class="dh-dates">${dates}</span><span></span></div>`;
+    `<div class="dh-row dh-foot"><span></span><span class="dh-dates">${dhDates(h.sessions || [])}</span><span></span></div>`;
   for (const b of body.querySelectorAll("[data-howto]")) {
     b.onclick = () => openHowto(b.dataset.howto);
   }
@@ -2395,11 +2428,14 @@ function pagDefects(defects) {
 }
 
 // Il mini-andamento: una barra per sessione, la più vecchia a sinistra, alte
-// in proporzione. La scala si taglia a due volte la mediana della serie:
-// nell'archivio vero una sessione lentissima (22 647 ms contro ~600 delle
-// altre) schiaccerebbe tutte le altre barre sul fondo. La barra tagliata resta
-// a piena altezza con il segno del taglio, e il suo valore vero sta nel
-// suggerimento: non si nasconde un dato vero, si evita che ne copra cinque.
+// in proporzione. Si taglia solo un fuori scala ISOLATO: se la barra più alta
+// supera tre volte la seconda, la scala è la seconda × 1,2 e solo quella barra
+// è tagliata. Nell'archivio vero una sessione lentissima (22 647 ms contro
+// 1 454 della seconda) schiaccerebbe tutte le altre sul fondo. Tagliare a due
+// volte la mediana, come si faceva prima, a Monza tagliava 5 barre su 10 di
+// «Gas tardi in uscita»: tutte alte uguali, e il calo che il pilota viene a
+// vedere spariva. La barra tagliata resta a piena altezza col segno del
+// taglio, e il suo valore vero sta nel suggerimento.
 const SPARK_H = 26;     // px, come `.pag-spark` in style.css
 
 function pagSpark(series, unit, trend) {
@@ -2413,12 +2449,10 @@ function pagSpark(series, unit, trend) {
 // Pagella e per la storia lunga di Andamento: stessa scala, stesso taglio.
 function sparkBars(vals, unit, trend, height) {
   const sorted = vals.slice().sort((a, b) => a - b);
-  const mid = sorted.length >> 1;
-  const median = sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
   const max = sorted[sorted.length - 1];
-  // Con la mediana a zero il taglio sarebbe a zero e ogni barra «tagliata»:
-  // lì la scala resta il massimo.
-  const top = Math.min(max, 2 * median) || max;
+  const second = sorted.length > 1 ? sorted[sorted.length - 2] : 0;
+  // Con la seconda a zero la scala sarebbe zero: lì resta il massimo.
+  const top = second > 0 && max > 3 * second ? 1.2 * second : max;
   const bars = vals.map((v, i) => {
     const cut = top > 0 && v > top;
     const h = top > 0 ? Math.max(2, Math.round(height * Math.min(v, top) / top)) : 2;

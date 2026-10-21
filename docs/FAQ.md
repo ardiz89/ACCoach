@@ -217,9 +217,7 @@ The report card is about driving. Setup problems stay with the Engineer.
 about one fault and the corners where it weighs most. The three choices are for
 the piece at the top; the others only show **How to do it →**.
 
-- **I'll follow it** puts it in progress, dated today. Only one piece can be in
-  progress. While there is one, the others show their place in the plan and
-  **How to do it →**, and nothing else.
+- **I'll follow it** puts it in progress, dated today.
 - **Not for me** takes a piece you haven't started out of the plan. The fault
   stays on the report card, and the advice stays out of the plan until you
   take it back. You find it again under "You set aside", with **Take it back**.

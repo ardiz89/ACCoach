@@ -371,9 +371,7 @@ La Pagella parla di guida. I problemi d'assetto restano all'Ingegnere.
 difetto e le curve dove pesa di più. Le tre scelte valgono per il consiglio
 in cima; gli altri mostrano solo **Come si fa →**.
 
-- **Lo seguo** lo mette in corso, con la data di oggi. Può essere in corso un
-  consiglio solo: finché ce n'è uno, gli altri mostrano la loro posizione nel
-  piano e **Come si fa →**, e basta.
+- **Lo seguo** lo mette in corso, con la data di oggi.
 - **Non lo seguo** toglie dal piano un consiglio che non hai ancora iniziato. Il
   difetto resta in Pagella e il consiglio resta fuori dal piano finché non lo
   riprendi. Lo ritrovi sotto «Hai messo da parte», con **Riprendi**.

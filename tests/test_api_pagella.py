@@ -584,6 +584,9 @@ def test_a_defect_that_was_main_once_stays_in_the_history(tmp_path):
     assert thr["values"][0] > 0 and thr["values"][1] == 0.0
     assert thr["trend"] == "down"
     assert h["defects"][0]["trend"] == "up"
+    # Principale oggi il primo, non piu' il secondo.
+    assert h["defects"][0]["main"] is True and thr["main"] is False
+    assert h["skipped"] is None
 
 
 def test_a_lone_wet_session_stays_out_of_a_dry_history(tmp_path):
@@ -605,6 +608,8 @@ def test_the_latest_session_alone_in_the_wet_does_not_hide_the_dry_history(tmp_p
     h = _history(TestClient(create_api(tmp_path)))
     assert h["excluded"] is None
     assert [s["started_utc"][:13] for s in h["sessions"]] == ["2026-10-20T10"]
+    # La pagina dice perche' l'ultima sessione non c'e'.
+    assert h["skipped"] == "wet"
 
 
 def test_the_history_skips_a_latest_session_it_cannot_measure(tmp_path):
@@ -615,6 +620,8 @@ def test_the_history_skips_a_latest_session_it_cannot_measure(tmp_path):
     h = _history(TestClient(create_api(tmp_path)))
     assert h["excluded"] is None
     assert [s["started_utc"][:13] for s in h["sessions"]] == ["2026-10-20T10"]
+    # Saltate per mancanza di giri, non per la gomma: nessuna frase.
+    assert h["skipped"] is None
 
 
 def test_the_history_of_a_single_lap_has_no_reference(tmp_path):

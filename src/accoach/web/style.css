@@ -1299,8 +1299,8 @@ body.view-pagella #lapbar { display: none; }
 }
 .pag-corners li { display: flex; justify-content: space-between; gap: 12px; padding: 2px 0; font-size: 14px; color: var(--muted); }
 /* Il mini-andamento: una barra per sessione, la più vecchia a sinistra; la
-   barra di oggi prende il colore della freccia. Una barra fuori scala (sopra
-   due volte la mediana, vedi pagSpark) resta a piena altezza con un taglio
+   barra di oggi prende il colore della freccia. Una barra fuori scala (un
+   fuori scala isolato, vedi sparkBars) resta a piena altezza con un taglio
    obliquo, il segno che è più alta di quanto si vede. */
 /* Alta quanto SPARK_H in app.js. */
 .pag-spark { display: inline-flex; gap: 3px; align-items: flex-end; height: 26px; margin-left: 10px; }
@@ -1339,6 +1339,8 @@ body.view-pagella #lapbar { display: none; }
 .dh-last { display: flex; align-items: center; gap: 6px; white-space: nowrap; align-self: center; }
 .dh .num { font-family: var(--font-mono); font-weight: 700; font-variant-numeric: tabular-nums; }
 .dh .num.loss { color: var(--red); }
+.dh .num.ok { color: var(--green); }
+.dh-note:empty { display: none; }
 @media (max-width: 700px) {
   .dh-row { grid-template-columns: minmax(0, 1fr) auto; }
   .dh-row .dh-bars, .dh-row .dh-dates { grid-column: 1 / -1; grid-row: 2; }

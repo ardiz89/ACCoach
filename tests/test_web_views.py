@@ -2500,7 +2500,7 @@ def _branches_after_the_await(body: str) -> list[tuple[str, str]]:
     return out
 
 
-def test_the_eight_loaders_are_all_here():
+def test_every_loader_is_accounted_for():
     """Anti-vacuità, in due sensi.
 
     Se l'elenco si svuota (regex che non aggancia più, funzione rinominata) ogni

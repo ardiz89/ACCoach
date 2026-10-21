@@ -5,8 +5,13 @@ file piatto senza toolchain, e un test che ha bisogno di un motore JS per
 girare è un test che smette di girare. La prova vera (leggibilità a
 1920×1080, «Lo seguo» che fa sparire gli altri bottoni) è nel browser.
 """
+import json
 import re
+import shutil
+import subprocess
 from pathlib import Path
+
+import pytest
 
 WEB = Path(__file__).resolve().parents[1] / "src" / "accoach" / "web"
 _HTML = (WEB / "index.html").read_text(encoding="utf-8")
@@ -180,11 +185,12 @@ def test_the_advice_buttons_post_and_reload():
 
 # --- il mini-andamento: una barra fuori scala non schiaccia le altre --------
 
-def test_the_spark_is_capped_at_twice_the_median():
-    """Nell'archivio vero una sessione lentissima (22 647 ms contro ~600)
-    appiattirebbe le altre. La barra tagliata si vede e porta il valore vero."""
+def test_the_spark_cuts_only_an_isolated_outlier():
+    """Nell'archivio vero una sessione lentissima (22 647 ms contro 1 454 della
+    seconda) appiattirebbe le altre. La barra tagliata si vede e porta il
+    valore vero. Il comportamento lo prova `test_the_scale_on_the_real_series`."""
     body = _body_of("function sparkBars(vals, unit, trend, height)")
-    assert "Math.min(max, 2 * median)" in body
+    assert "const top = second > 0 && max > 3 * second ? 1.2 * second : max;" in body
     # La barra sopra il taglio porta la classe che la segna, e il CSS la segna.
     assert "const cut = top > 0 && v > top;" in body
     assert '<i class="${cut ? "cut" : ""}' in body
@@ -452,18 +458,29 @@ def test_the_defect_history_reads_its_own_endpoint_with_the_progress_view():
     load = _body_of("async function loadDefectHistory(combo)")
     assert '"/api/defect-history?"' in load and "lang: LANG()" in load
     assert "renderDefectHistory(h)" in load
-    # Parte con la scheda, e riparte con lei (combo, lingua, resize).
+    # Riparte con la scheda quando cambiano combo o lingua.
     assert "loadProgress(combo); loadDefectHistory(combo);" in \
         _body_of("function reloadViewData(combo)")
-    assert "loadProgress(CURRENT); loadDefectHistory(CURRENT);" in \
-        _body_of("function redrawCurrentView()")
+
+
+def test_a_resize_repaints_the_history_and_opening_the_tab_reads_it_again():
+    """Il resize passa da `redrawCurrentView`: venti sessioni rilette a ogni
+    trascinamento della finestra sarebbero secondi di attesa. Ma aprire la
+    scheda rilegge: nel frattempo può essere arrivata una sessione."""
+    redraw = _body_of("function redrawCurrentView()")
+    assert "DEFHIST ? renderDefectHistory(DEFHIST) : loadDefectHistory(CURRENT);" in redraw
+    show = _body_of("function showView(name)")
+    assert show.index('if (name === "progress") DEFHIST = null;') < \
+        show.index("redrawCurrentView();")
+    load = _body_of("async function loadDefectHistory(combo)")
+    # Buttata prima dell'attesa (un resize durante il caricamento non ridisegna
+    # la combo di prima), salvata solo dopo la guardia.
+    assert load.index("DEFHIST = null;") < load.index("await ")
+    assert load.index("if (stale(seen)) return;\n  DEFHIST = h;") > load.index("await ")
 
 
 def test_the_history_bars_are_the_pagella_bars():
-    """Stessa scala tagliata a due volte la mediana, stesso segno di taglio:
-    una funzione sola per le due viste."""
-    bars = _body_of("function sparkBars(vals, unit, trend, height)")
-    assert "Math.min(max, 2 * median)" in bars
+    """Stessa scala, stesso segno di taglio: una funzione sola per le due viste."""
     assert "sparkBars(vals, unit, trend, SPARK_H)" in _body_of(
         "function pagSpark(series, unit, trend)")
     render = _body_of("function renderDefectHistory(h)")
@@ -481,7 +498,32 @@ def test_the_history_row_opens_the_howto_and_escapes_the_backend():
     assert not re.search(r"\$\{(?:h|d|s|r)\.\w+\}", render)
     # L'ultimo valore e la freccia, le date sotto le barre.
     assert "fmtSecs(last, d.unit)" in render
-    assert "dh-dates" in render and "s.started_utc" in render
+    assert "dh-dates" in render and "dhDates(h.sessions || [])" in render
+
+
+def test_a_defect_no_longer_main_is_not_marked_in_red():
+    render = _body_of("function renderDefectHistory(h)")
+    assert 'const tone = d.main ? "loss" : "ok";' in render
+    assert '<span class="num ${tone}">${fmtSecs(last, d.unit)}' in render
+    assert ".dh .num.ok { color: var(--green); }" in _CSS
+
+
+def test_two_sessions_on_the_same_day_show_their_time():
+    body = _body_of("function dhDates(sessions)")
+    assert "count[day(iso)] > 1" in body
+    assert 'toLocaleTimeString(LANG(), { hour: "2-digit", minute: "2-digit" })' in body
+    # E la data intera, con l'ora, nel suggerimento di ogni colonna.
+    assert "fmtWhen(iso)" in body and 'title="${escAttr(tip)}"' in body
+
+
+def test_the_history_says_when_it_skipped_a_session_or_has_only_one():
+    render = _body_of("function renderDefectHistory(h)")
+    assert 'if (h.skipped === "wet" || h.skipped === "dry") notes.push(t("dh.skipped." + h.skipped));' \
+        in render
+    assert 'if ((h.sessions || []).length < 2) notes.push(t("dh.first"));' in render
+    assert '$("dh-note").textContent = notes.join(" ");' in render
+    sec = _HTML.split('<section id="defect-history"', 1)[1].split("</section>", 1)[0]
+    assert sec.index('id="dh-note"') < sec.index('id="dh-body"')
 
 
 def test_the_history_says_why_it_is_empty():
@@ -494,8 +536,72 @@ def test_the_history_says_why_it_is_empty():
 def test_every_history_string_exists_in_both_languages():
     keys = set(re.findall(r'\bt\(\s*"(dh\.[\w.]+)"\s*\)', _APPJS))
     keys |= set(re.findall(r'\btf\(\s*"(dh\.[\w.]+)"', _APPJS))
-    keys |= {"dh.title", "dh.nolaps", "dh.noref", "load.dh", "err.dh"}
+    keys |= {"dh.title", "dh.nolaps", "dh.noref", "load.dh", "err.dh",
+             "dh.skipped.wet", "dh.skipped.dry", "dh.first"}
     assert len(keys) >= 8, sorted(keys)
     for key in sorted(keys):
         entry = _i18n_entry(key)
         assert "en:" in entry and "it:" in entry, key
+
+
+# --- la scala, eseguita: sparkBars in node sulle serie vere di Monza --------
+
+_NODE = shutil.which("node")
+
+_SPARK_HARNESS = r"""
+const fs = require("fs");
+const src = fs.readFileSync(process.argv[2], "utf8");
+function grab(name) {
+  const i = src.indexOf("function " + name + "(");
+  let depth = 0;
+  for (let k = src.indexOf("{", i); k < src.length; k++) {
+    if (src[k] === "{") depth++;
+    if (src[k] === "}") { depth--; if (!depth) return src.slice(i, k + 1); }
+  }
+}
+const escAttr = (s) => String(s);
+const fmtSecs = (v) => String(v);
+const tf = (k, o) => k + ":" + o.v;
+eval(grab("sparkBars"));
+const out = [];
+for (const vals of JSON.parse(fs.readFileSync(0, "utf8"))) {
+  const html = sparkBars(vals, "ms", "", 100);
+  out.push([...html.matchAll(/<i class="([^"]*)" style="height:(\d+)px"/g)]
+           .map((m) => [m[1].trim(), Number(m[2])]));
+}
+console.log(JSON.stringify(out));
+"""
+
+# «Gas tardi in uscita» a Monza: la storia (10 sessioni) e il mini-andamento
+# della Pagella (le ultime 6).
+_MONZA_10 = [4089.8, 7960.1, 35507.5, 11209.5, 1453.6, 22647.0, 855.0, 872.7, 445.7, 627.1]
+_MONZA_6 = [1453.6, 22647.0, 855.0, 872.7, 445.7, 627.1]
+
+
+def _bars(tmp_path, *series):
+    script = tmp_path / "spark.js"
+    script.write_text(_SPARK_HARNESS, encoding="utf-8")
+    run = subprocess.run([_NODE, str(script), str(WEB / "app.js")],
+                         input=json.dumps(series), capture_output=True, text=True,
+                         encoding="utf-8", timeout=60)
+    assert run.returncode == 0, run.stderr
+    return json.loads(run.stdout)
+
+
+@pytest.mark.skipif(_NODE is None, reason="serve node per eseguire la pagina")
+def test_the_scale_on_the_real_series(tmp_path):
+    ten, six, flat, zeros = _bars(tmp_path, _MONZA_10, _MONZA_6,
+                                  [0.0, 0.0, 500.0], [0.0, 0.0])
+    # Dieci sessioni: la piu' alta e' 1,6 volte la seconda, non un fuori scala
+    # isolato. Niente taglio, e il calo dalle prime sessioni alle ultime si vede.
+    assert [c for c, _ in ten] == [""] * 10
+    assert ten[2][1] == 100 and ten[0][1] == round(100 * 4089.8 / 35507.5)
+    # Sei sessioni: 22 647 contro 1 453,6 della seconda. Tagliata solo quella,
+    # e la scala e' la seconda x 1,2.
+    assert [c for c, _ in six] == ["", "cut", "", "", "", ""]
+    assert six[1][1] == 100
+    assert six[0][1] == round(100 * 1453.6 / (1.2 * 1453.6))
+    assert six[2][1] == round(100 * 855.0 / (1.2 * 1453.6))
+    # La seconda a zero non fa una scala a zero.
+    assert [c for c, _ in flat] == ["", "", ""] and flat[2][1] == 100
+    assert [h for _, h in zeros] == [2, 2]
