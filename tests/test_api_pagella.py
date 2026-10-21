@@ -458,6 +458,15 @@ def test_an_old_accepted_plan_becomes_the_active_advice(tmp_path):
     assert p["advice"][0]["status"] == ACTIVE
 
 
+def test_a_broken_old_plan_does_not_break_the_pagella(tmp_path):
+    c = _two_sessions(tmp_path)
+    with LapCatalog(_catalog_path(tmp_path)) as cat:
+        cat.save_plan(CAR, TRACK, "2026-10-20T12:00:00+00:00", ["boh"])
+    assert _pagella(c)["excluded"] is None
+    with LapCatalog(_catalog_path(tmp_path)) as cat:
+        assert cat.load_plan(CAR, TRACK) is None
+
+
 # --- il «come si fa» --------------------------------------------------------
 
 def _howto(c, defect, lang="it"):

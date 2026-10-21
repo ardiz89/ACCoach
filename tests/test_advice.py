@@ -222,6 +222,18 @@ def test_a_malformed_old_goal_is_dropped_not_retried_forever(tmp_path):
         assert cat.load_plan("A", "T") is None
 
 
+@pytest.mark.parametrize("goals", [["boh"], [None], [["x"]], [7],
+                                   {"corner_index": 4}, 7, "boh"])
+def test_an_old_plan_that_is_not_a_list_of_goals_is_cleared(tmp_path, goals):
+    """Un piano scritto male non deve far cadere la migrazione: fuori dal
+    `try` cadeva prima di `clear_plan`, e la Pagella rispondeva 500 per sempre."""
+    with LapCatalog(tmp_path / "catalog.db") as cat:
+        cat.save_plan("A", "T", "2026-09-01T09:00:00Z", goals)
+        cat.migrate_plan_to_advice("A", "T")
+        assert cat.load_advice("A", "T") == []
+        assert cat.load_plan("A", "T") is None
+
+
 def test_an_existing_declined_advice_beats_the_old_plan(tmp_path):
     from dataclasses import asdict
     with LapCatalog(tmp_path / "catalog.db") as cat:

@@ -717,9 +717,12 @@ class LapCatalog:
         plan = self.load_plan(car_model, track)
         if plan is None:
             return
-        goals = plan.get("goals") or []
-        if goals:
-            g = goals[0]
+        # Il piano e' un JSON scritto da versioni vecchie: se non e' una lista di
+        # obiettivi non si migra, ma si cancella lo stesso. Un errore qui fuori
+        # dal `try` lascerebbe il piano dov'e' e la Pagella in errore per sempre.
+        goals = plan.get("goals")
+        g = goals[0] if isinstance(goals, list) and goals else None
+        if isinstance(g, dict):
             try:
                 cat = CueCategory(g.get("category"))
             except ValueError:
