@@ -11,7 +11,7 @@ from dataclasses import asdict
 from accoach.coaching.advice import ACTIVE, PROPOSED, Advice, AdviceCorner
 from accoach.coaching.cue import CueCategory
 from accoach.coaching.debrief import CornerLoss, LapDebrief
-from accoach.coaching.focus import FocusCoach, FocusKind
+from accoach.coaching.focus import Focus, FocusCoach, FocusKind
 from accoach.comparison.reference import Reference
 from accoach.engine import CoachEngine
 from accoach.recording.catalog import LapCatalog
@@ -139,4 +139,45 @@ def test_an_unreadable_catalog_means_no_preference(tmp_path, monkeypatch):
                       laps_dir=tmp_path)
     eng.tick(0.0)
     assert eng._focus.preferred == []
+    eng.close()
+
+
+def _engine_on_five_corners(tmp_path):
+    eng = CoachEngine(reader=_StubReader([synth.snap(pos=0.5)]), voice=None,
+                      laps_dir=tmp_path)
+    eng._reference = Reference(synth.build_lap(n=300, clean=True))
+    eng._corners = [_corner(0, 0.0, 0.20), _corner(1, 0.25, 0.35),
+                    _corner(2, 0.40, 0.48), _corner(3, 0.60, 0.70),
+                    _corner(4, 0.80, 0.90)]
+    eng._focus_key = (CAR, TRACK)
+    eng._focus = FocusCoach()
+    return eng
+
+
+def test_no_catalog_read_while_a_focus_is_open(tmp_path, monkeypatch):
+    # Durante un esercizio `preferred` non lo legge nessuno, e a fine giro il
+    # registratore puo' tenere il catalogo: aprirlo farebbe aspettare il tick.
+    _save_advice(tmp_path, 0.63)
+    eng = _engine_on_five_corners(tmp_path)
+    eng._focus.focus = Focus(corner_index=1, name="Curva 2", theme="frenata",
+                             category=CueCategory.BRAKE_LATER, baseline_ms=300.0,
+                             drill="Ritarda la staccata.")
+    reads = []
+    real = LapCatalog.load_advice
+    monkeypatch.setattr(LapCatalog, "load_advice",
+                        lambda self, car, track: reads.append(1) or real(self, car, track))
+    eng._observe_lap(synth.build_lap(n=300, clean=True))
+    assert reads == []
+    eng.close()
+
+
+def test_the_advice_is_mapped_on_the_corners_the_focus_counts_with(tmp_path):
+    # Il metro del focus e' tenuto fermo (`_focus_ref`) e le sue curve non sono
+    # quelle di adesso: la traduzione segue le sue.
+    _save_advice(tmp_path, 0.63)
+    eng = _engine_on_five_corners(tmp_path)
+    eng._focus_ref = (eng._reference, [_corner(6, 0.10, 0.30),
+                                       _corner(7, 0.55, 0.75)])
+    eng._observe_lap(synth.build_lap(n=300, clean=True))
+    assert eng._focus.preferred == [7]
     eng.close()

@@ -560,8 +560,12 @@ class CoachEngine:
             # Il consiglio seguito si rilegge a ogni giro, sulle curve con cui
             # il focus conta (`fcorners`, non quelle di adesso): il riferimento
             # cambia sotto la sessione, e il pilota puo' scegliere un consiglio
-            # dal tablet mentre guida. Conta solo quando il focus sceglie.
-            self._focus.preferred = self._followed_advice_corners(fcorners)
+            # dal tablet mentre guida. Conta solo quando il focus sceglie, cioe'
+            # quando non ce n'e' uno aperto: aprire il catalogo a fine giro,
+            # mentre il registratore puo' scriverci, fa aspettare il tick fino
+            # al busy_timeout, e durante un esercizio sarebbe per niente.
+            if self._focus.focus is None:
+                self._focus.preferred = self._followed_advice_corners(fcorners)
             self._focus_report = self._focus.observe(
                 focus_debrief, stable=stable, reference=_reference_token(fref))
             # Il metro si tiene fermo per **tutto** il ciclo, non da quando il
