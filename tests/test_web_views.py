@@ -2533,9 +2533,11 @@ def test_every_async_function_that_waits_is_accounted_for():
     # nessuno, ma gira una volta sola dentro `init`, che a combo cambiata
     # riprende la scheda salvata. `adviceAction` scrive la nota «non si è
     # salvata» e rilegge la Pagella; scartata, la Pagella l'ha già rilanciata
-    # chi ha fatto salire il contatore.
+    # chi ha fatto salire il contatore. `openAskedPagella` e' la sorella di
+    # `openPagellaIfNew` per la Pagella chiesta dall'indirizzo: stessa corsa,
+    # stessa guardia, gira una volta sola dentro `init`.
     assert set(_ASYNC) == set(_LOADERS) | _NOT_WRITERS | {
-        "saveCornerName", "openPagellaIfNew", "adviceAction"}
+        "saveCornerName", "openPagellaIfNew", "openAskedPagella", "adviceAction"}
     assert not _NOT_WRITERS & set(_WAITERS) and "saveCornerName" in _WAITERS
 
 

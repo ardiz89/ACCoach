@@ -160,9 +160,35 @@ async function init() {
     rememberView("line");
     showView("line");
   };
+  // Il bottone «Ho finito» dell'hub apre il report con la Pagella di una
+  // combo precisa (`?view=pagella&car=…&track=…`). Prima di ricordare qualunque
+  // cosa: chi ha chiesto una pagina precisa non vuole l'ultima che ha visto.
+  // Auto e pista si confrontano senza maiuscole, come in `engineer.js`; una
+  // combo che nell'archivio non c'è lascia tutto com'è oggi. I parametri si
+  // tolgono dall'indirizzo subito, così un ricarica normale non li riapplica.
+  const qs = new URLSearchParams(location.search);
+  let asked = null;
+  if (qs.get("view") === "pagella") {
+    const low = (x) => (x || "").toLowerCase();
+    asked = [...sel.options].find((o) => {
+      const c = JSON.parse(o.value);
+      return low(c.car) === low(qs.get("car")) && low(c.track) === low(qs.get("track"));
+    }) || null;
+    if (asked) {
+      sel.value = asked.value;
+      try { localStorage.setItem(_COMBO_KEY, asked.value); } catch (e) {}
+    }
+  }
+  if (qs.has("view") || qs.has("car") || qs.has("track")) {
+    try {
+      qs.delete("view"); qs.delete("car"); qs.delete("track");
+      const rest = qs.toString();
+      history.replaceState(null, "", location.pathname + (rest ? "?" + rest : "") + location.hash);
+    } catch (e) {}
+  }
   // Pick up where you left off — but only if that car+track is still in the
   // archive (a lap store can be moved or cleared between two runs).
-  const combo = savedCombo();
+  const combo = asked ? null : savedCombo();
   if (combo) sel.value = combo;
   // Prima di `loadCombo`, non dopo: `loadCombo` disegna `renderFlow`/`redraw`
   // in modo sincrono appena il fetch risponde, e quei disegni leggono
@@ -178,7 +204,9 @@ async function init() {
   // Dopo una sessione nuova si riapre sulla Pagella, non sull'ultima scheda
   // vista: è la pagina che dice com'è andata. Altrimenti si riprende da dove
   // eri rimasto.
-  if (!(await openPagellaIfNew(CURRENT))) {
+  if (asked) {
+    await openAskedPagella(CURRENT);
+  } else if (!(await openPagellaIfNew(CURRENT))) {
     const view = savedView();
     if (view && view !== VIEW) showView(view);
     // No saved view (first visit) or the saved view IS the landing tab:
@@ -2315,6 +2343,25 @@ async function openPagellaIfNew(combo) {
     return true;
   }
   return false;
+}
+
+// La Pagella chiesta dall'indirizzo: l'uscita più recente di questa combo è
+// quella che il pilota è venuto a vedere, quindi risulta già vista (al
+// prossimo avvio non deve riaprirsi da sola) e la scheda si ricorda come
+// l'ultima. Se l'elenco non arriva la Pagella si apre lo stesso.
+async function openAskedPagella(combo) {
+  const seen = EPOCH;
+  try {
+    const s = await getJSON("/api/sessions?" +
+      new URLSearchParams({ car: combo.car, track: combo.track, index: 0 }));
+    if (stale(seen)) return;
+    const started = s && s.sessions && s.sessions[0] && s.sessions[0].started_utc;
+    if (started) localStorage.setItem(seenKey(combo), started);
+  } catch (e) {}
+  if (stale(seen)) return;
+  SESSION_I = 0;
+  rememberView("pagella");
+  showView("pagella");
 }
 
 async function loadPagella(combo, index) {

@@ -620,3 +620,51 @@ def test_the_scale_on_the_real_series(tmp_path):
     # La seconda a zero non fa una scala a zero.
     assert [c for c, _ in flat] == ["", "", ""] and flat[2][1] == 100
     assert [h for _, h in zeros] == [2, 2]
+
+
+# --- l'hub chiede una Pagella precisa: ?view=pagella&car=…&track=… ----------
+
+def _asked_branch() -> str:
+    """Il tratto di `init` che legge i parametri, fino a `savedCombo()`."""
+    init = _body_of("async function init()")
+    return init.split("new URLSearchParams(location.search)")[1].split("savedCombo()")[0]
+
+
+def test_init_reads_the_page_the_hub_asked_for():
+    init = _body_of("async function init()")
+    assert "new URLSearchParams(location.search)" in init
+    branch = _asked_branch()
+    for param in ('"view"', '"car"', '"track"'):
+        assert param in branch
+    # Senza maiuscole, come `sameName` di engineer.js; mai un confronto secco.
+    assert 'low(c.car) === low(qs.get("car"))' in branch
+    assert 'low(c.track) === low(qs.get("track"))' in branch
+    # La combo chiesta diventa quella ricordata.
+    assert "localStorage.setItem(_COMBO_KEY, asked.value)" in branch
+    # E i parametri spariscono dall'indirizzo: un ricarica non li riapplica.
+    assert "history.replaceState(" in branch
+
+
+def test_the_asked_combo_wins_over_the_remembered_one():
+    init = _body_of("async function init()")
+    assert "const combo = asked ? null : savedCombo();" in init
+
+
+def test_the_asked_pagella_opens_before_the_saved_view_is_restored():
+    init = _body_of("async function init()")
+    assert init.index("openAskedPagella(CURRENT)") < init.index("openPagellaIfNew(CURRENT)")
+    assert init.index("openAskedPagella(CURRENT)") < init.index("savedView()")
+    body = _body_of("async function openAskedPagella(combo)")
+    assert 'showView("pagella")' in body
+    assert "SESSION_I = 0" in body
+    # L'uscita più recente della combo risulta vista.
+    assert "localStorage.setItem(seenKey(combo), started)" in body
+    assert "index: 0" in body
+
+
+def test_an_unknown_combo_leaves_today_s_behaviour():
+    """Nessuna combo trovata: `asked` resta null, quindi si salta il ramo e
+    si va per `savedCombo`/`openPagellaIfNew`/`savedView` di sempre."""
+    init = _body_of("async function init()")
+    assert "let asked = null;" in init
+    assert "if (asked) {\n    await openAskedPagella(CURRENT);\n  } else if (!(await openPagellaIfNew(CURRENT)))" in init
