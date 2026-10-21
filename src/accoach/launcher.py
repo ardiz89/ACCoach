@@ -54,7 +54,6 @@ from .hubgate import (
     CANCEL,
     EXPLAIN,
     GUIDE as _GUIDE,
-    OPEN_ANYWAY,
     SWAP,
     IMPORT_PRO as _IMPORT_PRO,
     LIVE_SAFE_KEYS as _LIVE_SAFE_KEYS,
@@ -62,7 +61,6 @@ from .hubgate import (
     STOP_LIVE as _STOP_LIVE,
     WIZARD as _WIZARD,
     button_state,
-    opens_anyway,
     swap_is_safe,
     swap_plan,
     swap_text,
@@ -230,24 +228,20 @@ def _para(text: str, *, muted: bool = False) -> QLabel:
 
 
 class SwapToBackend(QDialog):
-    """Perché il Backend live non parte, e le uscite che restano.
+    """Perché il Backend live non parte, e lo scambio che resta.
 
     I blocchi seguono l'ordine delle domande di chi ha appena premuto: *perché
-    no*, *cosa succede se scambio*, *cosa ottengo se apro lo stesso*, *scelgo*.
-    L'avviso non è un dettaglio: Coach Live è un pacchetto solo, il Backend live
-    sono tre processi separati e l'overlay non è fra quelli che avvia lo
-    scambio. Presentare un cambio di architettura come un click è il secondo
-    difetto della stessa famiglia del primo.
+    no*, *cosa succede se scambio*, *scelgo*. L'avviso non è un dettaglio:
+    Coach Live è un pacchetto solo, il Backend live sono tre processi separati
+    e l'overlay non è fra quelli che avvia lo scambio. Presentare un cambio di
+    architettura come un click è il secondo difetto della stessa famiglia del
+    primo.
 
-    Le uscite sono due o tre a seconda di `open_anyway`, che il chiamante prende
-    da :func:`accoach.hubgate.opens_anyway` — la pagina Ingegnere ha una metà
-    che vive senza backend, il Backend live non ha niente da aprire lo stesso.
     L'esito si legge in :attr:`choice`, e chiudere in qualunque altro modo
     (Esc, la X) lascia `CANCEL`: l'uscita di sicurezza non deve avviare niente.
     """
 
-    def __init__(self, parent: QWidget | None = None, *,
-                 open_anyway: bool = False) -> None:
+    def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         txt = swap_text()
         self.choice = CANCEL
@@ -271,19 +265,11 @@ class SwapToBackend(QDialog):
         # colore del testo principale. Non un colore d'allarme — il peso che ha.
         lay.addWidget(_para(txt["warn"]))
 
-        if open_anyway:
-            # Questa invece è la didascalia di un'uscita secondaria, e resta tale.
-            lay.addWidget(_para(txt["open_anyway_why"], muted=True))
-
         row = QHBoxLayout()
         cancel = QPushButton(txt["cancel"])
         cancel.clicked.connect(self.reject)
         row.addWidget(cancel)
         row.addStretch(1)
-        if open_anyway:
-            keep = QPushButton(txt["open_anyway"])
-            keep.clicked.connect(partial(self._chose, OPEN_ANYWAY))
-            row.addWidget(keep)
         go = QPushButton(txt["confirm"])
         go.setProperty("accent", True)
         go.setDefault(True)
@@ -916,22 +902,14 @@ class MainWindow(QWidget):
         self._on_action(("web", "--engineer"), ["web", "--engineer"], False)
 
     def _offer_swap(self, key: tuple, args: list[str], console: bool) -> None:
-        """Spiega, chiedi, e fai quello che l'utente ha scelto.
-
-        Tre esiti. `OPEN_ANYWAY` avvia il bottone come se niente fosse — è già
-        fra i sicuri durante Coach Live, quindi non ferma niente e non accende
-        nessun secondo motore: apre la metà di pagina che vive senza backend.
-        """
-        choice = self._ask_swap(key)
-        if choice == SWAP:
+        """Spiega, chiedi, e fai lo scambio solo se l'utente lo ha scelto."""
+        if self._ask_swap(key) == SWAP:
             self._do_swap()
-        elif choice == OPEN_ANYWAY:
-            self._spawn(args, console)
 
     def _ask_swap(self, key: tuple) -> str:
         """Il dialogo. Isolato in un metodo suo così la decisione a monte e la
         sequenza a valle si possono provare senza aprire una finestra."""
-        dlg = SwapToBackend(self, open_anyway=opens_anyway(key))
+        dlg = SwapToBackend(self)
         dlg.exec()
         return dlg.choice
 
