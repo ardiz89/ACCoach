@@ -66,6 +66,62 @@ def test_local_addresses_never_raises(monkeypatch):
     assert {"127.0.0.1", "::1"} <= local_addresses()
 
 
+def test_local_addresses_survives_only_the_hostname_lookup_failing(monkeypatch):
+    import accoach.netinfo as ni
+    import socket
+
+    def boom(*a, **k):
+        raise OSError("no")
+    monkeypatch.setattr(ni, "lan_ip", lambda: "192.168.1.23")
+    monkeypatch.setattr(socket, "gethostbyname_ex", boom)
+    assert local_addresses() == {"127.0.0.1", "::1", "192.168.1.23"}
+
+
+def test_is_remote_normalises_ipv4_mapped_ipv6():
+    local = {"127.0.0.1", "::1", "192.168.1.23"}
+    assert not _is_remote("::ffff:192.168.1.23", local)
+    assert not _is_remote("::ffff:127.0.0.1", local)
+    assert _is_remote("::ffff:192.168.1.50", local)
+
+
+def test_health_does_not_hit_the_resolver_on_every_request(monkeypatch):
+    calls = []
+
+    def conta():
+        calls.append(1)
+        return {"127.0.0.1", "::1"}
+    monkeypatch.setattr(server, "local_addresses", conta)
+    with TestClient(_app_con_stato()) as c:
+        for _ in range(3):
+            c.get("/health")
+    assert len(calls) == 1
+
+
+def test_health_refreshes_addresses_after_the_ttl(monkeypatch):
+    calls = []
+    monkeypatch.setattr(server, "local_addresses",
+                        lambda: calls.append(1) or {"127.0.0.1"})
+    monkeypatch.setattr(server, "_LOCALI_TTL_S", -1.0)
+    with TestClient(_app_con_stato()) as c:
+        c.get("/health")
+        c.get("/health")
+    assert len(calls) == 2
+
+
+def test_two_clients_one_local_one_remote(monkeypatch):
+    monkeypatch.setattr(server, "local_addresses", lambda: {"127.0.0.1", "::1"})
+    n = []
+    # i due websocket hanno lo stesso host nel TestClient: il primo valutato
+    # passa per remoto, il secondo per locale
+    monkeypatch.setattr(server, "_is_remote",
+                        lambda host, local: len(n) == 0 and not n.append(1))
+    with TestClient(_app_con_stato()) as c:
+        with c.websocket_connect("/ws"), c.websocket_connect("/ws"):
+            h = _attendi(c, lambda h: h["clients"] == 2)
+            assert h["clients"] == 2
+            assert h["remote_clients"] == 1
+
+
 def test_is_remote_distinguishes_this_machine_from_others():
     local = {"127.0.0.1", "::1", "192.168.1.23"}
     assert not _is_remote("127.0.0.1", local)

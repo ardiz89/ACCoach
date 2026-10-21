@@ -42,12 +42,17 @@ def _cpu_percent() -> float | None:
         return None
 
 
+_LOCALI_TTL_S = 60.0
+
+
 def _is_remote(host: str, local: set[str]) -> bool:
     """True se `host` e' un'altra macchina (un tablet), non questo PC.
 
     Un host vuoto o sconosciuto non e' un tablet: meglio non spuntare un
     «tablet collegato» che non possiamo dimostrare.
     """
+    if host.lower().startswith("::ffff:"):
+        host = host[7:]   # IPv4 mappato su socket IPv6: e' lo stesso indirizzo
     return bool(host) and host not in local
 
 
@@ -181,13 +186,24 @@ def create_app(engine: CoachEngine | None = None, hz: float = 15.0, *,
             return {"ok": True}
         return {"ok": False}
 
+    async def _locali() -> set[str]:
+        """Gli indirizzi del PC, in cache: il resolver puo' essere lento (VPN,
+        NetBIOS) e `/health` gira sullo stesso loop del broadcast, quindi non
+        lo interroga mai sul loop e non piu' di una volta ogni `_LOCALI_TTL_S`."""
+        now = time.monotonic()
+        if holder.get("locali") is None or now - holder["locali_ts"] > _LOCALI_TTL_S:
+            holder["locali"] = await asyncio.get_running_loop().run_in_executor(
+                None, local_addresses)
+            holder["locali_ts"] = now
+        return holder["locali"]
+
     @app.get("/health")
     async def health() -> dict:
         last = holder.get("last_state") or {}
         last_tick = holder.get("last_tick_ts") or 0.0
         eng = holder.get("engine")
         acquire_hz = eng.acquisition_hz() if hasattr(eng, "acquisition_hz") else None
-        local = local_addresses()   # una volta per richiesta, non per client
+        local = await _locali()
         remote = sum(
             1 for ws in list(clients)
             if _is_remote(ws.client.host if ws.client else "", local))
