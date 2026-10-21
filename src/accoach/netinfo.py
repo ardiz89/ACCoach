@@ -30,6 +30,25 @@ def lan_ip() -> str | None:
     return None
 
 
+def local_addresses() -> set[str]:
+    """Gli indirizzi con cui questo PC si presenta a se stesso.
+
+    Serve a `/health` per distinguere il report aperto sul PC del pilota da un
+    tablet: un client il cui indirizzo e' uno di questi non e' un altro
+    dispositivo (nemmeno quando entra dall'IP di rete del PC). Best-effort: un
+    nome che non si risolve non deve mai far cadere `/health`.
+    """
+    out = {"127.0.0.1", "::1"}
+    ip = lan_ip()
+    if ip:
+        out.add(ip)
+    try:
+        out.update(socket.gethostbyname_ex(socket.gethostname())[2])
+    except Exception:  # noqa: BLE001 - best-effort, mai eccezioni
+        pass
+    return out
+
+
 def device_urls(port: int, ip: str | None = None) -> dict[str, str] | None:
     """Report + engineer + on-track test URLs a LAN device opens, or ``None`` if
     no LAN IP.

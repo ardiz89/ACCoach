@@ -24,6 +24,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from . import __version__
 from .engine import CoachEngine
 from .logging_setup import get_logger
+from .netinfo import local_addresses
 from .serialize import state_to_dict
 
 HOST = "127.0.0.1"
@@ -39,6 +40,15 @@ def _cpu_percent() -> float | None:
         return psutil.Process().cpu_percent(interval=None)
     except Exception:
         return None
+
+
+def _is_remote(host: str, local: set[str]) -> bool:
+    """True se `host` e' un'altra macchina (un tablet), non questo PC.
+
+    Un host vuoto o sconosciuto non e' un tablet: meglio non spuntare un
+    «tablet collegato» che non possiamo dimostrare.
+    """
+    return bool(host) and host not in local
 
 
 def create_app(engine: CoachEngine | None = None, hz: float = 15.0, *,
@@ -177,11 +187,21 @@ def create_app(engine: CoachEngine | None = None, hz: float = 15.0, *,
         last_tick = holder.get("last_tick_ts") or 0.0
         eng = holder.get("engine")
         acquire_hz = eng.acquisition_hz() if hasattr(eng, "acquisition_hz") else None
+        local = local_addresses()   # una volta per richiesta, non per client
+        remote = sum(
+            1 for ws in list(clients)
+            if _is_remote(ws.client.host if ws.client else "", local))
+        lap = last.get("lap") or {}
+        best = lap.get("best")
         return {
             "ok": True,
             "version": __version__,
             "uptime_s": round(time.monotonic() - holder["started"], 1),
             "clients": len(clients),
+            "remote_clients": remote,
+            "laps_done": lap.get("completed"),
+            # format_lap_time scrive «--:--.---» quando il tempo non c'e'
+            "best": best if best and not best.startswith("--") else None,
             "tick_errors": holder["tick_errors"],
             "tick_hz": holder.get("tick_hz"),
             "acquire_hz": acquire_hz,
