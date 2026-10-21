@@ -8,6 +8,7 @@ const LANG = () => (window.HoneI18n ? window.HoneI18n.lang : "en");
 
 let CURRENT = null;   // current combo {car, track}
 let ADVICE = null;    // il consiglio in corso {defect, name, corners:[{name, apex_pos}]}, o null
+let ADV_REQ = 0;      // contatore per richiesta di loadAdvice: due in volo nella stessa EPOCH
 let HOWTO_APEX = null; // apice (frazione di giro) a cui scorrere nel «Come si fa»
 let DATA = null;      // last /api/analysis payload
 let DIST = null;      // {pos[], m[], total} — the reviewed lap in metres (see buildDistance)
@@ -2666,11 +2667,12 @@ const ADVICE_VIEWS = {
 async function loadAdvice() {
   if (!CURRENT) return;
   const seen = EPOCH;
+  const req = ++ADV_REQ;
   const q = new URLSearchParams({ car: CURRENT.car, track: CURRENT.track });
   let next = null;
   try { next = (await getJSON("/api/advice/active?" + q.toString())).advice || null; }
   catch (e) { next = null; }
-  if (stale(seen)) return;
+  if (stale(seen) || req !== ADV_REQ) return;
   const changed = JSON.stringify(next) !== JSON.stringify(ADVICE);
   ADVICE = next;
   // Ridisegna solo le schede che la portano, e solo se e' cambiato qualcosa:
@@ -2723,10 +2725,12 @@ function adviceLineModel(view, corners, opts) {
       const hit = adv.find((a) => a.apex_pos === apex);
       names.push({ corner: c, apex, label: c.name || (hit && hit.name) || "" });
     }
-    if (!names.length) return null;
+    // Andamento ha la riga per tutti e sette i difetti: senza curve ritrovate
+    // dice la frase del giro intero. Le altre schede, senza curve, tacciono.
+    if (!names.length && view !== "progress") return null;
   }
   const key = (opts && opts.key) ||
-    (view === "progress" ? (adv.length ? "adv.progress.corners" : "adv.progress.lap")
+    (view === "progress" ? (names.length ? "adv.progress.corners" : "adv.progress.lap")
                          : `adv.${view}.${ADVICE.defect}`);
   if (t(key) === key) return null;
   return { names, key, vals: (opts && opts.vals) || {},
@@ -2758,20 +2762,22 @@ function renderAdviceLine(view, corners, goto, opts) {
   el.querySelector("[data-adv-how]").onclick = () => openHowto(ADVICE.defect, m.apex);
 }
 
-// Quale figura del «Come si fa» contiene l'apice, o -1.
-function howtoFigIndex(figs, apex) {
+// Quale figura del «Come si fa» contiene l'apice, o -1. Legge gli attributi
+// `data-entry`/`data-exit` che `renderHowto` mette su ogni figura.
+function howtoFigIndex(els, apex) {
   if (typeof apex !== "number") return -1;
-  return (figs || []).findIndex((f) => f.entry_pos <= apex && apex <= f.exit_pos);
+  return Array.from(els || []).findIndex((e) =>
+    Number(e.dataset.entry) <= apex && apex <= Number(e.dataset.exit));
 }
 
 // Il «Come si fa» aperto da una riga scorre alla figura della curva; senza
 // figura resta in cima. Una volta sola: un resize non deve riportarci li'.
-function scrollHowtoToApex(h) {
+function scrollHowtoToApex() {
   const apex = HOWTO_APEX;
   HOWTO_APEX = null;
-  const i = howtoFigIndex(h.figures, apex);
-  const el = i < 0 ? null : document.querySelectorAll("#howto-body .howto-fig")[i];
-  if (el) el.scrollIntoView({ block: "start" });
+  const els = document.querySelectorAll("#howto-body .howto-fig[data-entry]");
+  const i = howtoFigIndex(els, apex);
+  if (i >= 0) els[i].scrollIntoView({ block: "start" });
 }
 
 // «Come si fa →»: la vista di un consiglio, fuori dalla barra delle schede.
@@ -2823,7 +2829,6 @@ async function loadHowto(combo, index) {
   if (stale(seen) || SESSION_I !== want || req !== HOWTO_REQ) return;
   HOWTO = { h, laps: {} };
   renderHowto(h);
-  scrollHowtoToApex(h);
   // Un /api/analysis per coppia di giri (il migliore è lo stesso per tutte le
   // curve, il solito può cambiare), tutti insieme. Un giro che non si legge
   // diventa `null`, e la sua figura una frase.
@@ -2836,6 +2841,9 @@ async function loadHowto(combo, index) {
   if (stale(seen) || SESSION_I !== want || req !== HOWTO_REQ) return;
   keys.forEach((k, i) => { HOWTO.laps[k] = got[i]; });
   drawHowtoFigures();
+  // Solo ora: finche' i giri non sono arrivati ogni figura e' un segnaposto
+  // basso, e le canvas che si accendono spingono giu' quelle sotto.
+  scrollHowtoToApex();
 }
 
 function renderHowto(h) {

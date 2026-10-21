@@ -145,9 +145,24 @@ def test_loadAdvice_checks_stale_before_it_assigns():
     assert body.index("stale(") < body.index("ADVICE = ")
 
 
-def test_the_figures_carry_their_span_for_the_scroll():
-    assert "data-entry" in _APPJS and "data-exit" in _APPJS
+def test_the_scroll_waits_for_the_figures_and_reads_their_span():
+    load = _body_of("async function loadHowto(")
+    # dopo il disegno delle figure, non subito dopo renderHowto
+    assert "scrollHowtoToApex(" in load
+    assert load.index("scrollHowtoToApex(") > load.index("drawHowtoFigures(")
+    assert "scrollHowtoToApex(" not in load.split("renderHowto(h);")[1].split("drawHowtoFigures(")[0]
+    scroll = _body_of("function scrollHowtoToApex(")
+    assert "data-entry" in scroll and "scrollIntoView" in scroll
+    assert scroll.index("HOWTO_APEX = null") > scroll.index("= HOWTO_APEX")
+    assert 'data-entry="' in _body_of("function renderHowto(") or "data-entry" in _APPJS
     assert "function openHowto(defect, apex)" in _APPJS
+
+
+def test_two_advice_requests_in_one_epoch_cannot_land_out_of_order():
+    body = _body_of("async function loadAdvice(")
+    assert "const req = ++ADV_REQ;" in body
+    assert re.search(r"if \(stale\(seen\) \|\| req !== ADV_REQ\) return;", body)
+    assert body.index("req !== ADV_REQ") < body.index("ADVICE = ")
 
 
 # --- le funzioni vere, eseguite in node -------------------------------------
@@ -345,8 +360,9 @@ def test_opts_replace_the_sentence_and_its_values(tmp_path):
 
 @needs_node
 def test_the_scroll_picks_the_figure_that_holds_the_apex(tmp_path):
-    figs = [{"entry_pos": 0.10, "exit_pos": 0.20}, {"entry_pos": 0.40, "exit_pos": 0.45},
-            {"entry_pos": 0.60, "exit_pos": 0.70}]
+    figs = [{"dataset": {"entry": "0.1", "exit": "0.2"}},
+            {"dataset": {"entry": "0.4", "exit": "0.45"}},
+            {"dataset": {"entry": "0.6", "exit": "0.7"}}]
     got = _run(tmp_path, [
         {"call": "figidx", "figs": figs, "apex": 0.42},
         {"call": "figidx", "figs": figs, "apex": 0.45},
@@ -355,3 +371,24 @@ def test_the_scroll_picks_the_figure_that_holds_the_apex(tmp_path):
         {"call": "figidx", "figs": figs, "apex": None},
     ])
     assert got == [1, 1, 1, -1, -1]
+
+
+@needs_node
+def test_progress_keeps_the_line_with_or_without_matched_corners(tmp_path):
+    corners = [{"name": "Curva 1", "entry": 0.40, "exit": 0.45},
+               {"name": "Curva 2", "entry": 0.60, "exit": 0.65}]
+    lap = {"defect": "coasting", "name": "x", "corners": []}
+    got = _run(tmp_path, [
+        {"advice": _ADVICE, "call": "line", "view": "progress", "corners": corners},
+        {"call": "line", "view": "progress", "corners": [corners[1]]},   # nessuna ritrovata
+        {"call": "line", "view": "progress", "corners": []},
+        {"advice": lap, "call": "line", "view": "progress", "corners": corners},
+    ])
+    hit, nomatch, empty, nocorners = got
+    assert not hit["hidden"] and "Curva 1" in hit["html"]
+    assert "Further down, the cards for these corners" in hit["html"]
+    for g in (nomatch, empty, nocorners):
+        assert not g["hidden"], g
+        assert "Curva" not in g["html"]
+        assert "the advice you're following, session by session" in g["html"]
+        assert g["gone"] == [None]
