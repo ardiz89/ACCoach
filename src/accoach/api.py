@@ -2261,6 +2261,14 @@ def create_api(
         except pagella.NoSuchSession:
             raise HTTPException(404, "no such session")
 
+    @app.get("/api/defect-history")
+    def defect_history(car: str = Query(...), track: str = Query(...),
+                       lang: str | None = Query(None)) -> dict:
+        """I difetti sessione per sessione, per la scheda Andamento."""
+        with _catalog() as cat:
+            return pagella.build_defect_history(cat, car, track,
+                                                lang or current_language())
+
     @app.get("/api/howto")
     def howto_page(car: str = Query(...), track: str = Query(...),
                    defect: str = Query(...), index: int = Query(0),

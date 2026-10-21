@@ -1312,6 +1312,37 @@ body.view-pagella #lapbar { display: none; }
   content: ""; position: absolute; left: -1px; right: -1px; top: 5px; height: 3px;
   background: var(--panel); transform: skewY(-35deg);
 }
+/* Andamento: i difetti sessione per sessione. Le barre sono quelle del
+   mini-andamento (`.pag-spark i`: colori e taglio), più alte e larghe quanto
+   lo spazio, fino a venti. Le date stanno in una riga sotto, nella stessa
+   colonna e con lo stesso passo: ogni data sotto la sua barra. */
+.dh-row {
+  display: grid; grid-template-columns: minmax(130px, 220px) minmax(0, 1fr) 170px;
+  gap: 12px; align-items: end; padding: 6px 0; border-bottom: 1px solid var(--line);
+}
+.dh-row.dh-foot { border-bottom: 0; align-items: start; padding-top: 2px; }
+.dh-name {
+  background: none; border: 0; padding: 0; color: var(--text); font: inherit;
+  font-weight: 600; text-align: left; cursor: pointer; align-self: center;
+}
+.dh-name:hover { text-decoration: underline; }
+/* Alta quanto DH_H in app.js. */
+.dh-bars { height: 44px; }
+.pag-spark.dh-bars { display: flex; margin-left: 0; }
+.dh-bars i, .dh-dates span { flex: 1 1 0; max-width: 28px; }
+.dh-bars i { width: auto; }
+.dh-dates { display: flex; gap: 3px; }
+.dh-dates span {
+  font-size: 10px; line-height: 1.2; color: var(--muted); text-align: center;
+  overflow: hidden; white-space: nowrap;
+}
+.dh-last { display: flex; align-items: center; gap: 6px; white-space: nowrap; align-self: center; }
+.dh .num { font-family: var(--font-mono); font-weight: 700; font-variant-numeric: tabular-nums; }
+.dh .num.loss { color: var(--red); }
+@media (max-width: 700px) {
+  .dh-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .dh-row .dh-bars, .dh-row .dh-dates { grid-column: 1 / -1; grid-row: 2; }
+}
 .pag-trend { font-weight: 700; margin-left: 2px; }
 .pag-trend.down { color: var(--green); }
 .pag-trend.same { color: var(--amber); }

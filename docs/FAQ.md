@@ -207,21 +207,22 @@ Then, in order:
 - **The plan for your next run.** Three pieces of advice at most, in order.
 
 Every number comes from your laps. When a figure isn't there, the line says so
-or doesn't appear; we don't make one up. Every session is measured against the
+or doesn't appear. We don't make one up. Every session is measured against the
 same reference, today's, so when a fault goes down it is you that changed and
 not the yardstick. When the reference changes, the history is recalculated.
 
 The report card is about driving. Setup problems stay with the Engineer.
 
 **You follow the plan one piece of advice at a time.** Each piece of advice is
-about one fault and the corners where it weighs most. It has three buttons:
+about one fault and the corners where it weighs most. The three choices are for
+the piece at the top; the others only show **How to do it →**.
 
 - **I'll follow it** puts it in progress, dated today. Only one piece can be in
   progress. While there is one, the others show their place in the plan and
   **How to do it →**, and nothing else.
 - **Not for me** takes a piece you haven't started out of the plan. The fault
-  stays on the report card, and the advice doesn't come back every time you
-  open it. You find it again under "You set aside", with **Take it back**.
+  stays on the report card, and the advice stays out of the plan until you
+  take it back. You find it again under "You set aside", with **Take it back**.
 - **Drop it** closes the one in progress without counting it as done.
 
 The piece in progress is measured only on the laps you drive after you take it.
@@ -320,7 +321,10 @@ The tabs come in three groups, in the order you usually read them.
 
 **Over time**
 
-- **Trends** — lap times over time, consistency, your weak points corner by
+- **Trends** — at the top, your **faults session by session**, up to twenty
+  sessions, measured against the same reference as the Report card. That is
+  where you see a fault going down; a click on its name opens its **How to do
+  it**. Below, lap times over time, consistency, your weak points corner by
   corner (systematic or one-off) and recurring mistakes. It is the working; the
   plan that comes out of it lives on the **Report card**, and the tyre charts under
   **Race pace** — here the series covered your whole archive while calling

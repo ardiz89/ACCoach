@@ -255,7 +255,9 @@ function redrawCurrentView() {
   if (VIEW === "line") { LINE ? renderLine(null) : loadLine(); }
   else if (VIEW === "dynamics") { if (DATA) drawDynamics(LAST_HOVER); }
   else if (VIEW === "sectors") { if (CURRENT) loadSectors(); }
-  else if (VIEW === "progress") { if (CURRENT) loadProgress(CURRENT); }
+  else if (VIEW === "progress") {
+    if (CURRENT) { loadProgress(CURRENT); loadDefectHistory(CURRENT); }
+  }
   // Refetched rather than repainted: the verdict, the defect names and the
   // corner names are written by the backend, so a cached payload would still
   // be in the language you left.
@@ -490,6 +492,82 @@ async function loadProgress(combo) {
       `<div class="recur"><span class="count">${r.count}×</span>` +
       `<span class="msg">${r.message}</span>` +
       `<span class="where">${t("recur.corners")}${r.corners.join(", ")}</span></div>`).join("");
+  }
+}
+
+// --- Andamento: i difetti sessione per sessione ----------------------------
+// La storia lunga del mini-andamento della Pagella, fino a venti sessioni: gli
+// stessi numeri (il backend li costruisce con la stessa funzione), le stesse
+// barre con la stessa scala tagliata. Una riga per difetto: il nome apre il
+// «Come si fa», poi le barre, il valore dell'ultima sessione e la freccia. Le
+// date una volta sola, sotto, ognuna sotto la sua colonna.
+const DH_H = 44;     // px, come `.dh-bars` in style.css
+
+async function loadDefectHistory(combo) {
+  const seen = EPOCH;
+  $("dh-ref").textContent = "";
+  $("dh-body").innerHTML = `<div class="nothing">${t("load.dh")}</div>`;
+  let h;
+  try {
+    h = await getJSON("/api/defect-history?" +
+      new URLSearchParams({ car: combo.car, track: combo.track, lang: LANG() }));
+  } catch (e) {
+    if (stale(seen)) return;
+    $("dh-body").innerHTML = `<div class="nothing">${t("err.dh")}</div>`;
+    return;
+  }
+  if (stale(seen)) return;
+  renderDefectHistory(h);
+}
+
+// «21» sopra «ott»: venti date in fila stanno sotto le loro barre solo su due
+// righe.
+function fmtDay(iso) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  return `${d.getDate()}<br>${escAttr(d.toLocaleDateString(LANG(), { month: "short" }))}`;
+}
+
+function renderDefectHistory(h) {
+  const body = $("dh-body");
+  const r = h.reference;
+  if (h.excluded) {
+    $("dh-ref").textContent = "";
+    body.innerHTML =
+      `<div class="nothing">${t(h.excluded === "no_laps" ? "dh.nolaps" : "dh.noref")}</div>`;
+    return;
+  }
+  $("dh-ref").textContent = r
+    ? tf("dh.ref", { time: r.lap_time, when: fmtWhen(r.recorded_utc) }) : "";
+  const defs = h.defects || [];
+  if (!defs.length) {
+    body.innerHTML = `<div class="nothing">${t("dh.none")}</div>`;
+    return;
+  }
+  const arrows = { down: "↓", same: "=", up: "↑" };
+  const says = { down: t("pag.trend.down"), same: t("pag.trend.same"), up: t("pag.trend.up") };
+  const rows = defs.map((d) => {
+    const vals = (d.values || []).map(Number);
+    const last = vals.length ? vals[vals.length - 1] : 0;
+    const trend = arrows[d.trend] ? d.trend : "";
+    const arrow = trend
+      ? `<span class="pag-trend ${trend}" title="${escAttr(says[trend])}">${arrows[trend]}</span>`
+      : "";
+    const per = d.unit === "s" ? t("pag.def.coast") : t("pag.def.perlap");
+    return `<div class="dh-row">` +
+      `<button type="button" class="dh-name" data-howto="${escAttr(d.key)}" ` +
+      `title="${escAttr(t("dh.howto"))}">${escAttr(d.name)}</button>` +
+      `<span class="pag-spark dh-bars">${sparkBars(vals, d.unit, trend, DH_H)}</span>` +
+      `<span class="dh-last"><span class="num loss">${fmtSecs(last, d.unit)}</span> ` +
+      `<span class="pag-small">${per}</span>${arrow}</span></div>`;
+  }).join("");
+  const dates = (h.sessions || []).map((s) =>
+    `<span title="${escAttr(fmtWhen(s.started_utc) + " · " + tf("dh.valid", { n: s.valid }))}">` +
+    `${fmtDay(s.started_utc)}</span>`).join("");
+  body.innerHTML = rows +
+    `<div class="dh-row dh-foot"><span></span><span class="dh-dates">${dates}</span><span></span></div>`;
+  for (const b of body.querySelectorAll("[data-howto]")) {
+    b.onclick = () => openHowto(b.dataset.howto);
   }
 }
 
@@ -1375,7 +1453,7 @@ function reloadSelection() {
 // sempre. Chi fa salire il contatore passa di qui.
 function reloadViewData(combo) {
   if (!combo) return;
-  if (VIEW === "progress") loadProgress(combo);
+  if (VIEW === "progress") { loadProgress(combo); loadDefectHistory(combo); }
   if (VIEW === "pagella") loadPagella(combo, SESSION_I);
   if (VIEW === "howto") loadHowto(combo, SESSION_I);
   if (VIEW === "session") loadSession(combo, SESSION_I);
@@ -2327,6 +2405,13 @@ const SPARK_H = 26;     // px, come `.pag-spark` in style.css
 function pagSpark(series, unit, trend) {
   const vals = (series || []).map(Number).filter((v) => isFinite(v));
   if (vals.length < 2) return "";
+  return `<span class="pag-spark" title="${escAttr(t("pag.spark"))}">` +
+    `${sparkBars(vals, unit, trend, SPARK_H)}</span>`;
+}
+
+// Le barre, alte `height` px. Una funzione sola per il mini-andamento della
+// Pagella e per la storia lunga di Andamento: stessa scala, stesso taglio.
+function sparkBars(vals, unit, trend, height) {
   const sorted = vals.slice().sort((a, b) => a - b);
   const mid = sorted.length >> 1;
   const median = sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
@@ -2336,12 +2421,12 @@ function pagSpark(series, unit, trend) {
   const top = Math.min(max, 2 * median) || max;
   const bars = vals.map((v, i) => {
     const cut = top > 0 && v > top;
-    const h = top > 0 ? Math.max(2, Math.round(SPARK_H * Math.min(v, top) / top)) : 2;
+    const h = top > 0 ? Math.max(2, Math.round(height * Math.min(v, top) / top)) : 2;
     const last = i === vals.length - 1 && trend ? " " + trend : "";
     const tip = cut ? tf("pag.spark.cut", { v: fmtSecs(v, unit) }) : fmtSecs(v, unit);
     return `<i class="${cut ? "cut" : ""}${last}" style="height:${h}px" title="${escAttr(tip)}"></i>`;
   }).join("");
-  return `<span class="pag-spark" title="${escAttr(t("pag.spark"))}">${bars}</span>`;
+  return bars;
 }
 
 function pagWorst(list) {

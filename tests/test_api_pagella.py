@@ -543,3 +543,103 @@ def test_howto_without_advice_has_no_target(tmp_path):
     _put(tmp_path, "2026-10-20T10:00:00+00:00")
     h = _howto(TestClient(create_api(tmp_path)), "coasting")
     assert h["target"] is None and h["unit"] == "s"
+
+
+# --- la storia dei difetti (scheda Andamento) -------------------------------
+
+def _history(c, lang="it"):
+    r = c.get("/api/defect-history", params={"car": CAR, "track": TRACK, "lang": lang})
+    assert r.status_code == 200, r.text
+    return r.json()
+
+
+def test_the_history_agrees_with_the_pagella_series(tmp_path):
+    # Due sessioni con numeri diversi: con due sessioni uguali una serie
+    # rovesciata sarebbe la stessa serie.
+    c = _two_sessions(tmp_path, second=[("min", 40), ("thr", 20), ("min", 40), ("thr", 20)])
+    h, p = _history(c), _pagella(c)
+    assert h["excluded"] is None
+    assert h["reference"]["lap_time"] == p["reference"]["lap_time"]
+    assert [s["started_utc"][:13] for s in h["sessions"]] == \
+        ["2026-10-20T10", "2026-10-20T11"]
+    assert [s["valid"] for s in h["sessions"]] == [5, 4]
+    by = {d["key"]: d for d in h["defects"]}
+    assert [d["key"] for d in h["defects"]] == [d["key"] for d in p["defects"]]
+    for d in p["defects"]:
+        assert by[d["key"]]["values"] == d["series"]
+        assert len(by[d["key"]]["values"]) == 2
+        assert by[d["key"]]["trend"] == d["trend"]
+        assert by[d["key"]]["name"] == d["name"] and by[d["key"]]["unit"] == d["unit"]
+    assert by["min_speed"]["values"][0] < by["min_speed"]["values"][1]
+
+
+def test_a_defect_that_was_main_once_stays_in_the_history(tmp_path):
+    """Il gas tardi sparisce nella seconda sessione: in Pagella non c'e' piu',
+    nella storia si' — vederlo andare a zero e' proprio quello che il pilota
+    vuole vedere."""
+    c = _two_sessions(tmp_path, second=[("min", 40), ("min", 40)])
+    h = _history(c)
+    assert [d["key"] for d in h["defects"]] == ["min_speed", "throttle_late"]
+    thr = h["defects"][1]
+    assert thr["values"][0] > 0 and thr["values"][1] == 0.0
+    assert thr["trend"] == "down"
+    assert h["defects"][0]["trend"] == "up"
+
+
+def test_a_lone_wet_session_stays_out_of_a_dry_history(tmp_path):
+    _session(tmp_path, 9, [(None, 0)] + _MIXED, compound="dry_compound")
+    _session(tmp_path, 10, [(None, 0)] + _MIXED, compound="wet_compound")
+    _session(tmp_path, 11, _MIXED, compound="dry_compound")
+    h = _history(TestClient(create_api(tmp_path)))
+    assert h["excluded"] is None
+    assert [s["started_utc"][:13] for s in h["sessions"]] == \
+        ["2026-10-20T09", "2026-10-20T11"]
+    assert all(len(d["values"]) == 2 for d in h["defects"])
+
+
+def test_the_latest_session_alone_in_the_wet_does_not_hide_the_dry_history(tmp_path):
+    """La piu' recente e' l'unica sul bagnato: la Pagella la lascia fuori
+    dall'andamento, e la storia mostra l'asciutto invece di niente."""
+    _session(tmp_path, 10, [(None, 0)] + _MIXED, compound="dry_compound")
+    _session(tmp_path, 11, [(None, 0)] + _MIXED, compound="wet_compound")
+    h = _history(TestClient(create_api(tmp_path)))
+    assert h["excluded"] is None
+    assert [s["started_utc"][:13] for s in h["sessions"]] == ["2026-10-20T10"]
+
+
+def test_the_history_skips_a_latest_session_it_cannot_measure(tmp_path):
+    # Una sessione fatta del solo riferimento, e una senza giri validi.
+    _session(tmp_path, 10, _MIXED)
+    _put(tmp_path, "2026-10-20T11:00:00+00:00")
+    _put(tmp_path, "2026-10-20T12:00:00+00:00", "min", 26, valid=False)
+    h = _history(TestClient(create_api(tmp_path)))
+    assert h["excluded"] is None
+    assert [s["started_utc"][:13] for s in h["sessions"]] == ["2026-10-20T10"]
+
+
+def test_the_history_of_a_single_lap_has_no_reference(tmp_path):
+    _put(tmp_path, "2026-10-20T10:00:00+00:00")
+    h = _history(TestClient(create_api(tmp_path)))
+    assert h["excluded"] == "no_reference"
+    assert h["sessions"] == [] and h["defects"] == []
+
+
+def test_the_history_without_laps(tmp_path):
+    h = _history(TestClient(create_api(tmp_path)))
+    assert h["excluded"] == "no_laps"
+    assert h["sessions"] == [] and h["defects"] == [] and h["reference"] is None
+
+
+def test_the_history_stops_at_twenty_sessions(tmp_path):
+    _put(tmp_path, "2026-10-20T00:00:00+00:00")
+    for h in range(1, 23):          # ventidue sessioni da due giri lenti
+        _session(tmp_path, h, [("min", 26), ("min", 26)])
+    h = _history(TestClient(create_api(tmp_path)))
+    assert len(h["sessions"]) == 20
+    assert h["sessions"][-1]["started_utc"][:13] == "2026-10-20T22"
+    assert len(h["defects"][0]["values"]) == 20
+
+
+def test_the_history_names_follow_the_language(tmp_path):
+    h = _history(_two_sessions(tmp_path), lang="en")
+    assert h["defects"][0]["name"] == defect_name(h["defects"][0]["key"], "en")

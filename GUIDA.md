@@ -361,21 +361,22 @@ Poi, in ordine:
 - **Il piano per la prossima uscita.** Al massimo tre consigli, in ordine.
 
 Ogni numero viene dai tuoi giri. Se un dato non c'è, la riga lo dice o non
-compare: non te lo inventiamo. Tutte le sessioni si misurano contro lo stesso
+compare. Non te lo inventiamo. Tutte le sessioni si misurano contro lo stesso
 riferimento, quello di oggi. Così, se un difetto cala, sei cambiato tu e non il
 metro. Quando il riferimento cambia, lo storico si ricalcola.
 
 La Pagella parla di guida. I problemi d'assetto restano all'Ingegnere.
 
 **Il piano si segue un consiglio alla volta.** Ogni consiglio riguarda un
-difetto e le curve dove pesa di più. Ha tre bottoni:
+difetto e le curve dove pesa di più. Le tre scelte valgono per il consiglio
+in cima; gli altri mostrano solo **Come si fa →**.
 
 - **Lo seguo** lo mette in corso, con la data di oggi. Può essere in corso un
   consiglio solo: finché ce n'è uno, gli altri mostrano la loro posizione nel
   piano e **Come si fa →**, e basta.
 - **Non lo seguo** toglie dal piano un consiglio che non hai ancora iniziato. Il
-  difetto resta in Pagella e il consiglio non ti torna a ogni apertura. Lo
-  ritrovi sotto «Hai messo da parte», con **Riprendi**.
+  difetto resta in Pagella e il consiglio resta fuori dal piano finché non lo
+  riprendi. Lo ritrovi sotto «Hai messo da parte», con **Riprendi**.
 - **Lascio stare** chiude quello in corso senza darlo per raggiunto.
 
 Il consiglio in corso si misura solo sui giri che fai dopo averlo preso. Vale
@@ -547,7 +548,10 @@ Le schede sono in tre gruppi, nell'ordine in cui di solito le leggi.
 
 **Nel tempo**
 
-- **Andamento**: l'andamento dei tempi nel tempo, la **costanza** (migliore/media/
+- **Andamento**: in cima i tuoi **difetti sessione per sessione**, fino a venti
+  sessioni, misurati contro lo stesso riferimento della Pagella. Lì vedi se un
+  difetto cala; un clic sul nome apre il suo **Come si fa**. Sotto, l'andamento
+  dei tempi nel tempo, la **costanza** (migliore/media/
   scarto), i **punti deboli** curva per curva (sistematici o casuali) e gli
   **errori ricorrenti** ("5× Porta più velocità in curva · Curve 1, 2"). È il
   quaderno dei conti; il piano che ne esce sta nella **Pagella**, e le gomme

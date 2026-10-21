@@ -183,7 +183,7 @@ def test_the_advice_buttons_post_and_reload():
 def test_the_spark_is_capped_at_twice_the_median():
     """Nell'archivio vero una sessione lentissima (22 647 ms contro ~600)
     appiattirebbe le altre. La barra tagliata si vede e porta il valore vero."""
-    body = _body_of("function pagSpark(series, unit, trend)")
+    body = _body_of("function sparkBars(vals, unit, trend, height)")
     assert "Math.min(max, 2 * median)" in body
     # La barra sopra il taglio porta la classe che la segna, e il CSS la segna.
     assert "const cut = top > 0 && v > top;" in body
@@ -241,7 +241,9 @@ def test_the_secondary_boxes_are_compact():
 
 def test_the_spark_is_tall_enough_to_read():
     assert "const SPARK_H = 26;" in _APPJS
-    assert "SPARK_H * Math.min(v, top) / top" in _body_of("function pagSpark(series, unit, trend)")
+    assert "sparkBars(vals, unit, trend, SPARK_H)" in _body_of("function pagSpark(series, unit, trend)")
+    assert "height * Math.min(v, top) / top" in \
+        _body_of("function sparkBars(vals, unit, trend, height)")
     spark = _CSS[_CSS.index(".pag-spark {"):]
     assert "height: 26px" in spark[:spark.index("}")]
 
@@ -433,3 +435,67 @@ def test_every_howto_string_exists_in_both_languages():
         entry = _i18n_entry(key)
         assert "en:" in entry and "it:" in entry, key
     assert "Torna alla Pagella" in _i18n_entry("howto.back")
+
+
+# --- Andamento: i difetti sessione per sessione (Task 11) -------------------
+
+def test_the_defect_history_sits_on_top_of_the_progress_view():
+    assert re.search(r'<div id="view-progress" class="hidden">\s*'
+                     r'<section id="defect-history"', _HTML)
+    # E la sua parte riempita dal JS ha un posto suo.
+    sec = _HTML.split('<section id="defect-history"', 1)[1].split("</section>", 1)[0]
+    assert 'id="dh-body"' in sec and 'id="dh-ref"' in sec
+    assert 'data-i18n="dh.title"' in sec
+
+
+def test_the_defect_history_reads_its_own_endpoint_with_the_progress_view():
+    load = _body_of("async function loadDefectHistory(combo)")
+    assert '"/api/defect-history?"' in load and "lang: LANG()" in load
+    assert "renderDefectHistory(h)" in load
+    # Parte con la scheda, e riparte con lei (combo, lingua, resize).
+    assert "loadProgress(combo); loadDefectHistory(combo);" in \
+        _body_of("function reloadViewData(combo)")
+    assert "loadProgress(CURRENT); loadDefectHistory(CURRENT);" in \
+        _body_of("function redrawCurrentView()")
+
+
+def test_the_history_bars_are_the_pagella_bars():
+    """Stessa scala tagliata a due volte la mediana, stesso segno di taglio:
+    una funzione sola per le due viste."""
+    bars = _body_of("function sparkBars(vals, unit, trend, height)")
+    assert "Math.min(max, 2 * median)" in bars
+    assert "sparkBars(vals, unit, trend, SPARK_H)" in _body_of(
+        "function pagSpark(series, unit, trend)")
+    render = _body_of("function renderDefectHistory(h)")
+    assert "sparkBars(vals, d.unit, trend, DH_H)" in render
+    assert 'class="pag-spark dh-bars"' in render
+    assert f"height: {re.search(r'const DH_H = (\d+);', _APPJS).group(1)}px" in \
+        _CSS[_CSS.index(".dh-bars {"):].split("}", 1)[0]
+
+
+def test_the_history_row_opens_the_howto_and_escapes_the_backend():
+    render = _body_of("function renderDefectHistory(h)")
+    assert 'data-howto="${escAttr(d.key)}"' in render
+    assert "openHowto(b.dataset.howto)" in render
+    assert "escAttr(d.name)" in render
+    assert not re.search(r"\$\{(?:h|d|s|r)\.\w+\}", render)
+    # L'ultimo valore e la freccia, le date sotto le barre.
+    assert "fmtSecs(last, d.unit)" in render
+    assert "dh-dates" in render and "s.started_utc" in render
+
+
+def test_the_history_says_why_it_is_empty():
+    render = _body_of("function renderDefectHistory(h)")
+    assert 'h.excluded === "no_laps"' in render
+    for key in ("dh.nolaps", "dh.noref", "dh.none"):
+        assert f'"{key}"' in render, key
+
+
+def test_every_history_string_exists_in_both_languages():
+    keys = set(re.findall(r'\bt\(\s*"(dh\.[\w.]+)"\s*\)', _APPJS))
+    keys |= set(re.findall(r'\btf\(\s*"(dh\.[\w.]+)"', _APPJS))
+    keys |= {"dh.title", "dh.nolaps", "dh.noref", "load.dh", "err.dh"}
+    assert len(keys) >= 8, sorted(keys)
+    for key in sorted(keys):
+        entry = _i18n_entry(key)
+        assert "en:" in entry and "it:" in entry, key

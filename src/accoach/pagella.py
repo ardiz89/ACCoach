@@ -503,8 +503,9 @@ def build_pagella(cat, car: str, track: str, index: int, lang: str) -> dict:
     measured = ctx.measured(_SERIES)
     cur = measured[0]
     prev = measured[1] if len(measured) > 1 else None
-    summaries = summarize(cur.laps)
-    values = [{s.key: s.mean for s in summarize(rep.laps)} for rep in measured]
+    sums = [summarize(rep.laps) for rep in measured]
+    summaries = sums[0]
+    values = [_means(ss) for ss in sums]
     main = [s for s in summaries if s.main]
 
     def _trend(key: str, now: float) -> str | None:
@@ -517,7 +518,7 @@ def build_pagella(cat, car: str, track: str, index: int, lang: str) -> dict:
             "laps_with": s.laps_with, "laps": s.laps,
             "corners": [{"name": ctx.names.get(i, ""), "value": _r(v, s.unit)}
                         for i, v in s.corners],
-            "series": [_r(v.get(s.key, 0.0), s.unit) for v in reversed(values)],
+            "series": _series(sums, s.key),
             "trend": _trend(s.key, s.mean),
         })
     out["worst_corners"] = [{"name": ctx.names.get(i, ""),
@@ -563,6 +564,82 @@ def build_pagella(cat, car: str, track: str, index: int, lang: str) -> dict:
     out["declined"] = [{"defect": a.defect, "name": defect_name(a.defect, lang)}
                        for a, _ in stored.values() if a.status == DECLINED]
     out["verdict"] = text
+    return out
+
+
+def _means(sums: list[DefectSummary]) -> dict[str, float]:
+    return {s.key: s.mean for s in sums}
+
+
+def _series(sums: list[list[DefectSummary]], key: str) -> list[float]:
+    """Il valore di `key` sessione per sessione, la piu' vecchia prima.
+
+    `sums` sono i `summarize` delle sessioni misurate, dalla piu' recente. Il
+    valore e' la media sui giri della sessione, zero dove il difetto non c'e'.
+    Una regola sola per il mini-andamento della Pagella e per la storia lunga
+    di Andamento: due conti fatti a parte prima o poi direbbero due numeri.
+    """
+    unit = _unit(key)
+    return [_r(_means(ss).get(key, 0.0), unit) for ss in reversed(sums)]
+
+
+# --- la storia dei difetti (Andamento) ---------------------------------------
+
+#: Sessioni della storia lunga in Andamento.
+_HISTORY = 20
+
+
+def _history_context(cat, car: str, track: str, lang: str) -> _Context:
+    """Il contesto della sessione piu' recente che fa parte dell'andamento.
+
+    Si salta una sessione senza giri validi, e quella che la Pagella lascia
+    fuori perche' e' l'unica della sua classe di gomma con uno storico tutto
+    dell'altra: la storia di chi ha fatto un'uscita sul bagnato resta quella
+    dell'asciutto, invece di sparire.
+    """
+    i = 0
+    while True:
+        ctx = _context(cat, car, track, i, lang)
+        if ctx.excluded not in ("no_laps", "wet", "dry") or i + 1 >= len(ctx.runs):
+            return ctx
+        i += 1
+
+
+def build_defect_history(cat, car: str, track: str, lang: str) -> dict:
+    """I difetti sessione per sessione, contro il riferimento della Pagella.
+
+    Le sessioni sono quelle della classe di gomma della piu' recente, fino a
+    `_HISTORY`, la piu' vecchia prima. I difetti sono quelli principali in
+    almeno una di loro: uno che sparisce resta in lista col suo zero, perche'
+    vederlo calare e' il motivo della scheda. Sola lettura: niente migrazioni
+    ne' consigli, che sono affare della Pagella.
+    """
+    ctx = _history_context(cat, car, track, lang)
+    out = {"reference": _reference_info(ctx), "sessions": [], "defects": [],
+           "excluded": None}
+    measured = ctx.measured(_HISTORY) if ctx.ref_row is not None else []
+    if not measured:
+        out["excluded"] = "no_laps" if ctx.excluded == "no_laps" else "no_reference"
+        return out
+    sums = [summarize(rep.laps) for rep in measured]
+    out["sessions"] = [
+        {"started_utc": rep.session.started.isoformat() if rep.session.started else None,
+         "valid": len(rep.session.valid_laps)}
+        for rep in reversed(measured)]
+    main = {s.key for ss in sums for s in ss if s.main}
+    # L'ordine e' quello di `summarize` sull'ultima sessione; chi li' non c'e'
+    # (sparito) viene dopo, nell'ordine dei difetti.
+    latest = [s.key for s in sums[0]]
+    keys = sorted(main, key=lambda k: (k not in latest,
+                                       latest.index(k) if k in latest else 0,
+                                       _unit(k) == "s", DEFECTS.index(k)))
+    for key in keys:
+        means = [_means(ss).get(key, 0.0) for ss in sums[:2]]
+        out["defects"].append({
+            "key": key, "name": defect_name(key, lang), "unit": _unit(key),
+            "values": _series(sums, key),
+            "trend": trend_of(means[0], means[1], _unit(key)) if len(means) > 1 else None,
+        })
     return out
 
 

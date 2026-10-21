@@ -117,9 +117,12 @@ Dopo aver registrato qualche giro vero: *Analisi* → **Analisi & Report**, si a
 `localhost:8778`.
 
 - [ ] Il menu **Auto / Pista** mostra le tue combo.
-- [ ] Le dieci schede si aprono tutte: *Com'è andata*, *Il giro spiegato*,
-      *Allenamento*, *Sessione*, *Passo gara*, *Confronto*, *Traiettoria*,
-      *Settori*, *Dinamica*, *Andamento*. Si aprono anche coi tasti **1-9 e 0**.
+- [ ] Le nove schede si aprono tutte: *Pagella*, *Sessione*, *Il giro
+      spiegato*, *Confronto*, *Traiettoria*, *Settori*, *Dinamica*,
+      *Andamento*, *Passo gara*. Si aprono anche coi tasti **1-9**.
+- [ ] In *Andamento*, in cima, i difetti sessione per sessione: le barre della
+      sessione più vecchia a sinistra, una data sotto ogni barra, e un clic sul
+      nome di un difetto apre il suo *Come si fa*.
 - [ ] In *Confronto*: grafici delta / velocità / gas-freno, il **crosshair** che
       segue il mouse, e i pulsanti **⬇ CSV / ⬇ JSON**.
 - [ ] Una scheda senza abbastanza dati deve **dire quanti giri mancano**, mai

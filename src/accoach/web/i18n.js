@@ -162,6 +162,23 @@
     "pag.declined":    { en: `You set aside:`, it: `Hai messo da parte:` },
     "pag.undecline":   { en: `Take it back`, it: `Riprendi` },
 
+    // ---- Andamento: i difetti sessione per sessione ----
+    "dh.title":        { en: `Your faults, session by session`,
+                         it: `I tuoi difetti, sessione per sessione` },
+    "dh.ref":          { en: `Every session is measured against your reference lap, {time} from {when}. The lower the bar, the less time you lose.`,
+                         it: `Ogni sessione è misurata contro il tuo giro di riferimento, {time} del {when}. Più bassa è la barra, meno tempo perdi.` },
+    "dh.none":         { en: `No fault has cost you time lap after lap in these sessions.`,
+                         it: `In queste sessioni nessun difetto ti è costato tempo giro dopo giro.` },
+    "dh.nolaps":       { en: `You have no valid laps on this car and track yet.`,
+                         it: `Per questa auto e questa pista non hai ancora giri validi.` },
+    "dh.noref":        { en: `To measure your faults you need at least one more valid lap besides your reference.`,
+                         it: `Per misurare i difetti serve almeno un altro giro valido oltre al tuo riferimento.` },
+    "dh.howto":        { en: `How to do it`, it: `Come si fa` },
+    "dh.valid":        { en: `{n} valid {n|lap|laps}`, it: `{n} {n|giro valido|giri validi}` },
+    "load.dh":         { en: `Reading your sessions…`, it: `Sto leggendo le sessioni…` },
+    "err.dh":          { en: `Couldn't load your faults. Is the analysis backend running?`,
+                         it: `Non riesco a caricare i difetti. Il backend di analisi è acceso?` },
+
     // ---- «Come si fa», la vista di un consiglio ----
     // Stesso tono della Pagella. Il problema, il come si fa e l'esercizio li
     // scrive il backend (coaching/howto.py); qui le cornici e le frasi che

@@ -2510,12 +2510,14 @@ def test_the_eight_loaders_are_all_here():
     «chi lo rilancia?» non se la può fare una regex.
     """
     # `loadHowto` è il nono: la vista «Come si fa» sta per car+track come la
-    # Pagella, e la rilancia `reloadViewData` quando è aperta.
+    # Pagella, e la rilancia `reloadViewData` quando è aperta. `loadDefectHistory`
+    # è il decimo: la storia dei difetti in cima ad Andamento, che riparte
+    # accanto a `loadProgress`.
     assert set(_LOADERS) == {"loadBraking", "loadCombo", "loadLine", "loadProgress",
                              "loadSectors", "loadSession", "loadStint", "loadPagella",
-                             "loadHowto"}
+                             "loadHowto", "loadDefectHistory"}
     assert set(_PER_COMBO) == {"loadProgress", "loadSession", "loadStint", "loadPagella",
-                               "loadHowto"}
+                               "loadHowto", "loadDefectHistory"}
     assert set(_PER_LAP) == {"loadBraking", "loadLine", "loadSectors"}
 
 
