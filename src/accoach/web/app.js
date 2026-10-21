@@ -260,6 +260,13 @@ function redrawCurrentView() {
   // corner names are written by the backend, so a cached payload would still
   // be in the language you left.
   else if (VIEW === "pagella") { if (CURRENT) loadPagella(CURRENT, SESSION_I); }
+  // Il «Come si fa» si rilegge solo quando non c'è: un resize ridisegna le
+  // figure dai giri già arrivati (tre /api/analysis a ogni resize sarebbero
+  // secondi di attesa). La lingua passa da `reloadViewData`, che rilegge.
+  else if (VIEW === "howto") {
+    if (HOWTO) drawHowtoFigures();
+    else if (CURRENT) loadHowto(CURRENT, SESSION_I);
+  }
   else if (VIEW === "flow") { if (DATA) renderFlow(DATA); }
   else if (VIEW === "session") { if (CURRENT) loadSession(CURRENT, SESSION_I); }
   // Refetched, like the Pagella: the notes strip is written by the backend in the
@@ -347,6 +354,8 @@ function applyRailed(name) {
   // (giro, confronto, distacco) lì non dice niente e spinge il piano sotto
   // il bordo dello schermo a 1920×1080. Si spegne col CSS, da questa classe.
   document.body.classList.toggle("view-pagella", name === "pagella");
+  // Anche il «Come si fa» parla dei giri della sessione, non del giro scelto.
+  document.body.classList.toggle("view-howto", name === "howto");
 }
 
 // Switch to a view by name, as if its tab had been clicked. Used by the tabs
@@ -1323,9 +1332,13 @@ function drawMapTo(canvas, missing, a, cx, mode) {
   ctx.lineTo(tipX - ux * ah - px * ah * 0.6, tipY - uy * ah - py * ah * 0.6);
   ctx.closePath(); ctx.fill();
   // start/finish dot + label
-  ctx.beginPath(); ctx.arc(sx, sy, 5, 0, 6.283); ctx.fill();
-  ctx.font = "bold 11px " + UI_FONT;
-  ctx.fillText("S/F", sx - ux * 14 - 6, sy - uy * 14 + 4);
+  if (!a.window) {
+    // Su una curva ritagliata (`howtoMapSlice`) il primo campione è l'inizio
+    // della curva, non il traguardo: la freccia del verso resta, «S/F» no.
+    ctx.beginPath(); ctx.arc(sx, sy, 5, 0, 6.283); ctx.fill();
+    ctx.font = "bold 11px " + UI_FONT;
+    ctx.fillText("S/F", sx - ux * 14 - 6, sy - uy * 14 + 4);
+  }
 
   // Hover marker.
   if (cx != null) {
@@ -1364,6 +1377,7 @@ function reloadViewData(combo) {
   if (!combo) return;
   if (VIEW === "progress") loadProgress(combo);
   if (VIEW === "pagella") loadPagella(combo, SESSION_I);
+  if (VIEW === "howto") loadHowto(combo, SESSION_I);
   if (VIEW === "session") loadSession(combo, SESSION_I);
   if (VIEW === "stint") loadStint(combo, STINT_I);
 }
@@ -2129,9 +2143,11 @@ function renderSession(s) {
 // passare a un'altra pista non è una sessione nuova.
 const SEEN_KEY = "hone_seen_session";
 function seenKey(combo) { return SEEN_KEY + ":" + combo.car + "|" + combo.track; }
-// Il difetto del «Come si fa» aperto. La vista la disegna il Task 8; qui si
-// ricorda quale, così il bottone sa già dove portarti.
+// Il difetto del «Come si fa» aperto, e la sua pagina con i giri delle figure
+// (`{h, laps}`), o null mentre arriva.
 let HOWTO_DEFECT = null;
+let HOWTO = null;
+let HOWTO_REQ = 0;
 // Una riga da dire una volta sola sopra il piano: una scelta che non si è
 // salvata. Si consuma al disegno dopo.
 let PAG_NOTE = "";
@@ -2453,9 +2469,234 @@ async function adviceAction(defect, action) {
 }
 
 // «Come si fa →»: la vista di un consiglio, fuori dalla barra delle schede.
+// Butta la pagina di prima: è di un altro difetto, e `redrawCurrentView` la
+// ridisegnerebbe invece di leggere quella nuova.
 function openHowto(defect) {
   HOWTO_DEFECT = defect;
+  HOWTO = null;
   showView("howto");
+  window.scrollTo(0, 0);
+}
+
+// --- «Come si fa»: un consiglio spiegato sui tuoi giri ----------------------
+// Il problema coi tuoi numeri, una figura per curva (dalla più costosa), come
+// si fa, l'esercizio e l'andamento da quando lo segui (spec, «La vista Come si
+// fa»). Le parole e i numeri li scrive il backend (/api/howto); le figure sono
+// il disegno del Confronto ristretto alla curva, sui due giri che la pagina
+// nomina: il tuo solito di questa sessione e il tuo migliore.
+
+// Quale traccia sta accanto alla mappa, per difetto. Alzate e veleggio non
+// sono in una curva: niente figura, e la pagina dice perché.
+const HOWTO_TRACE = { brake_early: "brake", brake_late: "brake", over_brake: "brake",
+                      throttle_late: "throttle", min_speed: "speed" };
+
+function howtoLapKey(f) { return f.typical_path + "\n" + f.best_path; }
+
+// Segue l'uscita della Pagella (`SESSION_I`) e ha un contatore suo: due «Come
+// si fa →» premuti di fila, o un ritorno alla Pagella e un altro consiglio,
+// non si scrivono uno sopra l'altro.
+async function loadHowto(combo, index) {
+  if (!combo || !HOWTO_DEFECT) return;
+  const seen = EPOCH;
+  const want = index || 0;
+  const req = ++HOWTO_REQ;
+  HOWTO = null;
+  const q = new URLSearchParams({ car: combo.car, track: combo.track,
+                                  defect: HOWTO_DEFECT, index: want });
+  $("howto-body").innerHTML = `<div class="nothing">${t("load.howto")}</div>`;
+  let h;
+  try { h = await getJSON("/api/howto?" + q.toString()); }
+  catch (e) {
+    if (stale(seen) || SESSION_I !== want || req !== HOWTO_REQ) return;
+    $("howto-body").innerHTML = `<div class="nothing">${t("err.howto")}</div>` +
+      `<p><button type="button" class="mini-btn" id="howto-back">${t("howto.back")}</button></p>`;
+    $("howto-back").onclick = () => showView("pagella");
+    return;
+  }
+  if (stale(seen) || SESSION_I !== want || req !== HOWTO_REQ) return;
+  HOWTO = { h, laps: {} };
+  renderHowto(h);
+  // Un /api/analysis per coppia di giri (il migliore è lo stesso per tutte le
+  // curve, il solito può cambiare), tutti insieme. Un giro che non si legge
+  // diventa `null`, e la sua figura una frase.
+  const keys = [...new Set((h.figures || []).map(howtoLapKey))];
+  const got = await Promise.all(keys.map((k) => {
+    const [lap, baseline] = k.split("\n");
+    return getJSON("/api/analysis?" + new URLSearchParams(
+      { car: combo.car, track: combo.track, lap, baseline }).toString()).catch(() => null);
+  }));
+  if (stale(seen) || SESSION_I !== want || req !== HOWTO_REQ) return;
+  keys.forEach((k, i) => { HOWTO.laps[k] = got[i]; });
+  drawHowtoFigures();
+}
+
+function renderHowto(h) {
+  const body = $("howto-body");
+  if (!body) return;
+  const how = h.howto || {};
+  const ref = h.reference_lap;
+  const figs = h.figures || [];
+  const trace = HOWTO_TRACE[h.defect];
+  let html = `<h2 class="howto-title">${escAttr(h.name)}</h2>`;
+  html += h.problem
+    ? `<p class="howto-problem">${escAttr(h.problem)}</p>`
+    : `<p class="howto-problem nothing">${t("howto.noproblem")}</p>`;
+  if (ref) {
+    html += `<p class="pag-ref">${escAttr(tf("howto.ref", { time: ref.lap_time, when: fmtWhen(ref.recorded_utc) }))}</p>`;
+  }
+  // Le figure. Ogni tela parte con la riga di caricamento al suo posto: i giri
+  // arrivano dopo la pagina.
+  html += `<section class="pag-box howto-figs"><h4>${t("howto.figs")}</h4>`;
+  if (!figs.length) {
+    html += `<div class="nothing">${t(HOWTO_TRACE[h.defect] ? "howto.nofig" : "howto.nofig.lap")}</div>`;
+  } else {
+    html += `<p class="howto-legend pag-small"><span class="sw you"></span>${t("howto.leg.you")}` +
+            `<span class="sw best"></span>${t("howto.leg.best")}</p>`;
+    html += figs.map((f) => {
+      const name = f.name || tf("howto.corner", { n: f.corner + 1 });
+      const bp = f.brake_points_m;
+      const pts = bp && trace === "brake"
+        ? `<span class="pag-small">${escAttr(tf("howto.brakepts", { t: bp.typical, b: bp.best }))}</span>` : "";
+      return `<figure class="howto-fig"><figcaption><b>${escAttr(name)}</b> ${pts}</figcaption>` +
+        `<div class="howto-fig-grid">` +
+        `<div class="howto-cell"><canvas class="howto-c-map hidden"></canvas>` +
+        `<div class="rail-nomap howto-nomap">${t("load.lap")}</div></div>` +
+        `<div class="howto-cell"><div class="pag-small howto-tr">${t("howto.tr." + trace)}</div>` +
+        `<canvas class="howto-c-trace hidden"></canvas>` +
+        `<div class="rail-nomap howto-notrace">${t("load.lap")}</div></div>` +
+        `</div></figure>`;
+    }).join("");
+  }
+  html += `</section>`;
+  // Come si fa: il fatto e cosa cambiare, cosa guardare, cosa lasciare stare.
+  html += `<section class="pag-box"><h4>${t("howto.how")}</h4>` +
+          `<p>${escAttr(how.what)}</p><p>${escAttr(how.watch)}</p>` +
+          `<p>${escAttr(how.ignore)}</p></section>`;
+  // L'esercizio: quanti giri, l'obiettivo in numeri, quando è fatto.
+  const target = h.target != null
+    ? " " + tf(h.unit === "s" ? "howto.target.coast" : "howto.target",
+               { v: fmtSecs(h.target, h.unit) }) : "";
+  html += `<section class="pag-box"><h4>${t("howto.drill")}</h4>` +
+          `<p class="howto-laps">${tf("howto.laps", { n: how.laps })}${target}</p>` +
+          `<p>${escAttr(how.drill)}</p><p>${escAttr(how.done_when)}</p></section>`;
+  // Come sta andando: il numero del difetto, una sessione per volta.
+  const prog = h.progress || [];
+  html += `<section class="pag-box"><h4>${t("howto.prog")}</h4>` + (prog.length
+    ? `<p class="pag-small">${t("howto.prog.lead")}</p><div class="howto-prog">` +
+      prog.map((v) => `<span class="num">${fmtSecs(v, h.unit)}</span>`).join("") + `</div>`
+    : `<div class="nothing">${t("howto.prog.none")}</div>`) + `</section>`;
+  html += `<p class="howto-foot"><button type="button" class="mini-btn" id="howto-back">` +
+          `${t("howto.back")}</button></p>`;
+  body.innerHTML = html;
+  $("howto-back").onclick = () => showView("pagella");
+}
+
+// Ridisegna ogni figura dai giri arrivati; quelle ancora in attesa restano con
+// la loro riga di caricamento. La chiama anche il resize.
+function drawHowtoFigures() {
+  if (!HOWTO || VIEW !== "howto") return;
+  const figs = HOWTO.h.figures || [];
+  const els = document.querySelectorAll("#howto-body .howto-fig");
+  const trace = HOWTO_TRACE[HOWTO.h.defect];
+  figs.forEach((f, i) => {
+    const a = HOWTO.laps[howtoLapKey(f)];
+    if (els[i] && a !== undefined) drawHowtoFigure(els[i], f, a, trace);
+  });
+}
+
+function hasTrace(ch, name) {
+  return !!(ch && Array.isArray(ch.pos) && Array.isArray(ch[name]) &&
+            ch[name].length && ch[name].length === ch.pos.length);
+}
+
+// Una figura: la mappa della curva coi due giri (`drawMapTo`, la stessa del
+// Confronto) e accanto la traccia del pedale o della velocità. Dove manca un
+// dato il disegno lascia il posto a una frase, come `rail-nomap`.
+function drawHowtoFigure(el, f, a, trace) {
+  const mapCv = el.querySelector(".howto-c-map"), mapNote = el.querySelector(".howto-nomap");
+  const trCv = el.querySelector(".howto-c-trace"), trNote = el.querySelector(".howto-notrace");
+  if (!a) {
+    for (const cv of [mapCv, trCv]) cv.classList.add("hidden");
+    mapNote.textContent = t("howto.nolap");
+    trNote.textContent = t("howto.nolap");
+    for (const n of [mapNote, trNote]) n.classList.remove("hidden");
+    return;
+  }
+  const win = cornerWindow({ entry: f.entry_pos, exit: f.exit_pos,
+                             name: f.name, index: f.corner });
+  mapCv.classList.remove("hidden");
+  mapNote.textContent = t("howto.nomap");
+  drawMapTo(mapCv, mapNote, howtoMapSlice(a, win, f), null);
+
+  const rv = a.review.channels, rf = a.reference.channels;
+  if (!hasTrace(rv, trace) || !hasTrace(rf, trace)) {
+    trCv.classList.add("hidden");
+    trNote.textContent = tf("howto.notrace", { what: t("howto.ch." + trace) });
+    trNote.classList.remove("hidden");
+    return;
+  }
+  trNote.classList.add("hidden");
+  trCv.classList.remove("hidden");
+  const { ctx, w, h } = setup(trCv);
+  let lo = 0, hi = 1, fmt = (v) => Math.round(v * 100) + "%";
+  if (trace === "speed") {
+    lo = Infinity; hi = -Infinity;
+    for (const c of [rv, rf]) {
+      for (let i = 0; i < c.pos.length; i++) {
+        if (c.pos[i] >= win.from && c.pos[i] <= win.to) {
+          lo = Math.min(lo, c.speed[i]); hi = Math.max(hi, c.speed[i]);
+        }
+      }
+    }
+    if (!isFinite(lo)) { lo = 0; hi = 1; }
+    lo = Math.floor(lo - 5); hi = Math.ceil(hi + 5);
+    fmt = (v) => Math.round(v) + "";
+  }
+  // La curva, dall'ingresso all'uscita: il resto della finestra è il margine.
+  const x0 = projX(f.entry_pos, w, win);
+  ctx.fillStyle = "rgba(120,140,170,0.10)";
+  ctx.fillRect(x0, 0, projX(f.exit_pos, w, win) - x0, h);
+  gridY(ctx, w, h, lo, hi, fmt);
+  // Il migliore tratteggiato come nel Confronto, il solito pieno sopra.
+  ctx.save();
+  ctx.setLineDash([5, 4]);
+  line(ctx, w, h, rf.pos, rf[trace], lo, hi, "#3fd0e0", 1.5, win);
+  ctx.restore();
+  line(ctx, w, h, rv.pos, rv[trace], lo, hi, "#ffffff", 1.8, win);
+}
+
+// I due giri ritagliati alla finestra della curva, nella forma che `drawMapTo`
+// legge. La mappa del Confronto si adatta a quello che riceve, quindi un giro
+// ritagliato è una curva ingrandita senza toccare il disegno. Il colore della
+// linea è lo scarto di velocità dal migliore, preso per posizione (`d.pos`),
+// e la croce del giro perso resta solo se cade qui dentro.
+function howtoMapSlice(a, win, f) {
+  if (!a.has_map) return a;
+  const inWin = (p) => p >= win.from && p <= win.to;
+  const keep = (pos) => pos.map((p, i) => (inWin(p) ? i : -1)).filter((i) => i >= 0);
+  const pick = (arr, ii) => (Array.isArray(arr) ? ii.map((i) => arr[i]) : arr);
+  const cut = (c) => {
+    const ii = keep(c.pos);
+    return { x: pick(c.x, ii), z: pick(c.z, ii), pos: pick(c.pos, ii),
+             brake: pick(c.brake, ii), balance: pick(c.balance, ii) };
+  };
+  const rv = cut(a.review.channels), rf = cut(a.reference.channels);
+  const d = a.review.delta || {};
+  const sd = Array.isArray(d.pos) && Array.isArray(d.speed_delta)
+    ? rv.pos.map((p) => d.speed_delta[nearest(d.pos, p)]) : [];
+  // Una sola etichetta: la curva della figura, col nome che le dà la Pagella.
+  const mid = (f.entry_pos + f.exit_pos) / 2;
+  const near = (a.corners || []).filter((c) => inWin(c.apex))
+    .sort((x, y) => Math.abs(x.apex - mid) - Math.abs(y.apex - mid))[0];
+  const lost = a.review.lost_at;
+  return {
+    window: true,
+    has_map: rv.x.length > 1 && rf.x.length > 1,
+    corners: near ? [{ ...near, name: f.name || near.name }] : [],
+    review: { channels: rv, delta: { speed_delta: sd },
+              lost_at: lost != null && inWin(lost) ? lost : null },
+    reference: { channels: rf },
+  };
 }
 
 // --- race pace: one run on one tank --------------------------------------
@@ -2970,7 +3211,9 @@ function gridX(ctx, w, h, labels) {
   ctx.restore();
 }
 
-function line(ctx, w, h, pos, vals, lo, hi, color, lw) {
+// `win` facoltativa, come in `projX`: la vista «Come si fa» disegna la sua
+// curva senza toccare `RANGE`, che è la finestra del Confronto.
+function line(ctx, w, h, pos, vals, lo, hi, color, lw, win) {
   ctx.beginPath();
   const span = hi - lo || 1;
   // I punti fuori finestra si proiettano comunque e finiscono fuori dalla tela,
@@ -2978,7 +3221,7 @@ function line(ctx, w, h, pos, vals, lo, hi, color, lw) {
   // interrompersi al primo campione dentro. Ritagliare la serie serve alla
   // *scala* (vedi `winVals`), non al disegno.
   for (let i = 0; i < pos.length; i++) {
-    const x = projX(pos[i], w), y = h - ((vals[i] - lo) / span) * h;
+    const x = projX(pos[i], w, win), y = h - ((vals[i] - lo) / span) * h;
     i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
   }
   ctx.strokeStyle = color; ctx.lineWidth = lw || 1.5; ctx.stroke();

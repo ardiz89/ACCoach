@@ -527,3 +527,19 @@ def test_howto_without_data_still_explains(tmp_path):
     _put(tmp_path, "2026-10-20T10:00:00+00:00")
     h = _howto(TestClient(create_api(tmp_path)), "lift")
     assert h["howto"]["what"] and h["problem"] is None and h["figures"] == []
+
+
+def test_howto_carries_the_target_of_its_advice(tmp_path):
+    """L'esercizio dice l'obiettivo in numeri (spec, «La vista Come si fa»):
+    lo stesso della riga del piano, nella stessa unita'."""
+    c = _two_sessions(tmp_path)
+    a = next(x for x in _pagella(c)["advice"] if x["defect"] == "min_speed")
+    h = _howto(c, "min_speed")
+    assert h["target"] == a["target"] and h["target"] > 0
+    assert h["unit"] == a["unit"] == "ms"
+
+
+def test_howto_without_advice_has_no_target(tmp_path):
+    _put(tmp_path, "2026-10-20T10:00:00+00:00")
+    h = _howto(TestClient(create_api(tmp_path)), "coasting")
+    assert h["target"] is None and h["unit"] == "s"

@@ -107,9 +107,14 @@
   </div>
 
   <!-- «Come si fa», uno per consiglio. Non ha una scheda: ci si arriva dal
-       bottone «Come si fa →» della Pagella (openHowto in app.js). Il contenuto
-       lo disegna il Task 8. -->
-  <div id="view-howto" class="hidden"></div>
+       bottone «Come si fa →» della Pagella (openHowto in app.js). Tutto il
+       contenuto lo scrive renderHowto da /api/howto, le figure da due giri
+       letti con /api/analysis. -->
+  <div id="view-howto" class="hidden">
+    <div class="pag-shell howto-shell">
+      <div id="howto-body" class="howto-body"></div>
+    </div>
+  </div>
 
   <!-- The lap explained one step at a time. Same findings as the debrief below,
        edited server-side into what to look at first (see coaching/flow.py). -->

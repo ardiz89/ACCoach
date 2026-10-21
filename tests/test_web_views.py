@@ -2045,6 +2045,12 @@ def _hidden_writers() -> list[str]:
 #                             #line-readout e #dyn-readout (i suoi due
 #                             chiamanti: renderLine e drawDynamics)
 #   $("dyn-elsewhere")      → #dyn-elsewhere
+#   cv / trCv / trNote      → le tele e le frasi delle figure del «Come si fa»
+#                             (drawHowtoFigure), scritte da renderHowto e non
+#                             nell'HTML: la regola che le accende è
+#                             `.howto-fig canvas:not(.hidden)`, qualificata
+#                             apposta. Anche `missing` di drawMapTo ne colpisce
+#                             una (.howto-nomap), che nessuna regola accende.
 _HIDDEN_TARGET_IDS = {
     "view-pagella", "view-howto", "view-flow", "view-session", "view-stint",
     "view-compare", "view-line", "view-sectors", "view-progress",
@@ -2106,14 +2112,15 @@ def test_the_census_of_hidden_writers_is_still_the_one_that_was_checked():
     solo non basta neanche: uno tolto e uno aggiunto lo lasciano fermo.
     """
     writers = _hidden_writers()
-    assert len(writers) == 25, (
-        f"{len(writers)} siti che scrivono `hidden` invece di 25: risolvi i "
+    assert len(writers) == 28, (
+        f"{len(writers)} siti che scrivono `hidden` invece di 28: risolvi i "
         "nuovi in _HIDDEN_TARGET_IDS e aggiorna il numero qui")
     assert set(writers) == {
         "p", "el", "sec", '$("tyre-temp-wrap")', '$("tyre-press-wrap")',
         "ro", "legend", "lost", "missing", "$(id)", "wrap",
         '$("tyres")', "main", '$("dyn-tyres")', '$("dyn-balance-wrap")', "miss",
         '$("line-missing")', "grid", "charts", "legRoad", '$("dyn-elsewhere")',
+        "cv", "trCv", "trNote",
     }, sorted(set(writers))
 
     # Il censimento passa da `classList`: se qualcuno scrivesse la classe in un
@@ -2502,9 +2509,13 @@ def test_the_eight_loaders_are_all_here():
     coprono da soli, ma la sua riga va guardata da un umano, perché la domanda
     «chi lo rilancia?» non se la può fare una regex.
     """
+    # `loadHowto` è il nono: la vista «Come si fa» sta per car+track come la
+    # Pagella, e la rilancia `reloadViewData` quando è aperta.
     assert set(_LOADERS) == {"loadBraking", "loadCombo", "loadLine", "loadProgress",
-                             "loadSectors", "loadSession", "loadStint", "loadPagella"}
-    assert set(_PER_COMBO) == {"loadProgress", "loadSession", "loadStint", "loadPagella"}
+                             "loadSectors", "loadSession", "loadStint", "loadPagella",
+                             "loadHowto"}
+    assert set(_PER_COMBO) == {"loadProgress", "loadSession", "loadStint", "loadPagella",
+                               "loadHowto"}
     assert set(_PER_LAP) == {"loadBraking", "loadLine", "loadSectors"}
 
 

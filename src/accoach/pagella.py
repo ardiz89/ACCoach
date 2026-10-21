@@ -585,7 +585,7 @@ def build_howto(cat, car: str, track: str, defect: str, index: int,
         raise UnknownDefect(defect)
     out = {"defect": defect, "name": defect_name(defect, lang), "problem": None,
            "howto": asdict(howto(defect, lang)), "figures": [], "progress": [],
-           "reference_lap": None}
+           "reference_lap": None, "target": None, "unit": _unit(defect)}
     ctx = _context(cat, car, track, index, lang)
     out["reference_lap"] = _reference_info(ctx)
     if ctx.excluded:
@@ -594,6 +594,10 @@ def build_howto(cat, car: str, track: str, defect: str, index: int,
     summaries = summarize(cur.laps)
     summary = next((s for s in summaries if s.key == defect), None)
     adv = _advice_for(cat, car, track, ctx, defect, summaries)
+    # L'esercizio dice l'obiettivo in numeri (spec): quello del consiglio, lo
+    # stesso che la riga del piano mostra in Pagella.
+    if adv is not None:
+        out["target"] = _r(adv.target, out["unit"])
 
     if adv is not None and adv.corners:
         idxs = [c.index for c in adv.corners]

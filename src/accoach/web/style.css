@@ -1345,6 +1345,31 @@ body.view-pagella #lapbar { display: none; }
 .pag-declined .mini-btn { padding: 1px 8px; font-size: 12px; }
 .pag-tag.reached { color: var(--green); border-color: var(--green); }
 
+/* «Come si fa»: la stessa colonna della Pagella. Le figure stanno a due a due
+   (mappa della curva, traccia) e su un telefono una sotto l'altra. */
+body.view-howto #lapbar { display: none; }
+.howto-title { margin: 6px 0 0; font-family: var(--font-display); font-size: 22px; font-weight: 700; }
+.howto-problem {
+  margin: 4px 0 2px; font-family: var(--font-display);
+  font-size: 19px; font-weight: 700; line-height: 1.35;
+}
+.howto-problem.nothing { font-family: inherit; font-size: 16px; font-weight: 400; }
+.howto-shell .pag-box p { margin: 4px 0; }
+.howto-legend { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.howto-legend .sw { display: inline-block; width: 22px; height: 0; margin-left: 8px; }
+.howto-legend .sw.you { border-top: 2px solid #ffffff; }
+.howto-legend .sw.best { border-top: 2px dashed #3fd0e0; }
+.howto-fig { margin: 8px 0 4px; }
+.howto-fig figcaption { margin-bottom: 4px; }
+.howto-fig-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: start; }
+.howto-cell { min-width: 0; }
+/* `:not(.hidden)`: `display: block` qui (0,1,1) batterebbe `.hidden` (0,1,0) e
+   la tela spenta resterebbe accesa sopra la sua frase. */
+.howto-fig canvas:not(.hidden) { display: block; width: 100%; height: 220px; }
+.howto-tr { margin-bottom: 2px; }
+.howto-prog { display: flex; gap: 14px; flex-wrap: wrap; font-size: 15px; }
+.howto-foot { margin: 14px 0 0; }
+
 .mini-btn.primary { border-color: var(--cyan); color: var(--cyan); }
 /* The pointer left behind on Trends, where the plan used to live. */
 /* `:not(.hidden)` per lo stesso duello già pagato da `#view-flow`, `.map-legend`
@@ -1368,6 +1393,7 @@ body.view-pagella #lapbar { display: none; }
      nome invece di spingere la pagina di lato. */
   .pag-row, .pag-step { flex-wrap: wrap; }
   .pag-btns { justify-content: flex-start; }
+  .howto-fig-grid { grid-template-columns: 1fr; }
 }
 
 /* Where inside a corner the time went: one loss cut into its parts, so one hue

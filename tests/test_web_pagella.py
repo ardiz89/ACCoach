@@ -282,3 +282,126 @@ def test_a_declined_advice_can_be_taken_back_from_under_the_plan():
     assert 't("pag.declined")' in body and 't("pag.undecline")' in body
     assert "Hai messo da parte" in _i18n_entry("pag.declined")
     assert "Riprendi" in _i18n_entry("pag.undecline")
+
+
+# --- la vista «Come si fa» ---------------------------------------------------
+
+def test_the_howto_view_reads_its_page_from_the_api():
+    """`openHowto` resta il contratto del bottone (Task 7): ricorda il difetto,
+    butta la vista di prima e apre la scheda. Il caricamento passa da
+    `redrawCurrentView`, come per ogni scheda."""
+    open_ = _body_of("function openHowto(defect)")
+    assert "HOWTO = null;" in open_
+    assert open_.index("HOWTO = null;") < open_.index('showView("howto")')
+    redraw = _body_of("function redrawCurrentView()")
+    branch = redraw.split('VIEW === "howto"', 1)[1].split("else if", 2)
+    branch = branch[0] + "else if" + branch[1]
+    assert "drawHowtoFigures()" in branch and "loadHowto(CURRENT, SESSION_I)" in branch
+    load = _body_of("async function loadHowto(combo, index)")
+    assert '"/api/howto?"' in load
+    assert "defect: HOWTO_DEFECT" in load and "index: want" in load
+
+
+def test_the_howto_drops_answers_that_arrive_too_late():
+    """La guardia di Task 7 più un contatore suo: due «Come si fa →» premuti
+    di fila non si scrivono uno sopra l'altro."""
+    load = _body_of("async function loadHowto(combo, index)")
+    guard = "if (stale(seen) || SESSION_I !== want || req !== HOWTO_REQ) return;"
+    # Dopo la pagina (nel ramo buono e nel `catch`) e dopo i giri delle figure.
+    assert load.count(guard) == 3, load
+    assert load.index("const req = ++HOWTO_REQ;") < load.index("await ")
+    assert "/api/analysis?" in load
+    # Le viste per car+track ripartono quando il contatore sale (lingua, combo).
+    assert 'if (VIEW === "howto") loadHowto(combo, SESSION_I);' in \
+        _body_of("function reloadViewData(combo)")
+
+
+def test_the_howto_shows_its_parts_in_the_agreed_order():
+    """Problema, figure, come si fa, esercizio, andamento, «← Torna alla
+    Pagella» (spec e brief, nell'ordine)."""
+    body = _body_of("function renderHowto(h)")
+    order = ["howto-problem", "howto-figs", 't("howto.how")', 't("howto.drill")',
+             't("howto.prog")', 't("howto.back")']
+    at = [body.index(x) for x in order]
+    assert at == sorted(at), dict(zip(order, at))
+    assert 'showView("pagella")' in body
+
+
+def test_the_howto_says_which_lap_it_measures_against():
+    body = _body_of("function renderHowto(h)")
+    assert 'tf("howto.ref", { time: ref.lap_time, when: fmtWhen(ref.recorded_utc) })' in body
+    assert "{time}" in _i18n_entry("howto.ref") and "{when}" in _i18n_entry("howto.ref")
+
+
+def test_every_backend_string_is_escaped_in_the_howto():
+    body = _body_of("function renderHowto(h)")
+    for s in ("escAttr(h.name)", "escAttr(h.problem)", "escAttr(how.what)",
+              "escAttr(how.drill)", "escAttr(how.done_when)", "escAttr(name)"):
+        assert s in body, s
+    # Nessun campo del backend scritto a crudo.
+    assert not re.search(r"\$\{(?:h|how|f)\.\w+\}", body)
+
+
+def test_lift_and_coasting_say_why_there_is_no_figure():
+    body = _body_of("function renderHowto(h)")
+    nofig = body.split("if (!figs.length)", 1)[1].split("\n  }", 1)[0]
+    # Con una traccia ma senza curve in questa sessione, una frase; alzate e
+    # veleggio (nessuna traccia) l'altra, che dice che non stanno in una curva.
+    assert 't(HOWTO_TRACE[h.defect] ? "howto.nofig" : "howto.nofig.lap")' in nofig
+    # Le alzate e il veleggio non hanno una traccia da curva: niente figura.
+    assert re.search(r"const HOWTO_TRACE = \{[^}]*\}", _APPJS)
+    table = re.search(r"const HOWTO_TRACE = \{([^}]*)\}", _APPJS).group(1)
+    assert "lift" not in table and "coasting" not in table
+    assert 'brake_early: "brake"' in table and 'min_speed: "speed"' in table
+    assert 'throttle_late: "throttle"' in table
+
+
+def test_a_figure_without_coordinates_or_channel_becomes_a_sentence():
+    """Come `rail-nomap`: il disegno lascia il posto a una frase che dice perché."""
+    fig = _body_of("function drawHowtoFigure(el, f, a, trace)")
+    # La mappa: `drawMapTo` spegne la tela e accende la frase da sé.
+    assert "drawMapTo(mapCv, mapNote, howtoMapSlice(a, win, f), null)" in fig
+    assert 't("howto.nomap")' in fig
+    # La traccia: il canale deve esserci in entrambi i giri.
+    assert "!hasTrace(rv, trace) || !hasTrace(rf, trace)" in fig
+    assert 'tf("howto.notrace"' in fig
+    # Un giro che non si legge: la frase, non due tele vuote.
+    assert 't("howto.nolap")' in fig
+    # La tela spenta resta spenta: la regola che la accende non batte `.hidden`
+    # (stesso duello di `.line-grid`, vedi test_web_views).
+    assert ".howto-fig canvas:not(.hidden) { display: block;" in _CSS
+    assert not re.search(r"\.howto-fig canvas\s*\{", _CSS)
+
+
+def test_the_figures_reuse_the_compare_drawing_cut_to_the_corner():
+    fig = _body_of("function drawHowtoFigure(el, f, a, trace)")
+    assert "cornerWindow(" in fig
+    assert re.search(r"line\(ctx, w, h, rf\.pos, rf\[trace\], lo, hi, [^)]*, win\)", fig)
+    assert re.search(r"line\(ctx, w, h, rv\.pos, rv\[trace\], lo, hi, [^)]*, win\)", fig)
+    # `line` proietta nella finestra data; senza, resta su `RANGE` come prima.
+    line = _body_of("function line(ctx, w, h, pos, vals, lo, hi, color, lw, win)")
+    assert "projX(pos[i], w, win)" in line
+    # La mappa ritagliata non scrive «S/F» all'inizio della curva.
+    sl = _body_of("function howtoMapSlice(a, win, f)")
+    assert "window: true" in sl
+    dm = _body_of("function drawMapTo(canvas, missing, a, cx, mode)")
+    assert "// start/finish dot + label\n  if (!a.window) {" in dm
+
+
+def test_the_lap_strip_is_hidden_on_the_howto_too():
+    assert "body.view-howto #lapbar { display: none; }" in _CSS
+    rail = _body_of("function applyRailed(name)")
+    assert 'classList.toggle("view-howto", name === "howto")' in rail
+
+
+def test_every_howto_string_exists_in_both_languages():
+    keys = set(re.findall(r'\bt\(\s*"(howto\.[\w.]+)"\s*\)', _APPJS))
+    keys |= {"load.howto", "err.howto", "howto.nofig", "howto.nofig.lap"}
+    keys |= set(re.findall(r'\btf\(\s*"(howto\.[\w.]+)"', _APPJS))
+    keys |= {"howto.ch." + c for c in ("brake", "throttle", "speed")}
+    keys |= {"howto.tr." + c for c in ("brake", "throttle", "speed")}
+    assert len(keys) >= 15, sorted(keys)
+    for key in sorted(keys):
+        entry = _i18n_entry(key)
+        assert "en:" in entry and "it:" in entry, key
+    assert "Torna alla Pagella" in _i18n_entry("howto.back")
