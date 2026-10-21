@@ -343,6 +343,24 @@ def _section(title_key: str) -> tuple[QWidget, QVBoxLayout]:
     return page, lay
 
 
+def _qr_image(url: str, scale: int = 5) -> QLabel:
+    """Il QR di `url` in un'etichetta; senza `segno` lo dice al suo posto.
+
+    Lo usano la pagina «Dispositivi» e il passo del tablet del pannello «In
+    pista»: un solo modo di disegnarlo, e un solo ripiego quando manca."""
+    img = QLabel()
+    img.setAlignment(Qt.AlignHCenter)
+    png = qr_png(url, scale=scale)
+    if png:
+        pix = QPixmap()
+        pix.loadFromData(png, "PNG")
+        img.setPixmap(pix)
+    else:
+        img.setText(t("mob.no_qr"))
+        img.setProperty("role", "muted")
+    return img
+
+
 def _hint(text: str, key: str | None = None) -> QLabel:
     lbl = QLabel(text)
     lbl.setProperty("role", "muted")
@@ -653,17 +671,7 @@ class DevicesPanel(QWidget):
         head.setStyleSheet("font-weight: bold;")
         head.setAlignment(Qt.AlignHCenter)
         v.addWidget(head)
-        img = QLabel()
-        img.setAlignment(Qt.AlignHCenter)
-        png = qr_png(url, scale=5)
-        if png:
-            pix = QPixmap()
-            pix.loadFromData(png, "PNG")
-            img.setPixmap(pix)
-        else:
-            img.setText(t("mob.no_qr"))
-            img.setProperty("role", "muted")
-        v.addWidget(img)
+        v.addWidget(_qr_image(url, scale=5))
         link = QLabel(url)
         link.setAlignment(Qt.AlignHCenter)
         link.setProperty("role", "link")
@@ -727,7 +735,8 @@ class MainWindow(QWidget):
         self._stack.addWidget(self._devices)
         self._settings = SettingsPanel(self)
         self._stack.addWidget(self._settings)
-        self._panels = [self._home, self._settings, self._devices]
+        self._panels = [self._home, self._settings, self._devices,
+                        self._live_panel]
 
         self._nav.setCurrentRow(0)
 
@@ -792,15 +801,15 @@ class MainWindow(QWidget):
 
     # --- section pages ---------------------------------------------------
     def _build_live_page(self) -> QWidget:
-        page, lay = _section("nav.live")
-        lay.addWidget(self.action_button("btn.coach_live", ["live"], accent=True))
-        lay.addWidget(self.action_button("btn.coach_live_demo", ["live", "--demo"]))
-        lay.addWidget(self.special_button("btn.stop_live", _STOP_LIVE,
-                                          self._stop_live, danger=True))
-        lay.addSpacing(8)
-        lay.addWidget(_hint(t("ui.tip_borderless"), key="ui.tip_borderless"))
-        lay.addStretch(1)
-        return page
+        """La pagina «In pista»: i bottoni di sempre a Coach Live spento, il
+        pannello passo passo (`livepanel_ui`) mentre gira."""
+        # Import qui e non in cima: il pannello usa gli aiuti di disegno di
+        # questo modulo (`_hint`, `_qr_image`), e un import in cima sarebbe un
+        # giro chiuso fra i due file.
+        from .livepanel_ui import LivePanel
+
+        self._live_panel = LivePanel(self)
+        return self._live_panel
 
     def _build_analysis_page(self) -> QWidget:
         page, lay = _section("nav.analysis")
@@ -1026,6 +1035,12 @@ class MainWindow(QWidget):
             # then shows exactly the one action that applies right now.
             if key == _STOP_LIVE:
                 btn.setVisible(live)
+        # Il pannello «In pista» segue il processo: acceso, interroga /health;
+        # spento, torna ai bottoni. `getattr`: nessuno deve cadere se questo
+        # giro arriva prima che la pagina esista.
+        panel = getattr(self, "_live_panel", None)
+        if panel is not None:
+            panel.sync(live)
 
     def _prune(self) -> None:
         """Forget children that have already exited."""

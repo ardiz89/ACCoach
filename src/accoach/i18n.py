@@ -102,7 +102,6 @@ _UI: dict[str, dict[str, str]] = {
                        "it": "▶  Coach Live  (overlay + voce)"},
     "btn.coach_live_demo": {"en": "▶  Coach Live — DEMO (no game)",
                             "it": "▶  Coach Live — DEMO (senza gioco)"},
-    "btn.stop_live": {"en": "⏹  Stop Coach Live", "it": "⏹  Ferma Coach Live"},
     "btn.analysis": {"en": "📊  Analysis & Report (browser)",
                      "it": "📊  Analisi & Report (browser)"},
     "btn.engineer": {"en": "🔧  Race engineer (browser)",
@@ -386,11 +385,12 @@ _UI: dict[str, dict[str, str]] = {
     "swap.failed": {
         "en": "Coach Live is still running, so the live backend was NOT "
               "started — two recorders would have saved every lap twice. Press "
-              "Stop Coach Live, wait for its window to close, and try again.",
+              "“Stop without opening the report”, wait for its window to close, "
+              "and try again.",
         "it": "Coach Live sta ancora girando, quindi il Backend live NON è "
               "stato avviato — due registratori avrebbero salvato ogni giro "
-              "due volte. Premi Ferma Coach Live, aspetta che la sua finestra "
-              "si chiuda, e riprova."},
+              "due volte. Premi «Ferma senza aprire il report», aspetta che la "
+              "sua finestra si chiuda, e riprova."},
     "swap.tooltip": {
         "en": "Coach Live is running. Click to read why this can't start "
               "alongside it — and to swap over in one step.",
@@ -425,6 +425,95 @@ _UI: dict[str, dict[str, str]] = {
     "btn.save": {"en": "Save", "it": "Salva"},
     "btn.cancel": {"en": "Cancel", "it": "Annulla"},
     "btn.close": {"en": "Close", "it": "Chiudi"},
+    # Il pannello «In pista» (`livepanel_ui.py`): dal via di Coach Live alla
+    # Pagella. Il tono e' quello deciso col pilota il 21/10: frasi brevi col tu,
+    # prima il fatto e poi cosa fare, mai la stessa frase in due posti (un test
+    # lo controlla).
+    "live.preview": {"en": "What happens when you start it",
+                     "it": "Cosa succede quando lo avvii"},
+    "live.before": {"en": "Before you go", "it": "Prima di partire"},
+    "live.driving": {"en": "You're driving", "it": "Stai guidando"},
+    "live.finished": {"en": "Session over", "it": "Sessione finita"},
+    "live.s1": {"en": "Coach Live is on", "it": "Coach Live acceso"},
+    "live.s1_sub": {"en": "Voice and overlay are ready.",
+                    "it": "Voce e overlay sono pronti."},
+    "live.s2": {"en": "Connect your tablet to the engineer",
+                "it": "Collega il tablet all'ingegnere"},
+    "live.s2_scan": {"en": "Scan the code with the tablet's camera, or open {addr}.",
+                     "it": "Inquadra il codice con la fotocamera del tablet, "
+                           "oppure apri {addr}."},
+    "live.s2_lan_off": {
+        "en": "The tablet can only connect with network access on.",
+        "it": "Il tablet si collega solo con la rete locale attiva."},
+    "live.s2_to_devices": {"en": "Turn on network access",
+                           "it": "Attiva la rete locale"},
+    "live.s2_no_ip": {
+        "en": "This PC has no network address. Connect it to Wi-Fi or a cable.",
+        "it": "Questo PC non ha un indirizzo di rete. Collegalo al Wi-Fi o al cavo."},
+    "live.s2_web_down": {
+        "en": "The Engineer page isn't answering. Open it on this PC, or "
+              "restart Coach Live.",
+        "it": "La pagina Ingegnere non risponde. Aprila su questo PC, o "
+              "riavvia Coach Live."},
+    "live.open_here": {"en": "Open on this PC", "it": "Apri su questo PC"},
+    "live.skip": {"en": "Skip, I'll drive without", "it": "Salta, guido senza"},
+    "live.s3": {"en": "Start ACC and leave the pits",
+                "it": "Avvia ACC ed esci dai box"},
+    "live.s3_sub": {"en": "This ticks itself when the telemetry arrives.",
+                    "it": "Si spunta da solo quando arriva la telemetria."},
+    "live.tablet_on": {"en": "Tablet connected.", "it": "Tablet collegato."},
+    "live.tablet_off": {
+        "en": "The tablet disconnected. Wake its screen or reload the page.",
+        "it": "Il tablet si è scollegato. Riaccendi lo schermo o ricarica la "
+              "pagina."},
+    "live.tablet_skipped": {"en": "Driving without the tablet.",
+                            "it": "Guidi senza tablet."},
+    "live.tablet_none": {"en": "No tablet connected.",
+                         "it": "Nessun tablet collegato."},
+    "live.laps_one": {"en": "1 lap completed", "it": "1 giro completato"},
+    "live.laps": {"en": "{n} laps completed", "it": "{n} giri completati"},
+    "live.no_lap_yet": {"en": "No lap completed yet",
+                        "it": "Ancora nessun giro completato"},
+    "live.best": {"en": "best {time}", "it": "miglior {time}"},
+    "live.following": {"en": "You're working on: {name}",
+                       "it": "Stai seguendo: {name}"},
+    "live.following_sub": {
+        "en": "The coach reminds you in the corners of this advice.",
+        "it": "Il coach te lo ricorda nelle curve di questo consiglio."},
+    "live.finish": {"en": "I'm done, show me how it went",
+                    "it": "Ho finito, mostrami com'è andata"},
+    "live.finish_sub": {"en": "Stops the coach and opens the report card.",
+                        "it": "Ferma il coach e apre la Pagella."},
+    "live.stop_quiet": {"en": "Stop without opening the report",
+                        "it": "Ferma senza aprire il report"},
+    "live.no_laps": {
+        "en": "No laps saved in this run. The report opens on your last session.",
+        "it": "Nessun giro salvato in questa corsa. Il report si apre "
+              "sull'ultima sessione."},
+    "live.saved_one": {"en": "1 lap saved", "it": "1 giro salvato"},
+    "live.saved": {"en": "{n} laps saved", "it": "{n} giri salvati"},
+    "live.closed": {
+        "en": "ACC has been closed for a minute. The coach stays on until you "
+              "stop it, in case you're only changing track.",
+        "it": "ACC è chiuso da un minuto. Il coach resta acceso finché non lo "
+              "fermi tu, nel caso tu stia solo cambiando pista."},
+    "live.show": {"en": "Show me how it went", "it": "Mostrami com'è andata"},
+    "live.stay": {"en": "I'm staying on track", "it": "Resto in pista"},
+    "live.silent": {
+        "en": "The coach isn't answering. If it doesn't come back in a few "
+              "seconds, stop it and start it again.",
+        "it": "Il coach non risponde. Se non torna fra qualche secondo, "
+              "fermalo e riavvialo."},
+    "live.stop_late": {
+        "en": "The coach didn't stop within 5 s. The report opens anyway.",
+        "it": "Il coach non si è fermato entro 5 s. Il report si apre lo stesso."},
+    "live.report_wait": {"en": "Starting the report…",
+                         "it": "Sto avviando il report…"},
+    "live.report_late": {
+        "en": "The report didn't answer within 5 s. If the page stays blank, "
+              "reload it.",
+        "it": "Il report non ha risposto entro 5 s. Se la pagina resta vuota, "
+              "ricaricala."},
 }
 
 
