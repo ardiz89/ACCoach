@@ -2712,3 +2712,18 @@ def test_the_two_index_pickers_arbitrate_their_own_race(fn, state):
     assert len(line) == 1, f"il selettore di {fn} non è più dov'era"
     assert "EPOCH" not in line[0], \
         "il selettore fa salire il contatore globale: butterebbe richieste che nessuno rilancia"
+
+
+def test_the_stint_tyre_drift_is_written_with_catalogue_sentences():
+    """La riga «come cambiano le gomme nello stint» era composta in app.js
+    («Nello stint: Temp Ant. +3 ° · …»): un'etichetta coi due punti e un grado
+    nudo, invisibili al controllo del tono che legge solo il catalogo. Ora sono
+    due frasi intere del catalogo, coi numeri in °C e psi."""
+    block = _APPJS.split("function drawTyres")[1].split("\nfunction ")[0]
+    assert 'tf("tyre.drift.temp"' in block and 'tf("tyre.drift.press"' in block
+    assert '"°C"' in block and '"psi"' in block
+    assert "tyre.driftLead" not in block and ":</span>" not in block
+    for key in ("tyre.drift.temp", "tyre.drift.press"):
+        entry = _I18NJS[_I18NJS.index(f'"{key}"'):]
+        entry = entry[:entry.index("},")]
+        assert "en:" in entry and "it:" in entry and "{f}" in entry and "{r}" in entry

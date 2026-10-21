@@ -408,3 +408,12 @@ def test_the_guide_may_repeat_a_ui_label_but_not_itself():
     both = {"g1": guide["g1"], "g2": guide["g1"]}
     assert list(tono.duplicates({"hub": ui, "guide": both}).values()) == [["guide|g1", "guide|g2"]]
     assert tono.duplicates({"hub": ui, "report": {"r": ui["a"]}})
+
+
+def test_keys_asked_inside_a_template_are_found(tmp_path, monkeypatch):
+    """`${t("…")}` e `${tf("…", …)}` stanno dentro un letterale col backtick:
+    senza cercarli come argomenti, la chiave finisce nella superficie sbagliata."""
+    (tmp_path / "x.js").write_text(
+        'el.innerHTML = `<b>${t("a.one")}</b> ${tf("a.two", { n: 1 })}`;', encoding="utf-8")
+    monkeypatch.setattr(tono, "WEB", tmp_path)
+    assert {"a.one", "a.two"} <= tono._literals("x.js")

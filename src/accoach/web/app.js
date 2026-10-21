@@ -868,16 +868,16 @@ function drawTyres(p) {
   if (firstT && lastT && firstT !== lastT) {
     const df = axle(lastT.temp, 0, 1) - axle(firstT.temp, 0, 1);
     const dr = axle(lastT.temp, 2, 3) - axle(firstT.temp, 2, 3);
-    bits.push(`<b>${t("tyre.tempLabel")}</b> ${t("tyre.front")} ${sgn(df, 0, "°")} · ${t("tyre.rear")} ${sgn(dr, 0, "°")}`);
+    bits.push(tf("tyre.drift.temp", { f: sgn(df, 0, "°C"), r: sgn(dr, 0, "°C") }));
   }
   if (firstP && lastP && firstP !== lastP) {
     const df = axle(lastP.press, 0, 1) - axle(firstP.press, 0, 1);
     const dr = axle(lastP.press, 2, 3) - axle(firstP.press, 2, 3);
-    bits.push(`<b>${t("tyre.pressLabel")}</b> ${t("tyre.front")} ${sgn(df, 1, "")} · ${t("tyre.rear")} ${sgn(dr, 1, "")} psi`);
+    bits.push(tf("tyre.drift.press", { f: sgn(df, 1, "psi"), r: sgn(dr, 1, "psi") }));
   }
-  $("tyre-drift").innerHTML = bits.length
-    ? `<span class="muted">${t("tyre.driftLead")}:</span> ${bits.join("  ·  ")}`
-    : "";
+  // Frasi intere dal catalogo, non «Etichetta: valore» composto qui: il
+  // controllo del tono legge il catalogo, e una riga scritta a mano gli sfugge.
+  $("tyre-drift").textContent = bits.join(" ");
 }
 
 // One tyre chart: four wheel lines over the laps that carry ``field`` (temp or
@@ -3358,7 +3358,7 @@ function renderStint(s) {
           ? `<span class="tag fuel" title="${escAttr(t("st.fuel"))}">${fmtDec(l.fuel_used, 2, "L")}</span>`
           : "") +
         (l.tyre_c != null
-          ? `<span class="tag tyre" title="${escAttr(t("tyre.temp"))}">${fmtDec(l.tyre_c, 0, "°")}</span>`
+          ? `<span class="tag tyre" title="${escAttr(t("tyre.temp"))}">${fmtDec(l.tyre_c, 0, "°C")}</span>`
           : "");
       return `<button type="button" class="ses-lap${l.counted ? "" : " not-pace"}" ` +
              `data-path="${l.path}" title="${t("ses.open")}">` +
@@ -4872,8 +4872,8 @@ function apexWord(c) {
   // and a sentence in a right-aligned number column wrecks the row it sits in.
   if (c.off_here) return `<span title="${escAttr(t("line.apexOff"))}">–</span>`;
   if (c.apex_flat_m > 0) {
-    return `${t("line.sameSpot")} <span class="muted">${
-      tf("line.apexFlat", { m: Math.round(c.apex_flat_m) })}</span>`;
+    return `${t("line.sameSpot")} <span class="muted">(${
+      tf("line.apexFlat", { m: Math.round(c.apex_flat_m) })})</span>`;
   }
   const shift = c.apex_shift_m;
   if (Math.abs(shift) < 0.5) return t("line.sameSpot");

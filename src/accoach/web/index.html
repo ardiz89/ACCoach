@@ -78,7 +78,7 @@
         <!-- I giri registrati prima dello schema con le coordinate non hanno una
              mappa. Il rail non diventa per questo una colonna vuota: il disegno
              lascia il posto a questa riga e la lista curve sotto resta viva. -->
-        <div id="rail-nomap" class="rail-nomap hidden" data-i18n="rail.nomap">This lap was recorded without coordinates, so it has no map. The corners below still work.</div>
+        <div id="rail-nomap" class="rail-nomap hidden" data-i18n="rail.nomap">Without the coordinates of one of the two laps there's no map. The corners below still work.</div>
       </div>
       <nav id="rail-list" class="rail-list"></nav>
     </aside>
@@ -186,7 +186,7 @@
       <section id="st-numbers" class="summary"></section>
       <main id="st-chart-wrap">
         <div class="chart">
-          <h3 data-i18n-html="st.chart">Pace across the stint <small>(each dot is a lap, faded = not at pace, the line is the measured drift)</small></h3>
+          <h3 data-i18n-html="st.chart">Pace across the stint <small>(each dot is a lap, the faded ones weren't at pace, the line is the measured drift)</small></h3>
           <canvas id="c-stint" class="tall"></canvas>
         </div>
       </main>
@@ -299,7 +299,7 @@
         <!-- `.missing`, non `.empty`: quella è la schermata «ancora nessun giro»
              di tutta la pagina, accesa solo da `body.no-data`, e riusarla qui
              lasciava il messaggio a `display: none` per sempre (vedi il CSS). -->
-        <div id="map-missing" class="missing hidden" data-i18n="map.missing">This lap has no coordinates, because it was recorded before HONE saved them. Drive a new lap and the map will show here.</div>
+        <div id="map-missing" class="missing hidden" data-i18n="map.missing">One of the two laps has no coordinates, so the map can't be drawn. Drive a new lap and you'll see it here.</div>
         <!-- The braking sheet travelled here with the map rather than getting a
              tab of its own: the drawing above already says where you brake, and
              the sheet is the same fact as numbers. Measured across your recent
@@ -424,11 +424,11 @@
     <section id="dyn-coasting" class="summary"></section>
     <main id="dyn-charts">
       <div class="chart gg">
-        <h3 data-i18n-html="chart.gg">How much grip you use (G-G) <small>(each dot is a moment, further from the centre = more grip, the ring is your peak)</small></h3>
+        <h3 data-i18n-html="chart.gg">G-G diagram <small>(each dot is a moment, the further from the centre the more grip you're using, the ring is your peak)</small></h3>
         <canvas id="c-gg"></canvas>
       </div>
       <div class="chart">
-        <h3 data-i18n-html="chart.slip">Locking and wheelspin <small>(slip ratio, cyan = front, amber = rear, below 0 = locking, above = spinning, bar underneath = ABS and TC at work)</small></h3>
+        <h3 data-i18n-html="chart.slip">Locking and wheelspin <small>(slip ratio, cyan for the fronts and amber for the rears. Below zero the wheel locks, above it spins. The bar underneath is ABS or TC stepping in.)</small></h3>
         <canvas id="c-slip"></canvas>
       </div>
       <!-- Lo scostamento dalla traiettoria stava qui, ed era lo STESSO canale
@@ -445,7 +445,7 @@
         <canvas id="c-yaw"></canvas>
       </div>
       <div class="chart">
-        <h3 data-i18n-html="chart.rpm">Revs and shifts <small>(rpm across the lap, triangle up = upshift, triangle down = downshift)</small></h3>
+        <h3 data-i18n-html="chart.rpm">Revs and shifts <small>(rpm across the lap, the triangles pointing up are upshifts and those pointing down are downshifts)</small></h3>
         <canvas id="c-rpm"></canvas>
       </div>
     </main>
@@ -466,7 +466,7 @@
       </div>
     </section>
     <div id="dyn-balance-wrap" class="chart ribbon hidden">
-      <h3 data-i18n-html="chart.balance">Balance along the lap <small>(the racing line coloured by how the car behaves)</small></h3>
+      <h3 data-i18n-html="chart.balance">Balance <small>(the colour shows how the car behaves along the racing line)</small></h3>
       <canvas id="c-balance"></canvas>
       <div class="map-legend">
         <span class="swatch"><span class="marker" style="color:#5896ff">■</span> <span data-i18n="bal.under">understeer</span></span>
