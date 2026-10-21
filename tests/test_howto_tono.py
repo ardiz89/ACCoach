@@ -17,9 +17,11 @@ from accoach.coaching.howto import (
     HowTo,
     defect_name,
     error_name,
+    excluded,
     fmt_s,
     howto,
     problem,
+    reached,
     verdict,
 )
 
@@ -64,6 +66,14 @@ def _all_texts():
             yield from (getattr(h, f) for f in _FIELDS)
         yield from _verdicts(lang)
         yield from _problems(lang)
+        yield from _pagella_notes(lang)
+
+
+_REASONS = ("wet", "dry", "no_reference", "no_laps")
+
+
+def _pagella_notes(lang):
+    return [excluded(r, lang) for r in _REASONS] + [reached("min_speed", 4, 6, lang)]
 
 
 # --- i nomi -----------------------------------------------------------------
@@ -165,7 +175,7 @@ def test_done_when_sentences_do_not_share_a_skeleton(lang):
 
 def test_no_emoji_and_no_slogan_colons():
     texts = list(_all_texts())
-    assert len(texts) == 2 * (7 * 5 + 4 + 7)
+    assert len(texts) == 2 * (7 * 5 + 4 + 7 + 5)
     for text in texts:
         assert not re.search(r"[\U0001F300-\U0001FAFF☀-➿]", text), text
         assert not re.search(r"^[^:]{1,30}:\s", text), text
@@ -265,3 +275,20 @@ def test_coasting_is_not_a_share_of_the_lost_time():
 def test_verdict_without_a_dominant_defect():
     text = verdict(0.30, None, 0.0, None, "en")
     assert "0.30 s" in text and "“" not in text
+
+
+# --- le frasi della Pagella senza pagella, e il consiglio raggiunto -----------
+
+@pytest.mark.parametrize("lang", LANGS)
+def test_pagella_notes_are_distinct_and_have_no_colon(lang):
+    notes = _pagella_notes(lang)
+    sentences = [x for t in notes for x in _split(t)]
+    assert len(sentences) == len(set(sentences))
+    for t in notes:
+        assert ":" not in t, t
+    assert all(excluded(r, "en") != excluded(r, "it") for r in _REASONS)
+
+
+def test_reached_names_the_defect_and_the_count():
+    text = reached("min_speed", 4, 6, "it")
+    assert "«Poca velocità in curva»" in text and "4 giri su 6" in text

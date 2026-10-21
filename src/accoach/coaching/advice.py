@@ -101,7 +101,7 @@ def propose_advice(summaries: list[DefectSummary], stored: list[Advice],
     return out
 
 
-def _lap_value(a: Advice, ld: LapDefects) -> float:
+def lap_value(a: Advice, ld: LapDefects) -> float:
     """Il difetto in un giro, sommato sulle curve del consiglio.
 
     Coasting e sollevamenti non hanno ripartizione per curva in `LapDefects`
@@ -115,7 +115,7 @@ def _lap_value(a: Advice, ld: LapDefects) -> float:
 
 
 def measure_advice(a: Advice, laps_since: list[LapDefects]) -> AdviceProgress:
-    vals = [_lap_value(a, ld) for ld in laps_since]
+    vals = [lap_value(a, ld) for ld in laps_since]
     n = len(vals)
     hits = sum(1 for v in vals if v <= a.target)
     needed = max(2, math.ceil(RECUR_FRAC * n))

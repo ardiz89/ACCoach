@@ -524,3 +524,46 @@ def verdict(mean_gap_s: float, top: DefectSummary | None, share: float,
             parts.append(t[tpl].format(names=names))
     cmp_ += t["with"].format(parts=t["and"].join(parts)) if parts else t["end"]
     return f"{out} {cmp_}"
+
+
+# --- quando la Pagella non giudica, e quando un consiglio è raggiunto -------
+
+# Al posto dei blocchi della Pagella: il motivo, detto una volta.
+_EXCLUDED = {
+    "it": {
+        "wet": "Questa sessione è sul bagnato e il tuo storico è sull'asciutto. "
+               "Resta fuori dall'andamento, perché le due cose non si confrontano.",
+        "dry": "Questa sessione è sull'asciutto e il tuo storico è sul bagnato. "
+               "Non entra nell'andamento finché non ne guidi un'altra così.",
+        "no_reference": "Non c'è ancora un altro giro valido con cui confrontare "
+                        "questa sessione. Il confronto parte dal prossimo giro pulito.",
+        "no_laps": "In questa sessione non c'è nessun giro valido da giudicare.",
+    },
+    "en": {
+        "wet": "This session is on wet tyres and your history is on dry ones. It "
+               "stays out of the trend, because the two don't compare.",
+        "dry": "This session is on dry tyres and your history is on wet ones. It "
+               "joins the trend once you drive another one like it.",
+        "no_reference": "There's no other valid lap yet to compare this session "
+                        "with. The comparison starts with your next clean lap.",
+        "no_laps": "This session has no valid lap to judge.",
+    },
+}
+
+_REACHED = {
+    "it": "Il consiglio su «{name}» è raggiunto, sotto l'obiettivo in {hits} giri "
+          "su {laps}. Nel piano trovi il prossimo.",
+    "en": "The advice on “{name}” is done, under the target on {hits} laps out of "
+          "{laps}. The plan shows the next one.",
+}
+
+
+def excluded(reason: str, lang: str) -> str:
+    """Perché questa sessione non ha pagella: bagnato, asciutto, niente metro o giri."""
+    return _EXCLUDED[_lang(lang)][reason]
+
+
+def reached(key: str, hits: int, laps: int, lang: str) -> str:
+    """La frase che si aggiunge al verdetto quando un consiglio è raggiunto."""
+    lg = _lang(lang)
+    return _REACHED[lg].format(name=defect_name(key, lg), hits=hits, laps=laps)

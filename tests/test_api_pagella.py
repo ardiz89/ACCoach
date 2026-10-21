@@ -1,0 +1,398 @@
+"""Gli endpoint della Pagella: /api/pagella, /api/howto e POST /api/advice.
+
+Giri sintetici salvati in `tmp_path` e letti dal catalogo, come in
+`tests/test_plan.py`. I giri lenti sono di due tipi, uno per difetto: `min`
+perde velocita' nella curva 0 (Poca velocita' in curva), `thr` apre il gas
+tardi nella curva 1 (Gas tardi in uscita). Un giro ha un solo difetto, quindi
+in una sessione con due giri per tipo entrambi i difetti sono «principali»
+(sopra soglia in meta' dei giri).
+"""
+from dataclasses import asdict
+
+import pytest
+from fastapi.testclient import TestClient
+
+from accoach import pagella
+from accoach.api import create_api
+from accoach.coaching.advice import ACTIVE, Advice, AdviceCorner
+from accoach.coaching.howto import defect_name
+from accoach.recording.catalog import LapCatalog
+from accoach.recording.storage import _catalog_path, save_lap
+
+import synth
+
+CAR, TRACK = "ferrari_488_gt3", "monza"
+
+
+@pytest.fixture(autouse=True)
+def _cache_vuota():
+    pagella.clear_cache()
+    yield
+    pagella.clear_cache()
+
+
+def _lap(kind, amt):
+    if kind is None:
+        return synth.build_lap(clean=True)
+    if kind == "min":
+        return synth.build_lap(slow_corner=0, amt=amt, clean=True)
+    lap = synth.build_lap(slow_corner=1, amt=amt, clean=True)
+    for s in lap.samples:          # gas tardi all'uscita della curva 1
+        if 0.70 <= s.pos <= 0.80:
+            s.throttle = 0.2
+    return lap
+
+
+def _put(tmp_path, stamp, kind=None, amt=0, compound="", valid=True):
+    lap = _lap(kind, amt)
+    lap.recorded_utc = stamp
+    lap.tyre_compound = compound
+    lap.valid = valid
+    save_lap(lap, tmp_path)
+
+
+def _session(tmp_path, hour, kinds, compound="", minute=0):
+    for i, (kind, amt) in enumerate(kinds):
+        _put(tmp_path, f"2026-10-20T{hour:02d}:{minute + 2 * i:02d}:00+00:00",
+             kind, amt, compound)
+
+
+_MIXED = [("min", 26), ("thr", 20), ("min", 26), ("thr", 20)]
+
+
+def _two_sessions(tmp_path, second=_MIXED):
+    _session(tmp_path, 10, [(None, 0)] + _MIXED)
+    _session(tmp_path, 11, second)
+    return TestClient(create_api(tmp_path))
+
+
+def _pagella(c, index=0, lang="it"):
+    r = c.get("/api/pagella", params={"car": CAR, "track": TRACK,
+                                      "index": index, "lang": lang})
+    assert r.status_code == 200, r.text
+    return r.json()
+
+
+def _advice(c, defect, action, expect=200):
+    r = c.post("/api/advice", json={"car": CAR, "track": TRACK,
+                                    "defect": defect, "action": action})
+    assert r.status_code == expect, r.text
+    return r.json()
+
+
+def _rows(tmp_path):
+    with LapCatalog(_catalog_path(tmp_path)) as cat:
+        return cat.laps_for(CAR, TRACK)
+
+
+def _ref_path(tmp_path):
+    return min(_rows(tmp_path), key=lambda r: r["lap_time_ms"])["path"]
+
+
+def _stored(tmp_path):
+    with LapCatalog(_catalog_path(tmp_path)) as cat:
+        return {a["defect"]: a for a in cat.load_advice(CAR, TRACK)}
+
+
+def _store(tmp_path, advice: dict):
+    with LapCatalog(_catalog_path(tmp_path)) as cat:
+        cat.save_advice(CAR, TRACK, advice)
+
+
+# --- la Pagella -------------------------------------------------------------
+
+def test_two_sessions_give_a_full_pagella(tmp_path):
+    p = _pagella(_two_sessions(tmp_path))
+    assert p["excluded"] is None
+    assert p["verdict"]
+    assert p["session"]["laps"] == 4 and p["session"]["valid"] == 4
+    assert p["session"]["wet"] is False
+    keys = [d["key"] for d in p["defects"]]
+    assert keys == ["min_speed", "throttle_late"]
+    values = [d["value"] for d in p["defects"]]
+    assert values == sorted(values, reverse=True)
+    for d in p["defects"]:
+        assert len(d["series"]) == 2
+        assert d["trend"] == "same"
+        assert d["name"] == defect_name(d["key"], "it")
+        assert d["corners"] and d["corners"][0]["name"]
+    assert p["advice"][0]["status"] == "proposed"
+    assert p["advice"][0]["defect"] == "min_speed"
+    assert p["advice"][0]["corners"]
+    assert p["reference"]["lap_time"] and p["reference"]["recorded_utc"]
+    assert p["worst_corners"] and all(w["name"] for w in p["worst_corners"])
+    assert p["worst_corners"][0]["value_s"] > 0
+
+
+def test_the_trend_follows_the_previous_session(tmp_path):
+    # Seconda sessione: la curva 0 perde molto di piu', il gas tardi sparisce.
+    p = _pagella(_two_sessions(tmp_path, second=[("min", 40), ("min", 40)]))
+    by = {d["key"]: d for d in p["defects"]}
+    assert by["min_speed"]["trend"] == "up"
+    assert by["min_speed"]["series"][0] < by["min_speed"]["series"][1]
+    # Il gas tardi non e' piu' principale in questa sessione: non e' in lista.
+    assert "throttle_late" not in by
+
+
+def test_the_series_stops_at_six_sessions(tmp_path):
+    _put(tmp_path, "2026-10-20T08:00:00+00:00")
+    for h in range(9, 17):          # otto sessioni da due giri lenti
+        _session(tmp_path, h, [("min", 26), ("min", 26)])
+    p = _pagella(TestClient(create_api(tmp_path)))
+    assert len(p["defects"][0]["series"]) == 6
+
+
+def test_trend_thresholds_are_relative_and_absolute():
+    assert pagella.trend_of(200.0, 300.0, "ms") == "down"
+    assert pagella.trend_of(300.0, 200.0, "ms") == "up"
+    # 10% si', ma meno di 20 ms: uguale.
+    assert pagella.trend_of(150.0, 165.0, "ms") == "same"
+    # 20 ms si', ma meno del 10%: uguale.
+    assert pagella.trend_of(500.0, 530.0, "ms") == "same"
+    assert pagella.trend_of(0.5, 0.65, "s") == "down"
+    assert pagella.trend_of(0.5, 0.58, "s") == "same"
+    assert pagella.trend_of(1.0, None, "ms") is None
+
+
+def test_an_older_session_never_sees_the_ones_after_it(tmp_path):
+    p = _pagella(_two_sessions(tmp_path), index=1)
+    assert p["excluded"] is None
+    for d in p["defects"]:
+        assert len(d["series"]) == 1
+        assert d["trend"] is None
+    assert "prima sessione" in p["verdict"]
+
+
+def test_a_single_lap_has_no_reference(tmp_path):
+    _put(tmp_path, "2026-10-20T10:00:00+00:00")
+    p = _pagella(TestClient(create_api(tmp_path)))
+    assert p["excluded"] == "no_reference"
+    assert p["defects"] == [] and p["advice"] == []
+    assert p["verdict"]
+
+
+def test_no_laps_at_all(tmp_path):
+    p = _pagella(TestClient(create_api(tmp_path)))
+    assert p["excluded"] == "no_laps"
+    assert p["defects"] == []
+
+
+def test_a_session_without_valid_laps(tmp_path):
+    _session(tmp_path, 10, [(None, 0)] + _MIXED)
+    _put(tmp_path, "2026-10-20T11:00:00+00:00", "min", 26, valid=False)
+    p = _pagella(TestClient(create_api(tmp_path)))
+    assert p["excluded"] == "no_laps"
+
+
+def test_a_wet_session_with_a_dry_history_is_left_out(tmp_path):
+    _session(tmp_path, 10, [(None, 0)] + _MIXED, compound="dry_compound")
+    _session(tmp_path, 11, [(None, 0)] + _MIXED, compound="wet_compound")
+    c = TestClient(create_api(tmp_path))
+    p = _pagella(c)
+    assert p["excluded"] == "wet"
+    assert p["session"]["wet"] is True
+    assert p["defects"] == [] and p["advice"] == []
+    assert "bagnato" in p["verdict"]
+    assert _pagella(c, index=1)["excluded"] is None
+
+
+def test_a_dry_session_with_a_wet_history_is_left_out(tmp_path):
+    _session(tmp_path, 10, [(None, 0)] + _MIXED, compound="wet_compound")
+    _session(tmp_path, 11, [(None, 0)] + _MIXED, compound="dry_compound")
+    assert _pagella(TestClient(create_api(tmp_path)))["excluded"] == "dry"
+
+
+def test_two_wet_sessions_make_their_own_history(tmp_path):
+    _session(tmp_path, 9, [(None, 0)] + _MIXED, compound="dry_compound")
+    _session(tmp_path, 10, [(None, 0)] + _MIXED, compound="wet_compound")
+    _session(tmp_path, 11, _MIXED, compound="wet_compound")
+    p = _pagella(TestClient(create_api(tmp_path)))
+    assert p["excluded"] is None
+    assert all(len(d["series"]) == 2 for d in p["defects"])
+
+
+def test_errors_are_counted_and_named(tmp_path):
+    p = _pagella(_two_sessions(tmp_path))
+    assert p["errors"], p["errors"]
+    for e in p["errors"]:
+        assert e["count"] > 0 and e["name"]
+
+
+def test_english(tmp_path):
+    p = _pagella(_two_sessions(tmp_path), lang="en")
+    assert p["defects"][0]["name"] == defect_name("min_speed", "en")
+    assert "lap" in p["verdict"]
+
+
+# --- il piano ---------------------------------------------------------------
+
+def test_one_advice_at_a_time(tmp_path):
+    c = _two_sessions(tmp_path)
+    _advice(c, "min_speed", "follow")
+    _advice(c, "throttle_late", "follow", expect=409)
+    _advice(c, "min_speed", "drop")
+    _advice(c, "throttle_late", "follow")
+    p = _pagella(c)
+    assert p["advice"][0]["defect"] == "throttle_late"
+    assert p["advice"][0]["status"] == ACTIVE
+    stored = _stored(tmp_path)
+    assert stored["throttle_late"]["accepted_utc"]
+    assert stored["throttle_late"]["reference_path"] == _ref_path(tmp_path)
+    assert stored["min_speed"]["status"] == "dropped"
+
+
+def test_following_stores_what_was_proposed(tmp_path):
+    c = _two_sessions(tmp_path)
+    shown = _pagella(c)["advice"][0]
+    _advice(c, "min_speed", "follow")
+    a = _stored(tmp_path)["min_speed"]
+    assert a["status"] == ACTIVE
+    # Il metro con cui e' stato proposto: senza, la prima lettura lo ricalcola.
+    assert a["reference_path"] == _ref_path(tmp_path)
+    assert a["target"] == shown["target"]
+    assert a["corners"][0]["index"] == 0
+    assert a["corners"][0]["apex_pos"] > 0
+
+
+def test_decline_keeps_the_defect_and_drops_the_advice(tmp_path):
+    c = _two_sessions(tmp_path)
+    _advice(c, "throttle_late", "decline")
+    p = _pagella(c)
+    assert "throttle_late" in [d["key"] for d in p["defects"]]
+    assert "throttle_late" not in [a["defect"] for a in p["advice"]]
+    _advice(c, "throttle_late", "undecline")
+    assert "throttle_late" in [a["defect"] for a in _pagella(c)["advice"]]
+
+
+def test_bad_requests(tmp_path):
+    c = _two_sessions(tmp_path)
+    _advice(c, "min_speed", "explode", expect=422)
+    _advice(c, "nonsense", "follow", expect=422)
+    _advice(c, "min_speed", "drop", expect=409)          # nessuno in corso
+    _advice(c, "lift", "follow", expect=404)              # non proposto
+    _advice(c, "min_speed", "follow")
+    _advice(c, "min_speed", "decline", expect=409)        # in corso: si lascia
+
+
+def test_an_active_advice_is_reached_and_the_next_one_is_proposed(tmp_path):
+    _session(tmp_path, 10, [(None, 0)] + _MIXED)
+    ref = _ref_path(tmp_path)
+    # Seguito fra le due sessioni: curva 0, obiettivo 120 ms.
+    _store(tmp_path, {**asdict(Advice(
+        defect="min_speed", corners=[AdviceCorner(0, "x", 0.31, 212.5)],
+        baseline=212.5, target=120.0, status=ACTIVE,
+        accepted_utc="2026-10-20T10:30:00+00:00")), "reference_path": ref})
+    # Dopo: due giri senza perdita in curva 0 (sotto obiettivo), uno sopra.
+    _session(tmp_path, 11, [("thr", 20), ("min", 26), ("thr", 20)])
+    c = TestClient(create_api(tmp_path))
+    p = _pagella(c)
+    by = {a["defect"]: a for a in p["advice"]}
+    assert by["min_speed"]["status"] == "reached"
+    assert by["min_speed"]["progress"]["hits"] == 2
+    assert p["advice"][1]["defect"] == "throttle_late"
+    assert p["advice"][1]["status"] == "proposed"
+    assert defect_name("min_speed", "it") in p["verdict"]
+    stored = _stored(tmp_path)["min_speed"]
+    assert stored["status"] == "reached"
+    # Chiuso sul giro che l'ha deciso, non sull'ora della lettura.
+    assert stored["closed_utc"] == "2026-10-20T11:04:00+00:00"
+    # Una seconda lettura lo dice ancora: e' la sessione in cui e' successo.
+    assert defect_name("min_speed", "it") in _pagella(c)["verdict"]
+
+
+def test_an_active_advice_is_rebased_when_the_reference_changes(tmp_path):
+    _session(tmp_path, 10, [(None, 0)] + _MIXED)
+    _store(tmp_path, {**asdict(Advice(
+        defect="min_speed", corners=[AdviceCorner(0, "x", 0.31, 9999.0)],
+        baseline=9999.0, target=4999.5, status=ACTIVE,
+        accepted_utc="2026-10-20T10:30:00+00:00")), "reference_path": "vecchio"})
+    _session(tmp_path, 11, [("min", 40), ("min", 40)])
+    _pagella(TestClient(create_api(tmp_path)))
+    a = _stored(tmp_path)["min_speed"]
+    assert a["reference_path"] == _ref_path(tmp_path)
+    # Partenza misurata sulla sessione dell'accettazione (425+425+0+0)/4, non
+    # su quella di oggi (680).
+    assert a["baseline"] == pytest.approx(212.5, abs=1.0)
+    assert a["corners"][0]["mean"] == pytest.approx(212.5, abs=1.0)
+    assert a["status"] == ACTIVE
+
+
+def test_an_old_accepted_plan_becomes_the_active_advice(tmp_path):
+    c = _two_sessions(tmp_path)
+    with LapCatalog(_catalog_path(tmp_path)) as cat:
+        # Accettato dopo l'ultima sessione: nessun giro lo ha ancora misurato.
+        cat.save_plan(CAR, TRACK, "2026-10-20T12:00:00+00:00", [{
+            "corner_index": 0, "name": "x", "category": "carry_speed",
+            "what": "w", "fix": "f", "baseline_ms": 300.0, "target_ms": 150.0,
+            "laps_seen": 4}])
+    p = _pagella(c)
+    assert p["advice"][0]["defect"] == "min_speed"
+    assert p["advice"][0]["status"] == ACTIVE
+
+
+# --- il «come si fa» --------------------------------------------------------
+
+def _howto(c, defect, lang="it"):
+    r = c.get("/api/howto", params={"car": CAR, "track": TRACK, "defect": defect,
+                                    "index": 0, "lang": lang})
+    assert r.status_code == 200, r.text
+    return r.json()
+
+
+def test_howto_is_built_on_the_drivers_laps(tmp_path):
+    c = _two_sessions(tmp_path)
+    p = _pagella(c)
+    corner = p["advice"][0]["corners"][0]
+    h = _howto(c, "min_speed")
+    assert h["name"] == defect_name("min_speed", "it")
+    assert corner in h["problem"]
+    assert h["howto"]["drill"] and h["howto"]["laps"] >= 1
+    paths = {r["path"] for r in _rows(tmp_path)}
+    f = h["figures"][0]
+    assert f["typical_path"] in paths and f["best_path"] in paths
+    assert f["best_path"] == _ref_path(tmp_path)
+    assert f["name"] == corner and f["entry_pos"] < f["exit_pos"]
+    assert h["progress"] == []
+    assert h["reference_lap"]["lap_time"]
+
+
+def test_the_typical_lap_is_the_one_closest_to_the_median(tmp_path):
+    # Tre giri lenti in curva 0: 10, 26 e 40 km/h. La mediana e' quello da 26.
+    _session(tmp_path, 10, [(None, 0), ("min", 10), ("min", 26), ("min", 40)])
+    c = TestClient(create_api(tmp_path))
+    f = _howto(c, "min_speed")["figures"][0]
+    rows = sorted(_rows(tmp_path), key=lambda r: r["lap_time_ms"])
+    assert f["typical_path"] == rows[2]["path"]
+
+
+def test_howto_brake_points_use_the_braking_sheet_measure(tmp_path):
+    c = _two_sessions(tmp_path)
+    bp = _howto(c, "min_speed")["figures"][0]["brake_points_m"]
+    assert bp is not None
+    assert bp["typical"] > 0 and bp["best"] > 0
+
+
+def test_howto_progress_after_following(tmp_path):
+    _session(tmp_path, 10, [(None, 0)] + _MIXED)
+    _store(tmp_path, {**asdict(Advice(
+        defect="min_speed", corners=[AdviceCorner(0, "x", 0.31, 212.5)],
+        baseline=212.5, target=120.0, status=ACTIVE,
+        accepted_utc="2026-10-20T10:30:00+00:00")),
+        "reference_path": _ref_path(tmp_path)})
+    _session(tmp_path, 11, [("min", 26), ("min", 26)])
+    _session(tmp_path, 12, [("min", 26), ("thr", 20)])
+    h = _howto(TestClient(create_api(tmp_path)), "min_speed")
+    assert len(h["progress"]) == 2
+    assert h["progress"][0] > h["progress"][1] > 0
+
+
+def test_howto_of_an_unknown_defect_is_404(tmp_path):
+    c = _two_sessions(tmp_path)
+    r = c.get("/api/howto", params={"car": CAR, "track": TRACK, "defect": "x"})
+    assert r.status_code == 404
+
+
+def test_howto_without_data_still_explains(tmp_path):
+    _put(tmp_path, "2026-10-20T10:00:00+00:00")
+    h = _howto(TestClient(create_api(tmp_path)), "lift")
+    assert h["howto"]["what"] and h["problem"] is None and h["figures"] == []

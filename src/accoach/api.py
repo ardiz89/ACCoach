@@ -44,7 +44,7 @@ from .coaching.phases import PHASES
 from .coaching.training import MIN_LAPS as _TRAIN_MIN_LAPS, assess as _assess_training
 from .coaching.trends import session_recap, session_series
 from .comparison import Reference
-from . import cornernames
+from . import cornernames, pagella
 from .cornermap import learn_from
 from .i18n import current_language
 from .recording import laps_root, load_lap
@@ -2249,6 +2249,47 @@ def create_api(
         with _catalog() as cat:
             cat.clear_plan(car, track)
         return {"ok": True}
+
+    @app.get("/api/pagella")
+    def pagella_page(car: str = Query(...), track: str = Query(...),
+                     index: int = Query(0), lang: str | None = Query(None)) -> dict:
+        """La prima pagina del report: com'è andata, i difetti, il piano."""
+        with _catalog() as cat:
+            return pagella.build_pagella(cat, car, track, index,
+                                         lang or current_language())
+
+    @app.get("/api/howto")
+    def howto_page(car: str = Query(...), track: str = Query(...),
+                   defect: str = Query(...), index: int = Query(0),
+                   lang: str | None = Query(None)) -> dict:
+        """La vista «Come si fa» di un difetto, sui giri del pilota."""
+        try:
+            with _catalog() as cat:
+                return pagella.build_howto(cat, car, track, defect, index,
+                                           lang or current_language())
+        except pagella.UnknownDefect:
+            raise HTTPException(404, "unknown defect")
+
+    @app.post("/api/advice")
+    def advice_set(payload: dict = Body(...)) -> dict:
+        """Lo seguo / lascio stare / raggiunto / non lo seguo / lo riprendo."""
+        car = str(payload.get("car") or "")
+        track = str(payload.get("track") or "")
+        if not car or not track:
+            raise HTTPException(422, "car and track are required")
+        try:
+            index = int(payload.get("index") or 0)
+            with _catalog() as cat:
+                return pagella.advice_action(
+                    cat, car, track, str(payload.get("defect") or ""),
+                    str(payload.get("action") or ""), index,
+                    str(payload.get("lang") or current_language()))
+        except pagella.AdviceConflict as e:
+            raise HTTPException(409, str(e))
+        except LookupError:
+            raise HTTPException(404, "no advice proposed for this defect")
+        except (TypeError, ValueError):
+            raise HTTPException(422, "unknown action or defect")
 
     @app.get("/api/export")
     def export(
