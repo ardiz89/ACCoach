@@ -20,6 +20,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from ..textfmt import fmt_num
 from .defects import DefectSummary
 from .training import GlossaryEntry, glossary_of
 
@@ -81,10 +82,7 @@ def error_name(key: str, lang: str) -> str:
 
 def fmt_s(v: float, lang: str) -> str:
     """Secondi con due decimali e l'unità: «0,18 s» in italiano, «0.18 s» in inglese."""
-    text = f"{v:.2f}"
-    if _lang(lang) == "it":
-        text = text.replace(".", ",")
-    return f"{text} s"
+    return fmt_num(v, 2, _lang(lang), "s")
 
 
 def _seconds(value: float, unit: str) -> float:

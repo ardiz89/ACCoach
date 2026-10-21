@@ -1100,6 +1100,16 @@
   };
 
   // ---- core ---------------------------------------------------------------
+  // A number as the page's language writes it: «0,18 s» in Italian, «0.18 s» in
+  // English, a space before the unit, and a value that rounds to nothing is "0",
+  // never "-0,00". Python twin: accoach.textfmt.fmt_num. Reads the language from
+  // HoneI18n.lang, which set() keeps current (app.js and engineer.js both use it).
+  function fmtNum(v, decimals, unit) {
+    var s = (Math.abs(v) < 0.5 * Math.pow(10, -decimals) ? 0 : v).toFixed(decimals);
+    if (window.HoneI18n.lang === "it") s = s.replace(".", ",");
+    return unit ? s + " " + unit : s;
+  }
+
   function readLang() {
     var l = "en";
     try { l = localStorage.getItem(STORE) || "en"; } catch (e) {}
@@ -1218,7 +1228,7 @@
     applyStatic();
   }
 
-  window.HoneI18n = { lang: lang, t: t, set: set, applyStatic: applyStatic };
+  window.HoneI18n = { lang: lang, t: t, set: set, applyStatic: applyStatic, fmtNum: fmtNum };
 
   // Script lives at the end of <body>, after the header — the DOM we need is
   // already parsed, so boot immediately (and also catch the event, defensively).

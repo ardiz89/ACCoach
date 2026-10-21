@@ -2446,17 +2446,17 @@ let HOWTO_REQ = 0;
 let PAG_NOTE = "";
 
 // Un numero con la virgola in italiano: «0,18», mai «0.18» su una pagina
-// italiana (il tono deciso col pilota). `fixz` per non stampare «-0,00».
+// italiana (il tono deciso col pilota). La regola sta in `HoneI18n.fmtNum`,
+// che non stampa mai «-0,00»; qui restano i due nomi che le schede usano.
 function fmtDec(v, d) {
-  const s = fixz(v, d);
-  return LANG() === "it" ? s.replace(".", ",") : s;
+  return window.HoneI18n ? window.HoneI18n.fmtNum(v, d) : fixz(v, d);
 }
 
 // Un valore della Pagella in secondi, con l'unità. I difetti arrivano in ms
 // (`unit: "ms"`), il veleggio già in secondi (`unit: "s"`).
 function fmtSecs(v, unit) {
   const s = unit === "ms" ? v / 1000 : v;
-  return fmtDec(s, 2) + " s";
+  return window.HoneI18n ? window.HoneI18n.fmtNum(s, 2, "s") : fixz(s, 2) + " s";
 }
 
 // Le opzioni del selettore delle uscite, uguali in Sessione e in Pagella.
