@@ -30,7 +30,7 @@
     "tour.btn.done":   { en: `Done`, it: `Ho capito` },
     "tour.btn.step":   { en: `Step`, it: `Passo` },
     "cb.label":        { en: `Colour-blind palette (blue/orange)`, it: `Palette daltonici (blu/arancio)` },
-    "demo.banner":     { en: `These are sample laps, not yours.`, it: `Questi sono giri di prova, non i tuoi.` },
+    "demo.banner":     { en: `These are sample laps made by HONE, not yours.`, it: `Questi sono giri di esempio generati da HONE, non i tuoi.` },
 
     // ---- analysis page (index.html) ----
     "title.analysis":  { en: `HONE · Analysis`, it: `HONE · Analisi` },
@@ -153,7 +153,10 @@
     "adv.mark.title": { en: `Corner in the advice you're following`,
                       it: `Curva del consiglio che segui` },
     "pag.howto":       { en: `How to do it →`, it: `Come si fa →` },
-    "pag.declined":    { en: `You set aside`, it: `Hai messo da parte` },
+    "pag.declined":    { en: `You set these aside.`, it: `Hai messo da parte questi consigli.` },
+    // Il suggerimento sul nome di un difetto nello storico: dove porta il clic.
+    "dh.open":         { en: `Open «How to do it» for this fault`,
+                         it: `Apri «Come si fa» per questo difetto` },
     "pag.undecline":   { en: `Take it back`, it: `Riprendi` },
 
     // ---- Andamento: i difetti sessione per sessione ----
@@ -211,13 +214,13 @@
     "howto.tr.brake":  { en: `Brake pedal`, it: `Pedale del freno` },
     "howto.tr.throttle": { en: `Throttle pedal`, it: `Pedale del gas` },
     "howto.tr.speed":  { en: `Speed, km/h`, it: `Velocità, km/h` },
-    "howto.how":       { en: `How it's done`, it: `Come si fa` },
+    "howto.how":       { en: `The technique`, it: `La tecnica` },
     "howto.drill":     { en: `The drill`, it: `L'esercizio` },
     "howto.laps":      { en: `{n} {n|lap|laps}.`, it: `{n} {n|giro|giri}.` },
     // Una frase intera, sulla riga sua: è il numero che il pilota porta in pista.
     "howto.target":    { en: `Aim for under {v} a lap.`,
                          it: `L'obiettivo è stare sotto {v} a giro.` },
-    "howto.target.coast": { en: `Aim for under {v} of coasting a lap.`,
+    "howto.target.coast": { en: `Aim to coast for less than {v} a lap.`,
                             it: `L'obiettivo è veleggiare meno di {v} a giro.` },
     "howto.prog":      { en: `How it's going`, it: `Come sta andando` },
     "howto.gloss":     { en: `Glossary`, it: `Glossario` },
@@ -227,12 +230,11 @@
                          it: `Qui lo vedi dalla prima sessione dopo che hai premuto «Lo seguo».` },
 
     "tab.flow":        { en: `Lap explained`, it: `Il giro spiegato` },
-    // "Start here" moved to tour.a12 when the recap became the landing tab —
-    // this step still opens Flow, so its own title now names what it is
-    // rather than claiming to be the door.
+    // Il passo del giro guidato che apre Il giro spiegato: il titolo dice
+    // cosa è («Parti da qui» sta su tour.a12, la Pagella).
     "tour.a9.t":       { en: `Lap explained`, it: `Il giro spiegato` },
-    "tour.a9.x":       { en: `The lap explained one step at a time. What cost you most, why, and what to do, with the chart that shows it. The other tabs hold the same findings for you to read yourself.`,
-                         it: `Il giro spiegato un passo alla volta. Cosa ti è costato di più, perché e cosa fare, col grafico che lo mostra. Le altre schede hanno gli stessi dati, da leggere da solo.` },
+    "tour.a9.x":       { en: `The lap explained one step at a time. It tells you what cost you most, why and what to do, and shows you the chart. The other tabs hold the same findings for you to read on your own.`,
+                         it: `Il giro spiegato un passo alla volta. Ti dice cosa ti è costato di più, perché e cosa fare, e ti mostra il grafico. Nelle altre schede trovi gli stessi dati, da leggere per conto tuo.` },
     "tour.a12.t":      { en: `Start here`, it: `Parti da qui` },
     // Says what the tab IS, not what is on it right now. The tour can be
     // started on any run, and on a run with nothing measurable this step lands
@@ -584,7 +586,7 @@
                          it: `Avvia il coach con <code>python -m accoach live</code>, o dal launcher.` },
     "empty.step2":     { en: `Drive a full, <b>valid</b> lap in AC or ACC.`,
                          it: `Guida un giro completo e <b>valido</b> in AC o ACC.` },
-    "empty.step3":     { en: `Reload this page and your lap is here to analyse.`,
+    "empty.step3":     { en: `Reload this page and your lap will be here, ready to analyse.`,
                          it: `Ricarica questa pagina e trovi qui il tuo giro da analizzare.` },
     "empty.hint":      { en: `Just want a tour? Launch with <code>python -m accoach web --demo</code> for sample laps.`,
                          it: `Vuoi solo dare un'occhiata? Avvia con <code>python -m accoach web --demo</code> per giri di esempio.` },
@@ -607,7 +609,7 @@
     "prog.dash":       { en: `—`, it: `—` },
     "prog.noValid":    { en: `no valid lap`, it: `nessun giro valido` },
 
-    "recur.none":      { en: `No mistakes in your recent laps.`,
+    "recur.none":      { en: `I found no mistakes in your recent laps.`,
                          it: `Nei tuoi ultimi giri non ho trovato errori.` },
 
     // The training plan. It lives on the Pagella now, one piece of advice at
@@ -625,7 +627,7 @@
     "lvl.beaten":      { en: `already beaten`, it: `già battuto` },
     "lvl.vsPro":       { en: `vs PRO`, it: `vs PRO` },
 
-    "trends.none":     { en: `No corner is a weak point in your recent laps.`,
+    "trends.none":     { en: `In your recent laps no corner is a weak point.`,
                          it: `Nei tuoi ultimi giri nessuna curva è un punto debole.` },
     "badge.systematic":{ en: `Systematic`, it: `Sistematico` },
     "badge.sporadic":  { en: `Sporadic`, it: `Sporadico` },
@@ -639,7 +641,7 @@
     // sovrascrivevano, e «nessun giro registrato» e «I tuoi giri» diventavano
     // queste frasi.
     "cornerses.none":  { en: `No corner has enough sessions for a trend yet.`,
-                         it: `Nessuna curva ha ancora abbastanza sessioni per un andamento.` },
+                         it: `Nessuna curva ha ancora abbastanza sessioni per vederne l'andamento.` },
     "cornerses.laps":  { en: `laps`, it: `giri` },
     "ses.better":      { en: `better than the first session`,
                          it: `meglio della prima sessione` },
@@ -650,10 +652,10 @@
     "lbl.lap":         { en: `Lap`, it: `Giro` },
     "lbl.gap":         { en: `Gap`, it: `Gap` },
     "lbl.road":        { en: `Track temp`, it: `Asfalto` },
-    "flow.map":        { en: `Where you are losing time, this stretch highlighted`,
-                         it: `Dove stai perdendo, col tratto in evidenza` },
-    "flow.map.all":    { en: `Where you are losing time, over the whole lap`,
-                         it: `Dove stai perdendo, su tutto il giro` },
+    "flow.map":        { en: `The highlighted stretch is where you lose time.`,
+                         it: `Il tratto in evidenza è dove perdi tempo.` },
+    "flow.map.all":    { en: `Where you lose time across the whole lap`,
+                         it: `Dove perdi tempo, su tutto il giro` },
     "kbd.tab":         { en: `Key {k}`, it: `Tasto {k}` },
     "kbd.lap":         { en: `[ and ] step through the laps`,
                          it: `[ e ] scorrono i giri` },
@@ -733,8 +735,8 @@
     "phase.after":     { en: `the run after`, it: `tratto dopo` },
 
     "debrief.title":   { en: `Where to improve`, it: `Dove migliorare` },
-    "debrief.clean":   { en: `Clean lap. No corner cost you a significant amount of time.`,
-                         it: `Giro pulito. Nessuna curva ti è costata tempo in modo significativo.` },
+    "debrief.clean":   { en: `Clean lap. No corner lost you enough time to flag.`,
+                         it: `Giro pulito. In nessuna curva hai perso abbastanza tempo da segnalarlo.` },
 
     "ro.pos":          { en: `Pos`, it: `Pos` },
     "ro.speed":        { en: `Speed`, it: `Velocità` },
@@ -745,8 +747,8 @@
 
     // analysis tour
     "tour.a1.t": { en: `Pick a lap`, it: `Scegli un giro` },
-    "tour.a1.x": { en: `Choose the car and track. HONE compares your laps on that pairing.`,
-                   it: `Scegli auto e pista. HONE confronta i tuoi giri su questa coppia.` },
+    "tour.a1.x": { en: `Choose the car and track. HONE compares your laps with that car on that track.`,
+                   it: `Scegli auto e pista. HONE confronta i tuoi giri con quell'auto su quella pista.` },
     // Counts nothing on purpose: this said "Four views" while there were five
     // tabs, and six the moment the guided flow landed. A number here is a
     // promise the tab bar keeps breaking.
@@ -758,8 +760,8 @@
     // _both_languages` cerca `it:` nei primi 400 caratteri dopo la chiave, e una
     // frase inglese lunga spinge la riga italiana fuori dalla finestra.
     "tour.a2.t": { en: `The other views`, it: `Le altre viste` },
-    "tour.a2.x": { en: `The same laps, seen other ways. Compare holds the most. The traces and the drawing of the lap sit side by side. You see where you lost time in the chart and on the track at once. The other tabs zoom in on a corner or pull back to your history. Each tab opens with a key, left to right. Hover a tab to see which one.`,
-                   it: `Gli stessi giri, visti in altri modi. Il Confronto è la scheda più ricca. Le tracce e il disegno del giro stanno fianco a fianco. Vedi dove hai perso nel grafico e in pista insieme. Le altre schede stringono su una curva o allargano al tuo storico. Ogni scheda si apre con un tasto, da sinistra a destra. Passa il mouse su una scheda per vedere quale.` },
+    "tour.a2.x": { en: `The same laps, seen other ways. Compare holds the most, with the traces and the drawing of the lap side by side. You see where you lost time in the chart and on the track at once. The other tabs zoom in on a corner or pull back to your history. Each tab opens with a key, left to right. Hover a tab to see its key.`,
+                   it: `Gli stessi giri, visti in altri modi. Il Confronto è la scheda più ricca, con le tracce e il disegno del giro fianco a fianco. Vedi dove hai perso nel grafico e in pista insieme. Le altre schede stringono su una curva o allargano al tuo storico. Ogni scheda si apre con un tasto, da sinistra a destra. Passa il mouse su una scheda per vedere il suo tasto.` },
     "tour.a3.t": { en: `Delta`, it: `Delta` },
     "tour.a3.x": { en: `Where you're gaining or losing vs your reference, across the lap. Green (below the line) is faster.`,
                    it: `Dove guadagni o perdi rispetto al riferimento, lungo il giro. Verde (sotto la linea) è più veloce.` },
@@ -772,8 +774,8 @@
     // Added when the debrief grew lap-wide findings and the lap list grew track
     // temperature: two things a driver sees before anyone explains them.
     "tour.a7.t": { en: `Whole-lap findings`, it: `Osservazioni sul giro` },
-    "tour.a7.x": { en: `The blue-edged blocks above the corners are about the whole lap. For example a lift where the reference stays flat out, or missing top speed. Coaches start here.`,
-                   it: `I riquadri col bordo azzurro sopra le curve valgono per tutto il giro. Per esempio un'alzata dove il riferimento sta in pieno, o i km/h di punta che mancano. Un coach parte da qui.` },
+    "tour.a7.x": { en: `The blue-edged blocks above the corners are about the whole lap. For example, you lift where the reference stays flat out, or you're short on top speed. Coaches start here.`,
+                   it: `I riquadri col bordo azzurro sopra le curve valgono per tutto il giro. Per esempio alzi il piede dove il riferimento tiene giù, o ti mancano km/h in velocità di punta. Un coach parte da qui.` },
     "tour.a8.t": { en: `Track temperature`, it: `Temperatura asfalto` },
     "tour.a8.x": { en: `The degrees next to each lap are the track, not the air. Braking points move 10-20 m between a cold track and a hot one. Two laps far apart in temperature are two different circuits.`,
                    it: `I gradi accanto a ogni giro sono dell'asfalto, non dell'aria. Fra pista fredda e calda i punti di frenata si spostano di 10-20 m. Due giri con temperature lontane sono due circuiti diversi.` },

@@ -676,7 +676,7 @@ function renderDefectHistory(h) {
     const mark = adviceRelevant("progress") && ADVICE.defect === d.key ? advMarkHTML() : "";
     return `<div class="dh-row">` +
       `<button type="button" class="dh-name" data-howto="${escAttr(d.key)}" ` +
-      `title="${escAttr(t("pag.howto"))}">${mark}${escAttr(d.name)}</button>` +
+      `title="${escAttr(t("dh.open"))}">${mark}${escAttr(d.name)}</button>` +
       `<span class="pag-spark dh-bars">${sparkBars(vals, d.unit, trend, DH_H)}</span>` +
       `<span class="dh-last"><span class="num ${tone}">${fmtSecs(last, d.unit)}</span> ` +
       `<span class="pag-small">${per}</span>${arrow}</span></div>`;

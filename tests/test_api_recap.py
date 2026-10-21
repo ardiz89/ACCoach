@@ -46,7 +46,7 @@ def test_the_displayed_total_matches_the_displayed_parts_exactly(tmp_path):
     own guarantee). (0, 29, 32) is a real repro — found by search, not by
     hand — where the un-fixed endpoint answers gain_avg_s=0.533 against a
     phase sum of 0.534. Pinned with no tolerance, on the digits actually
-    shown, because `recap.where` promises on screen that they add up and a
+    shown, because the recap promised on screen that they add up and a
     driver checks that by hand."""
     _lap(tmp_path, "2026-08-01T18:00:00+00:00")            # il migliore
     _lap(tmp_path, "2026-08-01T18:02:00+00:00", amt=29)

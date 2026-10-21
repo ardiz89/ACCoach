@@ -213,7 +213,7 @@ def test_the_report_is_split_in_two_without_losing_a_key():
     eng = tono._engineer_keys()
     every = {f"web/i18n.js:{k}" for k in tono.i18n_catalogue() if k not in eng}
     assert set(a) | set(b) == every
-    assert "web/i18n.js:pag.title" in a or any(k.startswith("web/i18n.js:pag.") for k in a)
+    assert any(k.startswith("web/i18n.js:pag.") for k in a)
     assert "web/i18n.js:demo.banner" in a and not any(k.startswith("web/i18n.js:pag.") for k in b)
 
 

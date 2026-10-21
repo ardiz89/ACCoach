@@ -1584,7 +1584,7 @@ def create_api(
         # six independent `round(x, 3)` calls can each move by up to 0.5 ms in
         # either direction, so a total rounded on its own can land a full
         # millisecond away from what the six displayed rows add up to. That
-        # shows at three decimals, and `recap.where` tells the driver on
+        # shows at three decimals, and the recap promised the driver on
         # screen that the parts sum to the number above. Summing what is
         # actually printed makes that true by construction, independent of
         # which way any single value happened to round.
@@ -2379,7 +2379,7 @@ def create_api(
             return FileResponse(str(path))
         html = path.read_text(encoding="utf-8")
         banner = ('<div class="demo-banner" data-i18n="demo.banner">'
-                  'These are sample laps, not yours.</div>')
+                  'These are sample laps made by HONE, not yours.</div>')
         html = html.replace("<body>", '<body class="demo-mode">\n' + banner, 1)
         return Response(content=html, media_type="text/html")
 

@@ -673,3 +673,16 @@ def test_an_unknown_combo_leaves_today_s_behaviour():
     init = _body_of("async function init()")
     assert "let asked = null;" in init
     assert "if (asked) {\n    await openAskedPagella(CURRENT);\n  } else if (!(await openPagellaIfNew(CURRENT)))" in init
+
+
+def test_every_failed_load_ends_with_the_shared_backend_sentence():
+    """Un caricamento fallito dice cosa non è arrivato e poi la frase comune
+    `err.backend`, una chiave sola (prima era la stessa domanda in quattro
+    chiavi). Nessun percorso d'errore deve mostrare la prima frase da sola."""
+    body = _body_of("function loadFailed(key)")
+    assert 't(key)' in body and 't("err.backend")' in body
+    for key in ("err.pagella", "err.dh", "err.howto", "err.progress"):
+        assert f'loadFailed("{key}")' in _APPJS, key
+        assert f't("{key}")' not in _APPJS, key
+    entry = _i18n_entry("err.backend")
+    assert "en:" in entry and "it:" in entry
