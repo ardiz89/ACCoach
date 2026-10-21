@@ -4,9 +4,11 @@ from __future__ import annotations
 import pytest
 
 from accoach.coaching.advice import (
-    MAX_ADVICE, Advice, AdviceCorner, measure_advice, propose_advice, rebase)
+    MAX_ADVICE, Advice, AdviceCorner, corner_at, measure_advice, propose_advice,
+    rebase, remap)
 from accoach.coaching.defects import DefectSummary, LapDefects
 from accoach.recording.catalog import LapCatalog
+from accoach.track import Corner
 
 
 def _s(key, corners, main=True, unit="ms", mean=None):
@@ -108,6 +110,55 @@ def test_rebase_remeasures_the_same_corners_against_the_new_history():
     assert [c.index for c in r.corners] == [4, 5]
     assert (r.baseline, r.target) == (460.0, 230.0)
     assert r.status == a.status and a.baseline == 280.0
+
+
+# --- remap: le curve del consiglio sul riferimento di adesso -----------------
+
+_NEW = [Corner(0, 0.05, 0.09, 0.13), Corner(1, 0.19, 0.31, 0.38),
+        Corner(2, 0.59, 0.71, 0.78)]
+
+
+def test_corner_at_is_the_corner_whose_span_holds_the_apex():
+    assert corner_at(0.31, _NEW).index == 1
+    assert corner_at(0.19, _NEW).index == 1          # i bordi sono dentro
+    assert corner_at(0.50, _NEW) is None              # fra due curve
+    assert corner_at(0.0, _NEW) is None               # senza posizione
+
+
+def test_remap_follows_the_apex_into_the_new_numbering():
+    a = Advice(defect="min_speed", baseline=200.0, target=120.0, status="active",
+               corners=[AdviceCorner(0, "Curva 1", 0.30, 120.0),
+                        AdviceCorner(1, "Ascari", 0.72, 80.0)])
+    names = {0: "Curva 1", 1: "Curva 2", 2: "Variante Ascari"}
+    out = remap(a, _NEW, names)
+    assert [(c.index, c.name, c.apex_pos) for c in out.corners] == [
+        (1, "Curva 2", 0.31), (2, "Variante Ascari", 0.71)]
+    # Le medie restano: le rimisura `rebase`, non `remap`.
+    assert [c.mean for c in out.corners] == [120.0, 80.0]
+    assert out.baseline == 200.0 and out.target == 120.0
+
+
+def test_remap_drops_a_corner_that_is_not_there_any_more():
+    a = Advice(defect="min_speed", corners=[AdviceCorner(3, "x", 0.50, 1.0),
+                                            AdviceCorner(0, "y", 0.10, 2.0)])
+    out = remap(a, _NEW, {})
+    assert [c.index for c in out.corners] == [0]
+
+
+def test_remap_finds_an_old_plan_corner_by_its_name():
+    """Un obiettivo del vecchio piano non ha l'apex (0.0): resta il nome."""
+    a = Advice(defect="brake_early",
+               corners=[AdviceCorner(4, "Variante Ascari", 0.0, 200.0)])
+    out = remap(a, _NEW, {0: "Curva 1", 1: "Curva 2", 2: "Variante Ascari"})
+    assert [(c.index, c.apex_pos) for c in out.corners] == [(2, 0.71)]
+    gone = remap(a, _NEW, {0: "Curva 1"})
+    assert gone.corners == []
+
+
+def test_remap_does_not_take_one_corner_twice():
+    a = Advice(defect="min_speed", corners=[AdviceCorner(0, "a", 0.30, 1.0),
+                                            AdviceCorner(1, "b", 0.33, 2.0)])
+    assert [c.index for c in remap(a, _NEW, {}).corners] == [1]
 
 
 def test_advice_round_trips_through_the_catalog(tmp_path):

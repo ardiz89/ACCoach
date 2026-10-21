@@ -661,7 +661,8 @@ class CoachEngine:
 
         Il consiglio le ha numerate sul riferimento dello storico, il focus le
         conta su quello del motore: le due numerazioni non coincidono, quindi si
-        passa per la posizione dell'apex, come in `_focus_zone`. Una curva il cui
+        passa per la posizione dell'apex (`advice.corner_at`, la stessa regola
+        della Pagella quando cambia il riferimento). Una curva il cui
         apex non cade in nessuna curva di adesso si scarta — meglio la scelta di
         sempre che la curva accanto — e cosi' una curva senza posizione (0.0: un
         obiettivo del vecchio piano, migrato).
@@ -672,7 +673,7 @@ class CoachEngine:
         if self._focus_key is None or not corners:
             return []
         try:
-            from .coaching.advice import ACTIVE
+            from .coaching.advice import ACTIVE, corner_at
             from .recording.catalog import LapCatalog
             from .recording.storage import _catalog_path
 
@@ -685,12 +686,9 @@ class CoachEngine:
             return []
         out: list[int] = []
         for apex in apexes:
-            if apex <= 0.0:
-                continue
-            hit = next((c.index for c in corners
-                        if c.entry_pos <= apex <= c.exit_pos), None)
-            if hit is not None and hit not in out:
-                out.append(hit)
+            hit = corner_at(apex, corners)
+            if hit is not None and hit.index not in out:
+                out.append(hit.index)
         return out
 
     def _save_focus_state(self) -> None:

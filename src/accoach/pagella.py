@@ -21,7 +21,8 @@ from . import cornernames
 from .braking_points import brake_points_of_lap
 from .coaching.advice import (
     ACTIVE, DECLINED, DROPPED, MAX_ADVICE, MAX_CORNERS, PROPOSED, REACHED,
-    Advice, AdviceCorner, lap_value, measure_advice, propose_advice, rebase)
+    Advice, AdviceCorner, lap_value, measure_advice, propose_advice, rebase,
+    remap)
 from .coaching.debrief import build_lap_debrief
 from .coaching.defects import (
     DEFECTS, DefectSummary, LapDefects, lap_defects, summarize, worst_corners)
@@ -467,12 +468,18 @@ def _reached_at(a: Advice, since: list[tuple[dict, LapDefects]]):
 
 def _update_active(cat, car: str, track: str, ctx: _Context,
                    stored: dict[str, tuple[Advice, str | None]]) -> None:
-    """Rebase sul metro nuovo, poi «raggiunto» se la misura lo dice. Scrive."""
+    """Rebase sul metro nuovo, poi «raggiunto» se la misura lo dice. Scrive.
+
+    Sul metro nuovo prima si ritrovano le curve (`remap`): il consiglio le ha
+    numerate sul riferimento vecchio, e una curva in piu' prima della sua
+    sposterebbe tutti i numeri, con nome e misura presi dalla curva accanto.
+    """
     ref_path = ctx.ref_row["path"]
     for key, (a, rp) in list(stored.items()):
         if a.status != ACTIVE:
             continue
         if rp != ref_path:
+            a = remap(a, ctx.corners, ctx.names)
             laps = _before(ctx, a.accepted_utc)
             if laps:
                 summary = next((s for s in summarize(laps) if s.key == key),
@@ -740,7 +747,10 @@ def _advice_for(cat, car, track, ctx: _Context, defect: str,
     stored = _load(cat, car, track)
     mine = stored.get(defect)
     if mine and mine[0].status in (ACTIVE, REACHED, DROPPED):
-        return mine[0]
+        # Su un metro diverso da quello del consiglio le curve si ritrovano
+        # come fa la Pagella (`_update_active`), ma qui senza scrivere.
+        a, rp = mine
+        return a if rp == ctx.ref_row["path"] else remap(a, ctx.corners, ctx.names)
     others = [a for k, (a, _) in stored.items() if k != defect]
     return next((a for a in propose_advice(summaries, others, ctx.names, ctx.apex)
                  if a.defect == defect), None)

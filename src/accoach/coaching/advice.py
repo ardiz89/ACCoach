@@ -124,6 +124,40 @@ def measure_advice(a: Advice, laps_since: list[LapDefects]) -> AdviceProgress:
                           done=n >= _MIN_LAPS_TO_JUDGE and hits >= needed)
 
 
+def corner_at(apex_pos: float, corners):
+    """La curva di `corners` il cui tratto contiene `apex_pos`, o ``None``.
+
+    Un consiglio numera le curve sul riferimento con cui e' nato; chi lo legge
+    con un altro metro (il focus del motore, la Pagella dopo un riferimento
+    nuovo) ritrova la curva passando per la posizione dell'apex, che non cambia
+    con la numerazione. Una sola regola per tutti. Un apex a 0.0 non e' una
+    posizione (obiettivo del vecchio piano, migrato): nessuna curva.
+    """
+    if apex_pos <= 0.0:
+        return None
+    return next((c for c in corners if c.entry_pos <= apex_pos <= c.exit_pos), None)
+
+
+def remap(a: Advice, corners, names: dict[int, str]) -> Advice:
+    """Le curve del consiglio rinumerate sulle curve `corners` di adesso.
+
+    Per posizione dell'apex (`corner_at`); senza posizione, per nome. Una curva
+    che non si ritrova si scarta: meglio una curva in meno che la curva accanto.
+    Le medie restano quelle di prima, le rimisura `rebase`.
+    """
+    out: list[AdviceCorner] = []
+    for c in a.corners:
+        hit = corner_at(c.apex_pos, corners)
+        if hit is None and c.apex_pos <= 0.0 and c.name:
+            i = next((i for i, n in names.items() if n == c.name), None)
+            hit = next((k for k in corners if k.index == i), None)
+        if hit is None or any(o.index == hit.index for o in out):
+            continue
+        out.append(replace(c, index=hit.index, apex_pos=hit.apex_pos,
+                           name=names.get(hit.index) or c.name))
+    return replace(a, corners=out)
+
+
 def rebase(a: Advice, summary: DefectSummary) -> Advice:
     """Ricalcola baseline e target sulle stesse curve con lo storico attuale."""
     if a.corners:

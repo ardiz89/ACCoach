@@ -61,6 +61,19 @@ def _lap(kind, amt):
     if kind == "skewed_min":
         return synth.skew_clock(synth.build_lap(slow_corner=0, amt=26, clean=True),
                                 2000)
+    if kind == "extra_ref":
+        # Il piu' veloce di tutti, con una curva in piu' prima della curva 0:
+        # sul suo metro la curva 0 dei giri vecchi diventa la curva 1.
+        lap = synth.retime(synth.build_lap(clean=True), 99_000)
+        for s in lap.samples:
+            if 0.04 <= s.pos <= 0.14:
+                d = max(0.0, 1 - abs(s.pos - 0.09) / 0.05)
+                s.steer_angle, s.speed_kmh = 0.28 * d, 255 - 100 * d
+                s.throttle = 1.0 if s.pos >= 0.09 else 0.0
+                s.brake = 0.85 if 0.05 <= s.pos < 0.09 else 0.0
+        return lap
+    if kind == "min1":
+        return synth.build_lap(slow_corner=1, amt=amt, clean=True)
     if kind == "min":
         return synth.build_lap(slow_corner=0, amt=amt, clean=True)
     lap = synth.build_lap(slow_corner=1, amt=amt, clean=True)
@@ -379,6 +392,57 @@ def test_an_active_advice_is_rebased_when_the_reference_changes(tmp_path):
     assert a["baseline"] == pytest.approx(212.5, abs=1.0)
     assert a["corners"][0]["mean"] == pytest.approx(212.5, abs=1.0)
     assert a["status"] == ACTIVE
+
+
+def test_a_new_reference_with_one_more_corner_keeps_the_advice_on_its_corner(tmp_path):
+    """Il riferimento nuovo ha una curva in piu' prima di quella del consiglio:
+    i numeri scalano di uno. Il consiglio deve restare sulla stessa curva (per
+    posizione dell'apex), col nome e la misura di quella, non della curva che
+    adesso ha il suo vecchio numero."""
+    _session(tmp_path, 10, [(None, 0)] + _MIXED)
+    ref = _ref_path(tmp_path)
+    _store(tmp_path, {**asdict(Advice(
+        defect="min_speed", corners=[AdviceCorner(0, "x", 0.31, 212.5)],
+        baseline=212.5, target=120.0, status=ACTIVE,
+        accepted_utc="2026-10-20T10:30:00+00:00")), "reference_path": ref})
+    # Dopo: il nuovo migliore (con la curva in piu') e tre giri lenti in curva 0.
+    _session(tmp_path, 11, [("extra_ref", 0), ("min", 26), ("min", 26),
+                            ("min", 26)])
+    assert _ref_path(tmp_path) != ref
+    c = TestClient(create_api(tmp_path))
+    p = _pagella(c)
+    with LapCatalog(_catalog_path(tmp_path)) as cat:
+        ctx = pagella._context(cat, CAR, TRACK, 0, "it")
+    assert len(ctx.corners) == 3
+    want = next(k for k in ctx.corners if k.entry_pos <= 0.31 <= k.exit_pos)
+    assert want.index == 1
+    a = _stored(tmp_path)["min_speed"]
+    assert [k["index"] for k in a["corners"]] == [1]
+    assert a["corners"][0]["name"] == ctx.names[1]
+    by = {x["defect"]: x for x in p["advice"]}
+    assert by["min_speed"]["corners"] == [ctx.names[1]]
+    # Misura la curva giusta: tre giri lenti li', nessuno sotto obiettivo.
+    assert by["min_speed"]["status"] == ACTIVE
+    assert by["min_speed"]["progress"]["hits"] == 0
+    assert by["min_speed"]["progress"]["median"] > 120.0
+    h = _howto(c, "min_speed")
+    assert [f["corner"] for f in h["figures"]] == [1]
+    assert ctx.names[1] in h["problem"]
+
+
+def test_the_howto_follows_the_new_reference_before_the_pagella_does(tmp_path):
+    """Il «Come si fa» e' sola lettura: se si apre prima della Pagella dopo un
+    cambio di riferimento, rimappa lui le curve del consiglio (senza scrivere)."""
+    _session(tmp_path, 10, [(None, 0)] + _MIXED)
+    _store(tmp_path, {**asdict(Advice(
+        defect="min_speed", corners=[AdviceCorner(0, "x", 0.31, 212.5)],
+        baseline=212.5, target=120.0, status=ACTIVE,
+        accepted_utc="2026-10-20T10:30:00+00:00")),
+        "reference_path": _ref_path(tmp_path)})
+    _session(tmp_path, 11, [("extra_ref", 0), ("min", 26), ("min", 26)])
+    h = _howto(TestClient(create_api(tmp_path)), "min_speed")
+    assert [f["corner"] for f in h["figures"]] == [1]
+    assert _stored(tmp_path)["min_speed"]["corners"][0]["index"] == 0
 
 
 def test_an_old_accepted_plan_becomes_the_active_advice(tmp_path):
