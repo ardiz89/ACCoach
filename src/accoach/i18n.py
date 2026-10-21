@@ -52,13 +52,13 @@ _UI: dict[str, dict[str, str]] = {
     # nothing is indistinguishable from a broken app, so each one names itself.
     "quiet.pit": {"en": "In the pits. I start at the line.",
                   "it": "Sei ai box. Parto dal traguardo."},
-    "quiet.out_lap": {"en": "Out lap. Coaching starts at the line.",
-                      "it": "Giro di uscita. Comincio dal traguardo."},
+    "quiet.out_lap": {"en": "Out lap. I'll start at the line.",
+                      "it": "Giro di lancio. Comincio dal traguardo."},
     "quiet.no_reference": {"en": "No reference yet. Drive one clean lap.",
                            "it": "Ancora nessun riferimento. Fai un giro pulito."},
     "quiet.off_pace": {"en": "Off-pace lap. I'll pick up at the line.",
                        "it": "Giro fuori ritmo. Riprendo dal traguardo."},
-    "quiet.green": {"en": "Green, flying lap", "it": "Via, giro lanciato"},
+    "quiet.green": {"en": "Flying lap", "it": "Giro lanciato"},
     # Not a quiet reason: the coach keeps working, only the delta goes away.
     # Says what happened AND that the lap is still worth driving, because the
     # instinct on seeing "invalidated" is to abort and go back to the pits.
@@ -77,8 +77,8 @@ _UI: dict[str, dict[str, str]] = {
     "coach.title": {"en": "voice coach", "it": "coach vocale"},
     "coach.listening": {"en": "Listening. Drive and I'll coach you.",
                         "it": "Ti ascolto. Guida e ti seguo."},
-    "coach.warming": {"en": "Warming up. Drive a few clean laps.",
-                      "it": "Mi sto scaldando. Fai qualche giro pulito."},
+    "coach.warming": {"en": "I'm getting your measure. Drive a few clean laps.",
+                      "it": "Sto prendendo le misure. Fai qualche giro pulito."},
     "coach.delta_title": {"en": "Delta to reference", "it": "Delta sul riferimento"},
     "coach.delta_none": {"en": "The delta appears after your first clean lap.",
                          "it": "Il delta arriva dopo il primo giro pulito."},
@@ -104,7 +104,7 @@ _UI: dict[str, dict[str, str]] = {
     # differenza conta (si apre nel browser, serve a un secondo schermo) lo dice
     # il suggerimento del bottone, con una frase.
     "btn.coach_live": {"en": "Coach Live", "it": "Coach Live"},
-    "btn.coach_live_demo": {"en": "Demo without the game",
+    "btn.coach_live_demo": {"en": "Demo without a game",
                             "it": "Demo senza gioco"},
     "btn.analysis": {"en": "Analysis and report", "it": "Analisi e report"},
     "btn.engineer": {"en": "Race engineer", "it": "Ingegnere di pista"},
@@ -116,8 +116,8 @@ _UI: dict[str, dict[str, str]] = {
     "btn.verify_g": {"en": "Check the G axes", "it": "Verifica gli assi G"},
     "btn.get_started": {"en": "Getting started", "it": "Come iniziare"},
     "tip.browser": {"en": "Opens in your browser.", "it": "Si apre nel browser."},
-    "tip.server": {"en": "For a second screen, without the overlay.",
-                   "it": "Serve a un secondo schermo, senza overlay."},
+    "tip.server": {"en": "Feeds a second screen, without the overlay.",
+                   "it": "Alimenta un secondo schermo, senza overlay."},
     # First-run wizard. Was hardcoded English in a bilingual app: the very first
     # screen a new driver sees ignored the language they had just chosen.
     "wiz.title": {"en": "Welcome to HONE", "it": "Benvenuto in HONE"},
@@ -156,7 +156,7 @@ _UI: dict[str, dict[str, str]] = {
         "it": "A fine sessione apri <b>Analisi</b> per il debrief curva per curva, "
               "e <b>Setup</b> per l'ingegnere di pista."},
     "wiz.s5": {
-        "en": "No game handy? <b>Demo without the game</b> runs it all on a "
+        "en": "No game handy? <b>Demo without a game</b> runs it all on a "
               "synthetic lap.",
         "it": "Non hai il gioco sottomano? <b>Demo senza gioco</b> fa girare "
               "tutto su un giro finto."},
@@ -252,15 +252,15 @@ _UI: dict[str, dict[str, str]] = {
     "mob.off": {"en": "Turn on the option above to open these pages from your phone.",
                 "it": "Attiva l'opzione qui sopra per aprire le pagine dal telefono."},
     "mob.no_ip": {"en": "No network address found. Connect this PC to Wi-Fi or "
-                        "the network.",
+                        "Ethernet.",
                   "it": "Non trovo un indirizzo di rete. Collega il PC al Wi-Fi o "
-                        "alla rete."},
+                        "al cavo di rete."},
     "mob.same_net": {"en": "Your phone must be on the same Wi-Fi network as this PC.",
                      "it": "Il telefono deve stare sulla stessa rete Wi-Fi del PC."},
     "mob.firewall": {"en": "If Windows asks, allow access on Private networks.",
                      "it": "Se Windows lo chiede, consenti l'accesso su reti private."},
-    "mob.restart": {"en": "After changing it, restart Coach Live or Analysis.",
-                    "it": "Dopo averla cambiata, riavvia Coach Live o Analisi."},
+    "mob.restart": {"en": "If you change this, restart Coach Live or Analysis.",
+                    "it": "Se cambi questa opzione, riavvia Coach Live o Analisi."},
     "mob.no_qr": {"en": "No QR code. Install the segno package.",
                   "it": "Il codice QR non c'è. Installa il pacchetto segno."},
     "mob.server_on": {"en": "The analysis server is running. These pages will open.",
@@ -273,7 +273,7 @@ _UI: dict[str, dict[str, str]] = {
     # settings
     "set.voice": {"en": "Coach voice", "it": "Voce del coach"},
     "set.engineer_voice": {"en": "Speak the engineer's proposals",
-                           "it": "Leggi le proposte dell'ingegnere"},
+                           "it": "Annuncia a voce le proposte dell'ingegnere"},
     "set.male_voice": {"en": "Male voice", "it": "Voce maschile"},
     "set.radio": {"en": "Team-radio effect", "it": "Effetto radio di pista"},
     "set.rate": {"en": "Voice speed", "it": "Velocità della voce"},
@@ -284,11 +284,11 @@ _UI: dict[str, dict[str, str]] = {
     # touch it, because a definition alone ("scales the overlay") helps nobody.
     "set.voice.help": {
         "en": "Speaks the coaching cues out loud. Turn it off to keep only the "
-              "on-screen overlay. That helps in a race, or on a headset you share "
-              "with a voice chat.",
+              "on-screen overlay. It comes in handy in a race, or on a headset "
+              "you share with a voice chat.",
         "it": "Legge i consigli ad alta voce. Spegnila per tenere solo "
-              "l'overlay a schermo. Serve in gara, o se usi le cuffie anche per "
-              "parlare con qualcuno."},
+              "l'overlay a schermo. Ti torna utile in gara, o se usi le cuffie "
+              "anche per parlare con qualcuno."},
     # «Setup» e non «Assetto»: è il nome della sezione nella barra laterale.
     "set.engineer_voice.help": {
         "en": "Whether the race engineer's setup proposals are spoken too. "
@@ -327,8 +327,8 @@ _UI: dict[str, dict[str, str]] = {
         "it": "Con l'hub aperto, HONE si accorge che AC o ACC è partito e "
               "registra i tuoi giri da solo. Così non perdi una sessione che hai "
               "dimenticato di avviare. Parte solo la registrazione silenziosa, e "
-              "voce e overlay restano spenti finché non premi Coach Live. Di "
-              "base è spenta.",
+              "voce e overlay restano spenti finché non premi Coach Live. "
+              "All'inizio è spenta.",
     },
     "watch.waiting": {"en": "Waiting for the game to start.",
                       "it": "Aspetto che parta il gioco."},
@@ -377,15 +377,15 @@ _UI: dict[str, dict[str, str]] = {
         "en": "Swapping stops Coach Live and starts the live backend in its "
               "place. The coach keeps talking and the Engineer page stays fed. "
               "The overlay, though, closes with Coach Live, so you have no HUD "
-              "on track. The live backend is three separate pieces, the "
-              "backend, the overlay and the web page. You can bring the "
-              "overlay back on its own from Devices.",
+              "on track. The backend, the overlay and the web page are three "
+              "separate pieces, and you can bring the overlay back on its own "
+              "from Devices.",
         "it": "Lo scambio ferma Coach Live e al suo posto avvia il Backend live. "
               "Il coach continua a parlare e la pagina Ingegnere resta "
               "alimentata. L'overlay però si spegne insieme a Coach Live, e in "
-              "pista resti senza HUD. Il Backend live è fatto di tre pezzi "
-              "separati, cioè backend, overlay e pagina web. L'overlay lo "
-              "riaccendi da solo, da Dispositivi."},
+              "pista resti senza HUD. Backend, overlay e pagina web sono tre "
+              "pezzi separati, e l'overlay si riaccende a parte da "
+              "Dispositivi."},
     # Senza glifo: `⇄` (U+21C4) non c'è nei font del brand né nel ripiego di
     # sistema, e a schermo usciva come un rettangolo vuoto davanti alla frase.
     "swap.confirm": {"en": "Stop Coach Live and switch",
@@ -395,19 +395,19 @@ _UI: dict[str, dict[str, str]] = {
     # ciascuna uscita lo dicono i paragrafi sopra, non il bottone.
     "swap.cancel": {"en": "Cancel", "it": "Annulla"},
     "swap.failed": {
-        "en": "Coach Live is still running, so the live backend didn't start, "
-              "because two recorders would have saved every lap twice. Press "
-              "“Stop without opening the report”, wait for its window to close "
-              "and try again.",
-        "it": "Coach Live è ancora acceso, quindi il Backend live non è partito, "
-              "perché due registratori avrebbero salvato ogni giro due volte. "
+        "en": "Coach Live is still running, so the live backend didn't start. "
+              "Two recorders would have saved every lap twice. Press “Stop "
+              "without opening the report”, wait for its window to close and "
+              "try again.",
+        "it": "Coach Live è ancora acceso, quindi il Backend live non è partito. "
+              "Con due registratori ogni giro si sarebbe salvato due volte. "
               "Premi «Ferma senza aprire il report», aspetta che la sua finestra "
               "si chiuda e riprova."},
     "swap.tooltip": {
-        "en": "Coach Live is running. Click to read why this can't start "
-              "alongside it, and to swap over in one step.",
-        "it": "Coach Live è acceso. Premi per leggere perché questo non può "
-              "partire insieme, e per fare lo scambio in un passo."},
+        "en": "Coach Live is running. Click to read why this can't run "
+              "alongside Coach Live, and to swap over in one step.",
+        "it": "Coach Live è acceso. Premi per leggere perché non può girare "
+              "insieme a Coach Live, e per fare lo scambio in un passo."},
     "set.pedals": {"en": "Show the pedal trace", "it": "Mostra la traccia dei pedali"},
     "set.pedals.help": {
         "en": "A strip under the overlay shows your throttle (green) and brake "
@@ -433,10 +433,9 @@ _UI: dict[str, dict[str, str]] = {
               "progetto. Alzala su un monitor 4K o se stai lontano dallo schermo, "
               "abbassala se ti copre troppa pista."},
     "set.scale_hint": {
-        "en": "The pedal trace and the overlay size apply from the next Coach "
-              "Live start.",
-        "it": "La traccia dei pedali e la grandezza dell'overlay valgono dal "
-              "prossimo avvio di Coach Live."},
+        "en": "Both apply from the next Coach Live start.",
+        "it": "Traccia dei pedali e grandezza dell'overlay valgono dal prossimo "
+              "avvio di Coach Live."},
     "btn.save": {"en": "Save", "it": "Salva"},
     "set.saved": {"en": "Saved.", "it": "Salvato."},
     "btn.close": {"en": "Close", "it": "Chiudi"},
@@ -472,8 +471,9 @@ _UI: dict[str, dict[str, str]] = {
     "live.s2_to_devices": {"en": "Turn on network access",
                            "it": "Attiva la rete locale"},
     "live.s2_no_ip": {
-        "en": "This PC has no network address. Connect it to Wi-Fi or a cable.",
-        "it": "Questo PC non ha un indirizzo di rete. Collegalo al Wi-Fi o al cavo."},
+        "en": "This PC has no network address. Connect it to Wi-Fi or Ethernet.",
+        "it": "Questo PC non ha un indirizzo di rete. Collegalo al Wi-Fi o al "
+              "cavo di rete."},
     # Non «aprila su questo PC»: e' la stessa pagina che non risponde.
     "live.s2_web_down": {
         "en": "The Engineer page isn't answering yet. If the tablet can't open "

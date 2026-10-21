@@ -89,12 +89,15 @@ def test_the_home_numbers_follow_the_language(monkeypatch, tmp_path):
     data = hub_home.HomeData(status="ok", total_gap_ms=420, laps_count=3,
                              best_ms=101_882, consistency={"spread_ms": 180},
                              top=loss)
-    for lang, gap, spread, lost in (("it", "+0,42 s", "0,18 s", "−0,4 s"),
-                                    ("en", "+0.42 s", "0.18 s", "−0.4 s")):
-        config.set_language(lang)
-        panel._apply(data)
-        assert panel._stat_widgets["gap"][0].text() == gap
-        assert panel._stat_widgets["consistency"][0].text() == spread
-        assert panel._stat_widgets["best"][0].text() == "1:41.882"
-        assert lost in panel._headline.text()
-    config.set_language("en")
+    try:
+        for lang, gap, spread, lost in (("it", "+0,42 s", "0,18 s", "−0,4 s"),
+                                        ("en", "+0.42 s", "0.18 s", "−0.4 s")):
+            config.set_language(lang)
+            panel._apply(data)
+            assert panel._stat_widgets["gap"][0].text() == gap
+            assert panel._stat_widgets["consistency"][0].text() == spread
+            assert panel._stat_widgets["best"][0].text() == "1:41.882"
+            assert lost in panel._headline.text()
+    finally:
+        # Un fallimento a metà non deve lasciare l'italiano ai test dopo.
+        config.set_language("en")

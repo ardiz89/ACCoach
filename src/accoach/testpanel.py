@@ -51,8 +51,9 @@ except ImportError:  # pragma: no cover - dipendenza opzionale
 _MAX_BODY_LINES = 2
 
 # I testi fissi della cornice, tutti qui: `tests/tono.py` li legge da questa
-# tabella (superficie «hub»). Maiuscoli come il titolo che scrive Claude, perché
-# si leggono con la coda dell'occhio.
+# tabella (superficie «hub»). «PASSO» e «FATTO» sono maiuscoli come il titolo
+# che scrive Claude, perché si leggono con la coda dell'occhio; l'attesa è una
+# frase normale, perché lì non c'è niente da leggere di corsa.
 _TXT = {
     "where": "PASSO {n} / {of}",
     "waiting": "In attesa del prossimo passo.",

@@ -33,7 +33,7 @@
     clear: "Azzera",
     noCues: "Ancora nessun avviso. Guida la manovra del test.",
     noLap: "Ancora nessun giro agganciato.",
-    lap: "Ho agganciato il giro in {time}.",
+    lap: "Ho agganciato il giro di {car} a {track} in {time}.",
     invalid: "non valido",
     saving: "Salvo…",
     saved: "Salvato",
@@ -154,10 +154,13 @@
   }
   function lapChip(r) {
     if (!r.lap) return `<div class="lapchip">${TXT.noLap}</div>`;
-    const time = `<b>${esc(r.lap.lap_time || "?")}</b>`;
-    return `<div class="lapchip">${TXT.lap.replace("{time}", time)}
-      ${esc(r.lap.car || "")} @ ${esc(r.lap.track || "")}
-      ${r.lap.valid ? "" : `· <i>${TXT.invalid}</i>`}</div>`;
+    // `lap_time`, `car` e `track` arrivano da /api/test/latest_lap.
+    const text = TXT.lap
+      .replace("{car}", esc(r.lap.car || "?"))
+      .replace("{track}", esc(r.lap.track || "?"))
+      .replace("{time}", `<b>${esc(r.lap.lap_time || "?")}</b>`);
+    return `<div class="lapchip">${text}
+      ${r.lap.valid ? "" : ` · <i>${TXT.invalid}</i>`}</div>`;
   }
   function fmtTel(tel) {
     if (!tel) return "";

@@ -441,7 +441,7 @@ def test_the_test_page_texts_are_read_from_their_table(tmp_path, monkeypatch):
         '       "unite.",\n'
         '  };\n', encoding="utf-8")
     monkeypatch.setattr(tono, "WEB", tmp_path)
-    assert tono.test_page_js_texts() == {"web/test.js:TXT.a": {"it": "Uno."},
+    assert tono.page_js_texts() == {"web/test.js:TXT.a": {"it": "Uno."},
                                          "web/test.js:TXT.b": {"it": "Due righe unite."}}
 
 
@@ -458,7 +458,7 @@ def test_every_test_page_text_is_used_and_every_use_is_defined():
     """Un testo nella tabella che nessuno usa è un testo che non si vede; un
     `TXT.x` senza voce scrive «undefined» sulla pagina."""
     src = (tono.WEB / "test.js").read_text(encoding="utf-8")
-    keys = {k.rsplit(".", 1)[1] for k in tono.test_page_js_texts()}
+    keys = {k.rsplit(".", 1)[1] for k in tono.page_js_texts()}
     used = set(re.findall(r"(?<![\w.])TXT\.(\w+)", src))
     assert keys and used == keys, (used ^ keys)
 

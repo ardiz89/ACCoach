@@ -443,7 +443,7 @@ _JS_TXT_BLOCK = re.compile(r"const TXT = \{(.*?)\n  \};", re.S)
 _JS_TXT_ENTRY = re.compile(r'(\w+):\s*((?:"[^"\n]*"\s*\+?\s*)+),')
 
 
-def test_page_js_texts() -> Entries:
+def page_js_texts() -> Entries:
     """`TXT` di `test.js`: {chiave: {"it": testo}}, concatenazioni comprese."""
     src = (WEB / "test.js").read_text(encoding="utf-8")
     block = _JS_TXT_BLOCK.search(src)
@@ -493,7 +493,7 @@ def _testpanel_texts() -> Entries:
 def _hub() -> Entries:
     from accoach import i18n
     ui = {f"i18n.py:_UI[{k}]": dict(v) for k, v in i18n._UI.items()}
-    return _merge(ui, test_page_js_texts(), html_texts(WEB / "test.html"),
+    return _merge(ui, page_js_texts(), html_texts(WEB / "test.html"),
                   _testpanel_texts())
 
 
