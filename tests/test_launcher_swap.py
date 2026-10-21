@@ -314,3 +314,18 @@ def test_the_home_setup_shortcut_goes_through_the_same_gate(hub, live, monkeypat
     assert gated == [("web", "--engineer")]
     assert asked == []
     assert spawned == [("web", "--engineer")]
+
+
+# --- il suggerimento al posto della parentesi (testi del 21/10) -------------
+
+def test_the_browser_buttons_say_it_in_their_tooltip_and_keep_it(hub):
+    """«(browser)» non sta più nell'etichetta: lo dice il suggerimento, e il
+    giro del poll che ridisegna i bottoni non lo deve cancellare."""
+    from accoach.i18n import t
+
+    hub._refresh_buttons()
+    for key in (("web",), ("web", "--engineer")):
+        btn = _button(hub, key)
+        assert "(" not in btn.text()
+        assert btn.toolTip() == t("tip.browser"), key
+    assert _button(hub, ("server",)).toolTip() == t("tip.server")

@@ -85,3 +85,12 @@ def test_lap_times_use_a_face_whose_digits_are_all_one_width(qt_app):
     fm = QFontMetricsF(lbl.font())
     widths = {round(fm.horizontalAdvance(d * 4), 2) for d in "0123456789"}
     assert len(widths) == 1, f"digits are not tabular: {sorted(widths)}"
+
+
+def test_no_hub_text_is_smaller_than_12_px():
+    """Spec dei testi (21/10): l'hub segue la scala di Windows, e lì nessun
+    testo sotto 12 px. Il link e il «?» delle impostazioni erano a 11."""
+    import re
+
+    sizes = [int(n) for n in re.findall(r"font-size:\s*(\d+)px", theme.qss())]
+    assert sizes and min(sizes) >= 12, sorted(sizes)

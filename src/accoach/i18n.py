@@ -40,45 +40,48 @@ def current_language() -> str:
 # Fixed interface strings for the Python surfaces (overlay, terminal, launcher),
 # so they follow the selected language like the voice and cues do.
 _UI: dict[str, dict[str, str]] = {
-    # overlay
-    "overlay.waiting": {"en": "waiting for the game…", "it": "in attesa del gioco…"},
-    "overlay.rec": {"en": "REC ● learning the reference lap…",
-                    "it": "REC ● sto imparando il giro di riferimento…"},
+    # Il tono di tutto il catalogo è quello deciso col pilota il 21/10: frasi
+    # brevi col tu, prima il fatto e poi cosa fare, niente emoji né due punti o
+    # lineette a effetto, mai la stessa frase in due chiavi. `tests/tono.py` lo
+    # controlla (superficie «hub»).
+    # overlay: si legge guidando, quindi poche parole.
+    "overlay.waiting": {"en": "Waiting for the game…", "it": "Aspetto il gioco…"},
+    "overlay.rec": {"en": "Learning the reference lap…",
+                    "it": "Sto imparando il giro di riferimento…"},
     # Why the coach is quiet. One per EngineState.quiet value: a gate that says
     # nothing is indistinguishable from a broken app, so each one names itself.
-    "quiet.pit": {"en": "In the pits — I start at the line",
-                  "it": "Ai box — parto dal traguardo"},
-    "quiet.out_lap": {"en": "Out lap — I start at the line",
-                      "it": "In ricognizione — parto dal traguardo"},
-    "quiet.no_reference": {"en": "No reference yet — complete one clean lap",
-                           "it": "Nessun riferimento — completa un giro pulito"},
-    "quiet.off_pace": {"en": "Off-pace lap — I'll resume at the line",
-                       "it": "Giro fuori ritmo — riprendo dal traguardo"},
-    "quiet.green": {"en": "Green — flying lap", "it": "Via — giro lanciato"},
+    "quiet.pit": {"en": "In the pits. I start at the line.",
+                  "it": "Sei ai box. Parto dal traguardo."},
+    "quiet.out_lap": {"en": "Out lap. Coaching starts at the line.",
+                      "it": "Giro di uscita. Comincio dal traguardo."},
+    "quiet.no_reference": {"en": "No reference yet. Drive one clean lap.",
+                           "it": "Ancora nessun riferimento. Fai un giro pulito."},
+    "quiet.off_pace": {"en": "Off-pace lap. I'll pick up at the line.",
+                       "it": "Giro fuori ritmo. Riprendo dal traguardo."},
+    "quiet.green": {"en": "Green, flying lap", "it": "Via, giro lanciato"},
     # Not a quiet reason: the coach keeps working, only the delta goes away.
     # Says what happened AND that the lap is still worth driving, because the
     # instinct on seeing "invalidated" is to abort and go back to the pits.
-    "overlay.lap_invalid": {"en": "Lap invalidated — keep driving, no delta",
-                            "it": "Giro invalidato — continua, niente delta"},
+    "overlay.lap_invalid": {"en": "Lap invalidated. Keep going, no delta.",
+                            "it": "Giro invalidato. Continua, senza delta."},
     "overlay.brake": {"en": "BRAKE", "it": "FRENA"},
-    "overlay.pit_due": {"en": "▶ BOX THIS LAP", "it": "▶ RIENTRA AI BOX"},
+    "overlay.pit_due": {"en": "BOX THIS LAP", "it": "RIENTRA AI BOX"},
     "overlay.focus": {"en": "FOCUS", "it": "FOCUS"},
+    # Il delta di questo tratto, sotto il numero grande.
+    "overlay.now": {"en": "now", "it": "ora"},
     "overlay.throttle_pedal": {"en": "THR", "it": "GAS"},
     "overlay.brake_pedal": {"en": "BRK", "it": "FRENO"},
     "overlay.trail": {"en": "TRAIL", "it": "TRAIL"},
     "overlay.coast": {"en": "COAST", "it": "COAST"},
     # terminal coach
     "coach.title": {"en": "voice coach", "it": "coach vocale"},
-    "coach.no_ref": {"en": "no reference yet — drive a clean lap",
-                     "it": "nessun riferimento — fai un giro pulito"},
-    "coach.listening": {"en": "listening… drive and I'll coach you",
-                        "it": "in ascolto… guida e ti seguo"},
-    "coach.waiting": {"en": "waiting for game…", "it": "in attesa del gioco…"},
-    "coach.warming": {"en": "warming up… drive a few clean laps",
-                      "it": "scaldando… fai qualche giro pulito"},
-    "coach.delta_title": {"en": "Delta vs reference", "it": "Delta vs riferimento"},
-    "coach.delta_none": {"en": "no reference yet — drive a clean lap",
-                         "it": "nessun riferimento — fai un giro pulito"},
+    "coach.listening": {"en": "Listening. Drive and I'll coach you.",
+                        "it": "Ti ascolto. Guida e ti seguo."},
+    "coach.warming": {"en": "Warming up. Drive a few clean laps.",
+                      "it": "Mi sto scaldando. Fai qualche giro pulito."},
+    "coach.delta_title": {"en": "Delta to reference", "it": "Delta sul riferimento"},
+    "coach.delta_none": {"en": "The delta appears after your first clean lap.",
+                         "it": "Il delta arriva dopo il primo giro pulito."},
     "coach.focus_title": {"en": "Focus · lesson", "it": "Focus · lezione"},
     "coach.coach_panel": {"en": "Coach", "it": "Coach"},
     "lbl.delta": {"en": "Delta", "it": "Delta"},
@@ -90,98 +93,98 @@ _UI: dict[str, dict[str, str]] = {
     "lbl.last": {"en": "Last", "it": "Ultimo"},
     "lbl.best": {"en": "Best", "it": "Migliore"},
     "lbl.laps_saved": {"en": "Laps saved", "it": "Giri salvati"},
-    "state.waiting_game": {"en": "waiting for game…", "it": "in attesa del gioco…"},
     "voice.on": {"en": "voice", "it": "voce"},
     "voice.off": {"en": "text", "it": "testo"},
     # launcher
     "ui.language": {"en": "Language", "it": "Lingua"},
     "ui.tip_borderless": {
-        "en": "Tip: set the game to Borderless so the overlay draws over it.",
-        "it": "Suggerimento: imposta il gioco in Borderless così l'overlay ci si disegna sopra."},
-    "btn.coach_live": {"en": "▶  Coach Live  (overlay + voice)",
-                       "it": "▶  Coach Live  (overlay + voce)"},
-    "btn.coach_live_demo": {"en": "▶  Coach Live — DEMO (no game)",
-                            "it": "▶  Coach Live — DEMO (senza gioco)"},
-    "btn.analysis": {"en": "📊  Analysis & Report (browser)",
-                     "it": "📊  Analisi & Report (browser)"},
-    "btn.engineer": {"en": "🔧  Race engineer (browser)",
-                     "it": "🔧  Ingegnere di pista (browser)"},
-    "btn.server": {"en": "📡  Live backend (second screen)",
-                   "it": "📡  Backend live (secondo schermo)"},
-    "btn.debrief": {"en": "📈  Last-lap debrief", "it": "📈  Debrief ultimo giro"},
-    "btn.monitor": {"en": "📈  Telemetry monitor", "it": "📈  Monitor telemetria"},
-    "btn.coach_term": {"en": "🎙  Voice coach (terminal)",
-                       "it": "🎙  Coach vocale (terminale)"},
-    "btn.verify_g": {"en": "🔧  Verify G axes", "it": "🔧  Verifica assi G"},
-    "btn.get_started": {"en": "✨  Get started", "it": "✨  Come iniziare"},
-    "btn.settings": {"en": "⚙  Settings", "it": "⚙  Impostazioni"},
-    "btn.mobile": {"en": "📱  Phone / tablet", "it": "📱  Telefono / tablet"},
+        "en": "Set the game to Borderless so the overlay can draw over it.",
+        "it": "Metti il gioco in Borderless, così l'overlay compare sopra."},
+    # I bottoni sono nomi corti, senza emoji e senza note fra parentesi: dove la
+    # differenza conta (si apre nel browser, serve a un secondo schermo) lo dice
+    # il suggerimento del bottone, con una frase.
+    "btn.coach_live": {"en": "Coach Live", "it": "Coach Live"},
+    "btn.coach_live_demo": {"en": "Demo without the game",
+                            "it": "Demo senza gioco"},
+    "btn.analysis": {"en": "Analysis and report", "it": "Analisi e report"},
+    "btn.engineer": {"en": "Race engineer", "it": "Ingegnere di pista"},
+    "btn.server": {"en": "Live backend", "it": "Backend live"},
+    "btn.debrief": {"en": "Last-lap debrief", "it": "Debrief dell'ultimo giro"},
+    "btn.monitor": {"en": "Telemetry monitor", "it": "Monitor della telemetria"},
+    "btn.coach_term": {"en": "Voice coach in a terminal",
+                       "it": "Coach vocale nel terminale"},
+    "btn.verify_g": {"en": "Check the G axes", "it": "Verifica gli assi G"},
+    "btn.get_started": {"en": "Getting started", "it": "Come iniziare"},
+    "tip.browser": {"en": "Opens in your browser.", "it": "Si apre nel browser."},
+    "tip.server": {"en": "For a second screen, without the overlay.",
+                   "it": "Serve a un secondo schermo, senza overlay."},
     # First-run wizard. Was hardcoded English in a bilingual app: the very first
     # screen a new driver sees ignored the language they had just chosen.
     "wiz.title": {"en": "Welcome to HONE", "it": "Benvenuto in HONE"},
-    "wiz.sub": {"en": "Know why you're slow. Here's how to get going:",
-                "it": "Scopri perché sei lento. Ecco come si comincia:"},
+    "wiz.sub": {"en": "Here's how to get going.",
+                "it": "Ecco come si comincia."},
     "wiz.dont_show": {"en": "Don't show this again",
                       "it": "Non mostrarlo più"},
     "wiz.open_guide": {"en": "Open full guide", "it": "Apri la guida completa"},
     "wiz.go": {"en": "Get started", "it": "Cominciamo"},
     "wiz.s1": {
-        "en": "Set your game (AC / ACC) to <b>Borderless</b> — the overlay cannot "
-              "draw over exclusive fullscreen.",
-        "it": "Metti il gioco (AC / ACC) in <b>Borderless</b> — sul fullscreen "
-              "esclusivo l'overlay non si disegna."},
+        "en": "Set AC or ACC to <b>Borderless</b>. The overlay can't draw over "
+              "exclusive fullscreen.",
+        "it": "Metti AC o ACC in <b>Borderless</b>. Sullo schermo intero "
+              "esclusivo l'overlay non compare."},
     "wiz.s2": {
         "en": "Open <b>Drive</b> in the sidebar and press <b>Coach Live</b>. The "
-              "panel walks you through it: the tablet with a QR code first, "
+              "panel walks you through it, first the tablet with a QR code and "
               "then the game. When you're done, <b>I'm done</b> opens the "
               "report card.",
         "it": "Apri <b>In pista</b> nella barra laterale e premi <b>Coach "
-              "Live</b>. Il pannello ti accompagna: prima il tablet col codice "
-              "QR, poi il gioco. Quando hai finito, <b>Ho finito</b> apre la "
-              "Pagella."},
+              "Live</b>. Il pannello ti accompagna passo per passo, prima il "
+              "tablet col codice QR e poi il gioco. Quando hai finito, <b>Ho "
+              "finito</b> apre la Pagella."},
     "wiz.s3": {
         "en": "Drive one complete lap. It becomes your <b>reference</b>, and the "
               "delta appears from the next lap on. Until then the coach still "
-              "calls locks, slides and tyres — everything that doesn't need a "
+              "calls locks, slides and tyres, everything that doesn't need a "
               "lap to compare against.",
         "it": "Fai un giro completo. Diventa il tuo <b>riferimento</b>, e il delta "
-              "compare dal giro dopo. Fino a lì il coach ti dice comunque "
-              "bloccaggi, scivolate e gomme — tutto ciò che non ha bisogno di un "
-              "giro con cui confrontarsi."},
+              "compare dal giro dopo. Fino ad allora il coach ti segnala comunque "
+              "bloccaggi, scivolate e gomme, cioè tutto quello che non ha "
+              "bisogno di un giro con cui confrontarti."},
     "wiz.s4": {
         "en": "After the session open <b>Analysis</b> for the corner-by-corner "
               "debrief, and <b>Setup</b> for the race engineer.",
         "it": "A fine sessione apri <b>Analisi</b> per il debrief curva per curva, "
               "e <b>Setup</b> per l'ingegnere di pista."},
     "wiz.s5": {
-        "en": "No game handy? <b>Coach Live — DEMO</b> runs it all on a synthetic lap.",
-        "it": "Non hai il gioco sottomano? <b>Coach Live — DEMO</b> fa girare "
+        "en": "No game handy? <b>Demo without the game</b> runs it all on a "
+              "synthetic lap.",
+        "it": "Non hai il gioco sottomano? <b>Demo senza gioco</b> fa girare "
               "tutto su un giro finto."},
-    "btn.import_pro": {"en": "⬇  Import a PRO reference lap",
-                       "it": "⬇  Importa un giro di riferimento PRO"},
+    "btn.import_pro": {"en": "Import a PRO reference lap",
+                       "it": "Importa un giro di riferimento PRO"},
     # Says what it's FOR, not what it does. The feature only makes sense once you
     # know the default reference is yourself.
     "import.hint": {
-        "en": "Your reference is normally your own best lap. Import a faster "
+        "en": "Your reference is usually your own best lap. Import a faster "
               "one and the coach measures you against that instead.",
-        "it": "Il riferimento è normalmente il tuo giro migliore. Importane uno "
-              "più veloce e il coach ti misura su quello."},
-    "import.done": {"en": "✓ Imported: {car} / {track} ({time})",
-                    "it": "✓ Importato: {car} / {track} ({time})"},
-    "import.failed": {"en": "Could not read that lap: {err}",
-                      "it": "Giro illeggibile: {err}"},
-    "btn.guide": {"en": "❓  Guide — how to use", "it": "❓  Guida — come si usa"},
-    "btn.overlay": {"en": "🖥  Overlay only", "it": "🖥  Solo overlay"},
+        "it": "Di solito il riferimento è il tuo giro migliore. Se ne importi "
+              "uno più veloce, il coach ti misura su quello."},
+    "import.done": {"en": "Imported the {car} lap at {track}, {time}.",
+                    "it": "Ho importato il giro di {car} a {track}, {time}."},
+    "import.failed": {"en": "I can't read that lap. {err}",
+                      "it": "Non riesco a leggere questo giro. {err}"},
+    "btn.guide": {"en": "User guide", "it": "Guida all'uso"},
+    "btn.overlay": {"en": "Overlay only", "it": "Solo overlay"},
     # hub — sidebar navigation
-    "nav.home": {"en": "  Home", "it": "  Home"},
-    # "In pista" e non "Guida": in italiano collideva con «❓ Guida — come si
-    # usa», e chi cercava il manuale finiva sui pulsanti di Coach Live. In
-    # inglese la collisione non c'era mai stata (Drive / Guide).
-    "nav.live": {"en": "  Drive", "it": "  In pista"},
-    "nav.analysis": {"en": "  Analysis", "it": "  Analisi"},
-    "nav.setup": {"en": "  Setup", "it": "  Setup"},
-    "nav.devices": {"en": "  Devices", "it": "  Dispositivi"},
-    "nav.settings": {"en": "  Settings", "it": "  Impostazioni"},
+    "nav.home": {"en": "Home", "it": "Home"},
+    # "In pista" e non "Guida": in italiano collideva con la guida all'uso, e
+    # chi cercava il manuale finiva sui pulsanti di Coach Live. In inglese la
+    # collisione non c'era mai stata (Drive / Guide).
+    "nav.live": {"en": "Drive", "it": "In pista"},
+    "nav.analysis": {"en": "Analysis", "it": "Analisi"},
+    "nav.setup": {"en": "Setup", "it": "Setup"},
+    "nav.devices": {"en": "Devices", "it": "Dispositivi"},
+    "nav.settings": {"en": "Settings", "it": "Impostazioni"},
     # hub — section intros
     "sec.devtools": {"en": "Advanced tools", "it": "Strumenti avanzati"},
     # hub — Home (last session)
@@ -189,161 +192,168 @@ _UI: dict[str, dict[str, str]] = {
                      "it": "Carico l'ultima sessione…"},
     # Terzo stato accanto a "vuoto" e "nessun riferimento": l'archivio non si
     # legge. Prima finiva su "vuoto", cioè si diceva «non hai mai guidato» a chi
-    # aveva appena finito una sessione — che manda a guidare di più invece che a
-    # guardare i log.
+    # aveva appena finito una sessione, e lo si mandava a guidare di più invece
+    # che a guardare i log. Il file di log e non «Impostazioni → Log»: nelle
+    # Impostazioni una voce Log non c'è.
     "home.error_title": {"en": "I can't read your laps",
                          "it": "Non riesco a leggere i tuoi giri"},
     "home.error_body": {
-        "en": "The lap archive didn't open — another HONE window may be using "
-              "it, or a file is damaged. Settings → Logs has the details. Your "
-              "laps are still on disk.",
-        "it": "L'archivio dei giri non si è aperto — può usarlo un'altra "
-              "finestra di HONE, o un file è danneggiato. I dettagli sono in "
-              "Impostazioni → Log. I tuoi giri sono ancora sul disco."},
+        "en": "The lap archive didn't open. Another HONE window may be using "
+              "it, or a file is damaged. The log file has the details, and "
+              "your laps are still on disk.",
+        "it": "L'archivio dei giri non si è aperto. Forse lo usa un'altra "
+              "finestra di HONE, o un file è danneggiato. I dettagli sono nel "
+              "file di log, e i tuoi giri sono ancora sul disco."},
     "home.empty_title": {"en": "No sessions yet",
-                         "it": "Nessuna sessione ancora"},
-    "home.empty_body": {"en": "Get on track and drive two laps — I'll listen and "
+                         "it": "Ancora nessuna sessione"},
+    "home.empty_body": {"en": "Get on track and drive two laps. I'll listen and "
                               "tell you where you lose time.",
-                        "it": "Sali in pista e fai due giri — io ascolto e ti dico "
+                        "it": "Sali in pista e fai due giri. Io ascolto e ti dico "
                               "dove perdi tempo."},
     "home.no_ref_title": {"en": "Almost there", "it": "Ci siamo quasi"},
     "home.no_ref_body": {"en": "Drive one clean, valid lap so I have a reference to "
                                "compare against.",
                          "it": "Fai un giro pulito e valido, così ho un riferimento "
-                               "con cui confrontare."},
+                               "con cui confrontarti."},
     "home.clean_title": {"en": "Clean lap", "it": "Giro pulito"},
-    "home.clean_body": {"en": "Slower than your reference, but no single corner cost "
-                              "you much — work on consistency to close the gap.",
-                        "it": "Più lento del riferimento, ma nessuna curva ti è "
-                              "costata molto — lavora sulla costanza per recuperare."},
-    "home.is_reference": {"en": "This is your reference lap — nothing faster to "
-                                "compare against. Nice one.",
-                          "it": "Questo è il tuo giro di riferimento — niente di più "
-                                "veloce da confrontare. Ottimo."},
-    "home.cta_analysis": {"en": "📊  Analyze", "it": "📊  Analizza"},
-    "home.cta_debrief": {"en": "📈  Full debrief", "it": "📈  Debrief completo"},
-    "home.cta_setup": {"en": "🔧  Try a setup", "it": "🔧  Prova un setup"},
+    "home.clean_body": {"en": "You're slower than your reference, but no single "
+                              "corner cost you much. Work on consistency to close "
+                              "the gap.",
+                        "it": "Sei più lento del riferimento, ma nessuna curva ti è "
+                              "costata molto. Per recuperare, lavora sulla "
+                              "costanza."},
+    "home.is_reference": {"en": "This is your reference lap. I have nothing faster "
+                                "to compare it with.",
+                          "it": "Questo è il tuo giro di riferimento. Non ho un "
+                                "giro più veloce con cui confrontarlo."},
+    "home.cta_analysis": {"en": "Analyze", "it": "Analizza"},
+    "home.cta_debrief": {"en": "Full debrief", "it": "Debrief completo"},
+    "home.cta_setup": {"en": "Try a setup", "it": "Prova un setup"},
     "home.stat_best": {"en": "Best lap", "it": "Miglior giro"},
     "home.stat_gap": {"en": "Gap to ref", "it": "Distacco rif."},
     "home.stat_laps": {"en": "Valid laps", "it": "Giri validi"},
     "home.stat_consistency": {"en": "Spread", "it": "Costanza"},
     # phone / tablet (LAN) dialog
-    "mob.title": {"en": "Open on phone / tablet", "it": "Apri su telefono / tablet"},
+    "mob.title": {"en": "Open on a phone or tablet",
+                  "it": "Apri su telefono o tablet"},
     "mob.lan": {"en": "Allow access from other devices on my network",
                 "it": "Consenti l'accesso dagli altri dispositivi in rete"},
     "mob.report": {"en": "Report", "it": "Report"},
     "mob.engineer": {"en": "Engineer", "it": "Ingegnere"},
     "mob.test": {"en": "On-track test", "it": "Test in pista"},
-    "mob.test_live": {"en": "For live cue capture on the test page, also start the "
-                            "Live backend (second screen).",
-                      "it": "Per la cattura dei cue dal vivo nella pagina test, avvia "
-                            "anche il Backend live (secondo schermo)."},
-    "mob.scan": {"en": "Scan with your phone's camera, or type the address.",
-                 "it": "Inquadra col telefono, oppure digita l'indirizzo."},
+    "mob.test_live": {"en": "To capture the coach's cues on the test page, start "
+                            "the Live backend too.",
+                      "it": "Per registrare gli avvisi del coach nella pagina di "
+                            "prova, avvia anche il Backend live."},
+    "mob.scan": {"en": "Scan the code with your phone's camera, or type the "
+                       "address.",
+                 "it": "Inquadra il codice col telefono, oppure scrivi "
+                       "l'indirizzo."},
     "mob.off": {"en": "Turn on the option above to open these pages from your phone.",
                 "it": "Attiva l'opzione qui sopra per aprire le pagine dal telefono."},
-    "mob.no_ip": {"en": "No network address found — connect this PC to Wi-Fi or LAN.",
-                  "it": "Nessun indirizzo di rete — collega il PC a Wi-Fi o LAN."},
-    "mob.same_net": {"en": "Your phone must be on the same Wi-Fi / network as this PC.",
-                     "it": "Il telefono dev'essere sulla stessa Wi-Fi / rete del PC."},
+    "mob.no_ip": {"en": "No network address found. Connect this PC to Wi-Fi or "
+                        "the network.",
+                  "it": "Non trovo un indirizzo di rete. Collega il PC al Wi-Fi o "
+                        "alla rete."},
+    "mob.same_net": {"en": "Your phone must be on the same Wi-Fi network as this PC.",
+                     "it": "Il telefono deve stare sulla stessa rete Wi-Fi del PC."},
     "mob.firewall": {"en": "If Windows asks, allow access on Private networks.",
                      "it": "Se Windows lo chiede, consenti l'accesso su reti private."},
-    "mob.restart": {"en": "After changing this, (re)start Coach Live or Analysis.",
-                    "it": "Dopo la modifica, (ri)avvia Coach Live o Analisi."},
-    "mob.no_qr": {"en": "(QR unavailable — install 'segno')",
-                  "it": "(QR non disponibile — installa 'segno')"},
-    "mob.server_on": {"en": "Analysis server is running — these pages will open.",
-                      "it": "Server analisi acceso: queste pagine si aprono."},
-    "mob.server_off": {"en": "Analysis server is off — these pages will not load. "
-                             "Start it from Analysis.",
-                       "it": "Server analisi spento: queste pagine non si aprono. "
-                             "Avvialo da Analisi."},
-    # settings dialog
-    "ui.settings": {"en": "Settings", "it": "Impostazioni"},
+    "mob.restart": {"en": "After changing it, restart Coach Live or Analysis.",
+                    "it": "Dopo averla cambiata, riavvia Coach Live o Analisi."},
+    "mob.no_qr": {"en": "No QR code. Install the segno package.",
+                  "it": "Il codice QR non c'è. Installa il pacchetto segno."},
+    "mob.server_on": {"en": "The analysis server is running. These pages will open.",
+                      "it": "Il server dell'analisi è acceso. Queste pagine si "
+                            "aprono."},
+    "mob.server_off": {"en": "The analysis server is off, so these pages won't "
+                             "load. Start it from Analysis.",
+                       "it": "Il server dell'analisi è spento e queste pagine non "
+                             "si aprono. Avvialo da Analisi."},
+    # settings
     "set.voice": {"en": "Coach voice", "it": "Voce del coach"},
-    "set.engineer_voice": {"en": "Speak engineer proposals",
-                           "it": "Annuncia proposte ingegnere"},
+    "set.engineer_voice": {"en": "Speak the engineer's proposals",
+                           "it": "Leggi le proposte dell'ingegnere"},
     "set.male_voice": {"en": "Male voice", "it": "Voce maschile"},
     "set.radio": {"en": "Team-radio effect", "it": "Effetto radio di pista"},
-    "set.rate": {"en": "Reading speed (wpm)", "it": "Velocità lettura (ppm)"},
-    "set.scale": {"en": "Overlay scale", "it": "Scala overlay"},
+    "set.rate": {"en": "Voice speed", "it": "Velocità della voce"},
+    "set.scale": {"en": "Overlay size", "it": "Grandezza dell'overlay"},
     # One "?" per setting. Reported by the user: a field named "Overlay scale"
     # or "Reading speed" means nothing to someone who didn't build it, and the
     # panel had no help text of any kind. Each answers WHAT it does and WHEN to
-    # touch it — a definition alone ("scales the overlay") helps nobody.
+    # touch it, because a definition alone ("scales the overlay") helps nobody.
     "set.voice.help": {
-        "en": "Speaks the coaching cues out loud. Turn it off to keep the "
-              "on-screen overlay only — useful in a race, or on a headset "
-              "you're sharing with a voice chat.",
+        "en": "Speaks the coaching cues out loud. Turn it off to keep only the "
+              "on-screen overlay. That helps in a race, or on a headset you share "
+              "with a voice chat.",
         "it": "Legge i consigli ad alta voce. Spegnila per tenere solo "
-              "l'overlay a schermo — utile in gara, o se le cuffie le stai "
-              "usando anche per parlare con qualcuno."},
+              "l'overlay a schermo. Serve in gara, o se usi le cuffie anche per "
+              "parlare con qualcuno."},
+    # «Setup» e non «Assetto»: è il nome della sezione nella barra laterale.
     "set.engineer_voice.help": {
         "en": "Whether the race engineer's setup proposals are spoken too. "
-              "They arrive between laps, not while you're driving a corner. "
-              "Off means you'll still find them in the Setup section.",
-        "it": "Se anche le proposte di assetto dell'ingegnere vengono dette a "
-              "voce. Arrivano fra un giro e l'altro, non mentre sei in curva. "
-              "Se la spegni le trovi comunque nella sezione Assetto."},
+              "They arrive between laps, not while you're in a corner. If "
+              "you turn it off, you still find them in the Setup section.",
+        "it": "Decide se anche le proposte di assetto dell'ingegnere si sentono "
+              "a voce. Arrivano fra un giro e l'altro, non mentre sei in curva. "
+              "Se la spegni, le trovi comunque nella sezione Setup."},
     "set.male_voice.help": {
-        "en": "Picks the male voice instead of the female one. Same words, "
-              "same timing — it only changes who says them.",
-        "it": "Sceglie la voce maschile invece di quella femminile. Stesse "
-              "parole, stessi tempi: cambia solo chi le dice."},
+        "en": "Uses the male voice instead of the female one. The words and the "
+              "timing stay the same, only the speaker changes.",
+        "it": "Usa la voce maschile al posto di quella femminile. Le parole e i "
+              "tempi restano gli stessi, cambia solo chi le dice."},
     "set.radio.help": {
-        "en": "Filters the voice to sound like a pit-to-car radio. Purely "
-              "cosmetic: it costs nothing in lap time and changes nothing in "
-              "the advice. Off is the clearest.",
-        "it": "Filtra la voce perché suoni come una radio di pista. È solo "
-              "estetica: non cambia una virgola dei consigli. Spenta è la più "
-              "comprensibile."},
+        "en": "Filters the voice to sound like a pit-to-car radio. It's only an "
+              "effect, and it changes nothing in the advice. Off is the clearest.",
+        "it": "Filtra la voce perché suoni come una radio di pista. È solo un "
+              "effetto e non cambia niente nei consigli. Spenta si capisce "
+              "meglio."},
     "set.rate.help": {
-        "en": "How fast the voice talks, in words per minute. Around 165 is "
-              "normal speech. Raise it if cues arrive too late in fast "
-              "corners; lower it if you're missing words.",
-        "it": "Quanto in fretta parla la voce, in parole al minuto. Intorno a "
-              "165 è il parlato normale. Alzala se nelle curve veloci i "
-              "consigli arrivano tardi, abbassala se ti perdi delle parole."},
+        "en": "How fast the voice talks, in words per minute. Normal speech is "
+              "around 165. Raise it if cues arrive too late in fast corners, "
+              "lower it if you're missing words.",
+        "it": "Quanto in fretta parla la voce, in parole al minuto. Il parlato "
+              "normale è intorno a 165. Alzala se nelle curve veloci i consigli "
+              "arrivano tardi, abbassala se ti perdi delle parole."},
     # Auto-record: the only setting that makes HONE do something without being
     # pressed, so the help says exactly what starts (and what doesn't).
     "set.autorecord": {"en": "Record by itself when the game starts",
                        "it": "Registra da solo quando parte il gioco"},
     "set.autorecord.help": {
-        "en": "With the hub open, HONE notices AC/ACC appearing and starts "
-              "recording your laps on its own — so a session you forgot to arm "
-              "isn't a session you lost. It starts the silent recorder only: "
-              "the voice and the overlay stay off until you press Coach Live. "
-              "Off by default.",
-        "it": "Con l'hub aperto, HONE si accorge che AC/ACC è partito e comincia "
-              "a registrare i tuoi giri da solo — così una sessione che hai "
-              "dimenticato di avviare non è una sessione persa. Parte solo la "
-              "registrazione silenziosa: voce e overlay restano spenti finché "
-              "non premi Coach Live. Di default è spenta.",
+        "en": "With the hub open, HONE notices AC or ACC starting and records "
+              "your laps on its own. A session you forgot to start isn't lost. "
+              "Only the silent recorder starts, and the voice and the overlay "
+              "stay off until you press Coach Live. It's off by default.",
+        "it": "Con l'hub aperto, HONE si accorge che AC o ACC è partito e "
+              "registra i tuoi giri da solo. Così non perdi una sessione che hai "
+              "dimenticato di avviare. Parte solo la registrazione silenziosa, e "
+              "voce e overlay restano spenti finché non premi Coach Live. Di "
+              "base è spenta.",
     },
-    "watch.waiting": {"en": "listening — waiting for the game",
-                      "it": "in ascolto — aspetto il gioco"},
-    "watch.recording": {"en": "the game is here — starting the recorder",
-                        "it": "il gioco c'è — avvio la registrazione"},
-    "watch.busy": {"en": "already recording", "it": "sto già registrando"},
+    "watch.waiting": {"en": "Waiting for the game to start.",
+                      "it": "Aspetto che parta il gioco."},
+    "watch.recording": {"en": "The game is running. Starting the recorder.",
+                        "it": "Il gioco è partito, avvio la registrazione."},
+    "watch.busy": {"en": "Already recording.", "it": "Sto già registrando."},
     "set.wean": {"en": "Retire braking markers", "it": "Ritira i segnali di frenata"},
     "set.wean.help": {
-        "en": "As you master a corner, the braking countdown stops appearing "
-              "there — the way you peel the racing line and braking boards away "
-              "one at a time once you know a track. Off keeps them at every "
-              "corner forever.",
-        "it": "Man mano che domini una curva, il conto alla rovescia della "
-              "frenata smette di comparire lì — come togli la traiettoria e i "
-              "cartelli di frenata uno alla volta quando impari un tracciato. "
-              "Spento li tiene a ogni curva per sempre."},
+        "en": "Once you master a corner, the braking countdown stops appearing "
+              "there. It's like taking the racing line and the braking boards "
+              "away one at a time as you learn a track. Off keeps them at every "
+              "corner.",
+        "it": "Quando domini una curva, lì il conto alla rovescia della frenata "
+              "smette di comparire. È come togliere una alla volta traiettoria e "
+              "cartelli quando impari una pista. Se lo spegni, restano in ogni "
+              "curva."},
     # Un pulsante spento senza motivo si legge come un guasto. Questo compare
     # come suggerimento su tutto ciò che registra, quando qualcos'altro già lo fa.
     "btn.busy_recording": {
-        "en": "Something is already recording this session. Two recorders save "
-              "every lap twice, and the copy looks exactly like a real extra lap "
-              "— stop the one that's running first.",
-        "it": "Qualcosa sta già registrando questa sessione. Due registratori "
-              "salvano ogni giro due volte, e la copia è identica a un giro vero "
-              "in più — ferma prima quello acceso."},
+        "en": "Something is already recording this session. With two recorders "
+              "every lap is saved twice, and the copy looks like a real extra "
+              "lap. Stop the running one first.",
+        "it": "Qualcosa sta già registrando questa sessione. Con due "
+              "registratori ogni giro si salva due volte, e la copia sembra un "
+              "giro vero in più. Ferma prima quello acceso."},
     # --- lo scambio Coach Live → Backend live ------------------------------
     # Il Backend live non può stare acceso insieme a Coach Live. Finché queste
     # frasi non c'erano, il bottone era spento e muto. Dal 24/09 la pagina
@@ -353,31 +363,29 @@ _UI: dict[str, dict[str, str]] = {
         "en": "The live backend can't run next to Coach Live",
         "it": "Il Backend live non può girare insieme a Coach Live"},
     "swap.why": {
-        "en": "The live backend records laps exactly like Coach Live does. "
-              "With both of them running, every lap you drive is saved twice — "
-              "and the copy looks exactly like a real extra lap, so afterwards "
-              "there is no telling them apart. If you're here for the Engineer "
-              "page you don't need it: while Coach Live runs, Coach Live feeds "
-              "that page itself.",
-        "it": "Il Backend live registra i giri esattamente come fa Coach Live. "
-              "Accesi tutti e due, ogni giro che guidi viene salvato due volte "
-              "— e la copia è identica a un giro vero in più, quindi dopo non "
-              "si distinguono. Se sei qui per la pagina Ingegnere non ti "
-              "serve: finché Coach Live è acceso, quella pagina la alimenta "
-              "lui."},
+        "en": "The live backend records laps just like Coach Live. With both "
+              "running, every lap you drive is saved twice, and afterwards the "
+              "copy can't be told apart from a real lap. If you're here for the "
+              "Engineer page you don't need it. While Coach Live runs, Coach "
+              "Live feeds that page itself.",
+        "it": "Il Backend live registra i giri proprio come Coach Live. Con tutti "
+              "e due accesi ogni giro che guidi si salva due volte, e dopo la "
+              "copia non si distingue da un giro vero. Se sei qui per la pagina "
+              "Ingegnere non ti serve. Finché Coach Live è acceso, quella pagina "
+              "la alimenta lui."},
     "swap.warn": {
         "en": "Swapping stops Coach Live and starts the live backend in its "
-              "place: the coach still talks and the Engineer page stays fed, "
-              "but the overlay closes with Coach Live — no HUD on track. The "
-              "live backend is three separate pieces (backend, overlay, web "
-              "page), not one package: you can bring the overlay back from "
-              "Devices, on its own.",
-        "it": "Lo scambio ferma Coach Live e avvia al suo posto il Backend "
-              "live: il coach parla lo stesso e la pagina Ingegnere resta "
-              "alimentata, ma l'overlay si spegne insieme a Coach Live — in "
-              "pista niente HUD. Il Backend live sono tre pezzi separati "
-              "(backend, overlay, pagina web), non un pacchetto solo: "
-              "l'overlay lo riaccendi da Dispositivi, per conto suo."},
+              "place. The coach keeps talking and the Engineer page stays fed. "
+              "The overlay, though, closes with Coach Live, so you have no HUD "
+              "on track. The live backend is three separate pieces, the "
+              "backend, the overlay and the web page. You can bring the "
+              "overlay back on its own from Devices.",
+        "it": "Lo scambio ferma Coach Live e al suo posto avvia il Backend live. "
+              "Il coach continua a parlare e la pagina Ingegnere resta "
+              "alimentata. L'overlay però si spegne insieme a Coach Live, e in "
+              "pista resti senza HUD. Il Backend live è fatto di tre pezzi "
+              "separati, cioè backend, overlay e pagina web. L'overlay lo "
+              "riaccendi da solo, da Dispositivi."},
     # Senza glifo: `⇄` (U+21C4) non c'è nei font del brand né nel ripiego di
     # sistema, e a schermo usciva come un rettangolo vuoto davanti alla frase.
     "swap.confirm": {"en": "Stop Coach Live and switch",
@@ -387,47 +395,50 @@ _UI: dict[str, dict[str, str]] = {
     # ciascuna uscita lo dicono i paragrafi sopra, non il bottone.
     "swap.cancel": {"en": "Cancel", "it": "Annulla"},
     "swap.failed": {
-        "en": "Coach Live is still running, so the live backend was NOT "
-              "started — two recorders would have saved every lap twice. Press "
-              "“Stop without opening the report”, wait for its window to close, "
+        "en": "Coach Live is still running, so the live backend didn't start, "
+              "because two recorders would have saved every lap twice. Press "
+              "“Stop without opening the report”, wait for its window to close "
               "and try again.",
-        "it": "Coach Live sta ancora girando, quindi il Backend live NON è "
-              "stato avviato — due registratori avrebbero salvato ogni giro "
-              "due volte. Premi «Ferma senza aprire il report», aspetta che la "
-              "sua finestra si chiuda, e riprova."},
+        "it": "Coach Live è ancora acceso, quindi il Backend live non è partito, "
+              "perché due registratori avrebbero salvato ogni giro due volte. "
+              "Premi «Ferma senza aprire il report», aspetta che la sua finestra "
+              "si chiuda e riprova."},
     "swap.tooltip": {
         "en": "Coach Live is running. Click to read why this can't start "
-              "alongside it — and to swap over in one step.",
+              "alongside it, and to swap over in one step.",
         "it": "Coach Live è acceso. Premi per leggere perché questo non può "
-              "partirgli accanto — e per fare lo scambio in un passo."},
+              "partire insieme, e per fare lo scambio in un passo."},
     "set.pedals": {"en": "Show the pedal trace", "it": "Mostra la traccia dei pedali"},
     "set.pedals.help": {
-        "en": "A strip under the overlay with your throttle (green) and brake "
-              "(red) as they happen. The ribbon under it turns amber while both "
-              "pedals are down — that's trail braking — and grey while neither "
-              "is, which is time you're giving away. It's the only place you "
-              "can watch your brake release as you do it, instead of being told "
-              "about it afterwards.",
-        "it": "Una striscia sotto l'overlay col tuo gas (verde) e il tuo freno "
-              "(rosso) mentre succedono. Il nastro sotto diventa ambra finché "
-              "premi tutti e due i pedali — è il trail braking — e grigio "
-              "quando non ne premi nessuno, che è tempo regalato. È l'unico "
-              "posto dove vedi il rilascio del freno **mentre** lo fai, invece "
-              "di sentirtelo raccontare dopo."},
+        "en": "A strip under the overlay shows your throttle (green) and brake "
+              "(red) as you use them. The ribbon under it turns amber while both "
+              "pedals are down, which is trail braking. It turns grey while "
+              "neither is, and that's time you're giving away. It's the only "
+              "place where you watch your brake release as you do it, instead "
+              "of being told about it afterwards.",
+        "it": "Una striscia sotto l'overlay mostra il gas (verde) e il freno "
+              "(rosso) mentre li usi. Il nastro sotto diventa ambra quando premi "
+              "tutti e due i pedali, cioè quando fai trail braking. Diventa "
+              "grigio quando non ne premi nessuno, e quello è tempo regalato. È "
+              "l'unico posto dove vedi il rilascio del freno mentre lo fai, "
+              "invece di sentirtelo raccontare dopo."},
     "set.pedals_hint": {
-        "en": "Makes the overlay taller. Applies on the next Coach Live start.",
-        "it": "Allunga l'overlay. Attivo al prossimo avvio di Coach Live."},
+        "en": "The pedal trace makes the overlay taller.",
+        "it": "La traccia dei pedali allunga l'overlay."},
     "set.scale.help": {
-        "en": "How big the overlay is drawn on screen. 1.0 is the design size; "
-              "raise it on a 4K monitor or if you sit far from the screen, "
-              "lower it if it covers too much track.",
-        "it": "Quanto è grande l'overlay a schermo. 1.0 è la dimensione di "
-              "progetto: alzala su un monitor 4K o se stai lontano, abbassala "
-              "se ti copre troppa pista."},
-    "set.scale_hint": {"en": "Applies on the next Coach Live start.",
-                       "it": "Attivo al prossimo avvio di Coach Live."},
+        "en": "How big the overlay is on screen. At 1.0 it has its design size. "
+              "Raise it on a 4K monitor or if you sit far from the screen, lower "
+              "it if it covers too much track.",
+        "it": "Quanto è grande l'overlay sullo schermo. A 1,0 ha la grandezza di "
+              "progetto. Alzala su un monitor 4K o se stai lontano dallo schermo, "
+              "abbassala se ti copre troppa pista."},
+    "set.scale_hint": {
+        "en": "The pedal trace and the overlay size apply from the next Coach "
+              "Live start.",
+        "it": "La traccia dei pedali e la grandezza dell'overlay valgono dal "
+              "prossimo avvio di Coach Live."},
     "btn.save": {"en": "Save", "it": "Salva"},
-    "btn.cancel": {"en": "Cancel", "it": "Annulla"},
+    "set.saved": {"en": "Saved.", "it": "Salvato."},
     "btn.close": {"en": "Close", "it": "Chiudi"},
     # Il pannello «In pista» (`livepanel_ui.py`): dal via di Coach Live alla
     # Pagella. Il tono e' quello deciso col pilota il 21/10: frasi brevi col tu,
@@ -490,8 +501,8 @@ _UI: dict[str, dict[str, str]] = {
     "live.no_lap_yet": {"en": "No lap completed yet",
                         "it": "Ancora nessun giro completato"},
     "live.best": {"en": "best {time}", "it": "migliore {time}"},
-    "live.following": {"en": "You're working on: {name}",
-                       "it": "Stai seguendo: {name}"},
+    "live.following": {"en": "You're working on “{name}”.",
+                       "it": "Stai seguendo il consiglio «{name}»."},
     "live.following_sub": {
         "en": "The coach reminds you in the corners of this advice.",
         "it": "Il coach te lo ricorda nelle curve di questo consiglio."},

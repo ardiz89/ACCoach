@@ -30,6 +30,7 @@ from .coaching.debrief import CornerLoss
 from .i18n import t
 from .logging_setup import get_logger
 from .telemetry.snapshot import format_lap_time
+from .textfmt import fmt_num
 from .theme import MONO
 
 _log = get_logger("hub")
@@ -169,6 +170,11 @@ class _HomeWorker(QThread):
         self.done.emit(load_home_data(self._laps_dir, self._lang))
 
 
+def _lang() -> str:
+    from .i18n import current_language
+    return current_language()
+
+
 def _card(*widgets: QWidget) -> QFrame:
     frame = QFrame()
     frame.setProperty("role", "card")
@@ -303,9 +309,11 @@ class HomePanel(QWidget):
             self._fix.setText("")
         else:
             loss = data.top
-            secs = loss.lost_ms / 1000.0
+            # I numeri passano da `fmt_num`: virgola in italiano, spazio prima
+            # dell'unità («−0,4 s»).
+            secs = fmt_num(loss.lost_ms / 1000.0, 1, _lang(), "s")
             self._headline.setText(
-                f"{loss.label}  ·  −{secs:.1f}s  ·  {loss.message}")
+                f"{loss.label}  ·  −{secs}  ·  {loss.message}")
             self._cause.setText(loss.cause or loss.detail)
             self._fix.setText(loss.fix)
 
@@ -313,11 +321,13 @@ class HomePanel(QWidget):
 
     def _fill_stats(self, data: HomeData) -> None:
         best = format_lap_time(data.best_ms) if data.best_ms else "—"
-        gap = (f"+{data.total_gap_ms / 1000.0:.2f}s"
+        lang = _lang()
+        gap = ("+" + fmt_num(data.total_gap_ms / 1000.0, 2, lang, "s")
                if data.status in ("ok", "clean") else "—")
         laps = str(data.laps_count) if data.laps_count else "—"
         spread = data.consistency.get("spread_ms", 0) if data.consistency else 0
-        cons = f"{spread / 1000.0:.2f}s" if data.laps_count >= 2 else "—"
+        cons = (fmt_num(spread / 1000.0, 2, lang, "s")
+                if data.laps_count >= 2 else "—")
         values = {"best": best, "gap": gap, "laps": laps, "consistency": cons}
         for key, (value_lbl, _label) in self._stat_widgets.items():
             value_lbl.setText(values[key])

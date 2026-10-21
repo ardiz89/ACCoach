@@ -155,13 +155,15 @@ def qss() -> str:
     QLabel[role="muted"]    {{ color: {b.MUTED}; font-size: 12px; }}
     QLabel[role="good"]     {{ color: {b.GREEN}; }}
     QLabel[role="bad"]      {{ color: {b.RED}; }}
-    QLabel[role="link"]     {{ color: {b.CYAN}; font-size: 11px; }}
+    /* Nessun testo sotto 12 px (spec dei testi, 21/10): il link e il «?»
+       erano a 11. */
+    QLabel[role="link"]     {{ color: {b.CYAN}; font-size: 12px; }}
     /* The "?" beside a setting: visible enough to invite a hover, quiet enough
        not to compete with the setting's own name. */
-    QLabel[role="help"]     {{ color: {b.MUTED}; font-size: 11px; font-weight: bold;
-                               border: 1px solid {b.MUTED}; border-radius: 7px;
-                               min-width: 14px; max-width: 14px;
-                               min-height: 14px; max-height: 14px;
+    QLabel[role="help"]     {{ color: {b.MUTED}; font-size: 12px; font-weight: bold;
+                               border: 1px solid {b.MUTED}; border-radius: 8px;
+                               min-width: 16px; max-width: 16px;
+                               min-height: 16px; max-height: 16px;
                                qproperty-alignment: AlignCenter; }}
     QLabel[role="help"]:hover {{ color: {b.CYAN}; border-color: {b.CYAN}; }}
 

@@ -19,6 +19,7 @@ from __future__ import annotations
 import ast
 import functools
 import html
+import html.parser
 import re
 from pathlib import Path
 from typing import Callable
@@ -435,9 +436,65 @@ def _report_backend() -> Entries:
     return _modules(*_BACKEND)
 
 
+# I testi fissi della pagina di prova (`test.js`, `test.html`) e del riquadro
+# di prova (`testpanel.py`): sono in italiano soltanto, e la spec li mette dentro
+# (il contenuto del protocollo, `test_plan.json`, resta fuori).
+_JS_TXT_BLOCK = re.compile(r"const TXT = \{(.*?)\n  \};", re.S)
+_JS_TXT_ENTRY = re.compile(r'(\w+):\s*((?:"[^"\n]*"\s*\+?\s*)+),')
+
+
+def test_page_js_texts() -> Entries:
+    """`TXT` di `test.js`: {chiave: {"it": testo}}, concatenazioni comprese."""
+    src = (WEB / "test.js").read_text(encoding="utf-8")
+    block = _JS_TXT_BLOCK.search(src)
+    if not block:
+        return {}
+    return {f"web/test.js:TXT.{k}": {"it": "".join(re.findall(r'"([^"\n]*)"', v))}
+            for k, v in _JS_TXT_ENTRY.findall(block.group(1))}
+
+
+class _HtmlText(html.parser.HTMLParser):
+    """Il testo che si vede di una pagina: nodi di testo, `placeholder`, `title`."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.found: list[tuple[int, str]] = []
+        self._skip = 0
+
+    def handle_starttag(self, tag, attrs):
+        if tag in ("script", "style"):
+            self._skip += 1
+        for name, value in attrs:
+            if name in ("placeholder", "title") and value and value.strip():
+                self.found.append((self.getpos()[0], value.strip()))
+
+    def handle_endtag(self, tag):
+        if tag in ("script", "style"):
+            self._skip -= 1
+
+    def handle_data(self, data):
+        if not self._skip and data.strip() and re.search(r"[^\W\d_]", data):
+            self.found.append((self.getpos()[0], " ".join(data.split())))
+
+
+def html_texts(path: Path) -> Entries:
+    parser = _HtmlText()
+    parser.feed(path.read_text(encoding="utf-8"))
+    out: Entries = {}
+    for i, (line, text) in enumerate(parser.found):
+        out[f"web/{path.name}:{line}#{i}"] = {"it": text}
+    return out
+
+
+def _testpanel_texts() -> Entries:
+    return _tables(SRC / "testpanel.py", ("_TXT",), lambda k, v: {"it": v})
+
+
 def _hub() -> Entries:
     from accoach import i18n
-    return {f"i18n.py:_UI[{k}]": dict(v) for k, v in i18n._UI.items()}
+    ui = {f"i18n.py:_UI[{k}]": dict(v) for k, v in i18n._UI.items()}
+    return _merge(ui, test_page_js_texts(), html_texts(WEB / "test.html"),
+                  _testpanel_texts())
 
 
 _COACH_FILES = ("coaching/cue.py", "coaching/focus.py", "coaching/pitcall.py",
@@ -584,7 +641,8 @@ SURFACES: dict[str, Callable[[], Entries]] = {
 }
 
 # Le superfici non ancora riscritte. Ogni task che ne riscrive una la toglie.
-PENDING: set[str] = set(SURFACES) - {"report_a", "report_b", "report_backend", "engineer"}
+PENDING: set[str] = set(SURFACES) - {"report_a", "report_b", "report_backend",
+                                       "engineer", "hub"}
 
 
 # --- il conto ---------------------------------------------------------------

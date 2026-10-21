@@ -177,7 +177,7 @@ instead.
 
 ## What the analysis app shows
 
-Open it from the hub (**Analysis → 📊 Analysis & Report**) or with
+Open it from the hub (**Analysis → Analysis and report**) or with
 `python -m accoach web`. It runs on your machine, on your laps; there is no
 account and nothing is uploaded.
 

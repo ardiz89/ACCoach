@@ -945,3 +945,14 @@ def test_the_starting_clock_begins_when_coach_live_starts(env, monkeypatch):
     now[0] += livepanel.STARTING_S + 1
     panel._on_health(None)
     assert panel.state.phase == "unreachable"
+
+
+def test_the_best_lap_keeps_the_game_format_in_italian(env):
+    """I tempi sul giro restano «1:41.882» anche in italiano (spec dei testi,
+    21/10): è il formato del gioco. Prima il pannello lo scriveva «1:41,882»."""
+    from accoach.config import set_language
+    _win, panel, _net, _tmp = env
+    set_language("it")
+    panel.render_state(_states()["driving"])
+    text = _joined(panel)
+    assert "1:41.882" in text and "1:41,882" not in text

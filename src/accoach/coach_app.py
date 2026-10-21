@@ -91,7 +91,7 @@ def _status_panel(s: TelemetrySnapshot, saved: int) -> Panel:
     table.add_column(justify="right", style="bold")
     table.add_column()
     if not s.connected:
-        conn = Text(t("state.waiting_game"), style="bold yellow")
+        conn = Text(t("overlay.waiting"), style="bold yellow")
     elif s.status == ACStatus.LIVE:
         conn = Text("● LIVE", style="bold green")
     else:

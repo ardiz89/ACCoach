@@ -14,6 +14,7 @@ contiene le regole e raccoglie i testi di ogni superficie; qui:
 `PENDING` vuol dire «non ancora riscritta»: le sue violazioni si contano
 (`python tests/tono.py`) ma non fanno fallire nulla.
 """
+import re
 import sys
 import textwrap
 from pathlib import Path
@@ -230,6 +231,10 @@ def test_every_surface_collects_texts_in_both_languages():
             langs = {lg for e in entries.values() for lg in e}
             assert langs >= {"it", "en"}
             continue
+        if name == "hub":
+            # La pagina e il riquadro di prova sono solo in italiano (lo dicono
+            # `test.js` e `testpanel.py`): il conto delle due lingue è sul catalogo.
+            entries = {k: v for k, v in entries.items() if k.startswith("i18n.py:")}
         both = [e for e in entries.values() if "it" in e and "en" in e]
         assert len(both) >= 0.9 * len(entries), name
 
@@ -239,6 +244,10 @@ def test_each_surface_has_its_own_sources():
     for src in ("debrief.py", "trajectory.py", "training.py", "howto.py", "api.py"):
         assert src in s["report_backend"], src
     assert "_UI[overlay.waiting]" in s["hub"]
+    # I testi fissi della pagina di prova e del riquadro di prova (spec, «Cosa
+    # entra»): stanno nella superficie dell'hub.
+    for src in ("web/test.js:TXT.", "web/test.html:", "testpanel.py:_TXT["):
+        assert src in s["hub"], src
     for src in ("cue.py", "focus.py", "_CUE_EN"):
         assert src in s["coach"], src
     # Le frasi di pitcall.py stanno già nella tabella inglese e portano la sua chiave.
@@ -419,3 +428,46 @@ def test_keys_asked_inside_a_template_are_found(tmp_path, monkeypatch):
         'el.innerHTML = `<b>${t("a.one")}</b> ${tf("a.two", { n: 1 })}`;', encoding="utf-8")
     monkeypatch.setattr(tono, "WEB", tmp_path)
     assert {"a.one", "a.two"} <= tono._literals("x.js")
+
+
+# --- la pagina di prova e il riquadro di prova ------------------------------
+
+def test_the_test_page_texts_are_read_from_their_table(tmp_path, monkeypatch):
+    (tmp_path / "test.js").write_text(
+        'const x = "fuori";\n'
+        '  const TXT = {\n'
+        '    a: "Uno.",\n'
+        '    b: "Due righe " +\n'
+        '       "unite.",\n'
+        '  };\n', encoding="utf-8")
+    monkeypatch.setattr(tono, "WEB", tmp_path)
+    assert tono.test_page_js_texts() == {"web/test.js:TXT.a": {"it": "Uno."},
+                                         "web/test.js:TXT.b": {"it": "Due righe unite."}}
+
+
+def test_the_visible_text_of_a_page_is_read_but_not_its_scripts(tmp_path):
+    page = tmp_path / "p.html"
+    page.write_text('<title>Titolo</title><p>Un testo <b>qui</b></p>'
+                    '<input placeholder="Scrivi"><span title="Aiuto"></span>'
+                    '<script>var a = "codice";</script><i>   </i>', encoding="utf-8")
+    got = [v["it"] for v in tono.html_texts(page).values()]
+    assert got == ["Titolo", "Un testo", "qui", "Scrivi", "Aiuto"]
+
+
+def test_every_test_page_text_is_used_and_every_use_is_defined():
+    """Un testo nella tabella che nessuno usa è un testo che non si vede; un
+    `TXT.x` senza voce scrive «undefined» sulla pagina."""
+    src = (tono.WEB / "test.js").read_text(encoding="utf-8")
+    keys = {k.rsplit(".", 1)[1] for k in tono.test_page_js_texts()}
+    used = set(re.findall(r"(?<![\w.])TXT\.(\w+)", src))
+    assert keys and used == keys, (used ^ keys)
+
+
+def test_the_hub_buttons_carry_no_emoji_or_decorative_arrow():
+    """La regola vale per le etichette dei bottoni in particolare: lì stavano
+    tutte le emoji dell'hub («📊  Analisi & Report (browser)»)."""
+    from accoach import i18n
+    for key, entry in i18n._UI.items():
+        if key.split(".")[0] in ("btn", "nav", "home") or key.startswith("live."):
+            for lang, text in entry.items():
+                assert not re.search(r"[▶►‹›→]|\(", text), (key, lang, text)

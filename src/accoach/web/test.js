@@ -14,6 +14,54 @@
   // La pagina di test e' solo in italiano: virgola decimale.
   function fmtIt(x, n) { return x.toFixed(n).replace(".", ","); }
 
+  // I testi fissi della pagina, tutti qui: `tests/tono.py` li legge da questo
+  // oggetto e ci applica le regole del tono (superficie «hub»). La pagina e'
+  // solo in italiano, quindi una lingua sola.
+  const TXT = {
+    next: "Avanti",
+    end: "Fine",
+    noTests: "Nessun test in questa categoria.",
+    how: "Come farlo",
+    expected: "Cosa deve fare HONE",
+    pass: "Funziona",
+    partial: "In parte",
+    fail: "Non funziona",
+    skip: "Salta",
+    notes: "Cosa hai visto",
+    notesPh: "Scrivi qui le tue note…",
+    cues: "Avvisi registrati dal vivo ({n})",
+    clear: "Azzera",
+    noCues: "Ancora nessun avviso. Guida la manovra del test.",
+    noLap: "Ancora nessun giro agganciato.",
+    lap: "Ho agganciato il giro in {time}.",
+    invalid: "non valido",
+    saving: "Salvo…",
+    saved: "Salvato",
+    saveError: "Il PC ha risposto con un errore.",
+    saveFailed: "Il salvataggio non è riuscito.",
+    noCue: "Nessun avviso",
+    tour1t: "Dimmi cosa stai provando",
+    tour1x: "Scegli la categoria dell'auto e il simulatore. Auto e pista li " +
+            "riconosco da solo appena vai in pista.",
+    tour2t: "Una prova alla volta",
+    tour2x: "Leggi come farla e cosa dovrei fare io. Ripetila due o tre volte " +
+            "prima di darmi un giudizio.",
+    tour3t: "Dimmi se ho azzeccato l'avviso",
+    tour3x: "Tocca il verdetto dopo la prova. Mi serve per capire se un avviso " +
+            "parte quando non deve, e non è un voto sulla tua guida.",
+    tour4t: "Quello che dico lo segno io",
+    tour4x: "Ogni avviso che do mentre guidi finisce qui con la telemetria del " +
+            "momento. Tu pensa a guidare.",
+    tour5t: "Salvo da solo, sul tuo PC",
+    tour5x: "Non devi premere niente. Puoi chiudere la pagina e riprendere " +
+            "quando vuoi.",
+    tourSkip: "Salta",
+    tourBack: "Indietro",
+    tourNext: "Avanti",
+    tourDone: "Ho capito",
+    tourStep: "Passo",
+  };
+
   const S = {
     plan: null,
     runId: null,
@@ -64,27 +112,27 @@
     $("p-text").textContent = `${done} / ${list.length}`;
     $("p-bar").style.width = list.length ? `${(done / list.length) * 100}%` : "0";
     $("prev").disabled = S.index <= 0;
-    $("next").textContent = S.index >= list.length - 1 ? "Fine" : "Avanti ›";
+    $("next").textContent = S.index >= list.length - 1 ? TXT.end : TXT.next;
 
-    if (!t) { $("card").innerHTML = "<p>Nessun test in questa categoria.</p>"; return; }
+    if (!t) { $("card").innerHTML = `<p>${TXT.noTests}</p>`; return; }
     const r = result(t.id);
     $("card").innerHTML = `
       <div class="num">Test ${t.n} · ${S.category}</div>
       <h2>${esc(stripNum(t.what))}</h2>
-      ${t.how ? blk("Come farlo", t.how) : ""}
-      ${t.expected ? blk("Cosa deve fare HONE", t.expected, "expected") : ""}
+      ${t.how ? blk(TXT.how, t.how) : ""}
+      ${t.expected ? blk(TXT.expected, t.expected, "expected") : ""}
       <div class="verdicts">
-        ${vbtn("pass", "✓ OK", r)}${vbtn("partial", "⚠ Parziale", r)}
-        ${vbtn("fail", "✗ NO", r)}${vbtn("skip", "— Salta", r)}
+        ${vbtn("pass", TXT.pass, r)}${vbtn("partial", TXT.partial, r)}
+        ${vbtn("fail", TXT.fail, r)}${vbtn("skip", TXT.skip, r)}
       </div>
       <div class="block">
-        <div class="lab">Cosa hai visto / note</div>
-        <textarea id="notes" placeholder="note libere…">${esc(r.notes)}</textarea>
+        <div class="lab">${TXT.notes}</div>
+        <textarea id="notes" placeholder="${TXT.notesPh}">${esc(r.notes)}</textarea>
       </div>
       ${lapChip(r)}
       <div class="captured">
-        <div class="lab"><span>Cue catturati dal vivo (${r.captured_cues.length})</span>
-          <button type="button" id="clearCues">azzera</button></div>
+        <div class="lab"><span>${TXT.cues.replace("{n}", r.captured_cues.length)}</span>
+          <button type="button" id="clearCues">${TXT.clear}</button></div>
         ${cueList(r)}
       </div>`;
 
@@ -99,16 +147,17 @@
     `<button class="verdict ${r.outcome === v ? "sel" : ""}" data-v="${v}">${label}</button>`;
   function cueList(r) {
     if (!r.captured_cues.length)
-      return `<div class="cue-empty">Nessun cue ancora — guida la manovra del test.</div>`;
+      return `<div class="cue-empty">${TXT.noCues}</div>`;
     return `<ul class="cue-list">${r.captured_cues.map((c) => `
-      <li><span class="cat">${esc(c.category)}</span> — ${esc(c.message)}
+      <li><span class="cat">${esc(c.category)}</span> · ${esc(c.message)}
       <div class="tel">${fmtTel(c.tel)}</div></li>`).join("")}</ul>`;
   }
   function lapChip(r) {
-    if (!r.lap) return `<div class="lapchip">Nessun giro agganciato ancora.</div>`;
-    return `<div class="lapchip">Giro agganciato: <b>${esc(r.lap.lap_time || "?")}</b>
-      · ${esc(r.lap.car || "")} @ ${esc(r.lap.track || "")}
-      ${r.lap.valid ? "" : "· <i>non valido</i>"}</div>`;
+    if (!r.lap) return `<div class="lapchip">${TXT.noLap}</div>`;
+    const time = `<b>${esc(r.lap.lap_time || "?")}</b>`;
+    return `<div class="lapchip">${TXT.lap.replace("{time}", time)}
+      ${esc(r.lap.car || "")} @ ${esc(r.lap.track || "")}
+      ${r.lap.valid ? "" : `· <i>${TXT.invalid}</i>`}</div>`;
   }
   function fmtTel(tel) {
     if (!tel) return "";
@@ -140,14 +189,14 @@
   }
 
   function scheduleSave() {
-    setSaveState("salvo…", false);
+    setSaveState(TXT.saving, false);
     clearTimeout(saveTimer);
     saveTimer = setTimeout(saveRun, 800);
   }
   // "Fine": skip the debounce and persist immediately, with a clear confirmation.
   async function saveNow() {
     clearTimeout(saveTimer);
-    setSaveState("salvo…", false);
+    setSaveState(TXT.saving, false);
     await saveRun();
   }
   async function saveRun() {
@@ -172,9 +221,9 @@
         body: JSON.stringify(payload),
       });
       const data = await res.json();
-      setSaveState(data.ok ? "salvato ✓" : "errore salvataggio", data.ok);
+      setSaveState(data.ok ? TXT.saved : TXT.saveError, data.ok);
     } catch (e) {
-      setSaveState("salvataggio non riuscito", false);
+      setSaveState(TXT.saveFailed, false);
     }
   }
   function setSaveState(txt, ok) {
@@ -212,7 +261,7 @@
     if (cue && cue.message) {
       chip.textContent = cue.message; chip.classList.add("hot");
     } else {
-      chip.textContent = "nessun avviso"; chip.classList.remove("hot");
+      chip.textContent = TXT.noCue; chip.classList.remove("hot");
     }
     captureCue(cue, st);
   }
@@ -264,26 +313,18 @@
   // a category has no tests.
   function tourSteps() {
     return [
-      { sel: ".setup", title: "Dimmi cosa stai provando",
-        text: "Scegli la categoria dell'auto e il simulatore. Auto e pista li riconosco da " +
-              "solo appena vai in pista." },
-      { sel: "#card", title: "Una prova alla volta",
-        text: "Leggi come farla e cosa dovrei fare io. Ripetila due o tre volte prima di " +
-              "darmi un giudizio." },
-      { sel: ".verdicts", title: "Dimmi se ho azzeccato l'avviso",
-        text: "Tocca il verdetto dopo la prova. Mi serve per capire se un avviso parte " +
-              "quando non deve — non è un voto sulla tua guida." },
-      { sel: ".captured", title: "Quello che dico lo segno io",
-        text: "Ogni avviso che do mentre guidi finisce qui con la telemetria del momento. " +
-              "Tu pensa a guidare." },
-      { sel: "#savestate", title: "Salvo da solo, sul tuo PC",
-        text: "Non devi premere niente: puoi chiudere la pagina e riprendere quando vuoi." },
+      { sel: ".setup", title: TXT.tour1t, text: TXT.tour1x },
+      { sel: "#card", title: TXT.tour2t, text: TXT.tour2x },
+      { sel: ".verdicts", title: TXT.tour3t, text: TXT.tour3x },
+      { sel: ".captured", title: TXT.tour4t, text: TXT.tour4x },
+      { sel: "#savestate", title: TXT.tour5t, text: TXT.tour5x },
     ];
   }
   // This page is Italian-only (it doesn't load i18n.js), so the tour buttons
   // have to be told their labels — tour.js defaults to English.
   const TOUR_LABELS = {
-    skip: "Salta", back: "Indietro", next: "Avanti", done: "Ho capito", step: "Passo",
+    skip: TXT.tourSkip, back: TXT.tourBack, next: TXT.tourNext, done: TXT.tourDone,
+    step: TXT.tourStep,
   };
   function wireTour() {
     if (!window.HoneTour) return;

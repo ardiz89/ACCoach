@@ -110,8 +110,9 @@ _LIVE_LABELS = ("live.before", "live.s2", "live.s2_to_devices", "live.skip",
 
 
 def _label(key: str, lang: str) -> str:
-    """Il testo del pannello fino al segnaposto (``Stai seguendo: {name}``)."""
-    return _flat(t(key, lang=lang).split("{")[0]).strip(": ")
+    """Il testo del pannello fino al segnaposto e alle virgolette che lo
+    aprono (``Stai seguendo il consiglio «{name}».``)."""
+    return _flat(t(key, lang=lang).split("{")[0]).strip(": «“")
 
 
 @pytest.mark.parametrize("key", _LIVE_LABELS)

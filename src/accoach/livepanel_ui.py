@@ -79,11 +79,6 @@ def _role(lbl: QLabel, role: str) -> QLabel:
     return lbl
 
 
-def _best(text: str) -> str:
-    """Il tempo come lo scrive il gioco («1:41.882»), con la virgola in italiano."""
-    return text.replace(".", ",") if current_language() == "it" else text
-
-
 def _utc_iso(ts: float) -> str:
     # Lo stesso formato di `save_lap` (`recorded_utc`), cosi' il confronto
     # fra stringhe nel catalogo e' un confronto fra istanti.
@@ -434,8 +429,7 @@ class LivePanel(QWidget):
         self.render_state(replace(self.state, phase="driving"))
 
     def _to_devices(self) -> None:
-        keys = [k for k, _glyph in self._hub._NAV]
-        self._hub._nav.setCurrentRow(keys.index("nav.devices"))
+        self._hub._nav.setCurrentRow(self._hub._NAV.index("nav.devices"))
 
     # --- il catalogo, in un thread ------------------------------------------
     def _catalog(self, st: PanelState) -> dict | None:
@@ -573,7 +567,7 @@ class LivePanel(QWidget):
         """Lo stato del tablet adesso, non quello del passo 2."""
         seen = self._tablet_seen or (st.tablet_done and not self._skipped)
         if st.tablet_now:
-            return _role(QLabel("✓ " + t("live.tablet_on")), "good")
+            return _role(QLabel(t("live.tablet_on")), "good")
         if seen:
             return _role(_hint(t("live.tablet_off")), "bad")
         if self._skipped:
@@ -692,7 +686,9 @@ class LivePanel(QWidget):
         laps = (t("live.no_lap_yet") if n <= 0 else
                 t("live.laps_one") if n == 1 else t("live.laps", n=n))
         if st.best:
-            laps += " · " + t("live.best", time=_best(st.best))
+            # Il tempo sul giro resta come lo scrive il gioco («1:41.882»),
+            # anche in italiano: è la regola dei tempi del 21/10.
+            laps += " · " + t("live.best", time=st.best)
         self._add(_hint(laps))
 
     def _draw_driving(self, st: PanelState, info) -> None:
@@ -712,7 +708,7 @@ class LivePanel(QWidget):
             except KeyError:
                 name = None
             if name:
-                self._add(_bold("▶ " + t("live.following", name=name)))
+                self._add(_bold(t("live.following", name=name)))
                 self._add(_hint(t("live.following_sub")))
         self._finish_block(st, "live.finish", "liveFinish", "live.finish_sub")
 
@@ -734,7 +730,7 @@ class LivePanel(QWidget):
                 v = info.get("valid", 0)
                 saved += ", " + (t("live.valid_one") if v == 1
                                  else t("live.valid", n=v))
-            self._add(_role(QLabel("✓ " + saved), "good"))
+            self._add(_role(QLabel(saved), "good"))
             where = [x for x in (st.track, st.car) if x]
             if cat_total and info.get("duration_s") is not None:
                 where.append(self._minutes(info["duration_s"]))

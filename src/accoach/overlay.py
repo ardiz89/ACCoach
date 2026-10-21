@@ -31,7 +31,8 @@ import signal
 import sys
 import time
 
-from .i18n import t
+from .i18n import current_language, t
+from .textfmt import fmt_num
 from .theme import DISPLAY, MONO, load_fonts
 
 try:
@@ -638,7 +639,7 @@ class Overlay(QWidget):
             p.setPen(_RED if losing else _GREEN)
             arrow = "▲" if losing else "▼"
             p.drawText(0, y + bar_h + 38, w, 16, Qt.AlignHCenter,
-                       f"now {arrow} {local:+.2f}")
+                       f"{t('overlay.now')} {arrow} {local:+.2f}")
 
     def _draw_pit_due(self, p: QPainter, w: int) -> bool:
         """L'avviso di rientro, nella banda della pastiglia. Torna True se ha
@@ -722,7 +723,9 @@ class Overlay(QWidget):
         name = (target.get("name") or "").upper()
         theme = (target.get("theme") or "").upper()
         base = target.get("baseline_ms", 0) or 0
-        gap = f"  −{base / 1000.0:.2f}s" if base else ""
+        # Virgola in italiano e spazio prima dell'unità, come nel resto dell'app.
+        gap = (f"  −{fmt_num(base / 1000.0, 2, current_language(), 's')}"
+               if base else "")
         # The word the voice will use, when it is using one. The pact that
         # agrees it is in the focus briefing, which reaches the terminal and the
         # web page but not here — and `python -m accoach live` is overlay plus

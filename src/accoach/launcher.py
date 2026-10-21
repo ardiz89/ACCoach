@@ -68,6 +68,7 @@ from .hubgate import (
 from .i18n import LANGUAGES, language_name, t
 from .netinfo import device_urls, port_open, qr_png
 from .paths import base_dir
+from .telemetry.snapshot import format_lap_time
 from .theme import load_fonts, qss, window_icon
 
 _SRC = Path(__file__).resolve().parents[1]   # .../src
@@ -522,7 +523,7 @@ class SettingsPanel(QWidget):
         cfg.overlay.pedals = self._pedals.isChecked()
         cfg.autorecord = self._autorecord.isChecked()
         save_config(cfg)
-        self._saved_note.setText("✓ " + t("btn.save"))
+        self._saved_note.setText(t("set.saved"))
 
     def show_watch_state(self, state: str) -> None:
         """One line under the checkbox: off / waiting / recording."""
@@ -539,7 +540,7 @@ class SettingsPanel(QWidget):
         self._save.setText(t("btn.save"))
         self._devtools.setText(t("sec.devtools"))
         if self._saved_note.text():
-            self._saved_note.setText("✓ " + t("btn.save"))
+            self._saved_note.setText(t("set.saved"))
 
 
 class DevicesPanel(QWidget):
@@ -591,7 +592,8 @@ class DevicesPanel(QWidget):
 
         srv_row = QHBoxLayout()
         srv_row.setSpacing(10)
-        srv_row.addWidget(hub.action_button("btn.server", ["server"], console=True))
+        srv_row.addWidget(hub.action_button("btn.server", ["server"], console=True,
+                                            tip="tip.server"))
         srv_row.addWidget(hub.action_button("btn.overlay", ["overlay"]))
         srv_row.addStretch(1)
         root.addLayout(srv_row)
@@ -690,15 +692,10 @@ class DevicesPanel(QWidget):
 class MainWindow(QWidget):
     """The hub shell: sidebar + stacked sections, and process ownership."""
 
-    # Sidebar order → stack pages.
-    _NAV = [
-        ("nav.home", "🏠"),
-        ("nav.live", "▶"),
-        ("nav.analysis", "📊"),
-        ("nav.setup", "🔧"),
-        ("nav.devices", "📱"),
-        ("nav.settings", "⚙"),
-    ]
+    # Sidebar order → stack pages. Solo il nome della sezione: le emoji davanti
+    # (🏠 ▶ 📊 …) le ha tolte il tono deciso col pilota il 21/10.
+    _NAV = ["nav.home", "nav.live", "nav.analysis", "nav.setup", "nav.devices",
+            "nav.settings"]
 
     def __init__(self) -> None:
         super().__init__()
@@ -774,8 +771,8 @@ class MainWindow(QWidget):
 
         self._nav = QListWidget()
         self._nav.setObjectName("sidebar")
-        for key, glyph in self._NAV:
-            self._nav.addItem(f"{glyph}{t(key)}")
+        for key in self._NAV:
+            self._nav.addItem(t(key))
         self._nav.currentRowChanged.connect(self._on_nav)
         lay.addWidget(self._nav, 1)
 
@@ -813,7 +810,8 @@ class MainWindow(QWidget):
 
     def _build_analysis_page(self) -> QWidget:
         page, lay = _section("nav.analysis")
-        lay.addWidget(self.action_button("btn.analysis", ["web"], accent=True))
+        lay.addWidget(self.action_button("btn.analysis", ["web"], accent=True,
+                                         tip="tip.browser"))
         lay.addWidget(self.action_button("btn.debrief", ["debrief"], console=True))
         # Importing a benchmark lap existed only as a CLI command, so the whole
         # "PRO reference" level of the product was unreachable in practice: a
@@ -851,22 +849,30 @@ class MainWindow(QWidget):
         lap.source = "pro"        # its own level, not one of the driver's laps
         lap.recorded_utc = ""     # let save_lap stamp it
         save_lap(lap)
+        # Il tempo come lo scrive il gioco («1:47.427»), non in secondi.
         self._import_note.setText(t("import.done").format(
             car=lap.car_model, track=lap.track,
-            time=f"{lap.lap_time_ms / 1000:.3f}s"))
+            time=format_lap_time(lap.lap_time_ms)))
 
     def _build_setup_page(self) -> QWidget:
         page, lay = _section("nav.setup")
         lay.addWidget(self.action_button("btn.engineer", ["web", "--engineer"],
-                                         accent=True))
+                                         accent=True, tip="tip.browser"))
         lay.addStretch(1)
         return page
 
     # --- button factories ------------------------------------------------
     def action_button(self, label_key: str, args: list[str], *,
-                      console: bool = False, accent: bool = False) -> QPushButton:
-        """A button that spawns ``args`` and is gated while Coach Live runs."""
+                      console: bool = False, accent: bool = False,
+                      tip: str | None = None) -> QPushButton:
+        """A button that spawns ``args`` and is gated while Coach Live runs.
+
+        ``tip`` è la chiave del suggerimento di sempre: l'etichetta è un nome
+        corto, e ciò che una volta stava fra parentesi («(browser)») lo dice
+        il suggerimento con una frase."""
         btn = QPushButton(t(label_key))
+        if tip:
+            btn.setProperty("tipKey", tip)
         btn.setMinimumHeight(40)
         if accent:
             btn.setProperty("accent", True)
@@ -1028,7 +1034,8 @@ class MainWindow(QWidget):
             elif state == EXPLAIN:
                 btn.setToolTip(t("swap.tooltip"))
             else:
-                btn.setToolTip("")
+                tip = btn.property("tipKey")
+                btn.setToolTip(t(tip) if tip else "")
             # "Stop Coach Live" is meaningless before there's one to stop, and a
             # disabled Stop sitting next to Start reads as "something is already
             # running" — the opposite of the truth. Hide it instead: the panel
@@ -1065,8 +1072,8 @@ class MainWindow(QWidget):
         coach voice picks it up on the next Coach Live start)."""
         set_language(self._lang.currentData())
         # Sidebar items.
-        for i, (key, glyph) in enumerate(self._NAV):
-            self._nav.item(i).setText(f"{glyph}{t(key)}")
+        for i, key in enumerate(self._NAV):
+            self._nav.item(i).setText(t(key))
         # Registered action/special buttons.
         for _key, label_key, btn in self._actions:
             btn.setText(t(label_key))

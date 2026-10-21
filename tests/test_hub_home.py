@@ -65,3 +65,36 @@ def test_mainwindow_builds_headless(monkeypatch):
         win._refresh_buttons()                    # gating must not raise
     finally:
         win.close()
+
+
+def test_the_home_numbers_follow_the_language(monkeypatch, tmp_path):
+    """Virgola in italiano e spazio prima dell'unità, come nel report: la Home
+    scriveva «+0.42s» anche in italiano."""
+    from PySide6.QtWidgets import QApplication
+    from accoach import config
+    from types import SimpleNamespace
+
+    monkeypatch.setattr(config, "config_path", lambda: tmp_path / "config.toml")
+    config.load_config(reload=True)
+    monkeypatch.setattr(hub_home, "load_home_data",
+                        lambda *a, **k: hub_home.HomeData(status="empty"))
+    app = QApplication.instance() or QApplication([])  # noqa: F841
+    panel = hub_home.HomePanel(on_analysis=lambda: None, on_setup=lambda: None)
+    if panel._worker is not None:
+        panel._worker.wait(3000)
+    # La Home legge soltanto questi campi della perdita.
+    loss = SimpleNamespace(label="Curva 4", lost_ms=420,
+                           message="Freni troppo presto", cause="", detail="",
+                           fix="")
+    data = hub_home.HomeData(status="ok", total_gap_ms=420, laps_count=3,
+                             best_ms=101_882, consistency={"spread_ms": 180},
+                             top=loss)
+    for lang, gap, spread, lost in (("it", "+0,42 s", "0,18 s", "−0,4 s"),
+                                    ("en", "+0.42 s", "0.18 s", "−0.4 s")):
+        config.set_language(lang)
+        panel._apply(data)
+        assert panel._stat_widgets["gap"][0].text() == gap
+        assert panel._stat_widgets["consistency"][0].text() == spread
+        assert panel._stat_widgets["best"][0].text() == "1:41.882"
+        assert lost in panel._headline.text()
+    config.set_language("en")

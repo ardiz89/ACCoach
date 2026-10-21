@@ -51,7 +51,7 @@ serve, premi *Salta, guido senza*. L'ultimo passo, *Avvia il gioco ed esci dai b
 quando arriva la telemetria.
 
 **Stai guidando.** Il pannello mostra se il tablet è collegato, pista e auto, i
-giri completati con il migliore e, sotto *Stai seguendo*, il consiglio su cui stai
+giri completati con il migliore e, sotto *Stai seguendo il consiglio*, quello su cui stai
 lavorando: il coach te lo ricorda nelle curve di quel consiglio. Quando hai
 finito premi **Ho finito, mostrami com'è andata**: ferma il coach e apre il report
 sulla Pagella. *Ferma senza aprire il report* ferma il coach e basta. Coach Live
@@ -353,7 +353,7 @@ Vale la pena saperlo alla prima sessione su un'auto nuova.
 
 Finita la sessione, rivedi tutto con calma:
 
-- Dall'hub, sezione **Analisi**: **📊 Analisi & Report (browser)**, oppure
+- Dall'hub, sezione **Analisi**: **Analisi e report**, oppure
   ```
   python -m accoach web
   ```

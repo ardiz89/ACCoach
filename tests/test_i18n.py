@@ -47,8 +47,8 @@ def test_cue_text_unknown_passes_through():
 
 
 def test_t_translates_ui_chrome():
-    assert i18n.t("overlay.waiting", "en") == "waiting for the game…"
-    assert i18n.t("overlay.waiting", "it") == "in attesa del gioco…"
+    assert i18n.t("overlay.waiting", "en") == "Waiting for the game…"
+    assert i18n.t("overlay.waiting", "it") == "Aspetto il gioco…"
     assert i18n.t("lbl.best", "it") == "Migliore"
 
 

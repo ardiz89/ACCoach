@@ -19,7 +19,7 @@ vero. Un processo che non legge telemetria non può ripeterlo, comunque venga
 lanciato. Spegnerlo a fine test è chiuderlo: nessuna opzione da ricordare, quindi
 nessuna opzione che resti accesa per sbaglio.
 
-Limite dichiarato: le etichette (`PASSO`, `FATTO`, `in attesa`) sono in italiano
+Limite dichiarato: le etichette (`PASSO`, `FATTO`, `In attesa`) sono in italiano
 fisso, fuori dall'i18n. Il contenuto dei passi lo scrive Claude in italiano
 durante la sessione, e tradurre solo la cornice darebbe un riquadro mezzo
 tradotto.
@@ -50,6 +50,15 @@ except ImportError:  # pragma: no cover - dipendenza opzionale
 # punto che deve restare lo stesso.
 _MAX_BODY_LINES = 2
 
+# I testi fissi della cornice, tutti qui: `tests/tono.py` li legge da questa
+# tabella (superficie «hub»). Maiuscoli come il titolo che scrive Claude, perché
+# si leggono con la coda dell'occhio.
+_TXT = {
+    "where": "PASSO {n} / {of}",
+    "waiting": "In attesa del prossimo passo.",
+    "done": "FATTO · {title}",
+}
+
 
 @dataclass(frozen=True)
 class Panel:
@@ -77,7 +86,7 @@ def render_step(step: dict | None, now: float) -> Panel:
 
     title = str(step.get("title") or "")
     n, of = step.get("step"), step.get("of")
-    where = f"PASSO {n} / {of}" if n and of else ""
+    where = _TXT["where"].format(n=n, of=of) if n and of else ""
 
     # La scadenza è un istante assoluto, non una durata: così il conto scorre
     # anche quando nessuno sta riscrivendo il file, e una finestra chiusa e
@@ -342,7 +351,7 @@ class TestPanel(QWidget):
             self._font(p, 15, bold=True)
             p.setPen(QColor(brand.MUTED))
             self._text(p, 16, _TITLE_Y, _BASE_W - 32, 30, Qt.AlignLeft,
-                       "in attesa del prossimo passo")
+                       _TXT["waiting"])
             return
 
         if pan.where:
@@ -354,7 +363,7 @@ class TestPanel(QWidget):
             self._font(p, 20, bold=True)
             p.setPen(QColor(brand.GREEN))
             self._text(p, 16, _TITLE_Y, _BASE_W - 32, 32, Qt.AlignLeft,
-                       f"✓ FATTO — {pan.title}")
+                       _TXT["done"].format(title=pan.title))
             if pan.done_msg:
                 self._font(p, 14)
                 p.setPen(QColor(brand.MUTED))
