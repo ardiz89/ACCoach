@@ -39,6 +39,7 @@
   --red: #FF4D5E;       /* Delta Red   — slower          */
   --cyan: #22D3CE;      /* Hone Cyan   — brand accent    */
   --amber: #FFB020;     /* Amber       — focus / advisory*/
+  --adv: #C792EA;       /* Violet      — the advice you follow; apart from the you/reference trace colours */
 
   /* Font stacks — the @font-face rules above supply the brand faces from /static;
      the system names stay as the fallback if a file is ever missing. */
@@ -1447,3 +1448,15 @@ body.view-howto #lapbar { display: none; }
   font-size: 10px; color: #1A1205; white-space: nowrap; overflow: hidden;
   font-family: var(--font-ui); cursor: help;
 }
+
+/* La riga del consiglio in corso, in cima alle viste (spec: rimandi). Nessun
+   `display` qui: `.hidden` e' display:none a una classe sola, e una regola
+   scritta dopo la riaccenderebbe vuota sopra ogni vista. Spenta non pesa. */
+.adv-line { padding: 8px 12px; margin: 0 0 10px; border-left: 3px solid var(--adv);
+  background: var(--panel); border-radius: 4px; font-size: 13px; line-height: 1.5; }
+.adv-mark { display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+  background: var(--adv); margin-right: 8px; vertical-align: middle; }
+.adv-name, .adv-link { background: none; border: 0; padding: 0; font: inherit;
+  color: var(--adv); cursor: pointer; text-decoration: underline; }
+.adv-name { font-weight: 700; text-decoration: none; }
+.adv-text { margin: 0 6px; }

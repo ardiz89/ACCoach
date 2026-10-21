@@ -7,6 +7,8 @@ const t = (k) => (window.HoneI18n ? window.HoneI18n.t(k) : k);
 const LANG = () => (window.HoneI18n ? window.HoneI18n.lang : "en");
 
 let CURRENT = null;   // current combo {car, track}
+let ADVICE = null;    // il consiglio in corso {defect, name, corners:[{name, apex_pos}]}, o null
+let HOWTO_APEX = null; // apice (frazione di giro) a cui scorrere nel «Come si fa»
 let DATA = null;      // last /api/analysis payload
 let DIST = null;      // {pos[], m[], total} — the reviewed lap in metres (see buildDistance)
 let COMBOS = [];      // last /api/combos payload (kept for re-labelling on lang switch)
@@ -1531,7 +1533,11 @@ function exportData(fmt) {
 
 async function loadCombo(combo, lapPath, baselinePath) {
   const seen = EPOCH;
+  // Un'altra auto o un'altra pista ha un altro consiglio: quello di prima non
+  // resta in piedi nell'attesa. Un altro giro della stessa combo lo tiene.
+  if (!CURRENT || CURRENT.car !== combo.car || CURRENT.track !== combo.track) ADVICE = null;
   CURRENT = combo;
+  loadAdvice();
   const q = new URLSearchParams({ car: combo.car, track: combo.track });
   if (lapPath) q.set("lap", lapPath);
   if (baselinePath) q.set("baseline", baselinePath);
@@ -2632,13 +2638,148 @@ async function adviceAction(defect, action) {
   if (stale(seen)) return;
   PAG_NOTE = ok ? "" : t("pag.adv.err");
   loadPagella(CURRENT, SESSION_I);
+  // Seguire, lasciare, mettere da parte, riprendere: il consiglio in corso
+  // cambia, e con lui la riga e il segno sulle altre schede.
+  loadAdvice();
+}
+
+// --- Il consiglio in corso: dalle schede al «Come si fa» ---------------------
+// Il pilota segue un consiglio alla volta (Pagella). Le altre schede lo sanno:
+// in cima una riga che dice dove guardare, e il segno sulle sue curve. Il
+// server dice quali curve (`apex_pos`, frazione di giro); la scheda dice dove
+// cade ognuna delle sue. Si incontrano SOLO sulla posizione: mai per indice
+// (le liste non sono le stesse) e mai per nome (il pilota li cambia).
+
+// Su quali schede compare la riga, per difetto (spec, «Dove compare la riga»).
+const ADVICE_VIEWS = {
+  compare:  ["brake_early", "brake_late", "over_brake", "throttle_late", "min_speed", "lift"],
+  line:     ["brake_early", "brake_late", "throttle_late", "min_speed"],
+  sectors:  ["brake_early", "brake_late", "over_brake", "throttle_late", "min_speed"],
+  dynamics: ["coasting", "over_brake", "throttle_late"],
+  progress: ["brake_early", "brake_late", "over_brake", "throttle_late", "min_speed",
+             "lift", "coasting"],
+};
+
+// Si rilegge quando cambia la combo e dopo ogni azione sul piano. Una risposta
+// che arriva dopo un cambio non scrive: parla di un'altra pista. Un errore
+// spegne il consiglio e basta: la pagina resta com'era senza.
+async function loadAdvice() {
+  if (!CURRENT) return;
+  const seen = EPOCH;
+  const q = new URLSearchParams({ car: CURRENT.car, track: CURRENT.track });
+  let next = null;
+  try { next = (await getJSON("/api/advice/active?" + q.toString())).advice || null; }
+  catch (e) { next = null; }
+  if (stale(seen)) return;
+  const changed = JSON.stringify(next) !== JSON.stringify(ADVICE);
+  ADVICE = next;
+  // Ridisegna solo le schede che la portano, e solo se e' cambiato qualcosa:
+  // senza consiglio la pagina non rifa' niente in piu'.
+  if (changed && ADVICE_VIEWS[VIEW]) redrawCurrentView();
+}
+
+// L'`apex_pos` della curva del consiglio che contiene `c` (`entry`/`exit` in
+// frazione di giro), o null. Un apice a 0 e' «non trovato» lato server, non il
+// traguardo: non ritrova nessuna curva.
+function adviceApexIn(c) {
+  if (!ADVICE || !c) return null;
+  for (const a of ADVICE.corners || []) {
+    if (a.apex_pos > 0 && c.entry <= a.apex_pos && a.apex_pos <= c.exit) return a.apex_pos;
+  }
+  return null;
+}
+
+function adviceRelevant(view) {
+  return !!ADVICE && (ADVICE_VIEWS[view] || []).includes(ADVICE.defect);
+}
+
+// Il segno: lo stesso cerchio nella riga, accanto ai nomi, e sui canvas.
+function advMarkHTML() {
+  return `<span class="adv-mark" title="${escAttr(t("adv.mark.title"))}"></span>`;
+}
+function drawAdvMark(ctx, x, y) {
+  const col = getComputedStyle(document.body).getPropertyValue("--adv").trim() || "#C792EA";
+  ctx.save();
+  ctx.fillStyle = col;
+  ctx.beginPath();
+  // Il contesto dei canvas e' gia' scalato da `setup()` per il pixel ratio:
+  // 4 px qui sono 4 px di schermo, come le altre etichette.
+  ctx.arc(x, y, 4, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+// Cosa scrive la riga, o null se non c'e' niente da dire. Difetto con curve:
+// servono curve ritrovate sulla scheda, senza non c'e' riga. Alzate, veleggio e
+// il giro intero non hanno curve: la riga non ha nomi.
+function adviceLineModel(view, corners, opts) {
+  if (!adviceRelevant(view)) return null;
+  const adv = ADVICE.corners || [];
+  const names = [];
+  if (adv.length) {
+    for (const c of corners || []) {
+      const apex = adviceApexIn(c);
+      if (apex === null) continue;
+      const hit = adv.find((a) => a.apex_pos === apex);
+      names.push({ corner: c, apex, label: c.name || (hit && hit.name) || "" });
+    }
+    if (!names.length) return null;
+  }
+  const key = (opts && opts.key) ||
+    (view === "progress" ? (adv.length ? "adv.progress.corners" : "adv.progress.lap")
+                         : `adv.${view}.${ADVICE.defect}`);
+  if (t(key) === key) return null;
+  return { names, key, vals: (opts && opts.vals) || {},
+           apex: names.length ? names[0].apex : null };
+}
+
+// `corners`: le curve della scheda ({name, entry, exit}). `goto(corner)` al clic
+// su un nome; `goto(null)` dal «Vai al punto» quando la riga non ha nomi.
+// `opts = {key, vals}` cambia la frase (Settori, Andamento).
+function renderAdviceLine(view, corners, goto, opts) {
+  const el = $("adv-line-" + view);
+  if (!el) return;
+  const m = adviceLineModel(view, corners, opts);
+  if (!m) { el.innerHTML = ""; el.classList.add("hidden"); return; }
+  const nameBtn = (n, i) => goto
+    ? `<button type="button" class="adv-name" data-adv-i="${i}">${escAttr(n.label)}</button>`
+    : `<span class="adv-name">${escAttr(n.label)}</span>`;
+  const names = m.names.map(nameBtn).join(" · ");
+  const toBox = !m.names.length && goto
+    ? ` <button type="button" class="adv-link" data-adv-goto>${t("adv.goto")}</button>` : "";
+  el.innerHTML = advMarkHTML() + (names ? names + " " : "") +
+    `<span class="adv-text">${escAttr(tf(m.key, m.vals))}</span>${toBox} ` +
+    `<button type="button" class="adv-link" data-adv-how>${t("pag.howto")}</button>`;
+  el.classList.remove("hidden");
+  const btns = el.querySelectorAll("[data-adv-i]");
+  m.names.forEach((n, i) => { if (btns[i] && goto) btns[i].onclick = () => goto(n.corner); });
+  const g = el.querySelector("[data-adv-goto]");
+  if (g && goto) g.onclick = () => goto(null);
+  el.querySelector("[data-adv-how]").onclick = () => openHowto(ADVICE.defect, m.apex);
+}
+
+// Quale figura del «Come si fa» contiene l'apice, o -1.
+function howtoFigIndex(figs, apex) {
+  if (typeof apex !== "number") return -1;
+  return (figs || []).findIndex((f) => f.entry_pos <= apex && apex <= f.exit_pos);
+}
+
+// Il «Come si fa» aperto da una riga scorre alla figura della curva; senza
+// figura resta in cima. Una volta sola: un resize non deve riportarci li'.
+function scrollHowtoToApex(h) {
+  const apex = HOWTO_APEX;
+  HOWTO_APEX = null;
+  const i = howtoFigIndex(h.figures, apex);
+  const el = i < 0 ? null : document.querySelectorAll("#howto-body .howto-fig")[i];
+  if (el) el.scrollIntoView({ block: "start" });
 }
 
 // «Come si fa →»: la vista di un consiglio, fuori dalla barra delle schede.
 // Butta la pagina di prima: è di un altro difetto, e `redrawCurrentView` la
 // ridisegnerebbe invece di leggere quella nuova.
-function openHowto(defect) {
+function openHowto(defect, apex) {
   HOWTO_DEFECT = defect;
+  HOWTO_APEX = typeof apex === "number" ? apex : null;
   HOWTO = null;
   showView("howto");
   window.scrollTo(0, 0);
@@ -2682,6 +2823,7 @@ async function loadHowto(combo, index) {
   if (stale(seen) || SESSION_I !== want || req !== HOWTO_REQ) return;
   HOWTO = { h, laps: {} };
   renderHowto(h);
+  scrollHowtoToApex(h);
   // Un /api/analysis per coppia di giri (il migliore è lo stesso per tutte le
   // curve, il solito può cambiare), tutti insieme. Un giro che non si legge
   // diventa `null`, e la sua figura una frase.
@@ -2728,7 +2870,9 @@ function renderHowto(h) {
       const bp = f.brake_points_m;
       const pts = bp && trace === "brake"
         ? `<span class="pag-small">${escAttr(tf("howto.brakepts", { t: bp.typical, b: bp.best }))}</span>` : "";
-      return `<figure class="howto-fig"><figcaption><b>${escAttr(name)}</b> ${pts}</figcaption>` +
+      const span = typeof f.entry_pos === "number" && typeof f.exit_pos === "number"
+        ? ` data-entry="${escAttr(f.entry_pos)}" data-exit="${escAttr(f.exit_pos)}"` : "";
+      return `<figure class="howto-fig"${span}><figcaption><b>${escAttr(name)}</b> ${pts}</figcaption>` +
         `<div class="howto-fig-grid">` +
         `<div class="howto-cell"><canvas class="howto-c-map hidden"></canvas>` +
         `<div class="rail-nomap howto-nomap">${t("load.lap")}</div></div>` +

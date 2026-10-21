@@ -97,7 +97,7 @@ def test_the_howto_view_exists_outside_the_bar():
     """Ci si arriva da «Come si fa →», non da una scheda (lo riempie il Task 8)."""
     assert 'id="view-howto"' in _HTML
     assert 'data-view="howto"' not in _HTML
-    body = _body_of("function openHowto(defect)")
+    body = _body_of("function openHowto(defect, apex)")
     assert 'showView("howto")' in body
     assert "HOWTO_DEFECT = defect" in body
 
@@ -298,7 +298,7 @@ def test_the_howto_view_reads_its_page_from_the_api():
     """`openHowto` resta il contratto del bottone (Task 7): ricorda il difetto,
     butta la vista di prima e apre la scheda. Il caricamento passa da
     `redrawCurrentView`, come per ogni scheda."""
-    open_ = _body_of("function openHowto(defect)")
+    open_ = _body_of("function openHowto(defect, apex)")
     assert "HOWTO = null;" in open_
     assert open_.index("HOWTO = null;") < open_.index('showView("howto")')
     redraw = _body_of("function redrawCurrentView()")
@@ -461,7 +461,10 @@ def test_every_howto_string_exists_in_both_languages():
 # --- Andamento: i difetti sessione per sessione (Task 11) -------------------
 
 def test_the_defect_history_sits_on_top_of_the_progress_view():
+    # Dopo la riga del consiglio (spenta, senza spazio): la storia resta il
+    # primo contenuto della scheda.
     assert re.search(r'<div id="view-progress" class="hidden">\s*'
+                     r'(?:<div id="adv-line-progress"[^>]*></div>\s*)?'
                      r'<section id="defect-history"', _HTML)
     # E la sua parte riempita dal JS ha un posto suo.
     sec = _HTML.split('<section id="defect-history"', 1)[1].split("</section>", 1)[0]

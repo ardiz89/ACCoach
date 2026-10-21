@@ -215,6 +215,7 @@
   </div>
 
   <div id="view-compare" class="hidden">
+    <div id="adv-line-compare" class="adv-line hidden"></div>
     <div class="hero">
       <section id="summary" class="summary"></section>
     </div>
@@ -314,6 +315,7 @@
        at a time and puts the geometry in metres (see trajectory.py — the numbers
        are computed server-side next to their wording). -->
   <div id="view-line" class="hidden">
+    <div id="adv-line-line" class="adv-line hidden"></div>
     <div id="line-readout" class="readout" data-i18n="line.readout">Hover the corner to read speed and how far you were from the reference line…</div>
     <section id="line-summary" class="summary"></section>
     <nav id="line-chips" class="chips"></nav>
@@ -355,6 +357,7 @@
   </div>
 
   <div id="view-sectors" class="hidden">
+    <div id="adv-line-sectors" class="adv-line hidden"></div>
     <div class="sec-head"><span><span data-i18n="sec.col.sector">Sector</span> <small id="sec-kind"></small></span><span data-i18n-html="sec.col.time">Time <small>(ref)</small></span><span data-i18n-html="sec.col.delta">Δ vs reference <small>(bars left = faster, right = slower)</small></span></div>
     <div id="sectors" class="sectors"></div>
     <section id="ideal" class="ideal"></section>
@@ -364,6 +367,7 @@
   </div>
 
   <div id="view-progress" class="hidden">
+    <div id="adv-line-progress" class="adv-line hidden"></div>
     <section id="defect-history" class="debrief dh">
       <!-- In cima: «i miei difetti calano?» è la domanda per cui il pilota
            apre questa scheda. -->
@@ -416,6 +420,7 @@
   </div>
 
   <div id="view-dynamics" class="hidden">
+    <div id="adv-line-dynamics" class="adv-line hidden"></div>
     <div id="dyn-readout" class="readout" data-i18n="dyn.readout">Hover the traces for point-by-point values…</div>
     <section id="dyn-coasting" class="summary"></section>
     <main id="dyn-charts">

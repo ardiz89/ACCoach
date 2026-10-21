@@ -2054,7 +2054,8 @@ def _hidden_writers() -> list[str]:
 _HIDDEN_TARGET_IDS = {
     "view-pagella", "view-howto", "view-flow", "view-session", "view-stint",
     "view-compare", "view-line", "view-sectors", "view-progress",
-    "view-dynamics",
+    "view-dynamics", "adv-line-compare", "adv-line-line", "adv-line-sectors",
+    "adv-line-dynamics", "adv-line-progress",
     "tyres", "tyre-temp-wrap", "tyre-press-wrap",
     "map-readout", "map-legend", "leg-lost", "leg-road", "map-missing",
     "rail-nomap", "line-missing", "dyn-missing",
@@ -2112,8 +2113,8 @@ def test_the_census_of_hidden_writers_is_still_the_one_that_was_checked():
     solo non basta neanche: uno tolto e uno aggiunto lo lasciano fermo.
     """
     writers = _hidden_writers()
-    assert len(writers) == 28, (
-        f"{len(writers)} siti che scrivono `hidden` invece di 28: risolvi i "
+    assert len(writers) == 29, (
+        f"{len(writers)} siti che scrivono `hidden` invece di 29: risolvi i "
         "nuovi in _HIDDEN_TARGET_IDS e aggiorna il numero qui")
     assert set(writers) == {
         "p", "el", "sec", '$("tyre-temp-wrap")', '$("tyre-press-wrap")',
@@ -2168,7 +2169,7 @@ def test_no_rule_outranks_hidden_on_anything_the_javascript_hides():
     # trovare i bersagli, i cicli qui sotto girano a vuoto e il test diventa una
     # decorazione. I quattro nominati sono le quattro FORME di bersaglio: un id,
     # una classe, un tag sotto un id, il genitore di una tela.
-    assert len(targets) == 31, f"{len(targets)} bersagli risolti invece di 31: {sorted(found)}"
+    assert len(targets) == 36, f"{len(targets)} bersagli risolti invece di 36: {sorted(found)}"
     assert {"map-readout", "line-grid", "main", "chart/flow-chart"} <= found, sorted(found)
 
     # Anti-vacuità sul matcher e sulla misura: uno che dica sempre di no, o una
@@ -2268,6 +2269,12 @@ _EMPTY_STATE_SURVIVORS = {
     ("view-line", "line-summary"):
         "renderLine la svuota — o ci scrive il «nessuna curva rilevata», che è "
         "il messaggio dell'altro nulla, non l'arredamento di questo",
+    ("view-line", "adv-line-line"):
+        "la riga e' del consiglio che segui, non del giro: un giro senza "
+        "coordinate non la invalida, e se non c'e' consiglio e' gia' spenta",
+    ("view-dynamics", "adv-line-dynamics"):
+        "la riga e' del consiglio che segui, non del giro: un giro senza "
+        "dinamica non la invalida, e se non c'e' consiglio e' gia' spenta",
     ("view-line", "line-chips"): "renderLine la svuota",
     ("view-line", "line-table"): "renderLine la svuota",
     ("view-dynamics", "dyn-coasting"): "drawDynamics la svuota",
@@ -2513,12 +2520,15 @@ def test_every_loader_is_accounted_for():
     # Pagella, e la rilancia `reloadViewData` quando è aperta. `loadDefectHistory`
     # è il decimo: la storia dei difetti in cima ad Andamento, che riparte
     # accanto a `loadProgress`.
+    # `loadAdvice` e' l'undicesimo: il consiglio in corso, per car+track ma
+    # senza argomenti (legge CURRENT), quindi lo rilancia `loadCombo` — che sale
+    # a ogni cambio di giro, di riferimento e di lingua — e non `reloadViewData`.
     assert set(_LOADERS) == {"loadBraking", "loadCombo", "loadLine", "loadProgress",
                              "loadSectors", "loadSession", "loadStint", "loadPagella",
-                             "loadHowto", "loadDefectHistory"}
+                             "loadHowto", "loadDefectHistory", "loadAdvice"}
     assert set(_PER_COMBO) == {"loadProgress", "loadSession", "loadStint", "loadPagella",
                                "loadHowto", "loadDefectHistory"}
-    assert set(_PER_LAP) == {"loadBraking", "loadLine", "loadSectors"}
+    assert set(_PER_LAP) == {"loadBraking", "loadLine", "loadSectors", "loadAdvice"}
 
 
 def test_every_async_function_that_waits_is_accounted_for():
