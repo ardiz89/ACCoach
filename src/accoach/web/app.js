@@ -1114,6 +1114,21 @@ function drawRoad(ctx, road, X, Y, hair) {
 function drawMap(a, cx) {
   const hit = drawMapTo($("c-map"), $("map-missing"), a, cx);
   if (hit) MAP_HIT = hit;
+  // Il segno del consiglio in corso sulle sue curve, al punto del loro apice
+  // sul giro in esame. Il contesto e' quello di `setup()`, gia' scalato.
+  if (hit && a.has_map) {
+    const ctx = $("c-map").getContext("2d");
+    const pos = hit.rv.pos;
+    for (const c of a.corners || []) {
+      const apex = adviceApexIn(c);
+      if (apex === null || !pos || !pos.length) continue;
+      let k = 0;
+      for (let i = 1; i < pos.length; i++) {
+        if (Math.abs(pos[i] - apex) < Math.abs(pos[k] - apex)) k = i;
+      }
+      drawAdvMark(ctx, hit.X(hit.rv.x[k]), hit.Y(hit.rv.z[k]));
+    }
+  }
   // The readout and the legend describe the drawing, and they are NOT inside
   // the canvas — they are sibling elements in the column (see index.html) —
   // so drawMapTo() turning the canvas off does nothing for them. Without this
@@ -1784,6 +1799,13 @@ function setupDelta(ref, rev) {
 // Min-speed-per-corner table: how fast you carry through each apex vs the
 // reference. Δ>0 = you're faster (green), Δ<0 = slower (red). Defensive: the
 // field may be absent (older backend) or empty.
+// La curva di `a.corners` con questo indice: le righe del debrief e della
+// cascata hanno solo l'apice, la curva con il suo tratto sta qui (stesso
+// riferimento dell'analisi, quindi stesso indice).
+function cornerOfIndex(a, index) {
+  return ((a && a.corners) || []).find((c) => c.index === index) || null;
+}
+
 function drawCornerSpeeds(a) {
   const el = $("vmin");
   if (!el) return;
@@ -1796,7 +1818,8 @@ function drawCornerSpeeds(a) {
     const cls = d == null || d === 0 ? "" : (d > 0 ? "faster" : "slower");
     const dTxt = d == null ? "–" : (d > 0 ? "+" : "") + Math.round(d);
     const name = c.name || ("T" + ((c.index ?? 0) + 1));
-    body += `<tr><td class="vc">${name}</td>` +
+    const mark = adviceApexIn(cornerOfIndex(a, c.index)) !== null ? advMarkHTML() : "";
+    body += `<tr><td class="vc">${mark}${name}</td>` +
       `<td class="vn">${num(c.vmin_live)}</td>` +
       `<td class="vn ref">${num(c.vmin_ref)}</td>` +
       `<td class="vn ${cls}">${dTxt}</td></tr>`;
@@ -1840,8 +1863,9 @@ function drawWaterfall(a) {
     const from = l.inherited_from >= 0
       ? `<span class="chain-chip" title="${escAttr(l.inherited)}">↩ T${l.inherited_from + 1}</span>`
       : "";
+    const mark = adviceApexIn(cornerOfIndex(a, l.index)) !== null ? advMarkHTML() : "";
     return `<div class="cons-row">` +
-      `<span class="corner">${l.label}${from}</span>` +
+      `<span class="corner">${mark}${l.label}${from}</span>` +
       `<span class="cons-track"><span class="cons-fill" style="width:${w}%;background:${lossColor(sev)}"></span></span>` +
       `<span class="cons-nums"><b>−${l.lost_s.toFixed(3)}s</b> · ${l.message}</span>` +
       `</div>`;
@@ -1885,7 +1909,7 @@ function phaseBar(loss) {
 // coach uses them: "you lift on the Kemmel straight" comes before turn 7.
 function noteBlocks(a) {
   return (a.notes || []).map((n) =>
-    `<div class="loss note">` +
+    `<div class="loss note" data-kind="${escAttr(n.kind || "")}">` +
     `<div class="loss-head"><span class="corner">${n.message}</span>` +
     (n.lost_s > 0 ? `<span class="lost">−${n.lost_s.toFixed(3)}s</span>` : "") +
     `</div>` +
@@ -1910,8 +1934,9 @@ function drawDebrief(a) {
   let html = `<h3>${t("debrief.title")}</h3>${legend}${head}${notes}`;
   for (const l of a.losses) {
     const major = l.lost_s >= 0.2 ? "major" : "";
+    const mark = adviceApexIn(cornerOfIndex(a, l.index)) !== null ? advMarkHTML() : "";
     html += `<div class="loss ${major}">` +
-      `<div class="loss-head"><span class="corner">${l.label}</span>` +
+      `<div class="loss-head"><span class="corner">${mark}${l.label}</span>` +
       `<span class="lost">−${l.lost_s.toFixed(3)}s</span></div>` +
       `<div class="cause">${l.message}</div>` +
       // The link to the corner before, when there is one. Above the numbers
@@ -3306,6 +3331,14 @@ function cornerBands(ctx, w, h, corners) {
     const label = degradeLabel(ctx, c.name || "T" + (c.index + 1), "T" + (c.index + 1), band);
     if (label) ctx.fillText(label, x0 + (band - ctx.measureText(label).width) / 2, 11);
   }
+  // Il segno del consiglio in corso, sul suo apice e in basso: in alto sta il
+  // nome della curva. Niente consiglio, nessun segno.
+  for (const c of corners) {
+    const apex = adviceApexIn(c);
+    if (apex === null) continue;
+    const x = projX(apex, w);
+    if (x >= 0 && x <= w) drawAdvMark(ctx, x, h - 6);
+  }
 }
 
 // Horizontal reference lines with their value, drawn INSIDE the plot against the
@@ -3597,11 +3630,35 @@ function axisLabel(ctx, w, h, top, bottom) {
 
 function redraw(cx) {
   if (!DATA) return;
+  // La riga del consiglio: dal percorso di disegno della scheda, cosi' un
+  // cambio lingua o un nuovo consiglio la riscrivono insieme ai grafici.
+  renderAdviceLine("compare", DATA.corners || [], gotoAdviceCompare);
   drawDelta(DATA, cx);
   drawSpeed(DATA, cx);
   drawInputs(DATA, cx);
   drawSteer(DATA, cx);
   updateReadout(DATA, cx);
+}
+
+// Dalla riga alla scheda. Una curva: la finestra su quella curva, i grafici in
+// vista e, se il difetto e' di frenata, la riga della scheda frenate accesa.
+// Senza curva (alzate): la prima nota del debrief che dice di un'alzata.
+function gotoAdviceCompare(corner) {
+  if (!corner) {
+    const note = document.querySelector('#debrief .note[data-kind="lift"]');
+    if (note) note.scrollIntoView({ block: "center" });
+    return;
+  }
+  setRange(cornerWindow(corner));
+  redrawCurrentView();
+  const apex = adviceApexIn(corner);
+  if (ADVICE && ["brake_early", "brake_late", "over_brake"].includes(ADVICE.defect)) {
+    for (const tr of document.querySelectorAll("#brakesheet tr[data-adv]")) {
+      tr.classList.toggle("adv-hit", Number(tr.dataset.adv) === apex);
+    }
+  }
+  const c = $("c-delta");
+  if (c) c.scrollIntoView({ block: "start" });
 }
 
 function drawDelta(a, cx) {
@@ -4137,8 +4194,11 @@ function renderBrakeSheet(b) {
     const spread = r.spread_kmh
       ? `±${r.spread_kmh}` + (r.spread_m ? ` <span class="muted">≈ ${r.spread_m} m</span>` : "")
       : `<span class="muted">${t("brk.repeatable")}</span>`;
-    body += `<tr>` +
-      `<td class="vc">${r.name}</td>` +
+    // Le righe hanno il tratto della loro curva (`entry`/`exit`, sul giro di
+    // riferimento della scheda): il consiglio le ritrova per posizione.
+    const adv = adviceApexIn(r);
+    body += `<tr${adv !== null ? ` data-adv="${adv}"` : ""}>` +
+      `<td class="vc">${adv !== null ? advMarkHTML() : ""}${r.name}</td>` +
       `<td class="vn big">${r.speed_kmh}<span class="muted"> km/h</span></td>` +
       `<td class="vn">${r.gear}</td>` +
       // Editable, and this is roadmap item 2 arriving from the only place it

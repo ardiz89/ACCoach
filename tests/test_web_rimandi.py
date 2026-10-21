@@ -392,3 +392,40 @@ def test_progress_keeps_the_line_with_or_without_matched_corners(tmp_path):
         assert "Curva" not in g["html"]
         assert "the advice you're following, session by session" in g["html"]
         assert g["gone"] == [None]
+
+
+# --- Task 3: il Confronto e la scheda frenate --------------------------------
+
+@pytest.mark.parametrize("head", [
+    "function drawCornerSpeeds(", "function drawWaterfall(",
+    "function drawDebrief(", "function renderBrakeSheet("])
+def test_the_compare_cards_carry_the_mark_on_the_advice_corners(head):
+    body = _body_of(head)
+    assert "adviceApexIn(" in body, head
+    assert "advMarkHTML(" in body, head
+
+
+def test_the_chart_bands_and_the_map_mark_the_advice_corners_on_the_canvas():
+    for head in ("function cornerBands(", "function drawMap("):
+        body = _body_of(head)
+        assert "adviceApexIn(" in body, head
+        assert "drawAdvMark(" in body, head
+
+
+def test_the_compare_redraw_writes_its_line_from_the_tab_s_own_render_path():
+    body = _body_of("function redraw(")
+    assert 'renderAdviceLine("compare"' in body
+
+
+def test_the_brake_sheet_rows_are_matched_on_their_own_span_not_on_the_index():
+    body = _body_of("function renderBrakeSheet(")
+    assert "adviceApexIn(r)" in body          # r ha entry/exit del suo riferimento
+    assert "data-adv" in body                  # la riga si ritrova per il goto
+
+
+def test_goto_for_lift_scrolls_to_the_first_lift_note():
+    body = _body_of("function gotoAdviceCompare(")
+    assert 'data-kind="lift"' in body
+    assert "setRange(cornerWindow(" in body
+    notes = _body_of("function noteBlocks(")
+    assert "data-kind" in notes

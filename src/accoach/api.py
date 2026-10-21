@@ -1416,8 +1416,13 @@ def create_api(
         except Exception:  # noqa: BLE001 - a degenerate lap shouldn't 500 the UI
             raise HTTPException(422, "lap could not be analysed")
 
+        span = {c.index: c for c in corners}
         rows = [{
             "index": r.index, "name": r.name, "pos": r.onset_pos,
+            # Il tratto della curva sul giro di riferimento: il consiglio in
+            # corso ritrova la sua curva per posizione, mai per indice.
+            "entry": span[r.index].entry_pos if r.index in span else None,
+            "exit": span[r.index].exit_pos if r.index in span else None,
             "speed_kmh": r.speed_kmh, "spread_kmh": r.speed_spread_kmh,
             "spread_m": r.speed_spread_m,
             "gear": r.gear, "distance_m": r.distance_m,

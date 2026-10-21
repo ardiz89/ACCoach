@@ -1460,3 +1460,5 @@ body.view-howto #lapbar { display: none; }
   color: var(--adv); cursor: pointer; text-decoration: underline; }
 .adv-name { font-weight: 700; text-decoration: none; }
 .adv-text { margin: 0 6px; }
+/* La riga della scheda frenate che il consiglio in corso ha indicato. */
+.vmin-table tr.adv-hit td { background: rgba(199,146,234,0.16); }

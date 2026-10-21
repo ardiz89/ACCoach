@@ -105,3 +105,13 @@ def test_a_combo_with_no_valid_lap_is_a_404_not_an_empty_sheet(tmp_path):
     c = TestClient(create_api(tmp_path))
     assert c.get("/api/braking",
                  params={"car": CAR, "track": "spa"}).status_code == 404
+
+
+def test_each_row_carries_the_span_of_its_corner_for_the_advice_marks(tmp_path):
+    """Il consiglio in corso ritrova la sua curva SOLO per posizione: la riga ha
+    bisogno di `entry`/`exit` del suo riferimento."""
+    _save(tmp_path, "2026-06-20")
+    j = _sheet(TestClient(create_api(tmp_path)))
+    assert j["rows"]
+    for r in j["rows"]:
+        assert 0 <= r["entry"] < r["exit"] <= 1
