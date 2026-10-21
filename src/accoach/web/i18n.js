@@ -196,6 +196,7 @@
                             it: `Nello storico dei difetti la riga segnata è il tuo consiglio. Più sotto, le schede di queste curve dicono come va sessione per sessione.` },
     "adv.progress.lap": { en: `In the fault history, the marked row is the advice you're following, session by session.`,
                         it: `Nello storico dei difetti la riga segnata è il consiglio che segui, sessione per sessione.` },
+    "adv.and": { en: `and`, it: `e` },
     "adv.goto": { en: `Show me`,
                 it: `Vai al punto` },
     "adv.mark.title": { en: `Corner in the advice you're following`,

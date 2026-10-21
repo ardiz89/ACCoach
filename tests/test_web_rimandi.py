@@ -227,6 +227,17 @@ eval(grab("function cornerOfIndex("));
 eval(grab("function adviceLiftWithoutNote("));
 let ADV_ROW = null;
 eval(grab("function brakeRowOpen("));
+eval(grab("function adviceCornersInSector("));
+eval(grab("function adviceSectorsModel("));
+eval(grab("function sectorMarkHTML("));
+eval(grab("function lineChipHTML("));
+eval(grab("function lineNameHTML("));
+eval(grab("function cornerWindow("));
+eval(grab("function gotoAdviceLine("));
+let LINE = null, LINE_I = 0;
+const CALLS = [];
+function setRange(r) { CALLS.push(["range", r]); }
+function redrawCurrentView() { CALLS.push(["redraw"]); }
 const OPENED = [];
 function openHowto(d, a) { OPENED.push([d, a]); }
 const job = JSON.parse(fs.readFileSync(0, "utf8"));
@@ -245,6 +256,22 @@ for (const step of job) {
   }
   else if (step.call === "analysismark") {
     out.push(step.indices.map((i) => adviceApexIn(cornerOfIndex(step.a, i)) !== null));
+  }
+  else if (step.call === "secmodel") {
+    out.push(adviceSectorsModel(step.sectors));
+  }
+  else if (step.call === "secmarks") {
+    out.push(step.sectors.map((sec, i) =>
+      sectorMarkHTML(sec, i === step.sectors.length - 1) !== ""));
+  }
+  else if (step.call === "linemarks") {
+    out.push({ chips: step.corners.map((c, i) => lineChipHTML(c, i, false).includes("adv-mark")),
+               names: step.corners.map((c) => lineNameHTML(c).includes("adv-mark")) });
+  }
+  else if (step.call === "gotoline") {
+    LINE = { corners: step.corners }; LINE_I = 0; CALLS.length = 0;
+    gotoAdviceLine(step.corners[step.pick]);
+    out.push({ i: LINE_I, calls: CALLS.slice() });
   }
   else if (step.call === "relines") {
     // lo stesso elemento, riscritto piu' volte: quante scritture vere
@@ -287,6 +314,7 @@ def _run(tmp_path, job):
     script.write_text(_HARNESS, encoding="utf-8")
     cat = {key: en for key, (en, _it) in TEXTS.items()}
     cat["pag.howto"] = "How to do it →"
+    cat["adv.and"] = "and"
     env = dict(os.environ, CAT=json.dumps(cat))
     run = subprocess.run([_NODE, str(script), str(WEB / "app.js")],
                          input=json.dumps(job), capture_output=True, text=True,
@@ -523,3 +551,106 @@ def test_the_analysis_card_is_found_by_index_and_marked_by_its_own_span(tmp_path
         {"advice": _ADVICE, "call": "analysismark", "a": a, "indices": [0, 1, 9]},
     ])
     assert got == [[True, False, False]]
+
+
+# --- Task 4: Traiettoria e Settori -------------------------------------------
+
+_SECS = [{"start": 0.0, "end": 0.30}, {"start": 0.30, "end": 0.65},
+         {"start": 0.65, "end": 1.0}]
+
+
+def _adv(*apexes, defect="brake_early"):
+    return {"defect": defect, "name": "x",
+            "corners": [{"name": f"C{i}", "apex_pos": a} for i, a in enumerate(apexes)]}
+
+
+@needs_node
+def test_the_sectors_line_picks_one_same_or_many_and_the_list(tmp_path):
+    got = _run(tmp_path, [
+        {"advice": _adv(0.42), "call": "secmodel", "sectors": _SECS},
+        {"advice": _adv(0.40, 0.50), "call": "secmodel", "sectors": _SECS},
+        {"advice": _adv(0.10, 0.80), "call": "secmodel", "sectors": _SECS},
+        {"advice": _adv(0.10, 0.42, 0.80), "call": "secmodel", "sectors": _SECS},
+    ])
+    assert (got[0]["key"], got[0]["vals"]) == ("adv.sectors.one", {"n": 2})
+    assert (got[1]["key"], got[1]["vals"]) == ("adv.sectors.same", {"n": 2})
+    assert (got[2]["key"], got[2]["vals"]) == ("adv.sectors.many", {"list": "1 and 3"})
+    assert (got[3]["key"], got[3]["vals"]) == ("adv.sectors.many", {"list": "1, 2 and 3"})
+    # i nomi sono quelli del consiglio, con l'apice come unico tratto
+    assert got[3]["corners"] == [
+        {"name": "C0", "entry": 0.10, "exit": 0.10, "sector": 0},
+        {"name": "C1", "entry": 0.42, "exit": 0.42, "sector": 1},
+        {"name": "C2", "entry": 0.80, "exit": 0.80, "sector": 2}]
+
+
+@needs_node
+def test_the_sectors_line_is_off_when_no_advice_corner_falls_in_a_sector(tmp_path):
+    got = _run(tmp_path, [
+        {"advice": None, "call": "secmodel", "sectors": _SECS},
+        {"advice": _adv(0), "call": "secmodel", "sectors": _SECS},          # non trovato
+        {"advice": _adv(), "call": "secmodel", "sectors": _SECS},           # senza curve
+        {"advice": _adv(0.42), "call": "secmodel", "sectors": []},          # senza settori
+        {"advice": _adv(0.42), "call": "secmodel", "sectors": [{"start": 0.5, "end": 0.9}]},
+    ])
+    assert got == [None] * 5
+
+
+@needs_node
+def test_an_apex_on_a_sector_boundary_counts_for_one_sector_only(tmp_path):
+    got = _run(tmp_path, [
+        {"advice": _adv(0.30), "call": "secmodel", "sectors": _SECS},
+        {"advice": _adv(1.0), "call": "secmodel", "sectors": _SECS},
+    ])
+    assert (got[0]["key"], got[0]["vals"]) == ("adv.sectors.one", {"n": 2})
+    assert (got[1]["key"], got[1]["vals"]) == ("adv.sectors.one", {"n": 3})
+
+
+@needs_node
+def test_only_the_sectors_that_hold_an_apex_get_the_mark(tmp_path):
+    got = _run(tmp_path, [
+        {"advice": _adv(0.42), "call": "secmarks", "sectors": _SECS},
+        {"advice": None, "call": "secmarks", "sectors": _SECS},
+    ])
+    assert got == [[False, True, False], [False, False, False]]
+
+
+@needs_node
+def test_only_the_trajectory_corner_whose_span_holds_the_apex_gets_the_mark(tmp_path):
+    # indici della Traiettoria diversi da quelli dell'analisi: si guarda il tratto
+    corners = [{"index": 3, "name": "A", "entry": 0.10, "exit": 0.20},
+               {"index": 4, "name": "B", "entry": 0.40, "exit": 0.45},
+               {"index": 5, "name": "C", "entry": 0.70, "exit": 0.75}]
+    got = _run(tmp_path, [
+        {"advice": _ADVICE, "call": "linemarks", "corners": corners},
+        {"advice": None, "call": "linemarks", "corners": corners},
+    ])
+    assert got[0] == {"chips": [False, True, False], "names": [False, True, False]}
+    assert got[1] == {"chips": [False] * 3, "names": [False] * 3}
+
+
+@needs_node
+def test_goto_on_the_trajectory_opens_the_corner_by_its_position_in_its_own_list(tmp_path):
+    corners = [{"index": 3, "name": "A", "entry": 0.10, "exit": 0.20},
+               {"index": 4, "name": "B", "entry": 0.40, "exit": 0.45}]
+    got = _run(tmp_path, [{"call": "gotoline", "corners": corners, "pick": 1}])
+    assert got[0]["i"] == 1
+    assert got[0]["calls"][0][0] == "range" and got[0]["calls"][0][1]["corner"] == 4
+    assert got[0]["calls"][-1] == ["redraw"]
+
+
+def test_the_trajectory_writes_its_line_from_its_own_render_path():
+    assert 'renderAdviceLine("line"' in _body_of("function renderLine(")
+    assert "lineChipHTML(" in _body_of("function renderLine(")
+    assert "lineNameHTML(" in _body_of("function renderLineTable(")
+
+
+def test_the_sectors_write_their_line_from_their_own_render_path():
+    draw = _body_of("function drawSectors(")
+    assert 'renderAdviceLine("sectors"' in draw
+    assert "adviceSectorsModel(" in draw
+    # la riga porta le curve e la frase scelte dal modello, non una lista vuota
+    assert "am.corners" in draw and "am.key" in draw and "am.vals" in draw
+    assert "sectorMarkHTML(" in draw
+    assert "sectorMarkHTML(" in _body_of("function drawSectorTable(")
+    # anche quando i settori non arrivano la riga si spegne
+    assert 'renderAdviceLine("sectors"' in _body_of("async function loadSectors(")

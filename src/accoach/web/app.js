@@ -881,6 +881,8 @@ async function loadSectors() {
   try { s = await getJSON("/api/sectors?" + q.toString()); }
   catch (e) {
     if (stale(seen)) return;
+    // Senza settori la riga non ha niente da indicare: si spegne.
+    renderAdviceLine("sectors", [], null, { hide: () => true });
     $("sectors").innerHTML = `<div class="muted">${e.message}</div>`;
     $("ideal").innerHTML = ""; $("sec-table").innerHTML = "";
     return;
@@ -889,7 +891,61 @@ async function loadSectors() {
   drawSectors(s);
 }
 
+// Le curve del consiglio il cui apice cade nel settore `sec` (`start`/`end` in
+// frazione di giro). Semiaperto, cosi' un apice sul bordo conta per un settore
+// solo; l'ultimo chiude sul traguardo.
+function adviceCornersInSector(sec, last) {
+  if (!ADVICE) return [];
+  return (ADVICE.corners || []).filter((a) => a.apex_pos > 0 &&
+    sec.start <= a.apex_pos && (a.apex_pos < sec.end || (last && a.apex_pos <= sec.end)));
+}
+
+// Il segno sull'etichetta di un settore che contiene una curva del consiglio.
+function sectorMarkHTML(sec, last) {
+  return adviceCornersInSector(sec, last).length ? advMarkHTML() : "";
+}
+
+// La scheda non ha curve: la riga porta quelle del consiglio, ognuna col suo
+// apice come unico tratto (la regola resta la posizione) e il settore in cui
+// cade. Null se nessuna cade in un settore. «1 e 3», «1, 2 e 3».
+function adviceSectorsModel(sectors) {
+  if (!ADVICE) return null;
+  const secs = sectors || [];
+  const corners = [];
+  const hit = [];
+  secs.forEach((sec, i) => {
+    for (const a of adviceCornersInSector(sec, i === secs.length - 1)) {
+      corners.push({ name: a.name, entry: a.apex_pos, exit: a.apex_pos, sector: i });
+      if (!hit.includes(i)) hit.push(i);
+    }
+  });
+  if (!corners.length) return null;
+  const nums = hit.map((i) => i + 1);
+  if (nums.length > 1) {
+    const list = nums.slice(0, -1).join(", ") + " " + t("adv.and") + " " + nums[nums.length - 1];
+    return { key: "adv.sectors.many", vals: { list }, corners };
+  }
+  return { key: corners.length > 1 ? "adv.sectors.same" : "adv.sectors.one",
+           vals: { n: nums[0] }, corners };
+}
+
+// Dalla riga al settore: la sua riga scorre in vista e si accende.
+function gotoAdviceSector(corner) {
+  if (!corner) return;
+  const rows = document.querySelectorAll("#sectors .secrow");
+  rows.forEach((r) => r.classList.remove("adv-hit"));
+  const row = document.querySelector(`#sectors .secrow[data-sec="${corner.sector}"]`);
+  if (!row) return;
+  row.classList.add("adv-hit");
+  row.scrollIntoView({ block: "center" });
+}
+
 function drawSectors(s) {
+  // La riga dal percorso di disegno della scheda: un nuovo consiglio o un
+  // cambio lingua passano di qui (loadSectors) e la riscrivono.
+  const am = adviceSectorsModel(s.sectors);
+  renderAdviceLine("sectors", am ? am.corners : [], gotoAdviceSector,
+                   am ? { key: am.key, vals: am.vals } : { hide: () => true });
   // Lap / reference / gap moved to the lap bar, on every tab. What was left of
   // this view's own summary was one fact — whether these splits are the sim's
   // own sectors or our thirds — and a whole banner to say it in. It belongs on
@@ -902,15 +958,15 @@ function drawSectors(s) {
   for (const sec of s.sectors) mx = Math.max(mx, Math.abs(sec.delta_ms) / 1000);
   const half = 50; // % of the bar track for one side
   let rows = "";
-  for (const sec of s.sectors) {
+  for (const [si, sec] of s.sectors.entries()) {
     const d = sec.delta_ms / 1000;
     const slower = d > 0;
     const w = (Math.min(Math.abs(d) / mx, 1) * half).toFixed(1);
     const fill = slower
       ? `<div class="fill slow" style="left:50%;width:${w}%"></div>`
       : `<div class="fill fast" style="right:50%;width:${w}%"></div>`;
-    rows += `<div class="secrow">` +
-      `<div class="seclabel">S${sec.index + 1}${sec.is_best ? ' <span class="star">★</span>' : ""}</div>` +
+    rows += `<div class="secrow" data-sec="${si}">` +
+      `<div class="seclabel">${sectorMarkHTML(sec, si === s.sectors.length - 1)}S${sec.index + 1}${sec.is_best ? ' <span class="star">★</span>' : ""}</div>` +
       `<div class="sectimes"><b>${fmtSec(sec.review_ms)}</b> <span class="muted">${fmtSec(sec.baseline_ms)}</span></div>` +
       `<div class="secbar"><div class="mid"></div>${fill}` +
       `<span class="secd ${slower ? "slower" : "faster"}">${d >= 0 ? "+" : ""}${d.toFixed(3)}</span></div>` +
@@ -967,7 +1023,11 @@ function drawSectorTable(s) {
       `</tr>`;
   }
   let head = `<th>${t("sec.t.lap")}</th>`;
-  for (let i = 0; i < n; i++) head += `<th>S${i + 1}</th>`;
+  const secs = s.sectors || [];
+  for (let i = 0; i < n; i++) {
+    const mk = secs[i] ? sectorMarkHTML(secs[i], i === secs.length - 1) : "";
+    head += `<th>${mk}S${i + 1}</th>`;
+  }
   el.innerHTML =
     `<h3>${t("sec.t.title")}</h3>` +
     `<table class="vmin-table wide"><thead><tr>${head}</tr></thead>` +
@@ -4395,8 +4455,35 @@ function offWord(m, corner) {
   return `${v.toFixed(1)} m ${word}`;
 }
 
+// Il chip di una curva e il nome nella tabella: il segno se il suo tratto
+// contiene l'apice di una curva del consiglio. Senza consiglio, come prima.
+function lineChipHTML(c, i, on) {
+  const mark = adviceApexIn(c) !== null ? advMarkHTML() : "";
+  return `<button type="button" class="chip${on ? " on" : ""}" data-i="${i}">` +
+    `${mark}T${c.index + 1}</button>`;
+}
+
+function lineNameHTML(c) {
+  return (adviceApexIn(c) !== null ? advMarkHTML() : "") + c.name;
+}
+
+// Dalla riga alla curva. Come il clic su un chip: la finestra va sulla curva e
+// la Traiettoria la ritrova per numero (`RANGE.corner`); con la sola posizione
+// una finestra gia' accesa su un'altra curva la riporterebbe indietro.
+function gotoAdviceLine(corner) {
+  if (!corner || !LINE) return;
+  const pos = LINE.corners.indexOf(corner);
+  if (pos < 0) return;
+  LINE_I = pos;
+  setRange(cornerWindow(corner));
+  redrawCurrentView();
+}
+
 function renderLine(cx) {
   const L = LINE;
+  // La riga del consiglio dal percorso di disegno della scheda; senza curve
+  // (nessuna Traiettoria) la riga tace.
+  renderAdviceLine("line", L ? L.corners : [], gotoAdviceLine);
   const shell = [$("line-chips"), $("line-facts"), $("line-table")];
   const grid = document.querySelector(".line-grid");
   const charts = document.querySelector("#view-line main");
@@ -4455,9 +4542,7 @@ function renderLine(cx) {
   $("line-chips").innerHTML =
     `<button type="button" class="chip${RANGE ? "" : " on"}" data-whole="1">` +
     `${t("line.whole")}</button>` +
-    L.corners.map((c, i) =>
-      `<button type="button" class="chip${railSynced && i === LINE_I ? " on" : ""}" data-i="${i}">` +
-      `T${c.index + 1}</button>`).join("") +
+    L.corners.map((c, i) => lineChipHTML(c, i, railSynced && i === LINE_I)).join("") +
     `<span class="chip-group"><span class="chip-label">${t("line.mag")}</span>` +
     [1, 3].map((z) =>
       `<button type="button" class="chip mag${z === LINE_MAG ? " on" : ""}" ` +
@@ -4697,7 +4782,7 @@ function renderLineTable(L) {
       : `${c.apex_shift_m > 0 ? "+" : "−"}${Math.abs(c.apex_shift_m).toFixed(0)} m`;
     const dv = c.vmin - c.vmin_ref;
     body += `<tr class="${i === LINE_I ? "on" : ""}" data-i="${i}">` +
-      `<td class="vc">${c.name}` +
+      `<td class="vc">${lineNameHTML(c)}` +
       (c.off_here ? ` <span class="off-track" title="${escAttr(t("line.apexOff"))}">!</span>` : "") +
       `</td>` +
       `<td class="vn">${shift}</td>` +
