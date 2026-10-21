@@ -335,104 +335,88 @@ Finita la sessione, rivedi tutto con calma:
   ```
   Si apre da solo `http://127.0.0.1:8778`.
 
-### Com'è andata (la prima schermata)
+### La Pagella (la prima schermata)
 
-Apri il report e la prima cosa che vedi è **l'ultima uscita**: quanto lasciavi
-per strada in media, e dove.
+Apri il report e arrivi sulla **Pagella** dell'ultima uscita. È una pagina sola,
+da leggere in dieci secondi. In alto trovi pista, auto, data e quanti giri hai
+fatto (validi su totali). Con la tendina scegli un'uscita più vecchia.
 
-Le cinque righe — **entrata, apice, uscita, dopo, lancio** — non sono un voto:
-sono i **secondi** che quella parte del giro ti è costata, e sommano **al
-numero grande in alto**. Quel numero non è il distacco che leggi a cronometro:
-è misurato sull'orologio della telemetria, che sui giri veri si scosta anche
-di un decimo da quello del gioco. Se sommi le cinque righe a mano ti torna
-comunque lui: è fatto apposta, ed è la differenza fra un dato e una pagella.
+Sotto c'è il verdetto, una o due frasi: quanto lasci in media a ogni giro
+rispetto al tuo giro di riferimento, e dove si concentra. Lo confronta con la
+sessione prima sulla stessa auto e pista. Se non ce n'è una, lo scrive.
 
-Tre cose da sapere:
+Poi, in ordine:
 
-- **Il metro è il tuo miglior giro di quell'uscita**, non il tuo record. Quindi
-  misura la **costanza** di quel pomeriggio: numeri piccoli non vogliono dire
-  che eri veloce, vogliono dire che eri ripetibile — un pomeriggio lento ma
-  costante mostra numeri piccoli lo stesso. Ed è per questo che il tuo giro
-  migliore **non compare nell'elenco dei giri**: è lui il metro, e mostrarlo
-  sarebbe una riga di zeri.
-- **«Lancio» non è una fase di guida.** È il tratto dal traguardo alla prima
-  staccata, che non appartiene a nessuna curva. Ha una riga sua perché senza di
-  lui la somma non tornerebbe, e una somma che non torna è una somma che non
-  puoi controllare.
-- **Quando in quell'uscita non c'è ancora abbastanza per misurarlo, la
-  schermata lo dice** invece di mostrarti uno zero: un dato mancante dichiarato
-  tale è meglio di un numero che sembra vero e non lo è.
+- **I tuoi difetti principali.** Sono abitudini di guida che si ripetono in più
+  curve, come frenare troppo presto o riprendere il gas tardi. Per ognuno vedi
+  quanto ti costa a giro, in quante curve e in quanti giri compare, e una
+  freccia (giù, uguale, su) rispetto alla sessione prima, con le ultime sessioni
+  accanto. Il progresso lo leggi lì, in un difetto che cala da una sessione
+  all'altra. Un clic lo apre curva per curva.
+- **Dove sbagli di più.** Le curve che ti costano di più, col loro nome.
+- **Errori più frequenti.** Bloccaggi, pattinamenti, sottosterzo, sovrasterzo,
+  uscite di pista, contati sulla sessione. Compaiono solo quelli che ci sono
+  stati. Su ACC con l'ABS acceso il bloccaggio fisico non avviene, quindi non lo
+  contiamo.
+- **Il piano per la prossima uscita.** Al massimo tre consigli, in ordine.
 
-Cosa trovi nelle altre schede:
-- **Il giro spiegato** (la seconda scheda): il giro una cosa alla volta invece di
-  cinque grafici insieme. Ti dice cosa ti è costato di più, perché, e cosa farci,
-  col grafico ritagliato sul tratto di cui sta parlando. Al massimo tre passi: se
-  sei lontano dal passo apre col tema generale e si ferma lì, perché a quella
-  distanza l'analisi curva per curva è la lente sbagliata. Sul tuo giro di
-  riferimento ti dice che non c'è niente da correggere, invece di inventarsi una
-  lezione.
-- **Allenamento**: la scheda che risponde alla domanda che tutte le altre
-  lasciano aperta — *e adesso come mi alleno?*. Parte da dove sei e da dove puoi
-  arrivare: il tuo miglior giro contro il tuo **ideale teorico** (i tuoi settori
-  migliori ricuciti), che non è un tempo inventato — l'hai già guidato tutto,
-  solo mai nello stesso giro — e ti dice **in quale settore** sta il grosso di
-  quel divario. Sotto, il programma: al massimo tre passi, **uno alla volta**, e
-  solo il primo è aperto. Ogni passo porta un **esercizio vero**: quanti giri
-  farlo, cosa fare giro per giro, **cosa guardare** e **cosa ignorare di
-  proposito**, più il numero che dice quando è fatto. L'esercizio non è generico:
-  viene scelto da dove *dentro la curva* stai perdendo il tempo — se il tempo se
-  ne va in staccata ti fa spostare il punto di frenata un'auto per volta, se se
-  ne va all'apex ti fa prima misurare quanta velocità la macchina regge davvero,
-  se se ne va in uscita ti fa costruire l'uscita prima dell'apex — e dentro ci
-  sono i **tuoi** numeri: a che velocità stacchi lì, di quanto ti sposti da un
-  giro all'altro, che minima porti contro quella del riferimento. In fondo c'è
-  **la tua prossima sessione**, in giri: riscaldamento, i giri di esercizio, e
-  qualche giro libero per vedere se è entrato quando smetti di pensarci.
+Ogni numero viene dai tuoi giri. Se un dato non c'è, la riga lo dice o non
+compare: non te lo inventiamo. Tutte le sessioni si misurano contro lo stesso
+riferimento, quello di oggi. Così, se un difetto cala, sei cambiato tu e non il
+metro. Quando il riferimento cambia, lo storico si ricalcola.
 
-  Qui vive anche **Il tuo piano** (prima stava in Andamento): uno o due obiettivi
-  presi dai tuoi punti deboli *sistematici* (i casuali non ci finiscono: non puoi
-  allenare un episodio), con un bersaglio in secondi — «qui perdi 0.42s, portalo
-  sotto 0.21s». Finché non premi **Inizia questo piano** è solo una proposta; da
-  quel momento ha una data, **non cambia più** mentre ci lavori, e i giri che fai
-  da lì in poi vengono misurati su quel bersaglio: «2 dei 2 giri che servono». È
-  fatto quando il bersaglio regge in metà dei giri — la stessa frazione con cui
-  una curva era diventata un punto debole. Le curve che il coach live ha già
-  dichiarato **superate** non ci finiscono: la memoria di «questa curva ce l'hai»
-  è una sola. Con **Cambia obiettivo** butti il piano e te ne propone uno nuovo.
+La Pagella parla di guida. I problemi d'assetto restano all'Ingegnere.
 
-  **La scheda si apre solo quando ha di che parlare**: servono **6 giri validi**
-  su quella auto e quella pista, e almeno una debolezza che si ripeta. Sotto
-  quella soglia non trovi una pagina vuota, trovi quanti giri mancano — sei giri
-  ne lasciano cinque da confrontare col tuo riferimento, e una debolezza per
-  chiamarsi tale deve tornare in tre di quei cinque. Con meno, quello che sembra
-  un punto debole è quello che hanno fatto due giri, e un programma costruito lì
-  sopra cambierebbe ogni volta che guidi.
+**Il piano si segue un consiglio alla volta.** Ogni consiglio riguarda un
+difetto e le curve dove pesa di più. Ha tre bottoni:
 
-  Una cosa che la scheda dice e vale la pena leggere due volte: i due numeri di
-  tempo che vedi **non si sommano**. Il divario dall'ideale teorico e quello che
-  perdi in media ogni giro nelle curve sono la stessa strada misurata in due
-  modi, e sommarli conterebbe due volte lo stesso tempo.
+- **Lo seguo** lo mette in corso, con la data di oggi. Può essere in corso un
+  consiglio solo: finché ce n'è uno, gli altri mostrano la loro posizione nel
+  piano e **Come si fa →**, e basta.
+- **Non lo seguo** toglie dal piano un consiglio che non hai ancora iniziato. Il
+  difetto resta in Pagella e il consiglio non ti torna a ogni apertura. Lo
+  ritrovi sotto «Hai messo da parte», con **Riprendi**.
+- **Lascio stare** chiude quello in corso senza darlo per raggiunto.
 
-  **È la scheda scritta per chi non mastica telemetria**, quindi è anche l'unica
-  che si spiega le parole mentre le usa: «l'ideale teorico» viene prima
-  descritto («i tuoi tempi migliori, uno per settore, messi insieme») e poi
-  nominato, e i termini che restano — apex, settore, velocità minima — sono
-  spiegati dentro l'esercizio che li usa, perché a schermo ne è aperto uno solo.
-  Dove una parola comune bastava, c'è quella: *il punto in cui inizi a frenare*,
-  non *la staccata*.
+Il consiglio in corso si misura solo sui giri che fai dopo averlo preso. Vale
+come raggiunto quando, su almeno tre giri, stai sotto l'obiettivo in metà di
+quelli. L'obiettivo è riprendersi metà di quello che perdi oggi. Quando succede
+la Pagella te lo dice e ti propone il successivo.
 
-  In fondo alla scheda c'è **«Le parole che sentirai dire dagli altri»**: un
-  dizionario di poche voci, chiuso, che mostra i termini in fila. Lo scorri e lo
-  apri solo per la parola che non conosci. Non è mai l'unico posto in cui una
-  parola è spiegata — l'esercizio sopra la spiega comunque — e contiene solo i
-  termini dell'esercizio che hai aperto in quel momento.
+**In macchina, il coach segue il tuo consiglio.** Alla prossima uscita il focus
+(vedi «Un tema alla volta») lavora sulle curve del consiglio che stai seguendo e
+parla lì, così piano e coach ti dicono la stessa cosa. Se in quelle curve non
+perdi più abbastanza, il coach sceglie come sempre. Un verdetto del coach non
+chiude il consiglio. Lo chiude solo la misura del report.
 
-  Gli esercizi **non sono uguali per tutte le auto** dove la differenza conta:
-  su una stradale a basso carico HONE non ti fa allenare il trail braking (il
-  freno trascinato dentro la curva), perché su quelle auto la tecnica corretta è
-  rallentare dritti e poi girare — è la stessa decisione, presa sugli stessi
-  dati, per cui il coach in tempo reale su quelle auto sta zitto. Al suo posto
-  ricevi **«Frena dritto, poi gira»**.
+### Come si fa (la vista di un consiglio)
+
+**Come si fa →** su un consiglio apre la sua pagina. Si torna con **← Torna alla
+Pagella**. È costruita sui tuoi giri:
+
+- Il problema in una frase, coi tuoi numeri: dove stacchi, di quanti metri
+  prima del tuo giro migliore, quanto ci perdi.
+- Le figure, una per curva, dalla più costosa. Hanno la mappa della curva coi
+  punti del tuo giro solito e del tuo migliore, e il grafico del freno, del gas
+  o della velocità sovrapposti. Se a un giro mancano le coordinate o il canale,
+  al posto della figura trovi scritto cosa manca.
+- Come si fa: poche righe su cosa fare, cosa guardare in pista e cosa ignorare.
+  Dove l'esercizio cambia da auto a auto, cambia: su una stradale a basso
+  carico non ti fa allenare il trail braking, perché lì la tecnica giusta è
+  frenare dritti e poi girare (è la stessa scelta per cui il coach live, su
+  quelle auto, ne sta zitto).
+- L'esercizio: quanti giri, l'obiettivo in numeri, quando è fatto.
+- Come sta andando: il numero di quel difetto in ogni sessione da quando lo
+  segui. Si riempie dalla prima sessione dopo il tuo **Lo seguo**.
+
+### Le schede del report
+
+Le schede sono in tre gruppi, nell'ordine in cui di solito le leggi.
+
+**Com'è andata oggi**
+
+- **Pagella**: la pagina qui sopra. Si apre da sola dopo una sessione nuova;
+  altrimenti il report riapre l'ultima scheda che guardavi.
 - **Sessione**: com'è andata una sola uscita. I giri nell'ordine in cui li hai
   guidati (compresi quelli tagliati o non validi — sono giri che hai fatto, solo
   non possono fare la media), migliore, costanza, temperatura dell'asfalto, e
@@ -444,25 +428,16 @@ Cosa trovi nelle altre schede:
   registrati prima non compare — non è «zero litri», è «non lo sappiamo» — e non
   compare nemmeno sui giri in cui hai rifornito, perché fra i due estremi di quel
   giro c'è un rifornimento, non un consumo.
-- **Passo gara**: come regge il passo su **un pieno solo**. È un taglio diverso da
-  Sessione, e la differenza è misurata: una sessione la deduciamo dagli orari, e
-  dentro una sola uscita ci può stare un **rifornimento** — mediare il passo
-  attraverso quel confine media due carichi di benzina e chiama costanza il
-  risultato. Lo stint invece si taglia dove il serbatoio **risale**, confrontando
-  quanto ne resta a fine giro con quanto ce n'è all'inizio del successivo.
-  Per ogni stint: il **passo** (mediana dei giri che erano davvero un passo — un
-  testacoda resta nella lista ma non fa la media), la **dispersione**, il consumo
-  al giro e i giri che ti restano nel serbatoio, il grafico del passo giro per
-  giro e le **gomme lungo lo stint** (temperature e pressioni per ruota).
-  E poi la cosa che vale più dei numeri: **cosa quei numeri non dicono**. La
-  pendenza del passo è un valore **netto** — lo stint accelera perché il
-  serbatoio si svuota e rallenta perché le gomme mollano — e per separare le due
-  cose serve sapere quanto vale un litro in secondi, che oggi **non lo sappiamo**
-  (va misurato guidando uno stint apposta a passo costante). Quindi la pendenza
-  esce con la sua barra d'errore, e quando è più piccola di quella barra la
-  scheda scrive **«nessuna deriva misurabile»** invece di inventarti un degrado.
-  Non è nemmeno usura gomme: nessuno dei due simulatori pubblica un'usura che
-  registriamo, quello che vedi è la temperatura.
+- **Il giro spiegato**: il giro una cosa alla volta invece di
+  cinque grafici insieme. Ti dice cosa ti è costato di più, perché, e cosa farci,
+  col grafico ritagliato sul tratto di cui sta parlando. Al massimo tre passi: se
+  sei lontano dal passo apre col tema generale e si ferma lì, perché a quella
+  distanza l'analisi curva per curva è la lente sbagliata. Sul tuo giro di
+  riferimento ti dice che non c'è niente da correggere, invece di inventarsi una
+  lezione.
+
+**Perché, nel dettaglio**
+
 - **Confronto**: scegli auto+pista e due giri (uno da rivedere, uno di confronto).
   Quattro grafici allineati alla posizione in pista — **delta sul giro**,
   **velocità** (tu vs riferimento), **gas/freno** e **sterzo** — con le bande
@@ -569,19 +544,41 @@ Cosa trovi nelle altre schede:
   bilanciamento**: la traiettoria colorata in blu dove l'auto sottosterza e in
   rosso dove sovrasterza. È la scheda da aprire quando il debrief dice *perché* e
   tu vuoi vederlo con i tuoi occhi.
+
+**Nel tempo**
+
 - **Andamento**: l'andamento dei tempi nel tempo, la **costanza** (migliore/media/
   scarto), i **punti deboli** curva per curva (sistematici o casuali) e gli
   **errori ricorrenti** ("5× Porta più velocità in curva · Curve 1, 2"). È il
-  quaderno dei conti; il piano che ne esce sta in **Allenamento**, e le gomme
+  quaderno dei conti; il piano che ne esce sta nella **Pagella**, e le gomme
   stanno in **Passo gara** — qui la serie copriva tutto l'archivio pur
   chiamandosi «lungo lo stint».
+- **Passo gara**: come regge il passo su **un pieno solo**. È un taglio diverso da
+  Sessione, e la differenza è misurata: una sessione la deduciamo dagli orari, e
+  dentro una sola uscita ci può stare un **rifornimento** — mediare il passo
+  attraverso quel confine media due carichi di benzina e chiama costanza il
+  risultato. Lo stint invece si taglia dove il serbatoio **risale**, confrontando
+  quanto ne resta a fine giro con quanto ce n'è all'inizio del successivo.
+  Per ogni stint: il **passo** (mediana dei giri che erano davvero un passo — un
+  testacoda resta nella lista ma non fa la media), la **dispersione**, il consumo
+  al giro e i giri che ti restano nel serbatoio, il grafico del passo giro per
+  giro e le **gomme lungo lo stint** (temperature e pressioni per ruota).
+  E poi la cosa che vale più dei numeri: **cosa quei numeri non dicono**. La
+  pendenza del passo è un valore **netto** — lo stint accelera perché il
+  serbatoio si svuota e rallenta perché le gomme mollano — e per separare le due
+  cose serve sapere quanto vale un litro in secondi, che oggi **non lo sappiamo**
+  (va misurato guidando uno stint apposta a passo costante). Quindi la pendenza
+  esce con la sua barra d'errore, e quando è più piccola di quella barra la
+  scheda scrive **«nessuna deriva misurabile»** invece di inventarti un degrado.
+  Non è nemmeno usura gomme: nessuno dei due simulatori pubblica un'usura che
+  registriamo, quello che vedi è la temperatura.
 
 Nella tendina dei giri, accanto al tempo, trovi **i gradi dell'asfalto** (es.
 `2:03.732 · 37.8°`). Non è un dettaglio: fra pista fredda e pista calda i punti
 di frenata si spostano di 10-20 metri, quindi due giri con temperature molto
 diverse sono due circuiti diversi e confrontarli dice poco.
 
-Sotto le schede c'è sempre **quale giro stai guardando** — tempo, riferimento,
+Sotto le altre schede c'è sempre **quale giro stai guardando** — tempo, riferimento,
 distacco e gradi dell'asfalto — perché con tutte queste schede è facile finire a leggere
 i numeri di un giro pensando a un altro.
 

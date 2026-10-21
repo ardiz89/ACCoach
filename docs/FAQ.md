@@ -181,81 +181,99 @@ Open it from the hub (**Analysis → 📊 Analysis & Report**) or with
 `python -m accoach web`. It runs on your machine, on your laps; there is no
 account and nothing is uploaded.
 
-Under the tabs you always see **which lap you are looking at** — its time, the
-reference, the gap and the track temperature — and every chart's x-axis is in
-**metres**, measured from the recorded coordinates rather than assumed from a
-track length. A lap whose coordinates don't add up falls back to per cent instead
-of showing you a wrong scale.
+Open the report and you land on the **Report card** for your latest outing. It
+is one page, built to be read in ten seconds. At the top you get track, car,
+date and how many laps you drove (valid out of total). The dropdown opens an
+older outing.
 
+Under that is the verdict, one or two sentences: how much you leave on the
+table each lap against your reference lap, and where it piles up. It compares
+that with the previous session on the same car and track. If there isn't one,
+it says so.
+
+Then, in order:
+
+- **Your main faults.** These are driving habits that repeat across several
+  corners, like braking too early or getting back on the throttle late. For
+  each one you see what it costs you per lap, in how many corners and on how
+  many laps it shows up, and an arrow (down, same, up) against the previous
+  session, with your last sessions beside it. Progress shows up here, as a
+  fault going down from one session to the next. A click opens it corner by
+  corner.
+- **Where you lose most.** The corners that cost you the most, by name.
+- **Most frequent mistakes.** Lockups, wheelspin, understeer, oversteer and
+  off-tracks, counted over the session. Only the ones that happened show up. On
+  ACC with ABS on, physical lockup doesn't happen, so we don't count it.
+- **The plan for your next run.** Three pieces of advice at most, in order.
+
+Every number comes from your laps. When a figure isn't there, the line says so
+or doesn't appear; we don't make one up. Every session is measured against the
+same reference, today's, so when a fault goes down it is you that changed and
+not the yardstick. When the reference changes, the history is recalculated.
+
+The report card is about driving. Setup problems stay with the Engineer.
+
+**You follow the plan one piece of advice at a time.** Each piece of advice is
+about one fault and the corners where it weighs most. It has three buttons:
+
+- **I'll follow it** puts it in progress, dated today. Only one piece can be in
+  progress. While there is one, the others show their place in the plan and
+  **How to do it →**, and nothing else.
+- **Not for me** takes a piece you haven't started out of the plan. The fault
+  stays on the report card, and the advice doesn't come back every time you
+  open it. You find it again under "You set aside", with **Take it back**.
+- **Drop it** closes the one in progress without counting it as done.
+
+The piece in progress is measured only on the laps you drive after you take it.
+It counts as done when, over at least three laps, you are under the target on
+half of them. The target is to win back half of what you lose today. When that
+happens the report card tells you and offers the next one.
+
+**In the car, the coach follows your advice.** On your next outing the focus
+(see "One theme at a time") works on the corners of the advice you are
+following, and speaks there, so the plan and the coach tell you the same thing.
+If you no longer lose enough in those corners, the coach picks as it always
+does. A verdict from the coach doesn't close the advice. Only the report's
+measurement does.
+
+**How to do it →** on a piece of advice opens its page, and **← Back to the
+report card** brings you back. It is built from your own laps:
+
+- The problem in one sentence, with your numbers: where you brake, how many
+  metres before your best lap, what it costs you.
+- The figures, one per corner, the most expensive first. Each has a map of the
+  corner with the points of your usual lap and your best, and the brake,
+  throttle or speed trace laid over each other. If one of the two laps has no
+  coordinates or no channel, the page says what is missing where the figure
+  would be.
+- How to do it: a few lines on what to do, what to watch for on track and what
+  to ignore. Where the drill depends on the car, it changes. On a low-downforce
+  road car it won't have you practise trail braking, because there the right
+  technique is to brake in a straight line and then turn (the same choice that
+  keeps the live coach silent about it on those cars).
+- The drill: how many laps, the target in numbers, when it is done.
+- How it's going: that fault's number in each session since you started
+  following it. It fills in from the first session after you press **I'll
+  follow it**.
+
+The tabs come in three groups, in the order you usually read them.
+
+**How today went**
+
+- **Report card** — the page above. It opens by itself after a new session;
+  otherwise the report reopens the last tab you were on.
+- **Session** — one outing: the laps in the order you drove them (including the
+  ones that don't count — you still drove them), your best, consistency, track
+  temperature, **fuel per lap** (measured from the tank, on laps recorded from
+  v11 onwards), and **what changed since last time** on that car and track.
 - **Lap explained** — the lap one thing at a time: what cost you most, why, and
   what to do, with the chart cropped to the stretch it is talking about and the
   track map beside it showing where that is. Three steps at most. If you are a
   long way off the pace it opens with the general theme and stops there, because
   corner-by-corner is the wrong lens at that distance.
-- **Training** — the tab that answers the question the others leave open: *so
-  what do I actually do about it?* It starts from your best lap against your
-  **theoretical ideal** — your best sectors stitched together, which is not an
-  invented time: you have driven all of it, just never on the same lap — and
-  says which sector holds most of that gap. Then the programme: three steps at
-  most, **one at a time**, and only the first one is open. Each step carries a
-  real **drill** — how many laps to run it for, what to do lap by lap, what to
-  watch and what to deliberately ignore, and the number that says when it's
-  done. The drill isn't generic: it is chosen from where *inside the corner* the
-  time goes — braking zone, apex, or exit — and it is filled with **your** own
-  numbers: the speed you brake at there, how much your braking point moves from
-  lap to lap, the minimum speed you carry against the reference's. At the bottom
-  is **your next session**, counted in laps: warm-up, the drill laps, and a few
-  free laps to see whether it stuck once you stop thinking about it.
 
-  **Your plan** lives here too (it used to sit under Trends): one or two goals
-  taken from your *systematic* weak points, with a target in seconds, measured
-  only on the laps you drive after you accept it. Corners the live coach has
-  already cleared never enter it — there is one memory of "you've got this
-  corner", not two.
+**Why, in detail**
 
-  The tab **only opens once it has something to say**: **6 valid laps** on that
-  car and track, and at least one weakness that repeats. Below that you get how
-  many laps are missing, not an empty page. Six laps leave five to compare
-  against your best one, and a weakness has to come back on three of those five
-  to be called one; below that, what looks like a weakness is just what two laps
-  did, and a programme built on it would change every time you drive.
-
-  One thing worth reading twice: the two time figures on that tab **do not add
-  up together**. The gap to your theoretical ideal and what you bleed on an
-  average lap in the corners are the same road measured two ways, and summing
-  them would count the same time twice.
-
-  At the bottom sits **«The words you'll hear other people use»** — a short
-  glossary, closed, showing the terms in a row: you scan it and open it for the
-  one word you don't have. It is never the only place a word is explained (the
-  exercise above still glosses its own), and it only carries the terms of the
-  exercise you have open.
-
-  The exercises are **not the same for every car** where the difference matters:
-  on a low-downforce road car HONE won't have you practise trail braking, because
-  on those cars slowing in a straight line and then turning is the correct
-  technique — the same decision, on the same data, that makes the live coach stay
-  silent about it there. You get **«Brake in a straight line, then turn»** instead.
-- **Session** — one outing: the laps in the order you drove them (including the
-  ones that don't count — you still drove them), your best, consistency, track
-  temperature, **fuel per lap** (measured from the tank, on laps recorded from
-  v11 onwards), and **what changed since last time** on that car and track.
-- **Race pace** — how the pace holds up over **one tank**. A different cut from
-  Session, and a measured one: a sitting is inferred from timestamps and can
-  contain a **refuel**, so a pace averaged across it averages two fuel loads. A
-  stint is cut where the tank goes back *up*. You get the pace (the median of
-  the laps that were actually running one — a spin stays on the list but can't
-  move the median), the spread, litres per lap, laps left in the tank, the pace
-  lap by lap, and the tyres across the stint.
-  And then what those numbers **don't** say, which matters more than the numbers.
-  The pace trend is a **net** figure — a stint speeds up as the tank empties and
-  slows down as the tyres give up — and telling the two apart needs a
-  seconds-per-litre figure we do not have yet (it has to be measured on a stint
-  driven at a deliberately constant pace). So the slope comes with its own error
-  bar, and when it is smaller than that bar the tab says **"no measurable
-  drift"** rather than inventing a degradation figure for you. It is not tyre
-  wear either: neither sim publishes a wear number we record, so what you see is
-  temperature.
 - **Compare** — two laps, aligned on track position: time delta, speed,
   throttle/brake, steering, with a shared crosshair. Exports to CSV/JSON.
   Beside the charts, on the same screen, **the track map**: your line coloured
@@ -299,11 +317,36 @@ of showing you a wrong scale.
 - **Dynamics** — what the car was doing: G with the friction circle, slip per
   axle, rotation vs steering, revs and shifts, tyre temperatures and pressures
   along the lap, and the handling ribbon (blue understeer, red oversteer).
+
+**Over time**
+
 - **Trends** — lap times over time, consistency, your weak points corner by
   corner (systematic or one-off) and recurring mistakes. It is the working; the
-  plan that comes out of it lives under **Training**, and the tyre charts under
+  plan that comes out of it lives on the **Report card**, and the tyre charts under
   **Race pace** — here the series covered your whole archive while calling
   itself a stint.
+- **Race pace** — how the pace holds up over **one tank**. A different cut from
+  Session, and a measured one: a sitting is inferred from timestamps and can
+  contain a **refuel**, so a pace averaged across it averages two fuel loads. A
+  stint is cut where the tank goes back *up*. You get the pace (the median of
+  the laps that were actually running one — a spin stays on the list but can't
+  move the median), the spread, litres per lap, laps left in the tank, the pace
+  lap by lap, and the tyres across the stint.
+  And then what those numbers **don't** say, which matters more than the numbers.
+  The pace trend is a **net** figure — a stint speeds up as the tank empties and
+  slows down as the tyres give up — and telling the two apart needs a
+  seconds-per-litre figure we do not have yet (it has to be measured on a stint
+  driven at a deliberately constant pace). So the slope comes with its own error
+  bar, and when it is smaller than that bar the tab says **"no measurable
+  drift"** rather than inventing a degradation figure for you. It is not tyre
+  wear either: neither sim publishes a wear number we record, so what you see is
+  temperature.
+
+Under the other tabs you always see **which lap you are looking at** — its time, the
+reference, the gap and the track temperature — and every chart's x-axis is in
+**metres**, measured from the recorded coordinates rather than assumed from a
+track length. A lap whose coordinates don't add up falls back to per cent instead
+of showing you a wrong scale.
 
 Keyboard: **every tab has a key that opens it**, in the order they sit left to
 right — hover a tab to see which one it is (the lap picker says so too). **[**
