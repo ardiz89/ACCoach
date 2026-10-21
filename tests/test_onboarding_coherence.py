@@ -102,6 +102,36 @@ def test_the_faq_points_at_the_button_not_only_the_command():
     assert "Import a PRO reference lap" in _FAQ
 
 
+# --- il pannello «In pista» raccontato con le sue parole --------------------
+
+_LIVE_LABELS = ("live.before", "live.s2", "live.s2_to_devices", "live.skip",
+                "live.s3", "live.driving", "live.following", "live.finish",
+                "live.stop_quiet", "live.finished", "live.show", "live.stay")
+
+
+def _label(key: str, lang: str) -> str:
+    """Il testo del pannello fino al segnaposto (``Stai seguendo: {name}``)."""
+    return _flat(t(key, lang=lang).split("{")[0]).strip(": ")
+
+
+@pytest.mark.parametrize("key", _LIVE_LABELS)
+def test_the_guides_name_the_live_panel_buttons_as_the_panel_does(key):
+    """La procedura dice «premi X»: se X cambia nel pannello e non qui, la guida
+    manda a cercare un bottone che non c'è."""
+    assert _label(key, "it") in _flat(_GUIDA), key
+    assert _label(key, "en") in _flat(_FAQ), key
+
+
+@pytest.mark.parametrize("lang", ("en", "it"))
+def test_the_wizard_step_sends_you_to_the_live_panel_and_the_report(lang):
+    """Il primo avvio nominava una sezione che non esiste più («Guida») e non
+    diceva che il pannello ti accompagna fino alla Pagella."""
+    step = re.sub(r"<[^>]+>", "", t("wiz.s2", lang=lang))
+    assert t("nav.live", lang=lang).strip() in step
+    assert ("Pagella" if lang == "it" else "report card") in step
+    assert "QR" in step
+
+
 # --- la visita guidata conosce le novità -----------------------------------
 
 def _tour_keys() -> set[str]:

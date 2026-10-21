@@ -131,10 +131,14 @@ _UI: dict[str, dict[str, str]] = {
         "it": "Metti il gioco (AC / ACC) in <b>Borderless</b> — sul fullscreen "
               "esclusivo l'overlay non si disegna."},
     "wiz.s2": {
-        "en": "Open <b>Drive</b> in the sidebar and hit <b>Coach Live</b>: voice "
-              "coach plus the on-screen overlay while you drive.",
-        "it": "Apri <b>Guida</b> nella barra laterale e premi <b>Coach Live</b>: "
-              "coach vocale più overlay a schermo mentre guidi."},
+        "en": "Open <b>Drive</b> in the sidebar and press <b>Coach Live</b>. The "
+              "panel walks you through it: the tablet with a QR code first, "
+              "then the game. When you're done, <b>I'm done</b> opens the "
+              "report card.",
+        "it": "Apri <b>In pista</b> nella barra laterale e premi <b>Coach "
+              "Live</b>. Il pannello ti accompagna: prima il tablet col codice "
+              "QR, poi il gioco. Quando hai finito, <b>Ho finito</b> apre la "
+              "Pagella."},
     "wiz.s3": {
         "en": "Drive one complete lap. It becomes your <b>reference</b>, and the "
               "delta appears from the next lap on. Until then the coach still "

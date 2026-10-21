@@ -38,6 +38,29 @@ dall'exe sia da sorgente), così l'analisi li ritrova sempre.
 > La Home ti mostra l'ultima sessione già analizzata, quindi dopo la prima volta
 > è lì che arrivi per sapere com'è andata.
 
+**Il pannello In pista ti accompagna.** Dopo ▶ Coach Live la pagina mostra tre
+momenti, uno dopo l'altro.
+
+**Prima di partire.** Il primo passo, *Coach Live acceso*, è già spuntato: voce e
+overlay sono pronti. Poi viene *Collega il tablet all'ingegnere*: inquadra il
+codice QR con la fotocamera del tablet, oppure apri l'indirizzo scritto accanto.
+Il tablet si collega solo con la rete locale attiva; se è spenta, il pannello ha
+il bottone *Attiva la rete locale*. Se il tablet non ti serve, premi *Salta,
+guido senza*. L'ultimo passo, *Avvia il gioco ed esci dai box*, si spunta da solo
+quando arriva la telemetria.
+
+**Stai guidando.** Il pannello mostra se il tablet è collegato, pista e auto, i
+giri completati con il migliore e, sotto *Stai seguendo*, il consiglio su cui stai
+lavorando: il coach te lo ricorda nelle curve di quel consiglio. Quando hai
+finito premi **Ho finito, mostrami com'è andata**: ferma il coach e apre il report
+sulla Pagella. *Ferma senza aprire il report* ferma il coach e basta. Coach Live
+non si ferma mai da solo.
+
+**Sessione finita.** Se chiudi il gioco, dopo un minuto il pannello passa a
+*Sessione finita* e ti offre due scelte: *Mostrami com'è andata* e *Resto in
+pista*, per quando stai solo cambiando pista. Il coach resta acceso finché non lo
+fermi tu.
+
 **Se ti dimentichi di premere il pulsante.** In **Impostazioni** c'è
 *«Registra da solo quando parte il gioco»*: con l'hub aperto, HONE si accorge che
 AC/ACC è comparso e **avvia la registrazione da sé**, così una sessione che non

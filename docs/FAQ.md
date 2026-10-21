@@ -371,6 +371,29 @@ the product grows with the community.
 
 Pro will be a one-time purchase. The model may change before launch.
 
+## How a Coach Live session goes (the Drive panel)
+
+After you press **Coach Live**, the **Drive** page shows three moments, one after
+the other.
+
+**Before you go.** *Coach Live is on* is already ticked: voice and overlay are
+ready. Next comes *Connect your tablet to the engineer*: scan the QR code with the
+tablet's camera, or open the address next to it. The tablet only connects with
+network access on; if it's off, the panel has a *Turn on network access* button.
+If you don't need the tablet, press *Skip, I'll drive without*. The last step,
+*Start the game and leave the pits*, ticks itself when the telemetry arrives.
+
+**You're driving.** The panel shows whether the tablet is connected, the track
+and car, the laps completed with your best, and, under *You're working on*, the
+advice you're following: the coach reminds you of it in its corners. When you're
+done, press **I'm done, show me how it went**. It stops the coach and opens the
+report on the report card. *Stop without opening the report* only stops the coach.
+Coach Live never stops by itself.
+
+**Session over.** If you close the game, the panel switches to *Session over*
+after a minute and offers two choices: *Show me how it went* and *I'm staying on
+track*, for when you're only changing track. The coach stays on until you stop it.
+
 ## How lap recording works (and starting from the pits)
 
 You don't have to do anything special: start the session (Practice, Hotlap, Race)
