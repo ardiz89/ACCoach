@@ -207,7 +207,8 @@ class FocusCoach:
 
     def __init__(self, *, min_laps: int = _MIN_LAPS,
                  mastered: set[int] | None = None,
-                 parked: set[int] | None = None) -> None:
+                 parked: set[int] | None = None,
+                 preferred: list[int] | None = None) -> None:
         self.min_laps = min_laps
         self.window: list[LapDebrief] = []
         self.focus: Focus | None = None
@@ -228,6 +229,13 @@ class FocusCoach:
         # live, minus the three ASSESS laps.
         self.mastered: set[int] = set(mastered or ())
         self.parked: set[int] = set(parked or ())
+        #: Le curve del consiglio che il pilota segue, nell'ordine del consiglio.
+        #: Prendono il posto della scelta del coach finche' perdono davvero
+        #: (stessa ricorrenza e soglia di sempre): il pilota ha scelto su cosa
+        #: lavorare, e il coach in pista non deve portarlo altrove. Il motore la
+        #: riscrive a ogni giro (vedi `CoachEngine._observe_lap`). Un verdetto qui
+        #: non chiude il consiglio: lo chiude solo la misura del report.
+        self.preferred: list[int] = list(preferred or ())
         self._last = FocusReport(
             FocusKind.ASSESS,
             _m("assess", current_language(), n=0, total=min_laps))
@@ -398,19 +406,31 @@ class FocusCoach:
             focus=focus, drill=focus.drill, progress_ms=current)
 
     def _choose(self) -> Focus | None:
-        """Pick the worst recurring, significant corner not already handled."""
+        """Pick the worst recurring, significant corner not already handled.
+
+        Le curve del consiglio seguito (:attr:`preferred`) vengono prima, nel
+        loro ordine, se passano la stessa prova; altrimenti la scelta di sempre.
+        """
         lang = current_language()
         agg = self._aggregate()
         recur_min = max(2, round(_RECUR_FRAC * len(self.window)))
 
+        def eligible(idx: int) -> bool:
+            a = agg.get(idx)
+            return (a is not None
+                    and idx not in self.mastered and idx not in self.parked
+                    and a.hits >= recur_min and a.median >= _SIGNIF_MS)
+
         best: tuple[float, int, _Agg] | None = None
-        for idx, a in agg.items():
-            if idx in self.mastered or idx in self.parked:
-                continue
-            if a.hits < recur_min or a.median < _SIGNIF_MS:
-                continue
-            if best is None or a.median > best[0]:
-                best = (a.median, idx, a)
+        followed = next((i for i in self.preferred if eligible(i)), None)
+        if followed is not None:
+            best = (agg[followed].median, followed, agg[followed])
+        else:
+            for idx, a in agg.items():
+                if not eligible(idx):
+                    continue
+                if best is None or a.median > best[0]:
+                    best = (a.median, idx, a)
         if best is None:
             return None
 

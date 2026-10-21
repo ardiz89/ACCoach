@@ -557,6 +557,11 @@ class CoachEngine:
             fref, fcorners = self._focus_ref or (self._reference, self._corners)
             focus_debrief = (debrief if fref is self._reference
                              else build_lap_debrief(lap, fref, fcorners))
+            # Il consiglio seguito si rilegge a ogni giro, sulle curve con cui
+            # il focus conta (`fcorners`, non quelle di adesso): il riferimento
+            # cambia sotto la sessione, e il pilota puo' scegliere un consiglio
+            # dal tablet mentre guida. Conta solo quando il focus sceglie.
+            self._focus.preferred = self._followed_advice_corners(fcorners)
             self._focus_report = self._focus.observe(
                 focus_debrief, stable=stable, reference=_reference_token(fref))
             # Il metro si tiene fermo per **tutto** il ciclo, non da quando il
@@ -646,6 +651,43 @@ class CoachEngine:
                 return cat.load_focus_state(car, track)
         except Exception:
             return set(), set()
+
+    def _followed_advice_corners(self, corners: list[Corner]) -> list[int]:
+        """Le curve del consiglio in corso, tradotte nelle curve di ``corners``.
+
+        Il consiglio le ha numerate sul riferimento dello storico, il focus le
+        conta su quello del motore: le due numerazioni non coincidono, quindi si
+        passa per la posizione dell'apex, come in `_focus_zone`. Una curva il cui
+        apex non cade in nessuna curva di adesso si scarta — meglio la scelta di
+        sempre che la curva accanto — e cosi' una curva senza posizione (0.0: un
+        obiettivo del vecchio piano, migrato).
+
+        Best-effort come `_load_focus_state`: un catalogo illeggibile vale
+        «nessun consiglio», e il focus sceglie da solo.
+        """
+        if self._focus_key is None or not corners:
+            return []
+        try:
+            from .coaching.advice import ACTIVE
+            from .recording.catalog import LapCatalog
+            from .recording.storage import _catalog_path
+
+            with LapCatalog(_catalog_path(Path(self.laps_dir))) as cat:
+                advice = cat.load_advice(*self._focus_key)
+            active = next((a for a in advice if a.get("status") == ACTIVE), None)
+            apexes = [float(c.get("apex_pos") or 0.0)
+                      for c in (active or {}).get("corners", [])]
+        except Exception:
+            return []
+        out: list[int] = []
+        for apex in apexes:
+            if apex <= 0.0:
+                continue
+            hit = next((c.index for c in corners
+                        if c.entry_pos <= apex <= c.exit_pos), None)
+            if hit is not None and hit not in out:
+                out.append(hit)
+        return out
 
     def _save_focus_state(self) -> None:
         if self._focus is None or self._focus_key is None:
@@ -1041,7 +1083,11 @@ class CoachEngine:
             # car+track so a mastered corner stays mastered across restarts.
             self._focus_key = (snap.car_model, snap.track)
             mastered, parked = self._load_focus_state(snap.car_model, snap.track)
-            self._focus = FocusCoach(mastered=mastered, parked=parked)
+            # …e le curve del consiglio che il pilota ha scelto di seguire nel
+            # report, che prendono il posto della scelta del coach.
+            self._focus = FocusCoach(
+                mastered=mastered, parked=parked,
+                preferred=self._followed_advice_corners(self._corners))
             self._focus_report = None
             self._focus_ref = None
             # Il comparatore e' nato qualche riga sopra, quando il focus era
