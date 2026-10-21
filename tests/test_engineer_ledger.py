@@ -205,7 +205,7 @@ def test_the_side_effect_is_named_in_the_message_the_driver_reads():
     for _ in range(3):
         out = eng.observe(_lap(100000, {SYM: 0.20, OTHER: 0.55}))
     # In parole, non con la chiave del registro («oversteer exit low»).
-    assert "oversteer on exit from slow corners" in out.message
+    assert "exit oversteer in slow corners" in out.message
     assert str(OTHER) not in out.message
 
 
@@ -556,3 +556,32 @@ def test_a_record_is_plain_json(tmp_path):
     assert isinstance(row["symptom"], str) and " " in row["symptom"]
     assert isinstance(row["side_effects"], dict)
     assert row["kept"] is True
+
+
+def test_the_record_names_each_lever_as_the_editor_does(api, tmp_path):
+    """La pagina mostrava «aRBFront»: il nome è quello dell'editor, nella lingua
+    della richiesta, e la chiave resta per chi la usa."""
+    p = tmp_path / "engineer_log.jsonl"
+    ledger.append(_rec(side_effects={str(OTHER): 0.35}), p)
+    it = api.get("/api/setup/record", params={"lang": "it"}).json()
+    assert it["labels"]["aRBFront"] == "Barra ant." and "aRBFront" in it["by_param"]
+    row = it["side_effects"][0]
+    assert row["label"] == "Barra ant." and row["param"] == "aRBFront"
+    assert row["words"] == "sovrasterzo in uscita dalle curve lente"
+    en = api.get("/api/setup/record", params={"lang": "en"}).json()
+    assert en["labels"]["aRBFront"] == "Front ARB"
+    assert en["side_effects"][0]["words"] == "exit oversteer in slow corners"
+
+
+def test_two_side_effects_are_said_in_the_plural():
+    from types import SimpleNamespace
+
+    from accoach.engineer.core import _side_effect_tail
+    third = Symptom(U, EN, HI)
+    two = SimpleNamespace(side_effects=((OTHER, 0.35), (third, -0.12)))
+    one = SimpleNamespace(side_effects=((OTHER, 0.35),))
+    assert _side_effect_tail(two, "it") == (
+        " Non li cercavamo, ma si sono mossi anche il sovrasterzo in uscita dalle "
+        "curve lente (+0,35) e il sottosterzo in ingresso alle curve veloci (−0,12).")
+    assert _side_effect_tail(one, "it").startswith(" Non lo cercavamo, ma si è mosso")
+    assert _side_effect_tail(two, "en").startswith(" We weren't aiming at them")

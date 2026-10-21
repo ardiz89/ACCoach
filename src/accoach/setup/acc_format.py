@@ -79,7 +79,7 @@ SETUP_PARAMS: tuple[ParamSpec, ...] = (
     # --- Tyres -------------------------------------------------------------
     ParamSpec("tyrePressure", "Tyres", "Pressure", _BASIC + ("tyres",),
               unit="psi", step=0.1, base=20.3,
-              note="Approximate cold value, 20.3 psi at click 0 and 0.1 psi per click"),
+              note="Approximate cold value. Base 20.3 psi at click 0, then 0.1 psi per click."),
     ParamSpec("tyreCompound", "Tyres", "Compound", _BASIC + ("tyres",),
               unit="", step=None, base=None),
     # --- Alignment ------------------------------------------------------

@@ -11,6 +11,10 @@ const t = (k) => (window.HoneI18n ? window.HoneI18n.t(k) : k);
 // questa. Quattro righe duplicate costano meno di un modulo condiviso per due.
 const tf = (k, vals) => {
   let s = t(k);
+  // `{n|giro|giri}` sceglie la forma col valore di `n`, come il `tf` del report.
+  s = s.replace(/\{(\w+)\|([^|{}]*)\|([^{}]*)\}/g,
+                (whole, k, one, many) =>
+                  (k in vals ? (Number(vals[k]) === 1 ? one : many) : whole));
   for (const n in vals) s = s.split("{" + n + "}").join(vals[n]);
   return s;
 };
@@ -370,7 +374,9 @@ async function loadRecord() {
     head += tf("rec.rate", { rate: Math.round(r.hit_rate * 100) });
   }
   if (r.median_gain_ms != null) {
-    head += tf("rec.gain", { gain: fmtN(r.median_gain_ms / 1000, 3, "s") });
+    // Col segno: «−0,120 s» e' piu' veloce, «+0,080 s» piu' lento.
+    const g = r.median_gain_ms / 1000;
+    head += tf("rec.gain", { gain: (g > 0 ? "+" : "") + fmtN(g, 3, "s") });
   }
   $("rec-head").innerHTML = head;
   $("rec-note").textContent = r.tests < REC_MIN_TESTS ? t("rec.thin") : "";
@@ -381,15 +387,18 @@ async function loadRecord() {
       `<div class="rec-row"><span>${k}</span><span>${v}</span></div>`).join("");
     return `<div class="rec-block"><div class="rec-sub">${title}</div>${li}</div>`;
   };
+  // Il nome della leva come nell'editor; la chiave solo se il server non lo sa.
+  const name = (k) => (r.labels && r.labels[k]) || k;
   const kept = (o) => Object.entries(o).map(
-    ([k, v]) => [k, tf("rec.kept_of", { kept: v.kept, tests: v.tests })]);
+    ([k, v]) => [name(k), tf("rec.kept_of", { kept: v.kept, tests: v.tests })]);
   $("rec-tables").innerHTML =
     rows(t("rec.byparam"), kept(r.by_param || {})) +
     rows(t("rec.byrank"), Object.entries(r.by_rank || {}).map(
       ([n, v]) => [tf("rec.rank", { n: Number(n) + 1 }),
                    tf("rec.kept_of", { kept: v.kept, tests: v.tests })])) +
     rows(t("rec.side"), (r.side_effects || []).map(
-      (s) => [`${s.param} → ${s.words || s.symptom}`, tf("rec.seen", { n: s.seen })]));
+      (s) => [`${s.label || s.param} → ${s.words || s.symptom}`,
+              tf("rec.seen", { n: s.seen })]));
 }
 
 async function loadClass(car) {
@@ -784,7 +793,9 @@ async function applyNow() {
   // in un'altra scheda non c'è. Un 409 quindi non è un errore da mostrare: è il
   // disco che sa il numero meglio di noi, e si prova il successivo.
   let name = nextAutoName();
+  let tried = name;
   for (let attempt = 0; attempt < 4; attempt++) {
+    tried = name;
     try {
       const res = await api("/api/setup/apply", {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -800,7 +811,7 @@ async function applyNow() {
       name = `${AUTO_PREFIX}_${parseInt(name.split("_").pop(), 10) + 1}`;
     }
   }
-  showToast(tf("eng.writeErrName", { name }), true);
+  showToast(tf("eng.writeErrName", { name: tried }), true);
 }
 
 // Quello che succede dopo una scrittura riuscita, per tutt'e due le vie. Vive
@@ -1117,7 +1128,7 @@ function renderOutcome(eng) {
   }
   let side = "";
   if (Array.isArray(o.side_effects) && o.side_effects.length) {
-    side = `<div class="oc-side">${t("eng.oc.side")} ` +
+    side = `<div class="oc-side"><span class="oc-side-label">${t("eng.oc.side")}</span> · ` +
       o.side_effects.map((s) =>
         `${s.words || s.symptom} ${s.delta >= 0 ? "+" : ""}${fmtN(s.delta, 2)}`).join(" · ") +
       `</div>`;
@@ -1146,13 +1157,16 @@ function renderFocus(st) {
   if (!f) {
     box.dataset.kind = "";
     $("focus-icon").textContent = "…";
+    $("focus-icon").hidden = false;
     $("focus-msg").textContent = t("focus.warmup");
     drill.hidden = true; target.hidden = true;
     return;
   }
   const meta = FOCUS_KIND[f.kind] || FOCUS_KIND.assess;
   box.dataset.kind = meta.state;
+  // Un'icona vuota non lascia lo spazio davanti al titolo.
   $("focus-icon").textContent = meta.icon;
+  $("focus-icon").hidden = !meta.icon;
   $("focus-msg").textContent = f.message || t("eng.dash");
 
   if (f.drill) { drill.hidden = false; drill.textContent = f.drill; }

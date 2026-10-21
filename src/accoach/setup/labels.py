@@ -79,8 +79,8 @@ _IT: dict[str, str] = {
     # --- strategy ---
     "Fuel": "Benzina",
     # --- notes (the caveats shown under a param) ---
-    "Approximate cold value, 20.3 psi at click 0 and 0.1 psi per click":
-        "Valore a freddo approssimato, 20,3 psi al click 0 e 0,1 psi per click",
+    "Approximate cold value. Base 20.3 psi at click 0, then 0.1 psi per click.":
+        "Valore a freddo, approssimato. Base 20,3 psi al click 0, poi 0,1 psi per click.",
     "Real degrees, from staticCamber": "Gradi reali, da staticCamber",
     "About 0.2 % per click, the front base depends on the car":
         "Circa 0,2 % per click, la base anteriore dipende dall'auto",
@@ -100,6 +100,18 @@ def tr(text: str, lang: str | None = None) -> str:
     if (lang or current_language()) == "it":
         return _IT.get(text, text)
     return text
+
+
+def param_label(key: str, lang: str | None = None) -> str:
+    """Il nome di una leva come lo mostra l'editor («Barra ant.»), dalla sua
+    chiave tecnica («aRBFront»). ACC prima, poi Assetto Corsa; una chiave che
+    nessuno dei due conosce torna com'e'."""
+    from .ac_format import AC_PARAMS
+    from .acc_format import SETUP_PARAMS
+    for spec in (*SETUP_PARAMS, *AC_PARAMS):
+        if spec.key == key:
+            return tr(spec.label, lang)
+    return key
 
 
 def _is_it(lang: str | None) -> bool:

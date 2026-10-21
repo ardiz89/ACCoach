@@ -149,7 +149,7 @@ def _press_change(cur, target=27.5, tol=0.7):
 def test_a_clamped_pressure_step_says_the_pressure_it_actually_reaches():
     ch = _press_change(24.7)
     assert ch is not None
-    assert "+8" in ch.rationale
+    assert "add 8 clicks" in ch.rationale
     assert "25.5" in ch.rationale, "la pressione a cui arriva questo passo"
     assert "27.5" in ch.rationale, "…e la finestra, che resta il bersaglio"
 
@@ -166,7 +166,7 @@ def test_the_step_is_capped_the_same_way_in_both_directions():
     """Sopra la finestra il taglio vale identico, e la frase pure: una pressione
     troppo alta e' lo stesso problema visto dall'altro lato."""
     ch = _press_change(30.0)
-    assert ch is not None and "−8" in ch.rationale and "29.2" in ch.rationale
+    assert ch is not None and "take 8 clicks off" in ch.rationale and "29.2" in ch.rationale
 
 
 def test_the_italian_message_names_the_axle_in_italian(monkeypatch):

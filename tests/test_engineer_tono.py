@@ -192,8 +192,8 @@ def test_the_symptom_is_said_in_words_not_as_its_identifier(lang):
     pagina in italiano era inglese, e in inglese non era una frase."""
     text = " ".join(_messages())
     assert str(SYM) not in text and str(OTHER) not in text
-    words = {"it": "sottosterzo a centro curva nelle curve lente",
-             "en": "understeer mid-corner in slow corners"}[lang]
+    words = {"it": "sottosterzo in percorrenza nelle curve lente",
+             "en": "mid-corner understeer in slow corners"}[lang]
     assert words in text
 
 

@@ -170,8 +170,8 @@ def test_su_ac_la_frase_dice_il_click_che_scrive_e_dove_arriva(ac):
     eng = engineer_for(ac("f1_prova"), "spa", is_acc=False)
     d = _proposal(_drive(eng, front=22.74, rear=22.0))
     assert [c.delta_clicks for c in d.change.changes] == [-1, -1]
-    assert "−1 click " in d.change.rationale
-    assert "is 22.7 psi" in d.change.rationale and "reach 21.7 psi" in d.change.rationale
+    assert "take 1 click off" in d.change.rationale
+    assert "is 22.7 psi" in d.change.rationale and "down to 21.7 psi" in d.change.rationale
 
 
 def test_un_click_che_vale_due_psi_si_scrive_come_due_psi(ac, tmp_path):
@@ -181,7 +181,7 @@ def test_un_click_che_vale_due_psi_si_scrive_come_due_psi(ac, tmp_path):
     eng = engineer_for(ac("f1_due", psi=2), "spa", is_acc=False)
     d = _proposal(_drive(eng, front=24.6, rear=22.0))
     assert [c.delta_clicks for c in d.change.changes] == [-1, -1]
-    assert "is 24.6 psi" in d.change.rationale and "reach 22.6 psi" in d.change.rationale
+    assert "is 24.6 psi" in d.change.rationale and "down to 22.6 psi" in d.change.rationale
     assert _write(tmp_path, d.change)("tyrePressure", 0) == 13
 
 
@@ -192,7 +192,7 @@ def test_su_ac_quattro_psi_fuori_si_prendono_un_click_per_sosta(ac):
     eng = engineer_for(ac("f1_prova"), "spa", is_acc=False)
     d = _proposal(_drive(eng, front=26.0, rear=22.0))
     assert [c.delta_clicks for c in d.change.changes] == [-1, -1]
-    assert "is 26.0 psi" in d.change.rationale and "reach 25.0 psi" in d.change.rationale
+    assert "is 26.0 psi" in d.change.rationale and "down to 25.0 psi" in d.change.rationale
 
 
 @pytest.mark.parametrize("is_acc, kind", [(True, AccSteps), (False, AcSteps)])
@@ -222,7 +222,7 @@ def test_su_acc_non_cambia_niente_otto_click_sono_otto_decimi(tmp_path):
     assert d.change.as_setup_payload() == [
         {"param": "tyrePressure", "slot": 0, "delta_clicks": 8},
         {"param": "tyrePressure", "slot": 1, "delta_clicks": 8}]
-    assert "is 24.7 psi" in d.change.rationale and "reach 25.5 psi" in d.change.rationale
+    assert "is 24.7 psi" in d.change.rationale and "up to 25.5 psi" in d.change.rationale
 
 
 def test_il_passo_di_acc_viene_dal_registro_del_formato_non_da_una_copia():

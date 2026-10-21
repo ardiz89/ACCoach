@@ -72,3 +72,104 @@ def test_every_record_string_is_in_both_languages():
     for key in re.findall(r'"(rec\.[a-z_]+)"', _I18N):
         block = _I18N[_I18N.index(f'"{key}"'):][:600]
         assert "en:" in block and "it:" in block, key
+
+
+# --- il registro come lo legge il pilota -----------------------------------
+# Si esegue la `loadRecord` vera, col catalogo vero (i18n.js) e un DOM finto.
+
+import json  # noqa: E402
+import shutil  # noqa: E402
+import subprocess  # noqa: E402
+
+import pytest  # noqa: E402
+
+_NODE = shutil.which("node")
+
+_HARNESS = r"""
+const fs = require("fs");
+const [i18nPath, engPath, lang] = process.argv.slice(2);
+global.window = {};
+global.localStorage = { getItem: () => lang, setItem() {} };
+global.document = { readyState: "complete", querySelectorAll: () => [],
+                    querySelector: () => null, documentElement: {} };
+eval(fs.readFileSync(i18nPath, "utf8"));
+const src = fs.readFileSync(engPath, "utf8");
+function grab(name) {
+  const i = src.indexOf("function " + name + "(");
+  let depth = 0;
+  for (let k = src.indexOf("{", i); k < src.length; k++) {
+    if (src[k] === "{") depth++;
+    if (src[k] === "}") { depth--; if (!depth) return src.slice(i, k + 1); }
+  }
+}
+const line = (re) => src.split("\n").find((l) => re.test(l));
+// `const` dentro un eval resta nell'eval: si dichiara `var`, che ne esce.
+const asVar = (code) => code.replace(/^const /, "var ");
+eval(asVar(line(/^const t = /))); eval(grab("fmtN"));
+eval(asVar(src.slice(src.indexOf("const tf = "), src.indexOf("};", src.indexOf("const tf = ")) + 2)));
+eval(asVar(line(/^const REC_MIN_TESTS/)));
+const els = {};
+const $ = (id) => els[id] || (els[id] = { hidden: false, textContent: "", innerHTML: "" });
+const state = { car: "c", track: "t" };
+let RECORD = null;
+const api = async () => RECORD;
+eval("async " + grab("loadRecord"));
+(async () => {
+  const out = [];
+  for (const r of JSON.parse(fs.readFileSync(0, "utf8"))) {
+    RECORD = r;
+    await loadRecord();
+    out.push({ head: $("rec-head").innerHTML, tables: $("rec-tables").innerHTML,
+               laps: [tf("eng.oc.laps", { n: 1 }), tf("eng.oc.laps", { n: 3 })] });
+  }
+  console.log(JSON.stringify(out));
+})();
+"""
+
+
+def _record(tmp_path, lang, *records):
+    script = tmp_path / "rec.js"
+    script.write_text(_HARNESS, encoding="utf-8")
+    run = subprocess.run([_NODE, str(script), str(_WEB / "i18n.js"), str(_WEB / "engineer.js"),
+                          lang], input=json.dumps(records), capture_output=True, text=True,
+                         encoding="utf-8", timeout=60)
+    assert run.returncode == 0, run.stderr
+    return json.loads(run.stdout)
+
+
+def _rec(gain_ms):
+    return {"tests": 2, "kept": 1, "hit_rate": 0.5, "median_gain_ms": gain_ms,
+            "by_param": {"aRBFront": {"kept": 1, "tests": 2}},
+            "labels": {"aRBFront": "Barra ant."},
+            "by_rank": {}, "side_effects": [
+                {"param": "aRBFront", "label": "Barra ant.", "symptom": "oversteer exit low",
+                 "words": "sovrasterzo in uscita dalle curve lente", "seen": 2}]}
+
+
+@pytest.mark.skipif(_NODE is None, reason="serve node per eseguire la pagina")
+def test_the_median_lap_time_change_keeps_its_sign(tmp_path):
+    """`median_gain_ms` è la variazione del tempo: negativa vuol dire più veloce.
+    Chiamarla «guadagno» rovesciava il senso proprio quando la modifica aiutava."""
+    faster, slower = _record(tmp_path, "it", _rec(-120.0), _rec(80.0))
+    assert "variazione mediana del giro −0,120 s" in faster["head"]
+    assert "variazione mediana del giro +0,080 s" in slower["head"]
+    assert "guadagno" not in faster["head"] + slower["head"]
+    (en,) = _record(tmp_path, "en", _rec(-120.0))
+    assert "median lap-time change −0.120 s" in en["head"]
+
+
+@pytest.mark.skipif(_NODE is None, reason="serve node per eseguire la pagina")
+def test_the_record_names_levers_and_symptoms_as_the_page_does(tmp_path):
+    (r,) = _record(tmp_path, "it", _rec(-120.0))
+    assert "Barra ant." in r["tables"] and "aRBFront" not in r["tables"]
+    assert "sovrasterzo in uscita dalle curve lente" in r["tables"]
+    assert "oversteer exit low" not in r["tables"]
+
+
+@pytest.mark.skipif(_NODE is None, reason="serve node per eseguire la pagina")
+def test_the_page_tf_picks_singular_and_plural(tmp_path):
+    """«su 1 giri» era il caso normale di una prova corta."""
+    (it,) = _record(tmp_path, "it", _rec(-120.0))
+    assert it["laps"] == ["su 1 giro", "su 3 giri"]
+    (en,) = _record(tmp_path, "en", _rec(-120.0))
+    assert en["laps"] == ["over 1 lap", "over 3 laps"]

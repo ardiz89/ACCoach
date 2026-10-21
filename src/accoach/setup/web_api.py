@@ -85,18 +85,18 @@ def _resolve_slot(setup, spec, slot, lang: str | None = None) -> tuple[int, str 
         return 0, None
     labels = slot_labels(n)
     if slot is None:
-        return -1, err_slot_required(spec.key, labels, lang)
+        return -1, err_slot_required(tr(spec.label, lang), labels, lang)
     if isinstance(slot, int) or (isinstance(slot, str) and slot.isdigit()):
         i = int(slot)
         if 0 <= i < n:
             return i, None
-        return -1, err_slot_out_of_range(i, spec.key, lang)
+        return -1, err_slot_out_of_range(i, tr(spec.label, lang), lang)
     # Accept the label in any language we render it in, not just the canonical
     # spelling — the web UI sends indices, so this path is a human typing.
     canon = canonical_slot(slot) if isinstance(slot, str) else slot
     if canon in labels:
         return labels.index(canon), None
-    return -1, err_slot_invalid(slot, spec.key, lang)
+    return -1, err_slot_invalid(slot, tr(spec.label, lang), lang)
 
 
 def _apply_changes(setup, changes: list[SetupChange],
@@ -121,7 +121,7 @@ def _apply_changes(setup, changes: list[SetupChange],
             elif ch.delta_clicks is not None:
                 setup.adjust(spec, slot, ch.delta_clicks)
             else:
-                errors.append(err_needs_value(ch.param, lang))
+                errors.append(err_needs_value(tr(spec.label, lang), lang))
         except ValueError as e:
             errors.append(str(e))
     return errors
@@ -344,6 +344,7 @@ def register_setup_routes(app: FastAPI, root=DEFAULT_ROOTS) -> None:
         """
         from ..engineer.core import symptom_words
         from ..engineer.ledger import read, side_effect_counts, summarise
+        from .labels import param_label
         rows = read(car=car, track=track)
         s = summarise(rows)
         return {
@@ -353,6 +354,9 @@ def register_setup_routes(app: FastAPI, root=DEFAULT_ROOTS) -> None:
             "median_gain_ms": s.median_gain_ms,
             "by_param": {k: {"kept": v[0], "tests": v[1]}
                          for k, v in sorted(s.by_param.items())},
+            # Il nome della leva come lo scrive l'editor, per chiave: la pagina
+            # mostrava «aRBFront».
+            "labels": {k: param_label(k, lang) for k in s.by_param},
             "by_symptom": {k: {"kept": v[0], "tests": v[1]}
                            for k, v in sorted(s.by_symptom.items())},
             # Does "most effective first" hold up? Ranks are ints; JSON keys
@@ -360,6 +364,7 @@ def register_setup_routes(app: FastAPI, root=DEFAULT_ROOTS) -> None:
             "by_rank": {str(k): {"kept": v[0], "tests": v[1]}
                         for k, v in sorted(s.by_rank.items())},
             "side_effects": [{"param": p, "symptom": sym, "seen": n,
+                              "label": param_label(p, lang),
                               "words": symptom_words(sym, lang)}
                              for (p, sym), n in
                              sorted(side_effect_counts(rows).items(),

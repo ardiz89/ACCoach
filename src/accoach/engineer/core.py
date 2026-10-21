@@ -357,7 +357,7 @@ _FUEL_BIAS_L = 2.0
 _DECISION_MSG = {
     "collect": {
         "en": "I need {n} clean laps for a baseline, and I have {have} so far.",
-        "it": "Servono {n} giri puliti per avere una base, per ora ne ho {have}.",
+        "it": "Servono {n} giri puliti per avere una base e per ora ne ho {have}.",
     },
     "done": {
         "en": "The setup is sorted, I can't find anything else to gain. It's a "
@@ -388,7 +388,7 @@ _DECISION_MSG = {
               "questione di guida.",
     },
     "evaluating": {
-        "en": "I'm judging the change. {laps}",
+        "en": "I'm still testing the change. {laps}",
         "it": "Sto valutando la modifica. {laps}",
     },
     # Quanti giri mancano, con la frase intera: «serve 1 giro», «servono 2 giri».
@@ -519,6 +519,11 @@ _DECISION_MSG = {
         "en": " We weren't aiming at it, but the {items} moved too.",
         "it": " Non lo cercavamo, ma si è mosso anche il {items}.",
     },
+    # Due o più: «si sono mossi anche il X e il Y».
+    "side_effects": {
+        "en": " We weren't aiming at them, but the {items} moved too.",
+        "it": " Non li cercavamo, ma si sono mossi anche il {items}.",
+    },
     "side_effect_and": {"en": " and the ", "it": " e il "},
     # Sa cosa proverebbe e non sa quanto vale un click di quella leva su
     # quest'auto. Lo dice, col nome della leva, e non lo scrive.
@@ -529,8 +534,8 @@ _DECISION_MSG = {
               "lo fai tu a mano, io non riesco a seguirlo.",
     },
     "no_step_plain": {
-        "en": "I'd try this change, but I'm not writing it, because {why}. {what}",
-        "it": "Proverei questa modifica, ma non la scrivo, perché {why}. {what}",
+        "en": "{what} I won't write it myself, because {why}.",
+        "it": "{what} Non la scrivo, perché {why}.",
     },
     "reason_noeffect": {
         "en": "The change had no measurable effect",
@@ -539,8 +544,10 @@ _DECISION_MSG = {
 }
 
 # Il ripristino nomina la modifica provata fra virgolette (`ProposedChange.named`).
-_REVERT_TEXT = {"en": "Undo the change you tried, “{what}”.",
-                "it": "Annulla la modifica che hai provato, «{what}»."}
+# Ne' «Annulla» (e' il bottone che chiude la finestra) ne' «Togli» (e' spesso la
+# prima parola della modifica citata: «Togli la modifica… «Togli 1 click…»»).
+_REVERT_TEXT = {"en": "Set the car back to before the change you tried, “{what}”.",
+                "it": "Riporta l'assetto a prima della modifica che hai provato, «{what}»."}
 
 # Un sintomo detto come lo direbbe un ingegnere al pilota, non come la stringa
 # tecnica «oversteer exit low» che resta nei messaggi del ciclo di prova.
@@ -548,26 +555,29 @@ _BALANCE_WORDS = {
     Balance.UNDERSTEER: {"en": "understeer", "it": "sottosterzo"},
     Balance.OVERSTEER: {"en": "oversteer", "it": "sovrasterzo"},
 }
+# In inglese l'ordine e' fase + bilanciamento + velocita' («mid-corner understeer
+# in slow corners»), in italiano bilanciamento + fase + velocita'; `{bal}` e'
+# il sottosterzo o il sovrasterzo.
 _PLACE_WORDS = {
-    (Phase.ENTRY, Speed.LOW): {"en": "on entry to slow corners",
-                               "it": "in ingresso alle curve lente"},
-    (Phase.ENTRY, Speed.HIGH): {"en": "on entry to fast corners",
-                                "it": "in ingresso alle curve veloci"},
-    (Phase.APEX, Speed.LOW): {"en": "mid-corner in slow corners",
-                              "it": "a centro curva nelle curve lente"},
-    (Phase.APEX, Speed.HIGH): {"en": "mid-corner in fast corners",
-                               "it": "a centro curva nelle curve veloci"},
-    (Phase.EXIT, Speed.LOW): {"en": "on exit from slow corners",
-                              "it": "in uscita dalle curve lente"},
-    (Phase.EXIT, Speed.HIGH): {"en": "on exit from fast corners",
-                               "it": "in uscita dalle curve veloci"},
+    (Phase.ENTRY, Speed.LOW): {"en": "entry {bal} in slow corners",
+                               "it": "{bal} in ingresso alle curve lente"},
+    (Phase.ENTRY, Speed.HIGH): {"en": "entry {bal} in fast corners",
+                                "it": "{bal} in ingresso alle curve veloci"},
+    (Phase.APEX, Speed.LOW): {"en": "mid-corner {bal} in slow corners",
+                              "it": "{bal} in percorrenza nelle curve lente"},
+    (Phase.APEX, Speed.HIGH): {"en": "mid-corner {bal} in fast corners",
+                               "it": "{bal} in percorrenza nelle curve veloci"},
+    (Phase.EXIT, Speed.LOW): {"en": "exit {bal} in slow corners",
+                              "it": "{bal} in uscita dalle curve lente"},
+    (Phase.EXIT, Speed.HIGH): {"en": "exit {bal} in fast corners",
+                               "it": "{bal} in uscita dalle curve veloci"},
 }
 
 
 def _symptom_words(sym: Symptom, lang: str) -> str:
     bal = _BALANCE_WORDS[sym.balance]
     place = _PLACE_WORDS[(sym.phase, sym.speed)]
-    return f"{bal.get(lang) or bal['en']} {place.get(lang) or place['en']}"
+    return (place.get(lang) or place["en"]).format(bal=bal.get(lang) or bal["en"])
 
 
 # --- la memoria fra una sessione e l'altra ---------------------------------
@@ -669,7 +679,7 @@ def _side_effect_tail(outcome: "Outcome", lang: str) -> str:
              for sym, delta in outcome.side_effects]
     items = _msg("side_effect_and", lang).join(
         [", ".join(parts[:-1]), parts[-1]] if len(parts) > 1 else parts)
-    return _msg("side_effect", lang, items=items)
+    return _msg("side_effects" if len(parts) > 1 else "side_effect", lang, items=items)
 
 
 def _median_time(window: list[LapStats]) -> float:

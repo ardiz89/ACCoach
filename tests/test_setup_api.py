@@ -322,3 +322,16 @@ def test_a_plain_name_still_writes(tmp_path):
     r = _apply_con_nome(c, path, "gara v1.2 bagnato")
     assert r.status_code == 200, r.text
     assert r.json()["name"] == "gara v1.2 bagnato"
+
+
+def test_a_slot_error_names_the_parameter_as_the_editor_does(tmp_path):
+    """«slot richiesto per 'tyrePressure'» parlava la lingua del file, non
+    quella del pilota: l'errore usa il nome dell'editor."""
+    c, path = _client(tmp_path)
+    body = {"path": path, "changes": [{"param": "tyrePressure", "slot": "XX",
+                                       "delta_clicks": 1}]}
+    it = c.post("/api/setup/preview", params={"lang": "it"}, json=body).json()
+    assert it["ok"] is False
+    assert "«Pressione»" in it["errors"][0] and "tyrePressure" not in it["errors"][0]
+    en = c.post("/api/setup/preview", params={"lang": "en"}, json=body).json()
+    assert "“Pressure”" in en["errors"][0]

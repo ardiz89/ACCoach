@@ -103,21 +103,21 @@ _IT: dict[str, str] = {
     "The car understeers on entry to fast corners, so take 1 click of rear wing off.":
         "Hai sottosterzo in ingresso alle curve veloci, quindi togli 1 click di ala posteriore.",
     "The car understeers mid-corner in slow corners, so take 1 click of differential preload off.":
-        "Hai sottosterzo a centro curva nelle curve lente, quindi togli 1 click di precarico al differenziale.",
+        "Hai sottosterzo in percorrenza nelle curve lente, quindi togli 1 click di precarico al differenziale.",
     "The car understeers mid-corner, so soften the front anti-roll bar by 1 click.":
-        "Hai sottosterzo a centro curva, quindi ammorbidisci la barra antirollio anteriore di 1 click.",
+        "Hai sottosterzo in percorrenza, quindi ammorbidisci la barra antirollio anteriore di 1 click.",
     "The car understeers mid-corner, so soften the front springs by 1 click.":
-        "Hai sottosterzo a centro curva, quindi ammorbidisci le molle anteriori di 1 click.",
+        "Hai sottosterzo in percorrenza, quindi ammorbidisci le molle anteriori di 1 click.",
     "The car understeers mid-corner, so add 1 click of negative front camber.":
-        "Hai sottosterzo a centro curva, quindi aumenta il camber negativo anteriore di 1 click.",
+        "Hai sottosterzo in percorrenza, quindi aumenta il camber negativo anteriore di 1 click.",
     "The car understeers mid-corner in fast corners, so take 1 click of rear wing off.":
-        "Hai sottosterzo a centro curva nelle curve veloci, quindi togli 1 click di ala posteriore.",
+        "Hai sottosterzo in percorrenza nelle curve veloci, quindi togli 1 click di ala posteriore.",
     "The car understeers mid-corner in fast corners, so add 1 click of front splitter.":
-        "Hai sottosterzo a centro curva nelle curve veloci, quindi aumenta lo splitter anteriore di 1 click.",
+        "Hai sottosterzo in percorrenza nelle curve veloci, quindi aumenta lo splitter anteriore di 1 click.",
     "The car understeers mid-corner in fast corners, so raise the rear by 1 click for more rake.":
-        "Hai sottosterzo a centro curva nelle curve veloci, quindi alza il posteriore di 1 click per avere più rake.",
+        "Hai sottosterzo in percorrenza nelle curve veloci, quindi alza il posteriore di 1 click per avere più rake.",
     "The car understeers mid-corner in fast corners, so add 1 click of front wing.":
-        "Hai sottosterzo a centro curva nelle curve veloci, quindi aumenta l'ala anteriore di 1 click.",
+        "Hai sottosterzo in percorrenza nelle curve veloci, quindi aumenta l'ala anteriore di 1 click.",
     "The car understeers on exit from slow corners under power, so take 1 click of differential preload off.":
         "Hai sottosterzo in uscita dalle curve lente quando dai gas, quindi togli 1 click di precarico al differenziale.",
     "The car understeers on exit, so soften the rear anti-roll bar by 1 click.":
@@ -147,17 +147,17 @@ _IT: dict[str, str] = {
     "The car oversteers on entry to fast corners, so soften the rear anti-roll bar by 1 click.":
         "Hai sovrasterzo in ingresso alle curve veloci, quindi ammorbidisci la barra antirollio posteriore di 1 click.",
     "The car oversteers mid-corner in slow corners, so soften the rear anti-roll bar by 1 click.":
-        "Hai sovrasterzo a centro curva nelle curve lente, quindi ammorbidisci la barra antirollio posteriore di 1 click.",
+        "Hai sovrasterzo in percorrenza nelle curve lente, quindi ammorbidisci la barra antirollio posteriore di 1 click.",
     "The car oversteers mid-corner, so add 1 click of differential preload.":
-        "Hai sovrasterzo a centro curva, quindi aumenta il precarico del differenziale di 1 click.",
+        "Hai sovrasterzo in percorrenza, quindi aumenta il precarico del differenziale di 1 click.",
     "The car oversteers mid-corner, so soften the rear anti-roll bar by 1 click.":
-        "Hai sovrasterzo a centro curva, quindi ammorbidisci la barra antirollio posteriore di 1 click.",
+        "Hai sovrasterzo in percorrenza, quindi ammorbidisci la barra antirollio posteriore di 1 click.",
     "The car oversteers mid-corner, so add 1 click of rear toe-in.":
-        "Hai sovrasterzo a centro curva, quindi aumenta il toe-in posteriore di 1 click.",
+        "Hai sovrasterzo in percorrenza, quindi aumenta il toe-in posteriore di 1 click.",
     "The car oversteers mid-corner in fast corners, so add 1 click of rear wing.":
-        "Hai sovrasterzo a centro curva nelle curve veloci, quindi aumenta l'ala posteriore di 1 click.",
+        "Hai sovrasterzo in percorrenza nelle curve veloci, quindi aumenta l'ala posteriore di 1 click.",
     "The car oversteers mid-corner in fast corners, so soften the rear anti-roll bar by 1 click.":
-        "Hai sovrasterzo a centro curva nelle curve veloci, quindi ammorbidisci la barra antirollio posteriore di 1 click.",
+        "Hai sovrasterzo in percorrenza nelle curve veloci, quindi ammorbidisci la barra antirollio posteriore di 1 click.",
     "The car oversteers on exit under power, so add 1 click of traction control.":
         "Hai sovrasterzo in uscita quando dai gas, quindi aumenta il controllo di trazione di 1 click.",
     "The car oversteers on exit, so soften the rear anti-roll bar by 1 click.":
@@ -264,11 +264,6 @@ def remedy(param: str, target, step: int, why: str, tag: str = "BOX"):
 def _psi(v: float, lang: str) -> str:
     return fmt_num(v, 1, lang, "psi")
 
-
-def _signed_clicks(n: int, lang: str) -> str:
-    """«+8», «−8»: il segno sempre, il meno tipografico."""
-    text = fmt_num(n, 0, lang)
-    return "+" + text if n > 0 else text
 
 
 class PressurePhase(WorkPhase):
@@ -389,26 +384,31 @@ class PressurePhase(WorkPhase):
             reached = cur + clicks * ppc
             short = clicks != wanted
             lang = current_language()
-            n = _signed_clicks(clicks, lang)
+            n = fmt_num(abs(clicks), 0, lang)
             now, to = _psi(cur, lang), _psi(reached, lang)
             window = _psi(self.target, lang)
+            up = clicks > 0
             if lang == "it":
                 # …e in italiano l'asse ha un nome italiano: la frase diceva
                 # "Pressione front", meta' tradotta, nell'unico punto dell'app
                 # dove il pilota legge un numero e poi va a girare una manopola.
                 axis = "anteriore" if ax == "front" else "posteriore"
+                act = (f"aggiungi {n} click e sali a {to}" if up
+                       else f"togli {n} click e scendi a {to}")
                 why = (f"La pressione {axis} è {now}, fuori dalla finestra di "
-                       f"circa {window}, quindi dai {n} click e arrivi a {to}.")
+                       f"circa {window}, quindi {act}.")
                 if short:
                     why += " È il massimo per una sosta, il resto al prossimo rientro."
-                lever = f"{n} click alla pressione {axis}"
+                lever = f"{n} click {'in più' if up else 'in meno'} alla pressione {axis}"
             else:
-                clicks_word = "click" if abs(clicks) == 1 else "clicks"
+                word = "click" if abs(clicks) == 1 else "clicks"
+                act = (f"add {n} {word} to bring it up to {to}" if up
+                       else f"take {n} {word} off to bring it down to {to}")
                 why = (f"{ax.capitalize()} pressure is {now}, outside the window "
-                       f"of about {window}, so give it {n} {clicks_word} to reach "
-                       f"{to}.")
+                       f"of about {window}, so {act}.")
                 if short:
                     why += " That's the most for one stop, the rest next time in."
-                lever = f"{n} {clicks_word} of {ax} pressure"
+                lever = (f"{n} {'more' if up else 'fewer'} {word} of {ax} "
+                         f"pressure")
             return ProposedChange(atomics, why, tr(self.label), "BOX", lever=lever)
         return None

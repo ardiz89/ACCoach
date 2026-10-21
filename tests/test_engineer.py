@@ -274,11 +274,12 @@ def test_phase_done_label_is_italian(it_lang):
 def test_rationale_is_italian(it_lang):
     eng = _eng()
     d = _drive_to_aero(eng, Symptom(U, AP, HI), 0.6)   # rearWing −1
-    assert d.change.rationale == ("Hai sottosterzo a centro curva nelle curve veloci, "
+    assert d.change.rationale == ("Hai sottosterzo in percorrenza nelle curve veloci, "
                                   "quindi togli 1 click di ala posteriore.")
     # the reverted change names the change it undoes, in Italian
     assert d.change.reversed().rationale == (
-        "Annulla la modifica che hai provato, «Togli 1 click di ala posteriore».")
+        "Riporta l'assetto a prima della modifica che hai provato, "
+        "«Togli 1 click di ala posteriore».")
 
 
 def test_exhausting_remedies_flags_driving_issue():
