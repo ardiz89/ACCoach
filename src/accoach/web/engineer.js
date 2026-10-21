@@ -659,6 +659,9 @@ function prepareChange(changes) {
   }
   rerender();
   if (applied) {
+    // Sugli schermi stretti l'editor sta nell'altra scheda: ci si va, se no la
+    // modifica si prepara dove non la vedi.
+    setTab("setup");
     $("setup-body").scrollIntoView({ behavior: "smooth", block: "start" });
     showToast(missing ? t("eng.prepared.some") : t("eng.prepared.ok"));
   } else {
@@ -690,6 +693,10 @@ function pendingChanges() {
 function renderTray() {
   const changes = pendingChanges();
   const tray = $("tray");
+  // Il numero sulla scheda Setup: dalla diagnosi il vassoio non si vede.
+  const badge = $("tab-count");
+  badge.hidden = !changes.length;
+  badge.textContent = String(changes.length);
   if (!changes.length) { tray.hidden = true; return; }
   tray.hidden = false;
   $("tray-count").textContent = `(${changes.length})`;
@@ -907,6 +914,7 @@ function applyLive(st) {
   state.lastLive = st;             // remembered so a language switch can re-render
   const badge = $("live-badge");
   if (!st.connected) {
+    traceReset();
     badge.dataset.state = "off"; $("live-text").textContent = t("live.offline");
     $("live-car").textContent = t("eng.waiting");
     // Don't leave the gauges, proposal, focus and pit reminder frozen with the
@@ -930,6 +938,7 @@ function applyLive(st) {
   $("g-abs").textContent = AID(st.aids && st.aids.abs);
   $("g-map").textContent = AID(st.aids && st.aids.engine_map);
   updateTyres(st.tyres);
+  tracePush(st);
 
   renderEngineer(st);
   renderFocus(st);
@@ -939,6 +948,135 @@ function applyLive(st) {
   // Auto-pick the matching combo once, if the user hasn't chosen yet.
   maybeAutoSelect(st.car, st.track);
 }
+
+// ---- pedals and steering trace -------------------------------------------
+// Gli ultimi secondi di gas, freno e sterzo, che scorrono verso sinistra. Lo
+// sterzo e' centrato (dritto a meta', sinistra in alto, come nel Confronto del
+// report) e la sua scala e' il volante piu' girato visto nella sessione, mai
+// sotto TRACE_STEER_FLOOR: sui giri veri la GT3 sta fra 0.33 e 0.9 e la Formula
+// arriva a 1.0. Cresce e basta, cosi' la linea non cambia scala a ogni curva.
+// Gemella della striscia dell'overlay (overlay.py, _draw_pedals).
+
+const TRACE_WINDOW_MS = 8000;
+const TRACE_STEER_FLOOR = 0.3;
+const trace = { hist: [], steerScale: TRACE_STEER_FLOOR };
+
+function traceReset() {
+  trace.hist = [];
+  trace.steerScale = TRACE_STEER_FLOOR;
+  for (const id of ["tr-thr", "tr-brk", "tr-steer"]) $(id).textContent = "–";
+  traceDraw();
+}
+
+function tracePush(st) {
+  const thr = Number(st.throttle), brk = Number(st.brake);
+  if (st.throttle == null || st.brake == null || !isFinite(thr) || !isFinite(brk)) return;
+  const steer = isFinite(Number(st.steer)) ? Number(st.steer) : 0;
+  const now = performance.now();
+  trace.hist.push([now, thr, brk, steer]);
+  trace.steerScale = Math.max(trace.steerScale, Math.abs(steer));
+  const cutoff = now - TRACE_WINDOW_MS;
+  let drop = 0;
+  while (drop < trace.hist.length && trace.hist[drop][0] < cutoff) drop++;
+  if (drop) trace.hist.splice(0, drop);
+  $("tr-thr").textContent = Math.round(thr * 100) + "%";
+  $("tr-brk").textContent = Math.round(brk * 100) + "%";
+  const side = steer > 0.02 ? "◀ " : steer < -0.02 ? "▶ " : "";
+  $("tr-steer").textContent = side + Math.round(Math.abs(steer) * 100) + "%";
+  traceDraw(now);
+}
+
+function traceDraw(now) {
+  const cv = $("trace-canvas");
+  // Nascosto (l'altra scheda): niente da disegnare, la storia intanto si
+  // aggiorna e al ritorno si vede tutta.
+  if (!cv || !cv.offsetWidth) return;
+  const dpr = window.devicePixelRatio || 1;
+  const w = cv.offsetWidth, h = cv.offsetHeight;
+  if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) {
+    cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+  }
+  const ctx = cv.getContext("2d");
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+  const css = getComputedStyle(document.documentElement);
+  const col = (n, d) => (css.getPropertyValue(n).trim() || d);
+  const pad = 4, ph = h - 2 * pad;
+  const y = (v) => pad + ph * (1 - Math.max(0, Math.min(1, v)));
+  // griglia 0 / 50 / 100 %; la riga di mezzo e' anche lo sterzo dritto
+  ctx.strokeStyle = col("--line", "#232B35");
+  ctx.lineWidth = 1;
+  for (const f of [0, 0.5, 1]) {
+    const gy = Math.round(y(f)) + 0.5;
+    ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(w, gy); ctx.stroke();
+  }
+  const hist = trace.hist;
+  if (hist.length < 2) return;
+  const t1 = now == null ? performance.now() : now;
+  const x = (t0) => w * (1 - (t1 - t0) / TRACE_WINDOW_MS);
+  const k = 0.5 / trace.steerScale;
+  const draw = (pick, colour, width) => {
+    ctx.strokeStyle = colour; ctx.lineWidth = width;
+    ctx.lineJoin = "round"; ctx.lineCap = "round";
+    ctx.beginPath();
+    hist.forEach((s, i) => {
+      const px = x(s[0]), py = y(pick(s));
+      if (i) ctx.lineTo(px, py); else ctx.moveTo(px, py);
+    });
+    ctx.stroke();
+  };
+  // lo sterzo per primo, cosi' i pedali gli restano sopra
+  draw((s) => 0.5 + s[3] * k, col("--text", "#E8EDF2"), 1.5);
+  draw((s) => s[2], col("--red", "#FF4D5E"), 2);
+  draw((s) => s[1], col("--green", "#34E08A"), 2);
+}
+
+// ---- tabs (narrow screens) -------------------------------------------------
+// Sotto i 1440 px diagnosi e assetto sono due schede (engineer.css); sopra sono
+// affiancate e questa logica non cambia niente di visibile. Si apre sempre
+// sulla telemetria: e' quella che serve in pista, l'assetto si apre ai box.
+
+function setTab(name) {
+  document.documentElement.dataset.tab = name;
+  for (const b of document.querySelectorAll(".eng-tab")) {
+    b.setAttribute("aria-selected", String(b.dataset.tab === name));
+  }
+  if (name === "live") traceDraw();
+}
+
+const narrow = window.matchMedia("(max-width: 1439px)");
+
+for (const b of document.querySelectorAll(".eng-tab")) {
+  b.onclick = () => setTab(b.dataset.tab);
+}
+
+// Lo scorrimento col dito. Dito verso sinistra = la scheda a destra (Setup),
+// verso destra = la telemetria. Deve essere netto e soprattutto orizzontale,
+// se no e' uno scorrimento della pagina. Non parte dai comandi dell'editor:
+// i bottoni +/- si tengono premuti e un dito che scivola li' non vuole
+// cambiare scheda.
+(function wireSwipe() {
+  const area = $("eng-layout");
+  let start = null;
+  area.addEventListener("touchstart", (ev) => {
+    start = null;
+    if (!narrow.matches || ev.touches.length !== 1) return;
+    if (ev.target.closest(".slot, button, input, select, textarea")) return;
+    const p = ev.touches[0];
+    start = { x: p.clientX, y: p.clientY };
+  }, { passive: true });
+  area.addEventListener("touchend", (ev) => {
+    if (!start) return;
+    const p = ev.changedTouches[0];
+    const dx = p.clientX - start.x, dy = p.clientY - start.y;
+    start = null;
+    if (Math.abs(dx) < 60 || Math.abs(dx) < 1.5 * Math.abs(dy)) return;
+    setTab(dx < 0 ? "setup" : "live");
+  }, { passive: true });
+  area.addEventListener("touchcancel", () => { start = null; }, { passive: true });
+})();
+
+window.addEventListener("resize", () => traceDraw());
 
 // Highlight, in cyan, the slots the engineer is currently proposing to change —
 // distinct from the amber "you changed it" state. Updated in place (the live

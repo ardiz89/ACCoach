@@ -718,6 +718,11 @@
     "live.ontrack":    { en: `on track`, it: `in pista` },
 
     "eng.liveDiag":    { en: `Live diagnosis`, it: `Diagnosi live` },
+    "tabs.aria":       { en: `Sections`, it: `Sezioni` },
+    "trace.title":     { en: `Pedals and steering`, it: `Pedali e sterzo` },
+    "trace.thr":       { en: `Throttle`, it: `Gas` },
+    "trace.brk":       { en: `Brake`, it: `Freno` },
+    "trace.steer":     { en: `Steering`, it: `Sterzo` },
     "eng.waiting":     { en: `Waiting for telemetry…`, it: `In attesa di telemetria…` },
     "g.speed":         { en: `Speed`, it: `Velocità` },
     "g.gear":          { en: `Gear`, it: `Marcia` },
@@ -750,8 +755,8 @@
     // acceso restava su «in attesa di telemetria» per sempre mentre il coach gli
     // parlava nelle cuffie. I due non possono nemmeno convivere: registrano
     // entrambi, e insieme salverebbero ogni giro due volte.
-    "eng.hint":        { en: `This page is fed by the <b>live backend</b> — hub → <b>Devices</b> → 📡 Live backend. Coach Live does not feed it, and the two can't run together (they'd both record). The changes on the right apply to the setup file: they must be <b>loaded in the pits</b>, they don't change the car while you drive.`,
-                         it: `Questa pagina la alimenta il <b>backend live</b> — hub → <b>Dispositivi</b> → 📡 Backend live. Coach Live non la alimenta, e i due non possono stare accesi insieme (registrano entrambi). Le modifiche a destra agiscono sul file di setup: vanno <b>caricate ai box</b>, non cambiano l'auto mentre guidi.` },
+    "eng.hint":        { en: `This page is fed by the <b>live backend</b> — hub → <b>Devices</b> → 📡 Live backend. Coach Live does not feed it, and the two can't run together (they'd both record). The changes in <b>Setup</b> apply to the setup file: they must be <b>loaded in the pits</b>, they don't change the car while you drive.`,
+                         it: `Questa pagina la alimenta il <b>backend live</b> — hub → <b>Dispositivi</b> → 📡 Backend live. Coach Live non la alimenta, e i due non possono stare accesi insieme (registrano entrambi). Le modifiche in <b>Setup</b> agiscono sul file di setup: vanno <b>caricate ai box</b>, non cambiano l'auto mentre guidi.` },
 
     "setup.title":     { en: `Setup`, it: `Setup` },
     "legend2.click":   { en: `<b>click</b> = game step`, it: `<b>click</b> = scatto di gioco` },

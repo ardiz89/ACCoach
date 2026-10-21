@@ -27,6 +27,10 @@ def snapshot_to_dict(s: TelemetrySnapshot) -> dict:
         "max_rpm": s.max_rpm,
         "throttle": round(s.throttle, 3),
         "brake": round(s.brake, 3),
+        # Il volante: -1..1 sui giri veri (la Formula arriva al bordo), positivo
+        # a sinistra. Lo disegnano la striscia dei pedali dell'overlay e il
+        # grafico della pagina Ingegnere, sotto gas e freno.
+        "steer": round(s.steer_angle, 3),
         "in_pit": s.in_pit,
         "lap_position": round(s.lap_position, 4),
         "aids": {

@@ -79,6 +79,13 @@ _BASE_W, _BASE_H = 560, 210   # design size; the window is this × the config sc
 _PEDAL_PANEL_H = 128          # extra window height (base coords) when pedals on
 _PEDAL_WINDOW_S = 6.0         # seconds of history the strip shows
 _PEDAL_EPS = 0.04             # below this a pedal counts as released (coasting)
+# Lo sterzo sta nella stessa striscia, centrato: dritto a meta' altezza, sinistra
+# in alto (come nel Confronto del report). La scala e' il volante piu' girato
+# visto finora in sessione, mai sotto questo pavimento: sui giri veri la GT3 sta
+# fra 0.33 e 0.9, la Formula arriva a 1.0, e una scala fissa a +-1 schiaccerebbe
+# una curva veloce in una riga piatta. Cresce e basta, cosi' la linea non cambia
+# scala sotto gli occhi a ogni curva.
+_STEER_FLOOR = 0.3
 
 # HONE palette (see accoach.brand). QColor wants ints, so they're spelled here.
 _CYAN = QColor(0x22, 0xD3, 0xCE)     # brand mark / cue accent
@@ -244,9 +251,10 @@ class Overlay(QWidget):
         # Edge detection for the "green — flying lap" flash.
         self._prev_quiet: str = ""
         self._green_at: float = 0.0
-        # Rolling (t, throttle, brake) samples for the optional pedal strip.
+        # Rolling (t, throttle, brake, steer) samples for the optional pedal strip.
         self._show_pedals = pedals
-        self._pedal_hist: list[tuple[float, float, float]] = []
+        self._pedal_hist: list[tuple[float, float, float, float]] = []
+        self._steer_scale = _STEER_FLOOR
 
         flags = Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool
         if not interactive:
@@ -322,11 +330,13 @@ class Overlay(QWidget):
         if thr is None or brk is None:
             return
         now = time.monotonic()
-        self._pedal_hist.append((now, float(thr), float(brk)))
+        steer = float(data.get("steer") or 0.0)
+        self._steer_scale = max(self._steer_scale, abs(steer))
+        self._pedal_hist.append((now, float(thr), float(brk), steer))
         # Drop samples older than the visible window (they scroll off the left).
         cutoff = now - _PEDAL_WINDOW_S
         drop = 0
-        for t0, _, _ in self._pedal_hist:
+        for t0, *_ in self._pedal_hist:
             if t0 >= cutoff:
                 break
             drop += 1
@@ -770,11 +780,14 @@ class Overlay(QWidget):
 
     # --- live pedal trace --------------------------------------------------
     def _draw_pedals(self, p: QPainter, w: int) -> None:
-        """Rolling throttle (green) / brake (red) strip under the HUD.
+        """Rolling throttle (green) / brake (red) / steering (white) strip.
 
         Reads the trail-brake overlap and the coasting gaps ("tempo morto") at a
         glance: the ribbon below the plot is amber while both pedals are pressed
-        (trailing) and grey while neither is (coasting)."""
+        (trailing) and grey while neither is (coasting). The steering line is
+        centred (straight = middle, left = up) so you see where the pedals move
+        against the wheel: gas going in with the lock still on, braking while
+        already turning."""
         top = _BASE_H
         px, pw = 28, w - 56
         plot_top, plot_h = top + 30, 64
@@ -803,7 +816,7 @@ class Overlay(QWidget):
 
         # ribbon: colour each time-span by pedal state (uses the left sample)
         for i in range(len(hist) - 1):
-            t0, thr, brk = hist[i]
+            t0, thr, brk, _ = hist[i]
             x0 = xy(t0, 0.0).x()
             x1 = xy(hist[i + 1][0], 0.0).x()
             col = None
@@ -816,10 +829,18 @@ class Overlay(QWidget):
                 p.setBrush(col)
                 p.drawRect(int(x0), ribbon_y, max(1, int(x1 - x0) + 1), ribbon_h)
 
-        # traces
+        # traces — the steering first, so the pedals stay on top of it
         if len(hist) >= 2:
-            brake_line = QPolygonF([xy(t0, brk) for t0, _, brk in hist])
-            thr_line = QPolygonF([xy(t0, thr) for t0, thr, _ in hist])
+            k = 0.5 / self._steer_scale
+            steer_line = QPolygonF([xy(t0, 0.5 + st * k) for t0, _, _, st in hist])
+            pen = QPen(_WHITE, 1.5)
+            pen.setJoinStyle(Qt.RoundJoin)
+            pen.setCapStyle(Qt.RoundCap)
+            p.setPen(pen)
+            p.setBrush(Qt.NoBrush)
+            p.drawPolyline(steer_line)
+            brake_line = QPolygonF([xy(t0, brk) for t0, _, brk, _ in hist])
+            thr_line = QPolygonF([xy(t0, thr) for t0, thr, _, _ in hist])
             pen = QPen(_RED, 2)
             pen.setJoinStyle(Qt.RoundJoin)
             pen.setCapStyle(Qt.RoundCap)
@@ -833,9 +854,9 @@ class Overlay(QWidget):
             p.drawPolyline(thr_line)
 
         # header: live readouts + current state tag
-        thr = brk = 0.0
+        thr = brk = steer = 0.0
         if hist:
-            _, thr, brk = hist[-1]
+            _, thr, brk, steer = hist[-1]
         self._set_font(p, 11, bold=True, mono=True)
         p.setPen(Qt.NoPen)
         p.setBrush(_GREEN)
@@ -849,6 +870,14 @@ class Overlay(QWidget):
         p.setPen(_RED)
         p.drawText(px + 128, top + 6, 96, 16, Qt.AlignVCenter,
                    f"{t('overlay.brake_pedal')} {brk * 100:3.0f}%")
+        # Lo sterzo con la sua freccia: il numero da solo non dice da che parte.
+        p.setPen(Qt.NoPen)
+        p.setBrush(_WHITE)
+        p.drawEllipse(px + 232, top + 10, 7, 7)
+        p.setPen(_WHITE)
+        side = "◀" if steer > 0.02 else "▶" if steer < -0.02 else " "
+        p.drawText(px + 244, top + 6, 110, 16, Qt.AlignVCenter,
+                   f"{t('overlay.steer')} {side}{abs(steer) * 100:3.0f}%")
 
         tag, tag_col = self._pedal_tag(now)
         if tag:
@@ -862,12 +891,12 @@ class Overlay(QWidget):
         hist = self._pedal_hist
         if not hist:
             return "", _GREY
-        _, thr, brk = hist[-1]
+        _, thr, brk, _ = hist[-1]
         if thr > _PEDAL_EPS and brk > _PEDAL_EPS:
             return t("overlay.trail"), _AMBER
         if thr <= _PEDAL_EPS and brk <= _PEDAL_EPS:
             start = hist[-1][0]
-            for t0, th, bk in reversed(hist):
+            for t0, th, bk, _ in reversed(hist):
                 if th <= _PEDAL_EPS and bk <= _PEDAL_EPS:
                     start = t0
                 else:

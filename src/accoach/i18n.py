@@ -65,6 +65,7 @@ _UI: dict[str, dict[str, str]] = {
     "overlay.focus": {"en": "FOCUS", "it": "FOCUS"},
     "overlay.throttle_pedal": {"en": "THR", "it": "GAS"},
     "overlay.brake_pedal": {"en": "BRK", "it": "FRENO"},
+    "overlay.steer": {"en": "STEER", "it": "STERZO"},
     "overlay.trail": {"en": "TRAIL", "it": "TRAIL"},
     "overlay.coast": {"en": "COAST", "it": "COAST"},
     # terminal coach
