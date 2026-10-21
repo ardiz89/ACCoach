@@ -375,6 +375,21 @@ def test_every_backend_string_is_escaped_in_the_howto():
     assert not re.search(r"\$\{(?:h|how|f)\.\w+\}", body)
 
 
+def test_the_howto_shows_the_glossary_from_the_backend():
+    """Il glossario della vecchia scheda Allenamento: le voci arrivano dal
+    backend (`glossary`), scritte con l'escape, dopo l'andamento e prima del
+    ritorno in fondo. Senza voci la sezione non c'e'."""
+    body = _body_of("function renderHowto(h)")
+    assert "const gloss = h.glossary || [];" in body
+    assert "if (gloss.length)" in body
+    assert "<dt>${escAttr(g.term)}</dt><dd>${escAttr(g.definition)}</dd>" in body
+    assert 't("howto.gloss")' in body
+    assert body.index('t("howto.prog")') < body.index('t("howto.gloss")') \
+        < body.index('html += back("foot")')
+    assert "Glossario" in _i18n_entry("howto.gloss")
+    assert re.search(r"\.howto-gloss dt\s*\{", _CSS)
+
+
 def test_lift_and_coasting_say_why_there_is_no_figure():
     body = _body_of("function renderHowto(h)")
     nofig = body.split("if (!figs.length || !trace)", 1)[1].split("\n  }", 1)[0]

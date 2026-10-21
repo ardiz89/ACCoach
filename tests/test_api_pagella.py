@@ -612,6 +612,17 @@ def test_howto_without_data_still_explains(tmp_path):
     assert h["howto"]["what"] and h["problem"] is None and h["figures"] == []
 
 
+def test_howto_carries_the_glossary_of_its_defect(tmp_path):
+    _put(tmp_path, "2026-10-20T10:00:00+00:00")
+    c = TestClient(create_api(tmp_path))
+    h = _howto(c, "brake_early")
+    assert {"term": "Punto di frenata",
+            "definition": "Il punto della pista in cui il tuo piede tocca il freno "
+                          "arrivando in curva."} in h["glossary"]
+    en = _howto(c, "brake_early", lang="en")
+    assert "Braking point" in [g["term"] for g in en["glossary"]]
+
+
 def test_howto_carries_the_target_of_its_advice(tmp_path):
     """L'esercizio dice l'obiettivo in numeri (spec, «La vista Come si fa»):
     lo stesso della riga del piano, nella stessa unita'."""

@@ -965,8 +965,18 @@ def glossary_for(drill_key_: str, lang: str = "it") -> list[GlossaryEntry]:
     one exercise at a time, and a definition for a word that isn't on the page
     is the thing that makes a glossary skippable.
     """
-    table = _GLOSSARY.get(lang, _GLOSSARY["en"])
     wanted = set(_ALWAYS_TERMS) | set(_DRILL_TERMS.get(drill_key_, ()))
+    return glossary_of(wanted, lang)
+
+
+def glossary_of(terms, lang: str = "it") -> list[GlossaryEntry]:
+    """Le voci di `terms`, nell'ordine della pagina e al massimo `MAX_GLOSSARY`.
+
+    La porta per chi sceglie da se' le parole: il «Come si fa» della Pagella,
+    che ha preso il posto di questa scheda, le sceglie per difetto.
+    """
+    table = _GLOSSARY.get(lang, _GLOSSARY["en"])
+    wanted = set(terms)
     out = [GlossaryEntry(term=table[k][0], definition=table[k][1])
            for k in _TERM_ORDER if k in wanted and k in table]
     return out[:MAX_GLOSSARY]

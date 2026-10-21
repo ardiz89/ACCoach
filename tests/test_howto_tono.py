@@ -19,6 +19,7 @@ from accoach.coaching.howto import (
     error_name,
     excluded,
     fmt_s,
+    glossary,
     howto,
     problem,
     reached,
@@ -294,3 +295,34 @@ def test_pagella_notes_are_distinct_and_have_no_colon(lang):
 def test_reached_names_the_defect_and_the_count():
     text = reached("min_speed", 4, 6, "it")
     assert "«Poca velocità in curva»" in text and "4 giri su 6" in text
+
+
+# --- il glossario del «Come si fa» --------------------------------------------
+
+@pytest.mark.parametrize("lang", LANGS)
+def test_every_howto_has_its_glossary_from_the_training_one(lang):
+    """Il glossario della vecchia scheda Allenamento vive nei «Come si fa»: le
+    stesse voci (una fonte sola), scelte per le parole di quel difetto, nell'ordine
+    della pagina."""
+    table = training._GLOSSARY[lang]
+    every = {v: k for k, v in table.items()}
+    order = training._TERM_ORDER
+    for k in DEFECTS:
+        g = glossary(k, lang)
+        assert g, k
+        keys = [every[(e.term, e.definition)] for e in g]
+        assert keys == sorted(keys, key=order.index), k
+        assert "reference" in keys, k            # «Il giro con cui HONE confronta…»
+
+
+def test_the_glossary_carries_the_words_of_its_defect_only():
+    terms = {k: {e.term for e in glossary(k, "it")} for k in DEFECTS}
+    assert {"Punto di frenata", "Bloccaggio"} <= terms["brake_early"]
+    assert "Pattinamento" in terms["throttle_late"]
+    assert "Trail braking" in terms["over_brake"]
+    assert "Punto di frenata" not in terms["lift"]
+    assert "Pattinamento" not in terms["brake_early"]
+    # Le voci della scheda vecchia che qui non compaiono mai (settori, ideale).
+    assert not any({"Settore", "Ideale teorico"} & t for t in terms.values())
+    assert [e.term for e in glossary("throttle_late", "en")] == [
+        "Apex", "Reference lap", "Wheelspin"]

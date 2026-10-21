@@ -21,6 +21,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from .defects import DefectSummary
+from .training import GlossaryEntry, glossary_of
 
 
 @dataclass(frozen=True)
@@ -365,6 +366,29 @@ _HOWTO = {
 
 def howto(key: str, lang: str) -> HowTo:
     return HowTo(laps=_LAPS[key], **_HOWTO[_lang(lang)][key])
+
+
+# --- il glossario -------------------------------------------------------------
+
+# Il glossario della vecchia scheda Allenamento (`training._GLOSSARY`), con le
+# sue regole: solo le parole che la pagina usa, nell'ordine della pagina, ed e'
+# sempre la *seconda* spiegazione. Qui la pagina e' il «Come si fa» di un
+# difetto: le parole sono quelle del suo testo e del suo problema, piu' il giro
+# di riferimento, che ogni vista nomina («Misurato contro…»).
+_GLOSSARY_TERMS = {
+    "brake_early": ("brake_point", "min_speed", "reference", "lockup"),
+    "brake_late": ("brake_point", "apex", "reference"),
+    "over_brake": ("brake_point", "apex", "reference", "trail_braking"),
+    "throttle_late": ("apex", "reference", "wheelspin"),
+    "min_speed": ("brake_point", "min_speed", "reference"),
+    "lift": ("reference",),
+    "coasting": ("brake_point", "reference"),
+}
+
+
+def glossary(key: str, lang: str) -> list[GlossaryEntry]:
+    """Le parole del «Come si fa» di `key`, spiegate."""
+    return glossary_of(_GLOSSARY_TERMS.get(key, ("reference",)), _lang(lang))
 
 
 # --- il problema in una frase -----------------------------------------------

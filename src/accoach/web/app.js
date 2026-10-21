@@ -2711,6 +2711,15 @@ function renderHowto(h) {
     ? `<p class="pag-small">${t("howto.prog.lead")}</p><div class="howto-prog">` +
       prog.map((v) => `<span class="num">${fmtSecs(v, h.unit)}</span>`).join("") + `</div>`
     : `<div class="nothing">${t("howto.prog.none")}</div>`) + `</section>`;
+  // Il glossario (era della scheda Allenamento): solo le parole di questa
+  // pagina, già scelte e tradotte dal backend. È la seconda spiegazione, quindi
+  // in fondo.
+  const gloss = h.glossary || [];
+  if (gloss.length) {
+    html += `<section class="pag-box howto-gloss"><h4>${t("howto.gloss")}</h4><dl>` +
+      gloss.map((g) => `<dt>${escAttr(g.term)}</dt><dd>${escAttr(g.definition)}</dd>`).join("") +
+      `</dl></section>`;
+  }
   html += back("foot");
   body.innerHTML = html;
   for (const b of body.querySelectorAll(".howto-back")) b.onclick = () => showView("pagella");

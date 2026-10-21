@@ -29,7 +29,7 @@ from .coaching.defects import (
 from .coaching.errors import lap_errors, session_errors
 from .coaching.trends import clock_covers_lap
 from .coaching.howto import (
-    defect_name, error_name, excluded as excluded_text, howto, problem,
+    defect_name, error_name, excluded as excluded_text, glossary, howto, problem,
     reached as reached_text, reached_by_pilot as reached_by_pilot_text, verdict)
 from .comparison import Reference
 from .recording import load_lap
@@ -692,12 +692,14 @@ def _advice_item(ctx: _Context, a: Advice, p, lang: str) -> dict:
 def build_howto(cat, car: str, track: str, defect: str, index: int,
                 lang: str) -> dict:
     """La vista di un difetto: il problema coi suoi numeri, le figure per curva,
-    l'esercizio e l'andamento da quando lo segui. Sola lettura."""
+    l'esercizio, l'andamento da quando lo segui e le parole spiegate. Sola
+    lettura."""
     if defect not in DEFECTS:
         raise UnknownDefect(defect)
     out = {"defect": defect, "name": defect_name(defect, lang), "problem": None,
            "howto": asdict(howto(defect, lang)), "figures": [], "progress": [],
-           "reference_lap": None, "target": None, "unit": _unit(defect)}
+           "reference_lap": None, "target": None, "unit": _unit(defect),
+           "glossary": [asdict(g) for g in glossary(defect, lang)]}
     ctx = _context(cat, car, track, index, lang)
     out["reference_lap"] = _reference_info(ctx)
     if ctx.excluded:

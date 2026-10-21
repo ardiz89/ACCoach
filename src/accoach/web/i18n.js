@@ -227,6 +227,7 @@
     "howto.target.coast": { en: `Target: under {v} of coasting a lap`,
                             it: `Obiettivo: sotto {v} di veleggio a giro` },
     "howto.prog":      { en: `How it's going`, it: `Come sta andando` },
+    "howto.gloss":     { en: `Glossary`, it: `Glossario` },
     "howto.prog.lead": { en: `This fault in each session since you started following it, the oldest first.`,
                          it: `Questo difetto in ogni sessione da quando lo segui, dalla più vecchia.` },
     "howto.prog.none": { en: `It shows here from the first session after you press «I'll follow it».`,
