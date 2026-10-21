@@ -710,7 +710,7 @@ class LapCatalog:
         """
         from dataclasses import asdict
 
-        from ..coaching.advice import ACTIVE, Advice, AdviceCorner
+        from ..coaching.advice import ACTIVE, PROPOSED, Advice, AdviceCorner
         from ..coaching.cue import CueCategory
         from ..coaching.defects import CATEGORY_OF
 
@@ -725,15 +725,25 @@ class LapCatalog:
             except ValueError:
                 cat = None
             defect = next((k for k, c in CATEGORY_OF.items() if c == cat), None)
-            have = {a["defect"] for a in self.load_advice(car_model, track)}
+            stored = self.load_advice(car_model, track)
+            have = {a["defect"] for a in stored}
+            # Un solo attivo alla volta: se ce n'e' gia' uno, il vecchio piano
+            # entra come proposta (senza data di accettazione).
+            busy = any(a["status"] == ACTIVE for a in stored)
             if defect is not None and defect not in have:
-                base = float(g.get("baseline_ms", 0.0))
-                self.save_advice(car_model, track, asdict(Advice(
-                    defect=defect,
-                    corners=[AdviceCorner(int(g["corner_index"]),
-                                          str(g.get("name", "")), 0.0, base)],
-                    baseline=base, target=float(g.get("target_ms", 0.0)),
-                    status=ACTIVE, accepted_utc=plan.get("created_utc", ""))))
+                try:
+                    base = float(g.get("baseline_ms", 0.0))
+                    adv = Advice(
+                        defect=defect,
+                        corners=[AdviceCorner(int(g["corner_index"]),
+                                              str(g.get("name", "")), 0.0, base)],
+                        baseline=base, target=float(g.get("target_ms", 0.0)),
+                        status=PROPOSED if busy else ACTIVE,
+                        accepted_utc="" if busy else plan.get("created_utc", ""))
+                except (KeyError, TypeError, ValueError):
+                    adv = None      # obiettivo malformato: non si ritenta in eterno
+                if adv is not None:
+                    self.save_advice(car_model, track, asdict(adv))
         self.clear_plan(car_model, track)
 
     def close(self) -> None:

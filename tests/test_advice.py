@@ -140,3 +140,42 @@ def test_an_old_accepted_plan_becomes_the_active_advice(tmp_path):
         assert cat.load_plan("Ferrari 296", "Monza") is None
         cat.migrate_plan_to_advice("Ferrari 296", "Monza")   # senza piano: nulla
         assert len(cat.load_advice("Ferrari 296", "Monza")) == 1
+
+
+_GOAL = {"corner_index": 4, "name": "Parabolica", "category": "brake_later",
+         "what": "x", "fix": "y", "baseline_ms": 200.0, "target_ms": 120.0,
+         "laps_seen": 8}
+
+
+def test_a_migrated_plan_does_not_make_a_second_active_advice(tmp_path):
+    from dataclasses import asdict
+    with LapCatalog(tmp_path / "catalog.db") as cat:
+        cat.save_advice("A", "T", asdict(_adv("over_brake", "active")))
+        cat.save_plan("A", "T", "2026-09-01T09:00:00Z", [_GOAL])
+        cat.migrate_plan_to_advice("A", "T")
+        got = {a["defect"]: a for a in cat.load_advice("A", "T")}
+        assert [d for d, a in got.items() if a["status"] == "active"] == ["over_brake"]
+        assert got["brake_early"]["status"] == "proposed"
+        assert got["brake_early"]["accepted_utc"] == ""
+        assert cat.load_plan("A", "T") is None
+        propose_advice([], [Advice(**{**a, "corners": [AdviceCorner(**c) for c in a["corners"]]})
+                            for a in got.values()], {}, {})
+
+
+def test_a_malformed_old_goal_is_dropped_not_retried_forever(tmp_path):
+    bad = {"category": "brake_later", "baseline_ms": "boh"}
+    with LapCatalog(tmp_path / "catalog.db") as cat:
+        cat.save_plan("A", "T", "2026-09-01T09:00:00Z", [bad])
+        cat.migrate_plan_to_advice("A", "T")
+        assert cat.load_advice("A", "T") == []
+        assert cat.load_plan("A", "T") is None
+
+
+def test_an_existing_declined_advice_beats_the_old_plan(tmp_path):
+    from dataclasses import asdict
+    with LapCatalog(tmp_path / "catalog.db") as cat:
+        cat.save_advice("A", "T", asdict(_adv("brake_early", "declined")))
+        cat.save_plan("A", "T", "2026-09-01T09:00:00Z", [_GOAL])
+        cat.migrate_plan_to_advice("A", "T")
+        (a,) = cat.load_advice("A", "T")
+        assert a["status"] == "declined" and cat.load_plan("A", "T") is None

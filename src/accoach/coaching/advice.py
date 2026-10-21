@@ -86,7 +86,7 @@ def propose_advice(summaries: list[DefectSummary], stored: list[Advice],
         floor = _threshold(s.key) / 2
         picked = [(i, m) for i, m in s.corners if m >= floor][:MAX_CORNERS]
         if picked:
-            corners = [AdviceCorner(i, names.get(i, f"T{i}"), apex.get(i, 0.0), m)
+            corners = [AdviceCorner(i, names.get(i, f"Corner {i + 1}"), apex.get(i, 0.0), m)
                        for i, m in picked]
             baseline = sum(m for _, m in picked)
         elif not s.corners:
