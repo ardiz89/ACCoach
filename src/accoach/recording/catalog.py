@@ -110,6 +110,20 @@ CREATE TABLE IF NOT EXISTS plan (
     goals_json  TEXT NOT NULL,
     PRIMARY KEY (car_key, track_key)
 );
+-- La roadmap dei consigli (Pagella): un consiglio per difetto, uno solo attivo.
+-- `data_json` tiene tutto il consiglio (curve con apex, baseline, target e il
+-- riferimento dello storico contro cui la baseline e' stata misurata); le
+-- colonne servono solo a cercare. Come `plan`, sopravvive al rebuild di `lap`.
+CREATE TABLE IF NOT EXISTS advice (
+    car_key      TEXT NOT NULL,
+    track_key    TEXT NOT NULL,
+    defect       TEXT NOT NULL,
+    status       TEXT NOT NULL,
+    accepted_utc TEXT NOT NULL DEFAULT '',
+    closed_utc   TEXT NOT NULL DEFAULT '',
+    data_json    TEXT NOT NULL,
+    PRIMARY KEY (car_key, track_key, defect)
+);
 -- The race engineer's memory across sessions, per car+track: which phase it had
 -- reached, which remedy is next for each symptom, which symptoms ran out of
 -- remedies, and the clicks already spent on each lever. Without it, reopening
@@ -652,6 +666,75 @@ class LapCatalog:
         self._conn.execute("DELETE FROM plan WHERE car_key=? AND track_key=?",
                            (self._slug(car_model), self._slug(track)))
         self._conn.commit()
+
+    def load_advice(self, car_model: str, track: str) -> list[dict]:
+        """I consigli di questa auto+pista come dict (`Advice` + `reference_path`)."""
+        import json
+
+        rows = self._conn.execute(
+            "SELECT data_json FROM advice WHERE car_key=? AND track_key=? "
+            "ORDER BY accepted_utc, defect",
+            (self._slug(car_model), self._slug(track))).fetchall()
+        out: list[dict] = []
+        for r in rows:
+            try:
+                out.append(json.loads(r["data_json"]))
+            except ValueError:
+                continue
+        return out
+
+    def save_advice(self, car_model: str, track: str, advice: dict) -> None:
+        """Salva (o sostituisce) il consiglio di quel difetto, intero."""
+        import json
+
+        self._conn.execute(
+            """INSERT INTO advice(car_key, track_key, defect, status,
+                                  accepted_utc, closed_utc, data_json)
+               VALUES (?,?,?,?,?,?,?)
+               ON CONFLICT(car_key, track_key, defect) DO UPDATE SET
+                 status=excluded.status, accepted_utc=excluded.accepted_utc,
+                 closed_utc=excluded.closed_utc, data_json=excluded.data_json""",
+            (self._slug(car_model), self._slug(track), advice["defect"],
+             advice["status"], advice.get("accepted_utc", ""),
+             advice.get("closed_utc", ""),
+             json.dumps(advice, ensure_ascii=False)))
+        self._conn.commit()
+
+    def migrate_plan_to_advice(self, car_model: str, track: str) -> None:
+        """Il vecchio piano accettato diventa il consiglio attivo, poi sparisce.
+
+        Il difetto e' quello della categoria del primo obiettivo, con quella
+        curva sola. Un obiettivo vecchio non ha l'apex: si scrive 0.0. Se per quel
+        difetto c'e' gia' un consiglio resta quello. Una categoria senza difetto
+        (perdita generica) non produce nulla: il piano sparisce lo stesso.
+        """
+        from dataclasses import asdict
+
+        from ..coaching.advice import ACTIVE, Advice, AdviceCorner
+        from ..coaching.cue import CueCategory
+        from ..coaching.defects import CATEGORY_OF
+
+        plan = self.load_plan(car_model, track)
+        if plan is None:
+            return
+        goals = plan.get("goals") or []
+        if goals:
+            g = goals[0]
+            try:
+                cat = CueCategory(g.get("category"))
+            except ValueError:
+                cat = None
+            defect = next((k for k, c in CATEGORY_OF.items() if c == cat), None)
+            have = {a["defect"] for a in self.load_advice(car_model, track)}
+            if defect is not None and defect not in have:
+                base = float(g.get("baseline_ms", 0.0))
+                self.save_advice(car_model, track, asdict(Advice(
+                    defect=defect,
+                    corners=[AdviceCorner(int(g["corner_index"]),
+                                          str(g.get("name", "")), 0.0, base)],
+                    baseline=base, target=float(g.get("target_ms", 0.0)),
+                    status=ACTIVE, accepted_utc=plan.get("created_utc", ""))))
+        self.clear_plan(car_model, track)
 
     def close(self) -> None:
         self._conn.close()
