@@ -24,7 +24,8 @@ from .sessions import Session
 
 #: (percorso del riferimento, percorso del giro) -> (difetti, errori). Vive per
 #: tutto il processo: un giro salvato non cambia, e se cambia il riferimento
-#: cambia la chiave.
+#: cambia la chiave. I `LapDefects` e i dizionari degli errori sono condivisi
+#: fra le chiamate: chi li riceve li legge soltanto, non li modifica.
 _CACHE: dict[tuple[str, str], tuple[LapDefects, dict]] = {}
 
 

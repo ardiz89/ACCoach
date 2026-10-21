@@ -179,3 +179,38 @@ def test_clear_cache_empties_it(tmp_path):
     assert pagella._CACHE
     pagella.clear_cache()
     assert not pagella._CACHE
+
+
+# --- SessionReplay.wet: il voto fra i giri che dicono la mescola ---------------
+
+def _wet_vote(tmp_path, compounds):
+    """Sessione di giri con le mescole date, rigiocata contro un riferimento
+    asciutto fuori dalla sessione (un'ora prima)."""
+    _put(tmp_path, 100_000, "2026-10-20T08:00:00+00:00", clean=True,
+         compound="dry_compound")
+    for i, c in enumerate(compounds):
+        _put(tmp_path, 101_000 + i * 100, f"2026-10-20T10:0{i}:00+00:00",
+             clean=True, compound=c)
+    rows = _rows(tmp_path)
+    ref_row = history_reference(rows, wet=False)
+    ref_lap = load_lap(ref_row["path"])
+    session = group_sessions(rows)[0]
+    assert len(session.valid_laps) == len(compounds)
+    return replay(session, ref_row, detect_corners(ref_lap.samples),
+                  Reference(ref_lap), {})
+
+
+def test_wet_session_is_decided_by_the_majority(tmp_path):
+    assert _wet_vote(tmp_path, ["wet_compound", "wet_compound", "dry_compound"]).wet is True
+
+
+def test_dry_majority_is_dry(tmp_path):
+    assert _wet_vote(tmp_path, ["wet_compound", "dry_compound", "dry_compound"]).wet is False
+
+
+def test_unknown_compound_does_not_vote(tmp_path):
+    assert _wet_vote(tmp_path, ["wet_compound", "", ""]).wet is True
+
+
+def test_a_tie_is_dry(tmp_path):
+    assert _wet_vote(tmp_path, ["wet_compound", "dry_compound"]).wet is False
