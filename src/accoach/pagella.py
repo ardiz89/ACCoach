@@ -30,7 +30,7 @@ from .coaching.errors import lap_errors, session_errors
 from .coaching.trends import clock_covers_lap
 from .coaching.howto import (
     defect_name, error_name, excluded as excluded_text, glossary, howto, problem,
-    reached as reached_text, reached_by_pilot as reached_by_pilot_text, verdict)
+    reached as reached_text, verdict)
 from .comparison import Reference
 from .recording import load_lap
 from .sessions import Session, group_sessions, parse_utc
@@ -188,7 +188,9 @@ _SERIES = 6
 _TREND_FRAC = 0.10
 _TREND_MIN = {"ms": 20.0, "s": 0.1}
 
-_ACTIONS = ("follow", "drop", "reached", "decline", "undecline")
+#: Niente «raggiunto» a mano: lo dice la misura (`_update_active`), e la pagina
+#: non ha mai avuto un bottone per dichiararlo.
+_ACTIONS = ("follow", "drop", "decline", "undecline")
 
 
 class AdviceConflict(Exception):
@@ -396,21 +398,11 @@ def _load(cat, car: str, track: str) -> dict[str, tuple[Advice, str | None]]:
     return out
 
 
-def _save(cat, car: str, track: str, a: Advice, ref_path: str | None,
-          by_pilot: bool = False) -> None:
+def _save(cat, car: str, track: str, a: Advice, ref_path: str | None) -> None:
     d = asdict(a)
     if ref_path:
         d["reference_path"] = ref_path
-    if by_pilot:
-        d["closed_by"] = "pilot"
     cat.save_advice(car, track, d)
-
-
-def _closed_by_pilot(cat, car: str, track: str) -> set[str]:
-    """I consigli chiusi a mano dal pilota: un «raggiunto» dichiarato non e' un
-    «raggiunto» misurato, e la frase del verdetto non deve dire il contrario."""
-    return {d.get("defect") for d in cat.load_advice(car, track)
-            if d.get("closed_by") == "pilot"}
 
 
 def _since(ctx: _Context, stamp: str) -> list[tuple[dict, LapDefects]]:
@@ -563,13 +555,11 @@ def build_pagella(cat, car: str, track: str, index: int, lang: str) -> dict:
     stored = _load(cat, car, track)
     _update_active(cat, car, track, ctx, stored)
     advice: list[dict] = []
-    manual = _closed_by_pilot(cat, car, track)
     for a, _ in stored.values():
         if a.status == REACHED and _in_window(ctx, a.closed_utc):
             _, p = _reached_at(a, _since(ctx, a.accepted_utc))
             advice.append(_advice_item(ctx, a, p, lang))
-            text += " " + (reached_by_pilot_text(a.defect, lang) if a.defect in manual
-                           else reached_text(a.defect, p.hits, p.laps, lang))
+            text += " " + reached_text(a.defect, p.hits, p.laps, lang)
     for a in propose_advice(summaries, [a for a, _ in stored.values()],
                             ctx.names, ctx.apex):
         p = (measure_advice(a, [ld for _, ld in _since(ctx, a.accepted_utc)])
@@ -851,7 +841,7 @@ def _progress_by_session(ctx: _Context, a: Advice) -> list[float]:
 
 def advice_action(cat, car: str, track: str, defect: str, action: str,
                   index: int = 0, lang: str = "en") -> dict:
-    """«Lo seguo», «Lascio stare», «Raggiunto», «Non lo seguo» e il suo inverso.
+    """«Lo seguo», «Lascio stare», «Non lo seguo» e il suo inverso.
 
     `follow` ricalcola la proposta della sessione `index` invece di prenderla
     dal client: si segue il consiglio che la Pagella propone, con le curve e
@@ -863,7 +853,6 @@ def advice_action(cat, car: str, track: str, defect: str, action: str,
     stored = _load(cat, car, track)
     a, ref_path = stored.get(defect, (None, None))
     now = _now()
-    by_pilot = False
     if action == "follow":
         if any(x.status == ACTIVE and k != defect for k, (x, _) in stored.items()):
             raise AdviceConflict("un altro consiglio e' in corso")
@@ -882,12 +871,10 @@ def advice_action(cat, car: str, track: str, defect: str, action: str,
             raise NotProposed(defect)
         new = replace(new, status=ACTIVE, accepted_utc=now, closed_utc="")
         ref_path = ctx.ref_row["path"]
-    elif action in ("drop", "reached"):
+    elif action == "drop":
         if a is None or a.status != ACTIVE:
             raise AdviceConflict("nessun consiglio in corso su questo difetto")
-        new = replace(a, status=DROPPED if action == "drop" else REACHED,
-                      closed_utc=now)
-        by_pilot = True
+        new = replace(a, status=DROPPED, closed_utc=now)
     elif action == "decline":
         if a is not None and a.status == ACTIVE:
             raise AdviceConflict("in corso: si lascia stare, non si rifiuta")
@@ -897,5 +884,5 @@ def advice_action(cat, car: str, track: str, defect: str, action: str,
         if a is None or a.status != DECLINED:
             raise AdviceConflict("non era rifiutato")
         new = replace(a, status=PROPOSED, closed_utc="")
-    _save(cat, car, track, new, ref_path, by_pilot)
+    _save(cat, car, track, new, ref_path)
     return {"ok": True, "defect": defect, "status": new.status}

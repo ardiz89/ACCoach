@@ -2283,7 +2283,7 @@ def create_api(
 
     @app.post("/api/advice")
     def advice_set(payload: dict = Body(...)) -> dict:
-        """Lo seguo / lascio stare / raggiunto / non lo seguo / lo riprendo."""
+        """Lo seguo / lascio stare / non lo seguo / lo riprendo."""
         car = str(payload.get("car") or "")
         track = str(payload.get("track") or "")
         if not car or not track:

@@ -575,13 +575,13 @@ def test_a_session_holding_only_the_reference_says_so(tmp_path):
     assert "riferimento" in p["verdict"] and "altro giro valido" not in p["verdict"]
 
 
-def test_reaching_by_hand_does_not_quote_a_measure(tmp_path):
+def test_reached_is_only_measured_never_declared(tmp_path):
+    """«Raggiunto» lo dice la misura: la pagina non ha un bottone per
+    dichiararlo, e l'API non accetta di farlo a mano."""
     c = _two_sessions(tmp_path)
     _advice(c, "min_speed", "follow")
-    _advice(c, "min_speed", "reached")
-    v = _pagella(c)["verdict"]
-    assert defect_name("min_speed", "it") in v
-    assert "giri su" not in v and "dichiarato" in v
+    _advice(c, "min_speed", "reached", expect=422)
+    assert _stored(tmp_path)["min_speed"]["status"] == ACTIVE
 
 
 def test_an_index_out_of_range_is_404(tmp_path):

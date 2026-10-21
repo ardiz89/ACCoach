@@ -23,7 +23,6 @@ from accoach.coaching.howto import (
     howto,
     problem,
     reached,
-    reached_by_pilot,
     verdict,
 )
 
@@ -76,7 +75,7 @@ _REASONS = ("wet", "dry", "no_reference", "reference_session", "no_laps")
 
 def _pagella_notes(lang):
     return ([excluded(r, lang) for r in _REASONS]
-            + [reached("min_speed", 4, 6, lang), reached_by_pilot("min_speed", lang)])
+            + [reached("min_speed", 4, 6, lang)])
 
 
 # --- i nomi -----------------------------------------------------------------
@@ -178,7 +177,8 @@ def test_done_when_sentences_do_not_share_a_skeleton(lang):
 
 def test_no_emoji_and_no_slogan_colons():
     texts = list(_all_texts())
-    assert len(texts) == 2 * (7 * 5 + 4 + 7 + 7)
+    # esercizi, verdetti, problemi, note (5 esclusioni + «raggiunto»)
+    assert len(texts) == 2 * (7 * 5 + 4 + 7 + 6)
     for text in texts:
         assert not re.search(r"[\U0001F300-\U0001FAFF☀-➿]", text), text
         assert not re.search(r"^[^:]{1,30}:\s", text), text

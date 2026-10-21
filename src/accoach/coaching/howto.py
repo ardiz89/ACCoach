@@ -588,14 +588,6 @@ _REACHED = {
 }
 
 
-_REACHED_BY_PILOT = {
-    "it": "Hai dichiarato raggiunto il consiglio su «{name}». Il prossimo è già "
-          "nel piano.",
-    "en": "You marked the advice on “{name}” as done. The next one is already in "
-          "the plan.",
-}
-
-
 def excluded(reason: str, lang: str) -> str:
     """Perché questa sessione non ha pagella: bagnato, asciutto, niente metro o giri."""
     return _EXCLUDED[_lang(lang)][reason]
@@ -610,9 +602,3 @@ def reached(key: str, hits: int, laps: int, lang: str) -> str:
     lg = _lang(lang)
     return _REACHED[lg].format(name=defect_name(key, lg), hits=hits, laps=laps)
 
-
-def reached_by_pilot(key: str, lang: str) -> str:
-    """La frase quando il consiglio l'ha chiuso il pilota: nessuna misura citata,
-    perché non è stata la misura a chiuderlo."""
-    lg = _lang(lang)
-    return _REACHED_BY_PILOT[lg].format(name=defect_name(key, lg))
