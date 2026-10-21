@@ -318,7 +318,13 @@ function redrawCurrentView() {
   // Il resize passa di qui, ed è così che il canvas della mappa riprende la
   // misura della colonna: `setup()` legge `clientWidth` a ogni disegno.
   else if (VIEW === "compare") {
-    if (DATA) { redraw(LAST_HOVER); drawMap(DATA, null); }
+    if (DATA) {
+      // Tabella delle minime, cascata e debrief portano il segno del consiglio:
+      // senza queste tre, un consiglio che cambia (o «Lascio stare») le lascia
+      // com'erano. Dal payload che c'e': niente rifetch.
+      drawCornerSpeeds(DATA); drawWaterfall(DATA); drawDebrief(DATA);
+      redraw(LAST_HOVER); drawMap(DATA, null);
+    }
     SHEET ? renderBrakeSheet(SHEET) : loadBraking();
   }
   // Il rail non appartiene a nessuna vista, quindi non sta in nessun ramo. Fuori
@@ -1215,6 +1221,18 @@ function drawRoad(ctx, road, X, Y, hair) {
   ctx.restore();
 }
 
+// Il segno del consiglio sulle sue curve, al campione dell'apice sul giro in
+// esame. Condiviso dalla mappa grande e da quella del rail.
+function drawAdvMarksOnMap(ctx, hit, corners) {
+  const pos = hit.rv.pos;
+  for (const c of corners || []) {
+    const apex = adviceApexIn(c);
+    if (apex === null || !pos || !pos.length) continue;
+    const k = nearest(pos, apex);
+    drawAdvMark(ctx, hit.X(hit.rv.x[k]), hit.Y(hit.rv.z[k]));
+  }
+}
+
 // Full track map (the right-hand column of Compare). Wrapper around drawMapTo
 // that also publishes the screen transform for the map's own hover.
 function drawMap(a, cx) {
@@ -1222,16 +1240,7 @@ function drawMap(a, cx) {
   if (hit) MAP_HIT = hit;
   // Il segno del consiglio in corso sulle sue curve, al punto del loro apice
   // sul giro in esame. Il contesto e' quello di `setup()`, gia' scalato.
-  if (hit && a.has_map) {
-    const ctx = $("c-map").getContext("2d");
-    const pos = hit.rv.pos;
-    for (const c of a.corners || []) {
-      const apex = adviceApexIn(c);
-      if (apex === null || !pos || !pos.length) continue;
-      const k = nearest(pos, apex);
-      drawAdvMark(ctx, hit.X(hit.rv.x[k]), hit.Y(hit.rv.z[k]));
-    }
-  }
+  if (hit && a.has_map) drawAdvMarksOnMap($("c-map").getContext("2d"), hit, a.corners);
   // The readout and the legend describe the drawing, and they are NOT inside
   // the canvas — they are sibling elements in the column (see index.html) —
   // so drawMapTo() turning the canvas off does nothing for them. Without this
@@ -1280,6 +1289,9 @@ function drawRail(p = LAST_HOVER) {
   if (!$("rail") || !$("rail").offsetWidth) return;
   RAIL_HIT = drawMapTo($("c-rail"), $("rail-nomap"), DATA, p);
   if (RAIL_HIT && RANGE) railWindow(RAIL_HIT);
+  if (RAIL_HIT && DATA.has_map) {
+    drawAdvMarksOnMap($("c-rail").getContext("2d"), RAIL_HIT, DATA.corners);
+  }
 }
 
 // Il tratto scelto, acceso sopra la mappa già disegnata. Ridisegnare con lo
@@ -1332,13 +1344,16 @@ function drawRailList() {
   // scritto, tornare indietro dalla curva sembra impossibile.
   let html = `<button type="button" class="rail-row whole${RANGE ? "" : " on"}" data-whole="1">` +
              `${t("rail.whole")}</button>`;
+  // Il segno per posizione, sul tratto della curva (le righe calde hanno solo
+  // l'indice: la curva con entry/exit sta in `DATA.corners`).
+  const markOf = (i) => adviceApexIn(at(i)) !== null ? advMarkHTML() : "";
   for (const l of rows.hot) {
     const w = (Math.min(l.lost_s / mx, 1) * 100).toFixed(0);
     const sev = Math.min(1, l.lost_s / Math.max(mx, 0.3));
     html += `<button type="button" class="rail-row${sel === l.index ? " on" : ""}" ` +
             `data-i="${l.index}" title="${escAttr(l.message || "")}">` +
             `<span class="n">T${l.index + 1}</span>` +
-            `<span class="nm">${l.label}</span>` +
+            `<span class="nm">${markOf(l.index)}${l.label}</span>` +
             `<span class="bar"><span class="fill" style="width:${w}%;` +
             `background:${lossColor(sev)}"></span></span>` +
             `<span class="s">−${l.lost_s.toFixed(2)}</span></button>`;
@@ -1349,7 +1364,7 @@ function drawRailList() {
   for (const c of rows.cold) {
     html += `<button type="button" class="rail-row cold${sel === c.index ? " on" : ""}" ` +
             `data-i="${c.index}"><span class="n">T${c.index + 1}</span>` +
-            `<span class="nm">${c.name}</span></button>`;
+            `<span class="nm">${markOf(c.index)}${c.name}</span></button>`;
   }
   el.innerHTML = html;
 
@@ -2806,7 +2821,8 @@ async function loadAdvice() {
   if (changed) ADV_ROW = null;
   // Ridisegna solo le schede che la portano, e solo se e' cambiato qualcosa:
   // senza consiglio la pagina non rifa' niente in piu'.
-  if (changed && ADVICE_VIEWS[VIEW]) redrawCurrentView();
+  // Anche le schede col rail senza riga (Flow): il rail porta il segno.
+  if (changed && (ADVICE_VIEWS[VIEW] || RAIL_VIEWS.includes(VIEW))) redrawCurrentView();
 }
 
 // L'`apex_pos` della curva del consiglio che contiene `c` (`entry`/`exit` in
@@ -2851,11 +2867,14 @@ function adviceLineModel(view, corners, opts) {
   const adv = ADVICE.corners || [];
   const names = [];
   if (adv.length) {
-    for (const c of corners || []) {
-      const apex = adviceApexIn(c);
-      if (apex === null) continue;
-      const hit = adv.find((a) => a.apex_pos === apex);
-      names.push({ corner: c, apex, label: c.name || (hit && hit.name) || "" });
+    // Nell'ORDINE DEL CONSIGLIO (la piu' costosa per prima, come la Pagella),
+    // non in quello della scheda: per ogni curva del consiglio la prima della
+    // scheda che ne contiene l'apice. Due apici nella stessa curva: una volta.
+    for (const a of adv) {
+      if (!(a.apex_pos > 0)) continue;
+      const c = (corners || []).find((k) => k.entry <= a.apex_pos && a.apex_pos <= k.exit);
+      if (!c || names.some((n) => n.corner === c)) continue;
+      names.push({ corner: c, apex: a.apex_pos, label: c.name || a.name || "" });
     }
     // Andamento ha la riga per tutti e sette i difetti: senza curve ritrovate
     // dice la frase del giro intero. Le altre schede, senza curve, tacciono.

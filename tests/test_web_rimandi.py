@@ -275,6 +275,20 @@ eval(tryGrab("function renderCornerConsistency("));
 eval(tryGrab("function renderDefectHistory("));
 const fmtSecs = (v) => String(v), sparkBars = () => "", dhDates = () => "", fmtWhen = () => "";
 const LANG = () => "en", DH_H = 44;
+// Task 6: Confronto ridisegnato su un cambio di consiglio, rail, ordine dei nomi.
+eval(tryGrab("function drawCornerSpeeds("));
+eval(tryGrab("function railRows("));
+eval(tryGrab("function drawRailList("));
+eval(tryGrab("function nearest("));
+eval(tryGrab("function drawAdvMarksOnMap("));
+eval(tryGrab("function redrawCurrentView(").replace("function redrawCurrentView(", "function redrawCurrentViewReal("));
+let DATA = null, RANGE = null, VIEW = "compare", LAST_HOVER = null, SHEET = null;
+const lossColor = () => "#f00";
+const REDRAWN = [];
+function redraw() {} function drawMap() {} function renderBrakeSheet() {} function loadBraking() {}
+function drawRail() {} 
+function drawWaterfall() { REDRAWN.push("waterfall"); }
+function drawDebrief() { REDRAWN.push("debrief"); }
 const job = JSON.parse(fs.readFileSync(0, "utf8"));
 const out = [];
 for (const step of job) {
@@ -367,6 +381,32 @@ for (const step of job) {
     const rows = els["dh-body"].innerHTML.split('class="dh-row"').slice(1);
     out.push(rows.map((r) => [(r.match(/data-howto="([^"]*)"/) || [])[1],
                               r.includes("adv-mark")]));
+  }
+  else if (step.call === "comparerefresh") {
+    // ADVICE cambia, poi il percorso di ridisegno del Confronto, SENZA rifetch.
+    els["vmin"] = fakeEl(); REDRAWN.length = 0;
+    DATA = step.a; VIEW = "compare";
+    drawCornerSpeeds(DATA);
+    const before = (els["vmin"].innerHTML.match(/adv-mark/g) || []).length;
+    ADVICE = step.next;
+    redrawCurrentViewReal();
+    out.push({ before, after: (els["vmin"].innerHTML.match(/adv-mark/g) || []).length,
+               redrawn: REDRAWN.slice() });
+  }
+  else if (step.call === "raillist") {
+    els["rail-list"] = fakeEl(); DATA = step.a; RANGE = null;
+    drawRailList();
+    const rows = els["rail-list"].innerHTML.split('class="rail-row').slice(1);
+    out.push(rows.map((r) => [(r.match(/data-i="(\d+)"/) || [])[1] ?? "whole",
+                              r.includes("adv-mark")]));
+  }
+  else if (step.call === "mapmarks") {
+    const arcs = [];
+    const ctx = new Proxy({ arc: (x, y) => arcs.push([x, y]) },
+      { get: (o, k) => (k in o ? o[k] : () => {}), set: () => true });
+    const hit = { rv: step.rv, X: (v) => v * 10, Y: (v) => v * 100 };
+    drawAdvMarksOnMap(ctx, hit, step.corners);
+    out.push(arcs);
   }
   else if (step.call === "relines") {
     // lo stesso elemento, riscritto piu' volte: quante scritture vere
@@ -557,14 +597,14 @@ def test_the_compare_cards_carry_the_mark_on_the_advice_corners(head):
 
 
 def test_the_chart_bands_and_the_map_mark_the_advice_corners_on_the_canvas():
-    for head in ("function cornerBands(", "function drawMap("):
+    for head in ("function cornerBands(", "function drawAdvMarksOnMap("):
         body = _body_of(head)
         assert "adviceApexIn(" in body, head
         assert "drawAdvMark(" in body, head
 
 
 def test_the_map_finds_the_apex_sample_with_the_shared_nearest():
-    assert "nearest(" in _body_of("function drawMap(")
+    assert "nearest(" in _body_of("function drawAdvMarksOnMap(")
 
 
 def test_the_compare_redraw_writes_its_line_from_the_tab_s_own_render_path():
@@ -978,3 +1018,100 @@ def test_the_progress_loader_writes_its_line_and_switches_it_off_on_failure():
     assert "adviceApexIn(" in _body_of("function renderCornerSessions(")
     assert "adviceApexIn(" in _body_of("function renderCornerConsistency(")
 
+
+
+# --- Task 6: tre difetti trovati nel browser --------------------------------
+
+_CMP = {"corners": [{"index": 0, "name": "Tosa", "entry": 0.38, "exit": 0.46},
+                    {"index": 1, "name": "Rivazza", "entry": 0.76, "exit": 0.84}],
+        "corner_speeds": [{"index": 0, "name": "Tosa", "vmin_live": 90, "vmin_ref": 91, "delta": -1},
+                          {"index": 1, "name": "Rivazza", "vmin_live": 80, "vmin_ref": 81, "delta": -1}]}
+
+
+@needs_node
+def test_the_compare_tables_are_redrawn_when_the_advice_changes(tmp_path):
+    got = _run(tmp_path, [
+        {"advice": _ADVICE, "call": "comparerefresh", "a": _CMP, "next": None},
+        {"advice": _ADVICE, "call": "comparerefresh", "a": _CMP,
+         "next": {"defect": "brake_early", "name": "x",
+                  "corners": [{"name": "Rivazza", "apex_pos": 0.80}]}},
+    ])
+    # senza consiglio non resta nessun segno; con un altro, solo quello suo
+    assert got[0]["before"] == 2 and got[0]["after"] == 0
+    assert got[1]["before"] == 2 and got[1]["after"] == 1
+    # cascata e debrief si ridisegnano dallo stesso percorso, senza rifetch
+    assert got[0]["redrawn"] == ["waterfall", "debrief"]
+
+
+@needs_node
+def test_the_rail_rows_carry_the_mark_only_on_the_advice_corners(tmp_path):
+    a = {"corners": [{"index": 0, "name": "Tosa", "entry": 0.38, "exit": 0.46},
+                     {"index": 1, "name": "Rivazza", "entry": 0.76, "exit": 0.84},
+                     {"index": 2, "name": "Acque", "entry": 0.60, "exit": 0.66}],
+         "losses": [{"index": 0, "label": "Tosa", "lost_s": 0.3, "message": ""},
+                    {"index": 1, "label": "Rivazza", "lost_s": 0.1, "message": ""}]}
+    got = _run(tmp_path, [
+        {"advice": _ADVICE, "call": "raillist", "a": a},
+        {"advice": None, "call": "raillist", "a": a},
+        # Acque e' una riga fredda (nessuna perdita): il segno va anche li'
+        {"advice": {"defect": "brake_early", "name": "x",
+                    "corners": [{"name": "Acque", "apex_pos": 0.63}]},
+         "call": "raillist", "a": a},
+    ])
+    # Tosa (0.42) e Rivazza (0.80) sono hot e segnate; Acque (cold) no.
+    assert got[0] == [["whole", False], ["0", True], ["1", True], ["2", False]]
+    assert got[1] == [["whole", False], ["0", False], ["1", False], ["2", False]]
+    assert got[2] == [["whole", False], ["0", False], ["1", False], ["2", True]]
+
+
+@needs_node
+def test_the_rail_map_mark_is_drawn_at_the_apex_sample_of_the_advice_corners(tmp_path):
+    rv = {"pos": [0.0, 0.2, 0.42, 0.6, 0.8], "x": [1, 2, 3, 4, 5], "z": [1, 2, 3, 4, 5]}
+    corners = [{"entry": 0.40, "exit": 0.45}, {"entry": 0.55, "exit": 0.65}]
+    got = _run(tmp_path, [
+        {"advice": {"defect": "brake_early", "name": "x",
+                    "corners": [{"name": "A", "apex_pos": 0.42}]},
+         "call": "mapmarks", "rv": rv, "corners": corners},
+        {"advice": None, "call": "mapmarks", "rv": rv, "corners": corners},
+    ])
+    assert got[0] == [[30, 300]]
+    assert got[1] == []
+
+
+def test_the_rail_draws_the_marks_on_its_map_and_is_refreshed_on_advice_change():
+    assert "drawAdvMarksOnMap(" in _body_of("function drawRail(")
+    assert "drawAdvMarksOnMap(" in _body_of("function drawMap(")
+    assert "adviceApexIn(" in _body_of("function drawRailList(")
+    # loadAdvice ridisegna una scheda con il rail anche fuori dalle schede della riga
+    assert "RAIL_VIEWS" in _body_of("async function loadAdvice(")
+
+
+@needs_node
+def test_the_line_names_follow_the_advice_order_and_how_to_uses_its_first_found(tmp_path):
+    # la scheda li ha in ordine di pista (Tosa 0.42 prima di Rivazza 0.80)
+    # ma il consiglio dice Rivazza, poi Variante Alta, poi Tosa (piu' costosa prima)
+    adv = {"defect": "brake_early", "name": "x",
+           "corners": [{"name": "Rivazza", "apex_pos": 0.80},
+                       {"name": "Variante Alta", "apex_pos": 0.60},
+                       {"name": "Tosa", "apex_pos": 0.42}]}
+    corners = [{"name": "Tosa", "entry": 0.40, "exit": 0.45},
+               {"name": "Rivazza", "entry": 0.78, "exit": 0.83}]
+    got = _run(tmp_path, [
+        {"advice": adv, "call": "line", "view": "compare", "corners": corners},
+    ])[0]
+    h = got["html"]
+    # Variante Alta non e' sulla scheda: restano Rivazza, Tosa nell'ordine del consiglio
+    assert h.index("Rivazza") < h.index("Tosa")
+    assert got["gone"] == ["Rivazza", "Tosa"]
+    assert got["opened"] == [["brake_early", 0.80]]
+
+
+@needs_node
+def test_two_advice_corners_in_one_tab_corner_are_named_once(tmp_path):
+    adv = {"defect": "brake_early", "name": "x",
+           "corners": [{"name": "A", "apex_pos": 0.42}, {"name": "B", "apex_pos": 0.44}]}
+    got = _run(tmp_path, [
+        {"advice": adv, "call": "line", "view": "compare",
+         "corners": [{"name": "Tosa", "entry": 0.40, "exit": 0.45}]},
+    ])[0]
+    assert got["gone"] == ["Tosa"] and got["html"].count("adv-name") == 1
