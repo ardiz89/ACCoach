@@ -2261,6 +2261,14 @@ def create_api(
         except pagella.NoSuchSession:
             raise HTTPException(404, "no such session")
 
+    @app.get("/api/advice/active")
+    def advice_active(car: str = Query(...), track: str = Query(...),
+                      lang: str | None = Query(None)) -> dict:
+        """Il consiglio in corso, perche' le schede del report lo indichino."""
+        with _catalog() as cat:
+            return pagella.build_active_advice(cat, car, track,
+                                               lang or current_language())
+
     @app.get("/api/defect-history")
     def defect_history(car: str = Query(...), track: str = Query(...),
                        lang: str | None = Query(None)) -> dict:

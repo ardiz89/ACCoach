@@ -398,6 +398,23 @@ def _load(cat, car: str, track: str) -> dict[str, tuple[Advice, str | None]]:
     return out
 
 
+def build_active_advice(cat, car: str, track: str, lang: str) -> dict:
+    """Il consiglio in corso per (auto, pista), per le schede del report.
+
+    Solo lettura del catalogo, nessun replay. Le curve senza posizione
+    (`apex_pos <= 0`, consigli salvati prima che la posizione esistesse) non
+    si possono indicare sulla mappa e restano fuori.
+    """
+    for a, _ in _load(cat, car, track).values():
+        if a.status == ACTIVE:
+            return {"advice": {
+                "defect": a.defect,
+                "name": defect_name(a.defect, lang),
+                "corners": [{"name": c.name, "apex_pos": round(c.apex_pos, 4)}
+                            for c in a.corners if c.apex_pos > 0.0]}}
+    return {"advice": None}
+
+
 def _save(cat, car: str, track: str, a: Advice, ref_path: str | None) -> None:
     d = asdict(a)
     if ref_path:
