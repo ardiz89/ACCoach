@@ -26,9 +26,10 @@ from .coaching.debrief import build_lap_debrief
 from .coaching.defects import (
     DEFECTS, DefectSummary, LapDefects, lap_defects, summarize, worst_corners)
 from .coaching.errors import lap_errors, session_errors
+from .coaching.trends import clock_covers_lap
 from .coaching.howto import (
     defect_name, error_name, excluded as excluded_text, howto, problem,
-    reached as reached_text, verdict)
+    reached as reached_text, reached_by_pilot as reached_by_pilot_text, verdict)
 from .comparison import Reference
 from .recording import load_lap
 from .sessions import Session, group_sessions, parse_utc
@@ -64,8 +65,8 @@ def is_wet_row(row: dict) -> bool | None:
     return "wet" in name or "rain" in name
 
 
-def history_reference(rows: list[dict], wet: bool) -> dict | None:
-    """Il giro piu' veloce valido e pulito delle condizioni date, o ``None``.
+def history_candidates(rows: list[dict], wet: bool) -> list[dict]:
+    """I giri validi e puliti delle condizioni date, dal piu' veloce.
 
     Senza mescola si conta come asciutto: e' il caso di tanti giri vecchi, e
     scartarli lascerebbe l'asciutto senza metro.
@@ -74,7 +75,13 @@ def history_reference(rows: list[dict], wet: bool) -> dict | None:
           if r.get("valid") and r.get("clean") != 0
           and (r.get("lap_time_ms") or 0) > 0
           and bool(is_wet_row(r)) == wet]
-    return min(ok, key=lambda r: r["lap_time_ms"]) if ok else None
+    return sorted(ok, key=lambda r: r["lap_time_ms"])
+
+
+def history_reference(rows: list[dict], wet: bool) -> dict | None:
+    """Il giro piu' veloce valido e pulito delle condizioni date, o ``None``."""
+    ok = history_candidates(rows, wet)
+    return ok[0] if ok else None
 
 
 @dataclass
@@ -95,7 +102,10 @@ def replay(session: Session, reference_row: dict, corners, ref: Reference,
 
     Il riferimento stesso si salta (contro se' stesso perde zero e falserebbe la
     media); i file illeggibili pure, come in `api._history`: una sessione con un
-    giro rotto si mostra con quelli che ci sono.
+    giro rotto si mostra con quelli che ci sono. E si salta un giro il cui
+    orologio non copre il giro (`trends.clock_covers_lap`, la regola del
+    riepilogo di sessione): il debrief stirerebbe il buco sulle curve e ne
+    uscirebbero perdite di decine di secondi che nessuno ha guidato.
     """
     if cache is None:
         cache = _CACHE
@@ -110,15 +120,25 @@ def replay(session: Session, reference_row: dict, corners, ref: Reference,
         if row["path"] == ref_path:
             continue
         key = (ref_path, row["path"])
-        hit = cache.get(key)
-        if hit is None:
+        if key in cache:
+            hit = cache[key]
+        else:
             try:
                 lap = load_lap(row["path"])
-                hit = (lap_defects(build_lap_debrief(lap, ref, corners)),
-                       lap_errors(lap, corners))
             except (OSError, ValueError):
                 continue
+            # Anche il «no» va in cache: il verdetto sull'orologio non cambia,
+            # e rileggere il file a ogni apertura costerebbe quanto il debrief.
+            hit = None
+            if clock_covers_lap(lap):
+                try:
+                    hit = (lap_defects(build_lap_debrief(lap, ref, corners)),
+                           lap_errors(lap, corners))
+                except (OSError, ValueError):
+                    continue
             cache[key] = hit
+        if hit is None:
+            continue
         laps.append(hit[0])
         errors.append(hit[1])
         gaps.append(row["lap_time_ms"] - ref_ms)
@@ -158,6 +178,19 @@ _ACTIONS = ("follow", "drop", "reached", "decline", "undecline")
 
 class AdviceConflict(Exception):
     """L'azione chiesta non vale nello stato attuale del consiglio (-> 409)."""
+
+
+class NoSuchSession(LookupError):
+    """Un indice di sessione che non esiste (-> 404): niente ritaglio muto, una
+    Pagella di un'altra sessione con l'indice sbagliato sarebbe una bugia."""
+
+
+class NotProposed(LookupError):
+    """«Lo seguo» su un difetto che la Pagella non propone (-> 404)."""
+
+
+class BadAction(ValueError):
+    """Azione o difetto sconosciuti nel POST (-> 422)."""
 
 
 class UnknownDefect(LookupError):
@@ -238,10 +271,12 @@ def _context(cat, car: str, track: str, index: int, lang: str) -> _Context:
     rows = cat.laps_for(car, track)
     runs = group_sessions(rows)
     ctx = _Context(runs=runs)
+    if index < 0 or (index > 0 and index >= len(runs)):
+        raise NoSuchSession(index)
     if not runs:
         ctx.excluded = "no_laps"
         return ctx
-    ctx.index = index = max(0, min(index, len(runs) - 1))
+    ctx.index = index
     ctx.cur = cur = runs[index]
     if not cur.valid_laps:
         ctx.excluded = "no_laps"
@@ -260,19 +295,14 @@ def _context(cat, car: str, track: str, index: int, lang: str) -> _Context:
     # Il riferimento e' uno per classe e per tutto l'archivio, non «fino alla
     # sessione mostrata»: se cambiasse sfogliando le sessioni, i consigli si
     # ricalcolerebbero avanti e indietro a ogni clic (e la cache con loro).
-    ctx.ref_row = history_reference(rows, wet)
+    # Dal piu' veloce, il primo che si legge e il cui orologio copre il giro:
+    # un riferimento con un buco nell'orologio storcerebbe ogni confronto.
+    ctx.ref_row = next((r for r in history_candidates(rows, wet)
+                        if _reference(r["path"]) is not None), None)
     if ctx.ref_row is None:
         ctx.excluded = "no_reference"
         return ctx
-    path = ctx.ref_row["path"]
-    if path not in _REFS:
-        try:
-            lap = load_lap(path)
-            _REFS[path] = (lap, Reference(lap), detect_corners(lap.samples))
-        except (OSError, ValueError):
-            ctx.ref_row, ctx.excluded = None, "no_reference"
-            return ctx
-    ctx.ref_lap, ctx.reference, ctx.corners = _REFS[path]
+    ctx.ref_lap, ctx.reference, ctx.corners = _REFS[ctx.ref_row["path"]]
     # I nomi come in `api._history`: `name_corners` sulle curve del riferimento,
     # con la mappa imparata (letta dal catalogo, dove `_history` la salva: qui
     # non si caricano tutti i giri per reimpararla) e i nomi scritti dal pilota.
@@ -281,11 +311,27 @@ def _context(cat, car: str, track: str, index: int, lang: str) -> _Context:
                                   cat.load_corner_map(car, track),
                                   cornernames.for_track(track)))}
     ctx.apex = {c.index: c.apex_pos for c in ctx.corners}
-    # Il solo riferimento non e' un confronto: la sessione con un giro solo,
-    # quel giro, non ha niente da misurare.
+    # Il solo riferimento non e' un confronto. Se la sessione contiene il giro
+    # di riferimento e altri giri dello storico esistono, lo si dice cosi':
+    # «non c'e' un altro giro» sarebbe falso.
     if not ctx.replay_of(index).laps:
-        ctx.excluded = "no_reference"
+        holds_ref = any(r["path"] == ctx.ref_row["path"] for r in cur.valid_laps)
+        others = any(i != index and runs[i].valid_laps for i in ctx.same_all)
+        ctx.excluded = "reference_session" if holds_ref and others else "no_reference"
     return ctx
+
+
+def _reference(path: str):
+    """(giro, Reference, curve) del riferimento, o ``None`` se non fa da metro
+    (illeggibile, o col suo orologio che non copre il giro). In cache anche il no."""
+    if path not in _REFS:
+        try:
+            lap = load_lap(path)
+        except (OSError, ValueError):
+            lap = None
+        _REFS[path] = ((lap, Reference(lap), detect_corners(lap.samples))
+                       if lap is not None and clock_covers_lap(lap) else None)
+    return _REFS[path]
 
 
 def _session_info(ctx: _Context) -> dict | None:
@@ -335,11 +381,21 @@ def _load(cat, car: str, track: str) -> dict[str, tuple[Advice, str | None]]:
     return out
 
 
-def _save(cat, car: str, track: str, a: Advice, ref_path: str | None) -> None:
+def _save(cat, car: str, track: str, a: Advice, ref_path: str | None,
+          by_pilot: bool = False) -> None:
     d = asdict(a)
     if ref_path:
         d["reference_path"] = ref_path
+    if by_pilot:
+        d["closed_by"] = "pilot"
     cat.save_advice(car, track, d)
+
+
+def _closed_by_pilot(cat, car: str, track: str) -> set[str]:
+    """I consigli chiusi a mano dal pilota: un «raggiunto» dichiarato non e' un
+    «raggiunto» misurato, e la frase del verdetto non deve dire il contrario."""
+    return {d.get("defect") for d in cat.load_advice(car, track)
+            if d.get("closed_by") == "pilot"}
 
 
 def _since(ctx: _Context, stamp: str) -> list[tuple[dict, LapDefects]]:
@@ -488,11 +544,13 @@ def build_pagella(cat, car: str, track: str, index: int, lang: str) -> dict:
     stored = _load(cat, car, track)
     _update_active(cat, car, track, ctx, stored)
     advice: list[dict] = []
+    manual = _closed_by_pilot(cat, car, track)
     for a, _ in stored.values():
         if a.status == REACHED and _in_window(ctx, a.closed_utc):
             _, p = _reached_at(a, _since(ctx, a.accepted_utc))
             advice.append(_advice_item(ctx, a, p, lang))
-            text += " " + reached_text(a.defect, p.hits, p.laps, lang)
+            text += " " + (reached_by_pilot_text(a.defect, lang) if a.defect in manual
+                           else reached_text(a.defect, p.hits, p.laps, lang))
     for a in propose_advice(summaries, [a for a, _ in stored.values()],
                             ctx.names, ctx.apex):
         p = (measure_advice(a, [ld for _, ld in _since(ctx, a.accepted_utc)])
@@ -547,9 +605,13 @@ def build_howto(cat, car: str, track: str, defect: str, index: int,
         else:
             value, name = summary.mean, ""
         metres = None
-        bp = out["figures"][0]["brake_points_m"] if out["figures"] else None
-        if bp is not None and defect in ("brake_early", "brake_late"):
-            metres = bp["typical"] - bp["best"]
+        if idxs and defect in ("brake_early", "brake_late"):
+            off = _mean_brake_offset_m(ctx, cur, ctx.corner(idxs[0]))
+            # «In media N metri prima/dopo» si dice solo se la media va nel
+            # verso del difetto: una staccata «presto» con la media dopo il
+            # migliore e' un numero che smentisce la frase.
+            if off is not None and (off < 0 if defect == "brake_early" else off > 0):
+                metres = off
         if value > 0:
             out["problem"] = problem(defect, name, value, summary.unit, lang, metres)
 
@@ -603,12 +665,42 @@ def _brake_points_m(ctx: _Context, typical_path: str, corner) -> dict | None:
         lap = load_lap(typical_path)
     except (OSError, ValueError):
         return None
-    t = brake_points_of_lap(lap, [corner])
-    b = brake_points_of_lap(ctx.ref_lap, [corner])
-    if not t or not b:
+    t = _onset_m(pts, lap, corner)
+    b = _onset_m(pts, ctx.ref_lap, corner)
+    if t is None or b is None:
         return None
-    return {"typical": round(path_length(pts, 0.0, t[0].onset_pos)),
-            "best": round(path_length(pts, 0.0, b[0].onset_pos))}
+    return {"typical": round(t), "best": round(b)}
+
+
+def _onset_m(pts, lap, corner) -> float | None:
+    """Il punto di frenata del foglio frenate, in metri sulla linea `pts`."""
+    bp = brake_points_of_lap(lap, [corner]) if corner is not None else []
+    return path_length(pts, 0.0, bp[0].onset_pos) if bp else None
+
+
+def _mean_brake_offset_m(ctx: _Context, rep: SessionReplay, corner) -> float | None:
+    """Di quanto, in media sui giri della sessione, stacchi rispetto al migliore.
+
+    Negativo = prima. Stessa misura e stesso righello delle figure (punto del
+    foglio frenate, metri sulla linea del riferimento); i giri che in quella
+    curva non frenano non entrano nella media.
+    """
+    pts = line_points(ctx.ref_lap)
+    if not has_line(pts):
+        return None
+    best = _onset_m(pts, ctx.ref_lap, corner)
+    if best is None:
+        return None
+    offs = []
+    for row in rep.rows:
+        try:
+            lap = load_lap(row["path"])
+        except (OSError, ValueError):
+            continue
+        m = _onset_m(pts, lap, corner)
+        if m is not None:
+            offs.append(m - best)
+    return sum(offs) / len(offs) if offs else None
 
 
 def _progress_by_session(ctx: _Context, a: Advice) -> list[float]:
@@ -640,11 +732,12 @@ def advice_action(cat, car: str, track: str, defect: str, action: str,
     l'obiettivo misurati qui.
     """
     if action not in _ACTIONS or defect not in DEFECTS:
-        raise ValueError(f"{action} / {defect}")
+        raise BadAction(f"{action} / {defect}")
     cat.migrate_plan_to_advice(car, track)
     stored = _load(cat, car, track)
     a, ref_path = stored.get(defect, (None, None))
     now = _now()
+    by_pilot = False
     if action == "follow":
         if any(x.status == ACTIVE and k != defect for k, (x, _) in stored.items()):
             raise AdviceConflict("un altro consiglio e' in corso")
@@ -654,13 +747,13 @@ def advice_action(cat, car: str, track: str, defect: str, action: str,
             raise AdviceConflict("rifiutato: prima si riprende")
         ctx = _context(cat, car, track, index, lang)
         if ctx.excluded:
-            raise LookupError(defect)
+            raise NotProposed(defect)
         summaries = summarize(ctx.replay_of(ctx.index).laps)
         new = next((p for p in propose_advice(
             summaries, [x for x, _ in stored.values()], ctx.names, ctx.apex)
             if p.defect == defect), None)
         if new is None:
-            raise LookupError(defect)
+            raise NotProposed(defect)
         new = replace(new, status=ACTIVE, accepted_utc=now, closed_utc="")
         ref_path = ctx.ref_row["path"]
     elif action in ("drop", "reached"):
@@ -668,6 +761,7 @@ def advice_action(cat, car: str, track: str, defect: str, action: str,
             raise AdviceConflict("nessun consiglio in corso su questo difetto")
         new = replace(a, status=DROPPED if action == "drop" else REACHED,
                       closed_utc=now)
+        by_pilot = True
     elif action == "decline":
         if a is not None and a.status == ACTIVE:
             raise AdviceConflict("in corso: si lascia stare, non si rifiuta")
@@ -677,5 +771,5 @@ def advice_action(cat, car: str, track: str, defect: str, action: str,
         if a is None or a.status != DECLINED:
             raise AdviceConflict("non era rifiutato")
         new = replace(a, status=PROPOSED, closed_utc="")
-    _save(cat, car, track, new, ref_path)
+    _save(cat, car, track, new, ref_path, by_pilot)
     return {"ok": True, "defect": defect, "status": new.status}

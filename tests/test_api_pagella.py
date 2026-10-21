@@ -16,7 +16,11 @@ from accoach import pagella
 from accoach.api import create_api
 from accoach.coaching.advice import ACTIVE, Advice, AdviceCorner
 from accoach.coaching.howto import defect_name
+from accoach.braking_points import brake_points_of_lap
+from accoach.recording import load_lap
 from accoach.recording.catalog import LapCatalog
+from accoach.track import detect_corners
+from accoach.trajectory import line_points, path_length
 from accoach.recording.storage import _catalog_path, save_lap
 
 import synth
@@ -34,6 +38,29 @@ def _cache_vuota():
 def _lap(kind, amt):
     if kind is None:
         return synth.build_lap(clean=True)
+    if kind == "late_ref":
+        # Il migliore che stacca tardi in curva 0 (dentro la curva, dove il
+        # debrief lo vede): i giri normali risultano «Freni troppo presto».
+        lap = synth.build_lap(clean=True)
+        for s in lap.samples:
+            if 0.15 <= s.pos < 0.27:
+                s.brake = 0.0
+        return lap
+    if kind == "min_mid":
+        # Lento in curva 0 ma stacca piu' tardi degli altri giri lenti (sempre
+        # prima del migliore): la media dei metri non e' quella di un giro solo.
+        lap = synth.build_lap(slow_corner=0, amt=amt, clean=True)
+        for s in lap.samples:
+            if 0.15 <= s.pos < 0.255:
+                s.brake = 0.0
+        return lap
+    if kind == "skewed_ref":
+        # Il piu' veloce di tutti, ma col suo orologio che non copre il giro.
+        lap = synth.retime(synth.build_lap(clean=True), 99_000)
+        return synth.skew_clock(lap, 2000)
+    if kind == "skewed_min":
+        return synth.skew_clock(synth.build_lap(slow_corner=0, amt=26, clean=True),
+                                2000)
     if kind == "min":
         return synth.build_lap(slow_corner=0, amt=amt, clean=True)
     lap = synth.build_lap(slow_corner=1, amt=amt, clean=True)
@@ -365,11 +392,49 @@ def test_the_typical_lap_is_the_one_closest_to_the_median(tmp_path):
     assert f["typical_path"] == rows[2]["path"]
 
 
+def _late_ref_session(tmp_path):
+    _session(tmp_path, 10, [("late_ref", 0), ("min", 10), ("min_mid", 20),
+                            ("min", 26)])
+    return TestClient(create_api(tmp_path))
+
+
+def _onset_on_ref_line(path, ref_path):
+    """Il punto del foglio frenate, in metri sulla linea del riferimento."""
+    ref = load_lap(ref_path)
+    corner = detect_corners(ref.samples)[0]
+    bp = brake_points_of_lap(load_lap(path), [corner])[0]
+    return path_length(line_points(ref), 0.0, bp.onset_pos)
+
+
 def test_howto_brake_points_use_the_braking_sheet_measure(tmp_path):
-    c = _two_sessions(tmp_path)
-    bp = _howto(c, "min_speed")["figures"][0]["brake_points_m"]
-    assert bp is not None
-    assert bp["typical"] > 0 and bp["best"] > 0
+    c = _late_ref_session(tmp_path)
+    f = _howto(c, "brake_early")["figures"][0]
+    ref = _ref_path(tmp_path)
+    assert f["best_path"] == ref and f["typical_path"] != ref
+    bp = f["brake_points_m"]
+    # Il solito stacca prima del migliore, ed entrambi si misurano sullo
+    # stesso righello: la linea del riferimento.
+    assert bp["typical"] < bp["best"]
+    assert bp["typical"] == round(_onset_on_ref_line(f["typical_path"], ref))
+    assert bp["best"] == round(_onset_on_ref_line(ref, ref))
+    own = load_lap(f["typical_path"])
+    corner = detect_corners(load_lap(ref).samples)[0]
+    own_ruler = path_length(line_points(own), 0.0,
+                            brake_points_of_lap(own, [corner])[0].onset_pos)
+    assert round(own_ruler) != bp["typical"]     # il righello conta
+
+
+def test_howto_brake_early_says_the_mean_metres_before(tmp_path):
+    c = _late_ref_session(tmp_path)
+    ref = _ref_path(tmp_path)
+    best = _onset_on_ref_line(ref, ref)
+    laps = [r["path"] for r in _rows(tmp_path) if r["path"] != ref]
+    offs = [_onset_on_ref_line(p, ref) - best for p in laps]
+    mean = sum(offs) / len(offs)
+    assert mean < 0
+    assert len({round(o) for o in offs}) > 1       # un giro solo non basterebbe
+    text = _howto(c, "brake_early")["problem"]
+    assert f"in media {round(abs(mean))} metri prima" in text, text
 
 
 def test_howto_progress_after_following(tmp_path):
@@ -384,6 +449,54 @@ def test_howto_progress_after_following(tmp_path):
     h = _howto(TestClient(create_api(tmp_path)), "min_speed")
     assert len(h["progress"]) == 2
     assert h["progress"][0] > h["progress"][1] > 0
+
+
+def test_a_lap_whose_clock_does_not_cover_it_is_never_the_reference(tmp_path):
+    _session(tmp_path, 10, [("skewed_ref", 0), (None, 0)] + _MIXED)
+    p = _pagella(TestClient(create_api(tmp_path)))
+    assert p["excluded"] is None
+    assert p["reference"]["lap_time"] == "1:40.000"
+
+
+def test_a_lap_whose_clock_does_not_cover_it_is_not_replayed(tmp_path):
+    _session(tmp_path, 10, [(None, 0)] + _MIXED + [("skewed_min", 0)])
+    p = _pagella(TestClient(create_api(tmp_path)))
+    assert p["session"]["valid"] == 6
+    assert all(d["laps"] == 4 for d in p["defects"])
+
+
+def test_a_session_holding_only_the_reference_says_so(tmp_path):
+    _session(tmp_path, 10, _MIXED)
+    _put(tmp_path, "2026-10-20T11:00:00+00:00")
+    c = TestClient(create_api(tmp_path))
+    p = _pagella(c)
+    assert p["excluded"] == "reference_session"
+    assert "riferimento" in p["verdict"] and "altro giro valido" not in p["verdict"]
+
+
+def test_reaching_by_hand_does_not_quote_a_measure(tmp_path):
+    c = _two_sessions(tmp_path)
+    _advice(c, "min_speed", "follow")
+    _advice(c, "min_speed", "reached")
+    v = _pagella(c)["verdict"]
+    assert defect_name("min_speed", "it") in v
+    assert "giri su" not in v and "dichiarato" in v
+
+
+def test_an_index_out_of_range_is_404(tmp_path):
+    c = _two_sessions(tmp_path)
+    for i in (2, -1):
+        r = c.get("/api/pagella", params={"car": CAR, "track": TRACK, "index": i})
+        assert r.status_code == 404
+        r = c.get("/api/howto", params={"car": CAR, "track": TRACK,
+                                        "defect": "min_speed", "index": i})
+        assert r.status_code == 404
+    r = c.post("/api/advice", json={"car": CAR, "track": TRACK, "defect": "min_speed",
+                                    "action": "follow", "index": 5})
+    assert r.status_code == 404
+    r = c.post("/api/advice", json={"car": CAR, "track": TRACK, "defect": "min_speed",
+                                    "action": "follow", "index": "x"})
+    assert r.status_code == 422
 
 
 def test_howto_of_an_unknown_defect_is_404(tmp_path):

@@ -2254,9 +2254,12 @@ def create_api(
     def pagella_page(car: str = Query(...), track: str = Query(...),
                      index: int = Query(0), lang: str | None = Query(None)) -> dict:
         """La prima pagina del report: com'è andata, i difetti, il piano."""
-        with _catalog() as cat:
-            return pagella.build_pagella(cat, car, track, index,
-                                         lang or current_language())
+        try:
+            with _catalog() as cat:
+                return pagella.build_pagella(cat, car, track, index,
+                                             lang or current_language())
+        except pagella.NoSuchSession:
+            raise HTTPException(404, "no such session")
 
     @app.get("/api/howto")
     def howto_page(car: str = Query(...), track: str = Query(...),
@@ -2267,8 +2270,8 @@ def create_api(
             with _catalog() as cat:
                 return pagella.build_howto(cat, car, track, defect, index,
                                            lang or current_language())
-        except pagella.UnknownDefect:
-            raise HTTPException(404, "unknown defect")
+        except (pagella.UnknownDefect, pagella.NoSuchSession):
+            raise HTTPException(404, "unknown defect or session")
 
     @app.post("/api/advice")
     def advice_set(payload: dict = Body(...)) -> dict:
@@ -2279,6 +2282,9 @@ def create_api(
             raise HTTPException(422, "car and track are required")
         try:
             index = int(payload.get("index") or 0)
+        except (TypeError, ValueError):
+            raise HTTPException(422, "index must be an integer")
+        try:
             with _catalog() as cat:
                 return pagella.advice_action(
                     cat, car, track, str(payload.get("defect") or ""),
@@ -2286,9 +2292,9 @@ def create_api(
                     str(payload.get("lang") or current_language()))
         except pagella.AdviceConflict as e:
             raise HTTPException(409, str(e))
-        except LookupError:
+        except (pagella.NotProposed, pagella.NoSuchSession):
             raise HTTPException(404, "no advice proposed for this defect")
-        except (TypeError, ValueError):
+        except pagella.BadAction:
             raise HTTPException(422, "unknown action or defect")
 
     @app.get("/api/export")

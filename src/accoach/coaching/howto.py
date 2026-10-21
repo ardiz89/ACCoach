@@ -537,6 +537,9 @@ _EXCLUDED = {
                "Non entra nell'andamento finché non ne guidi un'altra così.",
         "no_reference": "Non c'è ancora un altro giro valido con cui confrontare "
                         "questa sessione. Il confronto parte dal prossimo giro pulito.",
+        "reference_session": "In questa sessione c'è il tuo giro di riferimento "
+                             "e nessun altro giro da misurare. Gli altri giri si "
+                             "misurano contro di lui, lui contro sé stesso no.",
         "no_laps": "In questa sessione non c'è nessun giro valido da giudicare.",
     },
     "en": {
@@ -546,6 +549,9 @@ _EXCLUDED = {
                "joins the trend once you drive another one like it.",
         "no_reference": "There's no other valid lap yet to compare this session "
                         "with. The comparison starts with your next clean lap.",
+        "reference_session": "This session holds your reference lap and no other "
+                             "lap to measure. Other laps are measured against it, "
+                             "but it can't be measured against itself.",
         "no_laps": "This session has no valid lap to judge.",
     },
 }
@@ -558,12 +564,31 @@ _REACHED = {
 }
 
 
+_REACHED_BY_PILOT = {
+    "it": "Hai dichiarato raggiunto il consiglio su «{name}». Il prossimo è già "
+          "nel piano.",
+    "en": "You marked the advice on “{name}” as done. The next one is already in "
+          "the plan.",
+}
+
+
 def excluded(reason: str, lang: str) -> str:
     """Perché questa sessione non ha pagella: bagnato, asciutto, niente metro o giri."""
     return _EXCLUDED[_lang(lang)][reason]
 
 
 def reached(key: str, hits: int, laps: int, lang: str) -> str:
-    """La frase che si aggiunge al verdetto quando un consiglio è raggiunto."""
+    """La frase che si aggiunge al verdetto quando la misura chiude un consiglio.
+
+    ``hits`` è sempre almeno 2 (`measure_advice` chiede almeno due giri sotto
+    obiettivo), quindi «giri» resta plurale.
+    """
     lg = _lang(lang)
     return _REACHED[lg].format(name=defect_name(key, lg), hits=hits, laps=laps)
+
+
+def reached_by_pilot(key: str, lang: str) -> str:
+    """La frase quando il consiglio l'ha chiuso il pilota: nessuna misura citata,
+    perché non è stata la misura a chiuderlo."""
+    lg = _lang(lang)
+    return _REACHED_BY_PILOT[lg].format(name=defect_name(key, lg))
