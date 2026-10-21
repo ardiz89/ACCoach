@@ -202,7 +202,7 @@ function fakeEl() {
   const el = { _html: "", nodes: {}, cls: new Set(["hidden"]), classList: {
     add: (c) => el.cls.add(c), remove: (c) => el.cls.delete(c),
     contains: (c) => el.cls.has(c) } };
-  Object.defineProperty(el, "innerHTML", { get: () => el._html, set: (v) => {
+  Object.defineProperty(el, "innerHTML", { configurable: true, get: () => el._html, set: (v) => {
     el._html = v; el.nodes = {}; } });
   el.querySelectorAll = (sel) => {
     const attr = sel.match(/\[([\w-]+)\]/)[1];
@@ -223,17 +223,45 @@ eval(grab("function advMarkHTML("));
 eval(grab("function adviceLineModel("));
 eval(grab("function renderAdviceLine("));
 eval(grab("function howtoFigIndex("));
+eval(grab("function cornerOfIndex("));
+eval(grab("function adviceLiftWithoutNote("));
+let ADV_ROW = null;
+eval(grab("function brakeRowOpen("));
 const OPENED = [];
 function openHowto(d, a) { OPENED.push([d, a]); }
 const job = JSON.parse(fs.readFileSync(0, "utf8"));
 const out = [];
 for (const step of job) {
   if ("advice" in step) ADVICE = step.advice;
+  if ("adv_row" in step) ADV_ROW = step.adv_row;
   if (step.call === "apex") out.push(adviceApexIn(step.arg));
   else if (step.call === "relevant") out.push(adviceRelevant(step.arg));
   else if (step.call === "figidx") out.push(howtoFigIndex(step.figs, step.apex));
+  else if (step.call === "brakerows") {
+    out.push(step.rows.map((r) => {
+      const adv = adviceApexIn(r);
+      return brakeRowOpen(adv);
+    }));
+  }
+  else if (step.call === "analysismark") {
+    out.push(step.indices.map((i) => adviceApexIn(cornerOfIndex(step.a, i)) !== null));
+  }
+  else if (step.call === "relines") {
+    // lo stesso elemento, riscritto piu' volte: quante scritture vere
+    const el = els["adv-line-" + step.view] = fakeEl();
+    let writes = 0;
+    const desc = Object.getOwnPropertyDescriptor(el, "innerHTML");
+    Object.defineProperty(el, "innerHTML", { configurable: true, get: desc.get,
+      set: (v) => { writes++; desc.set(v); } });
+    for (const adv of step.sequence) {
+      if (adv !== "keep") ADVICE = adv;
+      renderAdviceLine(step.view, step.corners, () => {}, step.opts);
+    }
+    out.push({ writes, hidden: el.cls.has("hidden") });
+  }
   else if (step.call === "line") {
     const el = els["adv-line-" + step.view] = fakeEl();
+    if (step.hide) step.opts = { hide: () => adviceLiftWithoutNote({ notes: step.notes }) };
     const gone = [];
     OPENED.length = 0;
     renderAdviceLine(step.view, step.corners, (c) => gone.push(c ? c.name : null),
@@ -412,6 +440,10 @@ def test_the_chart_bands_and_the_map_mark_the_advice_corners_on_the_canvas():
         assert "drawAdvMark(" in body, head
 
 
+def test_the_map_finds_the_apex_sample_with_the_shared_nearest():
+    assert "nearest(" in _body_of("function drawMap(")
+
+
 def test_the_compare_redraw_writes_its_line_from_the_tab_s_own_render_path():
     body = _body_of("function redraw(")
     assert 'renderAdviceLine("compare"' in body
@@ -420,7 +452,8 @@ def test_the_compare_redraw_writes_its_line_from_the_tab_s_own_render_path():
 def test_the_brake_sheet_rows_are_matched_on_their_own_span_not_on_the_index():
     body = _body_of("function renderBrakeSheet(")
     assert "adviceApexIn(r)" in body          # r ha entry/exit del suo riferimento
-    assert "data-adv" in body                  # la riga si ritrova per il goto
+    assert "brakeRowOpen(adv)" in body         # la riga si ritrova per il goto
+    assert "data-adv" in _body_of("function brakeRowOpen(")
 
 
 def test_goto_for_lift_scrolls_to_the_first_lift_note():
@@ -429,3 +462,64 @@ def test_goto_for_lift_scrolls_to_the_first_lift_note():
     assert "setRange(cornerWindow(" in body
     notes = _body_of("function noteBlocks(")
     assert "data-kind" in notes
+
+
+@needs_node
+def test_lift_advice_shows_the_line_only_if_the_debrief_has_a_lift_note(tmp_path):
+    lift = {"defect": "lift", "name": "x", "corners": []}
+    got = _run(tmp_path, [
+        {"advice": lift, "call": "line", "view": "compare", "corners": [],
+         "hide": True, "notes": []},
+        {"call": "line", "view": "compare", "corners": [], "hide": True,
+         "notes": [{"kind": "top_speed"}]},
+        {"call": "line", "view": "compare", "corners": [], "hide": True,
+         "notes": [{"kind": "top_speed"}, {"kind": "lift"}]},
+    ])
+    assert [g["hidden"] for g in got] == [True, True, False]
+    assert got[0]["html"] == ""
+
+
+@needs_node
+def test_an_unchanged_line_is_not_rewritten_on_every_hover(tmp_path):
+    corners = [{"name": "Curva 1", "entry": 0.40, "exit": 0.45, "index": 0}]
+    got = _run(tmp_path, [
+        {"advice": _ADVICE, "call": "relines", "view": "compare",
+         "corners": corners, "sequence": ["keep"] * 4},
+    ])
+    assert got[0]["writes"] == 1
+    # scritta, spenta (una scrittura), ancora spenta (nessuna), riaccesa
+    got = _run(tmp_path, [
+        {"advice": _ADVICE, "call": "relines", "view": "compare",
+         "corners": corners, "sequence": ["keep", None, {"defect": "coasting",
+          "name": "x", "corners": []}, _ADVICE]},
+    ])
+    assert got[0]["writes"] == 3 and got[0]["hidden"] is False
+
+
+@needs_node
+def test_only_the_brake_row_whose_span_holds_the_apex_gets_the_mark(tmp_path):
+    # indici del riferimento della scheda DIVERSI da quelli dell'analisi: la
+    # riga 0 della scheda non e' la curva 0 dell'analisi.
+    rows = [{"index": 0, "entry": 0.10, "exit": 0.20},
+            {"index": 5, "entry": 0.40, "exit": 0.45},
+            {"index": 6, "entry": 0.70, "exit": 0.75},
+            {"index": 7, "entry": None, "exit": None}]
+    got = _run(tmp_path, [
+        {"advice": _ADVICE, "adv_row": None, "call": "brakerows", "rows": rows},
+        {"adv_row": 0.42, "call": "brakerows", "rows": rows},
+        {"advice": None, "adv_row": None, "call": "brakerows", "rows": rows},
+    ])
+    assert got[0] == ["<tr>", '<tr data-adv="0.42">', "<tr>", "<tr>"]
+    # l'accensione sopravvive a una riscrittura della scheda
+    assert got[1] == ["<tr>", '<tr data-adv="0.42" class="adv-hit">', "<tr>", "<tr>"]
+    assert got[2] == ["<tr>"] * 4
+
+
+@needs_node
+def test_the_analysis_card_is_found_by_index_and_marked_by_its_own_span(tmp_path):
+    a = {"corners": [{"index": 0, "entry": 0.40, "exit": 0.45},
+                     {"index": 1, "entry": 0.60, "exit": 0.65}]}
+    got = _run(tmp_path, [
+        {"advice": _ADVICE, "call": "analysismark", "a": a, "indices": [0, 1, 9]},
+    ])
+    assert got == [[True, False, False]]

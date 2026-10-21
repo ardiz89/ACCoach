@@ -1122,10 +1122,7 @@ function drawMap(a, cx) {
     for (const c of a.corners || []) {
       const apex = adviceApexIn(c);
       if (apex === null || !pos || !pos.length) continue;
-      let k = 0;
-      for (let i = 1; i < pos.length; i++) {
-        if (Math.abs(pos[i] - apex) < Math.abs(pos[k] - apex)) k = i;
-      }
+      const k = nearest(pos, apex);
       drawAdvMark(ctx, hit.X(hit.rv.x[k]), hit.Y(hit.rv.z[k]));
     }
   }
@@ -2700,6 +2697,7 @@ async function loadAdvice() {
   if (stale(seen) || req !== ADV_REQ) return;
   const changed = JSON.stringify(next) !== JSON.stringify(ADVICE);
   ADVICE = next;
+  if (changed) ADV_ROW = null;
   // Ridisegna solo le schede che la portano, e solo se e' cambiato qualcosa:
   // senza consiglio la pagina non rifa' niente in piu'.
   if (changed && ADVICE_VIEWS[VIEW]) redrawCurrentView();
@@ -2741,6 +2739,9 @@ function drawAdvMark(ctx, x, y) {
 // il giro intero non hanno curve: la riga non ha nomi.
 function adviceLineModel(view, corners, opts) {
   if (!adviceRelevant(view)) return null;
+  // `opts.hide()`: la scheda non mostra niente di questo consiglio (es. alzate
+  // senza una nota di alzata nel debrief): la riga non indica un bel niente.
+  if (opts && opts.hide && opts.hide()) return null;
   const adv = ADVICE.corners || [];
   const names = [];
   if (adv.length) {
@@ -2769,16 +2770,30 @@ function renderAdviceLine(view, corners, goto, opts) {
   const el = $("adv-line-" + view);
   if (!el) return;
   const m = adviceLineModel(view, corners, opts);
-  if (!m) { el.innerHTML = ""; el.classList.add("hidden"); return; }
+  if (!m) {
+    // Gia' spenta: niente da riscrivere (a ogni hover, senza consiglio).
+    if (el._advSig) {
+      el._advSig = null; el.innerHTML = ""; el.classList.add("hidden");
+    }
+    return;
+  }
   const nameBtn = (n, i) => goto
     ? `<button type="button" class="adv-name" data-adv-i="${i}">${escAttr(n.label)}</button>`
     : `<span class="adv-name">${escAttr(n.label)}</span>`;
   const names = m.names.map(nameBtn).join(" · ");
   const toBox = !m.names.length && goto
     ? ` <button type="button" class="adv-link" data-adv-goto>${t("adv.goto")}</button>` : "";
-  el.innerHTML = advMarkHTML() + (names ? names + " " : "") +
+  const html = advMarkHTML() + (names ? names + " " : "") +
     `<span class="adv-text">${escAttr(tf(m.key, m.vals))}</span>${toBox} ` +
     `<button type="button" class="adv-link" data-adv-how>${t("pag.howto")}</button>`;
+  // Il Confronto la richiama a ogni movimento del mouse: se non e' cambiato
+  // niente non si riscrive (si perderebbe il fuoco sui bottoni). La firma
+  // include il tratto delle curve, che il goto legge e l'HTML non dice.
+  const sig = html + "|" + ADVICE.defect + "|" +
+    m.names.map((n) => `${n.corner.entry},${n.corner.exit},${n.corner.index}`).join(";");
+  if (el._advSig === sig) return;
+  el._advSig = sig;
+  el.innerHTML = html;
   el.classList.remove("hidden");
   const btns = el.querySelectorAll("[data-adv-i]");
   m.names.forEach((n, i) => { if (btns[i] && goto) btns[i].onclick = () => goto(n.corner); });
@@ -3632,7 +3647,8 @@ function redraw(cx) {
   if (!DATA) return;
   // La riga del consiglio: dal percorso di disegno della scheda, cosi' un
   // cambio lingua o un nuovo consiglio la riscrivono insieme ai grafici.
-  renderAdviceLine("compare", DATA.corners || [], gotoAdviceCompare);
+  renderAdviceLine("compare", DATA.corners || [], gotoAdviceCompare,
+                   { hide: () => adviceLiftWithoutNote(DATA) });
   drawDelta(DATA, cx);
   drawSpeed(DATA, cx);
   drawInputs(DATA, cx);
@@ -3643,19 +3659,35 @@ function redraw(cx) {
 // Dalla riga alla scheda. Una curva: la finestra su quella curva, i grafici in
 // vista e, se il difetto e' di frenata, la riga della scheda frenate accesa.
 // Senza curva (alzate): la prima nota del debrief che dice di un'alzata.
+function adviceLiftWithoutNote(a) {
+  return !!ADVICE && ADVICE.defect === "lift" &&
+    !((a && a.notes) || []).some((n) => n.kind === "lift");
+}
+
+// La riga della scheda frenate da accendere (apice del consiglio): si ricorda,
+// cosi' un ridisegno della scheda, o la scheda che arriva dopo, la ritrova.
+let ADV_ROW = null;
+
+function brakeRowOpen(adv) {
+  if (adv === null) return "<tr>";
+  return `<tr data-adv="${adv}"${ADV_ROW === adv ? ' class="adv-hit"' : ""}>`;
+}
+
 function gotoAdviceCompare(corner) {
+  ADV_ROW = null;
   if (!corner) {
     const note = document.querySelector('#debrief .note[data-kind="lift"]');
     if (note) note.scrollIntoView({ block: "center" });
     return;
   }
+  const brake = ADVICE && ["brake_early", "brake_late", "over_brake"].includes(ADVICE.defect);
+  if (brake) ADV_ROW = adviceApexIn(corner);
   setRange(cornerWindow(corner));
-  redrawCurrentView();
-  const apex = adviceApexIn(corner);
-  if (ADVICE && ["brake_early", "brake_late", "over_brake"].includes(ADVICE.defect)) {
-    for (const tr of document.querySelectorAll("#brakesheet tr[data-adv]")) {
-      tr.classList.toggle("adv-hit", Number(tr.dataset.adv) === apex);
-    }
+  redrawCurrentView();           // la scheda frenate si riscrive con la riga accesa
+  if (brake) {
+    // La riga prima, i grafici dopo: se non stanno insieme vincono i grafici.
+    const row = document.querySelector("#brakesheet tr.adv-hit");
+    if (row) row.scrollIntoView({ block: "nearest" });
   }
   const c = $("c-delta");
   if (c) c.scrollIntoView({ block: "start" });
@@ -4197,7 +4229,7 @@ function renderBrakeSheet(b) {
     // Le righe hanno il tratto della loro curva (`entry`/`exit`, sul giro di
     // riferimento della scheda): il consiglio le ritrova per posizione.
     const adv = adviceApexIn(r);
-    body += `<tr${adv !== null ? ` data-adv="${adv}"` : ""}>` +
+    body += brakeRowOpen(adv) +
       `<td class="vc">${adv !== null ? advMarkHTML() : ""}${r.name}</td>` +
       `<td class="vn big">${r.speed_kmh}<span class="muted"> km/h</span></td>` +
       `<td class="vn">${r.gear}</td>` +
