@@ -712,14 +712,19 @@ def build_howto(cat, car: str, track: str, defect: str, index: int,
     out["figures"] = [f for f in (_figure(ctx, cur, defect, i) for i in idxs) if f]
 
     if summary is not None:
-        if idxs:
-            value = dict(summary.corners).get(idxs[0], 0.0)
-            name = ctx.names.get(idxs[0], "")
+        # La prima curva che in questa sessione costa qualcosa: la prima del
+        # consiglio puo' essere a zero oggi mentre le altre no, e allora «non
+        # c'e' un numero» sarebbe falso.
+        now = dict(summary.corners)
+        at = next((i for i in idxs if now.get(i, 0.0) > 0), idxs[0] if idxs else None)
+        if at is not None:
+            value = now.get(at, 0.0)
+            name = ctx.names.get(at, "")
         else:
             value, name = summary.mean, ""
         metres = None
-        if idxs and defect in ("brake_early", "brake_late"):
-            off = _mean_brake_offset_m(ctx, cur, ctx.corner(idxs[0]))
+        if at is not None and defect in ("brake_early", "brake_late"):
+            off = _mean_brake_offset_m(ctx, cur, ctx.corner(at))
             # «In media N metri prima/dopo» si dice solo se la media va nel
             # verso del difetto: una staccata «presto» con la media dopo il
             # migliore e' un numero che smentisce la frase.

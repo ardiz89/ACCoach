@@ -621,6 +621,24 @@ def test_howto_without_data_still_explains(tmp_path):
     assert h["howto"]["what"] and h["problem"] is None and h["figures"] == []
 
 
+def test_howto_problem_names_the_first_corner_that_costs_this_session(tmp_path):
+    """Il consiglio ha due curve; oggi la prima non costa niente e la seconda
+    si'. Il problema parla della seconda invece di dire che non c'e' un numero."""
+    _session(tmp_path, 10, [(None, 0), ("min1", 26), ("min1", 26)])
+    _store(tmp_path, {**asdict(Advice(
+        defect="min_speed", corners=[AdviceCorner(0, "x", 0.31, 200.0),
+                                     AdviceCorner(1, "y", 0.71, 200.0)],
+        baseline=400.0, target=200.0, status=ACTIVE,
+        accepted_utc="2026-10-20T09:00:00+00:00")),
+        "reference_path": _ref_path(tmp_path)})
+    c = TestClient(create_api(tmp_path))
+    with LapCatalog(_catalog_path(tmp_path)) as cat:
+        names = pagella._context(cat, CAR, TRACK, 0, "it").names
+    h = _howto(c, "min_speed")
+    assert h["problem"] and names[1] in h["problem"]
+    assert names[0] not in h["problem"]
+
+
 def test_howto_carries_the_glossary_of_its_defect(tmp_path):
     _put(tmp_path, "2026-10-20T10:00:00+00:00")
     c = TestClient(create_api(tmp_path))
