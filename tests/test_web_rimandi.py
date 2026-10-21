@@ -66,8 +66,8 @@ TEXTS = {
         "The coasting box shows how long you spend off both pedals.",
         "Il riquadro del veleggio dice quanto tempo passi senza gas né freno."),
     "adv.dynamics.over_brake": (
-        "Look at wheel slip under braking. A spike the reference doesn't have is too much brake.",
-        "Guarda lo slittamento delle ruote in frenata. Un picco che il riferimento non ha è freno di troppo."),
+        "Look at wheel slip under braking. A sharp spike before the corner is too much brake.",
+        "Guarda lo slittamento delle ruote in frenata. Un picco netto prima della curva è freno di troppo."),
     "adv.dynamics.throttle_late": (
         "On the way out, look at rear wheel slip. If it stays low, you have room to get on the throttle earlier.",
         "In uscita guarda lo slittamento delle ruote posteriori. Se resta basso, hai margine per tornare prima sul gas."),
@@ -805,6 +805,14 @@ def test_the_dynamics_writes_its_line_from_its_own_render_path():
     assert "dynamicsAdviceHidden(" in body
 
 
+def test_the_slip_chart_draws_its_bands_after_the_electronics_bars():
+    # il segno (h-6) sta dove stanno le barrette TC/ABS: se le fasce vengono
+    # prima, le barrette lo coprono
+    body = _body_of("function drawSlip(")
+    assert body.index("cornerBands(") > body.index('electronicsBand(ctx, w, h, pos, c.abs')
+    assert body.index("cornerBands(") > body.index('electronicsBand(ctx, w, h, pos, c.tc')
+
+
 @pytest.mark.parametrize("fn", ["drawSlip", "drawYaw", "drawShift"])
 def test_the_dynamics_charts_draw_their_bands_through_the_shared_helper(fn):
     # il segno sulle fasce vive in cornerBands: un canvas che disegna le fasce
@@ -877,6 +885,15 @@ def test_the_dynamics_line_is_off_when_the_chart_it_points_to_has_no_data(tmp_pa
          "call": "dynhidden", "channels": {"slip_front": [0, 0], "slip_rear": [0, 0.2]}},
     ])
     assert got == [False, True, False, True, False]
+    # gas tardi: il solo slittamento anteriore spegne la riga
+    got = _run(tmp_path, [
+        {"advice": {"defect": "throttle_late", "name": "x", "corners": []},
+         "call": "dynhidden", "channels": {"slip_front": [0, 0.3], "slip_rear": [0, 0]}},
+        {"call": "dynhidden", "channels": {"slip_front": [0, 0], "slip_rear": [0, 0.2]}},
+        {"advice": {"defect": "over_brake", "name": "x", "corners": []},
+         "call": "dynhidden", "channels": {"slip_front": [0, 0.3], "slip_rear": [0, 0]}},
+    ])
+    assert got == [True, False, False]
 
 
 def test_the_defect_history_rows_are_marked_by_the_defect_key():

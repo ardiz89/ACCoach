@@ -3921,6 +3921,8 @@ function dynamicsAdviceHidden(a) {
   if (ADVICE.defect === "coasting") {
     return !Math.min((c.throttle || []).length, (c.brake || []).length);
   }
+  // Il gas tardi si legge sul posteriore: il solo anteriore non basta.
+  if (ADVICE.defect === "throttle_late") return !_anyNonZero(c.slip_rear);
   return !(_anyNonZero(c.slip_front) || _anyNonZero(c.slip_rear));
 }
 
@@ -4140,7 +4142,6 @@ function drawSlip(a, cx) {
   let m = 0.15;
   for (const v of winVals(pos, sf)) m = Math.max(m, Math.abs(v));
   for (const v of winVals(pos, sr)) m = Math.max(m, Math.abs(v));
-  cornerBands(ctx, w, h, a.corners);
   gridX(ctx, w, h);
   gridY(ctx, w, h, -m, m, (v) => (Math.abs(v) < 1e-9 ? "0" : v.toFixed(2)));
   // Dove l'elettronica sta lavorando, PRIMA delle tracce, così la barretta sta
@@ -4150,6 +4151,10 @@ function drawSlip(a, cx) {
   // Non è una diagnosi, è il contesto senza cui l'altra non si legge.
   electronicsBand(ctx, w, h, pos, c.tc, h - 6, "#FFB020");
   electronicsBand(ctx, w, h, pos, c.abs, h - 11, "#22D3CE");
+  // Le fasce DOPO le barrette TC/ABS: il segno del consiglio sta a h-6, come il
+  // TC, proprio nelle zone di frenata e uscita a cui il consiglio rimanda. Prima
+  // delle barrette sarebbe stato coperto.
+  cornerBands(ctx, w, h, a.corners);
   // Zero line.
   ctx.strokeStyle = "rgba(255,255,255,0.25)";
   ctx.beginPath(); ctx.moveTo(0, h / 2); ctx.lineTo(w, h / 2); ctx.stroke();

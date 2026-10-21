@@ -46,6 +46,8 @@ def test_a_corner_that_improves_gives_a_falling_series(tmp_path):
     assert series, "una curva sistematica deve avere la sua serie"
     assert series[0]["corner_index"] == 0
     assert series[0]["name"]
+    # il tratto per l'incontro col consiglio (per posizione)
+    assert 0.0 <= series[0]["entry"] <= series[0]["exit"] <= 1.0
     pts = series[0]["points"]
     assert len(pts) == 2
     assert pts[0]["median_s"] == 0.68 and pts[1]["median_s"] == 0.34
