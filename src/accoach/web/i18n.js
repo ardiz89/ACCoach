@@ -92,6 +92,74 @@
     "recap.phase.after":  { en: `After`, it: `Dopo` },
     "recap.phase.launch": { en: `Launch`, it: `Lancio` },
 
+    // ---- la Pagella, la prima pagina del report ----
+    // Il tono è quello deciso col pilota (spec «Il tono dei testi»): frasi
+    // brevi col tu, i numeri con l'unità, niente slogan né due punti a
+    // effetto, mai la stessa frase in due posti. Le frasi con i numeri del
+    // pilota dentro (il verdetto, i nomi dei difetti) le scrive il backend
+    // (coaching/howto.py); qui c'è solo quello che la pagina mette intorno.
+    "tab.pagella":     { en: `Report card`, it: `Pagella` },
+    // I tre gruppi della barra, nell'ordine deciso col pilota.
+    "tabgroup.today":  { en: `How today went`, it: `Com'è andata oggi` },
+    "tabgroup.why":    { en: `Why, in detail`, it: `Perché, nel dettaglio` },
+    "tabgroup.time":   { en: `Over time`, it: `Nel tempo` },
+    "load.pagella":    { en: `Reading your session…`, it: `Sto leggendo la sessione…` },
+    "err.pagella":     { en: `Couldn't load the report card. Is the analysis backend running?`,
+                         it: `Non riesco a caricare la Pagella. Il backend di analisi è acceso?` },
+    "pag.nolaps":      { en: `No laps recorded for this car and track yet.`,
+                         it: `Per questa auto e questa pista non hai ancora giri registrati.` },
+    "pag.laps":        { en: `{laps} {laps|lap|laps} ({valid} valid)`,
+                         it: `{laps} {laps|giro|giri} ({valid} {valid|valido|validi})` },
+    "pag.wet":         { en: `wet`, it: `bagnato` },
+    "pag.ref":         { en: `Measured against your reference lap, {time} from {when}.`,
+                         it: `Misurata sul tuo giro di riferimento, {time} del {when}.` },
+    "pag.defects":     { en: `Your main faults`, it: `I tuoi difetti principali` },
+    "pag.defects.none": { en: `No habit costs you time lap after lap in this session.`,
+                          it: `In questa sessione nessuna abitudine ti costa tempo giro dopo giro.` },
+    "pag.def.where":   { en: `In {n} {n|corner|corners}, on {w} of {l} {l|lap|laps}`,
+                         it: `In {n} {n|curva|curve}, {w} {w|giro|giri} su {l}` },
+    "pag.def.laps":    { en: `On {w} of {l} {l|lap|laps}`, it: `In {w} {w|giro|giri} su {l}` },
+    "pag.def.perlap":  { en: `a lap`, it: `a giro` },
+    // Il veleggio non è tempo perso, è tempo passato senza pedali: lo dice.
+    "pag.def.coast":   { en: `of coasting a lap`, it: `di veleggio a giro` },
+    "pag.trend.down":  { en: `Down on the previous session`, it: `In calo rispetto alla sessione prima` },
+    "pag.trend.same":  { en: `Same as the previous session`, it: `Come nella sessione prima` },
+    "pag.trend.up":    { en: `Up on the previous session`, it: `In crescita rispetto alla sessione prima` },
+    "pag.spark":       { en: `Your last sessions, the oldest on the left`,
+                         it: `Le tue ultime sessioni, la più vecchia a sinistra` },
+    "pag.spark.cut":   { en: `{v}, off the scale`, it: `{v}, fuori scala` },
+    "pag.worst":       { en: `Where you lose most`, it: `Dove sbagli di più` },
+    "pag.worst.none":  { en: `No corner costs you time in this session.`,
+                         it: `In questa sessione nessuna curva ti costa tempo.` },
+    "pag.errors":      { en: `Most frequent mistakes`, it: `Errori più frequenti` },
+    "pag.errors.none": { en: `No mistakes counted in this session.`,
+                         it: `In questa sessione non ho contato errori.` },
+    "pag.plan":        { en: `The plan for your next run`, it: `Il piano per la prossima uscita` },
+    // La regola vale per tutta la lista: si dice una volta, sopra la lista.
+    "pag.plan.rule":   { en: `Work on one piece of advice at a time, in order.`,
+                         it: `Lavora su un consiglio alla volta, nell'ordine.` },
+    "pag.plan.none":   { en: `Nothing in the plan for now. No fault repeats often enough.`,
+                         it: `Per ora nel piano non c'è niente. Nessun difetto si ripete abbastanza.` },
+    // Le curve senza preposizione davanti: «da Variante Alta» suona sbagliato
+    // come «In Rivazza» (la regola già presa per il «Come si fa»).
+    "pag.adv.from":    { en: `{first}, then {rest}`, it: `{first}, poi {rest}` },
+    "pag.adv.lap":     { en: `Across the whole lap`, it: `Su tutto il giro` },
+    "pag.adv.target":  { en: `target under {v} a lap`, it: `obiettivo sotto {v} a giro` },
+    "pag.adv.target.coast": { en: `target under {v} of coasting a lap`,
+                              it: `obiettivo sotto {v} di veleggio a giro` },
+    "pag.adv.active":  { en: `In progress`, it: `In corso` },
+    "pag.adv.reached": { en: `Done`, it: `Raggiunto` },
+    "pag.adv.progress": { en: `Under the target on {hits} of {laps} {laps|lap|laps}. It takes {needed} to close it.`,
+                          it: `Sotto l'obiettivo in {hits} {hits|giro|giri} su {laps}. Per chiuderlo ne servono {needed}.` },
+    "pag.adv.nolaps":  { en: `No laps yet since you started it.`,
+                         it: `Da quando lo segui non hai ancora girato.` },
+    "pag.adv.follow":  { en: `I'll follow it`, it: `Lo seguo` },
+    "pag.adv.decline": { en: `Not for me`, it: `Non lo seguo` },
+    "pag.adv.drop":    { en: `Drop it`, it: `Lascio stare` },
+    "pag.adv.err":     { en: `Your choice wasn't saved. The plan below is as it stands now.`,
+                         it: `La scelta non si è salvata. Il piano qui sotto è com'è adesso.` },
+    "pag.howto":       { en: `How to do it →`, it: `Come si fa →` },
+
     "tab.flow":        { en: `Lap explained`, it: `Il giro spiegato` },
     // "Start here" moved to tour.a12 when the recap became the landing tab —
     // this step still opens Flow, so its own title now names what it is
@@ -107,8 +175,8 @@
     // measurable one. "Five numbers that add up" was therefore false at the
     // exact moment a first-time driver read it. The property is still stated,
     // as what the tab does when it can measure, and the empty case is named.
-    "tour.a12.x":      { en: `How the run went, before it's forgotten: where you left time on average, and lap by lap against your own best of the day — not a score but time, split into parts that add back up. When a run has too little in it to measure, this tab says so instead of guessing. The tabs after this go deeper, one lap at a time.`,
-                         it: `Com'è andata l'uscita, prima di dimenticarla: dove hai lasciato tempo in media, e giro per giro contro il tuo stesso migliore di oggi — non un voto ma tempo, diviso in parti che risommano. Quando in un'uscita non c'è abbastanza da misurare, questa scheda lo dice invece di tirare a indovinare. Le schede dopo entrano nel dettaglio, un giro alla volta.` },
+    "tour.a12.x":      { en: `How the session went, before you forget it. How much you lost to your reference lap, the habits that cost you time, where and how often you go wrong. Below that is the plan for your next run, one piece of advice at a time. When a session can't be judged, this page says why.`,
+                         it: `Com'è andata la sessione, prima di dimenticarla. Quanto hai perso sul tuo giro di riferimento, le abitudini che ti costano tempo, dove e quante volte sbagli. Sotto c'è il piano per la prossima uscita, un consiglio alla volta. Quando una sessione non si può giudicare, qui c'è scritto perché.` },
     "tab.session":     { en: `Session`, it: `Sessione` },
     "tab.compare":     { en: `Compare`, it: `Confronto` },
     // One run of laps, as it was driven.
@@ -481,13 +549,12 @@
                          it: `Nessun errore ricorrente — bella costanza!` },
     "recur.corners":   { en: `Corners: `, it: `Curve: ` },
 
-    // The training plan. It lives on the Training tab now — the strip that says
-    // since when and the one button; the goals themselves are the steps, each
-    // with the drill that closes it.
+    // The training plan. It lives on the Pagella now, one piece of advice at
+    // a time; Trends only points there.
     "plan.title":      { en: `Your plan`, it: `Il tuo piano` },
-    "plan.elsewhere":  { en: `Working on a plan? It lives under Training, next to the drills that close it.`,
-                         it: `Stai seguendo un piano? Sta nella scheda Allenamento, insieme agli esercizi che lo chiudono.` },
-    "plan.goto":       { en: `Open Training`, it: `Apri Allenamento` },
+    "plan.elsewhere":  { en: `Your plan is on the Report card, one piece of advice at a time.`,
+                         it: `Il tuo piano sta nella Pagella, un consiglio alla volta.` },
+    "plan.goto":       { en: `Open the Report card`, it: `Apri la Pagella` },
     "plan.none":       { en: `No systematic weakness to train — nothing worth putting in a plan yet.`,
                          it: `Nessun punto debole sistematico da allenare: per ora non c'è niente da mettere in un piano.` },
     "plan.proposed":   { en: `proposed from your recent laps — not started yet`,
@@ -938,6 +1005,8 @@
   //   data-i18n-title       -> title attribute
   //   data-i18n-aria        -> aria-label attribute
   //   data-i18n-placeholder -> placeholder attribute
+  //   data-i18n-label       -> data-label + aria-label (a group's caption,
+  //                            drawn by CSS from `attr(data-label)`)
   function applyStatic(root) {
     root = root || document;
     try {
@@ -960,6 +1029,13 @@
       root.querySelectorAll("[data-i18n-placeholder]").forEach(function (el) {
         var v = t(el.getAttribute("data-i18n-placeholder"));
         if (v != null) el.placeholder = v;
+      });
+      root.querySelectorAll("[data-i18n-label]").forEach(function (el) {
+        var v = t(el.getAttribute("data-i18n-label"));
+        if (v != null) {
+          el.setAttribute("data-label", v);
+          el.setAttribute("aria-label", v);
+        }
       });
     } catch (e) { /* defensive: never break the page over a missing node */ }
     try { document.documentElement.lang = lang; } catch (e) {}

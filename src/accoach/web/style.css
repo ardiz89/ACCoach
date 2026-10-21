@@ -275,6 +275,19 @@ select {
 }
 .tab:hover { color: var(--text); }
 .tab.active { color: var(--text); border-bottom-color: var(--cyan); }
+/* Tre gruppi nella barra, nell'ordine deciso col pilota: com'è andata oggi,
+   perché nel dettaglio, nel tempo. Il gruppo è una riga che non si comprime,
+   come la scheda (la fila scorre, vedi `.tabs`), e la sua etichetta la scrive
+   i18n.js in `data-label`: il CSS la disegna sopra le schede, piccola. */
+.tab-group { display: flex; gap: 4px; flex: 0 0 auto; position: relative; padding-top: 14px; }
+.tab-group + .tab-group { margin-left: 8px; padding-left: 8px; border-left: 1px solid var(--line); }
+.tab-group::before {
+  content: attr(data-label);
+  position: absolute; top: 0; left: 14px;
+  font-size: 10px; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--muted); white-space: nowrap;
+}
+.tab-group + .tab-group::before { left: 22px; }
 .hidden { display: none; }
 
 main { padding: 16px var(--gut); display: grid; gap: 18px; }
@@ -461,21 +474,6 @@ body:not(.railed) .rail { display: none; }
   .ses-nums { white-space: normal; text-align: right; }
 }
 
-/* "How it went": the phase bars above reuse .ses-row/.ses-track/.ses-fill/
-   .ses-nums as-is (same shape, same narrow-screen rule already above). Only
-   the lap-by-lap row is new. */
-.recap-lap { display: grid; grid-template-columns: 96px 88px 1fr; align-items: center;
-  gap: 12px; padding: 7px 12px; margin: 6px 0; background: var(--panel);
-  border: 1px solid var(--line); border-radius: 10px; cursor: pointer; }
-.recap-lap .lap-time { font-family: var(--font-mono); }
-.recap-lap .lap-gap { font-family: var(--font-mono); color: var(--muted); }
-.recap-lap .corner { font-weight: 600; }
-
-@media (max-width: 640px) {
-  .recap-lap { grid-template-columns: 1fr auto; }
-  .recap-lap .corner { grid-column: 1 / -1; }
-}
-
 .recur {
   display: flex; align-items: center; gap: 14px;
   padding: 10px 14px; margin: 8px 0;
@@ -646,7 +644,8 @@ body:not(.railed) .rail { display: none; }
 .empty { display: none; padding: 60px 24px; text-align: center; color: var(--muted); }
 /* «Qui non c'è ancora niente» DENTRO un pannello, che è un'altra cosa dal
    «non c'è ancora niente» di tutta la pagina qui sopra.
-   Serve una classe sua e non `.empty` per il motivo scritto a `.train-gate`:
+   Serve una classe sua e non `.empty` (lo stesso motivo per cui la scheda
+   Allenamento, che non c'è più, aveva il suo stato chiuso a parte):
    `.empty` è `display: none` finché la pagina intera non è senza dati, quindi
    riusarla in un pannello **nasconde la spiegazione e lascia il titolo con il
    vuoto sotto**. Era già successo una volta ed era già stato corretto lì; il
@@ -663,7 +662,7 @@ body:not(.railed) .rail { display: none; }
    mostravano il titolo della scheda e sotto il vuoto, mentre la frase che
    spiega perché stava nel DOM, leggibile solo dall'ispettore. È la terza volta
    che `.empty` viene riusata per un «vuoto» che non è il suo (vedi `.nothing`
-   qui sopra e `.train-gate` più giù): la classe dice *quale* vuoto, non solo
+   qui sopra e lo stato chiuso dell'Allenamento): la classe dice *quale* vuoto, non solo
    che è vuoto. Nessuna regola la riaccende, di proposito — spegnere e
    riaccendere è un duello di specificità, e questo file ne ha già uno. */
 .missing { padding: 60px 24px; text-align: center; color: var(--muted); }
@@ -1252,25 +1251,87 @@ body.no-data .empty { display: block; }
   font-family: var(--font-mono);
 }
 
-/* --- The Training tab -----------------------------------------------------
-   The one page that answers "so what do I do?". Laid out as one column with a
-   hard reading width: it is prose with numbers in it, and prose set across a
-   1600px window is prose nobody finishes.
+/* --- La Pagella -------------------------------------------------------------
+   La prima pagina del report. Una colonna sola, stretta e con caratteri più
+   grandi del resto: su un 32" il pilota «si perde a leggere» (spec). Verdetto,
+   difetti e piano devono stare sullo schermo senza scorrere a 1920×1080, per
+   questo le righe sono basse e i blocchi secondari (dove sbagli, errori)
+   stanno affiancati. Colori della palette HONE, mai scritti a mano. */
+.pag-shell { max-width: 860px; margin: 0 auto; padding: 14px 24px 40px; font-size: 16px; line-height: 1.45; }
+.pag-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.pag-sub { margin: 0; color: var(--muted); font-size: 14px; }
+.pag-verdict {
+  margin: 8px 0 2px; font-family: var(--font-display);
+  font-size: 20px; font-weight: 700; line-height: 1.35;
+}
+.pag-ref { margin: 0; color: var(--muted); font-size: 13px; }
+.pag-box {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+  padding: 10px 16px; margin-top: 12px;
+}
+.pag-box h4 {
+  margin: 0 0 4px; font-size: 12px; font-weight: 600;
+  letter-spacing: .06em; text-transform: uppercase; color: var(--muted);
+}
+.pag-row {
+  display: flex; justify-content: space-between; align-items: center; gap: 12px;
+  padding: 6px 0; border-bottom: 1px solid var(--line);
+}
+.pag-box > .pag-row:last-child, .pag-box > .pag-defect:last-child > .pag-row { border-bottom: 0; }
+.pag-small { color: var(--muted); font-size: 13px; }
+.pag-shell .num { font-family: var(--font-mono); font-weight: 700; font-variant-numeric: tabular-nums; }
+.pag-shell .num.loss { color: var(--red); }
+.pag-cost { display: flex; align-items: center; gap: 6px; flex: none; white-space: nowrap; }
+/* Un difetto si apre curva per curva. La freccia dice che si apre. */
+.pag-defect > summary { list-style: none; cursor: pointer; }
+.pag-defect > summary::-webkit-details-marker { display: none; }
+.pag-defect > summary b::after { content: " ▸"; color: var(--muted); font-weight: 400; }
+.pag-defect[open] > summary b::after { content: " ▾"; }
+.pag-corners {
+  list-style: none; margin: 0; padding: 2px 0 8px 16px;
+  border-bottom: 1px solid var(--line);
+}
+.pag-corners li { display: flex; justify-content: space-between; gap: 12px; padding: 2px 0; font-size: 14px; color: var(--muted); }
+/* Il mini-andamento: una barra per sessione, la più vecchia a sinistra; la
+   barra di oggi prende il colore della freccia. Una barra fuori scala (sopra
+   due volte la mediana, vedi pagSpark) resta a piena altezza con un taglio
+   obliquo, il segno che è più alta di quanto si vede. */
+.pag-spark { display: inline-flex; gap: 2px; align-items: flex-end; height: 18px; margin-left: 8px; }
+.pag-spark i { display: block; width: 5px; background: var(--muted); border-radius: 1px; position: relative; }
+.pag-spark i.down { background: var(--green); }
+.pag-spark i.same { background: var(--amber); }
+.pag-spark i.up { background: var(--red); }
+.pag-spark i.cut::after {
+  content: ""; position: absolute; left: -1px; right: -1px; top: 4px; height: 2px;
+  background: var(--panel); transform: skewY(-35deg);
+}
+.pag-trend { font-weight: 700; margin-left: 2px; }
+.pag-trend.down { color: var(--green); }
+.pag-trend.same { color: var(--amber); }
+.pag-trend.up { color: var(--red); }
+.pag-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
+.pag-note { margin-top: 12px; }
+/* Il piano: la regola una volta sopra la lista, poi i consigli in ordine. */
+.pag-rule { margin: 0 0 2px; color: var(--muted); font-size: 14px; }
+.pag-steps { list-style: none; margin: 0; padding: 0; }
+.pag-step { display: flex; gap: 12px; align-items: flex-start; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.pag-step:last-child { border-bottom: 0; }
+.pag-k {
+  width: 24px; height: 24px; border-radius: 50%; flex: none;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--line); font-weight: 700; font-size: 13px;
+}
+.pag-step.active .pag-k { background: var(--cyan); color: var(--bg); }
+.pag-step.reached .pag-k { background: var(--green); color: var(--bg); }
+.pag-step-body { flex: 1; min-width: 0; }
+.pag-btns { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; flex: none; }
+.pag-tag {
+  margin-left: 6px; padding: 1px 8px; border-radius: 999px;
+  border: 1px solid var(--line); color: var(--muted); font-size: 11px; font-weight: 600;
+}
+.pag-tag.active { color: var(--cyan); border-color: var(--cyan); }
+.pag-tag.reached { color: var(--green); border-color: var(--green); }
 
-   The plan's strip sits between the gap and the steps — it is the thing that
-   turns the steps from a suggestion into something with a date on it. */
-/* Stessa storia di `.session-shell` sopra: `--gut` qui è il pavimento locale
-   da 24px per le sette bande di questa scheda (`.plan`, `.plan-elsewhere`,
-   `.train-intro`, `.train-gap`, `.train-steps`, `.train-words`,
-   `.train-session`), non il gutter di pagina — `.stage > .views` lo
-   azzererebbe per eredità e il testo di Allenamento si allargherebbe di 48px.
-   La prova che l'inset era voluto: più avanti in questo file, sotto i 700px,
-   una media query rimette a mano `padding-left/right: 16px` proprio su
-   quelle sette classi. */
-.train-shell { max-width: 820px; margin: 0 auto; padding: 8px 0 40px; --gut: 24px; }
-.plan { padding: 12px var(--gut) 0; }
-.plan h3 { font-size: 13px; margin: 0 0 10px; display: flex; align-items: center; gap: 10px; }
-.plan-since { color: var(--muted); font-size: 12px; font-weight: 400; font-family: var(--font-ui); }
 .mini-btn.primary { border-color: var(--cyan); color: var(--cyan); }
 /* The pointer left behind on Trends, where the plan used to live. */
 /* `:not(.hidden)` per lo stesso duello già pagato da `#view-flow`, `.map-legend`
@@ -1284,146 +1345,16 @@ body.no-data .empty { display: block; }
   color: var(--muted); font-size: 13px;
 }
 
-.train-intro {
-  padding: 14px var(--gut) 0; margin: 0;
-  color: var(--muted); font-size: 13px; line-height: 1.6;
-}
-
-/* How far it is, and where it sits. The sector row is the only place on this
-   tab with a table in it, and it stays a three-column grid rather than a table
-   so it can collapse on a phone. */
-.train-gap { padding: 12px var(--gut) 0; }
-.train-gap h3 { font-size: 13px; margin: 0 0 8px; }
-.gap-head { margin: 0; font-size: 15px; line-height: 1.6; }
-.gap-note {
-  margin: 10px 0 0; padding-left: 10px;
-  border-left: 2px solid var(--line);
-  color: var(--muted); font-size: 12px; line-height: 1.6;
-}
-.gap-secs { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
-.gap-sec {
-  display: grid; gap: 1px; padding: 8px 12px; min-width: 110px;
-  background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
-}
-.gap-sec.worst { border-color: var(--amber); }
-.gap-sec .k { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
-.gap-sec .v { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 15px; }
-.gap-sec .d { font-family: var(--font-mono); font-size: 12px; color: var(--green); }
-.gap-sec.worst .d { color: var(--amber); }
-
-/* One card per step. Only the current one is unrolled — the others show their
-   heading and the reason they are not first, which is the whole argument for
-   doing them in that order. */
-.train-steps { padding: 4px var(--gut) 0; }
-.train-step {
-  display: flex; flex-direction: column; gap: 6px;
-  padding: 14px 16px; margin: 10px 0;
-  background: var(--panel); border: 1px solid var(--line);
-  border-left: 4px solid var(--line); border-radius: 12px;
-}
-.train-step.now { border-left-color: var(--cyan); }
-.train-step.done { border-left-color: var(--green); }
-.train-step.later { opacity: .72; }
-.step-head { display: flex; align-items: baseline; gap: 10px; }
-.step-head .n {
-  font-family: var(--font-mono); font-size: 11px; color: var(--muted);
-  border: 1px solid var(--line); border-radius: 50%; width: 20px; height: 20px;
-  display: inline-flex; align-items: center; justify-content: center; flex: none;
-}
-.step-head .where { font-weight: 700; font-size: 16px; }
-.step-head .badge {
-  margin-left: auto; flex: none; font-size: 11px; color: var(--muted);
-  border: 1px solid var(--line); border-radius: 999px; padding: 1px 9px;
-}
-.train-step.now .badge { color: var(--cyan); border-color: var(--cyan); }
-.train-step.done .badge { color: var(--green); border-color: var(--green); }
-.train-step .cause { font-weight: 600; }
-.train-step .why { color: var(--muted); font-size: 13px; line-height: 1.6; }
-.goal-target {
-  color: var(--muted); font-size: 12px;
-  font-family: var(--font-mono); font-variant-numeric: tabular-nums;
-}
-.drill-title {
-  display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
-  margin-top: 6px; padding-top: 10px; border-top: 1px solid var(--line);
-  font-weight: 700; color: var(--cyan);
-}
-/* A pill, not a prefix: run together as text it read "Drill · 10 lapsFind the
-   minimum", which is two facts wearing one sentence. */
-.drill-badge {
-  flex: none; font-size: 11px; font-weight: 600; color: var(--muted);
-  font-family: var(--font-mono); letter-spacing: .02em;
-  border: 1px solid var(--line); border-radius: 999px; padding: 1px 9px;
-}
-/* Numbered because the order is the exercise: the measuring laps come before
-   the moving-the-point laps, and doing them the other way round measures
-   nothing. */
-.drill-steps { margin: 2px 0 0; padding-left: 22px; line-height: 1.7; }
-.drill-steps li { margin: 6px 0; }
-.drill-focus {
-  display: flex; gap: 14px; flex-wrap: wrap; margin-top: 8px;
-  font-size: 12px;
-}
-.drill-focus .watch { color: var(--green); }
-.drill-focus .ignore { color: var(--muted); }
-.drill-done {
-  margin-top: 8px; padding: 8px 10px;
-  background: var(--inset); border-radius: 8px;
-  font-size: 12px; line-height: 1.6;
-}
-.plan-bar {
-  height: 8px; background: var(--inset); border-radius: 999px;
-  overflow: hidden; margin-top: 8px;
-}
-.plan-bar span { display: block; height: 100%; background: var(--cyan); border-radius: 999px; }
-.train-step.done .plan-bar span { background: var(--green); }
-.plan-prog {
-  font-size: 12px; color: var(--muted);
-  font-family: var(--font-mono); font-variant-numeric: tabular-nums;
-}
-.plan-prog.muted { font-family: var(--font-ui); }
-
-/* The glossary. Closed, it is a row of words — that row is the whole design:
-   you scan it, and you open it only if one of them is a word you don't know. */
-.train-words { padding: 18px var(--gut) 0; }
-.train-words .words { border-top: 1px solid var(--line); padding-top: 12px; }
-.train-words summary {
-  cursor: pointer; list-style: none; font-size: 13px;
-  display: flex; gap: 8px; flex-wrap: wrap; align-items: baseline;
-}
-.train-words summary::-webkit-details-marker { display: none; }
-.train-words summary::before { content: "▸"; color: var(--muted); }
-.train-words .words[open] summary::before { content: "▾"; }
-.words-lead { color: var(--muted); }
-.words-list { color: var(--cyan); }
-.train-words dl { margin: 12px 0 0; display: grid; gap: 8px; }
-.train-words dt { font-weight: 700; font-size: 13px; }
-.train-words dd { margin: 0 0 4px; color: var(--muted); font-size: 13px; line-height: 1.6; }
-
-/* The run plan. Deliberately the plainest thing on the page: it is what you
-   read last, standing up. */
-.train-session { padding: 14px var(--gut) 0; }
-.train-session h3 { font-size: 13px; margin: 0 0 8px; }
-.train-session h3 small { color: var(--muted); font-weight: 400; }
-.ses-plan { margin: 0; padding-left: 22px; line-height: 1.9; }
-/* The locked state. It borrows the empty page's typography but not its
-   `display: none` — reusing the `.empty` class here left the whole tab blank,
-   which is precisely the failure this panel exists to prevent. */
-.train-gate { padding: 56px 24px; text-align: center; color: var(--muted); }
-.train-gate .empty-title { font-size: 20px; }
-.train-gate .empty-hint { max-width: 620px; margin: 0 auto; line-height: 1.7; }
-.train-countdown { color: var(--cyan); font-size: 13px; margin-top: 12px; }
-
 @media (max-width: 700px) {
-  .plan, .train-gap, .train-steps, .train-session, .plan-elsewhere,
-  .train-intro, .train-words {
-    padding-left: 16px; padding-right: 16px;
-  }
-  .plan h3 { flex-wrap: wrap; }
-  /* The badge is `margin-left: auto` on a baseline row: with a long corner name
-     it stops fitting and pushes the row wider than the phone. */
-  .step-head { flex-wrap: wrap; }
-  .gap-sec { flex: 1 1 100%; }
+  /* Qualificata come la regola che sovrascrive: `.plan-elsewhere` da sola
+     (0,1,0) perdeva contro `.plan-elsewhere:not(.hidden)` (0,2,0). */
+  .plan-elsewhere:not(.hidden) { padding-left: 16px; padding-right: 16px; }
+  .pag-shell { padding: 12px 16px 32px; }
+  .pag-grid { grid-template-columns: 1fr; }
+  /* Il costo col mini-andamento è `nowrap`: su un telefono va a capo sotto il
+     nome invece di spingere la pagina di lato. */
+  .pag-row, .pag-step { flex-wrap: wrap; }
+  .pag-btns { justify-content: flex-start; }
 }
 
 /* Where inside a corner the time went: one loss cut into its parts, so one hue

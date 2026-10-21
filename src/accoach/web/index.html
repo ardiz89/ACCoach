@@ -36,23 +36,31 @@
     </div>
   </header>
 
+  <!-- Tre gruppi, nell'ordine deciso col pilota: com'è andata oggi, perché
+       nel dettaglio, nel tempo. L'etichetta del gruppo la scrive i18n.js in
+       `data-label` (e in `aria-label`), e il CSS la disegna sopra le schede. -->
   <nav class="tabs">
-    <button class="tab active" data-view="recap" data-i18n="tab.recap">How it went</button>
-    <button class="tab" data-view="flow" data-i18n="tab.flow">Lap explained</button>
-    <button class="tab" data-view="training" data-i18n="tab.training">Training</button>
-    <button class="tab" data-view="session" data-i18n="tab.session">Session</button>
-    <button class="tab" data-view="stint" data-i18n="tab.stint">Race pace</button>
-    <button class="tab" data-view="compare" data-i18n="tab.compare">Compare</button>
-    <button class="tab" data-view="line" data-i18n="tab.line">Line</button>
-    <button class="tab" data-view="sectors" data-i18n="tab.sectors">Sectors</button>
-    <button class="tab" data-view="dynamics" data-i18n="tab.dynamics">Dynamics</button>
-    <button class="tab" data-view="progress" data-i18n="tab.trends">Trends</button>
+    <div class="tab-group" role="group" data-i18n-label="tabgroup.today" data-label="How today went">
+      <button class="tab active" data-view="pagella" data-i18n="tab.pagella">Report card</button>
+      <button class="tab" data-view="session" data-i18n="tab.session">Session</button>
+      <button class="tab" data-view="flow" data-i18n="tab.flow">Lap explained</button>
+    </div>
+    <div class="tab-group" role="group" data-i18n-label="tabgroup.why" data-label="Why, in detail">
+      <button class="tab" data-view="compare" data-i18n="tab.compare">Compare</button>
+      <button class="tab" data-view="line" data-i18n="tab.line">Line</button>
+      <button class="tab" data-view="sectors" data-i18n="tab.sectors">Sectors</button>
+      <button class="tab" data-view="dynamics" data-i18n="tab.dynamics">Dynamics</button>
+    </div>
+    <div class="tab-group" role="group" data-i18n-label="tabgroup.time" data-label="Over time">
+      <button class="tab" data-view="progress" data-i18n="tab.trends">Trends</button>
+      <button class="tab" data-view="stint" data-i18n="tab.stint">Race pace</button>
+    </div>
   </nav>
 
   <!-- Which lap you are looking at, on every tab. These four numbers used to
        live only inside Compare's own summary, so every tab that explains the
        lap — Flow, Line, Sectors — showed its analysis without ever
-       saying which lap it was analysing. (The landing view is the recap now,
+       saying which lap it was analysing. (The landing view is the Pagella now,
        and that one is about a whole run, not this lap.) -->
   <section id="lapbar" class="lapbar"></section>
 
@@ -76,43 +84,32 @@
     </aside>
     <div class="views">
 
-  <!-- How the run went, before it's forgotten: the door onto the report. Reads
-       current.recap (coaching/session recap — Task 3) — a debrief for the whole
-       outing, not one lap. The gain is measured against the best lap of THIS
-       run, not the elected reference, and it is not the gap the timing screen
-       publishes (the two differ by up to a tenth): it is how much you were
-       leaving out there on average, as the sum of its own parts — the five
-       phase numbers below add up to it exactly (see app.js renderRecap). -->
-  <div id="view-recap">
-    <section id="recap-head" class="summary"></section>
-    <!-- This section, alone among the two, stays on screen when there is no
-         recap — and that is why its heading is split in two. The <h3> is a
-         plain label, true whatever the panel holds; the promise ("the parts
-         add up to the number above") lives in the <small>, which renderRecap
-         fills only once there IS a recap. Without the split the heading
-         announced an average per lap and five parts summing to a total, over
-         a run that has none of the three: #recap-head goes empty (and
-         `.summary:empty` removes it), #recap-laps-sec hides itself, and the
-         only thing left under the promise is the "can't measure this" line.
-         Six of the seventeen real sessions in the archive land there, one of
-         them the first combo /api/combos returns.
-         Hiding this section like #recap-laps-sec does is NOT the fix: it is
-         the tour's "Start here" target (tour.a12, app.js tourSteps), and
-         tour.js calls finish() — not skip() — on a step whose target isn't
-         visible, so hiding it would end the guided tour at step 3 of 12, in
-         silence, on every run without a recap. -->
-    <section id="recap-phases-sec" class="debrief">
-      <h3><span data-i18n="recap.where">Where the time went</span> <small id="recap-where-note"></small></h3>
-      <div id="recap-phases"></div>
-    </section>
-    <!-- Hidden as a whole, not just its list, when there is no recap: a
-         heading over an empty div reads as broken (see the `.nothing` CSS
-         comment — a panel that goes silent under its own title). -->
-    <section id="recap-laps-sec" class="debrief">
-      <h3 data-i18n-html="recap.laps">Lap by lap <small>(against your best lap of this run)</small></h3>
-      <div id="recap-laps"></div>
-    </section>
+  <!-- La Pagella: la prima pagina del report. Com'è andata la sessione sul
+       tuo riferimento, le abitudini che ti costano tempo, dove e quante volte
+       sbagli, e il piano per la prossima uscita (spec «La Pagella»). Tutto il
+       contenuto lo scrive renderPagella da /api/pagella; qui resta solo la
+       testata, che ha del testo anche prima che la risposta arrivi: la visita
+       guidata ci punta sopra il suo «Parti da qui», e tour.js controlla la
+       visibilità del bersaglio prima che il fetch possa rispondere. -->
+  <div id="view-pagella">
+    <div class="pag-shell">
+      <header id="pag-head" class="pag-head">
+        <p id="pag-sub" class="pag-sub"></p>
+        <label class="session-pick">
+          <span data-i18n="ses.which">Session</span>
+          <select id="pag-select"></select>
+        </label>
+      </header>
+      <p id="pag-verdict" class="pag-verdict"></p>
+      <p id="pag-ref" class="pag-ref"></p>
+      <div id="pag-body" class="pag-body"></div>
+    </div>
   </div>
+
+  <!-- «Come si fa», uno per consiglio. Non ha una scheda: ci si arriva dal
+       bottone «Come si fa →» della Pagella (openHowto in app.js). Il contenuto
+       lo disegna il Task 8. -->
+  <div id="view-howto" class="hidden"></div>
 
   <!-- The lap explained one step at a time. Same findings as the debrief below,
        edited server-side into what to look at first (see coaching/flow.py). -->
@@ -139,41 +136,6 @@
         <button id="flow-whole" type="button" class="flow-btn ghost" data-i18n="flow.whole">Show the whole chart</button>
         <button id="flow-next" type="button" class="flow-btn primary" data-i18n="flow.next">Next →</button>
       </nav>
-    </div>
-  </div>
-
-  <!-- How to get there, not just how far it is. Every other tab answers "what"
-       and "why"; this one turns the plan's goals into drills you can run
-       tonight, and it only opens once there are enough laps to mean it (see
-       coaching/training.py). -->
-  <div id="view-training" class="hidden">
-    <div class="train-shell">
-      <!-- Under the bar the whole tab is this one paragraph: what is missing
-           and how far off it is. Never an empty panel — that reads as broken. -->
-      <!-- Not `.empty`: that class is `display: none` until the page decides
-           there is no data at all, so the gate would never have shown. -->
-      <section id="train-gate" class="train-gate hidden"></section>
-      <!-- What this tab is, for someone who has just found it. Every other tab
-           shows you something; this one asks you to go and do something, and
-           that difference is worth one sentence. -->
-      <p id="train-intro" class="train-intro" data-i18n="train.intro">Here there
-        is no more analysis: there is what to do on track, one exercise at a
-        time, built from your own laps.</p>
-      <!-- Where you are, where your own sectors say you could be, and why the
-           two numbers on this page must not be added together. -->
-      <section id="train-gap" class="train-gap"></section>
-      <!-- The plan's identity strip: since when, measured on how many laps, and
-           the button that starts or drops it. The goals themselves are not
-           listed here — they are the steps below, with their drills. -->
-      <section id="plan" class="plan"></section>
-      <section id="train-steps" class="train-steps"></section>
-      <!-- The next time you sit down, as laps to run. -->
-      <section id="train-session" class="train-session"></section>
-      <!-- The words you'll hear other people use. Last, and closed: it is never
-           the only place a word is explained (the drill above still glosses its
-           own terms), so skipping it costs nothing — which is exactly why the
-           driver who opens it opens it for a word they actually met. -->
-      <section id="train-words" class="train-words"></section>
     </div>
   </div>
 
@@ -398,14 +360,13 @@
 
   <div id="view-progress" class="hidden">
     <section id="prog-summary" class="summary"></section>
-    <!-- The plan used to live here, next to the weak points it is picked from.
-         It moved to the Training tab, which is where the same goals now come
-         with the drills that close them: two panels for one plan is two places
-         to disagree about what you are working on. -->
-    <p class="plan-elsewhere"><span data-i18n="plan.elsewhere">Working on a
-      plan? It lives under Training, with the drills.</span>
-      <button type="button" id="go-training" class="mini-btn"
-              data-i18n="plan.goto">Open Training</button></p>
+    <!-- The plan used to live here, then under Training. It is the Pagella's
+         now, one piece of advice at a time: two panels for one plan is two
+         places to disagree about what you are working on. -->
+    <p class="plan-elsewhere"><span data-i18n="plan.elsewhere">Your plan is on
+      the Report card, one piece of advice at a time.</span>
+      <button type="button" id="go-pagella" class="mini-btn"
+              data-i18n="plan.goto">Open the Report card</button></p>
     <section id="levels" class="levels"></section>
     <main>
       <div class="chart">

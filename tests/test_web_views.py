@@ -51,9 +51,19 @@ def test_every_tab_has_a_panel():
         assert f"view-{view}" in _PANELS or view in _PANELS, view
 
 
+# Le viste che non hanno una scheda di proposito, e la funzione che le apre.
+# Il «Come si fa» si apre dal suo bottone nella Pagella, uno per consiglio.
+_OFF_BAR = {"howto": "function openHowto("}
+
+
 def test_every_panel_has_a_tab():
-    """A panel nothing can reach is dead weight that still renders."""
+    """A panel nothing can reach is dead weight that still renders — unless
+    something else opens it, and then that something has to exist."""
     for panel in _PANELS:
+        if panel in _OFF_BAR:
+            opener = _APPJS.split(_OFF_BAR[panel])[1].split("\n}")[0]
+            assert f'showView("{panel}")' in opener, panel
+            continue
         assert panel in _TABS, panel
 
 
@@ -305,49 +315,25 @@ def test_no_two_functions_in_app_js_share_a_name():
     assert not dupes, f"declared twice in app.js: {dupes}"
 
 
-# --- the training tab is wired --------------------------------------------
-
-def test_the_glossary_shows_its_words_when_closed():
-    """A box labelled "Glossary" tells the reader they don't know things, and
-    gets skipped by exactly the people it exists for. The row of terms is the
-    invitation: you scan it and open it for the one word you don't have."""
-    block = _APPJS.split("function renderWords(")[1].split("\n}")[0]
-    assert "words-list" in block and "e.term" in block
-    assert "<details" in block, "it has to start closed"
-    assert 'id="train-words"' in _HTML
-    assert _view_of_ids()["train-words"] == "training"
-
-
-@pytest.mark.parametrize("el", ("train-gate", "train-gap", "train-steps",
-                                "train-session", "train-words", "plan"))
-def test_the_training_view_has_the_elements_its_code_reaches_for(el):
-    assert f'id="{el}"' in _HTML
-    assert f'"{el}"' in _APPJS
-
+# --- the plan lives on the Pagella ----------------------------------------
 
 def test_the_plan_lives_on_exactly_one_tab():
-    """It used to sit under Trends. Two panels drawing the same plan is two
-    places for it to disagree about what you're working on — and the goals are
-    now the steps, each with the drill that closes it."""
-    assert _view_of_ids()["plan"] == "training"
+    """It sat under Trends, then under Training. Two panels drawing the same
+    plan is two places for it to disagree about what you're working on: it is
+    the Pagella's now, and nobody else draws it."""
+    assert 'id="view-training"' not in _HTML
     assert "renderPlan(" not in _APPJS, "the old Trends renderer is still there"
+    assert "renderPlanBar(" not in _APPJS, "the old Training renderer is still there"
     block = _APPJS.split("async function loadProgress(")[1].split("\n}")[0]
     assert "plan" not in block, "Trends is still drawing the plan"
+    assert "function pagPlan(" in _APPJS
 
 
 def test_trends_says_where_the_plan_went():
     """A panel that vanishes without a pointer reads as a feature that broke."""
-    assert 'id="go-training"' in _HTML
-    assert _view_of_ids()["go-training"] == "progress"
-    assert 'showView("training")' in _APPJS
-
-
-def test_the_training_tab_refetches_rather_than_repainting():
-    """Every sentence of a drill is written by the backend in the requested
-    language, so a cached payload would still be in the language you left."""
-    block = _APPJS.split("function redrawCurrentView()")[1].split("\n}")[0]
-    assert 'VIEW === "training"' in block
-    assert "loadTraining(CURRENT)" in block
+    assert 'id="go-pagella"' in _HTML
+    assert _view_of_ids()["go-pagella"] == "progress"
+    assert 'showView("pagella")' in _APPJS.split('$("go-pagella")')[1].split("};")[0]
 
 
 # --- the comparison lap is only forwarded when it was actually chosen ------
@@ -409,13 +395,15 @@ def test_a_language_switch_also_reaches_the_per_combo_views():
     accorgersi se un anello si stacca."""
     block = _APPJS.split("window.HoneI18nRerender")[1]
     assert "reloadSelection()" in block
-    for cache in ("SHEET = null", "TRAINING = null"):
-        assert cache in block, cache
+    assert "SHEET = null" in block
+    # L'Allenamento teneva una cache; la Pagella si rilegge sempre, quindi non
+    # ha niente da buttare — ma un nome rimasto lì vorrebbe dire codice morto.
+    assert "TRAINING" not in _APPJS
     sel = _body_of("function reloadSelection()")
     assert "reloadViewData(CURRENT)" in sel
     view = _body_of("function reloadViewData(combo)")
     for call in ("loadProgress(combo)", "loadSession(combo", "loadStint(combo",
-                 "loadTraining(combo)"):
+                 "loadPagella(combo"):
         assert call in view, call
 
 
@@ -465,12 +453,12 @@ def test_the_consistency_rows_stack_on_a_narrow_screen():
     assert "white-space: normal" in block
 
 
-@pytest.mark.parametrize("view", ("flow", "session", "line", "training"))
+@pytest.mark.parametrize("view", ("flow", "session", "line", "pagella"))
 def test_the_new_views_declare_a_narrow_layout(view):
     """All were built two-column-ish; none was checked on a phone until the
     page was measured in a 390px frame."""
     marker = {"flow": ".flow-btn.ghost", "session": ".ses-lap",
-              "line": ".line-grid", "training": ".step-head"}[view]
+              "line": ".line-grid", "pagella": ".pag-grid"}[view]
     tail = _CSS[_CSS.index("@media (max-width: 700px)"):]
     assert marker in tail, f"no narrow-screen rule for the {view} view"
 
@@ -930,8 +918,8 @@ def test_the_rail_is_declared_once_and_only_for_views_that_exist():
 def test_rail_views_is_exactly_the_views_about_one_lap():
     """Il test sopra verifica solo la metà positiva (ogni nome elencato è una
     scheda vera) — passerebbe anche con quattro nomi, o con sei se qualcuno
-    aggiungesse "session" per sbaglio. Le schede sopra il giro (Com'è andata,
-    Allenamento, Sessione, Passo gara, Andamento) non hanno un giro da
+    aggiungesse "session" per sbaglio. Le schede sopra il giro (Pagella,
+    Sessione, Passo gara, Andamento) non hanno un giro da
     ritagliare, quindi un rail lì risponderebbe a un clic senza cambiare
     niente — «peggio di un comando assente», dice il commento sopra
     RAIL_VIEWS. Erano sei finché la Mappa era una scheda; ora la mappa è la
@@ -941,7 +929,7 @@ def test_rail_views_is_exactly_the_views_about_one_lap():
     assert set(names) == {"flow", "compare", "line", "sectors", "dynamics"}, names
     # Insiemistica a parte: le due metà devono partizionare le schede vere, così
     # una scheda nuova non può restare fuori da entrambe senza che si veda.
-    assert set(names) | {"recap", "training", "session", "stint", "progress"} == set(_TABS)
+    assert set(names) | {"pagella", "session", "stint", "progress"} == set(_TABS)
 
 
 def test_switching_tab_says_whether_this_one_has_a_rail():
@@ -1362,152 +1350,14 @@ def test_the_series_is_rendered_when_the_tab_loads():
     assert "renderCornerSessions(p.corner_sessions)" in block
 
 
-# --- "Com'è andata": the recap, and the door onto the report (2026-08-06) ---
+# --- la porta del report: la Pagella (2026-10-21; prima il recap, 2026-08-06)
 
-def test_the_recap_has_a_home_and_it_is_the_landing_view():
-    html = (WEB / "index.html").read_text(encoding="utf-8")
-    assert 'id="view-recap"' in html
-    assert 'data-view="recap"' in html
+def test_the_pagella_is_the_landing_view():
+    assert 'id="view-pagella"' in _HTML
+    assert 'id="view-recap"' not in _HTML
     # la vista d'ingresso è l'unica senza `hidden`
-    assert 'id="view-recap" class="hidden"' not in html
-    assert 'id="view-flow" class="hidden"' in html
-
-
-def test_the_recap_call_is_wired_not_just_declared():
-    """A bare `"renderRecap(" in js` check (the brief's original Step 1 test)
-    is incapable of failing: the substring is right there in its own
-    `function renderRecap(` line even if nothing ever calls it. The call has
-    to live inside `renderSession`, which is what actually runs when the
-    shared /api/sessions payload lands — verified by mutation: moving the
-    call out of `renderSession` turns this red and leaves the bare check
-    green."""
-    js = (WEB / "app.js").read_text(encoding="utf-8")
-    block = js.split("function renderSession(s)")[1].split("\n}")[0]
-    assert "renderRecap(" in block
-
-
-def _recap_render_body() -> str:
-    return _APPJS.split("function renderRecap(")[1].split("\n}")[0]
-
-
-def test_the_total_and_the_five_parts_share_one_sign_convention():
-    """`gain_avg_s` used to print with a literal `"+"`, while the five phases
-    below it — and each lap's own gap — went through `fmtLoss`, which prints
-    a loss as `"−"`. `gain_avg_s` is always positive (it IS a loss, averaged),
-    so every full screen showed a `+` total over five `−` rows: adding the
-    five by hand gave the total's exact opposite. One call, one convention."""
-    block = _recap_render_body()
-    assert "fmtLoss(r.gain_avg_s)" in block
-    assert '"+" + r.gain_avg_s' not in block
-
-
-def test_the_empty_recap_names_only_the_cause_it_can_verify():
-    """`_recap_of` (api.py) returns `None` for seven different reasons — "one
-    valid lap" is only one of them. `!cur` is a different fact altogether (no
-    session at all, or the fetch failed): naming the single-lap cause there
-    would often be naming the wrong one, which is worse than a generic
-    message.
-
-    Exactly one of the seven is measured rather than guessed, and so may be
-    named: `recap_clock_broken`, decided by the guard in `trends.py` and
-    forwarded through the payload. Every other case still lands on the generic
-    sentence — that is the Task 4 correction, and this keeps it closed.
-    """
-    block = _recap_render_body()
-    assert '!cur ? t("recap.nolaps")' in block
-    assert 'cur.recap_clock_broken ? t("recap.clock") : t("recap.none")' in block
-    # Un solo modo di far comparire la frase specifica. Se ne avesse due, uno
-    # dei due sarebbe una causa affermata senza averla misurata.
-    assert block.count('"recap.clock"') == 1
-    # E il criterio non si rifà qui: la soglia vive in trends.py, dove è stata
-    # misurata. Una copia nel frontend è la seconda definizione che un giorno
-    # dirà il contrario della prima.
-    assert "250" not in block
-
-
-def test_the_empty_recap_is_muted_not_green():
-    """`.clean` is `var(--green)` — this report's colour for "no problem
-    here". A run with nothing measurable is not that; it's the project's own
-    `.nothing` (muted), the same class the Session panel uses for "no laps"
-    on this exact payload."""
-    block = _recap_render_body()
-    assert "clean" not in block
-    assert '"nothing"' in block
-
-
-def test_the_lap_by_lap_heading_hides_with_its_own_empty_list():
-    """A heading left on screen over an empty div reads as broken (see the
-    `.nothing` CSS comment: a panel that goes silent under its own title).
-    The whole section has to go, not just the list inside it."""
-    assert 'id="recap-laps-sec"' in _HTML
-    block = _recap_render_body()
-    assert 'lpSec.classList.add("hidden")' in block
-    assert 'lpSec.classList.remove("hidden")' in block
-
-
-def test_the_where_heading_keeps_its_promise_out_of_the_static_markup():
-    """«Dove è finito il tempo» resta sempre a schermo, anche quando non c'è
-    niente da misurare: è l'unica sezione di `#view-recap` con del contenuto
-    statico, e la visita guidata ci punta sopra il suo «Parti da qui». Quindi
-    la **promessa** — media per giro, le parti che sommano al numero sopra —
-    non può stare nel titolo statico: sopra un'uscita senza recap non c'è
-    nessun numero (`#recap-head` resta vuoto e `.summary:empty` lo toglie) e
-    sotto non c'è nessuna parte. Vive in un `<small>` che il JS riempie.
-
-    Verificato per mutazione: rimetti il `<small>(...)</small>` dentro
-    `recap.where` e questo diventa rosso."""
-    where = _i18n_between('"recap.where"', '"recap.wherenote"')
-    for promise in ("add up", "sommano", "average per lap", "media per giro"):
-        assert promise not in where, f"la promessa è tornata nel titolo statico: {promise}"
-    sec = re.search(r'<section id="recap-phases-sec".*?</section>', _HTML, re.S)
-    assert sec, "#recap-phases-sec non è più una sezione in index.html"
-    note = re.search(r'<small id="recap-where-note"[^>]*>(.*?)</small>',
-                     sec.group(0), re.S)
-    assert note, "manca il <small> che porta la promessa"
-    assert not note.group(1).strip(), (
-        "il <small> ha del testo scritto nel markup: sarebbe a schermo anche "
-        "senza recap, che è esattamente il difetto"
-    )
-
-
-def test_the_where_heading_promises_only_when_there_is_a_recap():
-    """Le due metà di `renderRecap`, una per volta. Nel ramo del vuoto il
-    `<small>` va svuotato (non lasciato com'era: la scheda si ridisegna a ogni
-    cambio di sessione, e la promessa della sessione prima resterebbe lì sopra
-    il messaggio del vuoto); nel ramo pieno va riempito.
-
-    Verificato per mutazione: sposta `t("recap.wherenote")` nel ramo del vuoto
-    e diventa rosso; toglilo dal ramo pieno e diventa rosso."""
-    block = _recap_render_body()
-    empty, filled = block.split('if (lpSec) lpSec.classList.remove')
-    assert 'note.textContent = ""' in empty
-    assert '"recap.wherenote"' not in empty, (
-        "la promessa è nel ramo dell'uscita non misurabile"
-    )
-    assert 't("recap.wherenote")' in filled
-
-
-def test_render_recap_never_hides_the_tour_s_start_here_target():
-    """La trappola già pagata una volta su questo ramo. `#recap-laps-sec` si
-    nasconde quando la lista è vuota, e la tentazione è fare lo stesso con la
-    sezione delle fasi. Ma `tour.js` su un bersaglio invisibile chiama
-    `finish()`, non «salta»: nascondere la sezione a cui punta `tour.a12`
-    chiuderebbe la visita guidata al terzo passo su dodici, in silenzio, su
-    ogni uscita senza recap — e nell'archivio vero sono 6 sessioni su 17, una
-    delle quali la prima combo che `/api/combos` restituisce.
-
-    Il bersaglio non è scritto a mano qui: è letto da `tourSteps()`, così il
-    test segue il passo se un giorno cambia elemento. Verificato per
-    mutazione: aggiungi `$("recap-phases-sec").classList.add("hidden")` nel
-    ramo del vuoto e diventa rosso."""
-    steps = _APPJS.split("function tourSteps()")[1].split("\n}")[0]
-    m = re.search(r'sel:\s*"#([^"]+)"[^}]*title:\s*t\("tour\.a12\.t"\)', steps)
-    assert m, "no tour step uses tour.a12.t (\"Start here\")"
-    target = m.group(1)
-    assert target not in _recap_render_body(), (
-        f"renderRecap tocca #{target}, il bersaglio di «Parti da qui»: se lo "
-        "nasconde, la visita guidata finisce lì senza dirlo"
-    )
+    assert 'id="view-pagella" class="hidden"' not in _HTML
+    assert 'id="view-flow" class="hidden"' in _HTML
 
 
 def test_the_start_here_step_does_not_count_what_may_not_be_on_screen():
@@ -1521,41 +1371,27 @@ def test_the_start_here_step_does_not_count_what_may_not_be_on_screen():
     assert not bad, f"il passo conta le parti a schermo: {bad.group(0) if bad else ''}"
 
 
-def test_the_yardstick_key_is_actually_shown():
-    """Declared in i18n.js and never read anywhere would be dead weight — or
-    worse, a sign the screen forgot to say why the best lap has no gap of its
-    own next to it."""
-    assert 't("recap.yardstick")' in _APPJS
-
-
-def test_the_recap_where_heading_does_not_promise_the_timing_screens_gap():
-    """The spec is explicit: this number differs from the timing screen's own
-    gap by up to a tenth, so the one word a driver would go check it against
-    must never be the word used to describe it."""
-    assert "gap" not in _i18n_between('"recap.where"', '"recap.laps"')
-
-
 def test_the_tour_start_here_step_points_at_the_new_landing_tab():
-    """The door moved from Flow to the recap; the "Start here" coachmark has
-    to move with it, or a first-time driver's very first tour step points at
-    a tab that is no longer where they landed."""
+    """The door moved from Flow to the recap, then to the Pagella; the "Start
+    here" coachmark has to move with it, or a first-time driver's very first
+    tour step points at a tab that is no longer where they landed."""
     block = _APPJS.split("function tourSteps()")[1].split("\n}")[0]
     m = re.search(r'sel:\s*"([^"]+)"[^}]*title:\s*t\("tour\.a12\.t"\)', block)
     assert m, "no tour step uses tour.a12.t (\"Start here\")"
-    assert _view_of_ids().get(m.group(1).lstrip("#"), "") == "recap"
+    assert _view_of_ids().get(m.group(1).lstrip("#"), "") == "pagella"
 
 
 def test_the_tour_start_here_step_points_at_something_with_static_content():
-    """`before: recap` calls `showView("recap")`, which calls `loadSession` —
-    asynchronous. `tour.js`'s `render()` runs `before()` and, in the very same
+    """`before: pagella` calls `showView("pagella")`, which calls
+    `loadPagella` — asynchronous. `tour.js`'s `render()` runs `before()` and, in the very same
     synchronous tick, checks `visible(elFor(step))`; anything still at
     `height: 0` at that instant fails the check and the whole tour calls
-    `finish()` in silence. `#recap-phases` is exactly that: an empty `<div>`
-    in index.html until `renderRecap` fills it after the fetch resolves, which
-    can never happen before the synchronous check runs. The step has to
+    `finish()` in silence. `#pag-body` is exactly that: an empty `<div>`
+    in index.html until `renderPagella` fills it after the fetch resolves,
+    which can never happen before the synchronous check runs. The step has to
     target an element that already has content in the raw HTML — verified
-    here by mutation: point tour.a12 back at `#recap-phases` and this goes
-    red; restore `#recap-phases-sec` and it's green again."""
+    here by mutation: point tour.a12 at `#pag-body` and this goes red;
+    restore `#pag-head` and it's green again."""
     block = _APPJS.split("function tourSteps()")[1].split("\n}")[0]
     m = re.search(r'sel:\s*"([^"]+)"[^}]*title:\s*t\("tour\.a12\.t"\)', block)
     assert m, "no tour step uses tour.a12.t (\"Start here\")"
@@ -2186,9 +2022,8 @@ def _hidden_writers() -> list[str]:
 # `querySelector` finto perché è l'unica parte che una macchina non può fare da
 # sola: `wrap` è tre elementi diversi in tre funzioni diverse.
 #
-#   p                       → i 10 pannelli `[id^='view-']` (showView)
-#   gate                    → #train-gate
-#   el                      → i 6 id del ciclo di renderTraining
+#   p                       → i 10 pannelli `[id^='view-']` (showView): le
+#                             9 schede e il «Come si fa»
 #   sec                     → #tyres (drawTyres) e #dyn-tyres (drawDynTyres)
 #   $("tyre-temp-wrap")     → #tyre-temp-wrap
 #   $("tyre-press-wrap")    → #tyre-press-wrap
@@ -2198,7 +2033,6 @@ def _hidden_writers() -> list[str]:
 #   $(id)                   → #map-missing, #line-missing, #dyn-missing
 #   wrap                    → il genitore di #c-flow, quello di #c-flow-map, e
 #                             #dyn-balance-wrap (drawBalanceRibbon)
-#   lpSec                   → #recap-laps-sec
 #   $("tyres")              → #tyres
 #   main / miss             → #dyn-charts / #dyn-missing
 #   $("dyn-tyres")          → #dyn-tyres
@@ -2212,14 +2046,12 @@ def _hidden_writers() -> list[str]:
 #                             chiamanti: renderLine e drawDynamics)
 #   $("dyn-elsewhere")      → #dyn-elsewhere
 _HIDDEN_TARGET_IDS = {
-    "view-recap", "view-flow", "view-training", "view-session", "view-stint",
+    "view-pagella", "view-howto", "view-flow", "view-session", "view-stint",
     "view-compare", "view-line", "view-sectors", "view-progress",
     "view-dynamics",
-    "train-gate", "train-intro", "train-gap", "plan", "train-steps",
-    "train-session", "train-words",
     "tyres", "tyre-temp-wrap", "tyre-press-wrap",
     "map-readout", "map-legend", "leg-lost", "leg-road", "map-missing",
-    "rail-nomap", "line-missing", "dyn-missing", "recap-laps-sec",
+    "rail-nomap", "line-missing", "dyn-missing",
     "dyn-charts", "dyn-tyres", "dyn-balance-wrap",
     "line-readout", "dyn-readout", "dyn-elsewhere",
 }
@@ -2274,12 +2106,12 @@ def test_the_census_of_hidden_writers_is_still_the_one_that_was_checked():
     solo non basta neanche: uno tolto e uno aggiunto lo lasciano fermo.
     """
     writers = _hidden_writers()
-    assert len(writers) == 28, (
-        f"{len(writers)} siti che scrivono `hidden` invece di 28: risolvi i "
+    assert len(writers) == 25, (
+        f"{len(writers)} siti che scrivono `hidden` invece di 25: risolvi i "
         "nuovi in _HIDDEN_TARGET_IDS e aggiorna il numero qui")
     assert set(writers) == {
-        "p", "gate", "el", "sec", '$("tyre-temp-wrap")', '$("tyre-press-wrap")',
-        "ro", "legend", "lost", "missing", "$(id)", "wrap", "lpSec",
+        "p", "el", "sec", '$("tyre-temp-wrap")', '$("tyre-press-wrap")',
+        "ro", "legend", "lost", "missing", "$(id)", "wrap",
         '$("tyres")', "main", '$("dyn-tyres")', '$("dyn-balance-wrap")', "miss",
         '$("line-missing")', "grid", "charts", "legRoad", '$("dyn-elsewhere")',
     }, sorted(set(writers))
@@ -2329,7 +2161,7 @@ def test_no_rule_outranks_hidden_on_anything_the_javascript_hides():
     # trovare i bersagli, i cicli qui sotto girano a vuoto e il test diventa una
     # decorazione. I quattro nominati sono le quattro FORME di bersaglio: un id,
     # una classe, un tag sotto un id, il genitore di una tela.
-    assert len(targets) == 39, f"{len(targets)} bersagli risolti invece di 39: {sorted(found)}"
+    assert len(targets) == 31, f"{len(targets)} bersagli risolti invece di 31: {sorted(found)}"
     assert {"map-readout", "line-grid", "main", "chart/flow-chart"} <= found, sorted(found)
 
     # Anti-vacuità sul matcher e sulla misura: uno che dica sempre di no, o una
@@ -2671,8 +2503,8 @@ def test_the_eight_loaders_are_all_here():
     «chi lo rilancia?» non se la può fare una regex.
     """
     assert set(_LOADERS) == {"loadBraking", "loadCombo", "loadLine", "loadProgress",
-                             "loadSectors", "loadSession", "loadStint", "loadTraining"}
-    assert set(_PER_COMBO) == {"loadProgress", "loadSession", "loadStint", "loadTraining"}
+                             "loadSectors", "loadSession", "loadStint", "loadPagella"}
+    assert set(_PER_COMBO) == {"loadProgress", "loadSession", "loadStint", "loadPagella"}
     assert set(_PER_LAP) == {"loadBraking", "loadLine", "loadSectors"}
 
 
@@ -2684,7 +2516,13 @@ def test_every_async_function_that_waits_is_accounted_for():
     parametrizzati qui sotto la coprono da soli, ma «cosa scrive, e chi la
     rilancia se la buttiamo?» è una domanda che nessuna regex si può fare.
     """
-    assert set(_ASYNC) == set(_LOADERS) | _NOT_WRITERS | {"saveCornerName"}
+    # `openPagellaIfNew` scrive `SESSION_I` e cambia scheda; la rilancia
+    # nessuno, ma gira una volta sola dentro `init`, che a combo cambiata
+    # riprende la scheda salvata. `adviceAction` scrive la nota «non si è
+    # salvata» e rilegge la Pagella; scartata, la Pagella l'ha già rilanciata
+    # chi ha fatto salire il contatore.
+    assert set(_ASYNC) == set(_LOADERS) | _NOT_WRITERS | {
+        "saveCornerName", "openPagellaIfNew", "adviceAction"}
     assert not _NOT_WRITERS & set(_WAITERS) and "saveCornerName" in _WAITERS
 
 

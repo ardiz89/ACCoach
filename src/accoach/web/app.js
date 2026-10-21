@@ -11,7 +11,7 @@ let DATA = null;      // last /api/analysis payload
 let DIST = null;      // {pos[], m[], total} — the reviewed lap in metres (see buildDistance)
 let COMBOS = [];      // last /api/combos payload (kept for re-labelling on lang switch)
 let LAST_HOVER = null; // last hover position, so a re-render keeps the readout
-let VIEW = "recap";   // whichever tab is `active` in index.html
+let VIEW = "pagella"; // whichever tab is `active` in index.html
 let HOVER_WIRED = false;
 // Did the driver pick the comparison lap by hand, or is it just whatever the
 // page elected last time? The difference matters now that the election depends
@@ -125,7 +125,6 @@ async function init() {
     SESSION_I = 0;        // a different car+track has different sessions
     STINT = null;         // …and different stints, on a different tank
     STINT_I = 0;
-    TRAINING = null;      // and its own plan, drills and readiness
     loadCombo(combo);
     // Gli indici sono stati appena azzerati qui sopra, quindi questa è la
     // stessa cosa delle quattro chiamate a mano che stavano qui.
@@ -140,11 +139,11 @@ async function init() {
   wireHints();
   wireFlow();
   // Trends still computes the weak points a plan is picked from; the plan
-  // itself is one tab away, so it says so and takes you there.
-  const goTrain = $("go-training");
-  if (goTrain) goTrain.onclick = () => {
-    rememberView("training");
-    showView("training");
+  // itself lives on the Pagella, so it says so and takes you there.
+  const goPag = $("go-pagella");
+  if (goPag) goPag.onclick = () => {
+    rememberView("pagella");
+    showView("pagella");
   };
   // Same reason, same shape: the tyre charts left Trends because the span they
   // were drawn over was the whole archive while the heading said "stint".
@@ -176,13 +175,19 @@ async function init() {
   // `redrawCurrentView()`, quindi non va ripetuta dopo.
   applyRailed(VIEW);
   await loadCombo(JSON.parse(sel.value));
-  const view = savedView();
-  if (view && view !== VIEW) showView(view);
-  // No saved view (first visit) or the saved view IS the landing tab: neither
-  // branch of `showView` above runs, so nothing else has fetched the session
-  // this landing tab depends on. `loadCombo` renders "flow" unconditionally
-  // for the same reason — a landing view can't wait for a tab click to load.
-  else loadSession(CURRENT, SESSION_I);
+  // Dopo una sessione nuova si riapre sulla Pagella, non sull'ultima scheda
+  // vista: è la pagina che dice com'è andata. Altrimenti si riprende da dove
+  // eri rimasto.
+  if (!(await openPagellaIfNew(CURRENT))) {
+    const view = savedView();
+    if (view && view !== VIEW) showView(view);
+    // No saved view (first visit) or the saved view IS the landing tab:
+    // neither branch of `showView` above runs, so nothing else has fetched the
+    // Pagella this landing tab depends on. `loadCombo` renders "flow"
+    // unconditionally for the same reason — a landing view can't wait for a
+    // tab click to load.
+    else loadPagella(CURRENT, SESSION_I);
+  }
   // First visit: pop the tour once data is on screen (so #vmin/#debrief exist).
   if (window.HoneTour) window.HoneTour.auto(tourSteps(), "hone_tour_analysis");
 }
@@ -213,23 +218,18 @@ function tourSteps() {
   // steps that happened to still be visible.
   const flow = () => showView("flow");
   const compare = () => showView("compare");
-  const recap = () => showView("recap");
+  const pagella = () => showView("pagella");
   return [
     { sel: "#combo", title: t("tour.a1.t"), text: t("tour.a1.x") },
     { sel: ".tabs", title: t("tour.a2.t"), text: t("tour.a2.x") },
-    // "Start here" now belongs to the door, not the guided flow — targeted at
-    // #recap-phases-sec (the static <section>, not #recap-head or the
-    // #recap-phases div it wraps). #recap-head goes empty on a run with
-    // nothing measurable yet; #recap-phases starts empty on EVERY run, filled
-    // only once loadSession's fetch resolves — and tour.js checks visibility
-    // synchronously right after `before()` runs, before that fetch can ever
-    // land, so a step pointed at a JS-filled div is always invisible and
-    // silently ends the tour. #recap-phases-sec has the h3 already in the
-    // markup, so it has height before any JS runs.
-    { sel: "#recap-phases-sec", title: t("tour.a12.t"), text: t("tour.a12.x"), before: recap },
+    // "Start here" belongs to the Pagella — targeted at #pag-head, the one
+    // part of it with text in the markup (the session picker's label). The
+    // verdict and the blocks under it are empty until loadPagella's fetch
+    // resolves, and tour.js checks visibility synchronously right after
+    // `before()` runs, before that fetch can ever land: a step pointed at a
+    // JS-filled element is always invisible and silently ends the tour.
+    { sel: "#pag-head", title: t("tour.a12.t"), text: t("tour.a12.x"), before: pagella },
     { sel: "#flow-card", title: t("tour.a9.t"), text: t("tour.a9.x"), before: flow },
-    { sel: "#train-steps", title: t("tour.a11.t"), text: t("tour.a11.x"),
-      before: () => showView("training") },
     { sel: "#c-delta", title: t("tour.a3.t"), text: t("tour.a3.x"), before: compare },
     { sel: "#vmin", title: t("tour.a4.t"), text: t("tour.a4.x"), before: compare },
     { sel: "#debrief", title: t("tour.a5.t"), text: t("tour.a5.x"), before: compare },
@@ -256,14 +256,13 @@ function redrawCurrentView() {
   else if (VIEW === "dynamics") { if (DATA) drawDynamics(LAST_HOVER); }
   else if (VIEW === "sectors") { if (CURRENT) loadSectors(); }
   else if (VIEW === "progress") { if (CURRENT) loadProgress(CURRENT); }
-  // Refetched rather than repainted: every word of the programme is written by
-  // the backend, so a cached payload would still be in the language you left.
-  else if (VIEW === "training") { if (CURRENT) loadTraining(CURRENT); }
+  // Refetched rather than repainted: the verdict, the defect names and the
+  // corner names are written by the backend, so a cached payload would still
+  // be in the language you left.
+  else if (VIEW === "pagella") { if (CURRENT) loadPagella(CURRENT, SESSION_I); }
   else if (VIEW === "flow") { if (DATA) renderFlow(DATA); }
-  // "recap" shares this fetch with "session" — same /api/sessions payload,
-  // one carries current.recap and the other carries everything below it.
-  else if (VIEW === "session" || VIEW === "recap") { if (CURRENT) loadSession(CURRENT, SESSION_I); }
-  // Refetched, like Training: the notes strip is written by the backend in the
+  else if (VIEW === "session") { if (CURRENT) loadSession(CURRENT, SESSION_I); }
+  // Refetched, like the Pagella: the notes strip is written by the backend in the
   // requested language, so repainting a cached payload would leave the one
   // paragraph on the tab in the language you just left.
   else if (VIEW === "stint") { if (CURRENT) loadStint(CURRENT, STINT_I); }
@@ -312,8 +311,8 @@ function wireCbToggle() {
 }
 
 // Le cinque schede che parlano di UN GIRO, e quindi di una curva. Le altre
-// cinque stanno sopra il giro nella gerarchia (una sessione, uno stint, lo
-// storico, un piano): lì il rail mostrerebbe un giro che non c'entra con quello
+// quattro stanno sopra il giro nella gerarchia (la Pagella, una sessione, uno
+// stint, lo storico): lì il rail mostrerebbe un giro che non c'entra con quello
 // che leggi, e cliccare una curva non cambierebbe niente. Un comando che non
 // risponde è peggio di un comando assente.
 const RAIL_VIEWS = ["flow", "compare", "line", "sectors", "dynamics"];
@@ -321,7 +320,7 @@ const RAIL_VIEWS = ["flow", "compare", "line", "sectors", "dynamics"];
 // The characters `e.key` reports for the row above the letters, in the order
 // a tab picks them — NOT their physical position, which moves between
 // keyboard layouts. Every one of these keys sends its printed character
-// regardless of layout, with no modifier, so all ten tabs stay reachable
+// regardless of layout, with no modifier, so all nine tabs stay reachable
 // everywhere. One shared constant — `wireKeys()` reads it to route the
 // keypress, `wireTabs()` reads it to show the tooltip — so the two cannot
 // drift the way the tab count and this row's length silently did before.
@@ -333,9 +332,9 @@ const RAIL_VIEWS = ["flow", "compare", "line", "sectors", "dynamics"];
 // semplicemente un tasto che il pilota preme e che non fa NIENTE, in silenzio.
 // È lo stesso principio per cui il rail non vive sulle schede dove cliccare una
 // curva non cambierebbe niente. Con undici schede la riga finiva in "-"; con
-// dieci finisce in "0", che è il tasto della decima. Quando torna un'undicesima
-// scheda si rimette "-".
-const KEY_ROW = "1234567890";
+// dieci in "0"; con le nove della Pagella (Com'è andata e Allenamento sono
+// confluite lì) finisce in "9". Quando torna una decima si rimette "0".
+const KEY_ROW = "123456789";
 
 // Non dentro `showView` da sola: al primo caricamento `init()` non ci passa
 // affatto quando la vista salvata coincide con quella già attiva in HTML (o
@@ -479,206 +478,6 @@ async function loadProgress(combo) {
       `<span class="msg">${r.message}</span>` +
       `<span class="where">${t("recur.corners")}${r.corners.join(", ")}</span></div>`).join("");
   }
-}
-
-// --- the Training tab ------------------------------------------------------
-// The one tab that answers "so what do I actually do?". Everything on it is
-// decided server-side (coaching/training.py): which drill, in what order, with
-// which of your numbers in it. The code below only draws.
-//
-// The plan lives here now rather than under Trends. It is the same plan and the
-// same storage — what changed is that its goals are no longer listed twice: a
-// goal *is* a step, and the step carries the drill that closes it.
-
-let TRAINING = null;
-
-async function loadTraining(combo) {
-  const seen = EPOCH;
-  setPanelLoading("train-gap", t("load.training"));
-  let b;
-  try {
-    b = await getJSON("/api/training?" +
-      new URLSearchParams({ car: combo.car, track: combo.track }));
-  } catch (e) {
-    if (stale(seen)) return;
-    TRAINING = null;
-    $("train-gap").innerHTML = "";
-    $("train-steps").innerHTML = `<div class="clean">${t("err.training")}</div>`;
-    $("train-session").innerHTML = "";
-    return;
-  }
-  if (stale(seen)) return;
-  TRAINING = b;
-  renderTraining(b);
-}
-
-function renderTraining(b) {
-  const gate = $("train-gate");
-  if (!gate) return;
-  // Not enough laps yet: the whole tab is the sentence that says so, and the
-  // panels below are emptied rather than left showing another combo's plan.
-  const ready = b && b.ready;
-  gate.classList.toggle("hidden", !!ready);
-  for (const id of ["train-intro", "train-gap", "plan", "train-steps",
-                    "train-session", "train-words"]) {
-    const el = $(id);
-    if (el) el.classList.toggle("hidden", !ready);
-  }
-  if (!ready) {
-    const r = (b && b.readiness) || {};
-    gate.innerHTML = `<h2 class="empty-title">${t("train.locked")}</h2>` +
-      `<p class="empty-hint">${r.reason || ""}</p>` +
-      (r.laps_needed
-        ? `<p class="train-countdown">${r.laps_needed === 1
-            ? t("train.countdown1")
-            : tf("train.countdown", { n: r.laps_needed })}</p>`
-        : "");
-    return;
-  }
-
-  renderGap(b.gap);
-  renderPlanBar(b.plan);
-  // The plan's per-goal progress is joined onto its step by corner: the bar
-  // that says "2 of the 3 laps it takes" belongs next to the drill that gets
-  // you there, not in a second list of the same corners.
-  const prog = {};
-  for (const g of ((b.plan && b.plan.goals) || [])) {
-    if (g.progress) prog[g.corner_index] = g.progress;
-  }
-  const saved = !!(b.plan && b.plan.saved);
-  $("train-steps").innerHTML =
-    (b.steps || []).map((s) => trainStep(s, prog[s.corner_index], saved)).join("");
-  renderRunPlan(b.session);
-  renderWords(b.glossary);
-}
-
-// The glossary. Closed it shows the words themselves, not the label "Glossary":
-// a driver scanning a row of terms can see whether one of them is a word they
-// don't know, and open it for that. A box labelled "Glossary" only says "you
-// don't know these things", and gets skipped by exactly the people it's for.
-function renderWords(entries) {
-  const el = $("train-words");
-  if (!el) return;
-  if (!entries || !entries.length) { el.innerHTML = ""; return; }
-  el.innerHTML =
-    `<details class="words"><summary><span class="words-lead">${t("train.words")}</span>` +
-    `<span class="words-list">${entries.map((e) => e.term).join(" · ")}</span></summary>` +
-    `<dl>${entries.map((e) =>
-      `<dt>${e.term}</dt><dd>${e.definition}</dd>`).join("")}</dl></details>`;
-}
-
-function renderGap(gap) {
-  const el = $("train-gap");
-  if (!el) return;
-  if (!gap) { el.innerHTML = ""; return; }
-  const bars = (gap.sectors || []).map((s) => {
-    const worst = s.number === gap.worst_sector;
-    return `<div class="gap-sec${worst ? " worst" : ""}">` +
-      `<span class="k">${tf("train.sector", { n: s.number })}</span>` +
-      `<span class="v">${fmtMs(s.your_ms)}</span>` +
-      `<span class="d">${s.gap_ms > 0 ? "−" + (s.gap_ms / 1000).toFixed(3) + "s" : "—"}</span></div>`;
-  }).join("");
-  el.innerHTML = `<h3>${t("train.gap.title")}</h3>` +
-    `<p class="gap-head">${gap.headline}</p>` +
-    (bars ? `<div class="gap-secs">${bars}</div>` : "") +
-    (gap.note ? `<p class="gap-note">${gap.note}</p>` : "");
-}
-
-// The plan's identity strip: since when, on how many laps, and the one button.
-function renderPlanBar(plan) {
-  const el = $("plan");
-  if (!el) return;
-  if (!plan || !plan.goals.length) {
-    // No systematic weakness is a real answer, and a good one: say it rather
-    // than showing an empty box that looks like something failed to load.
-    el.innerHTML = `<h3>${t("plan.title")}</h3>` +
-      `<div class="clean">${t("plan.none")}</div>`;
-    return;
-  }
-  const head = plan.saved
-    ? `<span class="plan-since">${tf("plan.since", { when: fmtWhen(plan.created_utc) })}` +
-      (plan.laps_since ? ` · ${tf("plan.laps_since", { n: plan.laps_since })}` : "") + `</span>` +
-      `<button type="button" id="plan-drop" class="mini-btn">${t("plan.change")}</button>`
-    : `<span class="plan-since">${t("plan.proposed")}</span>` +
-      `<button type="button" id="plan-start" class="mini-btn primary">${t("plan.start")}</button>`;
-  el.innerHTML = `<h3>${t("plan.title")} ${head}</h3>`;
-
-  // I due bottoni del piano aspettano anche loro, e anche loro senza guardia:
-  // dopo l'attesa non scrivono niente: nessuno stato, nessun nodo. `finally`
-  // chiama `loadTraining(CURRENT)`, che legge la combo di ADESSO e si arbitra
-  // per conto suo — se nel frattempo la combo è cambiata, quella riga rilegge
-  // il piano della combo nuova, che è la cosa giusta. Il corpo del POST invece
-  // è costruito prima dell'attesa, quindi parla della combo su cui il pilota ha
-  // premuto: è il piano che voleva salvare, non quello che sta guardando.
-  const start = $("plan-start");
-  if (start) start.onclick = async () => {
-    start.disabled = true;
-    try {
-      await fetch("/api/plan", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ car: CURRENT.car, track: CURRENT.track,
-                               goals: plan.goals }),
-      });
-    } finally { loadTraining(CURRENT); }
-  };
-  const drop = $("plan-drop");
-  if (drop) drop.onclick = async () => {
-    drop.disabled = true;
-    const q = new URLSearchParams({ car: CURRENT.car, track: CURRENT.track });
-    try { await fetch("/api/plan?" + q.toString(), { method: "DELETE" }); }
-    finally { loadTraining(CURRENT); }
-  };
-}
-
-function trainStep(s, progress, saved) {
-  const d = s.drill || {};
-  // Only the current step is opened. The others are a heading and a reason —
-  // a page that unrolls three drills at once is the list of weak points again.
-  const open = s.status === "now";
-  const body = open
-    ? `<ol class="drill-steps">${(d.steps || []).map((x) => `<li>${x}</li>`).join("")}</ol>` +
-      `<div class="drill-focus">` +
-      `<span class="watch">👁 ${t("train.watch")} ${d.watch || ""}</span>` +
-      `<span class="ignore">✕ ${t("train.ignore")} ${d.ignore || ""}</span></div>` +
-      `<div class="drill-done">${s.done_when}</div>` +
-      // Only the corner steps are plan goals, so only they carry the plan's
-      // own progress. The consistency step is measured against the ideal lap,
-      // and borrowing the goal bar for it would report the wrong thing.
-      (s.kind === "corner" ? planBar(progress, saved) : "")
-    : "";
-  return `<article class="train-step ${s.status}">` +
-    `<header class="step-head">` +
-    `<span class="n">${s.order}</span>` +
-    `<span class="where">${s.where || t("train.wholelap")}</span>` +
-    `<span class="badge">${t("train.status." + s.status)}</span></header>` +
-    (s.what ? `<div class="cause">${s.what}</div>` : "") +
-    `<div class="why">${s.why}</div>` +
-    `<div class="goal-target">🎯 ${s.target}</div>` +
-    (d.title ? `<div class="drill-title"><span class="drill-badge">${tf("train.drill", { n: d.laps })}</span>${d.title}</div>` : "") +
-    body + `</article>`;
-}
-
-function planBar(p, saved) {
-  // The bar fills with laps that met the target, not with time: "2 of the 3
-  // laps it takes" is a thing you can act on tonight, a percentage isn't.
-  // A plan you haven't accepted has no "since", so it can't be missing laps
-  // either: it says what will be measured once you do.
-  if (!p) return `<div class="plan-prog muted">${t(saved ? "plan.nolaps" : "plan.willmeasure")}</div>`;
-  return `<div class="plan-bar"><span style="width:${Math.min(100, (p.hits / Math.max(1, p.needed)) * 100).toFixed(0)}%"></span></div>` +
-    `<div class="plan-prog">${tf("plan.hits", { hits: p.hits, needed: p.needed })}` +
-    ` · ${tf("plan.now", { s: p.median_s.toFixed(2) })}` +
-    ` · ${tf("plan.best", { s: p.best_s.toFixed(2) })}</div>`;
-}
-
-// `renderRunPlan`, not `renderSession`: the Session tab already owns that name,
-// and a second declaration of it silently replaced the first — the run plan
-// simply never appeared, with nothing in the console to say so.
-function renderRunPlan(ses) {
-  const el = $("train-session");
-  if (!el) return;
-  if (!ses) { el.innerHTML = ""; return; }
-  el.innerHTML = `<h3>${t("train.session")} <small>${tf("train.session.laps", { n: ses.laps })}</small></h3>` +
-    `<ol class="ses-plan">${(ses.lines || []).map((x) => `<li>${x}</li>`).join("")}</ol>`;
 }
 
 // Benchmark ladder: best -> ideal (consistency) -> PRO (skill ceiling).
@@ -1560,9 +1359,9 @@ function reloadSelection() {
 function reloadViewData(combo) {
   if (!combo) return;
   if (VIEW === "progress") loadProgress(combo);
-  if (VIEW === "session" || VIEW === "recap") loadSession(combo, SESSION_I);
+  if (VIEW === "pagella") loadPagella(combo, SESSION_I);
+  if (VIEW === "session") loadSession(combo, SESSION_I);
   if (VIEW === "stint") loadStint(combo, STINT_I);
-  if (VIEW === "training") loadTraining(combo);
 }
 
 function exportData(fmt) {
@@ -2219,10 +2018,6 @@ function fmtWhen(iso) {
 
 function renderSession(s) {
   const cur = s && s.current;
-  // One fetch, two tabs: `current.recap` rides on the same /api/sessions
-  // payload as everything below, so the door screen and the Session tab never
-  // disagree about which run they're describing.
-  renderRecap(cur);
   const pick = $("ses-select");
   if (!cur) {
     $("ses-when").textContent = "";
@@ -2234,10 +2029,7 @@ function renderSession(s) {
     return;
   }
 
-  pick.innerHTML = s.sessions.map((x, i) =>
-    `<option value="${i}"${i === s.index ? " selected" : ""}>` +
-    `${fmtWhen(x.started_utc)} · ${x.laps} ${t("lbl.laps")}` +
-    `${x.best ? " · " + x.best : ""}</option>`).join("");
+  pick.innerHTML = sessionOptions(s.sessions, s.index);
   pick.onchange = () => loadSession(CURRENT, parseInt(pick.value, 10));
 
   $("ses-when").textContent = fmtWhen(cur.started_utc);
@@ -2320,87 +2112,320 @@ function renderSession(s) {
   }
 }
 
-// --- "How it went": the door onto the report -----------------------------
-// Dove è finito il tempo di un'uscita, in decimi che sommano al numero in
-// testa. Le barre sono in scala sulla fase peggiore di QUESTA sessione: non
-// c'è nessuna soglia, e nessun colore che voglia dire "bravo". `cur` è
-// `current` da /api/sessions.
-function renderRecap(cur) {
-  const head = $("recap-head"), ph = $("recap-phases"), lp = $("recap-laps");
-  const lpSec = $("recap-laps-sec");
-  const note = $("recap-where-note");
-  if (!head || !ph || !lp) return;
-  const r = cur && cur.recap;
-  if (!r) {
-    head.innerHTML = "";
-    // La promessa del titolo — «media per giro · le parti sommano al numero
-    // qui sopra» — se ne va col recap. Qui sopra non c'è nessun numero
-    // (`#recap-head` resta vuoto e `.summary:empty` lo toglie) e qui sotto non
-    // c'è nessuna parte: la frase nominerebbe due cose che non ci sono. Se ne
-    // va la promessa, non la sezione: nasconderla — come si fa con
-    // `#recap-laps-sec`, che di statico non ha niente da mostrare — ucciderebbe
-    // la visita guidata, che su questa sezione ha il suo «Parti da qui» e su un
-    // bersaglio invisibile chiama `finish()`, non «salta».
-    if (note) note.textContent = "";
-    // Tre casi, tre frasi: `!cur` è lo stesso fatto che il pannello Sessione
-    // scrive sullo stesso payload ("nessun giro registrato");
-    // `recap_clock_broken` è l'unica delle sette cause che sia MISURATA (la
-    // guardia in trends.py: l'orologio del miglior giro non copre il giro), e
-    // arriva già decisa dal payload — qui non si rifà nessun controllo; tutto
-    // il resto resta la frase generica, perché nominare una causa fra le altre
-    // sei sarebbe quasi sempre nominare quella sbagliata.
-    // Le tre chiamate restano scritte per esteso, con la chiave letterale
-    // dentro, perché è così che test_web_i18n_keys le vede: una chiave a pezzi non
-    // la controlla nessuno, ed è come i pulsanti del tour sono rimasti in
-    // inglese per mesi.
-    const msg = !cur ? t("recap.nolaps")
-              : cur.recap_clock_broken ? t("recap.clock") : t("recap.none");
-    ph.innerHTML = `<div class="nothing">${msg}</div>`;
-    lp.innerHTML = "";
-    // Un titolo («Giro per giro») sopra il vuoto si legge come rotto: la
-    // sezione sparisce con lui, non solo la lista sotto.
-    if (lpSec) lpSec.classList.add("hidden");
+// --- La Pagella: la prima pagina del report --------------------------------
+// Com'è andata la sessione sul tuo riferimento, le abitudini che ti costano
+// tempo, dove e quante volte sbagli, e il piano per la prossima uscita. Tutto
+// è deciso dal backend (pagella.py, /api/pagella): qui si disegna e basta.
+// Segue il selettore delle uscite (`SESSION_I`), lo stesso della scheda
+// Sessione, così le due schede parlano sempre della stessa uscita.
+
+// L'inizio dell'ultima uscita che hai visto in Pagella. Il report riapre
+// l'ultima scheda vista (`hone_view`); dopo una sessione nuova deve aprirsi
+// sulla Pagella, e questo è il segno per riconoscerla.
+const SEEN_KEY = "hone_seen_session";
+// Il difetto del «Come si fa» aperto. La vista la disegna il Task 8; qui si
+// ricorda quale, così il bottone sa già dove portarti.
+let HOWTO_DEFECT = null;
+// Una riga da dire una volta sola sopra il piano: una scelta che non si è
+// salvata. Si consuma al disegno dopo.
+let PAG_NOTE = "";
+
+// Un numero con la virgola in italiano: «0,18», mai «0.18» su una pagina
+// italiana (il tono deciso col pilota). `fixz` per non stampare «-0,00».
+function fmtDec(v, d) {
+  const s = fixz(v, d);
+  return LANG() === "it" ? s.replace(".", ",") : s;
+}
+
+// Un valore della Pagella in secondi, con l'unità. I difetti arrivano in ms
+// (`unit: "ms"`), il veleggio già in secondi (`unit: "s"`).
+function fmtSecs(v, unit) {
+  const s = unit === "ms" ? v / 1000 : v;
+  return fmtDec(s, 2) + " s";
+}
+
+// Le opzioni del selettore delle uscite, uguali in Sessione e in Pagella.
+function sessionOptions(runs, index) {
+  return runs.map((x, i) =>
+    `<option value="${i}"${i === index ? " selected" : ""}>` +
+    `${fmtWhen(x.started_utc)} · ${x.laps} ${t("lbl.laps")}` +
+    `${x.best ? " · " + x.best : ""}</option>`).join("");
+}
+
+// Fuori da `openPagellaIfNew` e non dentro: il suo `try` sarebbe l'ultimo
+// `catch` dopo l'attesa, e la guardia sul contatore va prima delle scritture.
+function seenSession() {
+  try { return localStorage.getItem(SEEN_KEY); } catch (e) { return null; }
+}
+
+// Se l'uscita più recente di questa combo non è quella che hai già visto in
+// Pagella, il report si apre lì. Vera quando l'ha aperta. Se mentre aspetta il
+// pilota ha già cambiato combo da sé, la risposta parla di quella di prima e
+// non apre niente: `init` riprende allora la scheda salvata, come sempre.
+async function openPagellaIfNew(combo) {
+  if (!combo) return false;
+  const seen = EPOCH;
+  let s;
+  try {
+    s = await getJSON("/api/sessions?" +
+      new URLSearchParams({ car: combo.car, track: combo.track, index: 0 }));
+  } catch (e) { return false; }
+  if (stale(seen)) return;
+  const latest = s && s.sessions && s.sessions[0];
+  const started = latest && latest.started_utc;
+  if (!started) return false;
+  const lastSeen = seenSession();
+  if (started !== lastSeen) {
+    SESSION_I = 0;
+    rememberView("pagella");
+    showView("pagella");
+    return true;
+  }
+  return false;
+}
+
+async function loadPagella(combo, index) {
+  if (!combo) return;
+  const seen = EPOCH;
+  // Stessa corsa del selettore delle uscite, vedi `loadSession`: l'indice con
+  // cui siamo partiti contro quello scelto quando la risposta arriva.
+  const want = index || 0;
+  SESSION_I = want;
+  const q = new URLSearchParams({ car: combo.car, track: combo.track, index: want });
+  $("pag-verdict").textContent = t("load.pagella");
+  // La lista delle uscite serve solo al selettore: se manca, il selettore
+  // resta vuoto ma la Pagella si legge lo stesso.
+  const listing = getJSON("/api/sessions?" + q.toString()).catch(() => null);
+  let p;
+  try { p = await getJSON("/api/pagella?" + q.toString()); }
+  catch (e) {
+    const list = await listing;
+    if (stale(seen) || SESSION_I !== want) return;
+    const none = !list || !list.sessions || !list.sessions.length;
+    $("pag-select").innerHTML = "";
+    $("pag-sub").textContent = "";
+    $("pag-ref").textContent = "";
+    $("pag-verdict").textContent = "";
+    $("pag-body").innerHTML =
+      `<div class="nothing">${none ? t("pag.nolaps") : t("err.pagella")}</div>`;
     return;
   }
-  if (lpSec) lpSec.classList.remove("hidden");
-  // C'è un recap: il titolo può promettere. La chiave sta scritta per esteso
-  // dentro la chiamata, come le tre frasi del vuoto qui sopra, perché è così
-  // che test_web_i18n_keys la vede.
-  if (note) note.textContent = t("recap.wherenote");
-  const item = (k, v) => `<div class="item"><div class="k">${k}</div><div class="v">${v}</div></div>`;
-  // Una sola convenzione di segno su tutta la scheda: `fmtLoss` gira il segno
-  // una volta sola, qui, per il totale come per le cinque fasi sotto e per il
-  // gap di ogni riga giro — sommare le cinque righe a mano deve ridare questo
-  // numero, segno compreso, non il suo opposto.
-  head.innerHTML = item(t("recap.best"), `${r.reference} <small>(${t("recap.yardstick")})</small>`) +
-                   item(t("recap.gain"), fmtLoss(r.gain_avg_s));
+  const list = await listing;
+  if (stale(seen) || SESSION_I !== want) return;
+  const pick = $("pag-select");
+  pick.innerHTML = sessionOptions((list && list.sessions) || [], want);
+  pick.onchange = () => loadPagella(CURRENT, parseInt(pick.value, 10));
+  renderPagella(p, want);
+}
 
-  let mx = 0.05;
-  for (const p of r.phases) mx = Math.max(mx, p.avg_s);
-  ph.innerHTML = r.phases.map((p) => {
-    const w = (Math.min(Math.max(p.avg_s, 0) / mx, 1) * 100).toFixed(0);
-    return `<div class="ses-row">` +
-      `<span class="ses-when">${t("recap.phase." + p.phase)}</span>` +
-      `<span class="ses-track"><span class="ses-fill" style="width:${w}%"></span></span>` +
-      `<span class="ses-nums">${fmtLoss(p.avg_s)}</span></div>`;
+function renderPagella(p, index) {
+  const body = $("pag-body");
+  if (!body) return;
+  const ses = p.session || {};
+  const bits = [CURRENT.track, CURRENT.car, fmtWhen(ses.started_utc),
+                tf("pag.laps", { laps: ses.laps || 0, valid: ses.valid || 0 })];
+  if (ses.wet) bits.push(t("pag.wet"));
+  $("pag-sub").textContent = bits.join(" · ");
+  // L'uscita più recente, vista: alla prossima apertura il report riprende
+  // dall'ultima scheda invece di tornare qui.
+  if (index === 0 && ses.started_utc) {
+    try { localStorage.setItem(SEEN_KEY, ses.started_utc); } catch (e) {}
+  }
+  if (p.excluded) {
+    // Bagnato contro asciutto, nessun riferimento, nessun giro: la Pagella non
+    // giudica, e il verdetto è la frase che dice perché. Al posto dei blocchi,
+    // non sopra blocchi vuoti.
+    $("pag-verdict").textContent = p.verdict || "";
+    $("pag-ref").textContent = "";
+    body.innerHTML = "";
+    return;
+  }
+  $("pag-verdict").textContent = p.verdict || "";
+  const r = p.reference;
+  $("pag-ref").textContent = r
+    ? tf("pag.ref", { time: r.lap_time, when: fmtWhen(r.recorded_utc) }) : "";
+  const note = PAG_NOTE;
+  PAG_NOTE = "";
+  body.innerHTML = pagDefects(p.defects) +
+    `<div class="pag-grid">${pagWorst(p.worst_corners)}${pagErrors(p.errors)}</div>` +
+    (note ? `<div class="nothing pag-note">${note}</div>` : "") +
+    pagPlan(p.advice);
+  wirePagella(body);
+}
+
+// I difetti principali. Un clic apre il difetto curva per curva; quelli senza
+// ripartizione per curva (veleggio, alzate) non hanno niente da aprire.
+function pagDefects(defects) {
+  const head = `<h4>${t("pag.defects")}</h4>`;
+  if (!defects || !defects.length) {
+    return `<section class="pag-box">${head}<div class="nothing">${t("pag.defects.none")}</div></section>`;
+  }
+  const arrows = { down: "↓", same: "=", up: "↑" };
+  const says = { down: t("pag.trend.down"), same: t("pag.trend.same"), up: t("pag.trend.up") };
+  const rows = defects.map((d) => {
+    const corners = d.corners || [];
+    const where = corners.length
+      ? tf("pag.def.where", { n: corners.length, w: d.laps_with, l: d.laps })
+      : tf("pag.def.laps", { w: d.laps_with, l: d.laps });
+    const per = d.unit === "s" ? t("pag.def.coast") : t("pag.def.perlap");
+    const trend = d.trend
+      ? `<span class="pag-trend ${d.trend}" title="${escAttr(says[d.trend])}">${arrows[d.trend]}</span>`
+      : "";
+    const line = `<div class="pag-name"><b>${escAttr(d.name)}</b>` +
+      `<div class="pag-small">${where}</div></div>` +
+      `<div class="pag-cost"><span class="num loss">${fmtSecs(d.value, d.unit)}</span> ` +
+      `<span class="pag-small">${per}</span>${pagSpark(d.series, d.unit, d.trend)}${trend}</div>`;
+    if (!corners.length) return `<div class="pag-row">${line}</div>`;
+    return `<details class="pag-defect"><summary class="pag-row">${line}</summary>` +
+      `<ul class="pag-corners">${corners.map((c) =>
+        `<li><span>${escAttr(c.name)}</span><span class="num">${fmtSecs(c.value, d.unit)}</span></li>`
+      ).join("")}</ul></details>`;
   }).join("");
+  return `<section class="pag-box">${head}${rows}</section>`;
+}
 
-  lp.innerHTML = r.laps.map((l) =>
-    `<div class="recap-lap" data-path="${l.path}">` +
-    `<span class="lap-time">${l.lap_time}</span>` +
-    `<span class="lap-gap">${fmtLoss(l.gap_s)}</span>` +
-    `<span class="corner">${l.corner}</span></div>`).join("");
-  // A click opens the lap in Compare — same mechanism the Session tab's own
-  // lap rows already use, not a second way to jump to a lap.
-  for (const el of lp.querySelectorAll(".recap-lap")) {
-    el.onclick = () => openLapInCompare(el.dataset.path);
+// Il mini-andamento: una barra per sessione, la più vecchia a sinistra, alte
+// in proporzione. La scala si taglia a due volte la mediana della serie:
+// nell'archivio vero una sessione lentissima (22 647 ms contro ~600 delle
+// altre) schiaccerebbe tutte le altre barre sul fondo. La barra tagliata resta
+// a piena altezza con il segno del taglio, e il suo valore vero sta nel
+// suggerimento: non si nasconde un dato vero, si evita che ne copra cinque.
+function pagSpark(series, unit, trend) {
+  const vals = (series || []).map(Number).filter((v) => isFinite(v));
+  if (vals.length < 2) return "";
+  const sorted = vals.slice().sort((a, b) => a - b);
+  const mid = sorted.length >> 1;
+  const median = sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+  const max = sorted[sorted.length - 1];
+  // Con la mediana a zero il taglio sarebbe a zero e ogni barra «tagliata»:
+  // lì la scala resta il massimo.
+  const top = Math.min(max, 2 * median) || max;
+  const bars = vals.map((v, i) => {
+    const cut = top > 0 && v > top;
+    const h = top > 0 ? Math.max(2, Math.round(18 * Math.min(v, top) / top)) : 2;
+    const last = i === vals.length - 1 && trend ? " " + trend : "";
+    const tip = cut ? tf("pag.spark.cut", { v: fmtSecs(v, unit) }) : fmtSecs(v, unit);
+    return `<i class="${cut ? "cut" : ""}${last}" style="height:${h}px" title="${escAttr(tip)}"></i>`;
+  }).join("");
+  return `<span class="pag-spark" title="${escAttr(t("pag.spark"))}">${bars}</span>`;
+}
+
+function pagWorst(list) {
+  const head = `<h4>${t("pag.worst")}</h4>`;
+  if (!list || !list.length) {
+    return `<section class="pag-box">${head}<div class="nothing">${t("pag.worst.none")}</div></section>`;
+  }
+  return `<section class="pag-box">${head}` + list.map((c) =>
+    `<div class="pag-row"><span>${escAttr(c.name)}</span>` +
+    `<span class="num loss">${fmtSecs(c.value_s, "s")}</span></div>`).join("") + `</section>`;
+}
+
+// Solo gli errori comparsi: il backend non manda gli zeri.
+function pagErrors(list) {
+  const head = `<h4>${t("pag.errors")}</h4>`;
+  if (!list || !list.length) {
+    return `<section class="pag-box">${head}<div class="nothing">${t("pag.errors.none")}</div></section>`;
+  }
+  return `<section class="pag-box">${head}` + list.map((e) =>
+    `<div class="pag-row"><span>${escAttr(e.name)}</span>` +
+    `<span class="num">${e.count}×</span></div>`).join("") + `</section>`;
+}
+
+// Il piano: al massimo tre consigli, in ordine. La regola «uno alla volta»
+// vale per tutta la lista e si dice una volta, sopra la lista: ripeterla su
+// ogni consiglio è la stessa frase in tre posti.
+function pagPlan(advice) {
+  const head = `<h4>${t("pag.plan")}</h4>`;
+  const list = advice || [];
+  if (!list.length) {
+    return `<section class="pag-box pag-plan">${head}<div class="nothing">${t("pag.plan.none")}</div></section>`;
+  }
+  const active = list.some((a) => a.status === "active");
+  // «Lo seguo» compare solo sul primo proposto, e solo se nessuno è in corso:
+  // si segue un consiglio alla volta (deciso dal pilota).
+  const first = list.findIndex((a) => !active && a.status === "proposed");
+  return `<section class="pag-box pag-plan">${head}` +
+    `<p class="pag-rule">${t("pag.plan.rule")}</p>` +
+    `<ol class="pag-steps">${list.map((a, i) => pagStep(a, i, active, i === first)).join("")}</ol>` +
+    `</section>`;
+}
+
+function pagStep(a, i, active, first) {
+  const corners = a.corners || [];
+  const where = !corners.length ? t("pag.adv.lap")
+    : corners.length === 1 ? escAttr(corners[0])
+    : tf("pag.adv.from", { first: escAttr(corners[0]),
+                           rest: corners.slice(1).map(escAttr).join(", ") });
+  const target = tf(a.unit === "s" ? "pag.adv.target.coast" : "pag.adv.target",
+                    { v: fmtSecs(a.target, a.unit) });
+  const btn = (action, label, cls) =>
+    `<button type="button" class="mini-btn${cls ? " " + cls : ""}" ` +
+    `data-defect="${escAttr(a.defect)}" data-action="${action}">${label}</button>`;
+  let mark = String(i + 1), tag = "", extra = "", buttons = "";
+  if (a.status === "active") {
+    tag = `<span class="pag-tag active">${t("pag.adv.active")}</span>`;
+    extra = `<div class="pag-small">${pagProgress(a.progress)}</div>`;
+    buttons = btn("drop", t("pag.adv.drop"));
+  } else if (a.status === "reached") {
+    mark = "✓";
+    tag = `<span class="pag-tag reached">${t("pag.adv.reached")}</span>`;
+  } else if (first) {
+    buttons = btn("follow", t("pag.adv.follow"), "primary") +
+              btn("decline", t("pag.adv.decline"));
+  }
+  const how = `<button type="button" class="mini-btn" data-howto="${escAttr(a.defect)}">` +
+              `${t("pag.howto")}</button>`;
+  return `<li class="pag-step ${a.status}">` +
+    `<span class="pag-k">${mark}</span>` +
+    `<div class="pag-step-body"><b>${escAttr(a.name)}</b> ${tag}` +
+    `<div class="pag-small">${where} · ${target}</div>${extra}</div>` +
+    `<div class="pag-btns">${buttons}${how}</div></li>`;
+}
+
+function pagProgress(p) {
+  if (!p || !p.laps) return t("pag.adv.nolaps");
+  return tf("pag.adv.progress", { hits: p.hits, laps: p.laps, needed: p.needed });
+}
+
+function wirePagella(root) {
+  for (const b of root.querySelectorAll("[data-action]")) {
+    b.onclick = () => adviceAction(b.dataset.defect, b.dataset.action);
+  }
+  for (const b of root.querySelectorAll("[data-howto]")) {
+    b.onclick = () => openHowto(b.dataset.howto);
   }
 }
 
-// Il segno dal punto di vista del pilota: perdere è meno tempo tuo. Meno
-// tipografico, come il resto del report.
-function fmtLoss(s) {
-  return (s > 0 ? "−" : s < 0 ? "+" : "") + Math.abs(s).toFixed(3) + "s";
+// «Lo seguo», «Non lo seguo», «Lascio stare». Il corpo si costruisce prima
+// dell'attesa, quindi parla della combo su cui il pilota ha premuto. Il server
+// decide le curve e l'obiettivo di un consiglio seguito: la pagina manda solo
+// quale difetto e quale scelta. Se mentre il POST è in volo la combo o la
+// lingua cambiano, chi le ha cambiate ha già rilanciato la Pagella, e la riga
+// «non si è salvata» finirebbe sopra la Pagella di un'altra pista: si esce.
+async function adviceAction(defect, action) {
+  if (!CURRENT) return;
+  const seen = EPOCH;
+  const body = JSON.stringify({ car: CURRENT.car, track: CURRENT.track, defect,
+                                action, index: SESSION_I, lang: LANG() });
+  for (const b of document.querySelectorAll("#pag-body [data-action]")) b.disabled = true;
+  let ok = false;
+  try {
+    const r = await fetch("/api/advice", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body,
+    });
+    ok = r.ok;
+  } catch (e) {
+    ok = false;
+  }
+  if (stale(seen)) return;
+  PAG_NOTE = ok ? "" : t("pag.adv.err");
+  loadPagella(CURRENT, SESSION_I);
+}
+
+// «Come si fa →»: la vista di un consiglio, fuori dalla barra delle schede.
+function openHowto(defect) {
+  HOWTO_DEFECT = defect;
+  showView("howto");
 }
 
 // --- race pace: one run on one tank --------------------------------------
@@ -4850,7 +4875,6 @@ window.HoneI18nRerender = function () {
   // language and content in the other. Found on the Training tab, but it was
   // never only there.
   SHEET = null;          // the braking sheet carries the landmark wording
-  TRAINING = null;       // the drills are prose, written server-side
   // `reloadSelection` fa salire il contatore — una risposta nella lingua
   // vecchia è vecchia — e rilancia entrambe le metà: il giro e, con
   // `reloadViewData`, le viste per car+track. Le tre chiamate a mano che
