@@ -103,9 +103,11 @@ def test_a_new_session_opens_the_pagella_instead_of_the_last_tab():
     """Il report riapre l'ultima scheda vista; dopo una sessione nuova deve
     aprirsi sulla Pagella (spec, «Le schede del report»)."""
     body = _body_of("async function openPagellaIfNew(combo)")
-    assert "seenSession()" in body and "started_utc" in body
-    assert "localStorage.getItem(SEEN_KEY)" in _body_of("function seenSession()")
+    assert "seenSession(combo)" in body and "started_utc" in body
+    assert "localStorage.getItem(seenKey(combo))" in _body_of("function seenSession(combo)")
+    # Per auto e pista: un'altra combo non è una sessione nuova.
     assert 'const SEEN_KEY = "hone_seen_session"' in _APPJS
+    assert 'SEEN_KEY + ":" + combo.car + "|" + combo.track' in _body_of("function seenKey(combo)")
     # Il confronto e, nel suo ramo, l'apertura della Pagella.
     branch = body.split("!== lastSeen")[1]
     assert 'showView("pagella")' in branch
@@ -116,7 +118,7 @@ def test_a_new_session_opens_the_pagella_instead_of_the_last_tab():
 
 def test_the_session_shown_at_the_top_is_marked_as_seen():
     body = _body_of("function renderPagella(p, index)")
-    assert "localStorage.setItem(SEEN_KEY" in body
+    assert "localStorage.setItem(seenKey(CURRENT)" in body
 
 
 # --- la Pagella segue il selettore di sessione ------------------------------
@@ -215,3 +217,50 @@ def test_every_pagella_string_exists_in_both_languages():
     for key in sorted(keys):
         entry = _i18n_entry(key)
         assert "en:" in entry and "it:" in entry, key
+
+
+# --- compatta: verdetto, difetti e piano sullo schermo a 1920×1080 ---------
+
+def test_the_lap_strip_is_hidden_on_the_pagella():
+    """La fascia del giro (giro, confronto, distacco) parla di un giro, la
+    Pagella di una sessione: lì costava ~45 px e spingeva il piano sotto il
+    bordo dello schermo (misurato nel browser dal controllore)."""
+    assert "body.view-pagella #lapbar { display: none; }" in _CSS
+    rail = _body_of("function applyRailed(name)")
+    assert 'classList.toggle("view-pagella", name === "pagella")' in rail
+    # applyRailed è quella che gira a ogni cambio scheda e al primo paint.
+    assert "applyRailed(name);" in _body_of("function showView(name)")
+    assert "applyRailed(VIEW);" in _body_of("async function init()")
+
+
+def test_the_secondary_boxes_are_compact():
+    assert ".pag-grid .pag-row { padding: 3px 0;" in _CSS
+    grid = _CSS[_CSS.index(".pag-grid {"):]
+    assert "align-items: start" in grid[:grid.index("}")]
+
+
+def test_the_spark_is_tall_enough_to_read():
+    assert "const SPARK_H = 26;" in _APPJS
+    assert "SPARK_H * Math.min(v, top) / top" in _body_of("function pagSpark(series, unit, trend)")
+    spark = _CSS[_CSS.index(".pag-spark {"):]
+    assert "height: 26px" in spark[:spark.index("}")]
+
+
+def test_the_picker_survives_a_failed_pagella():
+    """Se la Pagella non arriva, dal selettore si sceglie un'altra uscita."""
+    load = _body_of("async function loadPagella(combo, index)")
+    failed = load.split("catch (e) {", 1)[1].split("\n  }\n", 1)[0]
+    assert "fillPagellaPicker(list, want)" in failed
+
+
+def test_the_plan_buttons_go_quiet_while_another_session_loads():
+    load = _body_of("async function loadPagella(combo, index)")
+    pre = load[:load.index("await ")]
+    assert '#pag-body [data-action]")) b.disabled = true;' in pre
+
+
+def test_the_summary_holds_only_inline_content():
+    """<summary> non vuole blocchi: la riga del difetto è fatta di span."""
+    body = _body_of("function pagDefects(defects)")
+    line = body[body.index("const line ="):body.index("if (!corners.length)")]
+    assert "<div" not in line and "<span class=\"pag-name\">" in line

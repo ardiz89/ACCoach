@@ -343,6 +343,10 @@ const KEY_ROW = "123456789";
 // qualsiasi. Estratta così la chiamano sia `showView` sia `init`.
 function applyRailed(name) {
   document.body.classList.toggle("railed", RAIL_VIEWS.indexOf(name) >= 0);
+  // La Pagella parla di una sessione, non di un giro: la fascia del giro
+  // (giro, confronto, distacco) lì non dice niente e spinge il piano sotto
+  // il bordo dello schermo a 1920×1080. Si spegne col CSS, da questa classe.
+  document.body.classList.toggle("view-pagella", name === "pagella");
 }
 
 // Switch to a view by name, as if its tab had been clicked. Used by the tabs
@@ -1351,7 +1355,7 @@ function reloadSelection() {
   reloadViewData(CURRENT);
 }
 
-// Le viste per car+track — Trends, Sessione, Passo gara, Allenamento — quella
+// Le viste per car+track — Pagella, Trends, Sessione, Passo gara — quella
 // aperta. Il loro contenuto non dipende dal giro, quindi un cambio di giro non
 // le sporca: ma il contatore che sale butta anche le LORO risposte in volo, e
 // una risposta buttata che nessuno rifà lascia il pannello col suo «…» per
@@ -2119,10 +2123,12 @@ function renderSession(s) {
 // Segue il selettore delle uscite (`SESSION_I`), lo stesso della scheda
 // Sessione, così le due schede parlano sempre della stessa uscita.
 
-// L'inizio dell'ultima uscita che hai visto in Pagella. Il report riapre
-// l'ultima scheda vista (`hone_view`); dopo una sessione nuova deve aprirsi
-// sulla Pagella, e questo è il segno per riconoscerla.
+// L'inizio dell'ultima uscita che hai visto in Pagella, per auto e pista. Il
+// report riapre l'ultima scheda vista (`hone_view`); dopo una sessione nuova
+// deve aprirsi sulla Pagella, e questo è il segno per riconoscerla. Per combo:
+// passare a un'altra pista non è una sessione nuova.
 const SEEN_KEY = "hone_seen_session";
+function seenKey(combo) { return SEEN_KEY + ":" + combo.car + "|" + combo.track; }
 // Il difetto del «Come si fa» aperto. La vista la disegna il Task 8; qui si
 // ricorda quale, così il bottone sa già dove portarti.
 let HOWTO_DEFECT = null;
@@ -2154,8 +2160,8 @@ function sessionOptions(runs, index) {
 
 // Fuori da `openPagellaIfNew` e non dentro: il suo `try` sarebbe l'ultimo
 // `catch` dopo l'attesa, e la guardia sul contatore va prima delle scritture.
-function seenSession() {
-  try { return localStorage.getItem(SEEN_KEY); } catch (e) { return null; }
+function seenSession(combo) {
+  try { return localStorage.getItem(seenKey(combo)); } catch (e) { return null; }
 }
 
 // Se l'uscita più recente di questa combo non è quella che hai già visto in
@@ -2174,7 +2180,7 @@ async function openPagellaIfNew(combo) {
   const latest = s && s.sessions && s.sessions[0];
   const started = latest && latest.started_utc;
   if (!started) return false;
-  const lastSeen = seenSession();
+  const lastSeen = seenSession(combo);
   if (started !== lastSeen) {
     SESSION_I = 0;
     rememberView("pagella");
@@ -2193,6 +2199,10 @@ async function loadPagella(combo, index) {
   SESSION_I = want;
   const q = new URLSearchParams({ car: combo.car, track: combo.track, index: want });
   $("pag-verdict").textContent = t("load.pagella");
+  // Mentre arriva un'altra uscita i bottoni del piano parlano ancora di
+  // quella di prima: un «Lo seguo» premuto adesso seguirebbe il consiglio
+  // sbagliato.
+  for (const b of document.querySelectorAll("#pag-body [data-action]")) b.disabled = true;
   // La lista delle uscite serve solo al selettore: se manca, il selettore
   // resta vuoto ma la Pagella si legge lo stesso.
   const listing = getJSON("/api/sessions?" + q.toString()).catch(() => null);
@@ -2202,7 +2212,7 @@ async function loadPagella(combo, index) {
     const list = await listing;
     if (stale(seen) || SESSION_I !== want) return;
     const none = !list || !list.sessions || !list.sessions.length;
-    $("pag-select").innerHTML = "";
+    fillPagellaPicker(list, want);
     $("pag-sub").textContent = "";
     $("pag-ref").textContent = "";
     $("pag-verdict").textContent = "";
@@ -2212,10 +2222,15 @@ async function loadPagella(combo, index) {
   }
   const list = await listing;
   if (stale(seen) || SESSION_I !== want) return;
-  const pick = $("pag-select");
-  pick.innerHTML = sessionOptions((list && list.sessions) || [], want);
-  pick.onchange = () => loadPagella(CURRENT, parseInt(pick.value, 10));
+  fillPagellaPicker(list, want);
   renderPagella(p, want);
+}
+
+// Anche quando la Pagella non arriva: da lì si sceglie un'altra uscita.
+function fillPagellaPicker(list, index) {
+  const pick = $("pag-select");
+  pick.innerHTML = sessionOptions((list && list.sessions) || [], index);
+  pick.onchange = () => loadPagella(CURRENT, parseInt(pick.value, 10));
 }
 
 function renderPagella(p, index) {
@@ -2229,7 +2244,7 @@ function renderPagella(p, index) {
   // L'uscita più recente, vista: alla prossima apertura il report riprende
   // dall'ultima scheda invece di tornare qui.
   if (index === 0 && ses.started_utc) {
-    try { localStorage.setItem(SEEN_KEY, ses.started_utc); } catch (e) {}
+    try { localStorage.setItem(seenKey(CURRENT), ses.started_utc); } catch (e) {}
   }
   if (p.excluded) {
     // Bagnato contro asciutto, nessun riferimento, nessun giro: la Pagella non
@@ -2271,10 +2286,11 @@ function pagDefects(defects) {
     const trend = d.trend
       ? `<span class="pag-trend ${d.trend}" title="${escAttr(says[d.trend])}">${arrows[d.trend]}</span>`
       : "";
-    const line = `<div class="pag-name"><b>${escAttr(d.name)}</b>` +
-      `<div class="pag-small">${where}</div></div>` +
-      `<div class="pag-cost"><span class="num loss">${fmtSecs(d.value, d.unit)}</span> ` +
-      `<span class="pag-small">${per}</span>${pagSpark(d.series, d.unit, d.trend)}${trend}</div>`;
+    // Solo span: la riga finisce dentro un <summary>, che non vuole blocchi.
+    const line = `<span class="pag-name"><b>${escAttr(d.name)}</b>` +
+      `<span class="pag-small">${where}</span></span>` +
+      `<span class="pag-cost"><span class="num loss">${fmtSecs(d.value, d.unit)}</span> ` +
+      `<span class="pag-small">${per}</span>${pagSpark(d.series, d.unit, d.trend)}${trend}</span>`;
     if (!corners.length) return `<div class="pag-row">${line}</div>`;
     return `<details class="pag-defect"><summary class="pag-row">${line}</summary>` +
       `<ul class="pag-corners">${corners.map((c) =>
@@ -2290,6 +2306,8 @@ function pagDefects(defects) {
 // altre) schiaccerebbe tutte le altre barre sul fondo. La barra tagliata resta
 // a piena altezza con il segno del taglio, e il suo valore vero sta nel
 // suggerimento: non si nasconde un dato vero, si evita che ne copra cinque.
+const SPARK_H = 26;     // px, come `.pag-spark` in style.css
+
 function pagSpark(series, unit, trend) {
   const vals = (series || []).map(Number).filter((v) => isFinite(v));
   if (vals.length < 2) return "";
@@ -2302,7 +2320,7 @@ function pagSpark(series, unit, trend) {
   const top = Math.min(max, 2 * median) || max;
   const bars = vals.map((v, i) => {
     const cut = top > 0 && v > top;
-    const h = top > 0 ? Math.max(2, Math.round(18 * Math.min(v, top) / top)) : 2;
+    const h = top > 0 ? Math.max(2, Math.round(SPARK_H * Math.min(v, top) / top)) : 2;
     const last = i === vals.length - 1 && trend ? " " + trend : "";
     const tip = cut ? tf("pag.spark.cut", { v: fmtSecs(v, unit) }) : fmtSecs(v, unit);
     return `<i class="${cut ? "cut" : ""}${last}" style="height:${h}px" title="${escAttr(tip)}"></i>`;

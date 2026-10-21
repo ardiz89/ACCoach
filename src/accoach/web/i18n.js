@@ -106,7 +106,7 @@
     "load.pagella":    { en: `Reading your session…`, it: `Sto leggendo la sessione…` },
     "err.pagella":     { en: `Couldn't load the report card. Is the analysis backend running?`,
                          it: `Non riesco a caricare la Pagella. Il backend di analisi è acceso?` },
-    "pag.nolaps":      { en: `No laps recorded for this car and track yet.`,
+    "pag.nolaps":      { en: `You have no laps on this car and track yet.`,
                          it: `Per questa auto e questa pista non hai ancora giri registrati.` },
     "pag.laps":        { en: `{laps} {laps|lap|laps} ({valid} valid)`,
                          it: `{laps} {laps|giro|giri} ({valid} {valid|valido|validi})` },

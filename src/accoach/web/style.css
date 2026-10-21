@@ -1257,17 +1257,21 @@ body.no-data .empty { display: block; }
    difetti e piano devono stare sullo schermo senza scorrere a 1920×1080, per
    questo le righe sono basse e i blocchi secondari (dove sbagli, errori)
    stanno affiancati. Colori della palette HONE, mai scritti a mano. */
-.pag-shell { max-width: 860px; margin: 0 auto; padding: 14px 24px 40px; font-size: 16px; line-height: 1.45; }
+/* La fascia del giro sopra la Pagella non dice niente (è una sessione, non un
+   giro) e costava ~45 px fra il verdetto e il piano. */
+body.view-pagella #lapbar { display: none; }
+.pag-shell { max-width: 860px; margin: 0 auto; padding: 10px 24px 40px; font-size: 16px; line-height: 1.4; }
 .pag-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-.pag-sub { margin: 0; color: var(--muted); font-size: 14px; }
+.pag-sub { margin: 0; color: var(--muted); font-size: 13px; }
+.pag-head .session-pick { font-size: 12px; }
 .pag-verdict {
-  margin: 8px 0 2px; font-family: var(--font-display);
-  font-size: 20px; font-weight: 700; line-height: 1.35;
+  margin: 6px 0 2px; font-family: var(--font-display);
+  font-size: 19px; font-weight: 700; line-height: 1.35;
 }
 .pag-ref { margin: 0; color: var(--muted); font-size: 13px; }
 .pag-box {
   background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
-  padding: 10px 16px; margin-top: 12px;
+  padding: 8px 16px; margin-top: 10px;
 }
 .pag-box h4 {
   margin: 0 0 4px; font-size: 12px; font-weight: 600;
@@ -1279,6 +1283,8 @@ body.no-data .empty { display: block; }
 }
 .pag-box > .pag-row:last-child, .pag-box > .pag-defect:last-child > .pag-row { border-bottom: 0; }
 .pag-small { color: var(--muted); font-size: 13px; }
+/* Dentro <summary> solo span: il blocco lo dà il CSS. */
+.pag-name, .pag-name .pag-small { display: block; }
 .pag-shell .num { font-family: var(--font-mono); font-weight: 700; font-variant-numeric: tabular-nums; }
 .pag-shell .num.loss { color: var(--red); }
 .pag-cost { display: flex; align-items: center; gap: 6px; flex: none; white-space: nowrap; }
@@ -1296,25 +1302,29 @@ body.no-data .empty { display: block; }
    barra di oggi prende il colore della freccia. Una barra fuori scala (sopra
    due volte la mediana, vedi pagSpark) resta a piena altezza con un taglio
    obliquo, il segno che è più alta di quanto si vede. */
-.pag-spark { display: inline-flex; gap: 2px; align-items: flex-end; height: 18px; margin-left: 8px; }
-.pag-spark i { display: block; width: 5px; background: var(--muted); border-radius: 1px; position: relative; }
+/* Alta quanto SPARK_H in app.js. */
+.pag-spark { display: inline-flex; gap: 3px; align-items: flex-end; height: 26px; margin-left: 10px; }
+.pag-spark i { display: block; width: 7px; background: var(--muted); border-radius: 1px; position: relative; }
 .pag-spark i.down { background: var(--green); }
 .pag-spark i.same { background: var(--amber); }
 .pag-spark i.up { background: var(--red); }
 .pag-spark i.cut::after {
-  content: ""; position: absolute; left: -1px; right: -1px; top: 4px; height: 2px;
+  content: ""; position: absolute; left: -1px; right: -1px; top: 5px; height: 3px;
   background: var(--panel); transform: skewY(-35deg);
 }
 .pag-trend { font-weight: 700; margin-left: 2px; }
 .pag-trend.down { color: var(--green); }
 .pag-trend.same { color: var(--amber); }
 .pag-trend.up { color: var(--red); }
-.pag-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
+/* Dove sbagli e gli errori sono blocchi secondari: righe basse, e ogni box
+   alto quanto il suo contenuto (non stirato sull'altro). */
+.pag-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; align-items: start; }
+.pag-grid .pag-row { padding: 3px 0; font-size: 14px; }
 .pag-note { margin-top: 12px; }
 /* Il piano: la regola una volta sopra la lista, poi i consigli in ordine. */
 .pag-rule { margin: 0 0 2px; color: var(--muted); font-size: 14px; }
 .pag-steps { list-style: none; margin: 0; padding: 0; }
-.pag-step { display: flex; gap: 12px; align-items: flex-start; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.pag-step { display: flex; gap: 12px; align-items: flex-start; padding: 6px 0; border-bottom: 1px solid var(--line); }
 .pag-step:last-child { border-bottom: 0; }
 .pag-k {
   width: 24px; height: 24px; border-radius: 50%; flex: none;
