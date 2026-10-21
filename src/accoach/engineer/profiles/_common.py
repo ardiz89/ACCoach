@@ -7,6 +7,7 @@ phase parameterised by the class's hot-pressure window.
 from __future__ import annotations
 
 from ...i18n import current_language
+from ...textfmt import fmt_num
 from ..core import (
     ALL,
     FRONT,
@@ -72,116 +73,117 @@ _SLOTS = {"front": FRONT, "rear": REAR, "all": ALL, None: (None,)}
 # --- EN→IT catalogue -------------------------------------------------------
 # The remedy rationales, phase labels and al-volo lever names are authored in
 # English (the canonical interface language); when the app language is Italian we
-# look them up here. Strings are FIXED (the numeric click, e.g. "(−1)", is part of
+# look them up here. Strings are FIXED (the click count, «di 1 click», is part of
 # the phrase), so a static map suffices — no templating needed. The setup param
 # keys, AV/BOX tags and Symptom enums are technical identifiers and stay as-is.
+#
+# Ogni rimedio e' UNA frase, il sintomo e poi l'azione legati da «quindi» / «so»:
+# due frasi avrebbero ripetuto «Hai sottosterzo in ingresso.» sotto dieci
+# rimedi, e la stessa frase in dieci posti e' quello che il pilota ha bocciato.
+# L'azione da sola (`_lever`) e' quella che si cita dentro un'altra frase.
 _IT: dict[str, str] = {
     # --- remedy rationales (GT3 + Formula + Road) ---
-    "Understeer on slow entry: softer front anti-roll bar (−1)":
-        "Sottosterzo in entrata lenta: barra anteriore più morbida (−1)",
-    "Understeer on entry: more front toe-out (+1)":
-        "Sottosterzo in entrata: più toe-out anteriore (+1)",
-    "Understeer on entry: brake bias slightly rearward (−1)":
-        "Sottosterzo in entrata: bias freni un filo indietro (−1)",
-    "Understeer on entry: softer front anti-roll bar (−1)":
-        "Sottosterzo in entrata: barra anteriore più morbida (−1)",
-    "Understeer on fast entry: raise the rear, more rake (+2)":
-        "Sottosterzo in entrata veloce: alza il posteriore, più rake (+2)",
-    "Understeer on fast entry: more front splitter (+1)":
-        "Sottosterzo in entrata veloce: più splitter anteriore (+1)",
-    "Understeer on fast entry: softer front anti-roll bar (−1)":
-        "Sottosterzo in entrata veloce: barra anteriore più morbida (−1)",
-    "Understeer on fast entry: more front wing (+1)":
-        "Sottosterzo in entrata veloce: più ala anteriore (+1)",
-    "Understeer on fast entry: more rake, raise the rear (+2)":
-        "Sottosterzo in entrata veloce: più rake, alza il posteriore (+2)",
-    "Understeer on fast entry: less rear wing (−1)":
-        "Sottosterzo in entrata veloce: meno ala posteriore (−1)",
-    "Understeer at slow apex: less differential preload (−1)":
-        "Sottosterzo all'apex lento: meno precarico differenziale (−1)",
-    "Understeer at apex: softer front anti-roll bar (−1)":
-        "Sottosterzo all'apex: barra anteriore più morbida (−1)",
-    "Understeer at apex: softer front springs (−1)":
-        "Sottosterzo all'apex: molle anteriori più morbide (−1)",
-    "Understeer at apex: more front negative camber (−1)":
-        "Sottosterzo all'apex: più camber negativo anteriore (−1)",
-    "Understeer at fast apex: less rear wing (−1)":
-        "Sottosterzo all'apex veloce: meno ala posteriore (−1)",
-    "Understeer at fast apex: more front splitter (+1)":
-        "Sottosterzo all'apex veloce: più splitter anteriore (+1)",
-    "Understeer at fast apex: more rake (+1)":
-        "Sottosterzo all'apex veloce: più rake (+1)",
-    "Understeer at fast apex: more front wing (+1)":
-        "Sottosterzo all'apex veloce: più ala anteriore (+1)",
-    "Understeer on slow exit (traction): less diff preload (−1)":
-        "Sottosterzo in uscita lenta (trazione): meno precarico diff (−1)",
-    "Understeer on exit: softer rear anti-roll bar (−1)":
-        "Sottosterzo in uscita: barra posteriore più morbida (−1)",
-    "Understeer on exit (power): less locked differential (−1)":
-        "Sottosterzo in uscita (power): differenziale meno bloccato (−1)",
-    "Understeer on exit: less locked differential on power (−1)":
-        "Sottosterzo in uscita: differenziale meno bloccato in power (−1)",
-    "Understeer on fast exit: less rear wing (−1)":
-        "Sottosterzo in uscita veloce: meno ala posteriore (−1)",
-    "Understeer on fast exit: more splitter (+1)":
-        "Sottosterzo in uscita veloce: più splitter (+1)",
-    "Understeer on fast exit: more front wing (+1)":
-        "Sottosterzo in uscita veloce: più ala anteriore (+1)",
-    "Oversteer on slow entry: brake bias more forward (+1)":
-        "Sovrasterzo in entrata lenta: bias freni più avanti (+1)",
-    "Oversteer on entry: brake bias more forward (+1)":
-        "Sovrasterzo in entrata: bias freni più avanti (+1)",
-    "Oversteer on entry: softer rear anti-roll bar (−1)":
-        "Sovrasterzo in entrata: barra posteriore più morbida (−1)",
-    "Oversteer on entry: more rear toe-in (+1)":
-        "Sovrasterzo in entrata: più toe-in posteriore (+1)",
-    "Lift-off oversteer: more locked differential on coast (+1)":
-        "Sovrasterzo in rilascio: differenziale più chiuso in coast (+1)",
-    "Oversteer on fast entry: more rear wing (+1)":
-        "Sovrasterzo in entrata veloce: più ala posteriore (+1)",
-    "Oversteer on fast entry: lower the rear (−2)":
-        "Sovrasterzo in entrata veloce: abbassa il posteriore (−2)",
-    "Oversteer on fast entry: softer rear anti-roll bar (−1)":
-        "Sovrasterzo in entrata veloce: barra posteriore più morbida (−1)",
-    "Oversteer at slow apex: softer rear anti-roll bar (−1)":
-        "Sovrasterzo all'apex lento: barra posteriore più morbida (−1)",
-    "Oversteer at apex: more differential preload (+1)":
-        "Sovrasterzo all'apex: più precarico differenziale (+1)",
-    "Oversteer at apex: softer rear anti-roll bar (−1)":
-        "Sovrasterzo all'apex: barra posteriore più morbida (−1)",
-    "Oversteer at apex: more rear toe-in (+1)":
-        "Sovrasterzo all'apex: più toe-in posteriore (+1)",
-    "Oversteer at fast apex: more rear wing (+1)":
-        "Sovrasterzo all'apex veloce: più ala posteriore (+1)",
-    "Oversteer at fast apex: softer rear anti-roll bar (−1)":
-        "Sovrasterzo all'apex veloce: barra posteriore più morbida (−1)",
-    "Oversteer on exit (traction): more traction control (+1)":
-        "Sovrasterzo in uscita (trazione): più controllo di trazione (+1)",
-    "Oversteer on exit: softer rear anti-roll bar (−1)":
-        "Sovrasterzo in uscita: barra posteriore più morbida (−1)",
-    "Oversteer on exit: softer rear springs (−1)":
-        "Sovrasterzo in uscita: molle posteriori più morbide (−1)",
-    "Oversteer on exit (traction, no TC): softer differential on power (−1)":
-        "Sovrasterzo in uscita (trazione, no TC): differenziale più dolce in power (−1)",
-    "Oversteer on exit (traction): softer differential on power (−1)":
-        "Sovrasterzo in uscita (trazione): differenziale più dolce in power (−1)",
-    "Oversteer on fast exit: more rear wing (+1)":
-        "Sovrasterzo in uscita veloce: più ala posteriore (+1)",
-    "Oversteer on fast exit: more traction control (+1)":
-        "Sovrasterzo in uscita veloce: più controllo di trazione (+1)",
-    "Oversteer on fast exit: softer differential on power (−1)":
-        "Sovrasterzo in uscita veloce: differenziale più dolce in power (−1)",
-    # --- road-car lift-off / pressure remedies ---
-    "Understeer on entry: less front pressure (−2)":
-        "Sottosterzo in entrata: meno pressione anteriore (−2)",
-    "Lift-off oversteer: more rear toe-in (+1)":
-        "Sovrasterzo in rilascio: più toe-in posteriore (+1)",
-    "Lift-off oversteer: softer rear rebound (−1)":
-        "Sovrasterzo in rilascio: estensione posteriore più morbida (−1)",
-    "Lift-off oversteer: softer rear anti-roll bar (−1)":
-        "Sovrasterzo in rilascio: barra posteriore più morbida (−1)",
-    "Lift-off oversteer: brake bias more forward (+1)":
-        "Sovrasterzo in rilascio: bias freni più avanti (+1)",
+    # Una frase sola: il sintomo, poi «quindi» e l'azione (vedi `_lever`).
+    "The car understeers on entry to slow corners, so soften the front anti-roll bar by 1 click.":
+        "Hai sottosterzo in ingresso alle curve lente, quindi ammorbidisci la barra antirollio anteriore di 1 click.",
+    "The car understeers on entry, so add 1 click of front toe-out.":
+        "Hai sottosterzo in ingresso, quindi aumenta il toe-out anteriore di 1 click.",
+    "The car understeers on entry, so move the brake bias 1 click rearward.":
+        "Hai sottosterzo in ingresso, quindi sposta il bilanciamento freni indietro di 1 click.",
+    "The car understeers on entry, so soften the front anti-roll bar by 1 click.":
+        "Hai sottosterzo in ingresso, quindi ammorbidisci la barra antirollio anteriore di 1 click.",
+    "The car understeers on entry to fast corners, so raise the rear by 2 clicks for more rake.":
+        "Hai sottosterzo in ingresso alle curve veloci, quindi alza il posteriore di 2 click per avere più rake.",
+    "The car understeers on entry to fast corners, so add 1 click of front splitter.":
+        "Hai sottosterzo in ingresso alle curve veloci, quindi aumenta lo splitter anteriore di 1 click.",
+    "The car understeers on entry to fast corners, so soften the front anti-roll bar by 1 click.":
+        "Hai sottosterzo in ingresso alle curve veloci, quindi ammorbidisci la barra antirollio anteriore di 1 click.",
+    "The car understeers on entry to fast corners, so add 1 click of front wing.":
+        "Hai sottosterzo in ingresso alle curve veloci, quindi aumenta l'ala anteriore di 1 click.",
+    "The car understeers on entry to fast corners, so take 1 click of rear wing off.":
+        "Hai sottosterzo in ingresso alle curve veloci, quindi togli 1 click di ala posteriore.",
+    "The car understeers mid-corner in slow corners, so take 1 click of differential preload off.":
+        "Hai sottosterzo a centro curva nelle curve lente, quindi togli 1 click di precarico al differenziale.",
+    "The car understeers mid-corner, so soften the front anti-roll bar by 1 click.":
+        "Hai sottosterzo a centro curva, quindi ammorbidisci la barra antirollio anteriore di 1 click.",
+    "The car understeers mid-corner, so soften the front springs by 1 click.":
+        "Hai sottosterzo a centro curva, quindi ammorbidisci le molle anteriori di 1 click.",
+    "The car understeers mid-corner, so add 1 click of negative front camber.":
+        "Hai sottosterzo a centro curva, quindi aumenta il camber negativo anteriore di 1 click.",
+    "The car understeers mid-corner in fast corners, so take 1 click of rear wing off.":
+        "Hai sottosterzo a centro curva nelle curve veloci, quindi togli 1 click di ala posteriore.",
+    "The car understeers mid-corner in fast corners, so add 1 click of front splitter.":
+        "Hai sottosterzo a centro curva nelle curve veloci, quindi aumenta lo splitter anteriore di 1 click.",
+    "The car understeers mid-corner in fast corners, so raise the rear by 1 click for more rake.":
+        "Hai sottosterzo a centro curva nelle curve veloci, quindi alza il posteriore di 1 click per avere più rake.",
+    "The car understeers mid-corner in fast corners, so add 1 click of front wing.":
+        "Hai sottosterzo a centro curva nelle curve veloci, quindi aumenta l'ala anteriore di 1 click.",
+    "The car understeers on exit from slow corners under power, so take 1 click of differential preload off.":
+        "Hai sottosterzo in uscita dalle curve lente quando dai gas, quindi togli 1 click di precarico al differenziale.",
+    "The car understeers on exit, so soften the rear anti-roll bar by 1 click.":
+        "Hai sottosterzo in uscita, quindi ammorbidisci la barra antirollio posteriore di 1 click.",
+    "The car understeers on exit under power, so take 1 click of power locking off the differential.":
+        "Hai sottosterzo in uscita quando dai gas, quindi togli 1 click di bloccaggio al differenziale in accelerazione.",
+    "The car understeers on exit from fast corners, so take 1 click of rear wing off.":
+        "Hai sottosterzo in uscita dalle curve veloci, quindi togli 1 click di ala posteriore.",
+    "The car understeers on exit from fast corners, so add 1 click of splitter.":
+        "Hai sottosterzo in uscita dalle curve veloci, quindi aumenta lo splitter di 1 click.",
+    "The car understeers on exit from fast corners, so add 1 click of front wing.":
+        "Hai sottosterzo in uscita dalle curve veloci, quindi aumenta l'ala anteriore di 1 click.",
+    "The car oversteers on entry to slow corners, so move the brake bias 1 click forward.":
+        "Hai sovrasterzo in ingresso alle curve lente, quindi sposta il bilanciamento freni in avanti di 1 click.",
+    "The car oversteers on entry, so move the brake bias 1 click forward.":
+        "Hai sovrasterzo in ingresso, quindi sposta il bilanciamento freni in avanti di 1 click.",
+    "The car oversteers on entry, so soften the rear anti-roll bar by 1 click.":
+        "Hai sovrasterzo in ingresso, quindi ammorbidisci la barra antirollio posteriore di 1 click.",
+    "The car oversteers on entry, so add 1 click of rear toe-in.":
+        "Hai sovrasterzo in ingresso, quindi aumenta il toe-in posteriore di 1 click.",
+    "The car oversteers when you lift off, so add 1 click of coast locking to the differential.":
+        "Hai sovrasterzo quando alzi il piede, quindi aggiungi 1 click di bloccaggio al differenziale in rilascio.",
+    "The car oversteers on entry to fast corners, so add 1 click of rear wing.":
+        "Hai sovrasterzo in ingresso alle curve veloci, quindi aumenta l'ala posteriore di 1 click.",
+    "The car oversteers on entry to fast corners, so lower the rear by 2 clicks.":
+        "Hai sovrasterzo in ingresso alle curve veloci, quindi abbassa il posteriore di 2 click.",
+    "The car oversteers on entry to fast corners, so soften the rear anti-roll bar by 1 click.":
+        "Hai sovrasterzo in ingresso alle curve veloci, quindi ammorbidisci la barra antirollio posteriore di 1 click.",
+    "The car oversteers mid-corner in slow corners, so soften the rear anti-roll bar by 1 click.":
+        "Hai sovrasterzo a centro curva nelle curve lente, quindi ammorbidisci la barra antirollio posteriore di 1 click.",
+    "The car oversteers mid-corner, so add 1 click of differential preload.":
+        "Hai sovrasterzo a centro curva, quindi aumenta il precarico del differenziale di 1 click.",
+    "The car oversteers mid-corner, so soften the rear anti-roll bar by 1 click.":
+        "Hai sovrasterzo a centro curva, quindi ammorbidisci la barra antirollio posteriore di 1 click.",
+    "The car oversteers mid-corner, so add 1 click of rear toe-in.":
+        "Hai sovrasterzo a centro curva, quindi aumenta il toe-in posteriore di 1 click.",
+    "The car oversteers mid-corner in fast corners, so add 1 click of rear wing.":
+        "Hai sovrasterzo a centro curva nelle curve veloci, quindi aumenta l'ala posteriore di 1 click.",
+    "The car oversteers mid-corner in fast corners, so soften the rear anti-roll bar by 1 click.":
+        "Hai sovrasterzo a centro curva nelle curve veloci, quindi ammorbidisci la barra antirollio posteriore di 1 click.",
+    "The car oversteers on exit under power, so add 1 click of traction control.":
+        "Hai sovrasterzo in uscita quando dai gas, quindi aumenta il controllo di trazione di 1 click.",
+    "The car oversteers on exit, so soften the rear anti-roll bar by 1 click.":
+        "Hai sovrasterzo in uscita, quindi ammorbidisci la barra antirollio posteriore di 1 click.",
+    "The car oversteers on exit, so soften the rear springs by 1 click.":
+        "Hai sovrasterzo in uscita, quindi ammorbidisci le molle posteriori di 1 click.",
+    "With no TC, the car oversteers on exit under power, so take 1 click of power locking off the differential.":
+        "Senza TC hai sovrasterzo in uscita quando dai gas, quindi togli 1 click di bloccaggio al differenziale in accelerazione.",
+    "The car oversteers on exit under power, so take 1 click of power locking off the differential.":
+        "Hai sovrasterzo in uscita quando dai gas, quindi togli 1 click di bloccaggio al differenziale in accelerazione.",
+    "The car oversteers on exit from fast corners, so add 1 click of rear wing.":
+        "Hai sovrasterzo in uscita dalle curve veloci, quindi aumenta l'ala posteriore di 1 click.",
+    "The car oversteers on exit from fast corners, so add 1 click of traction control.":
+        "Hai sovrasterzo in uscita dalle curve veloci, quindi aumenta il controllo di trazione di 1 click.",
+    "The car oversteers on exit from fast corners, so take 1 click of power locking off the differential.":
+        "Hai sovrasterzo in uscita dalle curve veloci, quindi togli 1 click di bloccaggio al differenziale in accelerazione.",
+    "The car understeers on entry, so take 2 clicks of front tyre pressure off.":
+        "Hai sottosterzo in ingresso, quindi togli 2 click di pressione alle gomme anteriori.",
+    "The car oversteers when you lift off, so add 1 click of rear toe-in.":
+        "Hai sovrasterzo quando alzi il piede, quindi aumenta il toe-in posteriore di 1 click.",
+    "The car oversteers when you lift off, so soften the rear rebound by 1 click.":
+        "Hai sovrasterzo quando alzi il piede, quindi ammorbidisci l'estensione posteriore di 1 click.",
+    "The car oversteers when you lift off, so soften the rear anti-roll bar by 1 click.":
+        "Hai sovrasterzo quando alzi il piede, quindi ammorbidisci la barra antirollio posteriore di 1 click.",
+    "The car oversteers when you lift off, so move the brake bias 1 click forward.":
+        "Hai sovrasterzo quando alzi il piede, quindi sposta il bilanciamento freni in avanti di 1 click.",
     # --- phase labels ---
     "Pressures": "Pressioni",
     "Mechanical grip": "Grip meccanico",
@@ -227,6 +229,23 @@ def none_present(window: list[LapStats], owns) -> bool:
     return True
 
 
+#: Quello che separa il sintomo dall'azione in una frase di rimedio.
+_THEN = (", quindi ", ", so ")
+
+
+def _lever(text: str) -> str:
+    """L'azione di una frase di rimedio, senza il sintomo e senza il punto.
+
+    «Hai sottosterzo in ingresso, quindi ammorbidisci la barra…» → «Ammorbidisci
+    la barra…». Una frase senza il legame torna intera: si cita lei.
+    """
+    for sep in _THEN:
+        if sep in text:
+            act = text.split(sep, 1)[1].rstrip(". ")
+            return act[:1].upper() + act[1:]
+    return text.rstrip(". ")
+
+
 def remedy(param: str, target, step: int, why: str, tag: str = "BOX"):
     """Factory: returns a builder(symptom, phase) -> ProposedChange.
 
@@ -236,8 +255,20 @@ def remedy(param: str, target, step: int, why: str, tag: str = "BOX"):
     def build(symptom: Symptom, phase: WorkPhase) -> ProposedChange:
         slots = _SLOTS[target]
         atomics = tuple(AtomicChange(param, s, step) for s in slots)
-        return ProposedChange(atomics, tr(why), tr(phase.label), tag, symptom)
+        text = tr(why)
+        return ProposedChange(atomics, text, tr(phase.label), tag, symptom,
+                              lever=_lever(text))
     return build
+
+
+def _psi(v: float, lang: str) -> str:
+    return fmt_num(v, 1, lang, "psi")
+
+
+def _signed_clicks(n: int, lang: str) -> str:
+    """«+8», «−8»: il segno sempre, il meno tipografico."""
+    text = fmt_num(n, 0, lang)
+    return "+" + text if n > 0 else text
 
 
 class PressurePhase(WorkPhase):
@@ -276,14 +307,14 @@ class PressurePhase(WorkPhase):
         if self.target is not None:
             return ""
         if current_language() == "it":
-            return ("Pressioni: non so che tipo di auto e' questa, quindi non so "
-                    "che finestra hanno le sue gomme. Non le tocco: la finestra "
-                    "di un'altra categoria sarebbe un numero sbagliato detto con "
-                    "sicurezza. Vado avanti col resto.")
-        return ("Pressures: I don't know what kind of car this is, so I don't "
-                "know its tyre window. I'm leaving them alone: another class's "
-                "window would be a wrong number said with confidence. Moving on "
-                "to the rest.")
+            return ("Non so che tipo di auto è questa, quindi non conosco la "
+                    "finestra delle sue gomme. Le pressioni non le tocco, perché "
+                    "la finestra di un'altra categoria sarebbe un numero sbagliato "
+                    "detto con sicurezza. Vado avanti col resto.")
+        return ("I don't know what kind of car this is, so I don't know its tyre "
+                "window. I'm leaving the pressures alone, because another class's "
+                "window would be a wrong number said with confidence. I'm moving "
+                "on to the rest.")
 
     def _tol(self, psi_per_click: float | None) -> float:
         """La tolleranza che quest'auto puo' davvero raggiungere.
@@ -324,17 +355,19 @@ class PressurePhase(WorkPhase):
             if ppc is not None:
                 continue
             lang = current_language()
-            gap = self.target - cur
+            gap = fmt_num(self.target - cur, 1, lang, "psi")
+            gap = gap if gap.startswith("−") else "+" + gap
+            now, window = _psi(cur, lang), _psi(self.target, lang)
+            why = self.steps.why(lang)
             if lang == "it":
                 axis = "anteriore" if ax == "front" else "posteriore"
-                return (f"Pressione {axis} {cur:.1f} psi, finestra ~{self.target}: "
-                        f"servono circa {gap:+.1f} psi. Non la scrivo io: "
-                        f"{self.steps.why(lang)}. Correggila tu dal garage e io "
-                        f"rimisuro.")
-            return (f"{ax.capitalize()} pressure {cur:.1f} psi, window "
-                    f"~{self.target}: it wants about {gap:+.1f} psi. I'm not "
-                    f"writing this one: {self.steps.why(lang)}. Change it in the "
-                    f"garage yourself and I'll measure again.")
+                return (f"La pressione {axis} è {now}, fuori dalla finestra di "
+                        f"circa {window}. Servono circa {gap}. Non la scrivo io, "
+                        f"perché {why}. Correggila tu dal garage e io rimisuro.")
+            return (f"{ax.capitalize()} pressure is {now}, outside the window of "
+                    f"about {window}. It wants about {gap}. I'm not writing this "
+                    f"one, because {why}. Change it in the garage yourself and "
+                    f"I'll measure again.")
         return ""
 
     def pressure_remedy(self, stats: LapStats) -> ProposedChange | None:
@@ -349,28 +382,33 @@ class PressurePhase(WorkPhase):
             cap = max(1, int(_MAX_PSI_PER_STOP / ppc))
             clicks = max(-cap, min(cap, wanted))
             atomics = tuple(AtomicChange("tyrePressure", s, clicks) for s in slots)
-            sign = "+" if clicks > 0 else ""
             # Dove arriva QUESTO passo, che non e' dove vorremmo arrivare appena
             # il taglio morde: a 24.7 psi con finestra 27.5 il passo vale 25.5,
             # e la frase prometteva 27.5. Il pilota che ricarica il setup e
             # rimisura non aveva modo di capire se era andata come doveva.
             reached = cur + clicks * ppc
             short = clicks != wanted
-            if current_language() == "it":
+            lang = current_language()
+            n = _signed_clicks(clicks, lang)
+            now, to = _psi(cur, lang), _psi(reached, lang)
+            window = _psi(self.target, lang)
+            if lang == "it":
                 # …e in italiano l'asse ha un nome italiano: la frase diceva
                 # "Pressione front", meta' tradotta, nell'unico punto dell'app
                 # dove il pilota legge un numero e poi va a girare una manopola.
                 axis = "anteriore" if ax == "front" else "posteriore"
-                why = (f"Pressione {axis} fuori finestra "
-                       f"({cur:.1f}→{reached:.1f} psi, finestra ~{self.target}): "
-                       f"{sign}{clicks} click")
+                why = (f"La pressione {axis} è {now}, fuori dalla finestra di "
+                       f"circa {window}, quindi dai {n} click e arrivi a {to}.")
                 if short:
-                    why += " — il massimo per sosta, il resto al prossimo box"
+                    why += " È il massimo per una sosta, il resto al prossimo rientro."
+                lever = f"{n} click alla pressione {axis}"
             else:
-                why = (f"{ax.capitalize()} pressure out of window "
-                       f"({cur:.1f}→{reached:.1f} psi, window ~{self.target}): "
-                       f"{sign}{clicks} clicks")
+                clicks_word = "click" if abs(clicks) == 1 else "clicks"
+                why = (f"{ax.capitalize()} pressure is {now}, outside the window "
+                       f"of about {window}, so give it {n} {clicks_word} to reach "
+                       f"{to}.")
                 if short:
-                    why += " — the most per stop, the rest next time in"
-            return ProposedChange(atomics, why, tr(self.label), "BOX")
+                    why += " That's the most for one stop, the rest next time in."
+                lever = f"{n} {clicks_word} of {ax} pressure"
+            return ProposedChange(atomics, why, tr(self.label), "BOX", lever=lever)
         return None

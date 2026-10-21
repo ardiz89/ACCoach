@@ -79,12 +79,12 @@ SETUP_PARAMS: tuple[ParamSpec, ...] = (
     # --- Tyres -------------------------------------------------------------
     ParamSpec("tyrePressure", "Tyres", "Pressure", _BASIC + ("tyres",),
               unit="psi", step=0.1, base=20.3,
-              note="≈ cold; base 20.3 psi, 0.1 psi/click"),
+              note="Approximate cold value, 20.3 psi at click 0 and 0.1 psi per click"),
     ParamSpec("tyreCompound", "Tyres", "Compound", _BASIC + ("tyres",),
               unit="", step=None, base=None),
     # --- Alignment ------------------------------------------------------
     ParamSpec("camber", "Alignment", "Camber", _BASIC + ("alignment",),
-              unit="click", step=None, note="real degrees in staticCamber"),
+              unit="click", step=None, note="Real degrees, from staticCamber"),
     ParamSpec("toe", "Alignment", "Toe", _BASIC + ("alignment",),
               unit="click", step=None),
     ParamSpec("casterLF", "Alignment", "Caster LF", _BASIC + ("alignment",),
@@ -122,7 +122,7 @@ SETUP_PARAMS: tuple[ParamSpec, ...] = (
               _ADV + ("mechanicalBalance",), unit="click", step=None),
     ParamSpec("brakeBias", "Mechanical", "Brake bias",
               _ADV + ("mechanicalBalance",), unit="%", step=0.2, base=None,
-              note="~0.2%/click; front base depends on the car"),
+              note="About 0.2 % per click, the front base depends on the car"),
     # --- Dampers ----------------------------------------------------
     ParamSpec("bumpSlow", "Dampers", "Slow bump",
               _ADV + ("dampers",), unit="click", step=None),
@@ -134,7 +134,7 @@ SETUP_PARAMS: tuple[ParamSpec, ...] = (
               _ADV + ("dampers",), unit="click", step=None),
     # --- Aero / ride height ----------------------------------------------------
     ParamSpec("rideHeight", "Aero", "Ride height", _ADV + ("aeroBalance",),
-              unit="mm", step=1, base=0, note="1 mm step (approximate)"),
+              unit="mm", step=1, base=0, note="Steps of about 1 mm"),
     ParamSpec("splitter", "Aero", "Splitter", _ADV + ("aeroBalance",),
               unit="click", step=None),
     ParamSpec("rearWing", "Aero", "Rear wing", _ADV + ("aeroBalance",),

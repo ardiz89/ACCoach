@@ -204,7 +204,9 @@ def test_the_side_effect_is_named_in_the_message_the_driver_reads():
     eng.mark_applied()
     for _ in range(3):
         out = eng.observe(_lap(100000, {SYM: 0.20, OTHER: 0.55}))
-    assert str(OTHER) in out.message
+    # In parole, non con la chiave del registro («oversteer exit low»).
+    assert "oversteer on exit from slow corners" in out.message
+    assert str(OTHER) not in out.message
 
 
 def test_giving_up_on_a_symptom_is_recorded_as_a_claim_we_made():

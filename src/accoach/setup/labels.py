@@ -79,12 +79,12 @@ _IT: dict[str, str] = {
     # --- strategy ---
     "Fuel": "Benzina",
     # --- notes (the caveats shown under a param) ---
-    "≈ cold; base 20.3 psi, 0.1 psi/click":
-        "≈ a freddo; base 20.3 psi, 0.1 psi/click",
-    "real degrees in staticCamber": "gradi reali in staticCamber",
-    "~0.2%/click; front base depends on the car":
-        "~0.2%/click; base anteriore dipende dall'auto",
-    "1 mm step (approximate)": "passo 1 mm (approssimato)",
+    "Approximate cold value, 20.3 psi at click 0 and 0.1 psi per click":
+        "Valore a freddo approssimato, 20,3 psi al click 0 e 0,1 psi per click",
+    "Real degrees, from staticCamber": "Gradi reali, da staticCamber",
+    "About 0.2 % per click, the front base depends on the car":
+        "Circa 0,2 % per click, la base anteriore dipende dall'auto",
+    "Steps of about 1 mm": "Passi di circa 1 mm",
 }
 
 
@@ -137,30 +137,32 @@ def reload_hint(name: str, lang: str | None = None) -> str:
     car you're driving — so this line has to land in the reader's language.
     """
     if _is_it(lang):
-        return f"Rientra ai box → schermata Setup → carica '{name}' → riparti."
-    return f"Back to the pits → Setup screen → load '{name}' → head out."
+        return (f"Ho scritto «{name}». Ai box apri la schermata Setup, caricalo "
+                f"e riparti.")
+    return (f"I've written “{name}”. In the pits, open the Setup screen, load it "
+            f"and head out.")
 
 
 def err_slot_required(key: str, slots, lang: str | None = None) -> str:
     opts = ", ".join(slots)
     if _is_it(lang):
-        return f"slot richiesto per '{key}' ({opts})"
-    return f"slot required for '{key}' ({opts})"
+        return f"Per «{key}» serve la ruota o l'asse ({opts})."
+    return f"“{key}” needs a wheel or an axle ({opts})."
 
 
 def err_slot_out_of_range(index: int, key: str, lang: str | None = None) -> str:
     if _is_it(lang):
-        return f"slot {index} fuori range per '{key}'"
-    return f"slot {index} is out of range for '{key}'"
+        return f"«{key}» non ha la posizione {index}."
+    return f"“{key}” has no position {index}."
 
 
 def err_slot_invalid(slot, key: str, lang: str | None = None) -> str:
     if _is_it(lang):
-        return f"slot '{slot}' non valido per '{key}'"
-    return f"slot '{slot}' is not valid for '{key}'"
+        return f"«{slot}» non è una posizione valida per «{key}»."
+    return f"“{slot}” is not a valid position for “{key}”."
 
 
 def err_needs_value(param: str, lang: str | None = None) -> str:
     if _is_it(lang):
-        return f"'{param}': specifica delta_clicks o value"
-    return f"'{param}': specify delta_clicks or value"
+        return f"Per «{param}» indica delta_clicks oppure value."
+    return f"For “{param}”, give either delta_clicks or value."

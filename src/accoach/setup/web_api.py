@@ -332,7 +332,8 @@ def register_setup_routes(app: FastAPI, root=DEFAULT_ROOTS) -> None:
         }
 
     @app.get("/api/setup/record")
-    def setup_record(car: str = Query(""), track: str = Query("")) -> dict:
+    def setup_record(car: str = Query(""), track: str = Query(""),
+                     lang: str | None = Query(None)) -> dict:
         """The engineer's track record: how many of its changes actually worked.
 
         The one number a setup tool should be willing to publish, and the only
@@ -341,6 +342,7 @@ def register_setup_routes(app: FastAPI, root=DEFAULT_ROOTS) -> None:
         answer then*: a hit rate over three samples is noise wearing a
         percentage sign, so this returns the counts and lets the reader decide.
         """
+        from ..engineer.core import symptom_words
         from ..engineer.ledger import read, side_effect_counts, summarise
         rows = read(car=car, track=track)
         s = summarise(rows)
@@ -357,7 +359,8 @@ def register_setup_routes(app: FastAPI, root=DEFAULT_ROOTS) -> None:
             # aren't, so they go out as strings on purpose.
             "by_rank": {str(k): {"kept": v[0], "tests": v[1]}
                         for k, v in sorted(s.by_rank.items())},
-            "side_effects": [{"param": p, "symptom": sym, "seen": n}
+            "side_effects": [{"param": p, "symptom": sym, "seen": n,
+                              "words": symptom_words(sym, lang)}
                              for (p, sym), n in
                              sorted(side_effect_counts(rows).items(),
                                     key=lambda kv: kv[1], reverse=True)],

@@ -166,7 +166,7 @@ def test_the_step_is_capped_the_same_way_in_both_directions():
     """Sopra la finestra il taglio vale identico, e la frase pure: una pressione
     troppo alta e' lo stesso problema visto dall'altro lato."""
     ch = _press_change(30.0)
-    assert ch is not None and "-8" in ch.rationale and "29.2" in ch.rationale
+    assert ch is not None and "−8" in ch.rationale and "29.2" in ch.rationale
 
 
 def test_the_italian_message_names_the_axle_in_italian(monkeypatch):

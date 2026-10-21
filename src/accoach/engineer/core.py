@@ -35,6 +35,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 
 from ..i18n import current_language
+from ..textfmt import fmt_num
 from .steps import AccSteps, Steps
 
 
@@ -152,20 +153,36 @@ class ProposedChange:
     phase_label: str
     tag: str            # "AV" (al volo) or "BOX" (garage)
     symptom: Symptom | None = None
+    #: La sola azione, senza il sintomo che la motiva («Ammorbidisci la barra
+    #: antirollio anteriore di 1 click»): e' quella che si cita fra virgolette
+    #: quando la modifica si nomina dentro un'altra frase (il ripristino, il
+    #: sospetto sulle uscite, la modifica che non sappiamo scrivere). Vuota
+    #: quando chi costruisce la modifica non la separa: si cita `rationale`.
+    lever: str = ""
 
     @property
     def param(self) -> str:
         return self.changes[0].param if self.changes else ""
 
+    @property
+    def named(self) -> str:
+        """La modifica come si cita dentro un'altra frase, senza il punto finale."""
+        return (self.lever or self.rationale).rstrip(". ")
+
     def reversed(self) -> "ProposedChange":
-        """The change that undoes this one (used to revert a rejected remedy)."""
+        """The change that undoes this one (used to revert a rejected remedy).
+
+        La frase nomina fra virgolette la modifica provata invece di ripeterla:
+        ripetuta, «Ammorbidisci la barra» sotto un ripristino direbbe al pilota
+        il contrario di quello che fanno i click preparati."""
         lang = current_language()
-        prefix = _REVERT_PREFIX.get(lang) or _REVERT_PREFIX["en"]
+        undo = _REVERT_TEXT.get(lang) or _REVERT_TEXT["en"]
         return ProposedChange(
             changes=tuple(AtomicChange(c.param, c.slot, -c.delta_clicks, c.units)
                           for c in self.changes),
-            rationale=prefix + self.rationale,
-            phase_label=self.phase_label, tag=self.tag, symptom=self.symptom)
+            rationale=undo.format(what=self.named),
+            phase_label=self.phase_label, tag=self.tag, symptom=self.symptom,
+            lever=self.lever)
 
     def as_setup_payload(self) -> list[dict]:
         """Shape accepted by ``/api/setup/preview|apply``.
@@ -333,181 +350,197 @@ _FUEL_BIAS_L = 2.0
 
 # Decision messages, per language; resolved with the active app language at the
 # moment a Decision is built (the engine runs in the engine = config.language).
-# The Symptom string ({sym}) is a technical identifier and stays as-is; the phase
-# label is translated via the profiles' EN→IT map (see profiles/_common.tr).
+# Il sintomo ({sym}) arriva gia' in parole (`_symptom_words`) e i numeri gia'
+# scritti per la lingua (`textfmt.fmt_num`): nessun modello qui sotto ha una
+# specifica di formato, perche' `{a:.2f}` stampa «0.63» anche su una pagina
+# italiana. La fase arriva tradotta (profiles/_common.tr).
 _DECISION_MSG = {
     "collect": {
-        "en": "Need {n} clean laps for a baseline (have {have}).",
-        "it": "Servono {n} giri puliti per una base (ne ho {have}).",
+        "en": "I need {n} clean laps for a baseline, and I have {have} so far.",
+        "it": "Servono {n} giri puliti per avere una base, per ora ne ho {have}.",
     },
     "done": {
-        "en": "Setup is solid: no further gains. Good baseline.",
-        "it": "Setup a posto: nessun guadagno residuo. Buona base.",
+        "en": "The setup is sorted, I can't find anything else to gain. It's a "
+              "good baseline.",
+        "it": "Il setup è a posto, non trovo altro da guadagnare. È una buona "
+              "base.",
     },
     "phase_done": {
-        "en": "Phase '{label}' complete{tail}.",
-        "it": "Fase '{label}' completata{tail}.",
+        "en": "The “{label}” phase is done.{tail}",
+        "it": "La fase «{label}» è completata.{tail}",
     },
     "phase_tail_next": {
-        "en": " → moving to: {nxt}",
-        "it": " → passo a: {nxt}",
+        "en": " Moving on to “{nxt}”.",
+        "it": " Passo a «{nxt}».",
     },
     "phase_tail_complete": {
-        "en": " → setup complete",
-        "it": " → setup completo",
+        "en": " The setup is complete.",
+        "it": " Il setup è completo.",
     },
     "phase_nothing": {
-        "en": "Phase '{label}': nothing to correct.",
-        "it": "Fase '{label}': nulla da correggere.",
+        "en": "I found nothing to correct in the “{label}” phase.",
+        "it": "Nella fase «{label}» non ho trovato nulla da correggere.",
     },
     "remedies_exhausted": {
-        "en": "'{sym}': setup remedies exhausted — likely a driving issue.",
-        "it": "'{sym}': rimedi di setup esauriti — probabile questione di guida.",
+        "en": "I've run out of setup remedies for the {sym}. It's probably a "
+              "driving issue.",
+        "it": "Per il {sym} ho finito i rimedi di setup. Probabilmente è una "
+              "questione di guida.",
     },
     "evaluating": {
-        "en": "Evaluating the change: {need} more clean laps.",
-        "it": "Valuto la modifica: {need} giri puliti ancora.",
+        "en": "I'm judging the change. {laps}",
+        "it": "Sto valutando la modifica. {laps}",
+    },
+    # Quanti giri mancano, con la frase intera: «serve 1 giro», «servono 2 giri».
+    "laps_one": {
+        "en": "I need 1 more clean lap.",
+        "it": "Serve ancora 1 giro pulito.",
+    },
+    "laps_many": {
+        "en": "I need {n} more clean laps.",
+        "it": "Servono ancora {n} giri puliti.",
     },
     # Perche' l'ultimo giro non e' entrato nel conto. Senza questa coda un
     # contatore fermo e un motore rotto si leggono allo stesso modo — e in
     # macchina la domanda che nasce e' «sta funzionando?», non «cosa sbaglio?».
     "skip_cut_where": {
-        "en": " That last lap didn't count: off track at {where}.",
-        "it": " L'ultimo giro non conta: fuori pista a {where}.",
+        "en": " That last lap didn't count because you went off at {where}.",
+        "it": " L'ultimo giro non conta perché sei uscito di pista in {where}.",
     },
     "skip_cut": {
-        "en": " That last lap didn't count: off track.",
-        "it": " L'ultimo giro non conta: fuori pista.",
+        "en": " That last lap didn't count because you went off track.",
+        "it": " L'ultimo giro non conta perché sei uscito di pista.",
     },
     "skip_invalid": {
-        "en": " That last lap didn't count: the game never completed it.",
-        "it": " L'ultimo giro non conta: il gioco non l'ha completato.",
+        "en": " That last lap didn't count because the game never completed it.",
+        "it": " L'ultimo giro non conta perché il gioco non l'ha completato.",
     },
     # Una modifica scritta sulla macchina e mai giudicata, perche' la sessione e'
     # finita in mezzo. Detta una volta sola, all'inizio della sessione dopo.
     "unjudged": {
-        "en": "Left unjudged from last time: {why}. It's on the car, so it's the "
-              "new starting point — I'm measuring from here.",
-        "it": "Rimasta in sospeso dall'altra volta: {why}. E' sulla macchina, "
-              "quindi diventa il nuovo punto di partenza: misuro da qui.",
+        "en": "Last time's change, “{why}”, was left without a verdict. It's on "
+              "the car, so it's the new starting point and I'm measuring from here.",
+        "it": "La modifica dell'altra volta, «{why}», è rimasta senza verdetto. È "
+              "sulla macchina, quindi è il nuovo punto di partenza e misuro da qui.",
     },
     # Le uscite che si ripetono con lo stesso schema: un sospetto sull'assetto,
     # detto in coda al contatore. Mai una modifica scritta — vedi `_off_tail`.
     "off_pattern": {
-        "en": " But {k} of {n} offs share one pattern — {what} — in {c} "
-              "different corners{where}: that could be the setup, not the "
-              "driving. The first lever I'd try for it: {lever}. I'm not "
-              "writing it: an off lap can't judge a setup change, so I can only "
-              "measure it on clean laps.",
-        "it": " Però {k} uscite su {n} hanno lo stesso schema — {what} — in {c} "
-              "curve diverse{where}: potrebbe essere l'assetto, non la guida. "
-              "La prima leva che proverei: {lever}. Non la scrivo: un giro fuori "
-              "pista non può giudicare una modifica, la misuro solo sui giri "
-              "puliti.",
+        "en": " But {k} of {n} offs share one pattern, {what}, in {c} different "
+              "corners{where}. That could be the setup, not your driving.",
+        "it": " Però {k} uscite su {n} hanno lo stesso schema, {what}, in {c} "
+              "curve diverse{where}. Può essere l'assetto e non la guida.",
     },
-    "off_pattern_nolever": {
-        "en": " But {k} of {n} offs share one pattern — {what} — in {c} "
-              "different corners{where}: that could be the setup, not the "
-              "driving.",
-        "it": " Però {k} uscite su {n} hanno lo stesso schema — {what} — in {c} "
-              "curve diverse{where}: potrebbe essere l'assetto, non la guida.",
+    # …e la leva che il motore proverebbe, quando ne ha ancora una.
+    "off_lever": {
+        "en": " The first thing I'd try is “{lever}”. I'm not writing it, because "
+              "an off lap can't judge a setup change. I can only measure it on "
+              "clean laps.",
+        "it": " Per prima cosa proverei «{lever}». Non lo scrivo, perché un giro "
+              "fuori pista non può giudicare una modifica. Lo misuro solo sui "
+              "giri puliti.",
     },
     "skip_cold": {
-        "en": " That last lap didn't count: tyres still cold.",
-        "it": " L'ultimo giro non conta: gomme ancora fredde.",
+        "en": " That last lap didn't count because the tyres were still cold.",
+        "it": " L'ultimo giro non conta perché le gomme erano ancora fredde.",
     },
     "accepted_structural": {
-        "en": "Change applied, moving on.",
-        "it": "Modifica applicata, proseguo.",
+        "en": "I'm keeping the change and moving on.",
+        "it": "Tengo la modifica e vado avanti.",
     },
     "revert_structural": {
-        "en": "The change worsened the lap time: reverting.",
-        "it": "La modifica ha peggiorato il tempo: ripristino.",
+        "en": "The change made the lap time worse, so it comes off.",
+        "it": "La modifica ha peggiorato il tempo sul giro, quindi va tolta.",
     },
     "accepted_resolved": {
-        "en": "Handling: '{sym}' resolved ({a:.2f}→{b:.2f}).",
-        "it": "Tenuta: '{sym}' risolto ({a:.2f}→{b:.2f}).",
+        "en": "The {sym} is fixed. It was {a}, now it's {b}.",
+        "it": "Il {sym} è risolto. Era {a}, ora è {b}.",
     },
     "accepted_improving": {
-        "en": "Handling: '{sym}' improving, continuing ({a:.2f}→{b:.2f}).",
-        "it": "Tenuta: '{sym}' migliora, continuo ({a:.2f}→{b:.2f}).",
+        "en": "The {sym} is improving, from {a} to {b}. I'm keeping the change "
+              "and carrying on.",
+        "it": "Il {sym} migliora, da {a} a {b}. Tengo la modifica e continuo.",
     },
     "revert_reason": {
-        "en": "{reason}: reverting and trying another lever for '{sym}'.",
-        "it": "{reason}: ripristino e provo un'altra leva per '{sym}'.",
+        "en": "{reason}. It comes off, then I'll try another lever for the {sym}.",
+        "it": "{reason}. Va tolta, poi provo un'altra leva per il {sym}.",
     },
     "reason_worse": {
-        "en": "Change made it worse",
-        "it": "Modifica peggiorativa",
+        "en": "The change made things worse",
+        "it": "La modifica ha peggiorato le cose",
     },
     "predict": {
-        "en": "How you'll know: '{sym}' has to come down from {a:.2f} to under "
-              "{b:.2f} over {n} clean laps, without the lap time getting worse "
-              "by more than {ms:.0f} ms. If it doesn't, I put it back.",
-        "it": "Come lo capiremo: «{sym}» deve scendere da {a:.2f} sotto {b:.2f} "
-              "in {n} giri puliti, senza che il tempo peggiori di più di "
-              "{ms:.0f} ms. Se non succede, la rimetto com'era.",
+        "en": "To keep this change, the {sym} has to drop from {a} to under {b} "
+              "over {n} clean laps. The lap time must not get worse by more than "
+              "{ms} ms. If not, it comes off.",
+        "it": "Per tenere la modifica, in {n} giri puliti il {sym} deve scendere "
+              "da {a} a meno di {b}. Il tempo sul giro non deve peggiorare più di "
+              "{ms} ms. Se non succede, va tolta.",
     },
     "predict_structural": {
-        "en": "How you'll know: over {n} clean laps the lap time must not get "
-              "worse by more than {ms:.0f} ms. If it does, I put it back.",
-        "it": "Come lo capiremo: in {n} giri puliti il tempo non deve peggiorare "
-              "di più di {ms:.0f} ms. Se peggiora, la rimetto com'era.",
+        "en": "To keep this change, the lap time must not get worse by more than "
+              "{ms} ms over {n} clean laps. If it does, it comes off.",
+        "it": "Per tenere la modifica, in {n} giri puliti il tempo non deve "
+              "peggiorare più di {ms} ms. Se peggiora, va tolta.",
     },
     "wet_stand_down": {
-        "en": "Wet tyres are on. I'm not going to work the setup in the rain: "
-              "every remedy I have was derived dry, and in the wet several of "
-              "them point the other way. Pressures aside, what I'd tell you "
-              "would be a guess wearing a number.",
-        "it": "Hai le gomme da bagnato. Sul bagnato il setup non lo tocco: ogni "
+        "en": "You're on wet tyres, and I don't touch the setup in the wet. Every "
+              "remedy I have was worked out in the dry, and in the rain several "
+              "of them point the other way. Pressures aside, what I'd tell you "
+              "would be a guess, not a measurement.",
+        "it": "Hai le gomme da bagnato, e sul bagnato il setup non lo tocco. Ogni "
               "rimedio che ho è stato ricavato sull'asciutto, e con la pioggia "
-              "più d'uno punta dalla parte opposta. Tolte le pressioni, quello "
-              "che ti direi sarebbe un'ipotesi travestita da numero.",
+              "più d'uno punta dalla parte opposta. Pressioni a parte, quello che "
+              "ti direi sarebbe un'ipotesi, non una misura.",
     },
     "conditions_changed": {
-        "en": "Conditions changed mid-test (dry ↔ wet): I'm dropping this "
-              "verdict rather than reading it. Those laps aren't comparable.",
-        "it": "Le condizioni sono cambiate durante la prova (asciutto ↔ "
-              "bagnato): butto via questo verdetto invece di leggerlo. Quei "
-              "giri non sono confrontabili.",
+        "en": "Conditions changed during the test, from dry to wet or the other "
+              "way round. I'm dropping this verdict instead of reading it, "
+              "because those laps can't be compared.",
+        "it": "Le condizioni sono cambiate durante la prova, da asciutto a "
+              "bagnato o viceversa. Butto via questo verdetto invece di leggerlo, "
+              "perché quei giri non sono confrontabili.",
     },
     "accepted_unjudged": {
-        "en": "Change applied. I could not judge it on lap time — the tank was "
-              "not the same weight before and after — so the phase target "
-              "decides. Moving on.",
-        "it": "Modifica applicata. Sul tempo non ho potuto giudicarla — prima e "
-              "dopo il serbatoio non pesava uguale — quindi decide l'obiettivo "
-              "della fase. Proseguo.",
+        "en": "I'm keeping the change, but I couldn't judge it on lap time. The "
+              "tank wasn't the same weight before and after, so the phase target "
+              "decides and I'm moving on.",
+        "it": "Tengo la modifica, ma sul tempo non ho potuto giudicarla. Prima e "
+              "dopo il serbatoio non pesava uguale, quindi decide l'obiettivo "
+              "della fase e vado avanti.",
     },
     "fuel_confounded": {
-        "en": " I left the lap time out of this: {a:.0f} L in the tank before, "
-              "{b:.0f} L after, so the two are not the same car.",
-        "it": " Il tempo sul giro l'ho lasciato fuori: {a:.0f} L nel serbatoio "
-              "prima, {b:.0f} L dopo — non è la stessa macchina.",
+        "en": " I left the lap time out of this, because the tank had {a} L "
+              "before and {b} L after. That's not the same car.",
+        "it": " Il tempo sul giro l'ho lasciato fuori, perché nel serbatoio "
+              "c'erano {a} L prima e {b} L dopo. Non è la stessa macchina.",
     },
     "side_effect": {
-        "en": " Also moved, and nobody was aiming at it: {items}.",
-        "it": " Si è mosso anche questo, e non lo stavamo cercando: {items}.",
+        "en": " We weren't aiming at it, but the {items} moved too.",
+        "it": " Non lo cercavamo, ma si è mosso anche il {items}.",
     },
+    "side_effect_and": {"en": " and the ", "it": " e il "},
     # Sa cosa proverebbe e non sa quanto vale un click di quella leva su
     # quest'auto. Lo dice, col nome della leva, e non lo scrive.
     "no_step": {
-        "en": "'{sym}': I'd try this — {what} — but I'm not writing it: {why}. "
-              "If you make that change by hand I can't follow it.",
-        "it": "«{sym}»: proverei questo — {what} — ma non lo scrivo: {why}. "
-              "Se lo fai tu a mano, io non riesco a seguirlo.",
+        "en": "For the {sym} I'd try “{what}”. I'm not writing it, because {why}. "
+              "If you make that change by hand, I can't follow it.",
+        "it": "Per il {sym} proverei «{what}». Non lo scrivo, perché {why}. Se "
+              "lo fai tu a mano, io non riesco a seguirlo.",
     },
     "no_step_plain": {
-        "en": "I'd try this — {what} — but I'm not writing it: {why}.",
-        "it": "Proverei questo — {what} — ma non lo scrivo: {why}.",
+        "en": "I'd try this change, but I'm not writing it, because {why}. {what}",
+        "it": "Proverei questa modifica, ma non la scrivo, perché {why}. {what}",
     },
     "reason_noeffect": {
-        "en": "No measurable effect",
-        "it": "Nessun effetto misurabile",
+        "en": "The change had no measurable effect",
+        "it": "La modifica non ha avuto un effetto misurabile",
     },
 }
 
-_REVERT_PREFIX = {"en": "Revert: ", "it": "Ripristino: "}
+# Il ripristino nomina la modifica provata fra virgolette (`ProposedChange.named`).
+_REVERT_TEXT = {"en": "Undo the change you tried, “{what}”.",
+                "it": "Annulla la modifica che hai provato, «{what}»."}
 
 # Un sintomo detto come lo direbbe un ingegnere al pilota, non come la stringa
 # tecnica «oversteer exit low» che resta nei messaggi del ciclo di prova.
@@ -560,10 +593,34 @@ def _sym_from_key(key: str) -> Symptom | None:
         return None
 
 
+def symptom_words(sym: "Symptom | str", lang: str | None = None) -> str:
+    """Un sintomo in parole, per una pagina: l'oggetto o la sua chiave di registro
+    («oversteer exit low»). Una chiave che non si riconosce torna com'e'."""
+    lang = lang or current_language()
+    found = sym if isinstance(sym, Symptom) else _sym_from_key(sym)
+    return _symptom_words(found, lang) if found is not None else str(sym)
+
+
 def _msg(key: str, lang: str | None = None, **kw) -> str:
     lang = lang or current_language()
     entry = _DECISION_MSG[key]
     return (entry.get(lang) or entry["en"]).format(**kw)
+
+
+def _score(v: float, lang: str) -> str:
+    """Un punteggio di sintomo (0..1) come lo legge il pilota: «0,63»."""
+    return fmt_num(v, 2, lang)
+
+
+def _signed(v: float, lang: str) -> str:
+    """Una variazione col suo segno: «+0,36», «−0,12»."""
+    text = fmt_num(v, 2, lang)
+    return text if text.startswith("−") or text == fmt_num(0, 2, lang) else "+" + text
+
+
+def _laps_left(n: int, lang: str) -> str:
+    """«Serve ancora 1 giro pulito.» / «Servono ancora 2 giri puliti.»"""
+    return _msg("laps_one", lang) if n == 1 else _msg("laps_many", lang, n=n)
 
 
 def _skip_tail(stats: "LapStats | None", lang: str | None = None) -> str:
@@ -594,7 +651,8 @@ def _fuel_tail(outcome: "Outcome", lang: str) -> str:
     if not outcome.time_confounded:
         return ""
     return _msg("fuel_confounded", lang,
-                a=outcome.fuel_before_l, b=outcome.fuel_after_l)
+                a=fmt_num(outcome.fuel_before_l, 0, lang),
+                b=fmt_num(outcome.fuel_after_l, 0, lang))
 
 
 def _side_effect_tail(outcome: "Outcome", lang: str) -> str:
@@ -607,7 +665,10 @@ def _side_effect_tail(outcome: "Outcome", lang: str) -> str:
     """
     if not outcome.side_effects:
         return ""
-    items = ", ".join(f"{sym} {delta:+.2f}" for sym, delta in outcome.side_effects)
+    parts = [f"{_symptom_words(sym, lang)} ({_signed(delta, lang)})"
+             for sym, delta in outcome.side_effects]
+    items = _msg("side_effect_and", lang).join(
+        [", ".join(parts[:-1]), parts[-1]] if len(parts) > 1 else parts)
     return _msg("side_effect", lang, items=items)
 
 
@@ -732,7 +793,8 @@ class RaceEngineer:
             # trattino dentro.
             "applied_clicks": [[p, slot, n]
                                for (p, slot), n in self.applied_clicks.items()],
-            "unjudged": pending.rationale if pending is not None else "",
+            # La modifica per nome, che e' come la cita il messaggio di domani.
+            "unjudged": pending.named if pending is not None else "",
         }
 
     def restore(self, state: dict | None) -> None:
@@ -918,14 +980,16 @@ class RaceEngineer:
         if sym is None:
             return Prediction(
                 symptom=None, score_now=0.0, score_below=0.0, time_band_ms=band,
-                text=_msg("predict_structural", lang, n=self.min_stable, ms=band))
+                text=_msg("predict_structural", lang, n=self.min_stable,
+                          ms=fmt_num(band, 0, lang)))
         now = _median_score(self.window, sym)
         bar = round(now - _EPS_SCORE, 3)
         return Prediction(
             symptom=sym, score_now=round(now, 3), score_below=bar,
             time_band_ms=band,
-            text=_msg("predict", lang, sym=str(sym), a=now, b=bar,
-                      n=self.min_stable, ms=band))
+            text=_msg("predict", lang, sym=_symptom_words(sym, lang),
+                      a=_score(now, lang), b=_score(bar, lang),
+                      n=self.min_stable, ms=fmt_num(band, 0, lang)))
 
     def _sized(self, change: ProposedChange) -> ProposedChange | None:
         """La stessa modifica col passo di quest'auto, o None se non si sa.
@@ -943,7 +1007,7 @@ class RaceEngineer:
                 return None
             atoms.append(AtomicChange(c.param, c.slot, c.delta_clicks, units))
         return ProposedChange(tuple(atoms), change.rationale, change.phase_label,
-                              change.tag, change.symptom)
+                              change.tag, change.symptom, change.lever)
 
     def _cannot_write(self, change: ProposedChange) -> Decision:
         """Dire cosa si proverebbe, e perche' non lo si scrive."""
@@ -954,8 +1018,9 @@ class RaceEngineer:
                             _msg("no_step_plain", lang, what=change.rationale,
                                  why=why))
         return Decision(DecisionKind.STAND_DOWN,
-                        _msg("no_step", lang, sym=str(change.symptom),
-                             what=change.rationale, why=why))
+                        _msg("no_step", lang,
+                             sym=_symptom_words(change.symptom, lang),
+                             what=change.named, why=why))
 
     def _propose(self, change: ProposedChange, confidence: str) -> Decision:
         """Hold a change as pending and hand it over with its acceptance bar."""
@@ -1131,7 +1196,8 @@ class RaceEngineer:
             # never checked. Kept so the ledger can count how often we make it.
             self.exhausted_calls.append(symptom)
             return Decision(DecisionKind.PHASE_DONE,
-                            _msg("remedies_exhausted", lang, sym=str(symptom)))
+                            _msg("remedies_exhausted", lang,
+                                 sym=_symptom_words(symptom, lang)))
         return self._propose(change, self._confidence(symptom))
 
     def _evaluate_active(self) -> Decision:
@@ -1140,7 +1206,7 @@ class RaceEngineer:
         if a.laps_seen < self.min_stable:
             need = self.min_stable - a.laps_seen
             return Decision(DecisionKind.EVALUATING,
-                            _msg("evaluating", lang, need=need)
+                            _msg("evaluating", lang, laps=_laps_left(need, lang))
                             + _skip_tail(self._skipped, lang))
 
         new_time = _median_time(self.window)
@@ -1185,7 +1251,8 @@ class RaceEngineer:
             self._record(a.change)
             key = ("accepted_resolved" if new_score < _SYMPTOM_THRESH
                    else "accepted_improving")
-            msg = _msg(key, lang, sym=str(a.symptom), a=a.base_score, b=new_score)
+            msg = _msg(key, lang, sym=_symptom_words(a.symptom, lang),
+                       a=_score(a.base_score, lang), b=_score(new_score, lang))
             return Decision(DecisionKind.ACCEPTED,
                             msg + _fuel_tail(out, lang) + _side_effect_tail(out, lang),
                             outcome=out)
@@ -1199,7 +1266,7 @@ class RaceEngineer:
                   else _msg("reason_noeffect", lang))
         return self._revert(a.change,
                             _msg("revert_reason", lang, reason=reason,
-                                 sym=str(a.symptom)), out)
+                                 sym=_symptom_words(a.symptom, lang)), out)
 
     # -- symptom selection with safety gates -------------------------------
     def _corners(self, sym: Symptom) -> int:
@@ -1286,7 +1353,7 @@ class RaceEngineer:
         phase = next((p for p in self.phases if p.owns(sym)), None)
         if phase is None or idx >= min(len(remedies), _REMEDY_CAP):
             return ""
-        return remedies[idx](sym, phase).rationale
+        return remedies[idx](sym, phase).named
 
     def _off_tail(self) -> str:
         """Il sospetto sull'assetto, in coda al contatore, o "".
@@ -1320,9 +1387,8 @@ class RaceEngineer:
         kw = dict(k=len(laps), n=len(self._offs), what=_symptom_words(sym, lang),
                   c=len({s.off_corner for s in laps}), where=where)
         lever = self._first_lever(sym)
-        if lever:
-            return _msg("off_pattern", lang, lever=lever, **kw)
-        return _msg("off_pattern_nolever", lang, **kw)
+        tail = _msg("off_lever", lang, lever=lever) if lever else ""
+        return _msg("off_pattern", lang, **kw) + tail
 
     def _remedy_for(self, symptom: Symptom, phase: WorkPhase) -> ProposedChange | None:
         self._blocked = None

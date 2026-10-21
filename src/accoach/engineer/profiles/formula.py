@@ -35,59 +35,59 @@ REMEDY_TABLE: dict[Symptom, list] = {
     Symptom(U, EN, LO): [
         # On a formula with no ABS, moving the bias rearward to rotate on entry is
         # the most lock-prone lever — try front bar/geometry first, bias last.
-        remedy("aRBFront", None, -1, "Understeer on entry: softer front anti-roll bar (−1)"),
-        remedy("toe", "front", +1, "Understeer on entry: more front toe-out (+1)"),
-        remedy("brakeBias", None, -1, "Understeer on entry: brake bias slightly rearward (−1)", "AV"),
+        remedy("aRBFront", None, -1, "The car understeers on entry, so soften the front anti-roll bar by 1 click."),
+        remedy("toe", "front", +1, "The car understeers on entry, so add 1 click of front toe-out."),
+        remedy("brakeBias", None, -1, "The car understeers on entry, so move the brake bias 1 click rearward.", "AV"),
     ],
     Symptom(U, EN, HI): [
-        remedy("frontWing", None, +1, "Understeer on fast entry: more front wing (+1)"),
-        remedy("rideHeight", "rear", +2, "Understeer on fast entry: more rake, raise the rear (+2)"),
-        remedy("rearWing", None, -1, "Understeer on fast entry: less rear wing (−1)"),
+        remedy("frontWing", None, +1, "The car understeers on entry to fast corners, so add 1 click of front wing."),
+        remedy("rideHeight", "rear", +2, "The car understeers on entry to fast corners, so raise the rear by 2 clicks for more rake."),
+        remedy("rearWing", None, -1, "The car understeers on entry to fast corners, so take 1 click of rear wing off."),
     ],
     Symptom(U, AP, LO): [
-        remedy("preload", None, -1, "Understeer at slow apex: less differential preload (−1)"),
-        remedy("aRBFront", None, -1, "Understeer at apex: softer front anti-roll bar (−1)"),
+        remedy("preload", None, -1, "The car understeers mid-corner in slow corners, so take 1 click of differential preload off."),
+        remedy("aRBFront", None, -1, "The car understeers mid-corner, so soften the front anti-roll bar by 1 click."),
     ],
     Symptom(U, AP, HI): [
-        remedy("frontWing", None, +1, "Understeer at fast apex: more front wing (+1)"),
-        remedy("rearWing", None, -1, "Understeer at fast apex: less rear wing (−1)"),
-        remedy("rideHeight", "rear", +1, "Understeer at fast apex: more rake (+1)"),
+        remedy("frontWing", None, +1, "The car understeers mid-corner in fast corners, so add 1 click of front wing."),
+        remedy("rearWing", None, -1, "The car understeers mid-corner in fast corners, so take 1 click of rear wing off."),
+        remedy("rideHeight", "rear", +1, "The car understeers mid-corner in fast corners, so raise the rear by 1 click for more rake."),
     ],
     Symptom(U, EX, LO): [
-        remedy("diffPower", None, -1, "Understeer on exit (power): less locked differential (−1)"),
-        remedy("aRBRear", None, -1, "Understeer on exit: softer rear anti-roll bar (−1)"),
+        remedy("diffPower", None, -1, "The car understeers on exit under power, so take 1 click of power locking off the differential."),
+        remedy("aRBRear", None, -1, "The car understeers on exit, so soften the rear anti-roll bar by 1 click."),
     ],
     Symptom(U, EX, HI): [
-        remedy("rearWing", None, -1, "Understeer on fast exit: less rear wing (−1)"),
-        remedy("frontWing", None, +1, "Understeer on fast exit: more front wing (+1)"),
+        remedy("rearWing", None, -1, "The car understeers on exit from fast corners, so take 1 click of rear wing off."),
+        remedy("frontWing", None, +1, "The car understeers on exit from fast corners, so add 1 click of front wing."),
     ],
     # ---- Oversteer ----
     Symptom(O, EN, LO): [
-        remedy("brakeBias", None, +1, "Oversteer on entry: brake bias more forward (+1)", "AV"),
-        remedy("diffCoast", None, +1, "Lift-off oversteer: more locked differential on coast (+1)"),
-        remedy("aRBRear", None, -1, "Oversteer on entry: softer rear anti-roll bar (−1)"),
+        remedy("brakeBias", None, +1, "The car oversteers on entry, so move the brake bias 1 click forward.", "AV"),
+        remedy("diffCoast", None, +1, "The car oversteers when you lift off, so add 1 click of coast locking to the differential."),
+        remedy("aRBRear", None, -1, "The car oversteers on entry, so soften the rear anti-roll bar by 1 click."),
     ],
     Symptom(O, EN, HI): [
-        remedy("rearWing", None, +1, "Oversteer on fast entry: more rear wing (+1)"),
-        remedy("rideHeight", "rear", -2, "Oversteer on fast entry: lower the rear (−2)"),
-        remedy("aRBRear", None, -1, "Oversteer on fast entry: softer rear anti-roll bar (−1)"),
+        remedy("rearWing", None, +1, "The car oversteers on entry to fast corners, so add 1 click of rear wing."),
+        remedy("rideHeight", "rear", -2, "The car oversteers on entry to fast corners, so lower the rear by 2 clicks."),
+        remedy("aRBRear", None, -1, "The car oversteers on entry to fast corners, so soften the rear anti-roll bar by 1 click."),
     ],
     Symptom(O, AP, LO): [
-        remedy("aRBRear", None, -1, "Oversteer at slow apex: softer rear anti-roll bar (−1)"),
-        remedy("preload", None, +1, "Oversteer at apex: more differential preload (+1)"),
+        remedy("aRBRear", None, -1, "The car oversteers mid-corner in slow corners, so soften the rear anti-roll bar by 1 click."),
+        remedy("preload", None, +1, "The car oversteers mid-corner, so add 1 click of differential preload."),
     ],
     Symptom(O, AP, HI): [
-        remedy("rearWing", None, +1, "Oversteer at fast apex: more rear wing (+1)"),
-        remedy("aRBRear", None, -1, "Oversteer at fast apex: softer rear anti-roll bar (−1)"),
+        remedy("rearWing", None, +1, "The car oversteers mid-corner in fast corners, so add 1 click of rear wing."),
+        remedy("aRBRear", None, -1, "The car oversteers mid-corner in fast corners, so soften the rear anti-roll bar by 1 click."),
     ],
     Symptom(O, EX, LO): [
-        remedy("diffPower", None, -1, "Oversteer on exit (traction, no TC): softer differential on power (−1)"),
-        remedy("wheelRate", "rear", -1, "Oversteer on exit: softer rear springs (−1)"),
-        remedy("aRBRear", None, -1, "Oversteer on exit: softer rear anti-roll bar (−1)"),
+        remedy("diffPower", None, -1, "With no TC, the car oversteers on exit under power, so take 1 click of power locking off the differential."),
+        remedy("wheelRate", "rear", -1, "The car oversteers on exit, so soften the rear springs by 1 click."),
+        remedy("aRBRear", None, -1, "The car oversteers on exit, so soften the rear anti-roll bar by 1 click."),
     ],
     Symptom(O, EX, HI): [
-        remedy("rearWing", None, +1, "Oversteer on fast exit: more rear wing (+1)"),
-        remedy("diffPower", None, -1, "Oversteer on fast exit: softer differential on power (−1)"),
+        remedy("rearWing", None, +1, "The car oversteers on exit from fast corners, so add 1 click of rear wing."),
+        remedy("diffPower", None, -1, "The car oversteers on exit from fast corners, so take 1 click of power locking off the differential."),
     ],
 }
 

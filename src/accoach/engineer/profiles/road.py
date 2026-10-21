@@ -32,33 +32,33 @@ from ._common import (
 # Keyed by (balance, phase) — speed doesn't change the lever on a road car.
 _BASE: dict[tuple, list] = {
     (U, EN): [
-        remedy("tyrePressure", "front", -2, "Understeer on entry: less front pressure (−2)"),
-        remedy("aRBFront", None, -1, "Understeer on entry: softer front anti-roll bar (−1)"),
-        remedy("toe", "front", +1, "Understeer on entry: more front toe-out (+1)"),
+        remedy("tyrePressure", "front", -2, "The car understeers on entry, so take 2 clicks of front tyre pressure off."),
+        remedy("aRBFront", None, -1, "The car understeers on entry, so soften the front anti-roll bar by 1 click."),
+        remedy("toe", "front", +1, "The car understeers on entry, so add 1 click of front toe-out."),
     ],
     (U, AP): [
-        remedy("aRBFront", None, -1, "Understeer at apex: softer front anti-roll bar (−1)"),
-        remedy("camber", "front", -1, "Understeer at apex: more front negative camber (−1)"),
-        remedy("wheelRate", "front", -1, "Understeer at apex: softer front springs (−1)"),
+        remedy("aRBFront", None, -1, "The car understeers mid-corner, so soften the front anti-roll bar by 1 click."),
+        remedy("camber", "front", -1, "The car understeers mid-corner, so add 1 click of negative front camber."),
+        remedy("wheelRate", "front", -1, "The car understeers mid-corner, so soften the front springs by 1 click."),
     ],
     (U, EX): [
-        remedy("diffPower", None, -1, "Understeer on exit: less locked differential on power (−1)"),
-        remedy("aRBRear", None, -1, "Understeer on exit: softer rear anti-roll bar (−1)"),
+        remedy("diffPower", None, -1, "The car understeers on exit under power, so take 1 click of power locking off the differential."),
+        remedy("aRBRear", None, -1, "The car understeers on exit, so soften the rear anti-roll bar by 1 click."),
     ],
     (O, EN): [   # the lift-off / release oversteer signature
-        remedy("toe", "rear", +1, "Lift-off oversteer: more rear toe-in (+1)"),
-        remedy("reboundSlow", "rear", -1, "Lift-off oversteer: softer rear rebound (−1)"),
-        remedy("aRBRear", None, -1, "Lift-off oversteer: softer rear anti-roll bar (−1)"),
-        remedy("brakeBias", None, +1, "Lift-off oversteer: brake bias more forward (+1)", "AV"),
+        remedy("toe", "rear", +1, "The car oversteers when you lift off, so add 1 click of rear toe-in."),
+        remedy("reboundSlow", "rear", -1, "The car oversteers when you lift off, so soften the rear rebound by 1 click."),
+        remedy("aRBRear", None, -1, "The car oversteers when you lift off, so soften the rear anti-roll bar by 1 click."),
+        remedy("brakeBias", None, +1, "The car oversteers when you lift off, so move the brake bias 1 click forward.", "AV"),
     ],
     (O, AP): [
-        remedy("aRBRear", None, -1, "Oversteer at apex: softer rear anti-roll bar (−1)"),
-        remedy("toe", "rear", +1, "Oversteer at apex: more rear toe-in (+1)"),
+        remedy("aRBRear", None, -1, "The car oversteers mid-corner, so soften the rear anti-roll bar by 1 click."),
+        remedy("toe", "rear", +1, "The car oversteers mid-corner, so add 1 click of rear toe-in."),
     ],
     (O, EX): [
-        remedy("diffPower", None, -1, "Oversteer on exit (traction): softer differential on power (−1)"),
-        remedy("wheelRate", "rear", -1, "Oversteer on exit: softer rear springs (−1)"),
-        remedy("aRBRear", None, -1, "Oversteer on exit: softer rear anti-roll bar (−1)"),
+        remedy("diffPower", None, -1, "The car oversteers on exit under power, so take 1 click of power locking off the differential."),
+        remedy("wheelRate", "rear", -1, "The car oversteers on exit, so soften the rear springs by 1 click."),
+        remedy("aRBRear", None, -1, "The car oversteers on exit, so soften the rear anti-roll bar by 1 click."),
     ],
 }
 

@@ -22,19 +22,19 @@ from ..setup.acc_format import SETUP_PARAMS
 
 _PRESSURE = "tyrePressure"
 
-# Perche' non scrivo, detto al pilota. Una frase che regge dopo «Non la scrivo
-# io:» e prima di un punto.
+# Perche' non scrivo, detto al pilota. Una frase che regge dopo «Non lo scrivo,
+# perché» e prima di un punto.
 _WHY = {
     "no_game_id": {
-        "en": "I wasn't told which game this is, so I don't know what a click "
+        "en": "nobody told me which game this is, so I don't know what a click "
               "is worth",
-        "it": "non mi e' stato detto che gioco e', quindi non so quanto vale "
-              "un click",
+        "it": "nessuno mi ha detto che gioco è, quindi non so quanto vale un "
+              "click",
     },
     ac_steps.NO_GAME: {
         "en": "I can't find Assetto Corsa's car folder, which is where a car "
               "says what a click is worth",
-        "it": "non trovo la cartella delle auto di Assetto Corsa, che e' dove "
+        "it": "non trovo la cartella delle auto di Assetto Corsa, che è dove "
               "un'auto dichiara quanto vale un click",
     },
     ac_steps.NO_CAR: {

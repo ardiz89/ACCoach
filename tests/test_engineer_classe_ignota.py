@@ -133,7 +133,7 @@ def test_il_messaggio_e_in_italiano_quando_l_app_lo_e(monkeypatch):
     eng = engineer_for("ks_toyota_ts040", "spa", is_acc=False)
     said = [d for d in _laps(eng, 4, 27.0, 27.0)
             if d.kind is DecisionKind.STAND_DOWN]
-    assert "non so" in said[0].message and "finestra" in said[0].message
+    assert "Non so" in said[0].message and "finestra" in said[0].message
 
 
 # --- e il coach, che usa la stessa classe per le sue soglie ----------------

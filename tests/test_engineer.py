@@ -274,9 +274,11 @@ def test_phase_done_label_is_italian(it_lang):
 def test_rationale_is_italian(it_lang):
     eng = _eng()
     d = _drive_to_aero(eng, Symptom(U, AP, HI), 0.6)   # rearWing −1
-    assert d.change.rationale == "Sottosterzo all'apex veloce: meno ala posteriore (−1)"
-    # the reverted change keeps the Italian restore prefix
-    assert d.change.reversed().rationale.startswith("Ripristino: ")
+    assert d.change.rationale == ("Hai sottosterzo a centro curva nelle curve veloci, "
+                                  "quindi togli 1 click di ala posteriore.")
+    # the reverted change names the change it undoes, in Italian
+    assert d.change.reversed().rationale == (
+        "Annulla la modifica che hai provato, «Togli 1 click di ala posteriore».")
 
 
 def test_exhausting_remedies_flags_driving_issue():
@@ -430,7 +432,7 @@ def test_a_change_applied_and_never_judged_is_declared_not_judged():
     fresh.restore(eng.state())
     assert fresh.active is None, "un test non giudicabile non resta aperto"
     msg = fresh.observe(_lap()).message
-    assert proposed.change.rationale in msg
+    assert proposed.change.named in msg and "without a verdict" in msg
 
 
 def test_the_unjudged_note_is_said_once_not_every_lap():
@@ -551,7 +553,7 @@ def test_la_leva_nominata_e_quella_a_cui_il_motore_e_arrivato():
     eng.remedy_idx[_OFF] = 1
     for c in (2, 5, 9):
         d = eng.observe(_off(corner=c))
-    assert "softer rear anti-roll bar" in d.message
+    assert "Soften the rear anti-roll bar" in d.message
     assert "traction control" not in d.message
 
 
@@ -561,7 +563,7 @@ def test_senza_leve_rimaste_il_sospetto_resta_detto_senza_inventarne_una():
     for c in (2, 5, 9):
         d = eng.observe(_off(corner=c))
     assert "could be the setup" in d.message
-    assert "lever" not in d.message
+    assert "I'd try" not in d.message
 
 
 def test_un_uscita_sola_resta_guida():
@@ -635,7 +637,7 @@ def test_le_uscite_non_entrano_nella_base_dei_tempi():
     for c in (2, 5, 9):
         d = eng.observe(_off(corner=c, time_ms=90000))
     assert "traction control" in d.message
-    assert "(have 0)" in d.message
+    assert "I have 0 so far" in d.message
     assert eng.window == []
 
 

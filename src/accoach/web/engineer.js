@@ -140,7 +140,7 @@ function showComboAsMissing(car, track) {
   dropMissingOption();
   const o = document.createElement("option");
   o.id = MISSING_ID;
-  o.textContent = `${car}  ·  ${track}  — ${t("eng.miss.optNone")}`;
+  o.textContent = `${car}  ·  ${track}  (${t("eng.miss.optNone")})`;
   sel.insertBefore(o, sel.firstChild);
   sel.value = o.value;
 }
@@ -202,7 +202,7 @@ function renderMissing(sources) {
 
   const h = document.createElement("div");
   h.className = "miss-title";
-  h.textContent = "⚠ " + t("eng.miss.title");
+  h.textContent = t("eng.miss.title");
   box.appendChild(h);
 
   // I nomi vengono dal gioco e dal disco: vanno messi come testo, non come
@@ -210,15 +210,21 @@ function renderMissing(sources) {
   // macchina giusta?", che è la domanda con cui questa pagina si apre.
   const who = document.createElement("div");
   who.className = "miss-who";
+  // «Stai guidando <auto · pista> (ultimo giro registrato)»: una frase sola,
+  // senza i due punti dopo l'etichetta, e la fonte in coda.
   const lbl = document.createElement("span");
   lbl.className = "muted";
-  const src = state.live && state.live.source === "archive"
-    ? ` (${t("eng.fromArchive")})` : "";
-  lbl.textContent = t("eng.miss.driving") + src + ": ";
+  lbl.textContent = t("eng.miss.driving") + " ";
   who.appendChild(lbl);
   const strong = document.createElement("b");
   strong.textContent = `${car} · ${track}`;
   who.appendChild(strong);
+  if (state.live && state.live.source === "archive") {
+    const from = document.createElement("span");
+    from.className = "muted";
+    from.textContent = ` (${t("eng.fromArchive")})`;
+    who.appendChild(from);
+  }
   box.appendChild(who);
 
   const why = document.createElement("p");
@@ -364,7 +370,7 @@ async function loadRecord() {
     head += tf("rec.rate", { rate: Math.round(r.hit_rate * 100) });
   }
   if (r.median_gain_ms != null) {
-    head += tf("rec.gain", { gain: fmtN(r.median_gain_ms / 1000, 3) });
+    head += tf("rec.gain", { gain: fmtN(r.median_gain_ms / 1000, 3, "s") });
   }
   $("rec-head").innerHTML = head;
   $("rec-note").textContent = r.tests < REC_MIN_TESTS ? t("rec.thin") : "";
@@ -383,7 +389,7 @@ async function loadRecord() {
       ([n, v]) => [tf("rec.rank", { n: Number(n) + 1 }),
                    tf("rec.kept_of", { kept: v.kept, tests: v.tests })])) +
     rows(t("rec.side"), (r.side_effects || []).map(
-      (s) => [`${s.param} → ${s.symptom}`, tf("rec.seen", { n: s.seen })]));
+      (s) => [`${s.param} → ${s.words || s.symptom}`, tf("rec.seen", { n: s.seen })]));
 }
 
 async function loadClass(car) {
@@ -506,7 +512,7 @@ function renderSlot(p, s, i) {
 
   const minus = document.createElement("button");
   minus.type = "button"; minus.tabIndex = -1;
-  minus.textContent = "−"; minus.title = "−1 click (hold to go faster)";
+  minus.textContent = "−"; minus.title = "−1 click. " + t("eng.stepHint");
   minus.setAttribute("aria-hidden", "true");
   wireHold(minus, p.key, i, -1);
 
@@ -517,7 +523,7 @@ function renderSlot(p, s, i) {
 
   const plus = document.createElement("button");
   plus.type = "button"; plus.tabIndex = -1;
-  plus.textContent = "+"; plus.title = "+1 click (hold to go faster)";
+  plus.textContent = "+"; plus.title = "+1 click. " + t("eng.stepHint");
   plus.setAttribute("aria-hidden", "true");
   wireHold(plus, p.key, i, +1);
 
@@ -742,8 +748,8 @@ async function openWriteModal() {
       }
       const line = document.createElement("div");
       const where = d.slot ? ` [${d.slot}]` : "";
-      line.textContent = `${d.label}${where}: ${d.old_click} → ${d.new_click} ` +
-        `(${d.delta > 0 ? "+" : ""}${d.delta} click)  ${d.old_phys} → ${d.new_phys}`;
+      line.textContent = `${d.label}${where} · ${d.old_click} → ${d.new_click} ` +
+        `(${d.delta > 0 ? "+" : ""}${d.delta} click) · ${d.old_phys} → ${d.new_phys}`;
       box.appendChild(line);
     }
   }
@@ -794,7 +800,7 @@ async function applyNow() {
       name = `${AUTO_PREFIX}_${parseInt(name.split("_").pop(), 10) + 1}`;
     }
   }
-  showToast(t("eng.writeErr") + name, true);
+  showToast(tf("eng.writeErrName", { name }), true);
 }
 
 // Quello che succede dopo una scrittura riuscita, per tutt'e due le vie. Vive
@@ -812,7 +818,7 @@ async function afterWrite(res) {
   // Il file appena scritto è quello che il messaggio ti dice di caricare, ed è
   // quello su cui deve poggiare la modifica dopo.
   await onComboChange(res.name);
-  showToast("✓ " + res.reload_hint);
+  showToast(res.reload_hint);
 }
 
 async function confirmWrite() {
@@ -1007,7 +1013,7 @@ function renderEngineer(st) {
     if (txt === k) txt = t("eng.do.default");   // t() falls back to the key if missing
     phaseEl.hidden = false;
     // label + txt are trusted constants (profile label via tr(), i18n string).
-    phaseEl.innerHTML = `<b>${t("eng.phaseNow")}: ${eng.phase.label || ""}</b> — ${txt}`;
+    phaseEl.innerHTML = `<b>${tf("eng.phaseNow", { label: eng.phase.label || "" })}</b> ${txt}`;
   } else {
     phaseEl.hidden = true;
   }
@@ -1026,7 +1032,9 @@ function renderEngineer(st) {
       ? t("eng.corners") + eng.corners.join(", ") : "";
     $("es-cat").textContent = cz;
     const confidence = eng.confidence || "medium";
-    conf.hidden = false; conf.textContent = confidence;
+    // La parola del motore («medium») resta nel dataset per il colore; a
+    // schermo va quella della pagina.
+    conf.hidden = false; conf.textContent = t("eng.conf." + confidence);
     conf.dataset.c = confidence;
     // Low confidence: warn the driver not to over-trust it (few laps / weak
     // signal) and flag the whole box, so a tentative call gets a second look
@@ -1100,7 +1108,7 @@ function renderOutcome(eng) {
   const bits = [
     `<span class="oc-verdict" data-kept="${o.kept}">` +
     `${o.kept ? t("eng.oc.kept") : t("eng.oc.reverted")}</span>`,
-    `<span class="oc-num">${t("eng.oc.laps")} ${o.laps}</span>`,
+    `<span class="oc-num">${tf("eng.oc.laps", { n: o.laps })}</span>`,
     `<span class="oc-num">${dt >= 0 ? "+" : ""}${fmtN(dt, 2, "s")}</span>`,
   ];
   if (o.score_before || o.score_after) {
@@ -1111,7 +1119,7 @@ function renderOutcome(eng) {
   if (Array.isArray(o.side_effects) && o.side_effects.length) {
     side = `<div class="oc-side">${t("eng.oc.side")} ` +
       o.side_effects.map((s) =>
-        `${s.symptom} ${s.delta >= 0 ? "+" : ""}${fmtN(s.delta, 2)}`).join(" · ") +
+        `${s.words || s.symptom} ${s.delta >= 0 ? "+" : ""}${fmtN(s.delta, 2)}`).join(" · ") +
       `</div>`;
   }
   el.innerHTML = bits.join("") + side;
@@ -1120,13 +1128,15 @@ function renderOutcome(eng) {
 
 // Render the Focus/Lesson block (st.focus) — the driving coach working one
 // weakness at a time. Twin of the engineer box, but about the driver, not the car.
+// Lo stato si legge dal colore del riquadro (`data-kind`), non da un'emoji:
+// le icone 🎯 ✅ ⏸ ✨ sono uscite col tono nuovo, resta solo l'attesa.
 const FOCUS_KIND = {
   assess:   { icon: "…", state: "idle" },
-  brief:    { icon: "🎯", state: "warn" },
-  drill:    { icon: "🎯", state: "warn" },
-  improved: { icon: "✅", state: "good" },
-  stuck:    { icon: "⏸", state: "idle" },
-  clean:    { icon: "✨", state: "good" },
+  brief:    { icon: "", state: "warn" },
+  drill:    { icon: "", state: "warn" },
+  improved: { icon: "", state: "good" },
+  stuck:    { icon: "", state: "idle" },
+  clean:    { icon: "", state: "good" },
 };
 
 function renderFocus(st) {
@@ -1176,7 +1186,7 @@ function renderPitReminder(st) {
   }
   if (state.lastWritten) {
     el.hidden = false;
-    el.innerHTML = t("eng.pit1") + state.lastWritten + t("eng.pit2");
+    el.innerHTML = tf("eng.pit", { name: state.lastWritten });
     return;
   }
   el.hidden = true;

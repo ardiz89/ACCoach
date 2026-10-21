@@ -192,8 +192,8 @@ def test_the_report_catalogue_is_read_in_full_with_its_multiline_entries():
         [k for k, v in cat.items() if set(v) != {"it", "en"}][:5]
     assert "sample laps" in cat["demo.banner"]["en"]
     # Una voce scritta su due righe.
-    assert cat["tour.e6.x"]["en"].startswith("A dial you turn on the straight")
-    assert cat["tour.e6.x"]["it"].startswith("Una manopola che giri")
+    assert cat["tour.e6.x"]["en"].startswith("It's a dial you turn on the straight")
+    assert cat["tour.e6.x"]["it"].startswith("È una manopola che giri")
 
 
 def test_the_engineer_page_keys_are_not_in_the_report():
@@ -382,8 +382,10 @@ def test_branches_on_the_language_are_collected_in_pairs(tmp_path):
 def test_the_real_engineer_branches_are_collected():
     engineer = tono.SURFACES["engineer"]()
     pair = [e for k, e in engineer.items()
-            if "profiles/_common.py" in k and e.get("it", "").startswith("Pressione {axis} fuori finestra")]
-    assert pair and pair[0]["en"].endswith("{sign}{clicks} clicks")
+            if "profiles/_common.py" in k
+            and e.get("it", "").startswith("La pressione {axis} è {now}, fuori dalla finestra")
+            and "en" in e]
+    assert pair and pair[0]["en"].startswith("{x} pressure is {now}, outside the window")
     # Le espressioni di un'f-string («{ax.capitalize()}» contro «{axis}») non sono
     # confrontabili per nome: le coppie dei rami non si confrontano sui segnaposti.
     assert tono.placeholder_mismatches(engineer) == [

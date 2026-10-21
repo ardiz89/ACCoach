@@ -906,6 +906,7 @@ class CoachEngine:
         # THIS phase wants — "phase X done → moving to Y" alone doesn't say what to
         # do next. After a PHASE_DONE the engine has already advanced, so this is
         # the phase now in progress. None once the setup is complete.
+        from .engineer.core import symptom_words
         from .engineer.profiles._common import tr
         ph = self._engineer.phase if self._engineer else None
         phase = {"key": ph.key, "label": tr(ph.label)} if ph else None
@@ -949,7 +950,9 @@ class CoachEngine:
                 "fuel_before_l": d.outcome.fuel_before_l,
                 "fuel_after_l": d.outcome.fuel_after_l,
                 "time_confounded": d.outcome.time_confounded,
-                "side_effects": [{"symptom": str(s), "delta": v}
+                # `words` e' come la pagina lo scrive; `symptom` resta la chiave.
+                "side_effects": [{"symptom": str(s), "words": symptom_words(s),
+                                  "delta": v}
                                  for s, v in d.outcome.side_effects],
             }),
         }

@@ -60,19 +60,19 @@
       </div>
 
       <div class="av-now" id="av-now" hidden>
-        <div class="es-label" data-i18n="eng.avNow">⚡ Right now, in the car</div>
+        <div class="es-label" data-i18n="eng.avNow">Right now, in the car</div>
         <div class="av-msg" id="av-msg"></div>
         <!-- Only shown where the car doesn't publish the dial. On ACC the
              engine sees the knob move and closes this itself (atwheel.py);
              on AC the levels read -1, and without this button an "al volo"
              change could never be finished at all. -->
         <button class="ghost small av-done" id="av-done" hidden
-                data-i18n="eng.avDone">Done — I've made it</button>
+                data-i18n="eng.avDone">I've changed it</button>
       </div>
 
       <div class="engineer-says" id="engineer-says">
         <div class="es-head">
-          <span class="es-label" data-i18n-html="eng.suggests">🔧 The engineer suggests <span class="es-sub">(at the next pit stop)</span></span>
+          <span class="es-label" data-i18n-html="eng.suggests">The engineer suggests <span class="es-sub">(at the next pit stop)</span></span>
           <span class="conf" id="es-conf" hidden></span>
         </div>
         <div class="es-phase" id="es-phase" hidden></div>
@@ -101,7 +101,7 @@
           <span class="es-label"><span id="focus-icon">…</span> <span data-i18n="eng.focusTitle">Focus · lesson</span>
             <span class="es-sub" data-i18n="eng.focusSub">(your driving, one weakness at a time)</span></span>
         </div>
-        <div class="es-msg" id="focus-msg" data-i18n="focus.warmup">Warming up… drive a few clean laps.</div>
+        <div class="es-msg" id="focus-msg" data-i18n="focus.warmup">Drive a few clean laps to get started.</div>
         <div class="focus-drill" id="focus-drill" hidden></div>
         <div class="focus-target" id="focus-target" hidden></div>
       </div>
@@ -114,7 +114,7 @@
            torto. Restava scritto su disco e letto da un endpoint che nessuno
            chiamava. -->
       <div class="eng-record" id="eng-record" hidden>
-        <div class="es-label" data-i18n="rec.title">📒 Track record</div>
+        <div class="es-label" data-i18n="rec.title">Track record</div>
         <div class="rec-head" id="rec-head"></div>
         <div class="rec-note" id="rec-note"></div>
         <div class="rec-tables" id="rec-tables"></div>
@@ -123,16 +123,17 @@
       <div class="eng-profile" id="eng-profile" hidden>
         <div class="es-label" data-i18n="eng.profile">Engineer profile</div>
         <div class="prof-name" id="prof-name"></div>
-        <div class="prof-row"><span class="muted" data-i18n="eng.phases">Phases:</span>
+        <div class="prof-row"><span class="muted" data-i18n="eng.phases">Phases</span>
           <span id="prof-phases"></span></div>
-        <div class="prof-row"><span class="muted" data-i18n="eng.onfly">On the fly:</span>
+        <div class="prof-row"><span class="muted" data-i18n="eng.onfly">At the wheel</span>
           <span id="prof-alvolo"></span></div>
       </div>
 
       <p class="hint" data-i18n-html="eng.hint">
-        The diagnosis comes from the coach in real time (start <b>Coach Live</b> or the
-        <b>backend</b>). The changes on the right apply to the setup file:
-        they must be <b>loaded in the pits</b>, they don't change the car while you drive.
+        This page is fed by the <b>live backend</b>, which you start from the hub in
+        <b>Devices</b> → Live backend. Coach Live doesn't feed it, and the two can't run
+        together because they'd both record. The changes on the right go into the setup
+        file. They must be <b>loaded in the pits</b> and don't change the car while you drive.
       </p>
     </section>
 
@@ -146,7 +147,7 @@
         </div>
       </div>
       <div id="setup-body" class="setup-body">
-        <div class="empty2" data-i18n-html="setup.pick">Pick a car/track above. HONE reads setups from
+        <div class="empty2" data-i18n-html="setup.pick">Pick a car and track above. HONE reads setups from
           <code>Documents/Assetto Corsa Competizione/Setups/&lt;car&gt;/&lt;track&gt;/</code> (ACC)
           and <code>Documents/Assetto Corsa/setups/</code> (AC).</div>
       </div>
@@ -180,8 +181,8 @@
         <input id="modal-name" type="text" autocomplete="off">
       </label>
       <p class="modal-hint" data-i18n-html="modal.hint">
-        A <b>new file</b> will be created (the original stays intact). After
-        writing: return to the pits → Setup screen → load the new setup.
+        This creates a <b>new file</b> and leaves the original intact. After writing,
+        go back to the pits, open the Setup screen and load the new setup.
       </p>
       <div id="modal-error" class="modal-error" hidden></div>
       <div class="modal-actions">
