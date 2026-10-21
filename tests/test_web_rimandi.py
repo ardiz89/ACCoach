@@ -245,6 +245,36 @@ function setRange(r) { CALLS.push(["range", r]); }
 function redrawCurrentView() { CALLS.push(["redraw"]); }
 const OPENED = [];
 function openHowto(d, a) { OPENED.push([d, a]); }
+// Task 5: Dinamica e Andamento. Tolleranti: se una funzione manca fallisce il
+// test che la usa, non tutta la suite.
+function tryGrab(head) { try { return grab(head); } catch (e) { if (!/^manca/.test(e.message)) throw e; return ""; } }
+const SCROLLS = [];
+const DOC = { exist: [], asked: [] };
+const document = {
+  querySelectorAll: () => [],
+  querySelector: (sel) => {
+    DOC.asked.push(sel);
+    if (!DOC.exist.includes(sel)) return null;
+    return { classList: { add() {}, remove() {} }, scrollIntoView: () => SCROLLS.push(sel) };
+  },
+  body: {},
+};
+const getComputedStyle = () => ({ getPropertyValue: () => "#C792EA" });
+const UI_FONT = "sans";
+const _anyNonZero = (a) => (a || []).some((v) => v !== 0);
+const projX = (p, w) => p * w;
+eval(grab("function degradeLabel("));
+eval(grab("function drawAdvMark("));
+eval(grab("function cornerBands("));
+eval(tryGrab("function dynamicsAdviceHidden("));
+eval(tryGrab("function gotoAdviceDynamics("));
+eval(tryGrab("function progressAdviceCorners("));
+eval(tryGrab("function gotoAdviceProgress("));
+eval(tryGrab("function renderCornerSessions("));
+eval(tryGrab("function renderCornerConsistency("));
+eval(tryGrab("function renderDefectHistory("));
+const fmtSecs = (v) => String(v), sparkBars = () => "", dhDates = () => "", fmtWhen = () => "";
+const LANG = () => "en", DH_H = 44;
 const job = JSON.parse(fs.readFileSync(0, "utf8"));
 const out = [];
 for (const step of job) {
@@ -296,6 +326,47 @@ for (const step of job) {
     if (step.reload) LINE = { corners: step.reload };
     gotoAdviceLine(picked);
     out.push({ i: LINE_I, calls: CALLS.slice() });
+  }
+  else if (step.call === "bands") {
+    const arcs = [];
+    const ctx = new Proxy({ arc: (x, y) => arcs.push([x, y]) },
+      { get: (o, k) => (k in o ? o[k] : (k === "measureText" ? () => ({ width: 10 }) : () => {})),
+        set: () => true });
+    cornerBands(ctx, 1000, 150, step.corners);
+    out.push(arcs);
+  }
+  else if (step.call === "dynhidden") {
+    out.push(dynamicsAdviceHidden({ review: { channels: step.channels } }));
+  }
+  else if (step.call === "gotodyn") {
+    CALLS.length = 0; SCROLLS.length = 0;
+    els["dyn-coasting"] = { scrollIntoView: () => SCROLLS.push("dyn-coasting") };
+    els["c-slip"] = { scrollIntoView: () => SCROLLS.push("c-slip") };
+    gotoAdviceDynamics(step.corner);
+    out.push({ calls: CALLS.slice(), scrolls: SCROLLS.slice() });
+  }
+  else if (step.call === "progcorners") {
+    out.push(progressAdviceCorners(step.p));
+  }
+  else if (step.call === "gotoprog") {
+    DOC.exist = step.exist; DOC.asked.length = 0; SCROLLS.length = 0;
+    gotoAdviceProgress(step.corner);
+    out.push({ asked: DOC.asked.slice(), scrolls: SCROLLS.slice() });
+  }
+  else if (step.call === "progcards") {
+    els["corner-sessions"] = fakeEl(); els["corner-consistency"] = fakeEl();
+    renderCornerSessions(step.rows); renderCornerConsistency(step.rows);
+    // quali schede (per corner_index) portano il segno
+    const marked = (id) => els[id].innerHTML.split('data-corner="').slice(1)
+      .map((seg) => [Number(seg.split('"')[0]), seg.includes("adv-mark")]);
+    out.push({ sessions: marked("corner-sessions"), cons: marked("corner-consistency") });
+  }
+  else if (step.call === "dhrows") {
+    els["dh-body"] = fakeEl(); els["dh-ref"] = fakeEl(); els["dh-note"] = fakeEl();
+    renderDefectHistory(step.h);
+    const rows = els["dh-body"].innerHTML.split('class="dh-row"').slice(1);
+    out.push(rows.map((r) => [(r.match(/data-howto="([^"]*)"/) || [])[1],
+                              r.includes("adv-mark")]));
   }
   else if (step.call === "relines") {
     // lo stesso elemento, riscritto piu' volte: quante scritture vere
@@ -722,3 +793,171 @@ def test_the_line_numbers_the_sectors_like_the_bars_do(tmp_path):
     secs = [dict(sec, index=i + 4) for i, sec in enumerate(_SECS)]
     got = _run(tmp_path, [{"advice": _adv(0.42), "call": "secmodel", "sectors": secs}])
     assert got[0]["vals"] == {"n": 6}
+
+
+# --- Task 5: Dinamica e Andamento ---------------------------------------------
+
+def test_the_dynamics_writes_its_line_from_its_own_render_path():
+    body = _body_of("function drawDynamics(")
+    # con dati: la riga porta le curve del giro e il suo goto; senza dati si spegne
+    assert 'renderAdviceLine("dynamics", DATA.corners || [], gotoAdviceDynamics' in body
+    assert 'renderAdviceLine("dynamics", [], null' in body
+    assert "dynamicsAdviceHidden(" in body
+
+
+@pytest.mark.parametrize("fn", ["drawSlip", "drawYaw", "drawShift"])
+def test_the_dynamics_charts_draw_their_bands_through_the_shared_helper(fn):
+    # il segno sulle fasce vive in cornerBands: un canvas che disegna le fasce
+    # per conto suo non lo avrebbe
+    assert "cornerBands(ctx, w, h, a.corners)" in _body_of(f"function {fn}(")
+
+
+@needs_node
+def test_the_band_helper_marks_only_the_advice_corner_on_the_canvas(tmp_path):
+    corners = [{"index": 0, "name": "A", "entry": 0.10, "exit": 0.20},
+               {"index": 1, "name": "B", "entry": 0.40, "exit": 0.45},
+               {"index": 2, "name": "C", "entry": 0.70, "exit": 0.75}]
+    got = _run(tmp_path, [
+        {"advice": _ADVICE, "call": "bands", "corners": corners},
+        {"advice": None, "call": "bands", "corners": corners},
+    ])
+    # un solo cerchio, sull'apice 0.42 (x = 420 su 1000 px), in basso
+    assert got[0] == [[420, 144]]
+    assert got[1] == []
+
+
+@needs_node
+def test_the_line_on_the_dynamics_is_off_for_a_corner_the_advice_does_not_name(tmp_path):
+    named = [{"index": 1, "name": "B", "entry": 0.40, "exit": 0.45}]
+    other = [{"index": 2, "name": "C", "entry": 0.70, "exit": 0.75}]
+    ob = {"defect": "over_brake", "name": "x",
+          "corners": [{"name": "Variante Alta", "apex_pos": 0.42}]}
+    got = _run(tmp_path, [
+        {"advice": ob, "call": "line", "view": "dynamics", "corners": named},
+        {"call": "line", "view": "dynamics", "corners": other},
+    ])
+    assert not got[0]["hidden"] and "B" in got[0]["html"]
+    assert got[0]["gone"] == ["B"]
+    assert got[1]["hidden"] and got[1]["html"] == ""
+
+
+@needs_node
+def test_the_coasting_line_has_no_names_and_goto_null_scrolls_to_the_box(tmp_path):
+    coast = {"defect": "coasting", "name": "x", "corners": []}
+    got = _run(tmp_path, [
+        {"advice": coast, "call": "line", "view": "dynamics",
+         "corners": [{"index": 1, "name": "B", "entry": 0.40, "exit": 0.45}]},
+        {"call": "gotodyn", "corner": None},
+    ])
+    assert not got[0]["hidden"] and "B" not in got[0]["html"]
+    assert got[0]["gone"] == [None]
+    assert got[1] == {"calls": [], "scrolls": ["dyn-coasting"]}
+
+
+@needs_node
+def test_goto_on_the_dynamics_sets_the_window_on_the_corner_and_scrolls_to_the_slip(tmp_path):
+    corner = {"index": 4, "name": "B", "entry": 0.40, "exit": 0.45}
+    got = _run(tmp_path, [{"call": "gotodyn", "corner": corner}])
+    assert got[0]["calls"][0][0] == "range" and got[0]["calls"][0][1]["corner"] == 4
+    assert got[0]["calls"][-1] == ["redraw"]
+    assert got[0]["scrolls"] == ["c-slip"]
+
+
+@needs_node
+def test_the_dynamics_line_is_off_when_the_chart_it_points_to_has_no_data(tmp_path):
+    full = {"throttle": [0, 1], "brake": [0.5, 0], "slip_front": [0, 0.1], "slip_rear": [0, 0]}
+    got = _run(tmp_path, [
+        {"advice": {"defect": "coasting", "name": "x", "corners": []},
+         "call": "dynhidden", "channels": full},
+        {"call": "dynhidden", "channels": {"throttle": [], "brake": []}},
+        {"advice": {"defect": "over_brake", "name": "x", "corners": []},
+         "call": "dynhidden", "channels": full},
+        {"call": "dynhidden", "channels": {"slip_front": [0, 0], "slip_rear": [0, 0]}},
+        {"advice": {"defect": "throttle_late", "name": "x", "corners": []},
+         "call": "dynhidden", "channels": {"slip_front": [0, 0], "slip_rear": [0, 0.2]}},
+    ])
+    assert got == [False, True, False, True, False]
+
+
+def test_the_defect_history_rows_are_marked_by_the_defect_key():
+    body = _body_of("function renderDefectHistory(")
+    assert "advMarkHTML(" in body and "ADVICE.defect" in body
+
+
+@needs_node
+def test_only_the_defect_history_row_of_the_advice_gets_the_mark(tmp_path):
+    h = {"reference": None, "sessions": [{}, {}],
+         "defects": [{"key": "brake_early", "name": "A", "values": [1, 2], "unit": "s"},
+                     {"key": "coasting", "name": "B", "values": [1, 2], "unit": "s"},
+                     {"key": "lift", "name": "C", "values": [1, 2], "unit": "s"}]}
+    got = _run(tmp_path, [
+        {"advice": {"defect": "coasting", "name": "x", "corners": []},
+         "call": "dhrows", "h": h},
+        {"advice": None, "call": "dhrows", "h": h},
+    ])
+    assert got[0] == [["brake_early", False], ["coasting", True], ["lift", False]]
+    assert got[1] == [["brake_early", False], ["coasting", False], ["lift", False]]
+
+
+_PTS = [{"median_s": 0.1, "laps": 3, "started": ""}, {"median_s": 0.2, "laps": 3, "started": ""}]
+_PROG_ROWS = [
+    {"corner_index": 3, "name": "A", "entry": 0.10, "exit": 0.20, "spread_kmh": 1,
+     "std_kmh": 1, "n": 3, "points": _PTS},
+    {"corner_index": 4, "name": "B", "entry": 0.40, "exit": 0.45, "spread_kmh": 1,
+     "std_kmh": 1, "n": 3, "points": _PTS},
+    {"corner_index": 5, "name": "C", "spread_kmh": 1, "std_kmh": 1, "n": 3,   # senza tratto
+     "points": _PTS},
+]
+
+
+@needs_node
+def test_the_progress_corner_cards_are_marked_by_their_own_span(tmp_path):
+    got = _run(tmp_path, [
+        {"advice": _ADVICE, "call": "progcards", "rows": _PROG_ROWS},
+        {"advice": None, "call": "progcards", "rows": _PROG_ROWS},
+    ])
+    expect = [[3, False], [4, True], [5, False]]
+    assert got[0] == {"sessions": expect, "cons": expect}
+    off = [[3, False], [4, False], [5, False]]
+    assert got[1] == {"sessions": off, "cons": off}
+
+
+@needs_node
+def test_the_progress_cards_are_listed_once_per_corner_for_the_line(tmp_path):
+    p = {"corner_sessions": [_PROG_ROWS[1], _PROG_ROWS[0]],
+         "corner_consistency": [_PROG_ROWS[1], _PROG_ROWS[2]]}
+    got = _run(tmp_path, [{"advice": _ADVICE, "call": "progcorners", "p": p},
+                          {"call": "progcorners", "p": {}}])
+    assert [c["index"] for c in got[0]] == [4, 3, 5]
+    assert got[0][0] == {"index": 4, "name": "B", "entry": 0.40, "exit": 0.45}
+    assert "entry" not in got[0][2]
+    assert got[1] == []
+
+
+@needs_node
+def test_progress_goto_scrolls_to_the_defect_row_or_to_the_corner_card(tmp_path):
+    coast = {"defect": "coasting", "name": "x", "corners": []}
+    sel_c = '#corner-consistency [data-corner="4"]'
+    sel_s = '#corner-sessions [data-corner="4"]'
+    got = _run(tmp_path, [
+        {"advice": coast, "call": "gotoprog", "corner": None,
+         "exist": ['#dh-body [data-howto="coasting"]']},
+        {"advice": _ADVICE, "call": "gotoprog", "corner": {"index": 4},
+         "exist": [sel_s, sel_c]},
+        {"call": "gotoprog", "corner": {"index": 4}, "exist": [sel_c]},   # solo coerenza
+        {"call": "gotoprog", "corner": {"index": 4}, "exist": []},        # niente: non cade
+    ])
+    assert got[0]["scrolls"] == ['#dh-body [data-howto="coasting"]']
+    assert got[1]["scrolls"] == [sel_s]
+    assert got[2]["scrolls"] == [sel_c]
+    assert got[3]["scrolls"] == []
+
+
+def test_the_progress_loader_writes_its_line_and_switches_it_off_on_failure():
+    body = _body_of("async function loadProgress(")
+    assert 'renderAdviceLine("progress", progressAdviceCorners(p), gotoAdviceProgress' in body
+    assert 'renderAdviceLine("progress", [], null' in body
+    # le schede che il segno decora leggono lo stesso tratto
+    assert "adviceApexIn(" in _body_of("function renderCornerSessions(")
+    assert "adviceApexIn(" in _body_of("function renderCornerConsistency(")
+

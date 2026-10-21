@@ -501,6 +501,8 @@ async function loadProgress(combo) {
     const cs = $("corner-sessions"); if (cs) cs.innerHTML = "";
     $("recurring").innerHTML =
       `<div class="clean">${t("err.progress")}</div>`;
+    // Senza risposta niente da indicare: la riga si spegne, la pagina resta com'era.
+    renderAdviceLine("progress", [], null, { hide: () => true });
     return;
   }
   if (stale(seen)) return;
@@ -522,6 +524,9 @@ async function loadProgress(combo) {
   renderTrends(p.trends);
   renderCornerSessions(p.corner_sessions);
   renderCornerConsistency(p.corner_consistency);
+  // La riga dal percorso di disegno della scheda, a schede scritte. Le curve
+  // sono quelle delle schede per curva; senza nessuna ritrovata dice il giro.
+  renderAdviceLine("progress", progressAdviceCorners(p), gotoAdviceProgress);
 
   const el = $("recurring");
   if (!p.recurring.length) {
@@ -532,6 +537,43 @@ async function loadProgress(combo) {
       `<span class="msg">${r.message}</span>` +
       `<span class="where">${t("recur.corners")}${r.corners.join(", ")}</span></div>`).join("");
   }
+}
+
+// Le curve che le schede per curva dell'Andamento mostrano, una volta sola
+// ciascuna (una curva puo' stare sia in «Curva per sessione» sia nella
+// coerenza). Il tratto e' quello del giro piu' veloce, dal server: non e' il
+// riferimento del consiglio, e per questo si incontrano sulla posizione.
+function progressAdviceCorners(p) {
+  const seen = new Set(), out = [];
+  for (const r of [...(p.corner_sessions || []), ...(p.corner_consistency || [])]) {
+    if (seen.has(r.corner_index)) continue;
+    seen.add(r.corner_index);
+    const c = { index: r.corner_index, name: r.name };
+    if (typeof r.entry === "number" && typeof r.exit === "number") {
+      c.entry = r.entry; c.exit = r.exit;
+    }
+    out.push(c);
+  }
+  return out;
+}
+
+// Dalla riga alla scheda. Senza curva: la riga del difetto nello storico. Con
+// una curva: la sua scheda per sessione, o quella della coerenza se l'altra
+// non c'e'. La scheda trovata si accende; nessuna scheda, non cade.
+function gotoAdviceProgress(corner) {
+  for (const e of document.querySelectorAll("#view-progress .adv-hit")) {
+    e.classList.remove("adv-hit");
+  }
+  let el = null;
+  if (!corner) {
+    if (ADVICE) el = document.querySelector(`#dh-body [data-howto="${ADVICE.defect}"]`);
+  } else {
+    el = document.querySelector(`#corner-sessions [data-corner="${corner.index}"]`) ||
+         document.querySelector(`#corner-consistency [data-corner="${corner.index}"]`);
+  }
+  if (!el) return;
+  el.classList.add("adv-hit");
+  el.scrollIntoView({ block: "center" });
 }
 
 // --- Andamento: i difetti sessione per sessione ----------------------------
@@ -621,9 +663,11 @@ function renderDefectHistory(h) {
     // In rosso solo un difetto ancora principale oggi: uno sceso sotto la
     // soglia (o a zero) è la notizia buona, non un allarme.
     const tone = d.main ? "loss" : "ok";
+    // Il difetto del consiglio in corso porta il segno, per chiave.
+    const mark = adviceRelevant("progress") && ADVICE.defect === d.key ? advMarkHTML() : "";
     return `<div class="dh-row">` +
       `<button type="button" class="dh-name" data-howto="${escAttr(d.key)}" ` +
-      `title="${escAttr(t("dh.howto"))}">${escAttr(d.name)}</button>` +
+      `title="${escAttr(t("dh.howto"))}">${mark}${escAttr(d.name)}</button>` +
       `<span class="pag-spark dh-bars">${sparkBars(vals, d.unit, trend, DH_H)}</span>` +
       `<span class="dh-last"><span class="num ${tone}">${fmtSecs(last, d.unit)}</span> ` +
       `<span class="pag-small">${per}</span>${arrow}</span></div>`;
@@ -717,8 +761,9 @@ function renderCornerSessions(rows) {
         `<span class="ses-nums">−${p.median_s.toFixed(3)}s · ${p.laps} ${t("cornerses.laps")}</span>` +
         `</div>`;
     }).join("");
-    return `<div class="weak sys"><div class="weak-head">` +
-      `<span class="corner">${r.name}</span>${verdict}</div>${bars}</div>`;
+    const mark = adviceApexIn(r) !== null ? advMarkHTML() : "";
+    return `<div class="weak sys" data-corner="${r.corner_index}"><div class="weak-head">` +
+      `<span class="corner">${mark}${r.name}</span>${verdict}</div>${bars}</div>`;
   }).join("");
 }
 
@@ -737,8 +782,9 @@ function renderCornerConsistency(rows) {
   for (const r of rows) mx = Math.max(mx, r.spread_kmh);
   el.innerHTML = rows.map((r) => {
     const w = (Math.min(r.spread_kmh / mx, 1) * 100).toFixed(0);
-    return `<div class="cons-row">` +
-      `<span class="corner">${r.name}</span>` +
+    const mark = adviceApexIn(r) !== null ? advMarkHTML() : "";
+    return `<div class="cons-row" data-corner="${r.corner_index}">` +
+      `<span class="corner">${mark}${r.name}</span>` +
       `<span class="cons-track"><span class="cons-fill" style="width:${w}%"></span></span>` +
       `<span class="cons-nums">${t("cons.spread")} <b>${r.spread_kmh.toFixed(1)}</b> km/h · ` +
       `σ ${r.std_kmh.toFixed(1)} · ${r.n} ${t("lbl.laps")}</span>` +
@@ -3866,6 +3912,32 @@ function hasBalance(a) {
   return !!(a && a.has_map && c && _anyNonZero(c.balance));
 }
 
+// La riga manda al riquadro del veleggio (coasting) o al grafico dello
+// slittamento (frenata di troppo, gas tardi): senza i canali che li disegnano
+// non indica un bel niente.
+function dynamicsAdviceHidden(a) {
+  const c = (a && a.review && a.review.channels) || {};
+  if (!ADVICE) return true;
+  if (ADVICE.defect === "coasting") {
+    return !Math.min((c.throttle || []).length, (c.brake || []).length);
+  }
+  return !(_anyNonZero(c.slip_front) || _anyNonZero(c.slip_rear));
+}
+
+// Veleggio: scorre al riquadro. Una curva: la finestra su quella curva (come nel
+// Confronto) e il grafico dello slittamento in vista.
+function gotoAdviceDynamics(corner) {
+  if (!corner) {
+    const box = $("dyn-coasting");
+    if (box) box.scrollIntoView({ block: "center" });
+    return;
+  }
+  setRange(cornerWindow(corner));
+  redrawCurrentView();
+  const c = $("c-slip");
+  if (c) c.scrollIntoView({ block: "start" });
+}
+
 function drawDynamics(cx) {
   if (!DATA) return;
   const miss = $("dyn-missing"), main = $("dyn-charts"), coast = $("dyn-coasting");
@@ -3885,6 +3957,7 @@ function drawDynamics(cx) {
   // condizione è quel dato.
   $("dyn-elsewhere").classList.toggle("hidden", !hasOff);
   if (!anyData) {
+    renderAdviceLine("dynamics", [], null, { hide: () => true });
     if (miss) miss.classList.remove("hidden");
     if (main) main.classList.add("hidden");
     if (coast) coast.innerHTML = "";
@@ -3906,6 +3979,10 @@ function drawDynamics(cx) {
   }
   if (miss) miss.classList.add("hidden");
   if (main) main.classList.remove("hidden");
+  // La riga dal percorso di disegno della scheda (un nuovo consiglio o un cambio
+  // lingua passano di qui). Spenta se il grafico a cui manda non ha dati.
+  renderAdviceLine("dynamics", DATA.corners || [], gotoAdviceDynamics,
+                   { hide: () => dynamicsAdviceHidden(DATA) });
   drawCoasting(DATA);
   DYN_GG = drawGG(DATA, cx);
   drawSlip(DATA, cx);

@@ -1890,6 +1890,17 @@ def create_api(
                 "total_s": round(t.total_ms / 1000.0, 3),
             } for t in loss_trends]
 
+        # Il tratto di ogni curva (frazione di giro), dello stesso riferimento
+        # di queste schede (il giro piu' veloce). La riga del consiglio incontra
+        # le schede sulla posizione, mai sull'indice ne' sul nome: senza il
+        # tratto una scheda non puo' dire se e' del consiglio. Una curva senza
+        # tratto non lo porta (e quindi non e' mai segnata).
+        def span_of(index: int) -> dict:
+            for c in corners:
+                if c.index == index:
+                    return {"entry": round(c.entry_pos, 4), "exit": round(c.exit_pos, 4)}
+            return {}
+
         # La stessa mediana dei punti deboli, ma sessione per sessione: dove
         # stavi, dove sei. Solo per le curve sistematiche — su un errore
         # episodico un andamento misura il caso.
@@ -1903,6 +1914,7 @@ def create_api(
             corner_sessions.append({
                 "corner_index": t.corner_index,
                 "name": cnames.get(t.corner_index, t.name),
+                **span_of(t.corner_index),
                 "points": [{"started": p.started, "laps": p.laps,
                             "median_s": round(p.median_ms / 1000.0, 3)}
                            for p in pts],
@@ -1933,6 +1945,7 @@ def create_api(
                 corner_consistency.append({
                     "corner_index": c.index,
                     "name": cnames.get(c.index, f"Corner {c.index + 1}"),
+                    **span_of(c.index),
                     "n": len(vmins),
                     "mean_kmh": round(mean, 1),
                     "spread_kmh": round(max(vmins) - min(vmins), 1),

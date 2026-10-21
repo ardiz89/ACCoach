@@ -200,6 +200,17 @@ def test_progress_corner_consistency(tmp_path):
     assert cc == sorted(cc, key=lambda x: x["spread_kmh"], reverse=True)
 
 
+def test_progress_corner_cards_carry_their_span_for_the_advice_marks(tmp_path):
+    """Le schede per curva dell'Andamento si incontrano col consiglio sulla
+    POSIZIONE (entry <= apex <= exit), mai sull'indice: serve il tratto."""
+    c = _client(tmp_path)
+    data = c.get("/api/progress", params={"car": CAR, "track": TRACK}).json()
+    rows = data["corner_consistency"]
+    assert rows
+    for r in rows:
+        assert 0.0 <= r["entry"] <= r["exit"] <= 1.0, r
+
+
 def test_sectors_breakdown_and_ideal(tmp_path):
     c = _client(tmp_path)
     # Review the slowest lap against the fastest baseline.

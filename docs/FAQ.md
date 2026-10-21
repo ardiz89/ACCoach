@@ -235,6 +235,11 @@ If you no longer lose enough in those corners, the coach picks as it always
 does. A verdict from the coach doesn't close the advice. Only the report's
 measurement does.
 
+**In the other tabs, the advice you follow is marked.** Compare, Line, Sectors,
+Dynamics and Trends open with a line that says where to look, and a purple
+circle on the corners of the advice. A click on a corner's name takes you
+there. With no advice in progress the tabs stay as they are.
+
 **How to do it →** on a piece of advice opens its page, and **← Back to the
 report card** brings you back. It is built from your own laps:
 

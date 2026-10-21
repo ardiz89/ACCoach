@@ -412,6 +412,11 @@ parla lì, così piano e coach ti dicono la stessa cosa. Se in quelle curve non
 perdi più abbastanza, il coach sceglie come sempre. Un verdetto del coach non
 chiude il consiglio. Lo chiude solo la misura del report.
 
+**Nelle altre schede, il consiglio che segui è segnato.** Confronto, Traiettoria,
+Settori, Dinamica e Andamento hanno in cima una riga che dice dove guardare,
+e un cerchio viola sulle curve del consiglio. Un clic sul nome della curva ti
+porta lì. Senza un consiglio in corso le schede restano come sono.
+
 ### Come si fa (la vista di un consiglio)
 
 **Come si fa →** su un consiglio apre la sua pagina. Si torna con **← Torna alla

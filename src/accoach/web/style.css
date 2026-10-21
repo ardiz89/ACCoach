@@ -1464,3 +1464,5 @@ body.view-howto #lapbar { display: none; }
 .vmin-table tr.adv-hit td { background: rgba(199,146,234,0.16); }
 /* Il settore che il consiglio in corso ha indicato (Settori). */
 .secrow.adv-hit { background: rgba(199,146,234,0.16); }
+/* Andamento: la scheda per curva o la riga del difetto che il consiglio ha indicato. */
+.weak.adv-hit, .cons-row.adv-hit, .dh-name.adv-hit { background: rgba(199,146,234,0.16); }
