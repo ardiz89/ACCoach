@@ -2537,7 +2537,10 @@ function renderHowto(h) {
   const ref = h.reference_lap;
   const figs = h.figures || [];
   const trace = HOWTO_TRACE[h.defect];
-  let html = `<h2 class="howto-title">${escAttr(h.name)}</h2>`;
+  // Il ritorno sta anche in alto: con tre figure il fondo è lontano.
+  const back = (where) => `<p class="howto-back-row ${where}"><button type="button" ` +
+    `class="mini-btn howto-back">${t("howto.back")}</button></p>`;
+  let html = back("top") + `<h2 class="howto-title">${escAttr(h.name)}</h2>`;
   html += h.problem
     ? `<p class="howto-problem">${escAttr(h.problem)}</p>`
     : `<p class="howto-problem nothing">${t("howto.noproblem")}</p>`;
@@ -2547,8 +2550,10 @@ function renderHowto(h) {
   // Le figure. Ogni tela parte con la riga di caricamento al suo posto: i giri
   // arrivano dopo la pagina.
   html += `<section class="pag-box howto-figs"><h4>${t("howto.figs")}</h4>`;
-  if (!figs.length) {
-    html += `<div class="nothing">${t(HOWTO_TRACE[h.defect] ? "howto.nofig" : "howto.nofig.lap")}</div>`;
+  // Un difetto senza traccia (alzate, veleggio, o uno nuovo che la tabella non
+  // conosce ancora) non ha figure anche se il backend gliene mandasse.
+  if (!figs.length || !trace) {
+    html += `<div class="nothing">${t(trace ? "howto.nofig" : "howto.nofig.lap")}</div>`;
   } else {
     html += `<p class="howto-legend pag-small"><span class="sw you"></span>${t("howto.leg.you")}` +
             `<span class="sw best"></span>${t("howto.leg.best")}</p>`;
@@ -2573,11 +2578,13 @@ function renderHowto(h) {
           `<p>${escAttr(how.what)}</p><p>${escAttr(how.watch)}</p>` +
           `<p>${escAttr(how.ignore)}</p></section>`;
   // L'esercizio: quanti giri, l'obiettivo in numeri, quando è fatto.
+  // L'obiettivo su una riga sua, nella forma del modello approvato dal pilota
+  // («Obiettivo: scendere sotto 0,12.»): è il numero che porta in pista.
   const target = h.target != null
-    ? " " + tf(h.unit === "s" ? "howto.target.coast" : "howto.target",
-               { v: fmtSecs(h.target, h.unit) }) : "";
+    ? `<p class="howto-target">${tf(h.unit === "s" ? "howto.target.coast" : "howto.target",
+                                     { v: fmtSecs(h.target, h.unit) })}</p>` : "";
   html += `<section class="pag-box"><h4>${t("howto.drill")}</h4>` +
-          `<p class="howto-laps">${tf("howto.laps", { n: how.laps })}${target}</p>` +
+          `<p class="howto-laps">${tf("howto.laps", { n: how.laps })}</p>${target}` +
           `<p>${escAttr(how.drill)}</p><p>${escAttr(how.done_when)}</p></section>`;
   // Come sta andando: il numero del difetto, una sessione per volta.
   const prog = h.progress || [];
@@ -2585,10 +2592,9 @@ function renderHowto(h) {
     ? `<p class="pag-small">${t("howto.prog.lead")}</p><div class="howto-prog">` +
       prog.map((v) => `<span class="num">${fmtSecs(v, h.unit)}</span>`).join("") + `</div>`
     : `<div class="nothing">${t("howto.prog.none")}</div>`) + `</section>`;
-  html += `<p class="howto-foot"><button type="button" class="mini-btn" id="howto-back">` +
-          `${t("howto.back")}</button></p>`;
+  html += back("foot");
   body.innerHTML = html;
-  $("howto-back").onclick = () => showView("pagella");
+  for (const b of body.querySelectorAll(".howto-back")) b.onclick = () => showView("pagella");
 }
 
 // Ridisegna ogni figura dai giri arrivati; quelle ancora in attesa restano con

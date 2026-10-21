@@ -321,10 +321,35 @@ def test_the_howto_shows_its_parts_in_the_agreed_order():
     Pagella» (spec e brief, nell'ordine)."""
     body = _body_of("function renderHowto(h)")
     order = ["howto-problem", "howto-figs", 't("howto.how")', 't("howto.drill")',
-             't("howto.prog")', 't("howto.back")']
+             't("howto.prog")', 'html += back("foot")']
     at = [body.index(x) for x in order]
     assert at == sorted(at), dict(zip(order, at))
-    assert 'showView("pagella")' in body
+
+
+def test_the_way_back_is_at_the_top_and_at_the_bottom():
+    """Con tre figure il fondo è lontano: «← Torna alla Pagella» anche in alto,
+    prima del titolo, con lo stesso gestore."""
+    body = _body_of("function renderHowto(h)")
+    assert 't("howto.back")' in body.split("let html =", 1)[0]
+    assert body.index('let html = back("top")') < body.index("howto-title")
+    assert 'html += back("foot");' in body
+    assert ('for (const b of body.querySelectorAll(".howto-back")) '
+            'b.onclick = () => showView("pagella");') in body
+
+
+def test_the_drill_says_the_target_in_numbers():
+    """«L'esercizio: quanti giri, obiettivo in numeri» (spec), nella forma del
+    modello approvato dal pilota, su una riga sua, in secondi di veleggio per il
+    veleggio."""
+    body = _body_of("function renderHowto(h)")
+    drill = body[body.index("const target ="):body.index('t("howto.prog")')]
+    assert '<p class="howto-target">' in drill
+    assert 'tf(h.unit === "s" ? "howto.target.coast" : "howto.target"' in drill
+    assert "{ v: fmtSecs(h.target, h.unit) }" in drill
+    assert "${target}" in drill
+    assert "Obiettivo: sotto {v} a giro" in _i18n_entry("howto.target")
+    assert "Obiettivo: sotto {v} di veleggio a giro" in _i18n_entry("howto.target.coast")
+    assert "Target: under {v} a lap" in _i18n_entry("howto.target")
 
 
 def test_the_howto_says_which_lap_it_measures_against():
@@ -344,10 +369,13 @@ def test_every_backend_string_is_escaped_in_the_howto():
 
 def test_lift_and_coasting_say_why_there_is_no_figure():
     body = _body_of("function renderHowto(h)")
-    nofig = body.split("if (!figs.length)", 1)[1].split("\n  }", 1)[0]
+    nofig = body.split("if (!figs.length || !trace)", 1)[1].split("\n  }", 1)[0]
     # Con una traccia ma senza curve in questa sessione, una frase; alzate e
     # veleggio (nessuna traccia) l'altra, che dice che non stanno in una curva.
-    assert 't(HOWTO_TRACE[h.defect] ? "howto.nofig" : "howto.nofig.lap")' in nofig
+    # Un difetto che la tabella non conosce va per la seconda strada, e non
+    # scrive mai «howto.tr.undefined».
+    assert "const trace = HOWTO_TRACE[h.defect];" in body
+    assert 't(trace ? "howto.nofig" : "howto.nofig.lap")' in nofig
     # Le alzate e il veleggio non hanno una traccia da curva: niente figura.
     assert re.search(r"const HOWTO_TRACE = \{[^}]*\}", _APPJS)
     table = re.search(r"const HOWTO_TRACE = \{([^}]*)\}", _APPJS).group(1)
