@@ -457,8 +457,9 @@ _UI: dict[str, dict[str, str]] = {
               "riavvia Coach Live."},
     "live.open_here": {"en": "Open on this PC", "it": "Apri su questo PC"},
     "live.skip": {"en": "Skip, I'll drive without", "it": "Salta, guido senza"},
-    "live.s3": {"en": "Start ACC and leave the pits",
-                "it": "Avvia ACC ed esci dai box"},
+    # «il gioco» e non «ACC»: HONE segue anche AC, e il passo vale per tutti e due.
+    "live.s3": {"en": "Start the game and leave the pits",
+                "it": "Avvia il gioco ed esci dai box"},
     "live.s3_sub": {"en": "This ticks itself when the telemetry arrives.",
                     "it": "Si spunta da solo quando arriva la telemetria."},
     "live.tablet_on": {"en": "Tablet connected.", "it": "Tablet collegato."},
@@ -474,7 +475,7 @@ _UI: dict[str, dict[str, str]] = {
     "live.laps": {"en": "{n} laps completed", "it": "{n} giri completati"},
     "live.no_lap_yet": {"en": "No lap completed yet",
                         "it": "Ancora nessun giro completato"},
-    "live.best": {"en": "best {time}", "it": "miglior {time}"},
+    "live.best": {"en": "best {time}", "it": "migliore {time}"},
     "live.following": {"en": "You're working on: {name}",
                        "it": "Stai seguendo: {name}"},
     "live.following_sub": {
@@ -492,11 +493,15 @@ _UI: dict[str, dict[str, str]] = {
               "sull'ultima sessione."},
     "live.saved_one": {"en": "1 lap saved", "it": "1 giro salvato"},
     "live.saved": {"en": "{n} laps saved", "it": "{n} giri salvati"},
+    "live.valid_one": {"en": "1 valid", "it": "1 valido"},
+    "live.valid": {"en": "{n} valid", "it": "{n} validi"},
+    "live.minute_one": {"en": "1 minute", "it": "1 minuto"},
+    "live.minutes": {"en": "{n} minutes", "it": "{n} minuti"},
     "live.closed": {
-        "en": "ACC has been closed for a minute. The coach stays on until you "
-              "stop it, in case you're only changing track.",
-        "it": "ACC è chiuso da un minuto. Il coach resta acceso finché non lo "
-              "fermi tu, nel caso tu stia solo cambiando pista."},
+        "en": "The game has been closed for a minute. The coach stays on until "
+              "you stop it, in case you're only changing track.",
+        "it": "Il gioco è chiuso da un minuto. Il coach resta acceso finché non "
+              "lo fermi tu, nel caso tu stia solo cambiando pista."},
     "live.show": {"en": "Show me how it went", "it": "Mostrami com'è andata"},
     "live.stay": {"en": "I'm staying on track", "it": "Resto in pista"},
     "live.silent": {
@@ -507,8 +512,8 @@ _UI: dict[str, dict[str, str]] = {
     "live.stop_late": {
         "en": "The coach didn't stop within 5 s. The report opens anyway.",
         "it": "Il coach non si è fermato entro 5 s. Il report si apre lo stesso."},
-    "live.report_wait": {"en": "Starting the report…",
-                         "it": "Sto avviando il report…"},
+    "live.report_wait": {"en": "Opening the report…",
+                         "it": "Sto aprendo il report…"},
     "live.report_late": {
         "en": "The report didn't answer within 5 s. If the page stays blank, "
               "reload it.",

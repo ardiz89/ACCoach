@@ -5,25 +5,35 @@ muto) lo decide :mod:`accoach.livepanel` da `/health` e dal processo. Qui ci
 sono i tre momenti approvati col pilota, il clic «Ho finito» (ferma il coach,
 poi apre la Pagella della combo guidata) e l'interrogazione di `/health`.
 
-L'hub sta dietro al gioco mentre il pilota guida: non deve mai bloccarsi. Per
-questo `/health` si chiede con la rete asincrona di Qt, con un tetto di 1,5 s,
-una richiesta alla volta e solo mentre Coach Live gira; e l'attesa del report
-che parte e' un timer che riprova, non un ciclo che aspetta.
+L'hub sta dietro al gioco mentre il pilota guida: **non deve mai bloccarsi**.
+Quindi niente che aspetta sul thread dell'interfaccia:
+- `/health` con la rete asincrona di Qt, tetto 1,5 s, una richiesta alla volta,
+  solo mentre Coach Live gira;
+- «il report risponde?» con un `QTcpSocket` asincrono, non con `port_open`
+  (che su una porta chiusa di Windows costa 0,3 s a chiamata);
+- il catalogo (consiglio in corso, giri della corsa) letto in un thread, in sola
+  lettura e con un timeout breve: SQLite puo' aspettare chi sta scrivendo;
+- «Ho finito» chiede l'arresto e poi controlla con un timer che il processo sia
+  morto, invece di aspettarlo.
 """
 from __future__ import annotations
 
 import json
+import sqlite3
+import threading
 import time
 import webbrowser
 from dataclasses import replace
+from datetime import datetime, timezone
 from functools import partial
 
-from PySide6.QtCore import Qt, QTimer, QUrl
+from PySide6.QtCore import QObject, Qt, QTimer, QUrl, Signal
 from PySide6.QtNetwork import (
     QNetworkAccessManager,
     QNetworkProxy,
     QNetworkReply,
     QNetworkRequest,
+    QTcpSocket,
 )
 from PySide6.QtWidgets import (
     QHBoxLayout,
@@ -38,8 +48,8 @@ from .hubgate import STOP_LIVE
 from .i18n import current_language, t
 from .launcher import _hint, _qr_image
 from .livepanel import POLL_S, LiveTracker, PanelState, parse_health, report_url
-from .netinfo import device_urls, port_open
-from .recording.storage import _catalog_path, laps_root
+from .netinfo import device_urls
+from .recording.storage import _catalog_path, _slug, laps_root
 
 # Tetto di una richiesta a /health: sotto POLL_S, cosi' una risposta lenta non
 # si accavalla alla successiva (che comunque non parte finche' c'e' questa).
@@ -47,6 +57,13 @@ HEALTH_TIMEOUT_MS = 1500
 # Quanto si aspetta che il processo `web` appena acceso risponda.
 WEB_WAIT_S = 5.0
 _WEB_TICK_MS = 250
+# Una sonda sulla porta del report: 127.0.0.1 risponde o rifiuta subito.
+PROBE_TIMEOUT_MS = 400
+# Quanto si aspetta che Coach Live muoia dopo «Ho finito».
+STOP_WAIT_S = 5.0
+_STOP_TICK_MS = 100
+# Il catalogo in sola lettura: meglio «non lo so» che un'attesa lunga.
+CATALOG_TIMEOUT_S = 0.5
 
 
 def _bold(text: str) -> QLabel:
@@ -66,6 +83,95 @@ def _best(text: str) -> str:
     return text.replace(".", ",") if current_language() == "it" else text
 
 
+def _utc_iso(ts: float) -> str:
+    # Lo stesso formato di `save_lap` (`recorded_utc`), cosi' il confronto
+    # fra stringhe nel catalogo e' un confronto fra istanti.
+    return datetime.fromtimestamp(ts, timezone.utc).isoformat(timespec="seconds")
+
+
+def read_catalog(db, car: str, track: str, since_utc: str) -> dict | None:
+    """Il consiglio `active` della combo e i giri salvati da `since_utc`.
+
+    Gira in un thread. Connessione in sola lettura (`mode=ro`): non crea il
+    catalogo e non lo migra; e un timeout breve, perche' se Coach Live sta
+    scrivendo un giro la risposta puo' aspettare il prossimo poll. Le chiavi
+    sono normalizzate come le normalizza il catalogo (`_slug`). `None` se il
+    catalogo non si legge.
+    """
+    try:
+        conn = sqlite3.connect(f"{db.as_uri()}?mode=ro", uri=True,
+                               timeout=CATALOG_TIMEOUT_S)
+    except (sqlite3.Error, ValueError, OSError):
+        return None
+    try:
+        ck, tk = _slug(car), _slug(track)
+        defect = None
+        for (data,) in conn.execute(
+                "SELECT data_json FROM advice WHERE car_key=? AND track_key=? "
+                "ORDER BY accepted_utc, defect", (ck, tk)):
+            try:
+                d = json.loads(data)
+            except ValueError:
+                continue
+            if d.get("status") == "active":
+                defect = d.get("defect")
+                break
+        rows = conn.execute(
+            "SELECT recorded_utc, lap_time_ms, valid FROM lap "
+            "WHERE car_key=? AND track_key=? AND source='own' AND recorded_utc >= ? "
+            "ORDER BY recorded_utc", (ck, tk, since_utc)).fetchall()
+        total = len(rows)
+        valid = sum(1 for r in rows if r[2] == 1)
+        duration = None
+        if rows:
+            try:
+                first = datetime.fromisoformat(rows[0][0]).timestamp()
+                last = datetime.fromisoformat(rows[-1][0]).timestamp()
+                # Dalla partenza del primo giro salvato alla fine dell'ultimo.
+                duration = max(0.0, last - first + rows[0][1] / 1000.0)
+            except (TypeError, ValueError):
+                duration = None
+        return {"defect": defect, "total": total, "valid": valid,
+                "duration_s": duration}
+    except sqlite3.Error:
+        return None
+    finally:
+        conn.close()
+
+
+class _Bridge(QObject):
+    """Riporta il risultato di un thread sul thread dell'interfaccia."""
+
+    done = Signal(object)
+
+
+class _PortProbe(QObject):
+    """Risponde qualcuno su 127.0.0.1:`port`? Senza aspettare: il risultato
+    arriva a `cb(bool)` dal giro di eventi di Qt."""
+
+    def __init__(self, parent: QObject, port: int, cb) -> None:
+        super().__init__(parent)
+        self._cb = cb
+        self._done = False
+        self._sock = QTcpSocket(self)
+        self._sock.connected.connect(lambda: self._finish(True))
+        self._sock.errorOccurred.connect(lambda _err: self._finish(False))
+        self._timer = QTimer(self)
+        self._timer.setSingleShot(True)
+        self._timer.timeout.connect(lambda: self._finish(False))
+        self._timer.start(PROBE_TIMEOUT_MS)
+        self._sock.connectToHost("127.0.0.1", port)
+
+    def _finish(self, up: bool) -> None:
+        if self._done:
+            return
+        self._done = True
+        self._timer.stop()
+        self._sock.abort()
+        self.deleteLater()
+        self._cb(up)
+
+
 class LivePanel(QWidget):
     """La pagina «In pista». Con Coach Live spento: i bottoni di sempre e, sotto,
     i tre passi in anteprima. Acceso: il pannello del momento."""
@@ -76,20 +182,33 @@ class LivePanel(QWidget):
         self._tracker = LiveTracker()
         self.state = PanelState("idle")
         self._running = False
+        self._run_started = time.time()
         # Cose che `PanelState` non porta: chi ha premuto «Salta» e se il
         # tablet si e' mai visto in questa corsa (per dire «si e' scollegato»
         # invece di «nessun tablet»).
         self._skipped = False
         self._tablet_seen = False
-        self._web_failed = False
-        self._pending_url: str | None = None
-        self._web_deadline = 0.0
-        self._note = ""
+        # Le note sono chiavi, non testi: un cambio di lingua le ridice.
+        self._notes: list[str] = []
         self._reply = None
-        self._advice_stamp = None
-        self._advice_name: str | None = None
         self._sig = None
+        # Il processo `web`: chi aspetta che risponda, e se si sa che non c'e'.
+        self._web_failed = False
+        self._web_checking = False
+        self._web_waiters: list = []
+        self._web_deadline = 0.0
+        self._probing = False
+        # «Ho finito» in corso: l'indirizzo da aprire alla fine.
+        self._finish_url: str | None = None
+        self._stop_deadline = 0.0
+        # Il catalogo letto in un thread: la chiave chiesta, quella in volo e
+        # l'ultimo risultato (per quale chiave).
+        self._cat_job = None
+        self._cat_key = None
+        self._cat_info: dict | None = None
 
+        self._bridge = _Bridge(self)
+        self._bridge.done.connect(self._on_catalog)
         self._nam = QNetworkAccessManager(self)
         # /health e' sempre su 127.0.0.1: un proxy di sistema non c'entra.
         self._nam.setProxy(QNetworkProxy(QNetworkProxy.NoProxy))
@@ -99,6 +218,9 @@ class LivePanel(QWidget):
         self._web_timer = QTimer(self)
         self._web_timer.setInterval(_WEB_TICK_MS)
         self._web_timer.timeout.connect(self._web_tick)
+        self._stop_timer = QTimer(self)
+        self._stop_timer.setInterval(_STOP_TICK_MS)
+        self._stop_timer.timeout.connect(self._stop_tick)
 
         root = QVBoxLayout(self)
         root.setContentsMargins(24, 24, 24, 24)
@@ -126,6 +248,7 @@ class LivePanel(QWidget):
         root.addWidget(self._body)
 
         self._note_lbl = _hint("")
+        self._note_lbl.setObjectName("liveNote")
         root.addWidget(self._note_lbl)
 
         # Il vecchio «Ferma Coach Live», piccolo: l'hub lo mostra solo mentre
@@ -151,10 +274,14 @@ class LivePanel(QWidget):
         # Una corsa nuova parte pulita: niente di quella prima.
         self._tracker.feed(None, time.monotonic(), False)
         if live:
+            self._run_started = time.time()
             self._skipped = self._tablet_seen = self._web_failed = False
-            self._note = ""
-            self._advice_stamp = None
-            self._start_web_for_tablet()
+            if self._finish_url is None:
+                self._notes = []
+            self._cat_key = self._cat_info = None
+            if load_config().lan:
+                # Il QR punta alla pagina Ingegnere del processo `web`.
+                self._ensure_web(lambda _up: None)
             self._poll.start()
             self.render_state(PanelState("before"))
         else:
@@ -191,62 +318,100 @@ class LivePanel(QWidget):
                                              time.monotonic(), True))
 
     # --- il processo `web` --------------------------------------------------
-    def _start_web_for_tablet(self) -> None:
-        """Il QR punta alla pagina Ingegnere del processo `web`: con la rete
-        locale attiva lo si accende, se non c'e' gia'."""
-        cfg = load_config()
-        if cfg.lan and not port_open(cfg.web.port):
-            self._hub._spawn(["web"], False)
-            self._start_web_wait()
+    def _probe(self, port: int, cb) -> None:
+        _PortProbe(self, port, cb)
 
-    def _start_web_wait(self) -> None:
-        self._web_deadline = time.monotonic() + WEB_WAIT_S
-        self._web_timer.start()
+    def _web_child_alive(self) -> bool:
+        return any(a and a[0] == "web" and p.poll() is None
+                   for p, a in list(self._hub._children))
+
+    def _ensure_web(self, then) -> None:
+        """Fa in modo che il report risponda, poi chiama `then(su)`.
+
+        Se la porta risponde gia' si usa com'e' (anche la `web --engineer` del
+        pilota). Altrimenti si accende `web` — **una volta**: chi arriva mentre
+        si aspetta si mette in coda, e un `web` nostro ancora vivo non si
+        raddoppia — e si riprova fino a WEB_WAIT_S."""
+        self._web_waiters.append(then)
+        if self._web_checking:
+            return
+        self._web_checking = True
+        port = load_config().web.port
+
+        def first(up: bool) -> None:
+            if up:
+                self._web_resolve(True)
+                return
+            if not self._web_child_alive():
+                self._hub._spawn(["web"], False)
+            self._web_deadline = time.monotonic() + WEB_WAIT_S
+            self._web_timer.start()
+
+        self._probe(port, first)
 
     def _web_tick(self) -> None:
-        if port_open(load_config().web.port):
-            self._web_timer.stop()
-            self._web_failed = False
-            self._web_done(True)
-        elif time.monotonic() >= self._web_deadline:
-            self._web_timer.stop()
-            self._web_failed = True
-            self._web_done(False)
-
-    def _web_done(self, up: bool) -> None:
-        url, self._pending_url = self._pending_url, None
-        if url is not None:
-            # Si apre lo stesso: una pagina che non carica si ricarica, un
-            # bottone che non fa niente no.
-            if not up:
-                self._note = " ".join(x for x in (self._note, t("live.report_late")) if x)
-            webbrowser.open(url)
-        self._rerender()
-
-    def _open_when_up(self, url: str) -> None:
-        port = load_config().web.port
-        if port_open(port):
-            webbrowser.open(url)
-            self._rerender()
+        if self._probing:
             return
-        self._hub._spawn(["web"], False)
-        self._pending_url = url
-        self._start_web_wait()
+        self._probing = True
+
+        def got(up: bool) -> None:
+            self._probing = False
+            if not self._web_checking:
+                return
+            if up:
+                self._web_resolve(True)
+            elif time.monotonic() >= self._web_deadline:
+                self._web_resolve(False)
+
+        self._probe(load_config().web.port, got)
+
+    def _web_resolve(self, up: bool) -> None:
+        self._web_timer.stop()
+        self._web_checking = False
+        self._web_failed = not up
+        waiters, self._web_waiters = self._web_waiters, []
+        for w in waiters:
+            w(up)
         self._rerender()
 
     # --- i clic ---------------------------------------------------------------
     def _finish(self) -> None:
-        """«Ho finito»: ferma il coach, poi apre la Pagella della combo guidata.
-        Senza auto, pista o giri salvati apre il report cosi' com'e'."""
+        """«Ho finito»: chiede l'arresto del coach, aspetta (con un timer) che
+        sia morto, poi apre la Pagella della combo guidata. Senza auto, pista o
+        giri salvati apre il report cosi' com'e'."""
+        if self._finish_url is not None:
+            return
         st = self.state
-        stopped = self._hub._stop_live_and_wait(5.0)
-        self._note = "" if stopped else t("live.stop_late")
         base = f"http://127.0.0.1:{load_config().web.port}/"
-        url = report_url(base, st.car, st.track) if self._has_laps(st) else base
-        self._open_when_up(url)
+        self._finish_url = (report_url(base, st.car, st.track)
+                            if self._has_laps(st) else base)
+        self._notes = []
+        self._hub._stop_live()
+        self._stop_deadline = time.monotonic() + STOP_WAIT_S
+        self._stop_timer.start()
+        self._rerender()
+
+    def _stop_tick(self) -> None:
+        if self._hub._live_running():
+            if time.monotonic() < self._stop_deadline:
+                return
+            self._notes.append("live.stop_late")
+        self._stop_timer.stop()
+        self._ensure_web(self._open_report)
+
+    def _open_report(self, up: bool) -> None:
+        url, self._finish_url = self._finish_url, None
+        # Si apre lo stesso: una pagina che non carica si ricarica, un bottone
+        # che non fa niente no.
+        if not up:
+            self._notes.append("live.report_late")
+        if url:
+            webbrowser.open(url)
+        self._rerender()
 
     def _open_here(self) -> None:
-        self._open_when_up(f"http://127.0.0.1:{load_config().web.port}/engineer")
+        url = f"http://127.0.0.1:{load_config().web.port}/engineer"
+        self._ensure_web(lambda _up: webbrowser.open(url))
 
     def _skip(self) -> None:
         self._skipped = True
@@ -261,45 +426,49 @@ class LivePanel(QWidget):
         keys = [k for k, _glyph in self._hub._NAV]
         self._hub._nav.setCurrentRow(keys.index("nav.devices"))
 
-    # --- il consiglio in corso -----------------------------------------------
-    def _following(self, st: PanelState) -> str | None:
-        """Il nome del difetto del consiglio `active` di questa combo, o None.
+    # --- il catalogo, in un thread ------------------------------------------
+    def _catalog(self, st: PanelState) -> dict | None:
+        """L'ultima lettura del catalogo per questa combo (o None), e una nuova
+        lettura in un thread se i file del catalogo sono cambiati.
 
-        Il catalogo si riapre solo quando i suoi file cambiano (un giro salvato,
-        un consiglio accettato), non a ogni risposta di /health: e' SQLite sul
-        thread dell'interfaccia. E non si crea mai: l'hub legge, non fonda un
-        archivio dei giri."""
+        Il controllo e' uno `stat` (mtime e dimensione di `laps.db` e del suo
+        `-wal`): un giro salvato o un consiglio accettato lo cambiano, una
+        risposta di /health no."""
         if not st.car or not st.track:
             return None
         db = _catalog_path(laps_root())
-        stamp = [st.car, st.track]
+        key = [st.car, st.track, self._run_started]
         for p in (db, db.with_name(db.name + "-wal")):
             try:
                 s = p.stat()
-                stamp += [s.st_mtime_ns, s.st_size]
+                key += [s.st_mtime_ns, s.st_size]
             except OSError:
-                stamp += [None, None]
-        if stamp == self._advice_stamp:
-            return self._advice_name
-        self._advice_stamp = stamp
-        self._advice_name = None
-        if stamp[2] is None:
+                key += [None, None]
+        if key[3] is None:              # nessun catalogo: non lo si crea
             return None
-        try:
-            from .coaching.advice import ACTIVE
-            from .coaching.howto import defect_name
-            from .recording.catalog import LapCatalog
+        if key != self._cat_key and self._cat_job is None:
+            self._cat_job = key
+            since = _utc_iso(self._run_started)
+            threading.Thread(
+                target=self._catalog_worker,
+                args=(key, db, st.car, st.track, since),
+                name="hone-livepanel-catalog", daemon=True).start()
+        if self._cat_key is not None and self._cat_key[:3] == key[:3]:
+            return self._cat_info
+        return None
 
-            # Le chiavi le normalizza il catalogo (`_slug`): auto e pista
-            # passano come le da' il gioco.
-            with LapCatalog(db) as cat:
-                advice = cat.load_advice(st.car, st.track)
-            active = next((a for a in advice if a.get("status") == ACTIVE), None)
-            if active is not None:
-                self._advice_name = defect_name(active["defect"], current_language())
-        except Exception:   # noqa: BLE001 - un catalogo illeggibile = nessun consiglio
-            self._advice_name = None
-        return self._advice_name
+    def _catalog_worker(self, key, db, car, track, since) -> None:
+        try:
+            info = read_catalog(db, car, track, since)
+        except Exception:   # noqa: BLE001 - un catalogo illeggibile = niente
+            info = None
+        self._bridge.done.emit((key, info))
+
+    def _on_catalog(self, result) -> None:
+        key, info = result
+        self._cat_job = None
+        self._cat_key, self._cat_info = key, info
+        self._rerender()
 
     # --- il disegno -----------------------------------------------------------
     @staticmethod
@@ -319,11 +488,12 @@ class LivePanel(QWidget):
         self.state = state
         if state.tablet_now:
             self._tablet_seen = True
-        following = self._following(state) if state.phase == "driving" else None
+        info = (self._catalog(state) if state.phase in ("driving", "finished")
+                else None)
         cfg = load_config()
-        sig = (state, following, self._skipped, self._tablet_seen,
-               self._web_failed, self._pending_url, self._note, cfg.lan,
-               cfg.web.port, current_language())
+        sig = (state, info, self._skipped, self._tablet_seen, self._web_failed,
+               self._finish_url, tuple(self._notes), cfg.lan, cfg.web.port,
+               current_language())
         if sig == self._sig:
             return
         self._sig = sig
@@ -331,9 +501,14 @@ class LivePanel(QWidget):
         self._idle.setVisible(state.phase == "idle")
         self._clear_body()
         draw = getattr(self, f"_draw_{state.phase}", self._draw_idle)
-        draw(state, following)
-        self._note_lbl.setText(self._note)
-        self._note_lbl.setVisible(bool(self._note))
+        draw(state, info)
+        # Durante «Ho finito» il pannello torna ai bottoni (il coach e' fermo),
+        # ma la riga resta: il report sta arrivando.
+        lines = [t(k) for k in self._notes]
+        if self._finish_url is not None:
+            lines.append(t("live.report_wait"))
+        self._note_lbl.setText(" ".join(lines))
+        self._note_lbl.setVisible(bool(lines))
 
     def _clear_body(self) -> None:
         while self._body_lay.count():
@@ -415,19 +590,18 @@ class LivePanel(QWidget):
             self._add(_hint(t("live.no_laps")))
         btn = self._add(self._button(key, name, self._finish, accent=True,
                                      height=52))
-        if self._pending_url is not None:
+        if self._finish_url is not None:
             btn.setEnabled(False)
-            self._add(_hint(t("live.report_wait")))
         elif sub:
             self._add(_hint(t(sub)))
 
-    def _draw_idle(self, st: PanelState, _following) -> None:
+    def _draw_idle(self, st: PanelState, _info) -> None:
         self._body_lay.addSpacing(8)
         self._add(_hint(t("live.preview")))
         for i, key in enumerate(("live.s1", "live.s2", "live.s3"), 1):
             self._add(self._step(str(i), t(key), dim=True))
 
-    def _draw_before(self, st: PanelState, _following) -> None:
+    def _draw_before(self, st: PanelState, _info) -> None:
         self._header("live.before")
         self._add(self._step("✓", t("live.s1"), _hint(t("live.s1_sub")),
                              done=True))
@@ -486,27 +660,50 @@ class LivePanel(QWidget):
             laps += " · " + t("live.best", time=_best(st.best))
         self._add(_hint(laps))
 
-    def _draw_driving(self, st: PanelState, following) -> None:
+    def _draw_driving(self, st: PanelState, info) -> None:
         self._header("live.driving")
         self._add(self._tablet_line(st))
         self._combo(st)
-        if following:
-            self._add(_bold("▶ " + t("live.following", name=following)))
-            self._add(_hint(t("live.following_sub")))
+        defect = (info or {}).get("defect")
+        if defect:
+            from .coaching.howto import defect_name
+            try:
+                name = defect_name(defect, current_language())
+            except KeyError:
+                name = None
+            if name:
+                self._add(_bold("▶ " + t("live.following", name=name)))
+                self._add(_hint(t("live.following_sub")))
         self._finish_block(st, "live.finish", "liveFinish", "live.finish_sub")
 
-    def _draw_finished(self, st: PanelState, _following) -> None:
+    @staticmethod
+    def _minutes(seconds: float) -> str:
+        n = max(1, round(seconds / 60.0))
+        return t("live.minute_one") if n == 1 else t("live.minutes", n=n)
+
+    def _draw_finished(self, st: PanelState, info) -> None:
         self._header("live.finished")
-        if st.saved_laps:
-            saved = (t("live.saved_one") if st.saved_laps == 1
-                     else t("live.saved", n=st.saved_laps))
+        # Il catalogo sa validi e durata; se non risponde (o non ha ancora
+        # indicizzato i giri) resta il conto di /health, senza inventare il resto.
+        cat_total = (info or {}).get("total") or 0
+        total = cat_total or st.saved_laps or 0
+        if total:
+            saved = (t("live.saved_one") if total == 1
+                     else t("live.saved", n=total))
+            if cat_total:
+                v = info.get("valid", 0)
+                saved += ", " + (t("live.valid_one") if v == 1
+                                 else t("live.valid", n=v))
             self._add(_role(QLabel("✓ " + saved), "good"))
-            self._add(_hint(" · ".join(x for x in (st.track, st.car) if x)))
+            where = [x for x in (st.track, st.car) if x]
+            if cat_total and info.get("duration_s") is not None:
+                where.append(self._minutes(info["duration_s"]))
+            self._add(_hint(" · ".join(where)))
         self._add(_hint(t("live.closed")))
         self._finish_block(st, "live.show", "liveShow")
         self._add(self._button("live.stay", "liveStay", self._stay))
 
-    def _draw_silent(self, st: PanelState, _following) -> None:
+    def _draw_silent(self, st: PanelState, _info) -> None:
         # Al posto dei dati, che sono quelli dell'ultima risposta e non di
         # adesso: anche la riga del tablet, che direbbe «collegato» a vuoto.
         self._header("live.driving")
