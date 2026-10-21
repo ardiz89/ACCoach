@@ -2,8 +2,8 @@
 from __future__ import annotations
 
 from accoach.livepanel import (
-    CLOSED_AFTER_S, SILENT_AFTER, Health, LiveTracker, parse_health,
-    report_url,
+    CLOSED_AFTER_S, SILENT_AFTER, STARTING_S, Health, LiveTracker,
+    parse_health, report_url,
 )
 
 
@@ -15,7 +15,7 @@ def H(connected=True, remote=0, **kw) -> Health:
 
 
 def test_constants():
-    assert (SILENT_AFTER, CLOSED_AFTER_S) == (3, 60.0)
+    assert (SILENT_AFTER, CLOSED_AFTER_S, STARTING_S) == (3, 60.0, 30.0)
 
 
 def test_parse_health():
@@ -73,12 +73,52 @@ def test_three_missed_answers_is_silent_and_it_recovers():
     assert t.feed(None, 4.0, True).phase == "driving"
     assert t.feed(None, 6.0, True).phase == "silent"
     assert t.feed(H(True), 8.0, True).phase == "driving"
-    # prima della telemetria la fase precedente e' before
+    # prima della telemetria (ma dopo una risposta) la fase precedente e' before
     t2 = LiveTracker()
-    t2.feed(None, 0.0, True)
+    t2.feed(H(False), 0.0, True)
     t2.feed(None, 2.0, True)
-    assert t2.feed(None, 4.0, True).phase == "silent"
-    assert t2.feed(H(False), 6.0, True).phase == "before"
+    t2.feed(None, 4.0, True)
+    assert t2.feed(None, 6.0, True).phase == "silent"
+    assert t2.feed(H(False), 8.0, True).phase == "before"
+
+
+def test_before_the_first_answer_it_is_starting_not_silent():
+    """«Muto» vuol dire che rispondeva e ha smesso. Un coach che non ha mai
+    risposto si sta avviando, e dopo 30 s e' acceso ma non risponde: dirgli
+    «fermalo e riavvialo» come a uno che si e' piantato sarebbe un'altra cosa."""
+    t = LiveTracker()
+    t.begin(0.0)
+    for i in range(2, 30, 2):
+        assert t.feed(None, float(i), True).phase == "starting"
+    assert t.feed(None, 30.0, True).phase == "unreachable"
+    assert t.feed(None, 300.0, True).phase == "unreachable"
+    # la prima risposta buona lo sblocca, e da li' in poi il silenzio e' silenzio
+    assert t.feed(H(False), 302.0, True).phase == "before"
+    t.feed(None, 304.0, True)
+    t.feed(None, 306.0, True)
+    assert t.feed(None, 308.0, True).phase == "silent"
+
+
+def test_a_malformed_answer_is_not_a_first_answer():
+    t = LiveTracker()
+    t.begin(0.0)
+    assert t.feed(parse_health({}), 2.0, True).phase == "starting"
+    assert t.feed(parse_health("x"), 40.0, True).phase == "unreachable"
+
+
+def test_the_starting_clock_begins_with_the_run_not_the_first_poll():
+    t = LiveTracker()
+    t.begin(100.0)
+    assert t.feed(None, 129.0, True).phase == "starting"
+    assert t.feed(None, 130.0, True).phase == "unreachable"
+    # senza `begin` l'orologio parte dal primo feed della corsa
+    t2 = LiveTracker()
+    assert t2.feed(None, 50.0, True).phase == "starting"
+    assert t2.feed(None, 79.0, True).phase == "starting"
+    assert t2.feed(None, 80.0, True).phase == "unreachable"
+    # e una corsa nuova lo fa ripartire
+    t2.feed(None, 81.0, False)
+    assert t2.feed(None, 200.0, True).phase == "starting"
 
 
 def test_silent_is_not_acc_closed():

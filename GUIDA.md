@@ -41,12 +41,13 @@ dall'exe sia da sorgente), così l'analisi li ritrova sempre.
 **Il pannello In pista ti accompagna.** Dopo ▶ Coach Live la pagina mostra tre
 momenti, uno dopo l'altro.
 
-**Prima di partire.** Il primo passo, *Coach Live acceso*, è già spuntato: voce e
-overlay sono pronti. Poi viene *Collega il tablet all'ingegnere*: inquadra il
-codice QR con la fotocamera del tablet, oppure apri l'indirizzo scritto accanto.
-Il tablet si collega solo con la rete locale attiva; se è spenta, il pannello ha
-il bottone *Attiva la rete locale*. Se il tablet non ti serve, premi *Salta,
-guido senza*. L'ultimo passo, *Avvia il gioco ed esci dai box*, si spunta da solo
+**Prima di partire.** Il primo passo, *Coach Live acceso*, si spunta appena il
+coach risponde, di solito in un paio di secondi: voce e overlay sono pronti. Poi
+viene *Collega il tablet all'ingegnere*: inquadra il codice QR con la fotocamera
+del tablet, oppure apri l'indirizzo scritto accanto. Il tablet si collega solo
+con la rete locale attiva; se è spenta, il pannello ha il bottone *Attiva la
+rete locale*, e dopo averla attivata riavvia Coach Live. Se il tablet non ti
+serve, premi *Salta, guido senza*. L'ultimo passo, *Avvia il gioco ed esci dai box*, si spunta da solo
 quando arriva la telemetria.
 
 **Stai guidando.** Il pannello mostra se il tablet è collegato, pista e auto, i

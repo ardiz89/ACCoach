@@ -1,9 +1,10 @@
 """Il pannello «In pista» dell'hub: dal via di Coach Live alla Pagella.
 
-Disegna soltanto: lo stato (prima di partire, in pista, sessione finita, coach
-muto) lo decide :mod:`accoach.livepanel` da `/health` e dal processo. Qui ci
-sono i tre momenti approvati col pilota, il clic «Ho finito» (ferma il coach,
-poi apre la Pagella della combo guidata) e l'interrogazione di `/health`.
+Disegna soltanto: lo stato (in avvio, prima di partire, in pista, sessione
+finita, coach muto o mai risposto) lo decide :mod:`accoach.livepanel` da
+`/health` e dal processo. Qui ci sono i tre momenti approvati col pilota, il clic
+«Ho finito» (ferma il coach, poi apre la Pagella della combo guidata) e
+l'interrogazione di `/health`.
 
 L'hub sta dietro al gioco mentre il pilota guida: **non deve mai bloccarsi**.
 Quindi niente che aspetta sul thread dell'interfaccia:
@@ -188,6 +189,10 @@ class LivePanel(QWidget):
         # invece di «nessun tablet»).
         self._skipped = False
         self._tablet_seen = False
+        # La LAN com'era quando la corsa e' partita: Coach Live apre la rete solo
+        # allora, quindi accenderla dopo non rende raggiungibile il QR. `None`
+        # fuori da una corsa (vale la configurazione di adesso).
+        self._run_lan: bool | None = None
         # Le note sono chiavi, non testi: un cambio di lingua le ridice.
         self._notes: list[str] = []
         self._reply = None
@@ -274,18 +279,22 @@ class LivePanel(QWidget):
         # Una corsa nuova parte pulita: niente di quella prima.
         self._tracker.feed(None, time.monotonic(), False)
         if live:
+            # L'orologio dell'avvio parte adesso, non al primo poll.
+            self._tracker.begin(time.monotonic())
             self._run_started = time.time()
             self._skipped = self._tablet_seen = self._web_failed = False
             if self._finish_url is None:
                 self._notes = []
             self._cat_key = self._cat_info = None
-            if load_config().lan:
+            self._run_lan = load_config().lan
+            if self._run_lan:
                 # Il QR punta alla pagina Ingegnere del processo `web`.
                 self._ensure_web(lambda _up: None)
             self._poll.start()
-            self.render_state(PanelState("before"))
+            self.render_state(PanelState("starting"))
         else:
             self._poll.stop()
+            self._run_lan = None
             self.render_state(PanelState("idle"))
 
     def _poll_once(self) -> None:
@@ -343,7 +352,9 @@ class LivePanel(QWidget):
                 self._web_resolve(True)
                 return
             if not self._web_child_alive():
-                self._hub._spawn(["web"], False)
+                # Senza browser: la scheda giusta (Pagella, Ingegnere) la apre
+                # il pannello quando serve; quella di `web` sarebbe in piu'.
+                self._hub._spawn(["web", "--no-browser"], False)
             self._web_deadline = time.monotonic() + WEB_WAIT_S
             self._web_timer.start()
 
@@ -431,8 +442,8 @@ class LivePanel(QWidget):
         """L'ultima lettura del catalogo per questa combo (o None), e una nuova
         lettura in un thread se i file del catalogo sono cambiati.
 
-        Il controllo e' uno `stat` (mtime e dimensione di `laps.db` e del suo
-        `-wal`): un giro salvato o un consiglio accettato lo cambiano, una
+        Il controllo e' uno `stat` (mtime e dimensione di `catalog.db` e del
+        suo `-wal`): un giro salvato o un consiglio accettato lo cambiano, una
         risposta di /health no."""
         if not st.car or not st.track:
             return None
@@ -462,7 +473,12 @@ class LivePanel(QWidget):
             info = read_catalog(db, car, track, since)
         except Exception:   # noqa: BLE001 - un catalogo illeggibile = niente
             info = None
-        self._bridge.done.emit((key, info))
+        try:
+            self._bridge.done.emit((key, info))
+        except RuntimeError:
+            # L'hub si e' chiuso mentre il thread leggeva: il ponte e' gia'
+            # distrutto e non c'e' piu' nessuno a cui consegnare.
+            pass
 
     def _on_catalog(self, result) -> None:
         key, info = result
@@ -492,8 +508,8 @@ class LivePanel(QWidget):
                 else None)
         cfg = load_config()
         sig = (state, info, self._skipped, self._tablet_seen, self._web_failed,
-               self._finish_url, tuple(self._notes), cfg.lan, cfg.web.port,
-               current_language())
+               self._finish_url, tuple(self._notes), cfg.lan, self._run_lan,
+               cfg.web.port, current_language())
         if sig == self._sig:
             return
         self._sig = sig
@@ -601,10 +617,17 @@ class LivePanel(QWidget):
         for i, key in enumerate(("live.s1", "live.s2", "live.s3"), 1):
             self._add(self._step(str(i), t(key), dim=True))
 
-    def _draw_before(self, st: PanelState, _info) -> None:
+    def _draw_before(self, st: PanelState, _info,
+                     coach: QWidget | None = None) -> None:
+        """I tre passi. `coach` e' la riga del passo 1 quando il coach non ha
+        ancora risposto (in avvio, o acceso ma muto da sempre): allora il passo
+        non si spunta."""
         self._header("live.before")
-        self._add(self._step("✓", t("live.s1"), _hint(t("live.s1_sub")),
-                             done=True))
+        if coach is None:
+            self._add(self._step("✓", t("live.s1"), _hint(t("live.s1_sub")),
+                                 done=True))
+        else:
+            self._add(self._step("1", t("live.s1"), coach))
         if st.tablet_done:
             self._add(self._step("✓", t("live.s2"), self._tablet_line(st),
                                  done=True))
@@ -612,13 +635,25 @@ class LivePanel(QWidget):
             self._add(self._step("2", t("live.s2"), *self._tablet_how()))
         self._add(self._step("3", t("live.s3"), _hint(t("live.s3_sub"))))
 
+    def _draw_starting(self, st: PanelState, info) -> None:
+        self._draw_before(st, info, _hint(t("live.starting")))
+
+    def _draw_unreachable(self, st: PanelState, info) -> None:
+        self._draw_before(st, info, _role(_hint(t("live.unreachable")), "bad"))
+
     def _tablet_how(self) -> list[QWidget]:
-        """Come si collega il tablet: il QR con la rete locale attiva, altrimenti
-        la strada per attivarla. «Apri su questo PC» c'e' in tutti e due i casi."""
+        """Come si collega il tablet: il QR se la corsa e' partita con la rete
+        locale attiva, altrimenti la strada per attivarla (e riavviare).
+        «Apri su questo PC» c'e' in tutti i casi."""
         cfg = load_config()
+        lan = cfg.lan if self._run_lan is None else self._run_lan
         out: list[QWidget] = []
         buttons = [self._button("live.open_here", "liveOpenHere", self._open_here)]
-        if not cfg.lan:
+        if not lan and cfg.lan:
+            # Accesa a corsa iniziata: Coach Live non ascolta la rete finche'
+            # non riparte, e un QR porterebbe a una pagina muta.
+            out.append(_hint(t("live.s2_lan_restart")))
+        elif not lan:
             out.append(_hint(t("live.s2_lan_off")))
             buttons.insert(0, self._button("live.s2_to_devices", "liveToDevices",
                                            self._to_devices))
@@ -662,7 +697,12 @@ class LivePanel(QWidget):
 
     def _draw_driving(self, st: PanelState, info) -> None:
         self._header("live.driving")
-        self._add(self._tablet_line(st))
+        if st.tablet_done:
+            self._add(self._tablet_line(st))
+        else:
+            # La telemetria e' arrivata prima del tablet: il passo resta finche'
+            # il tablet non si collega o il pilota non lo salta.
+            self._add(self._step("2", t("live.s2"), *self._tablet_how()))
         self._combo(st)
         defect = (info or {}).get("defect")
         if defect:

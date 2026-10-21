@@ -2602,12 +2602,17 @@ def main(argv: list[str] | None = None) -> None:
     # launcher passes --engineer to land directly on the setup editor.
     path = "/engineer" if "--engineer" in argv else "/"
     url = f"http://{local}:{port}{path}"
+    # `--no-browser`: the hub's «In pista» panel starts this process for the
+    # tablet's QR and for «Ho finito», and opens the right tab itself. Opening
+    # the home page here too meant one extra tab on every Coach Live start.
+    browse = "--no-browser" not in argv
 
     # If a server is already up (e.g. the user opened Analysis earlier), don't try
     # to bind a second one — just open the browser at the requested page.
     if _port_in_use(local, port):
         print(f"HONE already running: opening {url}")
-        webbrowser.open(url)
+        if browse:
+            webbrowser.open(url)
         return
 
     laps_dir = _seed_demo() if "--demo" in argv else cfg.laps_path()
@@ -2618,7 +2623,8 @@ def main(argv: list[str] | None = None) -> None:
     if bind != local:
         print("LAN access ON — other devices on your network can reach this app.")
     # Open the browser once the server has had a moment to come up.
-    threading.Timer(1.5, lambda: webbrowser.open(url)).start()
+    if browse:
+        threading.Timer(1.5, lambda: webbrowser.open(url)).start()
     uvicorn.run(create_api(laps_dir, demo="--demo" in argv),
                 host=bind, port=port, log_level="warning")
 

@@ -376,11 +376,11 @@ Pro will be a one-time purchase. The model may change before launch.
 After you press **Coach Live**, the **Drive** page shows three moments, one after
 the other.
 
-**Before you go.** *Coach Live is on* is already ticked: voice and overlay are
-ready. Next comes *Connect your tablet to the engineer*: scan the QR code with the
+**Before you go.** *Coach Live is on* ticks as soon as the coach answers,
+usually within a couple of seconds: voice and overlay are ready. Next comes *Connect your tablet to the engineer*: scan the QR code with the
 tablet's camera, or open the address next to it. The tablet only connects with
-network access on; if it's off, the panel has a *Turn on network access* button.
-If you don't need the tablet, press *Skip, I'll drive without*. The last step,
+network access on; if it's off, the panel has a *Turn on network access* button,
+and once it's on, restart Coach Live. If you don't need the tablet, press *Skip, I'll drive without*. The last step,
 *Start the game and leave the pits*, ticks itself when the telemetry arrives.
 
 **You're driving.** The panel shows whether the tablet is connected, the track

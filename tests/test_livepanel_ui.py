@@ -73,7 +73,7 @@ class _Net:
         self.calls.append(("open", url))
         return True
 
-    def spawns(self, what=("web",)):
+    def spawns(self, what=("web", "--no-browser")):
         return [c for c in self.calls if c == ("spawn", what)]
 
 
@@ -675,7 +675,7 @@ def test_polling_runs_only_while_coach_live_runs(env):
     assert not panel._poll.isActive()
     proc = _live(win)
     assert panel._poll.isActive()
-    assert panel.state.phase == "before"
+    assert panel.state.phase == "starting"      # nessuna risposta, ancora
     proc.exit()
     win._refresh_buttons()
     assert not panel._poll.isActive()
@@ -758,4 +758,190 @@ def test_finished_falls_back_to_health_when_the_catalog_has_no_laps(env):
     text = _joined(panel)
     assert "14 laps saved" in text
     assert not re.search(r"\d+ valid", text)
-    assert not re.search(r"\d+ minutes?", text)
+    assert not re.search(r"\d+ minutes?\b", text)
+
+
+# --- i ritocchi della revisione finale -------------------------------------
+
+def test_every_web_the_panel_starts_opens_no_browser_tab(env, monkeypatch):
+    """Il `web` del pannello serve il QR e la Pagella: la scheda la apre il
+    pannello quando serve, non `api.main` a ogni avvio (due schede per clic)."""
+    from accoach import livepanel_ui
+    win, panel, net, _tmp = env
+    _cfg().lan = True
+    proc = _live(win)                             # avvio con la LAN
+    _stop_kills(monkeypatch, win, net, proc)
+    panel.render_state(_states()["driving"])
+    _click(panel, "liveFinish")                   # «Ho finito» col web giu'
+    panel._stop_tick()
+    later = time.monotonic() + livepanel_ui.WEB_WAIT_S + 1
+    monkeypatch.setattr(livepanel_ui.time, "monotonic", lambda: later)
+    panel._web_tick()
+    win._children.clear()
+    panel._open_here()                            # «Apri su questo PC»
+    spawned = [c[1] for c in net.calls if c[0] == "spawn"]
+    assert spawned and all(a == ("web", "--no-browser") for a in spawned), spawned
+    # Il bottone «Analisi» dell'hub resta quello di sempre, col suo browser.
+    assert ("web",) in {k for k, label, _b in win._actions
+                        if label == "btn.analysis"}
+
+
+def test_driving_keeps_the_tablet_step_until_it_is_done(env):
+    """La telemetria puo' arrivare prima del tablet: il passo 2 non sparisce."""
+    from PySide6.QtWidgets import QLabel, QPushButton
+    from accoach.i18n import t
+    _win, panel, _net, _tmp = env
+    _cfg().lan = True
+    st = PanelState("driving", car=CAR, track=TRACK, saved_laps=1, laps_done=1)
+    panel.render_state(st)
+    text = _joined(panel)
+    assert t("live.s2") in text
+    assert "192.168.1.23:8778/engineer" in text
+    qr = panel.findChild(QLabel, "liveQr")
+    assert qr is not None and _visible_in(qr, panel)
+    names = [w.objectName() for w in panel.findChildren(QPushButton)
+             if _visible_in(w, panel)]
+    assert {"liveOpenHere", "liveSkip", "liveFinish"} <= set(names)
+    # sopra il resto: il passo viene prima della combo e del bottone grande
+    texts = _texts(panel)
+    assert texts.index(t("live.s2")) < texts.index(t("live.finish"))
+    # e col QR in piu' la pagina ci sta ancora
+    panel.layout().activate()
+    assert panel.minimumSizeHint().width() <= PAGE_W
+    assert panel.sizeHint().height() <= PAGE_H, panel.sizeHint()
+    # senza LAN la riga per accenderla, non il QR
+    _cfg().lan = False
+    panel.render_state(_more_laps(st))
+    assert panel.findChild(QLabel, "liveQr") is None
+    assert t("live.s2") in _joined(panel)
+    # collegato (o saltato): il passo se ne va
+    _cfg().lan = True
+    panel.render_state(PanelState("driving", tablet_done=True, tablet_now=True,
+                                  car=CAR, track=TRACK))
+    assert t("live.s2") not in _joined(panel)
+    assert panel.findChild(QLabel, "liveQr") is None
+
+
+def _more_laps(st):
+    from dataclasses import replace
+    return replace(st, laps_done=(st.laps_done or 0) + 1)
+
+
+def test_skip_from_the_driving_view(env):
+    from accoach.i18n import t
+    win, panel, _net, _tmp = env
+    _cfg().lan = True
+    _live(win)
+    panel.render_state(PanelState("driving", car=CAR, track=TRACK))
+    _click(panel, "liveSkip")
+    assert t("live.s2") not in _joined(panel)
+    assert t("live.tablet_skipped") in _joined(panel)
+
+
+def test_starting_and_unreachable_are_not_silent(env):
+    from accoach.i18n import t
+    win, panel, _net, _tmp = env
+    _live(win)
+    assert panel.state.phase == "starting"
+    text = _joined(panel)
+    assert t("live.starting") in text
+    assert t("live.silent") not in text
+    panel.render_state(PanelState("unreachable"))
+    text = _joined(panel)
+    assert t("live.unreachable") in text
+    assert t("live.silent") not in text and t("live.starting") not in text
+    assert t("live.unreachable", "it").startswith(
+        "Coach Live è acceso ma non risponde")
+
+
+@pytest.mark.parametrize("lang", ["it", "en"])
+def test_starting_and_unreachable_fit(env, lang):
+    from accoach.config import set_language
+    _win, panel, _net, _tmp = env
+    set_language(lang)
+    _cfg().lan = True
+    for phase in ("before", "starting", "unreachable"):
+        panel.render_state(PanelState(phase))
+        # Il layout si ricalcola adesso, non al prossimo giro di eventi: senza,
+        # `sizeHint` e' quello dello stato di prima. La larghezza che conta e'
+        # la minima (le righe lunghe vanno a capo), l'altezza quella voluta.
+        panel.layout().activate()
+        assert panel.minimumSizeHint().width() <= PAGE_W, phase
+        assert panel.sizeHint().height() <= PAGE_H, phase
+        for text in _texts(panel):
+            assert not re.search(r"\blive\.[a-z_]", text), (phase, text)
+
+
+def test_a_run_started_without_lan_shows_no_qr_even_if_lan_comes_on(env):
+    """Coach Live ascolta la rete solo se la LAN era accesa quando e' partito:
+    accenderla dopo non basta, il QR porterebbe a una pagina che non risponde."""
+    from PySide6.QtWidgets import QLabel, QPushButton
+    from accoach.i18n import t
+    win, panel, _net, _tmp = env
+    _cfg().lan = False
+    _live(win)
+    panel.render_state(PanelState("before"))
+    assert t("live.s2_lan_off") in _joined(panel)
+    assert panel.findChild(QPushButton, "liveToDevices") is not None
+    _cfg().lan = True                              # accesa a corsa iniziata
+    panel.render_state(PanelState("before"))
+    assert panel.findChild(QLabel, "liveQr") is None
+    assert "192.168.1.23" not in _joined(panel)
+    assert t("live.s2_lan_restart") in _joined(panel)
+    # una corsa nuova, con la LAN accesa, ha il QR
+    win._children.clear()
+    win._refresh_buttons()
+    _live(win)
+    panel.render_state(PanelState("before"))
+    assert panel.findChild(QLabel, "liveQr") is not None
+
+
+def test_lan_texts_say_how_to_get_the_qr():
+    from accoach.i18n import t
+    it_off, en_off = t("live.s2_lan_off", "it"), t("live.s2_lan_off", "en")
+    assert "Dispositivi" in it_off and "riavvia" in it_off.lower()
+    assert "Devices" in en_off and "restart" in en_off.lower()
+    assert "riavvia" in t("live.s2_lan_restart", "it").lower()
+    assert "restart" in t("live.s2_lan_restart", "en").lower()
+
+
+def test_the_closed_line_does_not_count_the_minute():
+    """Dopo «Resto in pista» la scheda torna quando vuole: «da un minuto» non
+    sarebbe piu' vero."""
+    from accoach.i18n import t
+    assert "minut" not in t("live.closed", "it")
+    assert "minute" not in t("live.closed", "en")
+
+
+def test_web_down_does_not_send_to_the_same_dead_page():
+    from accoach.i18n import t
+    assert "questo PC" not in t("live.s2_web_down", "it")
+    assert "this PC" not in t("live.s2_web_down", "en")
+
+
+def test_a_destroyed_bridge_does_not_raise_in_the_worker(env, monkeypatch):
+    from accoach import livepanel_ui
+    _win, panel, _net, tmp = env
+
+    class _Dead:
+        class done:
+            @staticmethod
+            def emit(_x):
+                raise RuntimeError("Internal C++ object already deleted.")
+
+    monkeypatch.setattr(panel, "_bridge", _Dead())
+    monkeypatch.setattr(livepanel_ui, "read_catalog", lambda *a: None)
+    panel._catalog_worker(None, tmp / "x.db", CAR, TRACK, "")  # non solleva
+
+
+def test_the_starting_clock_begins_when_coach_live_starts(env, monkeypatch):
+    """I 30 s dell'avvio contano da quando Coach Live parte, non dal primo
+    poll andato a vuoto."""
+    from accoach import livepanel, livepanel_ui
+    win, panel, _net, _tmp = env
+    now = [1000.0]
+    monkeypatch.setattr(livepanel_ui.time, "monotonic", lambda: now[0])
+    _live(win)
+    now[0] += livepanel.STARTING_S + 1
+    panel._on_health(None)
+    assert panel.state.phase == "unreachable"

@@ -447,18 +447,28 @@ _UI: dict[str, dict[str, str]] = {
                      "it": "Inquadra il codice con la fotocamera del tablet, "
                            "oppure apri {addr}."},
     "live.s2_lan_off": {
-        "en": "The tablet can only connect with network access on.",
-        "it": "Il tablet si collega solo con la rete locale attiva."},
+        "en": "The tablet can only connect with network access on. Turn it on "
+              "in Devices, then restart Coach Live.",
+        "it": "Il tablet si collega solo con la rete locale attiva. Attivala in "
+              "Dispositivi, poi riavvia Coach Live."},
+    # Coach Live apre la rete solo se la LAN era accesa quando e' partito:
+    # accenderla a corsa iniziata non basta.
+    "live.s2_lan_restart": {
+        "en": "Coach Live started with network access off. Restart it to "
+              "connect the tablet.",
+        "it": "Coach Live è partito con la rete locale spenta. Riavvialo per "
+              "collegare il tablet."},
     "live.s2_to_devices": {"en": "Turn on network access",
                            "it": "Attiva la rete locale"},
     "live.s2_no_ip": {
         "en": "This PC has no network address. Connect it to Wi-Fi or a cable.",
         "it": "Questo PC non ha un indirizzo di rete. Collegalo al Wi-Fi o al cavo."},
+    # Non «aprila su questo PC»: e' la stessa pagina che non risponde.
     "live.s2_web_down": {
-        "en": "The Engineer page isn't answering. Open it on this PC, or "
-              "restart Coach Live.",
-        "it": "La pagina Ingegnere non risponde. Aprila su questo PC, o "
-              "riavvia Coach Live."},
+        "en": "The Engineer page isn't answering yet. If the tablet can't open "
+              "it, skip this step and drive without.",
+        "it": "La pagina Ingegnere non risponde ancora. Se il tablet non la "
+              "apre, salta questo passo e guida senza."},
     "live.open_here": {"en": "Open on this PC", "it": "Apri su questo PC"},
     "live.skip": {"en": "Skip, I'll drive without", "it": "Salta, guido senza"},
     # «il gioco» e non «ACC»: HONE segue anche AC, e il passo vale per tutti e due.
@@ -501,13 +511,23 @@ _UI: dict[str, dict[str, str]] = {
     "live.valid": {"en": "{n} valid", "it": "{n} validi"},
     "live.minute_one": {"en": "1 minute", "it": "1 minuto"},
     "live.minutes": {"en": "{n} minutes", "it": "{n} minuti"},
+    # Senza «da un minuto»: dopo «Resto in pista» la scheda puo' tornare dopo
+    # molto di piu'.
     "live.closed": {
-        "en": "The game has been closed for a minute. The coach stays on until "
-              "you stop it, in case you're only changing track.",
-        "it": "Il gioco è chiuso da un minuto. Il coach resta acceso finché non "
-              "lo fermi tu, nel caso tu stia solo cambiando pista."},
+        "en": "The game is closed. The coach stays on until you stop it, in "
+              "case you're only changing track.",
+        "it": "Il gioco è chiuso. Il coach resta acceso finché non lo fermi tu, "
+              "nel caso tu stia solo cambiando pista."},
     "live.show": {"en": "Show me how it went", "it": "Mostrami com'è andata"},
     "live.stay": {"en": "I'm staying on track", "it": "Resto in pista"},
+    # Prima della prima risposta di /health: non e' «muto» (vedi STARTING_S).
+    "live.starting": {"en": "The coach is starting…",
+                      "it": "Il coach si sta avviando…"},
+    "live.unreachable": {
+        "en": "Coach Live is on but isn't answering. This panel updates by "
+              "itself as soon as it does.",
+        "it": "Coach Live è acceso ma non risponde. Il pannello si aggiorna da "
+              "solo appena risponde."},
     "live.silent": {
         "en": "The coach isn't answering. If it doesn't come back in a few "
               "seconds, stop it and start it again.",

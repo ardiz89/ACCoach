@@ -17,6 +17,10 @@ SILENT_AFTER = 3
 CLOSED_AFTER_S = 60.0
 # Ogni quanto l'hub interroga /health mentre Coach Live e' acceso.
 POLL_S = 2.0
+# Secondi dall'avvio in cui un coach che non ha ancora mai risposto «si sta
+# avviando»; dopo, e' acceso ma non risponde. Non e' «muto»: muto vuol dire
+# che rispondeva e ha smesso, e il rimedio («fermalo e riavvialo») e' un altro.
+STARTING_S = 30.0
 
 
 @dataclass
@@ -58,7 +62,9 @@ def parse_health(d: dict | None) -> Health | None:
 
 @dataclass
 class PanelState:
-    phase: str  # "idle" | "before" | "driving" | "finished" | "silent"
+    # "idle" | "starting" | "unreachable" | "before" | "driving" | "finished"
+    # | "silent"
+    phase: str
     tablet_done: bool = False
     tablet_now: bool = False
     car: str | None = None
@@ -82,6 +88,15 @@ class LiveTracker:
         self._tablet_now = False
         self._last: Health | None = None
         self._last_now = 0.0
+        # Almeno una risposta buona in questa corsa, e quando la corsa e' partita.
+        self._answered = False
+        self._started_at: float | None = None
+
+    def begin(self, now: float) -> None:
+        """La corsa parte adesso: da qui contano i STARTING_S dell'avvio (senza,
+        contano dal primo `feed`, cioe' un poll dopo)."""
+        self._reset()
+        self._started_at = now
 
     def skip_tablet(self) -> None:
         self._tablet_done = True
@@ -100,11 +115,14 @@ class LiveTracker:
             self._reset()
             return PanelState("idle")
         self._last_now = now
+        if self._started_at is None:
+            self._started_at = now
 
         if health is None:
             self._missed += 1
         else:
             self._missed = 0
+            self._answered = True
             self._last = health
             if health.connected is True:
                 self._seen_telemetry = True
@@ -117,7 +135,10 @@ class LiveTracker:
             if self._tablet_now:
                 self._tablet_done = True
 
-        if self._missed >= SILENT_AFTER:
+        if not self._answered:
+            phase = ("starting" if now - self._started_at < STARTING_S
+                     else "unreachable")
+        elif self._missed >= SILENT_AFTER:
             # Un coach che non risponde non e' «ACC chiuso».
             phase = "silent"
         elif not self._seen_telemetry:

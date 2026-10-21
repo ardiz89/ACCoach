@@ -396,3 +396,49 @@ def test_every_loss_points_at_a_corner_that_exists(tmp_path):
     assert data["losses"], "il giro sintetico ha una curva lenta apposta"
     for loss in data["losses"]:
         assert loss["index"] in known, loss
+
+
+# --- `web --no-browser`: il processo che il pannello «In pista» accende ------
+
+def _run_web_main(monkeypatch, argv, port_busy):
+    """`api.main` senza server vero, senza porte e senza browser: registra
+    soltanto cosa aprirebbe."""
+    import threading
+    import uvicorn
+    import webbrowser
+    from accoach import api, logging_setup
+    opened, served = [], []
+
+    class _Timer:
+        def __init__(self, _delay, fn):
+            self._fn = fn
+
+        def start(self):
+            self._fn()
+
+    monkeypatch.setattr(logging_setup, "setup_logging", lambda *a, **k: None)
+    monkeypatch.setattr(webbrowser, "open", lambda url, *a, **k: opened.append(url))
+    monkeypatch.setattr(threading, "Timer", _Timer)
+    monkeypatch.setattr(uvicorn, "run", lambda *a, **k: served.append(k))
+    monkeypatch.setattr(api, "_port_in_use", lambda *a: port_busy)
+    monkeypatch.setattr(api, "create_api", lambda *a, **k: object())
+    api.main(argv)
+    return opened, served
+
+
+def test_web_opens_the_browser_by_default(monkeypatch):
+    opened, served = _run_web_main(monkeypatch, [], port_busy=False)
+    assert opened == ["http://127.0.0.1:8778/"] and len(served) == 1
+    opened, _ = _run_web_main(monkeypatch, [], port_busy=True)
+    assert opened == ["http://127.0.0.1:8778/"]
+
+
+def test_web_no_browser_serves_without_opening_a_tab(monkeypatch):
+    """Il pannello apre la scheda giusta da se': una seconda, sulla home, a
+    ogni avvio di Coach Live sarebbe una scheda in piu' a ogni giro."""
+    opened, served = _run_web_main(monkeypatch, ["--no-browser"],
+                                   port_busy=False)
+    assert opened == [] and len(served) == 1
+    opened, served = _run_web_main(monkeypatch, ["--no-browser"],
+                                   port_busy=True)
+    assert opened == [] and served == []
