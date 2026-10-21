@@ -361,7 +361,10 @@ _REPORT_FILES = ("index.html", "app.js", "tour.js", "test.html", "test.js")
 
 def _literals(name: str) -> set[str]:
     src = (WEB / name).read_text(encoding="utf-8")
-    return {a or b or c for a, b, c in _JS_STRING.findall(src)}
+    # Una chiave chiesta dentro un modello (`${t("eng.click")}`) sta dentro il
+    # letterale col backtick: si cerca anche come argomento di `t(…)`.
+    return {a or b or c for a, b, c in _JS_STRING.findall(src)} \
+        | set(re.findall(r"\bt\(\s*[\"']([\w.\-]+)[\"']", src))
 
 
 def _asked(names: tuple[str, ...], keys: set[str]) -> set[str]:
@@ -581,7 +584,7 @@ SURFACES: dict[str, Callable[[], Entries]] = {
 }
 
 # Le superfici non ancora riscritte. Ogni task che ne riscrive una la toglie.
-PENDING: set[str] = set(SURFACES) - {"report_a"}
+PENDING: set[str] = set(SURFACES) - {"report_a", "report_b"}
 
 
 # --- il conto ---------------------------------------------------------------

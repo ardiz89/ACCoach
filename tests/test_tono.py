@@ -202,6 +202,9 @@ def test_the_engineer_page_keys_are_not_in_the_report():
     assert "web/i18n.js:tour.e6.t" in engineer and "web/i18n.js:tour.e6.t" not in report
     assert "web/i18n.js:demo.banner" in report and "web/i18n.js:demo.banner" not in engineer
     assert "web/i18n.js:tour.a1.t" in report
+    # Una chiave chiesta solo dentro un modello di engineer.js
+    # (`${t("eng.click")}`) è della pagina Ingegnere, non del report.
+    assert "web/i18n.js:eng.click" in engineer and "web/i18n.js:eng.click" not in report
     # Più i dizionari del pacchetto engineer e la tabella dei rimedi.
     assert any("engineer/core.py" in k for k in engineer)
     assert any("profiles/_common.py" in k for k in engineer)

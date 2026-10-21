@@ -78,7 +78,7 @@
         <!-- I giri registrati prima dello schema con le coordinate non hanno una
              mappa. Il rail non diventa per questo una colonna vuota: il disegno
              lascia il posto a questa riga e la lista curve sotto resta viva. -->
-        <div id="rail-nomap" class="rail-nomap hidden" data-i18n="rail.nomap">This lap has no map.</div>
+        <div id="rail-nomap" class="rail-nomap hidden" data-i18n="rail.nomap">This lap was recorded without coordinates, so it has no map. The corners below still work.</div>
       </div>
       <nav id="rail-list" class="rail-list"></nav>
     </aside>
@@ -186,7 +186,7 @@
       <section id="st-numbers" class="summary"></section>
       <main id="st-chart-wrap">
         <div class="chart">
-          <h3 data-i18n-html="st.chart">Pace across the stint <small>(each point = a lap · faded = not running pace · the line is the fitted drift)</small></h3>
+          <h3 data-i18n-html="st.chart">Pace across the stint <small>(each dot is a lap, faded = not at pace, the line is the measured drift)</small></h3>
           <canvas id="c-stint" class="tall"></canvas>
         </div>
       </main>
@@ -195,7 +195,7 @@
            different evenings, different track temperatures, refuels in between.
            Same panel, finally over the span it claims. -->
       <section id="tyres" class="debrief tyres hidden">
-        <h3 data-i18n-html="tyre.header">Tyres across the stint <small>(core temp &amp; pressure · dashed = right side)</small></h3>
+        <h3 data-i18n-html="tyre.header">Tyres across the stint <small>(core temperature and pressure, dashed = right side)</small></h3>
         <div id="tyre-legend" class="tyre-legend"></div>
         <div class="tyre-charts">
           <div id="tyre-temp-wrap" class="chart">
@@ -220,7 +220,7 @@
       <section id="summary" class="summary"></section>
     </div>
 
-    <div id="readout" class="readout" data-i18n="readout.hint">Hover over the charts for point-by-point values…</div>
+    <div id="readout" class="readout" data-i18n="readout.hint">Hover the charts to read the values point by point.</div>
 
     <!-- Due colonne, una domanda sola. La mappa aveva una scheda propria e i
          grafici un'altra: «dove ho perso» disegnato e «dove ho perso» in
@@ -232,19 +232,19 @@
       <div class="cmp-charts">
         <main id="charts">
           <div class="chart">
-            <h3 data-i18n-html="chart.delta">Lap delta <small>(s · above the line = slower, below = faster)</small></h3>
+            <h3 data-i18n-html="chart.delta">Lap delta, in seconds <small>(above the line = slower, below = faster)</small></h3>
             <canvas id="c-delta"></canvas>
           </div>
           <div class="chart">
-            <h3 data-i18n-html="chart.speed">Speed <small>(km/h · white = reviewed lap, cyan = comparison)</small></h3>
+            <h3 data-i18n-html="chart.speed">Speed <small>(km/h, white = reviewed lap, cyan = comparison)</small></h3>
             <canvas id="c-speed"></canvas>
           </div>
           <div class="chart">
-            <h3 data-i18n-html="chart.inputs">Throttle / Brake <small>(green = throttle, red = brake · dashed = reference)</small></h3>
+            <h3 data-i18n-html="chart.inputs">Throttle and brake <small>(green = throttle, red = brake, dashed = reference)</small></h3>
             <canvas id="c-inputs"></canvas>
           </div>
           <div class="chart">
-            <h3 data-i18n-html="chart.steer">Steering <small>(white = reviewed lap, cyan = comparison · left up / right down)</small></h3>
+            <h3 data-i18n-html="chart.steer">Steering <small>(white = reviewed lap, cyan = comparison, left is up and right is down)</small></h3>
             <canvas id="c-steer"></canvas>
           </div>
         </main>
@@ -273,10 +273,10 @@
              caption for a picture that isn't there sends you looking for it.
              The h3 title stays: it names the column, and the reason sits right
              under it once the readout and legend are gone. -->
-        <div id="map-readout" class="readout" data-i18n="map.readout">Racing line · colour = speed vs reference (red = slower here, green = faster) · thicker line = bigger gap · ▽ your braking · ○ reference braking</div>
+        <div id="map-readout" class="readout" data-i18n="map.readout">Red marks where you're slower than the reference, green where you're faster. Hover the map for the values.</div>
         <main>
           <div class="chart map">
-            <h3 data-i18n-html="chart.map">Track map <small>(white dashed = reference · solid line = reviewed lap)</small></h3>
+            <h3 data-i18n-html="chart.map">Track map <small>(solid line = reviewed lap, white dashes = reference)</small></h3>
             <canvas id="c-map"></canvas>
             <div class="map-legend" id="map-legend">
               <span class="map-grad">
@@ -285,7 +285,7 @@
                   <span class="grad" aria-hidden="true"></span>
                   <span class="cap slow" data-i18n="map.grad.slow">slower</span>
                 </span>
-                <small data-i18n="map.grad.note">line thickens with the speed gap</small>
+                <small data-i18n="map.grad.note">the line is thicker where the speed gap is bigger</small>
               </span>
               <span class="swatch"><span class="marker">▽</span> <span data-i18n="map.leg.you">your braking</span></span>
               <span class="swatch"><span class="marker ring">○</span> <span data-i18n="map.leg.ref">reference braking</span></span>
@@ -299,7 +299,7 @@
         <!-- `.missing`, non `.empty`: quella è la schermata «ancora nessun giro»
              di tutta la pagina, accesa solo da `body.no-data`, e riusarla qui
              lasciava il messaggio a `display: none` per sempre (vedi il CSS). -->
-        <div id="map-missing" class="missing hidden" data-i18n="map.missing">This lap has no coordinates (recorded before the map update). Drive and record a new lap to see it here.</div>
+        <div id="map-missing" class="missing hidden" data-i18n="map.missing">This lap has no coordinates, because it was recorded before HONE saved them. Drive a new lap and the map will show here.</div>
         <!-- The braking sheet travelled here with the map rather than getting a
              tab of its own: the drawing above already says where you brake, and
              the sheet is the same fact as numbers. Measured across your recent
@@ -316,7 +316,7 @@
        are computed server-side next to their wording). -->
   <div id="view-line" class="hidden">
     <div id="adv-line-line" class="adv-line hidden"></div>
-    <div id="line-readout" class="readout" data-i18n="line.readout">Hover the corner to read speed and how far you were from the reference line…</div>
+    <div id="line-readout" class="readout" data-i18n="line.readout">Hover the corner to read your speed and how far you were from the reference line.</div>
     <section id="line-summary" class="summary"></section>
     <nav id="line-chips" class="chips"></nav>
     <div class="line-grid">
@@ -332,8 +332,8 @@
           <!-- The two pedals were already drawn here and were in no legend at
                all: a marker nobody can name is a decoration. Filled = you,
                hollow ring = the reference, on both. -->
-          <span class="swatch"><span class="marker brk">▼</span> <span data-i18n="line.leg.brake">braking starts</span></span>
-          <span class="swatch"><span class="marker thr">▲</span> <span data-i18n="line.leg.throttle">back on the power</span></span>
+          <span class="swatch"><span class="marker brk">▼</span> <span data-i18n="line.leg.brake">braking starts (filled = you, hollow = reference)</span></span>
+          <span class="swatch"><span class="marker thr">▲</span> <span data-i18n="line.leg.throttle">back on the power (filled = you, hollow = reference)</span></span>
           <!-- Only when the game's track data could be read AND matched to this
                lap; the wording says asphalt, because that is what it is. -->
           <span class="swatch hidden" id="leg-road"><span class="sw-road"></span>
@@ -344,21 +344,21 @@
     </div>
     <main>
       <div class="chart">
-        <h3 data-i18n-html="chart.offset">Where you were on the road <small>(m from the reference line · above = to its right, below = to its left)</small></h3>
+        <h3 data-i18n-html="chart.offset">Where you were on the road <small>(metres from the reference line, above = to its right, below = to its left)</small></h3>
         <canvas id="c-offset"></canvas>
       </div>
       <div class="chart">
-        <h3 data-i18n-html="chart.curv">How tight you are turning <small>(white = you, cyan = reference · further from the middle = tighter arc)</small></h3>
+        <h3 data-i18n-html="chart.curv">How tight you are turning <small>(white = you, cyan = reference, further from the middle = tighter arc)</small></h3>
         <canvas id="c-curv"></canvas>
       </div>
     </main>
     <section id="line-table" class="debrief"></section>
-    <div id="line-missing" class="missing hidden" data-i18n="line.missing">These laps have no coordinates (the track map arrived with schema v3). Drive and record a new lap to see your line here.</div>
+    <div id="line-missing" class="missing hidden" data-i18n="line.missing">These laps were recorded before HONE saved coordinates. Drive a new lap to see your line here.</div>
   </div>
 
   <div id="view-sectors" class="hidden">
     <div id="adv-line-sectors" class="adv-line hidden"></div>
-    <div class="sec-head"><span><span data-i18n="sec.col.sector">Sector</span> <small id="sec-kind"></small></span><span data-i18n-html="sec.col.time">Time <small>(ref)</small></span><span data-i18n-html="sec.col.delta">Δ vs reference <small>(bars left = faster, right = slower)</small></span></div>
+    <div class="sec-head"><span><span data-i18n="sec.col.sector">Sector</span> <small id="sec-kind"></small></span><span data-i18n-html="sec.col.time">Time <small>(ref)</small></span><span data-i18n-html="sec.col.delta">Δ to the reference <small>(bars to the left = faster, to the right = slower)</small></span></div>
     <div id="sectors" class="sectors"></div>
     <section id="ideal" class="ideal"></section>
     <!-- Which laps the ideal is actually made of: every lap, sector by sector,
@@ -395,8 +395,7 @@
          combo while calling itself a stint, so they moved to the tab that
          actually has one. A panel that vanishes without a pointer reads as a
          feature that broke. -->
-    <p class="plan-elsewhere"><span data-i18n="tyre.elsewhere">Tyre temperatures
-      and pressures live under Race pace, over one tank.</span>
+    <p class="plan-elsewhere"><span data-i18n="tyre.elsewhere">Tyre temperatures and pressures are in Race pace, drawn over a single tank instead of your whole archive.</span>
       <button type="button" id="go-stint" class="mini-btn"
               data-i18n="tyre.goto">Open Race pace</button></p>
 
@@ -421,15 +420,15 @@
 
   <div id="view-dynamics" class="hidden">
     <div id="adv-line-dynamics" class="adv-line hidden"></div>
-    <div id="dyn-readout" class="readout" data-i18n="dyn.readout">Hover the traces for point-by-point values…</div>
+    <div id="dyn-readout" class="readout" data-i18n="dyn.readout">Hover the charts to read G and slip at any point.</div>
     <section id="dyn-coasting" class="summary"></section>
     <main id="dyn-charts">
       <div class="chart gg">
-        <h3 data-i18n-html="chart.gg">Grip usage · G-G <small>(each dot = a moment · far from centre = more grip used · the ring = your peak)</small></h3>
+        <h3 data-i18n-html="chart.gg">How much grip you use (G-G) <small>(each dot is a moment, further from the centre = more grip, the ring is your peak)</small></h3>
         <canvas id="c-gg"></canvas>
       </div>
       <div class="chart">
-        <h3 data-i18n-html="chart.slip">Lock &amp; spin <small>(slip ratio · cyan = front, amber = rear · below 0 = locking, above = spinning)</small></h3>
+        <h3 data-i18n-html="chart.slip">Locking and wheelspin <small>(slip ratio, cyan = front, amber = rear, below 0 = locking, above = spinning, bar underneath = ABS and TC at work)</small></h3>
         <canvas id="c-slip"></canvas>
       </div>
       <!-- Lo scostamento dalla traiettoria stava qui, ed era lo STESSO canale
@@ -442,11 +441,11 @@
            rimando qui sotto: un pannello che sparisce senza puntatore si legge
            come una funzione rotta. -->
       <div class="chart">
-        <h3 data-i18n-html="chart.yaw">Rotation vs steering <small>(orange = yaw/rotation, white = steering · they should track together)</small></h3>
+        <h3 data-i18n-html="chart.yaw">Rotation and steering <small>(orange = the car's yaw, white = steering, the two should move together)</small></h3>
         <canvas id="c-yaw"></canvas>
       </div>
       <div class="chart">
-        <h3 data-i18n-html="chart.rpm">Revs &amp; shift points <small>(rpm across the lap · ▲ = upshift, ▼ = downshift)</small></h3>
+        <h3 data-i18n-html="chart.rpm">Revs and shifts <small>(rpm across the lap, triangle up = upshift, triangle down = downshift)</small></h3>
         <canvas id="c-rpm"></canvas>
       </div>
     </main>
@@ -455,12 +454,11 @@
          di un giro che quasi certamente non ha nemmeno le coordinate. Gli altri
          due `.plan-elsewhere` (in Progressi) non si spengono mai e non ne hanno
          bisogno. -->
-    <p id="dyn-elsewhere" class="plan-elsewhere"><span data-i18n="lineoff.elsewhere">Lo scostamento
-      dalla traiettoria vive sotto Traiettoria, che dice anche da che parte.</span>
+    <p id="dyn-elsewhere" class="plan-elsewhere"><span data-i18n="lineoff.elsewhere">How far you stray from the line is in the Line tab, which also tells you on which side.</span>
       <button type="button" id="go-line" class="mini-btn"
-              data-i18n="lineoff.goto">Apri Traiettoria</button></p>
+              data-i18n="lineoff.goto">Open Line</button></p>
     <section id="dyn-tyres" class="debrief tyres hidden">
-      <h3 data-i18n-html="dyn.tyre.header">Tyres across this lap <small>(core temp &amp; pressure corner by corner · dashed = right side)</small></h3>
+      <h3 data-i18n-html="dyn.tyre.header">Tyres across this lap <small>(core temperature and pressure corner by corner, dashed = right side)</small></h3>
       <div id="dyn-tyre-legend" class="tyre-legend"></div>
       <div class="tyre-charts">
         <div class="chart"><h4 data-i18n="tyre.temp">Core temperature (°C)</h4><canvas id="c-dtyre-temp"></canvas></div>
@@ -468,14 +466,14 @@
       </div>
     </section>
     <div id="dyn-balance-wrap" class="chart ribbon hidden">
-      <h3 data-i18n-html="chart.balance">Balance ribbon <small>(racing line coloured by handling · blue = understeer, red = oversteer)</small></h3>
+      <h3 data-i18n-html="chart.balance">Balance along the lap <small>(the racing line coloured by how the car behaves)</small></h3>
       <canvas id="c-balance"></canvas>
       <div class="map-legend">
         <span class="swatch"><span class="marker" style="color:#5896ff">■</span> <span data-i18n="bal.under">understeer</span></span>
         <span class="swatch"><span class="marker" style="color:#ff5a3c">■</span> <span data-i18n="bal.over">oversteer</span></span>
       </div>
     </div>
-    <div id="dyn-missing" class="missing hidden" data-i18n="dyn.missing">This lap has no dynamics data (G / slip were recorded from v6). Drive and record a new lap to see it here.</div>
+    <div id="dyn-missing" class="missing hidden" data-i18n="dyn.missing">This lap was recorded before HONE saved G and slip, so there's nothing to draw. Drive a new lap to see them.</div>
   </div>
 
     </div><!-- /views -->

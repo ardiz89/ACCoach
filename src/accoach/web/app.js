@@ -1896,8 +1896,8 @@ function conditionsNote(c) {
     });
   }
   return tf(c.faster_road_temp == null ? "sum.cond.vx" : "sum.cond.v", {
-    temp: fmtDec(c.road_temp, 1), time: c.faster_lap_time,
-    ftemp: c.faster_road_temp == null ? "" : fmtDec(c.faster_road_temp, 1),
+    temp: fmtDec(c.road_temp, 1, "°C"), time: c.faster_lap_time,
+    ftemp: c.faster_road_temp == null ? "" : fmtDec(c.faster_road_temp, 1, "°C"),
   });
 }
 
@@ -3276,7 +3276,7 @@ function renderStint(s) {
   if (!cur) {
     $("st-when").textContent = "";
     $("st-sub").textContent = "";
-    $("st-numbers").innerHTML = `<div class="nothing">${t("st.none")}</div>`;
+    $("st-numbers").innerHTML = `<div class="nothing">${t("ses.none")}</div>`;
     $("st-laps").innerHTML = "";
     $("st-notes").innerHTML = "";
     $("tyres").classList.add("hidden");
@@ -4421,8 +4421,8 @@ function renderBrakeSheet(b) {
     return;
   }
   const temps = (b.road_temp_from != null)
-    ? tf(b.road_temp_from === b.road_temp_to ? "brk.temp1" : "brk.temp",
-         { from: fmtDec(b.road_temp_from, 1), to: fmtDec(b.road_temp_to, 1) })
+    ? tf(b.road_temp_from === b.road_temp_to ? "brk.temp1" : "ses.sub_temp",
+         { from: fmtDec(b.road_temp_from, 1, "°C"), to: fmtDec(b.road_temp_to, 1, "°C") })
     : t("brk.noTemp");
 
   let body = "";
@@ -4457,8 +4457,8 @@ function renderBrakeSheet(b) {
   }
   el.innerHTML =
     `<h3>${t("brk.title")} ` +
-    `<button type="button" id="brk-csv" class="mini-btn" title="${t("brk.csv.title")}">⬇ CSV</button>` +
-    `<button type="button" id="brk-print" class="mini-btn" title="${t("brk.print.title")}">🖨</button>` +
+    `<button type="button" id="brk-csv" class="mini-btn" title="${t("brk.csv.title")}">CSV</button>` +
+    `<button type="button" id="brk-print" class="mini-btn" title="${t("brk.print.title")}">${t("brk.print")}</button>` +
     `</h3>` +
     `<div class="sheet-sub">${tf("brk.sub", { laps: b.laps })} · ${temps}</div>` +
     `<table class="vmin-table wide"><thead><tr>` +
