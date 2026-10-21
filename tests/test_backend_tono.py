@@ -135,7 +135,8 @@ def _stint_texts(lang):
         for trend in (None,
                       NS(direction="rising", significant=True, slope=184.0, error=42.0),
                       NS(direction="falling", significant=True, slope=-121.0, error=33.0),
-                      NS(direction="flat", significant=False, slope=-120.0, error=145.0)):
+                      NS(direction="flat", significant=False, slope=-120.0, error=145.0),
+                      NS(direction="flat", significant=False, slope=30.0, error=145.0)):
             out += api._pace_notes(lang, litres, known, trend, counted=7, needed=5)
     for ct in (NS(direction="rising", significant=True, slope=0.83),
                NS(direction="falling", significant=True, slope=-0.61),
@@ -166,6 +167,7 @@ def test_the_sample_decimals_reach_the_page_with_the_right_separator():
     for num in ("2.5 m", "0.4 s", "1.8 tenths", "12.4 L", "0.14 s", "0.8 °C"):
         assert num in en, num
     assert "−0,12" in it                      # un meno solo, quello tipografico
+    assert "+0,03 s/giro" in it and "+0.03 s/lap" in en   # il segno della pendenza piatta
 
 
 def test_the_speed_difference_is_the_difference_of_the_printed_speeds():

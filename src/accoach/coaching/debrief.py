@@ -69,16 +69,15 @@ _LOSS = {
         _C.BRAKE_LATER: ("You start braking earlier than the reference.",
                          "Move your braking point later, so you carry more speed "
                          "into the corner."),
-        _C.MORE_THROTTLE: ("Through the corner your throttle averages {tl} %, "
-                           "against {tr} % on the reference.",
+        _C.MORE_THROTTLE: ("Your average throttle is {tl} %, the reference's "
+                           "{tr} %.",
                            "Get back on the throttle earlier and harder on exit, "
                            "without spinning the wheels."),
         _C.BRAKE_EARLIER: ("You brake after the reference but you're {diff} km/h "
                            "slower at the apex, {vl} km/h against {vr} km/h.",
                            "Brake a little earlier. Arriving settled lets you turn "
                            "in sooner, and you find the speed again at the apex."),
-        _C.LESS_BRAKE: ("Through the corner your brake averages {bl} %, against "
-                        "{br} % on the reference.",
+        _C.LESS_BRAKE: ("Your average brake is {bl} %, the reference's {br} %.",
                         "You stay on the brake too long. Release it earlier and let "
                         "the car roll toward the apex."),
         _C.CARRY_SPEED: ("Your minimum speed at the apex is {vl} km/h, the "
@@ -86,23 +85,23 @@ _LOSS = {
                          "Use less brake and draw a wider, smoother line."),
         _C.TIME_LOSS: ("You lose about {tenths} {tenths_word} and no single cause "
                        "stands out.",
-                       "Tidy up your line and drive it the same way every lap. Look "
-                       "again at your line and at when you use the pedals."),
+                       "Tidy up your line and drive it the same way every lap. "
+                       "Check when you brake and when you get back on the throttle."),
     },
     "it": {
         _C.BRAKE_LATER: ("Cominci a frenare prima del riferimento.",
                          "Sposta il punto di frenata più avanti, così entri in curva "
                          "con più velocità."),
-        _C.MORE_THROTTLE: ("In curva il tuo gas medio è {tl} %, quello del "
-                           "riferimento {tr} %.",
+        _C.MORE_THROTTLE: ("Il tuo gas medio è {tl} %, quello del riferimento "
+                           "{tr} %.",
                            "Riapri il gas prima e con più decisione in uscita, senza "
                            "far pattinare le ruote."),
         _C.BRAKE_EARLIER: ("Stacchi dopo il riferimento ma all'apex vai {diff} km/h "
                            "più piano, {vl} km/h contro {vr} km/h.",
                            "Anticipa un po' la staccata. Se arrivi composto giri "
                            "prima, e la velocità la ritrovi all'apex."),
-        _C.LESS_BRAKE: ("In curva il tuo freno medio è {bl} %, quello del "
-                        "riferimento {br} %.",
+        _C.LESS_BRAKE: ("Il tuo freno medio è {bl} %, quello del riferimento "
+                        "{br} %.",
                         "Resti sul freno troppo a lungo. Rilascialo prima e lascia "
                         "scorrere l'auto verso l'apex."),
         _C.CARRY_SPEED: ("All'apex la tua velocità minima è {vl} km/h, quella del "
@@ -112,7 +111,7 @@ _LOSS = {
         _C.TIME_LOSS: ("Perdi circa {tenths} {tenths_word} e nessuna causa prevale "
                        "sulle altre.",
                        "Pulisci la traiettoria e guidala uguale a ogni giro. "
-                       "Riguarda la linea e il momento in cui usi i pedali."),
+                       "Riguarda quando freni e quando riapri il gas."),
     },
 }
 
@@ -348,13 +347,15 @@ _VMIN_COMPARABLE_KMH = 3.0
 
 _LIFT_MSG = {"en": "You lift where the reference stays flat out",
              "it": "Alzi il gas dove il riferimento va in pieno"}
-# Il numero comprende il rettilineo che segue (vedi `_lift_notes`): la frase lo
-# dice com'è, «compreso», e non «si moltiplicano», che lo farebbe sembrare in più.
+# Il numero copre solo la finestra dell'alzata (vedi `_lift_notes`): finisce
+# quando torni sopra il 90 % o il riferimento smette di stare in pieno. Il
+# rettilineo dopo non è dentro, e la frase non lo conta; dice solo che la
+# velocità persa te la porti dietro.
 _LIFT_DETAIL = {
     "en": " Your throttle drops to {thr} % for {secs} s{where}. It costs you about "
-          "{tenths} tenths, counting the straight that follows.",
+          "{tenths} tenths, and you carry the lost speed down the straight.",
     "it": " Il gas scende fino a {thr} % per {secs} s{where}. Ti costa circa {tenths} "
-          "decimi, compreso il rettilineo che segue."}
+          "decimi, e la velocità che perdi te la porti sul rettilineo."}
 _LIFT_WHERE = {"en": " at {name}", "it": " all'altezza di {name}"}
 _TOP_SPEED_MSG = {"en": "You're {gap} km/h down on top speed",
                   "it": "Ti mancano {gap} km/h di velocità di punta"}
@@ -362,7 +363,8 @@ _TOP_SPEED_MSG = {"en": "You're {gap} km/h down on top speed",
 # La frase di prima diceva il contrario («non è l'auto»), e mandava poi a
 # controllare l'ala, cioè l'auto.
 _TOP_SPEED_AERO = {
-    "en": " Your corner speeds match the reference, so it isn't you being slower. "
+    "en": " Your corner speeds match the reference, so the missing speed isn't "
+          "down to you. "
           "Check the wing and the gearing.",
     "it": " In curva vai come il riferimento, quindi non sei tu a essere più "
           "lento. Controlla ala e rapporti."}
@@ -424,20 +426,22 @@ _GRIP_LIMITED = {
     "en": " You already use {pct} % of the grip the reference reaches at its "
           "peaks. A later brake would have to take grip from what the tyre already "
           "spends on turning.",
-    "it": " La tua aderenza arriva già a {pct} % di quella che il riferimento "
-          "raggiunge nei suoi picchi. Una staccata più tarda dovrebbe prenderla da "
+    "it": " Sfrutti già {pct} % dell'aderenza che il riferimento raggiunge nei "
+          "suoi picchi. Una staccata più tarda dovrebbe prenderla da "
           "quella che la gomma spende già per girare."}
 # «Qui» non c'è più: l'inviluppo è il picco del riferimento su tutto il giro, non
 # in questa curva (stesso motivo detto sopra per `_GRIP_LIMITED`).
 _GRIP_UNUSED = {
     "en": " You only reach {pct} % of the grip the reference reaches at its peaks. "
           "The tyre still has load to give, not just time.",
-    "it": " La tua aderenza arriva solo a {pct} % di quella che il riferimento "
-          "raggiunge nei suoi picchi. Sulla gomma resta carico da usare, non solo "
+    "it": " Sfrutti solo {pct} % dell'aderenza che il riferimento raggiunge nei "
+          "suoi picchi. Sulla gomma resta carico da usare, non solo "
           "tempo."}
 
-_BRAKE_EARLY = {"en": " You brake about {m} m too early.",
-                "it": " Stacchi circa {m} m prima."}
+# Segue sempre la frase della categoria («Cominci a frenare prima del
+# riferimento»): qui resta solo la misura.
+_BRAKE_EARLY = {"en": " About {m} m early.",
+                "it": " Sono circa {m} m."}
 # Visual braking reference, appended *after* the metres so it augments rather than
 # replaces: even a slightly-off landmark stays anchored to the distance. Fires
 # only where the track has a verified landmark near the reference's braking onset
@@ -497,31 +501,27 @@ _HEADLINE_SHARE = 0.5
 
 _HEADLINE = {
     "braking": {
-        "en": "You're {pct} % off the reference's pace, and most of it goes in "
-              "braking. Before looking at single corners, brake later and harder.",
-        "it": "Sei a {pct} % dal passo del riferimento e quasi tutto lo perdi in "
-              "frenata. Prima di guardare le singole curve, frena più tardi e più "
-              "forte."},
+        "en": "You're {pct} % off the reference's pace, mostly under braking. "
+              "Before looking at single corners, brake later and harder.",
+        "it": "Perdi {pct} % sul passo del riferimento, quasi tutto in frenata. "
+              "Prima di guardare le singole curve, frena più tardi e più forte."},
     "traction": {
-        "en": "You're {pct} % off the reference's pace, and most of it goes on the "
-              "exits. The work is getting back to full throttle sooner in every "
-              "corner, not in one.",
-        "it": "Sei a {pct} % dal passo del riferimento e quasi tutto lo perdi in "
-              "uscita. Il lavoro è tornare in pieno prima in tutte le curve, non in "
-              "una sola."},
+        "en": "You're {pct} % off the reference's pace, mostly on the exits. The "
+              "work is getting back to full throttle sooner in every corner, not "
+              "in one.",
+        "it": "Perdi {pct} % sul passo del riferimento, quasi tutto in uscita. Il "
+              "lavoro è tornare in pieno prima in tutte le curve, non in una sola."},
     "cornering": {
-        "en": "You're {pct} % off the reference's pace, and most of it goes "
-              "mid-corner. Carry more speed to every apex, then fine-tune single "
-              "corners.",
-        "it": "Sei a {pct} % dal passo del riferimento e quasi tutto lo perdi a "
-              "centro curva. Porta più velocità a ogni apex, poi rifinisci le "
-              "singole curve."},
+        "en": "You're {pct} % off the reference's pace, mostly mid-corner. Carry "
+              "more speed to every apex, then fine-tune single corners.",
+        "it": "Perdi {pct} % sul passo del riferimento, quasi tutto a centro curva. "
+              "Porta più velocità a ogni apex, poi rifinisci le singole curve."},
     "line": {
-        "en": "You're {pct} % off the reference's pace, with the loss spread across "
-              "the lap. Work on a clean, repeatable line, then on single corners.",
-        "it": "Sei a {pct} % dal passo del riferimento, con la perdita sparsa su "
-              "tutto il giro. Lavora su una traiettoria pulita e ripetibile, poi "
-              "sulle singole curve."},
+        "en": "You're {pct} % off the reference's pace, spread across the whole "
+              "lap. Work on a clean, repeatable line, then on single corners.",
+        "it": "Perdi {pct} % sul passo del riferimento, sparso su tutto il giro. "
+              "Lavora su una traiettoria pulita e ripetibile, poi sulle singole "
+              "curve."},
 }
 
 

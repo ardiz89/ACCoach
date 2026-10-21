@@ -138,7 +138,7 @@ def test_a_stretch_where_you_were_quicker_reads_as_a_gain():
     parts = [PhaseLoss("entry", 400.0), PhaseLoss("apex", 0.0),
              PhaseLoss("exit", -100.0), PhaseLoss("after", 0.0)]
     note = phase_note(parts, 300.0, "en")
-    assert "0.40 s goes on entry" in note
+    assert "Most of the time goes on entry, 0.40 s." in note
     assert "0.10 s back on exit" in note
 
 
@@ -147,7 +147,7 @@ def test_a_stretch_where_you_were_quicker_reads_as_a_gain():
 def test_the_sentence_names_the_stretch_that_dominates():
     parts = [PhaseLoss("entry", 60.0), PhaseLoss("apex", 250.0),
              PhaseLoss("exit", 10.0), PhaseLoss("after", 0.0)]
-    assert phase_note(parts, 320.0, "it") == "Di questi, 0,25 s li perdi all'apex."
+    assert phase_note(parts, 320.0, "it") == "Il tempo lo perdi soprattutto all'apex, 0,25 s."
 
 
 def test_nothing_is_named_when_the_loss_is_spread_around_the_corner():

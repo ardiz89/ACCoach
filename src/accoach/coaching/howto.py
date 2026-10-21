@@ -470,7 +470,7 @@ _VERDICT = {
     "it": {
         "gap": "In media perdi {s} a giro rispetto al tuo giro di riferimento",
         "even": "In media sei sul tempo del tuo giro di riferimento",
-        "share": ", e il {p} % viene da {name}.",
+        "share": ", e {p} % di questo tempo viene da {name}.",
         "top": ", e l'abitudine che pesa di più è {name}.",
         "end": ".",
         "first": "È la tua prima sessione qui. Il confronto arriva dalla prossima.",

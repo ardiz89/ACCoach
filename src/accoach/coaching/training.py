@@ -338,8 +338,8 @@ _T = {
                                   "marcia.",
         "d.brake_move_later.s0d": "Oggi inizi a frenare a {v} km/h in {g}ª, e da "
                                   "lì si parte.",
-        "d.brake_move_later.s0c": "Invece di un numero puoi guardare un punto in "
-                                  "pista, e qui il riferimento frena {lm}.",
+        "d.brake_move_later.s0c": "Se a un numero preferisci un punto che vedi, "
+                                  "oggi inizi a frenare {lm}.",
         "d.brake_move_later.s1": "Guida due giri senza cambiare niente, solo per "
                                  "ripetere quel punto. Adesso si sposta di {m} m "
                                  "da un giro all'altro, e un punto che non sai "
@@ -387,7 +387,8 @@ _T = {
         "d.brake_release.s1": "Guida due giri esagerando da una parte, col freno "
                               "già a zero appena giri il volante. Uscirai largo e "
                               "lento, e va bene così perché è metà della misura.",
-        "d.brake_release.s2": "Poi due giri esagerando dall'altra, con un filo "
+        "d.brake_release.s2": "Poi guida due giri esagerando dall'altra parte, "
+                              "con un filo "
                               "di freno fino al punto in cui passi più vicino al "
                               "bordo interno, l'apex. Sentirai l'anteriore "
                               "mordere di più e l'auto girare di più, ma anche "
@@ -451,12 +452,12 @@ _T = {
                               "dell'esercizio.",
         "d.exit_throttle.s1": "Guida due giri per capire cosa ti impedisce di "
                               "aprirlo. Se devi ancora sterzare, ci sei arrivato "
-                              "troppo forte. Se le ruote motrici girano più "
-                              "veloci di quanto l'auto avanza, o senti il "
-                              "controllo di trazione strozzare il motore, il "
-                              "problema è un altro. Arrivi all'apex, il punto più "
-                              "vicino al bordo interno, con l'auto ancora piegata "
-                              "e le ruote ancora sterzate.",
+                              "troppo forte. Se le ruote motrici pattinano, "
+                              "cioè girano più veloci di quanto l'auto avanza, "
+                              "arrivi all'apex con l'auto ancora piegata e le "
+                              "ruote sterzate. Vale lo stesso se senti il "
+                              "controllo di trazione strozzare il motore. L'apex "
+                              "è il punto più vicino al bordo interno.",
         "d.exit_throttle.s1b": "Prova la stessa uscita con una marcia più alta. "
                                "La stessa apertura di gas spinge meno di colpo, "
                                "e spesso il pattinamento sparisce senza cambiare "
@@ -626,8 +627,8 @@ _T = {
                                   "gear.",
         "d.brake_move_later.s0d": "Today you start braking at {v} km/h in gear "
                                   "{g}, and that's where you start from.",
-        "d.brake_move_later.s0c": "Instead of a number you can watch a point on "
-                                  "the track, and here the reference brakes {lm}.",
+        "d.brake_move_later.s0c": "If you'd rather watch a point on track than a "
+                                  "number, today you brake {lm}.",
         "d.brake_move_later.s1": "Drive two laps changing nothing, just repeating "
                                  "that point. Right now it moves {m} m from lap to "
                                  "lap, and a point you can't repeat is a point "
@@ -733,11 +734,10 @@ _T = {
         "d.exit_throttle.s1": "Drive two laps to find out what stops you opening "
                               "it. If you still have to steer, you got there too "
                               "fast. If the driven wheels spin faster than the car "
-                              "goes, or the TC cuts in and the engine "
-                              "bogs, the problem is a different one. You "
-                              "reach the apex, the point closest to the inside "
-                              "edge, with the car still leaned over and the "
-                              "wheels still turned.",
+                              "goes, you reach the apex with the car still leaned "
+                              "over and the wheels still turned. The same goes if "
+                              "you feel the traction control bog the engine. The "
+                              "apex is the point closest to the inside edge.",
         "d.exit_throttle.s1b": "Try the same exit one gear higher. The same "
                                "throttle opening pushes less abruptly, and the "
                                "wheelspin often goes away without changing "
@@ -1205,7 +1205,7 @@ def _speed_gain(f: CornerFacts) -> int:
     return int(gain) if gain >= _REPEATABLE_KMH else 0
 
 
-def _brake_move_later(f: CornerFacts, s: dict) -> Drill:
+def _brake_move_later(f: CornerFacts, s: dict, lang: str) -> Drill:
     steps: list[str] = []
     # Three versions of the same opening line, because the braking sheet gives
     # a different amount depending on the lap: metres need coordinates and older
@@ -1213,19 +1213,19 @@ def _brake_move_later(f: CornerFacts, s: dict) -> Drill:
     # and gear are always there.
     if f.brake_speed_kmh > 0 and f.brake_distance_m > 0:
         steps.append(s["d.brake_move_later.s0"].format(
-            v=f"{f.brake_speed_kmh:.0f}", g=f.brake_gear or "?",
-            d=f"{f.brake_distance_m:.0f}"))
+            v=fmt_num(f.brake_speed_kmh, 0, lang), g=f.brake_gear or "?",
+            d=fmt_num(f.brake_distance_m, 0, lang)))
     elif f.brake_speed_kmh > 0:
         steps.append(s["d.brake_move_later.s0d"].format(
-            v=f"{f.brake_speed_kmh:.0f}", g=f.brake_gear or "?"))
+            v=fmt_num(f.brake_speed_kmh, 0, lang), g=f.brake_gear or "?"))
     else:
         steps.append(s["d.brake_move_later.s0b"])
     if f.landmark:
         steps.append(s["d.brake_move_later.s0c"].format(lm=f.landmark))
     if f.brake_spread_m >= 1.0:
-        steps.append(s["d.brake_move_later.s1"].format(m=f"{f.brake_spread_m:.0f}"))
+        steps.append(s["d.brake_move_later.s1"].format(m=fmt_num(f.brake_spread_m, 0, lang)))
     elif f.brake_spread_kmh >= 1.0:
-        steps.append(s["d.brake_move_later.s1c"].format(k=f"{f.brake_spread_kmh:.0f}"))
+        steps.append(s["d.brake_move_later.s1c"].format(k=fmt_num(f.brake_spread_kmh, 0, lang)))
     else:
         steps.append(s["d.brake_move_later.s1b"])
     steps.append(s["d.brake_move_later.s2"])
@@ -1235,13 +1235,13 @@ def _brake_move_later(f: CornerFacts, s: dict) -> Drill:
     steps.append(s["d.brake_move_later.s2b"])
     steps.append(s["d.brake_move_later.s3"])
     if f.min_speed_kmh > 0:
-        steps.append(s["d.brake_move_later.s4"].format(v=f"{f.min_speed_kmh:.0f}"))
+        steps.append(s["d.brake_move_later.s4"].format(v=fmt_num(f.min_speed_kmh, 0, lang)))
     return Drill(key="brake_move_later", title=s["d.brake_move_later.title"],
                  laps=8, steps=steps, watch=s["d.brake_move_later.watch"],
                  ignore=s["d.brake_move_later.ignore"])
 
 
-def _brake_release(f: CornerFacts, s: dict) -> Drill:
+def _brake_release(f: CornerFacts, s: dict, lang: str) -> Drill:
     # `s2b` is the abort: overdoing the second half of this drill doesn't just
     # make the car stop too much, it can step the rear out. A drill that asks a
     # driver to find an edge has to say what to do when they find it.
@@ -1250,13 +1250,13 @@ def _brake_release(f: CornerFacts, s: dict) -> Drill:
              s["d.brake_release.s3"]]
     if _speed_gain(f):
         steps.append(s["d.brake_release.s4"].format(
-            vr=f"{f.min_speed_ref_kmh:.0f}", v=f"{f.min_speed_kmh:.0f}"))
+            vr=fmt_num(f.min_speed_ref_kmh, 0, lang), v=fmt_num(f.min_speed_kmh, 0, lang)))
     return Drill(key="brake_release", title=s["d.brake_release.title"], laps=6,
                  steps=steps, watch=s["d.brake_release.watch"],
                  ignore=s["d.brake_release.ignore"])
 
 
-def _apex_speed(f: CornerFacts, s: dict) -> Drill:
+def _apex_speed(f: CornerFacts, s: dict, lang: str) -> Drill:
     steps: list[str] = []
     gain = _speed_gain(f)
     if gain:
@@ -1264,8 +1264,8 @@ def _apex_speed(f: CornerFacts, s: dict) -> Drill:
         # ones: 80.4 against 76.8 prints "80 km/h" and "77 km/h" and then said
         # "+4", which is a subtraction the reader can see is wrong.
         steps.append(s["d.apex_speed.s0"].format(
-            vr=f"{f.min_speed_ref_kmh:.0f}", v=f"{f.min_speed_kmh:.0f}",
-            diff=str(gain)))
+            vr=fmt_num(f.min_speed_ref_kmh, 0, lang), v=fmt_num(f.min_speed_kmh, 0, lang),
+            diff=fmt_num(gain, 0, lang)))
     # `s1b` is the abort. The drill deliberately asks the driver to arrive too
     # fast at least once, and the reflex it provokes — snapping off the throttle
     # mid-corner — is the classic way to spin a road car. Asking for the edge
@@ -1277,7 +1277,7 @@ def _apex_speed(f: CornerFacts, s: dict) -> Drill:
                  ignore=s["d.apex_speed.ignore"])
 
 
-def _exit_throttle(_f: CornerFacts, s: dict) -> Drill:
+def _exit_throttle(_f: CornerFacts, s: dict, lang: str) -> Drill:
     return Drill(key="exit_throttle", title=s["d.exit_throttle.title"], laps=6,
                  steps=[s["d.exit_throttle.s0"], s["d.exit_throttle.s1"],
                         s["d.exit_throttle.s1b"], s["d.exit_throttle.s2"],
@@ -1286,7 +1286,7 @@ def _exit_throttle(_f: CornerFacts, s: dict) -> Drill:
                  ignore=s["d.exit_throttle.ignore"])
 
 
-def _brake_straight(_f: CornerFacts, s: dict) -> Drill:
+def _brake_straight(_f: CornerFacts, s: dict, lang: str) -> Drill:
     """The entry drill for cars the tuning table says not to trail-brake.
 
     Same shape as `brake_release` — find the edge, then live just inside it —
@@ -1302,11 +1302,11 @@ def _brake_straight(_f: CornerFacts, s: dict) -> Drill:
                  ignore=s["d.brake_straight.ignore"])
 
 
-def _repeat(f: CornerFacts, s: dict) -> Drill:
+def _repeat(f: CornerFacts, s: dict, lang: str) -> Drill:
     steps = [s["d.repeat.s0"], s["d.repeat.s1"], s["d.repeat.s2"]]
     if f.spread_kmh > 0:
-        steps.append(s["d.repeat.s3"].format(s=f"{f.spread_kmh:.0f}",
-                                             r=f"{_REPEATABLE_KMH:.0f}"))
+        steps.append(s["d.repeat.s3"].format(s=fmt_num(f.spread_kmh, 0, lang),
+                                             r=fmt_num(_REPEATABLE_KMH, 0, lang)))
     steps.append(s["d.repeat.s4"])
     return Drill(key="repeat", title=s["d.repeat.title"], laps=10, steps=steps,
                  watch=s["d.repeat.watch"], ignore=s["d.repeat.ignore"])
@@ -1347,7 +1347,7 @@ def build_drill(category: str, phase: str, facts: CornerFacts,
     """The exercise for one corner, filled with that corner's own numbers."""
     key = drill_key(category, phase, trail_brake=trail_brake,
                     brake_later_blocked=brake_later_is_blocked(facts.grip))
-    return _BUILDERS[key](facts, _s(lang))
+    return _BUILDERS[key](facts, _s(lang), lang)
 
 
 # --- the programme ----------------------------------------------------------

@@ -78,7 +78,7 @@ _STRINGS = {
     },
     "en": {
         "all": "You arrive {dv} km/h down, and you had lost all of it by the "
-               "exit of {prev}. The time in this corner goes before you get here.",
+               "exit of {prev}. You lose this corner's time before you even reach it.",
         "most": "You arrive {dv} km/h down, and you had lost most of it by the "
                 "exit of {prev}. Work on that corner first.",
         "corner": "Corner {n}",

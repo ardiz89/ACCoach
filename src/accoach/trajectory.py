@@ -625,12 +625,12 @@ def corner_path(points: list[LinePoint], lo: float, hi: float,
 _TAGS: dict[str, dict[str, str]] = {
     # States the measurement, not a verdict: the driver knows what happened here
     # better than we do, and "no line to read" is the honest limit of this view.
-    "off_here": {"en": "Down to {v} km/h against {vr}, so there's no line to read here",
+    "off_here": {"en": "You drop to {v} km/h against {vr}, so there's no line to read here",
                  "it": "Scendi a {v} km/h contro {vr}, e qui la traiettoria non si legge"},
     "apex_early": {"en": "Apex {m} m earlier", "it": "Apex {m} m prima"},
     "apex_late": {"en": "Apex {m} m later", "it": "Apex {m} m dopo"},
-    "wide_entry": {"en": "{m} m wide on entry", "it": "{m} m largo in entrata"},
-    "tight_entry": {"en": "{m} m tight on entry", "it": "{m} m stretto in entrata"},
+    "wide_entry": {"en": "{m} m wide on entry", "it": "{m} m largo in ingresso"},
+    "tight_entry": {"en": "{m} m tight on entry", "it": "{m} m stretto in ingresso"},
     "wide_apex": {"en": "{m} m off the apex", "it": "{m} m lontano dall'apex"},
     "tight_apex": {"en": "{m} m inside at the apex", "it": "{m} m più dentro all'apex"},
     "wide_exit": {"en": "{m} m wide on exit", "it": "{m} m largo in uscita"},
@@ -638,9 +638,9 @@ _TAGS: dict[str, dict[str, str]] = {
     # Dove non c'è un interno solo (una variante), «largo» e «stretto» non
     # vogliono dire niente: resta il lato della linea, che è vero comunque.
     "left_entry": {"en": "{m} m left of the line on entry",
-                   "it": "{m} m a sinistra della linea in entrata"},
+                   "it": "{m} m a sinistra della linea in ingresso"},
     "right_entry": {"en": "{m} m right of the line on entry",
-                    "it": "{m} m a destra della linea in entrata"},
+                    "it": "{m} m a destra della linea in ingresso"},
     "left_apex": {"en": "{m} m left of the line at the apex",
                   "it": "{m} m a sinistra della linea all'apex"},
     "right_apex": {"en": "{m} m right of the line at the apex",
@@ -651,10 +651,10 @@ _TAGS: dict[str, dict[str, str]] = {
                    "it": "{m} m a destra della linea in uscita"},
     "longer_line": {"en": "{m} m longer through here", "it": "{m} m di strada in più"},
     "shorter_line": {"en": "{m} m shorter through here", "it": "{m} m di strada in meno"},
-    "tighter_arc": {"en": "A {r} m arc, tighter than the reference's {rr} m",
-                    "it": "Arco di {r} m, più stretto dei {rr} m del riferimento"},
-    "wider_arc": {"en": "A {r} m arc, wider than the reference's {rr} m",
-                  "it": "Arco di {r} m, più largo dei {rr} m del riferimento"},
+    "tighter_arc": {"en": "A {r} m radius, tighter than the reference's {rr} m",
+                    "it": "Curvi più stretto, con un raggio di {r} m contro {rr} m"},
+    "wider_arc": {"en": "A {r} m radius, wider than the reference's {rr} m",
+                  "it": "Curvi più largo, con un raggio di {r} m contro {rr} m"},
 }
 
 

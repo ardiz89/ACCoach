@@ -173,7 +173,7 @@ def test_braking_detail_appends_landmark(monkeypatch):
                         [("al cordolo bianco-rosso", "at the white-and-red kerb", ref_onset)])
     txt = _D._braking_detail(lap, ref, inside, refs, CueCategory.BRAKE_LATER, "it")
     assert "al cordolo bianco-rosso" in txt      # visual reference present
-    assert " m prima." in txt                     # …and the metres stay as anchor
+    assert "Sono circa " in txt                    # …and the metres stay as anchor
 
 
 def test_braking_detail_without_landmark_is_just_metres(monkeypatch):
@@ -181,7 +181,7 @@ def test_braking_detail_without_landmark_is_just_metres(monkeypatch):
     lap, ref, inside, refs = _early_braking_case()
     monkeypatch.setitem(trackdata._LANDMARKS, "monza", [])
     txt = _D._braking_detail(lap, ref, inside, refs, CueCategory.BRAKE_LATER, "it")
-    assert txt.startswith(" Stacchi circa ") and txt.endswith(" m prima.")
+    assert txt.startswith(" Sono circa ") and txt.endswith(" m.")
     assert "cordolo" not in txt
 
 

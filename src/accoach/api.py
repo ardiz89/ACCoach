@@ -335,8 +335,8 @@ _STINT_TEXT = {
                    "che si scalda, non l'auto.",
         "tyres_flat": "In questo stint battistrada e pressioni non hanno una "
                       "deriva misurabile.",
-        "tyres_rising": "Il battistrada sale di {slope} °C/giro.",
-        "tyres_falling": "Il battistrada cala di {slope} °C/giro.",
+        "tyres_rising": "La temperatura del battistrada sale di {slope} °C/giro.",
+        "tyres_falling": "La temperatura del battistrada cala di {slope} °C/giro.",
         "no_wear": "Nessuno dei due simulatori pubblica un dato di usura gomme "
                    "che possiamo registrare. Qui c'è la temperatura, che ne è "
                    "il sintomo.",
@@ -385,9 +385,14 @@ def _pace_notes(lg: str, litres: float | None, fuel_known: bool, trend,
     else:
         # Una deriva vera si dice in positivo («cala di», «migliora di»); una
         # piatta col suo segno, perché è il segno che sta dentro il margine.
-        slope = abs(trend.slope) if trend.significant else trend.slope
+        if trend.significant:
+            slope = fmt_num(abs(trend.slope) / 1000.0, 2, lg)
+        else:
+            slope = fmt_num(trend.slope / 1000.0, 2, lg)
+            if slope[0].isdigit() and slope.strip("0.,"):
+                slope = "+" + slope             # il segno della pendenza piatta
         notes.append(txt[trend.direction if trend.significant else "flat"].format(
-            slope=fmt_num(slope / 1000.0, 2, lg),
+            slope=slope,
             err=fmt_num(trend.error / 1000.0, 2, lg), n=counted))
     return notes
 

@@ -54,11 +54,11 @@ PHASES = ("entry", "apex", "exit", "after")
 _WORDS = {
     "it": {"entry": "in ingresso", "apex": "all'apex", "exit": "in uscita",
            "after": "nel tratto dopo",
-           "most": "Di questi, {s} s li perdi {phase}.",
+           "most": "Il tempo lo perdi soprattutto {phase}, {s} s.",
            "gain": " Ne recuperi {s} s {phase}."},
     "en": {"entry": "on entry", "apex": "at the apex", "exit": "on exit",
            "after": "on the run after",
-           "most": "Of that, {s} s goes {phase}.",
+           "most": "Most of the time goes {phase}, {s} s.",
            "gain": " You take {s} s back {phase}."},
 }
 
