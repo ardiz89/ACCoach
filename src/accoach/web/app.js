@@ -545,7 +545,7 @@ function renderCornerSessions(rows) {
   const el = $("corner-sessions");
   if (!el) return;
   if (!rows || !rows.length) {
-    el.innerHTML = `<div class="clean">${t("ses.none")}</div>`;
+    el.innerHTML = `<div class="clean">${t("cornerses.none")}</div>`;
     return;
   }
   el.innerHTML = rows.map((r) => {
@@ -563,7 +563,7 @@ function renderCornerSessions(rows) {
       return `<div class="ses-row">` +
         `<span class="ses-when">${day} ${hm}</span>` +
         `<span class="ses-track"><span class="ses-fill" style="width:${w}%"></span></span>` +
-        `<span class="ses-nums">−${p.median_s.toFixed(3)}s · ${p.laps} ${t("ses.laps")}</span>` +
+        `<span class="ses-nums">−${p.median_s.toFixed(3)}s · ${p.laps} ${t("cornerses.laps")}</span>` +
         `</div>`;
     }).join("");
     return `<div class="weak sys"><div class="weak-head">` +
@@ -2264,7 +2264,7 @@ function renderPagella(p, index) {
   body.innerHTML = pagDefects(p.defects) +
     `<div class="pag-grid">${pagWorst(p.worst_corners)}${pagErrors(p.errors)}</div>` +
     (note ? `<div class="nothing pag-note">${note}</div>` : "") +
-    pagPlan(p.advice);
+    pagPlan(p.advice, p.declined);
   wirePagella(body);
 }
 
@@ -2352,11 +2352,12 @@ function pagErrors(list) {
 // Il piano: al massimo tre consigli, in ordine. La regola «uno alla volta»
 // vale per tutta la lista e si dice una volta, sopra la lista: ripeterla su
 // ogni consiglio è la stessa frase in tre posti.
-function pagPlan(advice) {
+function pagPlan(advice, declined) {
   const head = `<h4>${t("pag.plan")}</h4>`;
   const list = advice || [];
   if (!list.length) {
-    return `<section class="pag-box pag-plan">${head}<div class="nothing">${t("pag.plan.none")}</div></section>`;
+    return `<section class="pag-box pag-plan">${head}<div class="nothing">${t("pag.plan.none")}</div>` +
+      `${pagDeclined(declined)}</section>`;
   }
   const active = list.some((a) => a.status === "active");
   // «Lo seguo» compare solo sul primo proposto, e solo se nessuno è in corso:
@@ -2365,7 +2366,18 @@ function pagPlan(advice) {
   return `<section class="pag-box pag-plan">${head}` +
     `<p class="pag-rule">${t("pag.plan.rule")}</p>` +
     `<ol class="pag-steps">${list.map((a, i) => pagStep(a, i, active, i === first)).join("")}</ol>` +
-    `</section>`;
+    `${pagDeclined(declined)}</section>`;
+}
+
+// I consigli messi da parte con «Non lo seguo». Fuori dal piano, ma non
+// spariti: una riga quieta sotto la lista, e «Riprendi» li rimette fra i
+// proposti. Senza, una scelta fatta per sbaglio non si disfaceva più.
+function pagDeclined(list) {
+  if (!list || !list.length) return "";
+  return `<p class="pag-declined">${t("pag.declined")} ` + list.map((d) =>
+    `<span class="pag-dec">${escAttr(d.name)} ` +
+    `<button type="button" class="mini-btn" data-defect="${escAttr(d.defect)}" ` +
+    `data-action="undecline">${t("pag.undecline")}</button></span>`).join(" · ") + `</p>`;
 }
 
 function pagStep(a, i, active, first) {

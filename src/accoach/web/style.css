@@ -1340,6 +1340,9 @@ body.view-pagella #lapbar { display: none; }
   border: 1px solid var(--line); color: var(--muted); font-size: 11px; font-weight: 600;
 }
 .pag-tag.active { color: var(--cyan); border-color: var(--cyan); }
+/* I consigli messi da parte: una riga quieta, non un altro blocco. */
+.pag-declined { margin: 6px 0 2px; color: var(--muted); font-size: 13px; }
+.pag-declined .mini-btn { padding: 1px 8px; font-size: 12px; }
 .pag-tag.reached { color: var(--green); border-color: var(--green); }
 
 .mini-btn.primary { border-color: var(--cyan); color: var(--cyan); }

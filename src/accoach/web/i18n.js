@@ -159,6 +159,8 @@
     "pag.adv.err":     { en: `Your choice wasn't saved. The plan below is as it stands now.`,
                          it: `La scelta non si è salvata. Il piano qui sotto è com'è adesso.` },
     "pag.howto":       { en: `How to do it →`, it: `Come si fa →` },
+    "pag.declined":    { en: `You set aside:`, it: `Hai messo da parte:` },
+    "pag.undecline":   { en: `Take it back`, it: `Riprendi` },
 
     "tab.flow":        { en: `Lap explained`, it: `Il giro spiegato` },
     // "Start here" moved to tour.a12 when the recap became the landing tab —
@@ -623,9 +625,12 @@
 
     "prog.sessions":   { en: `Corner by session <small>(median loss per session · each point = one run)</small>`,
                          it: `Curva per sessione <small>(perdita mediana per sessione · ogni punto è un'uscita)</small>` },
-    "ses.none":        { en: `No corner has enough sessions yet — keep driving.`,
+    // Chiavi sue: con lo stesso nome di quelle della scheda Sessione le
+    // sovrascrivevano, e «nessun giro registrato» e «I tuoi giri» diventavano
+    // queste frasi.
+    "cornerses.none":  { en: `No corner has enough sessions yet — keep driving.`,
                          it: `Nessuna curva ha ancora abbastanza sessioni — continua a girare.` },
-    "ses.laps":        { en: `laps`, it: `giri` },
+    "cornerses.laps":  { en: `laps`, it: `giri` },
     "ses.better":      { en: `better than the first session`,
                          it: `meglio della prima sessione` },
     "ses.worse":       { en: `worse than the first session`,

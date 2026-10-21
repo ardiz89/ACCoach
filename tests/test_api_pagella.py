@@ -291,6 +291,24 @@ def test_decline_keeps_the_defect_and_drops_the_advice(tmp_path):
     assert "throttle_late" in [a["defect"] for a in _pagella(c)["advice"]]
 
 
+def test_a_declined_advice_is_listed_so_it_can_be_taken_back(tmp_path):
+    """«Non lo seguo» toglie il consiglio dal piano: senza questa lista la
+    pagina non saprebbe offrire «Riprendi», e la scelta non si potrebbe
+    disfare."""
+    c = _two_sessions(tmp_path)
+    assert _pagella(c)["declined"] == []
+    _advice(c, "throttle_late", "decline")
+    assert _pagella(c)["declined"] == [
+        {"defect": "throttle_late", "name": "Gas tardi in uscita"}]
+    assert _pagella(c, lang="en")["declined"] == [
+        {"defect": "throttle_late", "name": "Late on the throttle"}]
+    _advice(c, "throttle_late", "undecline")
+    p = _pagella(c)
+    assert p["declined"] == []
+    assert "throttle_late" in [a["defect"] for a in p["advice"]
+                               if a["status"] == "proposed"]
+
+
 def test_bad_requests(tmp_path):
     c = _two_sessions(tmp_path)
     _advice(c, "min_speed", "explode", expect=422)

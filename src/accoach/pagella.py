@@ -495,7 +495,7 @@ def build_pagella(cat, car: str, track: str, index: int, lang: str) -> dict:
     ctx = _context(cat, car, track, index, lang)
     out = {"session": _session_info(ctx), "excluded": ctx.excluded,
            "verdict": "", "defects": [], "worst_corners": [], "errors": [],
-           "advice": [], "reference": _reference_info(ctx)}
+           "advice": [], "declined": [], "reference": _reference_info(ctx)}
     if ctx.excluded:
         out["verdict"] = excluded_text(ctx.excluded, lang)
         return out
@@ -557,6 +557,11 @@ def build_pagella(cat, car: str, track: str, index: int, lang: str) -> dict:
              if a.status == ACTIVE else None)
         advice.append(_advice_item(ctx, a, p, lang))
     out["advice"] = advice[:MAX_ADVICE]
+    # I consigli messi da parte con «Non lo seguo»: fuori dal piano, ma la
+    # pagina li elenca per poterli riprendere, altrimenti la scelta non si
+    # disfa piu'.
+    out["declined"] = [{"defect": a.defect, "name": defect_name(a.defect, lang)}
+                       for a, _ in stored.values() if a.status == DECLINED]
     out["verdict"] = text
     return out
 

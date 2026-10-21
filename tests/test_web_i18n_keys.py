@@ -77,3 +77,13 @@ def test_the_catalogue_answers_in_italian_too(cat: dict[str, str]) -> None:
     # everywhere except the one string nobody wrote an Italian for.
     missing = sorted(k for k, body in cat.items() if "it:" not in body)
     assert not missing, f"no Italian for: {missing}"
+
+
+def test_no_key_is_declared_twice() -> None:
+    """In un letterale d'oggetto la seconda dichiarazione vince, in silenzio:
+    `ses.none` era dichiarata due volte, e la scheda Sessione senza giri diceva
+    la frase delle curve per sessione."""
+    src = (WEB / "i18n.js").read_text(encoding="utf-8")
+    keys = _ENTRY.findall(src)
+    dupes = sorted({k for k in keys if keys.count(k) > 1})
+    assert not dupes, f"declared twice in i18n.js: {dupes}"

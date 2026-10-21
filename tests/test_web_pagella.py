@@ -152,7 +152,7 @@ def test_the_one_at_a_time_rule_is_said_once_above_the_list():
     it = _i18n_entry("pag.plan.rule")
     assert "Lavora su un consiglio alla volta, nell'ordine." in it
     assert _I18NJS.count("Lavora su un consiglio alla volta") == 1
-    plan = _body_of("function pagPlan(advice)")
+    plan = _body_of("function pagPlan(advice, declined)")
     assert plan.count('t("pag.plan.rule")') == 1
     assert plan.index('t("pag.plan.rule")') < plan.index("<ol")
     # E non dentro il passo, che si ripete per ogni consiglio.
@@ -163,7 +163,7 @@ def test_only_the_right_advice_carries_the_buttons():
     step = _body_of("function pagStep(a, i, active, first)")
     act, rest = step.split('a.status === "active"', 1)[1].split("else if", 1)
     assert '"drop"' in act and '"follow"' not in act
-    first = _body_of("function pagPlan(advice)")
+    first = _body_of("function pagPlan(advice, declined)")
     # «Lo seguo» solo sul primo proposto, e solo se nessuno è in corso.
     assert '!active && a.status === "proposed"' in first
     assert '"follow"' in rest and '"decline"' in rest
@@ -264,3 +264,21 @@ def test_the_summary_holds_only_inline_content():
     body = _body_of("function pagDefects(defects)")
     line = body[body.index("const line ="):body.index("if (!corners.length)")]
     assert "<div" not in line and "<span class=\"pag-name\">" in line
+
+
+# --- «Non lo seguo» si può disfare ------------------------------------------
+
+def test_a_declined_advice_can_be_taken_back_from_under_the_plan():
+    """Una riga sola, sotto il piano, con «Riprendi» per ogni difetto messo da
+    parte: manda `undecline`, che il backend accetta solo su un rifiutato."""
+    render = _body_of("function renderPagella(p, index)")
+    assert "pagPlan(p.advice, p.declined)" in render
+    plan = _body_of("function pagPlan(advice, declined)")
+    # Anche quando il piano è vuoto: magari è vuoto proprio per quello.
+    assert plan.count("pagDeclined(declined)") == 2
+    body = _body_of("function pagDeclined(list)")
+    assert 'data-action="undecline"' in body
+    assert "escAttr(d.name)" in body and "escAttr(d.defect)" in body
+    assert 't("pag.declined")' in body and 't("pag.undecline")' in body
+    assert "Hai messo da parte" in _i18n_entry("pag.declined")
+    assert "Riprendi" in _i18n_entry("pag.undecline")
