@@ -1,7 +1,6 @@
 "use strict";
 
 const $ = (id) => document.getElementById(id);
-const fmt = (s) => (s >= 0 ? "+" : "") + s.toFixed(3);
 // i18n: translate a chrome string (defensive if i18n.js failed to load).
 const t = (k) => (window.HoneI18n ? window.HoneI18n.t(k) : k);
 const LANG = () => (window.HoneI18n ? window.HoneI18n.lang : "en");
@@ -521,8 +520,8 @@ async function loadProgress(combo) {
   const item = (k, v) => `<div class="item"><div class="k">${k}</div><div class="v">${v}</div></div>`;
   $("prog-summary").innerHTML = c.n
     ? item(t("prog.validLaps"), c.n) + item(t("prog.best"), fmtMs(c.best_ms)) +
-      item(t("prog.average"), fmtMs(c.mean_ms)) + item(t("prog.spread"), (c.spread_ms / 1000).toFixed(3) + "s") +
-      item(t("prog.sigma"), (c.std_ms / 1000).toFixed(3) + "s")
+      item(t("prog.average"), fmtMs(c.mean_ms)) + item(t("prog.spread"), fmtDec(c.spread_ms / 1000, 3, "s")) +
+      item(t("prog.sigma"), fmtDec(c.std_ms / 1000, 3, "s"))
     : item(t("prog.dash"), t("prog.noValid"));
 
   drawProgress(p);
@@ -701,12 +700,12 @@ function renderLevels(levels) {
       gap = `<span class="lvl-gap base">${t("lvl.yourRef")}</span>`;
     } else if (lv.gain_s > 0) {
       const hint = lv.key === "ideal" ? t("lvl.consistency") : t("lvl.gapPro");
-      gap = `<span class="lvl-gap faster">−${lv.gain_s.toFixed(3)}s</span>` +
+      gap = `<span class="lvl-gap faster">−${fmtDec(lv.gain_s, 3, "s")}</span>` +
             `<span class="lvl-hint">${hint}</span>`;
     } else {
-      const ahead = Math.abs(lv.gain_s).toFixed(3);
+      const ahead = fmtDec(Math.abs(lv.gain_s), 3, "s");
       gap = `<span class="lvl-gap done">${t("lvl.beaten")}</span>` +
-            `<span class="lvl-hint">+${ahead}s ${t("lvl.vsPro")}</span>`;
+            `<span class="lvl-hint">+${ahead} ${t("lvl.vsPro")}</span>`;
     }
     rows += `<div class="lvl" data-key="${lv.key}">` +
       `<span class="lvl-label">${lv.label}</span>` +
@@ -735,9 +734,9 @@ function renderTrends(trends) {
     return `<div class="weak ${sys ? "sys" : ""}">` +
       `<div class="weak-head">` +
       `<span class="corner">${w.name}</span>${badge}` +
-      `<span class="lost">−${w.total_s.toFixed(3)}s</span></div>` +
+      `<span class="lost">−${fmtDec(w.total_s, 3, "s")}</span></div>` +
       `<div class="detail">${tag} · ` +
-      `${t("trends.median")} −${w.median_s.toFixed(3)}s · ${w.occurrences}/${w.laps} ${t("lbl.laps")}</div>` +
+      `${t("trends.median")} −${fmtDec(w.median_s, 3, "s")} · ${w.occurrences}/${w.laps} ${t("lbl.laps")}</div>` +
       `</div>`;
   }).join("");
 }
@@ -760,15 +759,15 @@ function renderCornerSessions(rows) {
     const delta = first - last;
     const verdict = delta === 0 ? "" :
       `<span class="ses-verdict ${delta > 0 ? "better" : "worse"}">` +
-      `${Math.abs(delta).toFixed(3)}s ${delta > 0 ? t("ses.better") : t("ses.worse")}</span>`;
+      `${fmtDec(Math.abs(delta), 3, "s")} ${delta > 0 ? t("ses.better") : t("ses.worse")}</span>`;
     const bars = r.points.map((p) => {
-      const w = (Math.min(p.median_s / mx, 1) * 100).toFixed(0);
+      const w = fixz(Math.min(p.median_s / mx, 1) * 100, 0);
       const day = (p.started || "").slice(0, 10);
       const hm = (p.started || "").slice(11, 16);
       return `<div class="ses-row">` +
         `<span class="ses-when">${day} ${hm}</span>` +
         `<span class="ses-track"><span class="ses-fill" style="width:${w}%"></span></span>` +
-        `<span class="ses-nums">−${p.median_s.toFixed(3)}s · ${p.laps} ${t("cornerses.laps")}</span>` +
+        `<span class="ses-nums">−${fmtDec(p.median_s, 3, "s")} · ${p.laps} ${t("cornerses.laps")}</span>` +
         `</div>`;
     }).join("");
     const mark = adviceApexIn(r) !== null ? advMarkHTML() : "";
@@ -791,13 +790,13 @@ function renderCornerConsistency(rows) {
   let mx = 0.1;
   for (const r of rows) mx = Math.max(mx, r.spread_kmh);
   el.innerHTML = rows.map((r) => {
-    const w = (Math.min(r.spread_kmh / mx, 1) * 100).toFixed(0);
+    const w = fixz(Math.min(r.spread_kmh / mx, 1) * 100, 0);
     const mark = adviceApexIn(r) !== null ? advMarkHTML() : "";
     return `<div class="cons-row" data-corner="${r.corner_index}">` +
       `<span class="corner">${mark}${r.name}</span>` +
       `<span class="cons-track"><span class="cons-fill" style="width:${w}%"></span></span>` +
-      `<span class="cons-nums">${t("cons.spread")} <b>${r.spread_kmh.toFixed(1)}</b> km/h · ` +
-      `σ ${r.std_kmh.toFixed(1)} · ${r.n} ${t("lbl.laps")}</span>` +
+      `<span class="cons-nums">${t("cons.spread")} <b>${fmtDec(r.spread_kmh, 1)}</b> km/h · ` +
+      `σ ${fmtDec(r.std_kmh, 1)} · ${r.n} ${t("lbl.laps")}</span>` +
       `</div>`;
   }).join("");
 }
@@ -864,7 +863,7 @@ function drawTyres(p) {
   const firstT = tyres.find((l) => l.temp), lastT = [...tyres].reverse().find((l) => l.temp);
   const firstP = tyres.find((l) => l.press), lastP = [...tyres].reverse().find((l) => l.press);
   const axle = (v, a, b) => (v[a] + v[b]) / 2;
-  const sgn = (x, d, u) => (x >= 0 ? "+" : "") + x.toFixed(d) + u;
+  const sgn = (x, d, u) => fmtSgn(x, d, u);
   const bits = [];
   if (firstT && lastT && firstT !== lastT) {
     const df = axle(lastT.temp, 0, 1) - axle(firstT.temp, 0, 1);
@@ -912,8 +911,8 @@ function drawTyreLines(cv, tyres, field, digits, unit) {
   });
 
   ctx.fillStyle = "rgba(255,255,255,0.45)"; ctx.font = "10px " + MONO;
-  ctx.fillText(rhi.toFixed(digits) + unit, w - 44, Y(rhi) + 10);
-  ctx.fillText(rlo.toFixed(digits) + unit, w - 44, Y(rlo) - 3);
+  ctx.fillText(fmtDec(rhi, digits, unit), w - 44, Y(rhi) + 10);
+  ctx.fillText(fmtDec(rlo, digits, unit), w - 44, Y(rlo) - 3);
   return true;
 }
 
@@ -1017,7 +1016,7 @@ function drawSectors(s) {
   for (const [si, sec] of s.sectors.entries()) {
     const d = sec.delta_ms / 1000;
     const slower = d > 0;
-    const w = (Math.min(Math.abs(d) / mx, 1) * half).toFixed(1);
+    const w = fixz(Math.min(Math.abs(d) / mx, 1) * half, 1);
     const fill = slower
       ? `<div class="fill slow" style="left:50%;width:${w}%"></div>`
       : `<div class="fill fast" style="right:50%;width:${w}%"></div>`;
@@ -1025,7 +1024,7 @@ function drawSectors(s) {
       `<div class="seclabel">${sectorMarkHTML(sec, si === s.sectors.length - 1)}S${sec.index + 1}${sec.is_best ? ' <span class="star">★</span>' : ""}</div>` +
       `<div class="sectimes"><b>${fmtSec(sec.review_ms)}</b> <span class="muted">${fmtSec(sec.baseline_ms)}</span></div>` +
       `<div class="secbar"><div class="mid"></div>${fill}` +
-      `<span class="secd ${slower ? "slower" : "faster"}">${d >= 0 ? "+" : ""}${d.toFixed(3)}</span></div>` +
+      `<span class="secd ${slower ? "slower" : "faster"}">${fmtSgn(d, 3)}</span></div>` +
       `</div>`;
   }
   $("sectors").innerHTML = rows;
@@ -1041,7 +1040,7 @@ function drawSectors(s) {
     $("ideal").innerHTML =
       `<h3>${t("ideal.title")}</h3>` +
       `<div class="ideal-time">${s.ideal.ideal}` +
-      (gain > 0 ? ` <span class="faster">${t("ideal.potential")} −${gain.toFixed(3)}s</span>` : "") +
+      (gain > 0 ? ` <span class="faster">${t("ideal.potential")} −${fmtDec(gain, 3, "s")}</span>` : "") +
       `</div><div class="ideal-from">${from}</div>` +
       `<div class="muted small">${t("ideal.from")}</div>`;
   } else {
@@ -1352,7 +1351,7 @@ function drawRailList() {
   // l'indice: la curva con entry/exit sta in `DATA.corners`).
   const markOf = (i) => adviceApexIn(at(i)) !== null ? advMarkHTML() : "";
   for (const l of rows.hot) {
-    const w = (Math.min(l.lost_s / mx, 1) * 100).toFixed(0);
+    const w = fixz(Math.min(l.lost_s / mx, 1) * 100, 0);
     const sev = Math.min(1, l.lost_s / Math.max(mx, 0.3));
     html += `<button type="button" class="rail-row${sel === l.index ? " on" : ""}" ` +
             `data-i="${l.index}" title="${escAttr(l.message || "")}">` +
@@ -1360,7 +1359,7 @@ function drawRailList() {
             `<span class="nm">${markOf(l.index)}${l.label}</span>` +
             `<span class="bar"><span class="fill" style="width:${w}%;` +
             `background:${lossColor(sev)}"></span></span>` +
-            `<span class="s">−${l.lost_s.toFixed(2)}</span></button>`;
+            `<span class="s">−${fmtDec(l.lost_s, 2)}</span></button>`;
   }
   if (rows.cold.length && rows.hot.length) {
     html += `<div class="rail-sep">${t("rail.clean")}</div>`;
@@ -1796,7 +1795,7 @@ function fillLaps(a, force) {
       // Track temp, when the lap carries it: two laps at 18° and 40° are two
       // different circuits, and until now the dropdown let you compare them
       // side by side with nothing to warn you.
-      const temp = l.road_temp ? ` · ${l.road_temp}°` : "";
+      const temp = l.road_temp ? ` · ${l.road_temp} °` : "";
       o.textContent = `${star}${l.lap_time}${l.valid ? "" : " " + t("lap.invalid")}${off}${temp}${clock ? " · " + clock : ""}${pro}`;
       if (l.path === selectedPath) o.selected = true;
       sel.appendChild(o);
@@ -1818,11 +1817,11 @@ function drawLapBar(a) {
   const bit = (k, v, cls) =>
     `<div class="bit"><span class="k">${k}</span><span class="v ${cls || ""}">${v}</span></div>`;
   const temp = a.review.road_temp != null
-    ? bit(t("lbl.road"), `${a.review.road_temp}°`) : "";
+    ? bit(t("lbl.road"), `${a.review.road_temp} °`) : "";
   el.innerHTML =
     bit(t("lbl.lap"), a.review.lap_time + offTrackBadge(a)) +
     bit(t("lbl.comparison"), a.reference.lap_time) +
-    bit(t("lbl.gap"), fmt(gap) + "s", gap > 0 ? "slower" : "faster") +
+    bit(t("lbl.gap"), fmtSgn(gap, 3, "s"), gap > 0 ? "slower" : "faster") +
     temp;
   // The window title, so three windows open on three tracks are three different
   // things in the taskbar instead of three "HONE · Analysis". The distinguishing
@@ -1868,7 +1867,7 @@ function drawSummary(a) {
   const condLabel = (a.reference.by_conditions || {}).reason === "unjudged"
     ? t("sum.cond.unj") : t("sum.cond");
   $("summary").innerHTML =
-    (c.n >= 2 ? item(t("sum.consistency"), `σ ${(c.std_ms / 1000).toFixed(3)}s · ${c.n} ${t("lbl.laps")}`) : "") +
+    (c.n >= 2 ? item(t("sum.consistency"), `σ ${fmtDec(c.std_ms / 1000, 3, "s")} · ${c.n} ${t("lbl.laps")}`) : "") +
     (condNote ? item(condLabel, condNote, "warn") : "") +
     (setupNote ? item(t("sum.setup_diff"), setupNote, "warn") : "");
 }
@@ -1890,7 +1889,7 @@ function conditionsNote(c) {
   }
   if (c.reason === "grip") {
     // Grip is a 0..1 fraction in the sim; nobody reads it that way.
-    const pct = (v) => Math.round(v * 100) + "%";
+    const pct = fmtPct;
     return tf(c.faster_grip == null ? "sum.cond.gripx" : "sum.cond.grip", {
       grip: pct(c.grip), time: c.faster_lap_time,
       fgrip: c.faster_grip == null ? "" : pct(c.faster_grip),
@@ -1977,7 +1976,7 @@ function drawWaterfall(a) {
   let mx = 0.05;
   for (const l of losses) mx = Math.max(mx, l.lost_s);
   const rows = losses.map((l) => {
-    const w = (Math.min(l.lost_s / mx, 1) * 100).toFixed(0);
+    const w = fixz(Math.min(l.lost_s / mx, 1) * 100, 0);
     const sev = Math.min(1, l.lost_s / Math.max(mx, 0.3));
     // A corner whose loss was inherited gets a mark pointing back at the one
     // that caused it: the waterfall is the "what do I fix first" glance, and
@@ -1989,7 +1988,7 @@ function drawWaterfall(a) {
     return `<div class="cons-row">` +
       `<span class="corner">${mark}${l.label}${from}</span>` +
       `<span class="cons-track"><span class="cons-fill" style="width:${w}%;background:${lossColor(sev)}"></span></span>` +
-      `<span class="cons-nums"><b>−${l.lost_s.toFixed(3)}s</b> · ${l.message}</span>` +
+      `<span class="cons-nums"><b>−${fmtDec(l.lost_s, 3, "s")}</b> · ${l.message}</span>` +
       `</div>`;
   }).join("");
   el.innerHTML = `<h3>${t("wf.title")}</h3>` + rows;
@@ -2019,9 +2018,9 @@ function phaseBar(loss) {
   const seg = parts.map((p) => {
     const pct = (p.lost_s / total) * 100;
     const label = t("phase." + p.phase);
-    return `<span class="ph" style="width:${pct.toFixed(1)}%;` +
+    return `<span class="ph" style="width:${fixz(pct, 1)}%;` +
       `background:rgba(255,176,32,${_PHASE_TINT[p.phase] || 0.5})" ` +
-      `title="${escAttr(label + " · " + p.lost_s.toFixed(2) + "s")}">` +
+      `title="${escAttr(label + " · " + fmtDec(p.lost_s, 2, "s"))}">` +
       `${pct >= 18 ? label : ""}</span>`;
   }).join("");
   return `<div class="phase-bar">${seg}</div>`;
@@ -2033,7 +2032,7 @@ function noteBlocks(a) {
   return (a.notes || []).map((n) =>
     `<div class="loss note" data-kind="${escAttr(n.kind || "")}">` +
     `<div class="loss-head"><span class="corner">${n.message}</span>` +
-    (n.lost_s > 0 ? `<span class="lost">−${n.lost_s.toFixed(3)}s</span>` : "") +
+    (n.lost_s > 0 ? `<span class="lost">−${fmtDec(n.lost_s, 3, "s")}</span>` : "") +
     `</div>` +
     (n.detail ? `<div class="detail">${n.detail}</div>` : "") +
     `</div>`).join("");
@@ -2059,7 +2058,7 @@ function drawDebrief(a) {
     const mark = adviceApexIn(cornerOfIndex(a, l.index)) !== null ? advMarkHTML() : "";
     html += `<div class="loss ${major}">` +
       `<div class="loss-head"><span class="corner">${mark}${l.label}</span>` +
-      `<span class="lost">−${l.lost_s.toFixed(3)}s</span></div>` +
+      `<span class="lost">−${fmtDec(l.lost_s, 3, "s")}</span></div>` +
       `<div class="cause">${l.message}</div>` +
       // The link to the corner before, when there is one. Above the numbers
       // because it changes *which corner* the driver should go and work on —
@@ -2122,7 +2121,7 @@ function renderFlow(a) {
   // the biggest thing only once, and repeating the claim would make it false.
   const cost = s.lost_s > 0
     ? `<p class="flow-cost">${tf(FLOW_STEP === 0 ? "flow.cost" : "flow.cost_more",
-                                { s: s.lost_s.toFixed(2) })}</p>`
+                                { s: fmtDec(s.lost_s, 2) })}</p>`
     : "";
   card.innerHTML =
     (s.where ? `<span class="flow-where">${s.where}</span>` : "") +
@@ -2280,7 +2279,7 @@ function drawFlowChart(a, step) {
     ctx.strokeStyle = "rgba(255,255,255,0.25)";
     ctx.beginPath(); ctx.moveTo(0, h / 2); ctx.lineTo(w, h / 2); ctx.stroke();
     trace(d.pos, d.delta_s, -m, m, "#ffffff", 2);
-    axisLabel(ctx, w, h, `+${m.toFixed(2)}s`, `-${m.toFixed(2)}s`);
+    axisLabel(ctx, w, h, `+${fmtDec(m, 2, "s")}`, `-${fmtDec(m, 2, "s")}`);
   }
 }
 
@@ -2347,8 +2346,8 @@ function renderSession(s) {
   const bits = [tf("ses.sub", { laps: cur.laps, valid: cur.valid,
                                mins: Math.max(1, Math.round(cur.duration_s / 60)) })];
   if (cur.road_temp_from != null) {
-    bits.push(tf("ses.sub_temp", { from: cur.road_temp_from.toFixed(1),
-                                   to: cur.road_temp_to.toFixed(1) }));
+    bits.push(tf("ses.sub_temp", { from: fmtDec(cur.road_temp_from, 1),
+                                   to: fmtDec(cur.road_temp_to, 1) }));
   }
   $("ses-sub").textContent = bits.join("  ·  ");
 
@@ -2361,17 +2360,17 @@ function renderSession(s) {
     numbers += item(t("ses.best"), cur.best);
     if (c.n >= 2) {
       numbers += item(t("ses.mean"), fmtMs(c.mean_ms));
-      numbers += item(t("ses.spread"), `σ ${(c.std_ms / 1000).toFixed(3)}s`);
+      numbers += item(t("ses.spread"), `σ ${fmtDec(c.std_ms / 1000, 3, "s")}`);
     }
     if (prev && prev.delta_ms != null) {
       const d = prev.delta_ms / 1000;
-      numbers += item(t("ses.vsprev"), (d > 0 ? "+" : "") + d.toFixed(3) + "s",
+      numbers += item(t("ses.vsprev"), (d > 0 ? "+" : "") + fmtDec(d, 3, "s"),
                       d > 0 ? "slower" : "faster");
     }
     // Measured, not modelled — and absent on laps recorded before the tank was
     // written down, which is why it's a conditional item and not a dash.
     if (cur.fuel_per_lap != null) {
-      numbers += item(t("ses.fuel"), `${cur.fuel_per_lap.toFixed(2)} L`);
+      numbers += item(t("ses.fuel"), fmtDec(cur.fuel_per_lap, 2, "L"));
     }
   } else {
     numbers = `<div class="nothing">${t("ses.nobest")}</div>`;
@@ -2392,12 +2391,12 @@ function renderSession(s) {
         (!l.valid ? `<span class="tag out">${t("ses.lap_out")}</span>` : "") +
         (l.off_track ? `<span class="tag cut">${t("ses.lap_cut")}</span>` : "") +
         (l.fuel_used != null
-          ? `<span class="tag fuel" title="${escAttr(t("ses.fuel"))}">${l.fuel_used.toFixed(2)} L</span>`
+          ? `<span class="tag fuel" title="${escAttr(t("ses.fuel"))}">${fmtDec(l.fuel_used, 2, "L")}</span>`
           : "");
       return `<button type="button" class="ses-lap${l.is_best ? " is-best" : ""}" ` +
              `data-path="${l.path}" title="${t("ses.open")}">` +
              `<span class="time">${l.lap_time}</span>` +
-             `<span class="bar"><i style="width:${w.toFixed(1)}%"></i></span>` +
+             `<span class="bar"><i style="width:${fixz(w, 1)}%"></i></span>` +
              `<span class="tags">${tags}</span></button>`;
     }).join("");
   for (const b of $("ses-laps").querySelectorAll(".ses-lap")) {
@@ -2413,7 +2412,7 @@ function renderSession(s) {
   } else {
     const rows = (list, cls) => list.map((x) =>
       `<div class="move ${cls}"><span class="corner">${x.label}</span>` +
-      `<span class="amount">${cls === "up" ? "−" : "+"}${x.gain_s.toFixed(2)}s</span>` +
+      `<span class="amount">${cls === "up" ? "−" : "+"}${fmtDec(x.gain_s, 2, "s")}</span>` +
       `${x.message ? `<span class="why">${x.message}</span>` : ""}</div>`).join("");
     const any = prev.improved.length + prev.regressed.length;
     $("ses-changed").innerHTML = `<h3>${t("ses.changed")}</h3>` + (any
@@ -2448,8 +2447,19 @@ let PAG_NOTE = "";
 // Un numero con la virgola in italiano: «0,18», mai «0.18» su una pagina
 // italiana (il tono deciso col pilota). La regola sta in `HoneI18n.fmtNum`,
 // che non stampa mai «-0,00»; qui restano i due nomi che le schede usano.
-function fmtDec(v, d) {
-  return window.HoneI18n ? window.HoneI18n.fmtNum(v, d) : fixz(v, d);
+function fmtDec(v, d, unit) {
+  return window.HoneI18n ? window.HoneI18n.fmtNum(v, d, unit)
+                         : fixz(v, d) + (unit ? " " + unit : "");
+}
+
+// Con il segno davanti anche al positivo: «+0,50 s». Il negativo ha il suo «-».
+function fmtSgn(v, d, unit) {
+  return (v >= 0 ? "+" : "") + fmtDec(v, d, unit);
+}
+
+// Una frazione 0..1 come percentuale intera: «46 %».
+function fmtPct(f) {
+  return fmtDec(Math.round(f * 100), 0, "%");
 }
 
 // Un valore della Pagella in secondi, con l'unità. I difetti arrivano in ms
@@ -3160,7 +3170,7 @@ function drawHowtoFigure(el, f, a, trace) {
   trNote.classList.add("hidden");
   trCv.classList.remove("hidden");
   const { ctx, w, h } = setup(trCv);
-  let lo = 0, hi = 1, fmt = (v) => Math.round(v * 100) + "%";
+  let lo = 0, hi = 1, fmt = fmtPct;
   if (trace === "speed") {
     lo = Infinity; hi = -Infinity;
     for (const c of [rv, rf]) {
@@ -3273,7 +3283,7 @@ function renderStint(s) {
   pick.innerHTML = s.stints.map((x, i) =>
     `<option value="${i}"${i === s.index ? " selected" : ""}>` +
     `${fmtWhen(x.started_utc)} · ${x.laps} ${t("lbl.laps")}` +
-    `${x.fuel_used != null ? " · " + x.fuel_used.toFixed(1) + " L" : ""}` +
+    `${x.fuel_used != null ? " · " + fmtDec(x.fuel_used, 1, "L") : ""}` +
     `${x.verified ? "" : " · " + t("st.unverified")}</option>`).join("");
   pick.onchange = () => loadStint(CURRENT, parseInt(pick.value, 10));
 
@@ -3281,8 +3291,8 @@ function renderStint(s) {
   const mins = minutesBetween(cur.started_utc, cur.ended_utc);
   const bits = [tf("st.sub", { laps: cur.laps, counted: cur.counted, mins })];
   if (cur.fuel.start != null && cur.fuel.end != null) {
-    bits.push(tf("st.sub_fuel", { from: cur.fuel.start.toFixed(1),
-                                  to: cur.fuel.end.toFixed(1) }));
+    bits.push(tf("st.sub_fuel", { from: fmtDec(cur.fuel.start, 1),
+                                  to: fmtDec(cur.fuel.end, 1) }));
   }
   $("st-sub").textContent = bits.join("  ·  ");
 
@@ -3292,21 +3302,21 @@ function renderStint(s) {
   if (cur.median_ms != null) {
     numbers += item(t("st.pace"), cur.median);
     numbers += item(t("st.best"), cur.best);
-    numbers += item(t("st.spread"), `${(cur.spread_ms / 1000).toFixed(3)}s`);
+    numbers += item(t("st.spread"), fmtDec(cur.spread_ms / 1000, 3, "s"));
     // The drift reads "flat" rather than a number whenever the slope sits
     // inside its own error bar. Printing ±0.26 there would be handing over a
     // finding that the data does not contain.
     if (cur.trend) {
       const v = cur.trend.significant
         ? (cur.trend.slope_ms > 0 ? "+" : "−") +
-          (Math.abs(cur.trend.slope_ms) / 1000).toFixed(3) + "s"
+          fmtDec(Math.abs(cur.trend.slope_ms) / 1000, 3, "s")
         : t("st.flat");
       numbers += item(t("st.drift"), v,
                       cur.trend.significant
                         ? (cur.trend.slope_ms > 0 ? "slower" : "faster") : "");
     }
     if (cur.fuel.per_lap != null) {
-      numbers += item(t("st.fuel"), `${cur.fuel.per_lap.toFixed(2)} L`);
+      numbers += item(t("st.fuel"), fmtDec(cur.fuel.per_lap, 2, "L"));
     }
     if (cur.fuel.range_laps != null) {
       numbers += item(t("st.range"), String(cur.fuel.range_laps));
@@ -3338,15 +3348,15 @@ function renderStint(s) {
       const tags = (l.counted ? "" : `<span class="tag out">${t("st.lap_off")}</span>`) +
         (l.off_track ? `<span class="tag cut">${t("ses.lap_cut")}</span>` : "") +
         (l.fuel_used != null
-          ? `<span class="tag fuel" title="${escAttr(t("st.fuel"))}">${l.fuel_used.toFixed(2)} L</span>`
+          ? `<span class="tag fuel" title="${escAttr(t("st.fuel"))}">${fmtDec(l.fuel_used, 2, "L")}</span>`
           : "") +
         (l.tyre_c != null
-          ? `<span class="tag tyre" title="${escAttr(t("tyre.temp"))}">${l.tyre_c.toFixed(0)}°</span>`
+          ? `<span class="tag tyre" title="${escAttr(t("tyre.temp"))}">${fmtDec(l.tyre_c, 0, "°")}</span>`
           : "");
       return `<button type="button" class="ses-lap${l.counted ? "" : " not-pace"}" ` +
              `data-path="${l.path}" title="${t("ses.open")}">` +
              `<span class="time">${l.lap_time}</span>` +
-             `<span class="bar"><i style="width:${w.toFixed(1)}%"></i></span>` +
+             `<span class="bar"><i style="width:${fixz(w, 1)}%"></i></span>` +
              `<span class="tags">${tags}</span></button>`;
     }).join("");
   for (const b of $("st-laps").querySelectorAll(".ses-lap")) {
@@ -3629,7 +3639,7 @@ function distanceTicks() {
 // A position for the readouts: metres when we know them, per cent when we don't.
 function posLabel(p) {
   const m = metresAt(p);
-  return m == null ? Math.round(p * 100) + "%" : Math.round(m) + " m";
+  return m == null ? fmtPct(p) : Math.round(m) + " m";
 }
 
 // --- la finestra ------------------------------------------------------------
@@ -3738,8 +3748,8 @@ function gridX(ctx, w, h, labels) {
     const marks = ticks ? ticks.map((k) => ({ at: k.at, s: k.m + " m" }))
                         : [0.25, 0.5, 0.75].map((q) => ({
                             at: frac(q),
-                            s: RANGE ? Math.round(frac(q) * 100) + "%"
-                                     : Math.round(q * 100) + "%" }));
+                            s: RANGE ? fmtPct(frac(q))
+                                     : fmtPct(q) }));
     for (const k of marks) {
       ctx.fillText(k.s, projX(k.at, w) - ctx.measureText(k.s).width / 2, h - 4);
     }
@@ -3858,7 +3868,7 @@ function drawDelta(a, cx) {
   ctx.fillStyle = tint(PAL.fast); ctx.fillRect(0, h / 2, w, h / 2);
   cornerBands(ctx, w, h, a.corners);
   gridX(ctx, w, h);
-  gridY(ctx, w, h, -m, m, (v) => (v > 0 ? "+" : "") + fixz(v, 2) + "s");
+  gridY(ctx, w, h, -m, m, (v) => (v > 0 ? "+" : "") + fmtDec(v, 2, "s"));
   ctx.strokeStyle = "rgba(255,255,255,0.25)";
   ctx.beginPath(); ctx.moveTo(0, h / 2); ctx.lineTo(w, h / 2); ctx.stroke();
   line(ctx, w, h, d.pos, d.delta_s, -m, m, "#ffffff", 2);
@@ -3884,7 +3894,7 @@ function drawInputs(a, cx) {
   const rv = a.review.channels, rf = a.reference.channels;
   cornerBands(ctx, w, h, a.corners);
   gridX(ctx, w, h);
-  gridY(ctx, w, h, 0, 1, (v) => Math.round(v * 100) + "%");
+  gridY(ctx, w, h, 0, 1, fmtPct);
   // Reference inputs (faint, dashed) — see where it braked / got on the gas.
   ctx.save();
   ctx.setLineDash([4, 3]);
@@ -4072,9 +4082,9 @@ function drawCoasting(a) {
     `<div class="item"><div class="k">${k}</div><div class="v">${v}</div>` +
     (sub ? `<div class="k">${sub}</div>` : "") + `</div>`;
   el.innerHTML =
-    item(t("dyn.coasting"), `${coastPct.toFixed(0)}% · ~${coastS.toFixed(2)}s`, t("dyn.hint")) +
-    item(t("dyn.trail"), `${trailPct.toFixed(0)}% ${t("dyn.ofLap")}`) +
-    item(t("dyn.gmax"), `${gmax.toFixed(2)} g`) +
+    item(t("dyn.coasting"), `${fmtDec(coastPct, 0, "%")} · ~${fmtDec(coastS, 2, "s")}`, t("dyn.hint")) +
+    item(t("dyn.trail"), `${fmtDec(trailPct, 0, "%")} ${t("dyn.ofLap")}`) +
+    item(t("dyn.gmax"), fmtDec(gmax, 2, "g")) +
     item(t("dyn.smooth"), reversals, t("dyn.smoothUnit"));
 }
 
@@ -4105,7 +4115,7 @@ function drawGG(a, cx) {
   ctx.font = "10px " + MONO; ctx.lineWidth = 1;
   for (let g = 1; g <= gmax + 0.01; g += 1) {
     ctx.beginPath(); ctx.arc(cx0, cy0, g * unit, 0, 6.283); ctx.stroke();
-    ctx.fillText(g + "g", cx0 + 2, cy0 - g * unit + 11);
+    ctx.fillText(fmtDec(g, 0, "g"), cx0 + 2, cy0 - g * unit + 11);
   }
   // Axes.
   ctx.strokeStyle = "rgba(255,255,255,0.25)";
@@ -4183,7 +4193,7 @@ function drawSlip(a, cx) {
   for (const v of winVals(pos, sr)) m = Math.max(m, Math.abs(v));
   cornerBands(ctx, w, h, a.corners, true);
   gridX(ctx, w, h);
-  gridY(ctx, w, h, -m, m, (v) => (Math.abs(v) < 1e-9 ? "0" : v.toFixed(2)));
+  gridY(ctx, w, h, -m, m, (v) => (Math.abs(v) < 1e-9 ? "0" : fmtDec(v, 2)));
   // Dove l'elettronica sta lavorando, PRIMA delle tracce, così la barretta sta
   // sotto e non le copre. Senza, questo grafico mente per omissione: col TC
   // attivo lo slip posteriore resta piatto perché è il TC a tenercelo, e un
@@ -4234,7 +4244,7 @@ function drawYaw(a, cx) {
   const k = ms / my;                       // yaw -> unità di sterzo
   cornerBands(ctx, w, h, a.corners);
   gridX(ctx, w, h);
-  gridY(ctx, w, h, -ms, ms, (v) => (Math.abs(v) < 1e-9 ? "0" : v.toFixed(2)));
+  gridY(ctx, w, h, -ms, ms, (v) => (Math.abs(v) < 1e-9 ? "0" : fmtDec(v, 2)));
   ctx.strokeStyle = "rgba(255,255,255,0.25)";
   ctx.beginPath(); ctx.moveTo(0, h / 2); ctx.lineTo(w, h / 2); ctx.stroke();
   line(ctx, w, h, pos, yw.map((v) => -v * k), -ms, ms, "#FFB020", 1.4);
@@ -4311,8 +4321,8 @@ function drawTyreOverLap(cv, wheels, pos, corners, cx, unit) {
     ctx.restore();
   }
   ctx.fillStyle = "rgba(255,255,255,0.45)"; ctx.font = "10px " + MONO;
-  ctx.fillText(rhi.toFixed(unit ? 0 : 1) + unit, w - 44, 12);
-  ctx.fillText(rlo.toFixed(unit ? 0 : 1) + unit, w - 44, h - 4);
+  ctx.fillText(fmtDec(rhi, unit ? 0 : 1, unit), w - 44, 12);
+  ctx.fillText(fmtDec(rlo, unit ? 0 : 1, unit), w - 44, h - 4);
   crosshair(ctx, w, h, cx);
 }
 
@@ -4339,12 +4349,12 @@ function dynReadoutHTML(a, p) {
   let extra = "";
   if (Array.isArray(a.review.line_offset)) {
     const off = a.review.line_offset[i] || 0;
-    extra += ` &nbsp;·&nbsp; ${t("dyn.ro.off")} <b>${off >= 0 ? "+" : ""}${off.toFixed(1)}m</b>`;
+    extra += ` &nbsp;·&nbsp; ${t("dyn.ro.off")} <b>${fmtSgn(off, 1, "m")}</b>`;
   }
   return where +
     `<b>${t("ro.pos")} ${posLabel(p)}</b> &nbsp;·&nbsp; ` +
-    `${t("dyn.ro.g")} <b>${gt.toFixed(2)}g</b> <span class="muted">(${t("dyn.ro.lat")} ${gl.toFixed(2)}, ${t("dyn.ro.lon")} ${gL.toFixed(2)})</span> &nbsp;·&nbsp; ` +
-    `${t("dyn.ro.slipF")} <b>${sf.toFixed(2)}</b>  ${t("dyn.ro.slipR")} <b>${sr.toFixed(2)}</b>` + extra;
+    `${t("dyn.ro.g")} <b>${fmtDec(gt, 2, "g")}</b> <span class="muted">(${t("dyn.ro.lat")} ${fmtDec(gl, 2)}, ${t("dyn.ro.lon")} ${fmtDec(gL, 2)})</span> &nbsp;·&nbsp; ` +
+    `${t("dyn.ro.slipF")} <b>${fmtDec(sf, 2)}</b>  ${t("dyn.ro.slipR")} <b>${fmtDec(sr, 2)}</b>` + extra;
 }
 
 function updateDynReadout(a, p, bare) {
@@ -4405,7 +4415,7 @@ function renderBrakeSheet(b) {
   }
   const temps = (b.road_temp_from != null)
     ? tf(b.road_temp_from === b.road_temp_to ? "brk.temp1" : "brk.temp",
-         { from: b.road_temp_from.toFixed(1), to: b.road_temp_to.toFixed(1) })
+         { from: fmtDec(b.road_temp_from, 1), to: fmtDec(b.road_temp_to, 1) })
     : t("brk.noTemp");
 
   let body = "";
@@ -4585,7 +4595,7 @@ function offWord(m, corner) {
   const known = corner && corner.sided !== false && corner.direction;
   const word = known ? (m > 0 ? t("line.in") : t("line.out"))
                      : (m > 0 ? t("line.right") : t("line.left"));
-  return `${v.toFixed(1)} m ${word}`;
+  return `${fmtDec(v, 1, "m")} ${word}`;
 }
 
 // Il chip di una curva e il nome nella tabella: il segno se il suo tratto
@@ -4664,11 +4674,11 @@ function renderLine(cx) {
     (sub ? `<div class="k">${sub}</div>` : "") + `</div>`;
   const extra = lap.extra_m;
   $("line-summary").innerHTML =
-    item(t("line.extra"), `${extra >= 0 ? "+" : ""}${extra.toFixed(1)} m`,
+    item(t("line.extra"), fmtSgn(extra, 1, "m"),
          tf("line.extraHint", { you: lap.path_m, ref: lap.ref_path_m }),
          extra > 0 ? "warn" : "") +
-    item(t("line.mean"), `${lap.mean_off_m.toFixed(2)} m`) +
-    item(t("line.worst"), `${lap.max_off_m.toFixed(1)} m`, lap.max_off_where) +
+    item(t("line.mean"), fmtDec(lap.mean_off_m, 2, "m")) +
+    item(t("line.worst"), fmtDec(lap.max_off_m, 1, "m"), lap.max_off_where) +
     item(t("line.corners"), L.corners.length);
 
   // «Tutto il giro» è il primo chip e non uno stato assente: finché la finestra
@@ -4860,7 +4870,7 @@ function apexWord(c) {
   }
   const shift = c.apex_shift_m;
   if (Math.abs(shift) < 0.5) return t("line.sameSpot");
-  return `${Math.abs(shift).toFixed(0)} m ${shift < 0 ? t("line.earlier") : t("line.later")}`;
+  return `${fmtDec(Math.abs(shift), 0, "m")} ${shift < 0 ? t("line.earlier") : t("line.later")}`;
 }
 
 function renderLineFacts(c) {
@@ -4873,7 +4883,7 @@ function renderLineFacts(c) {
   const arc = (c.radius_m && c.radius_ref_m)
     ? `${Math.round(c.radius_m)} m <span class="muted">${t("line.f.vs")} ${Math.round(c.radius_ref_m)} m</span>`
     : "–";
-  const dist = `${c.extra_m >= 0 ? "+" : ""}${c.extra_m.toFixed(1)} m`;
+  const dist = fmtSgn(c.extra_m, 1, "m");
   el.innerHTML =
     (c.tags.length
       ? `<div class="tagrow">` + c.tags.map((x) => `<span class="ltag">${x}</span>`).join("") + `</div>`
@@ -4885,7 +4895,7 @@ function renderLineFacts(c) {
     // `widest_m` is the biggest excursion on the minus side — the outside of a
     // corner, or simply the LEFT of the line where there is no single inside.
     row(t("line.f.widest"), c.widest_m
-        ? `${c.widest_m.toFixed(1)} m ${c.sided === false ? t("line.left") : t("line.out")}`
+        ? `${fmtDec(c.widest_m, 1, "m")} ${c.sided === false ? t("line.left") : t("line.out")}`
         : t("line.same")) +
     row(t("line.f.radius"), arc) +
     row(t("line.f.extra"), dist) +
@@ -4914,7 +4924,7 @@ function renderLineTable(L) {
                                    : t("line.sameSpot"));
     const shift = quiet
       ? `<span title="${escAttr(why)}">–</span>`
-      : `${c.apex_shift_m > 0 ? "+" : "−"}${Math.abs(c.apex_shift_m).toFixed(0)} m`;
+      : `${c.apex_shift_m > 0 ? "+" : "−"}${fmtDec(Math.abs(c.apex_shift_m), 0, "m")}`;
     const dv = c.vmin - c.vmin_ref;
     body += `<tr class="${i === LINE_I ? "on" : ""}" data-i="${i}">` +
       `<td class="vc">${lineNameHTML(c)}` +
@@ -4924,7 +4934,7 @@ function renderLineTable(L) {
       cell(c.entry_m, c) + cell(c.apex_m, c) + cell(c.exit_m, c) +
       `<td class="vn">${c.radius_m ? Math.round(c.radius_m) : "–"}` +
       `<span class="muted"> / ${c.radius_ref_m ? Math.round(c.radius_ref_m) : "–"}</span></td>` +
-      `<td class="vn">${c.extra_m >= 0 ? "+" : ""}${c.extra_m.toFixed(1)}</td>` +
+      `<td class="vn">${fmtSgn(c.extra_m, 1)}</td>` +
       `<td class="vn ${dv > 0 ? "faster" : (dv < 0 ? "slower" : "")}">` +
       `${c.vmin}<span class="muted"> / ${c.vmin_ref}</span></td></tr>`;
   });
@@ -5297,7 +5307,7 @@ function cornerNote(ctx, w, corner) {
   const maxw = w - 28;
   ctx.save();
   ctx.font = "12px " + UI_FONT;
-  const head = `${(l.lost_s || 0).toFixed(2)} s · ${l.message}`;
+  const head = `${fmtDec(l.lost_s || 0, 2, "s")} · ${l.message}`;
   // A backdrop, because this text lies over a drawing: the two lines cross the
   // whole canvas and a bare label on top of them is unreadable at the crossing.
   const sub = l.inherited || l.phase_note || "";
@@ -5469,8 +5479,8 @@ function updateLineReadout(L, p) {
   if (DATA) {
     const rv = DATA.review.channels, rf = DATA.reference.channels;
     const iv = nearest(rv.pos, p), ir = nearest(rf.pos, p);
-    bits += ` &nbsp;·&nbsp; ${t("ro.speed")} <b>${rv.speed[iv].toFixed(0)}</b> ` +
-            `<span class="muted">(${t("ro.ref")} ${rf.speed[ir].toFixed(0)})</span>`;
+    bits += ` &nbsp;·&nbsp; ${t("ro.speed")} <b>${fmtDec(rv.speed[iv], 0)}</b> ` +
+            `<span class="muted">(${t("ro.ref")} ${fmtDec(rf.speed[ir], 0)})</span>`;
   }
   el.innerHTML = chip + bits;
   wireRangeClear(el);
@@ -5499,9 +5509,9 @@ function readoutHTML(a, p) {
   const where = corner && !named ? `<b class="muted">${corner.name}</b> &nbsp;·&nbsp; ` : "";
   return where +
     `<b>${t("ro.pos")} ${posLabel(p)}</b> &nbsp;·&nbsp; ` +
-    `${t("ro.speed")} <b>${yv.toFixed(0)}</b> <span class="muted">(${t("ro.ref")} ${rfv.toFixed(0)}, ${dv >= 0 ? "+" : ""}${dv.toFixed(0)})</span> &nbsp;·&nbsp; ` +
-    `Δ <b class="${dl > 0 ? "slower" : "faster"}">${dl >= 0 ? "+" : ""}${dl.toFixed(3)}s</b> &nbsp;·&nbsp; ` +
-    `${t("ro.throttle")} <b>${Math.round(rv.throttle[iv] * 100)}%</b>  ${t("ro.brake")} <b>${Math.round(rv.brake[iv] * 100)}%</b> &nbsp;·&nbsp; ` +
+    `${t("ro.speed")} <b>${fmtDec(yv, 0)}</b> <span class="muted">(${t("ro.ref")} ${fmtDec(rfv, 0)}, ${fmtSgn(dv, 0)})</span> &nbsp;·&nbsp; ` +
+    `Δ <b class="${dl > 0 ? "slower" : "faster"}">${fmtSgn(dl, 3, "s")}</b> &nbsp;·&nbsp; ` +
+    `${t("ro.throttle")} <b>${fmtPct(rv.throttle[iv])}</b>  ${t("ro.brake")} <b>${fmtPct(rv.brake[iv])}</b> &nbsp;·&nbsp; ` +
     `${t("ro.gear")} <b>${rv.gear[iv]}</b>`;
 }
 
@@ -5529,7 +5539,7 @@ function rangeChip() {
   const what = RANGE.source === "corner" && RANGE.label ? RANGE.label
              : from != null && to != null
                ? `${Math.round(from)}–${Math.round(to)} m`
-               : `${Math.round(RANGE.from * 100)}–${Math.round(RANGE.to * 100)}%`;
+               : `${Math.round(RANGE.from * 100)}–${fmtPct(RANGE.to)}`;
   return `<span class="range-chip"><b>${what}</b>` +
          `<button type="button" class="range-clear" title="${t("range.clear")}">✕</button>` +
          `</span> &nbsp;·&nbsp; `;

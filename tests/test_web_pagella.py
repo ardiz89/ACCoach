@@ -203,10 +203,10 @@ def test_the_spark_cuts_only_an_isolated_outlier():
 # --- i numeri: la virgola in italiano, con l'unità --------------------------
 
 def test_numbers_use_the_italian_comma():
-    body = _body_of("function fmtDec(v, d)")
+    body = _body_of("function fmtDec(v, d, unit)")
     # La regola (virgola in italiano, mai «-0,00») sta in `HoneI18n.fmtNum`,
     # provata da `test_textfmt.py`; qui si controlla che le schede la chiamino.
-    assert "fmtNum(v, d)" in body and 'replace(".", ",")' not in body
+    assert "fmtNum(v, d, unit)" in body and 'replace(".", ",")' not in body
     secs = _body_of("function fmtSecs(v, unit)")
     assert 'unit === "ms"' in secs and "/ 1000" in secs and 'fmtNum(s, 2, "s")' in secs
 

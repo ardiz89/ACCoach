@@ -197,6 +197,12 @@ function tf(key, vals) {
 }
 const escAttr = (s) => String(s).replace(/&/g, "&amp;").replace(/"/g, "&quot;")
   .replace(/</g, "&lt;").replace(/>/g, "&gt;");
+// I formati dei numeri non sono l'oggetto di questa prova (li prova
+// `test_web_numeri.py`): qui bastano versioni col punto.
+const fixz = (v, d) => v.toFixed(d);
+const fmtDec = (v, d, u) => v.toFixed(d) + (u ? " " + u : "");
+const fmtSgn = (v, d, u) => (v >= 0 ? "+" : "") + fmtDec(v, d, u);
+const fmtPct = (f) => Math.round(f * 100) + " %";
 let ADVICE = null;
 const els = {};
 const $ = (id) => els[id] || null;

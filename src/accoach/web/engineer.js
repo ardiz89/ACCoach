@@ -15,6 +15,12 @@ const tf = (k, vals) => {
   return s;
 };
 const LANG = () => (window.HoneI18n ? window.HoneI18n.lang : "en");
+// Un numero per il pilota: virgola in italiano, spazio prima dell'unita'. La
+// regola sta in `HoneI18n.fmtNum`; il ripiego serve solo se i18n.js non c'e'.
+function fmtN(v, d, unit) {
+  if (window.HoneI18n) return window.HoneI18n.fmtNum(v, d, unit);
+  return v.toFixed(d) + (unit ? " " + unit : "");
+}
 
 const state = {
   car: null, track: null,
@@ -358,7 +364,7 @@ async function loadRecord() {
     head += tf("rec.rate", { rate: Math.round(r.hit_rate * 100) });
   }
   if (r.median_gain_ms != null) {
-    head += tf("rec.gain", { gain: (r.median_gain_ms / 1000).toFixed(3) });
+    head += tf("rec.gain", { gain: fmtN(r.median_gain_ms / 1000, 3) });
   }
   $("rec-head").innerHTML = head;
   $("rec-note").textContent = r.tests < REC_MIN_TESTS ? t("rec.thin") : "";
@@ -886,8 +892,8 @@ function updateTyres(tyres) {
     if (!cell) return;
     const tEl = cell.querySelector(".tt"), pEl = cell.querySelector(".tp");
     const t = temps[i], p = press[i];
-    tEl.textContent = (t == null || !isFinite(t)) ? "–" : Math.round(t) + "°";
-    pEl.textContent = (p == null || !isFinite(p)) ? "–" : p.toFixed(1);
+    tEl.textContent = (t == null || !isFinite(t)) ? "–" : fmtN(Math.round(t), 0, "°");
+    pEl.textContent = (p == null || !isFinite(p)) ? "–" : fmtN(p, 1);
     tEl.className = "tt " + tyreTempClass(t);
     pEl.className = "tp " + tyrePsiClass(p);
   });
@@ -1095,17 +1101,17 @@ function renderOutcome(eng) {
     `<span class="oc-verdict" data-kept="${o.kept}">` +
     `${o.kept ? t("eng.oc.kept") : t("eng.oc.reverted")}</span>`,
     `<span class="oc-num">${t("eng.oc.laps")} ${o.laps}</span>`,
-    `<span class="oc-num">${dt >= 0 ? "+" : ""}${dt.toFixed(2)}s</span>`,
+    `<span class="oc-num">${dt >= 0 ? "+" : ""}${fmtN(dt, 2, "s")}</span>`,
   ];
   if (o.score_before || o.score_after) {
-    bits.splice(1, 0, `<span class="oc-num">${o.score_before.toFixed(2)}` +
-      ` → ${o.score_after.toFixed(2)}</span>`);
+    bits.splice(1, 0, `<span class="oc-num">${fmtN(o.score_before, 2)}` +
+      ` → ${fmtN(o.score_after, 2)}</span>`);
   }
   let side = "";
   if (Array.isArray(o.side_effects) && o.side_effects.length) {
     side = `<div class="oc-side">${t("eng.oc.side")} ` +
       o.side_effects.map((s) =>
-        `${s.symptom} ${s.delta >= 0 ? "+" : ""}${s.delta.toFixed(2)}`).join(" · ") +
+        `${s.symptom} ${s.delta >= 0 ? "+" : ""}${fmtN(s.delta, 2)}`).join(" · ") +
       `</div>`;
   }
   el.innerHTML = bits.join("") + side;
@@ -1144,7 +1150,7 @@ function renderFocus(st) {
 
   if (f.focus) {
     const t = f.focus;
-    const base = t.baseline_ms ? ` · <span class="t-gap">−${(t.baseline_ms / 1000).toFixed(3)}s</span>` : "";
+    const base = t.baseline_ms ? ` · <span class="t-gap">−${fmtN(t.baseline_ms / 1000, 3, "s")}</span>` : "";
     target.hidden = false;
     target.innerHTML = `<b>${t.name}</b> · ${t.theme}${base}`;
   } else {

@@ -10,7 +10,9 @@
   "use strict";
   const LIVE_PORT = 8777;
   const $ = (id) => document.getElementById(id);
-  const round = (x, n = 0) => (x == null ? null : Number(x.toFixed(n)));
+  const round = (x, n = 0) => (x == null ? null : Math.round(x * 10 ** n) / 10 ** n);
+  // La pagina di test e' solo in italiano: virgola decimale.
+  function fmtIt(x, n) { return x.toFixed(n).replace(".", ","); }
 
   const S = {
     plan: null,
@@ -112,10 +114,10 @@
     if (!tel) return "";
     const p = [];
     if (tel.spd != null) p.push(`${tel.spd} km/h`);
-    if (tel.br != null) p.push(`freno ${Math.round(tel.br * 100)}%`);
-    if (tel.th != null) p.push(`gas ${Math.round(tel.th * 100)}%`);
+    if (tel.br != null) p.push(`freno ${Math.round(tel.br * 100)} %`);
+    if (tel.th != null) p.push(`gas ${Math.round(tel.th * 100)} %`);
     if (tel.gear) p.push(`m${tel.gear}`);
-    if (tel.pos != null) p.push(`pos ${tel.pos.toFixed(2)}`);
+    if (tel.pos != null) p.push(`pos ${fmtIt(tel.pos, 2)}`);
     return p.join(" · ");
   }
 

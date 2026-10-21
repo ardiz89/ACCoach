@@ -479,7 +479,7 @@ def test_the_metre_axis_still_has_a_way_back_to_per_cent():
     believe — must fall back, not draw a scale it doesn't have."""
     block = _APPJS[_APPJS.index("function gridX("):]
     block = block[:block.index("\nfunction ")]
-    assert 'Math.round(q * 100) + "%"' in block
+    assert "fmtPct(q)" in block
     assert "distanceTicks()" in block
 
 
