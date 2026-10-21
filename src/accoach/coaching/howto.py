@@ -200,7 +200,7 @@ _HOWTO = {
                   "istintiva, non una decisione.",
             ignore="Le curve lente lasciale come sono, l'esercizio riguarda solo i "
                    "tratti in pieno.",
-            drill="Al primo giro alza come sempre, ma meno, lasciando giù quasi "
+            drill="Al primo giro alza nello stesso punto, ma meno, lasciando giù quasi "
                   "tutto il pedale invece di mollarne metà. A ogni giro alza meno "
                   "del giro prima, finché passi in pieno. Guarda lontano, verso "
                   "l'uscita del curvone. Quasi sempre l'alzata nasce da quello che "
@@ -328,7 +328,7 @@ _HOWTO = {
                   "instinctive lift, not a decision.",
             ignore="Leave the slow corners as they are, this drill is only about "
                    "the flat-out sections.",
-            drill="On the first lap lift as usual, but less, keeping most of the "
+            drill="On the first lap lift at the same spot, but less, keeping most of the "
                   "pedal down instead of dropping half of it. Every lap lift less "
                   "than the one before, until you go through flat. Look far ahead, "
                   "towards the exit of the sweeper. The lift almost always comes "
