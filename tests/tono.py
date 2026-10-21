@@ -387,9 +387,25 @@ def _engineer_keys() -> frozenset[str]:
     return frozenset(used_eng - used_report)
 
 
-def _report() -> Entries:
+# Il report si riscrive in due tempi: prima la Pagella, il piano, la sessione,
+# la navigazione e l'accoglienza (`report_a`), poi le schede di analisi
+# (`report_b`). Il prefisso della chiave decide da che parte sta.
+REPORT_A_PREFIXES = frozenset((
+    "pag howto adv ses flow recap plan train rec prog dh trends recur cornerses "
+    "cons tour tab tabgroup nav title demo lang combo empty load err modal kbd "
+    "badge btn lbl ctl lvl focus live debrief").split())
+
+
+def _report(part: str | None = None) -> Entries:
     eng = _engineer_keys()
-    return {f"web/i18n.js:{k}": v for k, v in i18n_catalogue().items() if k not in eng}
+    out = {}
+    for k, v in i18n_catalogue().items():
+        if k in eng:
+            continue
+        in_a = k.split(".", 1)[0] in REPORT_A_PREFIXES
+        if part is None or (part == "a") == in_a:
+            out[f"web/i18n.js:{k}"] = v
+    return out
 
 
 def _engineer() -> Entries:
@@ -555,7 +571,8 @@ def _guide() -> Entries:
 
 
 SURFACES: dict[str, Callable[[], Entries]] = {
-    "report": functools.lru_cache(maxsize=1)(_report),
+    "report_a": functools.lru_cache(maxsize=1)(lambda: _report("a")),
+    "report_b": functools.lru_cache(maxsize=1)(lambda: _report("b")),
     "engineer": functools.lru_cache(maxsize=1)(_engineer),
     "report_backend": functools.lru_cache(maxsize=1)(_report_backend),
     "hub": functools.lru_cache(maxsize=1)(_hub),
@@ -564,7 +581,7 @@ SURFACES: dict[str, Callable[[], Entries]] = {
 }
 
 # Le superfici non ancora riscritte. Ogni task che ne riscrive una la toglie.
-PENDING: set[str] = set(SURFACES)
+PENDING: set[str] = set(SURFACES) - {"report_a"}
 
 
 # --- il conto ---------------------------------------------------------------

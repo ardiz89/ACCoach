@@ -458,7 +458,7 @@ function wireTabs() {
     // it used to stop at the ninth, which silently left the tenth tab's real,
     // working shortcut with no tooltip; now the eleventh would have repeated it.
     const i = tabs.indexOf(b);
-    if (i < KEY_ROW.length) b.title = `${t("kbd.tab")} ${KEY_ROW[i]}`;
+    if (i < KEY_ROW.length) b.title = tf("kbd.tab", { k: KEY_ROW[i] });
     b.onclick = () => { rememberView(b.dataset.view); showView(b.dataset.view); };
   }
 }
@@ -509,7 +509,7 @@ async function loadProgress(combo) {
     $("levels").innerHTML = ""; $("trends").innerHTML = "";
     const cs = $("corner-sessions"); if (cs) cs.innerHTML = "";
     $("recurring").innerHTML =
-      `<div class="clean">${t("err.progress")}</div>`;
+      `<div class="clean">${loadFailed("err.progress")}</div>`;
     // Senza risposta niente da indicare: la riga si spegne, la pagina resta com'era.
     renderAdviceLine("progress", [], null, { hide: () => true });
     return;
@@ -544,7 +544,7 @@ async function loadProgress(combo) {
     el.innerHTML = p.recurring.map((r) =>
       `<div class="recur"><span class="count">${r.count}×</span>` +
       `<span class="msg">${r.message}</span>` +
-      `<span class="where">${t("recur.corners")}${r.corners.join(", ")}</span></div>`).join("");
+      `<span class="where">${r.corners.join(", ")}</span></div>`).join("");
   }
 }
 
@@ -606,7 +606,7 @@ async function loadDefectHistory(combo) {
       new URLSearchParams({ car: combo.car, track: combo.track, lang: LANG() }));
   } catch (e) {
     if (stale(seen)) return;
-    $("dh-body").innerHTML = `<div class="nothing">${t("err.dh")}</div>`;
+    $("dh-body").innerHTML = `<div class="nothing">${loadFailed("err.dh")}</div>`;
     return;
   }
   if (stale(seen)) return;
@@ -676,7 +676,7 @@ function renderDefectHistory(h) {
     const mark = adviceRelevant("progress") && ADVICE.defect === d.key ? advMarkHTML() : "";
     return `<div class="dh-row">` +
       `<button type="button" class="dh-name" data-howto="${escAttr(d.key)}" ` +
-      `title="${escAttr(t("dh.howto"))}">${mark}${escAttr(d.name)}</button>` +
+      `title="${escAttr(t("pag.howto"))}">${mark}${escAttr(d.name)}</button>` +
       `<span class="pag-spark dh-bars">${sparkBars(vals, d.unit, trend, DH_H)}</span>` +
       `<span class="dh-last"><span class="num ${tone}">${fmtSecs(last, d.unit)}</span> ` +
       `<span class="pag-small">${per}</span>${arrow}</span></div>`;
@@ -2347,8 +2347,8 @@ function renderSession(s) {
   const bits = [tf("ses.sub", { laps: cur.laps, valid: cur.valid,
                                mins: Math.max(1, Math.round(cur.duration_s / 60)) })];
   if (cur.road_temp_from != null) {
-    bits.push(tf("ses.sub_temp", { from: fmtDec(cur.road_temp_from, 1),
-                                   to: fmtDec(cur.road_temp_to, 1) }));
+    bits.push(tf("ses.sub_temp", { from: fmtDec(cur.road_temp_from, 1, "°C"),
+                                   to: fmtDec(cur.road_temp_to, 1, "°C") }));
   }
   $("ses-sub").textContent = bits.join("  ·  ");
 
@@ -2448,6 +2448,12 @@ let PAG_NOTE = "";
 // Un numero con la virgola in italiano: «0,18», mai «0.18» su una pagina
 // italiana (il tono deciso col pilota). La regola sta in `HoneI18n.fmtNum`,
 // che non stampa mai «-0,00»; qui restano i due nomi che le schede usano.
+// Un caricamento fallito: cosa non è arrivato, poi la stessa domanda per
+// tutti (una chiave sola, non la stessa frase in quattro chiavi).
+function loadFailed(key) {
+  return `${t(key)} ${t("err.backend")}`;
+}
+
 function fmtDec(v, d, unit) {
   return window.HoneI18n ? window.HoneI18n.fmtNum(v, d, unit)
                          : fixz(v, d) + (unit ? " " + unit : "");
@@ -2556,7 +2562,7 @@ async function loadPagella(combo, index) {
     $("pag-ref").textContent = "";
     $("pag-verdict").textContent = "";
     $("pag-body").innerHTML =
-      `<div class="nothing">${none ? t("pag.nolaps") : t("err.pagella")}</div>`;
+      `<div class="nothing">${none ? t("pag.nolaps") : loadFailed("err.pagella")}</div>`;
     return;
   }
   const list = await listing;
@@ -3021,7 +3027,7 @@ async function loadHowto(combo, index) {
   try { h = await getJSON("/api/howto?" + q.toString()); }
   catch (e) {
     if (stale(seen) || SESSION_I !== want || req !== HOWTO_REQ) return;
-    $("howto-body").innerHTML = `<div class="nothing">${t("err.howto")}</div>` +
+    $("howto-body").innerHTML = `<div class="nothing">${loadFailed("err.howto")}</div>` +
       `<p><button type="button" class="mini-btn" id="howto-back">${t("howto.back")}</button></p>`;
     $("howto-back").onclick = () => showView("pagella");
     return;
@@ -3096,8 +3102,8 @@ function renderHowto(h) {
           `<p>${escAttr(how.what)}</p><p>${escAttr(how.watch)}</p>` +
           `<p>${escAttr(how.ignore)}</p></section>`;
   // L'esercizio: quanti giri, l'obiettivo in numeri, quando è fatto.
-  // L'obiettivo su una riga sua, nella forma del modello approvato dal pilota
-  // («Obiettivo: scendere sotto 0,12.»): è il numero che porta in pista.
+  // L'obiettivo su una riga sua, una frase intera («L'obiettivo è stare sotto
+  // 0,12 s a giro.»): è il numero che porta in pista.
   const target = h.target != null
     ? `<p class="howto-target">${tf(h.unit === "s" ? "howto.target.coast" : "howto.target",
                                      { v: fmtSecs(h.target, h.unit) })}</p>` : "";

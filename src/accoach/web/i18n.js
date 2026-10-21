@@ -30,7 +30,7 @@
     "tour.btn.done":   { en: `Done`, it: `Ho capito` },
     "tour.btn.step":   { en: `Step`, it: `Passo` },
     "cb.label":        { en: `Colour-blind palette (blue/orange)`, it: `Palette daltonici (blu/arancio)` },
-    "demo.banner":     { en: `DEMO — synthetic laps, not your real data`, it: `DEMO — giri sintetici, non i tuoi dati reali` },
+    "demo.banner":     { en: `These are sample laps, not yours.`, it: `Questi sono giri di prova, non i tuoi.` },
 
     // ---- analysis page (index.html) ----
     "title.analysis":  { en: `HONE · Analysis`, it: `HONE · Analisi` },
@@ -40,57 +40,6 @@
     "ctl.baseline":    { en: `Compare with`, it: `Confronta con` },
     "ctl.export":      { en: `Export`, it: `Esporta` },
 
-    // How the run went — the door onto the report. `gain_avg_s` is measured
-    // against the best lap of THIS run, not the elected reference, and is not
-    // the gap the timing screen publishes: it is the sum of its own parts.
-    "tab.recap":       { en: `How it went`, it: `Com'è andata` },
-    // "gap" is deliberately never used here: it's the word a driver checks
-    // against the timing screen, and this number is not that (see the recap
-    // spec — up to a tenth apart). It points at the total above it instead.
-    // Two keys, not one, because the heading has to stay true in both states.
-    // `recap.where` is the static label in index.html and says only what the
-    // panel is about. `recap.wherenote` is the promise, and renderRecap writes
-    // it into the <small> only when there is a recap to keep it: on a run with
-    // nothing measurable there is no number above and no parts below, so the
-    // promise would be naming two things that are not on screen.
-    "recap.where":     { en: `Where the time went`,
-                         it: `Dove è finito il tempo` },
-    "recap.wherenote": { en: `(average per lap · the parts add up to the number above)`,
-                         it: `(media per giro · le parti sommano al numero qui sopra)` },
-    "recap.laps":      { en: `Lap by lap <small>(against your best lap of this run)</small>`,
-                         it: `Giro per giro <small>(contro il tuo miglior giro di questa uscita)</small>` },
-    "recap.best":      { en: `Best lap of this run`, it: `Miglior giro di questa uscita` },
-    "recap.gain":      { en: `To gain, on average`, it: `Da guadagnare, in media` },
-    "recap.yardstick": { en: `your yardstick`, it: `il tuo metro` },
-    // `!cur`: no session at all for this car+track (or the fetch failed) —
-    // same fact the Session tab states about the very same payload.
-    "recap.nolaps":    { en: `No laps recorded for this car and track yet.`,
-                         it: `Nessun giro registrato per questa auto e questa pista.` },
-    // `cur` exists but `cur.recap` doesn't: `_recap_of` (api.py) returns None
-    // for seven different reasons — a single valid lap is only one of them
-    // (an unreadable best lap, a best lap the reference can't use, no lap
-    // that could be cut into phases, ...). Naming "one valid lap" here would
-    // often be naming the wrong cause, which is worse than a generic one.
-    "recap.none":      { en: `Not enough in this run to measure yet.`,
-                         it: `Non c'è ancora abbastanza in questa uscita per misurarlo.` },
-    // The one cause of an empty recap that is measured rather than guessed
-    // (`recap_clock_broken` in the payload, decided by the guard in trends.py):
-    // the run's own best lap — the yardstick every row would be measured
-    // against — carries a clock that doesn't account for the lap it drove, so
-    // every gap taken against it would be wrong by that much.
-    // No direction in the wording, on purpose: the criterion in trends.py is
-    // symmetric, and the real yardstick that trips it (Red Bull Ring, 02/08)
-    // has its clock running 694 ms LONG, not short. "Missing part of the lap"
-    // would send the driver hunting a gap in the recording that isn't there.
-    // And it says the recording doesn't line up, not that the driver did
-    // anything.
-    "recap.clock":     { en: `This run can't be measured: the recorded time of your best lap doesn't match the stretch of lap it covers, so every gap measured against it would be wrong.`,
-                         it: `Questa uscita non si può misurare: il tempo registrato del tuo miglior giro non corrisponde al giro che copre, e ogni distacco misurato su di lui sarebbe sbagliato.` },
-    "recap.phase.entry":  { en: `Entry`, it: `Entrata` },
-    "recap.phase.apex":   { en: `Apex`, it: `Apice` },
-    "recap.phase.exit":   { en: `Exit`, it: `Uscita` },
-    "recap.phase.after":  { en: `After`, it: `Dopo` },
-    "recap.phase.launch": { en: `Launch`, it: `Lancio` },
 
     // ---- la Pagella, la prima pagina del report ----
     // Il tono è quello deciso col pilota (spec «Il tono dei testi»): frasi
@@ -104,8 +53,12 @@
     "tabgroup.why":    { en: `Why, in detail`, it: `Perché, nel dettaglio` },
     "tabgroup.time":   { en: `Over time`, it: `Nel tempo` },
     "load.pagella":    { en: `Reading your session…`, it: `Sto leggendo la sessione…` },
-    "err.pagella":     { en: `Couldn't load the report card. Is the analysis backend running?`,
-                         it: `Non riesco a caricare la Pagella. Il backend di analisi è acceso?` },
+    // La seconda frase di ogni «non riesco a caricare»: una chiave sola, la
+    // stessa domanda in quattro chiavi era la stessa frase in quattro posti.
+    "err.backend":     { en: `Check that the analysis server is running.`,
+                         it: `Controlla che il server di analisi sia acceso.` },
+    "err.pagella":     { en: `Couldn't load the report card.`,
+                         it: `Non riesco a caricare la Pagella.` },
     "pag.nolaps":      { en: `You have no laps on this car and track yet.`,
                          it: `Per questa auto e questa pista non hai ancora giri registrati.` },
     "pag.laps":        { en: `{laps} {laps|lap|laps} ({valid} valid)`,
@@ -200,7 +153,7 @@
     "adv.mark.title": { en: `Corner in the advice you're following`,
                       it: `Curva del consiglio che segui` },
     "pag.howto":       { en: `How to do it →`, it: `Come si fa →` },
-    "pag.declined":    { en: `You set aside:`, it: `Hai messo da parte:` },
+    "pag.declined":    { en: `You set aside`, it: `Hai messo da parte` },
     "pag.undecline":   { en: `Take it back`, it: `Riprendi` },
 
     // ---- Andamento: i difetti sessione per sessione ----
@@ -220,19 +173,18 @@
                          it: `Per questa auto e questa pista non hai ancora giri validi.` },
     "dh.noref":        { en: `To measure your faults you need at least one more valid lap besides your reference.`,
                          it: `Per misurare i difetti serve almeno un altro giro valido oltre al tuo riferimento.` },
-    "dh.howto":        { en: `How to do it`, it: `Come si fa` },
     "dh.valid":        { en: `{n} valid {n|lap|laps}`, it: `{n} {n|giro valido|giri validi}` },
     "load.dh":         { en: `Reading your sessions…`, it: `Sto leggendo le sessioni…` },
-    "err.dh":          { en: `Couldn't load your faults. Is the analysis backend running?`,
-                         it: `Non riesco a caricare i difetti. Il backend di analisi è acceso?` },
+    "err.dh":          { en: `Couldn't load your faults.`,
+                         it: `Non riesco a caricare i difetti.` },
 
     // ---- «Come si fa», la vista di un consiglio ----
     // Stesso tono della Pagella. Il problema, il come si fa e l'esercizio li
     // scrive il backend (coaching/howto.py); qui le cornici e le frasi che
     // prendono il posto di una figura quando manca un dato.
     "load.howto":      { en: `Reading your laps…`, it: `Sto leggendo i tuoi giri…` },
-    "err.howto":       { en: `Couldn't load this page. Is the analysis backend running?`,
-                         it: `Non riesco a caricare questa pagina. Il backend di analisi è acceso?` },
+    "err.howto":       { en: `Couldn't load this page.`,
+                         it: `Non riesco a caricare questa pagina.` },
     "howto.back":      { en: `← Back to the report card`, it: `← Torna alla Pagella` },
     "howto.noproblem": { en: `In this session I don't have a number for this fault.`,
                          it: `In questa sessione non ho un numero per questo difetto.` },
@@ -259,14 +211,14 @@
     "howto.tr.brake":  { en: `Brake pedal`, it: `Pedale del freno` },
     "howto.tr.throttle": { en: `Throttle pedal`, it: `Pedale del gas` },
     "howto.tr.speed":  { en: `Speed, km/h`, it: `Velocità, km/h` },
-    "howto.how":       { en: `How to do it`, it: `Come si fa` },
+    "howto.how":       { en: `How it's done`, it: `Come si fa` },
     "howto.drill":     { en: `The drill`, it: `L'esercizio` },
     "howto.laps":      { en: `{n} {n|lap|laps}.`, it: `{n} {n|giro|giri}.` },
-    // La forma «Obiettivo: …» è quella del modello approvato dal pilota.
-    "howto.target":    { en: `Target: under {v} a lap`,
-                         it: `Obiettivo: sotto {v} a giro` },
-    "howto.target.coast": { en: `Target: under {v} of coasting a lap`,
-                            it: `Obiettivo: sotto {v} di veleggio a giro` },
+    // Una frase intera, sulla riga sua: è il numero che il pilota porta in pista.
+    "howto.target":    { en: `Aim for under {v} a lap.`,
+                         it: `L'obiettivo è stare sotto {v} a giro.` },
+    "howto.target.coast": { en: `Aim for under {v} of coasting a lap.`,
+                            it: `L'obiettivo è veleggiare meno di {v} a giro.` },
     "howto.prog":      { en: `How it's going`, it: `Come sta andando` },
     "howto.gloss":     { en: `Glossary`, it: `Glossario` },
     "howto.prog.lead": { en: `This fault in each session since you started following it, the oldest first.`,
@@ -279,8 +231,8 @@
     // this step still opens Flow, so its own title now names what it is
     // rather than claiming to be the door.
     "tour.a9.t":       { en: `Lap explained`, it: `Il giro spiegato` },
-    "tour.a9.x":       { en: `The lap, explained one thing at a time: what cost you the most, why, and what to do about it — with the chart that shows it. The other tabs are the same findings, laid out for you to read yourself.`,
-                         it: `Il giro spiegato una cosa alla volta: cosa ti è costato di più, perché, e cosa farci — col grafico che lo mostra. Le altre schede sono gli stessi dati, messi lì perché te li legga da solo.` },
+    "tour.a9.x":       { en: `The lap explained one step at a time. What cost you most, why, and what to do, with the chart that shows it. The other tabs hold the same findings for you to read yourself.`,
+                         it: `Il giro spiegato un passo alla volta. Cosa ti è costato di più, perché e cosa fare, col grafico che lo mostra. Le altre schede hanno gli stessi dati, da leggere da solo.` },
     "tour.a12.t":      { en: `Start here`, it: `Parti da qui` },
     // Says what the tab IS, not what is on it right now. The tour can be
     // started on any run, and on a run with nothing measurable this step lands
@@ -299,7 +251,7 @@
                          it: `Nessun giro registrato per questa auto e questa pista.` },
     "ses.sub":         { en: `{laps} {laps|lap|laps} · {valid} that {valid|counts|count} · {mins} min`,
                          it: `{laps} {laps|giro|giri} · {valid} che {valid|conta|contano} · {mins} min` },
-    "ses.sub_temp":    { en: `track {from}° → {to}°`, it: `asfalto {from}° → {to}°` },
+    "ses.sub_temp":    { en: `track {from} → {to}`, it: `asfalto {from} → {to}` },
     "ses.best":        { en: `Best`, it: `Migliore` },
     "ses.mean":        { en: `Average`, it: `Media` },
     "ses.spread":      { en: `Consistency`, it: `Costanza` },
@@ -313,12 +265,12 @@
     "ses.changed":     { en: `What changed since last time`, it: `Cosa è cambiato dall'ultima volta` },
     "ses.improved":    { en: `Faster here`, it: `Qui vai più forte` },
     "ses.regressed":   { en: `Slower here`, it: `Qui hai perso` },
-    "ses.first":       { en: `This is the first session on this car and track — nothing to compare it with yet.`,
-                         it: `È la prima sessione su questa auto e questa pista: non c'è ancora niente con cui confrontarla.` },
+    "ses.first":       { en: `This is your first session on this car and track. There's nothing to compare it with yet.`,
+                         it: `È la prima sessione su questa auto e questa pista. Non c'è ancora niente con cui confrontarla.` },
     "ses.nomoves":     { en: `No corner moved enough to be worth reporting.`,
                          it: `Nessuna curva si è mossa abbastanza da valere una segnalazione.` },
-    "ses.nobest":      { en: `No lap of this session could count — nothing to measure.`,
-                         it: `Nessun giro di questa sessione poteva contare: non c'è niente da misurare.` },
+    "ses.nobest":      { en: `No lap in this session could count, so there's nothing to measure.`,
+                         it: `In questa sessione nessun giro poteva contare, quindi non c'è niente da misurare.` },
     // Race pace: one run on one tank. The wording is careful on purpose — every
     // number on this tab is the NET of fuel burning off and tyres giving up, so
     // nothing here is allowed to be called degradation.
@@ -348,21 +300,20 @@
     // The guided flow: one finding at a time, with the chart that shows it.
     "flow.prev":       { en: `← Back`, it: `← Indietro` },
     "flow.next":       { en: `Next →`, it: `Avanti →` },
-    "flow.done":       { en: `That's all`, it: `Finito` },
     "flow.whole":      { en: `Show the whole chart`, it: `Mostrami il grafico intero` },
     "flow.step":       { en: `Step {n} of {total}`, it: `Passo {n} di {total}` },
-    "flow.cost":       { en: `You lose {s} s here — more than anywhere else`,
-                         it: `Qui perdi {s} s — più che in qualunque altro punto` },
-    "flow.cost_more":  { en: `{s} s lost here`, it: `Qui perdi {s} s` },
+    "flow.cost":       { en: `You lose {s} s here, more than anywhere else.`,
+                         it: `Qui perdi {s} s, più che in ogni altro punto.` },
+    "flow.cost_more":  { en: `You lose {s} s here.`, it: `Qui perdi {s} s.` },
     "flow.fix":        { en: `What to do`, it: `Cosa fare` },
     "flow.empty":      { en: `Pick a lap to see it explained.`,
                          it: `Scegli un giro per vederlo spiegato.` },
-    "flow.chart.speed":  { en: `Speed — white = you, cyan = reference`,
-                           it: `Velocità — bianco = tu, ciano = riferimento` },
-    "flow.chart.inputs": { en: `Throttle and brake — solid = you, dashed = reference`,
-                           it: `Gas e freno — pieno = tu, tratteggio = riferimento` },
-    "flow.chart.delta":  { en: `Gap across the lap — above the line = slower`,
-                           it: `Distacco sul giro — sopra la linea = più lento` },
+    "flow.chart.speed":  { en: `Speed (white = you, cyan = reference)`,
+                           it: `Velocità (bianco = tu, ciano = riferimento)` },
+    "flow.chart.inputs": { en: `Throttle and brake (solid = you, dashed = reference)`,
+                           it: `Gas e freno (pieno = tu, tratteggio = riferimento)` },
+    "flow.chart.delta":  { en: `Gap across the lap (above the line = slower)`,
+                           it: `Distacco sul giro (sopra la linea = più lento)` },
     "tab.sectors":     { en: `Sectors`, it: `Settori` },
     "tab.dynamics":    { en: `Dynamics`, it: `Dinamica` },
     "tab.trends":      { en: `Trends`, it: `Andamento` },
@@ -413,8 +364,8 @@
 
     "prog.consistency":{ en: `Corner consistency <small>(spread of your min speed per corner · wider = less repeatable)</small>`,
                          it: `Costanza per curva <small>(dispersione della velocità minima per curva · più larga = meno ripetibile)</small>` },
-    "cons.none":       { en: `Not enough laps yet to measure corner consistency.`,
-                         it: `Ancora troppi pochi giri per misurare la costanza per curva.` },
+    "cons.none":       { en: `Not enough laps yet to measure how consistent you are in each corner.`,
+                         it: `Hai ancora troppo pochi giri per misurare la costanza curva per curva.` },
     "cons.spread":     { en: `spread`, it: `dispersione` },
 
     "chart.yaw":       { en: `Rotation vs steering <small>(orange = yaw/rotation, white = steering · they should track together)</small>`,
@@ -515,7 +466,7 @@
                          it: `Quanto stai stringendo <small>(bianco = tu, ciano = riferimento · più lontano dal centro = arco più stretto)</small>` },
     "load.line":       { en: `Loading your line…`, it: `Caricamento traiettoria…` },
     "err.line":        { en: `Couldn't work out the line for these laps.`,
-                         it: `Non è stato possibile calcolare la traiettoria di questi giri.` },
+                         it: `Non riesco a calcolare la traiettoria di questi giri.` },
     "line.extra":      { en: `Extra distance`, it: `Strada in più` },
     "line.extraHint":  { en: `you drove {you} m, the reference {ref} m`,
                          it: `hai percorso {you} m, il riferimento {ref} m` },
@@ -629,12 +580,12 @@
                          it: `Nessun dato gomme su questi giri (registrati prima della cattura per ruota).` },
 
     "empty.title":     { en: `No laps yet`, it: `Ancora nessun giro` },
-    "empty.step1":     { en: `Start the coach: run <code>python -m accoach live</code> (or use the launcher).`,
-                         it: `Avvia il coach: esegui <code>python -m accoach live</code> (o usa il launcher).` },
+    "empty.step1":     { en: `Start the coach with <code>python -m accoach live</code>, or from the launcher.`,
+                         it: `Avvia il coach con <code>python -m accoach live</code>, o dal launcher.` },
     "empty.step2":     { en: `Drive a full, <b>valid</b> lap in AC or ACC.`,
                          it: `Guida un giro completo e <b>valido</b> in AC o ACC.` },
-    "empty.step3":     { en: `Reload this page — your lap shows up here for analysis.`,
-                         it: `Ricarica questa pagina — il tuo giro compare qui per l'analisi.` },
+    "empty.step3":     { en: `Reload this page and your lap is here to analyse.`,
+                         it: `Ricarica questa pagina e trovi qui il tuo giro da analizzare.` },
     "empty.hint":      { en: `Just want a tour? Launch with <code>python -m accoach web --demo</code> for sample laps.`,
                          it: `Vuoi solo dare un'occhiata? Avvia con <code>python -m accoach web --demo</code> per giri di esempio.` },
 
@@ -644,12 +595,9 @@
     "load.sectors":    { en: `Loading sectors…`, it: `Caricamento settori…` },
     "combo.laps":      { en: `laps`, it: `giri` },
     "combo.best":      { en: `best`, it: `migliore` },
-    "err.progress":    { en: `Couldn't load progress — is the analysis backend running?`,
-                         it: `Impossibile caricare l'andamento — il backend di analisi è in esecuzione?` },
-    "err.lap":         { en: `Couldn't load this lap.`, it: `Impossibile caricare questo giro.` },
-    "load.training":   { en: `Building your programme…`, it: `Costruzione del programma…` },
-    "err.training":    { en: `Couldn't load the programme — is the analysis backend running?`,
-                         it: `Impossibile caricare il programma — il backend di analisi è in esecuzione?` },
+    "err.progress":    { en: `Couldn't load your trends.`,
+                         it: `Non riesco a caricare l'andamento.` },
+    "err.lap":         { en: `Couldn't load this lap.`, it: `Non riesco a caricare questo giro.` },
 
     "prog.validLaps":  { en: `Valid laps`, it: `Giri validi` },
     "prog.best":       { en: `Best`, it: `Migliore` },
@@ -659,76 +607,26 @@
     "prog.dash":       { en: `—`, it: `—` },
     "prog.noValid":    { en: `no valid lap`, it: `nessun giro valido` },
 
-    "recur.none":      { en: `No recurring mistakes — nice consistency!`,
-                         it: `Nessun errore ricorrente — bella costanza!` },
-    "recur.corners":   { en: `Corners: `, it: `Curve: ` },
+    "recur.none":      { en: `No mistakes in your recent laps.`,
+                         it: `Nei tuoi ultimi giri non ho trovato errori.` },
 
     // The training plan. It lives on the Pagella now, one piece of advice at
     // a time; Trends only points there.
-    "plan.title":      { en: `Your plan`, it: `Il tuo piano` },
     "plan.elsewhere":  { en: `Your plan is on the Report card, one piece of advice at a time.`,
                          it: `Il tuo piano sta nella Pagella, un consiglio alla volta.` },
     "plan.goto":       { en: `Open the Report card`, it: `Apri la Pagella` },
-    "plan.none":       { en: `No systematic weakness to train — nothing worth putting in a plan yet.`,
-                         it: `Nessun punto debole sistematico da allenare: per ora non c'è niente da mettere in un piano.` },
-    "plan.proposed":   { en: `proposed from your recent laps — not started yet`,
-                         it: `proposto dai tuoi ultimi giri — non ancora avviato` },
-    "plan.since":      { en: `since {when}`, it: `dal {when}` },
-    "plan.laps_since": { en: `{n} {n|lap|laps} since`, it: `{n} {n|giro|giri} da allora` },
-    "plan.start":      { en: `Start this plan`, it: `Inizia questo piano` },
-    "plan.change":     { en: `Change target`, it: `Cambia obiettivo` },
-    "plan.hits":       { en: `{hits} of the {needed} laps it takes`,
-                         it: `{hits} dei {needed} giri che servono` },
-    // Both used to render as bare numbers next to each other — "now ~0.31s ·
-    // best 0.18s" — with nothing saying 0.31s *of what*.
-    "plan.now":        { en: `you lose ~{s}s now`, it: `ora perdi ~{s}s` },
-    "plan.best":       { en: `your best {s}s`, it: `il tuo meglio {s}s` },
-    "plan.nolaps":     { en: `no laps since you started it — go and drive`,
-                         it: `nessun giro da quando l'hai avviato — vai a guidare` },
-    "plan.willmeasure":{ en: `start the plan and from then on every lap is measured against this target`,
-                         it: `avvia il piano e da lì in poi ogni giro viene misurato su questo obiettivo` },
 
-    // ---- the Training tab ----
-    // Only the chrome is declared here. Every sentence with a number in it is
-    // written server-side (coaching/training.py), in the language asked for,
-    // because the wording and the rule that decides it belong together.
-    "tab.training":    { en: `Training`, it: `Allenamento` },
-    "train.locked":    { en: `Not enough laps yet`, it: `Non ci sono ancora abbastanza giri` },
-    "train.countdown": { en: `{n} more valid {n|lap|laps} and this opens.`,
-                         it: `Ancora {n} {n|giro valido|giri validi} e questa scheda si apre.` },
-    // The last lap before it opens is the one the driver is most likely to be
-    // looking at, and it is exactly the one the plural got wrong.
-    "train.countdown1": { en: `One more valid lap and this opens.`,
-                          it: `Ancora un giro valido e questa scheda si apre.` },
-    "train.intro":     { en: `Here there is no more analysis: there is what to do on track, one exercise at a time, built from your own laps.`,
-                         it: `Qui non c'è altra analisi: c'è cosa fare in pista, un esercizio alla volta, costruito sui tuoi giri.` },
-    "train.gap.title": { en: `Where your time is going`, it: `Dove se ne va il tuo tempo` },
-    "train.sector":    { en: `Sector {n}`, it: `Settore {n}` },
-    "train.drill":     { en: `Exercise · {n} laps`, it: `Esercizio · {n} giri` },
-    "train.watch":     { en: `Watch:`, it: `Guarda:` },
-    "train.ignore":    { en: `Ignore:`, it: `Ignora:` },
-    "train.wholelap":  { en: `The whole lap`, it: `Il giro intero` },
-    "train.status.now":   { en: `now`, it: `adesso` },
-    "train.status.later": { en: `later`, it: `dopo` },
-    "train.status.done":  { en: `✓ done`, it: `✓ fatto` },
-    "train.session":   { en: `Your next session`, it: `La tua prossima sessione` },
-    "train.session.laps": { en: `({n} {n|lap|laps})`, it: `({n} {n|giro|giri})` },
-    // Not "Glossary": that label tells the reader they don't know things, and
-    // gets skipped by the people it exists for. The words themselves are the
-    // invitation.
-    "train.words":     { en: `The words you'll hear other people use:`,
-                         it: `Le parole che sentirai dire dagli altri:` },
 
     "lvl.header":      { en: `Levels <small>(best → ideal → PRO · gap = time available)</small>`,
                          it: `Livelli <small>(migliore → ideale → PRO · gap = tempo disponibile)</small>` },
     "lvl.yourRef":     { en: `your reference`, it: `il tuo riferimento` },
     "lvl.consistency": { en: `consistency on the table`, it: `costanza da recuperare` },
     "lvl.gapPro":      { en: `gap to PRO`, it: `gap dal PRO` },
-    "lvl.beaten":      { en: `✓ already beaten`, it: `✓ già battuto` },
+    "lvl.beaten":      { en: `already beaten`, it: `già battuto` },
     "lvl.vsPro":       { en: `vs PRO`, it: `vs PRO` },
 
-    "trends.none":     { en: `No recurring weak points — nice consistency!`,
-                         it: `Nessun punto debole ricorrente — bella costanza!` },
+    "trends.none":     { en: `No corner is a weak point in your recent laps.`,
+                         it: `Nei tuoi ultimi giri nessuna curva è un punto debole.` },
     "badge.systematic":{ en: `Systematic`, it: `Sistematico` },
     "badge.sporadic":  { en: `Sporadic`, it: `Sporadico` },
     "trends.toTrain":  { en: `to train`, it: `da allenare` },
@@ -740,8 +638,8 @@
     // Chiavi sue: con lo stesso nome di quelle della scheda Sessione le
     // sovrascrivevano, e «nessun giro registrato» e «I tuoi giri» diventavano
     // queste frasi.
-    "cornerses.none":  { en: `No corner has enough sessions yet — keep driving.`,
-                         it: `Nessuna curva ha ancora abbastanza sessioni — continua a girare.` },
+    "cornerses.none":  { en: `No corner has enough sessions for a trend yet.`,
+                         it: `Nessuna curva ha ancora abbastanza sessioni per un andamento.` },
     "cornerses.laps":  { en: `laps`, it: `giri` },
     "ses.better":      { en: `better than the first session`,
                          it: `meglio della prima sessione` },
@@ -752,14 +650,13 @@
     "lbl.lap":         { en: `Lap`, it: `Giro` },
     "lbl.gap":         { en: `Gap`, it: `Gap` },
     "lbl.road":        { en: `Track temp`, it: `Asfalto` },
-    "flow.map":        { en: `Where you are losing it — this stretch highlighted`,
-                         it: `Dove stai perdendo — il tratto in evidenza` },
-    "flow.map.all":    { en: `Where you are losing it, over the whole lap`,
+    "flow.map":        { en: `Where you are losing time, this stretch highlighted`,
+                         it: `Dove stai perdendo, col tratto in evidenza` },
+    "flow.map.all":    { en: `Where you are losing time, over the whole lap`,
                          it: `Dove stai perdendo, su tutto il giro` },
-    "kbd.tab":         { en: `Keyboard:`, it: `Da tastiera:` },
+    "kbd.tab":         { en: `Key {k}`, it: `Tasto {k}` },
     "kbd.lap":         { en: `[ and ] step through the laps`,
                          it: `[ e ] scorrono i giri` },
-    "lbl.sectors":     { en: `Sectors`, it: `Settori` },
     "lbl.laps":        { en: `laps`, it: `giri` },
     "sum.consistency": { en: `Consistency`, it: `Costanza` },
     "sum.setup_diff":  { en: `Setup differs`, it: `Setup diverso` },
@@ -836,8 +733,8 @@
     "phase.after":     { en: `the run after`, it: `tratto dopo` },
 
     "debrief.title":   { en: `Where to improve`, it: `Dove migliorare` },
-    "debrief.clean":   { en: `Clean lap — no significant time lost per corner.`,
-                         it: `Giro pulito — nessuna perdita di tempo significativa per curva.` },
+    "debrief.clean":   { en: `Clean lap. No corner cost you a significant amount of time.`,
+                         it: `Giro pulito. Nessuna curva ti è costata tempo in modo significativo.` },
 
     "ro.pos":          { en: `Pos`, it: `Pos` },
     "ro.speed":        { en: `Speed`, it: `Velocità` },
@@ -848,8 +745,8 @@
 
     // analysis tour
     "tour.a1.t": { en: `Pick a lap`, it: `Scegli un giro` },
-    "tour.a1.x": { en: `Choose the car and track. HONE compares your laps for this combo.`,
-                   it: `Scegli auto e pista. HONE confronta i tuoi giri per questa combo.` },
+    "tour.a1.x": { en: `Choose the car and track. HONE compares your laps on that pairing.`,
+                   it: `Scegli auto e pista. HONE confronta i tuoi giri su questa coppia.` },
     // Counts nothing on purpose: this said "Four views" while there were five
     // tabs, and six the moment the guided flow landed. A number here is a
     // promise the tab bar keeps breaking.
@@ -861,31 +758,28 @@
     // _both_languages` cerca `it:` nei primi 400 caratteri dopo la chiave, e una
     // frase inglese lunga spinge la riga italiana fuori dalla finestra.
     "tour.a2.t": { en: `The other views`, it: `Le altre viste` },
-    "tour.a2.x": { en: `The same laps seen other ways. Compare holds the most: the traces and the drawing of the lap side by side, so “where did I lose it” is answered in a chart and on the track at once; the rest zoom in on a corner or pull back to your history. Each tab has a key that opens it, left to right — hover a tab to see which one.`,
-                   it: `Gli stessi giri visti in altri modi. Il Confronto è quello che tiene di più: le tracce e il disegno del giro fianco a fianco, così «dove ho perso» ha una risposta nel grafico e una in pista insieme; le altre stringono su una curva o allargano al tuo storico. Ogni scheda ha un tasto che la apre, da sinistra a destra — passa il mouse su una scheda per vedere qual è.` },
+    "tour.a2.x": { en: `The same laps, seen other ways. Compare holds the most. The traces and the drawing of the lap sit side by side. You see where you lost time in the chart and on the track at once. The other tabs zoom in on a corner or pull back to your history. Each tab opens with a key, left to right. Hover a tab to see which one.`,
+                   it: `Gli stessi giri, visti in altri modi. Il Confronto è la scheda più ricca. Le tracce e il disegno del giro stanno fianco a fianco. Vedi dove hai perso nel grafico e in pista insieme. Le altre schede stringono su una curva o allargano al tuo storico. Ogni scheda si apre con un tasto, da sinistra a destra. Passa il mouse su una scheda per vedere quale.` },
     "tour.a3.t": { en: `Delta`, it: `Delta` },
     "tour.a3.x": { en: `Where you're gaining or losing vs your reference, across the lap. Green (below the line) is faster.`,
                    it: `Dove guadagni o perdi rispetto al riferimento, lungo il giro. Verde (sotto la linea) è più veloce.` },
     "tour.a4.t": { en: `Min speed per corner`, it: `Velocità minima per curva` },
-    "tour.a4.x": { en: `Apex speed in every corner vs the reference — a positive delta means you carried more speed.`,
-                   it: `Velocità all'apice in ogni curva rispetto al riferimento — un delta positivo significa più velocità portata.` },
+    "tour.a4.x": { en: `Apex speed in every corner against the reference. A positive delta means you carried more speed.`,
+                   it: `La velocità all'apice di ogni curva, confrontata col riferimento. Un delta positivo vuol dire che hai portato più velocità.` },
     "tour.a5.t": { en: `Where to improve`, it: `Dove migliorare` },
     "tour.a5.x": { en: `Your biggest time losses, corner by corner, with the likely cause and a fix.`,
                    it: `Le tue perdite di tempo maggiori, curva per curva, con la causa probabile e una correzione.` },
     // Added when the debrief grew lap-wide findings and the lap list grew track
     // temperature: two things a driver sees before anyone explains them.
     "tour.a7.t": { en: `Whole-lap findings`, it: `Osservazioni sul giro` },
-    "tour.a7.x": { en: `The blue-edged blocks above the corners are lap-wide: a lift where the reference is flat, a top-speed deficit. Coaches say these first.`,
-                   it: `I riquadri col bordo azzurro sopra le curve valgono per tutto il giro: un sollevamento dove il riferimento sta in pieno, dei km/h di punta che mancano. Un coach parte da qui.` },
+    "tour.a7.x": { en: `The blue-edged blocks above the corners are about the whole lap. For example a lift where the reference stays flat out, or missing top speed. Coaches start here.`,
+                   it: `I riquadri col bordo azzurro sopra le curve valgono per tutto il giro. Per esempio un'alzata dove il riferimento sta in pieno, o i km/h di punta che mancano. Un coach parte da qui.` },
     "tour.a8.t": { en: `Track temperature`, it: `Temperatura asfalto` },
-    "tour.a8.x": { en: `The degrees next to each lap are the track, not the air. Braking points move 10-20 m between a cold track and a hot one, so two laps far apart in temperature are two different circuits.`,
-                   it: `I gradi accanto a ogni giro sono dell'asfalto, non dell'aria. Fra pista fredda e calda i punti di frenata si spostano di 10-20 m: due giri con temperature lontane sono due circuiti diversi.` },
+    "tour.a8.x": { en: `The degrees next to each lap are the track, not the air. Braking points move 10-20 m between a cold track and a hot one. Two laps far apart in temperature are two different circuits.`,
+                   it: `I gradi accanto a ogni giro sono dell'asfalto, non dell'aria. Fra pista fredda e calda i punti di frenata si spostano di 10-20 m. Due giri con temperature lontane sono due circuiti diversi.` },
     "tour.a10.t": { en: `Your line, corner by corner`, it: `La tua traiettoria, curva per curva` },
-    "tour.a10.x": { en: `One corner at a time, zoomed in: the shaded band is how far your line was from the reference's, in metres. Underneath, the same corner as numbers — where your slowest point sits, how tight an arc you drove, how much extra road you covered.`,
-                    it: `Una curva alla volta, ingrandita: la fascia colorata è quanto la tua traiettoria si è scostata da quella di riferimento, in metri. Sotto, la stessa curva in numeri — dov'è il tuo punto più lento, quanto stretto è l'arco che hai fatto, quanta strada in più hai percorso.` },
-    "tour.a11.t": { en: `And what do I do about it?`, it: `E adesso come mi alleno?` },
-    "tour.a11.x": { en: `The rest of the app tells you what you lose and why. This tab turns it into a drill: one thing at a time, how many laps to run it for, what to watch and what to deliberately ignore — plus the number that says when you're done. It opens once you have enough laps on this car and track for it to mean something.`,
-                    it: `Il resto dell'app ti dice cosa perdi e perché. Questa scheda lo trasforma in un esercizio: una cosa alla volta, per quanti giri farla, cosa guardare e cosa ignorare di proposito — più il numero che dice quando è fatta. Si apre quando hai abbastanza giri su questa auto e questa pista perché significhi qualcosa.` },
+    "tour.a10.x": { en: `One corner at a time, zoomed in. The shaded band shows how far your line was from the reference's, in metres. Below, the same corner in numbers tells you where your slowest point is, how tight your arc was and how much extra road you covered.`,
+                    it: `Una curva alla volta, ingrandita. La fascia colorata è quanto la tua traiettoria si è scostata da quella di riferimento, in metri. Sotto, i numeri della stessa curva dicono dov'è il tuo punto più lento, quanto è stretto l'arco e quanta strada in più fai.` },
     "tour.a6.t": { en: `Take it with you`, it: `Portalo con te` },
     "tour.a6.x": { en: `Export the lap as CSV or JSON for deeper analysis.`,
                    it: `Esporta il giro in CSV o JSON per un'analisi più approfondita.` },

@@ -187,17 +187,17 @@ def test_markdown_sentences_skip_code_and_keep_prose():
 
 def test_the_report_catalogue_is_read_in_full_with_its_multiline_entries():
     cat = tono.i18n_catalogue()
-    assert len(cat) > 450
+    assert len(cat) > 400
     assert all(set(v) == {"it", "en"} for v in cat.values()), \
         [k for k, v in cat.items() if set(v) != {"it", "en"}][:5]
-    assert "DEMO" in cat["demo.banner"]["en"]
+    assert "sample laps" in cat["demo.banner"]["en"]
     # Una voce scritta su due righe.
     assert cat["tour.e6.x"]["en"].startswith("A dial you turn on the straight")
     assert cat["tour.e6.x"]["it"].startswith("Una manopola che giri")
 
 
 def test_the_engineer_page_keys_are_not_in_the_report():
-    report = tono.SURFACES["report"]()
+    report = {**tono.SURFACES["report_a"](), **tono.SURFACES["report_b"]()}
     engineer = tono.SURFACES["engineer"]()
     assert "web/i18n.js:tour.e6.t" in engineer and "web/i18n.js:tour.e6.t" not in report
     assert "web/i18n.js:demo.banner" in report and "web/i18n.js:demo.banner" not in engineer
@@ -207,8 +207,18 @@ def test_the_engineer_page_keys_are_not_in_the_report():
     assert any("profiles/_common.py" in k for k in engineer)
 
 
+def test_the_report_is_split_in_two_without_losing_a_key():
+    a, b = tono.SURFACES["report_a"](), tono.SURFACES["report_b"]()
+    assert not set(a) & set(b)
+    eng = tono._engineer_keys()
+    every = {f"web/i18n.js:{k}" for k in tono.i18n_catalogue() if k not in eng}
+    assert set(a) | set(b) == every
+    assert "web/i18n.js:pag.title" in a or any(k.startswith("web/i18n.js:pag.") for k in a)
+    assert "web/i18n.js:demo.banner" in a and not any(k.startswith("web/i18n.js:pag.") for k in b)
+
+
 def test_every_surface_collects_texts_in_both_languages():
-    floor = {"report": 450, "engineer": 200, "report_backend": 200, "hub": 130,
+    floor = {"report_a": 220, "report_b": 200, "engineer": 200, "report_backend": 200, "hub": 130,
              "coach": 40, "guide": 400}
     for name, fn in tono.SURFACES.items():
         entries = fn()

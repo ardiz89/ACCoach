@@ -2379,7 +2379,7 @@ def create_api(
             return FileResponse(str(path))
         html = path.read_text(encoding="utf-8")
         banner = ('<div class="demo-banner" data-i18n="demo.banner">'
-                  'DEMO — synthetic laps, not your real data</div>')
+                  'These are sample laps, not yours.</div>')
         html = html.replace("<body>", '<body class="demo-mode">\n' + banner, 1)
         return Response(content=html, media_type="text/html")
 

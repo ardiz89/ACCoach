@@ -349,7 +349,7 @@ def test_the_way_back_is_at_the_top_and_at_the_bottom():
 
 def test_the_drill_says_the_target_in_numbers():
     """«L'esercizio: quanti giri, obiettivo in numeri» (spec), nella forma del
-    modello approvato dal pilota, su una riga sua, in secondi di veleggio per il
+    frase intera del tono nuovo («L'obiettivo è…», senza i due punti), su una riga sua, in secondi di veleggio per il
     veleggio."""
     body = _body_of("function renderHowto(h)")
     drill = body[body.index("const target ="):body.index('t("howto.prog")')]
@@ -357,9 +357,9 @@ def test_the_drill_says_the_target_in_numbers():
     assert 'tf(h.unit === "s" ? "howto.target.coast" : "howto.target"' in drill
     assert "{ v: fmtSecs(h.target, h.unit) }" in drill
     assert "${target}" in drill
-    assert "Obiettivo: sotto {v} a giro" in _i18n_entry("howto.target")
-    assert "Obiettivo: sotto {v} di veleggio a giro" in _i18n_entry("howto.target.coast")
-    assert "Target: under {v} a lap" in _i18n_entry("howto.target")
+    assert "L'obiettivo è stare sotto {v} a giro." in _i18n_entry("howto.target")
+    assert "L'obiettivo è veleggiare meno di {v} a giro." in _i18n_entry("howto.target.coast")
+    assert "Aim for under {v} a lap." in _i18n_entry("howto.target")
 
 
 def test_the_howto_says_which_lap_it_measures_against():
