@@ -38,7 +38,7 @@ def test_a_value_that_rounds_to_nothing_is_zero_never_minus_zero():
     assert fmt_num(-0.001, 2, "it", "s") == "0,00 s"
     assert fmt_num(-0.0, 1, "en") == "0.0"
     assert fmt_num(-0.004, 2, "en") == "0.00"
-    assert fmt_num(-0.006, 2, "en") == "-0.01"
+    assert fmt_num(-0.006, 2, "en") == "−0.01"
 
 
 def test_an_unknown_language_reads_as_english():

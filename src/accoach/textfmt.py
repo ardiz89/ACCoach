@@ -13,7 +13,7 @@ def fmt_num(v: float, decimals: int, lang: str, unit: str | None = None) -> str:
     """``fmt_num(0.18, 2, "it", "s")`` -> «0,18 s»; senza unità, solo il numero."""
     if abs(v) < 0.5 * 10 ** -decimals:
         v = 0.0
-    text = f"{v:.{decimals}f}"
+    text = f"{v:.{decimals}f}".replace("-", "−")
     if lang == "it":
         text = text.replace(".", ",")
     return f"{text} {unit}" if unit else text

@@ -10,7 +10,7 @@
   "use strict";
   const LIVE_PORT = 8777;
   const $ = (id) => document.getElementById(id);
-  const round = (x, n = 0) => (x == null ? null : Math.round(x * 10 ** n) / 10 ** n);
+  const round = (x, n = 0) => (x == null ? null : Number(x.toFixed(n)));
   // La pagina di test e' solo in italiano: virgola decimale.
   function fmtIt(x, n) { return x.toFixed(n).replace(".", ","); }
 

@@ -1107,6 +1107,7 @@
   function fmtNum(v, decimals, unit) {
     var s = (Math.abs(v) < 0.5 * Math.pow(10, -decimals) ? 0 : v).toFixed(decimals);
     if (window.HoneI18n.lang === "it") s = s.replace(".", ",");
+    s = s.replace("-", "−");   // il meno dei tempi persi, non il trattino
     return unit ? s + " " + unit : s;
   }
 

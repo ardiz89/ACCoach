@@ -1795,7 +1795,7 @@ function fillLaps(a, force) {
       // Track temp, when the lap carries it: two laps at 18° and 40° are two
       // different circuits, and until now the dropdown let you compare them
       // side by side with nothing to warn you.
-      const temp = l.road_temp ? ` · ${l.road_temp} °` : "";
+      const temp = l.road_temp ? ` · ${fmtDec(l.road_temp, 1, "°")}` : "";
       o.textContent = `${star}${l.lap_time}${l.valid ? "" : " " + t("lap.invalid")}${off}${temp}${clock ? " · " + clock : ""}${pro}`;
       if (l.path === selectedPath) o.selected = true;
       sel.appendChild(o);
@@ -1817,7 +1817,7 @@ function drawLapBar(a) {
   const bit = (k, v, cls) =>
     `<div class="bit"><span class="k">${k}</span><span class="v ${cls || ""}">${v}</span></div>`;
   const temp = a.review.road_temp != null
-    ? bit(t("lbl.road"), `${a.review.road_temp} °`) : "";
+    ? bit(t("lbl.road"), fmtDec(a.review.road_temp, 1, "°")) : "";
   el.innerHTML =
     bit(t("lbl.lap"), a.review.lap_time + offTrackBadge(a)) +
     bit(t("lbl.comparison"), a.reference.lap_time) +
@@ -1896,7 +1896,8 @@ function conditionsNote(c) {
     });
   }
   return tf(c.faster_road_temp == null ? "sum.cond.vx" : "sum.cond.v", {
-    temp: c.road_temp, time: c.faster_lap_time, ftemp: c.faster_road_temp,
+    temp: fmtDec(c.road_temp, 1), time: c.faster_lap_time,
+    ftemp: c.faster_road_temp == null ? "" : fmtDec(c.faster_road_temp, 1),
   });
 }
 
@@ -5414,7 +5415,7 @@ function drawOffsetTrace(L, corner, cx) {
   cornerBands(ctx, w, h, (DATA && DATA.corners) || []);
   cornerVeil(ctx, w, h, corner);
   gridX(ctx, w, h);
-  gridY(ctx, w, h, -m, m, (v) => fixz(v, 1) + " m");
+  gridY(ctx, w, h, -m, m, (v) => fmtDec(v, 1, "m"));
   ctx.strokeStyle = "rgba(255,255,255,0.3)";
   ctx.beginPath(); ctx.moveTo(0, h / 2); ctx.lineTo(w, h / 2); ctx.stroke();
   line(ctx, w, h, pos, off, -m, m, "#c58cff", 1.6);
