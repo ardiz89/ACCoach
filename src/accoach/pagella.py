@@ -100,8 +100,16 @@ def replay(session: Session, reference_row: dict, corners, ref: Reference,
            cache: dict | None = None) -> SessionReplay:
     """Rigioca i giri validi della sessione contro il riferimento unico.
 
-    Il riferimento stesso si salta (contro se' stesso perde zero e falserebbe la
-    media); i file illeggibili pure, come in `api._history`: una sessione con un
+    Due insiemi di giri, perche' le due domande sono diverse. I **difetti** si
+    misurano sui giri puliti che non sono il riferimento: contro se' stesso il
+    riferimento perde zero e falserebbe la media, e un giro tagliato e' piu'
+    veloce per un motivo che non e' la guida (`Session.valid_laps`). Gli
+    **errori** invece contano ogni giro valido, riferimento e tagliati compresi:
+    un bloccaggio nel giro migliore e' successo lo stesso, e un giro tagliato e'
+    proprio l'uscita di pista da contare. L'uscita la dice il catalogo, non il
+    file: e' il catalogo che declassa a «non lo so» i vecchi giri ACC.
+
+    I file illeggibili si saltano, come in `api._history`: una sessione con un
     giro rotto si mostra con quelli che ci sono. E si salta un giro il cui
     orologio non copre il giro (`trends.clock_covers_lap`, la regola del
     riepilogo di sessione): il debrief stirerebbe il buco sulle curve e ne
@@ -116,9 +124,11 @@ def replay(session: Session, reference_row: dict, corners, ref: Reference,
     errors: list[dict[str, int]] = []
     gaps: list[int] = []
     rows: list[dict] = []
-    for row in session.valid_laps:
-        if row["path"] == ref_path:
+    for row in session.laps:
+        if not row.get("valid"):
             continue
+        cut = row.get("clean") == 0
+        measured = not cut and row["path"] != ref_path
         key = (ref_path, row["path"])
         if key in cache:
             hit = cache[key]
@@ -131,16 +141,20 @@ def replay(session: Session, reference_row: dict, corners, ref: Reference,
             # e rileggere il file a ogni apertura costerebbe quanto il debrief.
             hit = None
             if clock_covers_lap(lap):
+                lap.clean = {0: False, 1: True}.get(row.get("clean"))
                 try:
-                    hit = (lap_defects(build_lap_debrief(lap, ref, corners)),
+                    hit = (lap_defects(build_lap_debrief(lap, ref, corners))
+                           if measured else None,
                            lap_errors(lap, corners))
                 except (OSError, ValueError):
                     continue
             cache[key] = hit
         if hit is None:
             continue
-        laps.append(hit[0])
         errors.append(hit[1])
+        if hit[0] is None:
+            continue
+        laps.append(hit[0])
         gaps.append(row["lap_time_ms"] - ref_ms)
         rows.append(row)
 

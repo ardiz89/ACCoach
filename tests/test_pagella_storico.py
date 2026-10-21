@@ -116,7 +116,9 @@ def test_replay_skips_the_reference_itself(tmp_path):
     newest, oldest = sessions
     r_new = replay(newest, ref_row, corners, ref, {})
     assert len(newest.valid_laps) == 3 and len(r_new.laps) == 2
-    assert len(r_new.errors) == 2
+    # Gli errori contano anche il riferimento: nel giro migliore un bloccaggio
+    # e' successo lo stesso.
+    assert len(r_new.errors) == 3
     r_old = replay(oldest, ref_row, corners, ref, {})
     assert len(r_old.laps) == 3 and r_old.wet is False
 
@@ -214,3 +216,58 @@ def test_unknown_compound_does_not_vote(tmp_path):
 
 def test_a_tie_is_dry(tmp_path):
     assert _wet_vote(tmp_path, ["wet_compound", "dry_compound"]).wet is False
+
+
+# --- gli errori: anche il riferimento e i giri tagliati -----------------------
+
+def _locked(lap, lo=0.24, hi=0.27):
+    """Un bloccaggio vero in curva 0: ABS che lavora e anteriori ferme, lo
+    stesso profilo di `test_errors._lock_frame`."""
+    for s in lap.samples:
+        if lo <= s.pos <= hi:
+            s.brake, s.abs_active = 0.9, 0.6
+            s.slip_ratio = (-1.0, -1.0, 0.0, 0.0)
+            s.tyre_pressure = (27.0, 27.0, 27.5, 27.5)
+    return lap
+
+
+def test_the_reference_and_the_cut_laps_count_their_errors(tmp_path):
+    """Gli errori contano ogni giro valido della sessione: il riferimento (che
+    nei difetti si salta, contro se' stesso perde zero) e i giri tagliati (che
+    `valid_laps` lascia fuori dai tempi). Senza, «Uscite di pista» non potrebbe
+    mai comparire: un giro tagliato e' proprio quello che non si rigiocava."""
+    ref = _locked(synth.retime(synth.build_lap(clean=True), 100_000))
+    ref.lap_time_ms, ref.recorded_utc = 100_000, "2026-10-20T10:00:00+00:00"
+    save_lap(ref, tmp_path)
+    _put(tmp_path, 101_000, "2026-10-20T10:02:00+00:00", clean=True)
+    _put(tmp_path, 102_000, "2026-10-20T10:04:00+00:00", clean=False)
+    rows = _rows(tmp_path)
+    ref_row = history_reference(rows, wet=False)
+    assert ref_row["lap_time_ms"] == 100_000
+    ref_lap = load_lap(ref_row["path"])
+    (session,) = group_sessions(rows)
+    r = replay(session, ref_row, detect_corners(ref_lap.samples),
+               Reference(ref_lap), {})
+    # I difetti restano sui giri puliti che non sono il metro.
+    assert len(r.laps) == 1 and r.mean_gap_ms == pytest.approx(1000)
+    assert len(r.errors) == 3
+    assert sum(e["off"] for e in r.errors) == 1
+    assert sum(e["lock"] for e in r.errors) >= 1
+
+
+def test_the_off_comes_from_the_catalog_verdict(tmp_path):
+    """Il catalogo e' il giudice di `clean` (declassa i vecchi giri ACC a
+    «non lo so»): un giro che il file dice tagliato ma il catalogo no non e'
+    un'uscita di pista."""
+    _put(tmp_path, 100_000, "2026-10-20T10:00:00+00:00", clean=True)
+    _put(tmp_path, 102_000, "2026-10-20T10:04:00+00:00", clean=False)
+    rows = _rows(tmp_path)
+    for row in rows:
+        if row["lap_time_ms"] == 102_000:
+            row["clean"] = -1
+    ref_row = history_reference(rows, wet=False)
+    ref_lap = load_lap(ref_row["path"])
+    (session,) = group_sessions(rows)
+    r = replay(session, ref_row, detect_corners(ref_lap.samples),
+               Reference(ref_lap), {})
+    assert sum(e["off"] for e in r.errors) == 0

@@ -70,8 +70,9 @@ def _lap(kind, amt):
     return lap
 
 
-def _put(tmp_path, stamp, kind=None, amt=0, compound="", valid=True):
+def _put(tmp_path, stamp, kind=None, amt=0, compound="", valid=True, clean=True):
     lap = _lap(kind, amt)
+    lap.clean = clean
     lap.recorded_utc = stamp
     lap.tyre_compound = compound
     lap.valid = valid
@@ -243,6 +244,24 @@ def test_errors_are_counted_and_named(tmp_path):
     assert p["errors"], p["errors"]
     for e in p["errors"]:
         assert e["count"] > 0 and e["name"]
+
+
+def test_a_cut_lap_is_an_off_and_stays_out_of_the_defects(tmp_path):
+    """Un giro tagliato e' un'uscita di pista nel conto degli errori, ma i
+    difetti restano la media dei giri puliti: il tagliato e' veloce per un
+    motivo che non e' la guida."""
+    plain = _pagella(_two_sessions(tmp_path / "a"))
+    _session(tmp_path / "b", 10, [(None, 0)] + _MIXED)
+    _session(tmp_path / "b", 11, _MIXED)
+    for m in (20, 22):     # due giri tagliati, lentissimi in curva 0
+        _put(tmp_path / "b", f"2026-10-20T11:{m:02d}:00+00:00", "min", 60,
+             clean=False)
+    p = _pagella(TestClient(create_api(tmp_path / "b")))
+    errors = {e["key"]: e for e in p["errors"]}
+    assert errors["off"]["count"] == 2
+    assert errors["off"]["name"] == "Uscite di pista"
+    assert p["session"]["valid"] == 4
+    assert p["defects"] == plain["defects"]
 
 
 def test_english(tmp_path):
