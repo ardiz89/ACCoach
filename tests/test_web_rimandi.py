@@ -227,6 +227,11 @@ eval(grab("function cornerOfIndex("));
 eval(grab("function adviceLiftWithoutNote("));
 let ADV_ROW = null;
 eval(grab("function brakeRowOpen("));
+eval(grab("function fmtSec("));
+const lapClock = () => "";
+eval(grab("function drawSectorTable("));
+eval(grab("function drawSectors("));
+function gotoAdviceSector() {}
 eval(grab("function adviceCornersInSector("));
 eval(grab("function adviceSectorsModel("));
 eval(grab("function sectorMarkHTML("));
@@ -257,6 +262,23 @@ for (const step of job) {
   else if (step.call === "analysismark") {
     out.push(step.indices.map((i) => adviceApexIn(cornerOfIndex(step.a, i)) !== null));
   }
+  else if (step.call === "sectable") {
+    for (const id of ["sec-kind", "sectors", "ideal", "sec-table"]) els[id] = fakeEl();
+    els["adv-line-sectors"] = fakeEl();
+    drawSectors(step.s);
+    const cnt = (h) => (h.match(/adv-mark/g) || []).length;
+    out.push({ bars: cnt(els["sectors"].innerHTML), table: cnt(els["sec-table"].innerHTML),
+               line: els["adv-line-sectors"].cls.has("hidden") ? 0 : 1 });
+  }
+  else if (step.call === "stale") {
+    const el = els["adv-line-" + step.view] = fakeEl();
+    const seen = [];
+    renderAdviceLine(step.view, step.corners, (c) => seen.push(["old", c]), step.opts);
+    renderAdviceLine(step.view, JSON.parse(JSON.stringify(step.corners)),
+                     (c) => seen.push(["new", c]), step.opts);
+    for (const b of el.querySelectorAll("[data-adv-i]")) b.onclick();
+    out.push(seen);
+  }
   else if (step.call === "secmodel") {
     out.push(adviceSectorsModel(step.sectors));
   }
@@ -270,7 +292,9 @@ for (const step of job) {
   }
   else if (step.call === "gotoline") {
     LINE = { corners: step.corners }; LINE_I = 0; CALLS.length = 0;
-    gotoAdviceLine(step.corners[step.pick]);
+    const picked = step.corners[step.pick];
+    if (step.reload) LINE = { corners: step.reload };
+    gotoAdviceLine(picked);
     out.push({ i: LINE_I, calls: CALLS.slice() });
   }
   else if (step.call === "relines") {
@@ -314,7 +338,7 @@ def _run(tmp_path, job):
     script.write_text(_HARNESS, encoding="utf-8")
     cat = {key: en for key, (en, _it) in TEXTS.items()}
     cat["pag.howto"] = "How to do it →"
-    cat["adv.and"] = "and"
+    cat["adv.and"] = _entry("adv.and")[0]
     env = dict(os.environ, CAT=json.dumps(cat))
     run = subprocess.run([_NODE, str(script), str(WEB / "app.js")],
                          input=json.dumps(job), capture_output=True, text=True,
@@ -654,3 +678,47 @@ def test_the_sectors_write_their_line_from_their_own_render_path():
     assert "sectorMarkHTML(" in _body_of("function drawSectorTable(")
     # anche quando i settori non arrivano la riga si spegne
     assert 'renderAdviceLine("sectors"' in _body_of("async function loadSectors(")
+
+
+@needs_node
+def test_the_buttons_use_the_latest_corners_and_goto_even_when_nothing_is_rewritten(tmp_path):
+    corners = [{"name": "Curva 1", "entry": 0.40, "exit": 0.45, "index": 4}]
+    got = _run(tmp_path, [{"advice": _ADVICE, "call": "stale", "view": "line",
+                           "corners": corners}])
+    assert got == [[["new", corners[0]]]]
+
+
+@needs_node
+def test_goto_finds_the_corner_in_a_reloaded_payload_by_value(tmp_path):
+    corners = [{"index": 3, "name": "A", "entry": 0.10, "exit": 0.20},
+               {"index": 4, "name": "B", "entry": 0.40, "exit": 0.45}]
+    copy = json.loads(json.dumps(corners))
+    got = _run(tmp_path, [{"call": "gotoline", "corners": corners, "pick": 1,
+                           "reload": copy}])
+    assert got[0]["i"] == 1
+
+
+@needs_node
+def test_the_sectors_marks_are_written_on_the_bars_and_the_table_header(tmp_path):
+    sec = lambda i, a, b: {"index": i, "start": a, "end": b, "review_ms": 1000,
+                           "baseline_ms": 1000, "delta_ms": 0, "is_best": False}
+    s = {"real": True, "sectors": [sec(0, 0, .3), sec(1, .3, .65), sec(2, .65, 1)],
+         "n": 3, "review": {"path": "a"}, "laps": [],
+         "per_lap": [{"path": "a", "lap_time": "1", "ms": [1, 1, 1]},
+                     {"path": "b", "lap_time": "2", "ms": [1, 1, 1]}]}
+    got = _run(tmp_path, [{"advice": _adv(0.42), "call": "sectable", "s": s},
+                          {"advice": None, "call": "sectable", "s": s}])
+    assert got[0] == {"bars": 1, "table": 1, "line": 1}
+    assert got[1] == {"bars": 0, "table": 0, "line": 0}
+
+
+def test_the_trajectory_line_is_switched_off_when_the_load_fails():
+    body = _body_of("async function loadLine(")
+    assert 'renderAdviceLine("line", [], null' in body
+
+
+@needs_node
+def test_the_line_numbers_the_sectors_like_the_bars_do(tmp_path):
+    secs = [dict(sec, index=i + 4) for i, sec in enumerate(_SECS)]
+    got = _run(tmp_path, [{"advice": _adv(0.42), "call": "secmodel", "sectors": secs}])
+    assert got[0]["vals"] == {"n": 6}

@@ -920,7 +920,7 @@ function adviceSectorsModel(sectors) {
     }
   });
   if (!corners.length) return null;
-  const nums = hit.map((i) => i + 1);
+  const nums = hit.map((i) => (secs[i].index != null ? secs[i].index : i) + 1);
   if (nums.length > 1) {
     const list = nums.slice(0, -1).join(", ") + " " + t("adv.and") + " " + nums[nums.length - 1];
     return { key: "adv.sectors.many", vals: { list }, corners };
@@ -2830,6 +2830,11 @@ function renderAdviceLine(view, corners, goto, opts) {
   const el = $("adv-line-" + view);
   if (!el) return;
   const m = adviceLineModel(view, corners, opts);
+  // I bottoni leggono sempre le curve e il goto dell'ULTIMA chiamata: se l'HTML
+  // non cambia non si riscrive, ma la scheda puo' aver sostituito i suoi oggetti
+  // (un ricaricamento con gli stessi tratti) e un goto vecchio non li ritroverebbe.
+  el._advGoto = goto;
+  el._advCorners = m ? m.names.map((n) => n.corner) : [];
   if (!m) {
     // Gia' spenta: niente da riscrivere (a ogni hover, senza consiglio).
     if (el._advSig) {
@@ -2856,9 +2861,13 @@ function renderAdviceLine(view, corners, goto, opts) {
   el.innerHTML = html;
   el.classList.remove("hidden");
   const btns = el.querySelectorAll("[data-adv-i]");
-  m.names.forEach((n, i) => { if (btns[i] && goto) btns[i].onclick = () => goto(n.corner); });
+  m.names.forEach((n, i) => {
+    if (btns[i] && goto) btns[i].onclick = () => {
+      if (el._advGoto) el._advGoto(el._advCorners[i]);
+    };
+  });
   const g = el.querySelector("[data-adv-goto]");
-  if (g && goto) g.onclick = () => goto(null);
+  if (g && goto) g.onclick = () => { if (el._advGoto) el._advGoto(null); };
   el.querySelector("[data-adv-how]").onclick = () => openHowto(ADVICE.defect, m.apex);
 }
 
@@ -4426,6 +4435,8 @@ async function loadLine() {
   catch (e) {
     if (stale(seen)) return;
     LINE = null;
+    // Senza Traiettoria la riga non ha curve da indicare: si spegne.
+    renderAdviceLine("line", [], null);
     $("line-summary").innerHTML =
       `<div class="item"><div class="v">—</div><div class="k">${t("err.line")}</div></div>`;
     $("line-chips").innerHTML = ""; $("line-facts").innerHTML = "";
@@ -4472,10 +4483,12 @@ function lineNameHTML(c) {
 // una finestra gia' accesa su un'altra curva la riporterebbe indietro.
 function gotoAdviceLine(corner) {
   if (!corner || !LINE) return;
-  const pos = LINE.corners.indexOf(corner);
+  // Per valore, non per identita': dopo un ricaricamento gli oggetti sono altri.
+  const pos = LINE.corners.findIndex((c) => c.index === corner.index &&
+    c.entry === corner.entry && c.exit === corner.exit);
   if (pos < 0) return;
   LINE_I = pos;
-  setRange(cornerWindow(corner));
+  setRange(cornerWindow(LINE.corners[pos]));
   redrawCurrentView();
 }
 
