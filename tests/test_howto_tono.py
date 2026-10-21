@@ -149,6 +149,18 @@ def test_no_sentence_is_copied_from_the_old_training_tab():
                 assert "difendila" not in s and "defend it" not in s
 
 
+@pytest.mark.parametrize("lang", LANGS)
+def test_done_when_sentences_do_not_share_a_skeleton(lang):
+    # Sette «È fatto quando in metà dei giri …» di fila sono lo stesso scheletro
+    # ripetuto, anche se nessuna frase è identica: le prime due parole e le
+    # ultime due devono cambiare da un difetto all'altro.
+    words = [howto(k, lang).done_when.rstrip(".").split() for k in DEFECTS]
+    heads = [tuple(w[:2]) for w in words]
+    assert len(set(heads)) == len(heads), heads
+    tails = [tuple(w[-2:]) for w in words]
+    assert len(set(tails)) >= len(tails) - 3, tails
+
+
 # --- tono di tutti i testi --------------------------------------------------
 
 def test_no_emoji_and_no_slogan_colons():
@@ -173,9 +185,21 @@ def test_italian_numbers_use_the_comma():
 @pytest.mark.parametrize("lang", LANGS)
 def test_problem_names_the_corner_and_the_cost(lang):
     for k, text in zip(DEFECTS, _problems(lang)):
-        assert "Variante Alta" in text, k
+        # Il nome apre come etichetta («Variante Alta. Qui …»), mai «In <nome>».
+        assert text.startswith("Variante Alta. "), text
+        assert not text.startswith(("In ", "At ")), text
+        assert (" Qui " if lang == "it" else " Here ") in text, text
         assert ("0,60 s" if lang == "it" else "0.60 s") in text if k == "coasting" \
             else ("0,29 s" if lang == "it" else "0.29 s") in text
+
+
+def test_problem_reads_like_the_approved_model():
+    assert problem("brake_early", "Variante Alta", 290, "ms", "it", metres=14) == (
+        "Variante Alta. Qui stacchi in media 14 metri prima del tuo giro migliore, "
+        "e ci perdi 0,29 s a giro.")
+    assert problem("brake_early", "Variante Alta", 290, "ms", "en", metres=14) == (
+        "Variante Alta. Here you brake 14 m earlier than your best lap on average, "
+        "and it costs you 0.29 s a lap.")
 
 
 def test_problem_says_the_metres_only_for_the_braking_point():
@@ -194,7 +218,7 @@ def test_problem_without_a_corner_speaks_of_the_lap(lang):
     for k in DEFECTS:
         text = problem(k, "", 150, "ms", lang)
         assert text[0].isupper() and "  " not in text, text
-        assert not text.startswith(("In ", "At ")), text
+        assert not text.startswith(("In ", "At ", "Qui ", "Here ")), text
 
 
 # --- il verdetto ------------------------------------------------------------
@@ -202,7 +226,15 @@ def test_problem_without_a_corner_speaks_of_the_lap(lang):
 def test_verdict_first_session_says_so():
     text = verdict(0.62, _top(), 0.45, None, "it")
     assert "0,62 s" in text and "45%" in text and "«Freni troppo presto»" in text
-    assert text.endswith("È la tua prima sessione qui: il confronto arriva dalla prossima.")
+    assert text.endswith("È la tua prima sessione qui. Il confronto arriva dalla prossima.")
+
+
+def test_no_verdict_has_a_colon_anywhere():
+    # Il regex «a effetto» guarda solo l'inizio del testo e si era lasciato
+    # sfuggire «… qui: il confronto …» a metà verdetto.
+    for lang in LANGS:
+        for text in _verdicts(lang):
+            assert ":" not in text, text
 
 
 def test_verdict_compares_with_the_previous_session():
@@ -217,10 +249,10 @@ def test_verdict_compares_with_the_previous_session():
     assert "in meno" not in same and "in più" not in same
 
 
-def test_verdict_is_one_or_two_sentences():
+def test_verdict_is_at_most_three_sentences():
     for lang in LANGS:
         for text in _verdicts(lang):
-            assert 1 <= len(_split(text)) <= 2, text
+            assert 1 <= len(_split(text)) <= 3, text
 
 
 def test_coasting_is_not_a_share_of_the_lost_time():

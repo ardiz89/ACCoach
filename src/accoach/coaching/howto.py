@@ -102,25 +102,25 @@ _HOWTO = {
     "it": {
         "brake_early": dict(
             what="Cominci a frenare prima del necessario, e quel tratto lo fai "
-                 "già lento. Il punto di frenata si sposta in avanti a piccoli "
-                 "passi, e solo dopo che sai ripeterlo.",
+                 "già lento. Prima impari a staccare sempre nello stesso punto, poi "
+                 "lo sposti più tardi a piccoli passi.",
             watch="In pista guarda la velocità minima della curva, la più bassa "
                   "che tocchi. Se scende mentre freni più tardi, quello che "
                   "prendi in staccata lo ridai in curva.",
             ignore="Il tempo sul giro, per questi giri, non conta.",
             drill="Scegli un punto che vedi, un cartello o l'inizio di un "
                   "cordolo, e stacca lì per i primi due giri. Poi frena una "
-                  "lunghezza d'auto più avanti a ogni giro. Il colpo di freno va "
+                  "lunghezza d'auto più tardi a ogni giro. Il colpo di freno va "
                   "dato forte subito, e si scarica man mano che rallenti. Quando "
                   "una ruota blocca, o con l'ABS senti il pedale vibrare e l'auto "
                   "allarga, torna al punto di prima e restaci fino alla fine.",
-            done_when="È fatto quando in metà dei giri la frenata in queste curve "
-                      "ti costa meno dell'obiettivo.",
+            done_when="L'esercizio è riuscito se almeno un giro su due chiudi queste "
+                      "staccate sotto l'obiettivo.",
         ),
         "brake_late": dict(
             what="Stacchi dopo il tuo giro migliore, ma all'apex sei più lento. "
                  "Arrivi troppo forte, resti sul freno mentre giri e l'auto non "
-                 "chiude la curva. Frena un po' prima, quanto basta per arrivare "
+                 "gira. Frena un po' prima, quanto basta per arrivare "
                  "all'apex col freno quasi finito.",
             watch="Guarda dove togli del tutto il piede dal freno. Deve succedere "
                   "prima dell'apex, non sopra.",
@@ -128,28 +128,30 @@ _HOWTO = {
                    "quanto esci forte.",
             drill="Per i primi due giri frena una lunghezza d'auto prima del "
                   "solito, e senti l'auto che si inserisce senza tirare dritta. "
-                  "Poi riporta la frenata in avanti di mezza lunghezza a ogni "
+                  "Poi torna a frenare più tardi, mezza lunghezza a ogni "
                   "giro. Fermati quando l'anteriore torna a scivolare in ingresso, "
                   "e resta sull'ultimo punto in cui l'auto girava pulita.",
-            done_when="È fatto quando in metà dei giri la staccata lunga smette di "
-                      "costarti più dell'obiettivo.",
+            done_when="Basta che la staccata lunga resti sotto l'obiettivo in metà "
+                      "dei giri, e questo difetto è chiuso.",
         ),
         "over_brake": dict(
             what="Usi più freno del tuo giro migliore, o lo tieni premuto troppo "
                  "a lungo, e arrivi in curva più piano del necessario. Il punto "
-                 "in cui stacchi va bene così. Da lavorare è come lasci il pedale.",
+                 "in cui stacchi va bene così. Quello che devi cambiare è come "
+                 "lasci il pedale.",
             watch="Mentre giri il volante, senti quanto stai ancora premendo. Più "
                   "sterzo metti, meno freno deve restare.",
             ignore="Il punto di frenata resta dov'è, in questi giri non si tocca.",
             drill="Per due giri lascia il freno appena giri il volante. Uscirai "
-                  "largo e lento, ed è metà della misura. Per altri due tieni un "
-                  "filo di freno fino all'apex, e sentirai l'auto girare di più ma "
+                  "largo e lento, ed è voluto, perché ti serve sentire un estremo. "
+                  "Per altri due tieni un filo di freno fino all'apex, che è "
+                  "l'altro estremo, e sentirai l'auto girare di più ma "
                   "anche rallentare troppo. Negli ultimi due cerca il punto in "
                   "mezzo, dove l'auto gira senza fermarsi. Se il posteriore "
                   "scappa, non staccare il piede di colpo. Molla il freno piano e "
                   "raddrizza.",
-            done_when="È fatto quando in metà dei giri il freno in più ti costa "
-                      "meno dell'obiettivo.",
+            done_when="Quando il freno in più scende sotto l'obiettivo in almeno "
+                      "metà dei giri, passi oltre.",
         ),
         "throttle_late": dict(
             what="In uscita apri il gas più tardi del tuo giro migliore, oppure "
@@ -166,8 +168,8 @@ _HOWTO = {
                   "ruote dietro pattinano, o senti il controllo di trazione "
                   "strozzare il motore, prova la stessa uscita con una marcia in "
                   "più.",
-            done_when="È fatto quando in metà dei giri l'uscita da queste curve ti "
-                      "costa meno dell'obiettivo.",
+            done_when="Ti fermi quando l'uscita da queste curve resta sotto "
+                      "l'obiettivo in un giro su due.",
         ),
         "min_speed": dict(
             what="Nel punto più lento della curva vai più piano del tuo giro "
@@ -185,8 +187,8 @@ _HOWTO = {
                   "il posteriore si alleggerisce, quella è la velocità che regge. "
                   "Se arrivi troppo forte, tieni il gas fermo e apri il volante, "
                   "senza alzare il piede di colpo.",
-            done_when="È fatto quando in metà dei giri la velocità che perdi in "
-                      "curva ti costa meno dell'obiettivo.",
+            done_when="Il traguardo è perdere a centro curva meno dell'obiettivo, in "
+                      "almeno metà dei giri.",
         ),
         # Nuovo: l'alzata è misurata dove il riferimento resta in pieno
         # (debrief._lift_notes), quindi curvoni e pieghe veloci. COACHING-PRO
@@ -200,14 +202,14 @@ _HOWTO = {
                   "istintiva, non una decisione.",
             ignore="Le curve lente lasciale come sono, l'esercizio riguarda solo i "
                    "tratti in pieno.",
-            drill="Al primo giro alza nello stesso punto, ma meno, lasciando giù quasi "
-                  "tutto il pedale invece di mollarne metà. A ogni giro alza meno "
+            drill="Al primo giro alza nello stesso punto, ma meno, lasciando "
+                  "giù quasi tutto il pedale invece di mollarne metà. A ogni giro alza meno "
                   "del giro prima, finché passi in pieno. Guarda lontano, verso "
                   "l'uscita del curvone. Quasi sempre l'alzata nasce da quello che "
                   "vedi, non da quello che fa l'auto. Se l'auto si muove sotto di "
                   "te, torna all'alzata del giro prima e restaci per altri due giri.",
-            done_when="È fatto quando in metà dei giri le alzate sul dritto ti "
-                      "costano meno dell'obiettivo.",
+            done_when="Le alzate sono sistemate quando, in metà dei giri, costano "
+                      "meno dell'obiettivo.",
         ),
         # Nuovo: il veleggio misurato è quello *prima* del freno (GripState.
         # coast_s). Quello in inserimento, dopo la frenata, alcuni coach lo
@@ -223,18 +225,18 @@ _HOWTO = {
             drill="Scegli il punto di frenata e tieni il gas a fondo fino a quel "
                   "punto, non un metro prima. Poi il piede va dritto sul freno, "
                   "senza pause. Se ti accorgi che alzi prima per prepararti, quel "
-                  "punto di frenata per ora è troppo avanti. Frena dove alzi, "
-                  "senza il vuoto in mezzo, e sposta la frenata più avanti solo "
+                  "punto di frenata per ora è troppo tardi per te. Frena dove alzi, "
+                  "senza il vuoto in mezzo, e torna a frenare più tardi solo "
                   "quando il passaggio fra i pedali è pulito.",
-            done_when="È fatto quando in metà dei giri il veleggio prima di "
-                      "frenare sta sotto l'obiettivo.",
+            done_when="Il veleggio è a posto se in almeno un giro su due resta sotto "
+                      "l'obiettivo.",
         ),
     },
     "en": {
         "brake_early": dict(
             what="You start braking earlier than you need to, and you drive that "
-                 "stretch already slow. The braking point moves forward in small "
-                 "steps, and only once you can repeat it.",
+                 "stretch already slow. First learn to brake at the same spot every "
+                 "lap, then move it later in small steps.",
             watch="On track, watch the minimum speed in the corner, the lowest you "
                   "reach. If it drops as you brake later, what you gain on the "
                   "brakes you give back in the corner.",
@@ -245,13 +247,13 @@ _HOWTO = {
                   "ease off as the car slows. When a wheel locks, or with ABS you "
                   "feel the pedal buzz and the car runs wide, go back to the "
                   "previous point and stay there to the end.",
-            done_when="It's done when, on half your laps, braking in these "
-                      "corners costs you less than the target.",
+            done_when="The drill has worked once at least one lap in two gets "
+                      "through these braking zones under the target.",
         ),
         "brake_late": dict(
             what="You brake later than your best lap, but you're slower at the "
                  "apex. You arrive too fast, stay on the brake while turning, and "
-                 "the car won't close the corner. Brake a little earlier, just "
+                 "the car won't turn in. Brake a little earlier, just "
                  "enough to reach the apex with the brake almost off.",
             watch="Watch where your foot comes fully off the brake. It should "
                   "happen before the apex, not on it.",
@@ -259,30 +261,31 @@ _HOWTO = {
                    "matters is how fast you leave the corner.",
             drill="For the first two laps brake one car length earlier than "
                   "usual, and feel the car turn in without pushing straight. Then "
-                  "move the braking back by half a car length every lap. Stop "
+                  "brake later again, half a car length each lap. Stop "
                   "when the front starts to slide on entry again, and stay on the "
                   "last point where the car turned cleanly.",
-            done_when="It's done when, on half your laps, the late braking stops "
-                      "costing you more than the target.",
+            done_when="Keep the late braking under the target on half your laps, and "
+                      "this one is closed.",
         ),
         "over_brake": dict(
             what="You use more brake than your best lap, or hold it too long, and "
                  "you reach the corner slower than you need to. Where you start "
-                 "braking is fine as it is. The work is in how you come off the "
-                 "pedal.",
+                 "braking is fine as it is. What you need to change is how you "
+                 "come off the pedal.",
             watch="As you turn the wheel, feel how hard you're still pressing. The "
                   "more steering you add, the less brake should be left.",
             ignore="Leave the braking point where it is, it doesn't move on these "
                    "laps.",
             drill="For two laps come off the brake as soon as you turn the wheel. "
-                  "You'll run wide and slow, and that is half the measurement. For "
-                  "two more keep a touch of brake all the way to the apex, and "
+                  "You'll run wide and slow, on purpose, because you need to feel one "
+                  "extreme. For two more keep a touch of brake all the way to the "
+                  "apex, the other extreme, and "
                   "you'll feel the car turn more but also slow down too much. On "
                   "the last two find the point in between, where the car turns "
                   "without stopping. If the rear steps out, don't jump off the "
                   "pedal. Ease off the brake and straighten up.",
-            done_when="It's done when, on half your laps, the extra brake costs "
-                      "you less than the target.",
+            done_when="When the extra brake drops under the target on at least half "
+                      "your laps, you move on.",
         ),
         "throttle_late": dict(
             what="On exit you open the throttle later than your best lap, or open "
@@ -298,8 +301,8 @@ _HOWTO = {
                   "Open the throttle a little at a time and keep opening. If the "
                   "rear wheels spin, or you hear traction control choke the "
                   "engine, try the same exit one gear higher.",
-            done_when="It's done when, on half your laps, the exit from these "
-                      "corners costs you less than the target.",
+            done_when="You stop when the exit from these corners stays under the "
+                      "target on one lap in two.",
         ),
         "min_speed": dict(
             what="At the slowest point of the corner you're slower than your best "
@@ -317,8 +320,8 @@ _HOWTO = {
                   "that is the speed it can hold. If you arrive too fast, hold the "
                   "throttle where it is and open the wheel, without lifting "
                   "sharply.",
-            done_when="It's done when, on half your laps, the speed you lose "
-                      "mid-corner costs you less than the target.",
+            done_when="The goal is to lose less than the target mid-corner, on at "
+                      "least half your laps.",
         ),
         "lift": dict(
             what="You lift off the throttle where your best lap stays flat, "
@@ -328,19 +331,20 @@ _HOWTO = {
                   "instinctive lift, not a decision.",
             ignore="Leave the slow corners as they are, this drill is only about "
                    "the flat-out sections.",
-            drill="On the first lap lift at the same spot, but less, keeping most of the "
-                  "pedal down instead of dropping half of it. Every lap lift less "
+            drill="On the first lap lift at the same spot, but less, keeping "
+                  "most of the pedal down instead of dropping half of it. Every lap lift less "
                   "than the one before, until you go through flat. Look far ahead, "
                   "towards the exit of the sweeper. The lift almost always comes "
                   "from what you see, not from what the car does. If the car moves "
                   "under you, go back to the previous lap's lift and stay there "
                   "for two more laps.",
-            done_when="It's done when, on half your laps, lifting on the straights "
-                      "costs you less than the target.",
+            done_when="The lifts are sorted when they cost less than the target on "
+                      "half your laps.",
         ),
         "coasting": dict(
             what="Between throttle and brake you spend time on neither pedal, and "
-                 "the car slows on its own without you using it. Your foot should "
+                 "that time is simply wasted, the car slows down without you "
+                 "doing anything with it. Your foot should "
                  "go from throttle to brake in one move.",
             watch="Watch your braking point. The throttle stays down until you "
                   "get there.",
@@ -352,8 +356,8 @@ _HOWTO = {
                   "get ready, that braking point is too deep for you for now. "
                   "Brake where you lift, with no gap in between, and only move the "
                   "braking later once the switch between pedals is clean.",
-            done_when="It's done when, on half your laps, the coasting before the "
-                      "brake stays under the target.",
+            done_when="The coasting is fixed if it stays under the target on at "
+                      "least one lap in two.",
         ),
     },
 }
@@ -365,8 +369,10 @@ def howto(key: str, lang: str) -> HowTo:
 
 # --- il problema in una frase -----------------------------------------------
 
-# Il corpo comincia minuscolo: con una curva diventa «In Ascari stacchi…», senza
-# (alzate e veleggio non hanno curve nel consiglio) parla del giro intero.
+# Il corpo comincia minuscolo. Con una curva il nome apre come etichetta, «Ascari.
+# Qui stacchi…», come nel modello approvato dal pilota: «In <nome>» sbaglia
+# l'articolo con metà dei nomi. Senza curva (alzate e veleggio non hanno curve
+# nel consiglio) niente «Qui»: la frase parla del giro intero, con la maiuscola.
 _PROBLEM = {
     "it": {
         "brake_early": "stacchi prima del tuo giro migliore, e ci perdi {s} a giro.",
@@ -384,7 +390,7 @@ _PROBLEM = {
         "lift": "alzi il gas dove il tuo giro migliore resta in pieno, e ci perdi "
                 "{s} a giro.",
         "coasting": "prima di frenare passi in media {s} a giro senza gas né freno.",
-        "where": "In {c} {body}",
+        "where": "{c}. Qui {body}",
         "metre": "{n} metro",
         "metres": "{n} metri",
     },
@@ -407,7 +413,7 @@ _PROBLEM = {
                 "lap.",
         "coasting": "before braking you spend {s} a lap on average off both "
                     "pedals.",
-        "where": "At {c} {body}",
+        "where": "{c}. Here {body}",
         "metre": "{n} m",
         "metres": "{n} m",
     },
@@ -445,7 +451,7 @@ _VERDICT = {
         "share": ", e il {p}% viene da {name}.",
         "top": ", e l'abitudine che pesa di più è {name}.",
         "end": ".",
-        "first": "È la tua prima sessione qui: il confronto arriva dalla prossima.",
+        "first": "È la tua prima sessione qui. Il confronto arriva dalla prossima.",
         "less": "Rispetto alla sessione prima perdi {s} in meno a giro",
         "more": "Rispetto alla sessione prima perdi {s} in più a giro",
         "same": "Rispetto alla sessione prima perdi lo stesso tempo a giro",
@@ -461,7 +467,7 @@ _VERDICT = {
         "share": ", and {p}% of it comes from {name}.",
         "top": ", and the habit that weighs most is {name}.",
         "end": ".",
-        "first": "This is your first session here, so the comparison starts with "
+        "first": "This is your first session here. The comparison starts with "
                  "the next one.",
         "less": "Compared with the previous session you lose {s} less a lap",
         "more": "Compared with the previous session you lose {s} more a lap",
