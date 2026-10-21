@@ -72,3 +72,13 @@ def test_endpoint_returns_the_active_advice(tmp_path):
     r = TestClient(create_api(tmp_path)).get(
         "/api/advice/active", params={"car": CAR, "track": TRACK, "lang": "en"})
     assert r.json()["advice"]["name"] == "Lifting on the straight"
+
+
+def test_the_corner_order_of_the_advice_is_kept(tmp_path):
+    # la Pagella le ordina per costo: le schede nominano le curve in quell'ordine
+    with _cat(tmp_path) as cat:
+        cat.save_advice(CAR, TRACK, _advice(
+            "brake_early", ACTIVE,
+            [(5, "Tosa", 0.8), (1, "Variante", 0.2), (3, "Ascari", 0.55)]))
+        out = pagella.build_active_advice(cat, CAR, TRACK, "it")["advice"]
+    assert [c["name"] for c in out["corners"]] == ["Tosa", "Variante", "Ascari"]

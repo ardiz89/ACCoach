@@ -32,6 +32,9 @@ const MAP_READOUT_DEFAULT = () => t("map.readout");
 // (header ◑) reaches the canvas-drawn map line and delta-chart tints too, not
 // just the CSS surfaces. Refreshed on load and whenever the toggle flips.
 let PAL = { slow: [255, 77, 94], fast: [52, 224, 138] };
+// Il colore del segno del consiglio, letto una volta e riletto con la palette:
+// `getComputedStyle` a ogni cerchio, a ogni ridisegno, costa senza motivo.
+let ADV_COL = null;
 function _hexRgb(s) {
   const m = (s || "").trim().match(/^#?([0-9a-fA-F]{6})$/);
   if (!m) return null;
@@ -42,6 +45,7 @@ function refreshPalette() {
   const cs = getComputedStyle(document.body);
   PAL.slow = _hexRgb(cs.getPropertyValue("--red")) || PAL.slow;
   PAL.fast = _hexRgb(cs.getPropertyValue("--green")) || PAL.fast;
+  ADV_COL = cs.getPropertyValue("--adv").trim() || null;
 }
 // Apply the saved preference before first paint, then load the active palette.
 document.body.classList.toggle("cb-safe", localStorage.getItem("hone_cb") === "1");
@@ -1669,7 +1673,7 @@ async function loadCombo(combo, lapPath, baselinePath) {
   const seen = EPOCH;
   // Un'altra auto o un'altra pista ha un altro consiglio: quello di prima non
   // resta in piedi nell'attesa. Un altro giro della stessa combo lo tiene.
-  if (!CURRENT || CURRENT.car !== combo.car || CURRENT.track !== combo.track) ADVICE = null;
+  if (!CURRENT || CURRENT.car !== combo.car || CURRENT.track !== combo.track) { ADVICE = null; ADV_ROW = null; }
   CURRENT = combo;
   loadAdvice();
   const q = new URLSearchParams({ car: combo.car, track: combo.track });
@@ -2799,7 +2803,8 @@ const ADVICE_VIEWS = {
   compare:  ["brake_early", "brake_late", "over_brake", "throttle_late", "min_speed", "lift"],
   line:     ["brake_early", "brake_late", "throttle_late", "min_speed"],
   sectors:  ["brake_early", "brake_late", "over_brake", "throttle_late", "min_speed"],
-  dynamics: ["coasting", "over_brake", "throttle_late"],
+  // `over_brake`: nessuna riga qui (il segno resta sui grafici).
+  dynamics: ["coasting", "throttle_late"],
   progress: ["brake_early", "brake_late", "over_brake", "throttle_late", "min_speed",
              "lift", "coasting"],
 };
@@ -2841,11 +2846,17 @@ function adviceRelevant(view) {
 }
 
 // Il segno: lo stesso cerchio nella riga, accanto ai nomi, e sui canvas.
-function advMarkHTML() {
-  return `<span class="adv-mark" title="${escAttr(t("adv.mark.title"))}"></span>`;
+// `titled` false: sulle righe senza curva (alzata, veleggio, giro intero) il
+// segno non e' «una curva del consiglio», quindi niente tooltip.
+function advMarkHTML(titled = true) {
+  return titled ? `<span class="adv-mark" title="${escAttr(t("adv.mark.title"))}"></span>`
+                : `<span class="adv-mark"></span>`;
 }
 function drawAdvMark(ctx, x, y) {
-  const col = getComputedStyle(document.body).getPropertyValue("--adv").trim() || "#C792EA";
+  if (ADV_COL === null) {
+    ADV_COL = getComputedStyle(document.body).getPropertyValue("--adv").trim() || "#C792EA";
+  }
+  const col = ADV_COL;
   ctx.save();
   ctx.fillStyle = col;
   ctx.beginPath();
@@ -2866,7 +2877,7 @@ function adviceLineModel(view, corners, opts) {
   if (opts && opts.hide && opts.hide()) return null;
   const adv = ADVICE.corners || [];
   const names = [];
-  if (adv.length) {
+  {
     // Nell'ORDINE DEL CONSIGLIO (la piu' costosa per prima, come la Pagella),
     // non in quello della scheda: per ogni curva del consiglio la prima della
     // scheda che ne contiene l'apice. Due apici nella stessa curva: una volta.
@@ -2876,10 +2887,14 @@ function adviceLineModel(view, corners, opts) {
       if (!c || names.some((n) => n.corner === c)) continue;
       names.push({ corner: c, apex: a.apex_pos, label: c.name || a.name || "" });
     }
-    // Andamento ha la riga per tutti e sette i difetti: senza curve ritrovate
-    // dice la frase del giro intero. Le altre schede, senza curve, tacciono.
-    if (!names.length && view !== "progress") return null;
   }
+  // Andamento ha la riga per tutti e sette i difetti: senza curve ritrovate
+  // dice la frase del giro intero. Le altre schede, senza curve, tacciono, anche
+  // se il server ha lasciato il consiglio senza curve (migrate): una riga con un
+  // «Vai al punto» che non porta da nessuna parte e' peggio di nessuna riga. Solo
+  // alzate e veleggio non hanno curve per natura.
+  const cornerless = (ADVICE.defect === "lift" || ADVICE.defect === "coasting") && !adv.length;
+  if (!names.length && view !== "progress" && !cornerless) return null;
   const key = (opts && opts.key) ||
     (view === "progress" ? (names.length ? "adv.progress.corners" : "adv.progress.lap")
                          : `adv.${view}.${ADVICE.defect}`);
@@ -2913,7 +2928,7 @@ function renderAdviceLine(view, corners, goto, opts) {
   const names = m.names.map(nameBtn).join(" · ");
   const toBox = !m.names.length && goto
     ? ` <button type="button" class="adv-link" data-adv-goto>${t("adv.goto")}</button>` : "";
-  const html = advMarkHTML() + (names ? names + " " : "") +
+  const html = advMarkHTML(m.names.length > 0) + (names ? names + " " : "") +
     `<span class="adv-text">${escAttr(tf(m.key, m.vals))}</span>${toBox} ` +
     `<button type="button" class="adv-link" data-adv-how>${t("pag.howto")}</button>`;
   // Il Confronto la richiama a ogni movimento del mouse: se non e' cambiato
@@ -3467,7 +3482,9 @@ function degradeLabel(ctx, full, short, avail) {
   return null;
 }
 
-function cornerBands(ctx, w, h, corners) {
+// `noMarks`: le fasce senza il segno del consiglio, per chi lo disegna dopo
+// (`cornerAdvMarks`) perche' le barrette dell'elettronica lo coprirebbero.
+function cornerBands(ctx, w, h, corners, noMarks) {
   ctx.fillStyle = "rgba(120,140,170,0.10)";
   for (const c of corners) {
     const x0 = projX(c.entry, w);
@@ -3480,8 +3497,12 @@ function cornerBands(ctx, w, h, corners) {
     const label = degradeLabel(ctx, c.name || "T" + (c.index + 1), "T" + (c.index + 1), band);
     if (label) ctx.fillText(label, x0 + (band - ctx.measureText(label).width) / 2, 11);
   }
-  // Il segno del consiglio in corso, sul suo apice e in basso: in alto sta il
-  // nome della curva. Niente consiglio, nessun segno.
+  if (!noMarks) cornerAdvMarks(ctx, w, h, corners);
+}
+
+// Il segno del consiglio in corso, sul suo apice e in basso: in alto sta il
+// nome della curva. Niente consiglio, nessun segno.
+function cornerAdvMarks(ctx, w, h, corners) {
   for (const c of corners) {
     const apex = adviceApexIn(c);
     if (apex === null) continue;
@@ -3941,8 +3962,7 @@ function dynamicsAdviceHidden(a) {
     return !Math.min((c.throttle || []).length, (c.brake || []).length);
   }
   // Il gas tardi si legge sul posteriore: il solo anteriore non basta.
-  if (ADVICE.defect === "throttle_late") return !_anyNonZero(c.slip_rear);
-  return !(_anyNonZero(c.slip_front) || _anyNonZero(c.slip_rear));
+  return !_anyNonZero(c.slip_rear);
 }
 
 // Veleggio: scorre al riquadro. Una curva: la finestra su quella curva (come nel
@@ -4161,6 +4181,7 @@ function drawSlip(a, cx) {
   let m = 0.15;
   for (const v of winVals(pos, sf)) m = Math.max(m, Math.abs(v));
   for (const v of winVals(pos, sr)) m = Math.max(m, Math.abs(v));
+  cornerBands(ctx, w, h, a.corners, true);
   gridX(ctx, w, h);
   gridY(ctx, w, h, -m, m, (v) => (Math.abs(v) < 1e-9 ? "0" : v.toFixed(2)));
   // Dove l'elettronica sta lavorando, PRIMA delle tracce, così la barretta sta
@@ -4170,10 +4191,10 @@ function drawSlip(a, cx) {
   // Non è una diagnosi, è il contesto senza cui l'altra non si legge.
   electronicsBand(ctx, w, h, pos, c.tc, h - 6, "#FFB020");
   electronicsBand(ctx, w, h, pos, c.abs, h - 11, "#22D3CE");
-  // Le fasce DOPO le barrette TC/ABS: il segno del consiglio sta a h-6, come il
-  // TC, proprio nelle zone di frenata e uscita a cui il consiglio rimanda. Prima
-  // delle barrette sarebbe stato coperto.
-  cornerBands(ctx, w, h, a.corners);
+  // Solo il segno DOPO le barrette TC/ABS: sta a h-6, come il TC, proprio nelle
+  // zone di frenata e uscita a cui il consiglio rimanda. Le fasce restano dove
+  // stavano: senza consiglio il grafico e' identico a prima.
+  cornerAdvMarks(ctx, w, h, a.corners);
   // Zero line.
   ctx.strokeStyle = "rgba(255,255,255,0.25)";
   ctx.beginPath(); ctx.moveTo(0, h / 2); ctx.lineTo(w, h / 2); ctx.stroke();

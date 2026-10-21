@@ -160,8 +160,8 @@
                          it: `La scelta non si è salvata. Il piano qui sotto è com'è adesso.` },
     // I rimandi dalle schede al consiglio che segui (spec: rimandi).
     // I nomi delle curve aprono la riga, fuori dalla frase.
-    "adv.compare.brake_early": { en: `On the brake chart, look at where your trace starts compared with the reference. The braking sheet has your braking point lap by lap.`,
-                               it: `Nel grafico del freno guarda dove parte la tua traccia rispetto al riferimento. La scheda frenate ha il punto di stacco giro per giro.` },
+    "adv.compare.brake_early": { en: `On the brake chart, look at where your trace starts compared with the reference. The Your braking points box has your braking point lap by lap.`,
+                               it: `Nel grafico del freno guarda dove parte la tua traccia rispetto al riferimento. Il riquadro Le tue frenate ha il punto di stacco giro per giro.` },
     "adv.compare.brake_late": { en: `Read the brake and speed charts together. A later braking point that lowers your minimum speed doesn't pay off.`,
                               it: `Guarda freno e velocità insieme. Una staccata più tarda che abbassa la velocità minima non paga.` },
     "adv.compare.over_brake": { en: `Compare how high your brake trace goes, and how long it stays there, with the reference.`,
@@ -188,10 +188,8 @@
                         it: `Sono nei settori {list}. I tempi di quei settori ti dicono se il lavoro su queste curve arriva al giro.` },
     "adv.dynamics.coasting": { en: `The coasting box shows how long you spend off both pedals.`,
                              it: `Il riquadro del veleggio dice quanto tempo passi senza gas né freno.` },
-    "adv.dynamics.over_brake": { en: `Look at wheel slip under braking. A sharp spike before the corner is too much brake.`,
-                               it: `Guarda lo slittamento delle ruote in frenata. Un picco netto prima della curva è freno di troppo.` },
-    "adv.dynamics.throttle_late": { en: `On the way out, look at rear wheel slip. If it stays low, you have room to get on the throttle earlier.`,
-                                  it: `In uscita guarda lo slittamento delle ruote posteriori. Se resta basso, hai margine per tornare prima sul gas.` },
+    "adv.dynamics.throttle_late": { en: `On the way out, look at rear wheel slip. If it stays low and TC isn't working, you have room to get on the throttle earlier.`,
+                                  it: `In uscita guarda lo slittamento delle ruote posteriori. Se resta basso e il TC non interviene, hai margine per tornare prima sul gas.` },
     "adv.progress.corners": { en: `In the fault history, the marked row is your advice. Further down, the cards for these corners show how it goes session by session.`,
                             it: `Nello storico dei difetti la riga segnata è il tuo consiglio. Più sotto, le schede di queste curve dicono come va sessione per sessione.` },
     "adv.progress.lap": { en: `In the fault history, the marked row is the advice you're following, session by session.`,

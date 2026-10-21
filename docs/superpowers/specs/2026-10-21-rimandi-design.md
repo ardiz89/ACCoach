@@ -70,7 +70,7 @@ scheda li mostra.
 | Frenate (dentro il Confronto) | `brake_early`, `brake_late`, `over_brake` | la riga della curva nella scheda frenate (la riga del Confronto la nomina) |
 | Traiettoria | `brake_early`, `brake_late`, `throttle_late`, `min_speed` | la curva aperta nella vista zoomata |
 | Settori | difetti con curve | il settore che contiene la curva |
-| Dinamica | `coasting`, `over_brake`, `throttle_late` | il riquadro del veleggio; per gli altri i grafici zoomati sulla curva |
+| Dinamica | `coasting`, `throttle_late` | il riquadro del veleggio; per il gas tardi i grafici zoomati sulla curva (`over_brake` non ha riga qui: resta solo il segno sui grafici) |
 | Andamento | tutti | la riga del difetto nello storico dei difetti; le schede per curva delle curve del consiglio |
 
 Se nessuna curva del consiglio si ritrova fra le curve della scheda, la riga non

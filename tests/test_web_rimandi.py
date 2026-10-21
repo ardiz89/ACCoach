@@ -24,8 +24,8 @@ VIEWS = ["compare", "line", "sectors", "dynamics", "progress"]
 # I testi esatti della tabella del piano (Task 2).
 TEXTS = {
     "adv.compare.brake_early": (
-        "On the brake chart, look at where your trace starts compared with the reference. The braking sheet has your braking point lap by lap.",
-        "Nel grafico del freno guarda dove parte la tua traccia rispetto al riferimento. La scheda frenate ha il punto di stacco giro per giro."),
+        "On the brake chart, look at where your trace starts compared with the reference. The Your braking points box has your braking point lap by lap.",
+        "Nel grafico del freno guarda dove parte la tua traccia rispetto al riferimento. Il riquadro Le tue frenate ha il punto di stacco giro per giro."),
     "adv.compare.brake_late": (
         "Read the brake and speed charts together. A later braking point that lowers your minimum speed doesn't pay off.",
         "Guarda freno e velocità insieme. Una staccata più tarda che abbassa la velocità minima non paga."),
@@ -65,12 +65,9 @@ TEXTS = {
     "adv.dynamics.coasting": (
         "The coasting box shows how long you spend off both pedals.",
         "Il riquadro del veleggio dice quanto tempo passi senza gas né freno."),
-    "adv.dynamics.over_brake": (
-        "Look at wheel slip under braking. A sharp spike before the corner is too much brake.",
-        "Guarda lo slittamento delle ruote in frenata. Un picco netto prima della curva è freno di troppo."),
     "adv.dynamics.throttle_late": (
-        "On the way out, look at rear wheel slip. If it stays low, you have room to get on the throttle earlier.",
-        "In uscita guarda lo slittamento delle ruote posteriori. Se resta basso, hai margine per tornare prima sul gas."),
+        "On the way out, look at rear wheel slip. If it stays low and TC isn't working, you have room to get on the throttle earlier.",
+        "In uscita guarda lo slittamento delle ruote posteriori. Se resta basso e il TC non interviene, hai margine per tornare prima sul gas."),
     "adv.progress.corners": (
         "In the fault history, the marked row is your advice. Further down, the cards for these corners show how it goes session by session.",
         "Nello storico dei difetti la riga segnata è il tuo consiglio. Più sotto, le schede di queste curve dicono come va sessione per sessione."),
@@ -139,6 +136,11 @@ def test_loadAdvice_runs_on_combo_change_and_after_every_plan_action():
     assert "loadAdvice(" in _body_of("async function adviceAction(")
 
 
+def test_a_combo_change_forgets_the_marked_brake_row_with_the_advice():
+    body = _body_of("async function loadCombo(")
+    assert re.search(r"ADVICE = null;\s*ADV_ROW = null;", body)
+
+
 def test_loadAdvice_checks_stale_before_it_assigns():
     body = _body_of("async function loadAdvice(")
     assert "stale(" in body
@@ -154,7 +156,7 @@ def test_the_scroll_waits_for_the_figures_and_reads_their_span():
     scroll = _body_of("function scrollHowtoToApex(")
     assert "data-entry" in scroll and "scrollIntoView" in scroll
     assert scroll.index("HOWTO_APEX = null") > scroll.index("= HOWTO_APEX")
-    assert 'data-entry="' in _body_of("function renderHowto(") or "data-entry" in _APPJS
+    assert 'data-entry="' in _body_of("function renderHowto(")
     assert "function openHowto(defect, apex)" in _APPJS
 
 
@@ -259,13 +261,16 @@ const document = {
   },
   body: {},
 };
-const getComputedStyle = () => ({ getPropertyValue: () => "#C792EA" });
+let STYLE_CALLS = 0;
+let ADV_COL = null;
+const getComputedStyle = () => { STYLE_CALLS++; return { getPropertyValue: () => "#C792EA" }; };
 const UI_FONT = "sans";
 const _anyNonZero = (a) => (a || []).some((v) => v !== 0);
 const projX = (p, w) => p * w;
 eval(grab("function degradeLabel("));
 eval(grab("function drawAdvMark("));
 eval(grab("function cornerBands("));
+eval(tryGrab("function cornerAdvMarks("));
 eval(tryGrab("function dynamicsAdviceHidden("));
 eval(tryGrab("function gotoAdviceDynamics("));
 eval(tryGrab("function progressAdviceCorners("));
@@ -348,6 +353,29 @@ for (const step of job) {
         set: () => true });
     cornerBands(ctx, 1000, 150, step.corners);
     out.push(arcs);
+  }
+  else if (step.call === "slip") {
+    const order = [];
+    const rec = (n) => (...a) => { order.push(n); };
+    const ctx = new Proxy({}, { get: (o, k) => (["fillRect", "fillText", "arc", "stroke"].includes(k)
+      ? rec("ctx." + k) : (k === "measureText" ? () => ({ width: 10 }) : () => {})), set: () => true });
+    els["c-slip"] = {};
+    const setup = () => ({ ctx, w: 1000, h: 150 });
+    const winVals = () => [];
+    const gridX = rec("gridX"), gridY = rec("gridY"), axisLabel = rec("axisLabel"),
+          crosshair = rec("crosshair");
+    const electronicsBand = (c, w, h, p, v, y, col) => order.push("elec:" + col);
+    const line = (c, w, h, p, v, lo, hi, col) => order.push("line:" + col);
+    eval("var drawSlipX = " + grab("function drawSlip("));
+    drawSlipX({ review: { channels: { pos: [], slip_front: [], slip_rear: [] } },
+                corners: step.corners }, null);
+    out.push(order);
+  }
+  else if (step.call === "markcolor") {
+    STYLE_CALLS = 0; ADV_COL = null;
+    const ctx = new Proxy({}, { get: () => () => {}, set: () => true });
+    for (let i = 0; i < 5; i++) drawAdvMark(ctx, 10, 10);
+    out.push(STYLE_CALLS);
   }
   else if (step.call === "dynhidden") {
     out.push(dynamicsAdviceHidden({ review: { channels: step.channels } }));
@@ -536,6 +564,38 @@ def test_lift_and_progress_lap_have_no_names_and_goto_null(tmp_path):
 
 
 @needs_node
+def test_a_corner_advice_with_no_corners_left_shows_no_line_but_progress_does(tmp_path):
+    dropped = {"defect": "brake_early", "name": "x", "corners": []}
+    corners = [{"name": "Curva 1", "entry": 0.40, "exit": 0.45}]
+    got = _run(tmp_path, [
+        {"advice": dropped, "call": "line", "view": "compare", "corners": corners},
+        {"call": "line", "view": "line", "corners": corners},
+        {"call": "line", "view": "sectors", "corners": corners},
+        {"call": "line", "view": "progress", "corners": corners},
+    ])
+    for g in got[:3]:
+        assert g["hidden"] and g["html"] == ""
+    assert not got[3]["hidden"]
+    assert "the advice you're following" in got[3]["html"]    # adv.progress.lap
+
+
+@needs_node
+def test_the_mark_title_is_only_on_lines_that_name_a_corner(tmp_path):
+    corners = [{"name": "Curva 1", "entry": 0.40, "exit": 0.45}]
+    lift = {"defect": "lift", "name": "x", "corners": []}
+    got = _run(tmp_path, [
+        {"advice": _ADVICE, "call": "line", "view": "compare", "corners": corners},
+        {"advice": lift, "call": "line", "view": "compare", "corners": []},
+        {"advice": {"defect": "coasting", "name": "x", "corners": []},
+         "call": "line", "view": "dynamics", "corners": corners},
+        {"advice": _ADVICE, "call": "line", "view": "progress", "corners": []},
+    ])
+    assert 'class="adv-mark" title="' in got[0]["html"]
+    for g in got[1:]:
+        assert 'class="adv-mark"' in g["html"] and "title=" not in g["html"]
+
+
+@needs_node
 def test_opts_replace_the_sentence_and_its_values(tmp_path):
     corners = [{"name": "Curva 1", "entry": 0.42, "exit": 0.42}]
     got = _run(tmp_path, [
@@ -597,7 +657,7 @@ def test_the_compare_cards_carry_the_mark_on_the_advice_corners(head):
 
 
 def test_the_chart_bands_and_the_map_mark_the_advice_corners_on_the_canvas():
-    for head in ("function cornerBands(", "function drawAdvMarksOnMap("):
+    for head in ("function cornerAdvMarks(", "function drawAdvMarksOnMap("):
         body = _body_of(head)
         assert "adviceApexIn(" in body, head
         assert "drawAdvMark(" in body, head
@@ -845,19 +905,47 @@ def test_the_dynamics_writes_its_line_from_its_own_render_path():
     assert "dynamicsAdviceHidden(" in body
 
 
-def test_the_slip_chart_draws_its_bands_after_the_electronics_bars():
-    # il segno (h-6) sta dove stanno le barrette TC/ABS: se le fasce vengono
-    # prima, le barrette lo coprono
+def test_the_slip_chart_keeps_its_bands_where_they_were_and_draws_only_the_marks_after_the_bars():
+    # le fasce stanno dove stavano prima del ramo (cosi' il grafico non cambia
+    # senza consiglio); solo il segno (h-6) va dopo le barrette TC/ABS, che lo
+    # coprirebbero
     body = _body_of("function drawSlip(")
-    assert body.index("cornerBands(") > body.index('electronicsBand(ctx, w, h, pos, c.abs')
-    assert body.index("cornerBands(") > body.index('electronicsBand(ctx, w, h, pos, c.tc')
+    assert body.index("cornerBands(") < body.index("gridX(")
+    assert "cornerBands(ctx, w, h, a.corners, true)" in body
+    assert body.index("cornerAdvMarks(") > body.index('electronicsBand(ctx, w, h, pos, c.abs')
+    assert body.index("cornerAdvMarks(") > body.index('electronicsBand(ctx, w, h, pos, c.tc')
 
 
-@pytest.mark.parametrize("fn", ["drawSlip", "drawYaw", "drawShift"])
+@needs_node
+def test_the_slip_chart_call_order_is_the_pre_branch_one_without_advice(tmp_path):
+    corners = [{"index": 1, "name": "B", "entry": 0.40, "exit": 0.45}]
+    got = _run(tmp_path, [
+        {"advice": None, "call": "slip", "corners": corners},
+        {"advice": _ADVICE, "call": "slip", "corners": corners},
+    ])
+    before = ["ctx.fillRect", "ctx.fillText", "gridX", "gridY", "elec:#FFB020",
+              "elec:#22D3CE", "ctx.stroke", "line:#FFB020", "line:#22D3CE",
+              "axisLabel", "crosshair"]
+    assert got[0] == before
+    # con il consiglio, un solo cerchio in piu', dopo le barrette e prima del resto
+    assert got[1] == before[:6] + ["ctx.arc"] + before[6:]
+
+
+@needs_node
+def test_the_mark_colour_is_read_once_not_on_every_mark(tmp_path):
+    assert _run(tmp_path, [{"call": "markcolor"}]) == [1]
+
+
+@pytest.mark.parametrize("fn", ["drawYaw", "drawShift"])
 def test_the_dynamics_charts_draw_their_bands_through_the_shared_helper(fn):
     # il segno sulle fasce vive in cornerBands: un canvas che disegna le fasce
     # per conto suo non lo avrebbe
     assert "cornerBands(ctx, w, h, a.corners)" in _body_of(f"function {fn}(")
+
+
+def test_the_marks_have_one_loop_shared_by_the_bands_and_the_slip_chart():
+    assert "cornerAdvMarks(ctx, w, h, corners)" in _body_of("function cornerBands(")
+    assert "drawAdvMark(" not in _body_of("function cornerBands(")
 
 
 @needs_node
@@ -878,7 +966,7 @@ def test_the_band_helper_marks_only_the_advice_corner_on_the_canvas(tmp_path):
 def test_the_line_on_the_dynamics_is_off_for_a_corner_the_advice_does_not_name(tmp_path):
     named = [{"index": 1, "name": "B", "entry": 0.40, "exit": 0.45}]
     other = [{"index": 2, "name": "C", "entry": 0.70, "exit": 0.75}]
-    ob = {"defect": "over_brake", "name": "x",
+    ob = {"defect": "throttle_late", "name": "x",
           "corners": [{"name": "Variante Alta", "apex_pos": 0.42}]}
     got = _run(tmp_path, [
         {"advice": ob, "call": "line", "view": "dynamics", "corners": named},
@@ -918,11 +1006,10 @@ def test_the_dynamics_line_is_off_when_the_chart_it_points_to_has_no_data(tmp_pa
         {"advice": {"defect": "coasting", "name": "x", "corners": []},
          "call": "dynhidden", "channels": full},
         {"call": "dynhidden", "channels": {"throttle": [], "brake": []}},
-        {"advice": {"defect": "over_brake", "name": "x", "corners": []},
-         "call": "dynhidden", "channels": full},
-        {"call": "dynhidden", "channels": {"slip_front": [0, 0], "slip_rear": [0, 0]}},
         {"advice": {"defect": "throttle_late", "name": "x", "corners": []},
-         "call": "dynhidden", "channels": {"slip_front": [0, 0], "slip_rear": [0, 0.2]}},
+         "call": "dynhidden", "channels": {**full, "slip_rear": [0, 0.2]}},
+        {"call": "dynhidden", "channels": {"slip_front": [0, 0], "slip_rear": [0, 0]}},
+        {"call": "dynhidden", "channels": {"slip_front": [0, 0], "slip_rear": [0, 0.2]}},
     ])
     assert got == [False, True, False, True, False]
     # gas tardi: il solo slittamento anteriore spegne la riga
@@ -930,10 +1017,29 @@ def test_the_dynamics_line_is_off_when_the_chart_it_points_to_has_no_data(tmp_pa
         {"advice": {"defect": "throttle_late", "name": "x", "corners": []},
          "call": "dynhidden", "channels": {"slip_front": [0, 0.3], "slip_rear": [0, 0]}},
         {"call": "dynhidden", "channels": {"slip_front": [0, 0], "slip_rear": [0, 0.2]}},
-        {"advice": {"defect": "over_brake", "name": "x", "corners": []},
-         "call": "dynhidden", "channels": {"slip_front": [0, 0.3], "slip_rear": [0, 0]}},
     ])
-    assert got == [True, False, False]
+    assert got == [True, False]
+
+
+@needs_node
+def test_over_brake_has_no_line_on_the_dynamics_but_keeps_its_marks(tmp_path):
+    ob = {"defect": "over_brake", "name": "x",
+          "corners": [{"name": "A", "apex_pos": 0.42}]}
+    corners = [{"index": 1, "name": "B", "entry": 0.40, "exit": 0.45}]
+    got = _run(tmp_path, [
+        {"advice": ob, "call": "relevant", "arg": "dynamics"},
+        {"call": "line", "view": "dynamics", "corners": corners},
+        {"call": "bands", "corners": corners},
+        {"call": "relevant", "arg": "compare"},
+    ])
+    assert got[0] is False
+    assert got[1]["hidden"] and got[1]["html"] == ""
+    assert got[2] == [[420, 144]]
+    assert got[3] is True
+
+
+def test_over_brake_has_no_dynamics_text_in_the_catalogue():
+    assert "adv.dynamics.over_brake" not in _I18NJS
 
 
 def test_the_defect_history_rows_are_marked_by_the_defect_key():
