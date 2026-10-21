@@ -17,6 +17,7 @@ import statistics
 from dataclasses import dataclass, field, replace
 
 from .defects import COAST_MAIN_S, DefectSummary, LapDefects
+from ..trackdata import corner_name
 from .thresholds import RECUR_FRAC, SIGNIF_LOSS_MS
 
 MAX_ADVICE = 3
@@ -71,7 +72,8 @@ def _target(defect: str, baseline: float) -> float:
 
 
 def propose_advice(summaries: list[DefectSummary], stored: list[Advice],
-                   names: dict[int, str], apex: dict[int, float]) -> list[Advice]:
+                   names: dict[int, str], apex: dict[int, float],
+                   lang: str | None = None) -> list[Advice]:
     actives = [a for a in stored if a.status == ACTIVE]
     if len(actives) > 1:
         raise ValueError("un solo consiglio alla volta puo' essere attivo")
@@ -86,7 +88,10 @@ def propose_advice(summaries: list[DefectSummary], stored: list[Advice],
         floor = _threshold(s.key) / 2
         picked = [(i, m) for i, m in s.corners if m >= floor][:MAX_CORNERS]
         if picked:
-            corners = [AdviceCorner(i, names.get(i, f"Corner {i + 1}"), apex.get(i, 0.0), m)
+            # Senza nome, quello dell'app per una curva che non conosce
+            # («Curva N» / «Corner N», nella lingua della pagina).
+            corners = [AdviceCorner(i, names.get(i) or corner_name("", i, 0.0, lang),
+                                    apex.get(i, 0.0), m)
                        for i, m in picked]
             baseline = sum(m for _, m in picked)
         elif not s.corners:

@@ -326,3 +326,9 @@ def test_the_glossary_carries_the_words_of_its_defect_only():
     assert not any({"Settore", "Ideale teorico"} & t for t in terms.values())
     assert [e.term for e in glossary("throttle_late", "en")] == [
         "Apex", "Reference lap", "Wheelspin"]
+
+
+def test_the_english_coasting_text_has_no_comma_splice():
+    what = howto("coasting", "en").what
+    assert "simply wasted. The car slows down" in what
+    assert "wasted, the car" not in what

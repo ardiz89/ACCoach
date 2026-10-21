@@ -344,7 +344,7 @@ _HOWTO = {
         ),
         "coasting": dict(
             what="Between throttle and brake you spend time on neither pedal, and "
-                 "that time is simply wasted, the car slows down without you "
+                 "that time is simply wasted. The car slows down without you "
                  "doing anything with it. Your foot should "
                  "go from throttle to brake in one move.",
             watch="Watch your braking point. The throttle stays down until you "

@@ -48,6 +48,14 @@ def test_only_the_first_three_corners_over_half_the_threshold_count():
     assert a.baseline == 600.0
 
 
+def test_a_corner_without_a_name_gets_the_apps_fallback_in_its_language():
+    s = _s("brake_early", [(1, 300.0)])
+    (it,) = propose_advice([s], [], {}, {}, lang="it")
+    (en,) = propose_advice([s], [], {}, {}, lang="en")
+    assert it.corners[0].name == "Curva 2"
+    assert en.corners[0].name == "Corner 2"
+
+
 def test_a_declined_defect_is_not_proposed_again():
     sums = [_s("brake_early", [(1, 300.0)]), _s("over_brake", [(3, 240.0)]),
             _s("min_speed", [(5, 220.0)])]

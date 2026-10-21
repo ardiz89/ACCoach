@@ -561,7 +561,7 @@ def build_pagella(cat, car: str, track: str, index: int, lang: str) -> dict:
             advice.append(_advice_item(ctx, a, p, lang))
             text += " " + reached_text(a.defect, p.hits, p.laps, lang)
     for a in propose_advice(summaries, [a for a, _ in stored.values()],
-                            ctx.names, ctx.apex):
+                            ctx.names, ctx.apex, lang):
         p = (measure_advice(a, [ld for _, ld in _since(ctx, a.accepted_utc)])
              if a.status == ACTIVE else None)
         advice.append(_advice_item(ctx, a, p, lang))
@@ -697,7 +697,7 @@ def build_howto(cat, car: str, track: str, defect: str, index: int,
     cur = ctx.replay_of(ctx.index)
     summaries = summarize(cur.laps)
     summary = next((s for s in summaries if s.key == defect), None)
-    adv = _advice_for(cat, car, track, ctx, defect, summaries)
+    adv = _advice_for(cat, car, track, ctx, defect, summaries, lang)
     # L'esercizio dice l'obiettivo in numeri (spec): quello del consiglio, lo
     # stesso che la riga del piano mostra in Pagella.
     if adv is not None:
@@ -739,7 +739,7 @@ def build_howto(cat, car: str, track: str, defect: str, index: int,
 
 
 def _advice_for(cat, car, track, ctx: _Context, defect: str,
-                summaries: list[DefectSummary]) -> Advice | None:
+                summaries: list[DefectSummary], lang: str) -> Advice | None:
     """Il consiglio di questo difetto: quello seguito se c'e', se no la proposta."""
     stored = _load(cat, car, track)
     mine = stored.get(defect)
@@ -749,7 +749,8 @@ def _advice_for(cat, car, track, ctx: _Context, defect: str,
         a, rp = mine
         return a if rp == ctx.ref_row["path"] else remap(a, ctx.corners, ctx.names)
     others = [a for k, (a, _) in stored.items() if k != defect]
-    return next((a for a in propose_advice(summaries, others, ctx.names, ctx.apex)
+    return next((a for a in propose_advice(summaries, others, ctx.names, ctx.apex,
+                                           lang)
                  if a.defect == defect), None)
 
 
@@ -870,7 +871,7 @@ def advice_action(cat, car: str, track: str, defect: str, action: str,
             raise NotProposed(defect)
         summaries = summarize(ctx.replay_of(ctx.index).laps)
         new = next((p for p in propose_advice(
-            summaries, [x for x, _ in stored.values()], ctx.names, ctx.apex)
+            summaries, [x for x, _ in stored.values()], ctx.names, ctx.apex, lang)
             if p.defect == defect), None)
         if new is None:
             raise NotProposed(defect)
