@@ -407,6 +407,8 @@ Pagella**. È costruita sui tuoi giri:
 - L'esercizio: quanti giri, l'obiettivo in numeri, quando è fatto.
 - Come sta andando: il numero di quel difetto in ogni sessione da quando lo
   segui. Si riempie dalla prima sessione dopo il tuo **Lo seguo**.
+- Glossario: le parole che usa la pagina (punto di frenata, apex, giro di
+  riferimento...), una frase ciascuna.
 
 ### Le schede del report
 

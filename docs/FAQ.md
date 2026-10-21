@@ -254,6 +254,8 @@ report card** brings you back. It is built from your own laps:
 - How it's going: that fault's number in each session since you started
   following it. It fills in from the first session after you press **I'll
   follow it**.
+- Glossary: the words that page uses (braking point, apex, reference lap...),
+  each in one sentence.
 
 The tabs come in three groups, in the order you usually read them.
 
