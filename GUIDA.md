@@ -768,27 +768,28 @@ tablet vecchio accanto al volante, come un iPad 3. Cambia da sola a seconda di
 dove sei. Se il coach non è acceso, la pagina te lo dice e si ricollega appena
 torna.
 
-- **In pista** vedi velocità, marcia, TC, ABS e mappa motore, temperatura e
+- **In pista.** Vedi velocità, marcia, TC, ABS e mappa motore, temperatura e
   pressione delle quattro gomme, e la striscia di gas, freno e sterzo degli
-  ultimi 8 s. Sotto c'è la fase di guida su cui lavora l'ingegnere. Se
-  l'ingegnere propone una modifica da fare subito in macchina, la leggi in un
-  riquadro e premi *L'ho cambiato* quando l'hai fatta.
+  ultimi 8 s. Sotto c'è la fase di guida su cui lavora l'ingegnere. Una
+  modifica da fare dal volante compare in un riquadro. Il bottone *L'ho
+  cambiato* c'è solo dove HONE non legge la manopola, come spiegato in «I
+  consigli di setup».
 - **Avviso di rientro.** Quando l'ingegnere ha una modifica da fare ai box, in
-  alto compare l'invito a rientrare a fine giro. La telemetria resta sotto. Lo
-  stesso avviso compare quando c'è da rimettere com'era una modifica
-  respinta.
-- **Fermo ai box.** La pagina mostra la fase, la modifica una leva alla volta,
-  dal valore di adesso a quello nuovo, il perché e il grado di fiducia.
-  Il file di partenza lo scegli tu. Per l'auto e la pista in uso è l'ultimo
-  assetto che HONE ha scritto da quando è partito il processo web. Se non ne
-  ha scritto nessuno, è il file modificato più di recente. Premi *Scrivi la
-  modifica* e conferma. HONE crea un file nuovo e non tocca il tuo. Poi la
+  alto compare l'invito a rientrare a fine giro. La telemetria resta sotto. Per
+  una modifica respinta l'avviso è simile e ti dice di rimettere l'ultima
+  modifica com'era.
+- **Fermo ai box.** La pagina mostra la fase e le leve da cambiare, una per
+  riga, dal valore di adesso a quello nuovo. Sotto trovi il perché e il grado
+  di fiducia. Come file di partenza HONE propone l'ultimo assetto che ha scritto
+  per quell'auto e quella pista da quando è partito il processo web. Se non ne
+  ha scritto nessuno, propone il file modificato più di recente. Dalla lista
+  puoi sceglierne un altro. Premi *Scrivi la modifica* e conferma. HONE crea un file nuovo e non tocca il tuo. Poi la
   pagina ti mostra in grande il nome del file, da caricare dal garage del
   gioco. Se non trova un assetto per quell'auto su quella pista, ti chiede di
   salvarne uno dal garage.
 - **Una modifica respinta.** Il bottone diventa *Scrivi il ripristino* e
-  scrive un file che rimette i valori di prima. Se li hai già rimessi a mano,
-  premi *L'ho già rimesso com'era*.
+  scrive un file che rimette i valori di prima. Se hai già ricaricato nel
+  garage del gioco il file di prima, premi *L'ho già rimesso com'era*.
 
 Per il resto, ad esempio per lo storico delle prove, usa la pagina completa
 dell'ingegnere. Resta su `/engineer`, e il collegamento *Pagina completa* in
