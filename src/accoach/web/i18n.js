@@ -389,6 +389,7 @@
                          it: `Gas e freno <small>(verde = gas, rosso = freno, tratteggio = riferimento)</small>` },
     "chart.steer":     { en: `Steering <small>(white = reviewed lap, cyan = comparison, left is up and right is down)</small>`,
                          it: `Sterzo <small>(bianco = giro in esame, ciano = confronto, sinistra in su e destra in giù)</small>` },
+    "steer.none":      { en: `This lap has no steering data.`, it: `In questo giro non c'è il dato dello sterzo.` },
 
     "map.readout":     { en: `Red marks where you're slower than the reference, green where you're faster. Hover the map for the values.`,
                          it: `Il rosso segna dove sei più lento del riferimento, il verde dove sei più veloce. Passa il mouse sulla mappa per i valori.` },
@@ -575,14 +576,14 @@
     "tyre.rr":         { en: `Rear-right`, it: `Post. dx` },
 
     "empty.title":     { en: `No laps yet`, it: `Ancora nessun giro` },
-    "empty.step1":     { en: `Start the coach with <code>python -m accoach live</code>, or from the launcher.`,
-                         it: `Avvia il coach con <code>python -m accoach live</code>, o dal launcher.` },
+    "empty.step1":     { en: `Open HONE, go to <b>Drive</b> and press <b>Coach Live</b>.`,
+                         it: `Apri HONE, vai su <b>In pista</b> e premi <b>Coach Live</b>.` },
     "empty.step2":     { en: `Drive a full, <b>valid</b> lap in AC or ACC.`,
                          it: `Guida un giro completo e <b>valido</b> in AC o ACC.` },
     "empty.step3":     { en: `Reload this page and your lap will be here, ready to analyse.`,
                          it: `Ricarica questa pagina e trovi qui il tuo giro da analizzare.` },
-    "empty.hint":      { en: `Just want a tour? Launch with <code>python -m accoach web --demo</code> for sample laps.`,
-                         it: `Vuoi solo dare un'occhiata? Avvia con <code>python -m accoach web --demo</code> per giri di esempio.` },
+    "empty.hint":      { en: `Just want a look? From the source, <code>python accoach_main.py web --demo</code> shows sample laps.`,
+                         it: `Vuoi solo dare un'occhiata? Dal sorgente, <code>python accoach_main.py web --demo</code> ti mostra giri di esempio.` },
 
     // ---- analysis page (app.js injected) ----
     "load.lap":        { en: `Loading lap…`, it: `Caricamento giro…` },

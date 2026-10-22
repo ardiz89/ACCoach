@@ -3955,7 +3955,7 @@ function drawSteer(a, cx) {
   const sv = rv && rv.steer, sf = rf && rf.steer;
   if (!Array.isArray(sv) || !sv.length) {
     ctx.fillStyle = "rgba(255,255,255,0.35)"; ctx.font = canvasFont(12) + "px " + UI_FONT;
-    ctx.fillText("No steering data for this lap.", 10, h / 2);
+    ctx.fillText(t("steer.none"), 10, h / 2);
     return;
   }
   let m = 0.1;
