@@ -186,8 +186,9 @@ def test_double_tap_writes_once_and_409_tries_the_next_name_four_times():
     assert r.returncode == 0, r.stderr
     out = json.loads(r.stdout)
     # Il valore fisico con la regola dei numeri della pagina (fmtNum).
-    assert out["levers"] == ["Pressione FL 26 psi → 26,2 psi (57 → 59 click)",
-                             "Campanatura FL −4 deg → −3,5 deg (0 → 0 click)"]
+    # I due valori coi decimali del piu' preciso; i click col segno.
+    assert out["levers"] == ["Pressione FL 26,0 psi → 26,2 psi (+2 click)",
+                             "Campanatura FL −4,0 deg → −3,5 deg (0 click)"]
     assert out["confirmHidden"] is False
     assert out["disabledInFlight"] is True
     assert out["afterDoubleTap"] == 1

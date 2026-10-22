@@ -13,7 +13,11 @@
        parte si vede la decide `data-mode`, che tablet.js riscrive a ogni frame:
        off, track, call (avviso di rientro, sopra la telemetria), box. -->
   <div id="tablet" class="tablet" data-mode="off">
-    <div id="t-off" class="t-off" data-i18n="tablet.off">The coach isn't running. This page reconnects by itself.</div>
+    <!-- Spento: il motore non risponde, oppure risponde ma il gioco tace. -->
+    <div id="t-off" class="t-off">
+      <span id="t-off-closed" data-i18n="tablet.off">The coach isn't running. This page reconnects by itself.</span>
+      <span id="t-off-wait" data-i18n="tablet.waiting" hidden>The coach is on and waiting for data from the game.</span>
+    </div>
 
     <div id="t-call" class="t-call">
       <div id="t-call-msg" class="t-call-msg"></div>
@@ -55,7 +59,9 @@
           <span class="tl brk"><span data-i18n="trace.brk">Brake</span> <b id="tr-brk">–</b></span>
           <span class="tl steer"><span data-i18n="trace.steer">Steering</span> <b id="tr-steer">–</b></span>
         </div>
-        <canvas id="t-trace" class="t-trace"></canvas>
+        <!-- La tela riempie il riquadro, che si allunga e si accorcia con lo
+             spazio: un canvas senza altezza fissa crescerebbe a ogni disegno. -->
+        <div class="t-trace-box"><canvas id="t-trace" class="t-trace"></canvas></div>
       </div>
 
       <div id="t-av" class="t-av" hidden>
@@ -111,7 +117,7 @@
       </div>
     </div>
 
-    <a class="t-full" href="/engineer" data-i18n="tablet.full">Full page</a>
+    <a id="t-full" class="t-full" href="/engineer" data-i18n="tablet.full">Full page</a>
   </div>
 
   <script src="/static/i18n.js"></script>

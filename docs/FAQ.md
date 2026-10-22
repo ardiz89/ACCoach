@@ -825,7 +825,8 @@ coach measures you against it.
 The QR code in the Drive panel opens `/tablet`, a page made for an old
 tablet beside the wheel, like an iPad 3. It changes by itself depending on where
 you are. If the coach isn't running, the page says so and reconnects as soon as
-it's back.
+it's back. If the coach is on but the game isn't sending data, the page says
+it's waiting for it. That happens in the menus or before the session.
 
 - **On track.** You see speed, gear, TC, ABS and engine map, and the temperature
   and pressure of the four tyres. A strip shows throttle, brake and steering
@@ -841,18 +842,18 @@ it's back.
   the confidence. As the starting file, HONE offers the last setup it wrote for
   that car and track since the web process started. If it hasn't written one, it
   offers the most recently modified file. You can pick another from the list.
-  Press *Write the change* and confirm. HONE
-  creates a new file and leaves yours alone. The page then shows the file name
-  in large type, to load from the game's garage. If it can't find a setup for
-  that car on that track, it asks you to save one from the garage.
+  Press *Write the change* and confirm. HONE creates a new file and leaves
+  yours alone. The page then shows the file name in large type, to load from
+  the game's garage. If it can't find a setup for that car on that track, it
+  asks you to save one from the garage.
 - **A rejected change.** The button becomes *Write the restore* and writes a file
   with the previous values. If you've already reloaded the previous file in the
   game's garage, press *I've already put it back*.
 
 For anything else, such as the history of the trials, use the full engineer
 page. It stays at `/engineer`, and the *Full page* link at the bottom of the
-tablet view leads there. An old browser that opens `/engineer` lands on `/tablet`
-by itself, because the full page doesn't start for it.
+tablet view leads there. On an old browser the full page doesn't start. There
+the link isn't shown, and opening `/engineer` lands on `/tablet` by itself.
 
 ### Opening the report on a phone or tablet
 

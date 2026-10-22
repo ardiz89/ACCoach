@@ -766,7 +766,8 @@ quello.
 Il codice QR del pannello In pista apre `/tablet`, una pagina pensata per un
 tablet vecchio accanto al volante, come un iPad 3. Cambia da sola a seconda di
 dove sei. Se il coach non è acceso, la pagina te lo dice e si ricollega appena
-torna.
+torna. Se il coach è acceso ma il gioco non manda dati, la pagina ti dice che
+lo sta aspettando. Succede nei menu o prima della sessione.
 
 - **In pista.** Vedi velocità, marcia, TC, ABS e mappa motore, temperatura e
   pressione delle quattro gomme, e la striscia di gas, freno e sterzo degli
@@ -783,18 +784,19 @@ torna.
   di fiducia. Come file di partenza HONE propone l'ultimo assetto che ha scritto
   per quell'auto e quella pista da quando è partito il processo web. Se non ne
   ha scritto nessuno, propone il file modificato più di recente. Dalla lista
-  puoi sceglierne un altro. Premi *Scrivi la modifica* e conferma. HONE crea un file nuovo e non tocca il tuo. Poi la
-  pagina ti mostra in grande il nome del file, da caricare dal garage del
-  gioco. Se non trova un assetto per quell'auto su quella pista, ti chiede di
-  salvarne uno dal garage.
+  puoi sceglierne un altro. Premi *Scrivi la modifica* e conferma. HONE crea
+  un file nuovo e non tocca il tuo. Poi la pagina ti mostra in grande il nome
+  del file, da caricare dal garage del gioco. Se non trova un assetto per
+  quell'auto su quella pista, ti chiede di salvarne uno dal garage.
 - **Una modifica respinta.** Il bottone diventa *Scrivi il ripristino* e
   scrive un file che rimette i valori di prima. Se hai già ricaricato nel
   garage del gioco il file di prima, premi *L'ho già rimesso com'era*.
 
 Per il resto, ad esempio per lo storico delle prove, usa la pagina completa
 dell'ingegnere. Resta su `/engineer`, e il collegamento *Pagina completa* in
-fondo alla vista tablet ci porta. Un browser vecchio che apre `/engineer` finisce
-su `/tablet` da solo, perché la pagina completa non gli parte.
+fondo alla vista tablet ci porta. Su un browser vecchio la pagina completa non
+parte. Lì il collegamento non compare, e chi apre `/engineer` finisce su
+`/tablet` da solo.
 
 ### Aprire il report sul telefono o sul tablet
 

@@ -1,4 +1,6 @@
-/* La vista tablet. Pensata per l'iPad 3 (1024 x 768 punti CSS, Safari 9):
+/* La vista tablet. Pensata per l'iPad 3 (1024 x 768 punti CSS, Safari 9; con
+   le barre di Safari la vista resta di circa 1024 x 680 in orizzontale e
+   768 x 940 in verticale, e li' deve stare senza scorrere):
    niente griglia, variabili, clamp() o gap sui flex, che Safari 9 non ha.
    I colori sono quelli di style.css scritti per esteso; le misure in px fissi,
    perche' lo schermo e' uno solo. Il controllo sta in tests/safari9.py. */
@@ -18,22 +20,56 @@ html, body {
   -webkit-text-size-adjust: 100%;
 }
 
+/* Il body e' una colonna anche lui: in modalita' demo la fascia sta sopra la
+   vista e la vista si accorcia, invece di uscire sotto lo schermo. */
+body {
+  display: -webkit-flex;
+  display: flex;
+  -webkit-flex-direction: column;
+  flex-direction: column;
+}
+
 .tablet {
   display: -webkit-flex;
   display: flex;
   -webkit-flex-direction: column;
   flex-direction: column;
-  height: 100%;
+  -webkit-flex: 1 1 auto;
+  flex: 1 1 auto;
+  min-height: 0;
   box-sizing: border-box;
   padding: 12px 16px;
+}
+
+/* La fascia della demo, come in style.css. */
+.demo-banner {
+  -webkit-flex: 0 0 auto;
+  flex: 0 0 auto;
+  background: #FFB020;
+  color: #1A1205;
+  text-align: center;
+  font-weight: 700;
+  font-size: 16px;
+  letter-spacing: .04em;
+  padding: 6px 12px;
 }
 
 /* Chi si vede in ogni stato. Il resto e' spento. */
 .t-off, .t-call, .t-track, .t-box { display: none; }
 .tablet[data-mode="off"] .t-off { display: block; }
 .tablet[data-mode="off"] .t-phase { display: none; }
+/* In pista la telemetria e' una colonna che prende lo spazio rimasto: a
+   cedere quando manca e' la striscia dei pedali, non la velocita'. */
 .tablet[data-mode="track"] .t-track,
-.tablet[data-mode="call"] .t-track { display: block; }
+.tablet[data-mode="call"] .t-track {
+  display: -webkit-flex;
+  display: flex;
+  -webkit-flex-direction: column;
+  flex-direction: column;
+  -webkit-flex: 1 1 auto;
+  flex: 1 1 auto;
+  min-height: 0;
+}
 .tablet[data-mode="call"] .t-call { display: block; }
 .tablet[data-mode="box"] .t-box { display: block; }
 
@@ -48,6 +84,8 @@ html, body {
 
 /* ---- avviso di rientro: il colore suo, la parte alta dello schermo ---- */
 .t-call {
+  -webkit-flex: 0 0 auto;
+  flex: 0 0 auto;
   background: #FFB020;
   color: #0B0E12;
   border-radius: 10px;
@@ -86,18 +124,24 @@ html, body {
   align-items: center;
   margin-right: 24px;
 }
+/* Cifre tutte larghe uguali: Safari di iOS 9 non conosce
+   font-variant-numeric, e la velocita' ballerebbe a ogni frame. */
 .t-num {
   font-size: 120px;
   font-weight: 700;
   line-height: 1;
   font-variant-numeric: tabular-nums;
+  -webkit-font-feature-settings: "tnum";
+  font-feature-settings: "tnum";
 }
 .t-gear .t-num { color: #22D3CE; }
 .t-unit { font-size: 20px; color: #8A95A3; margin-top: 4px; }
 
+/* 440 px: la gomma porta temperatura e pressione con l'unita', «84 °C
+   27,4 psi», e sotto questa larghezza le due cifre si toccano. */
 .t-side {
-  -webkit-flex: 0 0 420px;
-  flex: 0 0 420px;
+  -webkit-flex: 0 0 440px;
+  flex: 0 0 440px;
 }
 .t-aids {
   display: -webkit-flex;
@@ -116,6 +160,10 @@ html, body {
 }
 .t-aid:last-child { margin-right: 0; }
 .t-aid .k { display: block; font-size: 18px; color: #8A95A3; }
+.t-aid .v, .t-tyre .tt, .t-tyre .tp, .t-legend b {
+  -webkit-font-feature-settings: "tnum";
+  font-feature-settings: "tnum";
+}
 .t-aid .v { display: block; font-size: 32px; font-weight: 700; }
 
 .t-tyres {
@@ -148,16 +196,38 @@ html, body {
 .tt.hot { color: #FF4D5E; }
 .tp.low, .tp.high { color: #FFB020; }
 
-.t-strip { margin-top: 10px; }
+.t-row { -webkit-flex: 0 0 auto; flex: 0 0 auto; }
+.t-strip {
+  margin-top: 10px;
+  display: -webkit-flex;
+  display: flex;
+  -webkit-flex-direction: column;
+  flex-direction: column;
+  -webkit-flex: 1 1 auto;
+  flex: 1 1 auto;
+  min-height: 0;
+}
 .t-legend { font-size: 18px; color: #8A95A3; margin-bottom: 4px; }
 .t-legend .tl { margin-right: 22px; }
 .t-legend b { color: #E8EDF2; }
 .t-legend .thr b { color: #34E08A; }
 .t-legend .brk b { color: #FF4D5E; }
+/* Il riquadro si allunga fino a 200 px e si accorcia fino a 80: sotto, i
+   pedali non si leggono piu'. La tela lo riempie da sopra. */
+.t-trace-box {
+  position: relative;
+  -webkit-flex: 1 1 200px;
+  flex: 1 1 200px;
+  min-height: 80px;
+  max-height: 200px;
+}
 .t-trace {
+  position: absolute;
+  left: 0;
+  top: 0;
   display: block;
   width: 100%;
-  height: 150px;
+  height: 100%;
   background: #151A21;
   border: 1px solid #232B35;
   border-radius: 8px;
@@ -165,6 +235,8 @@ html, body {
 }
 
 .t-av {
+  -webkit-flex: 0 0 auto;
+  flex: 0 0 auto;
   display: -webkit-flex;
   display: flex;
   -webkit-align-items: center;
@@ -195,6 +267,8 @@ html, body {
 
 /* ---- la fase, in pista e ai box -------------------------------------- */
 .t-phase {
+  -webkit-flex: 0 0 auto;
+  flex: 0 0 auto;
   margin-top: 10px;
   padding: 10px 14px;
   background: #151A21;
@@ -285,10 +359,12 @@ html, body {
 .t-done-hint:empty { display: none; }
 
 .t-full {
+  -webkit-flex: 0 0 auto;
+  flex: 0 0 auto;
   -webkit-align-self: flex-end;
   align-self: flex-end;
   margin-top: auto;
-  padding: 12px 4px 0;
+  padding: 6px 4px 0;
   min-height: 44px;
   line-height: 32px;
   font-size: 18px;
@@ -303,5 +379,23 @@ html, body {
   }
   .t-main { margin-right: 0; margin-bottom: 12px; -webkit-justify-content: center; justify-content: center; }
   .t-side { -webkit-flex: 0 0 auto; flex: 0 0 auto; }
-  .t-trace { height: 200px; }
+}
+
+/* Con le barre di Safari (circa 680 punti di altezza in orizzontale, 940 in
+   verticale) avviso, telemetria e fase non ci stanno alla misura piena: si
+   stringono i margini e i testi lunghi, non le cifre. */
+@media (orientation: landscape) and (max-height: 720px),
+       (orientation: portrait) and (max-height: 980px) {
+  .tablet { padding: 8px 16px; }
+  .t-call { padding: 10px 16px; margin-bottom: 8px; }
+  .t-call-msg { font-size: 30px; }
+  .t-call-why { font-size: 18px; margin-top: 2px; }
+  .t-aid { padding: 2px 10px; }
+  .t-aid .v { font-size: 28px; }
+  .t-aids { margin-bottom: 8px; }
+  .t-tyre { padding: 4px 10px; margin-bottom: 6px; }
+  .t-strip { margin-top: 6px; }
+  .t-av { margin-top: 6px; padding: 6px 12px; }
+  .t-av-msg { font-size: 20px; }
+  .t-phase { margin-top: 6px; padding: 6px 12px; font-size: 18px; line-height: 1.3; }
 }

@@ -73,3 +73,38 @@ def test_redirect_fires_when_async_is_unknown():
                          timeout=20)
     assert out.returncode == 0, out.stderr
     assert out.stdout.strip() == "/tablet"
+
+
+def _probe(text):
+    m = re.search(r'new Function\("([^"]+)"\)', text)
+    assert m, "nessuna prova `new Function(...)`"
+    return m.group(1)
+
+
+def test_the_probe_covers_both_forms_the_full_page_uses():
+    # engineer.js scrive `async` e `??`: Safari 10-13 conosce il primo e non
+    # il secondo, e una prova del solo `async` lo lascerebbe sulla pagina bianca.
+    probe = _probe(_redirect_script())
+    assert "async function" in probe and "??" in probe
+
+
+def test_tablet_hides_the_full_page_link_with_the_same_probe():
+    # Il link «Pagina completa» si spegne dove /engineer rimanderebbe indietro:
+    # la regola e' una sola, quindi lo stesso testo nei due file.
+    tablet = (_SRC / "web" / "tablet.js").read_text(encoding="utf-8")
+    assert _probe(tablet) == _probe(_redirect_script())
+
+
+@pytest.mark.skipif(_NODE is None, reason="node non disponibile")
+def test_redirect_fires_when_nullish_is_unknown():
+    # Un browser che legge `async` ma non `??` (Safari 10-13): rinvio anche qui.
+    js = ("var location = {replace: function (u) { console.log(u); }};\n"
+          "var NativeFunction = Function;\n"
+          "Function = function (body) {\n"
+          "  if (body.indexOf('??') !== -1) throw new SyntaxError('no ??');\n"
+          "  return NativeFunction.apply(null, arguments);\n"
+          "};\n" + _redirect_script())
+    out = subprocess.run([_NODE, "-e", js], capture_output=True, text=True,
+                         timeout=20)
+    assert out.returncode == 0, out.stderr
+    assert out.stdout.strip() == "/tablet"

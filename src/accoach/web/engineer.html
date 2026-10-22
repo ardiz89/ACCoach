@@ -3,11 +3,14 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <!-- Il preferito vecchio sull'iPad 3: questa pagina scrive `async`, che
-       Safari 9 non legge, e resterebbe bianca. Lo script e' ES3 apposta; dove
-       `async` si legge non succede niente, dove no si va alla vista tablet. -->
+  <!-- Il preferito vecchio sull'iPad 3: questa pagina scrive `async` e `??`,
+       che Safari 9 non legge, e resterebbe bianca. Si provano tutti e due:
+       c'e' chi conosce `async` ma non `??` (Safari 10-13). Lo script e' ES3
+       apposta; dove si leggono non succede niente, dove no si va alla vista
+       tablet. tablet.js fa la stessa prova, con lo stesso testo, per il link
+       «Pagina completa». -->
   <script>
-    try { new Function("async function f(){}"); }
+    try { new Function("async function f(){}; var a = null ?? 1;"); }
     catch (e) { location.replace("/tablet"); }
   </script>
   <title data-i18n="title.engineer">HONE · Engineer</title>

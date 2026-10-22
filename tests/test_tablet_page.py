@@ -87,6 +87,44 @@ def test_mode_off_without_the_engine():
 
 
 @needs_node
+def test_off_says_whether_the_engine_or_the_game_is_missing():
+    # Senza frame il motore non c'e'; con `connected: false` c'e', e tace il
+    # gioco (menu, prima della sessione, replay): due frasi diverse.
+    closed, waiting = _call("offText", [[None], [{"connected": False}]])
+    assert closed == "Il coach non è acceso. La pagina si ricollega da sola."
+    assert waiting == "Il coach è acceso e aspetta i dati del gioco."
+
+
+def _lever(old_phys, new_phys, old_click, new_click):
+    return {"label": "x", "slot": "", "old_phys": old_phys, "new_phys": new_phys,
+            "old_click": old_click, "new_click": new_click}
+
+
+@needs_node
+def test_a_lever_in_clicks_is_said_once():
+    # ACC «11 click», AC «11» (il numero e' il click), ACC con passo senza
+    # base «11 click (~0.1psi/click)»: tre forme, una riga sola, in click.
+    assert _call("leverText", [
+        [_lever("11 click", "9 click", 11, 9)],
+        [_lever("11", "9", 11, 9)],
+        [_lever("11 click (~0.1psi/click)", "9 click (~0.1psi/click)", 11, 9)],
+    ]) == ["11 → 9 click"] * 3
+
+
+@needs_node
+def test_a_lever_with_a_unit_shows_the_value_and_the_clicks():
+    # Come il riepilogo della pagina completa: valore fisico, poi i click col
+    # segno. I due valori coi decimali del piu' preciso dei due.
+    assert _call("leverText", [
+        [_lever("26.8 psi", "27 psi", 66, 68)],
+        [_lever("64 °", "62.5 °", 4, 1)],
+        [_lever("12 mm", "14 mm", 3, 5)],
+    ]) == ["26,8 psi → 27,0 psi (+2 click)",
+           "64,0 ° → 62,5 ° (−3 click)",
+           "12 mm → 14 mm (+2 click)"]
+
+
+@needs_node
 def test_mode_track_while_driving_without_a_box_change():
     assert _modes([_live(None), _live({"kind": "propose", "tag": "AV", "change": _CHANGE})]) \
         == ["track", "track"]

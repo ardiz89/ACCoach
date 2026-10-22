@@ -43,6 +43,21 @@
     return boxChange(st.engineer) ? "call" : "track";
   }
 
+  // Spento ha due facce. Senza frame (il socket chiuso, o mai aperto) il
+  // motore non c'e'; con un frame `connected: false` il motore c'e' ma il gioco
+  // non manda dati (i menu, prima della sessione, un replay). Dire «il coach
+  // non e' acceso» al pilota che ce l'ha acceso lo manda a cercare il guasto
+  // sbagliato.
+  function offKey(st) { return st ? "tablet.waiting" : "tablet.off"; }
+
+  // La stessa prova di engineer.html, con lo stesso testo (un test lo
+  // confronta): dove non passa la pagina completa non parte e rimanda qui, e
+  // un link che ci porta farebbe solo un giro a vuoto.
+  function fullPageWorks() {
+    try { new Function("async function f(){}; var a = null ?? 1;"); return true; }
+    catch (e) { return false; }
+  }
+
   // ---- gomme ----------------------------------------------------------------
   // Le finestre di engineer.js (slick GT3 generiche), stessi colori.
   var TYRES = ["t-fl", "t-fr", "t-rl", "t-rr"];
@@ -60,7 +75,7 @@
       var tv = temps[i], pv = press[i];
       var te = $(TYRES[i] + "-t"), pe = $(TYRES[i] + "-p");
       te.textContent = num(tv) ? fmtN(Math.round(tv), 0, "°C") : "–";
-      pe.textContent = num(pv) ? fmtN(Number(pv), 1) : "–";
+      pe.textContent = num(pv) ? fmtN(Number(pv), 1, "psi") : "–";
       te.className = "tt " + tempClass(tv);
       pe.className = "tp " + psiClass(pv);
     }
@@ -348,18 +363,37 @@
     });
   }
 
-  // Il valore fisico arriva dal formato del file come testo, «26.2 psi»: il
-  // numero si riscrive con la regola della pagina (`fmtNum`, la virgola in
-  // italiano), con gli stessi decimali. Quello che non e' «numero unita'» resta
-  // com'e'.
-  function physText(s) {
-    s = s == null ? "" : String(s);
-    var m = /^(-?\d+)(?:\.(\d+))?(?: ([^\d]+))?$/.exec(s);
-    if (!m) return s;
-    return fmtN(parseFloat(m[1] + "." + (m[2] || "0")), m[2] ? m[2].length : 0, m[3] || "");
+  // Il valore fisico arriva dal formato del file come testo, «26.2 psi» o
+  // «11» (AC, senza unita'): `physParse` ne tira fuori numero, decimali e
+  // unita'. Quello che non e' «numero [unita']» (su ACC «11 click (~0.1psi/click)»)
+  // non si legge, e la riga va in click.
+  function physParse(s) {
+    var m = /^(-?\d+)(?:\.(\d+))?(?: ([^\d]+))?$/.exec(s == null ? "" : String(s));
+    if (!m) return null;
+    return { v: parseFloat(m[1] + "." + (m[2] || "0")), d: m[2] ? m[2].length : 0,
+             unit: m[3] || "" };
   }
 
-  // Ogni leva in una riga: nome, ruota o lato, il valore da a, e i clic.
+  // Il testo di una leva dopo il nome. I click sono la verita' (sono quello
+  // che si scrive); il valore fisico si mostra solo quando dice qualcosa in
+  // piu': non quando e' in click, non quando non si legge, non quando e' lo
+  // stesso numero dei click. Allora «11 → 9 click»; se no come il riepilogo
+  // della pagina completa, «26,8 psi → 27,0 psi (+2 click)», i due valori coi
+  // decimali del piu' preciso, se no «27» accanto a «26,8» sembra un'altra
+  // misura. Il meno dei click e' quello di `fmtNum`, come quello dei valori.
+  function leverText(d) {
+    var clicks = d.old_click + " → " + d.new_click + " " + t("eng.click");
+    var a = physParse(d.old_phys), b = physParse(d.new_phys);
+    if (!a || !b || a.unit !== b.unit || a.unit === "click"
+        || (a.v === Number(d.old_click) && b.v === Number(d.new_click))) return clicks;
+    var dec = Math.max(a.d, b.d);
+    var delta = Number(d.new_click) - Number(d.old_click);
+    return fmtN(a.v, dec, a.unit) + " → " + fmtN(b.v, dec, b.unit)
+           + " (" + (delta > 0 ? "+" : (delta < 0 ? "−" : "")) + Math.abs(delta)
+           + " " + t("eng.click") + ")";
+  }
+
+  // Ogni leva in una riga: nome, ruota o lato, il valore da a.
   function drawLevers(ul) {
     ul.innerHTML = "";
     var lines = [];
@@ -371,9 +405,7 @@
       var diff = bx.preview.diff || [];
       for (var i = 0; i < diff.length; i++) {
         var d = diff[i];
-        lines.push([d.label + (d.slot ? " " + d.slot : ""),
-                    physText(d.old_phys) + " → " + physText(d.new_phys)
-                    + " (" + d.old_click + " → " + d.new_click + " " + t("eng.click") + ")"]);
+        lines.push([d.label + (d.slot ? " " + d.slot : ""), leverText(d)]);
       }
     }
     for (var k = 0; k < lines.length; k++) {
@@ -548,6 +580,9 @@
     $("tablet").setAttribute("data-mode", m);
     boxFrame(st, m);
     if (m === "off") {
+      var wait = offKey(st) === "tablet.waiting";
+      setHidden($("t-off-closed"), wait);
+      setHidden($("t-off-wait"), !wait);
       traceReset();
       return;
     }
@@ -619,6 +654,7 @@
       render(last);
     };
     if (window.HoneI18n) window.HoneI18n.applyStatic();
+    if (!fullPageWorks()) $("t-full").hidden = true;
     window.addEventListener("resize", function () { traceDraw(); });
     render(null);
     connect();
@@ -626,7 +662,9 @@
 
   window.HoneTablet = { mode: mode, render: render, callKey: callKey,
                         avKey: avKey, avDoneHidden: avDoneHidden,
-                        nextName: nextName, changesFor: changesFor };
+                        nextName: nextName, changesFor: changesFor,
+                        offText: function (st) { return t(offKey(st)); },
+                        leverText: leverText, fullPageWorks: fullPageWorks };
 
   // In node (i test) non c'e' la pagina: si carica solo `mode`.
   if (typeof document !== "undefined" && document && document.getElementById("tablet")) boot();
