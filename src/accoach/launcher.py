@@ -522,8 +522,11 @@ class SettingsPanel(QWidget):
         cfg.overlay.wean = self._wean.isChecked()
         cfg.overlay.pedals = self._pedals.isChecked()
         cfg.autorecord = self._autorecord.isChecked()
-        save_config(cfg)
-        self._saved_note.setText(t("set.saved"))
+        ok = save_config(cfg)
+        # A page may have changed the language since the hub started: follow it
+        # first, so the note is in the language the hub is showing.
+        self._hub.follow_language()
+        self._saved_note.setText(t("set.saved" if ok else "set.save_failed"))
 
     def show_watch_state(self, state: str) -> None:
         """One line under the checkbox: off / waiting / recording."""
@@ -604,7 +607,17 @@ class DevicesPanel(QWidget):
     def _on_toggle(self, checked: bool) -> None:
         cfg = load_config()
         cfg.lan = checked
-        save_config(cfg)
+        ok = save_config(cfg)
+        self._hub.follow_language()
+        if not ok:
+            # Nothing was written: the box must not say LAN is on when it is not.
+            cfg.lan = not checked
+            self._lan.blockSignals(True)
+            self._lan.setChecked(not checked)
+            self._lan.blockSignals(False)
+            self._restart.setText(t("set.save_failed"))
+        else:
+            self._restart.setText(t("mob.restart"))
         self._render()
 
     def _render(self) -> None:
@@ -1071,6 +1084,23 @@ class MainWindow(QWidget):
         """Persist the chosen language and re-label the whole hub right away (the
         coach voice picks it up on the next Coach Live start)."""
         set_language(self._lang.currentData())
+        self._relabel()
+
+    def follow_language(self) -> None:
+        """If the file now says another language (a page changed it), show it:
+        move the dropdown, without writing anything back, and relabel."""
+        lang = load_config().language
+        if lang == self._lang.currentData():
+            return
+        i = self._lang.findData(lang)
+        if i < 0:
+            return
+        self._lang.blockSignals(True)
+        self._lang.setCurrentIndex(i)
+        self._lang.blockSignals(False)
+        self._relabel()
+
+    def _relabel(self) -> None:
         # Sidebar items.
         for i, key in enumerate(self._NAV):
             self._nav.item(i).setText(t(key))

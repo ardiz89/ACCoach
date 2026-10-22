@@ -11,6 +11,8 @@ from __future__ import annotations
 import copy
 import os
 import re
+import threading
+import time
 import tomllib
 from dataclasses import dataclass, field, fields, is_dataclass
 from pathlib import Path
@@ -225,12 +227,21 @@ laps_dir = "{cfg.data.laps_dir}"
 
 def _atomic_write(path: Path, text: str) -> None:
     """Write via a temp file in the same folder, so a reader (the hub, the web
-    server: other processes) never catches the file half written."""
+    server: other processes) never catches the file half written. On Windows the
+    replace is refused while another process has the file open, so it is
+    retried for a moment."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_name(path.name + f".{os.getpid()}.tmp")
+    tmp = path.with_name(path.name + f".{os.getpid()}.{threading.get_ident()}.tmp")
     try:
         tmp.write_text(text, encoding="utf-8")
-        os.replace(tmp, path)
+        for attempt in range(5):
+            try:
+                os.replace(tmp, path)
+                break
+            except PermissionError:
+                if attempt == 4:
+                    raise
+                time.sleep(0.02)
     finally:
         if tmp.exists():
             try:
@@ -280,7 +291,7 @@ def _set(dc, path, value) -> None:
     setattr(dc, path[-1], value)
 
 
-def save_config(cfg: Config | None = None) -> None:
+def save_config(cfg: Config | None = None) -> bool:
     """Persist what the caller changed, on top of what the file holds now.
 
     Several processes write this file (the hub, the overlay, the web pages), and
@@ -288,7 +299,8 @@ def save_config(cfg: Config | None = None) -> None:
     whatever the others had changed since, so only the fields that differ from
     what this process loaded are written. An unreadable file is left alone:
     replacing it with defaults would wipe the driver's settings. Best-effort,
-    never fatal."""
+    never raises. Returns whether the file was written, so the caller can say
+    when it was not."""
     global _baseline
     cfg = cfg or load_config()
     try:
@@ -298,7 +310,7 @@ def save_config(cfg: Config | None = None) -> None:
             if disk is None:
                 from .logging_setup import get_logger
                 get_logger("config").warning("config.toml unreadable, not saving")
-                return
+                return False
         else:
             disk = Config()
         base = _baseline if _baseline is not None else Config()
@@ -309,8 +321,11 @@ def save_config(cfg: Config | None = None) -> None:
         for leaf, value in _leaves(disk):      # the caller's copy now matches the file
             _set(cfg, leaf, value)
         _baseline = copy.deepcopy(cfg)
-    except OSError:  # pragma: no cover - best-effort persistence
-        pass
+        return True
+    except OSError:
+        from .logging_setup import get_logger
+        get_logger("config").warning("config.toml not saved", exc_info=True)
+        return False
 
 
 class ConfigUnreadable(Exception):
@@ -329,9 +344,20 @@ def write_language(lang: str) -> None:
     except Exception as exc:   # noqa: BLE001
         raise ConfigUnreadable(str(exc)) from exc
     line = f'language = "{lang}"'
-    new, n = re.subn(r'(?m)^language[ \t]*=[ \t]*"[^"\n]*"', line, text, count=1)
-    if n == 0:
-        new = line + "\n" + text
+    # Only the top-level key counts: the part before the first [section], and
+    # either quote style TOML allows.
+    m = re.search(r"(?m)^[ \t]*\[", text)
+    cut = m.start() if m else len(text)
+    head, rest = text[:cut], text[cut:]
+    head, n = re.subn(r"(?m)^language[ \t]*=[ \t]*(?:\"[^\"\n]*\"|'[^'\n]*')", line, head, count=1)
+    new = (head + rest) if n else (line + "\n" + text)
+    # Whatever was done, the file must still parse and say what was asked.
+    try:
+        ok = tomllib.loads(new).get("language") == lang
+    except Exception:   # noqa: BLE001
+        ok = False
+    if not ok:
+        raise ConfigUnreadable("could not set the top-level language key")
     _atomic_write(path, new)
     if _cache is not None:
         _cache.language = lang

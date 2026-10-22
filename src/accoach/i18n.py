@@ -438,6 +438,9 @@ _UI: dict[str, dict[str, str]] = {
               "avvio di Coach Live."},
     "btn.save": {"en": "Save", "it": "Salva"},
     "set.saved": {"en": "Saved.", "it": "Salvato."},
+    "set.save_failed": {
+        "en": "config.toml has an error. Fix it or delete it, then save again.",
+        "it": "config.toml contiene un errore. Correggilo o cancellalo, poi salva di nuovo."},
     "btn.close": {"en": "Close", "it": "Chiudi"},
     # Il pannello «In pista» (`livepanel_ui.py`): dal via di Coach Live alla
     # Pagella. Il tono e' quello deciso col pilota il 21/10: frasi brevi col tu,

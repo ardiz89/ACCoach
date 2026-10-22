@@ -169,14 +169,16 @@ def test_a_post_adds_the_line_when_the_file_has_none(tmp_path):
 
 
 def test_a_hub_save_does_not_undo_the_pages_choice(tmp_path):
-    """L'hub carica il config all'avvio (lingua «it») e salva tutto il file quando
-    cambia un'altra cosa: non deve riscrivere la lingua che la pagina ha cambiato."""
+    """L'hub carica il config all'avvio (lingua «it») e salva quando cambia
+    un'altra cosa: non deve riscrivere la lingua che la pagina ha cambiato.
+    La pagina qui è un altro processo: cambia il FILE, non la nostra cache."""
     path = config.config_path()
     path.write_text(_RICH, encoding="utf-8")
     hub_cfg = config.load_config(reload=True)           # come l'hub all'avvio
-    assert _client(tmp_path).post("/api/language", json={"lang": "en"}).status_code == 200
+    path.write_text(_RICH.replace('"it"', '"en"'), encoding="utf-8")
+    assert hub_cfg.language == "it"                     # la sua copia è vecchia
     hub_cfg.voice.rate = 120                            # l'hub cambia altro e salva
-    config.save_config(hub_cfg)
+    assert config.save_config(hub_cfg) is True
     fresh = config.load_config(reload=True)
     assert fresh.language == "en" and fresh.voice.rate == 120
     assert fresh.lan is True and fresh.data.laps_dir == "D:/miei_giri"
@@ -254,3 +256,122 @@ setTimeout(() => console.log(JSON.stringify({ lang: window.HoneI18n.lang, sel: s
     assert run.returncode == 0, run.stderr
     out = json.loads(run.stdout)
     assert out == {"lang": "en", "sel": "en", "reloaded": False}
+
+
+
+# --- giro 2 -------------------------------------------------------------------
+def test_a_single_quoted_language_line_is_edited_not_duplicated(tmp_path):
+    path = config.config_path()
+    path.write_text("language = 'it'\nlan = true\n", encoding="utf-8")
+    assert _client(tmp_path).post("/api/language", json={"lang": "en"}).status_code == 200
+    assert path.read_text(encoding="utf-8") == 'language = "en"\nlan = true\n'
+
+
+def test_a_language_key_in_a_section_is_not_the_apps(tmp_path):
+    path = config.config_path()
+    text = '[voice]\nlanguage = "it"\nmale = true\n'
+    path.write_text(text, encoding="utf-8")
+    r = _client(tmp_path).post("/api/language", json={"lang": "en"})
+    assert r.status_code == 200
+    assert path.read_text(encoding="utf-8") == 'language = "en"\n' + text
+    assert config.load_config(reload=True).language == "en"
+
+
+def test_if_the_result_does_not_carry_the_language_nothing_is_written(tmp_path, monkeypatch):
+    """Rete di sicurezza: dopo la sostituzione si rilegge il file e si controlla."""
+    path = config.config_path()
+    path.write_text('language = "it"\n', encoding="utf-8")
+    before = path.read_bytes()
+    monkeypatch.setattr(config.re, "subn", lambda *a, **k: (a[2], 1))   # «riuscita» ma vuota
+    r = _client(tmp_path).post("/api/language", json={"lang": "en"})
+    assert r.status_code == 503 and path.read_bytes() == before
+
+
+def test_save_config_says_whether_it_saved():
+    path = config.config_path()
+    cfg = config.load_config(reload=True)
+    cfg.voice.rate = 99
+    assert config.save_config(cfg) is True
+    path.write_text('lan = tr', encoding="utf-8")
+    assert config.save_config(cfg) is False
+
+
+def test_save_config_returns_false_on_an_os_error(monkeypatch):
+    cfg = config.load_config(reload=True)
+    cfg.voice.rate = 98
+
+    def boom(*a):
+        raise OSError("disk")
+    monkeypatch.setattr(config, "_atomic_write", boom)
+    assert config.save_config(cfg) is False
+
+
+def test_the_atomic_write_retries_when_windows_refuses_the_replace(monkeypatch):
+    import os
+    real, calls = os.replace, []
+
+    def flaky(a, b):
+        calls.append(1)
+        if len(calls) < 3:
+            raise PermissionError("file in uso")
+        real(a, b)
+    monkeypatch.setattr(os, "replace", flaky)
+    monkeypatch.setattr(config.time, "sleep", lambda s: None)
+    assert config.save_config(config.load_config(reload=True)) is True
+    assert len(calls) == 3
+
+
+def _hub(monkeypatch):
+    import os
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PySide6.QtWidgets import QApplication
+    from accoach import hub_home, launcher
+    QApplication.instance() or QApplication([])
+    monkeypatch.setattr(hub_home, "load_home_data",
+                        lambda *a, **k: hub_home.HomeData(status="empty"))
+    return launcher.MainWindow()
+
+
+def _panel(win, cls):
+    return next(p for p in win._panels if type(p).__name__ == cls)
+
+
+def test_the_settings_note_says_when_the_save_failed(monkeypatch):
+    from accoach.i18n import t
+    win = _hub(monkeypatch)
+    try:
+        panel = _panel(win, "SettingsPanel")
+        config.config_path().write_text('lan = tr', encoding="utf-8")
+        panel._do_save()
+        assert panel._saved_note.text() == t("set.save_failed")
+        assert t("set.save_failed") != "set.save_failed"
+        assert config.config_path().read_text(encoding="utf-8") == 'lan = tr'
+    finally:
+        win.close()
+
+
+def test_the_lan_checkbox_goes_back_when_the_save_failed(monkeypatch):
+    win = _hub(monkeypatch)
+    try:
+        panel = _panel(win, "DevicesPanel")
+        config.config_path().write_text('lan = tr', encoding="utf-8")
+        panel._lan.setChecked(True)
+        assert panel._lan.isChecked() is False
+    finally:
+        win.close()
+
+
+def test_the_hub_follows_a_language_changed_by_a_page(monkeypatch):
+    win = _hub(monkeypatch)
+    try:
+        panel = _panel(win, "SettingsPanel")
+        path = config.config_path()
+        config.set_language("it")
+        win._lang.setCurrentIndex(win._lang.findData("it"))
+        path.write_text(path.read_text(encoding="utf-8").replace(
+            'language = "it"', 'language = "en"'), encoding="utf-8")   # una pagina, altro processo
+        panel._do_save()
+        assert win._lang.currentData() == "en"
+        assert panel._saved_note.text() == "Saved."
+    finally:
+        win.close()
