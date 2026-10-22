@@ -24,8 +24,8 @@ VIEWS = ["compare", "line", "sectors", "dynamics", "progress"]
 # I testi esatti della tabella del piano (Task 2).
 TEXTS = {
     "adv.compare.brake_early": (
-        "On the brake chart, look at where your trace starts compared with the reference. The Your braking points box has your braking point lap by lap.",
-        "Nel grafico del freno guarda dove parte la tua traccia rispetto al riferimento. Il riquadro Le tue frenate ha il punto di stacco giro per giro."),
+        "On the brake chart, look at where your trace starts compared with the reference. The “Your braking points” panel shows your braking point lap by lap.",
+        "Nel grafico del freno guarda dove parte la tua traccia rispetto al riferimento. Il riquadro «Le tue frenate» ha il punto di stacco giro per giro."),
     "adv.compare.brake_late": (
         "Read the brake and speed charts together. A later braking point that lowers your minimum speed doesn't pay off.",
         "Guarda freno e velocità insieme. Una staccata più tarda che abbassa la velocità minima non paga."),
@@ -69,13 +69,13 @@ TEXTS = {
         "On the way out, look at rear wheel slip. If it stays low and TC isn't working, you have room to get on the throttle earlier.",
         "In uscita guarda lo slittamento delle ruote posteriori. Se resta basso e il TC non interviene, hai margine per tornare prima sul gas."),
     "adv.progress.corners": (
-        "In the fault history, the marked row is your advice. Further down, the cards for these corners show how it goes session by session.",
+        "In the fault history, the marked row is your tip. Further down, the cards for these corners show how it goes session by session.",
         "Nello storico dei difetti la riga segnata è il tuo consiglio. Più sotto, le schede di queste curve dicono come va sessione per sessione."),
     "adv.progress.lap": (
-        "In the fault history, the marked row is the advice you're following, session by session.",
+        "In the fault history, the marked row is the tip you're following, session by session.",
         "Nello storico dei difetti la riga segnata è il consiglio che segui, sessione per sessione."),
     "adv.goto": ("Show me", "Vai al punto"),
-    "adv.mark.title": ("Corner in the advice you're following",
+    "adv.mark.title": ("Corner in the tip you're following",
                        "Curva del consiglio che segui"),
 }
 
@@ -568,7 +568,7 @@ def test_lift_and_progress_lap_have_no_names_and_goto_null(tmp_path):
         assert g["gone"] == [None]             # goto(null): il riquadro della scheda
         assert g["opened"] == [["lift", None]]
     assert "The straight-line notes" in got[0]["html"]
-    assert "the advice you're following" in got[1]["html"]    # adv.progress.lap
+    assert "the tip you're following" in got[1]["html"]    # adv.progress.lap
 
 
 @needs_node
@@ -584,7 +584,7 @@ def test_a_corner_advice_with_no_corners_left_shows_no_line_but_progress_does(tm
     for g in got[:3]:
         assert g["hidden"] and g["html"] == ""
     assert not got[3]["hidden"]
-    assert "the advice you're following" in got[3]["html"]    # adv.progress.lap
+    assert "the tip you're following" in got[3]["html"]    # adv.progress.lap
 
 
 @needs_node
@@ -649,7 +649,7 @@ def test_progress_keeps_the_line_with_or_without_matched_corners(tmp_path):
     for g in (nomatch, empty, nocorners):
         assert not g["hidden"], g
         assert "Curva" not in g["html"]
-        assert "the advice you're following, session by session" in g["html"]
+        assert "the tip you're following, session by session" in g["html"]
         assert g["gone"] == [None]
 
 
