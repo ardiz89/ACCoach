@@ -131,7 +131,7 @@ def test_medium_confidence_proposal_uses_tentative_wording(tmp_path):
         _propose("Understeer on entry: more front toe-out (+1)", confidence="medium"))
     eng.close()
     assert voice.said == [
-        "Engineer, maybe try this in the box. Understeer on entry: more front toe-out."
+        "Engineer here, maybe try this in the box. Understeer on entry: more front toe-out."
     ]
 
 

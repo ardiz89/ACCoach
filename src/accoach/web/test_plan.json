@@ -290,7 +290,7 @@
           "id": "Generale-1",
           "n": "1",
           "what": "Connessione al gioco",
-          "how": "Avvia AC/ACC ed entra in una sessione di Prova. Avvia HONE (launcher o 'python -m accoach monitor').",
+          "how": "Avvia AC/ACC ed entra in una sessione di Prova. Avvia HONE (launcher o 'python accoach_main.py monitor').",
           "expected": "HONE passa da 'in attesa del gioco' a connesso e mostra auto, pista, velocità, marce e gomme che si aggiornano dal vivo."
         },
         {

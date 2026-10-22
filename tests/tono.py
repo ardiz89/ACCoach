@@ -522,7 +522,8 @@ def static_cue_texts(path: Path) -> set[str]:
             continue
         for a in args:
             # Un messaggio costruito prima (`msg = f"…"`) e passato per nome.
-            leaves = [x for v in assigned.get(a.id, []) for x in _text_of(v)]                 if isinstance(a, ast.Name) else _text_of(a)
+            leaves = ([x for v in assigned.get(a.id, []) for x in _text_of(v)]
+                      if isinstance(a, ast.Name) else _text_of(a))
             for sub, text in leaves:
                 if not sub and len(text) > 5:
                     out.add(text)

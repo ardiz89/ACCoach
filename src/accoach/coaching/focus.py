@@ -132,8 +132,8 @@ _MSG = {
         "it": "{name}, continua sulla {theme}. Ora perdi {cur}, all'inizio {base}.",
     },
     "default_drill": {
-        "en": "Tidy your line and repeat it every lap.",
-        "it": "Pulisci la traiettoria e ripetila uguale ogni giro.",
+        "en": "Pick one line and stick to it.",
+        "it": "Scegli una linea e non cambiarla.",
     },
 }
 

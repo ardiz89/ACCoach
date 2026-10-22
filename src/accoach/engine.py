@@ -136,9 +136,9 @@ _ENG_VOICE_PREFIX = {
     },
     "tentative": {
         "BOX": {"it": "Ingegnere, se vuoi prova ai box.",
-                "en": "Engineer, maybe try this in the box."},
+                "en": "Engineer here, maybe try this in the box."},
         "AV": {"it": "Ingegnere, se vuoi prova dal volante.",
-               "en": "Engineer, maybe try this from the wheel."},
+               "en": "Engineer here, maybe try this from the wheel."},
     },
 }
 

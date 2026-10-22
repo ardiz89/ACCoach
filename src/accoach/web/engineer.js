@@ -909,7 +909,7 @@ function updateTyres(tyres) {
     if (!cell) return;
     const tEl = cell.querySelector(".tt"), pEl = cell.querySelector(".tp");
     const t = temps[i], p = press[i];
-    tEl.textContent = (t == null || !isFinite(t)) ? "–" : fmtN(Math.round(t), 0, "°");
+    tEl.textContent = (t == null || !isFinite(t)) ? "–" : fmtN(Math.round(t), 0, "°C");
     pEl.textContent = (p == null || !isFinite(p)) ? "–" : fmtN(p, 1);
     tEl.className = "tt " + tyreTempClass(t);
     pEl.className = "tp " + tyrePsiClass(p);
