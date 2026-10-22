@@ -159,7 +159,7 @@ class BalanceDetector:
         push = self._is_understeer(s) and not loose and not winding_on
         if step(self._loose, loose, now, _MIN_HOLD_S):
             cues.append(make_cue(s, CueCategory.OVERSTEER,
-                                 "Sovrasterzo, sii più dolce col gas in uscita", _PRIORITY_BASE))
+                                 "Sovrasterzo in uscita, apri il gas più dolce", _PRIORITY_BASE))
         if step(self._push, push, now, _MIN_HOLD_S):
             cues.append(make_cue(s, CueCategory.UNDERSTEER,
                                  "L'anteriore scivola, entra più piano", _PRIORITY_BASE))

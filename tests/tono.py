@@ -537,13 +537,16 @@ def cue_english(italian: str) -> str:
     names = list(dict.fromkeys(re.findall(r"\{([^{}]*)\}", italian)))
     if not names:
         return i18n.cue_text(italian, "en")
-    fake = {n: str(9001 + i) for i, n in enumerate(names)}
+    # Il singolare ha la sua frase («Qui perdi {n} decimo»): con un numero finto
+    # plurale l'inglese verrebbe al plurale, uguale a quello della frase accanto.
+    singular = len(names) == 1 and re.search(r"\}\s+(?:giro|decimo)\b", italian)
+    fake = {n: ("1" if singular else str(9001 + i)) for i, n in enumerate(names)}
     rendered = _PLACEHOLDER.sub(lambda m: fake[m.group(0)[1:-1]], italian)
     english = i18n.cue_text(rendered, "en")
     if english == rendered:
         return italian                      # nessuno l'ha tradotta
     for n, num in fake.items():
-        english = english.replace(num, "{" + n + "}")
+        english = re.sub(rf"(?<!\d){num}(?!\d)", "{" + n + "}", english)
     return english
 
 
@@ -642,7 +645,7 @@ SURFACES: dict[str, Callable[[], Entries]] = {
 
 # Le superfici non ancora riscritte. Ogni task che ne riscrive una la toglie.
 PENDING: set[str] = set(SURFACES) - {"report_a", "report_b", "report_backend",
-                                       "engineer", "hub"}
+                                       "engineer", "hub", "coach"}
 
 
 # --- il conto ---------------------------------------------------------------

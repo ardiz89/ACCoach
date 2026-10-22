@@ -33,6 +33,7 @@ import math
 from ..engineer import CarClass
 from ..engineer.pressures import GT3_DRY_WINDOW
 from ..telemetry.snapshot import ACStatus, TelemetrySnapshot
+from ..textfmt import fmt_num
 from .cue import Cue, CueCategory
 from .tuning import tuning_for_class
 
@@ -190,11 +191,11 @@ class PressureAdvisor:
         shown = (math.ceil(axle_psi * 10) / 10 if dev > 0
                  else math.floor(axle_psi * 10) / 10)
         if dev > 0:
-            msg = (f"Gomme {axle} a {shown:.1f} psi, troppo alte: "
-                   f"cala circa {change:.1f} psi a freddo.")
+            msg = (f"Gomme {axle} a {fmt_num(shown, 1, 'it')} psi, troppo alte. "
+                   f"Togli circa {fmt_num(change, 1, 'it')} psi a freddo.")
         else:
-            msg = (f"Gomme {axle} a {shown:.1f} psi, troppo basse: "
-                   f"alza circa {change:.1f} psi a freddo.")
+            msg = (f"Gomme {axle} a {fmt_num(shown, 1, 'it')} psi, troppo basse. "
+                   f"Aggiungi circa {fmt_num(change, 1, 'it')} psi a freddo.")
         self._cooldown = _COOLDOWN_LAPS
         return Cue(category=CueCategory.TYRE_PRESSURE, message=msg,
                    priority=_PRIORITY, segment=0, pos=0.0)

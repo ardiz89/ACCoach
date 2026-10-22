@@ -141,13 +141,13 @@ def classify_corner(st: CornerStats, index: int, pos: float) -> Cue | None:
     """Pick the single most likely cause of a corner's time delta (or None)."""
     lost = st.lost_ms
     if lost <= -_GAIN_MS:
-        return Cue(CueCategory.GOOD, "Bel tratto, continua così",
+        return Cue(CueCategory.GOOD, "Qui guadagni, rifai la curva uguale",
                    priority=abs(lost), segment=index, pos=pos)
     if lost < _LOSS_MS:
         return None
     # Most actionable cause first.
     if st.braking_early:
-        return Cue(CueCategory.BRAKE_LATER, "Puoi frenare più tardi",
+        return Cue(CueCategory.BRAKE_LATER, "Qui hai margine, frena più tardi",
                    priority=lost, segment=index, pos=pos)
     # …e il suo opposto, che fino a oggi non aveva nessuno che lo dicesse.
     # Frenare dopo il riferimento non e' un errore — e' come si guadagna, e su 3
@@ -160,13 +160,13 @@ def classify_corner(st: CornerStats, index: int, pos: float) -> Cue | None:
     # velocita' d'ingresso, ha bisogno di prendersi il tempo per usarla.
     if (st.braking_late
             and st.min_speed_ref - st.min_speed_live >= _SPEED_MARGIN):
-        return Cue(CueCategory.BRAKE_EARLIER, "Frena prima",
+        return Cue(CueCategory.BRAKE_EARLIER, "Arrivi lungo, frena prima",
                    priority=lost, segment=index, pos=pos)
     if st.throttle_ref - st.throttle_live >= _THROTTLE_MARGIN:
-        return Cue(CueCategory.MORE_THROTTLE, "Più gas qui",
+        return Cue(CueCategory.MORE_THROTTLE, "Dai più gas qui",
                    priority=lost, segment=index, pos=pos)
     if st.brake_live - st.brake_ref >= _BRAKE_MARGIN:
-        return Cue(CueCategory.LESS_BRAKE, "Stai frenando troppo, alleggerisci",
+        return Cue(CueCategory.LESS_BRAKE, "Premi troppo il freno, alleggerisci",
                    priority=lost, segment=index, pos=pos)
     if st.min_speed_ref - st.min_speed_live >= _SPEED_MARGIN:
         return Cue(CueCategory.CARRY_SPEED, "Porta più velocità in curva",
@@ -177,8 +177,11 @@ def classify_corner(st: CornerStats, index: int, pos: float) -> Cue | None:
     # arrotonda a uno: la frase piu' piccola che dice era anche la piu'
     # frequente, e diceva «1 decimi».
     n = f"{lost / 100.0:.0f}"
-    unit = "decimo" if n == "1" else "decimi"
-    return Cue(CueCategory.TIME_LOSS, f"Stai perdendo {n} {unit} qui",
+    if n == "1":
+        msg = f"Qui perdi {n} decimo"
+    else:
+        msg = f"Qui perdi {n} decimi"
+    return Cue(CueCategory.TIME_LOSS, msg,
                priority=lost, segment=index, pos=pos)
 
 

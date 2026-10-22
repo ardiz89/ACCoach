@@ -45,7 +45,7 @@ from .coaching.pitcall import PitCall
 from .i18n import cue_text, current_language
 from .logging_setup import get_logger
 from .comparison import DeltaState, LapComparator, Reference
-from .engineer import RaceEngineer, classify, engineer_for
+from .engineer import DecisionKind, RaceEngineer, classify, engineer_for
 from .recording import Lap, LapRecorder, find_reference_lap, laps_root, save_lap
 from .recording.recorder import StartLineWatcher
 from .telemetry import SharedMemoryReader, TelemetrySnapshot
@@ -120,25 +120,33 @@ def _spoken_forms(cue: Cue, focus_theme: str | None, lang: str) -> tuple[str, st
     return trigger, cue.message
 
 # A spoken alert prefix for an engineer proposal, by confidence-tone × tag ×
-# language. The proposal's rationale (already localized) follows it; the prefix
-# tells the driver *whether* it needs the garage (BOX) or can be dialled at the
-# wheel (AV). A medium-confidence proposal gets a tentative wording so the tone
-# itself signals how much to trust it — the advice still reaches the ear, the
-# screen still shows the click count, but the voice doesn't oversell a guess.
+# language. The change itself follows it — only the action (`ProposedChange.named`,
+# «Ammorbidisci la barra antirollio anteriore di 1 click»), not the whole
+# rationale with its symptom: the voice has room for eight words a sentence, the
+# Engineer page keeps the rest. The prefix tells the driver *whether* it needs
+# the garage (BOX) or can be dialled from the wheel (AV). A medium-confidence
+# proposal gets a tentative wording so the tone itself signals how much to trust
+# it — the advice still reaches the ear, but the voice doesn't oversell a guess.
 _ENG_VOICE_PREFIX = {
     "firm": {
-        "BOX": {"it": "Ingegnere: rientra ai box.",
-                "en": "Engineer: box this lap."},
-        "AV": {"it": "Ingegnere: puoi farlo al volo.",
-               "en": "Engineer: you can do this at the wheel."},
+        "BOX": {"it": "Ingegnere, rientra ai box.",
+                "en": "Engineer here, box this lap."},
+        "AV": {"it": "Ingegnere, cambia dal volante.",
+               "en": "Engineer here, change it from the wheel."},
     },
     "tentative": {
-        "BOX": {"it": "Ingegnere, da valutare ai box:",
-                "en": "Engineer, worth trying in the box:"},
-        "AV": {"it": "Ingegnere, da valutare al volo:",
-               "en": "Engineer, worth trying at the wheel:"},
+        "BOX": {"it": "Ingegnere, se vuoi prova ai box.",
+                "en": "Engineer, maybe try this in the box."},
+        "AV": {"it": "Ingegnere, se vuoi prova dal volante.",
+               "en": "Engineer, maybe try this from the wheel."},
     },
 }
+
+# Un ripristino porta la leva della modifica provata (`ProposedChange.reversed`
+# la tiene per citarla fra virgolette): detta da sola, la voce direbbe al pilota
+# di rifare proprio la modifica da togliere.
+_ENG_VOICE_REVERT = {"it": "Riporta l'assetto com'era.",
+                     "en": "Put the setup back as it was."}
 
 
 def _spoken_log_line(category, focus_theme: str | None,
@@ -845,7 +853,11 @@ class CoachEngine:
         by_tag = _ENG_VOICE_PREFIX[tone]
         prefixes = by_tag.get(decision.change.tag) or by_tag["BOX"]
         prefix = prefixes.get(lang) or prefixes["en"]
-        self.voice.say(f"{prefix} {_voice_clean(rationale)}")
+        if decision.kind is DecisionKind.REVERTED:
+            action = _ENG_VOICE_REVERT.get(lang) or _ENG_VOICE_REVERT["en"]
+        else:
+            action = _voice_clean(decision.change.named).rstrip(".") + "."
+        self.voice.say(f"{prefix} {action}")
 
     def _log_engineer_outcome(self, lap, decision) -> None:
         """Write a finished test to the engineer's ledger.

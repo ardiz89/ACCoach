@@ -108,7 +108,7 @@ def test_box_proposal_is_announced_once(tmp_path):
     eng._announce_engineer(d)
     eng.close()
     assert voice.said == [
-        "Engineer: box this lap. Understeer at apex: softer front anti-roll bar"
+        "Engineer here, box this lap. Understeer at apex: softer front anti-roll bar."
     ]
 
 
@@ -121,7 +121,7 @@ def test_av_proposal_prefix_and_non_proposals_stay_silent(tmp_path):
     eng._announce_engineer(Decision(DecisionKind.COLLECT, "need laps"))
     eng.close()
     assert voice.said == [
-        "Engineer: you can do this at the wheel. Oversteer on exit: more traction control"
+        "Engineer here, change it from the wheel. Oversteer on exit: more traction control."
     ]
 
 
@@ -131,7 +131,31 @@ def test_medium_confidence_proposal_uses_tentative_wording(tmp_path):
         _propose("Understeer on entry: more front toe-out (+1)", confidence="medium"))
     eng.close()
     assert voice.said == [
-        "Engineer, worth trying in the box: Understeer on entry: more front toe-out"
+        "Engineer, maybe try this in the box. Understeer on entry: more front toe-out."
+    ]
+
+
+def test_the_voice_says_the_action_not_the_whole_rationale(tmp_path, monkeypatch):
+    """La frase intera del rimedio (sintomo, «quindi», azione) supera le otto
+    parole della voce: in pista si dice solo l'azione, lo schermo tiene il resto."""
+    import accoach.engine as engine_mod
+    from accoach.engineer import Decision, DecisionKind, ProposedChange
+    from accoach.engineer.core import AtomicChange
+    monkeypatch.setattr(engine_mod, "current_language", lambda: "it")
+    eng, voice = _engine_with_voice(tmp_path)
+    change = ProposedChange(
+        changes=(AtomicChange("aRBFront", 0, -1),),
+        rationale=("Hai sottosterzo in ingresso, quindi ammorbidisci la barra "
+                   "antirollio anteriore di 1 click."),
+        phase_label="Grip meccanico", tag="BOX",
+        lever="Ammorbidisci la barra antirollio anteriore di 1 click")
+    eng._announce_engineer(Decision(DecisionKind.PROPOSE, "msg", change, "high"))
+    # Il ripristino porta la stessa leva: detta, rifarebbe la modifica da togliere.
+    eng._announce_engineer(Decision(DecisionKind.REVERTED, "msg", change.reversed(), ""))
+    eng.close()
+    assert voice.said == [
+        "Ingegnere, rientra ai box. Ammorbidisci la barra antirollio anteriore di 1 click.",
+        "Ingegnere, rientra ai box. Riporta l'assetto com'era.",
     ]
 
 

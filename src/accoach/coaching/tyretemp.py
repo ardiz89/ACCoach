@@ -118,11 +118,11 @@ class TyreTempAdvisor:
 
         avg = self._temp_sum / self._samples
         if avg > self.target_c + self.tol_c:
-            msg = (f"Gomme troppo calde ({avg:.0f}°C): stai forzando, "
-                   f"cerca di essere più fluido.")
+            msg = (f"Gomme a {avg:.0f} °C, troppo calde. "
+                   f"Stai forzando, guida più fluido.")
         elif avg < self.target_c - self.tol_c:
-            msg = (f"Gomme fredde ({avg:.0f}°C): puoi spingere di più "
-                   f"per portarle in temperatura.")
+            msg = (f"Gomme a {avg:.0f} °C, troppo fredde. "
+                   f"Spingi di più per scaldarle.")
         else:
             return None
 

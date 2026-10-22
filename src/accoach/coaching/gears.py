@@ -73,7 +73,7 @@ class GearDetector:
                                  "Sei sul limitatore, cambia prima", _PRIORITY))
         if step(self._bog, self._is_bogged(s, gear), now, _MIN_HOLD_S):
             cues.append(make_cue(s, CueCategory.GEAR_TOO_TALL,
-                                 "Marcia troppo lunga, scala per avere più spinta", _PRIORITY))
+                                 "Marcia troppo lunga, scala per più spinta", _PRIORITY))
         return cues
 
     # --- conditions -------------------------------------------------------

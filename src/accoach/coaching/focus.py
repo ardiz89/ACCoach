@@ -29,6 +29,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 
 from ..i18n import current_language
+from ..textfmt import fmt_num
 from .cue import CueCategory, gates_voice, trigger_text
 from .cue import theme_label as _theme_label
 from .debrief import CornerLoss, LapDebrief
@@ -58,13 +59,13 @@ def _theme(cat: CueCategory, lang: str) -> str:
 # "later", "earlier". The first wording promised the one word — a promise broken
 # on the second lap.
 #
-# The Italian reads "sulla {theme}", which fits every theme a focus can carry
+# The Italian of the briefing reads "sulla {theme}", which fits every theme a focus can carry
 # (frenata, trazione, percorrenza, linea, guida — all feminine singular). Only
 # "marce" would need "sulle", and gear cues cannot reach a Focus: its category
 # comes from CornerLoss, which classify_corner fills from six categories only.
 _PACT = {
-    "it": " In pista ti dirò solo parole sulla {theme}, tipo «{word}».",
-    "en": " On track I'll only say words about {theme}, like “{word}”.",
+    "it": " In pista sentirai solo parole di {theme}, come «{word}».",
+    "en": " On track you'll only hear {theme} words, like “{word}”.",
 }
 
 
@@ -90,45 +91,49 @@ def _brief_pact(cat: CueCategory, lang: str) -> str:
 # Per-lap report messages, per language; resolved with the active language at the
 # moment the report is built (FocusCoach runs in the engine = config.language).
 _MSG = {
+    # La finestra conta i giri *validi* (interi, non di rientro), sporchi
+    # compresi (vedi engine.py): «giri puliti» sarebbe stato falso.
     "assess": {
-        "en": "Assessing your weak points… ({n}/{total} clean laps).",
-        "it": "Valuto i punti deboli… ({n}/{total} giri puliti).",
+        "en": "Looking for your weak points. I need {total} complete laps, I have {n}.",
+        "it": "Cerco i tuoi punti deboli. Mi servono {total} giri completi, ne ho {n}.",
     },
     "clean": {
-        "en": "No recurring weak point: steady driving. Just fine-tuning left.",
-        "it": "Nessun punto debole ricorrente: guida costante. Si lima il dettaglio.",
+        "en": "I can't find a weak point that repeats. Work on the details.",
+        "it": "Non trovo punti deboli che si ripetono. Lavora sui dettagli.",
     },
     "brief": {
-        "en": "New focus — {name}: let's work on {theme}. "
-              "You lose ~{base} here on average.{cause} {drill}",
-        "it": "Nuovo focus — {name}: lavoriamo la {theme}. "
-              "Qui perdi ~{base} di media.{cause} {drill}",
+        "en": "The new focus is {name}. Let's work on {theme}. "
+              "You lose {base} here on average.{cause} {drill}",
+        "it": "Il nuovo focus è {name}. Lavoriamo sulla {theme}. "
+              "Qui perdi in media {base}.{cause} {drill}",
     },
     "drill_start": {
-        "en": "{name}: work on {theme}. {drill}",
-        "it": "{name}: lavora la {theme}. {drill}",
+        "en": "Work on {theme} at {name}. {drill}",
+        "it": "Lavora sulla {theme} in {name}. {drill}",
     },
     "improved": {
-        "en": "{name} improved: from {base} to {cur}. Nice work — a new focus shortly.",
-        "it": "{name} migliorata: da {base} a {cur}. Bel lavoro — nuovo focus a breve.",
+        "en": "At {name} you were losing {base}, now {cur}. "
+              "Next lap I'll pick a new focus.",
+        "it": "In {name} perdevi {base}, ora {cur}. "
+              "Dal prossimo giro scelgo un nuovo focus.",
     },
     "stuck": {
-        "en": "{name}: {theme} isn't dropping ({cur} vs {base}).{setup} "
-              "Parking it and moving on.",
-        "it": "{name}: la {theme} non scende ({cur} vs {base}).{setup} "
-              "La parcheggio e passo oltre.",
+        "en": "At {name} you still lose {cur}, {base} at first. "
+              "I'm parking it and moving on.{setup}",
+        "it": "In {name} perdi ancora {cur}, all'inizio {base}. "
+              "La metto da parte e passo oltre.{setup}",
     },
     "stuck_setup": {
-        "en": " Possible setup cause: {cause}",
-        "it": " Possibile causa setup: {cause}",
+        "en": " It may be the setup. {cause}",
+        "it": " Potrebbe dipendere dall'assetto. {cause}",
     },
     "drill_progress": {
-        "en": "{name}: keep working {theme}. Now ~{cur} (started at {base}).",
-        "it": "{name}: continua sulla {theme}. Ora ~{cur} (partenza {base}).",
+        "en": "Keep working on {theme} at {name}. You lose {cur} now, {base} at the start.",
+        "it": "Continua sulla {theme} in {name}. Ora perdi {cur}, all'inizio {base}.",
     },
     "default_drill": {
-        "en": "Clean up the line and build consistency.",
-        "it": "Pulisci la traiettoria e cerca costanza.",
+        "en": "Tidy your line and repeat it every lap.",
+        "it": "Pulisci la traiettoria e ripetila uguale ogni giro.",
     },
 }
 
@@ -139,7 +144,7 @@ def _m(key: str, lang: str, **kw) -> str:
 
 
 def _secs(ms: float) -> str:
-    return f"{ms / 1000.0:.2f}s"
+    return fmt_num(ms / 1000.0, 2, current_language(), "s")
 
 
 # --- the focus and the per-lap report --------------------------------------

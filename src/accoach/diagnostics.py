@@ -654,7 +654,7 @@ def run_selftest(report_path: str | None = None) -> str:
             names = [x.name for x in v._engine.getProperty("voices") if x.id == vid]
             report["voice"] = names[0] if names else str(vid)
         # A pre-rendered (neural Piper) cue, then a SAPI5-fallback phrase.
-        v.say("Puoi frenare più tardi")
+        v.say("Qui hai margine, frena più tardi")
         time.sleep(2.5)
         v.say("Self test completato.")
         time.sleep(2.0)

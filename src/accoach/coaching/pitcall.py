@@ -117,10 +117,14 @@ _STOPPED_KMH = 1.0
 # events, which is what the tier does — this only breaks ties within it.
 _PRIORITY = 290.0
 
-_CALL = "Modifica pronta: rientra ai box a fine giro"
+_CALL = "Modifica pronta, rientra ai box a fine giro"
 _APPROACH = "Ingresso box qui davanti, rientra"
-_BRIEFING = ("Sei ai box. Apri la pagina Ingegnere nel browser: applica la "
-             "proposta, scrivi il setup e ricaricalo dal garage prima di uscire")
+# Si dice da fermi, quindi può essere più lunga di una frase in curva; ogni
+# frase resta sotto le otto parole. I nomi sono quelli dei bottoni della pagina
+# Ingegnere («Prepara la modifica», «Applica»), come `eng.pitTodo` sullo schermo.
+_BRIEFING = ("Sei ai box. Apri la pagina Ingegnere nel browser. "
+             "Prepara la modifica e applicala. "
+             "Ricarica il setup dal garage prima di uscire.")
 
 
 class PitCall:

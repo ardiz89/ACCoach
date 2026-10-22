@@ -146,25 +146,25 @@ class SetupAdvisor:
         # (abs_level is -1 when unknown, so this stays False and we suggest ABS.)
         if s.abs_level >= _ABS_ALREADY_HIGH:
             return self._make(CueCategory.BRAKE_BIAS,
-                              "Blocchi l'anteriore in più curve e l'ABS è già alto: "
-                              "prova a spostare il bilanciamento freni verso il posteriore.")
+                              "Con l'ABS già alto blocchi ancora davanti. "
+                              "Prova a spostare il bilanciamento indietro.")
         return self._make(
             CueCategory.ABS_UP,
-            "Blocchi l'anteriore in più curve: prova ad alzare l'ABS"
+            "Blocchi davanti in più curve. Prova ad alzare l'ABS"
             + self._from_to(s.abs_level))
 
     def _spin_advice(self, s: TelemetrySnapshot) -> Cue | None:
         return self._make(
             CueCategory.TC_UP,
-            "Pattini in uscita in più punti del giro: prova ad alzare il TC"
+            "Pattini in uscita in più punti. Prova ad alzare il TC"
             + self._from_to(s.tc_level))
 
     @staticmethod
     def _from_to(level: int) -> str:
-        """' (dal 4 al 5).' when the level is known, '.' otherwise."""
+        """' dal 4 al 5.' when the level is known, '.' otherwise."""
         if level < 0:
             return "."
-        return f" (dal {level} al {level + 1})."
+        return f" dal {level} al {level + 1}."
 
     def _make(self, category: CueCategory, message: str) -> Cue | None:
         if self._cooldown.get(category, 0) > 0:

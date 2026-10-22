@@ -52,12 +52,27 @@ def static_cue_messages() -> set[str]:
 
     for path in sorted(COACHING.glob("*.py")):
         tree = ast.parse(path.read_text(encoding="utf-8"))
+        # Un messaggio scritto prima e passato per nome: `msg = "…"` in fuel.py,
+        # le costanti `_CALL`/`_APPROACH`/`_BRIEFING` di pitcall.py. Prima il
+        # censimento guardava solo i letterali dentro la chiamata, e queste frasi
+        # (il rientro ai box, l'ultimo giro di benzina) uscivano da SAPI5.
+        assigned: dict[str, list[str]] = {}
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Assign) and isinstance(node.value, ast.Constant) \
+                    and isinstance(node.value.value, str):
+                for t in node.targets:
+                    if isinstance(t, ast.Name):
+                        assigned.setdefault(t.id, []).append(node.value.value)
         for node in ast.walk(tree):
             if isinstance(node, ast.Call) and has_cue_category(node):
                 for a in list(node.args) + [kw.value for kw in node.keywords]:
-                    if isinstance(a, ast.Constant) and isinstance(a.value, str) \
-                            and len(a.value) > 5:
-                        messages.add(a.value)
+                    if isinstance(a, ast.Constant) and isinstance(a.value, str):
+                        texts = [a.value]
+                    elif isinstance(a, ast.Name):
+                        texts = assigned.get(a.id, [])
+                    else:
+                        texts = []
+                    messages.update(t for t in texts if len(t) > 5)
 
     # The trigger words are a table, not a call, so the scanner above cannot see
     # them — and they are exactly the phrases the driver hears most often. Only
@@ -75,12 +90,13 @@ def dynamic_cue_messages() -> set[str]:
     SAPI5). Continuous numbers (tyre psi/°C advisories) stay on SAPI5.
     """
     msgs: set[str] = set()
-    # analyzer.py: f"Stai perdendo {tenths:.0f} decimi qui"  (integer tenths)
+    # analyzer.py: f"Qui perdi {n} {unit}"  (decimi interi, «1 decimo» al singolare)
     for n in range(1, 26):
-        msgs.add(f"Stai perdendo {n} decimi qui")
-    # fuel.py: f"Benzina per circa {thresh} giri."  (thresh in {2,3}; 1 is static)
-    for n in (2, 3):
-        msgs.add(f"Benzina per circa {n} giri.")
+        msgs.add(f"Qui perdi {n} {'decimo' if n == 1 else 'decimi'}")
+    # fuel.py: f"Benzina per circa {laps_left} {unit}."  (da 1 a 3: alla soglia
+    # dei 2 giri il serbatoio può valerne uno; l'ultimo giro è una frase fissa)
+    for n in (1, 2, 3):
+        msgs.add(f"Benzina per circa {n} {'giro' if n == 1 else 'giri'}.")
     return msgs
 
 

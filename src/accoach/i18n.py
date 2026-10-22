@@ -573,46 +573,56 @@ def t(key: str, lang: str | None = None, **fmt) -> str:
 # neural WAVs). Keep them verbatim.
 _CUE_EN: dict[str, str] = {
     # events.py
-    "Bloccaggio, alleggerisci il freno": "Lock-up — ease off the brake",
-    "Pattini in uscita, meno gas": "Wheelspin on exit — less throttle",
+    "Blocchi le ruote, alleggerisci il freno": "You're locking up, ease off the brake",
+    "Pattini in uscita, dosa il gas": "Wheelspin on exit, squeeze the throttle",
     # balance.py
-    "Sovrasterzo, sii più dolce col gas in uscita":
-        "Oversteer — smoother on the throttle out",
-    "L'anteriore scivola, entra più piano": "Front washing out — slower on entry",
+    "Sovrasterzo in uscita, apri il gas più dolce":
+        "Oversteer on exit, open the throttle gently",
+    "L'anteriore scivola, entra più piano": "The front is sliding, go in slower",
     # braking.py
-    "Stai veleggiando: riduci il tempo morto fra freno e gas":
-        "Coasting — close the gap between brake and throttle",
-    "Rilasci il freno troppo presto: portane un filo fino all'inserimento":
-        "Releasing the brake too early — trail a little to turn-in",
+    "Veleggi, passa subito dal freno al gas":
+        "You're coasting, go straight from brake to throttle",
+    "Resti a metà gas, aspetta e apri tutto":
+        "Half throttle too long, wait then go full",
+    "Molli presto il freno, tienine un filo all'inserimento":
+        "Releasing too early, trail the brake to turn-in",
     # gears.py
-    "Sei sul limitatore, cambia prima": "On the limiter — shift earlier",
-    "Marcia troppo lunga, scala per avere più spinta":
-        "Gear too tall — drop one for more drive",
+    "Sei sul limitatore, cambia prima": "You're on the limiter, shift earlier",
+    "Marcia troppo lunga, scala per più spinta":
+        "Gear too tall, drop one for more drive",
     # advisor.py (brake-bias, static)
-    "Blocchi l'anteriore in più curve e l'ABS è già alto: "
-    "prova a spostare il bilanciamento freni verso il posteriore.":
-        "Locking the fronts in several corners and ABS is already high: "
-        "try moving brake bias rearward.",
+    "Con l'ABS già alto blocchi ancora davanti. "
+    "Prova a spostare il bilanciamento indietro.":
+        "The fronts still lock with ABS high. "
+        "Try moving the brake bias rearward.",
     # analyzer.py (corner cues)
-    "Bel tratto, continua così": "Good through there, keep it up",
-    "Puoi frenare più tardi": "You can brake later",
-    "Più gas qui": "More throttle here",
-    "Stai frenando troppo, alleggerisci": "Braking too much — ease off",
+    "Qui guadagni, rifai la curva uguale": "You're gaining here, do it the same again",
+    "Qui hai margine, frena più tardi": "There's room here, brake later",
+    "Arrivi lungo, frena prima": "You're running deep, brake earlier",
+    "Dai più gas qui": "Use more throttle here",
+    "Premi troppo il freno, alleggerisci": "Too much brake pressure, go lighter",
     "Porta più velocità in curva": "Carry more speed through the corner",
     # fuel.py
-    "Ultimo giro di benzina, rientra ai box!": "Last lap of fuel — box now!",
+    "Ultimo giro di benzina, rientra ai box": "Fuel for one last lap, pit now",
     # pitcall.py
-    "Modifica pronta: rientra ai box a fine giro":
-        "Change ready — box this lap",
-    "Ingresso box qui davanti, rientra": "Pit entry just ahead — come in",
-    "Sei ai box. Apri la pagina Ingegnere nel browser: applica la "
-    "proposta, scrivi il setup e ricaricalo dal garage prima di uscire":
-        "You're in the box. Open the Engineer page in the browser: apply the "
-        "proposal, write the setup, and load it from the garage before you go out",
+    "Modifica pronta, rientra ai box a fine giro":
+        "Setup change ready, box this lap",
+    "Ingresso box qui davanti, rientra": "Pit entry just ahead, come in",
+    "Sei ai box. Apri la pagina Ingegnere nel browser. "
+    "Prepara la modifica e applicala. "
+    "Ricarica il setup dal garage prima di uscire.":
+        "You're in the box. Open the Engineer page in the browser. "
+        "Prepare the change and apply it. "
+        "Reload the setup in the garage before leaving.",
 }
 
 def _axle_en(it: str) -> str:
     return "Front" if it == "anteriori" else "Rear"
+
+
+def _num_en(it: str) -> str:
+    """Un numero scritto in italiano («27,3») come si scrive in inglese («27.3»)."""
+    return it.replace(",", ".")
 
 
 # Templated cues (f-strings in the detectors) → English. ``repl`` is either a
@@ -623,35 +633,33 @@ _CUE_EN_PATTERNS: list[tuple[re.Pattern, object]] = [
     # da 120 ms, che si arrotondano a un decimo, e il serbatoio passa da 1 giro
     # prima di arrivare all'ultimo. Prima la tabella conosceva solo il plurale,
     # quindi «1 giro» restava in italiano e «1 decimi» diventava «1 tenths».
-    (re.compile(r"^Stai perdendo (\d+) decim[oi] qui$"),
+    (re.compile(r"^Qui perdi (\d+) decim[oi]$"),
      lambda m: f"Losing {m.group(1)} tenth{'' if m.group(1) == '1' else 's'} here"),
     (re.compile(r"^Benzina per circa (\d+) gir[oi]\.$"),
      lambda m: f"Fuel for about {m.group(1)} lap{'' if m.group(1) == '1' else 's'}."),
-    # advisor.py — ABS / TC, with or without the "(dal N al N+1)" detail
-    (re.compile(r"^Blocchi l'anteriore in più curve: prova ad alzare l'ABS"
-                r"(?: \(dal (\d+) al (\d+)\))?\.$"),
-     lambda m: ("Locking the fronts in several corners: try raising the ABS"
-                + (f" (from {m.group(1)} to {m.group(2)})." if m.group(1) else "."))),
-    (re.compile(r"^Pattini in uscita in più punti del giro: prova ad alzare il TC"
-                r"(?: \(dal (\d+) al (\d+)\))?\.$"),
-     lambda m: ("Spinning up on exit in several places: try raising the TC"
-                + (f" (from {m.group(1)} to {m.group(2)})." if m.group(1) else "."))),
-    # pressure.py
-    (re.compile(r"^Gomme (anteriori|posteriori) a ([\d.]+) psi, troppo alte: "
-                r"cala circa ([\d.]+) psi a freddo\.$"),
-     lambda m: f"{_axle_en(m.group(1))} tyres at {m.group(2)} psi, too high: "
-               f"drop about {m.group(3)} psi cold."),
-    (re.compile(r"^Gomme (anteriori|posteriori) a ([\d.]+) psi, troppo basse: "
-                r"alza circa ([\d.]+) psi a freddo\.$"),
-     lambda m: f"{_axle_en(m.group(1))} tyres at {m.group(2)} psi, too low: "
-               f"add about {m.group(3)} psi cold."),
+    # advisor.py — ABS / TC, with or without the "dal N al N+1" detail
+    (re.compile(r"^Blocchi davanti in più curve\. Prova ad alzare l'ABS"
+                r"(?: dal (\d+) al (\d+))?\.$"),
+     lambda m: ("You're locking the fronts in several corners. Try raising the ABS"
+                + (f" from {m.group(1)} to {m.group(2)}." if m.group(1) else "."))),
+    (re.compile(r"^Pattini in uscita in più punti\. Prova ad alzare il TC"
+                r"(?: dal (\d+) al (\d+))?\.$"),
+     lambda m: ("You're spinning up on exit in several places. Try raising the TC"
+                + (f" from {m.group(1)} to {m.group(2)}." if m.group(1) else "."))),
+    # pressure.py — the Italian numbers carry the decimal comma
+    (re.compile(r"^Gomme (anteriori|posteriori) a ([\d,]+) psi, troppo alte\. "
+                r"Togli circa ([\d,]+) psi a freddo\.$"),
+     lambda m: f"{_axle_en(m.group(1))} tyres at {_num_en(m.group(2))} psi, too high. "
+               f"Take about {_num_en(m.group(3))} psi off cold."),
+    (re.compile(r"^Gomme (anteriori|posteriori) a ([\d,]+) psi, troppo basse\. "
+                r"Aggiungi circa ([\d,]+) psi a freddo\.$"),
+     lambda m: f"{_axle_en(m.group(1))} tyres at {_num_en(m.group(2))} psi, too low. "
+               f"Add about {_num_en(m.group(3))} psi cold."),
     # tyretemp.py
-    (re.compile(r"^Gomme troppo calde \((\d+)°C\): stai forzando, "
-                r"cerca di essere più fluido\.$"),
-     lambda m: f"Tyres too hot ({m.group(1)}°C): you're overdriving — be smoother."),
-    (re.compile(r"^Gomme fredde \((\d+)°C\): puoi spingere di più "
-                r"per portarle in temperatura\.$"),
-     lambda m: f"Tyres cold ({m.group(1)}°C): push harder to bring them up to temperature."),
+    (re.compile(r"^Gomme a (\d+) °C, troppo calde\. Stai forzando, guida più fluido\.$"),
+     lambda m: f"Tyres at {m.group(1)} °C, too hot. You're overdriving, be smoother."),
+    (re.compile(r"^Gomme a (\d+) °C, troppo fredde\. Spingi di più per scaldarle\.$"),
+     lambda m: f"Tyres at {m.group(1)} °C, too cold. Push harder to warm them up."),
 ]
 
 

@@ -68,7 +68,7 @@ def test_brief_on_recurring_loss():
     assert report.focus.corner_index == 0
     assert report.focus.theme == "braking"             # BRAKE_LATER → braking
     assert report.drill                                # a concrete instruction
-    assert "0.30s" in report.message                   # measured baseline
+    assert "0.30 s" in report.message                  # measured baseline
 
 
 def test_picks_worst_recurring_not_a_one_off():
@@ -109,7 +109,7 @@ def test_focus_improved_promotes_and_praises():
     assert report.kind is FocusKind.IMPROVED
     assert 0 in coach.mastered
     assert coach.focus is None                               # ready for the next one
-    assert "0.30s" in report.message and "0.05s" in report.message  # measured praise
+    assert "0.30 s" in report.message and "0.05 s" in report.message  # measured praise
 
 
 def test_focus_stuck_is_parked():
@@ -150,8 +150,9 @@ def test_brief_theme_and_message_are_italian(it_lang):
     report = _feed(coach, _debrief(_loss(0, 300)), 3)
     assert report.kind is FocusKind.BRIEF
     assert report.focus.theme == "frenata"             # BRAKE_LATER → frenata (IT)
-    assert "Nuovo focus" in report.message
-    assert "lavoriamo la frenata" in report.message
+    assert "Il nuovo focus" in report.message
+    assert "Lavoriamo sulla frenata" in report.message
+    assert "0,30 s" in report.message                  # la virgola decimale
 
 
 def test_stuck_message_is_italian(it_lang):
@@ -159,8 +160,9 @@ def test_stuck_message_is_italian(it_lang):
     _feed(coach, _debrief(_loss(0, 300, cause="L'auto sottosterza in ingresso.")), 3)
     report = _feed(coach, _debrief(_loss(0, 300)), 6)
     assert report.kind is FocusKind.STUCK
-    assert "parcheggio" in report.message.lower()
-    assert "causa setup" in report.message.lower()
+    assert "metto da parte" in report.message.lower()
+    assert "dipendere dall'assetto" in report.message.lower()
+    assert "L'auto sottosterza in ingresso." in report.message
 
 
 def test_format_focus_is_a_line():

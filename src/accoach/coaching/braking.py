@@ -109,11 +109,11 @@ class BrakingDetector:
 
         if step(self._coast, self._is_coasting(s), now, _COAST_HOLD_S):
             cues.append(make_cue(s, CueCategory.COASTING,
-                                 "Stai veleggiando: riduci il tempo morto fra freno e gas", _PRIORITY))
+                                 "Veleggi, passa subito dal freno al gas", _PRIORITY))
 
         if self._held_partial_throttle(s, now):
             cues.append(make_cue(s, CueCategory.PARTIAL_THROTTLE,
-                                 "Gas a metà troppo a lungo: aspetta e poi apri tutto", _PRIORITY))
+                                 "Resti a metà gas, aspetta e apri tutto", _PRIORITY))
 
         # Always step the turn-in state machine, even when the cue is off for this
         # class: set_car_class can flip it mid-session, and a state machine that
@@ -121,7 +121,7 @@ class BrakingDetector:
         trail_fault = self._trail_fault(s, now)
         if trail_fault and self._trail_cue:
             cues.append(make_cue(s, CueCategory.TRAIL_BRAKE,
-                                 "Rilasci il freno troppo presto: portane un filo fino all'inserimento", _PRIORITY))
+                                 "Molli presto il freno, tienine un filo all'inserimento", _PRIORITY))
         return cues
 
     # --- conditions -------------------------------------------------------

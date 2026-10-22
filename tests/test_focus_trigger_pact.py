@@ -14,9 +14,9 @@ from accoach.coaching.focus import _brief_pact
 
 def test_the_pact_names_the_theme_and_gives_the_word_as_an_example():
     assert _brief_pact(CueCategory.LESS_BRAKE, "it") == (
-        " In pista ti dirò solo parole sulla frenata, tipo «meno freno».")
+        " In pista sentirai solo parole di frenata, come «meno freno».")
     assert _brief_pact(CueCategory.LESS_BRAKE, "en") == (
-        " On track I'll only say words about braking, like “less brake”.")
+        " On track you'll only hear braking words, like “less brake”.")
 
 
 def test_the_theme_is_the_translated_label_not_the_english_key():

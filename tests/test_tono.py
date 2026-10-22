@@ -253,11 +253,15 @@ def test_each_surface_has_its_own_sources():
     # Le frasi di pitcall.py stanno già nella tabella inglese e portano la sua chiave.
     assert "_CUE_EN[Ingresso box qui davanti, rientra]" in s["coach"]
     coach = tono.SURFACES["coach"]()
-    assert coach["i18n.py:_CUE_EN[Ingresso box qui davanti, rientra]"]["en"] == "Pit entry just ahead — come in"
-    # Le frasi fisse di tutti i moduli del coach, non solo dei quattro nominati:
-    assert any(v.get("it") == "Gas a metà troppo a lungo: aspetta e poi apri tutto"
-               and "braking.py" in k for k, v in coach.items())
-    assert any(v.get("it") == "Frena prima" and "analyzer.py" in k for k, v in coach.items())
+    assert coach["i18n.py:_CUE_EN[Ingresso box qui davanti, rientra]"]["en"] == "Pit entry just ahead, come in"
+    # Le frasi fisse di tutti i moduli del coach, non solo dei quattro nominati
+    # (quelle che la tabella inglese conosce portano la sua chiave):
+    assert "i18n.py:_CUE_EN[Resti a metà gas, aspetta e apri tutto]" in coach
+    assert any(v.get("it") == "Qui perdi {n} decimi" and "analyzer.py" in k
+               for k, v in coach.items())
+    # Il singolare ha la sua frase, e il suo inglese al singolare.
+    assert any(v == {"it": "Qui perdi {n} decimo", "en": "Losing {n} tenth here"}
+               and "analyzer.py" in k for k, v in coach.items())
     assert "GUIDA.md" in s["guide"] and "FAQ.md" in s["guide"]
     assert "guide.py:" in s["guide"]          # i testi fissi della pagina della guida
     # Nessuna chiave in due superfici.
@@ -273,6 +277,17 @@ def test_the_coach_is_measured_with_the_voice_limit():
     entries = {"k": {"it": "Frena molto prima della curva lenta di destra adesso."}}
     assert tono.surface_violations("coach", entries) == [("k", "it", "long")]
     assert tono.surface_violations("report", entries) == []
+
+
+def test_every_coach_phrase_has_its_english():
+    """Una frase del coach che la tabella inglese non conosce arriva in italiano
+    a chi guida in inglese: «Frena prima» ci è arrivata così finché il Task 8 non
+    l'ha vista qui. Restano fuori le pressioni, il cui segnaposto è una parola
+    («anteriori»): le prova `test_i18n` sui messaggi veri del rilevatore."""
+    coach = tono.SURFACES["coach"]()
+    untranslated = [k for k, e in coach.items()
+                    if e.get("en") == e.get("it") and "{axle}" not in e["it"]]
+    assert not untranslated, untranslated
 
 
 # --- la verifica di una superficie, provata su superfici finte --------------

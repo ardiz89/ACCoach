@@ -161,10 +161,10 @@ class EventDetector:
         cues: list[Cue] = []
         if step(self._lock, self._is_lockup(s), now, _MIN_HOLD_S):
             cues.append(make_cue(s, CueCategory.LOCKED,
-                                 "Bloccaggio, alleggerisci il freno", _PRIORITY_BASE))
+                                 "Blocchi le ruote, alleggerisci il freno", _PRIORITY_BASE))
         if step(self._spin, self._is_wheelspin(s), now, _MIN_HOLD_S):
             cues.append(make_cue(s, CueCategory.WHEELSPIN,
-                                 "Pattini in uscita, meno gas", _PRIORITY_BASE))
+                                 "Pattini in uscita, dosa il gas", _PRIORITY_BASE))
         return cues
 
     # --- conditions -------------------------------------------------------

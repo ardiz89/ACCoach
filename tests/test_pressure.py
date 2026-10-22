@@ -35,7 +35,7 @@ def test_high_fronts():
     out, _ = _drive_lap(adv, (28.2, 28.0, 26.4, 26.5))
     assert len(out) == 1 and out[0].category is CueCategory.TYRE_PRESSURE
     assert "anteriori" in out[0].message and "troppo alte" in out[0].message
-    assert "1.6 psi" in out[0].message
+    assert "1,6 psi" in out[0].message
 
 
 def test_low_rears():
@@ -159,7 +159,7 @@ def test_a_gt3_on_acc_still_gets_the_advice():
     adv = _advisor_for(CarClass.GT3)
     out, _ = _drive_lap(adv, (25.0,) * 4)
     assert any(c.category is CueCategory.TYRE_PRESSURE for c in out)
-    assert "1.5 psi" in out[0].message, "e con la correzione giusta"
+    assert "1,5 psi" in out[0].message, "e con la correzione giusta"
 
 
 def test_a_gt3_mod_on_ac_is_not_judged_by_accs_window():
@@ -183,4 +183,4 @@ def test_the_number_said_is_on_the_right_side_of_the_edge():
     adv = PressureAdvisor()
     out, _ = _drive_lap(adv, (25.96, 25.96, 26.5, 26.5))
     assert len(out) == 1
-    assert "25.9 psi" in out[0].message, out[0].message
+    assert "25,9 psi" in out[0].message, out[0].message
