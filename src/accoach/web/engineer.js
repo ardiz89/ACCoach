@@ -951,8 +951,8 @@ function applyLive(st) {
     renderPitReminder({});
     return;
   }
-  badge.dataset.state = st.in_pit ? "pit" : "on";
-  $("live-text").textContent = st.in_pit ? t("live.inpit") : t("live.ontrack");
+  badge.dataset.state = st.at_box ? "pit" : "on";
+  $("live-text").textContent = st.at_box ? t("live.inpit") : t("live.ontrack");
   $("live-car").textContent = `${st.car || "?"} · ${st.track || "?"}`;
   $("live-car").classList.remove("muted");
   $("g-speed").textContent = Math.round(st.speed_kmh);

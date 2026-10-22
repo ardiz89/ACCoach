@@ -51,3 +51,12 @@ def test_pit_reminder_reads_at_box():
     body = src[start:start + m.end()]
     assert "st.at_box" in body
     assert "st.in_pit" not in body
+
+
+def test_live_badge_reads_at_box():
+    src = _ENGINEER_JS.read_text(encoding="utf-8")
+    start = src.index("function applyLive")
+    m = re.search(r"\n}\n", src[start:])
+    body = src[start:start + m.end()]
+    assert "st.at_box" in body
+    assert "st.in_pit" not in body

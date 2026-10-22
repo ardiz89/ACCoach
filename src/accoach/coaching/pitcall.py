@@ -113,21 +113,21 @@ _MOVING_KMH = 25.0
 _STOPPED_KMH = 1.0
 
 
+# "Stopped" has to be asked twice, because no single field answers it on
+# both sims. `in_pit` is the sim saying "in the garage" — but in
+# everything we were able to observe on ACC it never lights up: read
+# straight from the shared memory (offset 160) with the car standing
+# still in its box it was 0, while `isInPitLane` (offset 1236) was 1.
+# Gated on `in_pit` alone the briefing simply never happened there, which
+# is the last step of this whole feature. `in_pit` stays in front all the
+# same: on AC1 it may well work, and there is no reason to break it.
+# The second route says the same thing out of two fields that ACC does
+# publish — in the lane, and not moving. In the lane is not enough by
+# itself (the whole corridor reads as lane), stopped is not enough by
+# itself (the grid, a spin), so it is the pair.
 def stopped_in_box(s: TelemetrySnapshot) -> bool:
     """Stopped in the box. One rule, also sent to the pages as `at_box` in the
     live frame, so none of them re-derives it from `in_pit` (dead on ACC)."""
-    # "Stopped" has to be asked twice, because no single field answers it on
-    # both sims. `in_pit` is the sim saying "in the garage" — but in
-    # everything we were able to observe on ACC it never lights up: read
-    # straight from the shared memory (offset 160) with the car standing
-    # still in its box it was 0, while `isInPitLane` (offset 1236) was 1.
-    # Gated on `in_pit` alone the briefing simply never happened there, which
-    # is the last step of this whole feature. `in_pit` stays in front all the
-    # same: on AC1 it may well work, and there is no reason to break it.
-    # The second route says the same thing out of two fields that ACC does
-    # publish — in the lane, and not moving. In the lane is not enough by
-    # itself (the whole corridor reads as lane), stopped is not enough by
-    # itself (the grid, a spin), so it is the pair.
     return bool(s.in_pit or (s.in_pit_lane and s.speed_kmh <= _STOPPED_KMH))
 
 
