@@ -168,24 +168,45 @@
     }
   }
 
+  // Quale proposta e': il tocco su «Fatto» vale per questa e non per la
+  // prossima.
+  function avKey(eng) {
+    return eng ? String(eng.kind) + "|" + JSON.stringify(eng.change || null) : "";
+  }
+  // Il bottone resta nascosto dopo il tocco finche' il motore non segna la
+  // modifica come fatta: i frame arrivano a 15 Hz, e un bottone che ricompare
+  // subito chiede un secondo tocco. Una proposta diversa lo rimette.
+  function avDoneHidden(eng, tapped) {
+    return !!eng.watched || !!eng.applied || (tapped != null && tapped === avKey(eng));
+  }
+  var avTapped = null;          // avKey della proposta su cui hai toccato «Fatto»
+
   // La proposta al volo resta in pista, col suo «Fatto» dove la pagina
   // completa lo mostra: solo dove il gioco non pubblica la manopola (AC), se
   // no il motore la vede girare e chiude da solo.
   function renderAv(eng) {
     var box = $("t-av");
     if (eng && eng.tag === "AV" && eng.change) {
+      if (avTapped !== null && avTapped !== avKey(eng)) avTapped = null;
       box.hidden = false;
       $("t-av-msg").textContent = eng.rationale || eng.message || "";
-      $("t-av-done").hidden = !!eng.watched || !!eng.applied;
+      $("t-av-done").hidden = avDoneHidden(eng, avTapped);
+      $("t-av-done").setAttribute("data-key", avKey(eng));
     } else {
+      avTapped = null;
       box.hidden = true;
     }
+  }
+
+  // Il testo dell'avviso: un ripristino non e' una modifica nuova.
+  function callKey(eng) {
+    return eng && eng.kind === "reverted" ? "tablet.callRestore" : "tablet.call";
   }
 
   function renderCall(eng, m) {
     if (m !== "call") return;
     var restore = eng.kind === "reverted";
-    $("t-call-msg").textContent = t(restore ? "tablet.callRestore" : "tablet.call");
+    $("t-call-msg").textContent = t(callKey(eng));
     $("t-call-why").textContent = restore ? (eng.message || eng.rationale || "")
                                           : (eng.rationale || eng.message || "");
   }
@@ -225,12 +246,23 @@
   }
 
   // ---- collegamento ---------------------------------------------------------
+  // Un frame che non si disegna non ferma la vista, ma lascia traccia: senza,
+  // un elemento che manca congelerebbe la schermata a meta' in silenzio. Una
+  // volta per messaggio, non quindici al secondo.
+  var logged = {};
+  function logOnce(e) {
+    var msg = String((e && e.message) || e);
+    if (logged[msg]) return;
+    logged[msg] = true;
+    try { console.error("HONE tablet: un frame non si disegna", e); } catch (e2) {}
+  }
+
   function connect() {
     var ws;
     try { ws = new WebSocket("ws://" + location.hostname + ":" + WS_PORT + "/ws"); }
     catch (e) { setTimeout(connect, 3000); return; }
     ws.onmessage = function (ev) {
-      try { render(JSON.parse(ev.data)); } catch (e) { /* un frame rotto non ferma la vista */ }
+      try { render(JSON.parse(ev.data)); } catch (e) { logOnce(e); }
     };
     // Il motore spento o riavviato: la schermata lo dice e si ricollega da sola.
     ws.onclose = function () {
@@ -242,6 +274,7 @@
 
   function boot() {
     $("t-av-done").onclick = function () {
+      avTapped = $("t-av-done").getAttribute("data-key");
       $("t-av-done").hidden = true;
       postApplied();
     };
@@ -254,7 +287,8 @@
     connect();
   }
 
-  window.HoneTablet = { mode: mode, render: render };
+  window.HoneTablet = { mode: mode, render: render, callKey: callKey,
+                        avKey: avKey, avDoneHidden: avDoneHidden };
 
   // In node (i test) non c'e' la pagina: si carica solo `mode`.
   if (typeof document !== "undefined" && document && document.getElementById("tablet")) boot();

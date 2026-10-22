@@ -51,9 +51,9 @@ var document = {readyState: "complete",
 var fs = require("fs");
 eval(fs.readFileSync(process.argv[1], "utf8"));
 eval(fs.readFileSync(process.argv[2], "utf8"));
-var frames = JSON.parse(fs.readFileSync(0, "utf8"));
-process.stdout.write(JSON.stringify(frames.map(function (f) {
-  return window.HoneTablet.mode(f);
+var req = JSON.parse(fs.readFileSync(0, "utf8"));
+process.stdout.write(JSON.stringify(req.calls.map(function (args) {
+  return window.HoneTablet[req.fn].apply(null, args);
 })));
 """
 
@@ -61,12 +61,17 @@ _CHANGE = [{"param": "tyrePressure", "slot": 0, "delta_clicks": 1}]
 _PROPOSE = {"kind": "propose", "tag": "BOX", "change": _CHANGE}
 
 
-def _modes(frames):
+def _call(fn, calls):
+    """`HoneTablet[fn](*args)` in node, per ogni `args` di `calls`."""
     r = subprocess.run([_NODE, "-e", _HARNESS, str(_WEB / "i18n.js"), str(_WEB / "tablet.js")],
-                       input=json.dumps(frames), capture_output=True, text=True,
-                       encoding="utf-8")
+                       input=json.dumps({"fn": fn, "calls": calls}), capture_output=True,
+                       text=True, encoding="utf-8")
     assert r.returncode == 0, r.stderr
     return json.loads(r.stdout)
+
+
+def _modes(frames):
+    return _call("mode", [[f] for f in frames])
 
 
 def _live(eng, at_box=False):
@@ -104,6 +109,28 @@ def test_mode_call_ends_when_the_change_is_written():
 @needs_node
 def test_mode_box_when_stopped_in_the_pits():
     assert _modes([_live(_PROPOSE, at_box=True), _live(None, at_box=True)]) == ["box", "box"]
+
+
+@needs_node
+def test_the_call_says_restore_for_a_rejected_change():
+    restore = {"kind": "reverted", "tag": "BOX", "change": _CHANGE}
+    assert _call("callKey", [[_PROPOSE], [restore]]) == ["tablet.call", "tablet.callRestore"]
+
+
+@needs_node
+def test_the_done_button_stays_hidden_after_a_tap_for_that_proposal():
+    av = {"kind": "propose", "tag": "AV", "change": _CHANGE}
+    other = dict(av, change=[{"param": "tc", "slot": 0, "delta_clicks": -1}])
+    key = _call("avKey", [[av]])[0]
+    assert key and _call("avKey", [[other]])[0] != key
+    # (proposta, chiave del tocco) -> il bottone e' nascosto?
+    assert _call("avDoneHidden", [
+        [av, None],                 # mai toccato: si vede
+        [av, key],                  # toccato: resta nascosto finche' il motore non chiude
+        [other, key],               # un'altra proposta: si rivede
+        [dict(av, watched=True), None],
+        [dict(av, applied=True), None],
+    ]) == [False, True, False, True, True]
 
 
 def test_reconnects():

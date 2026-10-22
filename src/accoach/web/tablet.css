@@ -5,7 +5,10 @@
 
 [hidden] { display: none !important; }
 
+/* Niente 100vh: su Safari di iOS 9 conta anche la barra degli strumenti e la
+   pagina scorrerebbe. L'altezza scende da html a body alla vista. */
 html, body {
+  height: 100%;
   margin: 0;
   padding: 0;
   background: #0B0E12;
@@ -20,7 +23,7 @@ html, body {
   display: flex;
   -webkit-flex-direction: column;
   flex-direction: column;
-  min-height: 100vh;
+  height: 100%;
   box-sizing: border-box;
   padding: 12px 16px;
 }
