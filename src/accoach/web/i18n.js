@@ -997,6 +997,16 @@ Salva un setup nel gioco, poi ricarica questa pagina.` },
     "rec.seen":        { en: `{n}×`, it: `{n}×` },
     "eng.avDone":      { en: `I've changed it`, it: `L'ho cambiato` },
 
+    // ---- tablet view (tablet.html): the rest it borrows from the engineer page
+    "tablet.title":    { en: `HONE · Tablet`, it: `HONE · Tablet` },
+    "tablet.off":      { en: `The coach isn't running. This page reconnects by itself.`,
+                         it: `Il coach non è acceso. La pagina si ricollega da sola.` },
+    "tablet.call":     { en: `Pit this lap. There's a setup change to make.`,
+                         it: `Rientra ai box. C'è una modifica da fare all'assetto.` },
+    "tablet.callRestore": { en: `Pit this lap. The last change goes back to how it was.`,
+                            it: `Rientra ai box. L'ultima modifica va rimessa com'era.` },
+    "tablet.full":     { en: `Full page`, it: `Pagina completa` },
+
     // engineer tour
     "tour.e1.t": { en: `Live diagnosis`, it: `Diagnosi live` },
     "tour.e1.x": { en: `Speed, gear and aids come straight from the car while Coach Live or the live backend is running.`,

@@ -356,7 +356,8 @@ def i18n_catalogue() -> Entries:
 
 
 _JS_STRING = re.compile(r'"([^"\n]*)"|\'([^\'\n]*)\'|`([^`]*)`')
-_ENGINEER_FILES = ("engineer.html", "engineer.js")
+# La vista tablet e' un pezzo della pagina Ingegnere: le sue chiavi stanno qui.
+_ENGINEER_FILES = ("engineer.html", "engineer.js", "tablet.html", "tablet.js")
 _REPORT_FILES = ("index.html", "app.js", "tour.js", "test.html", "test.js")
 
 

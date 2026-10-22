@@ -36,6 +36,13 @@ _JS_FORBIDDEN = (
     (r"\bgetElementsBy\w+\s*\([^()]*\)\s*\.forEach\b", ".forEach su getElementsBy*"),
 )
 
+# Regole in piu' per un file solo. In tablet.js nessun `.forEach`: il controllo
+# generico lo vede solo attaccato a `querySelectorAll(...)`, e una NodeList
+# messa prima in una variabile gli sfugge. Nella vista si scrivono cicli `for`.
+_PER_FILE = {
+    "tablet.js": ((r"\.forEach\s*\(", ".forEach (in tablet.js solo cicli for)"),),
+}
+
 _CSS_FORBIDDEN = (
     (r"display\s*:\s*(inline-)?grid", "display: grid"),
     (r"\bclamp\s*\(", "clamp()"),
@@ -141,10 +148,12 @@ def _strip_css(src):
                   flags=re.S)
 
 
-def safari9_problems(src, kind):
-    """Le righe di `src` che Safari 9 non digerisce: ["<riga>: <cosa>", ...]."""
+def safari9_problems(src, kind, name=None):
+    """Le righe di `src` che Safari 9 non digerisce: ["<riga>: <cosa>", ...].
+
+    `name` e' il nome del file, se ha regole sue (`_PER_FILE`)."""
     if kind == "js":
-        clean, rules = _strip_js(src), _JS_FORBIDDEN
+        clean, rules = _strip_js(src), _JS_FORBIDDEN + _PER_FILE.get(name, ())
     elif kind == "css":
         clean, rules = _strip_css(src), _CSS_FORBIDDEN
     else:

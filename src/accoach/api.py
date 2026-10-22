@@ -2460,6 +2460,15 @@ def create_api(
         """The race-engineer setup page (live diagnosis + setup editor)."""
         return _serve("engineer.html")
 
+    @app.get("/tablet")
+    def tablet() -> Response:
+        """La vista leggera dell'ingegnere per il tablet accanto al volante.
+
+        Esiste perché il tablet del pilota è un iPad 3 con Safari 9, che non
+        legge `engineer.js`: questa pagina è ES5 e cambia schermata da sola
+        (in pista, avviso di rientro, fermo ai box)."""
+        return _serve("tablet.html")
+
     @app.get("/guida")
     @app.get("/guide")
     def guide_page(lang: str | None = None) -> Response:

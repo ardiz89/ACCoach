@@ -57,7 +57,7 @@ def cat() -> dict[str, str]:
     return _catalogue()
 
 
-@pytest.mark.parametrize("asset", ["app.js", "engineer.js"])
+@pytest.mark.parametrize("asset", ["app.js", "engineer.js", "tablet.js"])
 def test_every_key_a_page_asks_for_is_declared(asset: str, cat: dict[str, str]) -> None:
     asked = set(_CALL.findall((WEB / asset).read_text(encoding="utf-8")))
     missing = sorted(asked - set(cat))
@@ -139,7 +139,7 @@ def _literal_sentences(src: str) -> list[tuple[int, str]]:
     return found
 
 
-@pytest.mark.parametrize("asset", ["app.js", "engineer.js"])
+@pytest.mark.parametrize("asset", ["app.js", "engineer.js", "tablet.js"])
 def test_no_sentence_reaches_the_screen_outside_the_catalogue(asset: str) -> None:
     found = _literal_sentences((WEB / asset).read_text(encoding="utf-8"))
     assert not found, f"{asset}: frasi scritte nel codice, non da t()/tf(): {found}"

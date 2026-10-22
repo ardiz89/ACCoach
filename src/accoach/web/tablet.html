@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title data-i18n="tablet.title">HONE · Tablet</title>
+  <link rel="icon" href="/static/hone_icon.png">
+  <link rel="stylesheet" href="/static/tablet.css">
+</head>
+<body>
+  <!-- La vista per il tablet accanto al volante (iPad 3, Safari 9). Quale
+       parte si vede la decide `data-mode`, che tablet.js riscrive a ogni frame:
+       off, track, call (avviso di rientro, sopra la telemetria), box. -->
+  <div id="tablet" class="tablet" data-mode="off">
+    <div id="t-off" class="t-off" data-i18n="tablet.off">The coach isn't running. This page reconnects by itself.</div>
+
+    <div id="t-call" class="t-call">
+      <div id="t-call-msg" class="t-call-msg"></div>
+      <div id="t-call-why" class="t-call-why"></div>
+    </div>
+
+    <div id="t-track" class="t-track">
+      <div class="t-row">
+        <div class="t-main">
+          <div class="t-big">
+            <span id="t-speed" class="t-num">–</span>
+            <span class="t-unit">km/h</span>
+          </div>
+          <div class="t-big t-gear">
+            <span id="t-gear" class="t-num">–</span>
+            <span class="t-unit" data-i18n="g.gear">Gear</span>
+          </div>
+        </div>
+        <div class="t-side">
+          <div class="t-aids">
+            <div class="t-aid"><span class="k" data-i18n="g.tc">TC</span><span class="v" id="t-tc">–</span></div>
+            <div class="t-aid"><span class="k" data-i18n="g.abs">ABS</span><span class="v" id="t-abs">–</span></div>
+            <div class="t-aid"><span class="k" data-i18n="g.map">Map</span><span class="v" id="t-map">–</span></div>
+          </div>
+          <div class="t-tyres">
+            <div class="t-tyre"><span class="tw">FL</span><span class="tt" id="t-fl-t">–</span><span class="tp" id="t-fl-p">–</span></div>
+            <div class="t-tyre"><span class="tw">FR</span><span class="tt" id="t-fr-t">–</span><span class="tp" id="t-fr-p">–</span></div>
+            <div class="t-tyre"><span class="tw">RL</span><span class="tt" id="t-rl-t">–</span><span class="tp" id="t-rl-p">–</span></div>
+            <div class="t-tyre"><span class="tw">RR</span><span class="tt" id="t-rr-t">–</span><span class="tp" id="t-rr-p">–</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Gas, freno e sterzo degli ultimi 8 s, come la striscia della pagina
+           completa: dove i pedali si sovrappongono stai trailando. -->
+      <div class="t-strip">
+        <div class="t-legend">
+          <span class="tl thr"><span data-i18n="trace.thr">Throttle</span> <b id="tr-thr">–</b></span>
+          <span class="tl brk"><span data-i18n="trace.brk">Brake</span> <b id="tr-brk">–</b></span>
+          <span class="tl steer"><span data-i18n="trace.steer">Steering</span> <b id="tr-steer">–</b></span>
+        </div>
+        <canvas id="t-trace" class="t-trace"></canvas>
+      </div>
+
+      <div id="t-av" class="t-av" hidden>
+        <div class="t-av-text">
+          <div class="t-label" data-i18n="eng.avNow">Right now, in the car</div>
+          <div id="t-av-msg" class="t-av-msg"></div>
+        </div>
+        <button type="button" id="t-av-done" class="t-btn" hidden data-i18n="eng.avDone">I've changed it</button>
+      </div>
+    </div>
+
+    <div id="t-phase" class="t-phase" hidden></div>
+
+    <!-- La schermata dei box: la riempie la scrittura dell'assetto. -->
+    <div id="t-box" class="t-box"></div>
+
+    <a class="t-full" href="/engineer" data-i18n="tablet.full">Full page</a>
+  </div>
+
+  <script src="/static/i18n.js"></script>
+  <script src="/static/tablet.js"></script>
+</body>
+</html>

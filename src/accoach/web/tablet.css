@@ -1,0 +1,227 @@
+/* La vista tablet. Pensata per l'iPad 3 (1024 x 768 punti CSS, Safari 9):
+   niente griglia, variabili, clamp() o gap sui flex, che Safari 9 non ha.
+   I colori sono quelli di style.css scritti per esteso; le misure in px fissi,
+   perche' lo schermo e' uno solo. Il controllo sta in tests/safari9.py. */
+
+[hidden] { display: none !important; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: #0B0E12;
+  color: #E8EDF2;
+  font-family: -apple-system, "Helvetica Neue", "Segoe UI", Arial, sans-serif;
+  font-size: 20px;
+  -webkit-text-size-adjust: 100%;
+}
+
+.tablet {
+  display: -webkit-flex;
+  display: flex;
+  -webkit-flex-direction: column;
+  flex-direction: column;
+  min-height: 100vh;
+  box-sizing: border-box;
+  padding: 12px 16px;
+}
+
+/* Chi si vede in ogni stato. Il resto e' spento. */
+.t-off, .t-call, .t-track, .t-box { display: none; }
+.tablet[data-mode="off"] .t-off { display: block; }
+.tablet[data-mode="off"] .t-phase { display: none; }
+.tablet[data-mode="track"] .t-track,
+.tablet[data-mode="call"] .t-track { display: block; }
+.tablet[data-mode="call"] .t-call { display: block; }
+.tablet[data-mode="box"] .t-box { display: block; }
+
+/* ---- spento ---------------------------------------------------------- */
+.t-off {
+  margin: 120px 24px 0;
+  font-size: 32px;
+  line-height: 1.35;
+  color: #8A95A3;
+  text-align: center;
+}
+
+/* ---- avviso di rientro: il colore suo, la parte alta dello schermo ---- */
+.t-call {
+  background: #FFB020;
+  color: #0B0E12;
+  border-radius: 10px;
+  padding: 16px 20px;
+  margin-bottom: 12px;
+}
+.t-call-msg { font-size: 40px; font-weight: 700; line-height: 1.15; }
+.t-call-why { font-size: 20px; line-height: 1.3; margin-top: 6px; }
+.t-call-why:empty { display: none; }
+
+/* ---- in pista -------------------------------------------------------- */
+.t-row {
+  display: -webkit-flex;
+  display: flex;
+  -webkit-flex-direction: row;
+  flex-direction: row;
+  -webkit-align-items: stretch;
+  align-items: stretch;
+}
+
+.t-main {
+  display: -webkit-flex;
+  display: flex;
+  -webkit-flex: 1 1 auto;
+  flex: 1 1 auto;
+  -webkit-align-items: flex-end;
+  align-items: flex-end;
+  margin-right: 16px;
+}
+.t-big {
+  display: -webkit-flex;
+  display: flex;
+  -webkit-flex-direction: column;
+  flex-direction: column;
+  -webkit-align-items: center;
+  align-items: center;
+  margin-right: 24px;
+}
+.t-num {
+  font-size: 120px;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.t-gear .t-num { color: #22D3CE; }
+.t-unit { font-size: 20px; color: #8A95A3; margin-top: 4px; }
+
+.t-side {
+  -webkit-flex: 0 0 420px;
+  flex: 0 0 420px;
+}
+.t-aids {
+  display: -webkit-flex;
+  display: flex;
+  margin-bottom: 10px;
+}
+.t-aid {
+  -webkit-flex: 1 1 0;
+  flex: 1 1 0;
+  background: #151A21;
+  border: 1px solid #232B35;
+  border-radius: 8px;
+  padding: 6px 10px;
+  margin-right: 8px;
+  text-align: center;
+}
+.t-aid:last-child { margin-right: 0; }
+.t-aid .k { display: block; font-size: 18px; color: #8A95A3; }
+.t-aid .v { display: block; font-size: 32px; font-weight: 700; }
+
+.t-tyres {
+  display: -webkit-flex;
+  display: flex;
+  -webkit-flex-wrap: wrap;
+  flex-wrap: wrap;
+}
+.t-tyre {
+  box-sizing: border-box;
+  width: 49%;
+  margin: 0 2% 8px 0;
+  background: #151A21;
+  border: 1px solid #232B35;
+  border-radius: 8px;
+  padding: 6px 10px;
+  display: -webkit-flex;
+  display: flex;
+  -webkit-align-items: baseline;
+  align-items: baseline;
+  -webkit-justify-content: space-between;
+  justify-content: space-between;
+}
+.t-tyre:nth-child(2n) { margin-right: 0; }
+.t-tyre .tw { font-size: 18px; color: #8A95A3; }
+.t-tyre .tt { font-size: 30px; font-weight: 700; }
+.t-tyre .tp { font-size: 24px; }
+.tt.cold { color: #22D3CE; }
+.tt.ok, .tp.ok { color: #34E08A; }
+.tt.hot { color: #FF4D5E; }
+.tp.low, .tp.high { color: #FFB020; }
+
+.t-strip { margin-top: 10px; }
+.t-legend { font-size: 18px; color: #8A95A3; margin-bottom: 4px; }
+.t-legend .tl { margin-right: 22px; }
+.t-legend b { color: #E8EDF2; }
+.t-legend .thr b { color: #34E08A; }
+.t-legend .brk b { color: #FF4D5E; }
+.t-trace {
+  display: block;
+  width: 100%;
+  height: 150px;
+  background: #151A21;
+  border: 1px solid #232B35;
+  border-radius: 8px;
+  box-sizing: border-box;
+}
+
+.t-av {
+  display: -webkit-flex;
+  display: flex;
+  -webkit-align-items: center;
+  align-items: center;
+  margin-top: 10px;
+  padding: 10px 14px;
+  background: #151A21;
+  border: 1px solid #C792EA;
+  border-radius: 8px;
+}
+.t-av-text { -webkit-flex: 1 1 auto; flex: 1 1 auto; margin-right: 12px; }
+.t-label { font-size: 18px; color: #8A95A3; }
+.t-av-msg { font-size: 22px; line-height: 1.3; }
+
+/* Un bottone per il dito: almeno 44 punti, come chiede Apple. */
+.t-btn {
+  min-height: 48px;
+  min-width: 120px;
+  padding: 8px 18px;
+  font: inherit;
+  font-size: 20px;
+  color: #0B0E12;
+  background: #C792EA;
+  border: 0;
+  border-radius: 8px;
+  -webkit-appearance: none;
+}
+
+/* ---- la fase, in pista e ai box -------------------------------------- */
+.t-phase {
+  margin-top: 10px;
+  padding: 10px 14px;
+  background: #151A21;
+  border-left: 4px solid #22D3CE;
+  border-radius: 4px;
+  font-size: 20px;
+  line-height: 1.35;
+}
+.tablet[data-mode="box"] .t-phase { margin-top: 0; font-size: 24px; }
+
+.t-box { margin-top: 12px; }
+
+.t-full {
+  -webkit-align-self: flex-end;
+  align-self: flex-end;
+  margin-top: auto;
+  padding: 12px 4px 0;
+  min-height: 44px;
+  line-height: 32px;
+  font-size: 18px;
+  color: #8A95A3;
+}
+
+/* In verticale tutto in colonna: velocita' e marcia sopra, gomme sotto. */
+@media (orientation: portrait) {
+  .t-row {
+    -webkit-flex-direction: column;
+    flex-direction: column;
+  }
+  .t-main { margin-right: 0; margin-bottom: 12px; -webkit-justify-content: center; justify-content: center; }
+  .t-side { -webkit-flex: 0 0 auto; flex: 0 0 auto; }
+  .t-trace { height: 200px; }
+}

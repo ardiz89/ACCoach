@@ -62,7 +62,29 @@ def test_shipped_files_pass(name):
     if not path.exists():
         pytest.skip(name + " non esiste ancora")
     kind = "css" if name.endswith(".css") else "js"
-    assert safari9_problems(path.read_text(encoding="utf-8"), kind) == []
+    assert safari9_problems(path.read_text(encoding="utf-8"), kind, name) == []
+
+
+def test_tablet_files_exist():
+    # Senza i file, il controllo qui sopra si salta e passa senza aver guardato.
+    for name in ("tablet.js", "tablet.css"):
+        assert (_WEB / name).exists(), name
+
+
+def test_tablet_js_has_no_foreach_at_all():
+    # Su una variabile il controllo generico non sa se e' una NodeList: in
+    # tablet.js non si rischia, i cicli sono `for`.
+    src = "var l = document.querySelectorAll('a'); l.forEach(g);"
+    assert safari9_problems(src, "js", "tablet.js")
+    assert safari9_problems(src, "js") == []
+
+
+def test_tablet_js_mutation_is_caught():
+    src = (_WEB / "tablet.js").read_text(encoding="utf-8")
+    assert safari9_problems(src + "\nvar f = () => 1;\n", "js", "tablet.js")
+    assert safari9_problems(src + "\n[].forEach(g);\n", "js", "tablet.js")
+    css = (_WEB / "tablet.css").read_text(encoding="utf-8")
+    assert safari9_problems(css + "\n.z{display:grid}\n", "css", "tablet.css")
 
 
 def test_mutation_is_caught():
