@@ -193,8 +193,17 @@ def test_the_guide_explains_that_a_dial_needs_no_confirmation():
     """Il ciclo dell'ingegnere si chiude da solo su ACC e con un pulsante su AC:
     due comportamenti diversi sullo stesso schermo vanno detti, o il pulsante
     che non compare sembra un pezzo mancante."""
-    assert "Al volo" in _flat(_GUIDA) and "guarda il canale" in _flat(_GUIDA)
+    assert "Dal volante" in _flat(_GUIDA) and "guarda il canale" in _flat(_GUIDA)
     assert "eng.avDone" in _I18NJS
+    # La guida chiama le modifiche e il pulsante come la pagina Ingegnere.
+    assert t_js("eng.onfly") in _flat(_GUIDA) and t_js("eng.avDone") in _flat(_GUIDA)
+
+
+def t_js(key: str, lang: str = "it") -> str:
+    """Il testo di una chiave del catalogo del browser (`i18n.js`)."""
+    m = re.search(rf'"{re.escape(key)}"\s*:\s*\{{[^}}]*?\b{lang}:\s*`([^`]*)`', _I18NJS)
+    assert m, key
+    return m.group(1)
 
 
 def test_the_engineer_tour_introduces_the_at_the_wheel_panel():

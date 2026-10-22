@@ -223,13 +223,14 @@ def test_the_report_is_split_in_two_without_losing_a_key():
 
 def test_every_surface_collects_texts_in_both_languages():
     floor = {"report_a": 220, "report_b": 200, "engineer": 200, "report_backend": 200, "hub": 130,
-             "coach": 40, "guide": 400}
+             "coach": 40, "guide_it": 250, "guide_en": 150}
     for name, fn in tono.SURFACES.items():
         entries = fn()
         assert len(entries) >= floor[name], (name, len(entries))
-        if name == "guide":
+        if name.startswith("guide_"):
+            # Una superficie per lingua: la guida italiana e quella inglese.
             langs = {lg for e in entries.values() for lg in e}
-            assert langs >= {"it", "en"}
+            assert langs == {name.removeprefix("guide_")}, (name, langs)
             continue
         if name == "hub":
             # La pagina e il riquadro di prova sono solo in italiano (lo dicono
@@ -262,8 +263,10 @@ def test_each_surface_has_its_own_sources():
     # Il singolare ha la sua frase, e il suo inglese al singolare.
     assert any(v == {"it": "Qui perdi {n} decimo", "en": "Losing {n} tenth here"}
                and "analyzer.py" in k for k, v in coach.items())
-    assert "GUIDA.md" in s["guide"] and "FAQ.md" in s["guide"]
-    assert "guide.py:" in s["guide"]          # i testi fissi della pagina della guida
+    assert "GUIDA.md" in s["guide_it"] and "FAQ.md" in s["guide_en"]
+    assert "FAQ.md" not in s["guide_it"] and "GUIDA.md:" not in s["guide_en"]
+    # I testi fissi della pagina della guida, ciascuno nella sua lingua.
+    assert "guide.py:" in s["guide_it"] and "guide.py:" in s["guide_en"]
     # Nessuna chiave in due superfici.
     keys = {n: set(f()) for n, f in tono.SURFACES.items()}
     names = list(keys)
@@ -430,9 +433,9 @@ def test_fstring_cues_get_an_english_side_from_the_patterns():
 def test_the_guide_may_repeat_a_ui_label_but_not_itself():
     ui = {"a": {"it": "Apri la pagina Ingegnere nel browser."}}
     guide = {"g1": {"it": "Apri la pagina Ingegnere nel browser."}}
-    assert tono.duplicates({"hub": ui, "guide": guide}) == {}
+    assert tono.duplicates({"hub": ui, "guide_it": guide}) == {}
     both = {"g1": guide["g1"], "g2": guide["g1"]}
-    assert list(tono.duplicates({"hub": ui, "guide": both}).values()) == [["guide|g1", "guide|g2"]]
+    assert list(tono.duplicates({"hub": ui, "guide_it": both}).values()) == [["guide_it|g1", "guide_it|g2"]]
     assert tono.duplicates({"hub": ui, "report": {"r": ui["a"]}})
 
 

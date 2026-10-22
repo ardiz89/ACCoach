@@ -624,12 +624,17 @@ def markdown_sentences(src: str) -> list[tuple[int, str]]:
     return cleaned
 
 
-def _guide() -> Entries:
+def _guide(lang: str) -> Entries:
+    """Una lingua della guida: il suo file Markdown e i testi fissi della pagina
+    (`guide.py`) in quella lingua. Le due lingue sono due superfici perché si
+    riscrivono in due task: la chiave di `guide.py` porta la lingua, così non
+    sta in due superfici."""
+    name = {"it": "GUIDA.md", "en": "docs/FAQ.md"}[lang]
     out: Entries = {}
-    for name, lang in (("GUIDA.md", "it"), ("docs/FAQ.md", "en")):
-        for n, text in markdown_sentences((ROOT / name).read_text(encoding="utf-8")):
-            out[f"{name}:{n}"] = {lang: text}
-    out.update({f"guide.py:{k}": v for k, v in _modules("guide.py").items()})
+    for n, text in markdown_sentences((ROOT / name).read_text(encoding="utf-8")):
+        out[f"{name}:{n}"] = {lang: text}
+    out.update({f"guide.py:{k}[{lang}]": {lang: v[lang]}
+                for k, v in _modules("guide.py").items() if lang in v})
     return out
 
 
@@ -640,12 +645,14 @@ SURFACES: dict[str, Callable[[], Entries]] = {
     "report_backend": functools.lru_cache(maxsize=1)(_report_backend),
     "hub": functools.lru_cache(maxsize=1)(_hub),
     "coach": functools.lru_cache(maxsize=1)(_coach),
-    "guide": functools.lru_cache(maxsize=1)(_guide),
+    "guide_it": functools.lru_cache(maxsize=1)(lambda: _guide("it")),
+    "guide_en": functools.lru_cache(maxsize=1)(lambda: _guide("en")),
 }
 
 # Le superfici non ancora riscritte. Ogni task che ne riscrive una la toglie.
 PENDING: set[str] = set(SURFACES) - {"report_a", "report_b", "report_backend",
-                                       "engineer", "hub", "coach"}
+                                       "engineer", "hub", "coach",
+                                       "guide_it"}
 
 
 # --- il conto ---------------------------------------------------------------
@@ -687,8 +694,8 @@ def duplicates(surfaces: dict[str, Entries]) -> dict[tuple[str, str], list[str]]
     # un doppione guida-interfaccia non conta (quelli dentro la guida, sì).
     out = {}
     for key, where in seen.items():
-        ui = [w for w in where if not w.startswith("guide|")]
-        guide = [w for w in where if w.startswith("guide|")]
+        ui = [w for w in where if not w.startswith("guide_")]
+        guide = [w for w in where if w.startswith("guide_")]
         kept = (ui if len(ui) > 1 else []) + (guide if len(guide) > 1 else [])
         if kept:
             out[key] = kept
