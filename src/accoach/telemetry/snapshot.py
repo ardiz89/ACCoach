@@ -55,7 +55,11 @@ class TelemetrySnapshot:
     throttle: float          # 0..1
     brake: float             # 0..1
     clutch: float            # 0..1 (ACC only; 0 on AC)
-    steer_angle: float       # radians, +left
+    # Lo sterzo come frazione della corsa del volante, -1..1, positivo a sinistra.
+    # Non radianti, come diceva questa riga: sui giri veri la Formula si ferma a
+    # 1.0 esatto e la GT3 sta fra 0.33 e 0.9, cioe' un comando normalizzato
+    # (ACC lo documenta cosi'). Le scritte «34 %» lo leggono in questo senso.
+    steer_angle: float       # -1..1 (fraction of full lock), +left
     gear: str                # "R" / "N" / "1".."8"
 
     # --- engine / speed ---

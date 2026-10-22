@@ -47,7 +47,7 @@ class SPageFilePhysics(ctypes.Structure):
         ("fuel", _FLOAT),                      # litres
         ("gear", _INT),                        # 0 = reverse, 1 = neutral, 2 = 1st...
         ("rpms", _INT),
-        ("steerAngle", _FLOAT),                # radians, +left
+        ("steerAngle", _FLOAT),                # -1..1 fraction of lock, +left
         ("speedKmh", _FLOAT),
         ("velocity", _FLOAT * 3),              # world m/s
         ("accG", _FLOAT * 3),                  # G force [x, y, z]

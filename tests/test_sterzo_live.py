@@ -132,3 +132,52 @@ def test_the_readout_says_which_way_in_words_not_arrows(lang, steer, want):
     thr, brk, st = _pedal_readouts(0.45, 0.0, steer)
     assert st == want
     assert thr.endswith(" 45 %") and brk.endswith("  0 %")
+
+
+@pytest.mark.parametrize("lang", ["it", "en"])
+def test_the_worst_readouts_fit_their_boxes_with_the_real_font(app, lang):
+    """«FRENO 100 %» e «STERZO 100 % SX» col JetBrains Mono in grassetto
+    misuravano 99 e 135 px in riquadri fissi da 96 e 120: il «%» e il «SX»
+    uscivano tagliati. I riquadri ora si misurano; qui il caso peggiore sta
+    dentro, e l'ultimo finisce prima della targhetta a destra (COAST)."""
+    from PySide6.QtGui import QFont, QFontInfo, QFontMetrics
+
+    from accoach import config, theme
+    from accoach.overlay import MONO, _pedal_header_boxes, _pedal_readouts
+    theme.load_fonts()
+    config.set_language(lang)
+    f = QFont(MONO, 11)
+    f.setBold(True)
+    if QFontInfo(f).family() != MONO:
+        pytest.skip("il carattere del bundle non si carica qui")
+    fm = QFontMetrics(f)
+    boxes = _pedal_header_boxes(fm, 28)
+    for steer in (1.0, -1.0):
+        for (_, _, w), txt in zip(boxes, _pedal_readouts(1.0, 1.0, steer)):
+            assert fm.horizontalAdvance(txt) <= w, (txt, fm.horizontalAdvance(txt), w)
+    # la targhetta piu' lunga, a destra, col suo carattere
+    tag_font = QFont(theme.DISPLAY, 11)
+    tag_font.setBold(True)
+    tag = QFontMetrics(tag_font).horizontalAdvance("COAST 99,9 s")
+    _, x, w = boxes[-1]
+    assert x + w < 28 + (_BASE_W - 56) - tag, (x + w, tag)
+
+
+def test_coasting_reads_with_a_comma_and_a_spaced_unit(app):
+    from accoach import config
+    config.set_language("it")
+    o = Overlay(pedals=True)
+    now = time.monotonic()
+    o._pedal_hist = [(now - 1.25, 0.0, 0.0, 0.0), (now, 0.0, 0.0, 0.0)]
+    tag, _ = o._pedal_tag(now)
+    o.deleteLater()
+    assert tag == "COAST 1,2 s" or tag == "COAST 1,3 s", tag
+
+
+def test_a_new_session_restarts_the_steering_scale(app):
+    o = Overlay(pedals=True)
+    o.apply_state({"connected": True, "throttle": 0.5, "brake": 0.0, "steer": 0.9})
+    assert o._steer_scale == 0.9
+    o.apply_state({"connected": False})
+    assert o._steer_scale == _STEER_FLOOR
+    o.deleteLater()

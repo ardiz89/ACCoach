@@ -46,9 +46,9 @@ def _inputs_panel(s: TelemetrySnapshot) -> Panel:
     table.add_row("Brake", _bar(s.brake, color="red"))
     if s.clutch:
         table.add_row("Clutch", _bar(s.clutch, color="yellow"))
-    # steering: map radians to a -1..1-ish visual
+    # steering: already a -1..1 fraction of lock (not radians)
     steer = max(-1.0, min(1.0, s.steer_angle))
-    table.add_row("Steer", Text(f"{s.steer_angle:+.2f} rad", style="cyan"))
+    table.add_row("Steer", Text(f"{s.steer_angle:+.2f}", style="cyan"))
     table.add_row("Gear", Text(s.gear, style="bold magenta"))
 
     rev = (s.rpm / s.max_rpm) if s.max_rpm else 0.0

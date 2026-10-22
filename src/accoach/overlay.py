@@ -37,7 +37,7 @@ from .theme import DISPLAY, MONO, load_fonts
 
 try:
     from PySide6.QtCore import QPointF, Qt, QTimer, QUrl
-    from PySide6.QtGui import QColor, QFont, QPainter, QPen, QPolygonF
+    from PySide6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPen, QPolygonF
     from PySide6.QtWebSockets import QWebSocket
     from PySide6.QtWidgets import QApplication, QWidget
 except ImportError:  # pragma: no cover - optional dependency
@@ -248,6 +248,22 @@ def _pedal_readouts(thr: float, brk: float, steer: float) -> tuple[str, str, str
             f"{t('overlay.steer')} {pct(abs(steer))} {side}".rstrip())
 
 
+def _pedal_header_boxes(fm: QFontMetrics, x0: int) -> list[tuple[int, int, int]]:
+    """Dove vanno le tre scritte: (x del pallino, x del testo, larghezza).
+
+    Ogni riquadro e' largo quanto il caso peggiore nella lingua di adesso
+    («FRENO 100 %», «STERZO 100 % SX»), misurato col carattere vero: a misure
+    fisse (96 e 120 px) il mono in grassetto tagliava il «%» del freno e il «SX»
+    dello sterzo, cioe' proprio la parte che dice da che parte giri."""
+    worst = list(zip(_pedal_readouts(1.0, 1.0, 1.0), _pedal_readouts(1.0, 1.0, -1.0)))
+    boxes, x = [], x0
+    for a, b in worst:
+        w = max(fm.horizontalAdvance(a), fm.horizontalAdvance(b)) + 4
+        boxes.append((x, x + 12, w))
+        x += 12 + w + 10
+    return boxes
+
+
 class Overlay(QWidget):
     def __init__(self, url: str | None = None, interactive: bool = False,
                  pedals: bool | None = None) -> None:
@@ -346,6 +362,10 @@ class Overlay(QWidget):
             self._record_pedals(data)
 
     def _record_pedals(self, data: dict) -> None:
+        if data.get("connected") is False:
+            # Un'altra sessione puo' essere un'altra auto: la scala dello sterzo
+            # riparte dal pavimento, come fa la pagina Ingegnere (traceReset).
+            self._steer_scale = _STEER_FLOOR
         thr, brk = data.get("throttle"), data.get("brake")
         if thr is None or brk is None:
             return
@@ -880,25 +900,15 @@ class Overlay(QWidget):
         if hist:
             _, thr, brk, steer = hist[-1]
         self._set_font(p, 11, bold=True, mono=True)
-        thr_txt, brk_txt, steer_txt = _pedal_readouts(thr, brk, steer)
-        p.setPen(Qt.NoPen)
-        p.setBrush(_GREEN)
-        p.drawEllipse(px, top + 10, 7, 7)
-        p.setPen(_GREEN)
-        p.drawText(px + 12, top + 6, 96, 16, Qt.AlignVCenter,
-                   thr_txt)
-        p.setPen(Qt.NoPen)
-        p.setBrush(_RED)
-        p.drawEllipse(px + 116, top + 10, 7, 7)
-        p.setPen(_RED)
-        p.drawText(px + 128, top + 6, 96, 16, Qt.AlignVCenter,
-                   brk_txt)
-        # Lo sterzo con la sua parte (SX/DX): il numero da solo non lo dice.
-        p.setPen(Qt.NoPen)
-        p.setBrush(_WHITE)
-        p.drawEllipse(px + 232, top + 10, 7, 7)
-        p.setPen(_WHITE)
-        p.drawText(px + 244, top + 6, 120, 16, Qt.AlignVCenter, steer_txt)
+        texts = _pedal_readouts(thr, brk, steer)
+        for (dot_x, text_x, text_w), txt, col in zip(
+                _pedal_header_boxes(p.fontMetrics(), px), texts,
+                (_GREEN, _RED, _WHITE)):
+            p.setPen(Qt.NoPen)
+            p.setBrush(col)
+            p.drawEllipse(dot_x, top + 10, 7, 7)
+            p.setPen(col)
+            p.drawText(text_x, top + 6, text_w, 16, Qt.AlignVCenter, txt)
 
         tag, tag_col = self._pedal_tag(now)
         if tag:
@@ -922,7 +932,8 @@ class Overlay(QWidget):
                     start = t0
                 else:
                     break
-            return f"{t('overlay.coast')} {now - start:.1f}s", _GREY
+            return (f"{t('overlay.coast')} "
+                    f"{fmt_num(now - start, 1, current_language(), 's')}", _GREY)
         return "", _GREY
 
     # --- helpers -----------------------------------------------------------

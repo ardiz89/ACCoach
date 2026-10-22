@@ -32,7 +32,7 @@ from dataclasses import dataclass
 
 from .recording.lap import strip_leading_wrap
 
-# Tuning (all in normalized-position / steering-radian units).
+# Tuning (all in normalized-position / steering-fraction (-1..1) units).
 _STEER_ON = 0.08        # |steer| (rad) that starts a corner
 _STEER_OFF = 0.05       # drop below this to end it (hysteresis)
 _MIN_GAP = 0.012        # merge corners closer than this in pos

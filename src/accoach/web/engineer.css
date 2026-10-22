@@ -336,7 +336,7 @@ button.ghost:hover { color: var(--text); border-color: var(--muted); }
   .eng-live > h2 { display: none; }
   /* Lo scorrimento in orizzontale e' nostro (cambia scheda), quello in
      verticale resta al browser. */
-  .eng-layout { touch-action: pan-y; }
+  .eng-layout { touch-action: pan-y pinch-zoom; }
   html[data-tab="live"] .eng-setup,
   html[data-tab="setup"] .eng-live { display: none; }
   /* Il vassoio delle modifiche e' dell'assetto: sulla diagnosi coprirebbe il

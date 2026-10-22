@@ -98,3 +98,9 @@ def test_on_a_phone_the_setup_tab_does_not_widen_the_page():
     dell'editor volevano 430 px. Misurato nel browser prima e dopo."""
     body = re.search(r"\.setup-body \{[^}]*\}", CSS).group(0)
     assert "minmax(min(30.714rem, 100%)" in body
+
+
+def test_the_swipe_area_still_lets_you_zoom_with_two_fingers():
+    """`pan-y` da solo spegne anche lo zoom a due dita sul tablet."""
+    m = re.search(r"\.eng-layout \{ touch-action: ([^;]+); \}", CSS)
+    assert m and "pan-y" in m.group(1) and "pinch-zoom" in m.group(1), m

@@ -127,7 +127,7 @@ SAMPLE_FIELDS = (
     "speed_kmh",
     "throttle",      # 0..1
     "brake",         # 0..1
-    "steer_angle",   # radians, +left
+    "steer_angle",   # -1..1 fraction of lock, +left
     "gear",          # "R" / "N" / "1".. as shown to the driver
     "rpm",
     "g_lat",         # lateral G
