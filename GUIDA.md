@@ -105,11 +105,11 @@ giro il coach ti avvisa quando sbagli in assoluto.
 Per dirti dove perdi tempo e perché, il coach ha bisogno di un **giro di
 riferimento**, il tuo più veloce fra quelli validi.
 
-1. **Fai due giri puliti completi** partendo dal traguardo. Il primo giro
-   intero si salva e diventa il riferimento.
-2. Dal giro dopo, il coach confronta il tuo giro col riferimento. **Mentre ti
-   avvicini a ogni curva** ti anticipa il consiglio per quella curva. Ti
-   dice, per esempio, «Porta più velocità in curva» o «Arrivi lungo, frena
+1. **Fai un giro pulito completo**, dal traguardo al traguardo. Quello che
+   parte dai box non conta. Si salva e diventa il riferimento.
+2. Dal giro dopo arrivano i consigli di curva. Il coach confronta il tuo giro
+   col riferimento. **Mentre ti avvicini a ogni curva** ti anticipa il
+   consiglio per quella curva. Ti dice, per esempio, «Porta più velocità in curva» o «Arrivi lungo, frena
    prima». Ti parla prima della curva, quando puoi ancora farci qualcosa.
 3. Quando prendi bene quella curva, **smette di ripeterti** quel consiglio.
 4. Ogni volta che batti il tuo riferimento, da lì in poi il confronto è col
@@ -850,8 +850,8 @@ Queste voci esistono solo lì.
 
 ## 8. Consigli per usarlo al meglio
 
-- **Fai un buon riferimento.** I primi due giri falli puliti, perché sono il
-  metro su cui il coach ti giudica. Un riferimento sporco dà consigli sporchi.
+- **Fai un buon riferimento.** Il tuo primo giro pulito completo è il metro su
+  cui il coach ti giudica. Guidalo bene, e i consigli saranno giusti.
 - **Usa sempre Borderless** se vuoi l'overlay.
 - **Lavora su un'auto e una pista per volta.** Il riferimento vale solo per
   quell'auto su quella pista.

@@ -818,11 +818,9 @@
     "eng.onfly":       { en: `At the wheel`, it: `Dal volante` },
     "eng.engPrefix":   { en: `Engineer `, it: `Ingegnere ` },
 
-    // Diceva «avvia Coach Live **o** il backend». Falso: `live` è un processo
-    // unico senza WebSocket, quindi non alimenta questa pagina — e chi lo aveva
-    // acceso restava su «in attesa di telemetria» per sempre mentre il coach gli
-    // parlava nelle cuffie. I due non possono nemmeno convivere: registrano
-    // entrambi, e insieme salverebbero ogni giro due volte.
+    // La pagina la alimenta Coach Live (`app._serve_engineer_page`, la pagina
+    // Ingegnere in modalità spettatore) oppure il backend live. I due non possono
+    // convivere: registrano entrambi, e insieme salverebbero ogni giro due volte.
     "eng.hint":        { en: `This page is fed by <b>Coach Live</b>, or by the <b>live backend</b>, which you start from the hub in <b>Devices</b> → Live backend. The two can't run together, because they'd both record. The changes on the right go into the setup file. They must be <b>loaded in the pits</b> and don't change the car while you drive.`,
                          it: `Questa pagina la alimenta <b>Coach Live</b>, oppure il <b>backend live</b>, che accendi dall'hub in <b>Dispositivi</b> → Backend live. I due non possono stare accesi insieme, perché registrano entrambi. Le modifiche a destra agiscono sul file di setup. Vanno <b>caricate ai box</b> e non cambiano l'auto mentre guidi.` },
 
