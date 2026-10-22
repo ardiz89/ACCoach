@@ -88,6 +88,7 @@ def env(app, tmp_path, monkeypatch):
     monkeypatch.setattr(livepanel_ui, "device_urls", lambda port: {
         "report": f"http://192.168.1.23:{port}/",
         "engineer": f"http://192.168.1.23:{port}/engineer",
+        "tablet": f"http://192.168.1.23:{port}/tablet",
         "test": f"http://192.168.1.23:{port}/test"})
     monkeypatch.setattr(livepanel_ui, "laps_root", lambda: tmp_path / "laps")
     win = launcher.MainWindow()
@@ -205,7 +206,7 @@ def test_the_qr_is_there_only_with_lan_on(env):
     panel.render_state(PanelState("before"))
     qr = panel.findChild(QLabel, "liveQr")
     assert qr is not None and _visible_in(qr, panel)
-    assert "192.168.1.23:8778/engineer" in _joined(panel)
+    assert "192.168.1.23:8778/tablet" in _joined(panel)
 
     _cfg().lan = False
     panel.render_state(PanelState("before"))
@@ -796,7 +797,7 @@ def test_driving_keeps_the_tablet_step_until_it_is_done(env):
     panel.render_state(st)
     text = _joined(panel)
     assert t("live.s2") in text
-    assert "192.168.1.23:8778/engineer" in text
+    assert "192.168.1.23:8778/tablet" in text
     qr = panel.findChild(QLabel, "liveQr")
     assert qr is not None and _visible_in(qr, panel)
     names = [w.objectName() for w in panel.findChildren(QPushButton)

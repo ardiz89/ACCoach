@@ -50,7 +50,7 @@ def local_addresses() -> set[str]:
 
 
 def device_urls(port: int, ip: str | None = None) -> dict[str, str] | None:
-    """Report + engineer + on-track test URLs a LAN device opens, or ``None`` if
+    """Report + engineer + tablet + on-track test URLs a LAN device opens, or ``None`` if
     no LAN IP.
 
     Pass ``ip`` to skip auto-detection (useful for tests).
@@ -60,7 +60,7 @@ def device_urls(port: int, ip: str | None = None) -> dict[str, str] | None:
         return None
     base = f"http://{ip}:{port}"
     return {"report": base + "/", "engineer": base + "/engineer",
-            "test": base + "/test"}
+            "tablet": base + "/tablet", "test": base + "/test"}
 
 
 def port_open(port: int, host: str = "127.0.0.1", timeout: float = 0.3) -> bool:

@@ -107,7 +107,8 @@ moves through three stages, one after the other.
 **Before you go.** The first step, *Coach Live is on*, is ticked off as soon as
 the coach responds, usually within a couple of seconds. At that point voice and
 overlay are ready. Next comes *Connect your tablet to the engineer*. Scan the QR
-code with the tablet's camera, or open the address written next to it. The
+code with the tablet's camera, or open the address written next to it. It opens
+the tablet view, described in "The tablet view". The
 tablet can only connect with network access on. If it's off, the panel offers a
 *Turn on network access* button, and afterwards you restart Coach Live. If you
 don't need the tablet, press *Skip, I'll drive without*. The last step, *Start
@@ -818,6 +819,39 @@ coach measures you against it.
 
 > Want to try HONE without the game? `python accoach_main.py web --demo` loads
 > sample laps.
+
+### The tablet view
+
+The QR code in the On track panel opens `/tablet`, a page made for an old
+tablet beside the wheel, like an iPad 3. It changes by itself depending on where
+you are. If the coach isn't running, the page says so and reconnects as soon as
+it's back.
+
+- **On track** you see speed, gear, TC, ABS and engine map, and the temperature
+  and pressure of the four tyres. A strip shows throttle, brake and steering
+  from the last 8 s. Below it is the driving phase the engineer is working on.
+  The engineer may propose a change to make right now in the car. You read it
+  in a box and press *I've changed it* once it's done.
+- **Return-to-pits call.** When the engineer has a change to make in the pits,
+  the call to come in at the end of the lap appears at the top. The telemetry
+  stays below. The same call appears when a rejected change has to be put back
+  as it was.
+- **Stopped in the pits.** The page shows the phase, the change one lever at a
+  time, from the current value to the new one, the reason and the confidence.
+  You pick the starting file. For the car and track you're on, it's the last
+  setup HONE wrote since the web process started. If it hasn't written one, it's
+  the most recently modified file. Press *Write the change* and confirm. HONE
+  creates a new file and leaves yours alone. The page then shows the file name
+  in large type, to load from the game's garage. If it can't find a setup for
+  that car on that track, it asks you to save one from the garage.
+- **A rejected change.** The button becomes *Write the restore* and writes a file
+  with the previous values. If you've already put them back by hand, press
+  *I've already put it back*.
+
+For anything else, such as the history of the trials, use the full engineer
+page. It stays at `/engineer`, and the *Full page* link at the bottom of the
+tablet view leads there. An old browser that opens `/engineer` lands on `/tablet`
+by itself, because the full page doesn't start for it.
 
 ### Opening the report on a phone or tablet
 

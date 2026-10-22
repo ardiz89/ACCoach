@@ -46,7 +46,8 @@ pagina passa per tre momenti, uno dopo l'altro.
 **Prima di partire.** Il primo passo, *Coach Live acceso*, si spunta appena il
 coach risponde, di solito in un paio di secondi. A quel punto voce e overlay
 sono pronti. Poi viene *Collega il tablet all'ingegnere*. Inquadra il codice
-QR con la fotocamera del tablet, oppure apri l'indirizzo scritto accanto. Il
+QR con la fotocamera del tablet, oppure apri l'indirizzo scritto accanto. Si
+apre la vista tablet, descritta in «La vista tablet». Il
 tablet si collega solo con la rete locale attiva. Se è spenta, il pannello ti
 offre il bottone *Attiva la rete locale*, e dopo devi riavviare Coach Live. Se
 il tablet non ti serve, premi *Salta, guido senza*. L'ultimo passo, *Avvia il
@@ -759,6 +760,40 @@ quello.
 
 > Vuoi provare HONE senza il gioco? `python accoach_main.py web --demo` carica giri
 > di esempio.
+
+### La vista tablet
+
+Il codice QR del pannello In pista apre `/tablet`, una pagina pensata per un
+tablet vecchio accanto al volante, come un iPad 3. Cambia da sola a seconda di
+dove sei. Se il coach non è acceso, la pagina te lo dice e si ricollega appena
+torna.
+
+- **In pista** vedi velocità, marcia, TC, ABS e mappa motore, temperatura e
+  pressione delle quattro gomme, e la striscia di gas, freno e sterzo degli
+  ultimi 8 s. Sotto c'è la fase di guida su cui lavora l'ingegnere. Se
+  l'ingegnere propone una modifica da fare subito in macchina, la leggi in un
+  riquadro e premi *L'ho cambiato* quando l'hai fatta.
+- **Avviso di rientro.** Quando l'ingegnere ha una modifica da fare ai box, in
+  alto compare l'invito a rientrare a fine giro. La telemetria resta sotto. Lo
+  stesso avviso compare quando c'è da rimettere com'era una modifica
+  respinta.
+- **Fermo ai box.** La pagina mostra la fase, la modifica una leva alla volta,
+  dal valore di adesso a quello nuovo, il perché e il grado di fiducia.
+  Il file di partenza lo scegli tu. Per l'auto e la pista in uso è l'ultimo
+  assetto che HONE ha scritto da quando è partito il processo web. Se non ne
+  ha scritto nessuno, è il file modificato più di recente. Premi *Scrivi la
+  modifica* e conferma. HONE crea un file nuovo e non tocca il tuo. Poi la
+  pagina ti mostra in grande il nome del file, da caricare dal garage del
+  gioco. Se non trova un assetto per quell'auto su quella pista, ti chiede di
+  salvarne uno dal garage.
+- **Una modifica respinta.** Il bottone diventa *Scrivi il ripristino* e
+  scrive un file che rimette i valori di prima. Se li hai già rimessi a mano,
+  premi *L'ho già rimesso com'era*.
+
+Per il resto, ad esempio per lo storico delle prove, usa la pagina completa
+dell'ingegnere. Resta su `/engineer`, e il collegamento *Pagina completa* in
+fondo alla vista tablet ci porta. Un browser vecchio che apre `/engineer` finisce
+su `/tablet` da solo, perché la pagina completa non gli parte.
 
 ### Aprire il report sul telefono o sul tablet
 

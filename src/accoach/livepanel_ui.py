@@ -656,7 +656,7 @@ class LivePanel(QWidget):
             if not urls:
                 out.append(_hint(t("live.s2_no_ip")))
             else:
-                url = urls["engineer"]
+                url = urls["tablet"]
                 qr = _qr_image(url, scale=4)
                 qr.setObjectName("liveQr")
                 addr = url.split("://", 1)[-1]

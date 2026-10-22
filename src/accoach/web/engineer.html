@@ -3,6 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Il preferito vecchio sull'iPad 3: questa pagina scrive `async`, che
+       Safari 9 non legge, e resterebbe bianca. Lo script e' ES3 apposta; dove
+       `async` si legge non succede niente, dove no si va alla vista tablet. -->
+  <script>
+    try { new Function("async function f(){}"); }
+    catch (e) { location.replace("/tablet"); }
+  </script>
   <title data-i18n="title.engineer">HONE · Engineer</title>
   <link rel="icon" href="/static/hone_icon.png">
   <link rel="stylesheet" href="/static/style.css">
