@@ -179,6 +179,11 @@ def register_setup_routes(app: FastAPI, root=DEFAULT_ROOTS) -> None:
     else:
         roots = [Path(r) for r in root]
 
+    # L'ultimo file scritto da `/api/setup/apply` in questo processo, per
+    # auto/pista. Sta qui e non su disco: vale per questa sessione di guida, e
+    # la pagina dell'Ingegnere e il tablet scrivono entrambi da `setup_apply`.
+    last_written: dict[tuple[str, str], Path] = {}
+
     @app.get("/api/setup/combos")
     def setup_combos() -> list[dict]:
         """Every car/track folder (ACC or AC) that holds setups."""
@@ -271,7 +276,47 @@ def register_setup_routes(app: FastAPI, root=DEFAULT_ROOTS) -> None:
         found = []
         for game_root in roots:
             found += list_setups(car, track, game_root)
-        return [{"name": p.stem, "path": str(p)} for p in found]
+        return [{"name": p.stem, "path": str(p), "mtime": p.stat().st_mtime}
+                for p in found]
+
+    @app.get("/api/setup/base")
+    def setup_base(car: str = Query(""), track: str = Query("")) -> dict:
+        """Il file a cui la vista tablet applica una modifica, scelto qui.
+
+        La pagina non deve indovinarlo: a un tablet fermo ai box l'unica
+        domanda sensata e' «su quale assetto?», e la risposta onesta e' quello
+        che l'Ingegnere ha scritto per ultimo (la catena di prove parte da li),
+        se no il piu' recente per data (l'ultimo che il pilota ha salvato dal
+        garage). Auto e pista si cercano in minuscolo, come `sameName` in
+        `engineer.js`: il gioco non scrive i nomi sempre allo stesso modo.
+        """
+        car_l, track_l = car.strip().lower(), track.strip().lower()
+        car_dir = track_dir = None
+        found: list[Path] = []
+        for game_root in roots:
+            if not game_root.is_dir():
+                continue
+            for c in sorted(p for p in game_root.iterdir() if p.is_dir()):
+                if c.name.lower() != car_l:
+                    continue
+                for t in sorted(p for p in c.iterdir() if p.is_dir()):
+                    if t.name.lower() != track_l:
+                        continue
+                    car_dir, track_dir = car_dir or c.name, track_dir or t.name
+                    found += [p for p in sorted(t.glob("*.json"))
+                              + sorted(t.glob("*.ini")) if p.is_file()]
+        if not found:
+            return {"car": None, "track": None, "setups": [], "base": None,
+                    "last_written": None}
+        setups = [{"name": p.stem, "path": str(p), "mtime": p.stat().st_mtime}
+                  for p in found]
+        written = last_written.get((car_l, track_l))
+        if written is not None and written.is_file():
+            return {"car": car_dir, "track": track_dir, "setups": setups,
+                    "base": str(written), "last_written": written.stem}
+        newest = max(setups, key=lambda x: x["mtime"])
+        return {"car": car_dir, "track": track_dir, "setups": setups,
+                "base": newest["path"], "last_written": None}
 
     @app.get("/api/setup/class")
     def setup_class(car: str = Query(...),
@@ -325,6 +370,8 @@ def register_setup_routes(app: FastAPI, root=DEFAULT_ROOTS) -> None:
             raise HTTPException(409, str(e))
         except ValueError as e:      # as_name non e' un nome: vedi `store.save`
             raise HTTPException(400, str(e))
+        last_written[(out.parent.parent.name.lower(),
+                      out.parent.name.lower())] = out
         return {
             "ok": True, "path": str(out), "name": out.stem,
             "diff": _diff_payload(diff(before, after), lang),
