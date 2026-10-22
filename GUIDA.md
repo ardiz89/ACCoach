@@ -76,7 +76,7 @@ riparte solo quando chiudi e riapri il gioco.
 Dalla riga di comando fai la stessa cosa così.
 
 ```
-python -m accoach live           # coach vocale + overlay, in un solo processo
+python accoach_main.py live      # coach vocale + overlay, in un solo processo
 ```
 
 Aggiungi `--silent` se vuoi l'overlay senza la voce. Con `--interactive` puoi
@@ -375,7 +375,7 @@ Finita la sessione, rivedi tutto con calma.
 - Dall'hub, nella sezione **Analisi**, premi **Analisi e report**. Dalla riga
   di comando invece scrivi
   ```
-  python -m accoach web
+  python accoach_main.py web
   ```
   La pagina `http://127.0.0.1:8778` si apre da sola.
 
@@ -757,7 +757,7 @@ sei. Nella sezione **Analisi** dell'hub c'è **Importa un giro di riferimento
 PRO**. Puoi importare un giro più veloce, e da lì in poi il coach ti misura su
 quello.
 
-> Vuoi provare HONE senza il gioco? `python -m accoach web --demo` carica giri
+> Vuoi provare HONE senza il gioco? `python accoach_main.py web --demo` carica giri
 > di esempio.
 
 ### Aprire il report sul telefono o sul tablet
@@ -789,7 +789,7 @@ Qualche dettaglio pratico.
 Per un riassunto veloce a fine sessione, scrivi questo.
 
 ```
-python -m accoach debrief [auto] [pista]
+python accoach_main.py debrief [auto] [pista]
 ```
 
 Ti elenca le curve dove hai perso più tempo, con la causa, e la tua costanza.
@@ -799,11 +799,11 @@ Legge i giri salvati, quindi il gioco può essere chiuso.
 
 ## 7. Tutti i comandi
 
-Da un terminale scrivi `python -m accoach <comando>`. Dal sorgente il comando è
+Da un terminale, nella cartella del sorgente, scrivi
 `python accoach_main.py <comando>`.
 
 **Per guidare ti bastano tre comandi**, gli stessi che vedi con
-`python -m accoach help`.
+`python accoach_main.py help`.
 
 | Comando | A cosa serve |
 |---|---|
@@ -816,7 +816,7 @@ secondo schermo. Per guidare non servono, e per questo non stanno nella prima
 schermata. L'elenco completo e aggiornato lo trovi così.
 
 ```
-python -m accoach help --all
+python accoach_main.py help --all
 ```
 
 Questi sono quelli che potrebbero servirti davvero.
@@ -872,7 +872,7 @@ Queste voci esistono solo lì.
   memoria condivisa solo mentre il gioco gira.
 - **Non vedi l'overlay.** Sei a schermo intero esclusivo. Passa a
   **Borderless**.
-- **Non senti la voce.** Lancia `python -m accoach selftest`, che scrive un
+- **Non senti la voce.** Lancia `python accoach_main.py selftest`, che scrive un
   report e prova a parlare. Dal sorgente, installa pyttsx3 con
   `pip install pyttsx3`. Ti serve anche una voce italiana di Windows, come
   Microsoft Elsa.

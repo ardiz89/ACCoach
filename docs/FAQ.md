@@ -37,8 +37,8 @@ That way the analysis always finds them.
 git clone https://github.com/ardiz89/ACCoach.git
 cd ACCoach
 pip install -r requirements.txt
-python -m accoach live        # coach and overlay
-python -m accoach             # list the commands
+python accoach_main.py live      # coach and overlay
+python accoach_main.py help      # list the commands
 ```
 
 From the source you can also double-click `HONE.bat`. The first time, it sets up
@@ -138,7 +138,7 @@ reopen the game.
 From the command line you do the same thing like this.
 
 ```
-python -m accoach live           # voice coach and overlay, in one process
+python accoach_main.py live      # voice coach and overlay, in one process
 ```
 
 Add `--silent` if you want the overlay without the voice. With `--interactive`
@@ -437,7 +437,7 @@ Once the session is over, go through it at your own pace.
 - In the hub, in the **Analysis** section, press **Analysis and report**. From the
   command line, type this instead.
   ```
-  python -m accoach web
+  python accoach_main.py web
   ```
   The page `http://127.0.0.1:8778` opens by itself.
 
@@ -816,8 +816,8 @@ where you are. In the **Analysis** section of the hub there's
 **Import a PRO reference lap**. You can import a faster lap, and from then on the
 coach measures you against it.
 
-> Want to try HONE without the game? `python -m accoach web --demo` loads sample
-> laps.
+> Want to try HONE without the game? `python accoach_main.py web --demo` loads
+> sample laps.
 
 ### Opening the report on a phone or tablet
 
@@ -846,7 +846,7 @@ A few practical details.
 For a quick summary after the session, type this.
 
 ```
-python -m accoach debrief [car] [track]
+python accoach_main.py debrief [car] [track]
 ```
 
 It lists the corners where you lost the most time, with the cause, and your
@@ -856,12 +856,12 @@ consistency. It reads the saved laps, so the game can be closed.
 
 ## 7. Every command
 
-From a terminal, type `python -m accoach <command>`. From the source the command
-is `python accoach_main.py <command>`. The packaged app has no console window,
+From a terminal in the source folder, type `python accoach_main.py <command>`.
+The packaged app has no console window,
 so `HONE.exe <command>` runs the command but prints nothing in the terminal.
 
 **To drive you only need three commands**, the same ones you see with
-`python -m accoach help`.
+`python accoach_main.py help`.
 
 | Command | What it does |
 |---|---|
@@ -874,7 +874,7 @@ screen. You don't need them to drive, and that's why they aren't on the first
 screen. You get the full, up-to-date list like this.
 
 ```
-python -m accoach help --all
+python accoach_main.py help --all
 ```
 
 These are the ones you might really need.
@@ -932,8 +932,8 @@ These entries only exist there.
 - **You can't see the overlay.** You're in exclusive fullscreen. Switch to
   **Borderless**.
 - **You can't hear the voice.** Check you didn't start with `--silent`. Then run
-  `python -m accoach selftest`, which writes a report and tries to speak. From the
-  source, install pyttsx3 with `pip install pyttsx3`.
+  `python accoach_main.py selftest`, which writes a report and tries to speak.
+  From the source, install pyttsx3 with `pip install pyttsx3`.
 - **Some sentences sound more robotic than others.** The coach's fixed sentences
   and the focus's short words are recorded with a neural voice. Sentences that
   change every time, like the focus announcement with the corner's name, come from

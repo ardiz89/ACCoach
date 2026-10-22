@@ -65,11 +65,11 @@ def test_the_italian_guide_keeps_its_structure():
 
 
 def test_a_command_inside_a_bullet_stays_a_code_block():
-    """Section 5 puts `python -m accoach web` inside a list item; it used to be
+    """Section 5 puts `python accoach_main.py web` inside a list item; it used to be
     joined into the sentence, fences and all."""
     body, _ = render_markdown(_DOCS["it"])
     assert "<li>" in body
-    assert "<pre><code>python -m accoach web</code></pre>" in body
+    assert "<pre><code>python accoach_main.py web</code></pre>" in body
 
 
 # --- the pieces ------------------------------------------------------------
