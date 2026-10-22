@@ -138,22 +138,24 @@ Scelta mia, da far confermare al pilota.
 ## Safari 9: cosa vuol dire per il codice
 
 - Tutto quello che la vista carica (HTML, script, stili, testi) si legge su
-  Safari 9. Gli script sono JavaScript ES5: niente `let`/`const`, funzioni
-  freccia, `class`, `async/await`, template string, `...`, `?.`, `??`,
-  `fetch`. Le richieste vanno con `XMLHttpRequest`, il dal vivo col
+  Safari 9. Gli script sono JavaScript ES5 più le template string (che Safari 9
+  ha): niente `let`/`const`, funzioni freccia, `class`, `async/await`, `...`,
+  `?.`, `??`; e fra le funzioni del browser niente `fetch`,
+  `NodeList.forEach`, `padStart`, `Intl`, `Object.entries`/`values`,
+  `URLSearchParams`. Le richieste vanno con `XMLHttpRequest`, il dal vivo col
   `WebSocket` (Safari 9 lo ha).
 - Gli stili senza griglia CSS, senza `clamp()`, senza variabili CSS e senza
   `gap` sui flex. Si usano flexbox e misure semplici.
-- I testi: il file `i18n.js` di oggi usa le template string e una funzione
-  `async`, quindi Safari 9 non può caricarlo così. I testi della vista seguono
-  la lingua dell'hub come le altre pagine (`window.HONE_LANG`) e vivono in un
-  posto solo, senza copie da tenere allineate. Per questo `i18n.js` si
-  riscrive in ES5 tutto intero, per tutte le pagine: è una conversione
-  meccanica (le template string diventano stringhe normali), e si prova che
-  ogni chiave in entrambe le lingue ha lo stesso testo di prima, confrontando i
-  due cataloghi caricati prima e dopo. La vista aggiunge le sue chiavi lì.
-- Un controllo automatico prova che ogni script caricato dalla vista si legge
-  come ES5 e non usa le funzioni sopra. Deve fallire se qualcuno ci mette una
+- I testi: la vista carica `i18n.js` come le altre pagine, segue la lingua
+  dell'hub (`window.HONE_LANG`) e aggiunge lì le sue chiavi, senza copie da
+  tenere allineate. `i18n.js` è scritto con `var` e funzioni; le sue stringhe
+  sono template string senza `${}`, che Safari 9 legge. L'unico punto che su
+  Safari 9 si rompe è `querySelectorAll(...).forEach` (Safari 9 non ha
+  `NodeList.forEach`): sta dentro un `try`, quindi la pagina non cade, ma i
+  testi fissi non si traducono mai. Si corregge con
+  `Array.prototype.forEach.call`, per tutte le pagine.
+- Un controllo automatico prova che ogni script caricato dalla vista non usa la
+  sintassi e le funzioni sopra. Deve fallire se qualcuno ci mette una
   funzione freccia.
 
 ## Dove si apre
@@ -207,5 +209,5 @@ Prese da me, il pilota le può rovesciare.
    su ACC.
 7. **L'ultimo file scritto lo ricorda il processo web**, in memoria, per auto e
    pista; l'elenco dei file porta la data di modifica.
-8. **`i18n.js` riscritto in ES5** per tutte le pagine, invece di una copia dei
-   testi per la vista.
+8. **`i18n.js` resta com'è**, con la sola correzione di `NodeList.forEach`, e
+   la vista ci aggiunge le sue chiavi: nessuna copia dei testi.
