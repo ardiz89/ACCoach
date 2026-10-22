@@ -850,8 +850,9 @@ Queste voci esistono solo lì.
 
 ## 8. Consigli per usarlo al meglio
 
-- **Fai un buon riferimento.** Il tuo primo giro pulito completo è il metro su
-  cui il coach ti giudica. Guidalo bene, e i consigli saranno giusti.
+- **Fai un buon riferimento.** Il coach ti confronta col tuo giro pulito più
+  veloce. All'inizio è il primo giro pulito completo, poi lo sostituisce ogni
+  volta che ne fai uno migliore.
 - **Usa sempre Borderless** se vuoi l'overlay.
 - **Lavora su un'auto e una pista per volta.** Il riferimento vale solo per
   quell'auto su quella pista.
