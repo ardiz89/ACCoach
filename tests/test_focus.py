@@ -170,6 +170,26 @@ def test_format_focus_is_a_line():
     assert "Guida costante." in format_focus(r)
 
 
+@pytest.mark.parametrize("kind", list(FocusKind))
+def test_format_focus_has_no_emoji(kind):
+    """Il coach da terminale apriva ogni riga con 🎯 ✅ ⏸ ✨: le emoji sono
+    fuori da ogni testo di HONE, e la frase dice già cos'è successo."""
+    from tono import _EMOJI
+    line = format_focus(FocusReport(kind, "Guida costante."))
+    assert not _EMOJI.search(line), line
+    assert "Guida costante." in line
+
+
+def test_the_terminal_coach_writes_no_emoji():
+    """Lo stesso per i pannelli del coach da terminale (voce/testo, focus, stato)."""
+    from pathlib import Path
+    from tono import _EMOJI
+    src = (Path(__file__).resolve().parents[1] / "src" / "accoach"
+           / "coach_app.py").read_text(encoding="utf-8")
+    found = sorted(set(_EMOJI.findall(src)))
+    assert not found, f"emoji in coach_app.py: {found}"
+
+
 # --- engine wiring (real debrief → focus → payload) ------------------------
 
 def test_engine_focus_block_from_real_debriefs(tmp_path):

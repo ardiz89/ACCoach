@@ -471,13 +471,8 @@ class FocusCoach:
 
 
 def format_focus(report: FocusReport) -> str:
-    """One-line render of a focus report for the terminal coach / logs."""
-    icon = {
-        FocusKind.ASSESS: "…",
-        FocusKind.BRIEF: "🎯",
-        FocusKind.DRILL: "🎯",
-        FocusKind.IMPROVED: "✅",
-        FocusKind.STUCK: "⏸",
-        FocusKind.CLEAN: "✨",
-    }.get(report.kind, "•")
-    return f"{icon} {report.message}"
+    """One-line render of a focus report for the terminal coach / logs.
+
+    Just the message: no emoji in front of it (they are out of every text
+    HONE shows), the sentence already says what happened."""
+    return report.message

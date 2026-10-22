@@ -25,7 +25,7 @@ from rich.text import Text
 from .coaching import Voice
 from .comparison import DeltaState, format_delta
 from .engine import CoachEngine
-from .i18n import t
+from .i18n import current_language, t
 from .telemetry import TelemetrySnapshot, format_lap_time
 from .telemetry.snapshot import ACStatus
 
@@ -59,14 +59,14 @@ def _coach_panel(history: list[str], audio: bool) -> Panel:
             table.add_row(Text(line, style="bold white"))
     else:
         table.add_row(Text(t("coach.listening"), style="grey62"))
-    mode = ("🔊 " + t("voice.on")) if audio else ("📝 " + t("voice.off"))
+    mode = t("voice.on") if audio else t("voice.off")
     return Panel(table, title=f"{t('coach.coach_panel')} · {mode}", border_style="cyan")
 
 
+# Solo il colore distingue lo stato: niente emoji, la frase basta.
 _FOCUS_STYLE = {
-    "brief": ("🎯", "bold yellow"), "drill": ("🎯", "yellow"),
-    "improved": ("✅", "bold green"), "stuck": ("⏸", "grey62"),
-    "clean": ("✨", "bold green"), "assess": ("…", "grey50"),
+    "brief": "bold yellow", "drill": "yellow", "improved": "bold green",
+    "stuck": "grey62", "clean": "bold green", "assess": "grey50",
 }
 
 
@@ -75,14 +75,16 @@ def _focus_panel(focus: dict | None) -> Panel:
     if not focus:
         return Panel(Text(t("coach.warming"), style="grey50"),
                      title=t("coach.focus_title"), border_style="grey50")
-    icon, style = _FOCUS_STYLE.get(focus.get("kind", ""), ("•", "white"))
+    style = _FOCUS_STYLE.get(focus.get("kind", ""), "white")
     table = Table.grid(padding=(0, 1))
     table.add_column()
-    table.add_row(Text(f"{icon} {focus['message']}", style=style))
+    table.add_row(Text(focus["message"], style=style))
     f = focus.get("focus")
     if f:
-        table.add_row(Text(f"{f['name']} · {f['theme']} · "
-                           f"−{f['baseline_ms'] / 1000.0:.2f}s", style="cyan"))
+        secs = f"{f['baseline_ms'] / 1000.0:.2f}"
+        if current_language() == "it":
+            secs = secs.replace(".", ",")
+        table.add_row(Text(f"{f['name']} · {f['theme']} · −{secs} s", style="cyan"))
     return Panel(table, title=t("coach.focus_title"), border_style="yellow")
 
 
@@ -93,9 +95,9 @@ def _status_panel(s: TelemetrySnapshot, saved: int) -> Panel:
     if not s.connected:
         conn = Text(t("overlay.waiting"), style="bold yellow")
     elif s.status == ACStatus.LIVE:
-        conn = Text("● LIVE", style="bold green")
+        conn = Text("LIVE", style="bold green")
     else:
-        conn = Text(f"○ {s.status.name}", style="grey50")
+        conn = Text(s.status.name, style="grey50")
     table.add_row(t("lbl.state"), conn)
     table.add_row(t("lbl.car_track"),
                   Text(f"{s.car_model or '?'} @ {s.track or '?'}", style="white"))
