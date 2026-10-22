@@ -271,6 +271,7 @@ let STYLE_CALLS = 0;
 let ADV_COL = null;
 const getComputedStyle = () => { STYLE_CALLS++; return { getPropertyValue: () => "#C792EA" }; };
 const UI_FONT = "sans";
+const canvasFont = (px) => px;
 const _anyNonZero = (a) => (a || []).some((v) => v !== 0);
 const projX = (p, w) => p * w;
 eval(grab("function degradeLabel("));

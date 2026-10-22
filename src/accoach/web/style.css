@@ -43,6 +43,15 @@
 
   /* Font stacks — the @font-face rules above supply the brand faces from /static;
      the system names stay as the fallback if a file is ever missing. */
+  /* La base del testo: 14 px fino a 1600 px di finestra (il portatile, come
+     prima), poi cresce in proporzione fino a 20 px a 2880 px (18,5 px a 2560, un
+     32 pollici al 150 %). Ogni dimensione di testo e ogni larghezza che regge
+     testo sono in rem, quindi tutto cresce con lo stesso rapporto e le righe
+     restano della stessa lunghezza in caratteri. I @media restano in px: contano
+     la finestra, non il testo, e sotto i 1600 px la base e' ferma a 14. */
+  --fs: clamp(14px, calc(14px + (100vw - 1600px) * 6 / 1280), 20px);
+  font-size: var(--fs);
+
   --font-ui: "Inter", system-ui, "Segoe UI", sans-serif;
   --font-display: "Space Grotesk", system-ui, "Segoe UI", sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
@@ -55,7 +64,7 @@
      background running edge to edge while its *content* lines up with everything
      else. The percentage resolves against the band's own width (the body), so it
      is scrollbar-safe in a way 100vw is not. */
-  --page: 1600px;
+  --page: 114.286rem;
   --gut: max(24px, calc((100% - var(--page)) / 2));
 }
 
@@ -74,7 +83,7 @@ body.cb-safe {
 .demo-banner {
   position: sticky; top: 0; z-index: 100;
   background: var(--amber); color: #1A1205;
-  text-align: center; font-weight: 700; font-size: 13px;
+  text-align: center; font-weight: 700; font-size: 0.929rem;
   letter-spacing: .04em; padding: 6px 12px;
 }
 
@@ -84,7 +93,7 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font: 14px/1.4 var(--font-ui);
+  font: 1rem/1.4 var(--font-ui);
 }
 
 header {
@@ -98,7 +107,7 @@ header {
   background: var(--panel);
 }
 
-h1 { margin: 0; font-size: 20px; font-family: var(--font-display); font-weight: 600; letter-spacing: .01em; }
+h1 { margin: 0; font-size: 1.429rem; font-family: var(--font-display); font-weight: 600; letter-spacing: .01em; }
 h1 span { color: var(--muted); font-weight: 400; }
 
 /* Wraps because this row keeps growing: logo, name, the tour "?", the language
@@ -110,10 +119,10 @@ h1 span { color: var(--muted); font-weight: 400; }
 
 /* "?" header button — (re)opens the guided tour */
 .tour-help {
-  width: 26px; height: 26px; border-radius: 50%;
+  width: 1.857rem; height: 1.857rem; border-radius: 50%;
   background: var(--inset); color: var(--muted);
   border: 1px solid var(--line); cursor: pointer;
-  font-family: var(--font-display); font-size: 14px; font-weight: 600; line-height: 1;
+  font-family: var(--font-display); font-size: 1rem; font-weight: 600; line-height: 1;
   display: inline-flex; align-items: center; justify-content: center;
   padding: 0;
 }
@@ -121,7 +130,7 @@ h1 span { color: var(--muted); font-weight: 400; }
 
 /* Link to the user guide — the tour teaches this page, the guide teaches HONE. */
 .guide-link {
-  color: var(--muted); text-decoration: none; font-size: 12px;
+  color: var(--muted); text-decoration: none; font-size: 0.857rem;
   font-family: var(--font-ui); font-weight: 400; letter-spacing: .04em;
   border: 1px solid var(--line); border-radius: 999px; padding: 4px 11px;
   margin-left: 2px; white-space: nowrap;
@@ -130,10 +139,10 @@ h1 span { color: var(--muted); font-weight: 400; }
 
 /* Colour-blind palette toggle — same pill as the "?" button. */
 .cb-toggle {
-  width: 26px; height: 26px; border-radius: 50%;
+  width: 1.857rem; height: 1.857rem; border-radius: 50%;
   background: var(--inset); color: var(--muted);
   border: 1px solid var(--line); cursor: pointer;
-  font-size: 14px; line-height: 1;
+  font-size: 1rem; line-height: 1;
   display: inline-flex; align-items: center; justify-content: center;
   padding: 0; margin-left: 6px;
 }
@@ -143,7 +152,7 @@ h1 span { color: var(--muted); font-weight: 400; }
 /* Language selector — sits next to the "?" tour button in the header */
 .lang-select {
   min-width: 0; width: auto;
-  padding: 4px 8px; font-size: 12px;
+  padding: 4px 8px; font-size: 0.857rem;
   font-family: var(--font-ui);
   background: var(--inset); color: var(--text);
   border: 1px solid var(--line); border-radius: 8px;
@@ -153,7 +162,7 @@ h1 span { color: var(--muted); font-weight: 400; }
 h2, h3 { font-family: var(--font-display); }
 
 .controls { display: flex; gap: 16px; flex-wrap: wrap; }
-.controls label { color: var(--muted); font-size: 12px; display: grid; gap: 4px; }
+.controls label { color: var(--muted); font-size: 0.857rem; display: grid; gap: 4px; }
 
 select {
   background: var(--inset);
@@ -161,17 +170,17 @@ select {
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 6px 8px;
-  font-size: 13px;
+  font-size: 0.929rem;
   font-family: var(--font-ui);
-  min-width: 220px;
+  min-width: 15.714rem;
 }
 
 .export { display: flex; align-items: flex-end; gap: 8px; }
-.export span { color: var(--muted); font-size: 12px; align-self: center; }
+.export span { color: var(--muted); font-size: 0.857rem; align-self: center; }
 .export button {
   background: var(--inset); color: var(--text);
   border: 1px solid var(--line); border-radius: 8px;
-  padding: 7px 12px; font-size: 13px; cursor: pointer;
+  padding: 7px 12px; font-size: 0.929rem; cursor: pointer;
   font-family: var(--font-ui);
 }
 .export button:hover { border-color: var(--cyan); color: var(--cyan); }
@@ -190,9 +199,9 @@ select {
 .lapbar .bit { display: flex; align-items: baseline; gap: 7px; }
 .lapbar .k {
   color: var(--muted); font-family: var(--font-ui);
-  font-size: 10px; text-transform: uppercase; letter-spacing: .06em;
+  font-size: 0.857rem; text-transform: uppercase; letter-spacing: .06em;
 }
-.lapbar .v { font-size: 15px; font-weight: 600; }
+.lapbar .v { font-size: 1.071rem; font-weight: 600; }
 .lapbar .v.slower { color: var(--red); }
 .lapbar .v.faster { color: var(--green); }
 .lapbar .off-track { font-family: var(--font-ui); }
@@ -209,17 +218,17 @@ select {
    normal state now that the identity numbers live upstairs. */
 .summary:empty { display: none; }
 .summary .item { display: grid; gap: 2px; }
-.summary .item .k { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
-.summary .item .v { font-size: 18px; font-weight: 600; font-family: var(--font-mono); }
+.summary .item .k { color: var(--muted); font-size: 0.857rem; text-transform: uppercase; letter-spacing: .04em; }
+.summary .item .v { font-size: 1.286rem; font-weight: 600; font-family: var(--font-mono); }
 .summary .v.slower { color: var(--red); }
 .summary .v.faster { color: var(--green); }
 /* Setup difference: amber and smaller — a caveat on the gap, not a verdict. */
-.summary .v.warn { color: var(--amber); font-size: 13px; }
+.summary .v.warn { color: var(--amber); font-size: 0.929rem; }
 /* Track-limits chip, sized like the [PRO] tag — it qualifies the lap time, it
    doesn't compete with it. */
 .summary .off-track {
   font-family: var(--font-ui);
-  font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em;
+  font-size: 0.857rem; font-weight: 600; text-transform: uppercase; letter-spacing: .04em;
   color: var(--amber); border: 1px solid var(--amber); background: #241a08;
   border-radius: 5px; padding: 2px 6px; vertical-align: middle; cursor: help;
 }
@@ -229,7 +238,7 @@ select {
   padding: 10px var(--gut);
   background: var(--inset); border-bottom: 1px solid var(--line);
   font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums; font-size: 13px; color: var(--muted);
+  font-variant-numeric: tabular-nums; font-size: 0.929rem; color: var(--muted);
 }
 /* Il valore congelato quando il mouse esce dal grafico: c'è ancora, ma dice
    che non è più il punto sotto al dito. */
@@ -247,7 +256,7 @@ select {
 .range-chip b { color: var(--cyan); font-weight: 600; }
 .range-chip button {
   background: transparent; border: 0; color: inherit; cursor: pointer;
-  font-size: 12px; line-height: 1; padding: 2px 4px; border-radius: 999px;
+  font-size: 0.857rem; line-height: 1; padding: 2px 4px; border-radius: 999px;
 }
 .range-chip button:hover { background: color-mix(in srgb, var(--cyan) 25%, transparent); }
 .readout b { color: var(--text); }
@@ -268,7 +277,7 @@ select {
 .tab {
   background: transparent; color: var(--muted);
   border: none; border-bottom: 2px solid transparent;
-  padding: 8px 14px; font-size: 14px; cursor: pointer;
+  padding: 8px 14px; font-size: 1rem; cursor: pointer;
   font-family: var(--font-ui);
   /* Una scheda non si lascia comprimere in una colonna di lettere: o ci sta,
      o la fila scorre. */
@@ -285,7 +294,7 @@ select {
 .tab-group::before {
   content: attr(data-label);
   position: absolute; top: 0; left: 14px;
-  font-size: 10px; letter-spacing: .06em; text-transform: uppercase;
+  font-size: 0.857rem; letter-spacing: .06em; text-transform: uppercase;
   color: var(--muted); white-space: nowrap;
 }
 .tab-group + .tab-group::before { left: 22px; }
@@ -305,7 +314,7 @@ main { padding: 16px var(--gut); display: grid; gap: 18px; }
 /* Sticky: scorrendo un debrief lungo la mappa resta dov'è. `top` sotto le
    schede, che non sono sticky, quindi basta un filo d'aria. */
 .rail {
-  flex: 0 0 220px; position: sticky; top: 8px;
+  flex: 0 0 15.714rem; position: sticky; top: 8px;
   padding: 16px 0 24px; align-self: flex-start;
 }
 /* Sulle quattro schede che stanno SOPRA il giro (Sessione, Passo gara,
@@ -314,8 +323,8 @@ main { padding: 16px var(--gut); display: grid; gap: 18px; }
 body:not(.railed) .rail { display: none; }
 
 .rail-map { position: relative; }
-.rail-map canvas { width: 100%; height: 150px; cursor: crosshair; display: block; }
-.rail-nomap { font-size: 11px; color: var(--muted); line-height: 1.5; padding: 8px 0; }
+.rail-map canvas { width: 100%; height: 10.714rem; cursor: crosshair; display: block; }
+.rail-nomap { font-size: 0.857rem; color: var(--muted); line-height: 1.5; padding: 8px 0; }
 
 /* Con 16-20 curve la lista supera l'altezza dello schermo, e `.rail` è
    `position: sticky` — non `fixed`: senza un proprio scorrimento le ultime
@@ -324,22 +333,22 @@ body:not(.railed) .rail { display: none; }
    il "dove sono" non sparisce mai dallo schermo. */
 .rail-list {
   display: flex; flex-direction: column; gap: 2px; margin-top: 10px;
-  max-height: calc(100vh - 220px); overflow-y: auto;
+  max-height: calc(100vh - 15.714rem); overflow-y: auto;
 }
 .rail-row {
-  display: grid; grid-template-columns: 26px 1fr auto;
+  display: grid; grid-template-columns: 1.857rem 1fr auto;
   align-items: center; gap: 2px 6px;
   background: transparent; border: 0; border-radius: 8px;
   padding: 5px 6px; text-align: left; cursor: pointer;
-  color: var(--muted); font-family: var(--font-ui); font-size: 12px;
+  color: var(--muted); font-family: var(--font-ui); font-size: 0.857rem;
 }
 .rail-row:hover { background: var(--panel); color: var(--text); }
 .rail-row.on { background: var(--inset); color: var(--text); }
 .rail-row.whole { grid-template-columns: 1fr; font-weight: 600; margin-bottom: 4px; }
-.rail-row.cold { grid-template-columns: 26px 1fr; }
-.rail-row .n { grid-column: 1; grid-row: 1; font-family: var(--font-mono); font-size: 11px; opacity: .7; }
+.rail-row.cold { grid-template-columns: 1.857rem 1fr; }
+.rail-row .n { grid-column: 1; grid-row: 1; font-family: var(--font-mono); font-size: 0.857rem; opacity: .7; }
 .rail-row .nm { grid-column: 2; grid-row: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.rail-row .s { grid-column: 3; grid-row: 1; font-family: var(--font-mono); font-size: 11px; }
+.rail-row .s { grid-column: 3; grid-row: 1; font-family: var(--font-mono); font-size: 0.857rem; }
 /* La barra a piena riga (~200px), non più in una colonna da 34px: lì un
    rapporto 20:1 fra la curva peggiore e la più piccola perdita visibile
    finiva tutto sotto gli 8px e il confronto spariva — misurato su un giro
@@ -347,12 +356,12 @@ body:not(.railed) .rail { display: none; }
    stare: l'onestà è nella larghezza disponibile, non in una formula che
    comprime i numeri piccoli verso i grandi. */
 .rail-row .bar {
-  grid-column: 1 / -1; grid-row: 2; height: 6px; margin-top: 2px;
+  grid-column: 1 / -1; grid-row: 2; height: 0.429rem; margin-top: 2px;
   background: var(--inset); border-radius: 999px; overflow: hidden;
 }
 .rail-row .fill { display: block; height: 100%; border-radius: 999px; }
 .rail-sep {
-  font-size: 10px; text-transform: uppercase; letter-spacing: .06em;
+  font-size: 0.857rem; text-transform: uppercase; letter-spacing: .06em;
   color: var(--muted); opacity: .7; padding: 10px 6px 4px;
   border-top: 1px solid var(--line); margin-top: 6px;
 }
@@ -382,7 +391,7 @@ body:not(.railed) .rail { display: none; }
    spazio in cui scorrere dentro la propria area. */
 .cmp-shell {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(320px, 38%);
+  grid-template-columns: minmax(0, 1fr) minmax(22.857rem, 38%);
   gap: 20px;
   align-items: start;
 }
@@ -425,24 +434,24 @@ body:not(.railed) .rail { display: none; }
    quindi non condividono il mirino e non lo fingono. */
 #c-stint, #c-progress, #c-tyre-temp, #c-tyre-press,
 #c-dtyre-temp, #c-dtyre-press { cursor: default; }
-.chart canvas.tall { height: 240px; }
-.chart.map canvas { height: 60vh; min-height: 380px; }
+.chart canvas.tall { height: 17.143rem; }
+.chart.map canvas { height: 60vh; min-height: 27.143rem; }
 /* G-G scatter: taller and capped in width so it reads as a square-ish plot;
    drawGG scales the friction circle by min(w,h) so it stays circular anyway. */
-.chart.gg canvas { height: 340px; max-width: 440px; margin: 0 auto; }
+.chart.gg canvas { height: 24.286rem; max-width: 31.429rem; margin: 0 auto; }
 /* Balance ribbon: a moderate track map (smaller than the one beside Compare). */
-.chart.ribbon canvas { height: 44vh; min-height: 300px; cursor: crosshair; }
+.chart.ribbon canvas { height: 44vh; min-height: 21.429rem; cursor: crosshair; }
 
 /* Corner-consistency rows: a corner label, a spread bar, and the numbers. */
-.cons-row { display: grid; grid-template-columns: 120px 1fr auto; align-items: center;
+.cons-row { display: grid; grid-template-columns: 8.571rem 1fr auto; align-items: center;
   gap: 12px; padding: 7px 12px; margin: 6px 0; background: var(--panel);
   border: 1px solid var(--line); border-radius: 10px; }
 .cons-row .corner { font-weight: 600; }
-.cons-track { position: relative; height: 10px; background: var(--inset);
+.cons-track { position: relative; height: 0.714rem; background: var(--inset);
   border-radius: 999px; overflow: hidden; }
 .cons-fill { position: absolute; top: 0; left: 0; height: 100%; border-radius: 999px;
   background: linear-gradient(90deg, var(--green), var(--amber) 60%, var(--red)); }
-.cons-nums { font-family: var(--font-mono); font-size: 12px; color: var(--muted); white-space: nowrap; }
+.cons-nums { font-family: var(--font-mono); font-size: 0.857rem; color: var(--muted); white-space: nowrap; }
 .cons-nums b { color: var(--fg); }
 /* On a phone the third column can't shrink (`auto` + `nowrap`) and pushed the
    whole page sideways — 39px of horizontal scroll on Trends, 17 on Compare.
@@ -456,16 +465,16 @@ body:not(.railed) .rail { display: none; }
 
 /* Curva per sessione: stessa griglia della costanza per curva, perché è la
    stessa domanda letta nel tempo invece che fra i giri. */
-.ses-row { display: grid; grid-template-columns: 130px 1fr auto; align-items: center;
+.ses-row { display: grid; grid-template-columns: 9.286rem 1fr auto; align-items: center;
   gap: 12px; padding: 5px 12px; }
-.ses-when { font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
-.ses-track { position: relative; height: 10px; background: var(--inset);
+.ses-when { font-family: var(--font-mono); font-size: 0.857rem; color: var(--muted); }
+.ses-track { position: relative; height: 0.714rem; background: var(--inset);
   border-radius: 999px; overflow: hidden; }
 .ses-fill { position: absolute; top: 0; left: 0; height: 100%; border-radius: 999px;
   background: var(--amber); }
-.ses-nums { font-family: var(--font-mono); font-size: 12px; color: var(--muted);
+.ses-nums { font-family: var(--font-mono); font-size: 0.857rem; color: var(--muted);
   white-space: nowrap; }
-.ses-verdict { font-size: 12px; }
+.ses-verdict { font-size: 0.857rem; }
 .ses-verdict.better { color: var(--green); }
 .ses-verdict.worse { color: var(--red); }
 
@@ -481,23 +490,23 @@ body:not(.railed) .rail { display: none; }
   background: var(--panel); border: 1px solid var(--line);
   border-left: 4px solid var(--amber); border-radius: 12px;
 }
-.recur .count { font-weight: 700; min-width: 70px; color: var(--amber); font-family: var(--font-mono); }
-.recur .where { color: var(--muted); font-size: 12px; }
-.chart h3 { margin: 0 0 6px; font-size: 13px; font-weight: 600; }
+.recur .count { font-weight: 700; min-width: 5rem; color: var(--amber); font-family: var(--font-mono); }
+.recur .where { color: var(--muted); font-size: 0.857rem; }
+.chart h3 { margin: 0 0 6px; font-size: 0.929rem; font-weight: 600; }
 .chart h3 small { color: var(--muted); font-weight: 400; }
-.chart canvas { width: 100%; height: 150px; display: block; background: var(--inset); border: 1px solid var(--line); border-radius: 12px; }
+.chart canvas { width: 100%; height: 10.714rem; display: block; background: var(--inset); border: 1px solid var(--line); border-radius: 12px; }
 
 /* Tyres over time (Trends): two small line charts + wheel legend + drift. */
 .tyres .tyre-legend {
   display: flex; flex-wrap: wrap; gap: 6px 18px;
-  margin: 2px 0 10px; color: var(--muted); font-size: 12px;
+  margin: 2px 0 10px; color: var(--muted); font-size: 0.857rem;
 }
 .tyres .tl { display: inline-flex; align-items: center; gap: 7px; }
-.tyres .sw { width: 18px; height: 0; display: inline-block; }
+.tyres .sw { width: 1.286rem; height: 0; display: inline-block; }
 .tyre-charts { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
-.tyres .chart h4 { margin: 0 0 6px; font-size: 12px; font-weight: 600; color: var(--muted); }
+.tyres .chart h4 { margin: 0 0 6px; font-size: 0.857rem; font-weight: 600; color: var(--muted); }
 .tyres canvas { cursor: default; }
-.tyre-drift { margin-top: 10px; font-size: 12px; color: var(--text); font-variant-numeric: tabular-nums; }
+.tyre-drift { margin-top: 10px; font-size: 0.857rem; color: var(--text); font-variant-numeric: tabular-nums; }
 .tyre-drift .muted { color: var(--muted); }
 @media (max-width: 720px) { .tyre-charts { grid-template-columns: 1fr; } }
 
@@ -509,7 +518,7 @@ body:not(.railed) .rail { display: none; }
    lose the fight and the legend would stay on screen. */
 .map-legend:not(.hidden) {
   display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px;
-  margin-top: 8px; color: var(--muted); font-size: 12px;
+  margin-top: 8px; color: var(--muted); font-size: 0.857rem;
 }
 /* `:not(.hidden)` is not decoration. Two classes beat one, so this rule outranks
    `.hidden { display: none }` and every legend entry meant to appear only
@@ -542,7 +551,7 @@ body:not(.railed) .rail { display: none; }
 .vmin-table td.ref input.mark-in {
   background: var(--inset); color: var(--text);
   border: 1px solid var(--cyan); border-radius: 6px;
-  padding: 3px 7px; font: inherit; width: 60%; min-width: 140px;
+  padding: 3px 7px; font: inherit; width: 60%; min-width: 10rem;
 }
 .vmin-table td.ref .chip { margin-left: 6px; }
 
@@ -550,12 +559,12 @@ body:not(.railed) .rail { display: none; }
 /* Min speed per corner table (Compare view) */
 .vmin { padding: 8px var(--gut) 0; }
 .vmin:empty { display: none; }
-.vmin h3 { font-size: 13px; margin: 0 0 8px; }
-.vmin h3 small { color: var(--muted); font-weight: 400; font-size: 11px; }
-.vmin-table { border-collapse: collapse; width: 100%; max-width: 520px; }
+.vmin h3 { font-size: 0.929rem; margin: 0 0 8px; }
+.vmin h3 small { color: var(--muted); font-weight: 400; font-size: 0.857rem; }
+.vmin-table { border-collapse: collapse; width: 100%; max-width: 37.143rem; }
 .vmin-table th, .vmin-table td { text-align: right; padding: 6px 14px; border-bottom: 1px solid var(--line); }
 .vmin-table th {
-  color: var(--muted); font-size: 11px; font-weight: 600;
+  color: var(--muted); font-size: 0.857rem; font-weight: 600;
   text-transform: uppercase; letter-spacing: .04em;
 }
 .vmin-table th:first-child, .vmin-table td.vc { text-align: left; }
@@ -566,13 +575,13 @@ body:not(.railed) .rail { display: none; }
 .vmin-table td.vn.slower { color: var(--red); }
 
 .debrief { padding: 8px var(--gut) 32px; }
-.debrief h3 { font-size: 13px; }
-.debrief h3 small { color: var(--muted); font-weight: 400; font-size: 11px; }
+.debrief h3 { font-size: 0.929rem; }
+.debrief h3 small { color: var(--muted); font-weight: 400; font-size: 0.857rem; }
 
 /* Benchmark ladder (Andamento → Livelli) */
 .levels { padding: 8px var(--gut) 0; }
-.levels h3 { font-size: 13px; margin: 0 0 8px; }
-.levels h3 small { color: var(--muted); font-weight: 400; font-size: 11px; }
+.levels h3 { font-size: 0.929rem; margin: 0 0 8px; }
+.levels h3 small { color: var(--muted); font-weight: 400; font-size: 0.857rem; }
 .ladder { display: flex; flex-direction: column; gap: 8px; }
 .lvl {
   display: flex; align-items: baseline; gap: 14px;
@@ -583,13 +592,13 @@ body:not(.railed) .rail { display: none; }
 .lvl[data-key="best"] { border-left-color: var(--cyan); }
 .lvl[data-key="ideal"] { border-left-color: var(--amber); }
 .lvl[data-key="pro"] { border-left-color: var(--green); }
-.lvl .lvl-label { min-width: 160px; font-weight: 600; }
-.lvl .lvl-time { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 16px; min-width: 96px; }
+.lvl .lvl-label { min-width: 11.429rem; font-weight: 600; }
+.lvl .lvl-time { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 1.143rem; min-width: 6.857rem; }
 .lvl .lvl-gap { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-weight: 700; }
 .lvl .lvl-gap.faster { color: var(--green); }
 .lvl .lvl-gap.done { color: var(--cyan); }
 .lvl .lvl-gap.base { color: var(--muted); font-weight: 400; }
-.lvl .lvl-hint { color: var(--muted); font-size: 12px; }
+.lvl .lvl-hint { color: var(--muted); font-size: 0.857rem; }
 
 /* Per-corner weaknesses (Andamento → Punti deboli) */
 .weak {
@@ -600,11 +609,11 @@ body:not(.railed) .rail { display: none; }
 }
 .weak.sys { border-left-color: var(--amber); }
 .weak-head { display: flex; align-items: baseline; gap: 12px; }
-.weak .corner { font-weight: 700; font-size: 15px; }
+.weak .corner { font-weight: 700; font-size: 1.071rem; }
 .weak .lost { margin-left: auto; color: var(--red); font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
-.weak .detail { color: var(--muted); font-size: 12px; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.weak .detail { color: var(--muted); font-size: 0.857rem; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 .wk-badge {
-  font-size: 11px; font-weight: 700; padding: 1px 8px; border-radius: 999px;
+  font-size: 0.857rem; font-weight: 700; padding: 1px 8px; border-radius: 999px;
   border: 1px solid var(--line);
 }
 .wk-badge.on { color: var(--amber); border-color: var(--amber); background: #241a08; }
@@ -612,7 +621,7 @@ body:not(.railed) .rail { display: none; }
 
 .legend {
   display: flex; flex-wrap: wrap; gap: 6px 14px;
-  margin: 4px 0 12px; color: var(--muted); font-size: 12px;
+  margin: 4px 0 12px; color: var(--muted); font-size: 0.857rem;
 }
 .legend span b { color: var(--cyan); margin-right: 4px; }
 
@@ -627,18 +636,18 @@ body:not(.railed) .rail { display: none; }
    observation rather than as the worst corner of the list. */
 .loss.note { border-left-color: var(--cyan); }
 .loss-head { display: flex; align-items: baseline; gap: 12px; }
-.loss .corner { font-weight: 700; font-size: 15px; }
+.loss .corner { font-weight: 700; font-size: 1.071rem; }
 .loss .lost { color: var(--red); font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 .loss .cause { color: var(--text); font-weight: 600; }
-.loss .detail { color: var(--muted); font-size: 12px; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
-.loss .fix { color: var(--cyan); font-size: 13px; margin-top: 2px; }
+.loss .detail { color: var(--muted); font-size: 0.857rem; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.loss .fix { color: var(--cyan); font-size: 0.929rem; margin-top: 2px; }
 .clean { color: var(--green); padding: 10px 0; }
 /* The lap-wide theme: reframes the debrief, so it reads as a heading, not a row.
    Cyan left edge like the notes, but bigger and above them. */
 .debrief .headline {
   border-left: 3px solid var(--cyan);
   padding: 8px 12px; margin: 8px 0 12px;
-  font-size: 14px; font-weight: 600; line-height: 1.4;
+  font-size: 1rem; font-weight: 600; line-height: 1.4;
   background: color-mix(in srgb, var(--cyan) 8%, transparent);
 }
 
@@ -679,34 +688,34 @@ body.no-data main, body.no-data .summary, body.no-data .debrief,
 body.no-data nav.tabs, body.no-data #lapbar, body.no-data header .controls,
 body.no-data #view-flow { display: none; }
 body.no-data .empty { display: block; }
-.empty-title { font-size: 22px; color: var(--text); margin: 0 0 16px; }
-.empty-steps { display: inline-block; text-align: left; margin: 0 auto; padding-left: 22px; line-height: 1.9; max-width: 560px; }
+.empty-title { font-size: 1.571rem; color: var(--text); margin: 0 0 16px; }
+.empty-steps { display: inline-block; text-align: left; margin: 0 auto; padding-left: 22px; line-height: 1.9; max-width: 40rem; }
 .empty-steps b { color: var(--text); }
-.empty-hint { margin-top: 18px; font-size: 13px; }
+.empty-hint { margin-top: 18px; font-size: 0.929rem; }
 .empty code {
-  font-family: var(--font-mono); font-size: 12px; color: var(--cyan);
+  font-family: var(--font-mono); font-size: 0.857rem; color: var(--cyan);
   background: var(--panel); border: 1px solid var(--line);
   padding: 1px 6px; border-radius: 4px;
 }
 
 /* --- sectors view --- */
 .sec-head {
-  display: grid; grid-template-columns: 70px 200px 1fr; gap: 14px;
-  padding: 10px var(--gut) 4px; color: var(--muted); font-size: 11px;
+  display: grid; grid-template-columns: 5rem 14.286rem 1fr; gap: 14px;
+  padding: 10px var(--gut) 4px; color: var(--muted); font-size: 0.857rem;
   text-transform: uppercase; letter-spacing: .04em;
 }
 .sec-head small { text-transform: none; letter-spacing: 0; }
 .sectors { padding: 4px var(--gut); }
 .secrow {
-  display: grid; grid-template-columns: 70px 200px 1fr; gap: 14px;
+  display: grid; grid-template-columns: 5rem 14.286rem 1fr; gap: 14px;
   align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line);
 }
-.seclabel { font-weight: 700; font-size: 15px; }
+.seclabel { font-weight: 700; font-size: 1.071rem; }
 .seclabel .star { color: var(--amber); }
 .sectimes { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
-.sectimes .muted { color: var(--muted); font-size: 12px; }
+.sectimes .muted { color: var(--muted); font-size: 0.857rem; }
 .secbar {
-  position: relative; height: 22px; background: var(--inset);
+  position: relative; height: 1.571rem; background: var(--inset);
   border: 1px solid var(--line); border-radius: 6px;
 }
 .secbar .mid { position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: rgba(255,255,255,0.25); }
@@ -722,18 +731,18 @@ body.no-data .empty { display: block; }
    dell'asse y nei grafici. */
 .secbar .secd {
   position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
-  font-size: 12px; font-family: var(--font-mono); font-variant-numeric: tabular-nums;
+  font-size: 0.857rem; font-family: var(--font-mono); font-variant-numeric: tabular-nums;
   background: color-mix(in srgb, var(--bg) 82%, transparent);
   padding: 1px 5px; border-radius: 4px;
 }
 .secbar .secd.slower { color: var(--red); }
 .secbar .secd.faster { color: var(--green); }
 .ideal { padding: 16px var(--gut) 32px; }
-.ideal h3 { font-size: 13px; margin: 0 0 6px; }
-.ideal-time { font-size: 22px; font-weight: 700; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
-.ideal-time .faster { color: var(--green); font-size: 14px; font-weight: 600; margin-left: 8px; }
-.ideal-from { color: var(--muted); font-size: 13px; margin: 6px 0; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
-.ideal .small { font-size: 11px; }
+.ideal h3 { font-size: 0.929rem; margin: 0 0 6px; }
+.ideal-time { font-size: 1.571rem; font-weight: 700; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.ideal-time .faster { color: var(--green); font-size: 1rem; font-weight: 600; margin-left: 8px; }
+.ideal-from { color: var(--muted); font-size: 0.929rem; margin: 6px 0; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.ideal .small { font-size: 0.857rem; }
 .faster { color: var(--green); }
 
 /* Graded delta legend (track map) — a continuous green→pale→red bar that
@@ -741,7 +750,7 @@ body.no-data .empty { display: block; }
 .map-grad { display: flex; align-items: center; gap: 8px 14px; flex-wrap: wrap; }
 .map-grad .scale { display: inline-flex; align-items: center; gap: 8px; }
 .map-grad .grad {
-  width: 150px; height: 8px; border-radius: 999px;
+  width: 10.714rem; height: 0.571rem; border-radius: 999px;
   background: linear-gradient(90deg, var(--green) 0%, #E6E0E4 50%, var(--red) 100%);
 }
 .map-grad .cap.fast { color: var(--green); }
@@ -764,18 +773,18 @@ body.no-data .empty { display: block; }
 }
 
 @media (max-width: 520px) {
-  h1 { font-size: 18px; }
+  h1 { font-size: 1.286rem; }
   .summary, .lapbar, .readout, main, .tabs, .vmin, .debrief, .levels,
   .sectors, .sec-head, .ideal, #map-readout { padding-left: 12px; padding-right: 12px; }
   .tabs { gap: 0; overflow-x: auto; -webkit-overflow-scrolling: touch; }
   .tab { padding: 8px 12px; white-space: nowrap; }
   .summary { gap: 12px 18px; }
-  .chart.map canvas { height: 56vh; min-height: 300px; }
+  .chart.map canvas { height: 56vh; min-height: 21.429rem; }
   /* sector rows: drop the bar onto its own line so the label+times stay legible */
-  .sec-head { grid-template-columns: 56px 1fr; }
+  .sec-head { grid-template-columns: 4rem 1fr; }
   .sec-head span:last-child { display: none; }
   .secrow {
-    grid-template-columns: 56px 1fr;
+    grid-template-columns: 4rem 1fr;
     grid-template-areas: "label times" "bar bar";
     row-gap: 8px; column-gap: 12px;
   }
@@ -785,7 +794,7 @@ body.no-data .empty { display: block; }
   /* benchmark ladder: wrap instead of overflowing on a phone */
   .lvl { flex-wrap: wrap; }
   .lvl .lvl-label { min-width: 0; }
-  .map-grad .grad { width: 120px; }
+  .map-grad .grad { width: 8.571rem; }
 }
 
 /* --- The line you drove ---------------------------------------------------
@@ -799,7 +808,7 @@ body.no-data .empty { display: block; }
 .chip {
   background: var(--inset); color: var(--muted);
   border: 1px solid var(--line); border-radius: 999px;
-  padding: 5px 13px; font-size: 12px; font-family: var(--font-mono);
+  padding: 5px 13px; font-size: 0.857rem; font-family: var(--font-mono);
   cursor: pointer; line-height: 1;
 }
 .chip:hover { border-color: var(--cyan); color: var(--text); }
@@ -814,12 +823,12 @@ body.no-data .empty { display: block; }
    JavaScript's `add("hidden")` mean what whoever reads it thinks it means, from
    any line of this file. */
 .line-grid:not(.hidden) {
-  display: grid; grid-template-columns: minmax(0, 1fr) 300px;
+  display: grid; grid-template-columns: minmax(0, 1fr) 21.429rem;
   gap: 18px; padding: 12px var(--gut) 0; align-items: start;
 }
-.chart.corner-map canvas { height: 46vh; min-height: 320px; }
-.chart.corner-map h3 { font-size: 15px; font-weight: 600; }
-.chart.corner-map h3 small { color: var(--muted); font-weight: 400; font-size: 12px; margin-left: 6px; }
+.chart.corner-map canvas { height: 46vh; min-height: 22.857rem; }
+.chart.corner-map h3 { font-size: 1.071rem; font-weight: 600; }
+.chart.corner-map h3 small { color: var(--muted); font-weight: 400; font-size: 0.857rem; margin-left: 6px; }
 /* Naming a corner. The pencil was hidden until the title was hovered, which
    looked tidy on screen and was wrong: this control is the only route onto the
    twelve circuits nobody could curate and the ten with no geometry at all, and
@@ -828,7 +837,7 @@ body.no-data .empty { display: block; }
 .chart.corner-map h3 { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .chart.corner-map h3 .rename {
   background: none; border: 0; color: var(--muted); cursor: pointer;
-  font-size: 13px; line-height: 1; padding: 2px 4px; opacity: .55;
+  font-size: 0.929rem; line-height: 1; padding: 2px 4px; opacity: .55;
   transition: opacity .12s ease, color .12s ease;
 }
 .chart.corner-map h3:hover .rename, .chart.corner-map h3 .rename:focus { opacity: 1; }
@@ -836,24 +845,24 @@ body.no-data .empty { display: block; }
 .chart.corner-map h3 #corner-name {
   background: var(--inset); color: var(--text);
   border: 1px solid var(--cyan); border-radius: 6px;
-  padding: 4px 8px; font-size: 14px; font-family: inherit;
+  padding: 4px 8px; font-size: 1rem; font-family: inherit;
   /* Bounded, not fluid: the field sits in a heading beside two buttons, and a
      100% width pushes them off the card in the narrow column. */
-  min-width: 0; flex: 1 1 auto; max-width: 320px;
+  min-width: 0; flex: 1 1 auto; max-width: 22.857rem;
 }
 /* Legend swatches that are lines, not squares: the difference between your line
    and the reference's IS the dash pattern, so the key has to show it. */
-.map-legend .sw-line { width: 20px; height: 0; border-top: 3px solid var(--cyan); display: inline-block; }
+.map-legend .sw-line { width: 1.429rem; height: 0; border-top: 3px solid var(--cyan); display: inline-block; }
 .map-legend .sw-line.ref { border-top: 2px dashed rgba(255,255,255,0.6); }
 .map-legend /* Legend swatch for the asphalt ribbon: the same dark fill and hairline the
    canvas draws, so the legend looks like the thing it names. */
 .sw-road {
-  display: inline-block; width: 18px; height: 10px; vertical-align: middle;
+  display: inline-block; width: 1.286rem; height: 0.714rem; vertical-align: middle;
   background: rgba(255,255,255,0.05);
   border-top: 1px solid rgba(255,255,255,0.32);
   border-bottom: 1px solid rgba(255,255,255,0.32);
 }
-.sw-band { width: 18px; height: 11px; display: inline-block;
+.sw-band { width: 1.286rem; height: 0.786rem; display: inline-block;
   background: rgba(255,176,32,0.28); border: 1px solid rgba(255,176,32,0.5); border-radius: 3px; }
 
 .facts {
@@ -862,7 +871,7 @@ body.no-data .empty { display: block; }
 }
 .facts .tagrow { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
 .ltag {
-  font-size: 11px; line-height: 1.5; padding: 3px 9px; border-radius: 999px;
+  font-size: 0.857rem; line-height: 1.5; padding: 3px 9px; border-radius: 999px;
   color: var(--amber); border: 1px solid var(--amber); background: #241a08;
 }
 .ltag.ok { color: var(--green); border-color: var(--green); background: transparent; }
@@ -871,10 +880,10 @@ body.no-data .empty { display: block; }
   padding: 7px 0; border-top: 1px solid var(--line); align-items: baseline;
 }
 .fact:first-of-type { border-top: 0; }
-.fact .fk { color: var(--muted); font-size: 12px; }
-.fact .fv { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 13px; }
-.fact .fv .muted { color: var(--muted); font-size: 12px; }
-.fact .fs { grid-column: 1 / -1; color: var(--muted); font-size: 11px; }
+.fact .fk { color: var(--muted); font-size: 0.857rem; }
+.fact .fv { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 0.929rem; }
+.fact .fv .muted { color: var(--muted); font-size: 0.857rem; }
+.fact .fs { grid-column: 1 / -1; color: var(--muted); font-size: 0.857rem; }
 
 /* The corner table: same skin as the min-speed table, wider and clickable. */
 .vmin-table.wide { max-width: none; }
@@ -895,7 +904,7 @@ body.no-data .empty { display: block; }
 .mini-btn {
   background: var(--inset); color: var(--muted);
   border: 1px solid var(--line); border-radius: 7px;
-  padding: 3px 9px; font-size: 11px; cursor: pointer; margin-left: 10px;
+  padding: 3px 9px; font-size: 0.857rem; cursor: pointer; margin-left: 10px;
   font-family: var(--font-ui);
 }
 .mini-btn:hover { border-color: var(--cyan); color: var(--cyan); }
@@ -905,20 +914,20 @@ body.no-data .empty { display: block; }
    (reading the report on a tablet next to the wheel is a documented use). */
 @media (max-width: 900px) {
   .line-grid { grid-template-columns: 1fr; }
-  .chart.corner-map canvas { height: 40vh; min-height: 260px; }
+  .chart.corner-map canvas { height: 40vh; min-height: 18.571rem; }
 }
 @media (max-width: 700px) {
   .chips { padding-left: 16px; padding-right: 16px; }
   .line-grid { padding-left: 16px; padding-right: 16px; }
   #line-table, #brakesheet { overflow-x: auto; }
-  #line-table .vmin-table, #brakesheet .vmin-table { min-width: 560px; }
+  #line-table .vmin-table, #brakesheet .vmin-table { min-width: 40rem; }
 }
 
 /* --- The lap explained, one step at a time -------------------------------
    Deliberately narrow and roomy: this view competes with five dashboards for
    the same screen, and its only advantage is that it asks for one thing at a
    time. Filling the width would give that away. */
-.flow-shell { max-width: 780px; margin: 0 auto; padding: 8px 0 40px; }
+.flow-shell { max-width: 55.714rem; margin: 0 auto; padding: 8px 0 40px; }
 
 /* Wide screens: the sentence and the evidence side by side.
    Measured before this existed — the landing view used 627px of a 1271px
@@ -937,13 +946,13 @@ body.no-data .empty { display: block; }
      `display: grid` outranks `.hidden { display: none }`, and the landing view
      stayed on screen under every other tab. */
   #view-flow:not(.hidden) {
-    min-height: calc(100vh - 190px); display: grid; align-content: center;
+    min-height: calc(100vh - 13.571rem); display: grid; align-content: center;
   }
   .flow-shell {
     max-width: none;
     padding: 8px var(--gut) 40px;
     display: grid;
-    grid-template-columns: minmax(420px, 580px) minmax(0, 1fr);
+    grid-template-columns: minmax(30rem, 41.429rem) minmax(0, 1fr);
     /* The chart spans both content rows so the buttons sit under the card they
        belong to, instead of stranded below a column of empty space. */
     grid-template-areas: "head head" "card chart" "map  chart" "nav  chart";
@@ -956,19 +965,19 @@ body.no-data .empty { display: block; }
   .flow-chart { grid-area: chart; margin-bottom: 0; }
   .flow-map { grid-area: map; margin-top: 18px; }
   .flow-nav { grid-area: nav; margin-top: 20px; }
-  .flow-chart canvas { height: clamp(300px, 36vh, 440px); }
+  .flow-chart canvas { height: clamp(21.429rem, 36vh, 31.429rem); }
 }
 .flow-head {
   display: flex; align-items: center; justify-content: space-between;
   margin-bottom: 14px;
 }
 .flow-count {
-  color: var(--muted); font-size: 11px; letter-spacing: .12em;
+  color: var(--muted); font-size: 0.857rem; letter-spacing: .12em;
   text-transform: uppercase; font-family: var(--font-display);
 }
 .flow-dots { display: flex; gap: 7px; }
 .flow-dots .dot {
-  width: 7px; height: 7px; border-radius: 50%;
+  width: 0.5rem; height: 0.5rem; border-radius: 50%;
   background: var(--line); transition: background .15s;
 }
 .flow-dots .dot.on { background: var(--cyan); }
@@ -979,45 +988,45 @@ body.no-data .empty { display: block; }
   padding: 20px 22px; margin-bottom: 18px;
 }
 .flow-where {
-  display: inline-block; font-family: var(--font-display); font-size: 11px;
+  display: inline-block; font-family: var(--font-display); font-size: 0.857rem;
   letter-spacing: .1em; text-transform: uppercase; color: var(--cyan);
   border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px;
   margin-bottom: 10px;
 }
-.flow-cost { margin: 0 0 6px; color: var(--red); font-size: 13px; }
+.flow-cost { margin: 0 0 6px; color: var(--red); font-size: 0.929rem; }
 .flow-title {
-  margin: 0 0 10px; font-family: var(--font-display); font-size: 23px;
+  margin: 0 0 10px; font-family: var(--font-display); font-size: 1.643rem;
   line-height: 1.25;
 }
-.flow-body { margin: 0 0 10px; font-size: 15px; line-height: 1.6; }
+.flow-body { margin: 0 0 10px; font-size: 1.071rem; line-height: 1.6; }
 /* The figures behind the claim: present, checkable, and not competing with it. */
 .flow-detail {
-  margin: 0; color: var(--muted); font-size: 13px; line-height: 1.6;
+  margin: 0; color: var(--muted); font-size: 0.929rem; line-height: 1.6;
   font-variant-numeric: tabular-nums;
 }
 .flow-fix {
   margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line);
-  font-size: 15px; line-height: 1.55;
+  font-size: 1.071rem; line-height: 1.55;
 }
 .flow-fix .tag {
-  display: block; font-family: var(--font-display); font-size: 11px;
+  display: block; font-family: var(--font-display); font-size: 0.857rem;
   letter-spacing: .1em; text-transform: uppercase; color: var(--amber);
   margin-bottom: 5px;
 }
 .flow-empty { color: var(--muted); margin: 0; }
 
 .flow-chart { margin-bottom: 18px; }
-.flow-chart h3, .flow-map h3 { color: var(--muted); font-size: 12px; font-weight: 400; }
+.flow-chart h3, .flow-map h3 { color: var(--muted); font-size: 0.857rem; font-weight: 400; }
 /* The map beside the step. Taller than a trace because a track is a shape, and
    proportional to the window so it doesn't crowd the card it sits under. */
 .flow-map { margin-bottom: 18px; }
-.flow-map canvas { height: clamp(200px, 26vh, 320px); }
+.flow-map canvas { height: clamp(14.286rem, 26vh, 22.857rem); }
 
 .flow-nav { display: flex; gap: 10px; align-items: center; }
 .flow-btn {
   background: var(--inset); color: var(--text); border: 1px solid var(--line);
   border-radius: 7px; padding: 9px 16px; cursor: pointer;
-  font-family: var(--font-ui); font-size: 14px;
+  font-family: var(--font-ui); font-size: 1rem;
 }
 .flow-btn:hover:not(:disabled) { border-color: var(--cyan); color: var(--cyan); }
 .flow-btn:disabled { opacity: .35; cursor: default; }
@@ -1038,7 +1047,7 @@ body.no-data .empty { display: block; }
    gutter di pagina vero (sopra), e lo azzererebbe anche qui per eredità: senza
    questa riga il testo di Sessione e Passo gara si allarga di 48px, perché
    quei figli restano senza inset locale. */
-.session-shell { max-width: 900px; margin: 0 auto; padding: 8px 0 40px; --gut: 24px; }
+.session-shell { max-width: 64.286rem; margin: 0 auto; padding: 8px 0 40px; --gut: 24px; }
 
 /* Same move as the flow view: on a wide screen the laps you drove and what
    changed since last time are read together, not one under the other. */
@@ -1047,7 +1056,7 @@ body.no-data .empty { display: block; }
     max-width: none;
     padding: 8px var(--gut) 40px;
     display: grid;
-    grid-template-columns: minmax(360px, 1fr) minmax(360px, 1.1fr);
+    grid-template-columns: minmax(25.714rem, 1fr) minmax(25.714rem, 1.1fr);
     grid-template-areas: "head head" "nums nums" "laps changed";
     column-gap: 34px;
     align-items: start;
@@ -1084,36 +1093,36 @@ body.no-data .empty { display: block; }
   gap: 16px; flex-wrap: wrap; margin-bottom: 18px;
 }
 .session-when {
-  margin: 0; font-family: var(--font-display); font-size: 24px; font-weight: 600;
+  margin: 0; font-family: var(--font-display); font-size: 1.714rem; font-weight: 600;
 }
-.session-sub { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
-.session-pick { color: var(--muted); font-size: 12px; display: grid; gap: 4px; }
+.session-sub { margin: 4px 0 0; color: var(--muted); font-size: 0.929rem; }
+.session-pick { color: var(--muted); font-size: 0.857rem; display: grid; gap: 4px; }
 
 /* The laps of the run, in the order driven. Bar length is the gap to the best,
    so the shape of the list is the shape of the evening. */
 .session-laps { margin-bottom: 28px; }
 .session-laps h3, .session-changed h3 {
-  margin: 0 0 10px; font-family: var(--font-display); font-size: 12px;
+  margin: 0 0 10px; font-family: var(--font-display); font-size: 0.857rem;
   letter-spacing: .1em; text-transform: uppercase; color: var(--muted);
   font-weight: 600;
 }
 .ses-lap {
-  display: grid; grid-template-columns: 84px minmax(60px, 1fr) auto;
+  display: grid; grid-template-columns: 6rem minmax(4.286rem, 1fr) auto;
   align-items: center; gap: 12px; width: 100%; text-align: left;
   background: transparent; border: 0; border-radius: 7px;
   padding: 7px 10px; cursor: pointer; color: var(--text);
-  font-family: var(--font-ui); font-size: 13px;
+  font-family: var(--font-ui); font-size: 0.929rem;
 }
 .ses-lap:hover { background: var(--panel); }
 .ses-lap .time { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 .ses-lap.is-best .time { color: var(--green); }
-.ses-lap .bar { display: block; height: 8px; background: var(--inset);
+.ses-lap .bar { display: block; height: 0.571rem; background: var(--inset);
                 border-radius: 4px; overflow: hidden; }
 .ses-lap .bar i { display: block; height: 100%; background: var(--line); }
 .ses-lap.is-best .bar i { background: var(--green); }
 .ses-lap .tags { display: flex; gap: 6px; }
 .ses-lap .tag {
-  font-size: 10px; letter-spacing: .06em; text-transform: uppercase;
+  font-size: 0.857rem; letter-spacing: .06em; text-transform: uppercase;
   border: 1px solid var(--line); border-radius: 999px; padding: 2px 8px;
   color: var(--muted); white-space: nowrap;
 }
@@ -1135,20 +1144,20 @@ body.no-data .empty { display: block; }
    so has to read like part of the answer. */
 .stint-notes { margin: 8px 0 28px; }
 .stint-notes h3 {
-  margin: 0 0 10px; font-size: 13px; font-weight: 600; color: var(--text);
+  margin: 0 0 10px; font-size: 0.929rem; font-weight: 600; color: var(--text);
 }
 .stint-notes .note {
   margin: 0 0 8px; padding: 10px 14px; border-left: 3px solid var(--line);
   background: var(--inset); border-radius: 0 6px 6px 0;
-  color: var(--muted); font-size: 13px; line-height: 1.55;
+  color: var(--muted); font-size: 0.929rem; line-height: 1.55;
 }
 .stint-notes .note b { color: var(--text); font-weight: 600; }
 
 .session-changed h4 {
-  margin: 16px 0 8px; font-size: 13px; font-weight: 600; color: var(--text);
+  margin: 16px 0 8px; font-size: 0.929rem; font-weight: 600; color: var(--text);
 }
 .move {
-  display: grid; grid-template-columns: 180px 72px 1fr; gap: 12px;
+  display: grid; grid-template-columns: 12.857rem 5.143rem 1fr; gap: 12px;
   align-items: baseline; padding: 6px 10px; border-radius: 6px;
 }
 .move + .move { border-top: 1px solid var(--line); }
@@ -1156,13 +1165,13 @@ body.no-data .empty { display: block; }
 .move .amount { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 .move.up .amount { color: var(--green); }
 .move.down .amount { color: var(--red); }
-.move .why { color: var(--muted); font-size: 13px; }
+.move .why { color: var(--muted); font-size: 0.929rem; }
 /* Restava a puntare `.empty`, che in un pannello non si vede mai: ora la regola
    è dentro `.nothing` e questa serve solo se una di quelle frasi cresce. */
 .session-changed .nothing, .session-shell .nothing { padding: 4px 0; }
 
 @media (max-width: 700px) {
-  .ses-lap { grid-template-columns: 76px 1fr; }
+  .ses-lap { grid-template-columns: 5.429rem 1fr; }
   .ses-lap .tags { grid-column: 1 / -1; }
   .move { grid-template-columns: 1fr auto; }
   .move .why { grid-column: 1 / -1; }
@@ -1170,7 +1179,7 @@ body.no-data .empty { display: block; }
 
 /* The gap magnifier sits with the corner chips but isn't one of them. */
 .chip-group { display: inline-flex; align-items: center; gap: 4px; margin-left: 14px; }
-.chip-label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+.chip-label { color: var(--muted); font-size: 0.857rem; text-transform: uppercase; letter-spacing: .04em; }
 .chip.mag { padding: 5px 9px; }
 
 /* La riga in cima a Confronto: solo il riepilogo. Divideva questo spazio con
@@ -1189,13 +1198,13 @@ body.no-data .empty { display: block; }
 /* --- Your braking points (under the track map) ---------------------------
    A sheet, not a chart: it is read at a glance before going out, and printed.
    The braking speed is the number you act on, so it is the big one. */
-.sheet-sub { color: var(--muted); font-size: 12px; margin: -4px 0 10px; }
+.sheet-sub { color: var(--muted); font-size: 0.857rem; margin: -4px 0 10px; }
 /* A sheet is read across, so it is capped: columns spread over 1600px of screen
    stop being a row and become a treasure hunt. */
-.sheet .vmin-table { max-width: 1080px; }
-.sheet-note { color: var(--muted); font-size: 12px; max-width: 70ch; margin-top: 12px; }
-.vmin-table td.vn.big { font-size: 16px; font-weight: 600; }
-.vmin-table td.vn.big .muted, .vmin-table td .muted { color: var(--muted); font-size: 12px; font-weight: 400; }
+.sheet .vmin-table { max-width: 77.143rem; }
+.sheet-note { color: var(--muted); font-size: 0.857rem; max-width: 70ch; margin-top: 12px; }
+.vmin-table td.vn.big { font-size: 1.143rem; font-weight: 600; }
+.vmin-table td.vn.big .muted, .vmin-table td .muted { color: var(--muted); font-size: 0.857rem; font-weight: 400; }
 .vmin-table td.ref { text-align: left; color: var(--cyan); }
 
 /* Print: the sheet and nothing else. The braking cheat sheet the community
@@ -1233,7 +1242,7 @@ body.no-data .empty { display: block; }
   .cmp-map { position: static; }
   .stage { display: block; }
   #brakesheet { padding: 0; }
-  #brakesheet h3 { font-size: 18px; }
+  #brakesheet h3 { font-size: 1.286rem; }
   .sheet-sub, .sheet-note, .vmin-table td .muted { color: #444; }
   .vmin-table td.ref { color: #000; }
   .vmin-table th, .vmin-table td { border-bottom: 1px solid #bbb; }
@@ -1242,11 +1251,11 @@ body.no-data .empty { display: block; }
 /* The corner before: when a loss was inherited, say so above the numbers — it
    changes which corner the driver goes and works on, so it can't sit under them. */
 .loss .chain {
-  color: var(--cyan); font-size: 13px; line-height: 1.45;
+  color: var(--cyan); font-size: 0.929rem; line-height: 1.45;
   border-left: 2px solid var(--cyan); padding-left: 9px; margin: 2px 0 2px;
 }
 .chain-chip {
-  margin-left: 8px; font-size: 11px; font-weight: 600; cursor: help;
+  margin-left: 8px; font-size: 0.857rem; font-weight: 600; cursor: help;
   color: var(--cyan); border: 1px solid var(--cyan); border-radius: 999px;
   padding: 1px 7px; white-space: nowrap;
   font-family: var(--font-mono);
@@ -1261,21 +1270,21 @@ body.no-data .empty { display: block; }
 /* La fascia del giro sopra la Pagella non dice niente (è una sessione, non un
    giro) e costava ~45 px fra il verdetto e il piano. */
 body.view-pagella #lapbar { display: none; }
-.pag-shell { max-width: 860px; margin: 0 auto; padding: 10px 24px 40px; font-size: 16px; line-height: 1.4; }
+.pag-shell { max-width: 61.429rem; margin: 0 auto; padding: 10px 24px 40px; font-size: 1.143rem; line-height: 1.4; }
 .pag-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-.pag-sub { margin: 0; color: var(--muted); font-size: 13px; }
-.pag-head .session-pick { font-size: 12px; }
+.pag-sub { margin: 0; color: var(--muted); font-size: 0.929rem; }
+.pag-head .session-pick { font-size: 0.857rem; }
 .pag-verdict {
   margin: 6px 0 2px; font-family: var(--font-display);
-  font-size: 19px; font-weight: 700; line-height: 1.35;
+  font-size: 1.357rem; font-weight: 700; line-height: 1.35;
 }
-.pag-ref { margin: 0; color: var(--muted); font-size: 13px; }
+.pag-ref { margin: 0; color: var(--muted); font-size: 0.929rem; }
 .pag-box {
   background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
   padding: 8px 16px; margin-top: 10px;
 }
 .pag-box h4 {
-  margin: 0 0 4px; font-size: 12px; font-weight: 600;
+  margin: 0 0 4px; font-size: 0.857rem; font-weight: 600;
   letter-spacing: .06em; text-transform: uppercase; color: var(--muted);
 }
 .pag-row {
@@ -1283,7 +1292,7 @@ body.view-pagella #lapbar { display: none; }
   padding: 6px 0; border-bottom: 1px solid var(--line);
 }
 .pag-box > .pag-row:last-child, .pag-box > .pag-defect:last-child > .pag-row { border-bottom: 0; }
-.pag-small { color: var(--muted); font-size: 13px; }
+.pag-small { color: var(--muted); font-size: 0.929rem; }
 /* Dentro <summary> solo span: il blocco lo dà il CSS. */
 .pag-name, .pag-name .pag-small { display: block; }
 .pag-shell .num { font-family: var(--font-mono); font-weight: 700; font-variant-numeric: tabular-nums; }
@@ -1298,14 +1307,14 @@ body.view-pagella #lapbar { display: none; }
   list-style: none; margin: 0; padding: 2px 0 8px 16px;
   border-bottom: 1px solid var(--line);
 }
-.pag-corners li { display: flex; justify-content: space-between; gap: 12px; padding: 2px 0; font-size: 14px; color: var(--muted); }
+.pag-corners li { display: flex; justify-content: space-between; gap: 12px; padding: 2px 0; font-size: 1rem; color: var(--muted); }
 /* Il mini-andamento: una barra per sessione, la più vecchia a sinistra; la
    barra di oggi prende il colore della freccia. Una barra fuori scala (un
    fuori scala isolato, vedi sparkBars) resta a piena altezza con un taglio
    obliquo, il segno che è più alta di quanto si vede. */
 /* Alta quanto SPARK_H in app.js. */
 .pag-spark { display: inline-flex; gap: 3px; align-items: flex-end; height: 26px; margin-left: 10px; }
-.pag-spark i { display: block; width: 7px; background: var(--muted); border-radius: 1px; position: relative; }
+.pag-spark i { display: block; width: 0.5rem; background: var(--muted); border-radius: 1px; position: relative; }
 .pag-spark i.down { background: var(--green); }
 .pag-spark i.same { background: var(--amber); }
 .pag-spark i.up { background: var(--red); }
@@ -1318,7 +1327,7 @@ body.view-pagella #lapbar { display: none; }
    lo spazio, fino a venti. Le date stanno in una riga sotto, nella stessa
    colonna e con lo stesso passo: ogni data sotto la sua barra. */
 .dh-row {
-  display: grid; grid-template-columns: minmax(130px, 220px) minmax(0, 1fr) 170px;
+  display: grid; grid-template-columns: minmax(9.286rem, 15.714rem) minmax(0, 1fr) 12.143rem;
   gap: 12px; align-items: end; padding: 6px 0; border-bottom: 1px solid var(--line);
 }
 .dh-row.dh-foot { border-bottom: 0; align-items: start; padding-top: 2px; }
@@ -1330,11 +1339,11 @@ body.view-pagella #lapbar { display: none; }
 /* Alta quanto DH_H in app.js. */
 .dh-bars { height: 44px; }
 .pag-spark.dh-bars { display: flex; margin-left: 0; }
-.dh-bars i, .dh-dates span { flex: 1 1 0; max-width: 28px; }
+.dh-bars i, .dh-dates span { flex: 1 1 0; max-width: 2rem; }
 .dh-bars i { width: auto; }
 .dh-dates { display: flex; gap: 3px; }
 .dh-dates span {
-  font-size: 10px; line-height: 1.2; color: var(--muted); text-align: center;
+  font-size: 0.857rem; line-height: 1.2; color: var(--muted); text-align: center;
   overflow: hidden; white-space: nowrap;
 }
 .dh-last { display: flex; align-items: center; gap: 6px; white-space: nowrap; align-self: center; }
@@ -1353,17 +1362,17 @@ body.view-pagella #lapbar { display: none; }
 /* Dove sbagli e gli errori sono blocchi secondari: righe basse, e ogni box
    alto quanto il suo contenuto (non stirato sull'altro). */
 .pag-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; align-items: start; }
-.pag-grid .pag-row { padding: 3px 0; font-size: 14px; }
+.pag-grid .pag-row { padding: 3px 0; font-size: 1rem; }
 .pag-note { margin-top: 12px; }
 /* Il piano: la regola una volta sopra la lista, poi i consigli in ordine. */
-.pag-rule { margin: 0 0 2px; color: var(--muted); font-size: 14px; }
+.pag-rule { margin: 0 0 2px; color: var(--muted); font-size: 1rem; }
 .pag-steps { list-style: none; margin: 0; padding: 0; }
 .pag-step { display: flex; gap: 12px; align-items: flex-start; padding: 6px 0; border-bottom: 1px solid var(--line); }
 .pag-step:last-child { border-bottom: 0; }
 .pag-k {
-  width: 24px; height: 24px; border-radius: 50%; flex: none;
+  width: 1.714rem; height: 1.714rem; border-radius: 50%; flex: none;
   display: flex; align-items: center; justify-content: center;
-  background: var(--line); font-weight: 700; font-size: 13px;
+  background: var(--line); font-weight: 700; font-size: 0.929rem;
 }
 .pag-step.active .pag-k { background: var(--cyan); color: var(--bg); }
 .pag-step.reached .pag-k { background: var(--green); color: var(--bg); }
@@ -1371,26 +1380,26 @@ body.view-pagella #lapbar { display: none; }
 .pag-btns { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; flex: none; }
 .pag-tag {
   margin-left: 6px; padding: 1px 8px; border-radius: 999px;
-  border: 1px solid var(--line); color: var(--muted); font-size: 11px; font-weight: 600;
+  border: 1px solid var(--line); color: var(--muted); font-size: 0.857rem; font-weight: 600;
 }
 .pag-tag.active { color: var(--cyan); border-color: var(--cyan); }
 /* I consigli messi da parte: una riga quieta, non un altro blocco. */
-.pag-declined { margin: 6px 0 2px; color: var(--muted); font-size: 13px; }
-.pag-declined .mini-btn { padding: 1px 8px; font-size: 12px; }
+.pag-declined { margin: 6px 0 2px; color: var(--muted); font-size: 0.929rem; }
+.pag-declined .mini-btn { padding: 1px 8px; font-size: 0.857rem; }
 .pag-tag.reached { color: var(--green); border-color: var(--green); }
 
 /* «Come si fa»: la stessa colonna della Pagella. Le figure stanno a due a due
    (mappa della curva, traccia) e su un telefono una sotto l'altra. */
 body.view-howto #lapbar { display: none; }
-.howto-title { margin: 6px 0 0; font-family: var(--font-display); font-size: 22px; font-weight: 700; }
+.howto-title { margin: 6px 0 0; font-family: var(--font-display); font-size: 1.571rem; font-weight: 700; }
 .howto-problem {
   margin: 4px 0 2px; font-family: var(--font-display);
-  font-size: 19px; font-weight: 700; line-height: 1.35;
+  font-size: 1.357rem; font-weight: 700; line-height: 1.35;
 }
-.howto-problem.nothing { font-family: inherit; font-size: 16px; font-weight: 400; }
+.howto-problem.nothing { font-family: inherit; font-size: 1.143rem; font-weight: 400; }
 .howto-shell .pag-box p { margin: 4px 0; }
 .howto-legend { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.howto-legend .sw { display: inline-block; width: 22px; height: 0; margin-left: 8px; }
+.howto-legend .sw { display: inline-block; width: 1.571rem; height: 0; margin-left: 8px; }
 .howto-legend .sw.you { border-top: 2px solid #ffffff; }
 .howto-legend .sw.best { border-top: 2px dashed #3fd0e0; }
 .howto-fig { margin: 8px 0 4px; }
@@ -1399,16 +1408,16 @@ body.view-howto #lapbar { display: none; }
 .howto-cell { min-width: 0; }
 /* `:not(.hidden)`: `display: block` qui (0,1,1) batterebbe `.hidden` (0,1,0) e
    la tela spenta resterebbe accesa sopra la sua frase. */
-.howto-fig canvas:not(.hidden) { display: block; width: 100%; height: 220px; }
+.howto-fig canvas:not(.hidden) { display: block; width: 100%; height: 15.714rem; }
 .howto-tr { margin-bottom: 2px; }
-.howto-prog { display: flex; gap: 14px; flex-wrap: wrap; font-size: 15px; }
+.howto-prog { display: flex; gap: 14px; flex-wrap: wrap; font-size: 1.071rem; }
 .howto-gloss dl { margin: 0; }
 .howto-gloss dt { font-weight: 700; margin-top: 10px; }
 .howto-gloss dd { margin: 2px 0 0; }
 .howto-back-row { margin: 14px 0 0; }
 .howto-back-row.top { margin: 4px 0 2px; }
-.howto-back-row .howto-back { padding: 5px 14px; font-size: 14px; border-color: var(--cyan); color: var(--cyan); }
-.howto-shell .pag-box p.howto-target { margin: 6px 0; font-weight: 700; font-size: 17px; }
+.howto-back-row .howto-back { padding: 5px 14px; font-size: 1rem; border-color: var(--cyan); color: var(--cyan); }
+.howto-shell .pag-box p.howto-target { margin: 6px 0; font-weight: 700; font-size: 1.214rem; }
 
 .mini-btn.primary { border-color: var(--cyan); color: var(--cyan); }
 /* The pointer left behind on Trends, where the plan used to live. */
@@ -1420,7 +1429,7 @@ body.view-howto #lapbar { display: none; }
 .plan-elsewhere:not(.hidden) {
   display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
   padding: 0 var(--gut); margin: 4px 0 12px;
-  color: var(--muted); font-size: 13px;
+  color: var(--muted); font-size: 0.929rem;
 }
 
 @media (max-width: 700px) {
@@ -1440,12 +1449,12 @@ body.view-howto #lapbar { display: none; }
    in four strengths rather than four colours. Labels ride inside the segments
    that are wide enough to hold them. */
 .phase-bar {
-  display: flex; height: 16px; border-radius: 5px; overflow: hidden;
+  display: flex; height: 1.143rem; border-radius: 5px; overflow: hidden;
   margin: 4px 0 2px; background: var(--inset);
 }
 .phase-bar .ph {
   display: flex; align-items: center; justify-content: center;
-  font-size: 10px; color: #1A1205; white-space: nowrap; overflow: hidden;
+  font-size: 0.857rem; color: #1A1205; white-space: nowrap; overflow: hidden;
   font-family: var(--font-ui); cursor: help;
 }
 
@@ -1453,8 +1462,8 @@ body.view-howto #lapbar { display: none; }
    `display` qui: `.hidden` e' display:none a una classe sola, e una regola
    scritta dopo la riaccenderebbe vuota sopra ogni vista. Spenta non pesa. */
 .adv-line { padding: 8px 12px; margin: 0 0 10px; border-left: 3px solid var(--adv);
-  background: var(--panel); border-radius: 4px; font-size: 13px; line-height: 1.5; }
-.adv-mark { display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+  background: var(--panel); border-radius: 4px; font-size: 0.929rem; line-height: 1.5; }
+.adv-mark { display: inline-block; width: 0.571rem; height: 0.571rem; border-radius: 50%;
   background: var(--adv); margin-right: 8px; vertical-align: middle; }
 .adv-name, .adv-link { background: none; border: 0; padding: 0; font: inherit;
   color: var(--adv); cursor: pointer; text-decoration: underline; }

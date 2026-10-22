@@ -5,20 +5,20 @@
   align-self: center;
   padding: 6px 12px; border-radius: 999px;
   border: 1px solid var(--line); background: var(--inset);
-  font-size: 12px; color: var(--muted);
+  font-size: 0.857rem; color: var(--muted);
 }
 .live-badge .dot {
-  width: 9px; height: 9px; border-radius: 50%; background: var(--muted);
+  width: 0.643rem; height: 0.643rem; border-radius: 50%; background: var(--muted);
 }
 .live-badge[data-state="on"] { color: var(--green); border-color: var(--green); }
 .live-badge[data-state="on"] .dot { background: var(--green); box-shadow: 0 0 8px var(--green); }
 .live-badge[data-state="pit"] { color: var(--amber); border-color: var(--amber); }
 .live-badge[data-state="pit"] .dot { background: var(--amber); }
 
-.undo-btn { align-self: flex-end; padding: 6px 12px; font-size: 13px; }
+.undo-btn { align-self: flex-end; padding: 6px 12px; font-size: 0.929rem; }
 
 .class-chip {
-  font-size: 12px; font-weight: 700; padding: 2px 10px; border-radius: 999px;
+  font-size: 0.857rem; font-weight: 700; padding: 2px 10px; border-radius: 999px;
   margin-left: 8px; vertical-align: middle;
   background: var(--inset); border: 1px solid var(--cyan); color: var(--cyan);
 }
@@ -30,10 +30,10 @@
   background: var(--inset); margin: 12px 0;
 }
 .prof-name { font-weight: 600; margin: 2px 0 6px; }
-.prof-row { font-size: 12px; line-height: 1.6; }
+.prof-row { font-size: 0.857rem; line-height: 1.6; }
 
 .eng-layout {
-  display: grid; grid-template-columns: minmax(280px, 1fr) 2fr;
+  display: grid; grid-template-columns: minmax(20rem, 1fr) 2fr;
   gap: 18px; padding: 18px 24px; align-items: start;
 }
 @media (max-width: 860px) { .eng-layout { grid-template-columns: 1fr; } }
@@ -42,74 +42,74 @@
   background: var(--panel); border: 1px solid var(--line);
   border-radius: 14px; padding: 16px;
 }
-.eng-live h2, .eng-setup h2 { margin: 0 0 12px; font-size: 15px; }
-.live-car { font-size: 14px; margin-bottom: 12px; }
+.eng-live h2, .eng-setup h2 { margin: 0 0 12px; font-size: 1.071rem; }
+.live-car { font-size: 1rem; margin-bottom: 12px; }
 
 .gauges { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-bottom: 14px; }
 .gauge {
   display: grid; gap: 2px; text-align: center;
   padding: 8px 4px; background: var(--inset); border: 1px solid var(--line); border-radius: 12px;
 }
-.gauge .k { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .04em; }
-.gauge .v { font-size: 18px; font-weight: 700; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.gauge .k { color: var(--muted); font-size: 0.857rem; text-transform: uppercase; letter-spacing: .04em; }
+.gauge .v { font-size: 1.286rem; font-weight: 700; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 
 .engineer-says {
   border: 1px solid var(--line); border-left: 4px solid var(--cyan);
-  border-radius: 12px; padding: 12px 14px; background: var(--inset); min-height: 64px;
+  border-radius: 12px; padding: 12px 14px; background: var(--inset); min-height: 4.571rem;
 }
 .engineer-says.active { border-left-color: var(--amber); }
-.es-label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+.es-label { color: var(--muted); font-size: 0.857rem; text-transform: uppercase; letter-spacing: .04em; }
 .es-sub { text-transform: none; letter-spacing: 0; }
 .es-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-.es-msg { font-size: 17px; font-weight: 600; margin: 4px 0; }
-.es-cat { color: var(--cyan); font-size: 12px; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
-.conf { font-size: 11px; font-weight: 700; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+.es-msg { font-size: 1.214rem; font-weight: 600; margin: 4px 0; }
+.es-cat { color: var(--cyan); font-size: 0.857rem; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.conf { font-size: 0.857rem; font-weight: 700; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
 .conf[data-c="high"] { color: var(--green); border-color: var(--green); }
 .conf[data-c="medium"] { color: var(--amber); border-color: var(--amber); }
 .conf[data-c="low"] { color: var(--red); border-color: var(--red); }
 /* Low-confidence proposal: flag the whole box (not just the pill) and show a
    cautionary note, so a tentative call gets a second look before writing. */
 .engineer-says[data-conf="low"] { border-left-color: var(--red); border-left-style: dashed; }
-.es-hint { color: var(--amber); font-size: 12px; margin: 2px 0 4px; }
+.es-hint { color: var(--amber); font-size: 0.857rem; margin: 2px 0 4px; }
 
 /* The acceptance bar, before the laps. Quiet on purpose: it is the small print
    of the proposal above it, not a second headline. */
 .es-predict {
   margin: 6px 0 2px; padding-left: 9px;
   border-left: 2px solid var(--line);
-  color: var(--muted); font-size: 12px; line-height: 1.55;
+  color: var(--muted); font-size: 0.857rem; line-height: 1.55;
 }
 /* The verdict, after them. */
 .es-outcome { display: flex; gap: 10px; flex-wrap: wrap; align-items: baseline;
-              margin: 6px 0 2px; font-size: 12px; }
+              margin: 6px 0 2px; font-size: 0.857rem; }
 .oc-verdict { font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
-              font-size: 11px; }
+              font-size: 0.857rem; }
 .oc-verdict[data-kept="true"] { color: var(--green); }
 .oc-verdict[data-kept="false"] { color: var(--amber); }
 .oc-num { color: var(--muted); font-family: var(--font-mono);
           font-variant-numeric: tabular-nums; }
-.oc-side { flex: 1 1 100%; color: var(--amber); font-size: 12px; margin-top: 2px; }
+.oc-side { flex: 1 1 100%; color: var(--amber); font-size: 0.857rem; margin-top: 2px; }
 /* Persistent "what to do in this phase" guidance line. */
-.es-phase { font-size: 12.5px; line-height: 1.45; margin: 2px 0 6px; padding: 6px 9px;
+.es-phase { font-size: 0.893rem; line-height: 1.45; margin: 2px 0 6px; padding: 6px 9px;
   background: rgba(255,255,255,.03); border-radius: 7px; color: var(--muted); }
 .es-phase b { color: var(--cyan); font-weight: 700; }
-button.small { padding: 7px 12px; font-size: 13px; margin-top: 8px; }
+button.small { padding: 7px 12px; font-size: 0.929rem; margin-top: 8px; }
 
 /* Tyres panel — 2×2 grid in wheel order (FL FR / RL RR). */
 .tyres {
   border: 1px solid var(--line); border-radius: 12px;
   background: var(--inset); padding: 10px 12px; margin-bottom: 12px;
 }
-.tyres-label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 8px; }
+.tyres-label { color: var(--muted); font-size: 0.857rem; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 8px; }
 .tyre-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .tyre {
   position: relative; display: grid; gap: 1px; justify-items: center;
   padding: 8px 4px 6px; background: var(--panel);
   border: 1px solid var(--line); border-radius: 10px;
 }
-.tyre .tw { position: absolute; top: 5px; left: 8px; color: var(--muted); font-size: 10px; font-weight: 700; letter-spacing: .04em; }
-.tyre .tt { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 22px; font-weight: 700; color: var(--text); }
-.tyre .tp { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 12px; color: var(--muted); }
+.tyre .tw { position: absolute; top: 5px; left: 8px; color: var(--muted); font-size: 0.857rem; font-weight: 700; letter-spacing: .04em; }
+.tyre .tt { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 1.571rem; font-weight: 700; color: var(--text); }
+.tyre .tp { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 0.857rem; color: var(--muted); }
 .tyre .tt.t-cold { color: var(--cyan); }
 .tyre .tt.t-ok { color: var(--green); }
 .tyre .tt.t-hot { color: var(--red); }
@@ -118,7 +118,7 @@ button.small { padding: 7px 12px; font-size: 13px; margin-top: 8px; }
 .tyre .tp.p-high { color: var(--amber); }
 
 .empty2 code {
-  font-family: var(--font-mono); font-size: 11px; color: var(--cyan);
+  font-family: var(--font-mono); font-size: 0.857rem; color: var(--cyan);
   background: var(--inset); padding: 1px 4px; border-radius: 4px;
 }
 
@@ -129,27 +129,27 @@ button.small { padding: 7px 12px; font-size: 13px; margin-top: 8px; }
 .miss {
   border: 1px solid var(--amber); border-left: 4px solid var(--amber);
   border-radius: 12px; padding: 16px 18px; background: var(--inset);
-  max-width: 640px;
+  max-width: 45.714rem;
 }
 .miss-title {
-  font-family: var(--font-display); font-size: 15px; color: var(--amber);
+  font-family: var(--font-display); font-size: 1.071rem; color: var(--amber);
   margin-bottom: 10px;
 }
 /* La riga che risponde a "sto guardando la macchina giusta?": in mono e
    tabellare perché sono identificatori, non prosa, e si leggono a colpo. */
-.miss-who { font-size: 14px; margin-bottom: 10px; }
+.miss-who { font-size: 1rem; margin-bottom: 10px; }
 .miss-who b { font-family: var(--font-mono); color: var(--text); }
-.miss-why { color: var(--muted); font-size: 13px; line-height: 1.5; margin: 0 0 12px; }
-.miss-seed-head { font-size: 13px; margin-bottom: 6px; }
+.miss-why { color: var(--muted); font-size: 0.929rem; line-height: 1.5; margin: 0 0 12px; }
+.miss-seed-head { font-size: 0.929rem; margin-bottom: 6px; }
 .miss-seeds { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
 .miss-seed {
   display: flex; align-items: center; gap: 8px; cursor: pointer;
   padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px;
-  font-family: var(--font-mono); font-size: 12px;
+  font-family: var(--font-mono); font-size: 0.857rem;
 }
 .miss-seed:hover { border-color: var(--cyan); }
 .miss-caveat {
-  color: var(--muted); font-size: 12px; line-height: 1.5;
+  color: var(--muted); font-size: 0.857rem; line-height: 1.5;
   margin: 10px 0 0; border-top: 1px solid var(--line); padding-top: 10px;
 }
 .miss-caveat b { color: var(--amber); }
@@ -159,14 +159,14 @@ button.small { padding: 7px 12px; font-size: 13px; margin-top: 8px; }
 .focus-says {
   border: 1px solid var(--line); border-left: 4px solid var(--muted);
   border-radius: 12px; padding: 12px 14px; background: var(--inset);
-  min-height: 64px; margin-top: 12px;
+  min-height: 4.571rem; margin-top: 12px;
 }
 .focus-says[data-kind="warn"] { border-left-color: var(--amber); }
 .focus-says[data-kind="good"] { border-left-color: var(--green); }
 .focus-says[data-kind="idle"] { border-left-color: var(--muted); }
-.focus-drill { margin: 4px 0 0; font-size: 13px; color: var(--cyan); }
+.focus-drill { margin: 4px 0 0; font-size: 0.929rem; color: var(--cyan); }
 .focus-target {
-  margin-top: 6px; font-size: 12px; color: var(--muted);
+  margin-top: 6px; font-size: 0.857rem; color: var(--muted);
   font-family: var(--font-mono); font-variant-numeric: tabular-nums;
 }
 .focus-target b { color: var(--text); }
@@ -176,7 +176,7 @@ button.small { padding: 7px 12px; font-size: 13px; margin-top: 8px; }
   border: 1px solid var(--amber); border-left: 4px solid var(--amber);
   border-radius: 12px; padding: 10px 12px; margin-bottom: 12px; background: #241a08;
 }
-.av-msg { font-size: 15px; font-weight: 600; margin-top: 4px; }
+.av-msg { font-size: 1.071rem; font-weight: 600; margin-top: 4px; }
 /* Deliberately quiet: on ACC this button never appears (the engine watches the
    dial), and where it does appear it is a confirmation, not the main action. */
 .av-done { border-color: var(--amber); color: var(--amber); }
@@ -184,12 +184,12 @@ button.small { padding: 7px 12px; font-size: 13px; margin-top: 8px; }
 .pit-reminder {
   margin-top: 12px; padding: 10px 12px; border-radius: 12px;
   background: #0d2017; border: 1px solid var(--green); border-left: 4px solid var(--green);
-  font-size: 13px; line-height: 1.5;
+  font-size: 0.929rem; line-height: 1.5;
 }
-.hint { color: var(--muted); font-size: 12px; line-height: 1.5; margin: 14px 0 0; }
+.hint { color: var(--muted); font-size: 0.857rem; line-height: 1.5; margin: 14px 0 0; }
 
 .eng-setup-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
-.legend2 { display: flex; gap: 12px; font-size: 11px; }
+.legend2 { display: flex; gap: 12px; font-size: 0.857rem; }
 /* The setup list packs into as many columns as fit, with the per-wheel groups
    spanning the lot.
    Measured before: a single column where 16 of the 29 rows ended at 1189px of a
@@ -201,7 +201,7 @@ button.small { padding: 7px 12px; font-size: 13px; margin-top: 8px; }
    tool — diagnosis on the left, levers on the right — not something you read. */
 .setup-body {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(430px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(30.714rem, 1fr));
   gap: 16px 34px; align-items: start;
   margin-top: 8px;
 }
@@ -215,19 +215,19 @@ button.small { padding: 7px 12px; font-size: 13px; margin-top: 8px; }
 .grp.wide { grid-column: 1 / -1; }
 .grp.wide {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(27.143rem, 1fr));
   column-gap: 34px; align-content: start;
 }
 .grp.wide > .grp-title, .grp.wide > .param.wide { grid-column: 1 / -1; }
-.grp-title { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--cyan); margin: 0 0 6px; }
-.param { display: grid; grid-template-columns: 130px 1fr; gap: 8px; align-items: center; padding: 5px 0; border-bottom: 1px solid var(--line); }
+.grp-title { font-size: 0.857rem; text-transform: uppercase; letter-spacing: .05em; color: var(--cyan); margin: 0 0 6px; }
+.param { display: grid; grid-template-columns: 9.286rem 1fr; gap: 8px; align-items: center; padding: 5px 0; border-bottom: 1px solid var(--line); }
 .param:last-child { border-bottom: none; }
-.param-label { font-size: 13px; }
-.param-label .note { display: block; color: var(--muted); font-size: 10px; }
+.param-label { font-size: 0.929rem; }
+.param-label .note { display: block; color: var(--muted); font-size: 0.857rem; }
 /* "al volo" badge: this lever is adjustable on track (brake bias, TC, ABS, map). */
 .av-tag {
   display: inline-block; margin-left: 6px; vertical-align: middle;
-  font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+  font-size: 0.857rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
   color: var(--green); border: 1px solid var(--green); border-radius: 999px;
   padding: 0 6px; cursor: help;
 }
@@ -240,19 +240,19 @@ button.small { padding: 7px 12px; font-size: 13px; margin-top: 8px; }
 .slot.changed { border-color: var(--amber); }
 /* Keyboard focus: the whole slot is the spinbutton (tabindex=0). */
 .slot:focus-visible, .slot.focused { border-color: var(--cyan); box-shadow: 0 0 0 2px var(--cyan); }
-.slot .sl { color: var(--muted); font-size: 10px; min-width: 38px; text-align: right; }
-.slot .val { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-weight: 700; min-width: 78px; text-align: center; font-size: 12px; }
-.slot .val .phys { color: var(--muted); font-weight: 400; font-size: 10px; display: block; }
+.slot .sl { color: var(--muted); font-size: 0.857rem; min-width: 2.714rem; text-align: right; }
+.slot .val { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-weight: 700; min-width: 5.571rem; text-align: center; font-size: 0.857rem; }
+.slot .val .phys { color: var(--muted); font-weight: 400; font-size: 0.857rem; display: block; }
 .slot button {
-  width: 33px; height: 33px; border-radius: 8px; cursor: pointer;
+  width: 2.357rem; height: 2.357rem; border-radius: 8px; cursor: pointer;
   background: var(--panel); color: var(--text); border: 1px solid var(--line);
-  font-size: 19px; font-weight: 700; line-height: 1; display: flex; align-items: center; justify-content: center;
+  font-size: 1.357rem; font-weight: 700; line-height: 1; display: flex; align-items: center; justify-content: center;
   /* press-and-hold to accelerate: don't let touch turn the hold into a scroll/zoom */
   touch-action: none; user-select: none; -webkit-user-select: none;
 }
 .slot button:hover { border-color: var(--cyan); color: var(--cyan); }
 .slot button:focus-visible { border-color: var(--cyan); color: var(--cyan); box-shadow: 0 0 0 2px var(--cyan); }
-.slot .delta { color: var(--amber); font-size: 11px; min-width: 30px; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.slot .delta { color: var(--amber); font-size: 0.857rem; min-width: 2.143rem; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 
 /* Tray */
 .tray {
@@ -261,7 +261,7 @@ button.small { padding: 7px 12px; font-size: 13px; margin-top: 8px; }
   padding: 12px 24px; box-shadow: 0 -6px 20px rgba(0,0,0,.35);
 }
 .tray-head { display: flex; gap: 10px; align-items: baseline; margin-bottom: 6px; }
-.tray-list { display: flex; flex-wrap: wrap; gap: 6px 14px; max-height: 84px; overflow-y: auto; margin-bottom: 10px; font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 13px; }
+.tray-list { display: flex; flex-wrap: wrap; gap: 6px 14px; max-height: 6rem; overflow-y: auto; margin-bottom: 10px; font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 0.929rem; }
 .tray-list .ch b { color: var(--text); }
 .tray-list .ch .d { color: var(--amber); }
 .tray-actions { display: flex; gap: 10px; justify-content: flex-end; }
@@ -274,17 +274,17 @@ button.ghost:hover { color: var(--text); border-color: var(--muted); }
 /* Modal */
 .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: flex; align-items: center; justify-content: center; z-index: 50; }
 .modal-bg[hidden] { display: none; }   /* [hidden] must win over display:flex */
-.modal { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 20px 22px; width: min(560px, 92vw); }
+.modal { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 20px 22px; width: min(40rem, 92vw); }
 .modal h3 { margin: 0 0 12px; }
-.modal-diff { background: var(--inset); border: 1px solid var(--line); border-radius: 12px; padding: 12px; max-height: 240px; overflow-y: auto; font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 13px; }
-.modal-diff .g { color: var(--cyan); margin: 6px 0 2px; font-size: 11px; text-transform: uppercase; }
-.modal-name { display: grid; gap: 4px; color: var(--muted); font-size: 12px; margin: 14px 0 6px; }
-.modal-name input { background: var(--inset); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 14px; font-family: var(--font-ui); }
-.modal-hint { color: var(--muted); font-size: 12px; line-height: 1.5; }
-.modal-error { color: var(--red); font-size: 13px; margin: 6px 0; }
+.modal-diff { background: var(--inset); border: 1px solid var(--line); border-radius: 12px; padding: 12px; max-height: 17.143rem; overflow-y: auto; font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 0.929rem; }
+.modal-diff .g { color: var(--cyan); margin: 6px 0 2px; font-size: 0.857rem; text-transform: uppercase; }
+.modal-name { display: grid; gap: 4px; color: var(--muted); font-size: 0.857rem; margin: 14px 0 6px; }
+.modal-name input { background: var(--inset); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 1rem; font-family: var(--font-ui); }
+.modal-hint { color: var(--muted); font-size: 0.857rem; line-height: 1.5; }
+.modal-error { color: var(--red); font-size: 0.929rem; margin: 6px 0; }
 .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 12px; }
 
-.toast { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); z-index: 60; background: var(--panel); border: 1px solid var(--green); border-left: 4px solid var(--green); border-radius: 12px; padding: 12px 18px; max-width: 80vw; font-size: 14px; box-shadow: 0 6px 20px rgba(0,0,0,.4); }
+.toast { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); z-index: 60; background: var(--panel); border: 1px solid var(--green); border-left: 4px solid var(--green); border-radius: 12px; padding: 12px 18px; max-width: 80vw; font-size: 1rem; box-shadow: 0 6px 20px rgba(0,0,0,.4); }
 
 /* --- Responsive: phone ----------------------------------------------------
    Must live at the END of the file: these overrides share specificity with the
@@ -302,12 +302,12 @@ button.ghost:hover { color: var(--text); border-color: var(--muted); }
   margin-top: 12px; padding: 10px 12px; border-radius: 12px;
   background: #0e1620; border: 1px solid var(--line);
 }
-.rec-head { font-size: 15px; margin-top: 4px; }
-.rec-note { font-size: 12px; color: var(--muted); margin-top: 4px; line-height: 1.5; }
+.rec-head { font-size: 1.071rem; margin-top: 4px; }
+.rec-note { font-size: 0.857rem; color: var(--muted); margin-top: 4px; line-height: 1.5; }
 .rec-block { margin-top: 10px; }
-.rec-sub { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+.rec-sub { font-size: 0.857rem; color: var(--muted); margin-bottom: 4px; }
 .rec-row {
   display: flex; justify-content: space-between; gap: 12px;
-  font-size: 13px; padding: 2px 0; border-bottom: 1px solid var(--line);
+  font-size: 0.929rem; padding: 2px 0; border-bottom: 1px solid var(--line);
 }
 .rec-row span:last-child { font-family: var(--font-mono); color: var(--muted); }

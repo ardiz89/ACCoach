@@ -824,7 +824,7 @@ function drawProgress(p) {
   ctx.fillStyle = "#ffffff";
   for (let i = 0; i < n; i++) { ctx.beginPath(); ctx.arc(X(i), Y(times[i]), 3, 0, 6.283); ctx.fill(); }
 
-  ctx.fillStyle = "rgba(255,255,255,0.45)"; ctx.font = "10px " + MONO;
+  ctx.fillStyle = "rgba(255,255,255,0.45)"; ctx.font = canvasFont(12) + "px " + MONO;
   ctx.fillText(fmtMs(realLo), w - 70, Y(realLo) - 4);
   ctx.fillText(fmtMs(realHi), w - 70, Y(realHi) + 12);
 }
@@ -910,7 +910,7 @@ function drawTyreLines(cv, tyres, field, digits, unit) {
     for (const p of pts) { ctx.beginPath(); ctx.arc(X(p.i), Y(p.v[wi]), 2.5, 0, 6.283); ctx.fill(); }
   });
 
-  ctx.fillStyle = "rgba(255,255,255,0.45)"; ctx.font = "10px " + MONO;
+  ctx.fillStyle = "rgba(255,255,255,0.45)"; ctx.font = canvasFont(12) + "px " + MONO;
   ctx.fillText(fmtDec(rhi, digits, unit), w - 44, Y(rhi) + 10);
   ctx.fillText(fmtDec(rlo, digits, unit), w - 44, Y(rlo) - 3);
   return true;
@@ -1562,7 +1562,7 @@ function drawMapTo(canvas, missing, a, cx, mode) {
   // - il confronto è in coordinate schermo (dopo X()/Y()), le stesse in cui
   //   `fillText` scrive: un confronto in metri o in `pos` normalizzato
   //   ignorerebbe lo zoom del canvas.
-  ctx.fillStyle = "rgba(255,255,255,0.85)"; ctx.font = "11px " + UI_FONT;
+  ctx.fillStyle = "rgba(255,255,255,0.85)"; ctx.font = canvasFont(12) + "px " + UI_FONT;
   const placedLabels = [];
   const maxLabelW = w * 0.25;
   for (const c of a.corners || []) {
@@ -1614,7 +1614,7 @@ function drawMapTo(canvas, missing, a, cx, mode) {
     // Su una curva ritagliata (`howtoMapSlice`) il primo campione è l'inizio
     // della curva, non il traguardo: la freccia del verso resta, «S/F» no.
     ctx.beginPath(); ctx.arc(sx, sy, 5, 0, 6.283); ctx.fill();
-    ctx.font = "bold 11px " + UI_FONT;
+    ctx.font = "bold " + canvasFont(12) + "px " + UI_FONT;
     ctx.fillText("S/F", sx - ux * 14 - 6, sy - uy * 14 + 4);
   }
 
@@ -2218,7 +2218,7 @@ function drawFlowChart(a, step) {
   // nothing. Real corner names are long ("Variante della Roggia") and on a wide
   // window they overlap into an unreadable smear, which is worse than a band
   // with no caption.
-  ctx.font = "10px " + MONO;
+  ctx.font = canvasFont(12) + "px " + MONO;
   for (const c of a.corners) {
     if (c.exit < lo || c.entry > hi) continue;
     const x0 = X(c.entry), band = X(c.exit) - x0;
@@ -3447,7 +3447,7 @@ function drawStintPace(cur) {
     }
   });
 
-  ctx.fillStyle = "rgba(255,255,255,0.45)"; ctx.font = "10px " + MONO;
+  ctx.fillStyle = "rgba(255,255,255,0.45)"; ctx.font = canvasFont(12) + "px " + MONO;
   if (paced.length) {
     const fastest = Math.min(...paced), slowest = Math.max(...paced);
     ctx.fillText(fmtMs(fastest), w - 74, Y(fastest) - 5);
@@ -3470,6 +3470,20 @@ function openLapInCompare(path) {
 // in the mono face for the same reason the CSS puts them there: a column of
 // figures that shifts sideways as the digits change is hard to compare.
 const UI_FONT = '"Inter", system-ui, "Segoe UI", sans-serif';
+// Le etichette dei canvas crescono con la stessa base del testo della pagina
+// (--fs in style.css): `px` e' la misura a base 14, quella con cui le figure
+// sono state disegnate. Ogni `ctx.font` passa da qui.
+let _fontBase = 0;   // riletta a ogni resize: la base cambia con la finestra
+function canvasFont(px) {
+  let base = _fontBase || 14;
+  if (!_fontBase) {
+    try {
+      const b = parseFloat(getComputedStyle(document.documentElement).fontSize);
+      if (b > 0) base = _fontBase = b;
+    } catch (e) { /* senza DOM (test in node): resta la base 14 */ }
+  }
+  return Math.round(px * base / 14 * 10) / 10;
+}
 const MONO = '"JetBrains Mono", ui-monospace, Consolas, monospace';
 
 function setup(cv) {
@@ -3508,7 +3522,7 @@ function cornerBands(ctx, w, h, corners, noMarks) {
     ctx.fillRect(x0, 0, projX(c.exit, w) - x0, h);
   }
   ctx.fillStyle = "rgba(255,255,255,0.35)";
-  ctx.font = "10px " + UI_FONT;
+  ctx.font = canvasFont(12) + "px " + UI_FONT;
   for (const c of corners) {
     const x0 = projX(c.entry, w), band = projX(c.exit, w) - x0;
     const label = degradeLabel(ctx, c.name || "T" + (c.index + 1), "T" + (c.index + 1), band);
@@ -3538,7 +3552,7 @@ function cornerAdvMarks(ctx, w, h, corners) {
 function gridY(ctx, w, h, lo, hi, fmt, ticks) {
   ticks = ticks || 4;
   ctx.save();
-  ctx.font = "10px " + MONO;
+  ctx.font = canvasFont(12) + "px " + MONO;
   for (let i = 0; i <= ticks; i++) {
     const y = Math.round((i / ticks) * h) + 0.5;
     if (i > 0 && i < ticks) {
@@ -3750,7 +3764,7 @@ function gridX(ctx, w, h, labels) {
     ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
   }
   if (labels) {
-    ctx.font = "10px " + MONO;
+    ctx.font = canvasFont(12) + "px " + MONO;
     ctx.fillStyle = "rgba(255,255,255,0.4)";
     const marks = ticks ? ticks.map((k) => ({ at: k.at, s: k.m + " m" }))
                         : [0.25, 0.5, 0.75].map((q) => ({
@@ -3811,7 +3825,7 @@ function crosshair(ctx, w, h, cx) {
 // Takes the height: the bottom caption used to be pinned at y=145, which is
 // right for exactly one chart size and silently wrong for every other.
 function axisLabel(ctx, w, h, top, bottom) {
-  ctx.fillStyle = "rgba(255,255,255,0.45)"; ctx.font = "10px " + UI_FONT;
+  ctx.fillStyle = "rgba(255,255,255,0.45)"; ctx.font = canvasFont(12) + "px " + UI_FONT;
   ctx.fillText(top, w - 62, 12); ctx.fillText(bottom, w - 62, h - 5);
 }
 
@@ -3925,7 +3939,7 @@ function drawSteer(a, cx) {
   const rv = a.review.channels, rf = a.reference.channels;
   const sv = rv && rv.steer, sf = rf && rf.steer;
   if (!Array.isArray(sv) || !sv.length) {
-    ctx.fillStyle = "rgba(255,255,255,0.35)"; ctx.font = "11px " + UI_FONT;
+    ctx.fillStyle = "rgba(255,255,255,0.35)"; ctx.font = canvasFont(12) + "px " + UI_FONT;
     ctx.fillText("No steering data for this lap.", 10, h / 2);
     return;
   }
@@ -4119,7 +4133,7 @@ function drawGG(a, cx) {
 
   // Reference grid rings at each 1g, faint, with a value label.
   ctx.strokeStyle = "rgba(255,255,255,0.12)"; ctx.fillStyle = "rgba(255,255,255,0.35)";
-  ctx.font = "10px " + MONO; ctx.lineWidth = 1;
+  ctx.font = canvasFont(12) + "px " + MONO; ctx.lineWidth = 1;
   for (let g = 1; g <= gmax + 0.01; g += 1) {
     ctx.beginPath(); ctx.arc(cx0, cy0, g * unit, 0, 6.283); ctx.stroke();
     ctx.fillText(fmtDec(g, 0, "g"), cx0 + 2, cy0 - g * unit + 11);
@@ -4144,7 +4158,7 @@ function drawGG(a, cx) {
     ctx.setLineDash([]);
   }
   // Axis captions.
-  ctx.fillStyle = "rgba(255,255,255,0.5)"; ctx.font = "10px " + MONO;
+  ctx.fillStyle = "rgba(255,255,255,0.5)"; ctx.font = canvasFont(12) + "px " + MONO;
   ctx.fillText(t("dyn.gg.accel"), cx0 + 4, cy0 - R + 10);
   ctx.fillText(t("dyn.gg.brake"), cx0 + 4, cy0 + R - 3);
   ctx.fillText(t("dyn.gg.lat"), cx0 + R - 34, cy0 - 4);
@@ -4327,7 +4341,7 @@ function drawTyreOverLap(cv, wheels, pos, corners, cx, unit) {
     line(ctx, w, h, pos, vals, lo, hi, s.color, 1.4);
     ctx.restore();
   }
-  ctx.fillStyle = "rgba(255,255,255,0.45)"; ctx.font = "10px " + MONO;
+  ctx.fillStyle = "rgba(255,255,255,0.45)"; ctx.font = canvasFont(12) + "px " + MONO;
   ctx.fillText(fmtDec(rhi, unit ? 0 : 1, unit), w - 44, 12);
   ctx.fillText(fmtDec(rlo, unit ? 0 : 1, unit), w - 44, h - 4);
   crosshair(ctx, w, h, cx);
@@ -5268,13 +5282,13 @@ function drawCornerZoom(L, c, cx) {
   ctx.beginPath();
   ctx.moveTo(px0, py0 - 4); ctx.lineTo(px0, py0); ctx.lineTo(px0 + len, py0);
   ctx.lineTo(px0 + len, py0 - 4); ctx.stroke();
-  ctx.fillStyle = "rgba(255,255,255,0.55)"; ctx.font = "11px " + MONO;
+  ctx.fillStyle = "rgba(255,255,255,0.55)"; ctx.font = canvasFont(12) + "px " + MONO;
   ctx.fillText(nice + " m", px0 + len + 6, py0 + 1);
   // The magnification caveat sits with the scale bar, not in the top-left
   // corner: they are the same warning ("what you see is not the ground"), and
   // the top of the canvas now carries the sentence about the corner.
   if (LINE_MAG > 1) {
-    ctx.fillStyle = "#FFB020"; ctx.font = "11px " + UI_FONT;
+    ctx.fillStyle = "#FFB020"; ctx.font = canvasFont(12) + "px " + UI_FONT;
     ctx.fillText(tf("line.mag.note", { n: LINE_MAG }), px0, py0 - 14);
   }
 
@@ -5313,7 +5327,7 @@ function cornerNote(ctx, w, corner) {
   if (!l || !l.message) return;
   const maxw = w - 28;
   ctx.save();
-  ctx.font = "12px " + UI_FONT;
+  ctx.font = "" + canvasFont(12) + "px " + UI_FONT;
   const head = `${fmtDec(l.lost_s || 0, 2, "s")} · ${l.message}`;
   // A backdrop, because this text lies over a drawing: the two lines cross the
   // whole canvas and a bare label on top of them is unreadable at the crossing.
@@ -5324,7 +5338,7 @@ function cornerNote(ctx, w, corner) {
   ctx.fillStyle = "#FFB020";
   ctx.fillText(clipText(ctx, head, maxw), 14, 20);
   if (sub) {
-    ctx.font = "11px " + UI_FONT;
+    ctx.font = canvasFont(12) + "px " + UI_FONT;
     ctx.fillStyle = "rgba(255,255,255,0.6)";
     ctx.fillText(clipText(ctx, (l.inherited ? "↩ " : "") + sub, maxw), 14, 35);
   }
@@ -5780,6 +5794,7 @@ function wireHover() {
 // or response race); Sectors/Progress re-run their loader once at the end.
 let _resizeTimer = null;
 window.addEventListener("resize", () => {
+  _fontBase = 0;
   if (!CURRENT) return;
   clearTimeout(_resizeTimer);
   _resizeTimer = setTimeout(redrawCurrentView, 150);

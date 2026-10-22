@@ -214,8 +214,8 @@ def test_numbers_use_the_italian_comma():
 def test_the_pagella_reads_in_a_narrow_column_with_bigger_type():
     shell = _CSS[_CSS.index(".pag-shell {"):]
     shell = shell[:shell.index("}")]
-    assert "max-width: 860px" in shell
-    assert "font-size: 16px" in shell
+    assert "max-width: 61.429rem" in shell
+    assert "font-size: 1.143rem" in shell
 
 
 def test_every_pagella_string_exists_in_both_languages():

@@ -63,14 +63,14 @@
       ".hone-tour-card{position:fixed;max-width:360px;background:#151A21;border:1px solid #232B35;" +
       "border-radius:14px;padding:16px 18px;box-shadow:0 14px 44px rgba(0,0,0,.55);" +
       "color:#E8EDF2;pointer-events:auto;}" +
-      ".hone-tour-card h4{margin:0 0 6px;font-size:16px;font-weight:600;color:#E8EDF2;" +
+      ".hone-tour-card h4{margin:0 0 6px;font-size:1.143rem;font-weight:600;color:#E8EDF2;" +
       "font-family:var(--font-display,'Space Grotesk',system-ui,'Segoe UI',sans-serif);}" +
-      ".hone-tour-card p{margin:0 0 14px;font-size:13px;line-height:1.5;color:#8A95A3;}" +
+      ".hone-tour-card p{margin:0 0 14px;font-size:0.929rem;line-height:1.5;color:#8A95A3;}" +
       ".hone-tour-foot{display:flex;align-items:center;gap:8px;}" +
-      ".hone-tour-count{font-size:12px;color:#8A95A3;margin-right:auto;white-space:nowrap;" +
+      ".hone-tour-count{font-size:0.857rem;color:#8A95A3;margin-right:auto;white-space:nowrap;" +
       "font-family:var(--font-mono,ui-monospace,Consolas,monospace);}" +
       ".hone-tour-btn{background:#0B0E12;color:#E8EDF2;border:1px solid #232B35;border-radius:8px;" +
-      "padding:7px 14px;font-size:13px;cursor:pointer;font-family:inherit;}" +
+      "padding:7px 14px;font-size:0.929rem;cursor:pointer;font-family:inherit;}" +
       ".hone-tour-btn:hover{border-color:#22D3CE;color:#22D3CE;}" +
       ".hone-tour-btn[disabled]{opacity:.4;cursor:default;}" +
       ".hone-tour-btn[disabled]:hover{border-color:#232B35;color:#E8EDF2;}" +
