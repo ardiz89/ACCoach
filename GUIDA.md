@@ -31,9 +31,9 @@ dal sorgente. Così l'analisi li ritrova sempre.
 2. **Metti il gioco in modalità Borderless**, cioè in finestra senza bordi, e
    non a schermo intero esclusivo. Sopra lo schermo intero esclusivo l'overlay
    non si vede.
-3. **Apri HONE.** Si apre l'**hub**, una finestra con sei sezioni nella barra
-   laterale, **Home · In pista · Analisi · Setup · Dispositivi · Impostazioni**.
-   Vai su **In pista** e premi **Coach Live**.
+3. **Apri HONE.** Si apre l'**hub**. Nella barra laterale ha sei sezioni,
+   **Home · In pista · Analisi · Setup · Dispositivi · Impostazioni**. Vai su
+   **In pista** e premi **Coach Live**.
 
 > Dopo la prima volta, la Home ti mostra l'ultima sessione già analizzata.
 > È lì che arrivi per sapere com'è andata.
@@ -55,8 +55,7 @@ con che auto sei, quanti giri hai completato e il tuo migliore. Se segui un
 consiglio della Pagella, leggi *Stai seguendo il consiglio* col suo nome, e il
 coach te lo ricorda nelle curve di quel consiglio. Quando hai finito premi
 **Ho finito, mostrami com'è andata**. Il coach si ferma e il report si apre
-sulla Pagella. *Ferma senza aprire il report* ferma il coach e basta. Coach
-Live non si ferma mai da solo.
+sulla Pagella. *Ferma senza aprire il report* ferma il coach e basta.
 
 **Sessione finita.** Se chiudi il gioco, dopo un minuto il pannello passa a
 *Sessione finita* e ti offre due scelte. *Mostrami com'è andata* apre il
@@ -92,13 +91,14 @@ poi **ti corregge**. I suoi interventi sono di tre tipi.
 Questi non hanno bisogno di un giro di riferimento. Dal primo metro del primo
 giro il coach ti avvisa quando sbagli in assoluto.
 
-- **Bloccaggio** in frenata, «Blocchi le ruote, alleggerisci il freno».
-- **Pattinamento** in uscita, «Pattini in uscita, dosa il gas».
-- **Sottosterzo**, «L'anteriore scivola, entra più piano».
-- **Sovrasterzo**, «Sovrasterzo, in uscita apri il gas piano».
-- **Veleggio**, cioè né freno né gas, «Veleggi, passa subito dal freno al gas».
-- **Trail braking** che manca, «Molli presto il freno, tienine un filo
-  all'inserimento».
+- Se **blocchi** in frenata senti «Blocchi le ruote, alleggerisci il freno».
+- Se **pattini** in uscita senti «Pattini in uscita, dosa il gas».
+- Se l'auto **sottosterza** senti «L'anteriore scivola, entra più piano».
+- Se l'auto **sovrasterza** senti «Sovrasterzo, in uscita apri il gas piano».
+- Se **veleggi**, cioè non premi né freno né gas, senti «Veleggi, passa subito
+  dal freno al gas».
+- Se molli il freno troppo presto, senza **trail braking**, senti «Molli presto
+  il freno, tienine un filo all'inserimento».
 
 ### I consigli di curva
 
@@ -108,10 +108,9 @@ riferimento**, il tuo più veloce fra quelli validi.
 1. **Fai due giri puliti completi** partendo dal traguardo. Il primo giro
    intero si salva e diventa il riferimento.
 2. Dal giro dopo, il coach confronta il tuo giro col riferimento. **Mentre ti
-   avvicini a ogni curva** ti anticipa il consiglio per quella curva. Per
-   esempio «Porta più velocità in curva», «Qui hai margine, frena più tardi»,
-   «Arrivi lungo, frena prima» o «Dai più gas qui». Ti parla prima della
-   curva, quando puoi ancora farci qualcosa.
+   avvicini a ogni curva** ti anticipa il consiglio per quella curva. Ti
+   dice, per esempio, «Porta più velocità in curva» o «Arrivi lungo, frena
+   prima». Ti parla prima della curva, quando puoi ancora farci qualcosa.
 3. Quando prendi bene quella curva, **smette di ripeterti** quel consiglio.
 4. Ogni volta che batti il tuo riferimento, da lì in poi il confronto è col
    giro nuovo.
@@ -122,28 +121,32 @@ riferimento**, il tuo più veloce fra quelli validi.
 
 ### Un tema alla volta
 
-Dopo qualche giro pulito il coach smette di commentarti tutto ed **elegge una
-debolezza**, la curva dove perdi di più e il perché. Te lo annuncia, per
-esempio «Il nuovo focus è Variante Ascari. Lavoriamo sulla frenata.». **Da quel
-momento in pista ti parla solo di quel tema**, su tutta la pista e non solo in
-quella curva. Se freni male, non lo fai in un posto solo, ed è il difetto che
-si allena.
+Dopo qualche giro completo, anche sporco, il coach smette di commentarti tutto
+ed **elegge una debolezza**, la curva dove perdi di più e il perché. Te lo
+annuncia con una frase come «Il nuovo focus è Variante Ascari. Lavoriamo sulla
+frenata». **Da quel momento in pista ti parla solo di quel tema**, su tutta la
+pista e non solo in quella curva. Se freni male, non lo fai in un posto solo,
+ed è il difetto che si allena.
 
-Te ne parla **con una parola** invece che con una frase, come «meno freno»,
-«più tardi» o «gas». Le parole te le dice **prima**, nel messaggio che annuncia
-il focus, per esempio «In pista sentirai solo parole di frenata, come «meno
-freno».». Poi te le ricorda sulla riga del focus dell'overlay, così le hai
-davanti mentre guidi.
+Vale per i temi che il coach sa riconoscere in ogni punto della pista, cioè la
+frenata e la trazione. Con un focus sulla percorrenza o sulla linea la voce non
+si restringe, perché quei consigli nascono solo a curva chiusa.
 
-Il motivo è questo. Tre coach professionisti indipendenti si danno lo stesso
+Sulla frenata e sulla trazione te ne parla **con una parola** invece che con una
+frase, come «meno freno», «più tardi» o «gas». Le parole te le dice **prima**,
+nel messaggio che annuncia il focus, per esempio «In pista sentirai solo parole
+di frenata, come “meno freno”». Poi te le ricorda sulla riga del focus
+dell'overlay, così le hai davanti mentre guidi.
+
+Tre coach professionisti indipendenti si danno lo stesso
 limite, **due o tre temi per sessione**, e in pista **parole brevi**,
 concordate prima. Chi guida riesce ad ascoltare poco, e alla decima frase in
 tre giri smette di sentire.
 
 **Non perdi niente.** Quello che il coach tace in pista lo trovi nel **debrief**
-di fine sessione e nel report, coi suoi decimi. Il debrief si calcola sul giro,
-non su quello che la voce ha detto. Le curve su cui la voce è rimasta zitta ci
-sono tutte. La voce sceglie cosa dirti adesso, il debrief non sceglie niente.
+di fine sessione e nel report, coi suoi decimi. Il debrief si calcola sul giro e
+non su quello che ha detto la voce. Così ci trovi anche le curve su cui la voce
+è stata zitta. La voce sceglie cosa dirti adesso, il debrief non sceglie niente.
 
 **Il filtro vale solo per la tecnica di guida.** Bloccaggi, pattinamenti, sotto
 e sovrasterzo, benzina, chiamate ai box, avvisi d'assetto al traguardo e
@@ -158,8 +161,9 @@ cambiano le parole.
 
 Fra un giro e l'altro, quando un sintomo si ripete, il coach ti suggerisce una
 regolazione. Può riguardare le pressioni delle gomme, i livelli di TC e ABS
-dove si regolano, o il bilanciamento dei freni. Le pressioni le giudica solo a
-gomme in temperatura, sul valore delle GT3, circa 26,5 psi.
+dove si regolano, o il bilanciamento dei freni. Le pressioni le giudica solo
+sulle GT3, a gomme in temperatura, con l'obiettivo di circa 26,5 psi. Sulle
+altre auto non ne parla, perché quel numero vale solo per le GT3.
 
 Le modifiche sono di due tipi, e si chiudono in modo diverso.
 
@@ -205,10 +209,10 @@ l'avviso di rientro resta acceso sull'overlay finché non entri in corsia. Lo
 trovi spiegato in «Leggere l'overlay».
 
 Sappi che **l'ingresso della corsia box nessun gioco lo pubblica**. HONE lo
-impara guardando dove lasci la pista le prime volte che rientri davvero, e
-tiene la mediana di più rientri. Su una pista dove non sei mai rientrato
-l'avviso numero 2 **non c'è**. È meglio tacere che indicarti una corsia
-inventata, per cui alzeresti il piede. Dal secondo rientro in poi c'è.
+impara guardando dove lasci la pista quando rientri davvero, e ne tiene la
+mediana su più rientri. Su una pista dove non sei mai rientrato, l'avviso
+numero 2 **non c'è**, perché una corsia indovinata ti farebbe alzare il piede
+nel posto sbagliato. Dal secondo rientro in poi l'avviso c'è.
 
 Rientrare col menu del gioco, con «torna ai box», non insegna niente, ed è
 voluto. L'auto sparisce a metà pista e ricompare in garage. Prendere per buono
@@ -254,9 +258,9 @@ guida.
   diventa una parola sola, in rosso, **FRENA**. La soglia è in tempo e non in
   distanza. Dieci metri sono 0,14 s a 250 km/h, e mezzo secondo in una curva
   lenta.
-- **Una pastiglia** mostra l'ultimo consiglio detto, e sparisce da sola. Quando
+- **Un'etichetta** mostra l'ultimo consiglio detto, e sparisce da sola. Quando
   l'ingegnere propone una modifica che si fa **solo ai box**, il coach ti
-  richiama a fine giro. Da quel momento la pastiglia diventa l'**avviso di
+  richiama a fine giro. Da quel momento l'etichetta diventa l'**avviso di
   rientro**, in ambra, e non sparisce più. Resta finché non entri in corsia box,
   o finché la modifica non è più in attesa, per esempio se viene ritirata. Un
   richiamo che dura due secondi lo perdi se in quel momento guardavi la curva.
@@ -265,8 +269,8 @@ guida.
 - **Sotto c'è una riga sottile in ambra**, il **focus**, cioè il tema su cui
   stai lavorando, con la curva e i decimi che ci perdi. Quando il coach è
   passato alle parole brevi, descritte in «Un tema alla volta», lì trovi anche
-  **una parola d'esempio**, come «MENO FRENO». La frase intera resta nella
-  pastiglia e nel debrief. La riga del focus ti ricorda il tema, non tutte le
+  **una parola d'esempio**, come «MENO FRENO». La frase intera resta
+  nell'etichetta e nel debrief. La riga del focus ti ricorda il tema, non tutte le
   parole che sentirai.
 
 ### La traccia dei pedali
@@ -288,8 +292,7 @@ che si colora da solo.
 In alto a destra trovi la stessa cosa in una parola, **TRAIL**, oppure
 **COAST** col cronometro di quanto stai veleggiando.
 
-Serve per una ragione precisa. Il coach il trail braking te lo **dice**, ma a
-cose fatte. Qui lo **vedi mentre lo fai**, ed è l'unico modo di correggere un
+Il coach il trail braking te lo **dice**, ma a cose fatte. Qui lo **vedi mentre lo fai**, ed è l'unico modo di correggere un
 rilascio. Dove le due tracce si sovrappongono c'è il tuo trail braking.
 
 > Sulle auto stradali il consiglio a voce sul trail braking è **spento**. Lì
@@ -348,9 +351,9 @@ Su un **giro invalidato il coach continua a parlarti**, e sparisce solo il
 delta. Un giro annullato è un giro gratis. Frenate, bloccaggi, gomme e assetto
 si leggono lo stesso, e rientrare ai box sarebbe tempo buttato.
 
-C'è un'eccezione sola, **i complimenti**. Prendi un giro che il gioco non
-conta più. Lì una curva dove hai guadagnato non ti porta né «Qui guadagni,
-rifalla così» né il verde sul riquadro. Quel tempo l'hai guadagnato
+C'è un'eccezione sola, **i complimenti**. Su un giro che il gioco non conta
+più, in una curva dove hai guadagnato non senti «Qui guadagni, rifalla così». E
+il riquadro non mostra quel guadagno. Quel tempo l'hai guadagnato
 uscendo di pista, e un complimento ti insegnerebbe la scorciatoia. I consigli
 sulle curve dove hai **perso** restano tutti. Su un giro buttato, di solito, è
 lì che c'è più da imparare.
@@ -375,7 +378,7 @@ Finita la sessione, rivedi tutto con calma.
 
 Su un portatile, fino a 1600 px di larghezza, la pagina resta com'è. Su uno
 schermo più largo il testo del report e della pagina Ingegnere cresce da solo,
-fino a 20 px invece di 14. Così su un 32" lo leggi anche da un metro.
+fino a 20 px invece di 14.
 
 ### La Pagella
 
@@ -393,9 +396,9 @@ Poi trovi quattro blocchi, in quest'ordine.
 
 - **I tuoi difetti principali.** Sono abitudini di guida che si ripetono in più
   curve, come frenare troppo presto o tornare tardi sul gas. Per ognuno vedi
-  quanto ti costa a giro, in quante curve e in quanti giri compare. Accanto c'è
-  una freccia, in giù, uguale o in su, rispetto alla sessione prima, con le tue
-  ultime sessioni. Il progresso lo leggi lì, in un difetto che cala da una
+  quanto ti costa a giro, in quante curve e in quanti giri compare. Accanto,
+  una freccia ti dice se è sceso, è rimasto uguale o è salito rispetto alla
+  sessione prima, e di fianco vedi le ultime sessioni. Il progresso lo leggi lì, in un difetto che cala da una
   sessione all'altra. Con un clic lo apri curva per curva.
 - **Dove sbagli di più.** Le curve che ti costano di più, col loro nome.
 - **Errori più frequenti.** Bloccaggi, pattinamenti, sottosterzo, sovrasterzo e
@@ -412,8 +415,9 @@ metro. Quando il riferimento cambia, lo storico si ricalcola.
 La Pagella parla di guida. I problemi d'assetto restano all'Ingegnere.
 
 **Il piano si segue un consiglio alla volta.** Ogni consiglio riguarda un
-difetto e le curve dove pesa di più. Le tre scelte valgono per il consiglio in
-cima, e gli altri hanno solo **Come si fa →**.
+difetto e le curve dove pesa di più. **Lo seguo** e **Non lo seguo** compaiono
+sul primo consiglio proposto, finché non ne segui uno. **Lascio stare** compare
+sul consiglio in corso. Tutti hanno **Come si fa →**.
 
 - **Lo seguo** lo mette in corso, con la data di oggi.
 - **Non lo seguo** toglie dal piano un consiglio che non hai ancora cominciato.
@@ -474,8 +478,8 @@ Le schede stanno in tre gruppi, nell'ordine in cui di solito le leggi.
 - **Pagella** è la pagina descritta qui sopra. Si apre da sola dopo una
   sessione nuova. Altrimenti il report riapre l'ultima scheda che guardavi.
 - **Sessione** racconta una sola uscita. Trovi i giri nell'ordine in cui li hai
-  guidati, compresi quelli tagliati o non validi, che hai guidato ma che non
-  fanno media. Poi il migliore, la costanza, la temperatura dell'asfalto, e
+  guidati. Ci sono anche quelli tagliati o non validi, che però non fanno
+  media. Poi il migliore, la costanza, la temperatura dell'asfalto, e
   **cosa è cambiato dall'ultima volta** con la stessa auto sulla stessa pista,
   curva per curva. Con un clic su un giro lo apri in Confronto. Le sessioni le
   deduciamo dagli orari, e una pausa lunga vale come sessione nuova.
@@ -527,10 +531,10 @@ Le schede stanno in tre gruppi, nell'ordine in cui di solito le leggi.
   ingrandita ha la tua linea e quella del riferimento, e **la fascia colorata
   fra le due è lo scarto**. Se a scala vera è troppo sottile, il selettore
   **scarto ×3** la ingrandisce. Il grafico lo scrive, e la barra della scala
-  resta vera. Accanto trovi la stessa curva in numeri. Leggi quanto eri
-  **dentro o fuori** in ingresso, all'apex e in uscita. Leggi se il tuo punto
-  più lento cade **prima o dopo** quello del riferimento. Leggi anche quanto è
-  stretto l'**arco** che hai percorso e quanta **strada in più** hai fatto.
+  resta vera. Accanto trovi la stessa curva in numeri. Ti dicono quanto
+  eri **dentro o fuori** in ingresso, all'apex e in uscita. Poi vedi se il tuo
+  punto più lento cade **prima o dopo** quello del riferimento. C'è anche quanto è
+  stretto l'**arco** che hai percorso, e quanta **strada in più** hai fatto.
   Sotto c'è la tabella di tutte le curve, da scaricare in **CSV**.
 
   Sulle due linee vedi anche **dove freni e dove torni sul gas**, col segno
@@ -568,7 +572,7 @@ Le schede stanno in tre gruppi, nell'ordine in cui di solito le leggi.
   immagini satellitari. Sono meno dettagliati, senza cordoli, ma non dipendono
   da cosa hai sul disco.
 
-  Due avvertenze, che vedi anche nella pagina.
+  La pagina ti avverte di due cose.
 
   * La pista compare **solo se è davvero quella su cui hai guidato**. Dello
     stesso circuito girano versioni diverse, e una che non combacia
@@ -695,8 +699,8 @@ stesso pomeriggio restano due barre. Così vedi se quello che hai cambiato fra
 l'una e l'altra ha funzionato.
 
 Le soglie sono due, e valgono insieme. Una sessione con **meno di tre giri** su
-quella curva non compare. Una mediana su due giri è solo l'ultimo giro con un
-nome più serio. Una sessione che manca **non** si disegna
+quella curva non compare. Una mediana su due giri vale poco più di un giro
+solo. Una sessione che manca **non** si disegna
 a zero, perché lo zero qui vuol dire che l'hai presa bene. Poi la curva compare
 solo con **almeno due sessioni** sopra quella soglia. Un punto solo non è un
 andamento, è un giro fortunato. Una curva appena diventata sistematica può non
@@ -764,7 +768,7 @@ schermo a fianco.
    sotto, come `http://192.168.1.23:8778`. **Inquadra il codice** col telefono,
    oppure scrivi l'indirizzo nel browser.
 
-Qualche cosa pratica.
+Qualche dettaglio pratico.
 
 - Il telefono deve stare sulla **stessa rete Wi-Fi** del PC.
 - Se **Windows** te lo chiede al primo avvio, consenti l'accesso su **reti
@@ -865,7 +869,7 @@ Queste voci esistono solo lì.
 - **Non vedi l'overlay.** Sei a schermo intero esclusivo. Passa a
   **Borderless**.
 - **Non senti la voce.** Lancia `python -m accoach selftest`, che scrive un
-  report e prova a parlare. Dal sorgente, controlla di aver installato
+  report e prova a parlare. Dal sorgente, installa pyttsx3 con
   `pip install pyttsx3`. Ti serve anche una voce italiana di Windows, come
   Microsoft Elsa.
 - **Alcune frasi suonano più robotiche delle altre.** Le frasi fisse del coach
@@ -873,7 +877,7 @@ Queste voci esistono solo lì.
   che cambiano ogni volta, come l'annuncio del focus col nome della curva,
   escono dalla voce di Windows, che è più robotica. Cambia il suono, non
   quello che ti dice.
-- **Non arriva nessun consiglio di curva.** Ti manca il riferimento, quindi fai
-  due giri puliti completi. Gli avvisi immediati invece arrivano comunque.
+- **Non arriva nessun consiglio di curva.** Ti manca il riferimento. Ti basta un giro
+  pulito completo, dal traguardo al traguardo. Gli avvisi immediati invece arrivano comunque.
 - **L'analisi non mostra i giri.** Prima devi guidarli con Coach Live o col
   registratore. Finiscono in `Documenti/ACCoach/laps`, dove l'analisi li legge.

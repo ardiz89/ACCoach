@@ -142,11 +142,11 @@ _UI: dict[str, dict[str, str]] = {
               "tablet col codice QR e poi il gioco. Quando hai finito, <b>Ho "
               "finito</b> apre la Pagella."},
     "wiz.s3": {
-        "en": "Drive one complete lap. It becomes your <b>reference</b>, and the "
+        "en": "Drive one clean, complete lap. It becomes your <b>reference</b>, and the "
               "delta appears from the next lap on. Until then the coach still "
               "calls locks, slides and tyres, everything that doesn't need a "
               "lap to compare against.",
-        "it": "Fai un giro completo. Diventa il tuo <b>riferimento</b>, e il delta "
+        "it": "Fai un giro pulito completo. Diventa il tuo <b>riferimento</b>, e il delta "
               "compare dal giro dopo. Fino ad allora il coach ti segnala comunque "
               "bloccaggi, scivolate e gomme, cioè tutto quello che non ha "
               "bisogno di un giro con cui confrontarti."},

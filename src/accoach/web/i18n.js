@@ -810,8 +810,8 @@
     "eng.focusTitle":  { en: `Focus · lesson`, it: `Focus · lezione` },
     "eng.focusSub":    { en: `(your driving, one weakness at a time)`,
                          it: `(la tua guida, una debolezza alla volta)` },
-    "focus.warmup":    { en: `Drive a few clean laps to get started.`,
-                         it: `Fai qualche giro pulito per cominciare.` },
+    "focus.warmup":    { en: `Drive a few complete laps to get started. Dirty ones count too.`,
+                         it: `Fai qualche giro completo per cominciare. Valgono anche quelli sporchi.` },
 
     "eng.profile":     { en: `Engineer profile`, it: `Profilo ingegnere` },
     "eng.phases":      { en: `Phases`, it: `Fasi` },
@@ -823,8 +823,8 @@
     // acceso restava su «in attesa di telemetria» per sempre mentre il coach gli
     // parlava nelle cuffie. I due non possono nemmeno convivere: registrano
     // entrambi, e insieme salverebbero ogni giro due volte.
-    "eng.hint":        { en: `This page is fed by the <b>live backend</b>, which you start from the hub in <b>Devices</b> → Live backend. Coach Live doesn't feed it, and the two can't run together because they'd both record. The changes on the right go into the setup file. They must be <b>loaded in the pits</b> and don't change the car while you drive.`,
-                         it: `Questa pagina la alimenta il <b>backend live</b>, che accendi dall'hub in <b>Dispositivi</b> → Backend live. Coach Live non la alimenta, e i due non possono stare accesi insieme perché registrano entrambi. Le modifiche a destra agiscono sul file di setup. Vanno <b>caricate ai box</b> e non cambiano l'auto mentre guidi.` },
+    "eng.hint":        { en: `This page is fed by <b>Coach Live</b>, or by the <b>live backend</b>, which you start from the hub in <b>Devices</b> → Live backend. The two can't run together, because they'd both record. The changes on the right go into the setup file. They must be <b>loaded in the pits</b> and don't change the car while you drive.`,
+                         it: `Questa pagina la alimenta <b>Coach Live</b>, oppure il <b>backend live</b>, che accendi dall'hub in <b>Dispositivi</b> → Backend live. I due non possono stare accesi insieme, perché registrano entrambi. Le modifiche a destra agiscono sul file di setup. Vanno <b>caricate ai box</b> e non cambiano l'auto mentre guidi.` },
 
     "setup.title":     { en: `Setup`, it: `Setup` },
     "legend2.click":   { en: `<b>click</b> = game step`, it: `<b>click</b> = scatto di gioco` },
@@ -990,8 +990,8 @@ Salva un setup nel gioco, poi ricarica questa pagina.` },
 
     // engineer tour
     "tour.e1.t": { en: `Live diagnosis`, it: `Diagnosi live` },
-    "tour.e1.x": { en: `Speed, gear and aids come straight from the car while the live backend is running.`,
-                   it: `Velocità, marcia e aiuti arrivano dall'auto quando il backend live è acceso.` },
+    "tour.e1.x": { en: `Speed, gear and aids come straight from the car while Coach Live or the live backend is running.`,
+                   it: `Velocità, marcia e aiuti arrivano dall'auto quando è acceso Coach Live o il backend live.` },
     "tour.e2.t": { en: `Tyres`, it: `Gomme` },
     "tour.e2.x": { en: `Temperatures and pressures are colour-coded. Keep them in the green.`,
                    it: `Temperature e pressioni hanno un colore. Tienile nel verde.` },
