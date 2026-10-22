@@ -313,7 +313,7 @@
         + "&track=" + encodeURIComponent(bx.track), null, function (err, data) {
       if (seq !== bx.baseSeq) return;
       bx.base = err ? null : data;
-      bx.baseErr = err ? err.detail : "";
+      bx.baseErr = err ? t("eng.loadErr") + err.detail : "";
       // Un file scelto che non c'e' piu' non resta nominato.
       var still = false, s = (bx.base && bx.base.setups) || [];
       for (var i = 0; i < s.length; i++) if (s[i].path === bx.chosen) still = true;
@@ -348,11 +348,15 @@
     });
   }
 
-  // Su una macchina in italiano «27.1 psi» si legge «27,1 psi»: il valore
-  // arriva dal formato del file, col punto.
-  function localNum(s) {
+  // Il valore fisico arriva dal formato del file come testo, «26.2 psi»: il
+  // numero si riscrive con la regola della pagina (`fmtNum`, la virgola in
+  // italiano), con gli stessi decimali. Quello che non e' «numero unita'» resta
+  // com'e'.
+  function physText(s) {
     s = s == null ? "" : String(s);
-    return lang() === "it" ? s.replace(/(\d)\.(\d)/g, "$1,$2") : s;
+    var m = /^(-?\d+)(?:\.(\d+))?(?: ([^\d]+))?$/.exec(s);
+    if (!m) return s;
+    return fmtN(parseFloat(m[1] + "." + (m[2] || "0")), m[2] ? m[2].length : 0, m[3] || "");
   }
 
   // Ogni leva in una riga: nome, ruota o lato, il valore da a, e i clic.
@@ -368,7 +372,7 @@
       for (var i = 0; i < diff.length; i++) {
         var d = diff[i];
         lines.push([d.label + (d.slot ? " " + d.slot : ""),
-                    localNum(d.old_phys) + " → " + localNum(d.new_phys)
+                    physText(d.old_phys) + " → " + physText(d.new_phys)
                     + " (" + d.old_click + " → " + d.new_click + " " + t("eng.click") + ")"]);
       }
     }
