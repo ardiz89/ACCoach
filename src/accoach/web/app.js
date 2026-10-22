@@ -2233,7 +2233,7 @@ function drawFlowChart(a, step) {
                 : ctx.measureText(short).width + 4 <= band ? short : null;
     if (label) {
       ctx.fillStyle = "rgba(255,255,255,0.45)";
-      ctx.fillText(label, x0 + (band - ctx.measureText(label).width) / 2, 11);
+      ctx.fillText(label, x0 + (band - ctx.measureText(label).width) / 2, labelTop());
     }
   }
 
