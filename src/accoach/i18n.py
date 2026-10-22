@@ -574,10 +574,10 @@ def t(key: str, lang: str | None = None, **fmt) -> str:
 _CUE_EN: dict[str, str] = {
     # events.py
     "Blocchi le ruote, alleggerisci il freno": "You're locking up, ease off the brake",
-    "Pattini in uscita, dosa il gas": "Wheelspin on exit, squeeze the throttle",
+    "Pattini in uscita, dosa il gas": "Wheelspin on exit, ease the throttle",
     # balance.py
-    "Sovrasterzo in uscita, apri il gas più dolce":
-        "Oversteer on exit, open the throttle gently",
+    "Sovrasterzo, in uscita apri il gas piano":
+        "Oversteer, open the throttle gently on exit",
     "L'anteriore scivola, entra più piano": "The front is sliding, go in slower",
     # braking.py
     "Veleggi, passa subito dal freno al gas":
@@ -588,22 +588,22 @@ _CUE_EN: dict[str, str] = {
         "Releasing too early, trail the brake to turn-in",
     # gears.py
     "Sei sul limitatore, cambia prima": "You're on the limiter, shift earlier",
-    "Marcia troppo lunga, scala per più spinta":
+    "Marcia troppo lunga, scala per avere più spinta":
         "Gear too tall, drop one for more drive",
     # advisor.py (brake-bias, static)
-    "Con l'ABS già alto blocchi ancora davanti. "
-    "Prova a spostare il bilanciamento indietro.":
-        "The fronts still lock with ABS high. "
-        "Try moving the brake bias rearward.",
+    "ABS già alto, blocchi davanti in più curve. "
+    "Sposta il bilanciamento freni indietro.":
+        "ABS already high, fronts lock in several corners. "
+        "Move the brake bias rearward.",
     # analyzer.py (corner cues)
-    "Qui guadagni, rifai la curva uguale": "You're gaining here, do it the same again",
+    "Qui guadagni, rifalla così": "You're gaining here, same again next lap",
     "Qui hai margine, frena più tardi": "There's room here, brake later",
     "Arrivi lungo, frena prima": "You're running deep, brake earlier",
     "Dai più gas qui": "Use more throttle here",
-    "Premi troppo il freno, alleggerisci": "Too much brake pressure, go lighter",
+    "Freni troppo qui, alleggerisci": "Too much brake here, ease off",
     "Porta più velocità in curva": "Carry more speed through the corner",
     # fuel.py
-    "Ultimo giro di benzina, rientra ai box": "Fuel for one last lap, pit now",
+    "Ultimo giro di benzina, rientra ai box": "Last lap of fuel, box now",
     # pitcall.py
     "Modifica pronta, rientra ai box a fine giro":
         "Setup change ready, box this lap",

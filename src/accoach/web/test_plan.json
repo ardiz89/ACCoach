@@ -18,14 +18,14 @@
           "n": "2",
           "what": "2) Bloccaggio in frenata",
           "how": "In una staccata (frenata forte prima di una curva) premi il freno molto forte, fino a far slittare le ruote davanti (le senti 'raschiare' e l'auto non rallenta bene). Il termine tecnico è «bloccaggio».",
-          "expected": "HONE dice subito qualcosa tipo «Bloccaggio, alleggerisci il freno». Nei tornanti lentissimi (sotto ~40 km/h) non deve lamentarsi per niente."
+          "expected": "HONE dice subito qualcosa tipo «Blocchi le ruote, alleggerisci il freno». Nei tornanti lentissimi (sotto ~40 km/h) non deve lamentarsi per niente."
         },
         {
           "id": "GT3-3",
           "n": "3",
           "what": "3) Pattinamento in uscita",
           "how": "All'uscita di una curva lenta, dai gas in modo deciso/brusco così le ruote motrici girano a vuoto e slittano un istante. Il termine tecnico è «pattinamento» (o wheelspin).",
-          "expected": "HONE dice «Pattini in uscita, meno gas». Su questa categoria la soglia è tarata a 0,13: se dà l'allarme anche quando la trazione è pulita (nessuno slittamento vero), annotalo."
+          "expected": "HONE dice «Pattini in uscita, dosa il gas». Su questa categoria la soglia è tarata a 0,13: se dà l'allarme anche quando la trazione è pulita (nessuno slittamento vero), annotalo."
         },
         {
           "id": "GT3-4",
@@ -39,7 +39,7 @@
           "n": "5",
           "what": "5) Coda che scappa (sovrasterzo)",
           "how": "In uscita dai gas di colpo (o in rilascio) così il RETRO dell'auto scivola verso l'esterno e l'auto ruota troppo; correggi col volante. Il termine tecnico è «sovrasterzo».",
-          "expected": "HONE dice «Sovrasterzo, sii più dolce col gas in uscita». Deve scattare quando il retro scappa davvero, non in una curva normale."
+          "expected": "HONE dice «Sovrasterzo, in uscita apri il gas piano». Deve scattare quando il retro scappa davvero, non in una curva normale."
         },
         {
           "id": "GT3-6",
@@ -116,14 +116,14 @@
           "n": "2",
           "what": "2) Bloccaggio in frenata",
           "how": "In una staccata (frenata forte prima di una curva) premi il freno molto forte, fino a far slittare le ruote davanti (le senti 'raschiare' e l'auto non rallenta bene). Il termine tecnico è «bloccaggio».",
-          "expected": "HONE dice subito qualcosa tipo «Bloccaggio, alleggerisci il freno». Nei tornanti lentissimi (sotto ~40 km/h) non deve lamentarsi per niente."
+          "expected": "HONE dice subito qualcosa tipo «Blocchi le ruote, alleggerisci il freno». Nei tornanti lentissimi (sotto ~40 km/h) non deve lamentarsi per niente."
         },
         {
           "id": "Formula-3",
           "n": "3",
           "what": "3) Pattinamento in uscita",
           "how": "All'uscita di una curva lenta, dai gas in modo deciso/brusco così le ruote motrici girano a vuoto e slittano un istante. Il termine tecnico è «pattinamento» (o wheelspin).",
-          "expected": "HONE dice «Pattini in uscita, meno gas». Su questa categoria la soglia è tarata a 0,15: se dà l'allarme anche quando la trazione è pulita (nessuno slittamento vero), annotalo."
+          "expected": "HONE dice «Pattini in uscita, dosa il gas». Su questa categoria la soglia è tarata a 0,15: se dà l'allarme anche quando la trazione è pulita (nessuno slittamento vero), annotalo."
         },
         {
           "id": "Formula-4",
@@ -137,7 +137,7 @@
           "n": "5",
           "what": "5) Coda che scappa (sovrasterzo)",
           "how": "In uscita dai gas di colpo (o in rilascio) così il RETRO dell'auto scivola verso l'esterno e l'auto ruota troppo; correggi col volante. Il termine tecnico è «sovrasterzo».",
-          "expected": "HONE dice «Sovrasterzo, sii più dolce col gas in uscita». Deve scattare quando il retro scappa davvero, non in una curva normale."
+          "expected": "HONE dice «Sovrasterzo, in uscita apri il gas piano». Deve scattare quando il retro scappa davvero, non in una curva normale."
         },
         {
           "id": "Formula-6",
@@ -207,14 +207,14 @@
           "n": "2",
           "what": "2) Bloccaggio in frenata",
           "how": "In una staccata (frenata forte prima di una curva) premi il freno molto forte, fino a far slittare le ruote davanti (le senti 'raschiare' e l'auto non rallenta bene). Il termine tecnico è «bloccaggio».",
-          "expected": "HONE dice subito qualcosa tipo «Bloccaggio, alleggerisci il freno». Nei tornanti lentissimi (sotto ~40 km/h) non deve lamentarsi per niente."
+          "expected": "HONE dice subito qualcosa tipo «Blocchi le ruote, alleggerisci il freno». Nei tornanti lentissimi (sotto ~40 km/h) non deve lamentarsi per niente."
         },
         {
           "id": "Stradali-3",
           "n": "3",
           "what": "3) Pattinamento in uscita",
           "how": "All'uscita di una curva lenta, dai gas in modo deciso/brusco così le ruote motrici girano a vuoto e slittano un istante. Il termine tecnico è «pattinamento» (o wheelspin).",
-          "expected": "HONE dice «Pattini in uscita, meno gas». Su questa categoria la soglia è tarata a 0,12: se dà l'allarme anche quando la trazione è pulita (nessuno slittamento vero), annotalo."
+          "expected": "HONE dice «Pattini in uscita, dosa il gas». Su questa categoria la soglia è tarata a 0,12: se dà l'allarme anche quando la trazione è pulita (nessuno slittamento vero), annotalo."
         },
         {
           "id": "Stradali-4",
@@ -228,7 +228,7 @@
           "n": "5",
           "what": "5) Coda che scappa (sovrasterzo)",
           "how": "In uscita dai gas di colpo (o in rilascio) così il RETRO dell'auto scivola verso l'esterno e l'auto ruota troppo; correggi col volante. Il termine tecnico è «sovrasterzo».",
-          "expected": "HONE dice «Sovrasterzo, sii più dolce col gas in uscita». Deve scattare quando il retro scappa davvero, non in una curva normale."
+          "expected": "HONE dice «Sovrasterzo, in uscita apri il gas piano». Deve scattare quando il retro scappa davvero, non in una curva normale."
         },
         {
           "id": "Stradali-6",
@@ -389,7 +389,7 @@
           "n": "15",
           "what": "Il patto: il coach dice la parola che userà",
           "how": "Quando il focus viene annunciato a voce, a fine giro, ascolta la frase per intero.",
-          "expected": "La frase nomina il TEMA e fa un esempio di parola: «In pista ti dirò solo parole sulla frenata, tipo 'meno freno'». Se annuncia il focus senza dire cosa sentirai, è un difetto."
+          "expected": "La frase nomina il TEMA e fa un esempio di parola: «In pista sentirai solo parole di frenata, come 'meno freno'». Se annuncia il focus senza dire cosa sentirai, è un difetto."
         },
         {
           "id": "Generale-16",
@@ -403,14 +403,14 @@
           "n": "17",
           "what": "Sicurezza e box parlano comunque",
           "how": "Con un focus attivo su un tema qualsiasi, provoca apposta un bloccaggio in staccata (freno fortissimo).",
-          "expected": "«Bloccaggio, alleggerisci il freno» lo senti lo stesso e per intero, anche se il bloccaggio non c'entra col tema del focus. Vale anche per pattinamento, benzina e chiamate ai box: il filtro non li tocca mai."
+          "expected": "«Blocchi le ruote, alleggerisci il freno» lo senti lo stesso e per intero, anche se il bloccaggio non c'entra col tema del focus. Vale anche per pattinamento, benzina e chiamate ai box: il filtro non li tocca mai."
         },
         {
           "id": "Generale-18",
           "n": "18",
           "what": "Il briefing da fermo ai box",
           "how": "Guida finché l'Ingegnere propone una modifica che si fa SOLO in garage (prova 11), poi rientra ai box e fermati davvero nella tua piazzola, a 0 km/h. Su ACC questa prova prima non poteva riuscire.",
-          "expected": "Da fermo senti «Sei ai box. Apri la pagina Ingegnere nel browser: applica la proposta, scrivi il setup e ricaricalo dal garage prima di uscire». Se non arriva subito aspetta: si ripete ogni 8 secondi finché non viene detta."
+          "expected": "Da fermo senti «Sei ai box. Apri la pagina Ingegnere nel browser. Prepara la modifica e applicala. Ricarica il setup dal garage prima di uscire.». Se non arriva subito aspetta: si ripete ogni 8 secondi finché non viene detta."
         },
         {
           "id": "Generale-19",
@@ -515,7 +515,7 @@
     },
     {
       "term": "Cue / Segnale",
-      "meaning": "Un avviso di HONE, vocale o a schermo (es. «Bloccaggio, alleggerisci il freno»)."
+      "meaning": "Un avviso di HONE, vocale o a schermo (es. «Blocchi le ruote, alleggerisci il freno»)."
     },
     {
       "term": "Debrief / Resoconto",

@@ -399,7 +399,10 @@ class PressurePhase(WorkPhase):
                        f"circa {window}, quindi {act}.")
                 if short:
                     why += " È il massimo per una sosta, il resto al prossimo rientro."
-                lever = f"{n} click {'in più' if up else 'in meno'} alla pressione {axis}"
+                # La leva è quella che la voce dell'Ingegnere dice in pista: un
+                # imperativo, come le leve degli altri rimedi.
+                lever = (f"Aggiungi {n} click alla pressione {axis}" if up
+                         else f"Togli {n} click dalla pressione {axis}")
             else:
                 word = "click" if abs(clicks) == 1 else "clicks"
                 act = (f"add {n} {word} to bring it up to {to}" if up
@@ -408,7 +411,7 @@ class PressurePhase(WorkPhase):
                        f"of about {window}, so {act}.")
                 if short:
                     why += " That's the most for one stop, the rest next time in."
-                lever = (f"{n} {'more' if up else 'fewer'} {word} of {ax} "
-                         f"pressure")
+                lever = (f"Add {n} {word} to the {ax} pressure" if up
+                         else f"Take {n} {word} off the {ax} pressure")
             return ProposedChange(atomics, why, tr(self.label), "BOX", lever=lever)
         return None

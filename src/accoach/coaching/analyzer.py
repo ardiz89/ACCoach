@@ -141,7 +141,7 @@ def classify_corner(st: CornerStats, index: int, pos: float) -> Cue | None:
     """Pick the single most likely cause of a corner's time delta (or None)."""
     lost = st.lost_ms
     if lost <= -_GAIN_MS:
-        return Cue(CueCategory.GOOD, "Qui guadagni, rifai la curva uguale",
+        return Cue(CueCategory.GOOD, "Qui guadagni, rifalla così",
                    priority=abs(lost), segment=index, pos=pos)
     if lost < _LOSS_MS:
         return None
@@ -166,7 +166,7 @@ def classify_corner(st: CornerStats, index: int, pos: float) -> Cue | None:
         return Cue(CueCategory.MORE_THROTTLE, "Dai più gas qui",
                    priority=lost, segment=index, pos=pos)
     if st.brake_live - st.brake_ref >= _BRAKE_MARGIN:
-        return Cue(CueCategory.LESS_BRAKE, "Premi troppo il freno, alleggerisci",
+        return Cue(CueCategory.LESS_BRAKE, "Freni troppo qui, alleggerisci",
                    priority=lost, segment=index, pos=pos)
     if st.min_speed_ref - st.min_speed_live >= _SPEED_MARGIN:
         return Cue(CueCategory.CARRY_SPEED, "Porta più velocità in curva",

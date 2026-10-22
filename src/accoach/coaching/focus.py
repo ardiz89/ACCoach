@@ -108,19 +108,19 @@ _MSG = {
               "Qui perdi in media {base}.{cause} {drill}",
     },
     "drill_start": {
-        "en": "Work on {theme} at {name}. {drill}",
-        "it": "Lavora sulla {theme} in {name}. {drill}",
+        "en": "At {name}, work on {theme}. {drill}",
+        "it": "{name}, lavora sulla {theme}. {drill}",
     },
     "improved": {
-        "en": "At {name} you were losing {base}, now {cur}. "
-              "Next lap I'll pick a new focus.",
-        "it": "In {name} perdevi {base}, ora {cur}. "
-              "Dal prossimo giro scelgo un nuovo focus.",
+        "en": "At {name}, you were losing {base}, now {cur}. "
+              "I'll pick a new focus shortly.",
+        "it": "{name}, perdevi {base}, ora {cur}. "
+              "Fra poco scelgo un nuovo focus.",
     },
     "stuck": {
-        "en": "At {name} you still lose {cur}, {base} at first. "
+        "en": "At {name}, you still lose {cur}, {base} at first. "
               "I'm parking it and moving on.{setup}",
-        "it": "In {name} perdi ancora {cur}, all'inizio {base}. "
+        "it": "{name}, perdi ancora {cur}, all'inizio {base}. "
               "La metto da parte e passo oltre.{setup}",
     },
     "stuck_setup": {
@@ -128,8 +128,8 @@ _MSG = {
         "it": " Potrebbe dipendere dall'assetto. {cause}",
     },
     "drill_progress": {
-        "en": "Keep working on {theme} at {name}. You lose {cur} now, {base} at the start.",
-        "it": "Continua sulla {theme} in {name}. Ora perdi {cur}, all'inizio {base}.",
+        "en": "At {name}, keep working on {theme}. You lose {cur} now, {base} at the start.",
+        "it": "{name}, continua sulla {theme}. Ora perdi {cur}, all'inizio {base}.",
     },
     "default_drill": {
         "en": "Tidy your line and repeat it every lap.",

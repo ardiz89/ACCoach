@@ -71,6 +71,22 @@ def test_pressure_phase_proposes_off_axle():
     assert params == {"tyrePressure"}
     assert slots == {0, 1}                    # front wheels
     assert all(c.delta_clicks < 0 for c in d.change.changes)   # lower pressure
+    # La leva è quello che la voce dice in pista: un imperativo, non «2 fewer
+    # clicks of front pressure».
+    assert d.change.lever.startswith("Take ") and d.change.lever.endswith(
+        "off the front pressure"), d.change.lever
+
+
+def test_the_pressure_lever_is_an_imperative_in_italian_too(monkeypatch):
+    import accoach.engineer.profiles._common as common
+    monkeypatch.setattr(common, "current_language", lambda: "it")
+    eng = _eng()
+    off = {"front": 23.0, "rear": 26.5}      # front too low
+    eng.observe(_lap(press=off)); eng.observe(_lap(press=off))
+    d = eng.observe(_lap(press=off))
+    assert d.kind is DecisionKind.PROPOSE
+    assert d.change.lever.startswith("Aggiungi ")
+    assert d.change.lever.endswith("click alla pressione anteriore"), d.change.lever
 
 
 def _drive_to_aero(eng, symptom, score):

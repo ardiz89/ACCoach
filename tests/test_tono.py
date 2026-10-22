@@ -486,3 +486,32 @@ def test_the_hub_buttons_carry_no_emoji_or_decorative_arrow():
         if key.split(".")[0] in ("btn", "nav", "home") or key.startswith("live."):
             for lang, text in entry.items():
                 assert not re.search(r"[▶►‹›→]|\(", text), (key, lang, text)
+
+
+def test_the_track_test_plan_quotes_what_the_coach_says_today():
+    """Il protocollo di prova in pista (`web/test_plan.json`) cita le frasi del
+    coach fra «»: il pilota in macchina aspetta di sentire quelle. Una frase
+    riscritta qui e non là gli farebbe segnare come difetto una frase giusta.
+    Ogni citazione di almeno tre parole è l'inizio di una frase del coach di
+    oggi (le frasi fisse, i messaggi del focus, il patto sulle parole-innesco)."""
+    from accoach.coaching.cue import CueCategory
+    from accoach.coaching.focus import _brief_pact
+
+    def norm(t: str) -> str:
+        return re.sub(r"[«»“”'’.,]", "", t).lower().split()
+
+    said = [e["it"] for e in tono.SURFACES["coach"]().values() if "it" in e]
+    said.append(_brief_pact(CueCategory.LESS_BRAKE, "it"))
+    said = [norm(_render_placeholders(t)) for t in said]
+    plan = (tono.WEB / "test_plan.json").read_text(encoding="utf-8")
+    not_cues = {"FRENA / BRAKE  N m"}          # l'overlay, non la voce
+    stale = []
+    for q in set(re.findall(r"«([^«»]*)»", plan)) - not_cues:
+        words = norm(q)
+        if len(words) >= 3 and not any(s[:len(words)] == words for s in said):
+            stale.append(q)
+    assert not stale, sorted(stale)
+
+
+def _render_placeholders(t: str) -> str:
+    return re.sub(r"\{[^{}]*\}", "x", t)

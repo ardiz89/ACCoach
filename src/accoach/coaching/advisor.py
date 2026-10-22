@@ -146,8 +146,8 @@ class SetupAdvisor:
         # (abs_level is -1 when unknown, so this stays False and we suggest ABS.)
         if s.abs_level >= _ABS_ALREADY_HIGH:
             return self._make(CueCategory.BRAKE_BIAS,
-                              "Con l'ABS già alto blocchi ancora davanti. "
-                              "Prova a spostare il bilanciamento indietro.")
+                              "ABS già alto, blocchi davanti in più curve. "
+                              "Sposta il bilanciamento freni indietro.")
         return self._make(
             CueCategory.ABS_UP,
             "Blocchi davanti in più curve. Prova ad alzare l'ABS"
