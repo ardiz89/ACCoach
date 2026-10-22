@@ -41,6 +41,9 @@
 .eng-live, .eng-setup {
   background: var(--panel); border: 1px solid var(--line);
   border-radius: 14px; padding: 16px;
+  /* Una colonna della griglia non scende sotto il suo contenuto piu' largo:
+     a 420 px la scheda Setup allargava la pagina di 58 px. */
+  min-width: 0;
 }
 .eng-live h2, .eng-setup h2 { margin: 0 0 12px; font-size: 1.071rem; }
 .live-car { font-size: 1rem; margin-bottom: 12px; }
@@ -138,7 +141,7 @@ button.small { padding: 7px 12px; font-size: 0.929rem; margin-top: 8px; }
 /* La riga che risponde a "sto guardando la macchina giusta?": in mono e
    tabellare perché sono identificatori, non prosa, e si leggono a colpo. */
 .miss-who { font-size: 1rem; margin-bottom: 10px; }
-.miss-who b { font-family: var(--font-mono); color: var(--text); }
+.miss-who b { font-family: var(--font-mono); color: var(--text); overflow-wrap: anywhere; }
 .miss-why { color: var(--muted); font-size: 0.929rem; line-height: 1.5; margin: 0 0 12px; }
 .miss-seed-head { font-size: 0.929rem; margin-bottom: 6px; }
 .miss-seeds { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
@@ -188,8 +191,8 @@ button.small { padding: 7px 12px; font-size: 0.929rem; margin-top: 8px; }
 }
 .hint { color: var(--muted); font-size: 0.857rem; line-height: 1.5; margin: 14px 0 0; }
 
-.eng-setup-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
-.legend2 { display: flex; gap: 12px; font-size: 0.857rem; }
+.eng-setup-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 4px 12px; }
+.legend2 { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 0.857rem; }
 /* The setup list packs into as many columns as fit, with the per-wheel groups
    spanning the lot.
    Measured before: a single column where 16 of the 29 rows ended at 1189px of a
@@ -201,7 +204,8 @@ button.small { padding: 7px 12px; font-size: 0.929rem; margin-top: 8px; }
    tool — diagnosis on the left, levers on the right — not something you read. */
 .setup-body {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(30.714rem, 1fr));
+  /* Colonne da 430 px, ma mai piu' larghe dello schermo (telefono, 420 px). */
+  grid-template-columns: repeat(auto-fill, minmax(min(30.714rem, 100%), 1fr));
   gap: 16px 34px; align-items: start;
   margin-top: 8px;
 }
@@ -295,6 +299,70 @@ button.ghost:hover { color: var(--text); border-color: var(--muted); }
   .param { grid-template-columns: 1fr; gap: 4px; }
   .tray { padding: 12px 14px; }
 }
+
+/* --- Le schede: diagnosi e assetto su schermi stretti ----------------------
+   Sotto i 1440 px di larghezza (un portatile da 14-15" col ridimensionamento di
+   Windows al 125-150%, un tablet) le due colonne non ci stanno: l'assetto ne
+   vuole due terzi della larghezza e la diagnosi diventava una striscia. Li' diagnosi e
+   assetto diventano due schede, una alla volta a tutta larghezza. Sopra, la
+   pagina resta come prima e la barra non c'e'. Il limite in pollici non si puo'
+   leggere da una pagina web: si legge la larghezza, che e' quella che conta.
+   In fondo al file per la stessa ragione delle regole del telefono. */
+.eng-tabs { display: none; }
+.tab-count {
+  display: inline-block; min-width: 1.5rem; margin-left: 6px; padding: 0 6px;
+  border-radius: 999px; background: var(--amber); color: #241a08;
+  font-size: 0.857rem; font-weight: 700; line-height: 1.5rem; text-align: center;
+}
+.tab-count[hidden] { display: none; }
+@media (max-width: 1439px) {
+  .eng-tabs {
+    display: flex; gap: 6px; padding: 10px 24px 0;
+    position: sticky; top: 0; z-index: 20; background: var(--bg, #0b0e12);
+    border-bottom: 1px solid var(--line);
+  }
+  .eng-tab {
+    flex: 1 1 0; padding: 12px 10px; cursor: pointer;
+    background: transparent; color: var(--muted);
+    border: 1px solid transparent; border-bottom: none;
+    border-radius: 12px 12px 0 0; font: 600 1.071rem var(--font-ui);
+  }
+  .eng-tab[aria-selected="true"] {
+    color: var(--text); background: var(--panel); border-color: var(--line);
+    box-shadow: inset 0 3px 0 var(--cyan);
+  }
+  .eng-layout { grid-template-columns: 1fr; }
+  /* Il titolo del pannello ripeteva il nome della scheda appena sopra. */
+  .eng-live > h2 { display: none; }
+  /* Lo scorrimento in orizzontale e' nostro (cambia scheda), quello in
+     verticale resta al browser. */
+  .eng-layout { touch-action: pan-y; }
+  html[data-tab="live"] .eng-setup,
+  html[data-tab="setup"] .eng-live { display: none; }
+  /* Il vassoio delle modifiche e' dell'assetto: sulla diagnosi coprirebbe il
+     fondo della pagina. Il numero sulla scheda Setup dice che c'e'. */
+  html[data-tab="live"] .tray { display: none; }
+}
+@media (max-width: 560px) {
+  .eng-tabs { padding: 8px 14px 0; }
+}
+
+/* --- Pedali e sterzo --------------------------------------------------- */
+.trace {
+  border: 1px solid var(--line); border-radius: 12px;
+  background: var(--inset); padding: 10px 12px; margin-bottom: 12px;
+}
+.trace-head {
+  display: flex; flex-wrap: wrap; justify-content: space-between;
+  align-items: baseline; gap: 6px 12px; margin-bottom: 6px;
+}
+.trace-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 0.857rem; color: var(--muted); }
+.trace-legend b { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-weight: 700; }
+.tl i { display: inline-block; width: 14px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 4px; }
+.tl-thr i { background: var(--green); } .tl-thr b { color: var(--green); }
+.tl-brk i { background: var(--red); }   .tl-brk b { color: var(--red); }
+.tl-steer i { background: var(--text); } .tl-steer b { color: var(--text); }
+.trace-canvas { display: block; width: 100%; height: 10.714rem; }
 
 /* Il registro: conteggi, non un cruscotto. Deve leggersi come un verbale — e
    deve poter dare torto a chi l'ha scritto. */

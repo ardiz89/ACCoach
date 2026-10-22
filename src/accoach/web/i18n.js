@@ -793,6 +793,15 @@
     "live.ontrack":    { en: `on track`, it: `in pista` },
 
     "eng.liveDiag":    { en: `Live diagnosis`, it: `Diagnosi live` },
+    "tabs.aria":       { en: `Sections`, it: `Sezioni` },
+    "trace.title":     { en: `Pedals and steering`, it: `Pedali e sterzo` },
+    "trace.thr":       { en: `Throttle`, it: `Gas` },
+    "trace.brk":       { en: `Brake`, it: `Freno` },
+    "trace.steer":     { en: `Steering`, it: `Sterzo` },
+    // Da che parte giri: il numero da solo non lo dice. Al posto delle frecce
+    // di prima, la parola, come la direbbe il pilota.
+    "trace.steerLeft":  { en: `{v} left`, it: `{v} a sinistra` },
+    "trace.steerRight": { en: `{v} right`, it: `{v} a destra` },
     "eng.waiting":     { en: `Waiting for telemetry…`, it: `In attesa di telemetria…` },
     "g.speed":         { en: `Speed`, it: `Velocità` },
     "g.gear":          { en: `Gear`, it: `Marcia` },
@@ -823,8 +832,8 @@
     // La pagina la alimenta Coach Live (`app._serve_engineer_page`, la pagina
     // Ingegnere in modalità spettatore) oppure il backend live. I due non possono
     // convivere: registrano entrambi, e insieme salverebbero ogni giro due volte.
-    "eng.hint":        { en: `This page is fed by <b>Coach Live</b>, or by the <b>live backend</b>, which you start from the hub in <b>Devices</b> → Live backend. The two can't run together, because they'd both record. The changes on the right go into the setup file. They must be <b>loaded in the pits</b> and don't change the car while you drive.`,
-                         it: `Questa pagina la alimenta <b>Coach Live</b>, oppure il <b>backend live</b>, che accendi dall'hub in <b>Dispositivi</b> → Backend live. I due non possono stare accesi insieme, perché registrano entrambi. Le modifiche a destra agiscono sul file di setup. Vanno <b>caricate ai box</b> e non cambiano l'auto mentre guidi.` },
+    "eng.hint":        { en: `This page is fed by <b>Coach Live</b>, or by the <b>live backend</b>, which you start from the hub in <b>Devices</b> → Live backend. The two can't run together, because they'd both record. The changes in <b>Setup</b> go into the setup file. They must be <b>loaded in the pits</b> and don't change the car while you drive.`,
+                         it: `Questa pagina la alimenta <b>Coach Live</b>, oppure il <b>backend live</b>, che accendi dall'hub in <b>Dispositivi</b> → Backend live. I due non possono stare accesi insieme, perché registrano entrambi. Le modifiche in <b>Setup</b> agiscono sul file di setup. Vanno <b>caricate ai box</b> e non cambiano l'auto mentre guidi.` },
 
     "setup.title":     { en: `Setup`, it: `Setup` },
     "legend2.click":   { en: `<b>click</b> = game step`, it: `<b>click</b> = scatto di gioco` },

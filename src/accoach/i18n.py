@@ -71,6 +71,10 @@ _UI: dict[str, dict[str, str]] = {
     "overlay.now": {"en": "now", "it": "ora"},
     "overlay.throttle_pedal": {"en": "THR", "it": "GAS"},
     "overlay.brake_pedal": {"en": "BRK", "it": "FRENO"},
+    "overlay.steer": {"en": "STEER", "it": "STERZO"},
+    # Da che parte e' girato il volante, accanto alla percentuale dello sterzo.
+    "overlay.steer_left": {"en": "L", "it": "SX"},
+    "overlay.steer_right": {"en": "R", "it": "DX"},
     "overlay.trail": {"en": "TRAIL", "it": "TRAIL"},
     "overlay.coast": {"en": "COAST", "it": "COAST"},
     # terminal coach

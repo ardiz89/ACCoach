@@ -2417,7 +2417,10 @@ def create_api(
                     lang = DEFAULT_LANGUAGE
             if lang not in LANGUAGES:
                 lang = DEFAULT_LANGUAGE
-            html = re.sub(r'<html lang="[a-z]{2}">', f'<html lang="{lang}">', html, count=1)
+            # Solo l'attributo: la pagina Ingegnere porta anche `data-tab` sul
+            # tag, e una regola che voleva `>` subito dopo la lingua la lasciava
+            # in inglese.
+            html = re.sub(r'<html lang="[a-z]{2}"', f'<html lang="{lang}"', html, count=1)
             html = html.replace(
                 '<script src="/static/i18n.js">',
                 f'<script>window.HONE_LANG = "{lang}";</script>\n'

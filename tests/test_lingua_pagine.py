@@ -30,7 +30,9 @@ def _client(tmp_path):
 def test_the_served_page_carries_the_configured_language(tmp_path, page, lang):
     config.set_language(lang)
     html = _client(tmp_path).get(page).text
-    assert f'<html lang="{lang}">' in html
+    # Gli altri attributi del tag restano (la pagina Ingegnere ha `data-tab`).
+    assert re.search(rf'<html lang="{lang}"[ >]', html), html[:120]
+    assert html.count("<html ") == 1
     inj = f'window.HONE_LANG = "{lang}"'
     assert inj in html
     # prima di i18n.js, che la legge all'avvio

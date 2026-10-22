@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-tab="live">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -35,9 +35,26 @@
     </div>
   </header>
 
-  <main class="eng-layout">
+  <!-- Le due schede. Esistono solo sugli schermi stretti (portatile sotto i 15
+       pollici, tablet): li' diagnosi e assetto, affiancate, non ci stavano, e
+       una delle due finiva sotto l'altra a una pagina di scorrimento. Su un
+       monitor largo restano affiancate e questa barra non si vede. Si cambia
+       toccando il nome o scorrendo col dito. Si apre sempre sulla telemetria. -->
+  <nav class="eng-tabs" role="tablist" data-i18n-aria="tabs.aria" aria-label="Sections">
+    <button type="button" role="tab" class="eng-tab" id="tab-live" data-tab="live"
+            aria-controls="pane-live" aria-selected="true">
+      <span data-i18n="eng.liveDiag">Live diagnosis</span>
+    </button>
+    <button type="button" role="tab" class="eng-tab" id="tab-setup" data-tab="setup"
+            aria-controls="pane-setup" aria-selected="false">
+      <span data-i18n="setup.title">Setup</span>
+      <span class="tab-count" id="tab-count" hidden></span>
+    </button>
+  </nav>
+
+  <main class="eng-layout" id="eng-layout">
     <!-- LEFT: live diagnosis -->
-    <section class="eng-live">
+    <section class="eng-live" id="pane-live" role="tabpanel" aria-labelledby="tab-live">
       <h2 data-i18n="eng.liveDiag">Live diagnosis</h2>
       <div id="live-car" class="live-car muted" data-i18n="eng.waiting">Waiting for telemetry…</div>
 
@@ -47,6 +64,22 @@
         <div class="gauge"><span class="k" data-i18n="g.tc">TC</span><span class="v" id="g-tc">–</span></div>
         <div class="gauge"><span class="k" data-i18n="g.abs">ABS</span><span class="v" id="g-abs">–</span></div>
         <div class="gauge"><span class="k" data-i18n="g.map">Map</span><span class="v" id="g-map">–</span></div>
+      </div>
+
+      <!-- Gas, freno e sterzo degli ultimi secondi, che scorrono da destra a
+           sinistra. La stessa lettura della striscia dell'overlay: dove i due
+           pedali si sovrappongono stai trailando, dove sono tutti e due a zero
+           stai veleggiando, e lo sterzo dice in che punto della curva succede. -->
+      <div class="trace" id="trace">
+        <div class="trace-head">
+          <span class="es-label" data-i18n="trace.title">Pedals and steering</span>
+          <span class="trace-legend">
+            <span class="tl tl-thr"><i></i><span data-i18n="trace.thr">Throttle</span> <b id="tr-thr">–</b></span>
+            <span class="tl tl-brk"><i></i><span data-i18n="trace.brk">Brake</span> <b id="tr-brk">–</b></span>
+            <span class="tl tl-steer"><i></i><span data-i18n="trace.steer">Steering</span> <b id="tr-steer">–</b></span>
+          </span>
+        </div>
+        <canvas id="trace-canvas" class="trace-canvas" height="150"></canvas>
       </div>
 
       <div class="tyres" id="tyres">
@@ -132,13 +165,13 @@
       <p class="hint" data-i18n-html="eng.hint">
         This page is fed by <b>Coach Live</b>, or by the <b>live backend</b>, which you
         start from the hub in <b>Devices</b> → Live backend. The two can't run together,
-        because they'd both record. The changes on the right go into the setup
+        because they'd both record. The changes in <b>Setup</b> go into the setup
         file. They must be <b>loaded in the pits</b> and don't change the car while you drive.
       </p>
     </section>
 
     <!-- RIGHT: setup editor -->
-    <section class="eng-setup">
+    <section class="eng-setup" id="pane-setup" role="tabpanel" aria-labelledby="tab-setup">
       <div class="eng-setup-head">
         <h2><span data-i18n="setup.title">Setup</span> <span id="setup-car" class="muted"></span></h2>
         <div class="legend2">
