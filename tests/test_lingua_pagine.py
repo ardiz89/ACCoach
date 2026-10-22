@@ -95,10 +95,11 @@ global.document = { readyState: "complete", querySelectorAll: () => [],
                     querySelector: () => null, documentElement: {} };
 eval(fs.readFileSync(path, "utf8"));
 const out = { lang: window.HoneI18n.lang, label: window.HoneI18n.t("lang.label") };
-window.HoneI18n.set("it");
-out.after = window.HoneI18n.lang;
-out.posts = posts;
-console.log(JSON.stringify(out));
+window.HoneI18n.set("it").then(() => {
+  out.after = window.HoneI18n.lang;
+  out.posts = posts;
+  console.log(JSON.stringify(out));
+});
 """
 
 
@@ -132,3 +133,124 @@ def test_the_selector_changes_the_app_language(tmp_path):
 def test_i18n_js_no_longer_reads_the_browser_store():
     src = (_WEB / "i18n.js").read_text(encoding="utf-8")
     assert "localStorage" not in re.sub(r"//.*", "", src)
+
+
+# --- il config non si perde (giro di correzioni 1) ---------------------------
+_RICH = ('language = "it"   # lingua\nlan = true\n[data]\nlaps_dir = "D:/miei_giri"\n'
+         '[voice]\nmale = true\n')
+
+
+def test_a_post_on_an_unreadable_config_refuses_and_writes_nothing(tmp_path):
+    """L'hub può essere colto a metà scrittura, o il file ha un refuso: il POST
+    non deve rimpiazzarlo coi default (lan, laps_dir, male azzerati)."""
+    path = config.config_path()
+    broken = 'language = "it"\nlan = tr'
+    path.write_text(broken, encoding="utf-8")
+    before = path.read_bytes()
+    r = _client(tmp_path).post("/api/language", json={"lang": "en"})
+    assert r.status_code == 503
+    assert path.read_bytes() == before
+
+
+def test_a_post_changes_only_the_language_line(tmp_path):
+    path = config.config_path()
+    path.write_text(_RICH, encoding="utf-8")
+    config.load_config(reload=True)
+    assert _client(tmp_path).post("/api/language", json={"lang": "en"}).status_code == 200
+    assert path.read_text(encoding="utf-8") == _RICH.replace('"it"', '"en"')
+
+
+def test_a_post_adds_the_line_when_the_file_has_none(tmp_path):
+    path = config.config_path()
+    path.write_text('lan = true\n[voice]\nmale = true\n', encoding="utf-8")
+    assert _client(tmp_path).post("/api/language", json={"lang": "it"}).status_code == 200
+    cfg = config.load_config(reload=True)
+    assert cfg.language == "it" and cfg.lan is True and cfg.voice.male is True
+
+
+def test_a_hub_save_does_not_undo_the_pages_choice(tmp_path):
+    """L'hub carica il config all'avvio (lingua «it») e salva tutto il file quando
+    cambia un'altra cosa: non deve riscrivere la lingua che la pagina ha cambiato."""
+    path = config.config_path()
+    path.write_text(_RICH, encoding="utf-8")
+    hub_cfg = config.load_config(reload=True)           # come l'hub all'avvio
+    assert _client(tmp_path).post("/api/language", json={"lang": "en"}).status_code == 200
+    hub_cfg.voice.rate = 120                            # l'hub cambia altro e salva
+    config.save_config(hub_cfg)
+    fresh = config.load_config(reload=True)
+    assert fresh.language == "en" and fresh.voice.rate == 120
+    assert fresh.lan is True and fresh.data.laps_dir == "D:/miei_giri"
+
+
+def test_a_hub_save_still_saves_what_it_changed_over_an_outside_edit(tmp_path):
+    path = config.config_path()
+    path.write_text(_RICH, encoding="utf-8")
+    cfg = config.load_config(reload=True)
+    path.write_text(_RICH.replace("male = true", "male = false"), encoding="utf-8")
+    cfg.lan = False
+    config.save_config(cfg)
+    fresh = config.load_config(reload=True)
+    assert fresh.lan is False and fresh.voice.male is False
+
+
+def test_save_config_does_not_overwrite_an_unreadable_file():
+    path = config.config_path()
+    path.write_text('lan = tr', encoding="utf-8")
+    cfg = config.Config()
+    cfg.voice.rate = 99
+    config.save_config(cfg)
+    assert path.read_text(encoding="utf-8") == 'lan = tr'
+
+
+def test_save_config_writes_atomically(monkeypatch):
+    import os
+    seen = []
+    real = os.replace
+    monkeypatch.setattr(os, "replace", lambda a, b: (seen.append((str(a), str(b))), real(a, b))[1])
+    config.save_config(config.load_config(reload=True))
+    assert seen and seen[0][1] == str(config.config_path()) and seen[0][0] != seen[0][1]
+
+
+def test_serving_a_page_does_not_replace_the_shared_config(tmp_path):
+    path = config.config_path()
+    path.write_text(_RICH, encoding="utf-8")
+    cached = config.load_config(reload=True)
+    path.write_text('language = "it"\nlan = tr', encoding="utf-8")   # a metà scrittura
+    html = _client(tmp_path).get("/engineer").text
+    assert config.load_config() is cached and cached.lan is True
+    assert 'window.HONE_LANG = "it"' in html     # ripiego: la lingua che avevamo
+
+
+def test_pages_are_served_no_cache(tmp_path):
+    assert _client(tmp_path).get("/engineer").headers["cache-control"] == "no-cache"
+
+
+def test_a_page_without_i18n_keeps_its_own_language(tmp_path):
+    config.set_language("en")
+    html = _client(tmp_path).get("/test").text
+    assert '<html lang="it">' in html and "HONE_LANG" not in html
+
+
+@pytest.mark.skipif(_NODE is None, reason="serve node per eseguire il JS")
+def test_a_refused_change_puts_the_selector_back(tmp_path):
+    prog = r"""
+const fs = require("fs");
+global.window = { HONE_LANG: "en" };
+const sel = { value: "it", className: "lang-select" };
+global.fetch = () => Promise.resolve({ ok: false });
+let reloaded = false;
+global.location = { reload() { reloaded = true; } };
+global.document = { readyState: "complete", querySelectorAll: (q) => q === "select.lang-select" ? [sel] : [],
+                    querySelector: () => null, documentElement: {} };
+eval(fs.readFileSync(process.argv[2], "utf8"));
+window.HoneI18nRerender = () => { reloaded = true; };
+window.HoneI18n.set("it");
+setTimeout(() => console.log(JSON.stringify({ lang: window.HoneI18n.lang, sel: sel.value, reloaded })), 20);
+"""
+    script = tmp_path / "s.js"
+    script.write_text(prog, encoding="utf-8")
+    run = subprocess.run([_NODE, str(script), str(_WEB / "i18n.js")],
+                         capture_output=True, text=True, timeout=30)
+    assert run.returncode == 0, run.stderr
+    out = json.loads(run.stdout)
+    assert out == {"lang": "en", "sel": "en", "reloaded": False}

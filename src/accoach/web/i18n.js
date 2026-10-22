@@ -1080,16 +1080,26 @@ Salva un setup nel gioco, poi ricarica questa pagina.` },
 
   function set(l) {
     if (SUPPORTED.indexOf(l) === -1) l = "en";
-    lang = l;
-    window.HoneI18n.lang = l;
     // The selector changes the language of the whole app, not of this browser:
-    // the server writes it to the config, where the hub reads it too.
+    // the server writes it to the config, where the hub reads it too. The page
+    // changes only once the server has accepted it; if not, the selector goes
+    // back and the language stays what it was.
+    var req;
     try {
-      fetch("/api/language", {
+      req = fetch("/api/language", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ lang: l })
-      }).catch(function () {});
-    } catch (e) {}
+      });
+    } catch (e) { req = Promise.reject(e); }
+    return req.then(function (r) {
+      if (!r || !r.ok) throw new Error("language refused");
+      apply(l);
+    }).catch(function () { syncSelectors(); });
+  }
+
+  function apply(l) {
+    lang = l;
+    window.HoneI18n.lang = l;
     applyStatic();
     syncSelectors();
     // Re-render the dynamic views without a reload when the page provides a

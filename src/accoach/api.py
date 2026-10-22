@@ -2401,27 +2401,33 @@ def create_api(
         The language is read from the config file on every request: the hub is
         another process and only ever writes the file, so a change made there
         shows on the next reload of the page."""
-        from .config import load_config
+        from .config import load_config, read_language
         from .i18n import DEFAULT_LANGUAGE, LANGUAGES
 
         path = _WEB_DIR / page
         html = path.read_text(encoding="utf-8")
-        try:
-            lang = load_config(reload=True).language
-        except Exception:  # pragma: no cover - the config must never break a page
-            lang = DEFAULT_LANGUAGE
-        if lang not in LANGUAGES:
-            lang = DEFAULT_LANGUAGE
-        html = re.sub(r'<html lang="[a-z]{2}">', f'<html lang="{lang}">', html, count=1)
-        html = html.replace(
-            '<script src="/static/i18n.js">',
-            f'<script>window.HONE_LANG = "{lang}";</script>\n'
-            '  <script src="/static/i18n.js">', 1)
+        if '/static/i18n.js' in html:
+            # Only the language is read, and the shared cache is left alone: a
+            # file caught mid-write must not hand this process the defaults.
+            lang = read_language()
+            if lang is None:
+                try:
+                    lang = load_config().language
+                except Exception:  # pragma: no cover
+                    lang = DEFAULT_LANGUAGE
+            if lang not in LANGUAGES:
+                lang = DEFAULT_LANGUAGE
+            html = re.sub(r'<html lang="[a-z]{2}">', f'<html lang="{lang}">', html, count=1)
+            html = html.replace(
+                '<script src="/static/i18n.js">',
+                f'<script>window.HONE_LANG = "{lang}";</script>\n'
+                '  <script src="/static/i18n.js">', 1)
         if demo:
             banner = ('<div class="demo-banner" data-i18n="demo.banner">'
                       'These are sample laps made by HONE, not yours.</div>')
             html = html.replace("<body>", '<body class="demo-mode">\n' + banner, 1)
-        return Response(content=html, media_type="text/html")
+        return Response(content=html, media_type="text/html",
+                        headers={"Cache-Control": "no-cache"})
 
     @app.post("/api/language")
     def set_app_language(payload: dict = Body(...)) -> dict:
@@ -2429,15 +2435,17 @@ def create_api(
 
         Only the language: the body is read for one key and nothing else is
         written, because this port is also reachable from the LAN."""
-        from .config import load_config, set_language
+        from .config import ConfigUnreadable, write_language
         from .i18n import LANGUAGES
 
         lang = payload.get("lang")
         if not isinstance(lang, str) or lang not in LANGUAGES:
             raise HTTPException(status_code=422, detail="lang must be one of "
                                 + ", ".join(LANGUAGES))
-        load_config(reload=True)      # il file, non una cache vecchia: l'hub può aver scritto
-        set_language(lang)
+        try:
+            write_language(lang)       # solo la riga `language`, il resto resta com'è
+        except ConfigUnreadable:
+            raise HTTPException(status_code=503, detail="config.toml is not readable right now")
         return {"lang": lang}
 
     @app.get("/")

@@ -8,6 +8,9 @@ file never crashes the app (we log a warning and use defaults). Call
 
 from __future__ import annotations
 
+import copy
+import os
+import re
 import tomllib
 from dataclasses import dataclass, field, fields, is_dataclass
 from pathlib import Path
@@ -145,6 +148,7 @@ laps_dir = ""        # laps folder; empty = ~/Documents/ACCoach/laps
 """
 
 _cache: Config | None = None
+_baseline: Config | None = None   # what this process last loaded or saved
 
 
 def _merge(dc, data: dict) -> None:
@@ -219,15 +223,120 @@ laps_dir = "{cfg.data.laps_dir}"
 '''
 
 
+def _atomic_write(path: Path, text: str) -> None:
+    """Write via a temp file in the same folder, so a reader (the hub, the web
+    server: other processes) never catches the file half written."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(path.name + f".{os.getpid()}.tmp")
+    try:
+        tmp.write_text(text, encoding="utf-8")
+        os.replace(tmp, path)
+    finally:
+        if tmp.exists():
+            try:
+                tmp.unlink()
+            except OSError:  # pragma: no cover
+                pass
+
+
+def _parse_disk() -> Config | None:
+    """The config as the file holds it now, or ``None`` if it can't be parsed.
+    Never touches the shared cache."""
+    try:
+        with config_path().open("rb") as fh:
+            raw = tomllib.load(fh)
+    except Exception:   # noqa: BLE001 - mid-write or hand-edited file
+        return None
+    cfg = Config()
+    _merge(cfg, raw)
+    return cfg
+
+
+def read_language() -> str | None:
+    """The language the file says right now, or ``None`` if unreadable. Leaves
+    the shared cache alone (a web page being served must not replace it)."""
+    cfg = _parse_disk()
+    return None if cfg is None else cfg.language
+
+
+def _leaves(dc, prefix=()):
+    for f in fields(dc):
+        v = getattr(dc, f.name)
+        if is_dataclass(v):
+            yield from _leaves(v, prefix + (f.name,))
+        else:
+            yield prefix + (f.name,), v
+
+
+def _get(dc, path):
+    for k in path:
+        dc = getattr(dc, k)
+    return dc
+
+
+def _set(dc, path, value) -> None:
+    for k in path[:-1]:
+        dc = getattr(dc, k)
+    setattr(dc, path[-1], value)
+
+
 def save_config(cfg: Config | None = None) -> None:
-    """Persist the (cached) config to config.toml. Best-effort, never fatal."""
+    """Persist what the caller changed, on top of what the file holds now.
+
+    Several processes write this file (the hub, the overlay, the web pages), and
+    each holds a copy loaded when it started. Writing the whole copy back undid
+    whatever the others had changed since, so only the fields that differ from
+    what this process loaded are written. An unreadable file is left alone:
+    replacing it with defaults would wipe the driver's settings. Best-effort,
+    never fatal."""
+    global _baseline
     cfg = cfg or load_config()
     try:
         path = config_path()
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(_to_toml(cfg), encoding="utf-8")
+        if path.exists():
+            disk = _parse_disk()
+            if disk is None:
+                from .logging_setup import get_logger
+                get_logger("config").warning("config.toml unreadable, not saving")
+                return
+        else:
+            disk = Config()
+        base = _baseline if _baseline is not None else Config()
+        for leaf, value in _leaves(cfg):
+            if value != _get(base, leaf):
+                _set(disk, leaf, value)
+        _atomic_write(path, _to_toml(disk))
+        for leaf, value in _leaves(disk):      # the caller's copy now matches the file
+            _set(cfg, leaf, value)
+        _baseline = copy.deepcopy(cfg)
     except OSError:  # pragma: no cover - best-effort persistence
         pass
+
+
+class ConfigUnreadable(Exception):
+    """config.toml can't be parsed right now, so nothing is written to it."""
+
+
+def write_language(lang: str) -> None:
+    """Change only the ``language`` line of the file, leaving the rest as is.
+
+    For the web endpoint: it must not rewrite settings it does not own, so it
+    edits the line in place (comments and all) and refuses an unreadable file."""
+    path = config_path()
+    try:
+        text = path.read_text(encoding="utf-8")
+        tomllib.loads(text)
+    except Exception as exc:   # noqa: BLE001
+        raise ConfigUnreadable(str(exc)) from exc
+    line = f'language = "{lang}"'
+    new, n = re.subn(r'(?m)^language[ \t]*=[ \t]*"[^"\n]*"', line, text, count=1)
+    if n == 0:
+        new = line + "\n" + text
+    _atomic_write(path, new)
+    if _cache is not None:
+        _cache.language = lang
+        if _baseline is not None:
+            _baseline.language = lang
 
 
 def set_language(lang: str) -> None:
@@ -239,7 +348,7 @@ def set_language(lang: str) -> None:
 
 def load_config(*, reload: bool = False) -> Config:
     """Return the cached config, loading (and first-run-creating) it if needed."""
-    global _cache
+    global _cache, _baseline
     if _cache is not None and not reload:
         return _cache
 
@@ -258,4 +367,5 @@ def load_config(*, reload: bool = False) -> Config:
                 "config.toml unreadable, using defaults", exc_info=True
             )
     _cache = cfg
+    _baseline = copy.deepcopy(cfg)
     return cfg
