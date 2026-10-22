@@ -581,7 +581,7 @@ _EXCLUDED = {
 _REACHED = {
     "it": "Il consiglio su «{name}» è raggiunto, sotto l'obiettivo in {hits} giri "
           "su {laps}. Nel piano trovi il prossimo.",
-    "en": "The advice on “{name}” is done, under the target on {hits} laps out of "
+    "en": "The tip on “{name}” is done, under the target on {hits} laps out of "
           "{laps}. The plan shows the next one.",
 }
 

@@ -136,7 +136,7 @@ _UI: dict[str, dict[str, str]] = {
         "en": "Open <b>Drive</b> in the sidebar and press <b>Coach Live</b>. The "
               "panel walks you through it, first the tablet with a QR code and "
               "then the game. When you're done, <b>I'm done</b> opens the "
-              "report card.",
+              "Report card.",
         "it": "Apri <b>In pista</b> nella barra laterale e premi <b>Coach "
               "Live</b>. Il pannello ti accompagna passo per passo, prima il "
               "tablet col codice QR e poi il gioco. Quando hai finito, <b>Ho "
@@ -304,7 +304,7 @@ _UI: dict[str, dict[str, str]] = {
               "tempi restano gli stessi, cambia solo chi le dice."},
     "set.radio.help": {
         "en": "Filters the voice to sound like a pit-to-car radio. It's only an "
-              "effect, and it changes nothing in the advice. Off is the clearest.",
+              "effect, and it changes nothing the coach says. Off is the clearest.",
         "it": "Filtra la voce perché suoni come una radio di pista. È solo un "
               "effetto e non cambia niente nei consigli. Spenta si capisce "
               "meglio."},
@@ -504,11 +504,11 @@ _UI: dict[str, dict[str, str]] = {
     "live.following": {"en": "You're working on “{name}”.",
                        "it": "Stai seguendo il consiglio «{name}»."},
     "live.following_sub": {
-        "en": "The coach reminds you in the corners of this advice.",
+        "en": "The coach reminds you in the corners of this tip.",
         "it": "Il coach te lo ricorda nelle curve di questo consiglio."},
     "live.finish": {"en": "I'm done, show me how it went",
                     "it": "Ho finito, mostrami com'è andata"},
-    "live.finish_sub": {"en": "Stops the coach and opens the report card.",
+    "live.finish_sub": {"en": "Stops the coach and opens the Report card.",
                         "it": "Ferma il coach e apre la Pagella."},
     "live.stop_quiet": {"en": "Stop without opening the report",
                         "it": "Ferma senza aprire il report"},

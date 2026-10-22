@@ -58,7 +58,7 @@
     // stessa domanda in quattro chiavi era la stessa frase in quattro posti.
     "err.backend":     { en: `Check that the analysis server is running.`,
                          it: `Controlla che il server di analisi sia acceso.` },
-    "err.pagella":     { en: `Couldn't load the report card.`,
+    "err.pagella":     { en: `Couldn't load the Report card.`,
                          it: `Non riesco a caricare la Pagella.` },
     "pag.nolaps":      { en: `You have no laps on this car and track yet.`,
                          it: `Per questa auto e questa pista non hai ancora giri registrati.` },
@@ -90,7 +90,7 @@
                          it: `In questa sessione non ho contato errori.` },
     "pag.plan":        { en: `The plan for your next run`, it: `Il piano per la prossima uscita` },
     // La regola vale per tutta la lista: si dice una volta, sopra la lista.
-    "pag.plan.rule":   { en: `Work on one piece of advice at a time, in order.`,
+    "pag.plan.rule":   { en: `Work on one tip at a time, in order.`,
                          it: `Lavora su un consiglio alla volta, nell'ordine.` },
     "pag.plan.none":   { en: `Nothing in the plan for now. No fault repeats often enough.`,
                          it: `Per ora nel piano non c'è niente. Nessun difetto si ripete abbastanza.` },
@@ -144,14 +144,14 @@
                              it: `Il riquadro del veleggio dice quanto tempo passi senza gas né freno.` },
     "adv.dynamics.throttle_late": { en: `On the way out, look at rear wheel slip. If it stays low and TC isn't working, you have room to get on the throttle earlier.`,
                                   it: `In uscita guarda lo slittamento delle ruote posteriori. Se resta basso e il TC non interviene, hai margine per tornare prima sul gas.` },
-    "adv.progress.corners": { en: `In the fault history, the marked row is your advice. Further down, the cards for these corners show how it goes session by session.`,
+    "adv.progress.corners": { en: `In the fault history, the marked row is your tip. Further down, the cards for these corners show how it goes session by session.`,
                             it: `Nello storico dei difetti la riga segnata è il tuo consiglio. Più sotto, le schede di queste curve dicono come va sessione per sessione.` },
-    "adv.progress.lap": { en: `In the fault history, the marked row is the advice you're following, session by session.`,
+    "adv.progress.lap": { en: `In the fault history, the marked row is the tip you're following, session by session.`,
                         it: `Nello storico dei difetti la riga segnata è il consiglio che segui, sessione per sessione.` },
     "adv.and": { en: `and`, it: `e` },
     "adv.goto": { en: `Show me`,
                 it: `Vai al punto` },
-    "adv.mark.title": { en: `Corner in the advice you're following`,
+    "adv.mark.title": { en: `Corner in the tip you're following`,
                       it: `Curva del consiglio che segui` },
     "pag.howto":       { en: `How to do it →`, it: `Come si fa →` },
     "pag.declined":    { en: `You set these aside.`, it: `Hai messo da parte questi consigli.` },
@@ -189,7 +189,7 @@
     "load.howto":      { en: `Reading your laps…`, it: `Sto leggendo i tuoi giri…` },
     "err.howto":       { en: `Couldn't load this page.`,
                          it: `Non riesco a caricare questa pagina.` },
-    "howto.back":      { en: `← Back to the report card`, it: `← Torna alla Pagella` },
+    "howto.back":      { en: `← Back to the Report card`, it: `← Torna alla Pagella` },
     "howto.noproblem": { en: `In this session I don't have a number for this fault.`,
                          it: `In questa sessione non ho un numero per questo difetto.` },
     "howto.ref":       { en: `Everything here is measured against your best lap, {time} from {when}.`,
@@ -244,7 +244,7 @@
     // measurable one. "Five numbers that add up" was therefore false at the
     // exact moment a first-time driver read it. The property is still stated,
     // as what the tab does when it can measure, and the empty case is named.
-    "tour.a12.x":      { en: `How the session went, before you forget it. How much you lost to your reference lap, the habits that cost you time, where and how often you go wrong. Below that is the plan for your next run, one piece of advice at a time. When a session can't be judged, this page says why.`,
+    "tour.a12.x":      { en: `How the session went, before you forget it. How much you lost to your reference lap, the habits that cost you time, where and how often you go wrong. Below that is the plan for your next run, one tip at a time. When a session can't be judged, this page says why.`,
                          it: `Com'è andata la sessione, prima di dimenticarla. Quanto hai perso sul tuo giro di riferimento, le abitudini che ti costano tempo, dove e quante volte sbagli. Sotto c'è il piano per la prossima uscita, un consiglio alla volta. Quando una sessione non si può giudicare, qui c'è scritto perché.` },
     "tab.session":     { en: `Session`, it: `Sessione` },
     "tab.compare":     { en: `Compare`, it: `Confronto` },
@@ -608,7 +608,7 @@
 
     // The training plan. It lives on the Pagella now, one piece of advice at
     // a time; Trends only points there.
-    "plan.elsewhere":  { en: `Your plan is on the Report card, one piece of advice at a time.`,
+    "plan.elsewhere":  { en: `Your plan is on the Report card, one tip at a time.`,
                          it: `Il tuo piano sta nella Pagella, un consiglio alla volta.` },
     "plan.goto":       { en: `Open the Report card`, it: `Apri la Pagella` },
 

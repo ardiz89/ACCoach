@@ -115,10 +115,10 @@ the game and leave the pits*, ticks itself off when the telemetry arrives.
 
 **You're driving.** The panel tells you whether the tablet is connected, which
 track and car you're on, how many laps you've completed and your best. If you're
-following a tip from the report card, you read *You're working on* with its
+following a tip from the Report card, you read *You're working on* with its
 name. The coach reminds you of it in the corners that advice covers. When you're
 done, press **I'm done, show me how it went**. The coach stops and the report
-opens on the report card. *Stop without opening the report* only stops the
+opens on the Report card. *Stop without opening the report* only stops the
 coach.
 
 **Session over.** If you close the game, after a minute the panel switches to
@@ -445,7 +445,7 @@ On a laptop, up to 1600 px wide, the page stays as it is. On a wider screen the
 text of the report and of the Engineer page grows by itself, up to 20 px instead
 of 14.
 
-### The report card
+### The Report card
 
 Open the report and you land on the **Report card** for your latest outing. It's
 a single page, built to be read in ten seconds. At the top you see track, car,
@@ -477,7 +477,7 @@ doesn't appear, and we don't make one up. Every session is measured against the
 same reference, today's. So if a fault goes down, it's you that changed and not
 the yardstick. When the reference changes, the history is recalculated.
 
-The report card is about driving. Setup problems stay with the Engineer.
+The Report card is about driving. Setup problems stay with the Engineer.
 
 **You follow the plan one tip at a time.** Each tip targets one fault and the
 corners where it costs most. **I'll follow it** and **Not for me** show on the
@@ -486,7 +486,7 @@ working on. Every tip has **How to do it →**.
 
 - **I'll follow it** puts it in progress, dated today.
 - **Not for me** takes a tip you haven't started out of the plan. The fault
-  stays on the report card, and the tip stays out of the plan until you take it
+  stays on the Report card, and the tip stays out of the plan until you take it
   back. You find it again under "You set these aside.", with the **Take it
   back** button.
 - **Drop it** closes the tip you're working on without counting it as done.
@@ -494,7 +494,7 @@ working on. Every tip has **How to do it →**.
 The tip you're working on is measured only on the laps you drive after you take
 it. It's done when, over at least three laps, you're under the target on half of
 them. The target is to win back half of what you lose today. When that happens,
-the report card tells you and offers the next tip.
+the Report card tells you and offers the next tip.
 
 **On track, the coach works on the same advice.** On your next outing the focus,
 described in "One theme at a time", works on the corners of the tip you're
@@ -513,7 +513,7 @@ progress the tabs stay as they are.
 ### How to do it
 
 **How to do it →** on a tip opens its page, and **← Back to the
-report card** takes you back. The page is built from your own laps, and it has
+Report card** takes you back. The page is built from your own laps, and it has
 these parts.
 
 - At the top, the problem in one sentence with your numbers. It tells you where

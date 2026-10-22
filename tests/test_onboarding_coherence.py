@@ -129,7 +129,7 @@ def test_the_wizard_step_sends_you_to_the_live_panel_and_the_report(lang):
     diceva che il pannello ti accompagna fino alla Pagella."""
     step = re.sub(r"<[^>]+>", "", t("wiz.s2", lang=lang))
     assert t("nav.live", lang=lang).strip() in step
-    assert ("Pagella" if lang == "it" else "report card") in step
+    assert ("Pagella" if lang == "it" else "Report card") in step
     assert "QR" in step
 
 
