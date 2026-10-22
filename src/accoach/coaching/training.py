@@ -621,8 +621,8 @@ _T = {
         "d.brake_move_later.s0": "Today you start braking at {v} km/h in gear "
                                  "{g}, {d} m before the slowest point of the "
                                  "corner.",
-        "d.brake_move_later.s0b": "Start from where you brake today. The «Your "
-                                  "braking points» panel, under the map in "
+        "d.brake_move_later.s0b": "Start from where you brake today. The “Your "
+                                  "braking points” panel, under the map in "
                                   "Compare, tells you at what speed and in which "
                                   "gear.",
         "d.brake_move_later.s0d": "Today you start braking at {v} km/h in gear "
@@ -749,7 +749,7 @@ _T = {
                               "follows.",
         "d.exit_throttle.s3": "Open the throttle a bit at a time and keep "
                               "opening, not all at once like a switch.",
-        "d.exit_throttle.s4": "In the Dynamics tab, look at the «Locking and wheelspin» "
+        "d.exit_throttle.s4": "In the Dynamics tab, look at the “Locking and wheelspin” "
                               "chart. The amber line is the rear, and on exit it "
                               "should stay almost flat. If the car has traction "
                               "control it stays flat anyway, because the TC holds "

@@ -577,8 +577,8 @@ The tabs come in three groups, in the order you usually read them.
   lap, a red cross marks where you lost it. The map **stays put** while you scroll
   the charts. Hover over the delta and the same point lights up on the map.
 
-  Under the map there's **Your braking points**, the sheet of your braking points
-  corner by corner. For each corner you read **the speed you brake at**, in which
+  Under the map there's **Your braking points**, the panel with your braking
+  points corner by corner. For each corner you read **the speed you brake at**, in which
   gear, how long the braking zone is and your minimum speed. Speed is a reference
   you have in every car, and you read it on the dash. There's also the **visual
   reference** where the track has one, like the 150 m board. Where it doesn't,
@@ -608,7 +608,7 @@ The tabs come in three groups, in the order you usually read them.
   throttle**. The filled mark is yours and the empty one is the reference's.
   That's what turns "you're wider on entry" into a diagnosis. Wide with the same
   braking point and wide braking 15 m later are two different mistakes. The
-  thresholds are the same as in Your braking points, so the mark and the **You
+  thresholds match the "Your braking points" panel, so the mark and the **You
   brake at** column talk about the same spot.
 
   At the bottom right of the drawing there's **the whole lap with the corner

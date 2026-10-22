@@ -2087,7 +2087,7 @@ let FLOW_STEP = 0;
 function tf(key, vals) {
   let s = t(key);
   // `{chiave|singolare|plurale}` sceglie la forma in base al valore di `chiave`.
-  // Serve perché senza si legge «1 giri · 1 che contano», e una sessione da un
+  // Serve perché senza si legge «1 giri · 1 validi», e una sessione da un
   // giro solo è il caso normale, non il caso limite: capita a ogni out-lap.
   // Una chiave non passata resta tale e quale, così un errore di battitura si
   // vede invece di scegliere in silenzio il plurale.

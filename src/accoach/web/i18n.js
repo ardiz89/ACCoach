@@ -114,8 +114,8 @@
                          it: `La scelta non si è salvata. Il piano qui sotto è com'è adesso.` },
     // I rimandi dalle schede al consiglio che segui (spec: rimandi).
     // I nomi delle curve aprono la riga, fuori dalla frase.
-    "adv.compare.brake_early": { en: `On the brake chart, look at where your trace starts compared with the reference. The Your braking points box has your braking point lap by lap.`,
-                               it: `Nel grafico del freno guarda dove parte la tua traccia rispetto al riferimento. Il riquadro Le tue frenate ha il punto di stacco giro per giro.` },
+    "adv.compare.brake_early": { en: `On the brake chart, look at where your trace starts compared with the reference. The “Your braking points” panel shows your braking point lap by lap.`,
+                               it: `Nel grafico del freno guarda dove parte la tua traccia rispetto al riferimento. Il riquadro «Le tue frenate» ha il punto di stacco giro per giro.` },
     "adv.compare.brake_late": { en: `Read the brake and speed charts together. A later braking point that lowers your minimum speed doesn't pay off.`,
                               it: `Guarda freno e velocità insieme. Una staccata più tarda che abbassa la velocità minima non paga.` },
     "adv.compare.over_brake": { en: `Compare how high your brake trace goes, and how long it stays there, with the reference.`,
@@ -156,7 +156,7 @@
     "pag.howto":       { en: `How to do it →`, it: `Come si fa →` },
     "pag.declined":    { en: `You set these aside.`, it: `Hai messo da parte questi consigli.` },
     // Il suggerimento sul nome di un difetto nello storico: dove porta il clic.
-    "dh.open":         { en: `Open «How to do it» for this fault`,
+    "dh.open":         { en: `Open “How to do it” for this fault`,
                          it: `Apri «Come si fa» per questo difetto` },
     "pag.undecline":   { en: `Take it back`, it: `Riprendi` },
 
@@ -227,7 +227,7 @@
     "howto.gloss":     { en: `Glossary`, it: `Glossario` },
     "howto.prog.lead": { en: `This fault in each session since you started following it, the oldest first.`,
                          it: `Questo difetto in ogni sessione da quando lo segui, dalla più vecchia.` },
-    "howto.prog.none": { en: `It shows here from the first session after you press «I'll follow it».`,
+    "howto.prog.none": { en: `It shows here from the first session after you press “I'll follow it”.`,
                          it: `Qui lo vedi dalla prima sessione dopo che hai premuto «Lo seguo».` },
 
     "tab.flow":        { en: `Lap explained`, it: `Il giro spiegato` },
@@ -252,8 +252,8 @@
     "ses.which":       { en: `Session`, it: `Sessione` },
     "ses.none":        { en: `No laps recorded for this car and track yet.`,
                          it: `Nessun giro registrato per questa auto e questa pista.` },
-    "ses.sub":         { en: `{laps} {laps|lap|laps} · {valid} that {valid|counts|count} · {mins} min`,
-                         it: `{laps} {laps|giro|giri} · {valid} che {valid|conta|contano} · {mins} min` },
+    "ses.sub":         { en: `{laps} {laps|lap|laps} · {valid} valid · {mins} min`,
+                         it: `{laps} {laps|giro|giri} · {valid} {valid|valido|validi} · {mins} min` },
     "ses.sub_temp":    { en: `track {from} → {to}`, it: `asfalto {from} → {to}` },
     "ses.best":        { en: `Best`, it: `Migliore` },
     "ses.mean":        { en: `Average`, it: `Media` },
@@ -719,8 +719,8 @@
     // problem and reads fine for every name in every table: "fuori pista in
     // Variante Ascari", "fuori pista in Tamburello".
     "lap.offTrack.at": { en: `at`, it: `in` },
-    "lap.offTrack.why": { en: `You went off track on this lap with 3 or more wheels, so it can't become your reference.`,
-                          it: `In questo giro sei uscito di pista con 3 o più ruote, quindi non può diventare il tuo riferimento.` },
+    "lap.offTrack.why": { en: `You went beyond the track limits on this lap, so it can't become your reference.`,
+                          it: `In questo giro sei uscito dai limiti della pista, quindi non può diventare il tuo riferimento.` },
     // The four stretches of a corner. Same words the debrief uses for the cause
     // ("understeer at the apex"), so one word keeps meaning one place.
     "phase.entry":     { en: `entry`, it: `ingresso` },

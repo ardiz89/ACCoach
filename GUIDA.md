@@ -513,7 +513,7 @@ Le schede stanno in tre gruppi, nell'ordine in cui di solito le leggi.
   ferma** mentre scorri i grafici. Se passi il mouse sul delta, lo stesso punto
   si accende anche sulla mappa.
 
-  Sotto la mappa trovi **Le tue frenate**, la scheda dei tuoi punti di frenata
+  Sotto la mappa trovi **Le tue frenate**, il riquadro dei tuoi punti di frenata
   curva per curva. Per ogni curva leggi **a che velocità freni**, in che marcia,
   quanto è lunga la staccata e che minima porti. La velocità è un riferimento
   che hai su ogni auto, e la leggi sul cruscotto. C'è anche il **riferimento
@@ -543,9 +543,9 @@ Le schede stanno in tre gruppi, nell'ordine in cui di solito le leggi.
   Sulle due linee vedi anche **dove freni e dove torni sul gas**, col segno
   pieno per te e vuoto per il riferimento. È quello che trasforma «sei più
   largo in ingresso» in una diagnosi. Largo con la stessa staccata e largo
-  staccando 15 m dopo sono due errori diversi. Le soglie sono le stesse della
-  scheda Le tue frenate, quindi il segno e la colonna **Freni a** parlano dello
-  stesso punto.
+  staccando 15 m dopo sono due errori diversi. Le soglie sono le stesse del
+  riquadro «Le tue frenate», quindi il segno e la colonna **Freni a** parlano
+  dello stesso punto.
 
   In basso a destra del disegno c'è **il giro intero con la curva cerchiata**.
   Due tornanti della stessa pista fanno la stessa immagine, e senza quel
