@@ -5,7 +5,7 @@ shouting "gas" without ever having said so would just be shouting.
 
 The pact names the **theme** and gives the word as an example, because the theme
 is what the filter actually enforces: with "braking" active the driver also hears
-"release", "later", "earlier". Promising a single word and then saying four would
+"trail it", "later", "earlier". Promising a single word and then saying four would
 be a promise broken on the second lap.
 """
 from accoach.coaching.cue import CueCategory
@@ -29,3 +29,12 @@ def test_no_trigger_no_pact():
     """Categories with no trigger word promise nothing — and add no stray space."""
     assert _brief_pact(CueCategory.LOCKED, "it") == ""
     assert _brief_pact(CueCategory.GOOD, "it") == ""
+
+
+def test_the_trail_brake_word_does_not_mean_release():
+    """Il cue scatta quando rilasci il freno TROPPO PRESTO: la cura è portarne un
+    filo all'inserimento. «rilascia» diceva il contrario di quel che serve."""
+    from accoach.coaching.cue import TRIGGER
+    assert TRIGGER[CueCategory.TRAIL_BRAKE] == {"it": "accompagna", "en": "trail it"}
+    for word in TRIGGER[CueCategory.TRAIL_BRAKE].values():
+        assert "rilascia" not in word and "release" not in word

@@ -47,6 +47,7 @@
   "Sovrasterzo, in uscita apri il gas piano": "cue_ebbe72c72a.wav",
   "Ultimo giro di benzina, rientra ai box": "cue_bea23aaec1.wav",
   "Veleggi, passa subito dal freno al gas": "cue_24b1e2e602.wav",
+  "accompagna": "cue_1722a884ff.wav",
   "cambia": "cue_306d5887c3.wav",
   "gas": "cue_facafa7487.wav",
   "meno freno": "cue_19fcd6af44.wav",
@@ -54,7 +55,6 @@
   "porta velocità": "cue_2abd77dfea.wav",
   "prima": "cue_cf4e9ab949.wav",
   "qui perdi": "cue_e7f7afe9b6.wav",
-  "rilascia": "cue_e0367a7153.wav",
   "scala": "cue_54274edafa.wav",
   "tutto gas": "cue_6605c6e521.wav",
   "veleggi": "cue_ec0910efa4.wav"

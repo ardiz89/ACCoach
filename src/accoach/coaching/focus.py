@@ -55,7 +55,7 @@ def _theme(cat: CueCategory, lang: str) -> str:
 
 
 # Names the theme and gives the word as an example, because the theme is what
-# the gate actually enforces: on "braking" the driver also hears "release",
+# the gate actually enforces: on "braking" the driver also hears "trail it",
 # "later", "earlier". The first wording promised the one word — a promise broken
 # on the second lap.
 #

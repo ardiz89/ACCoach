@@ -1,7 +1,7 @@
 """Play the trigger words so a human can judge them. Nothing else can.
 
 The measurements in the test suite prove a WAV is not silence. They cannot say
-whether "rilascia" is *pronounced well* when torn out of a sentence, and a single
+whether "accompagna" is *pronounced well* when torn out of a sentence, and a single
 word said badly is worse than the sentence it replaces.
 
 By default you hear what the driver hears: the same radio treatment

@@ -12,6 +12,7 @@ new files, so it doesn't touch the live-coaching code.
 
 from __future__ import annotations
 
+import re
 import statistics
 import sys
 from dataclasses import dataclass, field
@@ -2392,17 +2393,52 @@ def create_api(
             headers={"Content-Disposition": f'attachment; filename="{stem}.csv"'})
 
     def _serve(page: str) -> Response:
-        """Serve a web page; in demo mode inject a DEMO banner so synthetic laps
-        can never be mistaken for real ones (the launcher will happily open a
-        demo server already bound to the analysis port)."""
+        """Serve a web page with the app language written into it, and, in demo
+        mode, a DEMO banner so synthetic laps can never be mistaken for real
+        ones (the launcher will happily open a demo server already bound to the
+        analysis port).
+
+        The language is read from the config file on every request: the hub is
+        another process and only ever writes the file, so a change made there
+        shows on the next reload of the page."""
+        from .config import load_config
+        from .i18n import DEFAULT_LANGUAGE, LANGUAGES
+
         path = _WEB_DIR / page
-        if not demo:
-            return FileResponse(str(path))
         html = path.read_text(encoding="utf-8")
-        banner = ('<div class="demo-banner" data-i18n="demo.banner">'
-                  'These are sample laps made by HONE, not yours.</div>')
-        html = html.replace("<body>", '<body class="demo-mode">\n' + banner, 1)
+        try:
+            lang = load_config(reload=True).language
+        except Exception:  # pragma: no cover - the config must never break a page
+            lang = DEFAULT_LANGUAGE
+        if lang not in LANGUAGES:
+            lang = DEFAULT_LANGUAGE
+        html = re.sub(r'<html lang="[a-z]{2}">', f'<html lang="{lang}">', html, count=1)
+        html = html.replace(
+            '<script src="/static/i18n.js">',
+            f'<script>window.HONE_LANG = "{lang}";</script>\n'
+            '  <script src="/static/i18n.js">', 1)
+        if demo:
+            banner = ('<div class="demo-banner" data-i18n="demo.banner">'
+                      'These are sample laps made by HONE, not yours.</div>')
+            html = html.replace("<body>", '<body class="demo-mode">\n' + banner, 1)
         return Response(content=html, media_type="text/html")
+
+    @app.post("/api/language")
+    def set_app_language(payload: dict = Body(...)) -> dict:
+        """The page's language selector changes the language of the whole app.
+
+        Only the language: the body is read for one key and nothing else is
+        written, because this port is also reachable from the LAN."""
+        from .config import load_config, set_language
+        from .i18n import LANGUAGES
+
+        lang = payload.get("lang")
+        if not isinstance(lang, str) or lang not in LANGUAGES:
+            raise HTTPException(status_code=422, detail="lang must be one of "
+                                + ", ".join(LANGUAGES))
+        load_config(reload=True)      # il file, non una cache vecchia: l'hub può aver scritto
+        set_language(lang)
+        return {"lang": lang}
 
     @app.get("/")
     def index() -> Response:

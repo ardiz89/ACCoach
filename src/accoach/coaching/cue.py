@@ -211,7 +211,7 @@ TRIGGER: dict[CueCategory, dict[str, str]] = {
     CueCategory.BRAKE_LATER: {"it": "più tardi", "en": "later"},
     CueCategory.BRAKE_EARLIER: {"it": "prima", "en": "earlier"},
     CueCategory.LESS_BRAKE: {"it": "meno freno", "en": "less brake"},
-    CueCategory.TRAIL_BRAKE: {"it": "rilascia", "en": "release"},
+    CueCategory.TRAIL_BRAKE: {"it": "accompagna", "en": "trail it"},
     CueCategory.MORE_THROTTLE: {"it": "gas", "en": "throttle"},
     CueCategory.PARTIAL_THROTTLE: {"it": "tutto gas", "en": "full throttle"},
     CueCategory.COASTING: {"it": "veleggi", "en": "coasting"},

@@ -3,7 +3,9 @@
 //
 //   window.HoneI18n = { lang, t(key), set(lang) }
 //
-// `lang` is read from localStorage.hone_lang (default "en"). `t(key)` returns the
+// `lang` is the app language, written into the page by the server as
+// window.HONE_LANG (default "en" if the page was not served by HONE). The
+// browser keeps no language of its own. `t(key)` returns the
 // string in the active language, falling back EN -> key. Static UI is tagged in
 // the HTML with data-i18n* attributes; applyStatic() walks the DOM and fills them.
 // Strings injected by app.js / engineer.js / tour.js call HoneI18n.t(key) directly.
@@ -13,7 +15,6 @@
 // translated here — it will be localised on the Python side; the pages already
 // pass &lang=<lang> to /api so those land in the right language when ready.
 (function () {
-  var STORE = "hone_lang";
   var SUPPORTED = ["en", "it"];
 
   // ---- catalogue: {key: {en, it}} -----------------------------------------
@@ -1021,8 +1022,7 @@ Salva un setup nel gioco, poi ricarica questa pagina.` },
   }
 
   function readLang() {
-    var l = "en";
-    try { l = localStorage.getItem(STORE) || "en"; } catch (e) {}
+    var l = window.HONE_LANG;
     return SUPPORTED.indexOf(l) === -1 ? "en" : l;
   }
 
@@ -1082,11 +1082,18 @@ Salva un setup nel gioco, poi ricarica questa pagina.` },
     if (SUPPORTED.indexOf(l) === -1) l = "en";
     lang = l;
     window.HoneI18n.lang = l;
-    try { localStorage.setItem(STORE, l); } catch (e) {}
+    // The selector changes the language of the whole app, not of this browser:
+    // the server writes it to the config, where the hub reads it too.
+    try {
+      fetch("/api/language", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lang: l })
+      }).catch(function () {});
+    } catch (e) {}
     applyStatic();
     syncSelectors();
     // Re-render the dynamic views without a reload when the page provides a
-    // hook; otherwise fall back to a full reload (state is in localStorage).
+    // hook; otherwise fall back to a full reload (the language is in the config).
     try {
       if (typeof window.HoneI18nRerender === "function") {
         var r = window.HoneI18nRerender();

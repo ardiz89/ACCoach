@@ -89,7 +89,7 @@ _HARNESS = r"""
 const fs = require("fs");
 const [i18nPath, engPath, lang] = process.argv.slice(2);
 global.window = {};
-global.localStorage = { getItem: () => lang, setItem() {} };
+window.HONE_LANG = lang;
 global.document = { readyState: "complete", querySelectorAll: () => [],
                     querySelector: () => null, documentElement: {} };
 eval(fs.readFileSync(i18nPath, "utf8"));
