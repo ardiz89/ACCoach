@@ -1,510 +1,1001 @@
-# HONE — Frequently Asked Questions
+# HONE user guide
 
-Quick links: [Requirements](#requirements) · [Install](#install) ·
-[SmartScreen & SHA-256](#smartscreen--security) · [Privacy](#privacy) ·
-[Overlay](#overlay) · [Recording](#how-lap-recording-works-and-starting-from-the-pits) ·
-[Free vs Pro](#free-vs-pro) · [Troubleshooting](#troubleshooting)
+HONE is a real-time driving coach for **Assetto Corsa** and **Assetto Corsa
+Competizione**. While you drive it talks to you and shows an overlay with the gap
+to your best lap. After the session you get the debrief and the full analysis in
+the browser. There is nothing to set up in the game, because HONE reads the
+telemetry from the shared memory of AC and ACC.
+
+This guide takes you from the first start to your first lap with the coach, and
+on to the analysis. If you're looking for one thing, jump to
+[Install](#install), [SmartScreen](#smartscreen--security),
+[Privacy](#privacy), [the overlay](#4-reading-the-overlay),
+[lap recording](#how-lap-recording-works-and-starting-from-the-pits) or
+[what to do when something goes wrong](#9-if-something-goes-wrong).
 
 ---
 
-## Requirements
+## 1. What you need
 
-- **Windows.** AC and ACC expose telemetry via shared memory, which is
-  Windows-only.
-- **Assetto Corsa** or **Assetto Corsa Competizione**.
-- For the overlay: the game in **Borderless** (windowed-fullscreen) mode.
-- From source only: Python 3.11+ and `pip install -r requirements.txt`. With the
-  executable you need nothing.
+- **Windows.** AC and ACC publish their telemetry through shared memory, and
+  that only exists on Windows.
+- **Assetto Corsa** or **Assetto Corsa Competizione**, installed.
+- **HONE**, in one of the two ways below.
 
-## Install
+Your laps end up in **`Documents\ACCoach\laps`**, whichever way you run HONE.
+That way the analysis always finds them.
 
-### Executable (recommended)
+### Install
 
-1. Download `HONE.exe` (or the zip) from the
-   [Releases](https://github.com/ardiz89/ACCoach/releases) page.
-2. Run it. On first run Windows may show a SmartScreen notice (see below).
-3. Pick a mode from the launcher, or from a terminal: `HONE.exe live`,
-   `HONE.exe web`, etc.
+**The executable**, if you only want to use it. Download the zip from the
+[Releases](https://github.com/ardiz89/ACCoach/releases) page, unzip it and run
+`HONE.exe`. You don't need Python.
 
-### From source
+**The source**, if you develop. You need Python 3.11 or newer.
 
 ```powershell
 git clone https://github.com/ardiz89/ACCoach.git
 cd ACCoach
 pip install -r requirements.txt
-python -m accoach live        # coach + overlay
-python -m accoach             # list every command
+python -m accoach live        # coach and overlay
+python -m accoach             # list the commands
 ```
 
-## SmartScreen & security
+From the source you can also double-click `HONE.bat`. The first time, it sets up
+its own Python environment and installs what HONE needs.
 
-On first run Windows may say *"Windows protected your PC"* (Microsoft Defender
-SmartScreen). **This is normal and does not mean the file is infected.**
+### SmartScreen & security
 
-It happens because the executable isn't signed with a paid code-signing
-certificate (hundreds of euros a year): without accumulated "reputation",
-SmartScreen warns about any new app from an independent author.
+The first time you run it, Windows may say *"Windows protected your PC"*. That's
+Microsoft Defender SmartScreen. **It's normal, and it doesn't mean the file is
+infected.**
 
-To run it: click **"More info"** → **"Run anyway"**.
+The executable isn't signed with a paid code-signing certificate, which costs
+hundreds of euros a year. Without a reputation built up over time, SmartScreen
+warns about any new app from an independent author.
 
-### Verify the file (SHA-256)
+To run it, click **More info** and then **Run anyway**.
 
-Every release publishes the SHA-256 of the executable. Compare it with the file
-you downloaded: if they match, the file is exactly what was published.
+### Verify the download (SHA-256)
 
-In PowerShell:
+Every release publishes the SHA-256 of its zip. Compare it with the file you
+downloaded. If they match, the file is exactly the one that was published. In
+PowerShell, from the folder where you saved it, run this.
 
 ```powershell
-Get-FileHash .\HONE.exe -Algorithm SHA256
+Get-FileHash .\HONE-<version>-windows.zip -Algorithm SHA256
 ```
 
-Compare the string with the one in the release notes. If they differ, **do not
-run the file** and re-download from the official Releases page.
+Use the name of the zip you actually downloaded. Compare the result with the
+string in the release notes. If they differ, **don't run the file**, and
+download it again from the official Releases page.
 
-## Privacy
+### Privacy
 
-HONE is **100% offline**. Concretely:
+HONE works **entirely offline**.
 
-- No account, no login.
-- No outbound network calls: telemetry, laps and analysis never leave your PC.
-- Data is stored locally under `Documents\ACCoach\` (laps in `laps\`, logs in
-  `logs\`, settings in `config.toml`).
-- The local servers (`web` on `127.0.0.1:8778`, backend on `127.0.0.1:8777`)
-  listen only on `localhost` — your machine — to let HONE's parts talk to each
-  other, not to the internet.
+- There's no account and no login.
+- HONE makes no calls to the internet. Telemetry, laps and analysis never leave
+  your PC.
+- Everything is stored under `Documents\ACCoach\`. Laps are in `laps\`, logs in
+  `logs\` and settings in `config.toml`.
+- HONE's parts talk to each other through two local servers, the analysis on
+  port 8778 and the live backend on port 8777. They only listen on this PC.
+  The exception is when you turn on access from other devices on your network,
+  described in "Opening the report on a phone or tablet".
 
 You can wipe everything at any time by emptying the `Documents\ACCoach\` folder.
 
-## Overlay
+---
 
-The overlay is transparent, always-on-top and *click-through* (it never steals
-clicks from the game).
+## 2. Up and running in 30 seconds
 
-- **Not showing over the game?** Set the game to **Borderless**. A transparent
-  overlay can't draw over *exclusive fullscreen* — same constraint as SimHub and
-  Crew Chief.
-- **Move or close it:** start it with `--interactive`, or close the terminal that
-  launched it (`Ctrl+C`).
-- **The thin amber line** is your focus: theme, corner and the tenths it costs.
-  Once the coach has moved to trigger words (see *One theme at a time*) it also
-  carries **an example word**, like "LESS BRAKE" — the whole sentence stays in
-  the pill above it and in the debrief; the line names the theme, not every
-  word you'll hear.
-- **Watching your own trail braking:** turn on **Settings → Show the pedal
-  trace**. It adds a strip under the HUD with your throttle (green) and brake
-  (red) over the last few seconds. The ribbon below them goes **amber** while
-  both pedals are down — that's trail braking — **grey** while neither is, which
-  is time you're giving away, and stays blank on a clean release. The coach
-  *tells* you about your brake release after the fact; this is the only place
-  you can watch it as you do it. Off by default because it makes the overlay
-  taller.
+1. **Start the game** and get on track in a **Practice** session, with the car
+   and track you want to train on.
+2. **Put the game in Borderless mode**, a window without borders, and not in
+   exclusive fullscreen. The overlay can't draw over exclusive fullscreen.
+3. **Open HONE.** The **hub** opens. Its sidebar has six sections,
+   **Home · Drive · Analysis · Setup · Devices · Settings**. Go to **Drive** and
+   press **Coach Live**.
 
-## One theme at a time (and why the coach says less after a few laps)
+> After the first time, Home shows you your last session, already analysed.
+> That's where you go to see how it went.
 
-Once you've put in a few clean laps, HONE stops commenting on everything and
-**elects one weakness**: the corner where you lose the most, and why. It tells
-you ("New focus — Variante Ascari: let's work on braking…"), and **from then on
-it only talks about that theme on track**. Everywhere on the lap, not just in
-that corner: if your braking is off, it isn't off in one place only, and the
-*mistake* is what gets trained.
+**The Drive panel walks you through it.** Once you press Coach Live, the page
+goes through three moments, one after the other.
 
-And it says it in **one word**, not a sentence: "less brake", "later",
-"throttle". The words are agreed with you **up front**, in the message that
-announces the focus — *"On track I'll only say words about braking, like 'less
-brake'"* — and the focus line on the overlay keeps the word in front of you while
-you drive.
+**Before you go.** The first step, *Coach Live is on*, ticks as soon as the coach
+answers, usually within a couple of seconds. At that point voice and overlay are
+ready. Next comes *Connect your tablet to the engineer*. Scan the QR code with the
+tablet's camera, or open the address written next to it. The tablet can only
+connect with network access on. If it's off, the panel offers a *Turn on network
+access* button, and afterwards you restart Coach Live. If you don't need the
+tablet, press *Skip, I'll drive without*. The last step, *Start the game and
+leave the pits*, ticks itself when the telemetry arrives.
 
-This isn't a whim: three independent professional coaches impose the same limit
-— **two or three themes per session**, and on track **trigger words of one to
-three words**, agreed beforehand. The reason they give is always the same, and
-it's yours: a driver in motion has finite bandwidth, and by the tenth sentence in
-three laps you've stopped listening.
+**You're driving.** The panel tells you whether the tablet is connected, which
+track and car you're on, how many laps you've completed and your best. If you're
+following a piece of advice from the report card, you read *You're working on*
+with its name. The coach reminds you of it in its corners. When you're done,
+press **I'm done, show me how it went**. The coach stops and the report opens on
+the report card. *Stop without opening the report* only stops the coach.
 
-**Nothing is lost.** Whatever the coach keeps quiet about on track is in the
-**debrief** and in the report, with its tenths: the debrief is computed from the
-lap, not from what was said, so the corners the voice skipped are all still
-there. The voice picks what to tell you *now*; the debrief picks nothing.
+**Session over.** If you close the game, after a minute the panel switches to
+*Session over* and offers two choices. *Show me how it went* opens the report.
+*I'm staying on track* is for when you're only changing track. The coach stays on
+until you stop it.
 
-**Outside the filter is anything that isn't driving technique on the active
-theme**: lock-ups, wheelspin, understeer and oversteer, fuel, the pit calls,
-the finish-line setup advisories, praise — always spoken.
+**If you forget to press the button.** In **Settings** there's *Record by itself
+when the game starts*. With the hub open, HONE notices that AC or ACC has started
+and begins recording on its own. That way you don't lose a session you forgot to
+start. **Only the silent recorder starts**, and the voice and the overlay stay
+off until you press Coach Live. A coach that starts talking just because you
+opened the game would be an intrusion. The option is off by default. If you stop
+the recording by hand it stays stopped, and starts again only when you close and
+reopen the game.
 
-Until there's a focus — the first laps, while it's still watching you drive — the
-coach talks about everything, as it always did. And when the corner improves, or
-won't budge after a few laps, it parks it and moves on: new theme, new words.
+From the command line you do the same thing like this.
 
-## Why it went quiet after a cut
+```
+python -m accoach live           # voice coach and overlay, in one process
+```
 
-On a lap the game has **invalidated** (ACC only — AC has no such flag), HONE
-keeps coaching but stops **praising**. A corner where you gained time on an
-invalidated lap earns no "Nice stretch" and no green on the corner card: you
-gained that time by leaving the track, and congratulating you for it would be
-teaching you the shortcut. Everything you *lost* is still called out, and the
-debrief still shows the whole lap — an invalidated lap is a free lap to learn
-from, and usually the one with the most in it.
+Add `--silent` if you want the overlay without the voice. Add `--interactive` if
+you want to drag the overlay somewhere else on the screen.
 
-## Being called into the pits
+---
 
-When the race engineer proposes a change that needs the garage, it doesn't just
-tell you *what* to change — it tells you *when to come in*. You'll hear it at the
-start of the final sector (or about 20 s before the pit entry, whichever comes
-first), again just before the entry, and once more standing in the box, telling
-you what to do with the change.
+## 3. How the coach trains you
 
-There is a fourth thing, and you don't hear it — you see it. The overlay has a
-**pill** that normally shows the last piece of advice spoken, and fades on its
-own. From the call onwards, that pill is no longer the last piece of advice: it
-is the **pit-in warning**, in amber, and it **does not fade**. It stays lit
-until you enter the pit lane, or until the change is no longer pending (if it
-gets dropped): a call that disappears after two seconds is a call you miss if
-you happened to be looking at the corner ahead. The advice is still **spoken**
-— it only gives up that line, and takes it back as soon as the warning goes
-out.
+The coach works like a real race engineer. First it **watches you drive**, then
+it **corrects you**. What it tells you comes in three kinds.
 
-**No game publishes where the pit lane begins**, so HONE learns it: it watches
-where you leave the track the first time you actually drive in, and keeps the
-median across visits. On a track you've never pitted at, the second call simply
-doesn't exist — a guessed pit entry spoken with confidence is worse than
-silence, because you'd lift for it. Returning to the garage from the game menu
-teaches it nothing, deliberately: the car vanishes from mid-track and reappears
-in the box, and taking that jump at face value would put the pit entry in the
-middle of a straight.
+### Immediate warnings
 
-Changes you can make **at the wheel** (TC, ABS, brake bias) need no confirmation
-at all: HONE reads those channels live and sees the dial move by itself. On AC
-those levels aren't published, so the Engineer page offers a "Done" button
-instead.
+These don't need a reference lap. From the first metre of the first lap, the
+coach warns you when something is wrong in absolute terms.
 
-## What the analysis app shows
+- If you **lock up** under braking, you hear "You're locking up, ease off the
+  brake".
+- If you **spin the wheels** on exit, you hear "Wheelspin on exit, ease the
+  throttle".
+- If the car **understeers**, you hear "The front is sliding, go in slower".
+- If the car **oversteers**, you hear "Oversteer, open the throttle gently on
+  exit".
+- If you **coast**, with neither brake nor throttle pressed, you hear "You're
+  coasting, go straight from brake to throttle".
+- If you let go of the brake too early, without **trail braking**, you hear
+  "Releasing too early, trail the brake to turn-in".
 
-Open it from the hub (**Analysis → Analysis and report**) or with
-`python -m accoach web`. It runs on your machine, on your laps; there is no
-account and nothing is uploaded.
+### Corner advice
 
-Open the report and you land on the **Report card** for your latest outing. It
-is one page, built to be read in ten seconds. At the top you get track, car,
-date and how many laps you drove (valid out of total). The dropdown opens an
-older outing.
+To tell you where you lose time and why, the coach needs a **reference lap**,
+your fastest valid one.
 
-Under that is the verdict, one or two sentences: how much you leave on the
-table each lap against your reference lap, and where it piles up. It compares
-that with the previous session on the same car and track. If there isn't one,
-it says so.
+1. **Drive one clean, complete lap**, from the line to the line. The one that
+   starts from the pits doesn't count. It's saved and becomes the reference.
+2. Corner advice starts on the next lap. The coach compares your lap with the
+   reference. **As you approach each corner** it gives you the advice for that
+   corner. For example, it says "Carry more speed through the corner" or "You're
+   running deep, brake earlier". It speaks before the corner, while you can
+   still do something about it.
+3. Once you get that corner right, it **stops repeating** that advice.
+4. Every time you beat your reference, the comparison moves to the new lap.
 
-Then, in order:
+> When you're not on a good lap, like after the pits, a spin or an off, the
+> coach **stays quiet** about technique. Only the safety warnings remain.
 
-- **Your main faults.** These are driving habits that repeat across several
-  corners, like braking too early or getting back on the throttle late. For
-  each one you see what it costs you per lap, in how many corners and on how
-  many laps it shows up, and an arrow (down, same, up) against the previous
-  session, with your last sessions beside it. Progress shows up here, as a
-  fault going down from one session to the next. A click opens it corner by
-  corner.
+### One theme at a time
+
+After a few complete laps, dirty ones included, the coach stops commenting on
+everything. It **picks one weakness**, the corner where you lose the most and
+why. It announces it with a sentence like "The new focus is Variante Ascari.
+Let's work on braking". **From then on it only talks to you about that theme on
+track**, all around the lap and not only in that corner. If your braking is off,
+it isn't off in one place only, and the habit is what you train.
+
+This applies to the themes the coach can recognise anywhere on the track, which
+are braking and traction. With a focus on cornering or on the line, the voice
+doesn't narrow, because that advice only comes once the corner is over.
+
+On braking and traction it speaks to you **with a word** instead of a sentence,
+like "less brake", "later" or "throttle". It tells you the words **in advance**,
+in the message that announces the focus. For example, "On track you'll only hear
+braking words, like “less brake”". Then the focus line on the overlay keeps them
+in front of you while you drive.
+
+Three independent professional coaches set themselves the same limit, **two or
+three themes per session**, and on track **short words** agreed beforehand. A
+driver can only take in so much, and by the tenth sentence in three laps you've
+stopped listening.
+
+**You don't lose anything.** Whatever the coach keeps quiet about on track is in
+the **debrief** after the session and in the report, with its tenths. The
+debrief is worked out from the lap, not from what the voice said. So it also has
+the corners the voice skipped. The voice chooses what to tell you now, and the
+debrief chooses nothing.
+
+**The filter only covers driving technique.** You always hear lock-ups, wheelspin,
+understeer and oversteer, fuel, pit calls, setup advice at the line and praise.
+
+Until there's a focus, in the first laps while it's still watching you, the
+coach talks about everything. When the corner improves, or doesn't improve after
+a few laps, the coach sets it aside and moves to the next one. The theme changes,
+and so do the words.
+
+### Setup advice
+
+Between laps, when a symptom keeps coming back, the coach suggests an
+adjustment. It can be about tyre pressures, TC and ABS levels where the car has
+them, or brake bias. It only judges pressures on GT3 cars, with the tyres up to
+temperature, aiming for about 26.5 psi. On other cars it doesn't mention them,
+because that figure only holds for GT3.
+
+There are two kinds of change, and they close in different ways.
+
+- **At the wheel.** A dial you turn on the straight, like TC, ABS or brake bias.
+  You don't have to confirm anything, because HONE **watches the channel** and
+  notices on its own that the dial has moved. The test starts without you taking
+  your hands off the wheel. On AC those levels can't be read, so the Engineer
+  page gives you an **I've changed it** button.
+- **In the pits.** A setup file to write. Here the coach also tells you **when to
+  come in**.
+
+### The Track record
+
+On the **Engineer** page, under the proposal, there's the **Track record**. It
+tells you how many proposed changes were **kept** after the measurement, and how
+many were rejected. It's the only number on that page that isn't a claim of ours.
+The tests you drove count it, and it can prove us wrong.
+
+It also shows **which levers earn their place**, whether "most effective first"
+holds up, and the **side effects** you've seen. One example is a change that
+cured understeer on entry and brought some on exit. We never predict side
+effects. They get seen and written down.
+
+While there are only a few tests, **you get counts and no percentages**. Over
+three tests a hit rate is just noise.
+
+### Being called into the pits
+
+When a change has to be made in the garage, you hear three things.
+
+1. **At the start of the last sector**, or about 20 s before the pit entry if
+   that comes first, "Setup change ready, box this lap". The second rule is
+   needed. On some circuits the pit lane splits off **before** the last sector.
+   A call tied to the sector would come with the entry already behind you.
+2. **Just before the entry**, "Pit entry just ahead, come in".
+3. **Standing in the box**, what to do with the change. It tells you out loud
+   because the change is on a browser page you weren't looking at while driving.
+
+There's a fourth thing you don't hear but **see**. From the first call, the
+pit-in warning stays lit on the overlay until you enter the pit lane. You'll find
+it in "Reading the overlay".
+
+Keep in mind that **no game publishes where the pit lane begins**. HONE learns
+it by watching where you leave the track when you actually come in, and keeps the
+median over several visits. On a track where you've never pitted, call number 2
+**doesn't exist**, because a guessed pit entry would make you lift in the wrong
+place. From your second visit onwards the call is there.
+
+Going back to the garage from the game menu teaches it nothing, on purpose. The
+car vanishes mid-track and reappears in the box. Taking that jump at face value
+would put the pit entry in the middle of a straight.
+
+### How lap recording works (and starting from the pits)
+
+You don't have to do anything special. Start the session, practice, hotlap or
+race, and drive.
+
+- A lap closes when you **cross the line**. HONE recognises it from **two signals
+  together**, the game's lap counter and your track position starting again from
+  zero. One alone isn't enough. On ACC the counter doesn't count the out-lap.
+  Without the second signal, the first flying lap after every pit exit was lost.
+  The time we save is the game's official one.
+- The **first lap is almost always partial**, because you start mid-track, and we
+  discard it. We only save **complete** laps, from line to line.
+- **If you start from the pits**, recording is paused in the garage and in the pit
+  lane. The out-lap is partial and discarded, and the first lap saved is your
+  first flying lap. The lap on which you come into the pits isn't saved either.
+  If you change car or track everything resets, and a lap never spans two
+  sessions.
+- A lap has two independent qualities. It's **complete** if it started from the
+  line, and only then is it saved. It's **clean** if you stayed within track
+  limits. A dirty lap is saved, but it **never becomes the reference**.
+- **How we decide a lap is clean depends on the game**, because the two titles
+  tell us different things. On **AC** we count wheels off the track, and with 3
+  or more the lap is dirty. On **ACC** we read the game's own track-limits
+  verdict. So on ACC a cut counts even without a wheel on the grass. If the game
+  tells us nothing, the lap stays "unknown", which doesn't mean clean.
+- The report also tells you **which corner** you lost the lap at, for example "off
+  track at Variante Ascari". Laps recorded before version 8 of the schema don't
+  have this. They say the lap was dirty, but not where.
+
+---
+
+## 4. Reading the overlay
+
+- **The delta bar** fills **to the right in red** when you're slower than the
+  reference, and **to the left in green** when you're faster.
+- **At the top** you see your **PB**, the lap you're racing against, and the
+  **predicted time** if you keep the pace. When a braking zone is coming, that
+  space goes to the **countdown in metres**. When it's time to brake it becomes a
+  single red word, **BRAKE**. The threshold is in time, not distance. Ten metres
+  are 0.14 s at 250 km/h, and half a second in a slow corner.
+- **A pill** shows the last piece of advice spoken, and fades on its own. When
+  the engineer proposes a change that can **only be made in the pits**, the coach
+  calls you in at the end of the lap. From then on the pill becomes the **pit-in
+  warning**, in amber, and it doesn't fade. It stays until you enter the pit lane,
+  or until the change is no longer pending, for example if it gets withdrawn. A
+  call that lasts two seconds is one you miss if you were looking at the corner.
+  The advice keeps coming by voice. It only gives up that line, and takes it back
+  when the warning goes out.
+- **Below it there's a thin amber line**, the **focus**. It's the theme you're
+  working on, with the corner and the tenths it costs you. Once the coach has
+  moved to short words, described in "One theme at a time", it also shows **an
+  example word**, like "LESS BRAKE". The whole sentence stays in the pill and in
+  the debrief. The focus line reminds you of the theme, not of every word you'll
+  hear.
+
+### The pedal trace
+
+You turn it on in **Settings**, with **Show the pedal trace**. It's **off** by
+default, because it makes the overlay taller. Keep it on when you're working on
+your brake release, and turn it off when you want a clean screen.
+
+It's a strip under the overlay with your **throttle in green** and your **brake
+in red**, over the last few seconds, as you use them. Under the two traces there's
+a ribbon that colours itself.
+
+| Ribbon | What you're doing |
+|---|---|
+| **amber** | You're pressing both pedals, so **you're trail braking**. |
+| **grey** | You're pressing neither pedal, and that's **time you're giving away**. |
+| nothing | A clean release. You let go of the brake and picked up the throttle with no gap. |
+
+At the top right you get the same thing in one word, **TRAIL**, or **COAST** with
+a timer for how long you've been coasting.
+
+The coach **tells** you about trail braking, but after the fact. Here you **see
+it while you do it**, and that's the only way to correct a release. Where the two
+traces overlap, that's your trail braking.
+
+> On road cars the spoken advice about trail braking is **off**. There, carrying
+> the brake into the turn rotates the car, and without aerodynamic downforce a
+> late release makes it snap. The trace stays, because watching it doesn't tell
+> you what to do.
+
+### The corner number
+
+At the bottom, after each corner, you read **what that corner cost you** against
+your reference, with a coloured dot. It stays there until you finish the next
+corner.
+
+| Colour | What it says |
+|---|---|
+| **cyan** | You gained **at least 0.25 s**. That's the threshold for the coach's praise. |
+| **green** | You're within the normal range, between a 0.25 s gain and a 0.12 s loss. |
+| **yellow** | You lose **0.12 to 0.25 s**. From 0.12 s the coach starts talking to you. |
+| **red** | You lose **more than 0.25 s**. |
+
+Three things look like faults and aren't.
+
+- **The number is measured, the colour is tuned.** You can recount the tenths by
+  hand. We chose the colour thresholds, and they're the same ones the coach uses
+  to decide whether to speak. So colour and voice never tell you different things.
+- **The number is relative to your reference**, the one chosen for today's
+  conditions. If your best lap is slow, green doesn't mean you're fast. It means
+  you're **consistent**.
+- **In your first session with a car or on a new track the box isn't there**, not
+  even as a dash. Without one of your complete laps there's nothing to measure
+  against, and a made-up number would be worse than none. It also disappears in
+  the pits, on the out-lap and on off-pace laps.
+
+The spoken advice **doesn't change**. It always comes at the entry of the same
+corner, on the next lap, where you can still do something about it. The number is
+an account after the fact, and that's why it can be missing.
+
+### When the delta isn't there
+
+The delta only shows **on laps that can count**, the ones that started from the
+line. That's not a fault. A number comparing the pit lane with a flying lap goes
+over 30 s and pins the bar at full scale. It would look like a disastrous lap,
+and it isn't a lap at all. In its place you always find **the reason**.
+
+| What you read | What's going on |
+|---|---|
+| *In the pits. I start at the line.* | You're in the garage or the pit lane. |
+| *Out lap. I'll start at the line.* | The coach starts working from the line. |
+| *No reference yet. Drive one clean lap.* | You don't have a complete lap with this car on this track yet. |
+| *Lap invalidated. Keep going, no delta.* | The game has cancelled this lap, which only happens on ACC. |
+| *Off-pace lap. I'll pick up at the line.* | Here the delta **stays**, because the lap started from the line. |
+| *Flying lap* | It lights up for a moment when the coach starts working again. |
+
+On an **invalidated lap the coach keeps talking to you**, and only the delta goes
+away. A cancelled lap is a free lap. Braking, lock-ups, tyres and setup can all
+be read the same, and going back to the pits would be time thrown away.
+
+There's one exception, **praise**. On a lap the game no longer counts, in a corner
+where you gained, you don't hear "You're gaining here, same again next lap". And
+the corner box doesn't show that gain. You gained that time by leaving the track,
+and praise would teach you the shortcut. The advice on corners where you **lost**
+time all stays. On a lap you've thrown away, that's usually where there's most to
+learn.
+
+Without a reference, on the other hand, everything that doesn't need one stays
+on. Understeer and oversteer, coasting, trail braking, gears, pressures and
+temperatures are always there. Worth knowing in your first session with a new car.
+
+---
+
+## 5. Analysis and report in the browser
+
+Once the session is over, you go through it all calmly.
+
+- In the hub, in the **Analysis** section, press **Analysis and report**. From the
+  command line, type this instead.
+  ```
+  python -m accoach web
+  ```
+  The page `http://127.0.0.1:8778` opens by itself.
+
+On a laptop, up to 1600 px wide, the page stays as it is. On a wider screen the
+text of the report and of the Engineer page grows by itself, up to 20 px instead
+of 14.
+
+### The report card
+
+Open the report and you land on the **Report card** for your latest outing. It's
+a single page, built to be read in ten seconds. At the top you see track, car,
+date and how many laps you drove, with the valid ones in brackets. The dropdown
+picks an older outing.
+
+Under it is the verdict, in one or two sentences. It tells you how much you leave
+on average each lap against your reference lap, and where it piles up. It
+compares that with the previous session, same car on the same track. If there's
+no previous session, it says so.
+
+Then come four blocks, in this order.
+
+- **Your main faults.** Driving habits that repeat across several corners, like
+  braking too early or getting back on the throttle late. For each one you see
+  what it costs you per lap, in how many corners and on how many laps it shows up.
+  Beside it, an arrow tells you whether it went down, stayed the same or went up
+  since the previous session. Next to that you see your last sessions. That's
+  where you read your progress, as a fault going down from one session to the
+  next. A click opens it corner by corner.
 - **Where you lose most.** The corners that cost you the most, by name.
-- **Most frequent mistakes.** Lockups, wheelspin, understeer, oversteer and
+- **Most frequent mistakes.** Lock-ups, wheelspin, understeer, oversteer and
   off-tracks, counted over the session. Only the ones that happened show up. On
-  ACC with ABS on, physical lockup doesn't happen, so we don't count it.
+  ACC with ABS on, a physical lock-up doesn't happen, so we don't count it.
 - **The plan for your next run.** Three pieces of advice at most, in order.
 
-Every number comes from your laps. When a figure isn't there, the line says so
-or doesn't appear. We don't make one up. Every session is measured against the
-same reference, today's, so when a fault goes down it is you that changed and
-not the yardstick. When the reference changes, the history is recalculated.
+Every number comes from your laps. If a figure is missing, the line says so or
+doesn't appear, and we don't make one up. Every session is measured against the
+same reference, today's. So if a fault goes down, it's you that changed and not
+the yardstick. When the reference changes, the history is recalculated.
 
 The report card is about driving. Setup problems stay with the Engineer.
 
-**You follow the plan one piece of advice at a time.** Each piece of advice is
-about one fault and the corners where it weighs most. The three choices are for
-the piece at the top; the others only show **How to do it →**.
+**You follow the plan one piece of advice at a time.** Each piece is about one
+fault and the corners where it weighs most. **I'll follow it** and **Not for me**
+appear on the first proposed piece, until you follow one. **Drop it** appears on
+the piece in progress. They all have **How to do it →**.
 
 - **I'll follow it** puts it in progress, dated today.
 - **Not for me** takes a piece you haven't started out of the plan. The fault
-  stays on the report card, and the advice stays out of the plan until you
-  take it back. You find it again under "You set aside", with **Take it back**.
-- **Drop it** closes the one in progress without counting it as done.
+  stays on the report card, and the advice stays out of the plan until you take it
+  back. You find it again under "You set these aside.", with the **Take it back**
+  button.
+- **Drop it** closes the piece in progress without counting it as done.
 
 The piece in progress is measured only on the laps you drive after you take it.
-It counts as done when, over at least three laps, you are under the target on
-half of them. The target is to win back half of what you lose today. When that
-happens the report card tells you and offers the next one.
+It's done when, over at least three laps, you're under the target on half of
+them. The target is to win back half of what you lose today. When that happens,
+the report card tells you and offers the next piece.
 
-**In the car, the coach follows your advice.** On your next outing the focus
-(see "One theme at a time") works on the corners of the advice you are
-following, and speaks there, so the plan and the coach tell you the same thing.
-If you no longer lose enough in those corners, the coach picks as it always
-does. A verdict from the coach doesn't close the advice. Only the report's
-measurement does.
+**In the car, the coach follows your advice.** On your next outing the focus,
+described in "One theme at a time", works on the corners of the advice you're
+following and speaks there. So the plan and the coach tell you the same thing. If
+you no longer lose enough in those corners, the coach picks on its own as always.
+A verdict from the coach doesn't close the advice. Only the report's measurement
+does.
 
 **In the other tabs, the advice you follow is marked.** Compare, Line, Sectors,
-Dynamics and Trends open with a line that says where to look, and a purple
-circle on the corners of the advice. A click on a corner's name takes you
-there. With no advice in progress the tabs stay as they are.
+Dynamics and Trends open with a line that has a purple border. The line names the
+corners of the advice and tells you what to look at in that tab. A click on a
+corner's name takes you there, and **How to do it →** opens the advice's page. In
+the charts and lists, the corners of the advice carry a purple dot. With no
+advice in progress the tabs stay as they are.
+
+### How to do it
 
 **How to do it →** on a piece of advice opens its page, and **← Back to the
-report card** brings you back. It is built from your own laps:
+report card** takes you back. The page is built from your own laps, and it has
+these parts.
 
-- The problem in one sentence, with your numbers: where you brake, how many
-  metres before your best lap, what it costs you.
-- The figures, one per corner, the most expensive first. Each has a map of the
-  corner with the points of your usual lap and your best, and the brake,
-  throttle or speed trace laid over each other. If one of the two laps has no
-  coordinates or no channel, the page says what is missing where the figure
-  would be.
-- How to do it: a few lines on what to do, what to watch for on track and what
-  to ignore. Where the drill depends on the car, it changes. On a low-downforce
-  road car it won't have you practise trail braking, because there the right
-  technique is to brake in a straight line and then turn (the same choice that
-  keeps the live coach silent about it on those cars).
-- The drill: how many laps, the target in numbers, when it is done.
-- How it's going: that fault's number in each session since you started
-  following it. It fills in from the first session after you press **I'll
-  follow it**.
-- Glossary: the words that page uses (braking point, apex, reference lap...),
-  each in one sentence.
+- At the top, the problem in one sentence with your numbers. It tells you where
+  you start braking, how many metres before your best lap, and what it costs you.
+- **From your laps**, the figures, one per corner, the most expensive first. Each
+  has a map of the corner with the points of your usual lap and your best. The
+  brake, throttle or speed traces are laid over each other. If a lap has no
+  coordinates or is missing a channel, you read what's missing instead of the
+  figure.
+- **The technique**, a few lines on what to do, what to watch on track and what
+  to ignore. Where the technique changes from one car to another, it changes
+  here too. On a low-downforce road car it won't have you practise trail
+  braking. There the right technique is to brake in a straight line and then
+  turn. For the same reason the coach on track doesn't mention it on those cars.
+- **The drill**, with how many laps to drive, the target in numbers and when it's
+  done.
+- **How it's going**, the number for that fault in each session since you started
+  following it. It fills in from the first session after you press **I'll follow
+  it**.
+- **Glossary**, the words the page uses, like braking point, apex or reference
+  lap, with one sentence each.
+
+### The report tabs
 
 The tabs come in three groups, in the order you usually read them.
 
 **How today went**
 
-- **Report card** — the page above. It opens by itself after a new session;
-  otherwise the report reopens the last tab you were on.
-- **Session** — one outing: the laps in the order you drove them (including the
-  ones that don't count — you still drove them), your best, consistency, track
-  temperature, **fuel per lap** (measured from the tank, on laps recorded from
-  v11 onwards), and **what changed since last time** on that car and track.
-- **Lap explained** — the lap one thing at a time: what cost you most, why, and
-  what to do, with the chart cropped to the stretch it is talking about and the
-  track map beside it showing where that is. Three steps at most. If you are a
-  long way off the pace it opens with the general theme and stops there, because
-  corner-by-corner is the wrong lens at that distance.
+- **Report card** is the page described above. It opens by itself after a new
+  session. Otherwise the report reopens the last tab you were looking at.
+- **Session** tells the story of one outing. You get the laps in the order you
+  drove them. The cut or invalid ones are there too, but they don't count towards
+  averages. Then your best, your consistency, the track temperature, and **what
+  changed since last time** with the same car on the same track, corner by
+  corner. A click on a lap opens it in Compare. We work out sessions from the
+  timestamps, and a long break counts as a new session.
+  You also get **fuel per lap**, measured from the tank and not estimated, next to
+  each lap and as the session average. On laps recorded before HONE read the tank
+  it doesn't appear, because we don't know it, and that doesn't mean zero litres.
+  It doesn't appear on laps where you refuelled either, because there's a refuel
+  in the middle and not a consumption.
+- **Lap explained** shows you the lap one thing at a time, instead of five charts
+  at once. It tells you what cost you most, why, and what to do, with the chart
+  cropped to the stretch it's talking about. It's three steps at most. If you're a
+  long way off the pace it opens with the general theme and stops there. At that
+  distance, corner by corner doesn't help. On your reference lap it tells
+  you there's nothing to correct, instead of inventing a lesson.
 
 **Why, in detail**
 
-- **Compare** — two laps, aligned on track position: time delta, speed,
-  throttle/brake, steering, with a shared crosshair. Exports to CSV/JSON.
-  Beside the charts, on the same screen, **the track map**: your line coloured
-  by where you gained and lost, and your braking points against the reference's.
-  It stays put while you scroll the charts, so the spike in the delta and the
-  corner it happened in are one glance apart instead of one tab apart — they
-  used to be two separate tabs answering the same question. The crosshair
-  crosses both: hover a chart and the map lights up the same point. Under the
-  map, **Your braking points**: the cheat sheet, built from *your* recent laps
-  in one track-temperature band, with the spread that says whether you have a
-  braking point at all. Prints and exports.
-- **Line** — where you actually drove, corner by corner: your line against the
-  reference with the gap between them shaded, how far inside or outside you were
-  at entry, apex and exit, the arc you drove, and the extra metres you covered.
-  Where a corner's speed minimum is flat it says "same place" instead of
-  inventing an apex shift, and where the car went off it says so instead of
-  reading the geometry as a choice. Beside the corner's title there is a pencil:
-  **you can name the corner yourself**, and that name then appears everywhere —
-  the debrief, the losses, the braking sheet, the coach's voice. HONE knows the
-  corner names of 14 of the 26 circuits it ships, and ten more ACC circuits have
-  no bundled geometry at all; on those you are the only source there is. Your
-  name outranks ours, and comes off the same way it went on. They live in
-  `Documents\ACCoach\corner-names.json` in plain text — along with the
-  **braking references** you type into the braking sheet ("at the end of the
-  green on the left"), which is the other half of the same idea: the positions
-  were measured long ago, the words could not be sourced, and you are the one
-  looking at the corner. Under both lines it draws **the track seen
-  from above** — the asphalt, its kerbs, and the grass, gravel and concrete
-  beside it. That is not a drawing of ours: it is the geometry the game itself
-  uses to decide where you are, read from its surface model with the surface
-  types already separated. The circuit is recognised **by the shape you drove,
-  not by its name** — the two sims don't even agree on those. Without the game
-  installed there are still the **26 circuits HONE ships with** (centre line and
-  widths, from OpenStreetMap and satellite imagery): less detail, no kerbs, but
-  independent of what you have on disk. It appears only when the fit says this
-  really is that circuit, and never while the gap is magnified — a magnified line
-  isn't where the car was.
-- **Sectors** — your sectors against the reference (the sim's real sectors when
-  it publishes them), the **ideal lap** stitched from your best sectors, and
-  every lap sector by sector so you can see which laps that ideal is made of.
-- **Dynamics** — what the car was doing: G with the friction circle, slip per
-  axle, rotation vs steering, revs and shifts, tyre temperatures and pressures
-  along the lap, and the handling ribbon (blue understeer, red oversteer).
+- **Compare.** Pick car and track and two laps, one to review and one to compare
+  against. You get four charts aligned on track position, **lap delta**,
+  **speed**, **throttle and brake** and **steering**, with the corner bands.
+  Hovering shows the values point by point. You can export the lap as **CSV** or
+  **JSON**.
+
+  On the **same screen** there's the **track map**. It shows your line coloured by
+  the gap, and your braking points against the reference's. The corners carry
+  **their names**, the same ones you find in the rest of the page. If you lost the
+  lap, a red cross marks where you lost it. The map **stays put** while you scroll
+  the charts. Hover over the delta and the same point lights up on the map.
+
+  Under the map there's **Your braking points**, the sheet of your braking points
+  corner by corner. For each corner you read **the speed you brake at**, in which
+  gear, how long the braking zone is and your minimum speed. Speed is a reference
+  you have in every car, and you read it on the dash. There's also the **visual
+  reference** where the track has one, like the 150 m board. Where it doesn't,
+  **write your own**. The cell opens, and your reference goes into the sheet and
+  into the coach's voice. At Imola two independent guides contradict each other on
+  almost every corner. No measurement chooses between the 50 board and the 100
+  board. You're the one looking at the corner.
+
+  The last column is the **spread**, how far your braking point moves from one lap
+  to the next. You read it in km/h and in the metres that means on that braking
+  zone. We measure it on your latest laps **within the same track-temperature
+  band**, and the header says which laps and at what temperature. The braking
+  sheets on forums don't know this, and that's why their numbers aren't yours. You
+  can download the sheet as **CSV**, and the **Print** button prints just the
+  sheet.
+- **Line.** Shows where you drove, corner by corner. The zoomed corner has your
+  line and the reference's, and **the shaded band between them is the gap**. If at
+  true scale it's too thin, the **gap ×3** selector magnifies it. The chart says
+  so, and the scale bar stays true. Beside it you get the same corner in numbers.
+  They tell you how far **inside or outside** you were at entry, apex and exit.
+  Then you see whether your slowest point comes **before or after** the
+  reference's. There's also how tight the **arc** you drove was, and how many
+  **extra metres** you covered. Below is the table of every corner, which you can
+  download as **CSV**.
+
+  On the two lines you also see **where you brake and where you get back on the
+  throttle**. The filled mark is yours and the empty one is the reference's.
+  That's what turns "you're wider on entry" into a diagnosis. Wide with the same
+  braking point and wide braking 15 m later are two different mistakes. The
+  thresholds are the same as in Your braking points, so the mark and the **You
+  brake at** column talk about the same spot.
+
+  At the bottom right of the drawing there's **the whole lap with the corner
+  circled**. Two hairpins on the same track make the same picture, and without
+  that drawing you'd have to remember which one you opened. At the top there's the
+  **debrief sentence** for that corner. It's the same sentence as in the debrief,
+  not a second opinion.
+
+  **You can name the corner yourself.** Next to the corner's title there's a
+  pencil. Write what you call it, and from then on that name appears everywhere,
+  in the debrief, the losses, the braking points and the coach's voice. HONE knows
+  the corner names of **14 of 26 circuits**, and for ten more ACC circuits it
+  doesn't even have the shape. There, only you know the corner's name. Your name
+  also beats ours, if you don't like ours, and it comes off the same way it went
+  on. The names live in `Documents\ACCoach\corner-names.json`, in plain text, and
+  you can read, copy and fix them by hand.
+
+  Under the two lines you see **the track from above**, with the asphalt and the
+  kerbs, and the grass, gravel and concrete beside them. It isn't a drawing of
+  ours. It's the geometry the game uses to decide where you are, read piece by
+  piece from its surface model.
+
+  We recognise the track **by the shape of your lap, not by its name**. The two
+  sims name circuits differently. Mount Panorama is `mount_panorama` in one and
+  `rt_bathurst` in the other, so the name isn't enough to find it. Without the
+  game installed there are still the **26 circuits HONE ships with**. Their centre
+  line and widths come from OpenStreetMap and satellite imagery. They have less
+  detail and no kerbs, but they don't depend on what you have on disk.
+
+  The page warns you about two things.
+
+  * The track only appears **if it really is the one you drove on**. Different
+    versions of the same circuit are around, and one that doesn't fit would draw
+    the road in the wrong place.
+  * The track **disappears when you magnify the gap ×3**. There the drawn line is
+    no longer where you drove, and you'd look off the road without being off.
+
+  The drawing **rotates** to fill the box. A rotation doesn't move one point
+  relative to another. Shape, widths and metres stay the same, and the scale bar
+  measures the same metres.
+
+  On "before or after" the tab gives you two warnings of its own. In a long corner
+  the bottom of the speed curve is **flat**, like at Fagnes for about a hundred
+  metres. There two identical laps would have their minimum in two different
+  places by pure chance. HONE then writes **same place** and says over how many
+  metres the minimum is flat, instead of having you chase a difference that isn't
+  there. If you went off or spun in that corner, it doesn't tell you that you
+  took the apex late. It tells you, for example, "You drop to 32 km/h against 93,
+  so there's no line to read here".
+- **Sectors.** Shows the three sectors, the **track's real ones** when the game
+  publishes them, and otherwise the lap split into three parts. The tab says
+  which. You see your time against the reference with gap bars. Then there's the
+  **ideal lap**, your best sectors put together, with what it's worth against your
+  actual best lap. Below you get **every lap, sector by sector**, with the best of
+  each column highlighted. Nobody drove the ideal lap, and there you see **which
+  laps it's made of**. So you can tell whether that sector was a lucky one or a
+  habit.
+- **Dynamics.** Tells you what the car was doing, not what you did. You get the
+  longitudinal and lateral G in the **G-G diagram**, which tells you how much of
+  the available grip you were using. Then there's **slip** per axle, with the
+  front locking and the rear spinning. After that come **rotation** against
+  steering, **revs** with the shifts, and the **tyres along the lap**, with
+  temperature and pressure. The **Balance** chart colours the line blue where the
+  car understeers and red where it oversteers. It's the tab to open when the
+  debrief tells you why and you want to see it with your own eyes.
 
 **Over time**
 
-- **Trends** — at the top, your **faults session by session**, up to twenty
-  sessions, measured against the same reference as the Report card. That is
-  where you see a fault going down; a click on its name opens its **How to do
-  it**. Below, lap times over time, consistency, your weak points corner by
-  corner (systematic or one-off) and recurring mistakes. It is the working; the
-  plan that comes out of it lives on the **Report card**, and the tyre charts under
-  **Race pace** — here the series covered your whole archive while calling
-  itself a stint.
-- **Race pace** — how the pace holds up over **one tank**. A different cut from
-  Session, and a measured one: a sitting is inferred from timestamps and can
-  contain a **refuel**, so a pace averaged across it averages two fuel loads. A
-  stint is cut where the tank goes back *up*. You get the pace (the median of
-  the laps that were actually running one — a spin stays on the list but can't
-  move the median), the spread, litres per lap, laps left in the tank, the pace
-  lap by lap, and the tyres across the stint.
-  And then what those numbers **don't** say, which matters more than the numbers.
-  The pace trend is a **net** figure — a stint speeds up as the tank empties and
-  slows down as the tyres give up — and telling the two apart needs a
-  seconds-per-litre figure we do not have yet (it has to be measured on a stint
-  driven at a deliberately constant pace). So the slope comes with its own error
-  bar, and when it is smaller than that bar the tab says **"no measurable
-  drift"** rather than inventing a degradation figure for you. It is not tyre
-  wear either: neither sim publishes a wear number we record, so what you see is
-  temperature.
+- **Trends.** At the top you find **your faults, session by session**, up to
+  twenty sessions, measured against the same reference as the Report card. That's
+  where you see whether a fault goes down, and a click on its name opens its
+  **How to do it**. Below are your lap times over time, your **consistency** and
+  your **weak points** corner by corner, systematic or one-off. Then the
+  **recurring mistakes**, with how many times you made them and in which corners.
+  It's the working. The plan that comes out of it lives on the **Report card**,
+  and the tyres live in **Race pace**.
+- **Race pace.** Tells you how the pace holds up **on a single tank**. It's a
+  different cut from Session, and the difference matters. We work out a session
+  from the timestamps, and one outing can contain a **refuel**. Averaging the
+  pace across a refuel mixes two fuel loads. A stint is cut where the tank **goes
+  back up**. We compare the fuel at the end of a lap with the fuel at the start of
+  the next.
 
-Under the other tabs you always see **which lap you are looking at** — its time, the
-reference, the gap and the track temperature — and every chart's x-axis is in
-**metres**, measured from the recorded coordinates rather than assumed from a
-track length. A lap whose coordinates don't add up falls back to per cent instead
-of showing you a wrong scale.
+  For each stint you get the **pace**, the median of the laps actually driven at
+  pace. A spin stays on the list but doesn't count towards it. Then the
+  **spread**, the fuel per lap, the laps left in the tank and the pace chart lap
+  by lap. At the bottom are the **tyres across the stint**, with temperatures and
+  pressures per wheel.
 
-Keyboard: **every tab has a key that opens it**, in the order they sit left to
-right — hover a tab to see which one it is (the lap picker says so too). **[**
-and **]** step through laps.
+  What the numbers **don't** say matters more than the numbers. The pace trend is
+  a **net** figure. The stint speeds up because the tank empties and slows down
+  because the tyres fade. To separate the two you'd need to know what a litre is
+  worth in seconds, and today **we don't know**. It's measured by driving a stint
+  on purpose at a constant pace. That's why the slope comes with its own margin of
+  error. When the slope is smaller than that margin, the tab writes "There's no
+  measurable drift." instead of inventing a degradation for you. It isn't tyre
+  wear either, because neither sim publishes it. What you see is temperature.
 
-## Free vs Pro
+In the lap dropdown, next to the time, you find **the track temperature**, as in
+`2:03.732 · 37.8 °`. It matters. Between a cold track and a hot one, braking
+points move by 10-20 m. Two laps at very different temperatures are almost two
+different circuits, and comparing them tells you little.
 
-A **one-time freemium** model (no subscription). Everything is free today while
-the product grows with the community.
+Under the other tabs there's always **the lap you're looking at**, with time,
+reference, gap and track temperature. With many tabs it's easy to read one lap's
+numbers while thinking of another.
 
-| Feature | Free | Pro (coming) |
-|---|:---:|:---:|
-| Voice coach + overlay | ✅ | ✅ |
-| "Why" debrief + analysis app | ✅ | ✅ |
-| Race engineer (setup AI) | — | ✅ |
-| Focus / Lesson (training plan) | — | ✅ |
-| Importable PRO references | — | ✅ |
+The horizontal axis of every chart is **in metres**, not in per cent of the lap.
+"At 50 %" is a number you'd have to convert before you could drive with it. We
+**measure the metres on the recorded coordinates**, and we don't derive them from
+the position times the track length. Sometimes a lap has no coordinates, or its
+coordinates don't add up with speed and time. Then the axis falls back to per
+cent, instead of giving you a wrong scale.
 
-Pro will be a one-time purchase. The model may change before launch.
+There are two shortcuts. **Every tab opens with a key**, in order from left to
+right, and you see which one by hovering over the tab. The lap dropdown has one
+too. The **[** and **]** keys step through the laps.
 
-## How a Coach Live session goes (the Drive panel)
+Under each corner you also see **where, inside the corner, the time went**. It
+can be a bar split into *entry, apex, exit and the run after*, and hovering shows
+the seconds of each piece. When nearly all the time is in one place, you get a
+single sentence instead, like "Most of the time goes on entry, 0.21 s.". It isn't
+an estimate. It's the time lost in the corner split into pieces, and the pieces
+add up exactly to the total. The run after is there because the debrief gives a
+corner the straight that follows it too. That's where you pay for a bad exit,
+and without that piece the other three wouldn't add up.
 
-After you press **Coach Live**, the **Drive** page shows three moments, one after
-the other.
+Sometimes, under a corner's title, you find a line that starts with **↩**. It
+means **the loss in that corner didn't start there**. You arrived already slower,
+and the km/h you're missing at the entry were already lost at the exit of the
+corner before. In that case **that** is the corner to work on, and once it's
+fixed, this one improves by itself. The line only appears when the numbers really
+add up. If you lost the speed on the straight between the two, with a lift or a
+bad shift, we don't blame the corner before.
 
-**Before you go.** *Coach Live is on* ticks as soon as the coach answers,
-usually within a couple of seconds: voice and overlay are ready. Next comes *Connect your tablet to the engineer*: scan the QR code with the
-tablet's camera, or open the address next to it. The tablet only connects with
-network access on; if it's off, the panel has a *Turn on network access* button,
-and once it's on, restart Coach Live. If you don't need the tablet, press *Skip, I'll drive without*. The last step,
-*Start the game and leave the pits*, ticks itself when the telemetry arrives.
+In the debrief, **above** the list of corners, one or two boxes with a light blue
+border can appear. They're observations **about the whole lap**, not about one
+corner.
 
-**You're driving.** The panel shows whether the tablet is connected, the track
-and car, the laps completed with your best, and, under *You're working on*, the
-advice you're following: the coach reminds you of it in its corners. When you're
-done, press **I'm done, show me how it went**. It stops the coach and opens the
-report on the report card. *Stop without opening the report* only stops the coach.
-Coach Live never stops by itself.
+- *You lift where the reference stays flat out.* The box tells you what the lift
+  cost you. The figure only covers the lift itself, but you carry the speed you
+  lose down the straight.
+- *You're N km/h down on top speed.* Here the rest of the sentence matters. If
+  you're as fast as the reference in the corners, it isn't you who's slower, and
+  you should look at the wing and the gearing. If you're slower in the corners
+  too, it's exit speed, and the setup has nothing to do with it.
 
-**Session over.** If you close the game, the panel switches to *Session over*
-after a minute and offers two choices: *Show me how it went* and *I'm staying on
-track*, for when you're only changing track. The coach stays on until you stop it.
+### Corner by session
 
-## How lap recording works (and starting from the pits)
+Under the weak points, every **systematic** corner has its own chart. It shows
+the median loss in that corner, **one bar per session**. Two outings on the same
+afternoon stay two bars. That way you see whether what you changed between them
+worked.
 
-You don't have to do anything special: start the session (Practice, Hotlap, Race)
-and drive.
+There are two thresholds, and both apply. A session with **fewer than three
+laps** through that corner doesn't appear, because a median over two laps is worth
+little more than one lap. A missing session is **not** drawn at zero, because zero
+here means you took the corner well. And the corner only appears with **at least
+two sessions** above that threshold. A single point isn't a trend, it's a lucky
+lap. A corner that has just become systematic may not have a chart yet, until it
+has two good sessions.
 
-- A lap is closed when you **cross the start/finish line**. HONE watches **two
-  signals at once**: the game's lap counter and the wrap of your track position.
-  Neither is enough alone — ACC **doesn't count the out-lap**, so on the counter
-  alone the first flying lap after every pit exit was lost. The saved time is the
-  game's own official lap time.
-- The **first lap is almost always partial** (you start mid-track), so it's
-  discarded automatically. Only **complete, line-to-line laps** are saved.
-- **Starting from the pits:** recording is paused in the garage *and in the pit
-  lane*; your **out-lap** is partial and discarded; your **first flying lap** is
-  the first one saved. Your **in-lap** isn't saved either, and changing car/track
-  resets everything — a lap never spans two sessions.
-- Two independent qualities: a lap is **complete** (started at the line — required
-  to be saved) and **clean** (no track-limits excursion). A dirty lap is still
-  saved but **never used as the reference**.
-- **How "clean" is decided depends on the game**, because the two titles expose
-  different things: **AC** counts wheels off track (3 or more = dirty), **ACC**
-  reads the game's own track-limits verdict. On ACC that includes cutting a
-  chicane without ever touching the grass. If the game tells us nothing the lap
-  stays *unknown*, which is not the same as clean.
-- The report also names **which corner** you lost the lap at (e.g. "off track at
-  Variante Ascari"). Laps recorded before schema v8 don't carry this: they say
-  the lap was dirty, not where.
+### Which lap becomes the reference
 
-## Which lap becomes the reference
+It's your fastest lap with that car on that track, with three extra rules.
 
-The reference is the fastest lap you've driven on that car and track — with two
-rules on top:
+- **Dirty laps are never candidates.** A cut lap is faster for a reason.
+- **A lap nobody judged doesn't beat a lap that was judged.** On ACC, the "clean"
+  of laps recorded **before 21 July 2026** came from a field that game declares
+  and never fills. It said clean because nothing looked, not because the lap was
+  clean. We don't throw those laps away. They stay your reference if you have
+  nothing else, because a doubtful target beats no target. But they lose to any
+  lap that was really checked. The rule came from a real case. At Monza the
+  reference was a 1:53.712 that **cut the Variante della Roggia** for half the
+  corner. It was the fastest precisely because of that. When this happens,
+  the summary says "Chosen because it was checked". Then it adds "your 1:53.712 is
+  faster, but nothing has checked it for track limits".
+- **Conditions matter**, and there are three of them, the **tyre**, the **track
+  temperature** and the **track grip**. A lap driven in conditions close to
+  today's beats a slightly faster one driven in very different conditions. The
+  tyre weighs most of all, because a different compound is a different car, and
+  grip weighs least. It's a preference, not a filter. If nothing resembles
+  today, the reference is still your best lap.
 
-- **Dirty laps are never eligible.** A cut lap is faster for a reason.
-- **A lap nobody judged doesn't beat a lap that was judged.** On ACC, the
-  "clean" flag on laps recorded **before 21 July 2026** came from a field that
-  game declares and never fills: it says clean because nothing looked, not
-  because it was. Those laps aren't discarded — they still become your reference
-  if you have nothing else, since a doubtful target beats no target — but they
-  lose to any lap that was really checked. It came from a real case: at Monza
-  the reference was a 1:53.712 that **cut the Variante della Roggia** for half
-  the corner, and was the fastest lap precisely because of that. When it
-  happens the summary says so: "chosen as the judged lap — your 1:53.712 is
-  faster but nothing ever checked it for track limits".
-- **Track temperature is taken into account.** Braking points move 10-20 m
-  between a cold track and a hot one, so a lap driven in comparable conditions
-  wins over a slightly faster one driven in very different ones. It's a
-  preference, not a filter: if nothing matches today's conditions you still get
-  your best lap rather than "no reference". The lap dropdown shows the track
-  temperature of each lap next to its time.
+  Two things to know about this data. We **only compare** the tyre, without
+  interpreting it. On ACC the compound name is always the same, `dry_compound` or
+  `wet_compound`. On AC it's whatever the car's author chose, like `Soft (S)`.
+  That's still enough to tell whether two laps were on the same tyre. **Grip on
+  ACC is always 0**. That game leaves the old field at zero and puts the
+  conditions in another part of the memory, which we don't read yet. So on ACC
+  grip carries no weight, and the reference is decided on tyre and temperature.
 
-## Troubleshooting
+In the **report** the same rule applies, but there "today" doesn't exist. The
+reference is chosen for the conditions **of the lap you're reviewing**. If you
+review a lap from a cold morning, the right target is your best in that cold.
+It isn't the record set in the evening on rubbered-in asphalt. Otherwise every
+tenth in the debrief would measure the weather and not the driving. When the
+comparison lap is slower than your best, the summary tells you, with the
+temperature of both. For example "Chosen for conditions" and "track at 12.0 °C,
+while your 1:39.000 was set at 32.0 °C". If you pick the comparison lap yourself
+from the dropdown, your choice holds and doesn't change.
 
-**"Waiting for the game…" and it won't connect.**
-Start AC/ACC and enter a session (practice/hotlap/race). HONE connects as soon as
-the game starts publishing telemetry.
+If you're a long way off the pace, your own best lap is a target that keeps you
+where you are. In the **Analysis** section of the hub there's
+**Import a PRO reference lap**. You can import a faster lap, and from then on the
+coach measures you against it.
 
-**I have no reference lap.**
-Drive at least one valid lap: it becomes the reference. Or import a faster one —
-**Analysis → Import a PRO reference lap** in the hub. (There's a command-line
-equivalent, `python -m accoach import-reference <file.lap.json.gz>`, but the
-button is the same thing with a file picker.)
+> Want to try HONE without the game? `python -m accoach web --demo` loads sample
+> laps.
 
-**The voice isn't speaking.**
-Run with the voice on (default) rather than `--silent`. Fixed phrases use a
-pre-rendered neural voice; numeric phrases fall back to the system voice.
+### Opening the report on a phone or tablet
 
-**The trigger words sound worse than the sentences.**
-They do, and we know. Fixed phrases come from a pre-rendered **neural** voice;
-the focus trigger words haven't been recorded yet, so for now they come out of
-the **system** voice, which is more robotic. Work in progress — it changes how
-it sounds, not what you're told.
+You need this if you play on three monitors and want the **Report** or the
+**Engineer** on a screen to the side.
 
-**Where are the logs if something breaks?**
-`logs` opens the folder with logs and crash reports. To send them to us, `logs
---zip` packages them into a single file in `Documents\ACCoach\`. It writes the
-zip even when there are no logs at all, and says so inside: "no logs" and "I
-didn't collect them" are different answers.
+1. In the hub, in the **Devices** section, tick **Allow access from other devices
+   on my network**. HONE remembers it.
+2. The QR codes appear, including **Report** and **Engineer**, with the address
+   under them, like `http://192.168.1.23:8778`. **Scan the code** with your phone,
+   or type the address into the browser.
 
-**What is in that zip, exactly?**
-Two things, and they are not the same.
+A few practical details.
 
-`contesto.txt`, which we write: the version, the commit, your Python/Windows
-versions and the last cars and tracks you drove — no paths, no machine name, no
-account name, because none of that would help us.
-
-Your log files, which go in **exactly as they are, not filtered**. At least all
-of this is in them:
-
-- paths that include your Windows account name (`C:\Users\<account>\...`), and
-  any network location you set as your laps folder;
-- one dated line every time you started HONE — together, a record of when you
-  sat down to drive, going back as far as your oldest log;
-- your lap times, the tracks and cars you drove, and the names of files you
-  opened;
-- crash reports (`crash-*.log`), each with a full traceback, the paths of our
-  source files, and whatever value the error carried with it.
-
-We leave all of it in on purpose — a log with the interesting parts taken out
-cannot diagnose anything, and quietly censoring one would be worse than the
-path. The zip is an ordinary file on your disk, and the command prints a short
-version of this when it finishes: open it and look before you send it.
-
-(Type the command the way `help` shows it: `HONE.exe logs --zip` from the
-packaged app, `python accoach_main.py logs --zip` from a source checkout.)
+- The phone has to be on the **same Wi-Fi network** as the PC.
+- If **Windows** asks the first time, allow access on **private networks**.
+- For the **Report**, which shows your saved laps, the analysis only has to be
+  running. The live **Engineer** page also needs Coach Live, or the Live backend
+  if you drive without the overlay.
+- With the option off, everything stays on this PC only, at `127.0.0.1`.
 
 ---
 
-More questions? Open an [issue on GitHub](https://github.com/ardiz89/ACCoach/issues).
+## 6. The debrief in the terminal
+
+For a quick summary after the session, type this.
+
+```
+python -m accoach debrief [car] [track]
+```
+
+It lists the corners where you lost the most time, with the cause, and your
+consistency. It reads the saved laps, so the game can be closed.
+
+---
+
+## 7. Every command
+
+From a terminal, type `python -m accoach <command>`. From the source the command
+is `python accoach_main.py <command>`, and from the packaged app it's
+`HONE.exe <command>`.
+
+**To drive you only need three commands**, the same ones you see with
+`python -m accoach help`.
+
+| Command | What it does |
+|---|---|
+| `live [--silent]` | **Voice coach and overlay** in one process. It's the normal way to use HONE. |
+| `web [--demo]` | The analysis in the browser, with saved laps, report and guide. |
+| `launcher` | The hub, the window with all the sections. |
+
+The other commands are tools for developing, testing on track or using a second
+screen. You don't need them to drive, and that's why they aren't on the first
+screen. You get the full, up-to-date list like this.
+
+```
+python -m accoach help --all
+```
+
+These are the ones you might really need.
+
+| Command | What it does |
+|---|---|
+| `debrief [car] [track]` | The text debrief after the session. The game can be closed. |
+| `coach [--silent]` | The voice coach in the terminal, without the overlay. |
+| `recorder` | Records laps only, without the coach. |
+| `monitor` | Shows the raw telemetry. |
+| `setup show <file>` | Reads an ACC setup without starting the game. |
+| `selftest` | Checks that the voice works and writes a report. |
+| `logs` | Opens the folder with the logs and crash reports. |
+| `logs --zip` | Packs the logs and some context into one file to attach to a report. **The logs go in as they are, unfiltered.** Read "What's in that zip" before you send it. |
+| `find-rain` | Finds the ACC rain fields by measuring them. You need a session with changing weather. |
+
+### The configuration file
+
+Almost everything is set from **Settings**. The rest is in
+`Documents\ACCoach\config.toml`, which HONE creates on first start with a comment
+for each entry. Edit it with the app closed, because **values are read at
+startup**.
+
+These entries only exist there.
+
+| Entry | What it sets |
+|---|---|
+| `data.laps_dir` | Moves the laps folder, to another disk or a synced folder. If you leave it empty it stays `Documents\ACCoach\laps`. |
+| `acquire.hz` | How many samples per second the recorder reads. |
+| `server.host` · `server.port` · `server.hz` | Address, port and rate of the Live backend. |
+| `web.port` | The port of the analysis. |
+| `logging.level` · `logging.console` | How much the logs write. |
+
+---
+
+## 8. Getting the most out of it
+
+- **Build a good reference.** The coach compares you with your fastest clean
+  lap. At first that's your first clean, complete lap, and then it's replaced
+  every time you drive a better one.
+- **Always use Borderless** if you want the overlay.
+- **Work on one car and one track at a time.** The reference only holds for that
+  car on that track.
+- If the coach distracts you while you're learning a track, use `--silent` and
+  watch only the overlay. Turn the voice back on when you want the advice.
+- Go over the **recurring mistakes** in Trends. That's where your pace improves.
+
+---
+
+## 9. If something goes wrong
+
+- **The overlay stays on "Waiting for the game…" and doesn't connect.** The game
+  has to be running and you have to be on track, in a session. HONE only reads the
+  shared memory while the game is running.
+- **You can't see the overlay.** You're in exclusive fullscreen. Switch to
+  **Borderless**.
+- **You can't hear the voice.** Check you didn't start with `--silent`. Then run
+  `python -m accoach selftest`, which writes a report and tries to speak. From the
+  source, install pyttsx3 with `pip install pyttsx3`.
+- **Some sentences sound more robotic than others.** The coach's fixed sentences
+  and the focus's short words are recorded with a neural voice. Sentences that
+  change every time, like the focus announcement with the corner's name, come from
+  the Windows voice, which is more robotic. It changes the sound, not what you're
+  told.
+- **No corner advice arrives.** You don't have a reference yet. One clean,
+  complete lap is enough, from the line to the line. The immediate warnings arrive
+  anyway.
+- **The analysis doesn't show your laps.** You have to drive them first with Coach
+  Live or the recorder. They end up in `Documents\ACCoach\laps`, where the
+  analysis reads them.
+
+### Where the logs are
+
+`logs` opens the folder with the logs and the crash reports. To send them to us,
+`logs --zip` packs them into a single file in `Documents\ACCoach\`. It writes the
+zip even when there are no logs at all, and says so inside. "There were no logs"
+and "I didn't collect them" are different answers.
+
+Type the command the way `help` shows it. That's `HONE.exe logs --zip` from the
+packaged app, and `python accoach_main.py logs --zip` from the source.
+
+### What's in that zip
+
+Two things, and they aren't the same.
+
+The first is `contesto.txt`, which we write. It has the version, the commit, your
+Python and Windows versions and the last cars and tracks you drove. It has no
+paths, no machine name and no account name, because none of that would help us.
+
+The second is your log files, which go in **exactly as they are, unfiltered**.
+At least all of this is in them.
+
+- Paths that include your Windows account name, like `C:\Users\<account>\...`,
+  and any network location you set as your laps folder.
+- One dated line every time you started HONE. Together they're a record of when
+  you sat down to drive, going back as far as your oldest log.
+- Your lap times, the tracks and cars you drove, and the names of the files you
+  opened.
+- Crash reports (`crash-*.log`), each with the full error, the paths of our source
+  files and whatever value the error carried with it.
+
+We leave all of it in on purpose. A log with the interesting parts taken out
+can't diagnose anything, and quietly censoring one would be worse than the path.
+The zip is an ordinary file on your disk, and the command prints a short version
+of this when it finishes. Open it and look before you send it.
+
+---
+
+## Free and Pro
+
+HONE will have a **freemium model with a one-time purchase**, and no
+subscription. Today everything is free, while the product grows with the
+community.
+
+| Feature | Free | Pro (coming) |
+|---|:---:|:---:|
+| Voice coach and overlay | yes | yes |
+| Debrief with the why, and the analysis app | yes | yes |
+| Race engineer (setup) | no | yes |
+| Focus and training plan | no | yes |
+| Importing PRO reference laps | no | yes |
+
+Pro will be a one-time purchase. The model may change before launch.
+
+---
+
+Got more questions? Open an [issue on GitHub](https://github.com/ardiz89/ACCoach/issues).

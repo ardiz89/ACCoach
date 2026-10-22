@@ -326,6 +326,8 @@ def test_duplicates_are_found_per_language_between_keys_and_surfaces():
 
 def test_pending_names_only_known_surfaces():
     assert tono.PENDING <= set(tono.SURFACES), tono.PENDING - set(tono.SURFACES)
+    # Tutte le superfici sono state riscritte: nessuna resta fuori dal controllo.
+    assert not tono.PENDING, tono.PENDING
 
 
 @pytest.mark.parametrize("name", sorted(tono.SURFACES))
