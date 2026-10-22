@@ -840,6 +840,36 @@ class RaceEngineer:
     def phase(self) -> WorkPhase | None:
         return self.phases[self.phase_idx] if self.phase_idx < len(self.phases) else None
 
+    def progress(self, lang: str | None = None) -> dict:
+        """Dove e' il lavoro: le fasi, quella in corso e che punto del suo ciclo.
+
+        Lo legge la pagina per disegnare la strada e il contatore di giri; sta
+        qui e non nel browser perche' lo stato (`_pending`, `_held_revert`,
+        `active`) e' privato del motore e il browser lo indovinerebbe dal testo
+        dei messaggi. L'ordine dei casi e' quello di `observe`: un ripristino
+        da rimettere viene prima di tutto, poi il test in corso, poi la
+        proposta in attesa, poi la raccolta di giri.
+        """
+        from .profiles._common import tr
+        phases = [{"key": p.key, "label": tr(p.label, lang), "tag": p.tag}
+                  for p in self.phases]
+        out = {"phases": phases, "index": self.phase_idx, "stage": "diagnose",
+               "have": None, "need": None}
+        if self.phase is None:
+            out.update(stage="done", index=len(self.phases))
+        elif self._held_revert is not None or (
+                self._pending is not None and self._pending_is_revert):
+            out["stage"] = "restore"
+        elif self.active is not None:
+            out.update(stage="test", have=self.active.laps_seen,
+                       need=self.min_stable)
+        elif self._pending is not None:
+            out["stage"] = "change"
+        elif len(self.window) < self.min_stable:
+            out.update(stage="baseline", have=len(self.window),
+                       need=self.min_stable)
+        return out
+
     def observe(self, stats: LapStats) -> Decision:
         """Feed one completed lap; return the next recommendation."""
         # Un ripristino non ancora confermato viene prima di tutto, pioggia

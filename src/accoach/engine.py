@@ -926,6 +926,8 @@ class CoachEngine:
             "kind": d.kind.value,
             "message": d.message,
             "phase": phase,
+            # La strada: fasi, quella in corso, giri raccolti. Calcolata dal motore.
+            "progress": self._engineer.progress() if self._engineer else None,
             "change": d.change.as_setup_payload() if d.change else None,
             "rationale": d.change.rationale if d.change else None,
             "tag": d.change.tag if d.change else None,
