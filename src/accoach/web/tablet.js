@@ -45,7 +45,8 @@
 
   // Spento ha due facce. Senza frame (il socket chiuso, o mai aperto) il
   // motore non c'e'; con un frame `connected: false` il motore c'e' ma il gioco
-  // non manda dati (i menu, prima della sessione, un replay). Dire «il coach
+  // no: e' chiuso, o non e' ancora partito (il reader e' connesso appena esiste
+  // la memoria condivisa del gioco, menu compresi). Dire «il coach
   // non e' acceso» al pilota che ce l'ha acceso lo manda a cercare il guasto
   // sbagliato.
   function offKey(st) { return st ? "tablet.waiting" : "tablet.off"; }

@@ -767,7 +767,7 @@ Il codice QR del pannello In pista apre `/tablet`, una pagina pensata per un
 tablet vecchio accanto al volante, come un iPad 3. Cambia da sola a seconda di
 dove sei. Se il coach non è acceso, la pagina te lo dice e si ricollega appena
 torna. Se il coach è acceso ma il gioco non manda dati, la pagina ti dice che
-lo sta aspettando. Succede nei menu o prima della sessione.
+lo sta aspettando. Succede quando il gioco è chiuso o non è ancora partito.
 
 - **In pista.** Vedi velocità, marcia, TC, ABS e mappa motore, temperatura e
   pressione delle quattro gomme, e la striscia di gas, freno e sterzo degli

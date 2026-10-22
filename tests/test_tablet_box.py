@@ -143,8 +143,8 @@ window.HoneTablet.render(frame);
 reply(find("/api/setup/preview")[0], 200, {ok: true, errors: [], diff: [
   {group: "Gomme", label: "Pressione", slot: "FL", old_click: 57, new_click: 59,
    delta: 2, old_phys: "26 psi", new_phys: "26.2 psi"},
-  {group: "Allineamento", label: "Campanatura", slot: "FL", old_click: 0, new_click: 0,
-   delta: 0, old_phys: "-4 deg", new_phys: "-3.5 deg"}]});
+  {group: "Allineamento", label: "Campanatura", slot: "FL", old_click: 0, new_click: 5,
+   delta: 5, old_phys: "-4 deg", new_phys: "-3.5 deg"}]});
 window.HoneTablet.render(frame);
 out.levers = $("t-levers").children.map(function (li) {
   return li.children.map(function (c) { return c.textContent; }).join("");
@@ -188,7 +188,7 @@ def test_double_tap_writes_once_and_409_tries_the_next_name_four_times():
     # Il valore fisico con la regola dei numeri della pagina (fmtNum).
     # I due valori coi decimali del piu' preciso; i click col segno.
     assert out["levers"] == ["Pressione FL 26,0 psi → 26,2 psi (+2 click)",
-                             "Campanatura FL −4,0 deg → −3,5 deg (0 click)"]
+                             "Campanatura FL −4,0 deg → −3,5 deg (+5 click)"]
     assert out["confirmHidden"] is False
     assert out["disabledInFlight"] is True
     assert out["afterDoubleTap"] == 1

@@ -826,7 +826,7 @@ The QR code in the Drive panel opens `/tablet`, a page made for an old
 tablet beside the wheel, like an iPad 3. It changes by itself depending on where
 you are. If the coach isn't running, the page says so and reconnects as soon as
 it's back. If the coach is on but the game isn't sending data, the page says
-it's waiting for it. That happens in the menus or before the session.
+it's waiting for it. That happens when the game is closed or hasn't started yet.
 
 - **On track.** You see speed, gear, TC, ABS and engine map, and the temperature
   and pressure of the four tyres. A strip shows throttle, brake and steering
