@@ -1053,30 +1053,33 @@ Salva un setup nel gioco, poi ricarica questa pagina.` },
   //   data-i18n-placeholder -> placeholder attribute
   //   data-i18n-label       -> data-label + aria-label (a group's caption,
   //                            drawn by CSS from `attr(data-label)`)
+  // Safari 9 (l'iPad del pilota) non ha .forEach sulle NodeList.
+  function each(list, fn) { Array.prototype.forEach.call(list, fn); }
+
   function applyStatic(root) {
     root = root || document;
     try {
-      root.querySelectorAll("[data-i18n]").forEach(function (el) {
+      each(root.querySelectorAll("[data-i18n]"), function (el) {
         var v = t(el.getAttribute("data-i18n"));
         if (v != null) el.textContent = v;
       });
-      root.querySelectorAll("[data-i18n-html]").forEach(function (el) {
+      each(root.querySelectorAll("[data-i18n-html]"), function (el) {
         var v = t(el.getAttribute("data-i18n-html"));
         if (v != null) el.innerHTML = v;
       });
-      root.querySelectorAll("[data-i18n-title]").forEach(function (el) {
+      each(root.querySelectorAll("[data-i18n-title]"), function (el) {
         var v = t(el.getAttribute("data-i18n-title"));
         if (v != null) el.title = v;
       });
-      root.querySelectorAll("[data-i18n-aria]").forEach(function (el) {
+      each(root.querySelectorAll("[data-i18n-aria]"), function (el) {
         var v = t(el.getAttribute("data-i18n-aria"));
         if (v != null) el.setAttribute("aria-label", v);
       });
-      root.querySelectorAll("[data-i18n-placeholder]").forEach(function (el) {
+      each(root.querySelectorAll("[data-i18n-placeholder]"), function (el) {
         var v = t(el.getAttribute("data-i18n-placeholder"));
         if (v != null) el.placeholder = v;
       });
-      root.querySelectorAll("[data-i18n-label]").forEach(function (el) {
+      each(root.querySelectorAll("[data-i18n-label]"), function (el) {
         var v = t(el.getAttribute("data-i18n-label"));
         if (v != null) {
           el.setAttribute("data-label", v);
@@ -1087,23 +1090,25 @@ Salva un setup nel gioco, poi ricarica questa pagina.` },
     try { document.documentElement.lang = lang; } catch (e) {}
   }
 
+  // Niente fetch: su Safari 9 non esiste e il selettore non funzionerebbe.
   function set(l) {
     if (SUPPORTED.indexOf(l) === -1) l = "en";
     // The selector changes the language of the whole app, not of this browser:
     // the server writes it to the config, where the hub reads it too. The page
     // changes only once the server has accepted it; if not, the selector goes
     // back and the language stays what it was.
-    var req;
+    var xhr;
     try {
-      req = fetch("/api/language", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ lang: l })
-      });
-    } catch (e) { req = Promise.reject(e); }
-    return req.then(function (r) {
-      if (!r || !r.ok) throw new Error("language refused");
-      apply(l);
-    }).catch(function () { syncSelectors(); });
+      xhr = new XMLHttpRequest();
+      xhr.open("POST", "/api/language");
+      xhr.setRequestHeader("Content-Type", "application/json");
+      xhr.onload = function () {
+        if (xhr.status >= 200 && xhr.status < 300) apply(l);
+        else syncSelectors();
+      };
+      xhr.onerror = function () { syncSelectors(); };
+      xhr.send(JSON.stringify({ lang: l }));
+    } catch (e) { syncSelectors(); }
   }
 
   function apply(l) {
@@ -1133,7 +1138,7 @@ Salva un setup nel gioco, poi ricarica questa pagina.` },
 
   function syncSelectors() {
     try {
-      document.querySelectorAll("select.lang-select").forEach(function (s) {
+      each(document.querySelectorAll("select.lang-select"), function (s) {
         s.value = lang;
       });
     } catch (e) {}

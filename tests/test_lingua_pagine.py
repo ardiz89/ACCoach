@@ -92,16 +92,20 @@ const posts = [];
 global.window = {};
 if (injected !== "-") window.HONE_LANG = injected;
 global.localStorage = { getItem: () => (stored === "-" ? null : stored), setItem() {} };
-global.fetch = (url, opt) => { posts.push([url, opt && opt.body]); return Promise.resolve({ ok: true }); };
+// Safari 9 non ha fetch: la pagina parla col server con XMLHttpRequest.
+global.XMLHttpRequest = function () {
+  this.open = (method, url) => { this.url = url; this.method = method; };
+  this.setRequestHeader = () => {};
+  this.send = (body) => { posts.push([this.url, body]); this.status = 200; this.onload(); };
+};
 global.document = { readyState: "complete", querySelectorAll: () => [],
                     querySelector: () => null, documentElement: {} };
 eval(fs.readFileSync(path, "utf8"));
 const out = { lang: window.HoneI18n.lang, label: window.HoneI18n.t("lang.label") };
-window.HoneI18n.set("it").then(() => {
-  out.after = window.HoneI18n.lang;
-  out.posts = posts;
-  console.log(JSON.stringify(out));
-});
+window.HoneI18n.set("it");
+out.after = window.HoneI18n.lang;
+out.posts = posts;
+console.log(JSON.stringify(out));
 """
 
 
@@ -241,7 +245,11 @@ def test_a_refused_change_puts_the_selector_back(tmp_path):
 const fs = require("fs");
 global.window = { HONE_LANG: "en" };
 const sel = { value: "it", className: "lang-select" };
-global.fetch = () => Promise.resolve({ ok: false });
+global.XMLHttpRequest = function () {
+  this.open = () => {};
+  this.setRequestHeader = () => {};
+  this.send = () => { this.status = 400; this.onload(); };
+};
 let reloaded = false;
 global.location = { reload() { reloaded = true; } };
 global.document = { readyState: "complete", querySelectorAll: (q) => q === "select.lang-select" ? [sel] : [],
