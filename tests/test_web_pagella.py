@@ -506,8 +506,8 @@ def test_the_history_bars_are_the_pagella_bars():
     render = _body_of("function renderDefectHistory(h)")
     assert "sparkBars(vals, d.unit, trend, DH_H)" in render
     assert 'class="pag-spark dh-bars"' in render
-    assert f"height: {re.search(r'const DH_H = (\d+);', _APPJS).group(1)}px" in \
-        _CSS[_CSS.index(".dh-bars {"):].split("}", 1)[0]
+    dh_h = re.search(r'const DH_H = (\d+);', _APPJS).group(1)
+    assert f"height: {dh_h}px" in _CSS[_CSS.index(".dh-bars {"):].split("}", 1)[0]
 
 
 def test_the_history_row_opens_the_howto_and_escapes_the_backend():
