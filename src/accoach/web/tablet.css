@@ -205,7 +205,84 @@ html, body {
 }
 .tablet[data-mode="box"] .t-phase { margin-top: 0; font-size: 24px; }
 
+/* ---- ai box --------------------------------------------------------------
+   La schermata sta nell'altezza della vista; se le leve sono tante scorre solo
+   lei, non la pagina (la fase sopra resta dov'e'). */
 .t-box { margin-top: 12px; }
+.tablet[data-mode="box"] .t-box {
+  -webkit-flex: 1 1 auto;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.t-change, .t-confirm {
+  background: #151A21;
+  border: 1px solid #232B35;
+  border-left: 4px solid #FFB020;
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+}
+.t-levers { list-style: none; margin: 0; padding: 0; }
+.t-levers li { font-size: 24px; line-height: 1.35; padding: 2px 0; }
+.t-levers b { color: #FFB020; }
+.t-levers .t-bad { color: #FF4D5E; font-size: 20px; }
+.t-why { font-size: 20px; line-height: 1.35; margin-top: 6px; }
+.t-why:empty { display: none; }
+.t-confrow { margin-top: 6px; font-size: 18px; color: #8A95A3; }
+.t-conf { margin-right: 12px; }
+.t-conf[data-c="high"] { color: #34E08A; }
+.t-conf[data-c="low"] { color: #FFB020; }
+.t-lowconf { color: #FFB020; }
+
+.t-msg { font-size: 22px; line-height: 1.35; margin-bottom: 12px; }
+
+.t-base-row { margin-bottom: 12px; }
+.t-select {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 480px;
+  min-height: 48px;
+  margin-top: 4px;
+  padding: 8px 12px;
+  font: inherit;
+  font-size: 22px;
+  color: #E8EDF2;
+  background: #151A21;
+  border: 1px solid #232B35;
+  border-radius: 8px;
+}
+.t-nobase { font-size: 20px; color: #FFB020; margin-top: 4px; }
+
+.t-actions {
+  display: -webkit-flex;
+  display: flex;
+  -webkit-flex-wrap: wrap;
+  flex-wrap: wrap;
+  -webkit-align-items: center;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.t-actions .t-btn { margin: 0 12px 8px 0; }
+.t-confirm .t-actions { margin: 10px 0 0; }
+.t-confirm-msg { font-size: 22px; line-height: 1.35; margin-bottom: 6px; }
+.t-btn-main { min-height: 60px; font-size: 24px; font-weight: 700; background: #FFB020; }
+.t-btn-ghost { background: transparent; color: #E8EDF2; border: 1px solid #8A95A3; }
+.t-btn[disabled] { opacity: 0.4; }
+
+.t-err { font-size: 20px; color: #FF4D5E; margin-bottom: 12px; }
+.t-done {
+  border-left: 4px solid #34E08A;
+  background: #151A21;
+  border-radius: 8px;
+  padding: 10px 14px;
+}
+.t-done-name { font-size: 26px; font-weight: 700; color: #34E08A; }
+.t-done-hint { font-size: 20px; line-height: 1.35; margin-top: 4px; }
+.t-done-hint:empty { display: none; }
 
 .t-full {
   -webkit-align-self: flex-end;

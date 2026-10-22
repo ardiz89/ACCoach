@@ -69,8 +69,47 @@
 
     <div id="t-phase" class="t-phase" hidden></div>
 
-    <!-- La schermata dei box: la riempie la scrittura dell'assetto. -->
-    <div id="t-box" class="t-box"></div>
+    <!-- La schermata dei box, sotto la fase: la modifica, il file su cui si
+         somma, il bottone che la scrive e la conferma. Gli elementi ci sono
+         sempre e tablet.js li accende: a 15 frame al secondo non si rifanno la
+         tendina e la conferma che il dito sta toccando. -->
+    <div id="t-box" class="t-box">
+      <div id="t-change" class="t-change" hidden>
+        <ul id="t-levers" class="t-levers"></ul>
+        <div id="t-why" class="t-why"></div>
+        <div class="t-confrow">
+          <span id="t-conf" class="t-conf" hidden></span>
+          <span id="t-lowconf" class="t-lowconf" hidden></span>
+        </div>
+      </div>
+      <div id="t-msg" class="t-msg" hidden></div>
+
+      <div id="t-base-row" class="t-base-row" hidden>
+        <label for="t-base" class="t-label" data-i18n="tablet.base">Starting setup</label>
+        <select id="t-base" class="t-select"></select>
+        <div id="t-nobase" class="t-nobase" hidden data-i18n="tablet.noBase">I can't find a setup for this car on this track. Save one from the game's garage.</div>
+      </div>
+
+      <div id="t-actions" class="t-actions" hidden>
+        <button type="button" id="t-write" class="t-btn t-btn-main"></button>
+        <button type="button" id="t-restored" class="t-btn t-btn-ghost" hidden data-i18n="tablet.restored">I've already put it back</button>
+      </div>
+
+      <div id="t-confirm" class="t-confirm" hidden>
+        <div id="t-confirm-msg" class="t-confirm-msg"></div>
+        <ul id="t-confirm-list" class="t-levers"></ul>
+        <div class="t-actions">
+          <button type="button" id="t-confirm-ok" class="t-btn t-btn-main" data-i18n="modal.write">Write</button>
+          <button type="button" id="t-confirm-no" class="t-btn t-btn-ghost" data-i18n="modal.cancel">Cancel</button>
+        </div>
+      </div>
+
+      <div id="t-err" class="t-err" hidden></div>
+      <div id="t-done" class="t-done" hidden>
+        <div id="t-done-name" class="t-done-name"></div>
+        <div id="t-done-hint" class="t-done-hint"></div>
+      </div>
+    </div>
 
     <a class="t-full" href="/engineer" data-i18n="tablet.full">Full page</a>
   </div>
