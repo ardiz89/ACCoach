@@ -112,6 +112,25 @@ _MOVING_KMH = 25.0
 # driving" — that is `_MOVING_KMH`'s job.
 _STOPPED_KMH = 1.0
 
+
+def stopped_in_box(s: TelemetrySnapshot) -> bool:
+    """Stopped in the box. One rule, also sent to the pages as `at_box` in the
+    live frame, so none of them re-derives it from `in_pit` (dead on ACC)."""
+    # "Stopped" has to be asked twice, because no single field answers it on
+    # both sims. `in_pit` is the sim saying "in the garage" — but in
+    # everything we were able to observe on ACC it never lights up: read
+    # straight from the shared memory (offset 160) with the car standing
+    # still in its box it was 0, while `isInPitLane` (offset 1236) was 1.
+    # Gated on `in_pit` alone the briefing simply never happened there, which
+    # is the last step of this whole feature. `in_pit` stays in front all the
+    # same: on AC1 it may well work, and there is no reason to break it.
+    # The second route says the same thing out of two fields that ACC does
+    # publish — in the lane, and not moving. In the lane is not enough by
+    # itself (the whole corridor reads as lane), stopped is not enough by
+    # itself (the grid, a spin), so it is the pair.
+    return bool(s.in_pit or (s.in_pit_lane and s.speed_kmh <= _STOPPED_KMH))
+
+
 # Ranks above ordinary technique advice: missing a pit call costs a whole lap,
 # and there is no second chance at the entry. Still below the acute safety
 # events, which is what the tier does — this only breaks ties within it.
@@ -261,19 +280,8 @@ class PitCall:
         # *driving* advice being spoken where it can't be used, and this is the
         # opposite: advice that can ONLY be used here. See engine._SAFETY_CATEGORIES.
         #
-        # "Stopped" has to be asked twice, because no single field answers it on
-        # both sims. `in_pit` is the sim saying "in the garage" — but in
-        # everything we were able to observe on ACC it never lights up: read
-        # straight from the shared memory (offset 160) with the car standing
-        # still in its box it was 0, while `isInPitLane` (offset 1236) was 1.
-        # Gated on `in_pit` alone the briefing simply never happened there, which
-        # is the last step of this whole feature. `in_pit` stays in front all the
-        # same: on AC1 it may well work, and there is no reason to break it.
-        # The second route says the same thing out of two fields that ACC does
-        # publish — in the lane, and not moving. In the lane is not enough by
-        # itself (the whole corridor reads as lane), stopped is not enough by
-        # itself (the grid, a spin), so it is the pair.
-        if s.in_pit or (s.in_pit_lane and s.speed_kmh <= _STOPPED_KMH):
+        # What "stopped in the box" means is in `stopped_in_box`.
+        if stopped_in_box(s):
             if self._briefed_spoken or now - self._briefed_at < _BRIEF_RETRY_S:
                 return []
             self._briefed_at = now

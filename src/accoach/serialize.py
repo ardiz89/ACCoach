@@ -9,6 +9,7 @@ both consume :func:`state_to_dict`.
 from __future__ import annotations
 
 from .coaching import Cue
+from .coaching.pitcall import stopped_in_box
 from .comparison import DeltaState, format_delta
 from .engine import EngineState
 from .telemetry import TelemetrySnapshot, format_lap_time
@@ -32,6 +33,7 @@ def snapshot_to_dict(s: TelemetrySnapshot) -> dict:
         # grafico della pagina Ingegnere, sotto gas e freno.
         "steer": round(s.steer_angle, 3),
         "in_pit": s.in_pit,
+        "at_box": stopped_in_box(s),
         "lap_position": round(s.lap_position, 4),
         "aids": {
             "tc": s.tc_level,            # current selected level, -1 if unknown

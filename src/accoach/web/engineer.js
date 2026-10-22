@@ -1325,7 +1325,7 @@ function renderFocus(st) {
 
 function renderPitReminder(st) {
   const el = $("pit-reminder");
-  if (!st.in_pit) { el.hidden = true; return; }
+  if (!st.at_box) { el.hidden = true; return; }
   // Stopped in the box with a garage change still unwritten. The voice has just
   // sent the driver to this page (coaching/pitcall.py); the page has to say what
   // to do here, or the trip in was for nothing. Checked BEFORE the "go load it"
