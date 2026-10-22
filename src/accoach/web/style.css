@@ -1342,7 +1342,8 @@ body.view-pagella #lapbar { display: none; }
 /* Alta quanto DH_H in app.js. */
 .dh-bars { height: 44px; }
 .pag-spark.dh-bars { display: flex; margin-left: 0; }
-.dh-bars i, .dh-dates span { flex: 1 1 0; max-width: 2rem; }
+/* La colonna regge l'etichetta («22:50»), che e' testo e cresce in rem. */
+.dh-bars i, .dh-dates span { flex: 1 1 0; max-width: 3.2rem; }
 .dh-bars i { width: auto; }
 .dh-dates { display: flex; gap: 3px; }
 .dh-dates span {

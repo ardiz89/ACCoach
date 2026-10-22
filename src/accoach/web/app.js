@@ -1797,7 +1797,7 @@ function fillLaps(a, force) {
       // Track temp, when the lap carries it: two laps at 18° and 40° are two
       // different circuits, and until now the dropdown let you compare them
       // side by side with nothing to warn you.
-      const temp = l.road_temp ? ` · ${fmtDec(l.road_temp, 1, "°")}` : "";
+      const temp = l.road_temp ? ` · ${fmtDec(l.road_temp, 1, "°C")}` : "";
       o.textContent = `${star}${l.lap_time}${l.valid ? "" : " " + t("lap.invalid")}${off}${temp}${clock ? " · " + clock : ""}${pro}`;
       if (l.path === selectedPath) o.selected = true;
       sel.appendChild(o);
@@ -1819,7 +1819,7 @@ function drawLapBar(a) {
   const bit = (k, v, cls) =>
     `<div class="bit"><span class="k">${k}</span><span class="v ${cls || ""}">${v}</span></div>`;
   const temp = a.review.road_temp != null
-    ? bit(t("lbl.road"), fmtDec(a.review.road_temp, 1, "°")) : "";
+    ? bit(t("lbl.road"), fmtDec(a.review.road_temp, 1, "°C")) : "";
   el.innerHTML =
     bit(t("lbl.lap"), a.review.lap_time + offTrackBadge(a)) +
     bit(t("lbl.comparison"), a.reference.lap_time) +
@@ -3834,10 +3834,13 @@ function crosshair(ctx, w, h, cx) {
 // driver. Where the number is the point, use gridY instead.
 // Takes the height: the bottom caption used to be pinned at y=145, which is
 // right for exactly one chart size and silently wrong for every other.
-function axisLabel(ctx, w, h, top, bottom) {
+// `belowBands`: il grafico ha i nomi delle curve sul bordo alto, e la didascalia
+// in alto a destra finiva sopra l'ultimo («T9»): la si scende di una riga.
+function axisLabel(ctx, w, h, top, bottom, belowBands) {
   ctx.fillStyle = "rgba(255,255,255,0.45)"; ctx.font = canvasFont(12) + "px " + UI_FONT;
   // In basso sta sopra la riga dei tick di gridX (stessa fascia a destra).
-  fillTextRight(ctx, top, w - 4, labelTop());
+  fillTextRight(ctx, top, w - 4,
+                labelTop() + (belowBands ? canvasFont(12) + 2 : 0));
   fillTextRight(ctx, bottom, w - 4, h - canvasFont(12) - 6);
 }
 
@@ -3973,7 +3976,7 @@ function drawSteer(a, cx) {
   }
   // Your steering (white, solid).
   line(ctx, w, h, rv.pos, sv, -m, m, "#ffffff", 1.5);
-  axisLabel(ctx, w, h, "left", "right");
+  axisLabel(ctx, w, h, t("line.left"), t("line.right"), true);
   crosshair(ctx, w, h, cx);
 }
 
@@ -4282,7 +4285,7 @@ function drawYaw(a, cx) {
   ctx.beginPath(); ctx.moveTo(0, h / 2); ctx.lineTo(w, h / 2); ctx.stroke();
   line(ctx, w, h, pos, yw.map((v) => -v * k), -ms, ms, "#FFB020", 1.4);
   line(ctx, w, h, pos, st, -ms, ms, "#ffffff", 1.5);
-  axisLabel(ctx, w, h, "left", "right");
+  axisLabel(ctx, w, h, t("line.left"), t("line.right"), true);
   crosshair(ctx, w, h, cx);
 }
 

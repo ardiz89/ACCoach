@@ -612,8 +612,8 @@
     "plan.goto":       { en: `Open the Report card`, it: `Apri la Pagella` },
 
 
-    "lvl.header":      { en: `Levels <small>(best → ideal → PRO · gap = time available)</small>`,
-                         it: `Livelli <small>(migliore → ideale → PRO · gap = tempo disponibile)</small>` },
+    "lvl.header":      { en: `Levels <small>(from your best to the ideal and the PRO lap, with the time that separates you)</small>`,
+                         it: `Livelli <small>(dal tuo migliore all'ideale e al giro PRO, con il tempo che ti separa)</small>` },
     "lvl.yourRef":     { en: `your reference`, it: `il tuo riferimento` },
     "lvl.consistency": { en: `consistency on the table`, it: `costanza da recuperare` },
     "lvl.gapPro":      { en: `gap to PRO`, it: `gap dal PRO` },

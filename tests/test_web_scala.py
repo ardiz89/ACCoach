@@ -205,3 +205,29 @@ def test_right_edge_labels_are_anchored_not_guessed():
 def test_top_labels_follow_the_font_size():
     assert "function labelTop()" in _SRC["app.js"]
     assert not re.search(r"width\) / 2, 11\)", _SRC["app.js"])
+
+
+# --- difetti del collaudo a 1366/2560 px ------------------------------------
+def test_axis_captions_come_from_the_catalog_not_literal_words():
+    calls = re.findall(r"axisLabel\(ctx, w, h, ([^;]*)\);", _SRC["app.js"])
+    assert len(calls) >= 4
+    for args in calls:
+        for arg in args.split(", "):
+            assert not re.fullmatch(r'"[A-Za-z ]+"', arg.strip()), args
+
+
+def test_axis_caption_clears_the_corner_names_row():
+    js = _SRC["app.js"]
+    assert "belowBands" in js
+    # I due grafici con i nomi delle curve in cima abbassano la didascalia.
+    assert js.count('t("line.left"), t("line.right"), true)') == 2
+
+
+def test_temperature_always_has_the_celsius_unit():
+    assert not re.search(r'road_temp[^;\n]*"°"\)', _SRC["app.js"])
+
+
+def test_defect_history_slots_are_wide_enough_for_the_time_label():
+    css = _outside_comments(_SRC["style.css"])
+    m = re.search(r"\.dh-bars i, \.dh-dates span \{[^}]*max-width:\s*([\d.]+)rem", css)
+    assert m and float(m.group(1)) >= 3.0   # «22:50» a 0.857rem sta in ~2.6rem
