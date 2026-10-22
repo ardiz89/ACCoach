@@ -96,6 +96,9 @@ body {
   font: 1rem/1.4 var(--font-ui);
 }
 
+/* `small` eredita `smaller` (10-11 px a base 14): sotto i 12 px del minimo. */
+small { font-size: 0.857rem; }
+
 header {
   display: flex;
   align-items: center;

@@ -60,7 +60,7 @@
       "box-shadow:0 0 0 9999px rgba(7,10,14,0.66),0 0 18px rgba(34,211,206,0.55);" +
       "pointer-events:none;transition:left .18s ease,top .18s ease,width .18s ease,height .18s ease;}" +
       // 360px, not 320: translated labels ("Indietro" vs "Back") need the room.
-      ".hone-tour-card{position:fixed;max-width:360px;background:#151A21;border:1px solid #232B35;" +
+      ".hone-tour-card{position:fixed;max-width:25.714rem;background:#151A21;border:1px solid #232B35;" +
       "border-radius:14px;padding:16px 18px;box-shadow:0 14px 44px rgba(0,0,0,.55);" +
       "color:#E8EDF2;pointer-events:auto;}" +
       ".hone-tour-card h4{margin:0 0 6px;font-size:1.143rem;font-weight:600;color:#E8EDF2;" +

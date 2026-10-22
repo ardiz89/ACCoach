@@ -45,11 +45,6 @@ def test_root_carries_the_growing_base(fname):
     assert "font-size: var(--fs)" in root
 
 
-def test_the_clamp_gives_14_then_18_5_then_20():
-    f = lambda w: min(20, max(14, 14 + (w - 1600) * 6 / 1280))
-    assert (f(1366), f(1600), f(2560), f(2880), f(3840)) == (14, 14, 18.5, 20, 20)
-
-
 @pytest.mark.parametrize("fname", CSS)
 def test_no_font_size_in_px_outside_root(fname):
     bad = re.findall(r"font(?:-size)?\s*:[^;}]*\d(?:\.\d+)?px", _without_root(_SRC[fname]))
@@ -128,3 +123,85 @@ def test_resize_rereads_the_canvas_base():
     src = _SRC["app.js"]
     i = src.index('window.addEventListener("resize"')
     assert "_fontBase = 0" in src[i:i + 120]
+
+
+def test_small_has_an_explicit_size():
+    # `small` eredita `smaller` (10-11 px a base 14): va dichiarato.
+    assert re.search(r"(?m)^small\s*\{[^}]*font-size:\s*0\.857rem", _outside_comments(_SRC["style.css"]))
+
+
+# --- l'effetto, misurato in un browser vero ---------------------------------
+
+def _chromium():
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError:
+        return None
+    return sync_playwright
+
+
+_MEASURE = """() => {
+  const small = [];
+  const tw = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  let n;
+  while ((n = tw.nextNode())) {
+    if (!n.textContent.trim() || ['SCRIPT', 'STYLE'].includes(n.parentElement.tagName)) continue;
+    const fs = parseFloat(getComputedStyle(n.parentElement).fontSize);
+    if (fs < 11.99) small.push([n.parentElement.tagName + '.' + n.parentElement.className, fs]);
+  }
+  return {body: parseFloat(getComputedStyle(document.body).fontSize), small,
+          over: document.documentElement.scrollWidth - document.documentElement.clientWidth};
+}"""
+
+
+@pytest.fixture(scope="module")
+def static_site():
+    import functools
+    import http.server
+    import threading
+
+    class H(http.server.SimpleHTTPRequestHandler):
+        def translate_path(self, path):
+            path = path.split("?")[0]
+            if path.startswith("/static/"):
+                path = path[len("/static"):]
+            return str(WEB / path.lstrip("/"))
+
+        def log_message(self, *a):
+            pass
+
+    srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), H)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    yield f"http://127.0.0.1:{srv.server_address[1]}"
+    srv.shutdown()
+
+
+@pytest.mark.skipif(_chromium() is None, reason="serve playwright")
+@pytest.mark.parametrize("page", ["index.html", "engineer.html"])
+@pytest.mark.parametrize("width,base", [(1366, 14), (1600, 14), (2560, 18.5), (2880, 20)])
+def test_in_a_real_browser_the_base_grows_and_no_text_is_under_12px(static_site, page, width, base):
+    with _chromium()() as p:
+        try:
+            b = p.chromium.launch()
+        except Exception:
+            pytest.skip("manca chromium")
+        pg = b.new_page(viewport={"width": width, "height": 900})
+        pg.goto(f"{static_site}/{page}")
+        pg.wait_for_timeout(300)
+        r = pg.evaluate(_MEASURE)
+        b.close()
+    assert r["body"] == pytest.approx(base, abs=0.01)
+    assert r["small"] == []
+    assert r["over"] <= 0
+
+
+def test_right_edge_labels_are_anchored_not_guessed():
+    # `w - 70` e simili indovinano la larghezza del testo: a base 20 esce dal bordo.
+    assert not re.search(r"fillText\([^;]*,\s*w - (?:44|62|70|74)\b", _SRC["app.js"])
+    assert "function fillTextRight(" in _SRC["app.js"]
+    assert _SRC["app.js"].count("fillTextRight(ctx") >= 8
+
+
+def test_top_labels_follow_the_font_size():
+    assert "function labelTop()" in _SRC["app.js"]
+    assert not re.search(r"width\) / 2, 11\)", _SRC["app.js"])

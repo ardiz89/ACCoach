@@ -825,8 +825,8 @@ function drawProgress(p) {
   for (let i = 0; i < n; i++) { ctx.beginPath(); ctx.arc(X(i), Y(times[i]), 3, 0, 6.283); ctx.fill(); }
 
   ctx.fillStyle = "rgba(255,255,255,0.45)"; ctx.font = canvasFont(12) + "px " + MONO;
-  ctx.fillText(fmtMs(realLo), w - 70, Y(realLo) - 4);
-  ctx.fillText(fmtMs(realHi), w - 70, Y(realHi) + 12);
+  fillTextRight(ctx, fmtMs(realLo), w - 4, Y(realLo) - 4);
+  fillTextRight(ctx, fmtMs(realHi), w - 4, Y(realHi) + canvasFont(12));
 }
 
 // --- tyres over time ------------------------------------------------------
@@ -911,8 +911,8 @@ function drawTyreLines(cv, tyres, field, digits, unit) {
   });
 
   ctx.fillStyle = "rgba(255,255,255,0.45)"; ctx.font = canvasFont(12) + "px " + MONO;
-  ctx.fillText(fmtDec(rhi, digits, unit), w - 44, Y(rhi) + 10);
-  ctx.fillText(fmtDec(rlo, digits, unit), w - 44, Y(rlo) - 3);
+  fillTextRight(ctx, fmtDec(rhi, digits, unit), w - 4, Y(rhi) + canvasFont(12) - 2);
+  fillTextRight(ctx, fmtDec(rlo, digits, unit), w - 4, Y(rlo) - 3);
   return true;
 }
 
@@ -1573,7 +1573,9 @@ function drawMapTo(canvas, missing, a, cx, mode) {
     // di default, "alphabetic": il testo sta SOPRA `ly`, non sotto).
     const rectOf = (text) => {
       const tw = ctx.measureText(text).width;
-      return { x0: lx, y0: ly - 11, x1: lx + tw, y1: ly + 3 };
+      // Dentro la tela: a destra del bordo l'etichetta si sposta a sinistra.
+      const x0 = Math.max(2, Math.min(lx, w - 2 - tw));
+      return { x0, y0: ly - canvasFont(12) + 1, x1: x0 + tw, y1: ly + 3 };
     };
     const overlaps = (r) => placedLabels.some((p) =>
       r.x0 < p.x1 && p.x0 < r.x1 && r.y0 < p.y1 && p.y0 < r.y1);
@@ -1587,7 +1589,7 @@ function drawMapTo(canvas, missing, a, cx, mode) {
       const rShort = rectOf(short);
       if (!overlaps(rShort)) { label = short; rect = rShort; }
     }
-    if (label) { ctx.fillText(label, lx, ly); placedLabels.push(rect); }
+    if (label) { ctx.fillText(label, rect.x0, ly); placedLabels.push(rect); }
   }
 
   // Start/finish + direction of travel. A white dot with an "S/F" label (kept
@@ -3450,8 +3452,8 @@ function drawStintPace(cur) {
   ctx.fillStyle = "rgba(255,255,255,0.45)"; ctx.font = canvasFont(12) + "px " + MONO;
   if (paced.length) {
     const fastest = Math.min(...paced), slowest = Math.max(...paced);
-    ctx.fillText(fmtMs(fastest), w - 74, Y(fastest) - 5);
-    ctx.fillText(fmtMs(slowest), w - 74, Y(slowest) + 13);
+    fillTextRight(ctx, fmtMs(fastest), w - 4, Y(fastest) - 5);
+    fillTextRight(ctx, fmtMs(slowest), w - 4, Y(slowest) + canvasFont(12) + 1);
   }
 }
 
@@ -3483,6 +3485,13 @@ function canvasFont(px) {
     } catch (e) { /* senza DOM (test in node): resta la base 14 */ }
   }
   return Math.round(px * base / 14 * 10) / 10;
+}
+// Etichette in cima e in fondo a un canvas: la linea di base segue la dimensione
+// del carattere, cosi' a base 20 non escono di 1-2 px dal bordo.
+function labelTop() { return Math.ceil(canvasFont(12) * 0.85) + 2; }
+// Testo ancorato a destra: la larghezza non si indovina, si lascia a textAlign.
+function fillTextRight(ctx, s, xr, y) {
+  const a = ctx.textAlign; ctx.textAlign = "right"; ctx.fillText(s, xr, y); ctx.textAlign = a;
 }
 const MONO = '"JetBrains Mono", ui-monospace, Consolas, monospace';
 
@@ -3526,7 +3535,7 @@ function cornerBands(ctx, w, h, corners, noMarks) {
   for (const c of corners) {
     const x0 = projX(c.entry, w), band = projX(c.exit, w) - x0;
     const label = degradeLabel(ctx, c.name || "T" + (c.index + 1), "T" + (c.index + 1), band);
-    if (label) ctx.fillText(label, x0 + (band - ctx.measureText(label).width) / 2, 11);
+    if (label) ctx.fillText(label, x0 + (band - ctx.measureText(label).width) / 2, labelTop());
   }
   if (!noMarks) cornerAdvMarks(ctx, w, h, corners);
 }
@@ -3563,10 +3572,11 @@ function gridY(ctx, w, h, lo, hi, fmt, ticks) {
     const label = fmt(hi - (i / ticks) * (hi - lo));
     if (!label) continue;
     // Keep the top and bottom labels inside the box rather than half-clipped.
-    const ty = i === 0 ? 11 : (i === ticks ? h - 4 : y + 3.5);
+    const fh = canvasFont(12);
+    const ty = i === 0 ? labelTop() : (i === ticks ? h - 4 : y + 3.5);
     const tw = ctx.measureText(label).width;
     ctx.fillStyle = "rgba(11,14,18,0.72)";
-    ctx.fillRect(3, ty - 9, tw + 6, 12);
+    ctx.fillRect(3, ty - fh * 0.85, tw + 6, fh + 1);
     ctx.fillStyle = "rgba(255,255,255,0.5)";
     ctx.fillText(label, 6, ty);
   }
@@ -3826,7 +3836,9 @@ function crosshair(ctx, w, h, cx) {
 // right for exactly one chart size and silently wrong for every other.
 function axisLabel(ctx, w, h, top, bottom) {
   ctx.fillStyle = "rgba(255,255,255,0.45)"; ctx.font = canvasFont(12) + "px " + UI_FONT;
-  ctx.fillText(top, w - 62, 12); ctx.fillText(bottom, w - 62, h - 5);
+  // In basso sta sopra la riga dei tick di gridX (stessa fascia a destra).
+  fillTextRight(ctx, top, w - 4, labelTop());
+  fillTextRight(ctx, bottom, w - 4, h - canvasFont(12) - 6);
 }
 
 function redraw(cx) {
@@ -4159,9 +4171,9 @@ function drawGG(a, cx) {
   }
   // Axis captions.
   ctx.fillStyle = "rgba(255,255,255,0.5)"; ctx.font = canvasFont(12) + "px " + MONO;
-  ctx.fillText(t("dyn.gg.accel"), cx0 + 4, cy0 - R + 10);
+  ctx.fillText(t("dyn.gg.accel"), cx0 + 4, cy0 - R + labelTop());
   ctx.fillText(t("dyn.gg.brake"), cx0 + 4, cy0 + R - 3);
-  ctx.fillText(t("dyn.gg.lat"), cx0 + R - 34, cy0 - 4);
+  fillTextRight(ctx, t("dyn.gg.lat"), cx0 + R - 2, cy0 - 4);
 
   // Highlighted moment (from the shared hover position).
   const pts = [];
@@ -4342,8 +4354,8 @@ function drawTyreOverLap(cv, wheels, pos, corners, cx, unit) {
     ctx.restore();
   }
   ctx.fillStyle = "rgba(255,255,255,0.45)"; ctx.font = canvasFont(12) + "px " + MONO;
-  ctx.fillText(fmtDec(rhi, unit ? 0 : 1, unit), w - 44, 12);
-  ctx.fillText(fmtDec(rlo, unit ? 0 : 1, unit), w - 44, h - 4);
+  fillTextRight(ctx, fmtDec(rhi, unit ? 0 : 1, unit), w - 4, labelTop());
+  fillTextRight(ctx, fmtDec(rlo, unit ? 0 : 1, unit), w - 4, h - 4);
   crosshair(ctx, w, h, cx);
 }
 
@@ -5327,20 +5339,21 @@ function cornerNote(ctx, w, corner) {
   if (!l || !l.message) return;
   const maxw = w - 28;
   ctx.save();
-  ctx.font = "" + canvasFont(12) + "px " + UI_FONT;
+  ctx.font = "bold " + canvasFont(13) + "px " + UI_FONT;
+  const lh = Math.ceil(canvasFont(13) * 1.3);
   const head = `${fmtDec(l.lost_s || 0, 2, "s")} · ${l.message}`;
   // A backdrop, because this text lies over a drawing: the two lines cross the
   // whole canvas and a bare label on top of them is unreadable at the crossing.
   const sub = l.inherited || l.phase_note || "";
   const lines = sub ? 2 : 1;
   ctx.fillStyle = "rgba(11,14,18,0.72)";
-  ctx.fillRect(0, 0, w, 12 + lines * 15);
+  ctx.fillRect(0, 0, w, 10 + lines * lh);
   ctx.fillStyle = "#FFB020";
-  ctx.fillText(clipText(ctx, head, maxw), 14, 20);
+  ctx.fillText(clipText(ctx, head, maxw), 14, 5 + lh * 0.85 + 2);
   if (sub) {
     ctx.font = canvasFont(12) + "px " + UI_FONT;
     ctx.fillStyle = "rgba(255,255,255,0.6)";
-    ctx.fillText(clipText(ctx, (l.inherited ? "↩ " : "") + sub, maxw), 14, 35);
+    ctx.fillText(clipText(ctx, (l.inherited ? "↩ " : "") + sub, maxw), 14, 5 + lh * 1.85 + 2);
   }
   ctx.restore();
 }
