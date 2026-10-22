@@ -14,10 +14,12 @@ Questa guida ti accompagna dall'avvio al primo giro col coach, fino all'analisi.
 
 - **Assetto Corsa** o **Assetto Corsa Competizione** installato.
 - **HONE**, in uno dei due modi.
-  - **L'eseguibile**, se vuoi solo usarlo. Fai doppio clic su `HONE.bat`, e
-    Python non ti serve.
+  - **L'eseguibile**, se vuoi solo usarlo. Scarica lo ZIP dalla pagina
+    Releases, scompattalo e avvia `HONE.exe`. Python non ti serve.
   - **Il sorgente**, se sviluppi. Ti serve Python 3.11 o più recente, poi
-    `pip install -r requirements.txt`.
+    `pip install -r requirements.txt`. Dal sorgente puoi anche fare doppio clic
+    su `HONE.bat`. La prima volta prepara il suo ambiente Python e installa
+    quello che serve.
 
 I tuoi giri finiscono in **`Documenti/ACCoach/laps`**, sia dall'eseguibile sia
 dal sorgente. Così l'analisi li ritrova sempre.
@@ -77,7 +79,8 @@ Dalla riga di comando fai la stessa cosa così.
 python -m accoach live           # coach vocale + overlay, in un solo processo
 ```
 
-Aggiungi `--silent` se vuoi l'overlay senza la voce.
+Aggiungi `--silent` se vuoi l'overlay senza la voce. Con `--interactive` puoi
+trascinare l'overlay in un altro punto dello schermo.
 
 ---
 
@@ -827,7 +830,7 @@ Questi sono quelli che potrebbero servirti davvero.
 | `setup show <file>` | Legge un setup ACC senza avviare il gioco. |
 | `selftest` | Controlla che la voce funzioni e scrive un report. |
 | `logs` | Apre la cartella dei log e dei crash report. |
-| `logs --zip` | Fa un solo file da allegare a una segnalazione, coi log, la versione, il commit, Python e il sistema, e le ultime auto e piste. Il file nasce anche se non ci sono log, e in quel caso lo dice. **I log entrano così come sono, senza filtri.** Contengono percorsi col nome del tuo account Windows, come `C:\Users\<account>\...`, e la cartella di rete se ne hai una. Hanno una riga con data e ora per ogni avvio di HONE, cioè il registro di quando ti sei seduto a guidare. Ci sono i tuoi tempi sul giro, piste, auto e nomi dei file aperti. Ci sono anche i crash report, con l'errore completo. È voluto, perché un log ripulito non serve a trovare un difetto. Il comando lo scrive dentro lo ZIP e a schermo quando finisce. Aprilo e guardalo prima di mandarlo. |
+| `logs --zip` | Fa un solo file da allegare a una segnalazione, coi log, la versione, il commit, Python e il sistema, e le ultime auto e piste. Il file nasce anche se non ci sono log, e in quel caso lo dice. **I log entrano così come sono, senza filtri.** Contengono percorsi col nome del tuo account Windows, come `C:\Users\<account>\...`, e la cartella di rete se ne hai una. Hanno una riga con data e ora per ogni avvio di HONE, cioè il registro di quando ti sei seduto a guidare. Ci sono i tuoi tempi sul giro, piste, auto e nomi dei file aperti. Ci sono anche i crash report, con l'errore completo. È voluto, perché un log ripulito non serve a trovare un difetto. Il comando lo scrive dentro lo ZIP, e dal sorgente anche a schermo quando finisce. L'app impacchettata non ha una finestra di terminale, quindi lì a schermo non vedi niente. Aprilo e guardalo prima di mandarlo. |
 | `find-rain` | Trova i campi della pioggia di ACC misurandoli. Ti serve una sessione con meteo variabile. |
 
 ### Il file di configurazione

@@ -964,7 +964,7 @@ Salva un setup nel gioco, poi ricarica questa pagina.` },
     // Presentato a CONTEGGI, non a percentuali, finché le prove non sono
     // abbastanza: un tasso di successo su tre campioni è rumore travestito da
     // percentuale, e il modulo che lo calcola lo dice per primo.
-    "rec.title":       { en: `Track record`, it: `Registro delle prove` },
+    "rec.title":       { en: `Test log`, it: `Registro delle prove` },
     "rec.none":        { en: `No test finished yet on this car and track. The engineer proposes a change, you drive it, and the verdict lands here, even when the change didn't work.`,
                          it: `Nessuna prova ancora conclusa su questa auto e questa pista. L'ingegnere propone una modifica, tu la guidi e il verdetto finisce qui, anche quando la modifica non ha funzionato.` },
     "rec.counts":      { en: `<b>{kept}</b> kept out of <b>{tests}</b> tested`,

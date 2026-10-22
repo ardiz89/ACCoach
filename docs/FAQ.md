@@ -102,28 +102,29 @@ You can wipe everything at any time by emptying the `Documents\ACCoach\` folder.
 > That's where you go to see how it went.
 
 **The Drive panel walks you through it.** Once you press Coach Live, the page
-goes through three moments, one after the other.
+moves through three stages, one after the other.
 
-**Before you go.** The first step, *Coach Live is on*, ticks as soon as the coach
-answers, usually within a couple of seconds. At that point voice and overlay are
-ready. Next comes *Connect your tablet to the engineer*. Scan the QR code with the
-tablet's camera, or open the address written next to it. The tablet can only
-connect with network access on. If it's off, the panel offers a *Turn on network
-access* button, and afterwards you restart Coach Live. If you don't need the
-tablet, press *Skip, I'll drive without*. The last step, *Start the game and
-leave the pits*, ticks itself when the telemetry arrives.
+**Before you go.** The first step, *Coach Live is on*, is ticked off as soon as
+the coach responds, usually within a couple of seconds. At that point voice and
+overlay are ready. Next comes *Connect your tablet to the engineer*. Scan the QR
+code with the tablet's camera, or open the address written next to it. The
+tablet can only connect with network access on. If it's off, the panel offers a
+*Turn on network access* button, and afterwards you restart Coach Live. If you
+don't need the tablet, press *Skip, I'll drive without*. The last step, *Start
+the game and leave the pits*, ticks itself off when the telemetry arrives.
 
 **You're driving.** The panel tells you whether the tablet is connected, which
 track and car you're on, how many laps you've completed and your best. If you're
-following a piece of advice from the report card, you read *You're working on*
-with its name. The coach reminds you of it in its corners. When you're done,
-press **I'm done, show me how it went**. The coach stops and the report opens on
-the report card. *Stop without opening the report* only stops the coach.
+following a tip from the report card, you read *You're working on* with its
+name. The coach reminds you of it in the corners that advice covers. When you're
+done, press **I'm done, show me how it went**. The coach stops and the report
+opens on the report card. *Stop without opening the report* only stops the
+coach.
 
 **Session over.** If you close the game, after a minute the panel switches to
 *Session over* and offers two choices. *Show me how it went* opens the report.
-*I'm staying on track* is for when you're only changing track. The coach stays on
-until you stop it.
+*I'm staying on track* is for when you've closed the game only to switch tracks.
+The coach stays on until you stop it.
 
 **If you forget to press the button.** In **Settings** there's *Record by itself
 when the game starts*. With the hub open, HONE notices that AC or ACC has started
@@ -140,20 +141,20 @@ From the command line you do the same thing like this.
 python -m accoach live           # voice coach and overlay, in one process
 ```
 
-Add `--silent` if you want the overlay without the voice. Add `--interactive` if
-you want to drag the overlay somewhere else on the screen.
+Add `--silent` if you want the overlay without the voice. With `--interactive`
+you can drag the overlay somewhere else on the screen.
 
 ---
 
 ## 3. How the coach trains you
 
 The coach works like a real race engineer. First it **watches you drive**, then
-it **corrects you**. What it tells you comes in three kinds.
+it **corrects you**. It tells you three kinds of things.
 
 ### Immediate warnings
 
 These don't need a reference lap. From the first metre of the first lap, the
-coach warns you when something is wrong in absolute terms.
+coach warns you when you do something that's wrong on any lap.
 
 - If you **lock up** under braking, you hear "You're locking up, ease off the
   brake".
@@ -191,8 +192,8 @@ After a few complete laps, dirty ones included, the coach stops commenting on
 everything. It **picks one weakness**, the corner where you lose the most and
 why. It announces it with a sentence like "The new focus is Variante Ascari.
 Let's work on braking". **From then on it only talks to you about that theme on
-track**, all around the lap and not only in that corner. If your braking is off,
-it isn't off in one place only, and the habit is what you train.
+track**, all around the lap and not only in that corner. Bad braking isn't
+confined to one corner, and the habit is what you train.
 
 This applies to the themes the coach can recognise anywhere on the track, which
 are braking and traction. With a focus on cornering or on the line, the voice
@@ -241,9 +242,9 @@ There are two kinds of change, and they close in different ways.
 - **In the pits.** A setup file to write. Here the coach also tells you **when to
   come in**.
 
-### The Track record
+### The Test log
 
-On the **Engineer** page, under the proposal, there's the **Track record**. It
+On the **Engineer** page, under the proposal, there's the **Test log**. It
 tells you how many proposed changes were **kept** after the measurement, and how
 many were rejected. It's the only number on that page that isn't a claim of ours.
 The tests you drove count it, and it can prove us wrong.
@@ -261,9 +262,9 @@ three tests a hit rate is just noise.
 When a change has to be made in the garage, you hear three things.
 
 1. **At the start of the last sector**, or about 20 s before the pit entry if
-   that comes first, "Setup change ready, box this lap". The second rule is
-   needed. On some circuits the pit lane splits off **before** the last sector.
-   A call tied to the sector would come with the entry already behind you.
+   that comes first, "Setup change ready, box this lap". The 20 s rule matters
+   because on some circuits the pit lane splits off **before** the last sector.
+   A call tied to the sector would come after you'd passed the entry.
 2. **Just before the entry**, "Pit entry just ahead, come in".
 3. **Standing in the box**, what to do with the change. It tells you out loud
    because the change is on a browser page you weren't looking at while driving.
@@ -287,11 +288,11 @@ would put the pit entry in the middle of a straight.
 You don't have to do anything special. Start the session, practice, hotlap or
 race, and drive.
 
-- A lap closes when you **cross the line**. HONE recognises it from **two signals
-  together**, the game's lap counter and your track position starting again from
-  zero. One alone isn't enough. On ACC the counter doesn't count the out-lap.
-  Without the second signal, the first flying lap after every pit exit was lost.
-  The time we save is the game's official one.
+- A lap closes when you **cross the line**. HONE recognises it from **two
+  signals together**, the game's lap counter and your track position starting
+  again from zero. One alone isn't enough. On ACC the counter doesn't count the
+  out-lap. Without the second signal, the first flying lap after every pit exit
+  would be lost. The time we save is the game's official one.
 - The **first lap is almost always partial**, because you start mid-track, and we
   discard it. We only save **complete** laps, from line to line.
 - **If you start from the pits**, recording is paused in the garage and in the pit
@@ -319,23 +320,23 @@ race, and drive.
   reference, and **to the left in green** when you're faster.
 - **At the top** you see your **PB**, the lap you're racing against, and the
   **predicted time** if you keep the pace. When a braking zone is coming, that
-  space goes to the **countdown in metres**. When it's time to brake it becomes a
-  single red word, **BRAKE**. The threshold is in time, not distance. Ten metres
-  are 0.14 s at 250 km/h, and half a second in a slow corner.
-- **A pill** shows the last piece of advice spoken, and fades on its own. When
-  the engineer proposes a change that can **only be made in the pits**, the coach
-  calls you in at the end of the lap. From then on the pill becomes the **pit-in
-  warning**, in amber, and it doesn't fade. It stays until you enter the pit lane,
-  or until the change is no longer pending, for example if it gets withdrawn. A
-  call that lasts two seconds is one you miss if you were looking at the corner.
-  The advice keeps coming by voice. It only gives up that line, and takes it back
-  when the warning goes out.
+  space goes to the **countdown in metres**. When it's time to brake it becomes
+  a single red word, **BRAKE**. The threshold is in time, not distance. Ten
+  metres is 0.14 s at 250 km/h, and half a second in a slow corner.
+- **A label** shows the last advice spoken, and fades on its own. When the
+  engineer proposes a change that can **only be made in the pits**, the coach
+  calls you in at the end of the lap. From then on the label becomes the
+  **pit-in warning**, in amber, and it doesn't fade. It stays until you enter
+  the pit lane, or until the change is no longer pending, for example if it gets
+  withdrawn. A call that lasts two seconds is one you miss if you were looking
+  at the corner. Spoken advice keeps coming. It just loses its line on the
+  overlay until the warning goes out.
 - **Below it there's a thin amber line**, the **focus**. It's the theme you're
   working on, with the corner and the tenths it costs you. Once the coach has
   moved to short words, described in "One theme at a time", it also shows **an
-  example word**, like "LESS BRAKE". The whole sentence stays in the pill and in
-  the debrief. The focus line reminds you of the theme, not of every word you'll
-  hear.
+  example word**, like "LESS BRAKE". The whole sentence stays in the label and
+  in the debrief. The focus line reminds you of the theme, not of every word
+  you'll hear.
 
 ### The pedal trace
 
@@ -424,13 +425,14 @@ learn.
 
 Without a reference, on the other hand, everything that doesn't need one stays
 on. Understeer and oversteer, coasting, trail braking, gears, pressures and
-temperatures are always there. Worth knowing in your first session with a new car.
+temperatures are always there. It's worth knowing in your first session with a
+new car.
 
 ---
 
 ## 5. Analysis and report in the browser
 
-Once the session is over, you go through it all calmly.
+Once the session is over, go through it at your own pace.
 
 - In the hub, in the **Analysis** section, press **Analysis and report**. From the
   command line, type this instead.
@@ -468,7 +470,7 @@ Then come four blocks, in this order.
 - **Most frequent mistakes.** Lock-ups, wheelspin, understeer, oversteer and
   off-tracks, counted over the session. Only the ones that happened show up. On
   ACC with ABS on, a physical lock-up doesn't happen, so we don't count it.
-- **The plan for your next run.** Three pieces of advice at most, in order.
+- **The plan for your next run.** Three tips at most, in order.
 
 Every number comes from your laps. If a figure is missing, the line says so or
 doesn't appear, and we don't make one up. Every session is measured against the
@@ -477,40 +479,40 @@ the yardstick. When the reference changes, the history is recalculated.
 
 The report card is about driving. Setup problems stay with the Engineer.
 
-**You follow the plan one piece of advice at a time.** Each piece is about one
-fault and the corners where it weighs most. **I'll follow it** and **Not for me**
-appear on the first proposed piece, until you follow one. **Drop it** appears on
-the piece in progress. They all have **How to do it →**.
+**You follow the plan one tip at a time.** Each tip targets one fault and the
+corners where it costs most. **I'll follow it** and **Not for me** show on the
+first suggested tip until you pick one. **Drop it** shows on the tip you're
+working on. Every tip has **How to do it →**.
 
 - **I'll follow it** puts it in progress, dated today.
-- **Not for me** takes a piece you haven't started out of the plan. The fault
-  stays on the report card, and the advice stays out of the plan until you take it
-  back. You find it again under "You set these aside.", with the **Take it back**
-  button.
-- **Drop it** closes the piece in progress without counting it as done.
+- **Not for me** takes a tip you haven't started out of the plan. The fault
+  stays on the report card, and the tip stays out of the plan until you take it
+  back. You find it again under "You set these aside.", with the **Take it
+  back** button.
+- **Drop it** closes the tip you're working on without counting it as done.
 
-The piece in progress is measured only on the laps you drive after you take it.
-It's done when, over at least three laps, you're under the target on half of
+The tip you're working on is measured only on the laps you drive after you take
+it. It's done when, over at least three laps, you're under the target on half of
 them. The target is to win back half of what you lose today. When that happens,
-the report card tells you and offers the next piece.
+the report card tells you and offers the next tip.
 
-**In the car, the coach follows your advice.** On your next outing the focus,
-described in "One theme at a time", works on the corners of the advice you're
-following and speaks there. So the plan and the coach tell you the same thing. If
-you no longer lose enough in those corners, the coach picks on its own as always.
-A verdict from the coach doesn't close the advice. Only the report's measurement
-does.
+**On track, the coach works on the same advice.** On your next outing the focus,
+described in "One theme at a time", works on the corners of the tip you're
+following and speaks there. So the plan and the coach tell you the same thing.
+If you no longer lose enough in those corners, the coach picks on its own as
+always. A verdict from the coach doesn't close the tip. Only the report's
+measurement does.
 
-**In the other tabs, the advice you follow is marked.** Compare, Line, Sectors,
-Dynamics and Trends open with a line that has a purple border. The line names the
-corners of the advice and tells you what to look at in that tab. A click on a
-corner's name takes you there, and **How to do it →** opens the advice's page. In
-the charts and lists, the corners of the advice carry a purple dot. With no
-advice in progress the tabs stay as they are.
+**In the other tabs, the tip you follow is marked.** Compare, Line, Sectors,
+Dynamics and Trends open with a line that has a purple border. The line names
+the corners of the tip and tells you what to look at in that tab. A click on a
+corner's name takes you there, and **How to do it →** opens the tip's page. In
+the charts and lists, the corners of the tip carry a purple dot. With no tip in
+progress the tabs stay as they are.
 
 ### How to do it
 
-**How to do it →** on a piece of advice opens its page, and **← Back to the
+**How to do it →** on a tip opens its page, and **← Back to the
 report card** takes you back. The page is built from your own laps, and it has
 these parts.
 
@@ -553,12 +555,13 @@ The tabs come in three groups, in the order you usually read them.
   it doesn't appear, because we don't know it, and that doesn't mean zero litres.
   It doesn't appear on laps where you refuelled either, because there's a refuel
   in the middle and not a consumption.
-- **Lap explained** shows you the lap one thing at a time, instead of five charts
-  at once. It tells you what cost you most, why, and what to do, with the chart
-  cropped to the stretch it's talking about. It's three steps at most. If you're a
-  long way off the pace it opens with the general theme and stops there. At that
-  distance, corner by corner doesn't help. On your reference lap it tells
-  you there's nothing to correct, instead of inventing a lesson.
+- **Lap explained** shows you the lap one thing at a time, instead of five
+  charts at once. It tells you what cost you most, why, and what to do, with the
+  chart cropped to the stretch it's talking about. It's three steps at most. If
+  you're a long way off the pace it opens with the general theme and stops
+  there. At that distance a corner-by-corner breakdown doesn't help. On your
+  reference lap it tells you there's nothing to correct, instead of inventing a
+  lesson.
 
 **Why, in detail**
 
@@ -616,12 +619,12 @@ The tabs come in three groups, in the order you usually read them.
 
   **You can name the corner yourself.** Next to the corner's title there's a
   pencil. Write what you call it, and from then on that name appears everywhere,
-  in the debrief, the losses, the braking points and the coach's voice. HONE knows
-  the corner names of **14 of 26 circuits**, and for ten more ACC circuits it
-  doesn't even have the shape. There, only you know the corner's name. Your name
-  also beats ours, if you don't like ours, and it comes off the same way it went
-  on. The names live in `Documents\ACCoach\corner-names.json`, in plain text, and
-  you can read, copy and fix them by hand.
+  in the debrief, the losses, the braking points and the coach's voice. HONE
+  knows the corner names of **14 of 26 circuits**, and for ten more ACC circuits
+  it doesn't even have the shape. There, only you know the corner's name. If you
+  don't like our name, yours replaces it, and you remove it the same way you
+  added it. The names live in `Documents\ACCoach\corner-names.json`, in plain
+  text, and you can read, copy and fix them by hand.
 
   Under the two lines you see **the track from above**, with the asphalt and the
   kerbs, and the grass, gravel and concrete beside them. It isn't a drawing of
@@ -675,13 +678,13 @@ The tabs come in three groups, in the order you usually read them.
 **Over time**
 
 - **Trends.** At the top you find **your faults, session by session**, up to
-  twenty sessions, measured against the same reference as the Report card. That's
-  where you see whether a fault goes down, and a click on its name opens its
-  **How to do it**. Below are your lap times over time, your **consistency** and
-  your **weak points** corner by corner, systematic or one-off. Then the
-  **recurring mistakes**, with how many times you made them and in which corners.
-  It's the working. The plan that comes out of it lives on the **Report card**,
-  and the tyres live in **Race pace**.
+  twenty sessions, measured against the same reference as the Report card.
+  That's where you see whether a fault goes down, and a click on its name opens
+  its **How to do it**. Below are your lap times over time, your **consistency**
+  and your **weak points** corner by corner, systematic or one-off. Then the
+  **recurring mistakes**, with how many times you made them and in which
+  corners. This is where the numbers are worked out. The plan that comes out of
+  it lives on the **Report card**, and the tyres live in **Race pace**.
 - **Race pace.** Tells you how the pace holds up **on a single tank**. It's a
   different cut from Session, and the difference matters. We work out a session
   from the timestamps, and one outing can contain a **refuel**. Averaging the
@@ -854,8 +857,8 @@ consistency. It reads the saved laps, so the game can be closed.
 ## 7. Every command
 
 From a terminal, type `python -m accoach <command>`. From the source the command
-is `python accoach_main.py <command>`, and from the packaged app it's
-`HONE.exe <command>`.
+is `python accoach_main.py <command>`. The packaged app has no console window,
+so `HONE.exe <command>` runs the command but prints nothing in the terminal.
 
 **To drive you only need three commands**, the same ones you see with
 `python -m accoach help`.
@@ -950,8 +953,9 @@ These entries only exist there.
 zip even when there are no logs at all, and says so inside. "There were no logs"
 and "I didn't collect them" are different answers.
 
-Type the command the way `help` shows it. That's `HONE.exe logs --zip` from the
-packaged app, and `python accoach_main.py logs --zip` from the source.
+From the source you type `python accoach_main.py logs --zip`. From the packaged
+app, `HONE.exe logs --zip` makes the zip just the same, but prints nothing in
+the terminal.
 
 ### What's in that zip
 
@@ -975,8 +979,9 @@ At least all of this is in them.
 
 We leave all of it in on purpose. A log with the interesting parts taken out
 can't diagnose anything, and quietly censoring one would be worse than the path.
-The zip is an ordinary file on your disk, and the command prints a short version
-of this when it finishes. Open it and look before you send it.
+The zip is an ordinary file on your disk, and `contesto.txt` inside it says this
+too. From the source, the command also prints it when it finishes. Open it and
+look before you send it.
 
 ---
 
