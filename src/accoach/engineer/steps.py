@@ -22,6 +22,9 @@ from ..setup.acc_format import SETUP_PARAMS
 
 _PRESSURE = "tyrePressure"
 
+#: Leve di AC di cui sappiamo il passo ma non il verso (vedi ``AcSteps.units``).
+_VERSO_IGNOTO = frozenset({"toe"})
+
 # Perche' non scrivo, detto al pilota. Una frase che regge dopo «Non lo scrivo,
 # perché» e prima di un punto.
 _WHY = {
@@ -59,6 +62,12 @@ _WHY = {
         "en": "this car has no setup.ini saying what a click is worth",
         "it": "quest'auto non ha un setup.ini che dica quanto vale un click",
     },
+    "toe_geometry": {
+        "en": "on Assetto Corsa which way a toe click goes depends on each "
+              "car's suspension",
+        "it": "su Assetto Corsa il verso di un click di convergenza dipende "
+              "dalla sospensione di ogni auto",
+    },
     "no_section": {
         "en": "this car doesn't declare a step for that setting",
         "it": "quest'auto non dichiara un passo per quella regolazione",
@@ -80,7 +89,8 @@ class Steps:
         """Quanti psi vale un click di pressione su queste ruote, o None."""
         return None
 
-    def why(self, lang: str) -> str:
+    def why(self, lang: str, param: str | None = None) -> str:
+        """Perche' non si scrive; ``param`` e' la leva bloccata, se si sa."""
         entry = _WHY.get(self.reason) or _WHY["no_section"]
         return entry.get(lang) or entry["en"]
 
@@ -124,8 +134,21 @@ class AcSteps(Steps):
         return self._sections.get(spec.sections[i])
 
     def units(self, param: str, slot: int | None) -> int | None:
+        # Il passo c'e', il verso no. Misurato il 23/10 sulla SF25: dieci click
+        # in piu' abbassano la convergenza letta davanti e la alzano dietro. Nel
+        # file e' la lunghezza del braccio dello sterzo, e dove sta il braccio
+        # lo decide la sospensione dell'auto: un click scritto potrebbe fare il
+        # contrario di quello che la frase promette.
+        if param in _VERSO_IGNOTO:
+            return None
         sec = self._section(param, slot)
         return sec.units if sec is not None else None
+
+    def why(self, lang: str, param: str | None = None) -> str:
+        if param in _VERSO_IGNOTO and self._sections is not None:
+            entry = _WHY["toe_geometry"]
+            return entry.get(lang) or entry["en"]
+        return super().why(lang, param)
 
     def psi_per_click(self, slots: tuple) -> float | None:
         steps = set()

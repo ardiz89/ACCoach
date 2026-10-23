@@ -76,7 +76,7 @@ def _ch(param, slots, step):
     ("rideHeight", (2, 3), -2, "Abbassa"),
     ("preload", (None,), -1, "Riduci"),
     ("preload", (None,), +1, "Aumenta"),
-    ("toe", (0, 1), +1, "toe-out"),
+    ("toe", (0, 1), -1, "toe-out"),
     ("toe", (2, 3), +1, "toe-in"),
     ("camber", (0, 1), -1, "negativo"),
     ("tyrePressure", (0, 1), -2, "Abbassa"),

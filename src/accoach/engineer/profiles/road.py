@@ -34,7 +34,7 @@ _BASE: dict[tuple, list] = {
     (U, EN): [
         remedy("tyrePressure", "front", -2, "The car understeers on entry, so take 2 clicks of front tyre pressure off."),
         remedy("aRBFront", None, -1, "The car understeers on entry, so soften the front anti-roll bar by 1 click."),
-        remedy("toe", "front", +1, "The car understeers on entry, so add 1 click of front toe-out."),
+        remedy("toe", "front", -1, "The car understeers on entry, so add 1 click of front toe-out."),
     ],
     (U, AP): [
         remedy("aRBFront", None, -1, "The car understeers mid-corner, so soften the front anti-roll bar by 1 click."),

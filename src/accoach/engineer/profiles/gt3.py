@@ -35,7 +35,7 @@ REMEDY_TABLE: dict[Symptom, list] = {
     # ---- Understeer ----
     Symptom(U, EN, LO): [
         remedy("aRBFront", None, -1, "The car understeers on entry to slow corners, so soften the front anti-roll bar by 1 click."),
-        remedy("toe", "front", +1, "The car understeers on entry, so add 1 click of front toe-out."),
+        remedy("toe", "front", -1, "The car understeers on entry, so add 1 click of front toe-out."),
         remedy("brakeBias", None, -1, "The car understeers on entry, so move the brake bias 1 click rearward.", "AV"),
     ],
     Symptom(U, EN, HI): [

@@ -198,6 +198,10 @@ ricontrolla anche nelle fasi dopo.
 5. Quando nella fase non resta niente che sappia sistemare, passa a quella
    dopo con la base che ha già.
 
+Su Assetto Corsa l'ingegnere non tocca la convergenza e prova la regolazione
+dopo. Lì in che verso va un click dipende da come è fatta la sospensione di
+ogni auto.
+
 A che punto sei lo vedi nella **strada**, la fila delle fasi sopra la riga
 della fase, sul tablet e nella pagina Ingegnere. Le fasi fatte hanno la spunta
 e quella in corso è evidenziata. Una fase saltata è barrata e senza spunta.

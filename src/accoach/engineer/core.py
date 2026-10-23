@@ -1071,7 +1071,10 @@ class RaceEngineer:
     def _cannot_write(self, change: ProposedChange) -> Decision:
         """Dire cosa si proverebbe, e perche' non lo si scrive."""
         lang = current_language()
-        why = self.steps.why(lang)
+        # Il perche' e' della leva bloccata: su AC la convergenza ha un passo
+        # ma non un verso, e «non dichiara il passo» sarebbe falso.
+        param = change.changes[0].param if change.changes else None
+        why = self.steps.why(lang, param)
         if change.symptom is None:
             return Decision(DecisionKind.STAND_DOWN,
                             _msg("no_step_plain", lang, what=change.rationale,

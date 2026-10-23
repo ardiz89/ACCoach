@@ -262,6 +262,9 @@ pressures in the later phases too.
 5. When the phase has nothing left that it knows how to fix, it moves on to the
    next one with the baseline it already has.
 
+On Assetto Corsa the engineer leaves toe alone and tries the next setting.
+There, which way a click goes depends on how each car's suspension is built.
+
 Where you are shows in the **road**, the row of phases above the phase line, on
 the tablet and on the Engineer page. Finished phases carry a tick and the
 current one is highlighted. A skipped phase is struck through, with no tick.

@@ -33,7 +33,7 @@ _LEVERS: dict[tuple[str, str | None, int], str] = {
     ("reboundSlow", "rear", -1): "Ammorbidisci l'estensione posteriore.",
     # geometria: il +1 di `toe` e' toe-out davanti e toe-in dietro, come dicono
     # i rimedi che lo propongono
-    ("toe", "front", +1): "Aumenta il toe-out anteriore.",
+    ("toe", "front", -1): "Aumenta il toe-out anteriore.",
     ("toe", "rear", +1): "Aumenta il toe-in posteriore.",
     ("camber", "front", -1): "Aumenta il camber negativo anteriore.",
     # altezze e aerodinamica
