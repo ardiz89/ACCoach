@@ -412,3 +412,105 @@ def test_dopo_l_aggiornamento_chi_arriva_secondo_non_butta_la_chiave_nuova(monke
     assert guard.lan_key() == "7K3M9P2QXR4T8VWZ"
     assert fatto
     assert p.read_text(encoding="utf-8").strip() == "7K3M9P2QXR4T8VWZ"
+
+
+# --- la chiave che non si puo' creare --------------------------------------
+# Accesso controllato alle cartelle di Windows: Documenti non si scrive, e
+# `lan_key()` solleva. Il guardiano non deve rispondere 500 a ogni richiesta:
+# il PC entra lo stesso (non porta chiavi), il tablet legge perche' no.
+
+@pytest.fixture
+def chiave_impossibile(tmp_path, monkeypatch):
+    un_file = tmp_path / "non-una-cartella"
+    un_file.write_text("", encoding="utf-8")
+    monkeypatch.setattr(guard, "key_path", lambda: un_file / "lan-key.txt")
+    guard._dimentica()
+    with pytest.raises(OSError):
+        guard.lan_key()
+    yield
+
+
+def test_senza_chiave_il_pc_entra_anche_con_k(chiave_impossibile):
+    with TestClient(_mini(), base_url="http://127.0.0.1:8778") as c:
+        assert c.get("/x").status_code == 200
+        assert c.get("/x", params={"k": "7K3M9P2QXR4T8VWZ"}).status_code == 200
+        assert c.post("/w", json={}).status_code == 200
+
+
+@pytest.mark.parametrize("lang,frase", [
+    ("en", "HONE can't save the network key on the PC."),
+    ("it", "HONE non riesce a salvare la chiave di rete sul PC."),
+])
+def test_senza_chiave_il_tablet_legge_perche_non_un_500(
+        chiave_impossibile, monkeypatch, lang, frase):
+    monkeypatch.setattr(guard, "current_language", lambda: lang)
+    with TestClient(_mini(), base_url=f"http://{PC_LAN}:8778", client=TABLET,
+                    raise_server_exceptions=False) as c:
+        for r in (c.get("/x"), c.get("/x", params={"k": "7K3M9P2QXR4T8VWZ"}),
+                  c.post("/w", json={})):
+            assert r.status_code == 503
+            assert frase in r.text
+            assert r.headers["content-type"].startswith("text/html")
+        with pytest.raises(WebSocketDisconnect):
+            with c.websocket_connect(f"ws://{PC_LAN}:8777/ws?k=7K3M9P2QXR4T8VWZ") as s:
+                s.receive_text()
+
+
+# --- dopo un cambio di rete ------------------------------------------------
+# Il portatile passa dal Wi-Fi di casa a quello del circuito: il QR nuovo porta
+# il nuovo IP, ma la lista in cache (scaduta) e' ancora quella di prima e il
+# ricalcolo parte in un thread senza essere aspettato. Il primo colpo dal
+# tablet prendeva 403. Con una lista scaduta, prima di dire no si aspetta un
+# ricalcolo.
+
+@pytest.fixture
+def rete_che_cambia(monkeypatch):
+    import time as _t
+    indirizzi = {"127.0.0.1", "::1", PC_LAN}
+    chiamate = []
+
+    def local_addresses():
+        chiamate.append(1)
+        _t.sleep(0.2)   # un resolver vero non e' istantaneo
+        return set(indirizzi)
+
+    monkeypatch.setattr(netinfo, "local_addresses", local_addresses)
+    guard._dimentica()
+    guard.allowed_hosts()   # cache piena con la rete di casa
+    chiamate.clear()
+    return indirizzi, chiamate
+
+
+def test_il_nuovo_ip_nell_host_passa_al_primo_colpo(rete_che_cambia):
+    indirizzi, _chiamate = rete_che_cambia
+    indirizzi.add("10.0.0.7")
+    guard._invecchia()
+    key = guard.lan_key()
+    with TestClient(_mini(), base_url="http://10.0.0.7:8778", client=TABLET) as c:
+        assert c.get("/x", params={"k": key}).status_code == 200
+
+
+def test_il_pc_dal_nuovo_ip_resta_locale_al_primo_colpo(rete_che_cambia):
+    indirizzi, _chiamate = rete_che_cambia
+    indirizzi.add("10.0.0.7")
+    guard._invecchia()
+    with TestClient(_mini(), base_url="http://127.0.0.1:8778",
+                    client=("10.0.0.7", 51000)) as c:
+        assert c.get("/x").status_code == 200
+
+
+def test_con_la_lista_fresca_un_host_estraneo_non_ricalcola(rete_che_cambia):
+    _indirizzi, chiamate = rete_che_cambia
+    with TestClient(_mini(), base_url="http://evil.example:8778") as c:
+        assert c.get("/x").status_code == 403
+        assert c.get("/x").status_code == 403
+    assert chiamate == []
+
+
+def test_con_la_lista_scaduta_un_host_estraneo_ricalcola_una_volta(rete_che_cambia):
+    _indirizzi, chiamate = rete_che_cambia
+    guard._invecchia()
+    with TestClient(_mini(), base_url="http://evil.example:8778") as c:
+        assert c.get("/x").status_code == 403
+        assert c.get("/x").status_code == 403   # ora la lista e' fresca
+    assert len(chiamate) == 1

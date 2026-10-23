@@ -56,6 +56,14 @@ _MESSAGGIO_401 = {
     "it": "Apri HONE dal codice QR dell'hub.",
     "en": "Open HONE from the hub's QR code.",
 }
+# Documenti non si scrive (Accesso controllato alle cartelle): la chiave non
+# c'e', e un tablet non puo' entrare. Meglio dirlo che rispondere 500.
+_MESSAGGIO_503 = {
+    "it": "HONE non riesce a salvare la chiave di rete sul PC. Controlla che "
+          "Windows non blocchi la cartella Documenti.",
+    "en": "HONE can't save the network key on the PC. Check that Windows "
+          "isn't blocking the Documents folder.",
+}
 
 _cache: dict = {}
 # Un ricalcolo degli indirizzi alla volta (vedi `_rinfresca`).
@@ -256,6 +264,46 @@ async def _rinfresca() -> None:
             _lock_rete.release()
 
 
+def _scaduta() -> bool:
+    hit = _cache.get("rete")
+    return hit is None or time.monotonic() - hit[0] > _TTL_S
+
+
+def _ricalcola_se_scaduta(generazione: int) -> None:
+    """Come `_ricalcola`, ma chi la chiama aspetta il risultato.
+
+    Se un ricalcolo e' gia' in corso (quello lanciato da `_rinfresca`) si
+    aspetta lui, e poi non se ne fa un secondo: la cache e' gia' fresca.
+    """
+    if not _lock_rete.acquire(timeout=10.0):
+        return
+    try:
+        if _scaduta():
+            nuova = _calcola()
+            if _cache.get("generazione", 0) == generazione:
+                _cache["rete"] = nuova
+    finally:
+        _lock_rete.release()
+
+
+async def _dopo_un_ricalcolo() -> bool:
+    """Prima di dire no per colpa di una lista *scaduta*, la si rifa'.
+
+    Dopo un cambio di rete (il portatile dal Wi-Fi di casa a quello del
+    circuito) il QR porta l'IP nuovo, ma la lista in cache e' ancora quella di
+    prima: `_rinfresca` la rifa' senza aspettare, e il primo colpo del tablet
+    prendeva un 403. Qui si aspetta, sempre fuori dal loop. True se c'e' stato
+    da aspettare, cioe' se vale la pena guardare di nuovo. Con una lista
+    fresca non si aspetta niente: un host estraneo resta un no immediato.
+    """
+    if not _scaduta():
+        return False
+    loop = asyncio.get_running_loop()
+    await loop.run_in_executor(None, _ricalcola_se_scaduta,
+                               _cache.get("generazione", 0))
+    return True
+
+
 def _invecchia() -> None:
     """Fa scadere la cache senza svuotarla. Per i test."""
     hit = _cache.get("rete")
@@ -388,7 +436,9 @@ class GuardMiddleware:
             headers[k.decode("latin-1").lower()] = v.decode("latin-1")
         # `allowed_hosts` e `is_local_client` si chiamano dal modulo, non da
         # un riferimento preso all'import: i test li rimpiazzano li'.
-        if _host_name(headers.get("host", "")) not in allowed_hosts():
+        nome = _host_name(headers.get("host", ""))
+        if nome not in allowed_hosts() and not (
+                await _dopo_un_ricalcolo() and nome in allowed_hosts()):
             await self._nega(kind, send, 403, "host not allowed")
             return
 
@@ -414,9 +464,18 @@ class GuardMiddleware:
         dalla_query = (query.get(QUERY) or [""])[0]
         client = scope.get("client")
         ip = client[0] if client else None
-        query_ok = bool(dalla_query) and _same(dalla_query, lan_key())
-        if not is_local_client(ip):
+        locale = is_local_client(ip) or (
+            await _dopo_un_ricalcolo() and is_local_client(ip))
+        try:
             key = lan_key()
+        except OSError:
+            # Il PC non porta chiavi e passa lo stesso; agli altri si spiega.
+            key = None
+        if key is None and not locale:
+            await self._nega(kind, send, 503, None)
+            return
+        query_ok = bool(dalla_query) and key is not None and _same(dalla_query, key)
+        if not locale:
             portate = (cookie_parser(headers.get("cookie", "")).get(COOKIE, ""),
                        headers.get(HEADER, ""))
             if not (query_ok or any(p and _same(p, key) for p in portate)):
@@ -458,9 +517,10 @@ class GuardMiddleware:
             # Chiudere prima di accettare: il server risponde 403 all'handshake.
             await send({"type": "websocket.close", "code": 1008})
             return
-        if status == 401:
+        if status in (401, 503):
             lang = current_language()
-            frase = html.escape(_MESSAGGIO_401.get(lang, _MESSAGGIO_401["en"]), quote=False)
+            testi = _MESSAGGIO_401 if status == 401 else _MESSAGGIO_503
+            frase = html.escape(testi.get(lang, testi["en"]), quote=False)
             body = (f'<!doctype html><html lang="{html.escape(lang)}"><meta charset="utf-8">'
                     '<meta name="viewport" content="width=device-width">'
                     f"<title>HONE</title><p>{frase}</p></html>").encode("utf-8")
