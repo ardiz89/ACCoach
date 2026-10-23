@@ -104,8 +104,7 @@ def _mark(c, text):
                   json={"track": TRACK, "pos": APEX, "text": text})
 
 
-@pytest.mark.parametrize("bad", [EVIL, 'Curva "Villeneuve"', "Tosa & Rivazza",
-                                 "L'Ascari", "a>b"])
+@pytest.mark.parametrize("bad", [EVIL, "a>b", "<b>Tosa", "Curva <"])
 def test_a_corner_name_with_markup_characters_is_refused(client, store, bad):
     r = _name(client, bad)
     assert r.status_code == 400
@@ -118,16 +117,33 @@ def test_the_refusal_says_why_in_the_drivers_language(client):
                      json={"track": TRACK, "pos": APEX, "name": EVIL})
     en = client.post("/api/corner-name?lang=en",
                      json={"track": TRACK, "pos": APEX, "name": EVIL})
-    assert it.json()["detail"] == "Il nome non può contenere < > & \" '."
-    assert en.json()["detail"] == "The name can't contain < > & \" '."
+    assert it.status_code == en.status_code == 400
+    assert it.json()["detail"] == "Il nome non può contenere < o >."
+    assert en.json()["detail"] == "The name can't contain < or >."
 
 
-def test_an_ordinary_name_is_still_accepted(client, store):
-    assert _name(client, "Tamburello").status_code == 200
-    assert cornernames.for_track(TRACK, store).of(APEX) == "Tamburello"
+def test_the_reference_refusal_has_its_own_sentence(client):
+    """Un riferimento non è un nome: la frase lo dice."""
+    it = client.post("/api/braking-reference?lang=it",
+                     json={"track": TRACK, "pos": APEX, "text": EVIL})
+    en = client.post("/api/braking-reference?lang=en",
+                     json={"track": TRACK, "pos": APEX, "text": EVIL})
+    assert it.status_code == en.status_code == 400
+    assert it.json()["detail"] == "Il riferimento non può contenere < o >."
+    assert en.json()["detail"] == "The reference can't contain < or >."
 
 
-@pytest.mark.parametrize("bad", [EVIL, 'Il cartello "100"', "Ponte & cordolo"])
+@pytest.mark.parametrize("good", ["Tamburello", 'Curva "Villeneuve"',
+                                  "Raidillon de l'Eau Rouge", "Curva dell'Ospedale",
+                                  "Tosa & Rivazza"])
+def test_a_real_name_is_accepted_quotes_and_apostrophes_included(client, store, good):
+    """Gli apostrofi stanno nei nomi veri («Raidillon de l'Eau Rouge»), e ogni
+    pagina li escapa con `esc`: si vietano solo `<` e `>`, che aprono un tag."""
+    assert _name(client, good).status_code == 200
+    assert cornernames.for_track(TRACK, store).of(APEX) == good
+
+
+@pytest.mark.parametrize("bad", [EVIL, "Il cartello <100>"])
 def test_a_braking_reference_with_markup_characters_is_refused(client, store, bad):
     r = _mark(client, bad)
     assert r.status_code == 400
@@ -135,14 +151,16 @@ def test_a_braking_reference_with_markup_characters_is_refused(client, store, ba
     assert len(cornernames.marks_for(TRACK, store)) == 0
 
 
-def test_an_ordinary_braking_reference_is_still_accepted(client, store):
-    assert _mark(client, "Cartello dei 100").status_code == 200
+@pytest.mark.parametrize("good", ["Cartello dei 100", 'Il cartello "100"',
+                                  "Ponte & cordolo", "All'inizio del cordolo"])
+def test_an_ordinary_braking_reference_is_still_accepted(client, store, good):
+    assert _mark(client, good).status_code == 200
     assert len(cornernames.marks_for(TRACK, store)) == 1
 
 
 def test_the_store_itself_refuses_them_too(store):
     """Il server non è l'unica strada per `put`: la regola sta nel negozio."""
-    assert cornernames.FORBIDDEN == set("<>&\"'")
+    assert cornernames.FORBIDDEN == set("<>")
     with pytest.raises(ValueError):
         cornernames.put(TRACK, APEX, EVIL, store)
     with pytest.raises(ValueError):

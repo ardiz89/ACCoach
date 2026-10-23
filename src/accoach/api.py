@@ -945,7 +945,7 @@ def create_api(
         """
         return cornernames.for_track(track)
 
-    def _refuse_markup(text: str, lang: str | None) -> None:
+    def _refuse_markup(text: str, lang: str | None, key: str) -> None:
         """400 con la frase nella lingua del pilota se il testo apre codice.
 
         Decisione 10 del piano di sicurezza: le pagine escapano comunque, ma
@@ -954,8 +954,7 @@ def create_api(
         e la pagina mostra il `detail` così com'è.
         """
         if cornernames.has_forbidden(text):
-            raise HTTPException(400, tr_ui("names.forbidden",
-                                           lang or current_language()))
+            raise HTTPException(400, tr_ui(key, lang or current_language()))
 
     @app.post("/api/corner-name")
     def corner_name_set(body: dict = Body(...), lang: str | None = None) -> dict:
@@ -977,7 +976,7 @@ def create_api(
             raise HTTPException(422, "pos must be between 0 and 1")
         if len(name) > cornernames.MAX_NAME:
             raise HTTPException(422, "name too long")
-        _refuse_markup(name, lang)
+        _refuse_markup(name, lang, "names.forbidden")
         try:
             cornernames.put(track, pos, name)
         except OSError:
@@ -1008,7 +1007,7 @@ def create_api(
             raise HTTPException(422, "pos must be between 0 and 1")
         if len(text) > cornernames.MAX_MARK:
             raise HTTPException(422, "reference too long")
-        _refuse_markup(text, lang)
+        _refuse_markup(text, lang, "marks.forbidden")
         try:
             cornernames.put_mark(track, pos, text)
         except OSError:

@@ -70,14 +70,14 @@ MARK_TOL = 0.02
 #: that. Eighty leaves room without letting a paragraph into a table cell.
 MAX_MARK = 80
 
-#: I caratteri che un nome o un riferimento non possono contenere. Sono quelli
-#: che aprono codice in una pagina: il nome finisce nel report, nella pagina
-#: Ingegnere e sul tablet, e il 23/10 la revisione di sicurezza ha trovato che
-#: ci entrava senza escape. Le pagine adesso escapano, ma il file resta l'unica
-#: copia e la si legge anche fuori dal browser: meglio che non ci entrino.
-#: Nessun nome vero di curva li usa ("Curva Grande", "Variante Ascari"); il
-#: prezzo è l'apostrofo di «Curva dell'Ascari», e si scrive senza.
-FORBIDDEN = set("<>&\"'")
+#: I caratteri che un nome o un riferimento non possono contenere: quelli che
+#: aprono un tag. Il nome finisce nel report, nella pagina Ingegnere e sul
+#: tablet, e il 23/10 la revisione di sicurezza ha trovato che ci entrava senza
+#: escape. Le pagine adesso escapano tutto con `esc`, e questa è la seconda
+#: difesa. Solo `<` e `>`: apostrofi, virgolette e `&` stanno nei nomi veri
+#: («Raidillon de l'Eau Rouge», «Curva dell'Ospedale», «Tosa & Rivazza»), e
+#: vietarli toglierebbe al pilota il nome giusto per una difesa che c'è già.
+FORBIDDEN = set("<>")
 
 
 def has_forbidden(text: str) -> bool:
