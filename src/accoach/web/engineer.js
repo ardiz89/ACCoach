@@ -1509,19 +1509,26 @@ function maybeAutoSelect(car, track) {
   selectCombo(car, track).then((ok) => { if (!ok) showMissingCombo(car, track); });
 }
 
+function onWsClose() {
+  $("live-badge").dataset.state = "off";
+  // Tradotto come tutto il resto: era l'unica scritta inglese su una pagina
+  // in italiano, e stava proprio sul distintivo che il pilota guarda per
+  // capire se il coach è acceso.
+  $("live-text").textContent = t("live.offline");
+  // Senza motore non c'e' un ultimo frame da fidarsi: se restasse quello «in
+  // pista», i bottoni resterebbero spenti per sempre proprio col gioco chiuso,
+  // il caso in cui scrivere un assetto deve restare possibile.
+  state.lastLive = { connected: false };
+  paintWriteLock();
+  setTimeout(connectWS, 3000);
+}
+
 function connectWS() {
   let ws;
   try { ws = new WebSocket(`ws://${location.hostname}:${WS_PORT}/ws`); }
   catch (e) { setTimeout(connectWS, 3000); return; }
   ws.onmessage = (ev) => { try { applyLive(JSON.parse(ev.data)); } catch (e) {} };
-  ws.onclose = () => {
-    $("live-badge").dataset.state = "off";
-    // Tradotto come tutto il resto: era l'unica scritta inglese su una pagina
-    // in italiano, e stava proprio sul distintivo che il pilota guarda per
-    // capire se il coach è acceso.
-    $("live-text").textContent = t("live.offline");
-    setTimeout(connectWS, 3000);
-  };
+  ws.onclose = onWsClose;
   ws.onerror = () => { try { ws.close(); } catch (e) {} };
 }
 

@@ -47,7 +47,7 @@ eval(asVar(src.slice(src.indexOf("const tf = "), src.indexOf("};", src.indexOf("
 var WS_PORT = 8777, AUTO_PREFIX = "HONE";
 var location = { hostname: "pc" };
 const els = {};
-var $ = (id) => els[id] || (els[id] = { hidden: false, disabled: false, textContent: "", innerHTML: "", value: "HONE_9" });
+var $ = (id) => els[id] || (els[id] = { dataset: {}, hidden: false, disabled: false, textContent: "", innerHTML: "", value: "HONE_9" });
 var state = { setupPath: "p", pending: { x: 1 }, lastLive: null };
 const calls = [];
 var fetch = (url, o) => { calls.push(url); return Promise.resolve({}); };
@@ -56,11 +56,11 @@ var changesPayload = () => [{ param: "a", slot: null, delta_clicks: 1 }];
 var nextAutoName = () => "HONE_1";
 var onComboChange = async () => {};
 var showToast = () => {};
+var setTimeout = () => {}, connectWS = () => {};
 var showModalError = (m) => { els["modal-error"] = { textContent: m }; };
 for (const f of ["inPista", "writeLocked", "paintWriteLock", "afterWrite", "applyNow",
-                 "confirmWrite", "confirmRestored", "confirmAvDone"]) {
-  const c = grab(f);
-  if (c) eval(c.startsWith("async") ? c : c);
+                 "confirmWrite", "confirmRestored", "confirmAvDone", "onWsClose"]) {
+  eval(grab(f));
 }
 (async () => {
   const out = [];
@@ -70,6 +70,7 @@ for (const f of ["inPista", "writeLocked", "paintWriteLock", "afterWrite", "appl
     for (const id of ["btn-apply", "btn-write", "modal-ok", "es-restored", "write-lock"]) {
       els[id] = { hidden: false, disabled: false, textContent: "" };
     }
+    if (sc.close) onWsClose();
     paintWriteLock();
     const painted = {
       apply: els["btn-apply"].disabled, write: els["btn-write"].disabled,
@@ -94,12 +95,12 @@ REPLAY = {"connected": True, "status": "REPLAY", "at_box": False}
 SPENTO = {"connected": False}
 
 
-def _run(tmp_path, lang, *frames):
+def _run(tmp_path, lang, *frames, close=False):
     script = tmp_path / "h.js"
     script.write_text(_HARNESS, encoding="utf-8")
     run = subprocess.run(
         [_NODE, str(script), str(_WEB / "i18n.js"), str(_WEB / "engineer.js"), lang],
-        input=json.dumps([{"frame": f} for f in frames]), capture_output=True,
+        input=json.dumps([{"frame": f, "close": close} for f in frames]), capture_output=True,
         text=True, encoding="utf-8", timeout=60)
     assert run.returncode == 0, run.stderr
     return json.loads(run.stdout)
@@ -157,3 +158,12 @@ def test_the_dial_button_still_tells_the_engine_on_track(tmp_path):
     """`av-done` e' la modifica fatta guidando: avvisare subito e' giusto."""
     (r,) = _run(tmp_path, "it", IN_PISTA)
     assert len(_applied(r["avDone"])) == 1
+
+
+def test_when_the_engine_goes_away_the_buttons_unlock(tmp_path):
+    """Ultimo frame «in pista», poi il WebSocket cade (motore fermo, gioco
+    chiuso): senza frame si scrive come sempre, non si resta bloccati."""
+    (r,) = _run(tmp_path, "it", IN_PISTA, close=True)
+    assert not any(r["painted"][k] for k in ("apply", "write", "ok", "restored"))
+    assert r["painted"]["line"] == ""
+    assert len(_writes(r)) == 2
