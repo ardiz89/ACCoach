@@ -4,24 +4,27 @@ Speaking runs on a background worker thread fed by a queue; :meth:`Voice.say`
 just enqueues and returns immediately, keeping the telemetry loop at full rate.
 
 Two backends, tried in order per phrase:
-1. **Pre-rendered neural cues** — the fixed cue phrases are synthesized at build
-   time with Piper (neural TTS) and shipped as WAVs (``accoach/voice_cues/`` +
-   ``manifest.json``). Playback is just ``winsound`` reading a small WAV: instant
-   and far more human than SAPI5, with zero runtime synthesis. Works even without
-   pyttsx3 installed.
-2. **SAPI5 via pyttsx3** — for dynamic phrases (numbers) and any cue without a
-   pre-rendered WAV. Picks a voice matching the language and (optionally) gender.
+1. **Pre-rendered cues** — every Italian phrase the coach and the engineer say
+   (the closed list in :mod:`accoach.coaching.spoken`) is recorded at build time
+   with ElevenLabs (``tools/render_voice.py``) and shipped as WAVs
+   (``accoach/voice_cues/`` or ``voice_cues_male/`` + ``manifest.json``).
+   Playback is just ``winsound`` reading a small WAV: instant, with zero runtime
+   synthesis. Works even without pyttsx3 installed.
+2. **SAPI5 via pyttsx3** — for anything without a WAV: every English phrase, and
+   an Italian one missing from the list. Picks a voice matching the language and
+   (optionally) gender.
 
 If neither is available it degrades to printing ``[coach] …`` so the coaching
 logic stays usable (and testable) without audio. ``enabled=False`` forces that.
 
 Two options shape the timbre:
 
-* ``male=True`` prefers an installed male system voice (e.g. "Cosimo" / "David")
-  for dynamic phrases, and loads the shipped male neural cue set
-  (``voice_cues_male/``, rendered with ``tools/render_cues.py --male``) for the
-  fixed ones, so every phrase comes out male. If that folder isn't present it
-  falls back to the male SAPI5 voice for everything instead.
+* ``male=True`` loads the male recordings (``voice_cues_male/``, MarcoTrox)
+  instead of the female ones (``voice_cues/``, Tiziana), and prefers an
+  installed male system voice (e.g. "Cosimo" / "David") for the rest, so every
+  phrase comes out male. If that folder isn't present it falls back to the male
+  SAPI5 voice for everything instead. The app passes ``cfg.voice.male``, which
+  defaults to True; the constructor's own default stays False.
 * ``radio=True`` (default) runs whatever is played — neural cue or SAPI phrase —
   through :mod:`accoach.coaching.radio`, so it sounds like a pit-to-car radio
   call. Per-cue results are cached so each fixed cue is processed only once.
@@ -85,11 +88,10 @@ def _pick_voice_id(voices, language: str, male: bool):
 def _cues_dir(male: bool = False) -> Path | None:
     """Folder of pre-rendered cue WAVs (under _MEIPASS when frozen).
 
-    The shipped set is a female neural voice (Piper it_IT-paola). A male neural
-    set is an optional drop-in: ``voice_cues_male/`` (render with
-    ``tools/render_cues.py --male``). Returns None for male when that set isn't
-    installed, so the caller falls back to the male SAPI5 voice instead of the
-    female cues."""
+    Two recorded sets ship, both rendered with ``tools/render_voice.py``:
+    ``voice_cues/`` (female, Tiziana) and ``voice_cues_male/`` (male,
+    MarcoTrox). Returns None for male when that set isn't installed, so the
+    caller falls back to the male SAPI5 voice instead of the female cues."""
     base = getattr(sys, "_MEIPASS", None)
     root = Path(base) / "accoach" if base else Path(__file__).resolve().parent.parent
     if male:
@@ -140,9 +142,9 @@ class Voice:
         if not enabled:
             return
 
-        # Neural cues: the shipped set is female; male mode uses the optional
-        # voice_cues_male/ set if installed, else falls back to the male SAPI
-        # voice (empty dict here) so every phrase shares one voice.
+        # Recorded cues: female or male set; male mode without its folder
+        # falls back to the male SAPI voice (empty dict here) so every phrase
+        # shares one voice.
         self._prerendered = _load_prerendered(male=male)   # independent of pyttsx3
 
         try:

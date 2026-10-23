@@ -646,14 +646,22 @@ def run_selftest(report_path: str | None = None) -> str:
         report["pyttsx3"] = f"MISSING: {e!r}"
 
     try:
-        v = Voice(enabled=True)
+        # La voce che hai scelto, costruita come la costruisce `live`: con
+        # `Voice(enabled=True)` e basta, la prova parlava sempre con la voce
+        # femminile, qualunque cosa dicesse il config.
+        from .config import load_config
+        cfg = load_config()
+        report["male"] = cfg.voice.male
+        v = Voice(enabled=True, rate=cfg.voice.rate, language=cfg.language,
+                  male=cfg.voice.male, radio=cfg.voice.radio)
         report["is_audio"] = v.is_audio
         report["prerendered_cues"] = len(v._prerendered)
         if v._engine is not None:
             vid = v._engine.getProperty("voice")
             names = [x.name for x in v._engine.getProperty("voices") if x.id == vid]
             report["voice"] = names[0] if names else str(vid)
-        # A pre-rendered (neural Piper) cue, then a SAPI5-fallback phrase.
+        # A recorded cue (ElevenLabs WAV), then a phrase deliberately left out
+        # of the list (`coaching/spoken.py`), so it comes from the SAPI5 voice.
         v.say("Qui hai margine, frena più tardi")
         time.sleep(2.5)
         v.say("Self test completato.")

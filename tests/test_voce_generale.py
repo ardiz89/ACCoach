@@ -94,7 +94,7 @@ def test_temperature_voice_has_no_degrees(temp, word, action):
 ])
 def test_aid_voice_drops_the_from_to(kind, level, aid):
     cue = _aid(kind, level)
-    assert f"alza" in cue.voice.lower() and aid in cue.voice
+    assert "alza" in cue.voice.lower() and aid in cue.voice
     _no_digits(cue.voice)
     assert "dal" not in cue.voice
     if level >= 0:

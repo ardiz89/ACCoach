@@ -48,3 +48,38 @@ def test_sectors_verdict_runs(capsys):
     _sectors_verdict({"count": 0, "seen": {0, 1, 2}, "valid": 500,
                       "bounds": {1: 0.3, 2: 0.6}, "prev": 2})
     assert "sector_count è 0" in capsys.readouterr().out
+
+
+def test_il_self_test_parla_con_la_voce_del_config(monkeypatch, tmp_path):
+    """La prova della voce usa la voce scelta, come `live`: prima costruiva
+    `Voice(enabled=True)` e parlava femminile anche col config su maschile."""
+    from accoach import config, diagnostics
+    import accoach.coaching as coaching
+
+    cfg_file = tmp_path / "config.toml"
+    cfg_file.write_text("[voice]\nmale = true\nradio = false\nrate = 150\n", encoding="utf-8")
+    monkeypatch.setattr(config, "config_path", lambda: cfg_file)
+    config.load_config(reload=True)
+
+    built = {}
+
+    class _Finta:
+        is_audio = False
+        _prerendered: dict = {}
+        _engine = None
+
+        def __init__(self, **kw):
+            built.update(kw)
+
+        def say(self, _text):
+            pass
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(coaching, "Voice", _Finta)
+    monkeypatch.setattr("time.sleep", lambda _s: None)
+    diagnostics.run_selftest(str(tmp_path / "report.json"))
+    assert built["male"] is True
+    assert built["radio"] is False
+    assert built["rate"] == 150
