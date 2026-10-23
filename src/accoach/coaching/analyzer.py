@@ -29,7 +29,7 @@ the difference is clearly outside noise, and otherwise falls back to a plain
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from ..comparison import DeltaState
 from ..telemetry.snapshot import TelemetrySnapshot
@@ -303,7 +303,7 @@ class CoachAnalyzer:
         if self._zones != previous:
             moved = self._follow(previous)
             self._advice = {
-                moved[i]: Cue(c.category, c.message, c.priority, moved[i], c.pos)
+                moved[i]: replace(c, segment=moved[i])
                 for i, c in self._advice.items() if i in moved}
             self._announced = {moved[i] for i in self._announced if i in moved}
             self._faults = {(moved[z], cat): age
@@ -427,8 +427,10 @@ class CoachAnalyzer:
                 if self._suppressed(i, adv.category):
                     continue
                 self._announced.add(i)
-                cues.append(Cue(adv.category, adv.message, adv.priority,
-                                adv.segment, pos))
+                # `replace` e non un Cue nuovo: una copia campo per campo
+                # dimenticava `voice`, e oltre i 25 decimi la frase registrata
+                # non usciva mai.
+                cues.append(replace(adv, pos=pos))
 
     def _new_segment(self, index: int, delta: DeltaState) -> _Seg:
         return _Seg(index=index, delta_start=delta.delta_ms, delta_last=delta.delta_ms)

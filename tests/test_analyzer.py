@@ -406,3 +406,47 @@ def test_il_consiglio_di_una_curva_sparita_si_butta():
     an, corners = _con_un_consiglio_alla_seconda()
     an.set_corners(corners[:1])
     assert not an._advice
+
+
+# --- La voce viaggia col consiglio --------------------------------------------
+#
+# Oltre i 25 decimi la voce dice una frase fissa (`Cue.voice`), perche' «Qui
+# perdi 30 decimi» non ha un WAV. Il consiglio pero' non si dice quando nasce:
+# si mette da parte e si ridice al giro dopo, ricostruito. Se la ricostruzione
+# perde `voice`, la frase registrata non esce mai e parla la voce di Windows.
+
+from accoach.engine import _spoken_forms
+
+_OLTRE = "Qui perdi più di due secondi e mezzo"
+
+
+def test_una_perdita_oltre_i_25_decimi_al_giro_dopo_dice_la_frase_registrata():
+    ref = Reference(synth.build_lap())
+    an = CoachAnalyzer()
+    an.set_corners(detect_corners(ref.lap.samples))
+    cmp = LapComparator(ref)
+    # Stesse mani del riferimento, tre secondi persi dall'apex della prima curva
+    # in poi: nessuna causa da nominare, quindi «qui perdi».
+    for smp in ref.lap.samples:
+        s = _snap_from_sample(smp, 3000 if smp.pos >= 0.31 else 0)
+        an.update(s, cmp.compare(s))
+    assert an._advice[0].category is CueCategory.TIME_LOSS
+    assert an._advice[0].voice == _OLTRE, "il fixture non arriva oltre i 25 decimi"
+    lap2 = _drive(an, cmp, ref.lap)
+    detti = [c for c in lap2 if c.category is CueCategory.TIME_LOSS and c.segment == 0]
+    assert detti, "il consiglio della prima curva non e' stato ridetto"
+    voce, schermo = _spoken_forms(detti[0], None, "it")
+    assert voce == _OLTRE
+    assert schermo.startswith("Qui perdi 3")
+
+
+def test_la_frase_registrata_segue_la_curva_quando_cambia_il_layout():
+    an, corners = _con_un_consiglio_alla_seconda()
+    an._advice[1] = classify_corner(_stats(3000), 1, 0.8)
+    assert an._advice[1].voice == _OLTRE
+    an.set_corners([Corner(index=0, entry_pos=0.04, apex_pos=0.06, exit_pos=0.08), *corners])
+    assert an._advice[2].voice == _OLTRE
+    lo = an._zones[2][0]
+    cues = []
+    an._feed_forward(lo - 0.01, cues)
+    assert [_spoken_forms(c, None, "it")[0] for c in cues] == [_OLTRE]
