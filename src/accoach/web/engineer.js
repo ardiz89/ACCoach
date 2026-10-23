@@ -1121,6 +1121,78 @@ function updateSuggested(eng) {
   });
 }
 
+// La strada dell'ingegnere: le tappe e la frase del passo, da
+// `engineer.progress` (lo calcola il motore). Gemella di `stripText` in
+// tablet.js, che resta ES5 per Safari 9: stesse chiavi, stesse regole, e un
+// test confronta le due caso per caso (tests/test_engineer_strip.py). Senza un
+// `progress` che si legge, null: la striscia si nasconde.
+function stripText(p) {
+  if (!p || typeof p !== "object" || !Array.isArray(p.phases) || !p.phases.length) return null;
+  const idx = Number(p.index), done = p.stage === "done";
+  const steps = p.phases.map((ph, i) => ({
+    label: String((ph && (ph.label || ph.key)) || ""),
+    // Finito, nessuna tappa resta accesa: l'indice e' oltre l'ultima.
+    state: (done || i < idx) ? "done" : (i === idx ? "now" : "next"),
+    av: !!ph && ph.tag === "AV",
+  }));
+  // Il contatore solo dove il motore conta giri verso una soglia; senza i suoi
+  // numeri la frase non se ne inventa uno.
+  const isNum = (v) => v != null && v !== "" && isFinite(Number(v));
+  const counted = isNum(p.have) && isNum(p.need);
+  const cur = p.phases[idx] || {};
+  let line = "", why = "";
+  if (p.stage === "baseline" || p.stage === "test") {
+    if (counted) {
+      line = tf(p.stage === "test" ? "eng.road.test" : "eng.road.base",
+                { have: p.have, need: p.need });
+      why = t("eng.road.why");
+    }
+  } else if (p.stage === "change") {
+    line = t(cur.tag === "AV" ? "eng.road.changeAv" : "eng.road.changeBox");
+  } else if (p.stage === "restore") {
+    line = t("eng.road.restore");
+  } else if (p.stage === "diagnose") {
+    line = t("eng.road.diagnose");
+  } else if (done) {
+    line = t("eng.road.done");
+  }
+  return { steps, line, why };
+}
+
+// La striscia si riscrive solo quando cambia: il frame arriva molte volte al
+// secondo e quasi sempre dice la stessa cosa.
+let roadKey = null;
+function renderRoad(eng) {
+  const s = stripText(eng && eng.progress);
+  const key = s ? JSON.stringify(s) + "|" + t("eng.road.wheel") : "";
+  if (key === roadKey) return;
+  roadKey = key;
+  const box = $("es-road");
+  if (!box) return;
+  if (!s) { box.hidden = true; return; }
+  const ol = $("es-road-steps");
+  ol.innerHTML = "";
+  for (const st of s.steps) {
+    const li = document.createElement("li");
+    li.className = "es-road-step " + st.state;
+    const name = document.createElement("span");
+    name.className = "es-road-name";
+    name.textContent = st.label;
+    li.appendChild(name);
+    if (st.av) {
+      const w = document.createElement("span");
+      w.className = "es-road-wheel";
+      w.textContent = t("eng.road.wheel");
+      li.appendChild(w);
+    }
+    ol.appendChild(li);
+  }
+  $("es-road-line").textContent = s.line;
+  $("es-road-why").textContent = s.why;
+  $("es-road-why").hidden = !s.why;
+  box.hidden = false;
+}
+
 // Render the structured engineer block (st.engineer) — proposal + at-the-wheel
 // advice. Falls back to the live coach cue until the diagnosis block exists.
 function renderEngineer(st) {
@@ -1155,6 +1227,8 @@ function renderEngineer(st) {
   const done = $("es-restored");
   done.hidden = !boxRestore;
   done.onclick = boxRestore ? confirmRestored : null;
+
+  renderRoad(eng);
 
   // Persistent "what to do in this phase" line: the decision message alone
   // ("phase done → moving to X") never says what the driver should now do.

@@ -179,6 +179,25 @@ Le modifiche sono di due tipi, e si chiudono in modo diverso.
 - **Ai box.** È un file di setup da scrivere. Qui il coach ti dice anche
   **quando rientrare**.
 
+### La strada dell'ingegnere
+
+L'ingegnere lavora per fasi, una dopo l'altra. Su una GT3 sono Pressioni, Grip
+meccanico, Aero / rake, Bilanciamento freni ed Elettronica. Le ultime due si
+fanno dal volante. In ogni fase il ciclo è lo stesso.
+
+1. Raccoglie **3 giri buoni** per la base. Un giro è buono se è valido, senza
+   uscite di pista e con le gomme in media ad almeno 75 °C.
+2. Propone **una modifica alla volta**.
+3. Quando l'hai fatta, conta altri **3 giri buoni** per verificarla.
+4. Se la modifica ha aiutato la tiene. Se no ti chiede di rimetterla com'era.
+5. Quando nella fase non resta niente che sappia sistemare, passa a quella
+   dopo.
+
+A che punto sei lo vedi nella **striscia** sopra la fase, sul tablet e nella
+pagina Ingegnere. Le fasi fatte hanno la spunta e quella in corso è
+evidenziata. Sotto c'è la frase sul passo in corso, con i giri buoni contati,
+per esempio «Giri buoni per la base, 2 di 3.»
+
 ### Il registro delle prove
 
 Nella pagina **Ingegnere**, sotto la proposta, c'è il **Registro delle prove**.
@@ -769,7 +788,14 @@ dove sei. Se il coach non è acceso, la pagina te lo dice e si ricollega appena
 torna. Se il coach è acceso ma il gioco non manda dati, la pagina ti dice che
 lo sta aspettando. Succede quando il gioco è chiuso o non è ancora partito.
 
-- **In pista.** Vedi velocità, marcia, TC, ABS e mappa motore, temperatura e
+In alto ci sono due linguette, **Telemetria** e **Assetto**. Quando ti fermi ai
+box la pagina passa ad Assetto, e quando riparti torna a Telemetria. Puoi
+sempre toccare l'altra linguetta, e la tua scelta resta finché non entri o esci
+dai box. Su Assetto compare un segno quando c'è una modifica da fare ai box. In
+tutte e due, sopra la fase, c'è la striscia descritta in «La strada
+dell'ingegnere».
+
+- **Telemetria.** Vedi velocità, marcia, TC, ABS e mappa motore, temperatura e
   pressione delle quattro gomme, e la striscia di gas, freno e sterzo degli
   ultimi 8 s. Sotto c'è la fase di guida su cui lavora l'ingegnere. Una
   modifica da fare dal volante compare in un riquadro. Il bottone *L'ho
@@ -778,9 +804,9 @@ lo sta aspettando. Succede quando il gioco è chiuso o non è ancora partito.
 - **Avviso di rientro.** Quando l'ingegnere ha una modifica da fare ai box, in
   alto compare l'invito a rientrare a fine giro. La telemetria resta sotto. Per
   una modifica respinta l'avviso è simile e ti dice di rimettere l'ultima
-  modifica com'era.
-- **Fermo ai box.** La pagina mostra la fase e le leve da cambiare, una per
-  riga, dal valore di adesso a quello nuovo. Sotto trovi il perché e il grado
+  modifica com'era. Se tocchi l'avviso passi ad Assetto.
+- **Assetto.** La pagina mostra la fase e le leve da cambiare, una per
+  riga, dal valore di adesso a quello nuovo. La puoi aprire anche in pista. Sotto trovi il perché e il grado
   di fiducia. Come file di partenza HONE propone l'ultimo assetto che ha scritto
   per quell'auto e quella pista da quando è partito il processo web. Se non ne
   ha scritto nessuno, propone il file modificato più di recente. Dalla lista

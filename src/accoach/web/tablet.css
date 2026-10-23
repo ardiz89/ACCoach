@@ -59,6 +59,7 @@ body {
 .t-off, .t-call, .t-track, .t-box { display: none; }
 .tablet[data-mode="off"] .t-off { display: block; }
 .tablet[data-mode="off"] .t-phase,
+.tablet[data-mode="off"] .t-road,
 .tablet[data-mode="off"] .t-tabs { display: none; }
 /* Su Telemetria la telemetria e' una colonna che prende lo spazio rimasto: a
    cedere quando manca e' la striscia dei pedali, non la velocita'. */
@@ -305,6 +306,47 @@ body {
   -webkit-appearance: none;
 }
 
+/* ---- la strada dell'ingegnere ------------------------------------------
+   Una riga sola di tappe, larghe uguali: un nome lungo si taglia coi puntini
+   invece di andare a capo, cosi' la striscia e' alta uguale con tre fasi o
+   con cinque, e la telemetria sopra non perde spazio. */
+.t-road {
+  -webkit-flex: 0 0 auto;
+  flex: 0 0 auto;
+  margin-top: 10px;
+}
+.t-road-steps {
+  display: -webkit-flex;
+  display: flex;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.t-road-step {
+  -webkit-flex: 1 1 0;
+  flex: 1 1 0;
+  min-width: 0;
+  margin-right: 6px;
+  padding: 3px 8px;
+  border: 1px solid #232B35;
+  border-radius: 6px;
+  background: #151A21;
+  color: #8A95A3;
+  font-size: 16px;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.t-road-step:last-child { margin-right: 0; }
+.t-road-step.done { color: #34E08A; }
+.t-road-step.done .t-road-name:before { content: "\2713\00a0"; }
+.t-road-step.now { color: #E8EDF2; border-color: #22D3CE; font-weight: 700; }
+/* «dal volante» accanto al nome, piccolo: si taglia lui per primo. */
+.t-road-wheel { margin-left: 6px; font-size: 13px; font-weight: 400; color: #C792EA; }
+.t-road-text { margin-top: 4px; font-size: 18px; line-height: 1.3; }
+.t-road-why { display: block; font-size: 15px; color: #8A95A3; }
+
 /* ---- la fase, in pista e ai box -------------------------------------- */
 .t-phase {
   -webkit-flex: 0 0 auto;
@@ -318,6 +360,9 @@ body {
   line-height: 1.35;
 }
 .tablet[data-tab="setup"] .t-phase { margin-top: 0; font-size: 24px; }
+/* Su Assetto la striscia sta subito sotto le linguette, e la fase sotto lei. */
+.tablet[data-tab="setup"] .t-road { margin-top: 0; }
+.tablet[data-tab="setup"] .t-road:not([hidden]) + .t-phase { margin-top: 6px; }
 
 /* ---- Assetto -------------------------------------------------------------
    La schermata sta nell'altezza della vista; se le leve sono tante scorre solo
@@ -440,4 +485,8 @@ body {
   .t-av { margin-top: 6px; padding: 6px 12px; }
   .t-av-msg { font-size: 20px; }
   .t-phase { margin-top: 6px; padding: 6px 12px; font-size: 18px; line-height: 1.3; }
+  .t-road { margin-top: 6px; }
+  .t-road-step { padding: 2px 6px; font-size: 15px; }
+  .t-road-text { margin-top: 2px; font-size: 17px; }
+  .t-road-why { font-size: 14px; }
 }

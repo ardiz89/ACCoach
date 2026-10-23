@@ -202,6 +202,79 @@
     }
   }
 
+  // ---- la strada dell'ingegnere --------------------------------------------
+  // Le tappe e la frase del passo, da `engineer.progress` (lo calcola il
+  // motore, `RaceEngineer.progress`): qui non si indovina niente dai testi.
+  // La gemella e' `stripText` di engineer.js, con le stesse chiavi e le stesse
+  // regole (un test le confronta caso per caso). Senza un `progress` che si
+  // legge la striscia non c'e': null, e la pagina la nasconde.
+  function stripText(p) {
+    if (!p || typeof p !== "object" || !Array.isArray(p.phases) || !p.phases.length) return null;
+    var idx = Number(p.index), done = p.stage === "done";
+    var steps = [];
+    for (var i = 0; i < p.phases.length; i++) {
+      var ph = p.phases[i] || {};
+      // Finito, nessuna tappa resta accesa: l'indice e' oltre l'ultima.
+      steps.push({ label: String(ph.label || ph.key || ""),
+                   state: (done || i < idx) ? "done" : (i === idx ? "now" : "next"),
+                   av: ph.tag === "AV" });
+    }
+    // Il contatore solo dove il motore conta giri verso una soglia; senza i
+    // suoi numeri la frase non se ne inventa uno.
+    var counted = num(p.have) && num(p.need);
+    var cur = p.phases[idx] || {};
+    var line = "", why = "";
+    if (p.stage === "baseline" || p.stage === "test") {
+      if (counted) {
+        line = tf(p.stage === "test" ? "eng.road.test" : "eng.road.base",
+                  { have: p.have, need: p.need });
+        why = t("eng.road.why");
+      }
+    } else if (p.stage === "change") {
+      line = t(cur.tag === "AV" ? "eng.road.changeAv" : "eng.road.changeBox");
+    } else if (p.stage === "restore") {
+      line = t("eng.road.restore");
+    } else if (p.stage === "diagnose") {
+      line = t("eng.road.diagnose");
+    } else if (done) {
+      line = t("eng.road.done");
+    }
+    return { steps: steps, line: line, why: why };
+  }
+
+  // La striscia si riscrive solo quando cambia: il frame arriva 15 volte al
+  // secondo e quasi sempre dice la stessa cosa.
+  var roadKey = null;
+  function renderRoad(eng) {
+    var s = stripText(eng && eng.progress);
+    var key = s ? JSON.stringify(s) + "|" + t("eng.road.wheel") : "";
+    if (key === roadKey) return;
+    roadKey = key;
+    var box = $("t-road");
+    if (!s) { box.hidden = true; return; }
+    var ol = $("t-road-steps");
+    ol.innerHTML = "";
+    for (var i = 0; i < s.steps.length; i++) {
+      var li = document.createElement("li");
+      li.className = "t-road-step " + s.steps[i].state;
+      var b = document.createElement("span");
+      b.className = "t-road-name";
+      b.textContent = s.steps[i].label;
+      li.appendChild(b);
+      if (s.steps[i].av) {
+        var w = document.createElement("span");
+        w.className = "t-road-wheel";
+        w.textContent = t("eng.road.wheel");
+        li.appendChild(w);
+      }
+      ol.appendChild(li);
+    }
+    $("t-road-line").textContent = s.line;
+    $("t-road-why").textContent = s.why;
+    $("t-road-why").hidden = !s.why;
+    box.hidden = false;
+  }
+
   // Quale proposta e': il tocco su «Fatto» vale per questa e non per la
   // prossima.
   function avKey(eng) {
@@ -656,6 +729,7 @@
     // Il ridisegno di un tocco rifa' l'ultimo frame: un campione in piu' dei
     // pedali, con l'ora di adesso, sarebbe inventato.
     if (!tapping) tracePush(st);
+    renderRoad(eng);
     renderPhase(eng);
     renderAv(eng);
     renderCall(eng, m);
@@ -740,7 +814,8 @@
                         avKey: avKey, avDoneHidden: avDoneHidden,
                         nextName: nextName, changesFor: changesFor,
                         offText: function (st) { return t(offKey(st)); },
-                        leverText: leverText, fullPageWorks: fullPageWorks };
+                        leverText: leverText, fullPageWorks: fullPageWorks,
+                        stripText: stripText };
 
   // In node (i test) non c'e' la pagina: si carica solo `mode`.
   if (typeof document !== "undefined" && document && document.getElementById("tablet")) boot();

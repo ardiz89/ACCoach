@@ -243,6 +243,26 @@ There are two kinds of change, and they close in different ways.
 - **In the pits.** A setup file to write. Here the coach also tells you **when to
   come in**.
 
+### The engineer's road
+
+The engineer works in phases, one after the other. On a GT3 they are Pressures,
+Mechanical grip, Aero / rake, Brake bias and Electronics. The last two are done
+from the wheel. Every phase runs the same cycle.
+
+1. It collects **3 good laps** for the baseline. A lap is good when it's valid,
+   with no off-track and the tyres averaging at least 75 °C.
+2. It proposes **one change at a time**.
+3. Once you've made it, it counts another **3 good laps** to check it.
+4. If the change helped it keeps it. If not, it asks you to put it back as it
+   was.
+5. When the phase has nothing left that it knows how to fix, it moves on to the
+   next one.
+
+Where you are shows in the **strip** above the phase, on the tablet and on the
+Engineer page. Finished phases carry a tick and the current one is highlighted.
+Below it is the sentence about the current step, with the good laps counted,
+for example "Good laps for the baseline, 2 of 3."
+
 ### The Test log
 
 On the **Engineer** page, under the proposal, there's the **Test log**. It
@@ -828,7 +848,14 @@ you are. If the coach isn't running, the page says so and reconnects as soon as
 it's back. If the coach is on but the game isn't sending data, the page says
 it's waiting for it. That happens when the game is closed or hasn't started yet.
 
-- **On track.** You see speed, gear, TC, ABS and engine map, and the temperature
+At the top there are two tabs, **Telemetry** and **Setup**. When you stop in the
+pits the page switches to Setup, and when you drive off it goes back to
+Telemetry. You can always tap the other tab, and your choice holds until you
+enter or leave the pits. Setup shows a mark when there's a change to make in the
+pits. On both tabs, above the phase, is the strip described in "The engineer's
+road".
+
+- **Telemetry.** You see speed, gear, TC, ABS and engine map, and the temperature
   and pressure of the four tyres. A strip shows throttle, brake and steering
   from the last 8 s. Below it is the driving phase the engineer is working on.
   A change to make from the wheel appears in a box. The *I've changed it* button
@@ -836,9 +863,10 @@ it's waiting for it. That happens when the game is closed or hasn't started yet.
 - **Return-to-pits call.** When the engineer has a change to make in the pits,
   the call to come in at the end of the lap appears at the top. The telemetry
   stays below. For a rejected change the call is similar and tells you to put
-  the last change back as it was.
-- **Stopped in the pits.** The page shows the phase and the levers to change,
-  one per row, from the current value to the new one. Below are the reason and
+  the last change back as it was. Tapping the call takes you to Setup.
+- **Setup.** The page shows the phase and the levers to change,
+  one per row, from the current value to the new one. You can open it on track
+  too. Below are the reason and
   the confidence. As the starting file, HONE offers the last setup it wrote for
   that car and track since the web process started. If it hasn't written one, it
   offers the most recently modified file. You can pick another from the list.

@@ -276,7 +276,7 @@ const $ = (id) => els[id] || (els[id] = {
 const t = (k) => k;
 const WS_PORT = 8777, location = { hostname: "h" };
 let prepared = null, posted = [];
-function renderPrediction() {} function renderOutcome() {}
+function renderPrediction() {} function renderOutcome() {} function renderRoad() {}
 function prepareChange(c) { prepared = c; }
 function fetch(url, opt) { posted.push([url, opt && opt.method]); return Promise.resolve(); }
 eval(grab("confirmRestored"));

@@ -92,6 +92,19 @@
 .oc-num { color: var(--muted); font-family: var(--font-mono);
           font-variant-numeric: tabular-nums; }
 .oc-side { flex: 1 1 100%; color: var(--amber); font-size: 0.857rem; margin-top: 2px; }
+/* La strada dell'ingegnere: le fasi in fila coi nomi interi (qui c'e' spazio,
+   e se la colonna e' stretta vanno a capo); sotto, la frase del passo e il
+   perche' del giro buono. */
+.es-road { margin: 2px 0 6px; }
+.es-road-steps { display: flex; flex-wrap: wrap; gap: 6px; list-style: none; margin: 0; padding: 0; }
+.es-road-step { flex: 1 1 auto; padding: 3px 8px; border: 1px solid var(--line);
+  border-radius: 6px; color: var(--muted); font-size: 0.857rem; white-space: nowrap; }
+.es-road-step.done { color: var(--green); }
+.es-road-step.done .es-road-name::before { content: "\2713"; margin-right: 4px; }
+.es-road-step.now { color: var(--text); border-color: var(--cyan); font-weight: 700; }
+.es-road-wheel { margin-left: 6px; font-size: 0.857rem; font-weight: 400; color: var(--adv); }
+.es-road-text { margin-top: 4px; font-size: 0.893rem; line-height: 1.45; }
+.es-road-why { display: block; font-size: 0.857rem; color: var(--muted); }
 /* Persistent "what to do in this phase" guidance line. */
 .es-phase { font-size: 0.893rem; line-height: 1.45; margin: 2px 0 6px; padding: 6px 9px;
   background: rgba(255,255,255,.03); border-radius: 7px; color: var(--muted); }

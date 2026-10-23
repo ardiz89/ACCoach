@@ -962,6 +962,27 @@ Salva un setup nel gioco, poi ricarica questa pagina.` },
                            it: `Guida ingresso e uscita in modo costante. Regolo il differenziale, una modifica da fare ai box.` },
     "eng.do.default":    { en: `Keep driving clean, consistent laps. I'm gathering data for this phase.`,
                            it: `Continua con giri puliti e costanti. Sto raccogliendo dati per questa fase.` },
+    // La strada dell'ingegnere: la striscia delle fasi, sul tablet e sulla
+    // pagina Ingegnere, e la frase sul passo in corso (`progress.stage`). Il
+    // contatore viene dal motore; il giro che conta e' quello di
+    // `stable and warmed_up` (coaching/diagnosis.py, _WARM_C = 75).
+    "eng.road.base":   { en: `Good laps for the baseline, {have} of {need}.`,
+                         it: `Giri buoni per la base, {have} di {need}.` },
+    "eng.road.why":    { en: `A lap counts when it's valid, with no off-track and the tyres averaging at least 75 °C.`,
+                         it: `Conta un giro valido, senza uscite di pista, con le gomme in media ad almeno 75 °C.` },
+    "eng.road.changeBox": { en: `You have a change to make in the pits.`,
+                            it: `Hai una modifica da fare ai box.` },
+    "eng.road.changeAv":  { en: `You have a change to make from the wheel.`,
+                            it: `Hai una modifica da fare dal volante.` },
+    "eng.road.test":   { en: `Testing the change, good laps {have} of {need}. Then I decide whether to keep it.`,
+                         it: `Provo la modifica, giri buoni {have} di {need}. Poi decido se tenerla.` },
+    "eng.road.restore": { en: `Put the last change back as it was.`,
+                          it: `Rimetti l'ultima modifica com'era.` },
+    "eng.road.diagnose": { en: `I have the laps I need and I decide at the end of the lap.`,
+                           it: `Ho i giri che servono e decido a fine giro.` },
+    "eng.road.done":   { en: `Setup finished, every phase is done.`,
+                         it: `Assetto finito, tutte le fasi sono fatte.` },
+    "eng.road.wheel":  { en: `from the wheel`, it: `dal volante` },
     "eng.pit":         { en: `You're in the pits. In the MFD open <b>Setup</b>, load <b>{name}</b> and head out to apply it.`,
                          it: `Sei ai box. Nell'MFD apri <b>Setup</b>, carica <b>{name}</b> ed esci per applicarlo.` },
     // Shown while stopped in the box with a garage change still unwritten —
