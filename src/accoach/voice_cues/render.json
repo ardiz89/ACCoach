@@ -3,6 +3,7 @@
     "language_code": "it",
     "model_id": "eleven_multilingual_v2",
     "output_format": "pcm_22050",
+    "text": "ABS già alto, <break time=\"0.3s\" /> blocchi davanti in più curve. Sposta il bilanciamento freni indietro.",
     "voice_id": "RXoaSpLaWTEckJgPUBG3",
     "voice_settings": {
       "similarity_boost": 0.7,
@@ -99,6 +100,7 @@
     "language_code": "it",
     "model_id": "eleven_multilingual_v2",
     "output_format": "pcm_22050",
+    "text": "Ammorbidisci la barra antirollìo anteriore.",
     "voice_id": "RXoaSpLaWTEckJgPUBG3",
     "voice_settings": {
       "similarity_boost": 0.7,
@@ -111,6 +113,7 @@
     "language_code": "it",
     "model_id": "eleven_multilingual_v2",
     "output_format": "pcm_22050",
+    "text": "Ammorbidisci la barra antirollìo posteriore.",
     "voice_id": "RXoaSpLaWTEckJgPUBG3",
     "voice_settings": {
       "similarity_boost": 0.7,
@@ -123,6 +126,7 @@
     "language_code": "it",
     "model_id": "eleven_multilingual_v2",
     "output_format": "pcm_22050",
+    "text": "Ammorbidisci le mòlle anteriori.",
     "voice_id": "RXoaSpLaWTEckJgPUBG3",
     "voice_settings": {
       "similarity_boost": 0.7,
@@ -135,6 +139,7 @@
     "language_code": "it",
     "model_id": "eleven_multilingual_v2",
     "output_format": "pcm_22050",
+    "text": "Ammorbidisci le mòlle posteriori.",
     "voice_id": "RXoaSpLaWTEckJgPUBG3",
     "voice_settings": {
       "similarity_boost": 0.7,
@@ -147,6 +152,7 @@
     "language_code": "it",
     "model_id": "eleven_multilingual_v2",
     "output_format": "pcm_22050",
+    "text": "Arrivi lungo, <break time=\"0.3s\" /> frena prima",
     "voice_id": "RXoaSpLaWTEckJgPUBG3",
     "voice_settings": {
       "similarity_boost": 0.7,
@@ -171,6 +177,7 @@
     "language_code": "it",
     "model_id": "eleven_multilingual_v2",
     "output_format": "pcm_22050",
+    "text": "Aumenta il càmber negativo anteriore.",
     "voice_id": "RXoaSpLaWTEckJgPUBG3",
     "voice_settings": {
       "similarity_boost": 0.7,
@@ -195,6 +202,7 @@
     "language_code": "it",
     "model_id": "eleven_multilingual_v2",
     "output_format": "pcm_22050",
+    "text": "Aumenta il precàrico del differenziale.",
     "voice_id": "RXoaSpLaWTEckJgPUBG3",
     "voice_settings": {
       "similarity_boost": 0.7,
@@ -315,6 +323,7 @@
     "language_code": "it",
     "model_id": "eleven_multilingual_v2",
     "output_format": "pcm_22050",
+    "text": "Blocchi le ruote, <break time=\"0.3s\" /> alleggerisci il freno",
     "voice_id": "RXoaSpLaWTEckJgPUBG3",
     "voice_settings": {
       "similarity_boost": 0.7,
@@ -327,6 +336,7 @@
     "language_code": "it",
     "model_id": "eleven_multilingual_v2",
     "output_format": "pcm_22050",
+    "text": "Dai più gas quì",
     "voice_id": "RXoaSpLaWTEckJgPUBG3",
     "voice_settings": {
       "similarity_boost": 0.7,
@@ -339,6 +349,7 @@
     "language_code": "it",
     "model_id": "eleven_multilingual_v2",
     "output_format": "pcm_22050",
+    "text": "Freni troppo quì, <break time=\"0.3s\" /> alleggerisci",
     "voice_id": "RXoaSpLaWTEckJgPUBG3",
     "voice_settings": {
       "similarity_boost": 0.7,
@@ -399,6 +410,7 @@
     "language_code": "it",
     "model_id": "eleven_multilingual_v2",
     "output_format": "pcm_22050",
+    "text": "Gomme troppo calde. Guida più flùido.",
     "voice_id": "RXoaSpLaWTEckJgPUBG3",
     "voice_settings": {
       "similarity_boost": 0.7,
@@ -423,6 +435,7 @@
     "language_code": "it",
     "model_id": "eleven_multilingual_v2",
     "output_format": "pcm_22050",
+    "text": "Ingegnere, <break time=\"0.3s\" /> cambia dal volante.",
     "voice_id": "RXoaSpLaWTEckJgPUBG3",
     "voice_settings": {
       "similarity_boost": 0.7,
@@ -435,6 +448,7 @@
     "language_code": "it",
     "model_id": "eleven_multilingual_v2",
     "output_format": "pcm_22050",
+    "text": "Ingegnere, <break time=\"0.3s\" /> rientra ai box.",
     "voice_id": "RXoaSpLaWTEckJgPUBG3",
     "voice_settings": {
       "similarity_boost": 0.7,
@@ -447,6 +461,7 @@
     "language_code": "it",
     "model_id": "eleven_multilingual_v2",
     "output_format": "pcm_22050",
+    "text": "Ingegnere, <break time=\"0.3s\" /> se vuoi prova ai box.",
     "voice_id": "RXoaSpLaWTEckJgPUBG3",
     "voice_settings": {
       "similarity_boost": 0.7,
@@ -459,6 +474,7 @@
     "language_code": "it",
     "model_id": "eleven_multilingual_v2",
     "output_format": "pcm_22050",
+    "text": "Ingegnere, <break time=\"0.3s\" /> se vuoi prova dal volante.",
     "voice_id": "RXoaSpLaWTEckJgPUBG3",
     "voice_settings": {
       "similarity_boost": 0.7,
@@ -471,6 +487,7 @@
     "language_code": "it",
     "model_id": "eleven_multilingual_v2",
     "output_format": "pcm_22050",
+    "text": "Ingresso box quì davanti, <break time=\"0.3s\" /> rientra",
     "voice_id": "RXoaSpLaWTEckJgPUBG3",
     "voice_settings": {
       "similarity_boost": 0.7,
@@ -483,6 +500,7 @@
     "language_code": "it",
     "model_id": "eleven_multilingual_v2",
     "output_format": "pcm_22050",
+    "text": "L'anteriore scìvola, <break time=\"0.3s\" /> entra più piano",
     "voice_id": "RXoaSpLaWTEckJgPUBG3",
     "voice_settings": {
       "similarity_boost": 0.7,
@@ -495,6 +513,7 @@
     "language_code": "it",
     "model_id": "eleven_multilingual_v2",
     "output_format": "pcm_22050",
+    "text": "Marcia troppo lunga, <break time=\"0.3s\" /> scala per avere più spinta",
     "voice_id": "RXoaSpLaWTEckJgPUBG3",
     "voice_settings": {
       "similarity_boost": 0.7,
@@ -507,6 +526,7 @@
     "language_code": "it",
     "model_id": "eleven_multilingual_v2",
     "output_format": "pcm_22050",
+    "text": "Modìfica pronta, <break time=\"0.3s\" /> rientra ai box a fine giro",
     "voice_id": "RXoaSpLaWTEckJgPUBG3",
     "voice_settings": {
       "similarity_boost": 0.7,
@@ -519,6 +539,7 @@
     "language_code": "it",
     "model_id": "eleven_multilingual_v2",
     "output_format": "pcm_22050",
+    "text": "Mòlli presto il freno, <break time=\"0.3s\" /> tiènine un filo all'inserimento",
     "voice_id": "RXoaSpLaWTEckJgPUBG3",
     "voice_settings": {
       "similarity_boost": 0.7,
@@ -531,6 +552,7 @@
     "language_code": "it",
     "model_id": "eleven_multilingual_v2",
     "output_format": "pcm_22050",
+    "text": "Pàttini in uscita in più punti. Alza il ti-ci di uno.",
     "voice_id": "RXoaSpLaWTEckJgPUBG3",
     "voice_settings": {
       "similarity_boost": 0.7,
@@ -543,6 +565,7 @@
     "language_code": "it",
     "model_id": "eleven_multilingual_v2",
     "output_format": "pcm_22050",
+    "text": "Pàttini in uscita, <break time=\"0.3s\" /> dosa il gas",
     "voice_id": "RXoaSpLaWTEckJgPUBG3",
     "voice_settings": {
       "similarity_boost": 0.7,
@@ -567,6 +590,7 @@
     "language_code": "it",
     "model_id": "eleven_multilingual_v2",
     "output_format": "pcm_22050",
+    "text": "Quì guadàgni, <break time=\"0.3s\" /> rifàlla così",
     "voice_id": "RXoaSpLaWTEckJgPUBG3",
     "voice_settings": {
       "similarity_boost": 0.7,
@@ -579,6 +603,7 @@
     "language_code": "it",
     "model_id": "eleven_multilingual_v2",
     "output_format": "pcm_22050",
+    "text": "Quì hai màrgine, <break time=\"0.3s\" /> frena più tardi",
     "voice_id": "RXoaSpLaWTEckJgPUBG3",
     "voice_settings": {
       "similarity_boost": 0.7,
@@ -591,6 +616,7 @@
     "language_code": "it",
     "model_id": "eleven_multilingual_v2",
     "output_format": "pcm_22050",
+    "text": "Quì perdi 1 decimo",
     "voice_id": "RXoaSpLaWTEckJgPUBG3",
     "voice_settings": {
       "similarity_boost": 0.7,
@@ -603,6 +629,7 @@
     "language_code": "it",
     "model_id": "eleven_multilingual_v2",
     "output_format": "pcm_22050",
+    "text": "Quì perdi 10 decimi",
     "voice_id": "RXoaSpLaWTEckJgPUBG3",
     "voice_settings": {
       "similarity_boost": 0.7,
@@ -615,6 +642,7 @@
     "language_code": "it",
     "model_id": "eleven_multilingual_v2",
     "output_format": "pcm_22050",
+    "text": "Quì perdi 11 decimi",
     "voice_id": "RXoaSpLaWTEckJgPUBG3",
     "voice_settings": {
       "similarity_boost": 0.7,
@@ -627,6 +655,7 @@
     "language_code": "it",
     "model_id": "eleven_multilingual_v2",
     "output_format": "pcm_22050",
+    "text": "Quì perdi 12 decimi",
     "voice_id": "RXoaSpLaWTEckJgPUBG3",
     "voice_settings": {
       "similarity_boost": 0.7,
@@ -639,6 +668,7 @@
     "language_code": "it",
     "model_id": "eleven_multilingual_v2",
     "output_format": "pcm_22050",
+    "text": "Quì perdi 13 decimi",
     "voice_id": "RXoaSpLaWTEckJgPUBG3",
     "voice_settings": {
       "similarity_boost": 0.7,
@@ -651,6 +681,7 @@
     "language_code": "it",
     "model_id": "eleven_multilingual_v2",
     "output_format": "pcm_22050",
+    "text": "Quì perdi 14 decimi",
     "voice_id": "RXoaSpLaWTEckJgPUBG3",
     "voice_settings": {
       "similarity_boost": 0.7,
@@ -663,6 +694,7 @@
     "language_code": "it",
     "model_id": "eleven_multilingual_v2",
     "output_format": "pcm_22050",
+    "text": "Quì perdi 15 decimi",
     "voice_id": "RXoaSpLaWTEckJgPUBG3",
     "voice_settings": {
       "similarity_boost": 0.7,
@@ -675,6 +707,7 @@
     "language_code": "it",
     "model_id": "eleven_multilingual_v2",
     "output_format": "pcm_22050",
+    "text": "Quì perdi 16 decimi",
     "voice_id": "RXoaSpLaWTEckJgPUBG3",
     "voice_settings": {
       "similarity_boost": 0.7,
@@ -687,6 +720,7 @@
     "language_code": "it",
     "model_id": "eleven_multilingual_v2",
     "output_format": "pcm_22050",
+    "text": "Quì perdi 17 decimi",
     "voice_id": "RXoaSpLaWTEckJgPUBG3",
     "voice_settings": {
       "similarity_boost": 0.7,
@@ -699,6 +733,7 @@
     "language_code": "it",
     "model_id": "eleven_multilingual_v2",
     "output_format": "pcm_22050",
+    "text": "Quì perdi 18 decimi",
     "voice_id": "RXoaSpLaWTEckJgPUBG3",
     "voice_settings": {
       "similarity_boost": 0.7,
@@ -711,6 +746,7 @@
     "language_code": "it",
     "model_id": "eleven_multilingual_v2",
     "output_format": "pcm_22050",
+    "text": "Quì perdi 19 decimi",
     "voice_id": "RXoaSpLaWTEckJgPUBG3",
     "voice_settings": {
       "similarity_boost": 0.7,
@@ -723,6 +759,7 @@
     "language_code": "it",
     "model_id": "eleven_multilingual_v2",
     "output_format": "pcm_22050",
+    "text": "Quì perdi 2 decimi",
     "voice_id": "RXoaSpLaWTEckJgPUBG3",
     "voice_settings": {
       "similarity_boost": 0.7,
@@ -735,6 +772,7 @@
     "language_code": "it",
     "model_id": "eleven_multilingual_v2",
     "output_format": "pcm_22050",
+    "text": "Quì perdi 20 decimi",
     "voice_id": "RXoaSpLaWTEckJgPUBG3",
     "voice_settings": {
       "similarity_boost": 0.7,
@@ -747,6 +785,7 @@
     "language_code": "it",
     "model_id": "eleven_multilingual_v2",
     "output_format": "pcm_22050",
+    "text": "Quì perdi 21 decimi",
     "voice_id": "RXoaSpLaWTEckJgPUBG3",
     "voice_settings": {
       "similarity_boost": 0.7,
@@ -759,6 +798,7 @@
     "language_code": "it",
     "model_id": "eleven_multilingual_v2",
     "output_format": "pcm_22050",
+    "text": "Quì perdi 22 decimi",
     "voice_id": "RXoaSpLaWTEckJgPUBG3",
     "voice_settings": {
       "similarity_boost": 0.7,
@@ -771,6 +811,7 @@
     "language_code": "it",
     "model_id": "eleven_multilingual_v2",
     "output_format": "pcm_22050",
+    "text": "Quì perdi 23 decimi",
     "voice_id": "RXoaSpLaWTEckJgPUBG3",
     "voice_settings": {
       "similarity_boost": 0.7,
@@ -783,6 +824,7 @@
     "language_code": "it",
     "model_id": "eleven_multilingual_v2",
     "output_format": "pcm_22050",
+    "text": "Quì perdi 24 decimi",
     "voice_id": "RXoaSpLaWTEckJgPUBG3",
     "voice_settings": {
       "similarity_boost": 0.7,
@@ -795,6 +837,7 @@
     "language_code": "it",
     "model_id": "eleven_multilingual_v2",
     "output_format": "pcm_22050",
+    "text": "Quì perdi 25 decimi",
     "voice_id": "RXoaSpLaWTEckJgPUBG3",
     "voice_settings": {
       "similarity_boost": 0.7,
@@ -807,6 +850,7 @@
     "language_code": "it",
     "model_id": "eleven_multilingual_v2",
     "output_format": "pcm_22050",
+    "text": "Quì perdi 3 decimi",
     "voice_id": "RXoaSpLaWTEckJgPUBG3",
     "voice_settings": {
       "similarity_boost": 0.7,
@@ -819,6 +863,7 @@
     "language_code": "it",
     "model_id": "eleven_multilingual_v2",
     "output_format": "pcm_22050",
+    "text": "Quì perdi 4 decimi",
     "voice_id": "RXoaSpLaWTEckJgPUBG3",
     "voice_settings": {
       "similarity_boost": 0.7,
@@ -831,6 +876,7 @@
     "language_code": "it",
     "model_id": "eleven_multilingual_v2",
     "output_format": "pcm_22050",
+    "text": "Quì perdi 5 decimi",
     "voice_id": "RXoaSpLaWTEckJgPUBG3",
     "voice_settings": {
       "similarity_boost": 0.7,
@@ -843,6 +889,7 @@
     "language_code": "it",
     "model_id": "eleven_multilingual_v2",
     "output_format": "pcm_22050",
+    "text": "Quì perdi 6 decimi",
     "voice_id": "RXoaSpLaWTEckJgPUBG3",
     "voice_settings": {
       "similarity_boost": 0.7,
@@ -855,6 +902,7 @@
     "language_code": "it",
     "model_id": "eleven_multilingual_v2",
     "output_format": "pcm_22050",
+    "text": "Quì perdi 7 decimi",
     "voice_id": "RXoaSpLaWTEckJgPUBG3",
     "voice_settings": {
       "similarity_boost": 0.7,
@@ -867,6 +915,7 @@
     "language_code": "it",
     "model_id": "eleven_multilingual_v2",
     "output_format": "pcm_22050",
+    "text": "Quì perdi 8 decimi",
     "voice_id": "RXoaSpLaWTEckJgPUBG3",
     "voice_settings": {
       "similarity_boost": 0.7,
@@ -879,6 +928,7 @@
     "language_code": "it",
     "model_id": "eleven_multilingual_v2",
     "output_format": "pcm_22050",
+    "text": "Quì perdi 9 decimi",
     "voice_id": "RXoaSpLaWTEckJgPUBG3",
     "voice_settings": {
       "similarity_boost": 0.7,
@@ -891,6 +941,7 @@
     "language_code": "it",
     "model_id": "eleven_multilingual_v2",
     "output_format": "pcm_22050",
+    "text": "Quì perdi più di due secondi e mezzo",
     "voice_id": "RXoaSpLaWTEckJgPUBG3",
     "voice_settings": {
       "similarity_boost": 0.7,
@@ -903,6 +954,7 @@
     "language_code": "it",
     "model_id": "eleven_multilingual_v2",
     "output_format": "pcm_22050",
+    "text": "Resti a metà gas, <break time=\"0.3s\" /> aspetta e apri tutto",
     "voice_id": "RXoaSpLaWTEckJgPUBG3",
     "voice_settings": {
       "similarity_boost": 0.7,
@@ -927,6 +979,7 @@
     "language_code": "it",
     "model_id": "eleven_multilingual_v2",
     "output_format": "pcm_22050",
+    "text": "Riduci il precàrico del differenziale.",
     "voice_id": "RXoaSpLaWTEckJgPUBG3",
     "voice_settings": {
       "similarity_boost": 0.7,
@@ -963,6 +1016,7 @@
     "language_code": "it",
     "model_id": "eleven_multilingual_v2",
     "output_format": "pcm_22050",
+    "text": "Sei ai box. Apri la pàgina Ingegnere nel browser. Prepara la modìfica e applìcala. Ricàrica il setup dal garage prima di uscire.",
     "voice_id": "RXoaSpLaWTEckJgPUBG3",
     "voice_settings": {
       "similarity_boost": 0.7,
@@ -975,6 +1029,7 @@
     "language_code": "it",
     "model_id": "eleven_multilingual_v2",
     "output_format": "pcm_22050",
+    "text": "Sei sul limitatore, <break time=\"0.3s\" /> cambia prima",
     "voice_id": "RXoaSpLaWTEckJgPUBG3",
     "voice_settings": {
       "similarity_boost": 0.7,
@@ -987,6 +1042,7 @@
     "language_code": "it",
     "model_id": "eleven_multilingual_v2",
     "output_format": "pcm_22050",
+    "text": "Sovrasterzo, <break time=\"0.3s\" /> in uscita apri il gas piano",
     "voice_id": "RXoaSpLaWTEckJgPUBG3",
     "voice_settings": {
       "similarity_boost": 0.7,
@@ -1023,6 +1079,7 @@
     "language_code": "it",
     "model_id": "eleven_multilingual_v2",
     "output_format": "pcm_22050",
+    "text": "Ùltimo giro di benzina, <break time=\"0.3s\" /> rientra ai box",
     "voice_id": "RXoaSpLaWTEckJgPUBG3",
     "voice_settings": {
       "similarity_boost": 0.7,
@@ -1035,6 +1092,7 @@
     "language_code": "it",
     "model_id": "eleven_multilingual_v2",
     "output_format": "pcm_22050",
+    "text": "Velèggi, <break time=\"0.3s\" /> passa sùbito dal freno al gas",
     "voice_id": "RXoaSpLaWTEckJgPUBG3",
     "voice_settings": {
       "similarity_boost": 0.7,
@@ -1131,6 +1189,7 @@
     "language_code": "it",
     "model_id": "eleven_multilingual_v2",
     "output_format": "pcm_22050",
+    "text": "quì perdi",
     "voice_id": "RXoaSpLaWTEckJgPUBG3",
     "voice_settings": {
       "similarity_boost": 0.7,
@@ -1167,6 +1226,7 @@
     "language_code": "it",
     "model_id": "eleven_multilingual_v2",
     "output_format": "pcm_22050",
+    "text": "velèggi",
     "voice_id": "RXoaSpLaWTEckJgPUBG3",
     "voice_settings": {
       "similarity_boost": 0.7,
