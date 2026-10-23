@@ -60,7 +60,7 @@ var onComboChange = async () => {};
 var showToast = () => {};
 var setTimeout = () => {}, connectWS = () => {};
 var showModalError = (m) => { els["modal-error"] = { textContent: m }; };
-for (const f of ["inPista", "writeLocked", "paintWriteLock", "afterWrite", "applyNow",
+for (const f of ["liveRefused", "inPista", "writeLocked", "paintWriteLock", "afterWrite", "applyNow",
                  "confirmWrite", "confirmRestored", "confirmAvDone", "onWsClose"]) {
   eval(grab(f));
 }

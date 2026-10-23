@@ -3,8 +3,9 @@
 // Vanilla JS, no libraries — same constraint as the analysis app.
 
 const WS_PORT = 8777;            // the live backend; the page itself is on 8778
-// Ogni URL verso il motore passa da qui: sul Wi-Fi porta la chiave (lankey.js),
-// che il cookie della 8778 non porterebbe alla 8777. Senza lankey.js l'URL
+// Ogni URL verso il motore passa da qui: sul Wi-Fi porta la chiave (lankey.js).
+// Il cookie varrebbe anche sulla 8777 (i cookie non guardano la porta), ma una
+// fetch cross-origin senza credenziali non lo manda. Senza lankey.js l'URL
 // resta com'e', e sul PC funziona lo stesso.
 const liveUrl = (u) => (window.honeLive ? window.honeLive(u) : u);
 const $ = (id) => document.getElementById(id);
@@ -59,6 +60,13 @@ const state = {
 const slotKey = (param, i) => `${param}#${i}`;
 const sameName = (a, b) => (a || "").toLowerCase() === (b || "").toLowerCase();
 
+// Le tre chiamate a `/engineer/applied` sono best-effort: a motore spento si
+// tace. Un 401 invece vuol dire che il motore non ha saputo della modifica e
+// la riproporra': lo si dice.
+function liveRefused(r) {
+  if (r && r.status === 401) showToast(t("lan.fromQr"), true);
+}
+
 async function api(url, opts) {
   // Pass the active language so backend-generated content arrives localised.
   // The setup routes honour it (labels, groups, notes, the engineer's phases and
@@ -67,6 +75,9 @@ async function api(url, opts) {
     url += (url.indexOf("?") === -1 ? "?" : "&") + "lang=" + encodeURIComponent(LANG());
   }
   const r = await fetch(url, opts);
+  // Un 401 e' il guardiano senza chiave: la sua risposta e' una pagina HTML, e
+  // il pilota leggeva «Unauthorized». Gli si dice cosa fare.
+  if (r.status === 401) throw new Error(t("lan.fromQr"));
   if (!r.ok) {
     let detail = r.statusText;
     try { detail = (await r.json()).detail ?? detail; } catch (e) {}
@@ -891,6 +902,7 @@ async function afterWrite(res) {
   // scrittura che non lo dichiara.
   fetch(liveUrl(`http://${location.hostname}:${WS_PORT}/engineer/applied`),
         { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" })
+    .then(liveRefused)
     .catch(() => { /* backend off — keeps proposing */ });
   // Il file appena scritto è quello che il messaggio ti dice di caricare, ed è
   // quello su cui deve poggiare la modifica dopo.
@@ -1395,6 +1407,7 @@ function confirmRestored() {
   $("es-restored").hidden = true;
   fetch(liveUrl(`http://${location.hostname}:${WS_PORT}/engineer/applied`),
         { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" })
+    .then(liveRefused)
     .catch(() => { /* backend off — resta da fare */ });
 }
 
@@ -1577,6 +1590,7 @@ function confirmAvDone() {
   // scrittura che non lo dichiara.
   fetch(liveUrl(`http://${location.hostname}:${WS_PORT}/engineer/applied`),
         { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" })
+    .then(liveRefused)
     .catch(() => { /* backend off — keeps proposing */ });
 }
 $("av-done").onclick = confirmAvDone;

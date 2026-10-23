@@ -10,9 +10,10 @@ La revisione di sicurezza del 23/10 ne ha trovate due:
   pagina Ingegnere. Un nome è salvato su disco: lo script restava lì e girava a
   ogni apertura.
 
-Le difese sono due e servono entrambe: il server rifiuta ``< > & " '`` nei
-nomi (Decisione 10), e le pagine escapano comunque ogni dato, perché sul disco
-ci possono già essere nomi scritti prima di questa regola.
+Le difese sono due e servono entrambe: il server rifiuta ``<`` e ``>`` nei
+nomi (Decisione 10; apostrofi, virgolette e ``&`` restano ammessi, «Curva
+dell'Ascari» è un nome vero), e le pagine escapano comunque ogni dato, perché
+sul disco ci possono già essere nomi scritti prima di questa regola.
 """
 import json
 import re

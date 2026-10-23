@@ -2,9 +2,9 @@
 
 Il guardiano (`accoach.guard`) chiede una chiave a chi non e' il PC. Il tablet
 la riceve dal QR dell'hub (`?k=`), il guardiano la ricorda in un cookie, e da li'
-le pagine la devono passare a mano alla 8777: il cookie della 8778 non viaggia
-con una richiesta cross-origin senza credenziali, e il WebSocket di un browser
-non accetta header. Qui si prova ogni anello: il QR, le pagine, il viaggio del
+le pagine la devono passare a mano alla 8777: il cookie non guarda la porta, ma
+una richiesta cross-origin senza credenziali non lo manda (il WebSocket si', e
+li' `?k=` e' una cintura in piu'). Qui si prova ogni anello: il QR, le pagine, il viaggio del
 tablet da `/tablet?k=` a `/engineer` col solo cookie, e le scritture verso il
 motore che il guardiano accetta solo in JSON.
 """
@@ -96,7 +96,7 @@ def test_engineer_applied_posts_send_json():
         assert 'body: "{}"' in tratto, tratto
     tab = (_WEB / "tablet.js").read_text(encoding="utf-8")
     # Il corpo `{}` e' anche quello che fa mettere a `xhr` il Content-Type.
-    assert re.search(r'xhr\("POST", liveUrl\([^\n]*/engineer/applied"\), \{\}, null\)', tab)
+    assert re.search(r'xhr\("POST", liveUrl\([^\n]*/engineer/applied"\), \{\}, appliedRefused\)', tab)
 
 
 def test_no_write_without_json_in_pages():
@@ -195,3 +195,79 @@ def test_the_json_post_preflight_from_the_tablet_passes():
         "Access-Control-Request-Headers": "content-type"})
     assert r.status_code == 200
     assert r.headers.get("access-control-allow-origin") == CASA
+
+
+# --- un 401 dentro la pagina Ingegnere ------------------------------------------
+# `api()` leggeva lo `statusText` («Unauthorized») perche' il 401 del guardiano
+# e' HTML; e le tre chiamate a `/engineer/applied` tacevano.
+
+_API_401 = r"""
+const fs = require("fs");
+const [i18nPath, engPath, lang, status] = process.argv.slice(2);
+global.window = {}; window.HONE_LANG = lang;
+global.document = { readyState: "complete", querySelectorAll: () => [],
+                    querySelector: () => null, documentElement: {} };
+eval(fs.readFileSync(i18nPath, "utf8"));
+const src = fs.readFileSync(engPath, "utf8");
+function grab(name) {
+  let i = src.indexOf("async function " + name + "(");
+  if (i < 0) i = src.indexOf("function " + name + "(");
+  if (i < 0) throw new Error("manca " + name);
+  let depth = 0;
+  for (let k = src.indexOf("{", i); k < src.length; k++) {
+    if (src[k] === "{") depth++;
+    if (src[k] === "}") { depth--; if (!depth) return src.slice(i, k + 1); }
+  }
+}
+const line = (re) => src.split("\n").find((l) => re.test(l));
+eval(line(/^const t = /).replace(/^const /, "var "));
+eval(line(/^const LANG = /).replace(/^const /, "var "));
+const toasts = [];
+var showToast = (m, bad) => toasts.push([m, !!bad]);
+var fetch = async () => ({ ok: false, status: Number(status), statusText: "Unauthorized",
+                           json: async () => { throw new SyntaxError("html"); } });
+eval(grab("api"));
+eval(grab("liveRefused"));
+(async () => {
+  let msg = null;
+  try { await api("/api/setup/combos"); } catch (e) { msg = e.message; }
+  liveRefused(await fetch());
+  liveRefused({});              // il fetch finto dei test vecchi: niente
+  console.log(JSON.stringify({ msg, toasts }));
+})();
+"""
+
+
+def _api_401(tmp_path, lang, status):
+    script = tmp_path / "a.js"
+    script.write_text(_API_401, encoding="utf-8")
+    r = subprocess.run([_NODE, str(script), str(_WEB / "i18n.js"), str(_WEB / "engineer.js"),
+                        lang, str(status)], capture_output=True, text=True,
+                       encoding="utf-8", timeout=60)
+    assert r.returncode == 0, r.stderr
+    return json.loads(r.stdout)
+
+
+@needs_node
+@pytest.mark.parametrize("lang,frase", [
+    ("it", "Apri HONE dal codice QR dell'hub."),
+    ("en", "Open HONE from the hub's QR code."),
+])
+def test_engineer_says_open_from_the_qr_on_a_401(tmp_path, lang, frase):
+    out = _api_401(tmp_path, lang, 401)
+    assert out["msg"] == frase
+    assert out["toasts"] == [[frase, True]]
+
+
+@needs_node
+def test_engineer_other_errors_keep_their_text(tmp_path):
+    out = _api_401(tmp_path, "it", 500)
+    assert out["msg"] == "Unauthorized"   # lo statusText finto, non la frase del QR
+    assert out["toasts"] == []
+
+
+def test_the_qr_phrase_is_the_guards_own():
+    """La pagina dice la stessa frase della pagina 401 del guardiano."""
+    src = (_WEB / "i18n.js").read_text(encoding="utf-8")
+    for lang, frase in guard._MESSAGGIO_401.items():
+        assert f"{lang}: `{frase}`" in src, lang

@@ -216,3 +216,65 @@ process.stdout.write(JSON.stringify({err: $("t-err").textContent, hidden: $("t-e
     assert r.returncode == 0, r.stderr
     out = json.loads(r.stdout)
     assert out == {"err": "Non riesco a caricare i setup. boom", "hidden": False}
+
+
+
+# --- un rifiuto del guardiano si legge -----------------------------------------
+# Il 401 del guardiano e' una pagina HTML: `xhr` non trovava un `detail` e il
+# pilota leggeva «Unauthorized», o niente del tutto per `/engineer/applied`.
+
+def _reply_401_js(what):
+    return r"""
+function reply401(x) {
+  x.readyState = 4; x.status = 401; x.statusText = "Unauthorized";
+  x.responseText = "<!doctype html><p>Apri HONE dal codice QR dell'hub.</p>";
+  x.onreadystatechange();
+}
+""" + what
+
+
+@needs_node
+def test_a_401_on_the_base_list_says_open_from_the_qr():
+    harness = _BOX_HARNESS.split("window.HoneTablet.render(frame);\nreply(")[0] + _reply_401_js(r"""
+window.HoneTablet.render(frame);
+reply401(find("/api/setup/base")[0]);
+window.HoneTablet.render(frame);
+process.stdout.write(JSON.stringify({err: $("t-err").textContent, hidden: $("t-err").hidden}));
+""")
+    r = subprocess.run([_NODE, "-e", harness, str(_WEB / "i18n.js"), str(_WEB / "tablet.js")],
+                       capture_output=True, text=True, encoding="utf-8")
+    assert r.returncode == 0, r.stderr
+    out = json.loads(r.stdout)
+    assert out == {"err": "Non riesco a caricare i setup. Apri HONE dal codice QR dell'hub.",
+                   "hidden": False}
+
+
+@needs_node
+def test_a_401_from_the_live_engine_is_said_not_swallowed():
+    head = _BOX_HARNESS.split("$(\"t-write\").onclick();")[0]
+    harness = head + _reply_401_js(r"""
+$("t-av-done").onclick();
+reply401(find("/engineer/applied")[0]);
+process.stdout.write(JSON.stringify({err: $("t-err").textContent, hidden: $("t-err").hidden,
+                                     posted: find("/engineer/applied").length}));
+""")
+    r = subprocess.run([_NODE, "-e", harness, str(_WEB / "i18n.js"), str(_WEB / "tablet.js")],
+                       capture_output=True, text=True, encoding="utf-8")
+    assert r.returncode == 0, r.stderr
+    out = json.loads(r.stdout)
+    assert out == {"err": "Apri HONE dal codice QR dell'hub.", "hidden": False, "posted": 1}
+
+
+@needs_node
+def test_the_live_engine_switched_off_stays_silent():
+    head = _BOX_HARNESS.split("$(\"t-write\").onclick();")[0]
+    harness = head + r"""
+$("t-av-done").onclick();
+var x = find("/engineer/applied")[0];
+x.readyState = 4; x.status = 0; x.responseText = ""; x.onreadystatechange();
+process.stdout.write(JSON.stringify({err: $("t-err").textContent}));
+"""
+    r = subprocess.run([_NODE, "-e", harness, str(_WEB / "i18n.js"), str(_WEB / "tablet.js")],
+                       capture_output=True, text=True, encoding="utf-8")
+    assert r.returncode == 0, r.stderr
+    assert json.loads(r.stdout) == {"err": ""}

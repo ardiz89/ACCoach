@@ -12,7 +12,8 @@
 (function () {
   var WS_PORT = 8777;            // il motore dal vivo; la pagina sta sulla 8778
   // Ogni URL verso il motore passa da qui: sul Wi-Fi porta la chiave del QR
-  // (lankey.js), che il cookie della 8778 non porterebbe alla 8777.
+  // (lankey.js). Il cookie varrebbe anche sulla 8777 (i cookie non guardano
+  // la porta), ma un XHR cross-origin senza credenziali non lo manda.
   function liveUrl(u) { return window.honeLive ? window.honeLive(u) : u; }
 
   function t(k) { return window.HoneI18n ? window.HoneI18n.t(k) : k; }
@@ -367,7 +368,10 @@
         var data = null;
         try { data = JSON.parse(r.responseText); } catch (e) {}
         if (r.status >= 200 && r.status < 300) { done(null, data); return; }
-        var detail = data && data.detail != null ? data.detail
+        // Un 401 e' il guardiano che non trova la chiave: la sua pagina e'
+        // HTML, e senza questa riga il pilota leggeva «Unauthorized».
+        var detail = r.status === 401 ? t("lan.fromQr")
+                   : data && data.detail != null ? data.detail
                    : (r.statusText || "HTTP " + r.status);
         if (typeof detail !== "string") detail = JSON.stringify(detail);
         done({ status: r.status, detail: detail }, data);
@@ -381,9 +385,15 @@
   // Lo stesso endpoint di `afterWrite` e di `av-done` della pagina completa:
   // quello che l'ingegnere aveva chiesto e' sulla macchina. Best-effort: a
   // motore spento l'ingegnere continua a proporre.
+  // Motore spento resta silenzio, come prima. Un 401 no: il motore non ha
+  // saputo della modifica e riproporra' la stessa, quindi lo si dice dove il
+  // pilota guarda gli errori dei box.
+  function appliedRefused(err) {
+    if (err && err.status === 401) { bx.err = err.detail; paintBox(); }
+  }
   function postApplied() {
     // Il corpo `{}` fa dichiarare JSON a `xhr`: senza, il guardiano dice 415.
-    xhr("POST", liveUrl("http://" + location.hostname + ":" + WS_PORT + "/engineer/applied"), {}, null);
+    xhr("POST", liveUrl("http://" + location.hostname + ":" + WS_PORT + "/engineer/applied"), {}, appliedRefused);
   }
 
   // ---- la schermata dei box -------------------------------------------------

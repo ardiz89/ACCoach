@@ -286,7 +286,7 @@ function fetch(url, opt) { posted.push([url, opt && opt.method]); return Promise
 const state = { lastLive: null };
 eval(grab("inPista")); eval(grab("writeLocked"));
 eval(grab("msgText"));
-eval(grab("confirmRestored"));
+eval(grab("liveRefused")); eval(grab("confirmRestored"));
 eval(grab("renderEngineer"));
 const out = [];
 for (const eng of JSON.parse(fs.readFileSync(0, "utf8"))) {

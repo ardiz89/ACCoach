@@ -23,6 +23,10 @@
     // shared chrome
     "lang.label":      { en: `Language`, it: `Lingua` },
     "tour.help":       { en: `Guided tour`, it: `Visita guidata` },
+    // Il 401 del guardiano (accoach/guard.py), detto dentro la pagina: una
+    // richiesta rifiutata per la chiave diceva «Unauthorized», o niente.
+    "lan.fromQr":      { en: `Open HONE from the hub's QR code.`,
+                         it: `Apri HONE dal codice QR dell'hub.` },
     "nav.guide":       { en: `Guide`, it: `Guida` },
     // Buttons of the coachmark overlay itself (tour.js reads these directly).
     "tour.btn.skip":   { en: `Skip`, it: `Salta` },
