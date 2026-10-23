@@ -982,7 +982,8 @@ def test_the_tablet_qr_carries_the_lan_key(env):
     _win, panel, _net, _tmp = env
     _cfg().lan = True
     panel.render_state(PanelState("before"))
-    assert f"192.168.1.23:8778/tablet?k={guard.lan_key()}" in _joined(panel)
+    assert (f"http://192.168.1.23:8778/tablet\n?k={guard.lan_key()}"
+            in _joined(panel))
 
 
 def test_the_devices_qr_codes_carry_the_lan_key(env, monkeypatch):
@@ -998,3 +999,77 @@ def test_the_devices_qr_codes_carry_the_lan_key(env, monkeypatch):
     _cfg().lan = True
     win._devices._render()
     assert chiavi == [guard.lan_key()]
+
+
+# --- l'indirizzo si scrive a mano: l'iPad del pilota non legge i QR -----------
+# iOS 9.3.6 non ha il lettore di QR nella fotocamera. L'indirizzo sotto il QR e'
+# quindi la strada principale, e va letto per intero: in monospazio (0 e O, 1 e
+# I non si confondono) e con la chiave su una riga sua, perche' un URL senza
+# spazi non va a capo e usciva dalla colonna.
+
+def test_display_address_puts_the_key_on_its_own_line():
+    from accoach.netinfo import display_address
+    assert (display_address("http://192.168.1.23:8778/tablet?k=7K3M9P2QXR4T8VWZ")
+            == "http://192.168.1.23:8778/tablet\n?k=7K3M9P2QXR4T8VWZ")
+    assert (display_address("http://192.168.1.23:8778/tablet")
+            == "http://192.168.1.23:8778/tablet")
+
+
+def test_the_live_panel_shows_the_whole_address_in_mono(env):
+    from PySide6.QtWidgets import QLabel
+    from accoach import guard
+    _win, panel, _net, _tmp = env
+    _cfg().lan = True
+    panel.render_state(PanelState("before"))
+    addr = panel.findChild(QLabel, "liveQrAddress")
+    assert addr is not None and _visible_in(addr, panel)
+    assert addr.text() == f"http://192.168.1.23:8778/tablet\n?k={guard.lan_key()}"
+    assert addr.property("role") == "address"
+    from PySide6.QtCore import Qt
+    assert addr.textInteractionFlags() & Qt.TextSelectableByMouse
+
+
+def test_the_devices_panel_shows_the_whole_address_in_mono(env, monkeypatch):
+    from PySide6.QtWidgets import QLabel
+    from accoach import guard, launcher, netinfo
+    win, _panel, _net, _tmp = env
+    monkeypatch.setattr(launcher, "device_urls",
+                        lambda port, key=None: netinfo.device_urls(
+                            port, ip="192.168.1.23", key=key))
+    _cfg().lan = True
+    win._devices._render()
+    testi = [w.text() for w in win._devices.findChildren(QLabel, "qrAddress")]
+    key = guard.lan_key()
+    assert f"http://192.168.1.23:8778/engineer\n?k={key}" in testi
+    assert len(testi) == 3
+    assert all(w.property("role") == "address"
+               for w in win._devices.findChildren(QLabel, "qrAddress"))
+
+
+def _chiave_rotta(*_a, **_k):
+    raise PermissionError("Accesso controllato alle cartelle")
+
+
+def test_without_a_key_the_live_panel_says_why_instead_of_the_qr(env, monkeypatch):
+    from PySide6.QtWidgets import QLabel
+    from accoach import livepanel_ui
+    from accoach.i18n import t
+    _win, panel, _net, _tmp = env
+    monkeypatch.setattr(livepanel_ui, "lan_key", _chiave_rotta)
+    _cfg().lan = True
+    panel.render_state(PanelState("before"))
+    assert panel.findChild(QLabel, "liveQr") is None
+    assert t("mob.no_key") in _joined(panel)
+
+
+def test_without_a_key_the_devices_panel_says_why_instead_of_the_qr(env, monkeypatch):
+    from PySide6.QtWidgets import QLabel
+    from accoach import launcher
+    from accoach.i18n import t
+    win, _panel, _net, _tmp = env
+    monkeypatch.setattr(launcher, "lan_key", _chiave_rotta)
+    _cfg().lan = True
+    win._devices._render()
+    assert win._devices.findChildren(QLabel, "qrAddress") == []
+    testi = [w.text() for w in win._devices.findChildren(QLabel)]
+    assert t("mob.no_key") in testi

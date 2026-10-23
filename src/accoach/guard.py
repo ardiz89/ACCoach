@@ -73,6 +73,37 @@ def key_path() -> Path:
     return base_dir() / "lan-key.txt"
 
 
+# La chiave si scrive anche a mano: l'iPad del pilota (iOS 9.3.6) non legge i
+# QR con la fotocamera. Sedici caratteri dall'alfabeto di Crockford, cioe' 80
+# bit: niente I, L, O e U, che sul vetro di un tablet si confondono con 1 e 0.
+_ALFABETO = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
+_LUNGHEZZA = 16
+# Chi scrive a mano sbaglia le maiuscole, mette un trattino per non perdere il
+# segno, o legge una O dove c'e' uno 0: Crockford li perdona tutti.
+_PERDONA = str.maketrans({"O": "0", "I": "1", "L": "1", "-": None, " ": None})
+
+
+def normalizza(key: str) -> str:
+    """La chiave come la confronta il guardiano: maiuscola, senza trattini."""
+    return (key or "").strip().upper().translate(_PERDONA)
+
+
+def _valida(key: str) -> str:
+    """La chiave normalizzata se ha il formato giusto, se no ``""``."""
+    k = normalizza(key)
+    if len(k) == _LUNGHEZZA and all(c in _ALFABETO for c in k):
+        return k
+    return ""
+
+
+def _nuova() -> str:
+    return "".join(secrets.choice(_ALFABETO) for _ in range(_LUNGHEZZA))
+
+
+def _unico(path: Path, coda: str) -> Path:
+    return path.with_name(f"{path.name}.{os.getpid()}.{secrets.token_hex(4)}.{coda}")
+
+
 def lan_key() -> str:
     """La chiave di questa installazione, creata al primo uso.
 
@@ -82,38 +113,74 @@ def lan_key() -> str:
     file temporaneo e lo si collega al nome vero con ``os.link``, che fallisce
     se il file c'e' gia'. Chi perde la corsa legge la chiave di chi l'ha vinta,
     invece di tenersene in memoria una che sul disco non c'e' piu'.
+
+    Un file che c'e' ma non vale (vuoto, rovinato, o la chiave di 32 caratteri
+    di prima, che a mano non si scriveva) si sposta via e si rifa' con la
+    stessa regola. Lo spostamento e' la parte delicata: dopo un aggiornamento
+    tutte e due le app trovano la chiave vecchia nello stesso istante, e quella
+    che arriva seconda potrebbe spostare via la chiave *nuova* dell'altra. Per
+    questo chi sposta guarda cosa ha spostato, e una chiave valida la rimette.
+
+    Se la cartella non si puo' scrivere (Accesso controllato alle cartelle di
+    Windows) solleva ``OSError``: chi la chiama decide cosa mostrare.
     """
     path = key_path()
     cached = _cache.get(("key", str(path)))
     if cached:
         return cached
-    key = _leggi(path)
-    if not key:
+    key = _valida(_leggi(path))
+    for _ in range(5):
+        if key:
+            break
         path.parent.mkdir(parents=True, exist_ok=True)
-        nuova = secrets.token_urlsafe(24)
-        tmp = path.with_name(f"{path.name}.{os.getpid()}.{secrets.token_hex(4)}.tmp")
+        if path.exists():
+            via = _unico(path, "old")
+            try:
+                os.replace(path, via)
+            except FileNotFoundError:
+                pass   # l'ha gia' spostato l'altro processo
+            except PermissionError:
+                pass   # l'altro lo sta leggendo o scrivendo: si riprova
+            else:
+                if _valida(_leggi(via)):
+                    # Era la chiave appena scritta dall'altro: torna al suo posto.
+                    try:
+                        os.link(via, path)
+                    except FileExistsError:
+                        pass
+                    except OSError:
+                        if not path.exists():
+                            os.replace(via, path)
+                _togli(via)
+            key = _valida(_leggi(path))
+            continue
+        nuova = _nuova()
+        tmp = _unico(path, "tmp")
         tmp.write_text(nuova, encoding="utf-8")
         try:
-            if path.exists():
-                # C'e' ma e' vuoto o rovinato: qui una sovrascrittura e' la cura.
-                os.replace(tmp, path)
-            else:
-                try:
-                    os.link(tmp, path)
-                except FileExistsError:
-                    pass   # l'altro processo e' arrivato prima: vale la sua
-                except OSError:
-                    # Un disco senza hard link (FAT): niente garanzia contro la
-                    # corsa, ma meglio una chiave che nessuna.
+            try:
+                os.link(tmp, path)
+            except FileExistsError:
+                pass   # l'altro processo e' arrivato prima: vale la sua
+            except OSError:
+                # Un disco senza hard link (FAT): niente garanzia contro la
+                # corsa, ma meglio una chiave che nessuna.
+                if not path.exists():
                     os.replace(tmp, path)
         finally:
-            try:
-                tmp.unlink()
-            except OSError:
-                pass
-        key = _leggi(path) or nuova
+            _togli(tmp)
+        key = _valida(_leggi(path))
+    if not key:
+        raise OSError(f"cannot create a valid LAN key at {path}")
     _cache[("key", str(path))] = key
     return key
+
+
+def _togli(path: Path) -> None:
+    try:
+        path.unlink()
+    except OSError:
+        pass
 
 
 def _leggi(path: Path) -> str:
@@ -239,7 +306,10 @@ def _origin_ok(origin: str, page_port: int) -> bool:
 
 
 def _same(a: str, b: str) -> bool:
-    return hmac.compare_digest(a.encode("utf-8"), b.encode("utf-8"))
+    """Chiave portata contro chiave vera, dopo averle normalizzate tutte e due:
+    il pilota puo' averla scritta in minuscolo sul tablet."""
+    return hmac.compare_digest(normalizza(a).encode("utf-8"),
+                               normalizza(b).encode("utf-8"))
 
 
 def new_nonce() -> str:
@@ -366,7 +436,9 @@ class GuardMiddleware:
             # 8777 come `?k=` o `X-HONE-Key`. I cookie non guardano la porta, ma
             # una fetch cross-origin senza credenziali non li manda, e il
             # WebSocket di un browser non accetta header.
-            cookie = (f"{COOKIE}={dalla_query}; Path=/; Max-Age={_MAX_AGE}; "
+            # Normalizzata: il cookie porta la chiave come la scrive il disco,
+            # anche se il pilota l'ha battuta in minuscolo o coi trattini.
+            cookie = (f"{COOKIE}={normalizza(dalla_query)}; Path=/; Max-Age={_MAX_AGE}; "
                       "SameSite=Lax").encode("latin-1")
 
             async def send_col_cookie(message):

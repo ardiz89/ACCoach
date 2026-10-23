@@ -69,6 +69,18 @@ def device_urls(port: int, ip: str | None = None,
             "tablet": base + "/tablet" + tail, "test": base + "/test" + tail}
 
 
+def display_address(url: str) -> str:
+    """L'URL di un QR come si legge sotto il codice: la chiave su una riga sua.
+
+    L'iPad del pilota (iOS 9.3.6) non legge i QR, quindi l'indirizzo si scrive a
+    mano ed e' la strada principale. Un URL non ha spazi e una QLabel non lo
+    manda a capo: con la chiave in coda usciva dalla colonna. Si spezza prima
+    di ``?k=``, che resta in vista e dice che la riga continua.
+    """
+    base, sep, tail = url.partition("?")
+    return f"{base}\n?{tail}" if sep else url
+
+
 def port_open(port: int, host: str = "127.0.0.1", timeout: float = 0.3) -> bool:
     """True if something is listening on ``host:port``.
 

@@ -107,7 +107,8 @@ moves through three stages, one after the other.
 **Before you go.** The first step, *Coach Live is on*, is ticked off as soon as
 the coach responds, usually within a couple of seconds. At that point voice and
 overlay are ready. Next comes *Connect your tablet to the engineer*. Scan the QR
-code with the tablet's camera, or open the address written next to it. It opens
+code with the tablet's camera. If the tablet can't read QR codes, like an iPad 3,
+type the address next to the code into the browser, key included. It opens
 the tablet view, described in "The tablet view". The
 tablet can only connect with network access on. If it's off, the panel offers a
 *Turn on network access* button, and afterwards you restart Coach Live. If you
@@ -912,15 +913,22 @@ You need this if you play on three monitors and want the **Report** or the
    on my network**. HONE remembers it.
 2. The QR codes appear, including **Report** and **Engineer**, with the address
    under them, like `http://192.168.1.23:8778/?k=…`. **Scan the code** with your
-   phone, or type the address into the browser.
+   phone, or type the address you see under it into the browser.
 
 A few practical details.
 
 - The phone has to be on the **same Wi-Fi network** as the PC.
-- The QR link carries a **key**. Someone on your Wi-Fi without the key can't get
-  in. If you type the address by hand, copy all of it, key included.
-- If the tablet says "Open HONE from the hub's QR code.", scan the code again.
-  After the first time the browser remembers the key.
+- The QR link carries a **key** of sixteen characters, after `?k=`. Someone on
+  your Wi-Fi without the key can't get in. If you type the address by hand,
+  copy all of it. Upper or lower case is fine for the key.
+- If the tablet says "Open HONE from the hub's QR code.", scan the code again
+  or type the address again.
+- The browser remembers the key as long as the PC keeps the same network
+  address. If the router gives it a new one, open the page from the new
+  address. To avoid this, reserve the PC's address in the router settings.
+- If a name like `mypc.local` doesn't work, use the IP shown under the QR.
+- To change the key, delete `lan-key.txt` in the HONE folder
+  (`Documents\ACCoach\`) and restart HONE. Old links stop working.
 - If **Windows** asks the first time, allow access on **private networks**.
 - For the **Report**, which shows your saved laps, the analysis only has to be
   running. The live **Engineer** page also needs Coach Live, or the Live backend

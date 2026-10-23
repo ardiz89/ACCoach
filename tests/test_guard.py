@@ -242,12 +242,77 @@ def test_cors_8777_non_e_piu_asterisco():
 
 # --- la chiave sul disco ----------------------------------------------------
 
-def test_lan_key_persistente_lunga_32_dove_dice_key_path():
+# L'iPad del pilota (iOS 9.3.6) non legge i QR con la fotocamera: la chiave si
+# scrive a mano. Sedici caratteri Crockford (niente I L O U, che si confondono
+# con 1 e 0 o diventano parolacce), cioe' 80 bit, invece dei 32 di base64.
+_CROCKFORD = set("0123456789ABCDEFGHJKMNPQRSTVWXYZ")
+
+
+def test_lan_key_persistente_16_crockford_dove_dice_key_path():
     a = guard.lan_key()
     guard._dimentica()
     b = guard.lan_key()
-    assert a == b and len(a) == 32
+    assert a == b and len(a) == 16
+    assert set(a) <= _CROCKFORD
     assert guard.key_path().read_text(encoding="utf-8").strip() == a
+
+
+def test_lan_key_ogni_installazione_la_sua():
+    a = guard.lan_key()
+    guard.key_path().unlink()
+    guard._dimentica()
+    assert guard.lan_key() != a
+
+
+@pytest.mark.parametrize("vecchia", [
+    "x" * 32,                         # il formato di prima (token_urlsafe)
+    "",                               # vuoto
+    "ABCDEFGHJKMNPQR",                # 15 caratteri
+    "ABCDEFGHJKMNPQRSU",              # 17
+    "ABCDEFGHJKMNPQ-_",               # fuori alfabeto
+])
+def test_una_chiave_non_valida_sul_disco_si_rifa(vecchia):
+    guard.key_path().parent.mkdir(parents=True, exist_ok=True)
+    guard.key_path().write_text(vecchia, encoding="utf-8")
+    guard._dimentica()
+    k = guard.lan_key()
+    assert len(k) == 16 and set(k) <= _CROCKFORD
+    assert guard.key_path().read_text(encoding="utf-8").strip() == k
+    # nessun file temporaneo lasciato accanto
+    assert sorted(p.name for p in guard.key_path().parent.iterdir()) == [
+        "lan-key.txt"]
+
+
+def test_una_chiave_valida_sul_disco_resta():
+    guard.key_path().parent.mkdir(parents=True, exist_ok=True)
+    guard.key_path().write_text("7K3M9P2QXR4T8VWZ\r\n", encoding="utf-8")
+    guard._dimentica()
+    assert guard.lan_key() == "7K3M9P2QXR4T8VWZ"
+
+
+def test_la_chiave_scritta_a_mano_in_minuscolo_passa_e_il_cookie_e_maiuscolo():
+    key = guard.lan_key()
+    with TestClient(_mini(), base_url=f"http://{PC_LAN}:8778", client=TABLET) as c:
+        r = c.get("/x", params={"k": key.lower()})
+        assert r.status_code == 200
+        assert f"hone_key={key};" in r.headers["set-cookie"]
+        assert c.get("/x").status_code == 200
+    with TestClient(_mini(), base_url=f"http://{PC_LAN}:8778", client=TABLET) as c:
+        assert c.get("/x", headers={"X-HONE-Key": key.lower()}).status_code == 200
+        c.cookies.set("hone_key", key.lower())
+        assert c.get("/x").status_code == 200
+
+
+def test_la_chiave_con_trattini_o_lettere_ambigue_passa():
+    # Crockford: O si legge 0, I e L si leggono 1, i trattini non contano.
+    guard.key_path().parent.mkdir(parents=True, exist_ok=True)
+    guard.key_path().write_text("10ABCDEFGHJKMNPQ", encoding="utf-8")
+    guard._dimentica()
+    with TestClient(_mini(), base_url=f"http://{PC_LAN}:8778", client=TABLET) as c:
+        assert c.get("/x", params={"k": "lo-abcd-efgh-jkmn-pq"}).status_code == 200
+    # un client nuovo: quello di prima ha gia' il cookie
+    with TestClient(_mini(), base_url=f"http://{PC_LAN}:8778", client=TABLET) as c:
+        assert c.get("/x", params={"k": "10ABCDEFGHJKMNPR"}).status_code == 401
 
 
 # --- giro 1 della revisione -------------------------------------------------
@@ -320,3 +385,30 @@ def test_un_resolver_lento_non_ferma_le_richieste(monkeypatch):
         via.set()
     # un ricalcolo solo, anche con due richieste mentre era in corso
     assert len(chiamate) <= 1
+
+
+def test_dopo_l_aggiornamento_chi_arriva_secondo_non_butta_la_chiave_nuova(monkeypatch):
+    """Le due app trovano la chiave vecchia nello stesso istante. Una la rifa',
+    l'altra -- che aveva letto la vecchia un attimo prima -- sposta via il file
+    e si ritrova in mano la chiave nuova: deve rimetterla, non farne una terza
+    (il tablet avrebbe un QR diverso a seconda di quale app ha risposto)."""
+    import os as _os
+
+    p = guard.key_path()
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text("x" * 32, encoding="utf-8")
+    vera = _os.replace
+    fatto = []
+
+    def replace_con_l_altro_processo(src, dst):
+        if not fatto and str(src) == str(p):
+            fatto.append(1)
+            vera(str(p) + "", str(p) + ".parked")   # l'altro sposta la vecchia...
+            p.write_text("7K3M9P2QXR4T8VWZ", encoding="utf-8")   # ...e scrive la sua
+        return vera(src, dst)
+
+    monkeypatch.setattr(guard.os, "replace", replace_con_l_altro_processo)
+    guard._dimentica()
+    assert guard.lan_key() == "7K3M9P2QXR4T8VWZ"
+    assert fatto
+    assert p.read_text(encoding="utf-8").strip() == "7K3M9P2QXR4T8VWZ"

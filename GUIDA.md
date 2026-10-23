@@ -46,7 +46,8 @@ pagina passa per tre momenti, uno dopo l'altro.
 **Prima di partire.** Il primo passo, *Coach Live acceso*, si spunta appena il
 coach risponde, di solito in un paio di secondi. A quel punto voce e overlay
 sono pronti. Poi viene *Collega il tablet all'ingegnere*. Inquadra il codice
-QR con la fotocamera del tablet, oppure apri l'indirizzo scritto accanto. Si
+QR con la fotocamera del tablet. Se il tablet non legge i QR, come un iPad 3,
+scrivi nel browser l'indirizzo accanto al codice, chiave compresa. Si
 apre la vista tablet, descritta in «La vista tablet». Il
 tablet si collega solo con la rete locale attiva. Se è spenta, il pannello ti
 offre il bottone *Attiva la rete locale*, e dopo devi riavviare Coach Live. Se
@@ -858,15 +859,22 @@ schermo a fianco.
    dispositivi in rete**. HONE se lo ricorda.
 2. Compaiono i codici QR, fra cui **Report** e **Ingegnere**, con l'indirizzo
    sotto, come `http://192.168.1.23:8778/?k=…`. **Inquadra il codice** col
-   telefono, oppure scrivi l'indirizzo nel browser.
+   telefono, oppure scrivi nel browser l'indirizzo che vedi sotto.
 
 Qualche dettaglio pratico.
 
 - Il telefono deve stare sulla **stessa rete Wi-Fi** del PC.
-- Il link del QR porta una **chiave**. Chi è sul tuo Wi-Fi senza la chiave non
-  entra. Se scrivi l'indirizzo a mano, copialo tutto, chiave compresa.
+- Il link del QR porta una **chiave** di sedici caratteri, dopo `?k=`. Chi è
+  sul tuo Wi-Fi senza la chiave non entra. Se scrivi l'indirizzo a mano,
+  copialo tutto. Maiuscole e minuscole per la chiave vanno bene uguali.
 - Se il tablet dice «Apri HONE dal codice QR dell'hub.», inquadra di nuovo il
-  codice. Dopo la prima volta il browser si ricorda la chiave.
+  codice o riscrivi l'indirizzo.
+- Il browser si ricorda la chiave finché il PC tiene lo stesso indirizzo di
+  rete. Se il router gliene dà un altro, riapri la pagina dal nuovo indirizzo.
+  Per evitarlo, riserva l'indirizzo del PC nelle impostazioni del router.
+- Se un nome come `nomepc.local` non funziona, usa l'IP scritto sotto il QR.
+- Per cambiare la chiave, cancella `lan-key.txt` nella cartella di HONE
+  (`Documenti/ACCoach/`) e riavvia HONE. I link vecchi smettono di funzionare.
 - Se **Windows** te lo chiede al primo avvio, consenti l'accesso su **reti
   private**.
 - Per il **Report**, cioè i giri salvati, basta che l'analisi sia accesa. La

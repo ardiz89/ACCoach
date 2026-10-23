@@ -67,7 +67,7 @@ from .hubgate import (
 )
 from .i18n import LANGUAGES, language_name, t
 from .guard import lan_key
-from .netinfo import device_urls, port_open, qr_png
+from .netinfo import device_urls, display_address, port_open, qr_png
 from .paths import base_dir
 from .telemetry.snapshot import format_lap_time
 from .theme import load_fonts, qss, window_icon
@@ -637,7 +637,15 @@ class DevicesPanel(QWidget):
             self._body.addWidget(_hint(t("mob.off")))
             return
         # La chiave del Wi-Fi nel QR: senza, il guardiano lascia il tablet al 401.
-        urls = device_urls(cfg.web.port, key=lan_key())
+        # Se Documenti non si scrive (Accesso controllato alle cartelle) la
+        # chiave non c'e': un QR senza chiave porterebbe dritto al 401, quindi
+        # si dice perche' invece di disegnarlo.
+        try:
+            key = lan_key()
+        except OSError:
+            self._body.addWidget(_hint(t("mob.no_key")))
+            return
+        urls = device_urls(cfg.web.port, key=key)
         if not urls:
             self._body.addWidget(_hint(t("mob.no_ip")))
             return
@@ -689,11 +697,13 @@ class DevicesPanel(QWidget):
         head.setAlignment(Qt.AlignHCenter)
         v.addWidget(head)
         v.addWidget(_qr_image(url, scale=5))
-        link = QLabel(url)
+        # L'indirizzo per intero, chiave compresa: sul tablet del pilota si
+        # scrive a mano (vedi `display_address`).
+        link = QLabel(display_address(url))
+        link.setObjectName("qrAddress")
         link.setAlignment(Qt.AlignHCenter)
-        link.setProperty("role", "link")
+        link.setProperty("role", "address")
         link.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        link.setWordWrap(True)
         v.addWidget(link)
         return w
 

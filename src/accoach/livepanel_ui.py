@@ -50,7 +50,7 @@ from .i18n import current_language, t
 from .launcher import _hint, _qr_image
 from .livepanel import POLL_S, LiveTracker, PanelState, parse_health, report_url
 from .guard import lan_key
-from .netinfo import device_urls
+from .netinfo import device_urls, display_address
 from .recording.storage import _catalog_path, _slug, laps_root
 
 # Tetto di una richiesta a /health: sotto POLL_S, cosi' una risposta lenta non
@@ -653,19 +653,32 @@ class LivePanel(QWidget):
             buttons.insert(0, self._button("live.s2_to_devices", "liveToDevices",
                                            self._to_devices))
         else:
-            # Con la chiave del Wi-Fi, come i QR della pagina Dispositivi.
-            urls = device_urls(cfg.web.port, key=lan_key())
-            if not urls:
+            # Con la chiave del Wi-Fi, come i QR della pagina Dispositivi. Se
+            # non si puo' creare (Documenti protetto) il QR porterebbe al 401.
+            try:
+                key = lan_key()
+            except OSError:
+                key = None
+            urls = device_urls(cfg.web.port, key=key) if key else None
+            if key is None:
+                out.append(_hint(t("mob.no_key")))
+            elif not urls:
                 out.append(_hint(t("live.s2_no_ip")))
             else:
                 url = urls["tablet"]
                 qr = _qr_image(url, scale=4)
                 qr.setObjectName("liveQr")
-                addr = url.split("://", 1)[-1]
                 side = QWidget()
                 v = QVBoxLayout(side)
                 v.setContentsMargins(0, 0, 0, 0)
-                v.addWidget(_hint(t("live.s2_scan", addr=addr)))
+                v.addWidget(_hint(t("live.s2_scan")))
+                # Per intero e in monospazio: l'iPad del pilota non legge i QR,
+                # l'indirizzo lo scrive a mano.
+                addr = QLabel(display_address(url))
+                addr.setObjectName("liveQrAddress")
+                addr.setProperty("role", "address")
+                addr.setTextInteractionFlags(Qt.TextSelectableByMouse)
+                v.addWidget(addr)
                 v.addStretch(1)
                 pair = QWidget()
                 h = QHBoxLayout(pair)

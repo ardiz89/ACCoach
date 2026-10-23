@@ -249,10 +249,18 @@ _UI: dict[str, dict[str, str]] = {
                             "the Live backend too.",
                       "it": "Per registrare gli avvisi del coach nella pagina di "
                             "prova, avvia anche il Backend live."},
-    "mob.scan": {"en": "Scan the code with your phone's camera, or type the "
-                       "address.",
-                 "it": "Inquadra il codice col telefono, oppure scrivi "
-                       "l'indirizzo."},
+    "mob.scan": {"en": "Scan the code, or type the address under it into the "
+                       "browser, key included.",
+                 "it": "Inquadra il codice, oppure scrivi nel browser "
+                       "l'indirizzo che c'è sotto, chiave compresa."},
+    # La chiave sta in Documenti\ACCoach: con l'Accesso controllato alle
+    # cartelle di Windows non si crea, e un QR senza chiave porta al 401.
+    "mob.no_key": {"en": "HONE can't save the network key in its folder, so "
+                         "there's no code. Check that Windows isn't blocking "
+                         "the Documents folder.",
+                   "it": "HONE non riesce a salvare la chiave di rete nella sua "
+                         "cartella, quindi il codice non c'è. Controlla che "
+                         "Windows non blocchi la cartella Documenti."},
     "mob.off": {"en": "Turn on the option above to open these pages from your phone.",
                 "it": "Attiva l'opzione qui sopra per aprire le pagine dal telefono."},
     "mob.no_ip": {"en": "No network address found. Connect this PC to Wi-Fi or "
@@ -460,9 +468,10 @@ _UI: dict[str, dict[str, str]] = {
                     "it": "Voce e overlay sono pronti."},
     "live.s2": {"en": "Connect your tablet to the engineer",
                 "it": "Collega il tablet all'ingegnere"},
-    "live.s2_scan": {"en": "Scan the code with the tablet's camera, or open {addr}.",
+    "live.s2_scan": {"en": "Scan the code with the tablet's camera, or type "
+                           "this address, key included.",
                      "it": "Inquadra il codice con la fotocamera del tablet, "
-                           "oppure apri {addr}."},
+                           "oppure scrivi questo indirizzo, chiave compresa."},
     "live.s2_lan_off": {
         "en": "The tablet can only connect with network access on. Turn it on "
               "in Devices, then restart Coach Live.",

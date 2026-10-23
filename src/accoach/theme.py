@@ -158,6 +158,10 @@ def qss() -> str:
     /* Nessun testo sotto 12 px (spec dei testi, 21/10): il link e il «?»
        erano a 11. */
     QLabel[role="link"]     {{ color: {b.CYAN}; font-size: 12px; }}
+    /* L'indirizzo sotto il QR si ricopia a mano sul tablet: in monospazio, dove
+       0 e O, 1 e I non si confondono, e un poco piu' grande del link. */
+    QLabel[role="address"]  {{ font-family: {_MONO_STACK}; color: {b.CYAN};
+                               font-size: 13px; }}
     /* The "?" beside a setting: visible enough to invite a hover, quiet enough
        not to compete with the setting's own name. */
     QLabel[role="help"]     {{ color: {b.MUTED}; font-size: 12px; font-weight: bold;
