@@ -58,9 +58,9 @@ _ENGINE_WOBBLE_HZ = 0.7
 _PRE_MS = 90
 _POST_MS = 40
 _CLICK_MS = 6            # scatto del tasto: rumore che decade
-_CLICK_AMP = 0.8
+_CLICK_REL = 0.5         # picco dello scatto, frazione del picco della voce
 _TAIL_MS = 150           # coda di squelch: rumore filtrato che decade
-_TAIL_AMP = 0.35
+_TAIL_REL = 0.5          # picco della coda, frazione del picco della voce
 
 _TARGET_PEAK = 0.85      # picco finale, frazione del fondo scala
 _FULL = 32767.0
@@ -244,15 +244,36 @@ def _noise_bed(n: int, fs: float, rnd: random.Random) -> list[float]:
     hiss = _HISS * _UNIFORM_TO_UNIT_RMS
     eng = _ENGINE
     rand = rnd.random
-    sin = math.sin
     w = 2.0 * math.pi * _ENGINE_WOBBLE_HZ / fs
-    f0, wob, inv_fs = _ENGINE_F0, _ENGINE_WOBBLE, 1.0 / fs
-    phase = 0.0                                  # in giri, non in radianti
+    # L'ondeggiare del giri (0,7 Hz) si aggiorna ogni 32 campioni (1,5 ms): a
+    # quella lentezza è inudibile, e risparmia un seno a campione.
+    shift = 5
+    steps = [(_ENGINE_F0 + _ENGINE_WOBBLE * math.sin(w * j)) / fs * size
+             for j in range(0, n, 1 << shift)]
+    phase = 0.0                                  # in posizioni della tabella
     out = [0.0] * n
     for i in range(n):
-        phase += (f0 + wob * sin(w * i)) * inv_fs
-        out[i] = hiss * (2.0 * rand() - 1.0) + eng * table[int(phase * size) & mask]
+        phase += steps[i >> shift]
+        out[i] = hiss * (2.0 * rand() - 1.0) + eng * table[int(phase) & mask]
     return out
+
+
+# Fondo (fruscio + motore) già filtrato, per (frequenza, seed). Dipende solo da
+# quei due e dalla lunghezza: generarlo una volta e tagliarlo è identico a
+# rigenerarlo, e toglie il passaggio più caro alle frasi SAPI5 dopo la prima.
+_BED_CACHE: dict[tuple[int, int], list[float]] = {}
+_BED_MIN_S = 4.0                 # copre quasi ogni frase; la prima chiamata non paga di più
+
+
+def _filtered_bed(n: int, fs: int, seed: int, band) -> list[float]:
+    key = (fs, seed)
+    bed = _BED_CACHE.get(key)
+    if bed is None or len(bed) < n:
+        bed = _cascade(_noise_bed(max(n, int(fs * _BED_MIN_S)), fs, random.Random(seed)), band)
+        if len(_BED_CACHE) >= 4:                 # pochi seed in uso: tetto alla memoria
+            _BED_CACHE.clear()
+        _BED_CACHE[key] = bed
+    return bed
 
 
 def _read_mono(wav_bytes: bytes):
@@ -287,32 +308,35 @@ def radioize_wav(wav_bytes: bytes, *, seed: int = 12345) -> bytes:
     if sig is None or not sig:
         return wav_bytes
 
-    rnd = random.Random(seed)
     band = _band_sections(fs)
 
     sig = [0.0] * int(fs * _PRE_MS / 1000) + sig + [0.0] * int(fs * _POST_MS / 1000)
     sig = _cascade(sig, band)
     sig = _compress_and_drive(sig, fs)
     sig = _codec(sig, fs)
+    sig = [a + b for a, b in zip(sig, _filtered_bed(len(sig), fs, seed, band))]
 
-    bed = _cascade(_noise_bed(len(sig), fs, rnd), band)
-    sig = [a + b for a, b in zip(sig, bed)]
+    # Il livello lo dà la voce: scatto e coda si scalano sul suo picco e restano
+    # sotto. Se lo desse lo scatto (rumore con picchi casuali) la voce uscirebbe
+    # più bassa del filtro di prima, ed è successo nella prima versione.
+    voice_peak = max(map(abs, sig), default=0.0) or 1.0
+    rnd = random.Random(seed + 1)                # diverso dal fondo, sempre deterministico
 
     n_click = int(fs * _CLICK_MS / 1000)
-    k = _CLICK_AMP * _UNIFORM_TO_UNIT_RMS
+    k = _CLICK_REL * voice_peak                  # rumore uniforme: |x| <= k per costruzione
     click = [k * (2.0 * rnd.random() - 1.0) * (1.0 - i / n_click) for i in range(n_click)]
 
     n_tail = int(fs * _TAIL_MS / 1000)
-    tail = _cascade([_UNIFORM_TO_UNIT_RMS * (2.0 * rnd.random() - 1.0) for _ in range(n_tail)],
-                    band)
-    tail = [x * _TAIL_AMP * (1.0 - i / n_tail) ** 1.5 for i, x in enumerate(tail)]
+    tail = _cascade([2.0 * rnd.random() - 1.0 for _ in range(n_tail)], band)
+    t_peak = max(map(abs, tail), default=0.0) or 1.0
+    kt = _TAIL_REL * voice_peak / t_peak
+    tail = [x * kt * (1.0 - i / n_tail) ** 1.5 for i, x in enumerate(tail)]
 
     full = click + sig + tail
 
-    # Normalizza: il campione più forte finisce al picco voluto, mai al fondo
-    # scala. Per costruzione nessun campione supera 0,85: niente clamp a campione.
-    peak = max(map(abs, full), default=1.0) or 1.0
-    g = _TARGET_PEAK / peak * _FULL
+    # Il picco della voce finisce a 0,85 del fondo scala; scatto e coda stanno
+    # sotto per costruzione, quindi niente clamp a campione.
+    g = _TARGET_PEAK / voice_peak * _FULL
     pcm = array("h", [int(x * g) for x in full])
 
     out = io.BytesIO()

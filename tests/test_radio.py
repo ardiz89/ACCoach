@@ -205,3 +205,43 @@ def test_band_filter_response_is_butterworth_420_3000():
     assert abs(gain_db(3000) + 3.0) < 0.5
     assert gain_db(100) < -40
     assert gain_db(6000) < -25
+
+
+def _speech_like(n, fs=_FS):
+    """Ronzio a 140 Hz ricco di armoniche, modulato a sillabe (4 al secondo)."""
+    return [6000 * math.sin(math.pi * 4 * i / fs) ** 2
+            * sum(math.sin(2 * math.pi * 140 * k * i / fs) / k for k in range(1, 21))
+            for i in range(n)]
+
+
+# RMS della voce col filtro di prima (3b4a565) su ``_speech_like(2 * _FS)``,
+# misurato sulla stessa finestra (dopo bip + pausa): il filtro vecchio non c'è
+# più nel codice, il numero resta qui come metro.
+_OLD_VOICE_RMS_DBFS = -18.50
+
+
+def test_voice_at_least_as_loud_as_old_filter():
+    n = 2 * _FS
+    s, *_ = _read(radioize_wav(_wav(_speech_like(n))))
+    voice = s[_LEAD:_LEAD + n]
+    db = 20 * math.log10(_rms(voice) / 32767)
+    assert db >= _OLD_VOICE_RMS_DBFS - 0.5
+
+
+def test_voice_sets_the_level_not_click_or_tail():
+    n = _FS
+    s, *_ = _read(radioize_wav(_wav(_speech_like(n))))
+    voice_peak = max(abs(x) for x in s[_LEAD:_LEAD + n])
+    assert abs(voice_peak - 0.85 * 32767) <= 2
+    assert max(abs(x) for x in s[:_ms(6)]) < voice_peak
+    assert max(abs(x) for x in s[len(s) - _ms(150):]) < voice_peak
+
+
+def test_noise_bed_cache_does_not_change_the_output():
+    from accoach.coaching import radio
+    long_src = _wav(_speech_like(6 * _FS))          # più lunga del fondo minimo
+    radio._BED_CACHE.clear()
+    fresh = radioize_wav(long_src)
+    radio._BED_CACHE.clear()
+    radioize_wav(_wav(_speech_like(_FS // 2)))       # riempie la cache, corta
+    assert radioize_wav(long_src) == fresh           # la cache cresce, stessi byte
