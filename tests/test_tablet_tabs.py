@@ -59,11 +59,21 @@ def test_the_tabs_are_in_the_page_with_their_keys():
 
 
 def test_the_tabs_are_tall_enough_for_a_finger():
+    # Ogni regola su .t-tab, anche quella della vista compatta: e' li' che
+    # l'altezza scende.
     css = (_WEB / "tablet.css").read_text(encoding="utf-8")
-    m = re.search(r"\.t-tab\s*\{([^}]*)\}", css)
-    assert m, "manca la regola .t-tab"
-    h = re.search(r"min-height:\s*(\d+)px", m.group(1))
-    assert h and int(h.group(1)) >= 44
+    blocks = re.findall(r"\.t-tab\s*\{([^}]*)\}", css)
+    heights = [int(h) for b in blocks for h in re.findall(r"min-height:\s*(\d+)px", b)]
+    assert len(heights) >= 2, heights
+    assert min(heights) >= 44, heights
+
+
+def test_the_tabs_are_a_tablist():
+    html = (_WEB / "tablet.html").read_text(encoding="utf-8")
+    assert re.search(r'<div[^>]*class="t-tabs"[^>]*role="tablist"', html)
+    for tid in ("t-tab-track", "t-tab-setup"):
+        m = re.search(r'<button[^>]*id="%s"[^>]*>' % tid, html)
+        assert m and 'role="tab"' in m.group(0), tid
 
 
 # Il DOM finto dei box, fino al primo frame escluso: da qui ogni test fa la sua
@@ -169,3 +179,124 @@ process.stdout.write(JSON.stringify(o));
     assert out["box"]["tab"] == "setup" and out["box"]["mode"] == "box"
     assert out["leave"]["tab"] == "track" and out["leave"]["mark"] != "1"
     assert out["off"] == "off"
+
+
+# Il riquadro del file scritto: resta finche' serve (il nome da caricare ai
+# box), sparisce quando non e' piu' la notizia.
+_WRITTEN = _ON_TRACK + r"""
+function lastReq(path) { var r = find(path); return r[r.length - 1]; }
+function tap(id) { $(id).onclick(); }
+var o = {};
+function writeOnTrack() {
+  window.HoneTablet.render(track);
+  tap("t-tab-setup");
+  reply(lastReq("/api/setup/base"), 200, {car: "mclaren", track: "Imola",
+    setups: [{name: "base", path: "S/base.json", mtime: 1}], base: "S/base.json", last_written: null});
+  window.HoneTablet.render(propose);
+  reply(lastReq("/api/setup/preview"), 200, {ok: true, errors: [], diff: [
+    {group: "Gomme", label: "Pressione", slot: "FL", old_click: 57, new_click: 59,
+     delta: 2, old_phys: "26 psi", new_phys: "26.2 psi"}]});
+  window.HoneTablet.render(propose);
+  tap("t-write");
+  tap("t-confirm-ok");
+}
+// Il riquadro come lo vede il pilota: sulla linguetta Assetto.
+function doneShown() {
+  if ($("tablet").getAttribute("data-tab") !== "setup") tap("t-tab-setup");
+  return !$("t-done").hidden;
+}
+function errShown() {
+  if ($("tablet").getAttribute("data-tab") !== "setup") tap("t-tab-setup");
+  return !$("t-err").hidden;
+}
+var box = JSON.parse(JSON.stringify(propose)); box.at_box = true;
+"""
+
+
+def _written(body):
+    return _run(_WRITTEN + body + "\nprocess.stdout.write(JSON.stringify(o));")
+
+
+def _ok_write():
+    return r"""
+writeOnTrack();
+reply(lastReq("/api/setup/apply"), 200, {name: "HONE_1", reload_hint: "Ho scritto HONE_1."});
+window.HoneTablet.render(propose);
+o.written = doneShown();
+"""
+
+
+@needs_node
+def test_a_file_written_on_track_stays_at_the_box_and_goes_when_you_leave():
+    out = _written(_ok_write() + r"""
+window.HoneTablet.render(box);
+o.atBox = doneShown();
+window.HoneTablet.render(track);
+o.left = doneShown();
+""")
+    assert out == {"written": True, "atBox": True, "left": False}
+
+
+@needs_node
+def test_a_new_proposal_drops_the_written_file():
+    out = _written(_ok_write() + r"""
+var other = JSON.parse(JSON.stringify(propose));
+other.engineer.change[0].delta_clicks = 3;
+window.HoneTablet.render(other);
+o.other = doneShown();
+""")
+    assert out == {"written": True, "other": False}
+
+
+@needs_node
+def test_box_then_off_then_track_drops_the_written_file():
+    out = _written(_ok_write() + r"""
+window.HoneTablet.render(box);
+window.HoneTablet.render({connected: false});
+window.HoneTablet.render(track);
+o.after = doneShown();
+""")
+    assert out == {"written": True, "after": False}
+
+
+@needs_node
+def test_another_car_or_track_drops_the_written_file():
+    out = _written(_ok_write() + r"""
+var monza = JSON.parse(JSON.stringify(propose)); monza.track = "Monza";
+window.HoneTablet.render(monza);
+o.monza = doneShown();
+""")
+    assert out == {"written": True, "monza": False}
+
+
+@needs_node
+def test_a_write_error_goes_when_you_come_back_to_setup():
+    out = _written(r"""
+writeOnTrack();
+reply(lastReq("/api/setup/apply"), 500, {detail: "boom"});
+window.HoneTablet.render(propose);
+o.err = errShown();
+tap("t-tab-track");
+o.back = errShown();
+""")
+    assert out == {"err": True, "back": False}
+
+
+@needs_node
+def test_a_tap_does_not_add_a_pedal_sample():
+    # Il tocco ridisegna col frame che c'era: non e' un campione nuovo.
+    out = _run(_ON_TRACK + r"""
+var cv = $("t-trace"); cv.offsetWidth = 0;
+var pushes = 0, orig = $("tr-thr");
+var val = "";
+Object.defineProperty(orig, "textContent", {get: function () { return val; },
+  set: function (v) { pushes++; val = v; }});
+var pedals = JSON.parse(JSON.stringify(track));
+pedals.throttle = 0.5; pedals.brake = 0; pedals.steer = 0;
+window.HoneTablet.render(pedals);
+var a = pushes;
+$("t-tab-setup").onclick();
+$("t-tab-track").onclick();
+process.stdout.write(JSON.stringify({first: a, afterTaps: pushes}));
+""")
+    assert out["afterTaps"] == out["first"]

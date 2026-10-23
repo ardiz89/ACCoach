@@ -450,11 +450,18 @@
   function boxFrame(st, m, tab) {
     var atBox = m !== "off" && !!st.at_box;
     // Riparti dai box: il file scritto e l'errore erano di quella sosta.
-    if (wasAtBox && !atBox && m !== "off") { bx.done = null; bx.err = ""; }
-    wasAtBox = atBox;
+    // Spento non conta come partenza ne' come sosta: box, spento, pista e'
+    // ripartire lo stesso.
+    if (m !== "off") {
+      if (wasAtBox && !atBox) { bx.done = null; bx.err = ""; }
+      wasAtBox = atBox;
+    }
     var on = m !== "off" && (tab === "setup" || atBox);
     var entering = on && !bxOn;
     bxOn = on;
+    // L'errore di una scrittura non resta per la prossima volta che apri
+    // Assetto; il file scritto si' (e' il nome da caricare ai box).
+    if (entering) bx.err = "";
     if (!on) {
       // Lasci Assetto: la conferma aperta non resta per la prossima volta.
       // Una scrittura gia' partita invece finisce, e avvisa il motore lo stesso.
@@ -470,6 +477,8 @@
     if (combo !== bx.combo) {
       bx.combo = combo; bx.car = car; bx.track = track;
       bx.chosen = null; bx.base = null;
+      // Il file scritto e l'errore erano di un'altra auto o pista.
+      bx.done = null; bx.err = "";
       fillSelect();
       loadBase();
     } else if (entering) {
@@ -605,6 +614,7 @@
   var last = null;
   var tabPrev = null;           // {tab, atBox} del frame prima, per pickTab
   var tabTapped = null;         // la linguetta toccata, consumata dal frame dopo
+  var tapping = false;          // il ridisegno di un tocco: non e' un frame nuovo
 
   function setAttr(el, k, v) { if (el.getAttribute(k) !== v) el.setAttribute(k, v); }
 
@@ -643,7 +653,9 @@
     $("t-abs").textContent = aid(st.aids && st.aids.abs);
     $("t-map").textContent = aid(st.aids && st.aids.engine_map);
     renderTyres(st.tyres);
-    tracePush(st);
+    // Il ridisegno di un tocco rifa' l'ultimo frame: un campione in piu' dei
+    // pedali, con l'ora di adesso, sarebbe inventato.
+    if (!tapping) tracePush(st);
     renderPhase(eng);
     renderAv(eng);
     renderCall(eng, m);
@@ -680,7 +692,9 @@
   // aspetta il prossimo dal motore.
   function tapTab(tab) {
     tabTapped = tab;
-    if (last) render(last);
+    if (!last) return;
+    tapping = true;
+    try { render(last); } finally { tapping = false; }
   }
 
   function boot() {
