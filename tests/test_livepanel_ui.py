@@ -957,3 +957,19 @@ def test_the_best_lap_keeps_the_game_format_in_italian(env):
     panel.render_state(_states()["driving"])
     text = _joined(panel)
     assert "1:41.882" in text and "1:41,882" not in text
+
+
+def test_after_the_game_closes_driving_still_shows_the_laps(env):
+    """Le regole di `LiveTracker` fino al disegno: nei 60 s dopo la chiusura di
+    ACC la vista di guida non torna a «nessun giro ancora»."""
+    from accoach.i18n import t
+    from accoach.livepanel import Health, LiveTracker
+    _win, panel, _net, _tmp = env
+    tr = LiveTracker()
+    tr.feed(Health(True, CAR, "Spa", 4, 4, "2:25.280", 0), 0.0, True)
+    st = tr.feed(Health(False, None, None, None, 0, None, 0), 10.0, True)
+    assert st.phase == "driving"
+    panel.render_state(st)
+    text = _joined(panel)
+    assert t("live.no_lap_yet") not in text
+    assert "2:25.280" in text and "Spa" in text

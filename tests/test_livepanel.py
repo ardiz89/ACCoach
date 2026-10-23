@@ -246,3 +246,43 @@ def test_a_new_run_forgets_the_combo():
     assert t.feed(None, 4.0, False).phase == "idle"
     s = t.feed(H(False), 6.0, True)
     assert (s.car, s.track, s.saved_laps) == (None, None, None)
+
+
+def test_closing_the_game_does_not_forget_laps_and_best():
+    # Il motore col gioco chiuso dice completed=0 e best "--" (-> None): nei
+    # 60 s prima di «finished», e dopo «Resto in pista», la vista di guida
+    # diceva «Spa · 720S — nessun giro ancora».
+    t = LiveTracker()
+    t.feed(H(True, laps_done=4, best="2:25.280", **SPA), 0.0, True)
+    s = t.feed(H(False, laps_done=0, best=None), 10.0, True)
+    assert s.phase == "driving"
+    assert (s.laps_done, s.best) == (4, "2:25.280")
+    # un frame collegato senza tempo non cancella il migliore; uno nuovo vince
+    s = t.feed(H(True, laps_done=5, best=None, **SPA), 12.0, True)
+    assert (s.laps_done, s.best) == (5, "2:25.280")
+    s = t.feed(H(True, laps_done=6, best="2:24.900", **SPA), 14.0, True)
+    assert (s.laps_done, s.best) == (6, "2:24.900")
+    # un motore che riparte sulla stessa combo conta da 0: i giri restano
+    s = t.feed(H(True, laps_done=0, **SPA), 15.0, True)
+    assert s.laps_done == 6
+    # scollegato: non dice niente del giro, anche se porta un tempo
+    s = t.feed(H(False, laps_done=0, best="9:99.999"), 16.0, True)
+    assert (s.laps_done, s.best) == (6, "2:24.900")
+
+
+def test_another_combo_in_the_same_run_has_its_own_laps_and_best():
+    t = LiveTracker()
+    t.feed(H(True, laps_done=7, best="2:25.280", **SPA), 0.0, True)
+    s = t.feed(H(True, car="c2", track="Imola", laps_done=0), 2.0, True)
+    assert (s.laps_done, s.best) == (0, None)
+    s = t.feed(H(True, car="c2", track="Imola", laps_done=1, best="1:41.882"),
+               4.0, True)
+    assert (s.laps_done, s.best) == (1, "1:41.882")
+
+
+def test_a_new_run_forgets_laps_and_best():
+    t = LiveTracker()
+    t.feed(H(True, laps_done=4, best="2:25.280", **SPA), 0.0, True)
+    assert t.feed(None, 2.0, False).phase == "idle"
+    s = t.feed(H(False), 4.0, True)
+    assert (s.laps_done, s.best) == (None, None)

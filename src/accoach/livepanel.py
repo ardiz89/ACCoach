@@ -98,6 +98,11 @@ class LiveTracker:
         self._car: str | None = None
         self._track: str | None = None
         self._saved: int | None = None
+        # Lo stesso per giri fatti e migliore: col gioco chiuso il motore dice
+        # completed=0 e nessun tempo, e la vista di guida dei 60 s prima di
+        # «finished» (o dopo «Resto in pista») diceva «nessun giro ancora».
+        self._laps: int | None = None
+        self._best: str | None = None
 
     def begin(self, now: float) -> None:
         """La corsa parte adesso: da qui contano i STARTING_S dell'avvio (senza,
@@ -133,13 +138,24 @@ class LiveTracker:
             self._last = health
             if health.connected is not False:
                 # Solo una risposta non scollegata dice quale combo si guida.
+                # Un'altra combo nella stessa corsa ha giri e migliore suoi.
+                if ((health.car and health.car != self._car)
+                        or (health.track and health.track != self._track)):
+                    self._laps = self._best = None
                 if health.car:
                     self._car = health.car
                 if health.track:
                     self._track = health.track
+                if health.laps_done is not None:
+                    self._laps = (health.laps_done if self._laps is None
+                                  else max(self._laps, health.laps_done))
+                if health.best:
+                    self._best = health.best
             if health.saved_laps is not None:
                 # Il piu' alto della corsa: un motore che riparte conta da 0,
-                # ma i giri che aveva salvato restano sul disco.
+                # ma i giri che aveva salvato restano sul disco. Il massimo
+                # attraversa anche un cambio di combo nella stessa corsa: serve
+                # solo a `_has_laps`, quindi non fa danni.
                 self._saved = (health.saved_laps if self._saved is None
                                else max(self._saved, health.saved_laps))
             if health.connected is True:
@@ -167,7 +183,6 @@ class LiveTracker:
         else:
             phase = "driving"
 
-        h = self._last
         return PanelState(
             phase=phase,
             tablet_done=self._tablet_done,
@@ -175,8 +190,8 @@ class LiveTracker:
             car=self._car,
             track=self._track,
             saved_laps=self._saved,
-            laps_done=h.laps_done if h else None,
-            best=h.best if h else None,
+            laps_done=self._laps,
+            best=self._best,
         )
 
 
