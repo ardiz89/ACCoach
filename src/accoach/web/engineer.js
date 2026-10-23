@@ -1548,7 +1548,7 @@ function onWsClose() {
   // capire se il coach è acceso.
   // Rifiutato al giro prima: si ridice il QR, non si fa lampeggiare «offline»
   // ogni 3 s in attesa della risposta di `probeKey`.
-  $("live-text").textContent = t(keyRefused ? "lan.fromQr" : "live.offline");
+  $("live-text").textContent = offlineText();
   // Senza motore non c'e' un ultimo frame da fidarsi: se restasse quello «in
   // pista», i bottoni resterebbero spenti per sempre proprio col gioco chiuso,
   // il caso in cui scrivere un assetto deve restare possibile.
@@ -1562,17 +1562,23 @@ function onWsClose() {
 // perche' non lo dice: lo si chiede alla 8777 con una fetch. Un 401 e' la
 // chiave che manca, e il distintivo dice del QR invece di «offline».
 let keyRefused = false;
+let noKey = false;   // 503: il PC non ha potuto salvare la chiave
+function offlineText() {
+  return t(keyRefused ? "lan.fromQr" : noKey ? "lan.noKey" : "live.offline");
+}
 function probeKey() {
   fetch(liveUrl(`http://${location.hostname}:${WS_PORT}/health`))
     .then((r) => {
       keyRefused = !!(r && r.status === 401);
+      noKey = !!(r && r.status === 503);
       if (state.lastLive && !state.lastLive.connected) {
-        $("live-text").textContent = t(keyRefused ? "lan.fromQr" : "live.offline");
+        $("live-text").textContent = offlineText();
       }
     })
     .catch(() => {
       // motore spento: «offline»
       keyRefused = false;
+      noKey = false;
       if (state.lastLive && !state.lastLive.connected) $("live-text").textContent = t("live.offline");
     });
 }

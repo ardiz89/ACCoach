@@ -256,11 +256,11 @@ _UI: dict[str, dict[str, str]] = {
     # La chiave sta in Documenti\ACCoach: con l'Accesso controllato alle
     # cartelle di Windows non si crea, e un QR senza chiave porta al 401.
     "mob.no_key": {"en": "HONE can't save the network key in its folder, so "
-                         "there's no code. Check that Windows isn't blocking "
-                         "the Documents folder.",
+                         "there's no code. Windows may be blocking the "
+                         "Documents folder.",
                    "it": "HONE non riesce a salvare la chiave di rete nella sua "
-                         "cartella, quindi il codice non c'è. Controlla che "
-                         "Windows non blocchi la cartella Documenti."},
+                         "cartella, quindi il codice non c'è. Forse Windows "
+                         "blocca la cartella Documenti."},
     "mob.off": {"en": "Turn on the option above to open these pages from your phone.",
                 "it": "Attiva l'opzione qui sopra per aprire le pagine dal telefono."},
     "mob.no_ip": {"en": "No network address found. Connect this PC to Wi-Fi or "

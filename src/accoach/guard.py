@@ -49,6 +49,10 @@ QUERY = "k"
 # quello del circuito): gli indirizzi si ricalcolano, ma non a ogni richiesta,
 # perche' `gethostbyname_ex` puo' metterci secondi con una VPN di mezzo.
 _TTL_S = 30.0
+# Una chiave che non si crea o non si legge si riprova dopo un minuto, non a
+# ogni richiesta: con l'Accesso controllato alle cartelle ogni tentativo e' una
+# notifica di Defender, e le richieste del PC passano lo stesso.
+_RIPROVA_S = 60.0
 _SAFE = frozenset({"GET", "HEAD", "OPTIONS"})
 _MAX_AGE = 31536000   # un anno: il segnalibro sul tablet deve reggere
 
@@ -136,6 +140,20 @@ def lan_key() -> str:
     cached = _cache.get(("key", str(path)))
     if cached:
         return cached
+    fallito = _cache.get(("errore", str(path)))
+    if fallito is not None:
+        quando, errore = fallito
+        if time.monotonic() - quando < _RIPROVA_S:
+            raise errore
+        del _cache[("errore", str(path))]
+    try:
+        return _crea_o_leggi(path)
+    except OSError as e:
+        _cache[("errore", str(path))] = (time.monotonic(), e)
+        raise
+
+
+def _crea_o_leggi(path: Path) -> str:
     key = _valida(_leggi(path))
     for _ in range(5):
         if key:
@@ -150,15 +168,16 @@ def lan_key() -> str:
             except PermissionError:
                 pass   # l'altro lo sta leggendo o scrivendo: si riprova
             else:
-                if _valida(_leggi(via)):
+                try:
+                    spostata = _valida(_leggi(via))
+                except OSError:
+                    # Non si legge ora: non si sa cosa c'e' dentro, quindi non
+                    # si butta. Torna al suo posto e si riprova fra un minuto.
+                    _rimetti(via, path)
+                    raise
+                if spostata:
                     # Era la chiave appena scritta dall'altro: torna al suo posto.
-                    try:
-                        os.link(via, path)
-                    except FileExistsError:
-                        pass
-                    except OSError:
-                        if not path.exists():
-                            os.replace(via, path)
+                    _rimetti(via, path)
                 _togli(via)
             key = _valida(_leggi(path))
             continue
@@ -184,6 +203,18 @@ def lan_key() -> str:
     return key
 
 
+def _rimetti(via: Path, path: Path) -> None:
+    """Riporta ``via`` al nome vero, senza sovrascrivere una chiave arrivata dopo."""
+    try:
+        os.link(via, path)
+    except FileExistsError:
+        pass
+    except OSError:
+        if not path.exists():
+            os.replace(via, path)
+    _togli(via)
+
+
 def _togli(path: Path) -> None:
     try:
         path.unlink()
@@ -192,9 +223,15 @@ def _togli(path: Path) -> None:
 
 
 def _leggi(path: Path) -> str:
+    """Il contenuto, ``""`` se il file non c'e'. Ogni altro ``OSError`` risale.
+
+    Un file valido che l'antivirus o il backup tengono aperti per un attimo non
+    e' un file rovinato: leggerlo come vuoto lo farebbe spostare via, e il
+    tablet perderebbe la chiave del segnalibro.
+    """
     try:
         return path.read_text(encoding="utf-8").strip()
-    except OSError:
+    except FileNotFoundError:
         return ""
 
 

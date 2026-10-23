@@ -27,6 +27,8 @@
     // richiesta rifiutata per la chiave diceva «Unauthorized», o niente.
     "lan.fromQr":      { en: `Open HONE from the hub's QR code.`,
                          it: `Apri HONE dal codice QR dell'hub.` },
+    "lan.noKey":       { en: `HONE can't save the network key on the PC. Check that Windows isn't blocking the Documents folder.`,
+                         it: `HONE non riesce a salvare la chiave di rete sul PC. Controlla che Windows non blocchi la cartella Documenti.` },
     "nav.guide":       { en: `Guide`, it: `Guida` },
     // Buttons of the coachmark overlay itself (tour.js reads these directly).
     "tour.btn.skip":   { en: `Skip`, it: `Salta` },

@@ -770,8 +770,9 @@
     boxFrame(st, m, tab);
     if (m === "off") {
       var wait = offKey(st) === "tablet.waiting";
-      setHidden($("t-off-closed"), wait || keyRefused);
+      setHidden($("t-off-closed"), wait || keyRefused || noKey);
       setHidden($("t-off-key"), wait || !keyRefused);
+      setHidden($("t-off-pc"), wait || !noKey);
       setHidden($("t-off-wait"), !wait);
       traceReset();
       return;
@@ -807,12 +808,15 @@
   // Un WebSocket rifiutato dal guardiano si chiude come un motore spento, e il
   // perche' non lo dice. Lo si chiede alla 8777 con una richiesta normale: un
   // 401 e' la chiave che manca, e la schermata dice del QR invece di «coach
-  // spento». Motore spento (nessuna risposta) resta «coach spento».
+  // spento». Un 503 e' il PC che non ha potuto salvare la chiave, e lo dice.
+  // Motore spento (nessuna risposta) resta «coach spento».
   var keyRefused = false;
+  var noKey = false;
   function probeKey() {
     xhr("GET", liveUrl("http://" + location.hostname + ":" + WS_PORT + "/health"), null,
         function (err) {
           keyRefused = !!(err && err.status === 401);
+          noKey = !!(err && err.status === 503);
           if (!last) render(null);
         });
   }
@@ -823,6 +827,7 @@
     catch (e) { setTimeout(connect, 3000); return; }
     ws.onmessage = function (ev) {
       keyRefused = false;
+      noKey = false;
       try { render(JSON.parse(ev.data)); } catch (e) { logOnce(e); }
     };
     // Il motore spento o riavviato: la schermata lo dice e si ricollega da sola.

@@ -58,10 +58,10 @@ var changesPayload = () => [{ param: "a", slot: null, delta_clicks: 1 }];
 var nextAutoName = () => "HONE_1";
 var onComboChange = async () => {};
 var showToast = () => {};
-var setTimeout = () => {}, connectWS = () => {}, keyRefused = false;
+var setTimeout = () => {}, connectWS = () => {}, keyRefused = false, noKey = false;
 var showModalError = (m) => { els["modal-error"] = { textContent: m }; };
 for (const f of ["liveRefused", "inPista", "writeLocked", "paintWriteLock", "afterWrite", "applyNow",
-                 "confirmWrite", "confirmRestored", "confirmAvDone", "onWsClose", "probeKey"]) {
+                 "confirmWrite", "confirmRestored", "confirmAvDone", "onWsClose", "probeKey", "offlineText"]) {
   eval(grab(f));
 }
 (async () => {
@@ -193,8 +193,8 @@ const asked = [];
 var fetch = (url) => { asked.push(url); return status === "off"
   ? Promise.reject(new Error("off")) : Promise.resolve({ status: Number(status) }); };
 var paintWriteLock = () => {}, setTimeout = () => {}, connectWS = () => {};
-var keyRefused = false;
-for (const name of ["onWsClose", "probeKey"]) {
+var keyRefused = false, noKey = false;
+for (const name of ["onWsClose", "probeKey", "offlineText"]) {
   const i = src.indexOf("function " + name + "(");
   let depth = 0;
   for (let k = src.indexOf("{", i); k < src.length; k++) {
@@ -214,6 +214,8 @@ setImmediate(() => {
 
 @pytest.mark.parametrize("status, text", [
     ("401", "Apri HONE dal codice QR dell'hub."),
+    ("503", "HONE non riesce a salvare la chiave di rete sul PC. Controlla che "
+            "Windows non blocchi la cartella Documenti."),
     ("off", "telemetria offline"),
 ])
 def test_a_websocket_refused_for_the_key_says_so_on_the_badge(tmp_path, status, text):

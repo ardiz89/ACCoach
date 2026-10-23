@@ -580,3 +580,48 @@ def test_le_pagine_della_8778_non_mettono_cors_sui_rifiuti(tmp_path):
         r = c.get("/", headers={"Origin": pagina})
         assert r.status_code == 401
         assert "access-control-allow-origin" not in r.headers
+
+
+def test_una_chiave_che_non_si_crea_non_si_ritenta_a_ogni_richiesta(
+        chiave_impossibile, monkeypatch):
+    # Con l'Accesso controllato alle cartelle ogni tentativo di scrivere e' una
+    # notifica di Defender: tre richieste del tablet, un solo tentativo.
+    tentativi = []
+    vero_mkdir = type(guard.key_path().parent).mkdir
+
+    def conta(self, *a, **k):
+        tentativi.append(1)
+        return vero_mkdir(self, *a, **k)
+
+    monkeypatch.setattr(type(guard.key_path().parent), "mkdir", conta)
+    ora = [1000.0]
+    monkeypatch.setattr(guard.time, "monotonic", lambda: ora[0])
+    guard._dimentica()
+    for _ in range(3):
+        with pytest.raises(OSError):
+            guard.lan_key()
+    assert len(tentativi) == 1
+    ora[0] += guard._RIPROVA_S + 1   # passato il minuto, si riprova
+    with pytest.raises(OSError):
+        guard.lan_key()
+    assert len(tentativi) == 2
+
+
+def test_una_chiave_valida_che_non_si_legge_per_un_attimo_non_si_cambia(monkeypatch):
+    key = guard.lan_key()
+    guard._dimentica()
+    vero = type(guard.key_path()).read_text
+    una_volta = [True]
+
+    def occupato(self, *a, **k):
+        if una_volta[0] and self.name == "lan-key.txt":
+            una_volta[0] = False
+            raise PermissionError("antivirus")
+        return vero(self, *a, **k)
+
+    monkeypatch.setattr(type(guard.key_path()), "read_text", occupato)
+    with pytest.raises(OSError):
+        guard.lan_key()
+    assert guard.key_path().read_text(encoding="utf-8").strip() == key
+    guard._dimentica()
+    assert guard.lan_key() == key

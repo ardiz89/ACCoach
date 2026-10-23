@@ -296,17 +296,21 @@ lastWs.onclose();
 var probe = find(":8777/health");
 """ + answer + r"""
 process.stdout.write(JSON.stringify({probes: probe.length,
-  closed: $("t-off-closed").hidden, key: $("t-off-key").hidden}));
+  closed: $("t-off-closed").hidden, key: $("t-off-key").hidden,
+  pc: $("t-off-pc").hidden}));
 """
 
 
 @needs_node
 @pytest.mark.parametrize("answer, expected", [
     ("probe[0].readyState = 4; probe[0].status = 401; probe[0].responseText = '<p>x</p>';"
-     " probe[0].onreadystatechange();", {"closed": True, "key": False}),
+     " probe[0].onreadystatechange();", {"closed": True, "key": False, "pc": True}),
     # Motore spento: nessuna risposta (status 0), resta «coach spento».
     ("probe[0].readyState = 4; probe[0].status = 0; probe[0].onreadystatechange();",
-     {"closed": False, "key": True}),
+     {"closed": False, "key": True, "pc": True}),
+    # 503: il PC non ha potuto salvare la chiave, e non e' «coach spento».
+    ("probe[0].readyState = 4; probe[0].status = 503; probe[0].responseText = '<p>x</p>';"
+     " probe[0].onreadystatechange();", {"closed": True, "key": True, "pc": False}),
 ])
 def test_a_websocket_refused_for_the_key_says_open_from_the_qr(answer, expected):
     r = subprocess.run([_NODE, "-e", _ws_closed_js(answer), str(_WEB / "i18n.js"),
