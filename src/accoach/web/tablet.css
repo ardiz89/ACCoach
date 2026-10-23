@@ -54,14 +54,15 @@ body {
   padding: 6px 12px;
 }
 
-/* Chi si vede in ogni stato. Il resto e' spento. */
+/* Chi si vede in ogni stato e linguetta. Il resto e' spento. Spento, si
+   vede solo la frase: le linguette non avrebbero niente da mostrare. */
 .t-off, .t-call, .t-track, .t-box { display: none; }
 .tablet[data-mode="off"] .t-off { display: block; }
-.tablet[data-mode="off"] .t-phase { display: none; }
-/* In pista la telemetria e' una colonna che prende lo spazio rimasto: a
+.tablet[data-mode="off"] .t-phase,
+.tablet[data-mode="off"] .t-tabs { display: none; }
+/* Su Telemetria la telemetria e' una colonna che prende lo spazio rimasto: a
    cedere quando manca e' la striscia dei pedali, non la velocita'. */
-.tablet[data-mode="track"] .t-track,
-.tablet[data-mode="call"] .t-track {
+.tablet[data-tab="track"]:not([data-mode="off"]) .t-track {
   display: -webkit-flex;
   display: flex;
   -webkit-flex-direction: column;
@@ -70,8 +71,46 @@ body {
   flex: 1 1 auto;
   min-height: 0;
 }
-.tablet[data-mode="call"] .t-call { display: block; }
-.tablet[data-mode="box"] .t-box { display: block; }
+.tablet[data-tab="track"][data-mode="call"] .t-call { display: block; }
+.tablet[data-tab="setup"]:not([data-mode="off"]) .t-box { display: block; }
+
+/* ---- le linguette ------------------------------------------------------ */
+.t-tabs {
+  -webkit-flex: 0 0 auto;
+  flex: 0 0 auto;
+  display: -webkit-flex;
+  display: flex;
+  margin-bottom: 10px;
+}
+/* Alte per il dito, come i bottoni. */
+.t-tab {
+  -webkit-flex: 1 1 0;
+  flex: 1 1 0;
+  min-height: 48px;
+  margin-right: 8px;
+  padding: 6px 12px;
+  font: inherit;
+  font-size: 20px;
+  font-weight: 700;
+  color: #8A95A3;
+  background: #151A21;
+  border: 1px solid #232B35;
+  border-radius: 8px;
+  -webkit-appearance: none;
+}
+.t-tab:last-child { margin-right: 0; }
+.t-tab[aria-selected="true"] { color: #E8EDF2; border-color: #22D3CE; }
+/* Il segno su Assetto: una modifica da fare ai box. */
+.t-tab[data-mark="1"]:after {
+  content: "";
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  margin-left: 10px;
+  border-radius: 6px;
+  background: #FFB020;
+  vertical-align: middle;
+}
 
 /* ---- spento ---------------------------------------------------------- */
 .t-off {
@@ -91,6 +130,7 @@ body {
   border-radius: 10px;
   padding: 16px 20px;
   margin-bottom: 12px;
+  cursor: pointer;
 }
 .t-call-msg { font-size: 40px; font-weight: 700; line-height: 1.15; }
 .t-call-why { font-size: 20px; line-height: 1.3; margin-top: 6px; }
@@ -277,13 +317,13 @@ body {
   font-size: 20px;
   line-height: 1.35;
 }
-.tablet[data-mode="box"] .t-phase { margin-top: 0; font-size: 24px; }
+.tablet[data-tab="setup"] .t-phase { margin-top: 0; font-size: 24px; }
 
-/* ---- ai box --------------------------------------------------------------
+/* ---- Assetto -------------------------------------------------------------
    La schermata sta nell'altezza della vista; se le leve sono tante scorre solo
    lei, non la pagina (la fase sopra resta dov'e'). */
 .t-box { margin-top: 12px; }
-.tablet[data-mode="box"] .t-box {
+.tablet[data-tab="setup"]:not([data-mode="off"]) .t-box {
   -webkit-flex: 1 1 auto;
   flex: 1 1 auto;
   min-height: 0;
@@ -387,6 +427,8 @@ body {
 @media (orientation: landscape) and (max-height: 720px),
        (orientation: portrait) and (max-height: 980px) {
   .tablet { padding: 8px 16px; }
+  .t-tabs { margin-bottom: 6px; }
+  .t-tab { min-height: 44px; padding: 4px 12px; }
   .t-call { padding: 10px 16px; margin-bottom: 8px; }
   .t-call-msg { font-size: 30px; }
   .t-call-why { font-size: 18px; margin-top: 2px; }

@@ -10,9 +10,16 @@
 </head>
 <body>
   <!-- La vista per il tablet accanto al volante (iPad 3, Safari 9). Quale
-       parte si vede la decide `data-mode`, che tablet.js riscrive a ogni frame:
-       off, track, call (avviso di rientro, sopra la telemetria), box. -->
-  <div id="tablet" class="tablet" data-mode="off">
+       parte si vede la decidono `data-mode`, che tablet.js riscrive a ogni
+       frame (off, track, call, box), e `data-tab`, la linguetta: track
+       (la telemetria, con l'avviso di rientro sopra) o setup (l'assetto). -->
+  <div id="tablet" class="tablet" data-mode="off" data-tab="track">
+    <!-- Le linguette: le cambia lo stato ai box, e il dito. -->
+    <div class="t-tabs">
+      <button type="button" id="t-tab-track" class="t-tab" aria-selected="true" data-i18n="tablet.tab.track">Telemetry</button>
+      <button type="button" id="t-tab-setup" class="t-tab" aria-selected="false" data-i18n="tablet.tab.setup">Setup</button>
+    </div>
+
     <!-- Spento: il motore non risponde, oppure risponde ma il gioco tace. -->
     <div id="t-off" class="t-off">
       <span id="t-off-closed" data-i18n="tablet.off">The coach isn't running. This page reconnects by itself.</span>
@@ -75,7 +82,7 @@
 
     <div id="t-phase" class="t-phase" hidden></div>
 
-    <!-- La schermata dei box, sotto la fase: la modifica, il file su cui si
+    <!-- La schermata Assetto, sotto la fase, in pista e ai box: la modifica, il file su cui si
          somma, il bottone che la scrive e la conferma. Gli elementi ci sono
          sempre e tablet.js li accende: a 15 frame al secondo non si rifanno la
          tendina e la conferma che il dito sta toccando. -->

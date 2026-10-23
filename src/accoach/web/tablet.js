@@ -4,9 +4,11 @@
 // freccia, fetch, e nessun `.forEach` (su Safari 9 la NodeList non ce l'ha, e
 // qui non si rischia: solo cicli `for`). Il controllo sta in tests/safari9.py.
 //
-// La schermata cambia da sola a ogni frame dal vivo (`mode`): spento, in
-// pista, avviso di rientro, fermo ai box. Le regole sono quelle che il motore
-// e la pagina completa usano gia'; qui non se ne inventano.
+// Lo stato si legge a ogni frame dal vivo (`mode`): spento, in pista, avviso
+// di rientro, fermo ai box. Le regole sono quelle che il motore e la pagina
+// completa usano gia'; qui non se ne inventano. Acceso, si vede una delle due
+// linguette, Telemetria o Assetto (`pickTab`): la sceglie lo stato ai box, e
+// il pilota col dito.
 (function () {
   var WS_PORT = 8777;            // il motore dal vivo; la pagina sta sulla 8778
 
@@ -41,6 +43,20 @@
     if (!st || !st.connected) return "off";
     if (st.at_box) return "box";
     return boxChange(st.engineer) ? "call" : "track";
+  }
+
+  // La linguetta: Telemetria («track») o Assetto («setup»). Il cambio e'
+  // automatico solo quando cambia lo stato ai box: fermo ai box apre Assetto,
+  // ripartire torna a Telemetria. Un tocco del pilota vale fino al prossimo di
+  // questi cambi, cosi' il frame dopo (15 al secondo) non gli toglie la
+  // schermata, e la vista non resta su Assetto quando riparte.
+  // `prev` = {tab, atBox} del frame prima, `manual` = la linguetta toccata in
+  // questo giro o null.
+  function pickTab(prev, st, manual) {
+    var atBox = !!(st && st.at_box);
+    if (manual === "track" || manual === "setup") return manual;
+    if (!prev || atBox !== !!prev.atBox) return atBox ? "setup" : "track";
+    return prev.tab;
   }
 
   // Spento ha due facce. Senza frame (il socket chiuso, o mai aperto) il
@@ -125,7 +141,7 @@
 
   function traceDraw(t1) {
     var cv = $("t-trace");
-    // Nascosta (ai box): la storia intanto si aggiorna.
+    // Nascosta (su Assetto): la storia intanto si aggiorna.
     if (!cv || !cv.offsetWidth) return;
     var dpr = window.devicePixelRatio || 1;
     var w = cv.offsetWidth, h = cv.offsetHeight;
@@ -302,13 +318,17 @@
     baseSeq: 0, base: null, baseErr: "",
     chosen: null,         // il file scelto dalla tendina; null = quello del server
     pvKey: null, pvSeq: 0, pvChanges: null, preview: null, pvErr: "",
-    confirm: null,        // {key, path, name, changes}: cio' che la conferma nomina
+    confirm: null,        // {key, path, name, changes, av}: cio' che la conferma nomina
     writing: false,
-    done: null,           // {name, hint} dopo una scrittura, fino a che riparti
+    done: null,           // {name, hint, key} dopo una scrittura, fino a che riparti
     err: "",
     restoredKey: null     // avKey del ripristino su cui hai toccato «L'ho gia' rimesso»
   };
-  var lastMode = "off";
+  // La schermata Assetto lavora (chiede base e anteprima, si dipinge) quando
+  // la linguetta e' Assetto, o quando sei fermo ai box anche su Telemetria:
+  // tornando su Assetto la modifica e' gia' pronta.
+  var bxOn = false;
+  var wasAtBox = false;
 
   function setText(el, s) { if (el.textContent !== s) el.textContent = s; }
   function setHidden(el, h) { if (el.hidden !== h) el.hidden = h; }
@@ -424,18 +444,27 @@
     }
   }
 
-  // Le regole, a ogni frame in box: chiedere la base entrando o se cambiano
-  // auto e pista, l'anteprima se cambiano file o leve. Poi si dipinge.
-  function boxFrame(st, m) {
-    var entering = m === "box" && lastMode !== "box";
-    lastMode = m;
-    if (m !== "box") {
-      // Riparti: la conferma aperta non resta per la prossima sosta. Una
-      // scrittura gia' partita invece finisce, e avvisa il motore lo stesso.
+  // Le regole, a ogni frame: chiedere la base entrando in Assetto (o ai box) o
+  // se cambiano auto e pista, l'anteprima se cambiano file o leve. Poi si
+  // dipinge.
+  function boxFrame(st, m, tab) {
+    var atBox = m !== "off" && !!st.at_box;
+    // Riparti dai box: il file scritto e l'errore erano di quella sosta.
+    if (wasAtBox && !atBox && m !== "off") { bx.done = null; bx.err = ""; }
+    wasAtBox = atBox;
+    var on = m !== "off" && (tab === "setup" || atBox);
+    var entering = on && !bxOn;
+    bxOn = on;
+    if (!on) {
+      // Lasci Assetto: la conferma aperta non resta per la prossima volta.
+      // Una scrittura gia' partita invece finisce, e avvisa il motore lo stesso.
       if (!bx.writing) bx.confirm = null;
       return;
     }
-    if (entering) { bx.done = null; bx.err = ""; }
+    var eng = st.engineer || null;
+    // Una proposta nuova: il file scritto per quella di prima non e' piu'
+    // la notizia.
+    if (bx.done && boxChange(eng) && avKey(eng) !== bx.done.key) bx.done = null;
     var car = String(st.car || ""), track = String(st.track || "");
     var combo = car + "|" + track;
     if (combo !== bx.combo) {
@@ -446,7 +475,6 @@
     } else if (entering) {
       loadBase();
     }
-    var eng = st.engineer || null;
     var changes = boxChange(eng) ? changesFor(eng) : [];
     var path = basePath();
     var key = changes.length && path ? path + "\n" + JSON.stringify(changes) : null;
@@ -462,7 +490,7 @@
   }
 
   function paintBox() {
-    if (lastMode !== "box") return;
+    if (!bxOn) return;
     var eng = (last && last.engineer) || null;
     var has = boxChange(eng);
     var restore = has && eng.kind === "reverted";
@@ -512,7 +540,7 @@
   function openConfirm() {
     if (!bx.preview || !bx.preview.ok || bx.writing || !basePath()) return;
     bx.confirm = { key: bx.pvKey, path: basePath(), changes: bx.pvChanges,
-                   name: nextName(setupNames()) };
+                   name: nextName(setupNames()), av: avKey(last && last.engineer) };
     bx.err = "";
     $("t-confirm-msg").textContent = tf("tablet.confirm", { name: bx.confirm.name });
     drawLevers($("t-confirm-list"));
@@ -538,7 +566,7 @@
     xhr("POST", "/api/setup/apply",
         { path: c.path, as_name: name, confirm: true, changes: c.changes },
         function (err, res) {
-      if (!err) { afterWrite(res); return; }
+      if (!err) { afterWrite(res, c); return; }
       var taken = err.status === 409 && err.detail.indexOf("already exists") !== -1;
       if (taken && attempt + 1 < 4) {
         writeAttempt(c, "HONE_" + (parseInt(name.split("_").pop(), 10) + 1), attempt + 1);
@@ -554,10 +582,11 @@
   // Come `afterWrite` di engineer.js: si avvisa il motore (se no l'ingegnere
   // ripropone la stessa modifica a ogni giro), e il file appena scritto
   // diventa la base, perche' e' quello che ti dice di caricare.
-  function afterWrite(res) {
+  function afterWrite(res, c) {
     bx.writing = false;
     bx.confirm = null;
-    bx.done = { name: (res && res.name) || "", hint: (res && res.reload_hint) || "" };
+    bx.done = { name: (res && res.name) || "", hint: (res && res.reload_hint) || "",
+                key: c.av };
     bx.chosen = null;
     postApplied();
     loadBase();
@@ -574,12 +603,32 @@
   }
 
   var last = null;
+  var tabPrev = null;           // {tab, atBox} del frame prima, per pickTab
+  var tabTapped = null;         // la linguetta toccata, consumata dal frame dopo
+
+  function setAttr(el, k, v) { if (el.getAttribute(k) !== v) el.setAttribute(k, v); }
+
+  // Le linguette e il segno su Assetto: c'e' una modifica da fare ai box
+  // (con l'avviso di rientro, o gia' fermo).
+  function renderTabs(tab, mark) {
+    setAttr($("t-tab-track"), "aria-selected", tab === "track" ? "true" : "false");
+    setAttr($("t-tab-setup"), "aria-selected", tab === "setup" ? "true" : "false");
+    setAttr($("t-tab-setup"), "data-mark", mark ? "1" : "0");
+  }
 
   function render(st) {
     last = st;
     var m = mode(st);
+    var tab = tabPrev ? tabPrev.tab : "track";
+    if (m !== "off") {
+      tab = pickTab(tabPrev, st, tabTapped);
+      tabPrev = { tab: tab, atBox: !!st.at_box };
+    }
+    tabTapped = null;
     $("tablet").setAttribute("data-mode", m);
-    boxFrame(st, m);
+    $("tablet").setAttribute("data-tab", tab);
+    renderTabs(tab, m !== "off" && (m === "call" || boxChange(st.engineer)));
+    boxFrame(st, m, tab);
     if (m === "off") {
       var wait = offKey(st) === "tablet.waiting";
       setHidden($("t-off-closed"), wait);
@@ -627,7 +676,19 @@
     ws.onerror = function () { try { ws.close(); } catch (e) {} };
   }
 
+  // Il tocco su una linguetta si vede subito, col frame che c'era: non si
+  // aspetta il prossimo dal motore.
+  function tapTab(tab) {
+    tabTapped = tab;
+    if (last) render(last);
+  }
+
   function boot() {
+    $("t-tab-track").onclick = function () { tapTab("track"); };
+    $("t-tab-setup").onclick = function () { tapTab("setup"); };
+    // L'avviso di rientro porta ad Assetto: la modifica si legge prima di
+    // entrare.
+    $("t-call").onclick = function () { tapTab("setup"); };
     $("t-av-done").onclick = function () {
       avTapped = $("t-av-done").getAttribute("data-key");
       $("t-av-done").hidden = true;
@@ -661,7 +722,7 @@
     connect();
   }
 
-  window.HoneTablet = { mode: mode, render: render, callKey: callKey,
+  window.HoneTablet = { mode: mode, pickTab: pickTab, render: render, callKey: callKey,
                         avKey: avKey, avDoneHidden: avDoneHidden,
                         nextName: nextName, changesFor: changesFor,
                         offText: function (st) { return t(offKey(st)); },
