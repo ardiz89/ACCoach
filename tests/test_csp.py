@@ -154,6 +154,27 @@ def test_the_live_backend_is_untouched():
             pass
 
 
+# --- /static non serve le pagine senza CSP --------------------------------------
+# Le pagine stanno nella stessa cartella dei loro file e usano percorsi
+# /static/... assoluti: /static/engineer.html era la pagina intera, senza CSP.
+
+@pytest.mark.parametrize("name", [
+    "engineer.html", "index.html", "tablet.html", "test.html",
+    # Windows: maiuscole, punto finale e flusso NTFS aprono lo stesso file.
+    "ENGINEER.HTML", "engineer.html.", "engineer.html%20", "engineer.html::$DATA",
+])
+def test_static_does_not_serve_pages(client, name):
+    r = client.get("/static/" + name)
+    assert r.status_code == 404, name
+    assert "text/html" not in r.headers.get("content-type", ""), name
+
+
+@pytest.mark.parametrize("name", ["engineer.js", "style.css", "modern.js",
+                                  "test_plan.json", "hone_icon.png"])
+def test_static_still_serves_assets(client, name):
+    assert client.get("/static/" + name).status_code == 200, name
+
+
 # --- i file serviti ------------------------------------------------------------
 
 def _served_files():
@@ -271,5 +292,11 @@ def test_setup_list_normal_names_unchanged(tmp_path):
     r = c.get("/api/setup/list", params={"car": "car_a", "track": "Imola"})
     assert r.status_code == 200
     assert [x["name"] for x in r.json()] == ["base"]
+    # Un nome con spazi e punti (non `.`/`..`) resta un nome qualunque.
+    d = tmp_path / "Setups" / "car_a" / "Red Bull Ring v1.2"
+    d.mkdir(parents=True)
+    (d / "q.json").write_text("{}", encoding="utf-8")
+    r = c.get("/api/setup/list", params={"car": "car_a", "track": "Red Bull Ring v1.2"})
+    assert [x["name"] for x in r.json()] == ["q"]
     # Una combinazione che non c'e' resta una lista vuota, non un errore.
     assert c.get("/api/setup/list", params={"car": "car_b", "track": "Monza"}).json() == []

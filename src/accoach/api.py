@@ -896,6 +896,20 @@ class _RevalidatingStatic(StaticFiles):
     nothing and an unnoticed stale file costs a bug report nobody can reproduce.
     """
 
+    async def get_response(self, path, scope):
+        # Le pagine stanno nella stessa cartella dei loro file e usano percorsi
+        # /static/... assoluti: /static/engineer.html era la pagina intera
+        # *senza* la CSP, cioe' la porta laterale di tutto il Task 4. Le pagine
+        # vere le servono le loro route (`_serve`), qui nessun HTML. Il nome si
+        # guarda come lo vede Windows, che apre lo stesso file anche per
+        # `ENGINEER.HTML`, `engineer.html.` (punti e spazi finali tolti) o
+        # `engineer.html::$DATA` (il flusso NTFS dopo i due punti).
+        name = str(path).split(":", 1)[0].rstrip(". ").lower()
+        if name.endswith((".html", ".htm")):
+            from starlette.exceptions import HTTPException as _StarletteHTTP
+            raise _StarletteHTTP(status_code=404)
+        return await super().get_response(path, scope)
+
     def is_not_modified(self, response_headers, request_headers) -> bool:
         return super().is_not_modified(response_headers, request_headers)
 

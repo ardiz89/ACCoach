@@ -29,7 +29,7 @@ from .labels import (
     tr,
 )
 from .loader import load_any
-from .store import DEFAULT_ROOTS, latest_backup, list_setups, save
+from .store import DEFAULT_ROOTS, car_track_dir, latest_backup, list_setups, save
 
 
 # --- request models --------------------------------------------------------
@@ -282,6 +282,14 @@ def register_setup_routes(app: FastAPI, root=DEFAULT_ROOTS) -> None:
                 raise HTTPException(400, f"invalid name: {name!r}")
         found = []
         for game_root in roots:
+            # Seconda cintura, come `_safe` nelle altre route: la cartella
+            # risolta (link e giunzioni compresi) resta dentro la radice, se no
+            # quella radice si salta invece di elencare altro.
+            try:
+                car_track_dir(car, track, game_root).resolve().relative_to(
+                    Path(game_root).resolve())
+            except (ValueError, OSError):
+                continue
             found += list_setups(car, track, game_root)
         return [{"name": p.stem, "path": str(p), "mtime": p.stat().st_mtime}
                 for p in found]
