@@ -2542,6 +2542,13 @@ def create_api(
         app.mount("/static", _RevalidatingStatic(directory=str(_WEB_DIR)),
                   name="static")
 
+    # Il guardiano per ultimo, cosi' e' il middleware piu' esterno: Host, chiave
+    # per il Wi-Fi e scritture solo JSON valgono per ogni route, anche per i
+    # file statici e per quelle aggiunte domani (vedi `guard`).
+    from .config import load_config
+    from .guard import GuardMiddleware
+    app.add_middleware(GuardMiddleware, page_port=load_config().web.port)
+
     return app
 
 

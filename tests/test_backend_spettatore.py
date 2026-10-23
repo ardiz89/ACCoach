@@ -141,5 +141,5 @@ def test_lo_scritto_sul_setup_arriva_al_motore_anche_da_spettatore():
     m = _MotoreFinto()
     app = create_app(m, hz=60.0, spettatore=True)
     with TestClient(app) as client:
-        assert client.post("/engineer/applied").json() == {"ok": True}
+        assert client.post("/engineer/applied", json={}).json() == {"ok": True}
     assert m.applied == 1

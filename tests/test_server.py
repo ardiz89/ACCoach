@@ -50,14 +50,14 @@ class _EngineWithMark(_StubEngine):
 
 def test_engineer_applied_noop_without_support():
     with TestClient(create_app(engine=_StubEngine(), hz=50)) as client:
-        r = client.post("/engineer/applied")
+        r = client.post("/engineer/applied", json={})
         assert r.status_code == 200 and r.json()["ok"] is False
 
 
 def test_engineer_applied_advances_engine():
     eng = _EngineWithMark()
     with TestClient(create_app(engine=eng, hz=50)) as client:
-        assert client.post("/engineer/applied").json()["ok"] is True
+        assert client.post("/engineer/applied", json={}).json()["ok"] is True
         assert eng.marked is True
 
 

@@ -172,10 +172,22 @@ def create_app(engine: CoachEngine | None = None, hz: float = 15.0, *,
 
     app.state.publish = publish
     # The engineer UI is served from the analysis app (a different local port),
-    # so it talks to this backend cross-origin. It's a local-only tool.
+    # so it talks to this backend cross-origin. Non piu' `*`: qualunque sito
+    # poteva leggere `/health` e scrivere `/engineer/applied` da un browser sul
+    # PC del pilota. Il CORS ammette solo la porta delle pagine; *quale* host
+    # lo decide il guardiano, che conosce i nomi del PC (vedi `guard`).
+    from .config import load_config
+    from .guard import GuardMiddleware
+    page_port = load_config().web.port
     app.add_middleware(
-        CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"],
+        CORSMiddleware,
+        allow_origin_regex=rf"^http://(\[[0-9a-fA-F:.]+\]|[^/:\[\]]+):{page_port}$",
+        allow_methods=["GET", "POST"],
+        allow_headers=["Content-Type", "X-HONE-Key"],
     )
+    # Aggiunto dopo il CORS, quindi lo avvolge: una richiesta da un Host
+    # estraneo non arriva nemmeno a farsi rispondere dal CORS.
+    app.add_middleware(GuardMiddleware, page_port=page_port)
 
     @app.post("/engineer/applied")
     async def engineer_applied() -> dict:

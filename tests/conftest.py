@@ -79,3 +79,29 @@ def _logs_nella_sandbox(tmp_path_factory, monkeypatch):
         if getattr(modulo, "logs_dir", None) is not None:
             monkeypatch.setattr(modulo, "logs_dir", lambda: finta, raising=False)
     yield
+
+
+# --- la chiave del Wi-Fi non si scrive nella casa vera -----------------------
+# Il guardiano dei server (`accoach.guard`) crea `lan-key.txt` in
+# `~/Documents/ACCoach` al primo uso: la suite non deve ne' leggerla ne'
+# crearla, come per config e log. E il `TestClient` si presenta con l'Host
+# `testserver` e il client `testclient`, due nomi che una rete vera non usa: si
+# ammettono qui, delegando per tutto il resto alle funzioni vere, cosi' i test
+# esistenti non devono sapere che c'e' un guardiano e quelli del guardiano
+# simulano gli altri casi con `base_url=` e `client=`.
+@pytest.fixture(autouse=True)
+def _guardiano_da_test(tmp_path_factory, monkeypatch):
+    from accoach import guard as _guard
+
+    chiave = tmp_path_factory.mktemp("guard") / "lan-key.txt"
+    monkeypatch.setattr(_guard, "key_path", lambda: chiave)
+    _guard._dimentica()
+    vere_host = _guard.allowed_hosts
+    vero_locale = _guard.is_local_client
+    monkeypatch.setattr(
+        _guard, "allowed_hosts", lambda: vere_host() | {"testserver"})
+    monkeypatch.setattr(
+        _guard, "is_local_client",
+        lambda ip: ip == "testclient" or vero_locale(ip))
+    yield
+    _guard._dimentica()

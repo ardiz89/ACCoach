@@ -247,7 +247,9 @@ def test_giving_up_on_a_plan_proposes_a_fresh_one(tmp_path):
     c = _seed(tmp_path)
     c.post("/api/plan", json={"car": CAR, "track": TRACK, "goals": _plan(c)["goals"]})
     assert _plan(c)["saved"] is True
-    assert c.delete("/api/plan", params={"car": CAR, "track": TRACK}).status_code == 200
+    # Ogni scrittura e' JSON, anche una DELETE senza corpo (vedi `guard`).
+    assert c.delete("/api/plan", params={"car": CAR, "track": TRACK},
+                    headers={"Content-Type": "application/json"}).status_code == 200
     assert _plan(c)["saved"] is False
 
 
