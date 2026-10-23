@@ -2,6 +2,7 @@
 
     python tools/render_voice.py --dry-run          # il conto dei caratteri, senza chiave ne' rete
     python tools/render_voice.py                    # genera quello che manca, nelle due voci
+    python tools/render_voice.py --show             # come --dry-run, piu' frase -> testo mandato
     python tools/render_voice.py --voice male       # solo la maschile (o female)
     python tools/render_voice.py --only "Gas" --only "Frena prima"   # ritocchi dopo l'ascolto
     python tools/render_voice.py --listen           # pagina d'ascolto via filtro radio
@@ -13,7 +14,7 @@ in testa a `sys.path` e dice quale `accoach` ha caricato.
 Per ogni voce scrive nella sua cartella i WAV (`cue_<sha1[:10]>.wav`, vedi
 `slug`), il `manifest.json` (testo detto -> file) che il
 player legge, e accanto `render.json`: per ogni frase voce, modello e
-impostazioni con cui e' stata resa. Una frase si rigenera solo se manca o se
+impostazioni e testo mandato (`render_text`: accenti e pause) con cui e' stata resa. Una frase si rigenera solo se manca o se
 quelle impostazioni sono cambiate, per non pagare due volte.
 
 La chiave: variabile d'ambiente `ELEVENLABS_API_KEY` o il file
@@ -28,6 +29,7 @@ import html
 import io
 import json
 import os
+import re
 import sys
 import tempfile
 import urllib.error
@@ -53,6 +55,54 @@ VOICES = {
     "male": ("W71zT1VwIFFx3mMGH2uZ", ROOT / "src" / "accoach" / "voice_cues_male"),   # MarcoTrox
     "female": ("RXoaSpLaWTEckJgPUBG3", ROOT / "src" / "accoach" / "voice_cues"),      # Tiziana
 }
+
+# Il pilota ha ascoltato le frasi (23/10): il modello sbaglia l'accento nelle
+# parole sdrucciole o con dittongo e legge «qui» come «chi». Si scrive
+# l'accento nel testo MANDATO; la frase originale (chiave del manifest, nome del
+# file, schermo) non cambia. Per parola intera; la maiuscola iniziale si
+# conserva. Le parole tronche gia' accentate (piu', meta', velocita') non si
+# toccano: l'accento scritto c'e' gia'.
+PRONUNCIA = {
+    "antirollio": "antirollìo", "pattini": "pàttini", "scivola": "scìvola",
+    "applicala": "applìcala", "tienine": "tiènine", "precarico": "precàrico",
+    "margine": "màrgine", "modifica": "modìfica", "ricarica": "ricàrica",
+    "pagina": "pàgina", "subito": "sùbito", "ultimo": "ùltimo",
+    "fluido": "flùido", "molli": "mòlli", "rifalla": "rifàlla",
+    "guadagni": "guadàgni", "veleggi": "velèggi", "qui": "quì",
+    # Aggiunte dopo aver riletto le 98 frasi:
+    # «molle» (le molle delle sospensioni): senza accento si confonde con
+    # l'aggettivo «molle» (mòlle/mólle), e il pilota ha gia' sentito sbagliare «molli».
+    "molle": "mòlle",
+    # parola inglese in frase italiana: il modello la legge «cambér» all'italiana.
+    "camber": "càmber",
+}
+# Le sigle sono maiuscole e non si confondono con una parola comune: la
+# corrispondenza e' esatta. «ABS» il modello rischia di leggerlo come una parola.
+SIGLE = {"TC": "ti-ci", "ABS": "a-bi-èsse"}
+
+# Pausa dopo ogni virgola: il modello a stabilita' 0,30 le ignora.
+PAUSA = ', <break time="0.3s" /> '
+
+_WORD = re.compile(r"[^\W\d_]+")
+
+
+def _respell(m: "re.Match[str]") -> str:
+    w = m.group(0)
+    if w in SIGLE:
+        return SIGLE[w]
+    low = w.lower()
+    new = PRONUNCIA.get(low)
+    # Solo «parola» o «Parola»: una sigla in maiuscolo (QUI) non e' la parola.
+    if new is None or w not in (low, low.capitalize()):
+        return w
+    return new.capitalize() if w != low else new
+
+
+def render_text(phrase: str) -> str:
+    """Il testo che si manda all'API per una frase (la frase originale resta la
+    chiave del manifest: codice e schermo non cambiano)."""
+    return _WORD.sub(_respell, phrase).replace(", ", PAUSA)
+
 
 KEY_ENV = "ELEVENLABS_API_KEY"
 KEY_FILE_NAME = ".elevenlabs-key"
@@ -109,6 +159,12 @@ def _settings(voice_id: str) -> dict:
     return {"voice_id": voice_id, "model_id": MODEL,
             "voice_settings": dict(VOICE_SETTINGS),
             "output_format": OUTPUT_FORMAT, "language_code": LANGUAGE}
+
+
+def _want(voice_id: str, phrase: str) -> dict:
+    """Le impostazioni piu' il testo mandato: se cambia la tabella di pronuncia
+    la frase si rifa', come per un'impostazione."""
+    return {**_settings(voice_id), "text": render_text(phrase)}
 
 
 def _load_json(path: Path) -> dict:
@@ -214,13 +270,12 @@ def _plan(voice: str, phrases: list[str], only: list[str] | None):
     voice_id, d = VOICES[voice]
     manifest = _load_json(d / "manifest.json")
     sidecar = _load_json(d / "render.json")
-    want = _settings(voice_id)
     if only is not None:
         return [t for t in phrases if t in only], []
     todo = [t for t in phrases
             if t not in manifest
             or not (d / manifest[t]).is_file()
-            or sidecar.get(t) != want]
+            or sidecar.get(t) != _want(voice_id, t)]
     wanted = set(phrases)
     gone = sorted(t for t in set(manifest) | set(sidecar) if t not in wanted)
     return todo, gone
@@ -250,16 +305,15 @@ def _render_voice(voice: str, todo: list[str], gone: list[str], key: str,
     if gone:
         _prune(d, gone, manifest, sidecar)
         print(f"  [{voice}] tolte {len(gone)} frasi non piu' nell'elenco")
-    want = _settings(voice_id)
     for text in todo:
         fname = slug(text) + ".wav"
-        wav = _to_wav(_synthesize(text, voice_id, key))
+        wav = _to_wav(_synthesize(render_text(text), voice_id, key))
         # Prima il WAV, poi il manifest, poi il sidecar: se si interrompe fra i
         # due, il sidecar vecchio fa rifare la frase alla prossima corsa.
         _atomic_write(d / fname, wav)
         manifest[text] = fname
         _write_json(d / "manifest.json", manifest)
-        sidecar[text] = want
+        sidecar[text] = _want(voice_id, text)
         _write_json(d / "render.json", sidecar)
         print(f"  OK [{voice}] {text}")
     if full_run:
@@ -327,6 +381,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--voice", choices=["male", "female", "both"], default="both")
     ap.add_argument("--dry-run", action="store_true",
                     help="conta frasi e caratteri da generare, senza chiave ne' rete")
+    ap.add_argument("--show", action="store_true",
+                    help="come --dry-run, e mostra frase -> testo mandato (solo quelle che cambiano)")
     ap.add_argument("--only", action="append", metavar="FRASE",
                     help="rigenera solo questa frase (ripetibile)")
     ap.add_argument("--listen", action="store_true",
@@ -357,16 +413,22 @@ def main(argv: list[str] | None = None) -> int:
     total_n = total_c = 0
     for v in voices:
         todo, gone = plans[v]
-        n, c = len(todo), sum(len(t) for t in todo)
+        n, c = len(todo), sum(len(render_text(t)) for t in todo)
         total_n, total_c = total_n + n, total_c + c
         line = f"{v}: {n} frasi, {c} caratteri da generare"
         if gone:
             line += f" ({len(gone)} da togliere)"
         print(line)
-    all_c = sum(len(t) for t in phrases)
+    all_c = sum(len(render_text(t)) for t in phrases)
     print(f"totale: {total_n} frasi, {total_c} caratteri "
           f"(elenco intero: {len(phrases)} frasi, {all_c} caratteri per voce)")
-    if args.dry_run:
+    if args.show:
+        changed = [(t, render_text(t)) for t in phrases if render_text(t) != t]
+        print(f"{len(changed)} frasi su {len(phrases)} cambiano nel testo mandato:")
+        for t, r in changed:
+            print(f"  {t}")
+            print(f"    -> {r}")
+    if args.dry_run or args.show:
         return 0
 
     # Anche senza niente da generare si passa da ogni voce: la pulizia dei

@@ -418,3 +418,89 @@ def test_language_code_unsupported_is_said_clearly(env, monkeypatch, capsys):
     out, err = capsys.readouterr()
     assert "language_code" in err and "non lo accetta" in err
     assert FAKE_KEY not in out + err
+
+
+# --- pronuncia e pause nel testo mandato -------------------------------------
+
+BRK = ', <break time="0.3s" /> '
+
+
+def test_render_text_respells_whole_words_keeping_the_capital():
+    assert render_voice.render_text("Ammorbidisci la barra antirollio anteriore.") == \
+        "Ammorbidisci la barra antirollìo anteriore."
+    assert render_voice.render_text("Pattini in uscita") == "Pàttini in uscita"
+    assert render_voice.render_text("Ultimo giro") == "Ùltimo giro"
+    # parola intera: «pattinio» o «subitodopo» non contengono una parola da toccare
+    assert render_voice.render_text("margineggia") == "margineggia"
+
+
+def test_render_text_leaves_accented_tronche_alone():
+    assert render_voice.render_text("più metà velocità così com'era") ==         "più metà velocità così com'era"
+
+
+def test_render_text_qui_in_the_middle_and_at_the_start():
+    assert render_voice.render_text("Qui perdi 3 decimi") == "Quì perdi 3 decimi"
+    assert render_voice.render_text("Dai più gas qui") == "Dai più gas quì"
+    assert render_voice.render_text("qui perdi") == "quì perdi"
+    # una parola che contiene «qui» non si tocca
+    assert render_voice.render_text("quindi equilibrio") == "quindi equilibrio"
+
+
+def test_render_text_spells_out_the_acronyms():
+    assert render_voice.render_text("Alza il TC di uno.") == "Alza il ti-ci di uno."
+    # esatta: «tc» minuscolo o dentro un'altra parola non e' la sigla
+    assert render_voice.render_text("tcx") == "tcx"
+
+
+def test_render_text_pause_after_every_comma():
+    assert render_voice.render_text("Arrivi lungo, frena prima") == \
+        f"Arrivi lungo{BRK}frena prima"
+    assert render_voice.render_text("Qui hai margine, frena, poi molli") == \
+        f"Quì hai màrgine{BRK}frena{BRK}poi mòlli"
+    # una virgola senza spazio (un numero) non e' una pausa
+    assert render_voice.render_text("1,5 secondi") == "1,5 secondi"
+
+
+def test_request_body_uses_render_text_but_manifest_uses_the_original(env):
+    env.phrases[:] = ["Qui hai margine, frena più tardi"]
+    render_voice.main(["--voice", "male"])
+    (call,) = env.api.calls
+    assert call["body"]["text"] == f"Quì hai màrgine{BRK}frena più tardi"
+    d = env.dirs["male"]
+    assert list(_manifest(d)) == ["Qui hai margine, frena più tardi"]
+    assert _manifest(d)["Qui hai margine, frena più tardi"] == \
+        render_voice.slug("Qui hai margine, frena più tardi") + ".wav"
+
+
+def test_sidecar_records_the_text_sent_and_pronunciation_change_regenerates(env, monkeypatch):
+    env.phrases[:] = ["Pattini in uscita"]
+    render_voice.main(["--voice", "male"])
+    d = env.dirs["male"]
+    assert _sidecar(d)["Pattini in uscita"]["text"] == "Pàttini in uscita"
+    env.api.calls.clear()
+    render_voice.main(["--voice", "male"])
+    assert env.api.calls == []  # stessa tabella: niente da pagare
+    monkeypatch.setattr(render_voice, "PRONUNCIA",
+                        {**render_voice.PRONUNCIA, "pattini": "pattìni"})
+    render_voice.main(["--voice", "male"])
+    assert env.api.texts() == ["Pattìni in uscita"]
+    assert _sidecar(d)["Pattini in uscita"]["text"] == "Pattìni in uscita"
+
+
+def test_dry_run_counts_the_characters_actually_sent(env, capsys):
+    env.phrases[:] = ["Qui, ora"]
+    render_voice.main(["--dry-run", "--voice", "male"])
+    out = capsys.readouterr().out
+    sent = f"Quì{BRK}ora"
+    assert f"male: 1 frasi, {len(sent)} caratteri" in out
+    assert env.api.calls == []
+
+
+def test_show_lists_pairs_and_never_calls_the_api(env, capsys):
+    env.phrases[:] = ["Gas", "Qui, ora"]
+    assert render_voice.main(["--show"]) == 0
+    out = capsys.readouterr().out
+    assert "Qui, ora" in out and f"Quì{BRK}ora" in out
+    assert "1 frasi su 2 cambiano" in out
+    assert env.api.calls == []
+    assert not env.dirs["male"].exists()
