@@ -66,6 +66,7 @@ from .hubgate import (
     swap_text,
 )
 from .i18n import LANGUAGES, language_name, t
+from .guard import lan_key
 from .netinfo import device_urls, port_open, qr_png
 from .paths import base_dir
 from .telemetry.snapshot import format_lap_time
@@ -635,7 +636,8 @@ class DevicesPanel(QWidget):
         if not cfg.lan:
             self._body.addWidget(_hint(t("mob.off")))
             return
-        urls = device_urls(cfg.web.port)
+        # La chiave del Wi-Fi nel QR: senza, il guardiano lascia il tablet al 401.
+        urls = device_urls(cfg.web.port, key=lan_key())
         if not urls:
             self._body.addWidget(_hint(t("mob.no_ip")))
             return

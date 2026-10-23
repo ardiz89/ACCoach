@@ -9,6 +9,8 @@
 (() => {
   "use strict";
   const LIVE_PORT = 8777;
+  // Sul Wi-Fi l'URL del motore porta la chiave del QR (lankey.js).
+  const liveUrl = (u) => (window.honeLive ? window.honeLive(u) : u);
   const $ = (id) => document.getElementById(id);
   const round = (x, n = 0) => (x == null ? null : Number(x.toFixed(n)));
   // La pagina di test e' solo in italiano: virgola decimale.
@@ -236,7 +238,7 @@
 
   // --- live feed (WebSocket) ------------------------------------------
   function connectLive() {
-    const url = `ws://${location.hostname}:${LIVE_PORT}/ws`;
+    const url = liveUrl(`ws://${location.hostname}:${LIVE_PORT}/ws`);
     let ws;
     try { ws = new WebSocket(url); } catch (e) { retry(); return; }
     ws.onopen = () => setDot("on");

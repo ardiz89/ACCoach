@@ -857,12 +857,16 @@ schermo a fianco.
 1. Nell'hub, sezione **Dispositivi**, spunta **Consenti l'accesso dagli altri
    dispositivi in rete**. HONE se lo ricorda.
 2. Compaiono i codici QR, fra cui **Report** e **Ingegnere**, con l'indirizzo
-   sotto, come `http://192.168.1.23:8778`. **Inquadra il codice** col telefono,
-   oppure scrivi l'indirizzo nel browser.
+   sotto, come `http://192.168.1.23:8778/?k=…`. **Inquadra il codice** col
+   telefono, oppure scrivi l'indirizzo nel browser.
 
 Qualche dettaglio pratico.
 
 - Il telefono deve stare sulla **stessa rete Wi-Fi** del PC.
+- Il link del QR porta una **chiave**. Chi è sul tuo Wi-Fi senza la chiave non
+  entra. Se scrivi l'indirizzo a mano, copialo tutto, chiave compresa.
+- Se il tablet dice «Apri HONE dal codice QR dell'hub.», inquadra di nuovo il
+  codice. Dopo la prima volta il browser si ricorda la chiave.
 - Se **Windows** te lo chiede al primo avvio, consenti l'accesso su **reti
   private**.
 - Per il **Report**, cioè i giri salvati, basta che l'analisi sia accesa. La

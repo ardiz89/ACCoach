@@ -45,6 +45,8 @@ const asVar = (code) => code.replace(/^const /, "var ");
 eval(asVar(line(/^const t = /)));
 eval(asVar(src.slice(src.indexOf("const tf = "), src.indexOf("};", src.indexOf("const tf = ")) + 2)));
 var WS_PORT = 8777, AUTO_PREFIX = "HONE";
+// La porta verso il motore vera: senza lankey.js lascia l'URL com'e'.
+eval(asVar(line(/^const liveUrl = /)));
 var location = { hostname: "pc" };
 const els = {};
 var $ = (id) => els[id] || (els[id] = { dataset: {}, hidden: false, disabled: false, textContent: "", innerHTML: "", value: "HONE_9" });

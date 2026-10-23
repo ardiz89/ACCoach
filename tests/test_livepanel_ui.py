@@ -85,11 +85,12 @@ def env(app, tmp_path, monkeypatch):
     net = _Net()
     monkeypatch.setattr(launcher, "port_open", lambda *a, **k: False)
     monkeypatch.setattr(livepanel_ui.webbrowser, "open", net.browse)
-    monkeypatch.setattr(livepanel_ui, "device_urls", lambda port: {
-        "report": f"http://192.168.1.23:{port}/",
-        "engineer": f"http://192.168.1.23:{port}/engineer",
-        "tablet": f"http://192.168.1.23:{port}/tablet",
-        "test": f"http://192.168.1.23:{port}/test"})
+    # Il costruttore vero con un IP fisso: cosi' la chiave del QR (`key=`)
+    # arriva negli URL come arriverebbe sul tablet.
+    from accoach import netinfo
+    monkeypatch.setattr(livepanel_ui, "device_urls",
+                        lambda port, key=None: netinfo.device_urls(
+                            port, ip="192.168.1.23", key=key))
     monkeypatch.setattr(livepanel_ui, "laps_root", lambda: tmp_path / "laps")
     win = launcher.MainWindow()
     net.win = win
@@ -973,3 +974,27 @@ def test_after_the_game_closes_driving_still_shows_the_laps(env):
     text = _joined(panel)
     assert t("live.no_lap_yet") not in text
     assert "2:25.280" in text and "Spa" in text
+
+
+def test_the_tablet_qr_carries_the_lan_key(env):
+    """Senza la chiave il tablet sul Wi-Fi si ferma al 401 del guardiano."""
+    from accoach import guard
+    _win, panel, _net, _tmp = env
+    _cfg().lan = True
+    panel.render_state(PanelState("before"))
+    assert f"192.168.1.23:8778/tablet?k={guard.lan_key()}" in _joined(panel)
+
+
+def test_the_devices_qr_codes_carry_the_lan_key(env, monkeypatch):
+    from accoach import guard, launcher, netinfo
+    win, _panel, _net, _tmp = env
+    chiavi = []
+
+    def urls(port, key=None):
+        chiavi.append(key)
+        return netinfo.device_urls(port, ip="192.168.1.23", key=key)
+
+    monkeypatch.setattr(launcher, "device_urls", urls)
+    _cfg().lan = True
+    win._devices._render()
+    assert chiavi == [guard.lan_key()]

@@ -10,6 +10,7 @@ the phone can just scan instead of typing the address. All offline, no CDN.
 from __future__ import annotations
 
 import socket
+from urllib.parse import quote
 
 
 def lan_ip() -> str | None:
@@ -49,18 +50,23 @@ def local_addresses() -> set[str]:
     return out
 
 
-def device_urls(port: int, ip: str | None = None) -> dict[str, str] | None:
+def device_urls(port: int, ip: str | None = None,
+                key: str | None = None) -> dict[str, str] | None:
     """Report + engineer + tablet + on-track test URLs a LAN device opens, or ``None`` if
     no LAN IP.
 
-    Pass ``ip`` to skip auto-detection (useful for tests).
+    Pass ``ip`` to skip auto-detection (useful for tests). Con ``key`` ogni URL
+    finisce con ``?k=<key>``: il guardiano (`accoach.guard`) non fa entrare un
+    dispositivo in rete senza la chiave, e il QR e' l'unico modo in cui il
+    tablet la riceve. Alla prima pagina il guardiano la mette in un cookie.
     """
     ip = ip if ip is not None else lan_ip()
     if not ip:
         return None
     base = f"http://{ip}:{port}"
-    return {"report": base + "/", "engineer": base + "/engineer",
-            "tablet": base + "/tablet", "test": base + "/test"}
+    tail = f"?k={quote(key, safe='')}" if key else ""
+    return {"report": base + "/" + tail, "engineer": base + "/engineer" + tail,
+            "tablet": base + "/tablet" + tail, "test": base + "/test" + tail}
 
 
 def port_open(port: int, host: str = "127.0.0.1", timeout: float = 0.3) -> bool:

@@ -275,6 +275,9 @@ const $ = (id) => els[id] || (els[id] = {
   classList: { add() {}, remove() {}, toggle() {} }, removeAttribute() {} });
 const t = (k) => k;
 const WS_PORT = 8777, location = { hostname: "h" };
+// La porta verso il motore vera: senza lankey.js lascia l'URL com'e'.
+const window = {};
+eval(src.split("\n").find((l) => l.startsWith("const liveUrl = ")).replace(/^const /, "var "));
 let prepared = null, posted = [];
 function renderPrediction() {} function renderOutcome() {} function renderRoad() {}
 function prepareChange(c) { prepared = c; }

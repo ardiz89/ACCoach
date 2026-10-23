@@ -49,6 +49,7 @@ from .hubgate import STOP_LIVE
 from .i18n import current_language, t
 from .launcher import _hint, _qr_image
 from .livepanel import POLL_S, LiveTracker, PanelState, parse_health, report_url
+from .guard import lan_key
 from .netinfo import device_urls
 from .recording.storage import _catalog_path, _slug, laps_root
 
@@ -652,7 +653,8 @@ class LivePanel(QWidget):
             buttons.insert(0, self._button("live.s2_to_devices", "liveToDevices",
                                            self._to_devices))
         else:
-            urls = device_urls(cfg.web.port)
+            # Con la chiave del Wi-Fi, come i QR della pagina Dispositivi.
+            urls = device_urls(cfg.web.port, key=lan_key())
             if not urls:
                 out.append(_hint(t("live.s2_no_ip")))
             else:

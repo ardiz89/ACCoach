@@ -35,8 +35,9 @@ def test_tablet_loads_only_its_files():
     sheets = [m for tag in re.findall(r"<link\b[^>]*>", html)
               if 'rel="stylesheet"' in tag
               for m in re.findall(r'href="([^"]+)"', tag)]
-    assert sorted(scripts + sheets) == ["/static/i18n.js", "/static/tablet.css",
-                                        "/static/tablet.js"]
+    # lankey.js: la chiave del Wi-Fi verso il motore (test_guard_pagine.py).
+    assert sorted(scripts + sheets) == ["/static/i18n.js", "/static/lankey.js",
+                                        "/static/tablet.css", "/static/tablet.js"]
 
 
 # Uno stub minimo di `document`: i18n.js al caricamento traduce i testi fissi e

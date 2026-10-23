@@ -11,6 +11,9 @@
 // il pilota col dito.
 (function () {
   var WS_PORT = 8777;            // il motore dal vivo; la pagina sta sulla 8778
+  // Ogni URL verso il motore passa da qui: sul Wi-Fi porta la chiave del QR
+  // (lankey.js), che il cookie della 8778 non porterebbe alla 8777.
+  function liveUrl(u) { return window.honeLive ? window.honeLive(u) : u; }
 
   function t(k) { return window.HoneI18n ? window.HoneI18n.t(k) : k; }
   // Il `tf` di engineer.js, senza le forme plurali che qui non servono.
@@ -379,7 +382,8 @@
   // quello che l'ingegnere aveva chiesto e' sulla macchina. Best-effort: a
   // motore spento l'ingegnere continua a proporre.
   function postApplied() {
-    xhr("POST", "http://" + location.hostname + ":" + WS_PORT + "/engineer/applied", null, null);
+    // Il corpo `{}` fa dichiarare JSON a `xhr`: senza, il guardiano dice 415.
+    xhr("POST", liveUrl("http://" + location.hostname + ":" + WS_PORT + "/engineer/applied"), {}, null);
   }
 
   // ---- la schermata dei box -------------------------------------------------
@@ -791,7 +795,7 @@
 
   function connect() {
     var ws;
-    try { ws = new WebSocket("ws://" + location.hostname + ":" + WS_PORT + "/ws"); }
+    try { ws = new WebSocket(liveUrl("ws://" + location.hostname + ":" + WS_PORT + "/ws")); }
     catch (e) { setTimeout(connect, 3000); return; }
     ws.onmessage = function (ev) {
       try { render(JSON.parse(ev.data)); } catch (e) { logOnce(e); }

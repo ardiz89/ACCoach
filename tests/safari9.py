@@ -13,7 +13,7 @@ codice e si controllano.
 import re
 
 # I file che /tablet carica; quelli che esistono si controllano tutti.
-TABLET_FILES = ("i18n.js", "tablet.js", "tablet.css")
+TABLET_FILES = ("i18n.js", "lankey.js", "tablet.js", "tablet.css")
 
 _JS_FORBIDDEN = (
     (r"\blet\b", "let"),

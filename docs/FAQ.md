@@ -911,12 +911,16 @@ You need this if you play on three monitors and want the **Report** or the
 1. In the hub, in the **Devices** section, tick **Allow access from other devices
    on my network**. HONE remembers it.
 2. The QR codes appear, including **Report** and **Engineer**, with the address
-   under them, like `http://192.168.1.23:8778`. **Scan the code** with your phone,
-   or type the address into the browser.
+   under them, like `http://192.168.1.23:8778/?k=…`. **Scan the code** with your
+   phone, or type the address into the browser.
 
 A few practical details.
 
 - The phone has to be on the **same Wi-Fi network** as the PC.
+- The QR link carries a **key**. Someone on your Wi-Fi without the key can't get
+  in. If you type the address by hand, copy all of it, key included.
+- If the tablet says "Open HONE from the hub's QR code.", scan the code again.
+  After the first time the browser remembers the key.
 - If **Windows** asks the first time, allow access on **private networks**.
 - For the **Report**, which shows your saved laps, the analysis only has to be
   running. The live **Engineer** page also needs Coach Live, or the Live backend

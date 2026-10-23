@@ -3,6 +3,10 @@
 // Vanilla JS, no libraries — same constraint as the analysis app.
 
 const WS_PORT = 8777;            // the live backend; the page itself is on 8778
+// Ogni URL verso il motore passa da qui: sul Wi-Fi porta la chiave (lankey.js),
+// che il cookie della 8778 non porterebbe alla 8777. Senza lankey.js l'URL
+// resta com'e', e sul PC funziona lo stesso.
+const liveUrl = (u) => (window.honeLive ? window.honeLive(u) : u);
 const $ = (id) => document.getElementById(id);
 // i18n: translate a chrome string (defensive if i18n.js failed to load).
 const t = (k) => (window.HoneI18n ? window.HoneI18n.t(k) : k);
@@ -875,8 +879,11 @@ async function afterWrite(res) {
   // advances its convergence re-test. Best-effort: the backend may be off.
   // .catch handles the async rejection (a sync try/catch wouldn't), so a
   // backend that's off doesn't raise an Uncaught (in promise).
-  fetch(`http://${location.hostname}:${WS_PORT}/engineer/applied`,
-        { method: "POST" }).catch(() => { /* backend off — keeps proposing */ });
+  // JSON anche senza niente da dire: il guardiano rifiuta (415) ogni
+  // scrittura che non lo dichiara.
+  fetch(liveUrl(`http://${location.hostname}:${WS_PORT}/engineer/applied`),
+        { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" })
+    .catch(() => { /* backend off — keeps proposing */ });
   // Il file appena scritto è quello che il messaggio ti dice di caricare, ed è
   // quello su cui deve poggiare la modifica dopo.
   await onComboChange(res.name);
@@ -1377,8 +1384,9 @@ function renderEngineer(st) {
 function confirmRestored() {
   if (writeLocked()) return;
   $("es-restored").hidden = true;
-  fetch(`http://${location.hostname}:${WS_PORT}/engineer/applied`,
-        { method: "POST" }).catch(() => { /* backend off — resta da fare */ });
+  fetch(liveUrl(`http://${location.hostname}:${WS_PORT}/engineer/applied`),
+        { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" })
+    .catch(() => { /* backend off — resta da fare */ });
 }
 
 // The acceptance bar, shown while the change is still a proposal and while it
@@ -1525,7 +1533,7 @@ function onWsClose() {
 
 function connectWS() {
   let ws;
-  try { ws = new WebSocket(`ws://${location.hostname}:${WS_PORT}/ws`); }
+  try { ws = new WebSocket(liveUrl(`ws://${location.hostname}:${WS_PORT}/ws`)); }
   catch (e) { setTimeout(connectWS, 3000); return; }
   ws.onmessage = (ev) => { try { applyLive(JSON.parse(ev.data)); } catch (e) {} };
   ws.onclose = onWsClose;
@@ -1554,8 +1562,11 @@ $("setup").onchange = onSetupChange;
 // avvisi subito.
 function confirmAvDone() {
   $("av-done").hidden = true;
-  fetch(`http://${location.hostname}:${WS_PORT}/engineer/applied`,
-        { method: "POST" }).catch(() => { /* backend off — keeps proposing */ });
+  // JSON anche senza niente da dire: il guardiano rifiuta (415) ogni
+  // scrittura che non lo dichiara.
+  fetch(liveUrl(`http://${location.hostname}:${WS_PORT}/engineer/applied`),
+        { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" })
+    .catch(() => { /* backend off — keeps proposing */ });
 }
 $("av-done").onclick = confirmAvDone;
 
