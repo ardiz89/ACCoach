@@ -144,8 +144,10 @@ def lan_key() -> str:
     if fallito is not None:
         quando, errore = fallito
         if time.monotonic() - quando < _RIPROVA_S:
-            raise errore
-        del _cache[("errore", str(path))]
+            # Un errore nuovo ogni volta: lo stesso oggetto rilanciato per un
+            # giorno si porterebbe dietro un traceback sempre piu' lungo.
+            raise OSError(errore.errno, errore.strerror, errore.filename)
+        _cache.pop(("errore", str(path)), None)
     try:
         return _crea_o_leggi(path)
     except OSError as e:
@@ -177,8 +179,9 @@ def _crea_o_leggi(path: Path) -> str:
                     raise
                 if spostata:
                     # Era la chiave appena scritta dall'altro: torna al suo posto.
-                    _rimetti(via, path)
-                _togli(via)
+                    _rimetti(via, path)   # toglie anche `via`
+                else:
+                    _togli(via)
             key = _valida(_leggi(path))
             continue
         nuova = _nuova()

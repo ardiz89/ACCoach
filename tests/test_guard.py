@@ -608,20 +608,48 @@ def test_una_chiave_che_non_si_crea_non_si_ritenta_a_ogni_richiesta(
 
 
 def test_una_chiave_valida_che_non_si_legge_per_un_attimo_non_si_cambia(monkeypatch):
+    # L'antivirus tiene aperto ogni file della cartella per le prime letture:
+    # col vecchio `_leggi` (OSError = file vuoto) la chiave veniva sostituita.
     key = guard.lan_key()
     guard._dimentica()
     vero = type(guard.key_path()).read_text
-    una_volta = [True]
+    rimaste = [2]
 
     def occupato(self, *a, **k):
-        if una_volta[0] and self.name == "lan-key.txt":
-            una_volta[0] = False
+        if rimaste[0] and self.parent == guard.key_path().parent:
+            rimaste[0] -= 1
             raise PermissionError("antivirus")
         return vero(self, *a, **k)
 
     monkeypatch.setattr(type(guard.key_path()), "read_text", occupato)
     with pytest.raises(OSError):
         guard.lan_key()
+    rimaste[0] = 0
     assert guard.key_path().read_text(encoding="utf-8").strip() == key
     guard._dimentica()
     assert guard.lan_key() == key
+
+
+def test_una_chiave_spostata_che_non_si_legge_torna_al_suo_posto(monkeypatch):
+    # La prima lettura vede un file vuoto (l'altro processo sta scrivendo), il
+    # file viene spostato via, e la lettura dello spostato fallisce: la chiave
+    # non va persa.
+    key = guard.lan_key()
+    guard._dimentica()
+    vero = type(guard.key_path()).read_text
+    chiamate = []
+
+    def a_scatti(self, *a, **k):
+        if self.parent == guard.key_path().parent:
+            chiamate.append(self.name)
+            if len(chiamate) == 1:
+                return ""
+            if self.name.endswith(".old"):
+                raise PermissionError("antivirus")
+        return vero(self, *a, **k)
+
+    monkeypatch.setattr(type(guard.key_path()), "read_text", a_scatti)
+    with pytest.raises(OSError):
+        guard.lan_key()
+    assert any(n.endswith(".old") for n in chiamate)
+    assert guard.key_path().read_text(encoding="utf-8").strip() == key
