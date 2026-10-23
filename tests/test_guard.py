@@ -653,3 +653,48 @@ def test_una_chiave_spostata_che_non_si_legge_torna_al_suo_posto(monkeypatch):
         guard.lan_key()
     assert any(n.endswith(".old") for n in chiamate)
     assert guard.key_path().read_text(encoding="utf-8").strip() == key
+
+
+# --- il tetto al corpo ------------------------------------------------------
+
+def test_un_corpo_oltre_il_tetto_e_413_con_o_senza_content_length(tmp_path):
+    grande = b'{"a": "' + b"x" * guard.MAX_BODY + b'"}'
+    assert len(grande) > guard.MAX_BODY
+    hdr = {"content-type": "application/json"}
+    for nome in ("mini", "api", "server"):
+        app = _apps(tmp_path)[nome]
+        with TestClient(app, base_url=f"http://localhost:{PAGINE}") as c:
+            r = c.post(_POST[nome], content=grande, headers=hdr)
+            assert r.status_code == 413, nome
+            # senza Content-Length: corpo a pezzi
+            r = c.post(_POST[nome], content=(grande[i:i + 65536]
+                                             for i in range(0, len(grande), 65536)),
+                       headers=hdr)
+            assert r.status_code == 413, nome
+
+
+def test_413_porta_il_cors_sulla_8777(tmp_path):
+    app = _apps(tmp_path)["server"]
+    grande = b"x" * (guard.MAX_BODY + 1)
+    with TestClient(app, base_url=f"http://localhost:{PAGINE}") as c:
+        r = c.post("/engineer/applied", content=grande,
+                   headers={"content-type": "application/json",
+                            "origin": f"http://localhost:{PAGINE}"})
+        assert r.status_code == 413
+        assert r.headers["access-control-allow-origin"] == f"http://localhost:{PAGINE}"
+
+
+def test_un_corpo_in_chunk_sotto_il_tetto_arriva_intero_all_app():
+    hdr = {"content-type": "application/json"}
+    with TestClient(_mini(), base_url=f"http://localhost:{PAGINE}") as c:
+        corpo = b'{"a": "' + b"y" * 150_000 + b'"}'
+        r = c.post("/w", content=(corpo[i:i + 4096]
+                                  for i in range(0, len(corpo), 4096)), headers=hdr)
+        assert r.status_code == 200
+
+
+def test_senza_chiave_un_corpo_enorme_e_401_non_413():
+    with TestClient(_mini(), base_url=f"http://{PC_LAN}:{PAGINE}", client=TABLET) as c:
+        r = c.post("/w", content=b"x" * (guard.MAX_BODY + 1),
+                   headers={"content-type": "application/json"})
+        assert r.status_code == 401

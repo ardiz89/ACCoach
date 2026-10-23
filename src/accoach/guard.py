@@ -55,6 +55,10 @@ _TTL_S = 30.0
 _RIPROVA_S = 60.0
 _SAFE = frozenset({"GET", "HEAD", "OPTIONS"})
 _MAX_AGE = 31536000   # un anno: il segnalibro sul tablet deve reggere
+# Il corpo piu' grande che una scrittura puo' portare: 1 MiB. Un assetto vero o
+# una prova del tablet stanno sotto i 200 KB; senza tetto, chi ha la chiave (o il
+# PC) riempiva memoria e disco con un solo POST.
+MAX_BODY = 1_048_576
 
 _MESSAGGIO_401 = {
     "it": "Apri HONE dal codice QR dell'hub.",
@@ -532,6 +536,12 @@ class GuardMiddleware:
                                  "content type must be application/json", origin)
                 return
 
+            # Il tetto dopo la chiave: chi non ha il diritto di scrivere prende
+            # 401, non scopre quanto e' grande il limite.
+            receive = await self._tetto(scope, receive, send, headers, origin)
+            if receive is None:
+                return
+
         if kind == "http" and method == "GET" and query_ok:
             # Il QR porta `?k=`: da qui in poi la chiave la ricorda il cookie.
             # Non HttpOnly di proposito: le pagine lo leggono e lo passano alla
@@ -554,6 +564,54 @@ class GuardMiddleware:
             return
 
         await self.app(scope, receive, send)
+
+    async def _tetto(self, scope, receive, send, headers, origin):
+        """Il `receive` da passare all'app, o ``None`` se il corpo e' troppo grande.
+
+        Con ``Content-Length`` si decide subito, senza leggere niente. Senza
+        (corpo a pezzi) si legge fino a ``MAX_BODY + 1`` byte: oltre e' 413, e
+        sotto lo si rigioca all'app come un solo messaggio. Si bufferizza solo
+        in questo caso perche' i corpi veri sono piccoli.
+        """
+        dichiarata = headers.get("content-length")
+        if dichiarata is not None:
+            try:
+                n = int(dichiarata)
+            except ValueError:
+                n = None
+            if n is not None:
+                if n > MAX_BODY:
+                    await self._nega("http", send, 413, "request body too large",
+                                     origin)
+                    return None
+                return receive
+        pezzi: list[bytes] = []
+        totale = 0
+        while True:
+            msg = await receive()
+            if msg["type"] != "http.request":
+                # Il client se ne e' andato: l'app lo scoprira' da sola.
+                break
+            body = msg.get("body", b"")
+            totale += len(body)
+            if totale > MAX_BODY:
+                await self._nega("http", send, 413, "request body too large",
+                                 origin)
+                return None
+            pezzi.append(body)
+            if not msg.get("more_body", False):
+                break
+        intero = b"".join(pezzi)
+        dato = False
+
+        async def rigioca():
+            nonlocal dato
+            if not dato:
+                dato = True
+                return {"type": "http.request", "body": intero, "more_body": False}
+            return await receive()
+
+        return rigioca
 
     async def _nega(self, kind, send, status, text, origin=None):
         """Il rifiuto. ``origin`` e' quello gia' vagliato da `_origin_ok`.
