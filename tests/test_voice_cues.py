@@ -1,12 +1,11 @@
-"""Pre-rendered neural (Piper) cue coverage.
+"""Pre-rendered cue coverage (ElevenLabs recordings).
 
-The coach speaks fixed cues from shipped WAVs (neural quality) and only falls
-back to robotic SAPI5 for phrases without a WAV. These tests guard that contract:
-if a cue phrase changes or is added without re-running ``tools/render_cues.py``,
-the coverage test fails — instead of the voice silently regressing to SAPI5.
+The coach speaks fixed cues from shipped WAVs and only falls back to robotic
+SAPI5 for phrases without a WAV. These tests guard that contract: if a cue
+phrase changes or is added without re-running ``tools/render_voice.py``, the
+coverage test fails — instead of the voice silently regressing to SAPI5.
 """
 import json
-import sys
 import wave
 from pathlib import Path
 
@@ -14,8 +13,7 @@ from accoach.coaching.voice import _load_prerendered
 
 _ROOT = Path(__file__).resolve().parent.parent
 _CUES = _ROOT / "src" / "accoach" / "voice_cues"
-sys.path.insert(0, str(_ROOT / "tools"))
-import render_cues  # noqa: E402 - build-time helper, reused here for coverage
+from accoach.coaching import spoken
 
 
 def _manifest() -> dict:
@@ -23,9 +21,9 @@ def _manifest() -> dict:
 
 
 def test_every_static_cue_has_a_neural_wav():
-    missing = render_cues.static_cue_messages() - set(_manifest())
+    missing = spoken.static_cue_messages() - set(_manifest())
     assert not missing, (
-        "cue senza WAV neurale — riesegui `python tools/render_cues.py`: " + repr(missing)
+        "cue senza WAV neurale — riesegui `python tools/render_voice.py --voice female`: " + repr(missing)
     )
 
 
@@ -51,7 +49,7 @@ def test_trigger_words_have_a_neural_wav():
 
 def test_the_numeric_cues_have_a_neural_wav_for_what_the_detectors_say():
     """Le frasi con un numero piccolo hanno il loro WAV, e devono essere quelle
-    che i rilevatori dicono davvero: la lista di `render_cues` le riscrive a
+    che i rilevatori dicono davvero: la lista di `spoken` le riscrive a
     mano, e fino al Task 8 rendeva «Stai perdendo 1 decimi qui» mentre il coach
     diceva «1 decimo» (quindi SAPI5)."""
     from accoach.coaching.analyzer import CornerStats, classify_corner
@@ -67,10 +65,10 @@ def test_the_numeric_cues_have_a_neural_wav_for_what_the_detectors_say():
         lost_ms=130.0, throttle_live=1.0, throttle_ref=1.0, brake_live=0.0,
         brake_ref=0.0, min_speed_live=100.0, min_speed_ref=100.0,
         braking_early=False, braking_late=False), 0, 0.3).message)
-    assert said <= render_cues.dynamic_cue_messages(), said - render_cues.dynamic_cue_messages()
+    assert said <= spoken.numeric_cue_messages(), said - spoken.numeric_cue_messages()
     assert "Qui perdi 1 decimo" in said
     man = _manifest()
-    missing = sorted(m for m in render_cues.dynamic_cue_messages() if m not in man)
+    missing = sorted(m for m in spoken.numeric_cue_messages() if m not in man)
     assert not missing, missing
 
 
@@ -113,9 +111,9 @@ def test_male_set_when_present_covers_the_same_cues():
         import pytest
         pytest.skip("male neural set not rendered (optional drop-in)")
     man = json.loads((_MALE / "manifest.json").read_text(encoding="utf-8"))
-    missing = render_cues.static_cue_messages() - set(man)
+    missing = spoken.static_cue_messages() - set(man)
     assert not missing, (
-        "cue maschile mancante — riesegui `python tools/render_cues.py --male`: "
+        "cue maschile mancante — riesegui `python tools/render_voice.py --voice male`: "
         + repr(missing)
     )
     for fname in man.values():

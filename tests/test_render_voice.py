@@ -24,7 +24,6 @@ import pytest
 _ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(_ROOT / "tools"))
 import render_voice  # noqa: E402 - script di build, provato qui
-import render_cues  # noqa: E402 - il nome del file viene da qui
 
 FAKE_KEY = "sk_FINTA_chiave_di_prova_7f3a9c"
 
@@ -153,7 +152,7 @@ def test_generation_writes_valid_wavs_and_manifest(env):
         man = _manifest(d)
         assert set(man) == set(PHRASES)
         for text, fname in man.items():
-            assert fname == render_cues.slug(text) + ".wav"
+            assert fname == render_voice.slug(text) + ".wav"
             raw = (d / fname).read_bytes()
             assert raw[:4] == b"RIFF" and raw[8:12] == b"WAVE"
             with wave.open(io.BytesIO(raw)) as w:
@@ -227,7 +226,7 @@ def test_missing_wav_file_is_regenerated(env):
 
 def test_phrase_removed_from_list_disappears(env):
     render_voice.main([])
-    gone = render_cues.slug("Gas") + ".wav"
+    gone = render_voice.slug("Gas") + ".wav"
     env.phrases.remove("Gas")
     env.api.calls.clear()
     render_voice.main([])
@@ -286,7 +285,7 @@ def test_auth_quota_rate_errors_stop_without_the_key(env, capsys, code):
         assert "FINTA" not in text
     assert FAKE_KEY.encode() not in _all_written_bytes(env.tmp)
     # nessun WAV rotto, nessun manifest a meta'
-    assert not (d / (render_cues.slug("Frena prima") + ".wav")).exists()
+    assert not (d / (render_voice.slug("Frena prima") + ".wav")).exists()
     assert not list(d.glob("*.tmp"))
     assert (d / "manifest.json").read_bytes() == before
 
@@ -308,7 +307,7 @@ def test_empty_audio_is_an_error_not_a_wav(env, monkeypatch):
     monkeypatch.setattr(urllib.request, "urlopen", lambda req, timeout=None: _Resp(b""))
     with pytest.raises(SystemExit):
         render_voice.main(["--voice", "male", "--only", "Gas"])
-    assert not (env.dirs["male"] / (render_cues.slug("Gas") + ".wav")).exists()
+    assert not (env.dirs["male"] / (render_voice.slug("Gas") + ".wav")).exists()
 
 
 # --- l'ascolto ------------------------------------------------------------------

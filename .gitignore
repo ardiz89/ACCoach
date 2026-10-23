@@ -30,7 +30,7 @@ logs/
 *.log
 
 # Vendored Piper TTS (downloaded binary + neural voice model, ~98MB).
-# Not source — fetch separately (see tools/render_cues.py / docs). Keep the script.
+# Not source. Used only by tools/voce/di.py; the coach's WAVs come from tools/render_voice.py.
 tools/piper/
 
 # OS / editor cruft

@@ -504,7 +504,7 @@ _COACH_FILES = ("coaching/cue.py", "coaching/focus.py", "coaching/pitcall.py",
 
 def static_cue_texts(path: Path) -> set[str]:
     """Le frasi fisse di un modulo del coach: testi passati a una chiamata che
-    prende anche una `CueCategory` (il criterio di `tools/render_cues.py`), con
+    prende anche una `CueCategory` (il criterio di `accoach.coaching.spoken`), con
     le f-string in forma «{nome}» e le stringhe spezzate con `+` ricomposte."""
     tree = ast.parse(path.read_text(encoding="utf-8-sig"))
     out: set[str] = set()

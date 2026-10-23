@@ -6,7 +6,7 @@ word said badly is worse than the sentence it replaces.
 
 By default you hear what the driver hears: the same radio treatment
 :class:`accoach.coaching.voice.Voice` applies (``radio=True``). Pass ``--nudo``
-to hear Piper's raw output instead — useful to tell a bad synthesis apart from a
+to hear the raw recording instead — useful to tell a bad synthesis apart from a
 harsh filter.
 
 Usage (from the repo root):

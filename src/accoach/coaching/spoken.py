@@ -10,7 +10,7 @@ che fa girare i percorsi veri e pretende che ogni testo detto ci sia).
 Le fonti sono cinque, e la scansione del sorgente ne vede una sola:
 
 * le frasi fisse passate a una chiamata con una `CueCategory` (scansione AST
-  dei moduli del coach, come faceva `tools/render_cues.py`) e le parole
+  dei moduli del coach) e le parole
   d'innesco italiane, che stanno in una tabella e non in una chiamata;
 * le frasi col numero che sono gia' un insieme chiuso: «Qui perdi N decimi»
   (1-25) e «Benzina per circa N giri» (1-3). Il numero e' il consiglio stesso;
@@ -106,7 +106,7 @@ def _scan() -> tuple[set[str], set[str]]:
 
 def static_cue_messages() -> set[str]:
     """Le frasi fisse dei moduli del coach e le parole d'innesco italiane
-    (le frasi che hanno gia' un WAV di Piper)."""
+    (la parte dell'elenco che si trova leggendo il sorgente)."""
     messages, _ = _scan()
     # Le parole d'innesco sono una tabella, non una chiamata, e sono le frasi
     # che il pilota sente piu' spesso quando c'e' un focus.

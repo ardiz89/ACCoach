@@ -10,8 +10,8 @@ L'elenco delle frasi e' `accoach.coaching.spoken.spoken_phrases()` di QUESTO
 repository (non dell'installazione da cui si guida): lo script mette `<repo>/src`
 in testa a `sys.path` e dice quale `accoach` ha caricato.
 
-Per ogni voce scrive nella sua cartella i WAV (`cue_<sha1[:10]>.wav`, lo stesso
-nome di `tools/render_cues.py`), il `manifest.json` (testo detto -> file) che il
+Per ogni voce scrive nella sua cartella i WAV (`cue_<sha1[:10]>.wav`, vedi
+`slug`), il `manifest.json` (testo detto -> file) che il
 player legge, e accanto `render.json`: per ogni frase voce, modello e
 impostazioni con cui e' stata resa. Una frase si rigenera solo se manca o se
 quelle impostazioni sono cambiate, per non pagare due volte.
@@ -23,6 +23,7 @@ La chiave: variabile d'ambiente `ELEVENLABS_API_KEY` o il file
 from __future__ import annotations
 
 import argparse
+import hashlib
 import html
 import io
 import json
@@ -38,9 +39,6 @@ ROOT = Path(__file__).resolve().parent.parent
 # Il nostro `src` davanti a tutto: senza, `import accoach` prende l'installazione
 # da cui si guida, e si genererebbe l'elenco di un altro commit.
 sys.path.insert(0, str(ROOT / "src"))
-sys.path.insert(0, str(ROOT / "tools"))
-
-from render_cues import slug  # noqa: E402 - il nome del file e' uno solo, quello del manifest di oggi
 
 API = "https://api.elevenlabs.io/v1/text-to-speech/{voice_id}?output_format={fmt}"
 MODEL = "eleven_multilingual_v2"
@@ -68,6 +66,14 @@ class _Stop(Exception):
 def _die(msg: str) -> None:
     print(msg, file=sys.stderr)
     raise SystemExit(1)
+
+
+def slug(text: str) -> str:
+    """Il nome del WAV di una frase. E' lo stesso che dava il vecchio
+    `render_cues.py` (Piper, ritirato il 23/10): i manifest di prima restano
+    leggibili e una frase gia' resa si riconosce."""
+    h = hashlib.sha1(text.encode("utf-8")).hexdigest()[:10]
+    return f"cue_{h}"
 
 
 def load_phrases() -> list[str]:
