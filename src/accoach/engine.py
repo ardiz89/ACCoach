@@ -910,8 +910,18 @@ class CoachEngine:
     def _engineer_block(self) -> dict | None:
         """The latest engineer decision, in the shape the setup UI consumes."""
         d = self._engineer_decision
+        from .engineer.profiles._common import tr
         if d is None:
-            return None
+            # Prima del primo giro non c'e' ancora una decisione, ma la strada
+            # (le fasi e il punto in cui si e') il pilota la vede da subito.
+            # Blocco parziale: niente kind/message/change, e chi legge protegge
+            # ogni campo con `eng && eng.x`.
+            if self._engineer is None:
+                return None
+            ph = getattr(self._engineer, "phase", None)
+            prog = getattr(self._engineer, "progress", None)
+            return {"phase": {"key": ph.key, "label": tr(ph.label)} if ph else None,
+                    "progress": prog() if callable(prog) else None}
         sym = d.change.symptom if d.change else None
         corners = self._engineer.corners_for(sym) if self._engineer else []
         # Current phase (key + localized label) so the UI can tell the driver what
@@ -919,7 +929,6 @@ class CoachEngine:
         # do next. After a PHASE_DONE the engine has already advanced, so this is
         # the phase now in progress. None once the setup is complete.
         from .engineer.core import symptom_words
-        from .engineer.profiles._common import tr
         ph = self._engineer.phase if self._engineer else None
         phase = {"key": ph.key, "label": tr(ph.label)} if ph else None
         return {

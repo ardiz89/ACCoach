@@ -107,3 +107,37 @@ def test_the_frame_block_carries_progress(tmp_path):
     eng._engineer = None
     assert eng._engineer_block()["progress"] is None
     eng.close()
+
+
+def _bare_engine(tmp_path):
+    from accoach.engine import CoachEngine
+    from accoach.telemetry import TelemetrySnapshot
+
+    class _Dead:
+        def read(self):
+            return TelemetrySnapshot.disconnected()
+
+        def close(self):
+            pass
+
+    return CoachEngine(reader=_Dead(), laps_dir=tmp_path)
+
+
+def test_before_any_lap_the_block_is_the_road_and_nothing_else(tmp_path):
+    """Il pilota vede la strada dall'inizio: senza decisione il blocco ha solo
+    fase e progress, e nessun campo che la pagina leggerebbe come un verdetto."""
+    eng = _bare_engine(tmp_path)
+    eng._engineer = _eng()
+    block = eng._engineer_block()
+    assert set(block) == {"phase", "progress"}
+    assert block["phase"]["key"] == "pressures"
+    p = block["progress"]
+    assert (p["stage"], p["have"], p["need"]) == ("baseline", 0, 3)
+    eng.close()
+
+
+def test_no_engineer_at_all_is_still_no_block(tmp_path):
+    eng = _bare_engine(tmp_path)
+    eng._engineer = None
+    assert eng._engineer_block() is None
+    eng.close()
