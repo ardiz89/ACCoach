@@ -23,6 +23,15 @@ const tf = (k, vals) => {
   return s;
 };
 const LANG = () => (window.HoneI18n ? window.HoneI18n.lang : "en");
+// Ogni dato che entra in un template destinato a `innerHTML` passa da qui: i
+// nomi e le etichette degli assetti vengono da file che il pilota può aver
+// scaricato, i nomi curva li scrive lui, e la revisione di sicurezza del 23/10
+// li ha trovati in `innerHTML` senza escape. Gemella di quella in app.js. Con
+// `tf` si escapano i valori prima di passarli, non la frase tradotta.
+function esc(s) {
+  return (s == null ? "" : String(s)).replace(/&/g, "&amp;").replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
 // Un numero per il pilota: virgola in italiano, spazio prima dell'unita'. La
 // regola sta in `HoneI18n.fmtNum`; il ripiego serve solo se i18n.js non c'e'.
 function fmtN(v, d, unit) {
@@ -388,8 +397,8 @@ async function loadRecord() {
   const rows = (title, entries) => {
     if (!entries.length) return "";
     const li = entries.map(([k, v]) =>
-      `<div class="rec-row"><span>${k}</span><span>${v}</span></div>`).join("");
-    return `<div class="rec-block"><div class="rec-sub">${title}</div>${li}</div>`;
+      `<div class="rec-row"><span>${esc(k)}</span><span>${v}</span></div>`).join("");
+    return `<div class="rec-block"><div class="rec-sub">${esc(title)}</div>${li}</div>`;
   };
   // Il nome della leva come nell'editor; la chiave solo se il server non lo sa.
   const name = (k) => (r.labels && r.labels[k]) || k;
@@ -487,7 +496,7 @@ function renderParam(p) {
   row.className = "param" + ((p.slots || []).length > 2 ? " wide" : "");
   const label = document.createElement("div");
   label.className = "param-label";
-  label.innerHTML = `${p.label}${p.note ? `<span class="note">${p.note}</span>` : ""}`;
+  label.innerHTML = `${esc(p.label)}${p.note ? `<span class="note">${esc(p.note)}</span>` : ""}`;
   if (isAlVolo(p)) {
     const tag = document.createElement("span");
     tag.className = "av-tag";
@@ -519,8 +528,7 @@ function renderSlot(p, s, i) {
   el.tabIndex = 0;
   el.setAttribute("role", "spinbutton");
   el.setAttribute("aria-valuenow", String(cur));
-  const where = s.slot ? ` ${s.slot}` : "";
-  el.setAttribute("aria-label", `${p.label}${where}: ${cur}`);
+  el.setAttribute("aria-label", `${p.label}${s.slot ? ` ${s.slot}` : ""}: ${cur}`);
   el.onkeydown = (ev) => onSlotKey(ev, p.key, i);
 
   const minus = document.createElement("button");
@@ -531,7 +539,7 @@ function renderSlot(p, s, i) {
 
   const val = document.createElement("div");
   val.className = "val";
-  const physTxt = delta ? "" : `<span class="phys">${s.physical}</span>`;
+  const physTxt = delta ? "" : `<span class="phys">${esc(s.physical)}</span>`;
   val.innerHTML = `${cur}${physTxt}`;
 
   const plus = document.createElement("button");
@@ -731,8 +739,8 @@ function renderTray() {
   for (const c of changes) {
     const span = document.createElement("span");
     span.className = "ch";
-    const where = c.slotLabel ? ` [${c.slotLabel}]` : "";
-    span.innerHTML = `<b>${c.label}${where}</b> ` +
+    const slotHTML = c.slotLabel ? ` [${esc(c.slotLabel)}]` : "";
+    span.innerHTML = `<b>${esc(c.label)}${slotHTML}</b> ` +
       `<span class="d">${c.delta > 0 ? "+" : ""}${c.delta} ${t("eng.click")}</span>`;
     list.appendChild(span);
   }
@@ -758,7 +766,7 @@ async function openWriteModal() {
 
   const box = $("modal-diff");
   if (!res.ok) {
-    box.innerHTML = `<div class="modal-error">${res.errors.join("<br>")}</div>`;
+    box.innerHTML = `<div class="modal-error">${res.errors.map(esc).join("<br>")}</div>`;
   } else {
     box.innerHTML = "";
     let g = null;
@@ -768,8 +776,8 @@ async function openWriteModal() {
         h.className = "g"; h.textContent = d.group; box.appendChild(h); g = d.group;
       }
       const line = document.createElement("div");
-      const where = d.slot ? ` [${d.slot}]` : "";
-      line.textContent = `${d.label}${where} · ${d.old_click} → ${d.new_click} ` +
+      line.textContent = `${d.label}${d.slot ? ` [${d.slot}]` : ""} · ` +
+        `${d.old_click} → ${d.new_click} ` +
         `(${d.delta > 0 ? "+" : ""}${d.delta} click) · ${d.old_phys} → ${d.new_phys}`;
       box.appendChild(line);
     }
@@ -1315,8 +1323,9 @@ function renderEngineer(st) {
     let txt = t(k);
     if (txt === k) txt = t("eng.do.default");   // t() falls back to the key if missing
     phaseEl.hidden = false;
-    // label + txt are trusted constants (profile label via tr(), i18n string).
-    phaseEl.innerHTML = `<b>${tf("eng.phaseNow", { label: eng.phase.label || "" })}</b> ${txt}`;
+    // `txt` è una frase nostra (i18n); l'etichetta della fase arriva dal server
+    // e si escapa lo stesso: «fidata» oggi è una promessa su un altro file.
+    phaseEl.innerHTML = `<b>${tf("eng.phaseNow", { label: esc(eng.phase.label) })}</b> ${txt}`;
   } else {
     phaseEl.hidden = true;
   }
@@ -1424,7 +1433,7 @@ function renderOutcome(eng) {
   if (Array.isArray(o.side_effects) && o.side_effects.length) {
     side = `<div class="oc-side"><span class="oc-side-label">${t("eng.oc.side")}</span> · ` +
       o.side_effects.map((s) =>
-        `${s.words || s.symptom} ${s.delta >= 0 ? "+" : ""}${fmtN(s.delta, 2)}`).join(" · ") +
+        `${esc(s.words || s.symptom)} ${s.delta >= 0 ? "+" : ""}${fmtN(s.delta, 2)}`).join(" · ") +
       `</div>`;
   }
   el.innerHTML = bits.join("") + side;
@@ -1467,10 +1476,12 @@ function renderFocus(st) {
   else { drill.hidden = true; }
 
   if (f.focus) {
-    const t = f.focus;
-    const base = t.baseline_ms ? ` · <span class="t-gap">−${fmtN(t.baseline_ms / 1000, 3, "s")}</span>` : "";
+    // `fc` e non `t`: col nome della traduzione addosso, un `t(...)` scritto
+    // qui un giorno chiamerebbe l'oggetto.
+    const fc = f.focus;
+    const base = fc.baseline_ms ? ` · <span class="t-gap">−${fmtN(fc.baseline_ms / 1000, 3, "s")}</span>` : "";
     target.hidden = false;
-    target.innerHTML = `<b>${t.name}</b> · ${t.theme}${base}`;
+    target.innerHTML = `<b>${esc(fc.name)}</b> · ${esc(fc.theme)}${base}`;
   } else {
     target.hidden = true;
   }
@@ -1494,7 +1505,7 @@ function renderPitReminder(st) {
   }
   if (state.lastWritten) {
     el.hidden = false;
-    el.innerHTML = tf("eng.pit", { name: state.lastWritten });
+    el.innerHTML = tf("eng.pit", { name: esc(state.lastWritten) });
     return;
   }
   el.hidden = true;

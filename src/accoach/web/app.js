@@ -56,8 +56,22 @@ function fixz(v, d) {
   return (Math.abs(v) < 0.5 * Math.pow(10, -d) ? 0 : v).toFixed(d);
 }
 
+// Ogni dato che entra in un template destinato a `innerHTML` passa da qui: nomi
+// curva e riferimenti scritti dal pilota, frasi del debrief, nomi di auto e
+// piste, messaggi d'errore. La revisione di sicurezza del 23/10 ha trovato un
+// nome curva salvato che diventava codice eseguito a ogni apertura del report.
+// L'HTML che serve davvero (un `<b>` attorno) si scrive nel template, e dentro
+// si escapa il dato, non il contorno. Anche `'`, per gli attributi fra apici.
+function esc(s) {
+  return (s == null ? "" : String(s)).replace(/&/g, "&amp;").replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
 // Text going into an HTML attribute (a tooltip): the debrief writes prose, and
-// prose contains apostrophes and quotes in both our languages.
+// prose contains apostrophes and quotes in both our languages. Resta com'era,
+// senza `'`: i nostri attributi sono tutti fra virgolette doppie, e le frasi
+// del debrief che passano di qui restano leggibili nel sorgente della pagina
+// (le prove di `test_web_rimandi.py` le cercano così). Per un dato nuovo, `esc`.
 function escAttr(s) {
   return String(s || "").replace(/&/g, "&amp;").replace(/"/g, "&quot;")
                         .replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -547,8 +561,8 @@ async function loadProgress(combo) {
   } else {
     el.innerHTML = p.recurring.map((r) =>
       `<div class="recur"><span class="count">${r.count}×</span>` +
-      `<span class="msg">${r.message}</span>` +
-      `<span class="where">${r.corners.join(", ")}</span></div>`).join("");
+      `<span class="msg">${esc(r.message)}</span>` +
+      `<span class="where">${r.corners.map(esc).join(", ")}</span></div>`).join("");
   }
 }
 
@@ -627,16 +641,16 @@ function dhDates(sessions) {
   for (const s of sessions) count[day(s.started_utc)] = (count[day(s.started_utc)] || 0) + 1;
   return sessions.map((s) => {
     const iso = s.started_utc;
-    let label = "—";
+    let dateHTML = "—";
     if (iso) {
       const d = new Date(iso);
       const second = count[day(iso)] > 1
         ? d.toLocaleTimeString(LANG(), { hour: "2-digit", minute: "2-digit" })
         : d.toLocaleDateString(LANG(), { month: "short" });
-      label = `${d.getDate()}<br>${escAttr(second)}`;
+      dateHTML = `${d.getDate()}<br>${escAttr(second)}`;
     }
     const tip = fmtWhen(iso) + " · " + tf("dh.valid", { n: s.valid });
-    return `<span title="${escAttr(tip)}">${label}</span>`;
+    return `<span title="${escAttr(tip)}">${dateHTML}</span>`;
   }).join("");
 }
 
@@ -711,9 +725,9 @@ function renderLevels(levels) {
       gap = `<span class="lvl-gap done">${t("lvl.beaten")}</span>` +
             `<span class="lvl-hint">+${ahead} ${t("lvl.vsPro")}</span>`;
     }
-    rows += `<div class="lvl" data-key="${lv.key}">` +
-      `<span class="lvl-label">${lv.label}</span>` +
-      `<span class="lvl-time">${lv.lap_time}</span>` +
+    rows += `<div class="lvl" data-key="${esc(lv.key)}">` +
+      `<span class="lvl-label">${esc(lv.label)}</span>` +
+      `<span class="lvl-time">${esc(lv.lap_time)}</span>` +
       gap + `</div>`;
   }
   el.innerHTML = `<h3>${t("lvl.header")}</h3>` +
@@ -737,7 +751,7 @@ function renderTrends(trends) {
     const tag = sys ? t("trends.toTrain") : t("trends.oneOff");
     return `<div class="weak ${sys ? "sys" : ""}">` +
       `<div class="weak-head">` +
-      `<span class="corner">${w.name}</span>${badge}` +
+      `<span class="corner">${esc(w.name)}</span>${badge}` +
       `<span class="lost">−${fmtDec(w.total_s, 3, "s")}</span></div>` +
       `<div class="detail">${tag} · ` +
       `${t("trends.median")} −${fmtDec(w.median_s, 3, "s")} · ${w.occurrences}/${w.laps} ${t("lbl.laps")}</div>` +
@@ -769,14 +783,14 @@ function renderCornerSessions(rows) {
       const day = (p.started || "").slice(0, 10);
       const hm = (p.started || "").slice(11, 16);
       return `<div class="ses-row">` +
-        `<span class="ses-when">${day} ${hm}</span>` +
+        `<span class="ses-when">${esc(day)} ${esc(hm)}</span>` +
         `<span class="ses-track"><span class="ses-fill" style="width:${w}%"></span></span>` +
         `<span class="ses-nums">−${fmtDec(p.median_s, 3, "s")} · ${p.laps} ${t("cornerses.laps")}</span>` +
         `</div>`;
     }).join("");
     const mark = adviceApexIn(r) !== null ? advMarkHTML() : "";
     return `<div class="weak sys" data-corner="${r.corner_index}"><div class="weak-head">` +
-      `<span class="corner">${mark}${r.name}</span>${verdict}</div>${bars}</div>`;
+      `<span class="corner">${mark}${esc(r.name)}</span>${verdict}</div>${bars}</div>`;
   }).join("");
 }
 
@@ -797,7 +811,7 @@ function renderCornerConsistency(rows) {
     const w = fixz(Math.min(r.spread_kmh / mx, 1) * 100, 0);
     const mark = adviceApexIn(r) !== null ? advMarkHTML() : "";
     return `<div class="cons-row" data-corner="${r.corner_index}">` +
-      `<span class="corner">${mark}${r.name}</span>` +
+      `<span class="corner">${mark}${esc(r.name)}</span>` +
       `<span class="cons-track"><span class="cons-fill" style="width:${w}%"></span></span>` +
       `<span class="cons-nums">${t("cons.spread")} <b>${fmtDec(r.spread_kmh, 1)}</b> km/h · ` +
       `σ ${fmtDec(r.std_kmh, 1)} · ${r.n} ${t("lbl.laps")}</span>` +
@@ -942,7 +956,7 @@ async function loadSectors() {
     if (stale(seen)) return;
     // Senza settori la riga non ha niente da indicare: si spegne.
     renderAdviceLine("sectors", [], null, { hide: () => true });
-    $("sectors").innerHTML = `<div class="muted">${e.message}</div>`;
+    $("sectors").innerHTML = `<div class="muted">${esc(e.message)}</div>`;
     $("ideal").innerHTML = ""; $("sec-table").innerHTML = "";
     return;
   }
@@ -1360,7 +1374,7 @@ function drawRailList() {
     html += `<button type="button" class="rail-row${sel === l.index ? " on" : ""}" ` +
             `data-i="${l.index}" title="${escAttr(l.message || "")}">` +
             `<span class="n">T${l.index + 1}</span>` +
-            `<span class="nm">${markOf(l.index)}${l.label}</span>` +
+            `<span class="nm">${markOf(l.index)}${esc(l.label)}</span>` +
             `<span class="bar"><span class="fill" style="width:${w}%;` +
             `background:${lossColor(sev)}"></span></span>` +
             `<span class="s">−${fmtDec(l.lost_s, 2)}</span></button>`;
@@ -1371,7 +1385,7 @@ function drawRailList() {
   for (const c of rows.cold) {
     html += `<button type="button" class="rail-row cold${sel === c.index ? " on" : ""}" ` +
             `data-i="${c.index}"><span class="n">T${c.index + 1}</span>` +
-            `<span class="nm">${markOf(c.index)}${c.name}</span></button>`;
+            `<span class="nm">${markOf(c.index)}${esc(c.name)}</span></button>`;
   }
   el.innerHTML = html;
 
@@ -1845,11 +1859,11 @@ function drawLapBar(a) {
 function offTrackBadge(a) {
   const rev = (a.laps || []).find((l) => l.path === a.review.path);
   if (!(rev && rev.off_track)) return "";
-  const where = a.review.lost_at_corner
-    ? ` ${t("lap.offTrack.at")} ${a.review.lost_at_corner}`
+  const atHTML = a.review.lost_at_corner
+    ? ` ${t("lap.offTrack.at")} ${esc(a.review.lost_at_corner)}`
     : "";
   return ` <span class="off-track" title="${t("lap.offTrack.why")}">` +
-         `${t("lap.offTrack")}${where}</span>`;
+         `${t("lap.offTrack")}${atHTML}</span>`;
 }
 
 // What's left for Compare's own summary once the lap bar owns the identity: the
@@ -1889,8 +1903,9 @@ function conditionsNote(c) {
   }
   if (c.reason === "compound") {
     return tf("sum.cond.tyre", {
-      tyre: c.compound, time: c.faster_lap_time,
-      ftyre: c.faster_compound || t("sum.cond.unknown"),
+      // La mescola viene dal gioco e la frase finisce in innerHTML.
+      tyre: esc(c.compound), time: c.faster_lap_time,
+      ftyre: c.faster_compound ? esc(c.faster_compound) : t("sum.cond.unknown"),
     });
   }
   if (c.reason === "grip") {
@@ -1913,9 +1928,9 @@ function conditionsNote(c) {
 function setupDelta(ref, rev) {
   if (!ref || !rev) return "";
   const bits = [];
-  const num = (k, label, suffix) => {
+  const num = (k, abbr, suffix) => {
     if (ref[k] === undefined || rev[k] === undefined || ref[k] === rev[k]) return;
-    bits.push(`${label} ${ref[k]}${suffix || ""} → ${rev[k]}${suffix || ""}`);
+    bits.push(`${abbr} ${esc(ref[k])}${suffix || ""} → ${esc(rev[k])}${suffix || ""}`);
   };
   num("brake_bias", "BB", "%");
   num("tc", "TC", "");
@@ -1947,7 +1962,7 @@ function drawCornerSpeeds(a) {
     const dTxt = d == null ? "–" : (d > 0 ? "+" : "") + Math.round(d);
     const name = c.name || ("T" + ((c.index ?? 0) + 1));
     const mark = adviceApexIn(cornerOfIndex(a, c.index)) !== null ? advMarkHTML() : "";
-    body += `<tr><td class="vc">${mark}${name}</td>` +
+    body += `<tr><td class="vc">${mark}${esc(name)}</td>` +
       `<td class="vn">${num(c.vmin_live)}</td>` +
       `<td class="vn ref">${num(c.vmin_ref)}</td>` +
       `<td class="vn ${cls}">${dTxt}</td></tr>`;
@@ -1962,7 +1977,7 @@ function drawCornerSpeeds(a) {
 function cornerLegend(a) {
   if (!a.corners || !a.corners.length) return "";
   return `<div class="legend">` + a.corners.map((c) =>
-    `<span><b>T${c.index + 1}</b>${c.name}</span>`).join("") + `</div>`;
+    `<span><b>T${c.index + 1}</b>${esc(c.name)}</span>`).join("") + `</div>`;
 }
 
 // Waterfall: the corner time losses ranked biggest-first as proportional bars —
@@ -1993,9 +2008,9 @@ function drawWaterfall(a) {
       : "";
     const mark = adviceApexIn(cornerOfIndex(a, l.index)) !== null ? advMarkHTML() : "";
     return `<div class="cons-row">` +
-      `<span class="corner">${mark}${l.label}${from}</span>` +
+      `<span class="corner">${mark}${esc(l.label)}${from}</span>` +
       `<span class="cons-track"><span class="cons-fill" style="width:${w}%;background:${lossColor(sev)}"></span></span>` +
-      `<span class="cons-nums"><b>−${fmtDec(l.lost_s, 3, "s")}</b> · ${l.message}</span>` +
+      `<span class="cons-nums"><b>−${fmtDec(l.lost_s, 3, "s")}</b> · ${esc(l.message)}</span>` +
       `</div>`;
   }).join("");
   el.innerHTML = `<h3>${t("wf.title")}</h3>` + rows;
@@ -2014,7 +2029,7 @@ const _PHASE_TINT = { entry: 0.95, apex: 0.75, exit: 0.55, after: 0.35 };
 function phaseBlock(loss) {
   const bar = phaseBar(loss);
   if (bar) return bar;
-  return loss.phase_note ? `<div class="detail">${loss.phase_note}</div>` : "";
+  return loss.phase_note ? `<div class="detail">${esc(loss.phase_note)}</div>` : "";
 }
 
 function phaseBar(loss) {
@@ -2038,10 +2053,10 @@ function phaseBar(loss) {
 function noteBlocks(a) {
   return (a.notes || []).map((n) =>
     `<div class="loss note" data-kind="${escAttr(n.kind || "")}">` +
-    `<div class="loss-head"><span class="corner">${n.message}</span>` +
+    `<div class="loss-head"><span class="corner">${esc(n.message)}</span>` +
     (n.lost_s > 0 ? `<span class="lost">−${fmtDec(n.lost_s, 3, "s")}</span>` : "") +
     `</div>` +
-    (n.detail ? `<div class="detail">${n.detail}</div>` : "") +
+    (n.detail ? `<div class="detail">${esc(n.detail)}</div>` : "") +
     `</div>`).join("");
 }
 
@@ -2058,22 +2073,22 @@ function drawDebrief(a) {
   // that the corner list is the wrong lens. Distinct look — it reframes the
   // whole debrief rather than adding to it.
   const head = a.headline
-    ? `<div class="headline">${a.headline}</div>` : "";
+    ? `<div class="headline">${esc(a.headline)}</div>` : "";
   let html = `<h3>${t("debrief.title")}</h3>${legend}${head}${notes}`;
   for (const l of a.losses) {
     const major = l.lost_s >= 0.2 ? "major" : "";
     const mark = adviceApexIn(cornerOfIndex(a, l.index)) !== null ? advMarkHTML() : "";
     html += `<div class="loss ${major}">` +
-      `<div class="loss-head"><span class="corner">${mark}${l.label}</span>` +
+      `<div class="loss-head"><span class="corner">${mark}${esc(l.label)}</span>` +
       `<span class="lost">−${fmtDec(l.lost_s, 3, "s")}</span></div>` +
-      `<div class="cause">${l.message}</div>` +
+      `<div class="cause">${esc(l.message)}</div>` +
       // The link to the corner before, when there is one. Above the numbers
       // because it changes *which corner* the driver should go and work on —
       // there is no point reading this corner's figures first.
-      (l.inherited ? `<div class="chain">↩ ${l.inherited}</div>` : "") +
+      (l.inherited ? `<div class="chain">↩ ${esc(l.inherited)}</div>` : "") +
       phaseBlock(l) +
-      (l.detail ? `<div class="detail">${l.detail}</div>` : "") +
-      (l.fix ? `<div class="fix">💡 ${l.fix}</div>` : "") +
+      (l.detail ? `<div class="detail">${esc(l.detail)}</div>` : "") +
+      (l.fix ? `<div class="fix">💡 ${esc(l.fix)}</div>` : "") +
       `</div>`;
   }
   el.innerHTML = html;
@@ -2131,12 +2146,12 @@ function renderFlow(a) {
                                 { s: fmtDec(s.lost_s, 2) })}</p>`
     : "";
   card.innerHTML =
-    (s.where ? `<span class="flow-where">${s.where}</span>` : "") +
+    (s.where ? `<span class="flow-where">${esc(s.where)}</span>` : "") +
     cost +
-    `<h2 class="flow-title">${s.title}</h2>` +
-    (s.body ? `<p class="flow-body">${s.body}</p>` : "") +
-    (s.detail ? `<p class="flow-detail">${s.detail}</p>` : "") +
-    (s.fix ? `<div class="flow-fix"><span class="tag">${t("flow.fix")}</span>${s.fix}</div>` : "");
+    `<h2 class="flow-title">${esc(s.title)}</h2>` +
+    (s.body ? `<p class="flow-body">${esc(s.body)}</p>` : "") +
+    (s.detail ? `<p class="flow-detail">${esc(s.detail)}</p>` : "") +
+    (s.fix ? `<div class="flow-fix"><span class="tag">${t("flow.fix")}</span>${esc(s.fix)}</div>` : "");
 
   const hasChart = s.kind !== "clean";
   const wrap = $("c-flow").parentNode;
@@ -2401,7 +2416,7 @@ function renderSession(s) {
           ? `<span class="tag fuel" title="${escAttr(t("ses.fuel"))}">${fmtDec(l.fuel_used, 2, "L")}</span>`
           : "");
       return `<button type="button" class="ses-lap${l.is_best ? " is-best" : ""}" ` +
-             `data-path="${l.path}" title="${t("ses.open")}">` +
+             `data-path="${esc(l.path)}" title="${t("ses.open")}">` +
              `<span class="time">${l.lap_time}</span>` +
              `<span class="bar"><i style="width:${fixz(w, 1)}%"></i></span>` +
              `<span class="tags">${tags}</span></button>`;
@@ -2418,9 +2433,9 @@ function renderSession(s) {
       `<h3>${t("ses.changed")}</h3><div class="nothing">${t("ses.first")}</div>`;
   } else {
     const rows = (list, cls) => list.map((x) =>
-      `<div class="move ${cls}"><span class="corner">${x.label}</span>` +
+      `<div class="move ${cls}"><span class="corner">${esc(x.label)}</span>` +
       `<span class="amount">${cls === "up" ? "−" : "+"}${fmtDec(x.gain_s, 2, "s")}</span>` +
-      `${x.message ? `<span class="why">${x.message}</span>` : ""}</div>`).join("");
+      `${x.message ? `<span class="why">${esc(x.message)}</span>` : ""}</div>`).join("");
     const any = prev.improved.length + prev.regressed.length;
     $("ses-changed").innerHTML = `<h3>${t("ses.changed")}</h3>` + (any
       ? (prev.improved.length ? `<h4>${t("ses.improved")}</h4>` + rows(prev.improved, "up") : "") +
@@ -2650,7 +2665,7 @@ function renderPagella(p, index) {
   PAG_NOTE = "";
   body.innerHTML = pagDefects(p.defects) +
     `<div class="pag-grid">${pagWorst(p.worst_corners)}${pagErrors(p.errors)}</div>` +
-    (note ? `<div class="nothing pag-note">${note}</div>` : "") +
+    (note ? `<div class="nothing pag-note">${esc(note)}</div>` : "") +
     pagPlan(p.advice, p.declined);
   wirePagella(body);
 }
@@ -2666,16 +2681,17 @@ function pagDefects(defects) {
   const says = { down: t("pag.trend.down"), same: t("pag.trend.same"), up: t("pag.trend.up") };
   const rows = defects.map((d) => {
     const corners = d.corners || [];
-    const where = corners.length
+    // Solo numeri dentro: è già HTML sicuro, e il nome lo dice.
+    const whereHTML = corners.length
       ? tf("pag.def.where", { n: corners.length, w: d.laps_with, l: d.laps })
       : tf("pag.def.laps", { w: d.laps_with, l: d.laps });
     const per = d.unit === "s" ? t("pag.def.coast") : t("pag.def.perlap");
     const trend = d.trend
-      ? `<span class="pag-trend ${d.trend}" title="${escAttr(says[d.trend])}">${arrows[d.trend]}</span>`
+      ? `<span class="pag-trend ${esc(d.trend)}" title="${escAttr(says[d.trend])}">${arrows[d.trend] || ""}</span>`
       : "";
     // Solo span: la riga finisce dentro un <summary>, che non vuole blocchi.
     const line = `<span class="pag-name"><b>${escAttr(d.name)}</b>` +
-      `<span class="pag-small">${where}</span></span>` +
+      `<span class="pag-small">${whereHTML}</span></span>` +
       `<span class="pag-cost"><span class="num loss">${fmtSecs(d.value, d.unit)}</span> ` +
       `<span class="pag-small">${per}</span>${pagSpark(d.series, d.unit, d.trend)}${trend}</span>`;
     if (!corners.length) return `<div class="pag-row">${line}</div>`;
@@ -2777,15 +2793,16 @@ function pagDeclined(list) {
 
 function pagStep(a, i, active, first) {
   const corners = a.corners || [];
-  const where = !corners.length ? t("pag.adv.lap")
+  // I nomi curva escapati uno per uno: la frase intorno è nostra.
+  const whereHTML = !corners.length ? t("pag.adv.lap")
     : corners.length === 1 ? escAttr(corners[0])
     : tf("pag.adv.from", { first: escAttr(corners[0]),
                            rest: corners.slice(1).map(escAttr).join(", ") });
   const target = tf(a.unit === "s" ? "pag.adv.target.coast" : "pag.adv.target",
                     { v: fmtSecs(a.target, a.unit) });
-  const btn = (action, label, cls) =>
+  const btn = (action, text, cls) =>
     `<button type="button" class="mini-btn${cls ? " " + cls : ""}" ` +
-    `data-defect="${escAttr(a.defect)}" data-action="${action}">${label}</button>`;
+    `data-defect="${escAttr(a.defect)}" data-action="${action}">${text}</button>`;
   let mark = String(i + 1), tag = "", extra = "", buttons = "";
   if (a.status === "active") {
     tag = `<span class="pag-tag active">${t("pag.adv.active")}</span>`;
@@ -2803,7 +2820,7 @@ function pagStep(a, i, active, first) {
   return `<li class="pag-step ${a.status}">` +
     `<span class="pag-k">${mark}</span>` +
     `<div class="pag-step-body"><b>${escAttr(a.name)}</b> ${tag}` +
-    `<div class="pag-small">${where} · ${target}</div>${extra}</div>` +
+    `<div class="pag-small">${whereHTML} · ${target}</div>${extra}</div>` +
     `<div class="pag-btns">${buttons}${how}</div></li>`;
 }
 
@@ -3102,7 +3119,7 @@ function renderHowto(h) {
   const figs = h.figures || [];
   const trace = HOWTO_TRACE[h.defect];
   // Il ritorno sta anche in alto: con tre figure il fondo è lontano.
-  const back = (where) => `<p class="howto-back-row ${where}"><button type="button" ` +
+  const back = (pos) => `<p class="howto-back-row ${pos}"><button type="button" ` +
     `class="mini-btn howto-back">${t("howto.back")}</button></p>`;
   let html = back("top") + `<h2 class="howto-title">${escAttr(h.name)}</h2>`;
   html += h.problem
@@ -3403,7 +3420,7 @@ function renderStint(s) {
           ? `<span class="tag tyre" title="${escAttr(t("tyre.temp"))}">${fmtDec(l.tyre_c, 0, "°C")}</span>`
           : "");
       return `<button type="button" class="ses-lap${l.counted ? "" : " not-pace"}" ` +
-             `data-path="${l.path}" title="${t("ses.open")}">` +
+             `data-path="${esc(l.path)}" title="${t("ses.open")}">` +
              `<span class="time">${l.lap_time}</span>` +
              `<span class="bar"><i style="width:${fixz(w, 1)}%"></i></span>` +
              `<span class="tags">${tags}</span></button>`;
@@ -4418,7 +4435,7 @@ function dynReadoutHTML(a, p) {
   const c = a.review.channels;
   const i = nearest(c.pos, p);
   const corner = (a.corners || []).find((x) => p >= x.entry && p <= x.exit);
-  const where = corner ? `<b class="muted">${corner.name}</b> &nbsp;·&nbsp; ` : "";
+  const whereHTML = corner ? `<b class="muted">${esc(corner.name)}</b> &nbsp;·&nbsp; ` : "";
   const gl = (c.g_lat || [])[i] || 0, gL = (c.g_long || [])[i] || 0;
   const gt = Math.hypot(gl, gL);
   const sf = (c.slip_front || [])[i] || 0, sr = (c.slip_rear || [])[i] || 0;
@@ -4427,7 +4444,7 @@ function dynReadoutHTML(a, p) {
     const off = a.review.line_offset[i] || 0;
     extra += ` &nbsp;·&nbsp; ${t("dyn.ro.off")} <b>${fmtSgn(off, 1, "m")}</b>`;
   }
-  return where +
+  return whereHTML +
     `<b>${t("ro.pos")} ${posLabel(p)}</b> &nbsp;·&nbsp; ` +
     `${t("dyn.ro.g")} <b>${fmtDec(gt, 2, "g")}</b> <span class="muted">(${t("dyn.ro.lat")} ${fmtDec(gl, 2)}, ${t("dyn.ro.lon")} ${fmtDec(gL, 2)})</span> &nbsp;·&nbsp; ` +
     `${t("dyn.ro.slipF")} <b>${fmtDec(sf, 2)}</b>  ${t("dyn.ro.slipR")} <b>${fmtDec(sr, 2)}</b>` + extra;
@@ -4507,7 +4524,7 @@ function renderBrakeSheet(b) {
     // riferimento della scheda): il consiglio le ritrova per posizione.
     const adv = adviceApexIn(r);
     body += brakeRowOpen(adv) +
-      `<td class="vc">${adv !== null ? advMarkHTML() : ""}${r.name}</td>` +
+      `<td class="vc">${adv !== null ? advMarkHTML() : ""}${esc(r.name)}</td>` +
       `<td class="vn big">${r.speed_kmh}<span class="muted"> km/h</span></td>` +
       `<td class="vn">${r.gear}</td>` +
       // Editable, and this is roadmap item 2 arriving from the only place it
@@ -4515,7 +4532,7 @@ function renderBrakeSheet(b) {
       // not be sourced — two guides contradict each other on almost every Imola
       // corner, and no measurement arbitrates between a 50 m board and a 100 m
       // one. The driver is looking at the thing.
-      `<td class="ref"><button type="button" class="mark" data-pos="${r.pos}" ` +
+      `<td class="ref"><button type="button" class="mark" data-pos="${esc(r.pos)}" ` +
       `data-typed="${r.typed ? 1 : 0}" title="${escAttr(t("brk.mark.edit"))}">` +
       (r.landmark ? escAttr(r.landmark)
                   : `<span class="muted">– <span class="pencil">✎</span></span>`) +
@@ -4550,6 +4567,17 @@ function renderBrakeSheet(b) {
   $("brk-print").onclick = () => window.print();
 }
 
+// La frase del server quando rifiuta un nome (400: un carattere vietato, già
+// nella lingua del pilota), vuota per ogni altro errore: lì «non sono riuscito
+// a salvare» resta la risposta giusta, e un 500 non ha niente da dire al pilota.
+// Una promessa e non una `async`: non scrive niente, quindi non corre la corsa
+// dei caricatori, ed è chi la aspetta a guardare il contatore.
+function refusalOf(r) {
+  if (r.status !== 400) return Promise.resolve("");
+  return r.json().then((j) => (typeof j.detail === "string" ? j.detail : ""),
+                       () => "");
+}
+
 // One cell of the braking sheet, turned into a field. The row already knows
 // where it brakes; what it is missing is what you look at when you do.
 function editMark(btn) {
@@ -4576,14 +4604,15 @@ function editMark(btn) {
   // ramo buono fa `SHEET = null; await loadBraking()`, cioè al peggio una
   // richiesta in più della scheda del momento, che `loadBraking` arbitra da sé.
   const send = async (text) => {
+    let why = "";
     try {
-      const r = await fetch("/api/braking-reference", {
+      const r = await fetch("/api/braking-reference?lang=" + encodeURIComponent(LANG()), {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ track: CURRENT.track, pos: parseFloat(pos), text }),
       });
-      if (!r.ok) throw new Error(r.status);
+      if (!r.ok) { why = await refusalOf(r); throw new Error(r.status); }
     } catch (e) {
-      cell.innerHTML = `<span class="warn">${t("line.name.err")}</span>`;
+      cell.innerHTML = `<span class="warn">${esc(why || t("line.name.err"))}</span>`;
       return;
     }
     // Re-fetch the sheet rather than patch the cell: the same phrase is spoken
@@ -4683,7 +4712,7 @@ function lineChipHTML(c, i, on) {
 }
 
 function lineNameHTML(c) {
-  return (adviceApexIn(c) !== null ? advMarkHTML() : "") + c.name;
+  return (adviceApexIn(c) !== null ? advMarkHTML() : "") + esc(c.name);
 }
 
 // Dalla riga alla curva. Come il clic su un chip: la finestra va sulla curva e
@@ -4754,7 +4783,7 @@ function renderLine(cx) {
          tf("line.extraHint", { you: lap.path_m, ref: lap.ref_path_m }),
          extra > 0 ? "warn" : "") +
     item(t("line.mean"), fmtDec(lap.mean_off_m, 2, "m")) +
-    item(t("line.worst"), fmtDec(lap.max_off_m, 1, "m"), lap.max_off_where) +
+    item(t("line.worst"), fmtDec(lap.max_off_m, 1, "m"), esc(lap.max_off_where)) +
     item(t("line.corners"), L.corners.length);
 
   // «Tutto il giro» è il primo chip e non uno stato assente: finché la finestra
@@ -4901,16 +4930,17 @@ async function saveCornerName(name) {
   if (!L || !L.corners[LINE_I]) return;
   const c = L.corners[LINE_I];
   const seen = EPOCH;
+  let why = "";
   try {
-    const r = await fetch("/api/corner-name", {
+    const r = await fetch("/api/corner-name?lang=" + encodeURIComponent(LANG()), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ track: L.track, pos: c.apex, name: name }),
     });
-    if (!r.ok) throw new Error(r.status);
+    if (!r.ok) { why = await refusalOf(r); throw new Error(r.status); }
   } catch (e) {
     if (stale(seen)) return;
-    $("line-readout").innerHTML = `<span class="warn">${t("line.name.err")}</span>`;
+    $("line-readout").innerHTML = `<span class="warn">${esc(why || t("line.name.err"))}</span>`;
     return;
   }
   // Il disegno sì, la cache no: vedi sopra la funzione. Azzerarla anche qui è
@@ -4962,7 +4992,7 @@ function renderLineFacts(c) {
   const dist = fmtSgn(c.extra_m, 1, "m");
   el.innerHTML =
     (c.tags.length
-      ? `<div class="tagrow">` + c.tags.map((x) => `<span class="ltag">${x}</span>`).join("") + `</div>`
+      ? `<div class="tagrow">` + c.tags.map((x) => `<span class="ltag">${esc(x)}</span>`).join("") + `</div>`
       : `<div class="tagrow"><span class="ltag ok">${t("line.same")}</span></div>`) +
     row(t("line.f.apex"), apex) +
     row(t("line.f.entry"), offWord(c.entry_m, c)) +
@@ -5384,7 +5414,7 @@ function cornerNote(ctx, w, corner) {
   ctx.save();
   ctx.font = "bold " + canvasFont(13) + "px " + UI_FONT;
   const lh = Math.ceil(canvasFont(13) * 1.3);
-  const head = `${fmtDec(l.lost_s || 0, 2, "s")} · ${l.message}`;
+  const head = `${fmtDec(l.lost_s || 0, 2, "s")} · ${l.message}`;  // per il canvas (fillText), non HTML
   // A backdrop, because this text lies over a drawing: the two lines cross the
   // whole canvas and a bare label on top of them is unreadable at the crossing.
   const sub = l.inherited || l.phase_note || "";
@@ -5544,7 +5574,7 @@ function updateLineReadout(L, p) {
   const c = L.corners[LINE_I];
   const off = DATA && DATA.review && DATA.review.line_offset;
   const pos = DATA && DATA.review && DATA.review.channels.pos;
-  let bits = `<b class="muted">${c.name}</b> &nbsp;·&nbsp; ` +
+  let bits = `<b class="muted">${esc(c.name)}</b> &nbsp;·&nbsp; ` +
              `<b>${t("ro.pos")} ${posLabel(p)}</b>`;
   if (Array.isArray(off) && pos) {
     const i = nearest(pos, p);
@@ -5583,8 +5613,8 @@ function readoutHTML(a, p) {
   // centimetri più a sinistra: «Curva 1 ✕ · Curva 1 · Pos 1294 m» è esattamente
   // il tipo di eco che rende la pagina più lunga senza dire niente di nuovo.
   const named = RANGE && RANGE.label && corner && RANGE.label === corner.name;
-  const where = corner && !named ? `<b class="muted">${corner.name}</b> &nbsp;·&nbsp; ` : "";
-  return where +
+  const whereHTML = corner && !named ? `<b class="muted">${esc(corner.name)}</b> &nbsp;·&nbsp; ` : "";
+  return whereHTML +
     `<b>${t("ro.pos")} ${posLabel(p)}</b> &nbsp;·&nbsp; ` +
     `${t("ro.speed")} <b>${fmtDec(yv, 0)}</b> <span class="muted">(${t("ro.ref")} ${fmtDec(rfv, 0)}, ${fmtSgn(dv, 0)})</span> &nbsp;·&nbsp; ` +
     `Δ <b class="${dl > 0 ? "slower" : "faster"}">${fmtSgn(dl, 3, "s")}</b> &nbsp;·&nbsp; ` +
@@ -5617,7 +5647,8 @@ function rangeChip() {
              : from != null && to != null
                ? `${Math.round(from)}–${Math.round(to)} m`
                : `${Math.round(RANGE.from * 100)}–${fmtPct(RANGE.to)}`;
-  return `<span class="range-chip"><b>${what}</b>` +
+  // L'etichetta è il nome della curva, quindi un dato del pilota.
+  return `<span class="range-chip"><b>${esc(what)}</b>` +
          `<button type="button" class="range-clear" title="${t("range.clear")}">✕</button>` +
          `</span> &nbsp;·&nbsp; `;
 }

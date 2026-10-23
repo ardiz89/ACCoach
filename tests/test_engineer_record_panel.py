@@ -105,7 +105,7 @@ function grab(name) {
 const line = (re) => src.split("\n").find((l) => re.test(l));
 // `const` dentro un eval resta nell'eval: si dichiara `var`, che ne esce.
 const asVar = (code) => code.replace(/^const /, "var ");
-eval(asVar(line(/^const t = /))); eval(grab("fmtN"));
+eval(asVar(line(/^const t = /))); eval(grab("fmtN")); eval(grab("esc"));
 eval(asVar(src.slice(src.indexOf("const tf = "), src.indexOf("};", src.indexOf("const tf = ")) + 2)));
 eval(asVar(line(/^const REC_MIN_TESTS/)));
 const els = {};

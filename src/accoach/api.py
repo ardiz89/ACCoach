@@ -48,6 +48,7 @@ from .comparison import Reference
 from . import cornernames, pagella
 from .cornermap import learn_from
 from .i18n import current_language
+from .i18n import t as tr_ui
 from .recording import laps_root, load_lap
 from .recording.catalog import LapCatalog, _GRIP_BAND, _TEMP_BAND_C
 from .recording.lap import SAMPLE_FIELDS
@@ -944,8 +945,20 @@ def create_api(
         """
         return cornernames.for_track(track)
 
+    def _refuse_markup(text: str, lang: str | None) -> None:
+        """400 con la frase nella lingua del pilota se il testo apre codice.
+
+        Decisione 10 del piano di sicurezza: le pagine escapano comunque, ma
+        il nome è salvato e riletto ovunque, quindi non deve entrarci. 400 e
+        non 422: non è una richiesta malformata, è un nome che non accettiamo,
+        e la pagina mostra il `detail` così com'è.
+        """
+        if cornernames.has_forbidden(text):
+            raise HTTPException(400, tr_ui("names.forbidden",
+                                           lang or current_language()))
+
     @app.post("/api/corner-name")
-    def corner_name_set(body: dict = Body(...)) -> dict:
+    def corner_name_set(body: dict = Body(...), lang: str | None = None) -> dict:
         """Name a corner, or hand the name back.
 
         An empty name is the *undo*, and it is the same gesture as naming: the
@@ -964,6 +977,7 @@ def create_api(
             raise HTTPException(422, "pos must be between 0 and 1")
         if len(name) > cornernames.MAX_NAME:
             raise HTTPException(422, "name too long")
+        _refuse_markup(name, lang)
         try:
             cornernames.put(track, pos, name)
         except OSError:
@@ -972,7 +986,8 @@ def create_api(
                 "names": len(cornernames.for_track(track))}
 
     @app.post("/api/braking-reference")
-    def braking_reference_set(body: dict = Body(...)) -> dict:
+    def braking_reference_set(body: dict = Body(...),
+                              lang: str | None = None) -> dict:
         """What you look at when you brake here — roadmap item 2, from the one
         source that can settle it.
 
@@ -993,6 +1008,7 @@ def create_api(
             raise HTTPException(422, "pos must be between 0 and 1")
         if len(text) > cornernames.MAX_MARK:
             raise HTTPException(422, "reference too long")
+        _refuse_markup(text, lang)
         try:
             cornernames.put_mark(track, pos, text)
         except OSError:

@@ -82,6 +82,36 @@ _ITALIC = re.compile(r"(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)", re.S)
 _INLINE = (_LINK, _BOLD, _ITALIC)
 
 
+#: Gli schemi che un link della guida può usare. Tutto il resto (``javascript:``,
+#: ``data:``, ``vbscript:``…) diventa testo: la guida si apre sulla 8778, la
+#: pagina da cui partono le scritture degli assetti, e un link che esegue codice
+#: lì dentro non ha nessun motivo di esistere in un documento nostro.
+_SAFE_SCHEMES = ("http:", "https:", "mailto:")
+_SCHEME = re.compile(r"^[a-z][a-z0-9+.-]*:", re.I)
+
+
+def _safe_href(href: str) -> bool:
+    """Un'ancora (``#…``), un percorso relativo senza schema, o uno schema noto.
+
+    Il controllo si fa sul testo con le entità sciolte e senza spazi o
+    caratteri di controllo, perché il browser li ignora: «java», un tab e
+    «script:» per lui è ``javascript:``, e ``javascript&colon;`` anche.
+    """
+    plain = re.sub(r"[\x00-\x20]", "", html.unescape(href)).lower()
+    if not _SCHEME.match(plain):
+        return True
+    return plain.startswith(_SAFE_SCHEMES)
+
+
+def _link(m: re.Match[str]) -> str:
+    if not _safe_href(m.group(2)):
+        return m.group(1)
+    # Il testo è già escapato da `_inline`: `html.escape` sopra un `&amp;`
+    # darebbe `&amp;amp;`, quindi si riparte dall'originale.
+    href = html.escape(html.unescape(m.group(2)), quote=True)
+    return f'<a href="{href}">{m.group(1)}</a>'
+
+
 def _inline(text: str) -> str:
     """Escape, then apply inline markup — with code spans held out of it."""
     spans: list[str] = []
@@ -92,8 +122,7 @@ def _inline(text: str) -> str:
 
     text = _CODE_SPAN.sub(_stash, text)
     text = html.escape(text)
-    text = _LINK.sub(lambda m: f'<a href="{html.escape(m.group(2), quote=True)}">'
-                               f"{m.group(1)}</a>", text)
+    text = _LINK.sub(_link, text)
     text = _BOLD.sub(r"<strong>\1</strong>", text)
     text = _ITALIC.sub(r"<em>\1</em>", text)
     return re.sub(r"\x00(\d+)\x00", lambda m: f"<code>{spans[int(m.group(1))]}</code>",
@@ -422,6 +451,13 @@ def render_page(markdown_text: str, lang: str = "it",
     fonts are served from ``/static`` and simply fall back to the system stack
     there — a different typeface beats a page that only opens sometimes.
     """
+    from .i18n import DEFAULT_LANGUAGE, LANGUAGES
+
+    # La lingua arriva da `?lang=` ed entra in `<html lang="…">`: una lingua che
+    # non conosciamo diventa quella predefinita invece di essere scritta com'è,
+    # se no `lang="><script>…` è uno script eseguito sulla 8778.
+    if lang not in LANGUAGES:
+        lang = DEFAULT_LANGUAGE
     body, headings = render_markdown(markdown_text)
     s = _STRINGS.get(lang, _STRINGS["it"])
     title = next((t for lvl, _, t in headings if lvl == 1), "HONE")
@@ -438,14 +474,21 @@ def render_page(markdown_text: str, lang: str = "it",
                   f'<a class="back" href="/">{s["back"]}</a>')
         icon = '<link rel="icon" href="/static/hone_icon.png">'
 
-    return _PAGE.format(lang=lang, title=html.escape(title), css=_CSS, body=body,
-                        toc=toc, toc_label=s["toc"], header=header, icon=icon)
+    # Escapato tutto quello che non è già HTML costruito qui (`body`, `toc`,
+    # `header`, `css`, `icon`): oggi sono costanti, ma è la riga in cui un
+    # domani qualcuno farà passare un valore che viene da fuori.
+    esc = html.escape
+    return _PAGE.format(lang=esc(lang), title=esc(title), css=_CSS, body=body,
+                        toc=toc, toc_label=esc(s["toc"]), header=header, icon=icon)
 
 
 def render_guide(lang: str | None = None, standalone: bool = False) -> str:
     """Read the guide for ``lang`` off disk and render it."""
-    if lang is None:
-        from .i18n import current_language
+    from .i18n import LANGUAGES, current_language
+
+    # Una lingua sconosciuta (dall'URL) vale quanto nessuna lingua: quella
+    # dell'app, non un documento scelto a caso e poi un `lang` scritto com'è.
+    if lang not in LANGUAGES:
         lang = current_language()
     path = guide_source(lang)
     if not path.is_file():

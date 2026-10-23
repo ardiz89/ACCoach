@@ -70,6 +70,19 @@ MARK_TOL = 0.02
 #: that. Eighty leaves room without letting a paragraph into a table cell.
 MAX_MARK = 80
 
+#: I caratteri che un nome o un riferimento non possono contenere. Sono quelli
+#: che aprono codice in una pagina: il nome finisce nel report, nella pagina
+#: Ingegnere e sul tablet, e il 23/10 la revisione di sicurezza ha trovato che
+#: ci entrava senza escape. Le pagine adesso escapano, ma il file resta l'unica
+#: copia e la si legge anche fuori dal browser: meglio che non ci entrino.
+#: Nessun nome vero di curva li usa ("Curva Grande", "Variante Ascari"); il
+#: prezzo è l'apostrofo di «Curva dell'Ascari», e si scrive senza.
+FORBIDDEN = set("<>&\"'")
+
+
+def has_forbidden(text: str) -> bool:
+    return any(ch in FORBIDDEN for ch in text or "")
+
 
 def path() -> Path:
     from .paths import base_dir
@@ -219,6 +232,10 @@ def _put(track: str, pos: float, text: str, kind: str, field: str,
          tol: float, p: Path | None) -> None:
     p = p or path()
     text = (text or "").strip()
+    # Qui e non solo nel server: `put` ha altri chiamanti, e la regola che
+    # protegge il file deve stare dove il file si scrive.
+    if has_forbidden(text):
+        raise ValueError(f"{kind}: {field} contains one of {''.join(sorted(FORBIDDEN))}")
     key = _key(track)
     data = _read(p)
 

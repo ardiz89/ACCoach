@@ -561,6 +561,10 @@ _UI: dict[str, dict[str, str]] = {
               "reload it.",
         "it": "Il report non ha risposto entro 5 s. Se la pagina resta vuota, "
               "ricaricala."},
+    # Il rifiuto di un nome curva o di un riferimento di frenata con dentro un
+    # carattere che apre codice nelle pagine (Decisione 10 della sicurezza).
+    "names.forbidden": {"en": "The name can't contain < > & \" '.",
+                        "it": "Il nome non può contenere < > & \" '."},
 }
 
 

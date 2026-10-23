@@ -197,6 +197,8 @@ function tf(key, vals) {
 }
 const escAttr = (s) => String(s).replace(/&/g, "&amp;").replace(/"/g, "&quot;")
   .replace(/</g, "&lt;").replace(/>/g, "&gt;");
+// `esc` quella vera: i nomi curva ci passano dal 23/10 (sicurezza, Task 3).
+eval(grab("function esc("));
 // I formati dei numeri non sono l'oggetto di questa prova (li prova
 // `test_web_numeri.py`): qui bastano versioni col punto.
 const fixz = (v, d) => v.toFixed(d);
