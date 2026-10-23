@@ -248,3 +248,75 @@ def test_lan_key_persistente_lunga_32_dove_dice_key_path():
     b = guard.lan_key()
     assert a == b and len(a) == 32
     assert guard.key_path().read_text(encoding="utf-8").strip() == a
+
+
+# --- giro 1 della revisione -------------------------------------------------
+
+def test_un_sito_sulla_porta_8778_non_legge_health():
+    """Il CORS ammette `http://<qualunque>:8778`: senza un controllo dell'Origin
+    anche sulle letture, un sito ospitato altrove sulla porta 8778 leggeva
+    `/health` dal browser del PC (che e' locale e non porta chiavi)."""
+    evil = "http://evil.example:8778"
+    with TestClient(create_app(engine=_Motore(), hz=50),
+                    base_url="http://127.0.0.1:8777") as c:
+        r = c.get("/health", headers={"Origin": evil})
+        assert r.headers.get("access-control-allow-origin") != evil
+        assert r.status_code == 403
+        r = c.options("/health", headers={
+            "Origin": evil, "Access-Control-Request-Method": "GET"})
+        assert r.headers.get("access-control-allow-origin") != evil
+        assert r.status_code == 403
+
+        buona = "http://127.0.0.1:8778"
+        r = c.get("/health", headers={"Origin": buona})
+        assert r.status_code == 200
+        assert r.headers["access-control-allow-origin"] == buona
+        r = c.options("/health", headers={
+            "Origin": buona, "Access-Control-Request-Method": "GET"})
+        assert r.status_code == 200
+        assert r.headers["access-control-allow-origin"] == buona
+
+
+def test_i_client_python_passano_da_127_senza_origin_ne_chiave():
+    """L'overlay (QWebSocket) e il pannello dell'hub (GET /health): locali,
+    senza Origin e senza chiave. Provato col loro IP vero, non col nome
+    `testclient` che la conftest ammette per comodita'."""
+    app = create_app(engine=_Motore(), hz=50)
+    with TestClient(app, base_url="http://127.0.0.1:8777",
+                    client=("127.0.0.1", 5000)) as c:
+        assert c.get("/health").status_code == 200
+        with c.websocket_connect("ws://127.0.0.1:8777/ws"):
+            pass
+
+
+def test_un_resolver_lento_non_ferma_le_richieste(monkeypatch):
+    """`local_addresses` puo' metterci secondi dietro una VPN, e la 8777
+    trasmette a 15 Hz sullo stesso loop: con una cache gia' piena il ricalcolo
+    va fuori dal loop e intanto vale quella vecchia."""
+    import threading
+    import time as _t
+
+    guard.allowed_hosts()   # cache piena
+    guard._invecchia()      # ...e scaduta
+    via = threading.Event()
+    chiamate = []
+
+    def lento():
+        chiamate.append(1)
+        via.wait(5.0)
+        return {"127.0.0.1", "::1", PC_LAN}
+
+    monkeypatch.setattr(netinfo, "local_addresses", lento)
+    try:
+        with TestClient(_mini(), base_url="http://127.0.0.1:8778") as c:
+            t0 = _t.monotonic()
+            assert c.get("/x").status_code == 200
+            assert c.get("/x").status_code == 200
+            assert _t.monotonic() - t0 < 2.0
+            # liberato dentro il `with`: all'uscita il TestClient aspetta i
+            # suoi thread, e qui si misura la richiesta, non la chiusura
+            via.set()
+    finally:
+        via.set()
+    # un ricalcolo solo, anche con due richieste mentre era in corso
+    assert len(chiamate) <= 1

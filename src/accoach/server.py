@@ -172,10 +172,12 @@ def create_app(engine: CoachEngine | None = None, hz: float = 15.0, *,
 
     app.state.publish = publish
     # The engineer UI is served from the analysis app (a different local port),
-    # so it talks to this backend cross-origin. Non piu' `*`: qualunque sito
-    # poteva leggere `/health` e scrivere `/engineer/applied` da un browser sul
-    # PC del pilota. Il CORS ammette solo la porta delle pagine; *quale* host
-    # lo decide il guardiano, che conosce i nomi del PC (vedi `guard`).
+    # so it talks to this backend cross-origin. Non piu' `*`, che lasciava a
+    # qualunque sito leggere `/health` dal browser del PC del pilota. Il CORS
+    # ammette qualunque host sulla porta delle pagine e da solo non basterebbe
+    # (un sito su `evil.example:8778` passerebbe): *quale* host lo decide il
+    # guardiano, che rifiuta con 403 ogni richiesta, letture e preflight
+    # compresi, il cui Origin non e' un nome di questo PC (vedi `guard`).
     from .config import load_config
     from .guard import GuardMiddleware
     page_port = load_config().web.port

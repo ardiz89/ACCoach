@@ -24,11 +24,13 @@ browser sul PC del pilota la leggerebbe tutta.
 
 from __future__ import annotations
 
+import asyncio
 import hmac
 import html
 import os
 import secrets
 import socket
+import threading
 import time
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
@@ -56,11 +58,15 @@ _MESSAGGIO_401 = {
 }
 
 _cache: dict = {}
+# Un ricalcolo degli indirizzi alla volta (vedi `_rinfresca`).
+_lock_rete = threading.Lock()
 
 
 def _dimentica() -> None:
     """Svuota le cache (indirizzi e chiave). Per i test, e per chi cambia rete."""
+    generazione = _cache.get("generazione", 0) + 1
     _cache.clear()
+    _cache["generazione"] = generazione
 
 
 def key_path() -> Path:
@@ -117,13 +123,77 @@ def _leggi(path: Path) -> str:
         return ""
 
 
-def _locali() -> set[str]:
-    now = time.monotonic()
-    hit = _cache.get("locali")
-    if hit is None or now - hit[0] > _TTL_S:
-        hit = (now, set(netinfo.local_addresses()))
-        _cache["locali"] = hit
-    return hit[1]
+def _calcola() -> tuple[float, frozenset[str], frozenset[str]]:
+    """Indirizzi del PC e nomi ammessi nell'Host, in un colpo solo.
+
+    E' la parte lenta (``gethostbyname_ex`` puo' metterci secondi con una VPN
+    di mezzo): il guardiano la chiama fuori dal loop, vedi `_rinfresca`.
+    """
+    try:
+        locali = set(netinfo.local_addresses())
+    except Exception:  # noqa: BLE001 - best-effort, mai cadere qui
+        locali = {"127.0.0.1", "::1"}
+    nomi = {"localhost", "127.0.0.1", "::1", "[::1]"}
+    nomi.update(a.lower() for a in locali)
+    try:
+        nomi.add(socket.gethostname().lower())
+    except Exception:  # noqa: BLE001 - best-effort, mai cadere qui
+        pass
+    return time.monotonic(), frozenset(locali), frozenset(nomi)
+
+
+def _rete() -> tuple[float, frozenset[str], frozenset[str]]:
+    """La cache degli indirizzi; la calcola qui solo se e' vuota.
+
+    Chi la legge non la rinfresca mai: se e' scaduta vale lo stesso, finche'
+    `_rinfresca` non ne porta una nuova. Calcolarla qui, sul loop della 8777,
+    vorrebbe dire fermare il feed dal vivo per tutto il tempo del resolver.
+    """
+    hit = _cache.get("rete")
+    if hit is None:
+        hit = _calcola()
+        _cache["rete"] = hit
+    return hit
+
+
+def _ricalcola(generazione: int) -> None:
+    try:
+        nuova = _calcola()
+        # Un `_dimentica()` arrivato nel frattempo vince: niente dati vecchi
+        # scritti sopra una cache appena svuotata.
+        if _cache.get("generazione", 0) == generazione:
+            _cache["rete"] = nuova
+    finally:
+        _lock_rete.release()
+
+
+async def _rinfresca() -> None:
+    """Prima di ogni richiesta: la cache c'e' ed e' fresca, o lo sara'.
+
+    Vuota (il primo colpo di un processo) si riempie in un thread e si
+    aspetta, senza fermare il loop. Scaduta si rinfresca in un thread e
+    **non** si aspetta: intanto vale quella di prima, e un solo ricalcolo alla
+    volta anche con mille richieste nel frattempo.
+    """
+    hit = _cache.get("rete")
+    if hit is not None and time.monotonic() - hit[0] <= _TTL_S:
+        return
+    loop = asyncio.get_running_loop()
+    if hit is None:
+        await loop.run_in_executor(None, _rete)
+        return
+    if _lock_rete.acquire(blocking=False):
+        try:
+            loop.run_in_executor(None, _ricalcola, _cache.get("generazione", 0))
+        except Exception:  # pragma: no cover - executor chiuso
+            _lock_rete.release()
+
+
+def _invecchia() -> None:
+    """Fa scadere la cache senza svuotarla. Per i test."""
+    hit = _cache.get("rete")
+    if hit is not None:
+        _cache["rete"] = (hit[0] - 10 * _TTL_S, hit[1], hit[2])
 
 
 def allowed_hosts() -> frozenset[str]:
@@ -132,18 +202,7 @@ def allowed_hosts() -> frozenset[str]:
     Loopback, gli indirizzi del PC (dentro c'e' l'IP di rete, quello del QR) e
     il nome della macchina. La porta non conta: si confronta solo il nome.
     """
-    now = time.monotonic()
-    hit = _cache.get("hosts")
-    if hit is None or now - hit[0] > _TTL_S:
-        nomi = {"localhost", "127.0.0.1", "::1", "[::1]"}
-        nomi.update(a.lower() for a in _locali())
-        try:
-            nomi.add(socket.gethostname().lower())
-        except Exception:  # noqa: BLE001 - best-effort, mai cadere qui
-            pass
-        hit = (now, frozenset(nomi))
-        _cache["hosts"] = hit
-    return hit[1]
+    return _rete()[2]
 
 
 def is_local_client(ip: str | None) -> bool:
@@ -152,7 +211,7 @@ def is_local_client(ip: str | None) -> bool:
         return False
     if ip.lower().startswith("::ffff:"):
         ip = ip[7:]   # IPv4 mappato su socket IPv6: e' lo stesso indirizzo
-    return ip in _locali()
+    return ip in _rete()[1]
 
 
 def _host_name(host: str) -> str:
@@ -196,6 +255,7 @@ class GuardMiddleware:
             await self.app(scope, receive, send)
             return
 
+        await _rinfresca()
         headers: dict[str, str] = {}
         for k, v in scope.get("headers") or ():
             headers[k.decode("latin-1").lower()] = v.decode("latin-1")
@@ -205,17 +265,22 @@ class GuardMiddleware:
             await self._nega(kind, send, 403, "host not allowed")
             return
 
-        method = scope.get("method", "GET").upper() if kind == "http" else "GET"
-        # Il preflight non porta credenziali: solo l'Host, il resto lo decide
-        # il CORS dietro di noi.
-        if kind == "http" and method == "OPTIONS":
-            await self.app(scope, receive, send)
+        # L'Origin, quando c'e', e' sempre una delle nostre pagine: anche sulle
+        # letture e sui preflight. Il CORS della 8777 ammette qualunque host
+        # sulla porta delle pagine, e un sito ospitato su `evil.example:8778`
+        # leggeva `/health` dal browser del PC, che e' locale e non porta
+        # chiavi. Le pagine non ne soffrono: una GET o una navigazione sulla
+        # stessa origine l'Origin non lo manda, e quando lo manda e' il nostro.
+        origin = headers.get("origin")
+        if origin is not None and not _origin_ok(origin, self.page_port):
+            await self._nega(kind, send, 403, "origin not allowed")
             return
 
-        origin = headers.get("origin")
-        if kind == "websocket" and origin is not None \
-                and not _origin_ok(origin, self.page_port):
-            await self._nega(kind, send, 403, "origin not allowed")
+        method = scope.get("method", "GET").upper() if kind == "http" else "GET"
+        # Il preflight non porta credenziali: Host e Origin bastano, il resto
+        # lo decide il CORS dietro di noi.
+        if kind == "http" and method == "OPTIONS":
+            await self.app(scope, receive, send)
             return
 
         query = parse_qs(scope.get("query_string", b"").decode("latin-1"))
@@ -237,14 +302,13 @@ class GuardMiddleware:
                 await self._nega(kind, send, 415,
                                  "content type must be application/json")
                 return
-            if origin is not None and not _origin_ok(origin, self.page_port):
-                await self._nega(kind, send, 403, "origin not allowed")
-                return
 
         if kind == "http" and method == "GET" and query_ok:
             # Il QR porta `?k=`: da qui in poi la chiave la ricorda il cookie.
-            # Non HttpOnly di proposito: le pagine lo leggono per parlare con
-            # la 8777, dove il cookie della 8778 non viaggia (cross-origin).
+            # Non HttpOnly di proposito: le pagine lo leggono e lo passano alla
+            # 8777 come `?k=` o `X-HONE-Key`. I cookie non guardano la porta, ma
+            # una fetch cross-origin senza credenziali non li manda, e il
+            # WebSocket di un browser non accetta header.
             cookie = (f"{COOKIE}={dalla_query}; Path=/; Max-Age={_MAX_AGE}; "
                       "SameSite=Lax").encode("latin-1")
 
