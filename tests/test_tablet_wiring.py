@@ -18,13 +18,25 @@ _SRC = Path(__file__).resolve().parent.parent / "src" / "accoach"
 _NODE = shutil.which("node")
 
 
-def _redirect_script() -> str:
-    html = (_SRC / "web" / "engineer.html").read_text(encoding="utf-8")
-    head = html.split("</head>", 1)[0]
-    for m in re.finditer(r"<script>(.*?)</script>", head, re.S):
-        if 'location.replace("/tablet")' in m.group(1):
-            return m.group(1)
-    raise AssertionError("nessuno script di rinvio nel <head> di engineer.html")
+def _web(name: str) -> str:
+    return (_SRC / "web" / name).read_text(encoding="utf-8")
+
+
+def _head_scripts() -> list[str]:
+    head = _web("engineer.html").split("</head>", 1)[0]
+    return re.findall(r'<script src="([^"]+)"', head)
+
+
+def _node(js: str) -> str:
+    out = subprocess.run([_NODE, "-e", js], capture_output=True, text=True,
+                         timeout=20)
+    assert out.returncode == 0, out.stderr
+    return out.stdout.strip()
+
+
+# Il finto browser: una `window` e un `location` che stampa dove si va.
+_FINTO = ("var window = {};\n"
+          "var location = {replace: function (u) { console.log(u); }};\n")
 
 
 def test_device_urls_has_tablet():
@@ -42,69 +54,43 @@ def test_qr_points_to_tablet():
 
 
 def test_engineer_redirects_old_browsers():
-    html = (_SRC / "web" / "engineer.html").read_text(encoding="utf-8")
-    head = html.split("</head>", 1)[0]
-    at = head.index('location.replace("/tablet")')
-    assert "<script src=" not in head[:at]
-    assert "<script src=" in html  # i file veri vengono dopo
-    assert safari9_problems(_redirect_script(), "js") == []
+    # La prova e' la prima cosa del <head>: prima di qualunque altro script,
+    # se no un browser vecchio si ferma su engineer.js e resta bianco. Niente
+    # script inline: la CSP delle pagine non li lascia passare senza nonce.
+    assert _head_scripts()[:2] == ["/static/modern.js", "/static/modern-gate.js"]
+    assert "<script src=" in _web("engineer.html").split("</head>", 1)[1]
+    assert safari9_problems(_web("modern-gate.js"), "js") == []
+    assert 'location.replace("/tablet")' in _web("modern-gate.js")
 
 
 @pytest.mark.skipif(_NODE is None, reason="node non disponibile")
 def test_redirect_skips_modern_browsers():
-    js = ("var location = {replace: function (u) { console.log(u); }};\n"
-          + _redirect_script())
-    out = subprocess.run([_NODE, "-e", js], capture_output=True, text=True,
-                         timeout=20)
-    assert out.returncode == 0, out.stderr
-    assert out.stdout == ""
+    assert _node(_FINTO + _web("modern.js") + "\n" + _web("modern-gate.js")) == ""
 
 
 @pytest.mark.skipif(_NODE is None, reason="node non disponibile")
-def test_redirect_fires_when_async_is_unknown():
-    # La prova contraria: se `new Function` rifiuta `async`, il rinvio scatta.
-    js = ("var location = {replace: function (u) { console.log(u); }};\n"
-          "var NativeFunction = Function;\n"
-          "Function = function (body) {\n"
-          "  if (/async/.test(body)) throw new SyntaxError('no async');\n"
-          "  return NativeFunction.apply(null, arguments);\n"
-          "};\n" + _redirect_script())
-    out = subprocess.run([_NODE, "-e", js], capture_output=True, text=True,
-                         timeout=20)
-    assert out.returncode == 0, out.stderr
-    assert out.stdout.strip() == "/tablet"
-
-
-def _probe(text):
-    m = re.search(r'new Function\("([^"]+)"\)', text)
-    assert m, "nessuna prova `new Function(...)`"
-    return m.group(1)
+def test_redirect_fires_when_modern_js_does_not_parse():
+    # La prova contraria: un browser che non analizza modern.js non esegue
+    # nemmeno la riga della bandierina, ed e' come se il file non ci fosse.
+    assert _node(_FINTO + _web("modern-gate.js")) == "/tablet"
 
 
 def test_the_probe_covers_both_forms_the_full_page_uses():
     # engineer.js scrive `async` e `??`: Safari 10-13 conosce il primo e non
     # il secondo, e una prova del solo `async` lo lascerebbe sulla pagina bianca.
-    probe = _probe(_redirect_script())
-    assert "async function" in probe and "??" in probe
+    # Tutte e due nello stesso file della bandierina: un errore di sintassi
+    # ferma il file intero, quindi la bandierina si alza solo se passano entrambe.
+    src = _web("modern.js")
+    assert "async function" in src and "??" in src
+    assert "window.HONE_MODERN = true" in src
 
 
 def test_tablet_hides_the_full_page_link_with_the_same_probe():
     # Il link «Pagina completa» si spegne dove /engineer rimanderebbe indietro:
-    # la regola e' una sola, quindi lo stesso testo nei due file.
-    tablet = (_SRC / "web" / "tablet.js").read_text(encoding="utf-8")
-    assert _probe(tablet) == _probe(_redirect_script())
-
-
-@pytest.mark.skipif(_NODE is None, reason="node non disponibile")
-def test_redirect_fires_when_nullish_is_unknown():
-    # Un browser che legge `async` ma non `??` (Safari 10-13): rinvio anche qui.
-    js = ("var location = {replace: function (u) { console.log(u); }};\n"
-          "var NativeFunction = Function;\n"
-          "Function = function (body) {\n"
-          "  if (body.indexOf('??') !== -1) throw new SyntaxError('no ??');\n"
-          "  return NativeFunction.apply(null, arguments);\n"
-          "};\n" + _redirect_script())
-    out = subprocess.run([_NODE, "-e", js], capture_output=True, text=True,
-                         timeout=20)
-    assert out.returncode == 0, out.stderr
-    assert out.stdout.strip() == "/tablet"
+    # la regola e' una sola, quindi la stessa bandierina dallo stesso file.
+    tablet = _web("tablet.js")
+    body = tablet.split("function fullPageWorks", 1)[1].split("}", 1)[0]
+    assert "window.HONE_MODERN" in body
+    assert "window.HONE_MODERN" in _web("modern-gate.js")
+    html = _web("tablet.html")
+    assert html.index('src="/static/modern.js"') < html.index('src="/static/tablet.js"')

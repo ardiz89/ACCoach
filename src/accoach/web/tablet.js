@@ -70,12 +70,12 @@
   // sbagliato.
   function offKey(st) { return st ? "tablet.waiting" : "tablet.off"; }
 
-  // La stessa prova di engineer.html, con lo stesso testo (un test lo
-  // confronta): dove non passa la pagina completa non parte e rimanda qui, e
-  // un link che ci porta farebbe solo un giro a vuoto.
+  // La stessa prova di engineer.html: la bandierina di modern.js, che si
+  // alza solo dove `async` e `??` si leggono. Dove non c'e' la pagina
+  // completa non parte e rimanda qui, e un link che ci porta farebbe solo un
+  // giro a vuoto. Prima compilava una stringa, e la CSP non lo lascia passare.
   function fullPageWorks() {
-    try { new Function("async function f(){}; var a = null ?? 1;"); return true; }
-    catch (e) { return false; }
+    return window.HONE_MODERN === true;
   }
 
   // ---- gomme ----------------------------------------------------------------

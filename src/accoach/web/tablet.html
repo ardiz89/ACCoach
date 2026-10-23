@@ -139,6 +139,9 @@
     <a id="t-full" class="t-full" href="/engineer" data-i18n="tablet.full">Full page</a>
   </div>
 
+  <!-- modern.js su Safari 9 non si analizza (errore in console, voluto):
+       window.HONE_MODERN resta assente e tablet.js spegne «Pagina completa». -->
+  <script src="/static/modern.js"></script>
   <script src="/static/i18n.js"></script>
   <script src="/static/lankey.js"></script>
   <script src="/static/tablet.js"></script>

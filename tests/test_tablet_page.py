@@ -36,7 +36,10 @@ def test_tablet_loads_only_its_files():
               if 'rel="stylesheet"' in tag
               for m in re.findall(r'href="([^"]+)"', tag)]
     # lankey.js: la chiave del Wi-Fi verso il motore (test_guard_pagine.py).
+    # modern.js: la prova «pagina completa» che su Safari 9 non si analizza
+    # apposta (test_csp.py); e' l'unico file qui fuori da TABLET_FILES.
     assert sorted(scripts + sheets) == ["/static/i18n.js", "/static/lankey.js",
+                                        "/static/modern.js",
                                         "/static/tablet.css", "/static/tablet.js"]
 
 

@@ -242,18 +242,75 @@ def _same(a: str, b: str) -> bool:
     return hmac.compare_digest(a.encode("utf-8"), b.encode("utf-8"))
 
 
-class GuardMiddleware:
-    """Il guardiano, montato come middleware piu' esterno di tutte e due le app."""
+def new_nonce() -> str:
+    """Un nonce per risposta: uno fisso si impara e si ricopia nello script."""
+    return secrets.token_urlsafe(16)
 
-    def __init__(self, app, *, page_port: int):
+
+def csp(host_header: str, nonce: str, live_port: int) -> str:
+    """La Content-Security-Policy di una pagina servita dalla 8778.
+
+    Uno script iniettato da un testo sfuggito all'escape non ha il nonce, e il
+    browser non lo esegue. ``'unsafe-inline'`` accanto al nonce e' voluto: i
+    browser CSP2 lo ignorano quando c'e' un nonce, Safari 9 (l'iPad del
+    pilota, CSP1) il nonce non lo conosce e senza resterebbe senza lo script
+    della lingua. ``connect-src`` apre solo la 8777 dello stesso host con cui
+    la pagina e' stata chiamata: e' li' che stanno il WebSocket e
+    ``/engineer/applied``. L'host l'ha gia' vagliato il guardiano, quindi qui
+    entra solo un nome di questo PC.
+    """
+    host = _host_name(host_header)
+    live = int(live_port)
+    return (
+        "default-src 'self'; "
+        f"script-src 'self' 'nonce-{nonce}' 'unsafe-inline'; "
+        "style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data: blob:; "
+        "font-src 'self' data:; "
+        f"connect-src 'self' ws://{host}:{live} http://{host}:{live}; "
+        "object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
+    )
+
+
+# Su ogni risposta delle pagine, anche un JSON o un rifiuto del guardiano: un
+# file servito con un tipo sbagliato non diventa uno script (nosniff), e nessun
+# sito puo' mettere le nostre pagine in un iframe e far cliccare il pilota su
+# «Applica» senza che lo sappia (DENY, per i browser senza frame-ancestors).
+_PAGE_HEADERS = ((b"x-content-type-options", b"nosniff"),
+                 (b"x-frame-options", b"DENY"))
+
+
+def _con_header(send):
+    """`send` che aggiunge `_PAGE_HEADERS` all'inizio di ogni risposta."""
+    async def wrapped(message):
+        if message["type"] == "http.response.start":
+            message = dict(message)
+            presenti = {k.lower() for k, _ in message.get("headers") or []}
+            message["headers"] = list(message.get("headers") or []) + [
+                h for h in _PAGE_HEADERS if h[0] not in presenti]
+        await send(message)
+    return wrapped
+
+
+class GuardMiddleware:
+    """Il guardiano, montato come middleware piu' esterno di tutte e due le app.
+
+    ``page_headers`` lo accende solo l'app delle pagine (8778): la 8777 parla
+    JSON e WebSocket con l'overlay e con l'hub, e non ne ha bisogno.
+    """
+
+    def __init__(self, app, *, page_port: int, page_headers: bool = False):
         self.app = app
         self.page_port = int(page_port)
+        self.page_headers = bool(page_headers)
 
     async def __call__(self, scope, receive, send):
         kind = scope["type"]
         if kind not in ("http", "websocket"):
             await self.app(scope, receive, send)
             return
+        if kind == "http" and self.page_headers:
+            send = _con_header(send)
 
         await _rinfresca()
         headers: dict[str, str] = {}

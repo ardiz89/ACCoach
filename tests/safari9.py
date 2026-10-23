@@ -13,6 +13,8 @@ codice e si controllano.
 import re
 
 # I file che /tablet carica; quelli che esistono si controllano tutti.
+# Tranne `modern.js`: scrive `async` e `??` apposta, e su Safari 9 non si deve
+# analizzare (e' la prova che la pagina completa li' non parte).
 TABLET_FILES = ("i18n.js", "lankey.js", "tablet.js", "tablet.css")
 
 _JS_FORBIDDEN = (

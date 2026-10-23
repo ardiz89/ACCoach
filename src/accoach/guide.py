@@ -335,7 +335,7 @@ _PAGE = """<!doctype html>
   </nav>
   <main class="guide-body">{body}</main>
 </div>
-<script>
+<script{nonce_attr}>
 // Highlight the section you're reading. Progressive: without JS the page is
 // still the whole guide, just without the moving marker.
 (function () {{
@@ -442,7 +442,7 @@ _STRINGS = {
 
 
 def render_page(markdown_text: str, lang: str = "it",
-                standalone: bool = False) -> str:
+                standalone: bool = False, nonce: str | None = None) -> str:
     """The full HTML page for a guide document.
 
     ``standalone`` is for the copy the hub opens straight off disk, with no
@@ -450,6 +450,10 @@ def render_page(markdown_text: str, lang: str = "it",
     ``file://`` page, so they're dropped rather than left broken. The brand
     fonts are served from ``/static`` and simply fall back to the system stack
     there — a different typeface beats a page that only opens sometimes.
+
+    ``nonce`` e' quello della CSP con cui il server manda la pagina: lo script
+    del sommario lo porta, se no il browser non lo esegue. La copia aperta dal
+    disco non ha CSP e lo script resta senza.
     """
     from .i18n import DEFAULT_LANGUAGE, LANGUAGES
 
@@ -478,11 +482,14 @@ def render_page(markdown_text: str, lang: str = "it",
     # `header`, `css`, `icon`): oggi sono costanti, ma è la riga in cui un
     # domani qualcuno farà passare un valore che viene da fuori.
     esc = html.escape
+    nonce_attr = f' nonce="{esc(nonce)}"' if nonce else ""
     return _PAGE.format(lang=esc(lang), title=esc(title), css=_CSS, body=body,
-                        toc=toc, toc_label=esc(s["toc"]), header=header, icon=icon)
+                        toc=toc, toc_label=esc(s["toc"]), header=header, icon=icon,
+                        nonce_attr=nonce_attr)
 
 
-def render_guide(lang: str | None = None, standalone: bool = False) -> str:
+def render_guide(lang: str | None = None, standalone: bool = False,
+                 nonce: str | None = None) -> str:
     """Read the guide for ``lang`` off disk and render it."""
     from .i18n import LANGUAGES, current_language
 
@@ -493,7 +500,7 @@ def render_guide(lang: str | None = None, standalone: bool = False) -> str:
     path = guide_source(lang)
     if not path.is_file():
         raise FileNotFoundError(path)
-    return render_page(path.read_text(encoding="utf-8"), lang, standalone)
+    return render_page(path.read_text(encoding="utf-8"), lang, standalone, nonce)
 
 
 def write_offline_copy(lang: str | None = None) -> Path:

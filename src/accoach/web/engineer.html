@@ -4,15 +4,14 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <!-- Il preferito vecchio sull'iPad 3: questa pagina scrive `async` e `??`,
-       che Safari 9 non legge, e resterebbe bianca. Si provano tutti e due:
-       c'e' chi conosce `async` ma non `??` (Safari 10-13). Lo script e' ES3
-       apposta; dove si leggono non succede niente, dove no si va alla vista
-       tablet. tablet.js fa la stessa prova, con lo stesso testo, per il link
-       «Pagina completa». -->
-  <script>
-    try { new Function("async function f(){}; var a = null ?? 1;"); }
-    catch (e) { location.replace("/tablet"); }
-  </script>
+       che Safari 9 non legge, e resterebbe bianca. modern.js li scrive tutti
+       e due (c'e' chi conosce `async` ma non `??`, Safari 10-13) e, dove si
+       leggono, alza window.HONE_MODERN; modern-gate.js, ES3, senza la
+       bandierina va alla vista tablet. Prima era uno script inline che compilava
+       una stringa, e la CSP delle pagine non lo lascia piu' passare. La
+       stessa bandierina la legge tablet.js per il link «Pagina completa». -->
+  <script src="/static/modern.js"></script>
+  <script src="/static/modern-gate.js"></script>
   <title data-i18n="title.engineer">HONE · Engineer</title>
   <link rel="icon" href="/static/hone_icon.png">
   <link rel="stylesheet" href="/static/style.css">

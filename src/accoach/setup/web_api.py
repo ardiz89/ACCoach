@@ -273,6 +273,13 @@ def register_setup_routes(app: FastAPI, root=DEFAULT_ROOTS) -> None:
 
     @app.get("/api/setup/list")
     def setup_list(car: str = Query(...), track: str = Query(...)) -> list[dict]:
+        # `car` e `track` diventano cartelle sotto la radice del gioco: un `..`
+        # o un `C:/` (che `Path` prende per assoluto e mette al posto della
+        # radice) elencava file di qualunque cartella del PC, col percorso
+        # intero. Un nome del gioco non ha mai separatori ne' due punti.
+        for name in (car, track):
+            if name in (".", "..") or any(c in name for c in "/\\:"):
+                raise HTTPException(400, f"invalid name: {name!r}")
         found = []
         for game_root in roots:
             found += list_setups(car, track, game_root)

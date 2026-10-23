@@ -310,6 +310,10 @@
       .map((g) => `<dt>${esc(g.term)}</dt><dd>${esc(g.meaning)}</dd>`).join("");
     $("glossBtn").onclick = () => $("glossDlg").showModal();
   }
+  // «Chiudi» del glossario: era un `onclick=` nell'HTML, che sotto la CSP
+  // (niente script inline senza nonce) il browser non esegue piu'. Qui una
+  // volta sola, non in `fillGlossary`, che riparte a ogni piano caricato.
+  $("glossClose").addEventListener("click", () => $("glossDlg").close());
 
   // --- guided tour (vanilla coachmarks — see tour.js) -------------------
   // Says what to *do*, not what each control is: you arrive here from a QR code

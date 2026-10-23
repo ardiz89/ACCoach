@@ -18,7 +18,7 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from fastapi import Body, FastAPI, HTTPException, Query
+from fastapi import Body, FastAPI, HTTPException, Query, Request
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 
@@ -2407,7 +2407,23 @@ def create_api(
             buf.getvalue(), media_type="text/csv",
             headers={"Content-Disposition": f'attachment; filename="{stem}.csv"'})
 
-    def _serve(page: str) -> Response:
+    def _csp_headers(request: Request, nonce: str) -> dict[str, str]:
+        """La CSP di una pagina, col nonce di questa risposta.
+
+        La porta live si legge dal config a ogni richiesta (e' in cache): e'
+        quella su cui la pagina apre il WebSocket, e una CSP che ne apre
+        un'altra lascerebbe la pagina Ingegnere senza dati dal vivo."""
+        from .config import load_config
+        from .guard import csp
+
+        try:
+            live = load_config().server.port
+        except Exception:  # pragma: no cover - config illeggibile: la predefinita
+            live = 8777
+        return {"Content-Security-Policy":
+                csp(request.headers.get("host", ""), nonce, live)}
+
+    def _serve(page: str, request: Request) -> Response:
         """Serve a web page with the app language written into it, and, in demo
         mode, a DEMO banner so synthetic laps can never be mistaken for real
         ones (the launcher will happily open a demo server already bound to the
@@ -2415,10 +2431,16 @@ def create_api(
 
         The language is read from the config file on every request: the hub is
         another process and only ever writes the file, so a change made there
-        shows on the next reload of the page."""
+        shows on the next reload of the page.
+
+        Lo script della lingua e' l'unico inline delle pagine, e porta il nonce
+        della CSP: uno script iniettato da un testo sfuggito all'escape non lo
+        conosce, e il browser non lo esegue."""
         from .config import load_config, read_language
+        from .guard import new_nonce
         from .i18n import DEFAULT_LANGUAGE, LANGUAGES
 
+        nonce = new_nonce()
         path = _WEB_DIR / page
         html = path.read_text(encoding="utf-8")
         if '/static/i18n.js' in html:
@@ -2438,14 +2460,15 @@ def create_api(
             html = re.sub(r'<html lang="[a-z]{2}"', f'<html lang="{lang}"', html, count=1)
             html = html.replace(
                 '<script src="/static/i18n.js">',
-                f'<script>window.HONE_LANG = "{lang}";</script>\n'
+                f'<script nonce="{nonce}">window.HONE_LANG = "{lang}";</script>\n'
                 '  <script src="/static/i18n.js">', 1)
         if demo:
             banner = ('<div class="demo-banner" data-i18n="demo.banner">'
                       'These are sample laps made by HONE, not yours.</div>')
             html = html.replace("<body>", '<body class="demo-mode">\n' + banner, 1)
         return Response(content=html, media_type="text/html",
-                        headers={"Cache-Control": "no-cache"})
+                        headers={"Cache-Control": "no-cache",
+                                 **_csp_headers(request, nonce)})
 
     @app.post("/api/language")
     def set_app_language(payload: dict = Body(...)) -> dict:
@@ -2467,26 +2490,26 @@ def create_api(
         return {"lang": lang}
 
     @app.get("/")
-    def index() -> Response:
-        return _serve("index.html")
+    def index(request: Request) -> Response:
+        return _serve("index.html", request)
 
     @app.get("/engineer")
-    def engineer() -> Response:
+    def engineer(request: Request) -> Response:
         """The race-engineer setup page (live diagnosis + setup editor)."""
-        return _serve("engineer.html")
+        return _serve("engineer.html", request)
 
     @app.get("/tablet")
-    def tablet() -> Response:
+    def tablet(request: Request) -> Response:
         """La vista leggera dell'ingegnere per il tablet accanto al volante.
 
         Esiste perché il tablet del pilota è un iPad 3 con Safari 9, che non
         legge `engineer.js`: questa pagina è ES5 e cambia schermata da sola
         (in pista, avviso di rientro, fermo ai box)."""
-        return _serve("tablet.html")
+        return _serve("tablet.html", request)
 
     @app.get("/guida")
     @app.get("/guide")
-    def guide_page(lang: str | None = None) -> Response:
+    def guide_page(request: Request, lang: str | None = None) -> Response:
         """The user guide, rendered from the Markdown we ship.
 
         Two paths because the guide has two names depending on which language
@@ -2494,10 +2517,16 @@ def create_api(
         replaces — the "Guide" button used to open the Italian file in Notepad
         whatever you had chosen.
         """
+        from .guard import new_nonce
         from .guide import render_guide
 
+        # Il sommario che si illumina e' uno script inline: col nonce, se no
+        # sotto la CSP non parte.
+        nonce = new_nonce()
         try:
-            return Response(content=render_guide(lang), media_type="text/html")
+            return Response(content=render_guide(lang, nonce=nonce),
+                            media_type="text/html",
+                            headers=_csp_headers(request, nonce))
         except FileNotFoundError:
             # A build that lost the .md should say so, not serve a blank page.
             return Response(
@@ -2506,10 +2535,10 @@ def create_api(
                 media_type="text/html", status_code=404)
 
     @app.get("/test")
-    def test_page() -> Response:
+    def test_page(request: Request) -> Response:
         """The on-track test checklist — tablet-first, reads the live feed and
         auto-captures the cues HONE fires for each test."""
-        return _serve("test.html")
+        return _serve("test.html", request)
 
     @app.get("/api/test/latest_lap")
     def test_latest_lap() -> dict:
@@ -2562,7 +2591,10 @@ def create_api(
     # file statici e per quelle aggiunte domani (vedi `guard`).
     from .config import load_config
     from .guard import GuardMiddleware
-    app.add_middleware(GuardMiddleware, page_port=load_config().web.port)
+    # `page_headers`: nosniff e X-Frame-Options su ogni risposta della 8778,
+    # anche sui JSON, sui file statici e sui rifiuti del guardiano stesso.
+    app.add_middleware(GuardMiddleware, page_port=load_config().web.port,
+                       page_headers=True)
 
     return app
 
