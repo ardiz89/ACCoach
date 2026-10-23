@@ -1,10 +1,10 @@
 """Pre-render the coach's fixed cue phrases to WAV with Piper (neural TTS).
 
-Run at BUILD time (not shipped): `python tools/render_cues.py`. It AST-scans the
-coaching modules for the static string messages passed to `Cue(...)` (skipping
-f-strings / dynamic numeric phrases, which fall back to SAPI5 at runtime),
-synthesizes each with Piper's Italian voice, and writes them to
-`src/accoach/voice_cues/<slug>.wav` plus a `manifest.json` (message -> filename)
+Run at BUILD time (not shipped): `python tools/render_cues.py`. It takes every
+Italian phrase the voice can say from `accoach.coaching.spoken.spoken_phrases()`
+(the fixed cues, the numeric ones, the general `Cue.voice` sentences and the
+engineer's prefix, levers and revert), synthesizes each with Piper's Italian
+voice, and writes them to `src/accoach/voice_cues/<slug>.wav` plus a `manifest.json` (message -> filename)
 that the runtime PrerenderedBackend loads. Re-run whenever cue phrases change.
 
 Pass `--male` to render the optional male neural set (Piper it_IT-riccardo) into
@@ -14,7 +14,6 @@ is on, otherwise that option falls back to a male SAPI5 voice.
 
 from __future__ import annotations
 
-import ast
 import hashlib
 import json
 import subprocess
@@ -22,12 +21,11 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-COACHING = ROOT / "src" / "accoach" / "coaching"
 PIPER = ROOT / "tools" / "piper"
 PIPER_EXE = PIPER / "piper.exe"
 
-# (output folder, Piper model) per voice variant. Female is the shipped default;
-# male is an optional drop-in the runtime prefers when the male option is on.
+# (output folder, Piper model) per voice variant. La maschile e' quella
+# predefinita dal 23/10 (`voice.male = true`); la femminile resta l'altra scelta.
 _VARIANTS = {
     "female": (ROOT / "src" / "accoach" / "voice_cues", "voices/it_IT-paola-medium.onnx"),
     "male": (ROOT / "src" / "accoach" / "voice_cues_male", "voices/it_IT-riccardo-x_low.onnx"),
@@ -35,73 +33,16 @@ _VARIANTS = {
 
 
 def static_cue_messages() -> set[str]:
-    """Literal message strings of any call that also takes a CueCategory.
-
-    Catches both `Cue(CueCategory.X, "msg", ...)` and helper calls like
-    `self._make(s, CueCategory.X, "msg")` used across the detector modules.
-    f-strings (dynamic numeric phrases) are ignored — they fall back to SAPI5.
-    """
-    messages: set[str] = set()
-
-    def has_cue_category(call: ast.Call) -> bool:
-        for a in list(call.args) + [kw.value for kw in call.keywords]:
-            if isinstance(a, ast.Attribute) and isinstance(a.value, ast.Name) \
-                    and a.value.id == "CueCategory":
-                return True
-        return False
-
-    for path in sorted(COACHING.glob("*.py")):
-        tree = ast.parse(path.read_text(encoding="utf-8"))
-        # Un messaggio scritto prima e passato per nome: `msg = "…"` in fuel.py,
-        # le costanti `_CALL`/`_APPROACH`/`_BRIEFING` di pitcall.py. Prima il
-        # censimento guardava solo i letterali dentro la chiamata, e queste frasi
-        # (il rientro ai box, l'ultimo giro di benzina) uscivano da SAPI5.
-        assigned: dict[str, list[str]] = {}
-        for node in ast.walk(tree):
-            if isinstance(node, ast.Assign) and isinstance(node.value, ast.Constant) \
-                    and isinstance(node.value.value, str):
-                for t in node.targets:
-                    if isinstance(t, ast.Name):
-                        assigned.setdefault(t.id, []).append(node.value.value)
-        for node in ast.walk(tree):
-            if isinstance(node, ast.Call) and has_cue_category(node):
-                for a in list(node.args) + [kw.value for kw in node.keywords
-                                            if kw.arg != "voice"]:
-                    # `voice=` (la frase generale di `Cue.voice`) la raccogliera'
-                    # il catalogo delle frasi dette a voce, non questa scansione:
-                    # qui non c'e' ancora il loro WAV.
-                    if isinstance(a, ast.Constant) and isinstance(a.value, str):
-                        texts = [a.value]
-                    elif isinstance(a, ast.Name):
-                        texts = assigned.get(a.id, [])
-                    else:
-                        texts = []
-                    messages.update(t for t in texts if len(t) > 5)
-
-    # The trigger words are a table, not a call, so the scanner above cannot see
-    # them — and they are exactly the phrases the driver hears most often. Only
-    # the Italian ones: the shipped WAVs are Italian by construction.
-    from accoach.coaching.cue import TRIGGER
-    messages.update(e["it"] for e in TRIGGER.values())
-    return messages
+    """Le frasi fisse e le parole d'innesco: la scansione vive in
+    `accoach.coaching.spoken`, l'elenco da cui partono generazione e test."""
+    from accoach.coaching.spoken import static_cue_messages as scan
+    return scan()
 
 
 def dynamic_cue_messages() -> set[str]:
-    """Enumerate the small-range numeric cues so they're neural too.
-
-    These mirror the f-strings in the coaching modules over their real value
-    ranges; the runtime matches the full string exactly (any drift falls back to
-    SAPI5). Continuous numbers (tyre psi/°C advisories) stay on SAPI5.
-    """
-    msgs: set[str] = set()
-    # analyzer.py: f"Qui perdi {n} {unit}"  (decimi interi, «1 decimo» al singolare)
-    for n in range(1, 26):
-        msgs.add(f"Qui perdi {n} {'decimo' if n == 1 else 'decimi'}")
-    # fuel.py: f"Benzina per circa {laps_left} {unit}."  (da 1 a 3: alla soglia
-    # dei 2 giri il serbatoio può valerne uno; l'ultimo giro è una frase fissa)
-    for n in (1, 2, 3):
-        msgs.add(f"Benzina per circa {n} {'giro' if n == 1 else 'giri'}.")
-    return msgs
+    """I decimi (1-25) e la benzina (1-3), da `accoach.coaching.spoken`."""
+    from accoach.coaching.spoken import numeric_cue_messages
+    return numeric_cue_messages()
 
 
 def slug(text: str) -> str:
@@ -127,8 +68,11 @@ def main() -> None:
         raise SystemExit(1)
 
     out.mkdir(parents=True, exist_ok=True)
-    messages = sorted(static_cue_messages() | dynamic_cue_messages())
-    print(f"rendering {len(messages)} cue phrases (static + numeric) "
+    # Tutto quello che la voce dice in italiano, non solo le frasi fisse: anche
+    # le frasi generali di `Cue.voice` e l'ingegnere (`coaching/spoken.py`).
+    from accoach.coaching.spoken import spoken_phrases
+    messages = spoken_phrases()
+    print(f"rendering {len(messages)} spoken phrases "
           f"with Piper [{variant}: {model}]…")
 
     manifest: dict[str, str] = {}

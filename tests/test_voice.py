@@ -39,12 +39,12 @@ def test_none_when_nothing_matches():
 
 def test_voice_male_radio_config_roundtrip():
     cfg = Config()
-    assert cfg.voice.male is False and cfg.voice.radio is True   # defaults
-    cfg.voice.male = True
+    assert cfg.voice.male is True and cfg.voice.radio is True    # defaults
+    cfg.voice.male = False
     cfg.voice.radio = False
 
     fresh = Config()
     _merge(fresh, tomllib.loads(_to_toml(cfg)))
-    assert fresh.voice.male is True
+    assert fresh.voice.male is False
     assert fresh.voice.radio is False
     assert fresh.voice.engineer is True      # neighbouring keys still parse

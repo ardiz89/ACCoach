@@ -1020,6 +1020,8 @@ These entries only exist there.
   change every time, like the focus announcement with the corner's name, come from
   the Windows voice, which is more robotic. It changes the sound, not what you're
   told.
+- **You want the other voice.** The default voice is male. For the female one,
+  untick **Male voice** in **Settings**, and the other way round.
 - **No corner advice arrives.** You don't have a reference yet. One clean,
   complete lap is enough, from the line to the line. The immediate warnings arrive
   anyway.

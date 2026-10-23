@@ -966,6 +966,8 @@ Queste voci esistono solo lì.
   che cambiano ogni volta, come l'annuncio del focus col nome della curva,
   escono dalla voce di Windows, che è più robotica. Cambia il suono, non
   quello che ti dice.
+- **Vuoi un'altra voce.** La voce di partenza è maschile. Per quella femminile
+  togli la spunta da **Voce maschile** in **Impostazioni**, e viceversa.
 - **Non arriva nessun consiglio di curva.** Ti manca il riferimento. Ti basta un giro
   pulito completo, dal traguardo al traguardo. Gli avvisi immediati invece arrivano comunque.
 - **L'analisi non mostra i giri.** Prima devi guidarli con Coach Live o col
