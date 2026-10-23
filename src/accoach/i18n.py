@@ -579,6 +579,16 @@ def t(key: str, lang: str | None = None, **fmt) -> str:
 # Keys MUST match the exact strings the detectors emit (they also key the Italian
 # neural WAVs). Keep them verbatim.
 _CUE_EN: dict[str, str] = {
+    # La voce italiana dei consigli con un valore (`Cue.voice`): in inglese si
+    # parla con la traduzione di `message`, queste servono solo a non lasciare
+    # la frase senza controparte (`test_every_coach_phrase_has_its_english`).
+    "Blocchi davanti in più curve. Alza l'ABS di uno.":
+        "You're locking the fronts in several corners. Raise the ABS by one.",
+    "Pattini in uscita in più punti. Alza il TC di uno.":
+        "You're spinning up on exit in several places. Raise the TC by one.",
+    "Gomme troppo calde. Guida più fluido.": "Tyres too hot. Be smoother.",
+    "Gomme troppo fredde. Spingi per scaldarle.":
+        "Tyres too cold. Push to warm them up.",
     # events.py
     "Blocchi le ruote, alleggerisci il freno": "You're locking up, ease off the brake",
     "Pattini in uscita, dosa il gas": "Wheelspin on exit, ease the throttle",

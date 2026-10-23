@@ -110,6 +110,11 @@ class Cue:
     priority: float       # ms of time loss this addresses (higher = more urgent)
     segment: int          # which track segment it refers to
     pos: float            # normalized position where it was generated
+    # Cio' che si dice a voce, se non e' `message`. Lo schermo e il report
+    # tengono il numero («27,4 psi», «dal 4 al 5»); la voce, che non ha un
+    # WAV per ogni valore, dice la regola. Il 22/10 il pilota: «basta
+    # generalizzare, i dettagli li vedo ai box». `None` = a voce e' `message`.
+    voice: str | None = None
 
     @property
     def tier(self) -> int:

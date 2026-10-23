@@ -65,7 +65,11 @@ def static_cue_messages() -> set[str]:
                         assigned.setdefault(t.id, []).append(node.value.value)
         for node in ast.walk(tree):
             if isinstance(node, ast.Call) and has_cue_category(node):
-                for a in list(node.args) + [kw.value for kw in node.keywords]:
+                for a in list(node.args) + [kw.value for kw in node.keywords
+                                            if kw.arg != "voice"]:
+                    # `voice=` (la frase generale di `Cue.voice`) la raccogliera'
+                    # il catalogo delle frasi dette a voce, non questa scansione:
+                    # qui non c'e' ancora il loro WAV.
                     if isinstance(a, ast.Constant) and isinstance(a.value, str):
                         texts = [a.value]
                     elif isinstance(a, ast.Name):

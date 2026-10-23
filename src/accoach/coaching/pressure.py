@@ -190,15 +190,20 @@ class PressureAdvisor:
         # portava sul bordo. Si arrotonda verso fuori dalla finestra.
         shown = (math.ceil(axle_psi * 10) / 10 if dev > 0
                  else math.floor(axle_psi * 10) / 10)
+        # A voce senza valori: «gonfie» e «sgonfie» sono le due direzioni, e la
+        # direzione sbagliata e' l'unico errore che una frase generale non puo'
+        # permettersi. I psi restano nel `message`, per lo schermo.
         if dev > 0:
             msg = (f"Gomme {axle} a {fmt_num(shown, 1, 'it')} psi, troppo alte. "
                    f"Togli circa {fmt_num(change, 1, 'it')} psi a freddo.")
+            voice = f"Gomme {axle} troppo gonfie. Togli pressione a freddo."
         else:
             msg = (f"Gomme {axle} a {fmt_num(shown, 1, 'it')} psi, troppo basse. "
                    f"Aggiungi circa {fmt_num(change, 1, 'it')} psi a freddo.")
+            voice = f"Gomme {axle} troppo sgonfie. Aggiungi pressione a freddo."
         self._cooldown = _COOLDOWN_LAPS
         return Cue(category=CueCategory.TYRE_PRESSURE, message=msg,
-                   priority=_PRIORITY, segment=0, pos=0.0)
+                   priority=_PRIORITY, segment=0, pos=0.0, voice=voice)
 
     # --- helpers ----------------------------------------------------------
     @staticmethod

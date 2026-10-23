@@ -108,15 +108,21 @@ def _gate_theme_key(report: FocusReport | None) -> str | None:
 def _spoken_forms(cue: Cue, focus_theme: str | None, lang: str) -> tuple[str, str]:
     """What the ear hears and what the eye reads: (voice, screen).
 
-    They are the same string until a focus is active. From then on the voice gets
-    the trigger word and the screen keeps the whole sentence — the driver in a
-    corner has room for three words, the debrief afterwards has room for the rest.
+    They are the same string until a focus is active, or until a cue carries a
+    general sentence of its own (`Cue.voice`: the rule without the numbers, the
+    screen keeps the value). With a focus the voice gets the trigger word and the
+    screen keeps the whole sentence — the driver in a corner has room for three
+    words, the debrief afterwards has room for the rest.
+
+    In English the voice stays the translation of `message`: `Cue.voice` is
+    Italian only, and the engine translates `message` before calling here.
     """
+    general = cue.voice if (cue.voice and lang != "en") else cue.message
     if focus_theme is None:
-        return cue.message, cue.message
+        return general, cue.message
     trigger = trigger_text(cue.category, lang)
     if trigger is None:
-        return cue.message, cue.message
+        return general, cue.message
     return trigger, cue.message
 
 # A spoken alert prefix for an engineer proposal, by confidence-tone × tag ×

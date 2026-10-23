@@ -151,13 +151,15 @@ class SetupAdvisor:
         return self._make(
             CueCategory.ABS_UP,
             "Blocchi davanti in più curve. Prova ad alzare l'ABS"
-            + self._from_to(s.abs_level))
+            + self._from_to(s.abs_level),
+            voice="Blocchi davanti in più curve. Alza l'ABS di uno.")
 
     def _spin_advice(self, s: TelemetrySnapshot) -> Cue | None:
         return self._make(
             CueCategory.TC_UP,
             "Pattini in uscita in più punti. Prova ad alzare il TC"
-            + self._from_to(s.tc_level))
+            + self._from_to(s.tc_level),
+            voice="Pattini in uscita in più punti. Alza il TC di uno.")
 
     @staticmethod
     def _from_to(level: int) -> str:
@@ -166,13 +168,14 @@ class SetupAdvisor:
             return "."
         return f" dal {level} al {level + 1}."
 
-    def _make(self, category: CueCategory, message: str) -> Cue | None:
+    def _make(self, category: CueCategory, message: str,
+              voice: str | None = None) -> Cue | None:
         if self._cooldown.get(category, 0) > 0:
             return None
         self._cooldown[category] = _COOLDOWN_LAPS
         # Delivered at the line, so it lands on the straight; segment 0.
         return Cue(category=category, message=message,
-                   priority=_PRIORITY, segment=0, pos=0.0)
+                   priority=_PRIORITY, segment=0, pos=0.0, voice=voice)
 
     # --- bookkeeping ------------------------------------------------------
     def _tick_cooldown(self) -> None:

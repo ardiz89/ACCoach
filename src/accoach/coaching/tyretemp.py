@@ -120,15 +120,18 @@ class TyreTempAdvisor:
         if avg > self.target_c + self.tol_c:
             msg = (f"Gomme a {avg:.0f} °C, troppo calde. "
                    f"Stai forzando, guida più fluido.")
+            # A voce senza i gradi: restano sullo schermo.
+            voice = "Gomme troppo calde. Guida più fluido."
         elif avg < self.target_c - self.tol_c:
             msg = (f"Gomme a {avg:.0f} °C, troppo fredde. "
                    f"Spingi di più per scaldarle.")
+            voice = "Gomme troppo fredde. Spingi per scaldarle."
         else:
             return None
 
         self._cooldown = _COOLDOWN_LAPS
         return Cue(category=CueCategory.TYRE_TEMP, message=msg,
-                   priority=_PRIORITY, segment=0, pos=0.0)
+                   priority=_PRIORITY, segment=0, pos=0.0, voice=voice)
 
     # --- helpers ----------------------------------------------------------
     @staticmethod
