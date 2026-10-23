@@ -958,15 +958,16 @@ Queste voci esistono solo lì.
 - **Non vedi l'overlay.** Sei a schermo intero esclusivo. Passa a
   **Borderless**.
 - **Non senti la voce.** Lancia `python accoach_main.py selftest`, che scrive un
-  report e prova a parlare. Dal sorgente, installa pyttsx3 con
-  `pip install pyttsx3`. Ti serve anche una voce italiana di Windows, come
-  Microsoft Elsa.
-- **Alcune frasi suonano più robotiche delle altre.** Le frasi fisse del coach
-  e le parole brevi del focus sono registrate con una voce neurale. Le altre,
-  come i consigli sulle gomme e le proposte dell'ingegnere, escono dalla voce
-  di Windows, che è più robotica. Cambia il suono, non quello che ti dice.
-- **Vuoi un'altra voce.** La voce di partenza è maschile. Per quella femminile
-  togli la spunta da **Voce maschile** in **Impostazioni**, e viceversa.
+  report e prova a parlare. In italiano le frasi del coach sono registrate e
+  partono anche senza pyttsx3. Per l'inglese ti serve pyttsx3, che dal sorgente
+  installi con `pip install pyttsx3`.
+- **Quale voce senti.** In italiano ogni frase che il coach e l'ingegnere dicono
+  in pista è registrata, con due voci. La voce di partenza è maschile. Per quella
+  femminile togli la spunta da **Voce maschile** in **Impostazioni**, e viceversa.
+  In inglese parla sempre la voce di Windows, che è più robotica.
+- **Hai aggiornato e senti ancora la voce femminile.** L'aggiornamento non
+  cambia il tuo `config.toml`. Le versioni di prima ci scrivevano
+  `male = false`, e quella scelta resta. Metti la spunta su **Voce maschile** in **Impostazioni**.
 - **Non arriva nessun consiglio di curva.** Ti manca il riferimento. Ti basta un giro
   pulito completo, dal traguardo al traguardo. Gli avvisi immediati invece arrivano comunque.
 - **L'analisi non mostra i giri.** Prima devi guidarli con Coach Live o col
