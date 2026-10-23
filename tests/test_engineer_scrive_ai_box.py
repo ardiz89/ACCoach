@@ -58,7 +58,7 @@ var changesPayload = () => [{ param: "a", slot: null, delta_clicks: 1 }];
 var nextAutoName = () => "HONE_1";
 var onComboChange = async () => {};
 var showToast = () => {};
-var setTimeout = () => {}, connectWS = () => {};
+var setTimeout = () => {}, connectWS = () => {}, keyRefused = false;
 var showModalError = (m) => { els["modal-error"] = { textContent: m }; };
 for (const f of ["liveRefused", "inPista", "writeLocked", "paintWriteLock", "afterWrite", "applyNow",
                  "confirmWrite", "confirmRestored", "confirmAvDone", "onWsClose", "probeKey"]) {
@@ -193,6 +193,7 @@ const asked = [];
 var fetch = (url) => { asked.push(url); return status === "off"
   ? Promise.reject(new Error("off")) : Promise.resolve({ status: Number(status) }); };
 var paintWriteLock = () => {}, setTimeout = () => {}, connectWS = () => {};
+var keyRefused = false;
 for (const name of ["onWsClose", "probeKey"]) {
   const i = src.indexOf("function " + name + "(");
   let depth = 0;
@@ -202,7 +203,12 @@ for (const name of ["onWsClose", "probeKey"]) {
   }
 }
 onWsClose();
-setImmediate(() => console.log(JSON.stringify({ asked, text: $("live-text").textContent })));
+setImmediate(() => {
+  const first = $("live-text").textContent;
+  onWsClose();   // il giro dopo: nessun lampeggio prima della risposta
+  const meanwhile = $("live-text").textContent;
+  setImmediate(() => console.log(JSON.stringify({ asked, text: first, meanwhile })));
+});
 """
 
 
@@ -218,5 +224,5 @@ def test_a_websocket_refused_for_the_key_says_so_on_the_badge(tmp_path, status, 
                          capture_output=True, text=True, encoding="utf-8", timeout=60)
     assert run.returncode == 0, run.stderr
     out = json.loads(run.stdout)
-    assert out["asked"] == ["http://pc:8777/health"]
-    assert out["text"] == text
+    assert out["asked"] == ["http://pc:8777/health"] * 2
+    assert out["text"] == text and out["meanwhile"] == text

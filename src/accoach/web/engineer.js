@@ -1546,7 +1546,9 @@ function onWsClose() {
   // Tradotto come tutto il resto: era l'unica scritta inglese su una pagina
   // in italiano, e stava proprio sul distintivo che il pilota guarda per
   // capire se il coach è acceso.
-  $("live-text").textContent = t("live.offline");
+  // Rifiutato al giro prima: si ridice il QR, non si fa lampeggiare «offline»
+  // ogni 3 s in attesa della risposta di `probeKey`.
+  $("live-text").textContent = t(keyRefused ? "lan.fromQr" : "live.offline");
   // Senza motore non c'e' un ultimo frame da fidarsi: se restasse quello «in
   // pista», i bottoni resterebbero spenti per sempre proprio col gioco chiuso,
   // il caso in cui scrivere un assetto deve restare possibile.
@@ -1559,14 +1561,20 @@ function onWsClose() {
 // Un WebSocket rifiutato dal guardiano si chiude come un motore spento, e il
 // perche' non lo dice: lo si chiede alla 8777 con una fetch. Un 401 e' la
 // chiave che manca, e il distintivo dice del QR invece di «offline».
+let keyRefused = false;
 function probeKey() {
   fetch(liveUrl(`http://${location.hostname}:${WS_PORT}/health`))
     .then((r) => {
-      if (r && r.status === 401 && state.lastLive && !state.lastLive.connected) {
-        $("live-text").textContent = t("lan.fromQr");
+      keyRefused = !!(r && r.status === 401);
+      if (state.lastLive && !state.lastLive.connected) {
+        $("live-text").textContent = t(keyRefused ? "lan.fromQr" : "live.offline");
       }
     })
-    .catch(() => { /* motore spento: resta «offline» */ });
+    .catch(() => {
+      // motore spento: «offline»
+      keyRefused = false;
+      if (state.lastLive && !state.lastLive.connected) $("live-text").textContent = t("live.offline");
+    });
 }
 
 function connectWS() {
