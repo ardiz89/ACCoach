@@ -182,21 +182,25 @@ Le modifiche sono di due tipi, e si chiudono in modo diverso.
 ### La strada dell'ingegnere
 
 L'ingegnere lavora per fasi, una dopo l'altra. Su una GT3 sono Pressioni, Grip
-meccanico, Aero / rake, Bilanciamento freni ed Elettronica. Le ultime due si
-fanno dal volante. In ogni fase il ciclo è lo stesso.
+meccanico, Aero / rake, Bilanciamento freni ed Elettronica. Le pressioni le
+ricontrolla anche nelle fasi dopo.
 
-1. Raccoglie **3 giri buoni** per la base. Un giro è buono se è valido, senza
-   uscite di pista e con le gomme in media ad almeno 75 °C.
-2. Propone **una modifica alla volta**.
-3. Quando l'hai fatta, conta altri **3 giri buoni** per verificarla.
-4. Se la modifica ha aiutato la tiene. Se no ti chiede di rimetterla com'era.
+1. Per decidere gli serve una base di **3 giri buoni**. Un giro è buono se è
+   valido, senza uscite di pista e con le gomme in media ad almeno 75 °C. La
+   base la raccoglie all'inizio, dopo un ripristino e quando la pista passa
+   dall'asciutto al bagnato o al contrario.
+2. Con la base propone **una modifica alla volta**. La proposta ti dice se si
+   fa ai box o dal volante.
+3. Quando l'hai fatta, conta **3 giri buoni** con la modifica per verificarla.
+4. Se la modifica ha aiutato la tiene, e quei giri diventano la base per il
+   passo dopo. Se no ti chiede di rimetterla com'era.
 5. Quando nella fase non resta niente che sappia sistemare, passa a quella
-   dopo.
+   dopo con la base che ha già.
 
-A che punto sei lo vedi nella **striscia** sopra la fase, sul tablet e nella
-pagina Ingegnere. Le fasi fatte hanno la spunta e quella in corso è
-evidenziata. Sotto c'è la frase sul passo in corso, con i giri buoni contati,
-per esempio «Giri buoni per la base, 2 di 3.»
+A che punto sei lo vedi nella **strada**, la fila delle fasi sopra la riga
+della fase, sul tablet e nella pagina Ingegnere. Le fasi fatte hanno la spunta
+e quella in corso è evidenziata. Sotto c'è la frase sul passo in corso, con i
+giri buoni contati, per esempio «Giri buoni per la base, 2 di 3.»
 
 ### Il registro delle prove
 
@@ -792,12 +796,12 @@ In alto ci sono due linguette, **Telemetria** e **Assetto**. Quando ti fermi ai
 box la pagina passa ad Assetto, e quando riparti torna a Telemetria. Puoi
 sempre toccare l'altra linguetta, e la tua scelta resta finché non entri o esci
 dai box. Su Assetto compare un segno quando c'è una modifica da fare ai box. In
-tutte e due, sopra la fase, c'è la striscia descritta in «La strada
+tutte e due, sopra la fase, c'è la strada descritta in «La strada
 dell'ingegnere».
 
 - **Telemetria.** Vedi velocità, marcia, TC, ABS e mappa motore, temperatura e
   pressione delle quattro gomme, e la striscia di gas, freno e sterzo degli
-  ultimi 8 s. Sotto c'è la fase di guida su cui lavora l'ingegnere. Una
+  ultimi 8 s. Sotto ci sono la strada e la fase su cui lavora l'ingegnere. Una
   modifica da fare dal volante compare in un riquadro. Il bottone *L'ho
   cambiato* c'è solo dove HONE non legge la manopola, come spiegato in «I
   consigli di setup».
@@ -805,12 +809,12 @@ dell'ingegnere».
   alto compare l'invito a rientrare a fine giro. La telemetria resta sotto. Per
   una modifica respinta l'avviso è simile e ti dice di rimettere l'ultima
   modifica com'era. Se tocchi l'avviso passi ad Assetto.
-- **Assetto.** La pagina mostra la fase e le leve da cambiare, una per
-  riga, dal valore di adesso a quello nuovo. La puoi aprire anche in pista. Sotto trovi il perché e il grado
-  di fiducia. Come file di partenza HONE propone l'ultimo assetto che ha scritto
-  per quell'auto e quella pista da quando è partito il processo web. Se non ne
-  ha scritto nessuno, propone il file modificato più di recente. Dalla lista
-  puoi sceglierne un altro. Premi *Scrivi la modifica* e conferma. HONE crea
+- **Assetto.** La pagina mostra la fase e le leve da cambiare, una per riga,
+  dal valore di adesso a quello nuovo. La puoi aprire anche in pista. Sotto
+  trovi il perché e il grado di fiducia. Come file di partenza HONE propone
+  l'ultimo assetto che ha scritto per quell'auto e quella pista da quando è
+  partito il processo web. Se non ne ha scritto nessuno, propone il file
+  modificato più di recente. Dalla lista puoi sceglierne un altro. Premi *Scrivi la modifica* e conferma. HONE crea
   un file nuovo e non tocca il tuo. Poi la pagina ti mostra in grande il nome
   del file, da caricare dal garage del gioco. Se non trova un assetto per
   quell'auto su quella pista, ti chiede di salvarne uno dal garage.

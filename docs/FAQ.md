@@ -246,22 +246,25 @@ There are two kinds of change, and they close in different ways.
 ### The engineer's road
 
 The engineer works in phases, one after the other. On a GT3 they are Pressures,
-Mechanical grip, Aero / rake, Brake bias and Electronics. The last two are done
-from the wheel. Every phase runs the same cycle.
+Mechanical grip, Aero / rake, Brake bias and Electronics. It keeps checking the
+pressures in the later phases too.
 
-1. It collects **3 good laps** for the baseline. A lap is good when it's valid,
-   with no off-track and the tyres averaging at least 75 °C.
-2. It proposes **one change at a time**.
-3. Once you've made it, it counts another **3 good laps** to check it.
-4. If the change helped it keeps it. If not, it asks you to put it back as it
-   was.
+1. To decide anything it needs a baseline of **3 good laps**. A lap is good when
+   it's valid, with no off-track and the tyres averaging at least 75 °C. It
+   collects the baseline at the start, after a restore and when the track goes
+   from dry to wet or back.
+2. With the baseline it proposes **one change at a time**. The proposal tells
+   you whether it's done in the pits or from the wheel.
+3. Once you've made it, it counts **3 good laps** with the change to check it.
+4. If the change helped it keeps it, and those laps become the baseline for the
+   next step. If not, it asks you to put it back as it was.
 5. When the phase has nothing left that it knows how to fix, it moves on to the
-   next one.
+   next one with the baseline it already has.
 
-Where you are shows in the **strip** above the phase, on the tablet and on the
-Engineer page. Finished phases carry a tick and the current one is highlighted.
-Below it is the sentence about the current step, with the good laps counted,
-for example "Good laps for the baseline, 2 of 3."
+Where you are shows in the **road**, the row of phases above the phase line, on
+the tablet and on the Engineer page. Finished phases carry a tick and the
+current one is highlighted. Below it is the sentence about the current step,
+with the good laps counted, for example "Good laps for the baseline, 2 of 3."
 
 ### The Test log
 
@@ -852,23 +855,22 @@ At the top there are two tabs, **Telemetry** and **Setup**. When you stop in the
 pits the page switches to Setup, and when you drive off it goes back to
 Telemetry. You can always tap the other tab, and your choice holds until you
 enter or leave the pits. Setup shows a mark when there's a change to make in the
-pits. On both tabs, above the phase, is the strip described in "The engineer's
+pits. On both tabs, above the phase, is the road described in "The engineer's
 road".
 
 - **Telemetry.** You see speed, gear, TC, ABS and engine map, and the temperature
   and pressure of the four tyres. A strip shows throttle, brake and steering
-  from the last 8 s. Below it is the driving phase the engineer is working on.
+  from the last 8 s. Below it are the road and the phase the engineer is on.
   A change to make from the wheel appears in a box. The *I've changed it* button
   is there only where HONE can't read the dial, as explained in "Setup advice".
 - **Return-to-pits call.** When the engineer has a change to make in the pits,
   the call to come in at the end of the lap appears at the top. The telemetry
   stays below. For a rejected change the call is similar and tells you to put
   the last change back as it was. Tapping the call takes you to Setup.
-- **Setup.** The page shows the phase and the levers to change,
-  one per row, from the current value to the new one. You can open it on track
-  too. Below are the reason and
-  the confidence. As the starting file, HONE offers the last setup it wrote for
-  that car and track since the web process started. If it hasn't written one, it
+- **Setup.** The page shows the phase and the levers to change, one per row,
+  from the current value to the new one. You can open it on track too. Below
+  are the reason and the confidence. As the starting file, HONE offers the last
+  setup it wrote for that car and track since the web process started. If it hasn't written one, it
   offers the most recently modified file. You can pick another from the list.
   Press *Write the change* and confirm. HONE creates a new file and leaves
   yours alone. The page then shows the file name in large type, to load from

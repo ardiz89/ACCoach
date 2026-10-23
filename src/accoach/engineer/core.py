@@ -848,16 +848,16 @@ class RaceEngineer:
         `active`) e' privato del motore e il browser lo indovinerebbe dal testo
         dei messaggi. L'ordine dei casi e' quello di `observe`: un ripristino
         da rimettere viene prima di tutto, poi il test in corso, poi la
-        proposta in attesa, poi la raccolta di giri.
+        proposta in attesa, poi la raccolta di giri. «Finito» viene dopo i
+        primi tre: a fasi chiuse `_advance` ricontrolla ancora le pressioni e
+        puo' proporre, e quella modifica va fatta e provata come le altre.
         """
         from .profiles._common import tr
         phases = [{"key": p.key, "label": tr(p.label, lang), "tag": p.tag}
                   for p in self.phases]
-        out = {"phases": phases, "index": self.phase_idx, "stage": "diagnose",
-               "have": None, "need": None}
-        if self.phase is None:
-            out.update(stage="done", index=len(self.phases))
-        elif self._held_revert is not None or (
+        out = {"phases": phases, "index": min(self.phase_idx, len(self.phases)),
+               "stage": "diagnose", "have": None, "need": None}
+        if self._held_revert is not None or (
                 self._pending is not None and self._pending_is_revert):
             out["stage"] = "restore"
         elif self.active is not None:
@@ -865,6 +865,8 @@ class RaceEngineer:
                        need=self.min_stable)
         elif self._pending is not None:
             out["stage"] = "change"
+        elif self.phase is None:
+            out["stage"] = "done"
         elif len(self.window) < self.min_stable:
             out.update(stage="baseline", have=len(self.window),
                        need=self.min_stable)

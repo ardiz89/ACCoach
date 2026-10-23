@@ -33,16 +33,25 @@ def _p(index, stage, have=None, need=None):
     return {"phases": _PHASES, "index": index, "stage": stage, "have": have, "need": need}
 
 
-# I casi del brief: il nome, il `progress`.
+# I casi: il nome, gli argomenti di `stripText` (`progress`, il `tag` della
+# modifica in attesa). Il «dove» della modifica viene dalla modifica, non
+# dalla fase: le fasi 3 e 4 (dal volante) propongono anche leve da box, e una
+# fase da box propone il bilanciamento freni dal volante.
 _CASES = [
-    ("baseline", _p(0, "baseline", 2, 3)),
-    ("test", _p(1, "test", 1, 3)),
-    ("change_box", _p(1, "change")),
-    ("change_av", _p(3, "change")),
-    ("restore", _p(2, "restore")),
-    ("diagnose", _p(1, "diagnose")),
-    ("done", _p(5, "done")),
-    ("null", None),
+    ("baseline", [_p(0, "baseline", 2, 3), None]),
+    ("test", [_p(1, "test", 1, 3), "BOX"]),
+    ("change_box", [_p(1, "change"), "BOX"]),
+    ("change_av", [_p(3, "change"), "AV"]),
+    ("change_box_in_av_phase", [_p(3, "change"), "BOX"]),
+    ("change_av_in_box_phase", [_p(1, "change"), "AV"]),
+    ("change_untagged", [_p(1, "change"), None]),
+    ("restore", [_p(2, "restore"), "BOX"]),
+    ("diagnose", [_p(1, "diagnose"), None]),
+    ("done", [_p(5, "done"), None]),
+    ("change_after_done", [_p(5, "change"), "BOX"]),
+    ("baseline_no_count", [_p(0, "baseline"), None]),
+    ("test_no_count", [_p(1, "test"), None]),
+    ("null", [None, None]),
 ]
 
 # tablet.js come lo carica la pagina, con la lingua scelta.
@@ -57,8 +66,8 @@ var fs = require("fs");
 eval(fs.readFileSync(process.argv[1], "utf8"));
 eval(fs.readFileSync(process.argv[2], "utf8"));
 var cases = JSON.parse(fs.readFileSync(0, "utf8"));
-process.stdout.write(JSON.stringify(cases.map(function (p) {
-  return window.HoneTablet.stripText(p);
+process.stdout.write(JSON.stringify(cases.map(function (a) {
+  return window.HoneTablet.stripText(a[0], a[1]);
 })));
 """
 
@@ -87,7 +96,7 @@ eval(asVar(line(/^const t = /)));
 eval(asVar(src.slice(src.indexOf("const tf = "), src.indexOf("};", src.indexOf("const tf = ")) + 2)));
 eval(grab("stripText"));
 const cases = JSON.parse(fs.readFileSync(0, "utf8"));
-console.log(JSON.stringify(cases.map((p) => stripText(p))));
+console.log(JSON.stringify(cases.map((a) => stripText(a[0], a[1]))));
 """
 
 
@@ -126,7 +135,6 @@ def test_the_road_in_italian(page):
     b = r["baseline"]
     assert _states(b) == ["now", "next", "next", "next", "next"]
     assert [s["label"] for s in b["steps"]] == [p["label"] for p in _PHASES]
-    assert [s["av"] for s in b["steps"]] == [False, False, False, True, True]
     assert b["line"] == "Giri buoni per la base, 2 di 3."
     assert "75 °C" in b["why"] and "valido" in b["why"]
 
@@ -138,10 +146,17 @@ def test_the_road_in_italian(page):
     assert r["change_box"]["line"] == "Hai una modifica da fare ai box."
     assert r["change_av"]["line"] == "Hai una modifica da fare dal volante."
     assert _states(r["change_av"]) == ["done", "done", "done", "now", "next"]
-    assert r["restore"]["line"] == "Rimetti l'ultima modifica com'era."
+    # Il «dove» lo dice la modifica, non la fase.
+    assert r["change_box_in_av_phase"]["line"] == "Hai una modifica da fare ai box."
+    assert r["change_av_in_box_phase"]["line"] == "Hai una modifica da fare dal volante."
+    assert r["change_untagged"]["line"] == "Hai una modifica da fare."
+    # Diverso dall'avviso di rientro, che nello stesso momento sta sopra.
+    assert r["restore"]["line"] == (
+        "La modifica non ha aiutato. Quando è di nuovo com'era rifaccio la base.")
     assert r["diagnose"]["line"] == "Ho i giri che servono e decido a fine giro."
     # Il perché del giro buono serve solo dove si contano giri.
-    for name in ("change_box", "change_av", "restore", "diagnose", "done"):
+    for name in ("change_box", "change_av", "change_box_in_av_phase", "restore",
+                 "diagnose", "done"):
         assert r[name]["why"] == "", name
 
     # Review Focus 3: finito, niente contatore e niente tappa accesa oltre la fine.
@@ -149,6 +164,14 @@ def test_the_road_in_italian(page):
     assert _states(d) == ["done"] * 5
     assert d["line"] == "Assetto finito, tutte le fasi sono fatte."
     assert not re.search(r"\d", d["line"])
+    # Una modifica proposta a fasi finite (il ricontrollo delle pressioni).
+    a = r["change_after_done"]
+    assert _states(a) == ["done"] * 5
+    assert a["line"] == "Hai una modifica da fare ai box."
+
+    # Il contatore viene dal motore: senza numeri la frase non ne scrive uno.
+    for name in ("baseline_no_count", "test_no_count"):
+        assert r[name]["line"] == "" and r[name]["why"] == "", name
 
     # Review Focus 4: senza `progress` niente striscia, e niente si rompe.
     assert r["null"] is None
@@ -160,28 +183,24 @@ def test_the_road_in_english():
     assert r["baseline"]["line"] == "Good laps for the baseline, 2 of 3."
     assert r["test"]["line"] == "Testing the change, good laps 1 of 3. Then I decide whether to keep it."
     assert r["change_av"]["line"] == "You have a change to make from the wheel."
+    assert r["change_box_in_av_phase"]["line"] == "You have a change to make in the pits."
+    assert r["restore"]["line"] == (
+        "The change didn't help. Once it's back as it was, I redo the baseline.")
     assert r["done"]["line"] == "Setup finished, every phase is done."
 
 
 @needs_node
 def test_a_broken_progress_hides_the_strip_instead_of_breaking():
-    bad = [{}, {"phases": []}, {"phases": "x", "index": 0, "stage": "baseline"}, "x", 3]
+    bad = [[b, "BOX"] for b in
+           ({}, {"phases": []}, {"phases": "x", "index": 0, "stage": "baseline"}, "x", 3)]
     assert _run(_TABLET, "tablet.js", "it", bad) == [None] * len(bad)
     assert _run(_ENGINEER, "engineer.js", "it", bad) == [None] * len(bad)
 
 
-@needs_node
-def test_a_count_that_is_missing_is_not_invented():
-    # Il contatore viene dal motore: senza numeri la frase non ne scrive uno.
-    r = _run(_TABLET, "tablet.js", "it", [_p(0, "baseline"), _p(1, "test")])
-    for x in r:
-        assert x["line"] == "" and "null" not in json.dumps(x)
-
-
 def test_the_new_keys_are_on_the_engineer_surface_and_in_tone():
     keys = {f"web/i18n.js:eng.road.{k}" for k in
-            ("base", "why", "changeBox", "changeAv", "test", "restore", "diagnose",
-             "done", "wheel")}
+            ("base", "why", "change", "changeBox", "changeAv", "test", "restore",
+             "diagnose", "done")}
     entries = tono.SURFACES["engineer"]()
     assert keys <= set(entries), keys - set(entries)
     for k in keys:
@@ -237,4 +256,49 @@ def test_the_tablet_writes_the_strip_only_when_it_changes():
     assert out["steps"] == 2
     assert out["line"] == "Giri buoni per la base, 1 di 3."
     assert out["line2"] == "Giri buoni per la base, 2 di 3."
+    assert out["hiddenNull"] is True
+
+
+# renderRoad di engineer.js, sul suo DOM finto: tre frame uguali, un disegno.
+_ENG_DOM = _ENGINEER.split("const cases = ")[0] + r"""
+let writes = 0;
+const els = {};
+const El = () => ({ hidden: false, textContent: "", className: "", children: [],
+  set innerHTML(v) { writes++; this.children = []; },
+  appendChild(c) { this.children.push(c); return c; } });
+var $ = (id) => els[id] || (els[id] = El());
+global.document.createElement = () => El();
+eval("var roadKey = null;");
+eval(grab("renderRoad"));
+const prog = { phases: [{ key: "pressures", label: "Pressioni", tag: "BOX" }],
+               index: 0, stage: "baseline", have: 1, need: 3 };
+const out = {};
+renderRoad({});
+out.hiddenWithout = $("es-road").hidden;
+for (let i = 0; i < 3; i++) renderRoad({ progress: prog });
+out.writes = writes;
+out.hiddenWith = $("es-road").hidden;
+out.line = $("es-road-line").textContent;
+renderRoad({ progress: Object.assign({}, prog, { have: 2 }) });
+out.writes2 = writes;
+out.line2 = $("es-road-line").textContent;
+renderRoad({ progress: Object.assign({}, prog, { stage: "change" }), tag: "AV" });
+out.line3 = $("es-road-line").textContent;
+renderRoad(null);
+out.hiddenNull = $("es-road").hidden;
+console.log(JSON.stringify(out));
+"""
+
+
+@needs_node
+def test_the_engineer_page_writes_the_strip_only_when_it_changes():
+    r = subprocess.run([_NODE, "-e", _ENG_DOM, str(_WEB / "i18n.js"), str(_WEB / "engineer.js"),
+                        "it"], capture_output=True, text=True, encoding="utf-8")
+    assert r.returncode == 0, r.stderr
+    out = json.loads(r.stdout)
+    assert out["hiddenWithout"] is True and out["hiddenWith"] is False
+    assert out["writes"] == 1
+    assert out["line"] == "Giri buoni per la base, 1 di 3."
+    assert out["writes2"] == 2 and out["line2"] == "Giri buoni per la base, 2 di 3."
+    assert out["line3"] == "Hai una modifica da fare dal volante."
     assert out["hiddenNull"] is True

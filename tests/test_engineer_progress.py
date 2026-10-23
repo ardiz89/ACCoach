@@ -141,3 +141,22 @@ def test_no_engineer_at_all_is_still_no_block(tmp_path):
     eng._engineer = None
     assert eng._engineer_block() is None
     eng.close()
+
+
+def test_past_the_last_phase_a_pending_change_is_still_a_change():
+    """Il ricontrollo delle pressioni propone anche a fasi finite (`_advance`
+    guarda le gomme prima di `phase is None`): finche' c'e' una modifica da fare,
+    da provare o da rimettere, la strada non e' «finita»."""
+    eng = _eng()
+    eng.phase_idx = len(eng.phases)
+    for _ in range(3):
+        d = eng.observe(_lap(OFF))
+    assert d.kind is DecisionKind.PROPOSE
+    p = eng.progress()
+    assert (p["stage"], p["index"]) == ("change", 5)
+    eng.mark_applied()
+    p = eng.progress()
+    assert (p["stage"], p["have"], p["need"], p["index"]) == ("test", 0, 3, 5)
+    eng.active = None
+    eng._held_revert = object()
+    assert eng.progress()["stage"] == "restore"

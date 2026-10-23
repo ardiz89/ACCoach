@@ -102,7 +102,6 @@
 .es-road-step.done { color: var(--green); }
 .es-road-step.done .es-road-name::before { content: "\2713"; margin-right: 4px; }
 .es-road-step.now { color: var(--text); border-color: var(--cyan); font-weight: 700; }
-.es-road-wheel { margin-left: 6px; font-size: 0.857rem; font-weight: 400; color: var(--adv); }
 .es-road-text { margin-top: 4px; font-size: 0.893rem; line-height: 1.45; }
 .es-road-why { display: block; font-size: 0.857rem; color: var(--muted); }
 /* Persistent "what to do in this phase" guidance line. */

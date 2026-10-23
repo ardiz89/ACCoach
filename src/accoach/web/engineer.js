@@ -1125,21 +1125,22 @@ function updateSuggested(eng) {
 // `engineer.progress` (lo calcola il motore). Gemella di `stripText` in
 // tablet.js, che resta ES5 per Safari 9: stesse chiavi, stesse regole, e un
 // test confronta le due caso per caso (tests/test_engineer_strip.py). Senza un
-// `progress` che si legge, null: la striscia si nasconde.
-function stripText(p) {
+// `progress` che si legge, null: la striscia si nasconde. `changeTag` e' il
+// `tag` della modifica in attesa (`engineer.tag`), non quello della fase: una
+// fase «dal volante» propone anche leve da box, e il ricontrollo delle
+// pressioni propone ai box in qualunque fase.
+function stripText(p, changeTag) {
   if (!p || typeof p !== "object" || !Array.isArray(p.phases) || !p.phases.length) return null;
   const idx = Number(p.index), done = p.stage === "done";
   const steps = p.phases.map((ph, i) => ({
     label: String((ph && (ph.label || ph.key)) || ""),
     // Finito, nessuna tappa resta accesa: l'indice e' oltre l'ultima.
     state: (done || i < idx) ? "done" : (i === idx ? "now" : "next"),
-    av: !!ph && ph.tag === "AV",
   }));
   // Il contatore solo dove il motore conta giri verso una soglia; senza i suoi
   // numeri la frase non se ne inventa uno.
   const isNum = (v) => v != null && v !== "" && isFinite(Number(v));
   const counted = isNum(p.have) && isNum(p.need);
-  const cur = p.phases[idx] || {};
   let line = "", why = "";
   if (p.stage === "baseline" || p.stage === "test") {
     if (counted) {
@@ -1148,7 +1149,8 @@ function stripText(p) {
       why = t("eng.road.why");
     }
   } else if (p.stage === "change") {
-    line = t(cur.tag === "AV" ? "eng.road.changeAv" : "eng.road.changeBox");
+    line = t(changeTag === "AV" ? "eng.road.changeAv"
+             : (changeTag === "BOX" ? "eng.road.changeBox" : "eng.road.change"));
   } else if (p.stage === "restore") {
     line = t("eng.road.restore");
   } else if (p.stage === "diagnose") {
@@ -1163,8 +1165,8 @@ function stripText(p) {
 // secondo e quasi sempre dice la stessa cosa.
 let roadKey = null;
 function renderRoad(eng) {
-  const s = stripText(eng && eng.progress);
-  const key = s ? JSON.stringify(s) + "|" + t("eng.road.wheel") : "";
+  const s = stripText(eng && eng.progress, eng && eng.tag);
+  const key = s ? JSON.stringify(s) : "";
   if (key === roadKey) return;
   roadKey = key;
   const box = $("es-road");
@@ -1179,12 +1181,6 @@ function renderRoad(eng) {
     name.className = "es-road-name";
     name.textContent = st.label;
     li.appendChild(name);
-    if (st.av) {
-      const w = document.createElement("span");
-      w.className = "es-road-wheel";
-      w.textContent = t("eng.road.wheel");
-      li.appendChild(w);
-    }
     ol.appendChild(li);
   }
   $("es-road-line").textContent = s.line;

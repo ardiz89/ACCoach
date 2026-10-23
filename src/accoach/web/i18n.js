@@ -970,19 +970,23 @@ Salva un setup nel gioco, poi ricarica questa pagina.` },
                          it: `Giri buoni per la base, {have} di {need}.` },
     "eng.road.why":    { en: `A lap counts when it's valid, with no off-track and the tyres averaging at least 75 °C.`,
                          it: `Conta un giro valido, senza uscite di pista, con le gomme in media ad almeno 75 °C.` },
+    // La modifica in attesa senza un `tag` che si legge: non si dice dove.
+    "eng.road.change": { en: `You have a change to make.`, it: `Hai una modifica da fare.` },
     "eng.road.changeBox": { en: `You have a change to make in the pits.`,
                             it: `Hai una modifica da fare ai box.` },
     "eng.road.changeAv":  { en: `You have a change to make from the wheel.`,
                             it: `Hai una modifica da fare dal volante.` },
     "eng.road.test":   { en: `Testing the change, good laps {have} of {need}. Then I decide whether to keep it.`,
                          it: `Provo la modifica, giri buoni {have} di {need}. Poi decido se tenerla.` },
-    "eng.road.restore": { en: `Put the last change back as it was.`,
-                          it: `Rimetti l'ultima modifica com'era.` },
+    // Non ripete l'avviso di rientro (`tablet.callRestore`), che sta sopra
+    // nello stesso momento: dice il perche' e cosa succede dopo
+    // (`mark_applied` di un ripristino svuota la finestra, si rifa' la base).
+    "eng.road.restore": { en: `The change didn't help. Once it's back as it was, I redo the baseline.`,
+                          it: `La modifica non ha aiutato. Quando è di nuovo com'era rifaccio la base.` },
     "eng.road.diagnose": { en: `I have the laps I need and I decide at the end of the lap.`,
                            it: `Ho i giri che servono e decido a fine giro.` },
     "eng.road.done":   { en: `Setup finished, every phase is done.`,
                          it: `Assetto finito, tutte le fasi sono fatte.` },
-    "eng.road.wheel":  { en: `from the wheel`, it: `dal volante` },
     "eng.pit":         { en: `You're in the pits. In the MFD open <b>Setup</b>, load <b>{name}</b> and head out to apply it.`,
                          it: `Sei ai box. Nell'MFD apri <b>Setup</b>, carica <b>{name}</b> ed esci per applicarlo.` },
     // Shown while stopped in the box with a garage change still unwritten —

@@ -208,7 +208,10 @@
   // La gemella e' `stripText` di engineer.js, con le stesse chiavi e le stesse
   // regole (un test le confronta caso per caso). Senza un `progress` che si
   // legge la striscia non c'e': null, e la pagina la nasconde.
-  function stripText(p) {
+  // `changeTag` e' il `tag` della modifica in attesa (`engineer.tag`), non
+  // quello della fase: una fase «dal volante» propone anche leve da box, e il
+  // ricontrollo delle pressioni propone ai box in qualunque fase.
+  function stripText(p, changeTag) {
     if (!p || typeof p !== "object" || !Array.isArray(p.phases) || !p.phases.length) return null;
     var idx = Number(p.index), done = p.stage === "done";
     var steps = [];
@@ -216,13 +219,11 @@
       var ph = p.phases[i] || {};
       // Finito, nessuna tappa resta accesa: l'indice e' oltre l'ultima.
       steps.push({ label: String(ph.label || ph.key || ""),
-                   state: (done || i < idx) ? "done" : (i === idx ? "now" : "next"),
-                   av: ph.tag === "AV" });
+                   state: (done || i < idx) ? "done" : (i === idx ? "now" : "next") });
     }
     // Il contatore solo dove il motore conta giri verso una soglia; senza i
     // suoi numeri la frase non se ne inventa uno.
     var counted = num(p.have) && num(p.need);
-    var cur = p.phases[idx] || {};
     var line = "", why = "";
     if (p.stage === "baseline" || p.stage === "test") {
       if (counted) {
@@ -231,7 +232,8 @@
         why = t("eng.road.why");
       }
     } else if (p.stage === "change") {
-      line = t(cur.tag === "AV" ? "eng.road.changeAv" : "eng.road.changeBox");
+      line = t(changeTag === "AV" ? "eng.road.changeAv"
+               : (changeTag === "BOX" ? "eng.road.changeBox" : "eng.road.change"));
     } else if (p.stage === "restore") {
       line = t("eng.road.restore");
     } else if (p.stage === "diagnose") {
@@ -246,8 +248,8 @@
   // secondo e quasi sempre dice la stessa cosa.
   var roadKey = null;
   function renderRoad(eng) {
-    var s = stripText(eng && eng.progress);
-    var key = s ? JSON.stringify(s) + "|" + t("eng.road.wheel") : "";
+    var s = stripText(eng && eng.progress, eng && eng.tag);
+    var key = s ? JSON.stringify(s) : "";
     if (key === roadKey) return;
     roadKey = key;
     var box = $("t-road");
@@ -261,12 +263,6 @@
       b.className = "t-road-name";
       b.textContent = s.steps[i].label;
       li.appendChild(b);
-      if (s.steps[i].av) {
-        var w = document.createElement("span");
-        w.className = "t-road-wheel";
-        w.textContent = t("eng.road.wheel");
-        li.appendChild(w);
-      }
       ol.appendChild(li);
     }
     $("t-road-line").textContent = s.line;
