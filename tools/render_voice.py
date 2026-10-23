@@ -141,7 +141,7 @@ def _scrub(text: str, key: str) -> str:
     return text.replace(key, "***") if key else text
 
 
-def _http_message(err: urllib.error.HTTPError, key: str) -> str:
+def _http_message(err: urllib.error.HTTPError, key: str, voice_id: str = "") -> str:
     try:
         raw = err.read().decode("utf-8", "replace")
     except Exception:  # noqa: BLE001 - il corpo e' solo un aiuto, non serve
@@ -157,6 +157,20 @@ def _http_message(err: urllib.error.HTTPError, key: str) -> str:
         detail = raw
     # Il corpo dell'errore puo' ripetere la chiave: la si toglie prima di dirlo.
     detail = _scrub(detail, key)[:300]
+    low = raw.lower()
+    if err.code == 400 and "language" in low:
+        # Non si ritenta da soli senza `language_code`: e' una scelta da fare
+        # a mano (togliere il campo dallo script), non da indovinare.
+        why = ("ElevenLabs non lo accetta: il modello rifiuta `language_code` (400). "
+               "Va tolto dalla richiesta nello script, poi si rilancia.")
+        return why + (f" Dettaglio: {detail}" if detail else "")
+    if err.code == 404 or (err.code == 400 and (
+            "voice_not_found" in low or (voice_id and voice_id.lower() in low)
+            or ("voice" in low and "not found" in low))):
+        why = (f"ElevenLabs non trova la voce (HTTP {err.code}): aggiungi MarcoTrox "
+               "(maschile) e Tiziana (femminile) a «My voices» dalla libreria "
+               "di ElevenLabs (un clic ciascuna), poi rilancia.")
+        return why + (f" Dettaglio: {detail}" if detail else "")
     why = {
         401: "ElevenLabs ha rifiutato la chiave (401): controlla la chiave nel file "
              f"{_key_file()} o nella variabile {KEY_ENV}.",
@@ -180,7 +194,7 @@ def _synthesize(text: str, voice_id: str, key: str) -> bytes:
         with urllib.request.urlopen(req, timeout=TIMEOUT_S) as resp:
             pcm = resp.read()
     except urllib.error.HTTPError as e:
-        raise _Stop(_http_message(e, key)) from None
+        raise _Stop(_http_message(e, key, voice_id)) from None
     except (urllib.error.URLError, OSError) as e:
         raise _Stop(_scrub(f"Rete non raggiungibile: {e}", key)) from None
     # PCM 16 bit: un numero dispari di byte o niente audio e' una risposta rotta.
@@ -221,6 +235,10 @@ def _render_voice(voice: str, todo: list[str], gone: list[str], key: str,
                   full_run: bool) -> None:
     voice_id, d = VOICES[voice]
     d.mkdir(parents=True, exist_ok=True)
+    # `.tmp` lasciati da una corsa interrotta: PyInstaller copia la cartella
+    # intera, e finirebbero nel pacchetto.
+    for f in d.glob("*.tmp"):
+        f.unlink()
     manifest = _load_json(d / "manifest.json")
     sidecar = _load_json(d / "render.json")
     if gone:
@@ -345,9 +363,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.dry_run:
         return 0
 
-    if total_n == 0 and not any(g for _, g in plans.values()):
-        print("niente da fare.")
-        return 0
+    # Anche senza niente da generare si passa da ogni voce: la pulizia dei
+    # `.tmp` e dei WAV orfani non deve dipendere dall'avere lavoro da pagare.
     key = _read_key() if total_n else ""
     try:
         for v in voices:
@@ -355,7 +372,7 @@ def main(argv: list[str] | None = None) -> int:
             _render_voice(v, todo, gone, key, full_run=args.only is None)
     except _Stop as e:
         _die(str(e))
-    print("fatto.")
+    print("fatto." if total_n else "niente da generare.")
     return 0
 
 

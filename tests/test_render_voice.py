@@ -341,3 +341,81 @@ def test_reports_which_accoach_it_loaded(env, capsys):
     out = capsys.readouterr().out
     assert "accoach da " in out
     assert str(_ROOT / "src") in out
+
+
+# --- la pulizia della cartella ---------------------------------------------------
+
+STRAY = "cue_deadbeef00.wav"
+
+
+def test_full_run_removes_stray_wav_even_with_nothing_to_render(env):
+    render_voice.main(["--voice", "male"])
+    d = env.dirs["male"]
+    (d / STRAY).write_bytes(b"RIFF")
+    env.api.calls.clear()
+    render_voice.main(["--voice", "male"])  # niente da generare
+    assert env.api.calls == []
+    assert not (d / STRAY).exists()
+    assert set(_manifest(d)) == set(PHRASES)
+
+
+def test_full_run_with_work_removes_stray_wav(env):
+    d = env.dirs["male"]
+    d.mkdir(parents=True)
+    (d / STRAY).write_bytes(b"RIFF")
+    render_voice.main(["--voice", "male"])
+    assert not (d / STRAY).exists()
+
+
+def test_only_keeps_stray_wav(env):
+    render_voice.main(["--voice", "male"])
+    d = env.dirs["male"]
+    (d / STRAY).write_bytes(b"RIFF")
+    render_voice.main(["--voice", "male", "--only", "Gas"])
+    assert (d / STRAY).exists()
+
+
+@pytest.mark.parametrize("args", [["--voice", "male"], ["--voice", "male", "--only", "Gas"]])
+def test_stale_tmp_files_are_removed(env, args):
+    """Un'interruzione puo' lasciare `.tmp` che PyInstaller impacchetterebbe."""
+    render_voice.main(["--voice", "male"])
+    d = env.dirs["male"]
+    (d / "manifest.json.tmp").write_text("{", encoding="utf-8")
+    (d / "cue_0123456789.wav.tmp").write_bytes(b"RI")
+    render_voice.main(args)
+    assert not list(d.glob("*.tmp"))
+
+
+# --- errori che hanno una causa precisa -------------------------------------------
+
+def _fail_with(env, monkeypatch, code, body):
+    def boom(req, timeout=None):
+        raise urllib.error.HTTPError(req.full_url, code, "errore", {},
+                                     io.BytesIO(json.dumps(body).encode()))
+    monkeypatch.setattr(urllib.request, "urlopen", boom)
+
+
+@pytest.mark.parametrize("code,body", [
+    (404, {"detail": {"status": "voice_not_found",
+                      "message": f"A voice with voice_id W71zT1VwIFFx3mMGH2uZ was not found. {FAKE_KEY}"}}),
+    (400, {"detail": {"status": "voice_not_found", "message": "voice missing"}}),
+    (404, {"detail": "Not Found"}),
+])
+def test_missing_voice_says_to_add_it_from_the_library(env, monkeypatch, capsys, code, body):
+    _fail_with(env, monkeypatch, code, body)
+    with pytest.raises(SystemExit):
+        render_voice.main(["--voice", "male", "--only", "Gas"])
+    out, err = capsys.readouterr()
+    assert "My voices" in err and "MarcoTrox" in err and "Tiziana" in err
+    assert FAKE_KEY not in out + err
+
+
+def test_language_code_unsupported_is_said_clearly(env, monkeypatch, capsys):
+    _fail_with(env, monkeypatch, 400, {"detail": {
+        "status": "unsupported_language",
+        "message": f"Model eleven_multilingual_v2 does not support language_code. {FAKE_KEY}"}})
+    with pytest.raises(SystemExit):
+        render_voice.main(["--voice", "male", "--only", "Gas"])
+    out, err = capsys.readouterr()
+    assert "language_code" in err and "non lo accetta" in err
+    assert FAKE_KEY not in out + err
