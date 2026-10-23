@@ -514,3 +514,69 @@ def test_con_la_lista_scaduta_un_host_estraneo_ricalcola_una_volta(rete_che_camb
         assert c.get("/x").status_code == 403
         assert c.get("/x").status_code == 403   # ora la lista e' fresca
     assert len(chiamate) == 1
+
+
+# --- il tablet con la chiave non aspetta la rete --------------------------
+# La localita' (il PC non porta chiavi) si calcolava prima della chiave: con la
+# lista scaduta anche il tablet con la chiave giusta aspettava il ricalcolo
+# degli indirizzi, fino a 10 s con una VPN, una volta ogni 30 s.
+
+def test_con_la_chiave_giusta_il_tablet_non_aspetta_il_ricalcolo(monkeypatch):
+    import threading as _th
+    import time as _t
+    key = guard.lan_key()
+    guard.allowed_hosts()   # cache piena
+    sblocca = _th.Event()
+
+    def resolver_lento():
+        sblocca.wait(5.0)
+        return {"127.0.0.1", "::1", PC_LAN}
+
+    monkeypatch.setattr(netinfo, "local_addresses", resolver_lento)
+    guard._invecchia()
+    try:
+        with TestClient(_mini(), base_url=f"http://{PC_LAN}:8778", client=TABLET) as c:
+            for richiesta in (lambda: c.get("/x", params={"k": key}),
+                              lambda: c.get("/x", headers={"X-HONE-Key": key})):
+                t0 = _t.monotonic()
+                assert richiesta().status_code == 200
+                assert _t.monotonic() - t0 < 1.0
+            sblocca.set()
+    finally:
+        sblocca.set()
+
+
+# --- un rifiuto della 8777 si legge dalla pagina ---------------------------
+# Senza CORS sul 401 il browser nasconde la risposta: la pagina vede un errore
+# di rete, e il tablet diceva «coach spento» invece della frase del QR.
+
+def test_il_401_della_8777_porta_il_cors_per_le_nostre_pagine(tmp_path):
+    app = _apps(tmp_path)["server"]
+    pagina = f"http://{PC_LAN}:{PAGINE}"
+    with TestClient(app, base_url=f"http://{PC_LAN}:8777", client=TABLET) as c:
+        for r in (c.get("/health", headers={"Origin": pagina}),
+                  c.post("/engineer/applied", json={}, headers={"Origin": pagina})):
+            assert r.status_code == 401
+            assert r.headers["access-control-allow-origin"] == pagina
+            assert "origin" in r.headers["vary"].lower()
+        # Senza Origin (non e' una pagina) niente CORS.
+        r = c.get("/health")
+        assert r.status_code == 401
+        assert "access-control-allow-origin" not in r.headers
+
+
+def test_il_403_per_un_origin_estraneo_resta_senza_cors(tmp_path):
+    app = _apps(tmp_path)["server"]
+    with TestClient(app, base_url=f"http://{PC_LAN}:8777", client=TABLET) as c:
+        r = c.get("/health", headers={"Origin": f"http://evil.example:{PAGINE}"})
+        assert r.status_code == 403
+        assert "access-control-allow-origin" not in r.headers
+
+
+def test_le_pagine_della_8778_non_mettono_cors_sui_rifiuti(tmp_path):
+    app = _apps(tmp_path)["api"]
+    pagina = f"http://{PC_LAN}:{PAGINE}"
+    with TestClient(app, base_url=pagina, client=TABLET) as c:
+        r = c.get("/", headers={"Origin": pagina})
+        assert r.status_code == 401
+        assert "access-control-allow-origin" not in r.headers

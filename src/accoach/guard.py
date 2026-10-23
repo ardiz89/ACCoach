@@ -462,31 +462,34 @@ class GuardMiddleware:
 
         query = parse_qs(scope.get("query_string", b"").decode("latin-1"))
         dalla_query = (query.get(QUERY) or [""])[0]
-        client = scope.get("client")
-        ip = client[0] if client else None
-        locale = is_local_client(ip) or (
-            await _dopo_un_ricalcolo() and is_local_client(ip))
         try:
             key = lan_key()
         except OSError:
             # Il PC non porta chiavi e passa lo stesso; agli altri si spiega.
             key = None
-        if key is None and not locale:
-            await self._nega(kind, send, 503, None)
-            return
         query_ok = bool(dalla_query) and key is not None and _same(dalla_query, key)
-        if not locale:
-            portate = (cookie_parser(headers.get("cookie", "")).get(COOKIE, ""),
-                       headers.get(HEADER, ""))
-            if not (query_ok or any(p and _same(p, key) for p in portate)):
-                await self._nega(kind, send, 401, None)
+        portate = (cookie_parser(headers.get("cookie", "")).get(COOKIE, ""),
+                   headers.get(HEADER, ""))
+        con_chiave = query_ok or (key is not None
+                                  and any(p and _same(p, key) for p in portate))
+        # Chi porta la chiave giusta entra senza chiedersi da dove arriva: la
+        # localita' puo' voler aspettare il ricalcolo degli indirizzi (secondi
+        # con una VPN), e il tablet in pista non deve fermarsi ogni 30 s.
+        if not con_chiave:
+            client = scope.get("client")
+            ip = client[0] if client else None
+            locale = is_local_client(ip) or (
+                await _dopo_un_ricalcolo() and is_local_client(ip))
+            if not locale:
+                await self._nega(kind, send, 503 if key is None else 401, None,
+                                 origin)
                 return
 
         if kind == "http" and method not in _SAFE:
             ctype = headers.get("content-type", "").strip().lower()
             if not ctype.startswith("application/json"):
                 await self._nega(kind, send, 415,
-                                 "content type must be application/json")
+                                 "content type must be application/json", origin)
                 return
 
         if kind == "http" and method == "GET" and query_ok:
@@ -512,7 +515,15 @@ class GuardMiddleware:
 
         await self.app(scope, receive, send)
 
-    async def _nega(self, kind, send, status, text):
+    async def _nega(self, kind, send, status, text, origin=None):
+        """Il rifiuto. ``origin`` e' quello gia' vagliato da `_origin_ok`.
+
+        Sulla 8777 la pagina che chiama sta su un'altra porta, e senza
+        ``Access-Control-Allow-Origin`` il browser le nasconde la risposta: il
+        tablet vedeva un errore di rete e diceva «coach spento» invece della
+        frase del QR. Lo si mette solo per un'origine nostra, e solo sulla
+        8777: sulle pagine la chiamata e' della stessa origine.
+        """
         if kind == "websocket":
             # Chiudere prima di accettare: il server risponde 403 all'handshake.
             await send({"type": "websocket.close", "code": 1008})
@@ -528,7 +539,11 @@ class GuardMiddleware:
         else:
             body = text.encode("utf-8")
             ctype = b"text/plain; charset=utf-8"
+        risposta = [(b"content-type", ctype),
+                    (b"content-length", str(len(body)).encode())]
+        if origin is not None and not self.page_headers:
+            risposta += [(b"access-control-allow-origin", origin.encode("latin-1")),
+                         (b"vary", b"Origin")]
         await send({"type": "http.response.start", "status": status,
-                    "headers": [(b"content-type", ctype),
-                                (b"content-length", str(len(body)).encode())]})
+                    "headers": risposta})
         await send({"type": "http.response.body", "body": body})

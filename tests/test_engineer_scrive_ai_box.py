@@ -61,7 +61,7 @@ var showToast = () => {};
 var setTimeout = () => {}, connectWS = () => {};
 var showModalError = (m) => { els["modal-error"] = { textContent: m }; };
 for (const f of ["liveRefused", "inPista", "writeLocked", "paintWriteLock", "afterWrite", "applyNow",
-                 "confirmWrite", "confirmRestored", "confirmAvDone", "onWsClose"]) {
+                 "confirmWrite", "confirmRestored", "confirmAvDone", "onWsClose", "probeKey"]) {
   eval(grab(f));
 }
 (async () => {
@@ -169,3 +169,54 @@ def test_when_the_engine_goes_away_the_buttons_unlock(tmp_path):
     assert not any(r["painted"][k] for k in ("apply", "write", "ok", "restored"))
     assert r["painted"]["line"] == ""
     assert len(_writes(r)) == 2
+
+
+# Il guardiano chiude il WebSocket senza dire perche': alla chiusura la pagina
+# chiede /health alla 8777, e un 401 (la chiave che manca) si dice sul
+# distintivo invece di «offline». Motore spento resta «offline».
+_PROBE = r"""
+const fs = require("fs");
+const [i18nPath, engPath, status] = process.argv.slice(2);
+global.window = {}; window.HONE_LANG = "it";
+global.document = { readyState: "complete", querySelectorAll: () => [],
+                    querySelector: () => null, documentElement: {} };
+eval(fs.readFileSync(i18nPath, "utf8"));
+const src = fs.readFileSync(engPath, "utf8");
+const line = (re) => src.split("\n").find((l) => re.test(l));
+eval(line(/^const t = /).replace(/^const /, "var "));
+eval(line(/^const liveUrl = /).replace(/^const /, "var "));
+var WS_PORT = 8777, location = { hostname: "pc" };
+const els = {};
+var $ = (id) => els[id] || (els[id] = { dataset: {}, textContent: "" });
+var state = { lastLive: null };
+const asked = [];
+var fetch = (url) => { asked.push(url); return status === "off"
+  ? Promise.reject(new Error("off")) : Promise.resolve({ status: Number(status) }); };
+var paintWriteLock = () => {}, setTimeout = () => {}, connectWS = () => {};
+for (const name of ["onWsClose", "probeKey"]) {
+  const i = src.indexOf("function " + name + "(");
+  let depth = 0;
+  for (let k = src.indexOf("{", i); k < src.length; k++) {
+    if (src[k] === "{") depth++;
+    if (src[k] === "}") { depth--; if (!depth) { eval(src.slice(i, k + 1)); break; } }
+  }
+}
+onWsClose();
+setImmediate(() => console.log(JSON.stringify({ asked, text: $("live-text").textContent })));
+"""
+
+
+@pytest.mark.parametrize("status, text", [
+    ("401", "Apri HONE dal codice QR dell'hub."),
+    ("off", "telemetria offline"),
+])
+def test_a_websocket_refused_for_the_key_says_so_on_the_badge(tmp_path, status, text):
+    script = tmp_path / "p.js"
+    script.write_text(_PROBE, encoding="utf-8")
+    run = subprocess.run([_NODE, str(script), str(_WEB / "i18n.js"),
+                          str(_WEB / "engineer.js"), status],
+                         capture_output=True, text=True, encoding="utf-8", timeout=60)
+    assert run.returncode == 0, run.stderr
+    out = json.loads(run.stdout)
+    assert out["asked"] == ["http://pc:8777/health"]
+    assert out["text"] == text

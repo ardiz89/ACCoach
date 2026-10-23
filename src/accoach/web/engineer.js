@@ -1552,7 +1552,21 @@ function onWsClose() {
   // il caso in cui scrivere un assetto deve restare possibile.
   state.lastLive = { connected: false };
   paintWriteLock();
+  probeKey();
   setTimeout(connectWS, 3000);
+}
+
+// Un WebSocket rifiutato dal guardiano si chiude come un motore spento, e il
+// perche' non lo dice: lo si chiede alla 8777 con una fetch. Un 401 e' la
+// chiave che manca, e il distintivo dice del QR invece di «offline».
+function probeKey() {
+  fetch(liveUrl(`http://${location.hostname}:${WS_PORT}/health`))
+    .then((r) => {
+      if (r && r.status === 401 && state.lastLive && !state.lastLive.connected) {
+        $("live-text").textContent = t("lan.fromQr");
+      }
+    })
+    .catch(() => { /* motore spento: resta «offline» */ });
 }
 
 function connectWS() {

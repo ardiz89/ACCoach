@@ -11,6 +11,7 @@ import re
 import subprocess
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 
 from accoach.api import create_api
@@ -278,3 +279,39 @@ process.stdout.write(JSON.stringify({err: $("t-err").textContent}));
                        capture_output=True, text=True, encoding="utf-8")
     assert r.returncode == 0, r.stderr
     assert json.loads(r.stdout) == {"err": ""}
+
+
+# --- il WebSocket rifiutato per la chiave ------------------------------------
+# Il guardiano chiude il WebSocket senza dire perche', e la schermata diceva
+# «coach spento». Alla chiusura si chiede /health alla 8777: un 401 e' la
+# chiave che manca.
+
+def _ws_closed_js(answer):
+    head = _BOX_HARNESS.split("var frame = ")[0].replace(
+        "function WebSocket() { return {}; }",
+        "var lastWs = null; function WebSocket() { lastWs = {}; return lastWs; }")
+    return head + r"""
+var setTimeout = function () {};
+lastWs.onclose();
+var probe = find(":8777/health");
+""" + answer + r"""
+process.stdout.write(JSON.stringify({probes: probe.length,
+  closed: $("t-off-closed").hidden, key: $("t-off-key").hidden}));
+"""
+
+
+@needs_node
+@pytest.mark.parametrize("answer, expected", [
+    ("probe[0].readyState = 4; probe[0].status = 401; probe[0].responseText = '<p>x</p>';"
+     " probe[0].onreadystatechange();", {"closed": True, "key": False}),
+    # Motore spento: nessuna risposta (status 0), resta «coach spento».
+    ("probe[0].readyState = 4; probe[0].status = 0; probe[0].onreadystatechange();",
+     {"closed": False, "key": True}),
+])
+def test_a_websocket_refused_for_the_key_says_open_from_the_qr(answer, expected):
+    r = subprocess.run([_NODE, "-e", _ws_closed_js(answer), str(_WEB / "i18n.js"),
+                        str(_WEB / "tablet.js")],
+                       capture_output=True, text=True, encoding="utf-8")
+    assert r.returncode == 0, r.stderr
+    out = json.loads(r.stdout)
+    assert out == dict(expected, probes=1)
