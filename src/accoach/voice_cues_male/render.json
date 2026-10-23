@@ -1,0 +1,1178 @@
+{
+  "ABS già alto, blocchi davanti in più curve. Sposta il bilanciamento freni indietro.": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Abbassa il posteriore.": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Abbassa la pressione delle gomme anteriori.": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Abbassa la pressione delle gomme posteriori.": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Alza il posteriore per avere più rake.": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Alza la pressione delle gomme anteriori.": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Alza la pressione delle gomme posteriori.": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Ammorbidisci l'estensione posteriore.": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Ammorbidisci la barra antirollio anteriore.": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Ammorbidisci la barra antirollio posteriore.": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Ammorbidisci le molle anteriori.": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Ammorbidisci le molle posteriori.": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Arrivi lungo, frena prima": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Aumenta il bloccaggio del differenziale in rilascio.": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Aumenta il camber negativo anteriore.": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Aumenta il controllo di trazione.": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Aumenta il precarico del differenziale.": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Aumenta il toe-in posteriore.": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Aumenta il toe-out anteriore.": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Aumenta l'ala anteriore.": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Aumenta l'ala posteriore.": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Aumenta lo splitter anteriore.": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Benzina per circa 1 giro.": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Benzina per circa 2 giri.": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Benzina per circa 3 giri.": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Blocchi davanti in più curve. Alza l'ABS di uno.": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Blocchi le ruote, alleggerisci il freno": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Dai più gas qui": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Freni troppo qui, alleggerisci": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Gomme anteriori troppo gonfie. Togli pressione a freddo.": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Gomme anteriori troppo sgonfie. Aggiungi pressione a freddo.": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Gomme posteriori troppo gonfie. Togli pressione a freddo.": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Gomme posteriori troppo sgonfie. Aggiungi pressione a freddo.": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Gomme troppo calde. Guida più fluido.": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Gomme troppo fredde. Spingi per scaldarle.": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Ingegnere, cambia dal volante.": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Ingegnere, rientra ai box.": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Ingegnere, se vuoi prova ai box.": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Ingegnere, se vuoi prova dal volante.": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Ingresso box qui davanti, rientra": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "L'anteriore scivola, entra più piano": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Marcia troppo lunga, scala per avere più spinta": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Modifica pronta, rientra ai box a fine giro": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Molli presto il freno, tienine un filo all'inserimento": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Pattini in uscita in più punti. Alza il TC di uno.": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Pattini in uscita, dosa il gas": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Porta più velocità in curva": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Qui guadagni, rifalla così": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Qui hai margine, frena più tardi": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Qui perdi 1 decimo": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Qui perdi 10 decimi": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Qui perdi 11 decimi": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Qui perdi 12 decimi": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Qui perdi 13 decimi": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Qui perdi 14 decimi": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Qui perdi 15 decimi": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Qui perdi 16 decimi": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Qui perdi 17 decimi": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Qui perdi 18 decimi": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Qui perdi 19 decimi": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Qui perdi 2 decimi": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Qui perdi 20 decimi": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Qui perdi 21 decimi": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Qui perdi 22 decimi": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Qui perdi 23 decimi": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Qui perdi 24 decimi": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Qui perdi 25 decimi": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Qui perdi 3 decimi": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Qui perdi 4 decimi": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Qui perdi 5 decimi": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Qui perdi 6 decimi": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Qui perdi 7 decimi": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Qui perdi 8 decimi": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Qui perdi 9 decimi": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Qui perdi più di due secondi e mezzo": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Resti a metà gas, aspetta e apri tutto": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Riduci il bloccaggio del differenziale in accelerazione.": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Riduci il precarico del differenziale.": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Riduci l'ala posteriore.": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Riporta l'assetto com'era.": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Sei ai box. Apri la pagina Ingegnere nel browser. Prepara la modifica e applicala. Ricarica il setup dal garage prima di uscire.": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Sei sul limitatore, cambia prima": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Sovrasterzo, in uscita apri il gas piano": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Sposta il bilanciamento freni in avanti.": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Sposta il bilanciamento freni indietro.": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Ultimo giro di benzina, rientra ai box": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Veleggi, passa subito dal freno al gas": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "accompagna": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "cambia": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "gas": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "meno freno": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "più tardi": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "porta velocità": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "prima": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "qui perdi": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "scala": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "tutto gas": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "veleggi": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  }
+}

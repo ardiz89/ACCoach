@@ -61,9 +61,10 @@ def test_sorted_and_without_duplicates(catalogue):
 
 def test_every_wav_of_today_is_in_the_list(catalogue):
     manifest = json.loads(_MANIFEST.read_text(encoding="utf-8"))
-    assert len(manifest) == 59
-    # Le chiavi di oggi non hanno numeri di dettaglio: le sole cifre sono i
-    # decimi e la benzina. Verificato, non supposto.
+    # Prima delle voci ElevenLabs il manifest aveva le 59 frasi di Piper; ora
+    # ha tutto l'elenco. Quello che conta resta: nessuna chiave fuori elenco, e
+    # le sole cifre sono i decimi e la benzina. Verificato, non supposto.
+    assert len(manifest) >= 59
     assert [k for k in manifest if re.search(r"\d", k) and not _NUMBERED.match(k)] == []
     assert sorted(set(manifest) - set(catalogue)) == []
 
