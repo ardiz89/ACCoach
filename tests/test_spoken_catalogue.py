@@ -113,12 +113,57 @@ def _real_cues():
     return cues
 
 
+def _time_loss(lost_ms):
+    from accoach.coaching.analyzer import CornerStats, classify_corner
+    return classify_corner(CornerStats(
+        lost_ms=lost_ms, throttle_live=1.0, throttle_ref=1.0, brake_live=0.0,
+        brake_ref=0.0, min_speed_live=100.0, min_speed_ref=100.0,
+        braking_early=False, braking_late=False), 0, 0.3)
+
+
+def _fuel_cues(levels):
+    """Gli avvisi della benzina, giro per giro, dal rilevatore vero."""
+    import test_fuel as fuel_t
+    from accoach.coaching.fuel import FuelEngineer
+    eng, now, out = FuelEngineer(), 0.0, []
+    for fuel in levels:
+        cues, now = fuel_t._lap(eng, fuel, now)
+        out += cues
+    return out
+
+
+# Un serbatoio che scende piano (2, 1, ultimo) e uno che crolla: dopo
+# «Ultimo giro» le soglie piu' larghe rimaste libere dicevano «0 giri».
+_FUEL_RUNS = [(12.0, 9.5, 7.0, 4.5, 2.0, 1.0, 0.5),
+              (12.0, 9.5, 2.0, 1.0, 0.5, 0.2)]
+
+
 def test_closing_every_dynamic_coach_cue_is_in_the_list(catalogue):
     said = set()
     for cue in _real_cues():
         said |= _said_by_the_coach(cue)
     assert len(said) >= 9          # 4 pressioni, 2 temperature, ABS, TC, ripartitore
     assert sorted(said - set(catalogue)) == []
+
+
+@pytest.mark.parametrize("lost_ms", [120, 149, 151, 2549, 2551, 2600, 4000, 9000])
+def test_closing_time_loss_at_any_size(catalogue, lost_ms):
+    """Oltre i 25 decimi la voce non dice il numero (non ha un WAV), lo schermo si."""
+    cue = _time_loss(lost_ms)
+    said = _said_by_the_coach(cue)
+    assert sorted(said - set(catalogue)) == []
+    if lost_ms > 2550:
+        assert f"{lost_ms / 100:.0f} decimi" in cue.message
+        assert cue.voice == "Qui perdi più di due secondi e mezzo"
+
+
+@pytest.mark.parametrize("levels", _FUEL_RUNS)
+def test_closing_fuel_never_says_zero_laps(catalogue, levels):
+    cues = _fuel_cues(levels)
+    assert any("Ultimo giro" in c.message for c in cues)
+    for cue in cues:
+        assert "0 giri" not in cue.message
+        assert sorted(_said_by_the_coach(cue) - set(catalogue)) == []
 
 
 def test_closing_every_engineer_announcement_is_in_the_list(catalogue, tmp_path, monkeypatch):

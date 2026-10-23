@@ -39,6 +39,7 @@ from .cue import Cue, CueCategory
 # Tuning. Thresholds are intentionally above sensor/driving noise.
 _BRAKE_ON = 0.15            # brake pedal fraction that counts as "braking"
 _LOSS_MS = 120.0           # min time lost in a segment before we say anything
+_SPOKEN_TENTHS = 25        # «Qui perdi N decimi» ha un WAV fino a qui (coaching/spoken.py)
 _GAIN_MS = 250.0           # gain this big earns a brief "good"
 _THROTTLE_MARGIN = 0.10    # avg throttle deficit that blames throttle
 _BRAKE_MARGIN = 0.10       # avg brake excess that blames over-braking
@@ -181,8 +182,13 @@ def classify_corner(st: CornerStats, index: int, pos: float) -> Cue | None:
         msg = f"Qui perdi {n} decimo"
     else:
         msg = f"Qui perdi {n} decimi"
+    # Le frasi a voce coi decimi sono registrate da 1 a 25: oltre, il numero
+    # resta sullo schermo e la voce dice una frase fissa, vera per ogni cifra
+    # da 26 in su (cioe' da 2,55 s). Fermarsi a «25 decimi» direbbe meno di
+    # quanto perdi.
+    voice = "Qui perdi più di due secondi e mezzo" if int(n) > _SPOKEN_TENTHS else None
     return Cue(CueCategory.TIME_LOSS, msg,
-               priority=lost, segment=index, pos=pos)
+               priority=lost, segment=index, pos=pos, voice=voice)
 
 
 def corner_level(lost_ms: float) -> str:

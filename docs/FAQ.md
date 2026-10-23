@@ -1015,10 +1015,11 @@ These entries only exist there.
 - **You can't hear the voice.** Check you didn't start with `--silent`. Then run
   `python accoach_main.py selftest`, which writes a report and tries to speak.
   From the source, install pyttsx3 with `pip install pyttsx3`.
-- **Some sentences sound more robotic than others.** The coach's fixed sentences
-  and the focus's short words are recorded with a neural voice. Sentences that
-  change every time, like the focus announcement with the corner's name, come from
-  the Windows voice, which is more robotic. It changes the sound, not what you're
+- **Some sentences sound more robotic than others.** The recorded voice speaks
+  Italian. In Italian the coach's fixed sentences and the focus's short words are
+  recorded with a neural voice. The rest, like the tyre advice and the engineer's
+  proposals, come from the Windows voice, which is more robotic. In English every
+  sentence comes from the Windows voice. It changes the sound, not what you're
   told.
 - **You want the other voice.** The default voice is male. For the female one,
   untick **Male voice** in **Settings**, and the other way round.

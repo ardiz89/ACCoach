@@ -103,7 +103,11 @@ class FuelEngineer:
         # Fire the tightest threshold the estimate has dropped to, once.
         for thresh in sorted(_WARN_LAPS):          # 1, 2, 3
             if remaining <= thresh and thresh not in self._warned:
-                self._warned.add(thresh)
+                # Una soglia piu' stretta vale anche per quelle piu' larghe. Prima
+                # si segnava solo la sua: dopo «Ultimo giro di benzina» il 2 o il
+                # 3 rimasti liberi scattavano al giro dopo con int(remaining) = 0,
+                # e la voce diceva «Benzina per circa 0 giri».
+                self._warned.update(t for t in _WARN_LAPS if t >= thresh)
                 if thresh <= 1:
                     msg = "Ultimo giro di benzina, rientra ai box"
                 else:

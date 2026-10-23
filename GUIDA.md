@@ -962,10 +962,9 @@ Queste voci esistono solo lì.
   `pip install pyttsx3`. Ti serve anche una voce italiana di Windows, come
   Microsoft Elsa.
 - **Alcune frasi suonano più robotiche delle altre.** Le frasi fisse del coach
-  e le parole brevi del focus sono registrate con una voce neurale. Le frasi
-  che cambiano ogni volta, come l'annuncio del focus col nome della curva,
-  escono dalla voce di Windows, che è più robotica. Cambia il suono, non
-  quello che ti dice.
+  e le parole brevi del focus sono registrate con una voce neurale. Le altre,
+  come i consigli sulle gomme e le proposte dell'ingegnere, escono dalla voce
+  di Windows, che è più robotica. Cambia il suono, non quello che ti dice.
 - **Vuoi un'altra voce.** La voce di partenza è maschile. Per quella femminile
   togli la spunta da **Voce maschile** in **Impostazioni**, e viceversa.
 - **Non arriva nessun consiglio di curva.** Ti manca il riferimento. Ti basta un giro

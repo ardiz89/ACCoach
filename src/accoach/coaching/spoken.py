@@ -14,9 +14,9 @@ Le fonti sono cinque, e la scansione del sorgente ne vede una sola:
   d'innesco italiane, che stanno in una tabella e non in una chiamata;
 * le frasi col numero che sono gia' un insieme chiuso: «Qui perdi N decimi»
   (1-25) e «Benzina per circa N giri» (1-3). Il numero e' il consiglio stesso;
-* le frasi generali di `Cue.voice` (pressioni, temperature, ABS e TC): quattro
-  sono f-string sull'asse, e la scansione non puo' vederle, quindi sono
-  scritte qui una per una;
+* le frasi generali di `Cue.voice` (pressioni, temperature, ABS e TC, i decimi
+  oltre i 25): la scansione legge quelle scritte per intero; le quattro della
+  pressione sono f-string sull'asse e sono copiate qui una per una;
 * il prefisso dell'ingegnere, il ripristino e le leve senza click
   (`engineer/voice_levers.py`).
 
@@ -34,72 +34,92 @@ from pathlib import Path
 
 _COACHING = Path(__file__).resolve().parent
 
-#: Le frasi generali di `Cue.voice`, come le costruiscono `pressure.py`,
-#: `tyretemp.py` e `advisor.py`. Una copia scritta a mano: se una cambia la'
-#: e non qui, il test di chiusura lo dice.
-_CUE_VOICE: tuple[str, ...] = tuple(
+#: Le frasi generali della pressione (`pressure.py`): f-string sull'asse, che
+#: la scansione non puo' leggere, quindi copiate qui. Se una cambia la' e non
+#: qui, il test di chiusura lo dice.
+_PRESSURE_VOICE: tuple[str, ...] = tuple(
     f"Gomme {axle} troppo {state}. {action} pressione a freddo."
     for axle in ("anteriori", "posteriori")
     for state, action in (("gonfie", "Togli"), ("sgonfie", "Aggiungi"))
-) + (
-    "Gomme troppo calde. Guida più fluido.",
-    "Gomme troppo fredde. Spingi per scaldarle.",
-    "Blocchi davanti in più curve. Alza l'ABS di uno.",
-    "Pattini in uscita in più punti. Alza il TC di uno.",
 )
 
 
-def static_cue_messages() -> set[str]:
-    """Le frasi fisse dei moduli del coach e le parole d'innesco italiane.
+def _str_leaves(node: ast.AST) -> list[str]:
+    """I testi letterali di un valore: una stringa, o i due rami di un
+    `"a" if … else "b"` (il `None` dell'altro ramo non e' testo)."""
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return [node.value]
+    if isinstance(node, ast.IfExp):
+        return _str_leaves(node.body) + _str_leaves(node.orelse)
+    return []
 
-    Prende i testi letterali di ogni chiamata che prende anche una
-    `CueCategory` (`Cue(CueCategory.X, "…")` e gli aiutanti come
-    `self._make(s, CueCategory.X, "…")`), anche quando il testo e' scritto
-    prima e passato per nome. Salta le f-string e l'argomento `voice=`: le
-    frasi generali le elenca `_CUE_VOICE`, una per una.
+
+def _scan() -> tuple[set[str], set[str]]:
+    """(frasi fisse, frasi `voice=`) delle chiamate che prendono una `CueCategory`.
+
+    Prende i testi letterali di `Cue(CueCategory.X, "…")` e degli aiutanti come
+    `self._make(s, CueCategory.X, "…")`, anche quando il testo e' scritto prima
+    e passato per nome. Le f-string restano fuori. L'argomento `voice=` (la
+    frase generale di `Cue.voice`) sta da parte: e' quello che la voce dice al
+    posto del messaggio, e il messaggio di quell'avviso non si dice mai.
     """
     sources = sorted(_COACHING.glob("*.py"))
     if not sources:
         # Un elenco vuoto passerebbe per «niente da registrare»: meglio fermarsi.
         raise RuntimeError(f"nessun sorgente del coach in {_COACHING}")
     messages: set[str] = set()
+    voices: set[str] = set()
 
     def has_cue_category(call: ast.Call) -> bool:
         for a in list(call.args) + [kw.value for kw in call.keywords]:
-            if isinstance(a, ast.Attribute) and isinstance(a.value, ast.Name) \
-                    and a.value.id == "CueCategory":
+            if isinstance(a, ast.Attribute) and isinstance(a.value, ast.Name)                     and a.value.id == "CueCategory":
                 return True
         return False
 
     for path in sources:
         tree = ast.parse(path.read_text(encoding="utf-8"))
-        # Un messaggio scritto prima e passato per nome: `msg = "…"` in fuel.py,
-        # le costanti `_CALL`/`_APPROACH`/`_BRIEFING` di pitcall.py. Senza,
-        # il rientro ai box e l'ultimo giro di benzina restavano fuori.
+        # Un testo scritto prima e passato per nome: `msg = "…"` in fuel.py, le
+        # costanti `_CALL`/`_APPROACH`/`_BRIEFING` di pitcall.py, `voice = "…"`
+        # in tyretemp.py. Senza, il rientro ai box e l'ultimo giro di benzina
+        # restavano fuori.
         assigned: dict[str, list[str]] = {}
         for node in ast.walk(tree):
-            if isinstance(node, ast.Assign) and isinstance(node.value, ast.Constant) \
-                    and isinstance(node.value.value, str):
+            if isinstance(node, ast.Assign):
                 for t in node.targets:
                     if isinstance(t, ast.Name):
-                        assigned.setdefault(t.id, []).append(node.value.value)
+                        assigned.setdefault(t.id, []).extend(_str_leaves(node.value))
+
+        def texts(a: ast.AST) -> list[str]:
+            if isinstance(a, ast.Name):
+                return assigned.get(a.id, [])
+            return _str_leaves(a)
+
         for node in ast.walk(tree):
             if isinstance(node, ast.Call) and has_cue_category(node):
-                for a in list(node.args) + [kw.value for kw in node.keywords
-                                            if kw.arg != "voice"]:
-                    if isinstance(a, ast.Constant) and isinstance(a.value, str):
-                        texts = [a.value]
-                    elif isinstance(a, ast.Name):
-                        texts = assigned.get(a.id, [])
-                    else:
-                        texts = []
-                    messages.update(t for t in texts if len(t) > 5)
+                for a in node.args:
+                    messages.update(t for t in texts(a) if len(t) > 5)
+                for kw in node.keywords:
+                    into = voices if kw.arg == "voice" else messages
+                    into.update(t for t in texts(kw.value) if len(t) > 5)
+    return messages, voices
 
+
+def static_cue_messages() -> set[str]:
+    """Le frasi fisse dei moduli del coach e le parole d'innesco italiane
+    (le frasi che hanno gia' un WAV di Piper)."""
+    messages, _ = _scan()
     # Le parole d'innesco sono una tabella, non una chiamata, e sono le frasi
     # che il pilota sente piu' spesso quando c'e' un focus.
     from .cue import TRIGGER
     messages.update(e["it"] for e in TRIGGER.values())
     return messages
+
+
+def cue_voice_messages() -> set[str]:
+    """Le frasi generali di `Cue.voice`: quelle scritte per intero nel codice
+    (temperature, ABS e TC, i decimi oltre i 25) e le quattro della pressione."""
+    _, voices = _scan()
+    return voices | set(_PRESSURE_VOICE)
 
 
 def numeric_cue_messages() -> set[str]:
@@ -135,4 +155,4 @@ def spoken_phrases() -> list[str]:
     """Tutte le frasi italiane che `Voice.say` puo' ricevere dal motore, una
     volta sola ciascuna, in ordine."""
     return sorted(static_cue_messages() | numeric_cue_messages()
-                  | set(_CUE_VOICE) | engineer_phrases())
+                  | cue_voice_messages() | engineer_phrases())
