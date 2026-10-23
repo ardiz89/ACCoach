@@ -249,13 +249,14 @@ The engineer works in phases, one after the other. On a GT3 they are Pressures,
 Mechanical grip, Aero / rake, Brake bias and Electronics. It keeps checking the
 pressures in the later phases too.
 
-1. To decide anything it needs a baseline of **3 good laps**. A lap is good when
-   it's valid, with no off-track and the tyres averaging at least 75 °C. It
-   collects the baseline at the start, after a restore and when the track goes
-   from dry to wet or back.
+1. To decide anything it needs a baseline of **3 clean laps**. For the
+   engineer a lap is clean when it's valid, with no off-track and the tyres
+   averaging at least 75 °C. It collects the baseline at the start, after a
+   restore and when the track changes between dry and wet. In the wet, though,
+   it proposes nothing, because its remedies were worked out in the dry.
 2. With the baseline it proposes **one change at a time**. The proposal tells
    you whether it's done in the pits or from the wheel.
-3. Once you've made it, it counts **3 good laps** with the change to check it.
+3. Once you've made it, it counts **3 clean laps** with the change to check it.
 4. If the change helped it keeps it, and those laps become the baseline for the
    next step. If not, it asks you to put it back as it was.
 5. When the phase has nothing left that it knows how to fix, it moves on to the
@@ -263,8 +264,12 @@ pressures in the later phases too.
 
 Where you are shows in the **road**, the row of phases above the phase line, on
 the tablet and on the Engineer page. Finished phases carry a tick and the
-current one is highlighted. Below it is the sentence about the current step,
-with the good laps counted, for example "Good laps for the baseline, 2 of 3."
+current one is highlighted. A skipped phase is struck through, with no tick.
+That happens when the engineer can't judge it on that car, or finds nothing to
+correct. When the engineer stands down, in the wet for example, the sentence
+below the phases only says it isn't writing any change for now. The reason is
+in its message. Otherwise the sentence gives the current step, with the clean
+laps counted, for example "Clean laps for the baseline, 2 of 3."
 
 ### The Test log
 
@@ -868,17 +873,23 @@ road".
   stays below. For a rejected change the call is similar and tells you to put
   the last change back as it was. Tapping the call takes you to Setup.
 - **Setup.** The page shows the phase and the levers to change, one per row,
-  from the current value to the new one. You can open it on track too. Below
-  are the reason and the confidence. As the starting file, HONE offers the last
-  setup it wrote for that car and track since the web process started. If it hasn't written one, it
-  offers the most recently modified file. You can pick another from the list.
-  Press *Write the change* and confirm. HONE creates a new file and leaves
-  yours alone. The page then shows the file name in large type, to load from
-  the game's garage. If it can't find a setup for that car on that track, it
-  asks you to save one from the garage.
+  from the current value to the new one. Below are the reason and the
+  confidence. As the starting file, HONE offers the last setup it wrote for
+  that car and track since the web process started. If it hasn't written one,
+  it offers the most recently modified file. You can pick another from the
+  list. Press *Write the change* and confirm. HONE creates a new file and
+  leaves yours alone. The page then shows the file name in large type, to load
+  from the game's garage. If it can't find a setup for that car on that track,
+  it asks you to save one from the garage.
+- **On track, Setup is for reading.** You see the change, the starting file
+  and the levers while you drive, but the buttons only switch on when you're
+  stopped in the pits. When you write the file, the engineer starts counting
+  the test laps. On track the car still has the previous setup, and those laps
+  would say nothing about the change.
 - **A rejected change.** The button becomes *Write the restore* and writes a file
   with the previous values. If you've already reloaded the previous file in the
-  game's garage, press *I've already put it back*.
+  game's garage, press *I've already put it back*. This button too only works
+  in the pits.
 
 For anything else, such as the history of the trials, use the full engineer
 page. It stays at `/engineer`, and the *Full page* link at the bottom of the

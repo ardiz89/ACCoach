@@ -965,9 +965,11 @@ Salva un setup nel gioco, poi ricarica questa pagina.` },
     // La strada dell'ingegnere: la striscia delle fasi, sul tablet e sulla
     // pagina Ingegnere, e la frase sul passo in corso (`progress.stage`). Il
     // contatore viene dal motore; il giro che conta e' quello di
-    // `stable and warmed_up` (coaching/diagnosis.py, _WARM_C = 75).
-    "eng.road.base":   { en: `Good laps for the baseline, {have} of {need}.`,
-                         it: `Giri buoni per la base, {have} di {need}.` },
+    // `stable and warmed_up` (coaching/diagnosis.py, _WARM_C = 75). «Puliti»
+    // come li chiama il motore nei suoi messaggi («servono 3 giri puliti»):
+    // una parola sola per gli stessi giri, sulla strada e nelle guide.
+    "eng.road.base":   { en: `Clean laps for the baseline, {have} of {need}.`,
+                         it: `Giri puliti per la base, {have} di {need}.` },
     "eng.road.why":    { en: `A lap counts when it's valid, with no off-track and the tyres averaging at least 75 °C.`,
                          it: `Conta un giro valido, senza uscite di pista, con le gomme in media ad almeno 75 °C.` },
     // La modifica in attesa senza un `tag` che si legge: non si dice dove.
@@ -976,8 +978,8 @@ Salva un setup nel gioco, poi ricarica questa pagina.` },
                             it: `Hai una modifica da fare ai box.` },
     "eng.road.changeAv":  { en: `You have a change to make from the wheel.`,
                             it: `Hai una modifica da fare dal volante.` },
-    "eng.road.test":   { en: `Testing the change, good laps {have} of {need}. Then I decide whether to keep it.`,
-                         it: `Provo la modifica, giri buoni {have} di {need}. Poi decido se tenerla.` },
+    "eng.road.test":   { en: `Testing the change, clean laps {have} of {need}. Then I decide whether to keep it.`,
+                         it: `Provo la modifica, giri puliti {have} di {need}. Poi decido se tenerla.` },
     // Non ripete l'avviso di rientro (`tablet.callRestore`), che sta sopra
     // nello stesso momento: dice il perche' e cosa succede dopo
     // (`mark_applied` di un ripristino svuota la finestra, si rifa' la base).
@@ -987,6 +989,11 @@ Salva un setup nel gioco, poi ricarica questa pagina.` },
                            it: `Ho i giri che servono e decido a fine giro.` },
     "eng.road.done":   { en: `Setup finished, every phase is done.`,
                          it: `Assetto finito, tutte le fasi sono fatte.` },
+    // L'ultima decisione e' un passo indietro (STAND_DOWN: bagnato, fase
+    // cieca, leva che non sa scrivere, condizioni cambiate). Il perche' sta
+    // nel messaggio del motore; qui solo il fatto, vero per tutti i casi.
+    "eng.road.standDown": { en: `For now I'm not writing any change.`,
+                            it: `Per ora non scrivo modifiche.` },
     "eng.pit":         { en: `You're in the pits. In the MFD open <b>Setup</b>, load <b>{name}</b> and head out to apply it.`,
                          it: `Sei ai box. Nell'MFD apri <b>Setup</b>, carica <b>{name}</b> ed esci per applicarlo.` },
     // Shown while stopped in the box with a garage change still unwritten —
@@ -1044,6 +1051,10 @@ Salva un setup nel gioco, poi ricarica questa pagina.` },
                          it: `Scrivo queste modifiche in un file nuovo, {name}.` },
     "tablet.writeErr": { en: `The file wasn't written. `, it: `Il file non è stato scritto. ` },
     "tablet.restored": { en: `I've already put it back`, it: `L'ho già rimesso com'era` },
+    // In pista i bottoni sono spenti: avvisare il motore aprirebbe la prova
+    // con l'assetto vecchio ancora montato (tablet.js, `atBoxNow`).
+    "tablet.writeAtBox": { en: `You write the file when you're stopped in the pits.`,
+                           it: `Il file lo scrivi quando sei fermo ai box.` },
 
     // engineer tour
     "tour.e1.t": { en: `Live diagnosis`, it: `Diagnosi live` },

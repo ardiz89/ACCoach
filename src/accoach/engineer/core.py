@@ -272,6 +272,13 @@ class Decision:
     #: On an ACCEPTED / REVERTED: what happened, with the numbers on both sides.
     #: This is what `ledger.py` writes down.
     outcome: Outcome | None = None
+    #: Su un COLLECT o un EVALUATING col contatore: la parte del messaggio che
+    #: il contatore non dice (perche' l'ultimo giro non conta, il sospetto
+    #: sulle uscite), "" se non c'e'. La strada della pagina i giri li conta
+    #: gia' (`progress`): senza questa coda separata la pagina ripeteva lo
+    #: stesso numero due volte con due frasi diverse, o perdeva il perche'.
+    #: None su tutto il resto: il messaggio va letto intero.
+    tail: str | None = None
 
 
 # --- the profile contract --------------------------------------------------
@@ -773,6 +780,11 @@ class RaceEngineer:
         #: macchina (assetto o asciutto/bagnato): un'uscita fatta con un'altra
         #: macchina non accusa questa.
         self._offs: list[LapStats] = []
+        #: Le fasi che `_advance` ha passato senza chiuderle: cieche su
+        #: quest'auto, o senza niente da correggere col cancello ancora chiuso.
+        #: La strada non le spunta come fatte, perche' nessuno le ha
+        #: controllate. Va su disco con `phase_idx`, che le ha gia' superate.
+        self.skipped_phases: set[int] = set()
 
     # -- memoria fra sessioni ----------------------------------------------
     def state(self) -> dict:
@@ -795,6 +807,7 @@ class RaceEngineer:
         pending = self.active.change if self.active is not None else None
         return {
             "phase_idx": self.phase_idx,
+            "skipped_phases": sorted(self.skipped_phases),
             "remedy_idx": {_sym_key(k): v for k, v in self.remedy_idx.items()},
             "exhausted": [_sym_key(s) for s in self.exhausted],
             # Le chiavi sono coppie (parametro, slot) e JSON vuole stringhe:
@@ -819,6 +832,9 @@ class RaceEngineer:
         idx = state.get("phase_idx")
         if isinstance(idx, int) and 0 <= idx < len(self.phases):
             self.phase_idx = idx
+        for i in state.get("skipped_phases") or []:
+            if isinstance(i, int) and not isinstance(i, bool) and 0 <= i < len(self.phases):
+                self.skipped_phases.add(i)
         tried = state.get("remedy_idx")
         for key, val in (tried.items() if isinstance(tried, dict) else ()):
             sym = _sym_from_key(key)
@@ -856,6 +872,7 @@ class RaceEngineer:
         phases = [{"key": p.key, "label": tr(p.label, lang), "tag": p.tag}
                   for p in self.phases]
         out = {"phases": phases, "index": min(self.phase_idx, len(self.phases)),
+               "skipped": sorted(self.skipped_phases),
                "stage": "diagnose", "have": None, "need": None}
         if self._held_revert is not None or (
                 self._pending is not None and self._pending_is_revert):
@@ -930,11 +947,11 @@ class RaceEngineer:
                             _msg("unjudged", current_language(), why=pendente))
 
         if len(self.window) < self.min_stable:
+            tail = _skip_tail(self._skipped) + self._off_tail()
             return Decision(DecisionKind.COLLECT,
                             _msg("collect", n=self.min_stable,
-                                 have=len(self.window))
-                            + _skip_tail(self._skipped)
-                            + self._off_tail())
+                                 have=len(self.window)) + tail,
+                            tail=tail)
         return self._advance()
 
     def mark_applied(self) -> None:
@@ -1196,6 +1213,7 @@ class RaceEngineer:
             # Prima del cancello, non dopo: un cancello che non sa cosa guardare
             # risponderebbe «a posto», e il pilota leggerebbe «fase completata»
             # su una cosa che nessuno ha controllato.
+            self.skipped_phases.add(self.phase_idx)
             self.phase_idx += 1
             return Decision(DecisionKind.STAND_DOWN, blind)
         if phase.gate(self.window):
@@ -1220,7 +1238,9 @@ class RaceEngineer:
             by_hand = self._pressure_by_hand(phase)
             if by_hand:
                 return Decision(DecisionKind.STAND_DOWN, by_hand)
-            # Nothing actionable here; treat the phase as done to avoid a stall.
+            # Nothing actionable here; move on to avoid a stall. Il cancello pero'
+            # non e' passato: per la strada e' saltata, non fatta.
+            self.skipped_phases.add(self.phase_idx)
             self.phase_idx += 1
             return Decision(DecisionKind.PHASE_DONE,
                             _msg("phase_nothing", lang, label=tr(phase.label)))
@@ -1247,9 +1267,10 @@ class RaceEngineer:
         lang = current_language()
         if a.laps_seen < self.min_stable:
             need = self.min_stable - a.laps_seen
+            tail = _skip_tail(self._skipped, lang)
             return Decision(DecisionKind.EVALUATING,
                             _msg("evaluating", lang, laps=_laps_left(need, lang))
-                            + _skip_tail(self._skipped, lang))
+                            + tail, tail=tail)
 
         new_time = _median_time(self.window)
         new_score = _median_score(self.window, a.symptom)

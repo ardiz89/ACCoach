@@ -28,7 +28,10 @@ Il pilota, il 22/10, dopo la prima prova della vista tablet:
   alto quando c'è.
 - **Assetto** è la schermata «ai box» di oggi: fase, modifica leva per leva, file
   di partenza, bottone che scrive con la conferma, ripristino. La si può aprire
-  anche fuori dai box. Il bottone scrive comunque solo dopo la conferma.
+  anche fuori dai box, ma lì si legge e basta: *Scrivi la modifica* e *L'ho già
+  rimesso com'era* si accendono solo con `at_box`, e una riga dice che il file
+  si scrive da fermo ai box. **Cambiato dopo la revisione finale** (vedi
+  «Scelte mie», n. 2).
 - Lo stato «nessun collegamento» resta a tutto schermo, senza linguette utili.
 - Automatico: quando il pilota si ferma ai box la vista passa ad Assetto; quando
   riparte torna a Telemetria. Un tocco su una linguetta vale fino al prossimo
@@ -48,15 +51,26 @@ da `RaceEngineer` (una regola, un posto):
 | `phases` | le fasi del profilo in ordine: `key`, `label` tradotta, `tag` («BOX» o «AV» quando la fase si fa dal volante) |
 | `index` | la fase in corso (da 0); uguale al numero di fasi quando l'assetto è finito |
 | `stage` | il passo in corso: `baseline` (raccolgo i giri), `change` (modifica proposta da fare), `test` (verifico la modifica), `restore` (rimetti com'era), `diagnose` (ho i giri, sto decidendo), `done` |
-| `have`, `need` | giri buoni contati e giri che servono, solo per `baseline` e `test` |
+| `have`, `need` | giri puliti contati e giri che servono, solo per `baseline` e `test` |
+| `skipped` | gli indici delle fasi che il motore ha passato senza chiuderle (cieche, o niente da correggere col cancello chiuso); la strada le disegna barrate, senza spunta. Va su disco con `phase_idx` |
+
+Accanto a `progress`, il blocco porta `tail`: su una raccolta o una prova, la
+parte del messaggio del motore che il contatore non dice (perché l'ultimo giro
+non conta, il sospetto sulle uscite), `""` se non c'è, `null` altrove. Quando
+la strada conta i giri la pagina mostra solo quella, così lo stesso numero non
+si legge due volte con due frasi. Quando l'ultima decisione è `stand_down`
+(bagnato, fase cieca, leva che non si sa scrivere) la frase del passo sarebbe
+falsa, e la strada dice solo «Per ora non scrivo modifiche.»; il perché sta nel
+messaggio.
 
 La striscia, sul tablet in entrambe le linguette e sulla pagina Ingegnere sopra
 la riga della fase:
 
 - le fasi come tappe in fila, la fase in corso evidenziata, le fatte spuntate;
-- sotto, una frase sul passo in corso col contatore, per esempio «Giro buono 2 di
-  3 per la base» o «Verifico la modifica, giro 1 di 3». Poi cosa succede dopo
-  («Poi decido se tenerla»).
+- sotto, una frase sul passo in corso col contatore, per esempio «Giri puliti
+  per la base, 2 di 3.» o «Provo la modifica, giri puliti 1 di 3.». Poi cosa
+  succede dopo («Poi decido se tenerla»). «Puliti», la parola che il motore usa
+  già nei suoi messaggi, e la stessa nelle guide.
 
 Le parole sono nuove chiavi di `i18n.js`, italiano e inglese, col tono del 21/10.
 Ogni frase deve dire il vero sul codice: per esempio che un giro conta solo se è
@@ -74,8 +88,16 @@ valido, pulito e con le gomme calde (sopra 75 °C).
 ## Scelte mie
 
 1. Il tocco manuale vale fino al prossimo cambio ai box / non ai box.
-2. La linguetta Assetto si apre anche in pista, e il bottone scrive lo stesso
-   (sempre dopo la conferma).
+2. La linguetta Assetto si apre anche in pista, ma lì si legge e basta: il
+   bottone che scrive e «L'ho già rimesso com'era» funzionano solo con
+   `at_box`. **Cambiato dopo la revisione finale** (Ruling 5). All'inizio il
+   bottone scriveva anche in pista. Ma la scrittura avvisa il motore
+   (`/engineer/applied` → `mark_applied`), che apre la prova della modifica
+   mentre la macchina ha ancora l'assetto vecchio: un file si carica solo dal
+   garage. I giri di prova e il verdetto sarebbero stati misurati sull'assetto
+   sbagliato. «L'ho già rimesso com'era» chiama lo stesso endpoint: su un
+   ripristino `mark_applied` svuota la finestra e rifà la base da lì, quindi
+   anche lui vale solo ai box, dove il file di prima si ricarica.
 3. Il contatore c'è solo per `baseline` e `test`: sono gli unici passi in cui il
    motore conta giri verso una soglia.
 4. La striscia va anche sulla pagina Ingegnere, così le due pagine raccontano la

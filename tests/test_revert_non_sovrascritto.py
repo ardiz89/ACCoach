@@ -279,6 +279,7 @@ let prepared = null, posted = [];
 function renderPrediction() {} function renderOutcome() {} function renderRoad() {}
 function prepareChange(c) { prepared = c; }
 function fetch(url, opt) { posted.push([url, opt && opt.method]); return Promise.resolve(); }
+eval(grab("msgText"));
 eval(grab("confirmRestored"));
 eval(grab("renderEngineer"));
 const out = [];

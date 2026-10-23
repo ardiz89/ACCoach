@@ -160,3 +160,115 @@ def test_past_the_last_phase_a_pending_change_is_still_a_change():
     eng.active = None
     eng._held_revert = object()
     assert eng.progress()["stage"] == "restore"
+
+
+# --- le fasi saltate ---------------------------------------------------------
+# «Una fase cieca non e' una fase completata» (`WorkPhase.blind`): `_advance`
+# la salta, e lo stesso fa con una fase in cui non trova niente da correggere
+# senza che il cancello sia passato. La strada le disegnava spuntate come le
+# fasi chiuse davvero.
+
+def test_a_new_engineer_has_skipped_nothing():
+    assert _eng().progress()["skipped"] == []
+
+
+def test_a_blind_phase_is_reported_skipped_not_done():
+    from accoach.engineer.core import NO_WINDOW
+    eng = RaceEngineer(GT3_PROFILE, min_stable=3, pressure_window=NO_WINDOW)
+    for _ in range(3):
+        d = eng.observe(_lap())
+    assert d.kind is DecisionKind.STAND_DOWN
+    p = eng.progress()
+    assert p["index"] == 1 and p["skipped"] == [0]
+
+
+def _gate_shut(eng, i):
+    # Il cancello che non passa, su una fase senza sintomi da curare: e' il
+    # caso «non ho trovato nulla da correggere». Su una copia: la fase puo'
+    # essere quella del profilo condiviso (`reconfigure` rende se stessa).
+    import copy
+    ph = copy.copy(eng.phases[i])
+    ph.gate = lambda window: False
+    eng.phases[i] = ph
+
+
+def test_a_phase_with_nothing_to_correct_is_reported_skipped():
+    eng = _eng()
+    eng.phase_idx = 1
+    _gate_shut(eng, 1)
+    for _ in range(3):
+        d = eng.observe(_lap())
+    assert d.kind is DecisionKind.PHASE_DONE
+    p = eng.progress()
+    assert p["index"] == 2 and p["skipped"] == [1]
+
+
+def test_a_phase_whose_gate_passes_is_done_not_skipped():
+    eng = _eng()
+    eng.phase_idx = 1
+    for _ in range(3):
+        d = eng.observe(_lap())
+    assert d.kind is DecisionKind.PHASE_DONE
+    p = eng.progress()
+    assert p["index"] == 2 and p["skipped"] == []
+
+
+def test_skipped_phases_come_back_next_session():
+    import json
+    eng = _eng()
+    eng.phase_idx = 1
+    _gate_shut(eng, 1)
+    for _ in range(3):
+        eng.observe(_lap())
+    state = json.loads(json.dumps(eng.state()))
+    back = _eng()
+    back.restore(state)
+    assert back.progress()["skipped"] == [1]
+    junk = _eng()
+    junk.restore({"phase_idx": 2, "skipped_phases": [1, "x", 99, -1, None]})
+    assert junk.progress()["skipped"] == [1]
+
+
+# --- il contatore detto una volta -------------------------------------------
+# La strada dice «Giri puliti per la base, 1 di 3»; il messaggio del motore
+# diceva la stessa cosa con altre parole. Il motore separa la coda (perche'
+# l'ultimo giro non conta, il sospetto sulle uscite) dal contatore, e la
+# pagina mostra solo la coda quando la strada conta.
+
+def test_a_collect_carries_its_tail_apart():
+    eng = _eng()
+    d = eng.observe(_lap())
+    assert d.kind is DecisionKind.COLLECT and d.tail == ""
+    cold = LapStats(lap_time_ms=100000, stable=True, warmed_up=False,
+                    symptom_scores={}, symptom_corners={}, pressures_hot=PRESS_OK,
+                    lock_segments=0, spin_segments=0)
+    d = eng.observe(cold)
+    assert d.tail and d.message.endswith(d.tail)
+    assert d.message != d.tail
+
+
+def test_an_evaluating_carries_its_tail_apart():
+    eng = _eng()
+    for _ in range(3):
+        eng.observe(_lap(OFF))
+    eng.mark_applied()
+    d = eng.observe(_lap(OFF))
+    assert d.kind is DecisionKind.EVALUATING and d.tail == ""
+
+
+def test_other_decisions_have_no_tail():
+    eng = _eng()
+    for _ in range(3):
+        d = eng.observe(_lap(OFF))
+    assert d.kind is DecisionKind.PROPOSE and d.tail is None
+
+
+def test_the_frame_block_carries_the_tail(tmp_path):
+    from accoach.engineer.core import Decision
+    eng = _bare_engine(tmp_path)
+    eng._engineer = _eng()
+    eng._engineer_decision = Decision(DecisionKind.COLLECT, "x y", tail=" y")
+    assert eng._engineer_block()["tail"] == " y"
+    eng._engineer_decision = Decision(DecisionKind.PROPOSE, "x")
+    assert eng._engineer_block()["tail"] is None
+    eng.close()

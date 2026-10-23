@@ -1128,21 +1128,31 @@ function updateSuggested(eng) {
 // `progress` che si legge, null: la striscia si nasconde. `changeTag` e' il
 // `tag` della modifica in attesa (`engineer.tag`), non quello della fase: una
 // fase «dal volante» propone anche leve da box, e il ricontrollo delle
-// pressioni propone ai box in qualunque fase.
-function stripText(p, changeTag) {
+// pressioni propone ai box in qualunque fase. `kind` e' quello dell'ultima
+// decisione (`engineer.kind`).
+function stripText(p, changeTag, kind) {
   if (!p || typeof p !== "object" || !Array.isArray(p.phases) || !p.phases.length) return null;
   const idx = Number(p.index), done = p.stage === "done";
+  // Le fasi che il motore ha passato senza chiuderle (cieche, o senza niente da
+  // correggere): dietro di noi, ma senza la spunta di una fase fatta.
+  const skipped = Array.isArray(p.skipped) ? p.skipped : [];
   const steps = p.phases.map((ph, i) => ({
     label: String((ph && (ph.label || ph.key)) || ""),
     // Finito, nessuna tappa resta accesa: l'indice e' oltre l'ultima.
-    state: (done || i < idx) ? "done" : (i === idx ? "now" : "next"),
+    state: (done || i < idx) ? (skipped.includes(i) ? "skipped" : "done")
+                             : (i === idx ? "now" : "next"),
   }));
   // Il contatore solo dove il motore conta giri verso una soglia; senza i suoi
   // numeri la frase non se ne inventa uno.
   const isNum = (v) => v != null && v !== "" && isFinite(Number(v));
   const counted = isNum(p.have) && isNum(p.need);
   let line = "", why = "";
-  if (p.stage === "baseline" || p.stage === "test") {
+  if (kind === "stand_down") {
+    // Il motore si e' tirato indietro (bagnato, fase cieca, leva che non sa
+    // scrivere): «giri puliti per la base» o «decido a fine giro» qui sarebbero
+    // falsi. Il perche' lo dice il suo messaggio.
+    line = t("eng.road.standDown");
+  } else if (p.stage === "baseline" || p.stage === "test") {
     if (counted) {
       line = tf(p.stage === "test" ? "eng.road.test" : "eng.road.base",
                 { have: p.have, need: p.need });
@@ -1161,11 +1171,28 @@ function stripText(p, changeTag) {
   return { steps, line, why };
 }
 
+// Il messaggio del motore quando non c'e' una modifica in mano. Su raccolta e
+// prova la strada dice gia' i giri contati: del messaggio resta solo la coda
+// (`engineer.tail`: perche' l'ultimo giro non conta, il sospetto sulle
+// uscite), se no lo stesso numero si leggeva due volte con due frasi. Senza
+// `tail` il messaggio si legge intero. Gemella di `msgText` in tablet.js.
+function msgText(eng) {
+  if (!eng || !eng.message) return "";
+  const p = eng.progress;
+  const isNum = (v) => v != null && v !== "" && isFinite(Number(v));
+  const counted = !!(p && (p.stage === "baseline" || p.stage === "test")
+                     && isNum(p.have) && isNum(p.need));
+  if (counted && eng.kind !== "stand_down" && typeof eng.tail === "string") {
+    return eng.tail.trim();
+  }
+  return String(eng.message);
+}
+
 // La striscia si riscrive solo quando cambia: il frame arriva molte volte al
 // secondo e quasi sempre dice la stessa cosa.
 let roadKey = null;
 function renderRoad(eng) {
-  const s = stripText(eng && eng.progress, eng && eng.tag);
+  const s = stripText(eng && eng.progress, eng && eng.tag, eng && eng.kind);
   const key = s ? JSON.stringify(s) : "";
   if (key === roadKey) return;
   roadKey = key;
@@ -1276,7 +1303,7 @@ function renderEngineer(st) {
     prep.onclick = () => prepareChange(eng.change);
     says.classList.add("active");
   } else if (eng && eng.message) {
-    $("es-msg").textContent = eng.message;      // evaluating / accepted / done…
+    $("es-msg").textContent = msgText(eng);     // evaluating / accepted / done…
     $("es-cat").textContent = "";
     conf.hidden = true; prep.hidden = true;
     says.classList.remove("active");
@@ -1288,8 +1315,8 @@ function renderEngineer(st) {
   } else {
     // Un trattino è un silenzio che non dice perché tace, dentro un riquadro
     // intitolato «Il tecnico suggerisce». Nei primi giri l'ingegnere non ha
-    // ancora una base e lo dice benissimo da solo appena il primo giro si
-    // chiude («servono 3 giri puliti, ne ho 1»): mancava solo prima.
+    // ancora una base, e appena il primo giro si chiude la strada lo dice
+    // («Giri puliti per la base, 1 di 3»): mancava solo prima.
     $("es-msg").textContent = st.connected ? t("eng.warmup") : t("eng.dash");
     $("es-cat").textContent = "";
     conf.hidden = true; prep.hidden = true;

@@ -98,6 +98,7 @@ function snap() {
   return {tab: $("tablet").getAttribute("data-tab"), mode: $("tablet").getAttribute("data-mode"),
           change: !$("t-change").hidden, actions: !$("t-actions").hidden,
           levers: $("t-levers").children.length, mark: $("t-tab-setup").getAttribute("data-mark"),
+          write: !$("t-write").disabled, atbox: !$("t-atbox").hidden,
           trackSel: $("t-tab-track").getAttribute("aria-selected"),
           setupSel: $("t-tab-setup").getAttribute("aria-selected")};
 }
@@ -127,7 +128,13 @@ reply(find("/api/setup/preview")[0], 200, {ok: true, errors: [], diff: [
    delta: 2, old_phys: "26 psi", new_phys: "26.2 psi"}]});
 window.HoneTablet.render(propose);
 o.proposal = snap();
-// Il bottone scrive anche fuori dai box, sempre dopo la conferma.
+// In pista si legge e basta: il bottone non apre la conferma.
+$("t-write").onclick();
+o.confirmOnTrack = !$("t-confirm").hidden;
+// Fermo ai box scrive, dopo la conferma.
+var box = JSON.parse(JSON.stringify(propose)); box.at_box = true;
+window.HoneTablet.render(box);
+o.atBox = snap();
 $("t-write").onclick();
 o.confirm = !$("t-confirm").hidden;
 o.applyBeforeOk = find("/api/setup/apply").length;
@@ -146,6 +153,11 @@ process.stdout.write(JSON.stringify(o));
     assert p["tab"] == "setup" and p["mode"] == "call"
     assert p["change"] and p["actions"] and p["levers"] == 1
     assert p["mark"] == "1"
+    # Ruling 5: in pista la modifica si legge, il file no.
+    assert p["write"] is False and p["atbox"] is True
+    assert out["confirmOnTrack"] is False
+    b = out["atBox"]
+    assert b["write"] is True and b["atbox"] is False
     assert out["confirm"] and out["applyBeforeOk"] == 0 and out["apply"] == 1
 
 
@@ -182,21 +194,23 @@ process.stdout.write(JSON.stringify(o));
 
 
 # Il riquadro del file scritto: resta finche' serve (il nome da caricare ai
-# box), sparisce quando non e' piu' la notizia.
+# box), sparisce quando non e' piu' la notizia. Il file si scrive fermo ai box
+# (Ruling 5): in pista la linguetta Assetto si legge e basta.
 _WRITTEN = _ON_TRACK + r"""
 function lastReq(path) { var r = find(path); return r[r.length - 1]; }
 function tap(id) { $(id).onclick(); }
 var o = {};
-function writeOnTrack() {
+var box = JSON.parse(JSON.stringify(propose)); box.at_box = true;
+function writeAtBox() {
   window.HoneTablet.render(track);
-  tap("t-tab-setup");
+  window.HoneTablet.render(box);
   reply(lastReq("/api/setup/base"), 200, {car: "mclaren", track: "Imola",
     setups: [{name: "base", path: "S/base.json", mtime: 1}], base: "S/base.json", last_written: null});
-  window.HoneTablet.render(propose);
+  window.HoneTablet.render(box);
   reply(lastReq("/api/setup/preview"), 200, {ok: true, errors: [], diff: [
     {group: "Gomme", label: "Pressione", slot: "FL", old_click: 57, new_click: 59,
      delta: 2, old_phys: "26 psi", new_phys: "26.2 psi"}]});
-  window.HoneTablet.render(propose);
+  window.HoneTablet.render(box);
   tap("t-write");
   tap("t-confirm-ok");
 }
@@ -209,7 +223,6 @@ function errShown() {
   if ($("tablet").getAttribute("data-tab") !== "setup") tap("t-tab-setup");
   return !$("t-err").hidden;
 }
-var box = JSON.parse(JSON.stringify(propose)); box.at_box = true;
 """
 
 
@@ -219,15 +232,15 @@ def _written(body):
 
 def _ok_write():
     return r"""
-writeOnTrack();
+writeAtBox();
 reply(lastReq("/api/setup/apply"), 200, {name: "HONE_1", reload_hint: "Ho scritto HONE_1."});
-window.HoneTablet.render(propose);
+window.HoneTablet.render(box);
 o.written = doneShown();
 """
 
 
 @needs_node
-def test_a_file_written_on_track_stays_at_the_box_and_goes_when_you_leave():
+def test_a_file_written_at_the_box_stays_while_you_are_there_and_goes_when_you_leave():
     out = _written(_ok_write() + r"""
 window.HoneTablet.render(box);
 o.atBox = doneShown();
@@ -240,7 +253,7 @@ o.left = doneShown();
 @needs_node
 def test_a_new_proposal_drops_the_written_file():
     out = _written(_ok_write() + r"""
-var other = JSON.parse(JSON.stringify(propose));
+var other = JSON.parse(JSON.stringify(box));
 other.engineer.change[0].delta_clicks = 3;
 window.HoneTablet.render(other);
 o.other = doneShown();
@@ -251,7 +264,6 @@ o.other = doneShown();
 @needs_node
 def test_box_then_off_then_track_drops_the_written_file():
     out = _written(_ok_write() + r"""
-window.HoneTablet.render(box);
 window.HoneTablet.render({connected: false});
 window.HoneTablet.render(track);
 o.after = doneShown();
@@ -262,7 +274,7 @@ o.after = doneShown();
 @needs_node
 def test_another_car_or_track_drops_the_written_file():
     out = _written(_ok_write() + r"""
-var monza = JSON.parse(JSON.stringify(propose)); monza.track = "Monza";
+var monza = JSON.parse(JSON.stringify(box)); monza.track = "Monza";
 window.HoneTablet.render(monza);
 o.monza = doneShown();
 """)
@@ -270,13 +282,13 @@ o.monza = doneShown();
 
 
 @needs_node
-def test_a_write_error_goes_when_you_come_back_to_setup():
+def test_a_write_error_goes_when_you_leave_the_box():
     out = _written(r"""
-writeOnTrack();
+writeAtBox();
 reply(lastReq("/api/setup/apply"), 500, {detail: "boom"});
-window.HoneTablet.render(propose);
+window.HoneTablet.render(box);
 o.err = errShown();
-tap("t-tab-track");
+window.HoneTablet.render(track);
 o.back = errShown();
 """)
     assert out == {"err": True, "back": False}
@@ -297,6 +309,84 @@ window.HoneTablet.render(pedals);
 var a = pushes;
 $("t-tab-setup").onclick();
 $("t-tab-track").onclick();
-process.stdout.write(JSON.stringify({first: a, afterTaps: pushes}));
+var b = pushes;
+// Neanche un altro file di partenza o il cambio di lingua: ridisegnano
+// l'ultimo frame, non ne portano uno nuovo.
+$("t-base").value = "S/altro.json";
+$("t-base").onchange();
+window.HoneI18nRerender();
+process.stdout.write(JSON.stringify({first: a, afterTaps: b, afterRedraws: pushes}));
 """)
     assert out["afterTaps"] == out["first"]
+    assert out["afterRedraws"] == out["first"]
+
+
+# Ruling 5: scrivere in pista avvisava il motore (`/engineer/applied`), che
+# apriva la prova con la macchina ancora sull'assetto vecchio. In pista la
+# linguetta Assetto si legge; il file e «l'ho gia' rimesso» solo da fermo ai
+# box.
+_READY = r"""
+var revert = JSON.parse(JSON.stringify(propose));
+revert.engineer.kind = "reverted"; revert.engineer.message = "Va tolta.";
+var revertBox = JSON.parse(JSON.stringify(revert)); revertBox.at_box = true;
+function prep(f) {
+  window.HoneTablet.render(f);
+  if ($("tablet").getAttribute("data-tab") !== "setup") tap("t-tab-setup");
+  var b = lastReq("/api/setup/base");
+  if (b && b.readyState !== 4) reply(b, 200, {car: "mclaren", track: "Imola",
+    setups: [{name: "base", path: "S/base.json", mtime: 1}], base: "S/base.json", last_written: null});
+  window.HoneTablet.render(f);
+  var pv = lastReq("/api/setup/preview");
+  if (pv && pv.readyState !== 4) reply(pv, 200, {ok: true, errors: [], diff: [
+    {group: "Gomme", label: "Pressione", slot: "FL", old_click: 57, new_click: 59,
+     delta: 2, old_phys: "26 psi", new_phys: "26.2 psi"}]});
+  window.HoneTablet.render(f);
+}
+"""
+
+
+@needs_node
+def test_on_track_a_confirm_opened_at_the_box_cannot_write():
+    out = _written(_READY + r"""
+prep(box);
+tap("t-write");
+o.confirmAtBox = !$("t-confirm").hidden;
+// Riparte con la conferma aperta, e il dito la tocca lo stesso.
+window.HoneTablet.render(propose);
+tap("t-confirm-ok");
+tap("t-tab-setup");
+tap("t-confirm-ok");
+tap("t-write");
+o.confirmOnTrack = !$("t-confirm").hidden;
+tap("t-confirm-ok");
+o.apply = find("/api/setup/apply").length;
+o.applied = find("/engineer/applied").length;
+""")
+    assert out == {"confirmAtBox": True, "confirmOnTrack": False, "apply": 0, "applied": 0}
+
+
+@needs_node
+def test_on_track_the_restore_cannot_be_marked_put_back():
+    out = _written(_READY + r"""
+prep(revert);
+o.trackShown = !$("t-restored").hidden;
+o.trackEnabled = !$("t-restored").disabled;
+o.writeEnabled = !$("t-write").disabled;
+o.atbox = !$("t-atbox").hidden;
+tap("t-restored");
+o.appliedOnTrack = find("/engineer/applied").length;
+window.HoneTablet.render(revertBox);
+o.boxEnabled = !$("t-restored").disabled;
+o.boxAtbox = !$("t-atbox").hidden;
+tap("t-restored");
+o.appliedAtBox = find("/engineer/applied").length;
+""")
+    assert out == {"trackShown": True, "trackEnabled": False, "writeEnabled": False,
+                   "atbox": True, "appliedOnTrack": 0,
+                   "boxEnabled": True, "boxAtbox": False, "appliedAtBox": 1}
+
+
+def test_the_at_box_line_is_in_the_page_with_its_key():
+    html = (_WEB / "tablet.html").read_text(encoding="utf-8")
+    m = re.search(r'<[^>]*id="t-atbox"[^>]*>', html)
+    assert m and 'data-i18n="tablet.writeAtBox"' in m.group(0)

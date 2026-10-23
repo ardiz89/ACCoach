@@ -211,21 +211,32 @@
   // `changeTag` e' il `tag` della modifica in attesa (`engineer.tag`), non
   // quello della fase: una fase «dal volante» propone anche leve da box, e il
   // ricontrollo delle pressioni propone ai box in qualunque fase.
-  function stripText(p, changeTag) {
+  // `kind` e' quello dell'ultima decisione (`engineer.kind`).
+  function stripText(p, changeTag, kind) {
     if (!p || typeof p !== "object" || !Array.isArray(p.phases) || !p.phases.length) return null;
     var idx = Number(p.index), done = p.stage === "done";
+    // Le fasi che il motore ha passato senza chiuderle (cieche, o senza niente
+    // da correggere): dietro di noi, ma senza la spunta di una fase fatta.
+    var skipped = Array.isArray(p.skipped) ? p.skipped : [];
     var steps = [];
     for (var i = 0; i < p.phases.length; i++) {
       var ph = p.phases[i] || {};
       // Finito, nessuna tappa resta accesa: l'indice e' oltre l'ultima.
+      var past = done || i < idx;
       steps.push({ label: String(ph.label || ph.key || ""),
-                   state: (done || i < idx) ? "done" : (i === idx ? "now" : "next") });
+                   state: past ? (skipped.indexOf(i) !== -1 ? "skipped" : "done")
+                               : (i === idx ? "now" : "next") });
     }
     // Il contatore solo dove il motore conta giri verso una soglia; senza i
     // suoi numeri la frase non se ne inventa uno.
     var counted = num(p.have) && num(p.need);
     var line = "", why = "";
-    if (p.stage === "baseline" || p.stage === "test") {
+    if (kind === "stand_down") {
+      // Il motore si e' tirato indietro (bagnato, fase cieca, leva che non sa
+      // scrivere): «giri puliti per la base» o «decido a fine giro» qui
+      // sarebbero falsi. Il perche' lo dice il suo messaggio.
+      line = t("eng.road.standDown");
+    } else if (p.stage === "baseline" || p.stage === "test") {
       if (counted) {
         line = tf(p.stage === "test" ? "eng.road.test" : "eng.road.base",
                   { have: p.have, need: p.need });
@@ -248,7 +259,7 @@
   // secondo e quasi sempre dice la stessa cosa.
   var roadKey = null;
   function renderRoad(eng) {
-    var s = stripText(eng && eng.progress, eng && eng.tag);
+    var s = stripText(eng && eng.progress, eng && eng.tag, eng && eng.kind);
     var key = s ? JSON.stringify(s) : "";
     if (key === roadKey) return;
     roadKey = key;
@@ -269,6 +280,22 @@
     $("t-road-why").textContent = s.why;
     $("t-road-why").hidden = !s.why;
     box.hidden = false;
+  }
+
+  // Il messaggio del motore quando non c'e' una modifica in mano. Su raccolta
+  // e prova la strada dice gia' i giri contati: del messaggio resta solo la
+  // coda (`engineer.tail`: perche' l'ultimo giro non conta, il sospetto sulle
+  // uscite), se no lo stesso numero si leggeva due volte con due frasi. Senza
+  // `tail` il messaggio si legge intero. Gemella di `msgText` in engineer.js.
+  function msgText(eng) {
+    if (!eng || !eng.message) return "";
+    var p = eng.progress;
+    var counted = !!(p && (p.stage === "baseline" || p.stage === "test")
+                     && num(p.have) && num(p.need));
+    if (counted && eng.kind !== "stand_down" && typeof eng.tail === "string") {
+      return eng.tail.trim();
+    }
+    return String(eng.message);
   }
 
   // Quale proposta e': il tocco su «Fatto» vale per questa e non per la
@@ -401,6 +428,16 @@
 
   function setText(el, s) { if (el.textContent !== s) el.textContent = s; }
   function setHidden(el, h) { if (el.hidden !== h) el.hidden = h; }
+  function setDisabled(el, d) { if (el.disabled !== d) el.disabled = d; }
+
+  // Il file si scrive, e il motore si avvisa, solo da fermo ai box. Avvisare
+  // il motore (`/engineer/applied`) apre la prova della modifica, o rifa' la
+  // base dopo un ripristino; in pista la macchina ha ancora l'assetto di
+  // prima, perche' un file si carica solo dal garage, e i giri di prova
+  // sarebbero guidati con l'assetto sbagliato. Lo stesso vale per «L'ho gia'
+  // rimesso com'era»: il file di prima si ricarica ai box, e il motore
+  // svuota la finestra e rifa' la base da quel momento.
+  function atBoxNow() { return !!(last && last.connected && last.at_box); }
 
   function basePath() {
     if (bx.chosen) return bx.chosen;
@@ -534,6 +571,9 @@
     if (!on) {
       // Lasci Assetto: la conferma aperta non resta per la prossima volta.
       // Una scrittura gia' partita invece finisce, e avvisa il motore lo stesso.
+      // Ripartire dai box porta sempre qui (`pickTab` torna a Telemetria):
+      // e' questo che toglie la conferma a chi riparte, e `confirmWrite`
+      // ricontrolla i box lo stesso.
       if (!bx.writing) bx.confirm = null;
       return;
     }
@@ -584,7 +624,7 @@
       setHidden($("t-lowconf"), restore || c !== "low");
       setText($("t-lowconf"), t("eng.lowConf"));
     }
-    var msg = !has && eng && eng.message ? eng.message : "";
+    var msg = !has ? msgText(eng) : "";
     setText($("t-msg"), msg);
     setHidden($("t-msg"), !msg);
 
@@ -594,10 +634,15 @@
     setHidden($("t-nobase"), !bx.base || setups.length > 0);
 
     var ready = !!(bx.preview && bx.preview.ok && basePath());
+    var atBox = atBoxNow();
     setHidden($("t-actions"), !has || !!bx.confirm);
     setText($("t-write"), t(restore ? "tablet.writeRestore" : "tablet.write"));
-    $("t-write").disabled = !ready || bx.writing;
+    setDisabled($("t-write"), !ready || bx.writing || !atBox);
     setHidden($("t-restored"), !restore || bx.restoredKey === avKey(eng));
+    setDisabled($("t-restored"), !atBox);
+    // In pista la modifica si legge, e una riga dice perche' i bottoni sono
+    // spenti.
+    setHidden($("t-atbox"), !has || atBox);
 
     setHidden($("t-confirm"), !bx.confirm);
     var err = bx.err || bx.baseErr;
@@ -616,7 +661,7 @@
   // che si scrive e' quello che la conferma nomina, preso qui e non al tocco
   // dopo, cosi' un frame che arriva nel mezzo non cambia il file sotto il dito.
   function openConfirm() {
-    if (!bx.preview || !bx.preview.ok || bx.writing || !basePath()) return;
+    if (!bx.preview || !bx.preview.ok || bx.writing || !basePath() || !atBoxNow()) return;
     bx.confirm = { key: bx.pvKey, path: basePath(), changes: bx.pvChanges,
                    name: nextName(setupNames()), av: avKey(last && last.engineer) };
     bx.err = "";
@@ -630,7 +675,7 @@
   // richiesta: un doppio tocco scriverebbe due file.
   function confirmWrite() {
     var c = bx.confirm;
-    if (!c || bx.writing) return;
+    if (!c || bx.writing || !atBoxNow()) return;
     $("t-confirm-ok").disabled = true;
     bx.writing = true;
     bx.err = "";
@@ -674,6 +719,7 @@
   // «L'ho gia' rimesso com'era» (`confirmRestored`): chi ripristina caricando
   // nel gioco il file di prima non scrive niente, e il motore aspetta lo stesso.
   function confirmRestored() {
+    if (!atBoxNow()) return;
     var eng = last && last.engineer;
     bx.restoredKey = avKey(eng);
     $("t-restored").hidden = true;
@@ -763,6 +809,12 @@
   function tapTab(tab) {
     tabTapped = tab;
     if (!last) return;
+    redraw();
+  }
+
+  // Ridisegna l'ultimo frame (un tocco, un altro file, la lingua): non e' un
+  // frame nuovo, quindi niente campione dei pedali.
+  function redraw() {
     tapping = true;
     try { render(last); } finally { tapping = false; }
   }
@@ -789,7 +841,7 @@
     // Un altro file di partenza: l'anteprima si rifa' al frame dopo.
     $("t-base").onchange = function () {
       bx.chosen = $("t-base").value || null;
-      if (last) render(last);
+      if (last) redraw();
     };
     // Cambio di lingua dalla pagina: i testi fissi li rifa' i18n.js, quelli
     // scritti da qui si rifanno col frame che c'era.
@@ -797,7 +849,7 @@
     window.HoneI18nRerender = function () {
       bx.pvKey = null;
       if (bx.confirm) $("t-confirm-msg").textContent = tf("tablet.confirm", { name: bx.confirm.name });
-      render(last);
+      redraw();
     };
     if (window.HoneI18n) window.HoneI18n.applyStatic();
     if (!fullPageWorks()) $("t-full").hidden = true;
@@ -811,7 +863,7 @@
                         nextName: nextName, changesFor: changesFor,
                         offText: function (st) { return t(offKey(st)); },
                         leverText: leverText, fullPageWorks: fullPageWorks,
-                        stripText: stripText };
+                        stripText: stripText, msgText: msgText };
 
   // In node (i test) non c'e' la pagina: si carica solo `mode`.
   if (typeof document !== "undefined" && document && document.getElementById("tablet")) boot();

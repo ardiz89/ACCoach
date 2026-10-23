@@ -934,6 +934,10 @@ class CoachEngine:
         return {
             "kind": d.kind.value,
             "message": d.message,
+            # La parte del messaggio oltre il contatore, su raccolta e prova
+            # (None altrove): la pagina, che i giri li conta nella strada,
+            # mostra solo questa.
+            "tail": d.tail,
             "phase": phase,
             # La strada: fasi, quella in corso, giri raccolti. Calcolata dal motore.
             "progress": self._engineer.progress() if self._engineer else None,

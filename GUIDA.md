@@ -185,13 +185,14 @@ L'ingegnere lavora per fasi, una dopo l'altra. Su una GT3 sono Pressioni, Grip
 meccanico, Aero / rake, Bilanciamento freni ed Elettronica. Le pressioni le
 ricontrolla anche nelle fasi dopo.
 
-1. Per decidere gli serve una base di **3 giri buoni**. Un giro è buono se è
-   valido, senza uscite di pista e con le gomme in media ad almeno 75 °C. La
-   base la raccoglie all'inizio, dopo un ripristino e quando la pista passa
-   dall'asciutto al bagnato o al contrario.
+1. Per decidere gli serve una base di **3 giri puliti**. Per l'ingegnere un
+   giro è pulito se è valido, senza uscite di pista e con le gomme in media ad
+   almeno 75 °C. La base la raccoglie all'inizio, dopo un ripristino e quando
+   la pista cambia fra asciutto e bagnato. Sul bagnato però non propone
+   niente, perché i suoi rimedi sono ricavati sull'asciutto.
 2. Con la base propone **una modifica alla volta**. La proposta ti dice se si
    fa ai box o dal volante.
-3. Quando l'hai fatta, conta **3 giri buoni** con la modifica per verificarla.
+3. Quando l'hai fatta, conta **3 giri puliti** con la modifica per verificarla.
 4. Se la modifica ha aiutato la tiene, e quei giri diventano la base per il
    passo dopo. Se no ti chiede di rimetterla com'era.
 5. Quando nella fase non resta niente che sappia sistemare, passa a quella
@@ -199,8 +200,13 @@ ricontrolla anche nelle fasi dopo.
 
 A che punto sei lo vedi nella **strada**, la fila delle fasi sopra la riga
 della fase, sul tablet e nella pagina Ingegnere. Le fasi fatte hanno la spunta
-e quella in corso è evidenziata. Sotto c'è la frase sul passo in corso, con i
-giri buoni contati, per esempio «Giri buoni per la base, 2 di 3.»
+e quella in corso è evidenziata. Una fase saltata è barrata e senza spunta.
+Succede quando su quell'auto l'ingegnere non la può giudicare, o quando non
+trova niente da correggere. Quando l'ingegnere si tira indietro, per esempio
+sul bagnato, la frase sotto le fasi dice solo che per ora non scrive modifiche.
+Il perché lo trovi nel suo messaggio. Negli altri casi la frase dice il passo
+in corso, con i giri puliti contati, per esempio «Giri puliti per la base, 2
+di 3.»
 
 ### Il registro delle prove
 
@@ -810,17 +816,23 @@ dell'ingegnere».
   una modifica respinta l'avviso è simile e ti dice di rimettere l'ultima
   modifica com'era. Se tocchi l'avviso passi ad Assetto.
 - **Assetto.** La pagina mostra la fase e le leve da cambiare, una per riga,
-  dal valore di adesso a quello nuovo. La puoi aprire anche in pista. Sotto
-  trovi il perché e il grado di fiducia. Come file di partenza HONE propone
-  l'ultimo assetto che ha scritto per quell'auto e quella pista da quando è
-  partito il processo web. Se non ne ha scritto nessuno, propone il file
-  modificato più di recente. Dalla lista puoi sceglierne un altro. Premi *Scrivi la modifica* e conferma. HONE crea
+  dal valore di adesso a quello nuovo. Sotto trovi il perché e il grado di
+  fiducia. Come file di partenza HONE propone l'ultimo assetto che ha scritto
+  per quell'auto e quella pista da quando è partito il processo web. Se non ne
+  ha scritto nessuno, propone il file modificato più di recente. Dalla lista
+  puoi sceglierne un altro. Premi *Scrivi la modifica* e conferma. HONE crea
   un file nuovo e non tocca il tuo. Poi la pagina ti mostra in grande il nome
   del file, da caricare dal garage del gioco. Se non trova un assetto per
   quell'auto su quella pista, ti chiede di salvarne uno dal garage.
+- **In pista Assetto si legge.** La modifica, il file di partenza e le leve li
+  vedi anche mentre giri, ma i bottoni si accendono solo quando sei fermo ai
+  box. Quando scrivi il file, l'ingegnere comincia a contare i giri di prova.
+  In pista sulla macchina c'è ancora l'assetto di prima, e quei giri non
+  direbbero niente della modifica.
 - **Una modifica respinta.** Il bottone diventa *Scrivi il ripristino* e
   scrive un file che rimette i valori di prima. Se hai già ricaricato nel
-  garage del gioco il file di prima, premi *L'ho già rimesso com'era*.
+  garage del gioco il file di prima, premi *L'ho già rimesso com'era*. Anche
+  questo bottone funziona solo ai box.
 
 Per il resto, ad esempio per lo storico delle prove, usa la pagina completa
 dell'ingegnere. Resta su `/engineer`, e il collegamento *Pagina completa* in

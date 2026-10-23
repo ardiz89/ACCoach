@@ -29,12 +29,13 @@ _PHASES = [
 ]
 
 
-def _p(index, stage, have=None, need=None):
-    return {"phases": _PHASES, "index": index, "stage": stage, "have": have, "need": need}
+def _p(index, stage, have=None, need=None, skipped=()):
+    return {"phases": _PHASES, "index": index, "stage": stage, "have": have, "need": need,
+            "skipped": list(skipped)}
 
 
 # I casi: il nome, gli argomenti di `stripText` (`progress`, il `tag` della
-# modifica in attesa). Il «dove» della modifica viene dalla modifica, non
+# modifica in attesa, il `kind` dell'ultima decisione). Il «dove» della modifica viene dalla modifica, non
 # dalla fase: le fasi 3 e 4 (dal volante) propongono anche leve da box, e una
 # fase da box propone il bilanciamento freni dal volante.
 _CASES = [
@@ -52,6 +53,13 @@ _CASES = [
     ("baseline_no_count", [_p(0, "baseline"), None]),
     ("test_no_count", [_p(1, "test"), None]),
     ("null", [None, None]),
+    # Le fasi saltate (cieche, o niente da correggere) restano senza spunta.
+    ("skipped", [_p(2, "baseline", 1, 3, skipped=[0]), None, "collect"]),
+    ("done_skipped", [_p(5, "done", skipped=[0, 3]), None, "done"]),
+    # Il motore si tira indietro (bagnato, fase cieca): la frase del passo
+    # sarebbe falsa.
+    ("stand_down_base", [_p(0, "baseline", 2, 3), None, "stand_down"]),
+    ("stand_down_diagnose", [_p(1, "diagnose"), None, "stand_down"]),
 ]
 
 # tablet.js come lo carica la pagina, con la lingua scelta.
@@ -67,7 +75,7 @@ eval(fs.readFileSync(process.argv[1], "utf8"));
 eval(fs.readFileSync(process.argv[2], "utf8"));
 var cases = JSON.parse(fs.readFileSync(0, "utf8"));
 process.stdout.write(JSON.stringify(cases.map(function (a) {
-  return window.HoneTablet.stripText(a[0], a[1]);
+  return window.HoneTablet.stripText(a[0], a[1], a[2]);
 })));
 """
 
@@ -96,7 +104,7 @@ eval(asVar(line(/^const t = /)));
 eval(asVar(src.slice(src.indexOf("const tf = "), src.indexOf("};", src.indexOf("const tf = ")) + 2)));
 eval(grab("stripText"));
 const cases = JSON.parse(fs.readFileSync(0, "utf8"));
-console.log(JSON.stringify(cases.map((a) => stripText(a[0], a[1]))));
+console.log(JSON.stringify(cases.map((a) => stripText(a[0], a[1], a[2]))));
 """
 
 
@@ -135,12 +143,12 @@ def test_the_road_in_italian(page):
     b = r["baseline"]
     assert _states(b) == ["now", "next", "next", "next", "next"]
     assert [s["label"] for s in b["steps"]] == [p["label"] for p in _PHASES]
-    assert b["line"] == "Giri buoni per la base, 2 di 3."
+    assert b["line"] == "Giri puliti per la base, 2 di 3."
     assert "75 °C" in b["why"] and "valido" in b["why"]
 
     t = r["test"]
     assert _states(t) == ["done", "now", "next", "next", "next"]
-    assert t["line"] == "Provo la modifica, giri buoni 1 di 3. Poi decido se tenerla."
+    assert t["line"] == "Provo la modifica, giri puliti 1 di 3. Poi decido se tenerla."
     assert t["why"] == b["why"]
 
     assert r["change_box"]["line"] == "Hai una modifica da fare ai box."
@@ -176,17 +184,28 @@ def test_the_road_in_italian(page):
     # Review Focus 4: senza `progress` niente striscia, e niente si rompe.
     assert r["null"] is None
 
+    # Saltata non e' fatta: niente spunta (la classe «skipped», non «done»).
+    assert _states(r["skipped"]) == ["skipped", "done", "now", "next", "next"]
+    assert _states(r["done_skipped"]) == ["skipped", "done", "done", "skipped", "done"]
+    assert r["skipped"]["line"] == "Giri puliti per la base, 1 di 3."
+
+    # Sul passo indietro del motore la frase del passo non si dice.
+    for name in ("stand_down_base", "stand_down_diagnose"):
+        assert r[name]["line"] == "Per ora non scrivo modifiche.", name
+        assert r[name]["why"] == "", name
+
 
 @needs_node
 def test_the_road_in_english():
     r = {k: v[0] for k, v in _both("en").items()}
-    assert r["baseline"]["line"] == "Good laps for the baseline, 2 of 3."
-    assert r["test"]["line"] == "Testing the change, good laps 1 of 3. Then I decide whether to keep it."
+    assert r["baseline"]["line"] == "Clean laps for the baseline, 2 of 3."
+    assert r["test"]["line"] == "Testing the change, clean laps 1 of 3. Then I decide whether to keep it."
     assert r["change_av"]["line"] == "You have a change to make from the wheel."
     assert r["change_box_in_av_phase"]["line"] == "You have a change to make in the pits."
     assert r["restore"]["line"] == (
         "The change didn't help. Once it's back as it was, I redo the baseline.")
     assert r["done"]["line"] == "Setup finished, every phase is done."
+    assert r["stand_down_base"]["line"] == "For now I'm not writing any change."
 
 
 @needs_node
@@ -200,7 +219,7 @@ def test_a_broken_progress_hides_the_strip_instead_of_breaking():
 def test_the_new_keys_are_on_the_engineer_surface_and_in_tone():
     keys = {f"web/i18n.js:eng.road.{k}" for k in
             ("base", "why", "change", "changeBox", "changeAv", "test", "restore",
-             "diagnose", "done")}
+             "diagnose", "done", "standDown")}
     entries = tono.SURFACES["engineer"]()
     assert keys <= set(entries), keys - set(entries)
     for k in keys:
@@ -254,8 +273,8 @@ def test_the_tablet_writes_the_strip_only_when_it_changes():
     assert out["hiddenWithout"] is True
     assert out["hiddenWith"] is False
     assert out["steps"] == 2
-    assert out["line"] == "Giri buoni per la base, 1 di 3."
-    assert out["line2"] == "Giri buoni per la base, 2 di 3."
+    assert out["line"] == "Giri puliti per la base, 1 di 3."
+    assert out["line2"] == "Giri puliti per la base, 2 di 3."
     assert out["hiddenNull"] is True
 
 
@@ -298,7 +317,101 @@ def test_the_engineer_page_writes_the_strip_only_when_it_changes():
     out = json.loads(r.stdout)
     assert out["hiddenWithout"] is True and out["hiddenWith"] is False
     assert out["writes"] == 1
-    assert out["line"] == "Giri buoni per la base, 1 di 3."
-    assert out["writes2"] == 2 and out["line2"] == "Giri buoni per la base, 2 di 3."
+    assert out["line"] == "Giri puliti per la base, 1 di 3."
+    assert out["writes2"] == 2 and out["line2"] == "Giri puliti per la base, 2 di 3."
     assert out["line3"] == "Hai una modifica da fare dal volante."
     assert out["hiddenNull"] is True
+
+
+# --- il messaggio sotto la strada (`msgText`) -------------------------------
+# Quando la strada conta i giri, il messaggio del motore non li ripete: resta
+# la sua coda (`engineer.tail`). Gli stessi casi sulle due pagine.
+
+_COUNTING = _p(0, "baseline", 1, 3)
+_MSG_CASES = [
+    ("collect_plain", {"kind": "collect", "message": "Servono 3 giri puliti per avere una "
+                       "base e per ora ne ho 1.", "tail": "", "progress": _COUNTING}),
+    ("collect_tail", {"kind": "collect", "message": "Servono 3 giri puliti per avere una "
+                      "base e per ora ne ho 1. L'ultimo giro non conta perché le gomme "
+                      "erano ancora fredde.",
+                      "tail": " L'ultimo giro non conta perché le gomme erano ancora fredde.",
+                      "progress": _COUNTING}),
+    ("evaluating", {"kind": "evaluating", "message": "Sto valutando la modifica. Servono "
+                    "ancora 2 giri puliti.", "tail": "", "progress": _p(1, "test", 1, 3)}),
+    # La nota della modifica mai giudicata e' un COLLECT senza coda: si legge.
+    ("unjudged", {"kind": "collect", "message": "La modifica dell'altra volta…",
+                  "tail": None, "progress": _COUNTING}),
+    ("wet", {"kind": "stand_down", "message": "Hai le gomme da bagnato…", "tail": None,
+             "progress": _COUNTING}),
+    # Senza contatore sulla strada il messaggio resta intero.
+    ("no_count", {"kind": "collect", "message": "Servono 3 giri puliti…", "tail": "",
+                  "progress": _p(0, "baseline")}),
+    ("no_progress", {"kind": "collect", "message": "Servono 3 giri puliti…", "tail": ""}),
+    ("accepted", {"kind": "accepted", "message": "Tengo la modifica.", "tail": None,
+                  "progress": _p(2, "diagnose")}),
+    ("nothing", None),
+]
+
+_TABLET_MSG = _TABLET.replace("window.HoneTablet.stripText(a[0], a[1], a[2])",
+                              "window.HoneTablet.msgText(a)")
+_ENGINEER_MSG = _ENGINEER.replace('eval(grab("stripText"));', 'eval(grab("msgText"));').replace(
+    "stripText(a[0], a[1], a[2])", "msgText(a)")
+
+
+@needs_node
+def test_both_pages_show_the_same_message_under_the_road():
+    cases = [c[1] for c in _MSG_CASES]
+    tab = _run(_TABLET_MSG, "tablet.js", "it", cases)
+    eng = _run(_ENGINEER_MSG, "engineer.js", "it", cases)
+    assert tab == eng
+    r = {name: v for (name, _), v in zip(_MSG_CASES, tab)}
+    assert r["collect_plain"] == ""
+    assert r["collect_tail"] == "L'ultimo giro non conta perché le gomme erano ancora fredde."
+    assert r["evaluating"] == ""
+    assert r["unjudged"] == "La modifica dell'altra volta…"
+    assert r["wet"] == "Hai le gomme da bagnato…"
+    assert r["no_count"] == "Servono 3 giri puliti…"
+    assert r["no_progress"] == "Servono 3 giri puliti…"
+    assert r["accepted"] == "Tengo la modifica."
+    assert r["nothing"] == ""
+
+
+@needs_node
+def test_the_tablet_setup_tab_shows_only_the_tail():
+    script = _BOX_HARNESS.split("var frame = {")[0] + r"""
+var f = {connected: true, at_box: true, car: "c", track: "t",
+  engineer: {kind: "collect", message: "Servono 3 giri puliti per avere una base e per ora ne ho 1.",
+             tail: "", progress: {phases: [{key: "pressures", label: "Pressioni", tag: "BOX"}],
+                                  index: 0, stage: "baseline", have: 1, need: 3, skipped: []}}};
+window.HoneTablet.render(f);
+var a = {hidden: $("t-msg").hidden, text: $("t-msg").textContent};
+f = JSON.parse(JSON.stringify(f));
+f.engineer.tail = " L'ultimo giro non conta perché sei uscito di pista.";
+f.engineer.message += f.engineer.tail;
+window.HoneTablet.render(f);
+var b = {hidden: $("t-msg").hidden, text: $("t-msg").textContent};
+process.stdout.write(JSON.stringify([a, b]));
+"""
+    r = subprocess.run([_NODE, "-e", script, str(_WEB / "i18n.js"), str(_WEB / "tablet.js")],
+                       capture_output=True, text=True, encoding="utf-8")
+    assert r.returncode == 0, r.stderr
+    a, b = json.loads(r.stdout)
+    assert a == {"hidden": True, "text": ""}
+    assert b == {"hidden": False, "text": "L'ultimo giro non conta perché sei uscito di pista."}
+
+
+def test_the_engineer_page_writes_the_message_through_msgtext():
+    src = (_WEB / "engineer.js").read_text(encoding="utf-8")
+    assert '$("es-msg").textContent = msgText(eng);' in src
+    css = (_WEB / "engineer.css").read_text(encoding="utf-8")
+    assert re.search(r"\.es-msg:empty\s*\{\s*display:\s*none", css)
+    # Finding 5: `display: block` batteva `hidden`.
+    assert re.search(r"\.es-road-why\[hidden\]\s*\{\s*display:\s*none", css)
+
+
+def test_skipped_steps_have_their_own_look_without_the_tick():
+    tcss = (_WEB / "tablet.css").read_text(encoding="utf-8")
+    ecss = (_WEB / "engineer.css").read_text(encoding="utf-8")
+    assert ".t-road-step.skipped" in tcss and ".es-road-step.skipped" in ecss
+    assert not re.search(r"\.t-road-step\.skipped[^{]*:before", tcss)
+    assert not re.search(r"\.es-road-step\.skipped[^{]*::before", ecss)
