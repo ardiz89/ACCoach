@@ -504,3 +504,21 @@ def test_show_lists_pairs_and_never_calls_the_api(env, capsys):
     assert "1 frasi su 2 cambiano" in out
     assert env.api.calls == []
     assert not env.dirs["male"].exists()
+
+
+def test_old_sidecar_without_text_counts_as_phrase_sent_plain(env):
+    env.phrases[:] = ["Gas", "Pattini in uscita"]
+    render_voice.main(["--voice", "male"])
+    d = env.dirs["male"]
+    side = _sidecar(d)
+    for e in side.values():
+        del e["text"]  # come lo scriveva lo script di prima
+    (d / "render.json").write_text(json.dumps(side), encoding="utf-8")
+    env.api.calls.clear()
+    render_voice.main(["--voice", "male"])
+    # «Gas» e' uguale: gia' approvata, non si rifa'. «Pattini...» cambia: si rifa'.
+    assert env.api.texts() == ["Pàttini in uscita"]
+
+
+def test_abs_is_not_respelled(env):
+    assert render_voice.render_text("Alza l'ABS di uno") == "Alza l'ABS di uno"

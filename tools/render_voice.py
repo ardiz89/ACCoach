@@ -77,8 +77,8 @@ PRONUNCIA = {
     "camber": "càmber",
 }
 # Le sigle sono maiuscole e non si confondono con una parola comune: la
-# corrispondenza e' esatta. «ABS» il modello rischia di leggerlo come una parola.
-SIGLE = {"TC": "ti-ci", "ABS": "a-bi-èsse"}
+# corrispondenza e' esatta.
+SIGLE = {"TC": "ti-ci"}
 
 # Pausa dopo ogni virgola: il modello a stabilita' 0,30 le ignora.
 PAUSA = ', <break time="0.3s" /> '
@@ -165,6 +165,14 @@ def _want(voice_id: str, phrase: str) -> dict:
     """Le impostazioni piu' il testo mandato: se cambia la tabella di pronuncia
     la frase si rifa', come per un'impostazione."""
     return {**_settings(voice_id), "text": render_text(phrase)}
+
+
+def _sent(entry, phrase: str):
+    """Una voce del sidecar scritta prima di `render_text` non ha «text»: allora
+    il vecchio script mandava la frase cosi' com'era."""
+    if isinstance(entry, dict) and "text" not in entry:
+        return {**entry, "text": phrase}
+    return entry
 
 
 def _load_json(path: Path) -> dict:
@@ -275,7 +283,7 @@ def _plan(voice: str, phrases: list[str], only: list[str] | None):
     todo = [t for t in phrases
             if t not in manifest
             or not (d / manifest[t]).is_file()
-            or sidecar.get(t) != _want(voice_id, t)]
+            or _sent(sidecar.get(t), t) != _want(voice_id, t)]
     wanted = set(phrases)
     gone = sorted(t for t in set(manifest) | set(sidecar) if t not in wanted)
     return todo, gone
