@@ -188,3 +188,61 @@ def test_report_url_encodes_and_falls_back():
     assert report_url(base, "", "t") == base
     u = report_url(base, "a b", "x&y")
     assert "car=a%20b" in u and "track=x%26y" in u
+
+
+# --- la corsa ricorda auto, pista e giri dopo che il gioco si chiude ---------
+# Il 22/10 il pilota ha guidato a Spa, chiuso ACC e premuto «Ho finito»: col
+# gioco chiuso /health risponde car="" e track="", e il report e' partito senza
+# parametri (ha aperto Imola).
+
+SPA = dict(car="mclaren_720s_gt3_evo", track="Spa")
+
+
+def test_closing_the_game_does_not_forget_the_combo():
+    t = LiveTracker()
+    s = t.feed(H(True, saved_laps=4, **SPA), 0.0, True)
+    assert (s.car, s.track, s.saved_laps) == (SPA["car"], "Spa", 4)
+    # il motore col gioco chiuso: TelemetrySnapshot.disconnected()
+    s = t.feed(H(False, car=None, track=None, saved_laps=None), 10.0, True)
+    assert (s.car, s.track, s.saved_laps) == (SPA["car"], "Spa", 4)
+    s = t.feed(H(False), 70.0, True)
+    assert s.phase == "finished"
+    assert (s.car, s.track, s.saved_laps) == (SPA["car"], "Spa", 4)
+    u = report_url("http://127.0.0.1:8778/", s.car, s.track)
+    assert u.endswith("?view=pagella&car=mclaren_720s_gt3_evo&track=Spa")
+
+
+def test_saved_laps_keep_the_highest_seen_in_the_run():
+    # Un motore che riparte ricomincia a contare da 0: i giri gia' salvati
+    # non spariscono.
+    t = LiveTracker()
+    t.feed(H(True, saved_laps=4, **SPA), 0.0, True)
+    assert t.feed(H(True, saved_laps=0, **SPA), 2.0, True).saved_laps == 4
+    assert t.feed(H(True, saved_laps=5, **SPA), 4.0, True).saved_laps == 5
+
+
+def test_an_empty_or_disconnected_frame_does_not_overwrite_the_combo():
+    t = LiveTracker()
+    t.feed(H(True, **SPA), 0.0, True)
+    # collegato ma senza auto/pista (un frame a meta'): non cancella
+    s = t.feed(H(True, car=None, track=None), 2.0, True)
+    assert (s.car, s.track) == (SPA["car"], "Spa")
+    # scollegato: non dice cosa si guida, anche se porta dei nomi
+    s = t.feed(H(False, car="c2", track="Imola"), 4.0, True)
+    assert (s.car, s.track) == (SPA["car"], "Spa")
+
+
+def test_a_connected_frame_with_a_new_combo_wins():
+    t = LiveTracker()
+    t.feed(H(True, **SPA), 0.0, True)
+    s = t.feed(H(True, car="c2", track="Imola"), 2.0, True)
+    assert (s.car, s.track) == ("c2", "Imola")
+
+
+def test_a_new_run_forgets_the_combo():
+    t = LiveTracker()
+    t.feed(H(True, saved_laps=4, **SPA), 0.0, True)
+    t.feed(H(False), 2.0, True)
+    assert t.feed(None, 4.0, False).phase == "idle"
+    s = t.feed(H(False), 6.0, True)
+    assert (s.car, s.track, s.saved_laps) == (None, None, None)

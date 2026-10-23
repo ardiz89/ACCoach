@@ -91,6 +91,13 @@ class LiveTracker:
         # Almeno una risposta buona in questa corsa, e quando la corsa e' partita.
         self._answered = False
         self._started_at: float | None = None
+        # Auto, pista e giri salvati della corsa. Col gioco chiuso il motore
+        # risponde car="" e track="" (TelemetrySnapshot.disconnected()) proprio
+        # quando nasce «Ho finito»: senza questa memoria il report partiva
+        # senza combo e apriva quella ricordata dal browser (22/10, Spa -> Imola).
+        self._car: str | None = None
+        self._track: str | None = None
+        self._saved: int | None = None
 
     def begin(self, now: float) -> None:
         """La corsa parte adesso: da qui contano i STARTING_S dell'avvio (senza,
@@ -124,6 +131,17 @@ class LiveTracker:
             self._missed = 0
             self._answered = True
             self._last = health
+            if health.connected is not False:
+                # Solo una risposta non scollegata dice quale combo si guida.
+                if health.car:
+                    self._car = health.car
+                if health.track:
+                    self._track = health.track
+            if health.saved_laps is not None:
+                # Il piu' alto della corsa: un motore che riparte conta da 0,
+                # ma i giri che aveva salvato restano sul disco.
+                self._saved = (health.saved_laps if self._saved is None
+                               else max(self._saved, health.saved_laps))
             if health.connected is True:
                 self._seen_telemetry = True
                 self._closed_since = None
@@ -154,9 +172,9 @@ class LiveTracker:
             phase=phase,
             tablet_done=self._tablet_done,
             tablet_now=self._tablet_now,
-            car=h.car if h else None,
-            track=h.track if h else None,
-            saved_laps=h.saved_laps if h else None,
+            car=self._car,
+            track=self._track,
+            saved_laps=self._saved,
             laps_done=h.laps_done if h else None,
             best=h.best if h else None,
         )

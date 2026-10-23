@@ -686,3 +686,83 @@ def test_every_failed_load_ends_with_the_shared_backend_sentence():
         assert f't("{key}")' not in _APPJS, key
     entry = _i18n_entry("err.backend")
     assert "en:" in entry and "it:" in entry
+
+
+# --- senza parametri: la sessione nuova, su qualunque combo sia --------------
+# Il 22/10 il pilota ha guidato a Spa; il report senza parametri ha riaperto la
+# combo ricordata (Imola), guardato se c'era una sessione nuova solo lì, e
+# rimesso il recap. La combo più recente dell'archivio è la prima del selettore
+# (`/api/combos` è ordinato per `MAX(recorded_utc) DESC`).
+
+_LANDING_HARNESS = r"""
+const fs = require("fs");
+const src = fs.readFileSync(process.argv[2], "utf8");
+const i = src.indexOf("function landingCombo(");
+let depth = 0, body = null;
+for (let k = src.indexOf("{", i); k < src.length; k++) {
+  if (src[k] === "{") depth++;
+  if (src[k] === "}") { depth--; if (!depth) { body = src.slice(i, k + 1); break; } }
+}
+eval(body);
+const out = JSON.parse(fs.readFileSync(0, "utf8")).map((a) => landingCombo(...a));
+console.log(JSON.stringify(out));
+"""
+
+_SPA = '{"car":"mclaren_720s_gt3_evo","track":"Spa"}'
+_IMOLA = '{"car":"mclaren_720s_gt3_evo","track":"Imola"}'
+_T_SPA = "2026-10-22T18:22:00Z"
+
+
+def _landing(tmp_path, cases):
+    script = tmp_path / "landing.js"
+    script.write_text(_LANDING_HARNESS, encoding="utf-8")
+    run = subprocess.run([_NODE, str(script), str(WEB / "app.js")],
+                         input=json.dumps(cases), capture_output=True, text=True,
+                         encoding="utf-8", timeout=60)
+    assert run.returncode == 0, run.stderr
+    return json.loads(run.stdout)
+
+
+@pytest.mark.skipif(_NODE is None, reason="serve node per eseguire la pagina")
+def test_a_new_session_on_another_combo_wins_over_the_remembered_one(tmp_path):
+    assert _landing(tmp_path, [
+        # Spa nuova, Imola ricordata: si apre Spa.
+        [_SPA, _T_SPA, None, _IMOLA],
+        [_SPA, _T_SPA, "2026-10-20T10:00:00Z", _IMOLA],
+        # nessuna combo ricordata (prima visita): la più recente, come oggi
+        [_SPA, _T_SPA, None, None],
+    ]) == ["newest", "newest", "newest"]
+
+
+@pytest.mark.skipif(_NODE is None, reason="serve node per eseguire la pagina")
+def test_otherwise_it_is_today_s_behaviour(tmp_path):
+    assert _landing(tmp_path, [
+        # già vista: si riprende la combo ricordata
+        [_SPA, _T_SPA, _T_SPA, _IMOLA],
+        # già vista e nessuna combo ricordata
+        [_SPA, _T_SPA, _T_SPA, None],
+        # la risposta non è arrivata (errore di rete) o non ha uscite
+        [_SPA, None, None, _IMOLA],
+        [_SPA, None, "2026-10-20T10:00:00Z", _IMOLA],
+        # la più recente è già quella ricordata: ci pensa `openPagellaIfNew`
+        [_SPA, _T_SPA, None, _SPA],
+        # archivio senza combo
+        [None, None, None, None],
+    ]) == ["saved"] * 6
+
+
+def test_init_looks_at_the_newest_combo_before_the_remembered_one():
+    init = _body_of("async function init()")
+    # Dopo i parametri dell'hub, prima di `savedCombo()` e di `loadCombo`.
+    assert "if (!asked) asked = await newestUnseen(sel);" in init
+    assert init.index("newestUnseen(sel)") > init.index("history.replaceState(")
+    assert init.index("newestUnseen(sel)") < init.index("const combo = asked ? null : savedCombo();")
+    body = _body_of("async function newestUnseen(sel)")
+    # Una richiesta sola, sull'uscita più recente della prima combo.
+    assert body.count("getJSON(") == 1 and "index: 0" in body
+    assert "sel.options[0]" in body
+    assert 'landingCombo(newest, started, seenSession(c), saved) !== "newest"' in body
+    # Diventa la combo ricordata, come quella chiesta dall'hub.
+    assert "localStorage.setItem(_COMBO_KEY, newest)" in body
+    # Se il pilota ha già cambiato combo da sé mentre aspetta, non si tocca.
+    assert "stale(seen)" in body

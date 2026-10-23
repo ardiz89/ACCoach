@@ -192,6 +192,10 @@ async function init() {
       history.replaceState(null, "", location.pathname + (rest ? "?" + rest : "") + location.hash);
     } catch (e) {}
   }
+  // Senza una combo chiesta, una sessione nuova vince su quella ricordata
+  // ovunque sia: chi ha appena guidato a Spa non vuole riaprire Imola perché
+  // l'ultima volta guardava quella (22/10). Si apre come la chiede l'hub.
+  if (!asked) asked = await newestUnseen(sel);
   // Pick up where you left off — but only if that car+track is still in the
   // archive (a lap store can be moved or cleared between two runs).
   const combo = asked ? null : savedCombo();
@@ -2516,6 +2520,42 @@ async function openPagellaIfNew(combo) {
     return true;
   }
   return false;
+}
+
+// Da quale combo parte il report senza parametri. `newest` è la prima del
+// selettore (`/api/combos` è ordinato per l'ultimo giro registrato),
+// `newestStarted` l'inizio della sua uscita più recente (null se la risposta
+// non è arrivata), `seenStarted` quella già vista in Pagella, `saved` la combo
+// ricordata. «newest» solo se c'è un'uscita che non hai visto; se la più
+// recente è già quella ricordata ci pensa `openPagellaIfNew`, come sempre.
+function landingCombo(newest, newestStarted, seenStarted, saved) {
+  if (!newest || !newestStarted) return "saved";
+  if (newest === saved) return "saved";
+  return newestStarted === seenStarted ? "saved" : "newest";
+}
+
+// L'opzione della combo più recente se ha un'uscita mai vista e non è già
+// quella ricordata, altrimenti null. Una richiesta sola, e solo quando le due
+// combo differiscono. Diventa la combo ricordata, come quella chiesta dall'hub.
+async function newestUnseen(sel) {
+  const opt = sel.options[0];
+  const newest = opt ? opt.value : null;
+  const saved = savedCombo();
+  if (!newest || newest === saved) return null;
+  const c = JSON.parse(newest);
+  const seen = EPOCH;
+  let started = null;
+  try {
+    const s = await getJSON("/api/sessions?" +
+      new URLSearchParams({ car: c.car, track: c.track, index: 0 }));
+    started = (s && s.sessions && s.sessions[0] && s.sessions[0].started_utc) || null;
+  } catch (e) { started = null; }
+  // Se mentre aspetta il pilota ha già scelto una combo da sé, si tiene quella.
+  if (stale(seen)) return null;
+  if (landingCombo(newest, started, seenSession(c), saved) !== "newest") return null;
+  sel.value = newest;
+  try { localStorage.setItem(_COMBO_KEY, newest); } catch (e) {}
+  return opt;
 }
 
 // La Pagella chiesta dall'indirizzo: l'uscita più recente di questa combo è

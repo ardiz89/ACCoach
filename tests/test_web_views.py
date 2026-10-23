@@ -2545,9 +2545,13 @@ def test_every_async_function_that_waits_is_accounted_for():
     # salvata» e rilegge la Pagella; scartata, la Pagella l'ha già rilanciata
     # chi ha fatto salire il contatore. `openAskedPagella` e' la sorella di
     # `openPagellaIfNew` per la Pagella chiesta dall'indirizzo: stessa corsa,
-    # stessa guardia, gira una volta sola dentro `init`.
+    # stessa guardia, gira una volta sola dentro `init`. `newestUnseen` sceglie
+    # la combo di partenza (il selettore e la combo ricordata) prima di
+    # `loadCombo`, una volta sola dentro `init`; scartata, si tiene la combo
+    # che il pilota ha scelto da sé, e il suo `onchange` ha già caricato tutto.
     assert set(_ASYNC) == set(_LOADERS) | _NOT_WRITERS | {
-        "saveCornerName", "openPagellaIfNew", "openAskedPagella", "adviceAction"}
+        "saveCornerName", "openPagellaIfNew", "openAskedPagella", "adviceAction",
+        "newestUnseen"}
     assert not _NOT_WRITERS & set(_WAITERS) and "saveCornerName" in _WAITERS
 
 
