@@ -279,6 +279,9 @@ let prepared = null, posted = [];
 function renderPrediction() {} function renderOutcome() {} function renderRoad() {}
 function prepareChange(c) { prepared = c; }
 function fetch(url, opt) { posted.push([url, opt && opt.method]); return Promise.resolve(); }
+// Nessun frame dal vivo: si scrive come sempre (la guardia sta in `inPista`).
+const state = { lastLive: null };
+eval(grab("inPista")); eval(grab("writeLocked"));
 eval(grab("msgText"));
 eval(grab("confirmRestored"));
 eval(grab("renderEngineer"));

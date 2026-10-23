@@ -720,6 +720,7 @@ function renderTray() {
   badge.textContent = String(changes.length);
   if (!changes.length) { tray.hidden = true; return; }
   tray.hidden = false;
+  paintWriteLock();
   $("tray-count").textContent = `(${changes.length})`;
   const list = $("tray-list");
   list.innerHTML = "";
@@ -793,7 +794,50 @@ function nextAutoName() {
   return `${AUTO_PREFIX}_${max + 1}`;
 }
 
+// Si scrive l'assetto solo da fermo ai box. Scrivere avvisa il motore
+// (`/engineer/applied`) e da li' l'ingegnere conta i giri di verifica: in pista
+// il file nuovo non e' ancora sulla macchina (si carica dal garage), quei giri
+// sarebbero guidati con l'assetto vecchio e il verdetto «la tengo / la rimetto»
+// sarebbe sbagliato. La vista tablet lo sapeva gia' (tablet.js, `atBoxNow`).
+//
+// Ma la pagina serve anche senza guidare, per preparare un assetto col gioco
+// spento o nei menu: li' scrivere resta possibile. Si blocca solo se l'ultimo
+// frame dice «stai guidando e non sei fermo ai box». PAUSE conta come guida: in
+// pausa ACC sei fermo in pista, non ai box, e l'assetto non si carica lo stesso.
+// REPLAY e OFF no: non c'e' una macchina in pista a cui mancherebbe il file.
+function inPista(st) {
+  return !!st && st.connected === true
+    && (st.status === "LIVE" || st.status === "PAUSE") && !st.at_box;
+}
+function writeLocked() { return inPista(state.lastLive); }
+
+// Spegne i quattro bottoni che scrivono e dice perche'. Chiamata a ogni frame e
+// quando il vassoio o il riquadro dell'ingegnere si ridisegnano.
+function paintWriteLock() {
+  const lock = writeLocked();
+  for (const id of ["btn-apply", "btn-write", "modal-ok", "es-restored"]) {
+    const el = $(id);
+    if (el) el.disabled = lock;
+  }
+  const line = $("write-lock");
+  if (line) {
+    line.hidden = !lock;
+    line.textContent = lock ? t("tablet.writeAtBox") : "";
+  }
+  // Il vassoio non c'e' quando la modifica e' un ripristino: la riga la porta
+  // anche il bottone «L'ho già rimesso», che altrimenti sarebbe spento a vuoto.
+  const rl = $("restored-lock");
+  if (rl) {
+    const on = lock && !$("es-restored").hidden;
+    rl.hidden = !on;
+    rl.textContent = on ? t("tablet.writeAtBox") : "";
+  }
+}
+
 async function applyNow() {
+  // Seconda guardia: il bottone e' spento, ma un frame puo' arrivare fra il
+  // tocco e qui.
+  if (writeLocked()) return;
   const changes = changesPayload();
   if (!changes.length || !state.setupPath) return;
   // La tendina è la nostra unica idea di quali nomi sono presi; un file scritto
@@ -840,6 +884,7 @@ async function afterWrite(res) {
 }
 
 async function confirmWrite() {
+  if (writeLocked()) { showModalError(t("tablet.writeAtBox")); return; }
   const name = $("modal-name").value.trim();
   if (!name) { showModalError(t("eng.enterName")); return; }
   const body = { path: state.setupPath, as_name: name, confirm: true,
@@ -949,6 +994,7 @@ function applyLive(st) {
     renderEngineer({});
     renderFocus({});
     renderPitReminder({});
+    paintWriteLock();
     return;
   }
   badge.dataset.state = st.at_box ? "pit" : "on";
@@ -966,6 +1012,7 @@ function applyLive(st) {
   renderEngineer(st);
   renderFocus(st);
   renderPitReminder(st);
+  paintWriteLock();               // dopo renderEngineer: conta se `es-restored` e' visibile
   updateSuggested(st.engineer);   // highlight the proposed levers in the editor
 
   // Auto-pick the matching combo once, if the user hasn't chosen yet.
@@ -1328,6 +1375,7 @@ function renderEngineer(st) {
 // `av-done`, perché è lo stesso evento: quello che l'ingegnere aveva chiesto è
 // sulla macchina. Best-effort come gli altri due.
 function confirmRestored() {
+  if (writeLocked()) return;
   $("es-restored").hidden = true;
   fetch(`http://${location.hostname}:${WS_PORT}/engineer/applied`,
         { method: "POST" }).catch(() => { /* backend off — resta da fare */ });
@@ -1495,11 +1543,14 @@ $("setup").onchange = onSetupChange;
 // the same event: the change the engineer proposed is now on the car, so the
 // re-test window can start. Best-effort like the other one — a backend that
 // isn't running just means the engineer keeps proposing.
-$("av-done").onclick = () => {
+// Niente guardia: la modifica «dal volante» si fa guidando, ed e' giusto che
+// avvisi subito.
+function confirmAvDone() {
   $("av-done").hidden = true;
   fetch(`http://${location.hostname}:${WS_PORT}/engineer/applied`,
         { method: "POST" }).catch(() => { /* backend off — keeps proposing */ });
-};
+}
+$("av-done").onclick = confirmAvDone;
 
 $("btn-reset").onclick = () => { state.pending = {};
   renderSetup({ groups: groupsOf(state.params), params: state.params }); renderTray(); };

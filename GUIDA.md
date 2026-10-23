@@ -834,6 +834,11 @@ dell'ingegnere».
   garage del gioco il file di prima, premi *L'ho già rimesso com'era*. Anche
   questo bottone funziona solo ai box.
 
+La pagina completa dell'ingegnere segue la stessa regola. I bottoni che
+scrivono si spengono quando stai guidando e non sei fermo ai box, anche in
+pausa in pista. Col gioco spento o nei menu puoi scrivere lo stesso, per
+preparare un assetto senza guidare.
+
 Per il resto, ad esempio per lo storico delle prove, usa la pagina completa
 dell'ingegnere. Resta su `/engineer`, e il collegamento *Pagina completa* in
 fondo alla vista tablet ci porta. Su un browser vecchio la pagina completa non

@@ -890,6 +890,10 @@ road".
   with the previous values. If you've already reloaded the previous file in the
   game's garage, press *I've already put it back*. This button too only works
   in the pits.
+- **The full Engineer page follows the same rule.** Its writing buttons switch
+  off when you're driving and not stopped in the pits, even paused on track.
+  With the game off or in the menus you can still write, to prepare a setup
+  without driving.
 
 For anything else, such as the history of the trials, use the full engineer
 page. It stays at `/engineer`, and the *Full page* link at the bottom of the

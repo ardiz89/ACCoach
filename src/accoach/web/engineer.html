@@ -146,6 +146,7 @@
              si dica prima di proporre altro. -->
         <button id="es-restored" class="small" type="button" hidden
           data-i18n="eng.restoredByHand">I've already restored it in the garage</button>
+        <div id="restored-lock" class="muted" hidden></div>
       </div>
 
       <div class="focus-says" id="focus-says" data-kind="">
@@ -213,6 +214,8 @@
       <span id="tray-count" class="muted"></span>
     </div>
     <div id="tray-list" class="tray-list"></div>
+    <!-- In pista i bottoni sono spenti: engineer.js, `paintWriteLock`. -->
+    <div id="write-lock" class="muted" hidden></div>
     <div class="tray-actions">
       <button id="btn-reset" type="button" class="ghost" data-i18n="tray.reset">Reset all</button>
       <!-- The named road stays: it is the one that shows the physical diff (psi,
