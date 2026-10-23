@@ -925,7 +925,11 @@ def create_api(
     demo: bool = False,
 ) -> FastAPI:
     laps_dir = Path(laps_dir)
-    app = FastAPI(title="HONE analysis")
+    # Niente /docs, /redoc e /openapi.json: sono pagine HTML senza la nostra CSP
+    # (caricano script da una CDN) e l'elenco di ogni route che scrive, servite
+    # anche al Wi-Fi. HONE non ha client che leggano lo schema.
+    app = FastAPI(title="HONE analysis", docs_url=None, redoc_url=None,
+                  openapi_url=None)
 
     # Race-engineer setup read/write routes (/api/setup/*). Kept in their own
     # module so this file stays about lap analysis.

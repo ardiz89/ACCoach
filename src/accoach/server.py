@@ -164,7 +164,10 @@ def create_app(engine: CoachEngine | None = None, hz: float = 15.0, *,
             if holder["engine"] is not None and holder["e_nostro"]:
                 holder["engine"].close()
 
-    app = FastAPI(title="HONE backend", lifespan=lifespan)
+    # Niente documentazione automatica, come sulla 8778: nessuno legge lo
+    # schema, e la 8777 ascolta anche in rete.
+    app = FastAPI(title="HONE backend", lifespan=lifespan, docs_url=None,
+                  redoc_url=None, openapi_url=None)
 
     def publish(st) -> None:
         """Chi guida il motore deposita qui l'ultimo stato. Usato da Coach Live."""

@@ -300,3 +300,48 @@ def test_setup_list_normal_names_unchanged(tmp_path):
     assert [x["name"] for x in r.json()] == ["q"]
     # Una combinazione che non c'e' resta una lista vuota, non un errore.
     assert c.get("/api/setup/list", params={"car": "car_b", "track": "Monza"}).json() == []
+
+
+# --- nessuna pagina HTML senza CSP, e niente documentazione automatica ---------
+# FastAPI di serie pubblica /docs e /redoc: due pagine HTML che caricano script
+# da una CDN, senza la nostra CSP. Sulla 8778 erano una pagina senza cintura, e
+# /openapi.json l'elenco di ogni route che scrive. Si spengono su tutte e due
+# le app, e qui si prova ogni GET senza parametri, non un elenco scritto a mano:
+# la route aggiunta domani ci finisce dentro da sola.
+
+def _get_routes_senza_parametri(app):
+    for route in app.routes:
+        path = getattr(route, "path", "")
+        methods = getattr(route, "methods", None) or set()
+        if "GET" in methods and "{" not in path:
+            yield path
+
+
+def test_every_html_response_of_the_pages_app_has_the_csp(client):
+    percorsi = sorted(set(_get_routes_senza_parametri(client.app)) | set(PAGES))
+    assert len(percorsi) > len(PAGES)   # l'elenco viene davvero dalle route
+    html_visti = 0
+    for path in percorsi:
+        r = client.get(path)
+        if "text/html" in r.headers.get("content-type", ""):
+            html_visti += 1
+            assert "script-src 'self' 'nonce-" in r.headers.get(
+                "content-security-policy", ""), path
+    assert html_visti >= len(PAGES)
+
+
+@pytest.mark.parametrize("path", ["/docs", "/redoc", "/openapi.json",
+                                  "/docs/oauth2-redirect"])
+def test_no_auto_docs_on_either_app(client, path):
+    from accoach.server import create_app
+
+    class _Motore:
+        def tick(self):
+            return None
+
+        def close(self):
+            pass
+
+    assert client.get(path).status_code == 404, path
+    with TestClient(create_app(engine=_Motore(), hz=50)) as live:
+        assert live.get(path).status_code == 404, path
