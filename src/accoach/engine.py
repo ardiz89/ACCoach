@@ -17,6 +17,7 @@ with scripted snapshots and no audio.
 
 from __future__ import annotations
 
+import re
 import threading
 from dataclasses import dataclass
 from pathlib import Path
@@ -126,10 +127,11 @@ def _spoken_forms(cue: Cue, focus_theme: str | None, lang: str) -> tuple[str, st
     return trigger, cue.message
 
 # A spoken alert prefix for an engineer proposal, by confidence-tone × tag ×
-# language. The change itself follows it — only the action (`ProposedChange.named`,
-# «Ammorbidisci la barra antirollio anteriore di 1 click»), not the whole
+# language. The change itself follows it — only the action, not the whole
 # rationale with its symptom: the voice has room for eight words a sentence, the
-# Engineer page keeps the rest. The prefix tells the driver *whether* it needs
+# Engineer page keeps the rest. In italiano l'azione e' la frase scritta a mano
+# senza click (`engineer/voice_levers.py`, «Ammorbidisci la barra antirollio
+# anteriore»), detta come frase a se'; in inglese `ProposedChange.named`. The prefix tells the driver *whether* it needs
 # the garage (BOX) or can be dialled from the wheel (AV). A medium-confidence
 # proposal gets a tentative wording so the tone itself signals how much to trust
 # it — the advice still reaches the ear, but the voice doesn't oversell a guess.
@@ -153,6 +155,33 @@ _ENG_VOICE_PREFIX = {
 # di rifare proprio la modifica da togliere.
 _ENG_VOICE_REVERT = {"it": "Riporta l'assetto com'era.",
                      "en": "Put the setup back as it was."}
+
+
+#: «di 2 click», «1 click di»: il numero dei click dentro una leva dello schermo.
+_CLICKS = (re.compile(r"\s+di\s+\d+\s+click\b"),
+           re.compile(r"\b\d+\s+click\s+(?:di\s+)?"))
+
+
+def _eng_voice_lever(change) -> str:
+    """La leva come la dice la voce italiana: la frase scritta a mano
+    (`engineer/voice_levers.py`), senza click.
+
+    Se manca, la leva dello schermo senza il numero: l'italiano puo' venire
+    zoppo e la frase non ha un WAV, quindi la dice la voce di Windows. Non
+    deve succedere (lo impedisce `tests/test_voce_leve.py`); se succede, il
+    log dice quale leva manca, che e' la riga da aggiungere alla tabella.
+    """
+    from .engineer.voice_levers import voice_lever
+    phrase = voice_lever(change)
+    if phrase is not None:
+        return phrase
+    atoms = ", ".join(f"{a.param}[{a.slot}]{a.delta_clicks:+d}"
+                      for a in change.changes)
+    _log.warning("ingegnere: leva senza frase a voce: %s", atoms)
+    text = _voice_clean(change.named)
+    for rx in _CLICKS:
+        text = rx.sub(" ", text)
+    return re.sub(r"\s+", " ", text).strip().rstrip(".") + "."
 
 
 def _spoken_log_line(category, focus_theme: str | None,
@@ -861,9 +890,18 @@ class CoachEngine:
         prefix = prefixes.get(lang) or prefixes["en"]
         if decision.kind is DecisionKind.REVERTED:
             action = _ENG_VOICE_REVERT.get(lang) or _ENG_VOICE_REVERT["en"]
+        elif lang == "it":
+            action = _eng_voice_lever(decision.change)
         else:
             action = _voice_clean(decision.change.named).rstrip(".") + "."
-        self.voice.say(f"{prefix} {action}")
+        if lang != "it":
+            self.voice.say(f"{prefix} {action}")
+            return
+        # In italiano due frasi, due WAV in fila: il prefisso (quattro frasi)
+        # e la leva (una tabella chiusa). Le frasi intere sarebbero il
+        # prodotto delle due, otto volte i caratteri da registrare.
+        self.voice.say(prefix)
+        self.voice.say(action)
 
     def _log_engineer_outcome(self, lap, decision) -> None:
         """Write a finished test to the engineer's ledger.

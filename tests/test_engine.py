@@ -144,7 +144,7 @@ def test_the_voice_says_the_action_not_the_whole_rationale(tmp_path, monkeypatch
     monkeypatch.setattr(engine_mod, "current_language", lambda: "it")
     eng, voice = _engine_with_voice(tmp_path)
     change = ProposedChange(
-        changes=(AtomicChange("aRBFront", 0, -1),),
+        changes=(AtomicChange("aRBFront", None, -1),),
         rationale=("Hai sottosterzo in ingresso, quindi ammorbidisci la barra "
                    "antirollio anteriore di 1 click."),
         phase_label="Grip meccanico", tag="BOX",
@@ -153,9 +153,13 @@ def test_the_voice_says_the_action_not_the_whole_rationale(tmp_path, monkeypatch
     # Il ripristino porta la stessa leva: detta, rifarebbe la modifica da togliere.
     eng._announce_engineer(Decision(DecisionKind.REVERTED, "msg", change.reversed(), ""))
     eng.close()
+    # In italiano prefisso e leva sono due frasi (due WAV), e la leva non dice
+    # i click: vedi tests/test_voce_leve.py.
     assert voice.said == [
-        "Ingegnere, rientra ai box. Ammorbidisci la barra antirollio anteriore di 1 click.",
-        "Ingegnere, rientra ai box. Riporta l'assetto com'era.",
+        "Ingegnere, rientra ai box.",
+        "Ammorbidisci la barra antirollio anteriore.",
+        "Ingegnere, rientra ai box.",
+        "Riporta l'assetto com'era.",
     ]
 
 
