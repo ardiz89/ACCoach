@@ -117,7 +117,7 @@ _HOWTO = {
                       "staccate sotto l'obiettivo.",
         ),
         "brake_late": dict(
-            what="Stacchi dopo il tuo giro migliore, ma all'apex sei più lento. "
+            what="Stacchi dopo il tuo giro di riferimento, ma all'apex sei più lento. "
                  "Arrivi troppo forte, resti sul freno mentre giri e l'auto non "
                  "gira. Frena un po' prima, quanto basta per arrivare "
                  "all'apex col freno quasi finito.",
@@ -134,7 +134,7 @@ _HOWTO = {
                       "dei giri, e questo difetto è chiuso.",
         ),
         "over_brake": dict(
-            what="Usi più freno del tuo giro migliore, o lo tieni premuto troppo "
+            what="Usi più freno del tuo giro di riferimento, o lo tieni premuto troppo "
                  "a lungo, e arrivi in curva più piano del necessario. Il punto "
                  "in cui stacchi va bene così. Quello che devi cambiare è come "
                  "lasci il pedale.",
@@ -153,7 +153,7 @@ _HOWTO = {
                       "metà dei giri, passi oltre.",
         ),
         "throttle_late": dict(
-            what="In uscita apri il gas più tardi del tuo giro migliore, oppure "
+            what="In uscita apri il gas più tardi del tuo giro di riferimento, oppure "
                  "lo apri e poi lo richiudi. Di solito il motivo sta prima, in "
                  "ingresso. Se all'apex hai ancora il volante girato, il gas non "
                  "lo puoi dare.",
@@ -194,7 +194,7 @@ _HOWTO = {
         # mette la vista al primo posto della gerarchia: l'alzata istintiva
         # nasce dall'occhio più che dall'auto.
         "lift": dict(
-            what="Alzi il piede dal gas dove il tuo giro migliore resta in pieno, "
+            what="Alzi il piede dal gas dove il tuo giro di riferimento resta in pieno, "
                  "di solito in un curvone veloce o in una piega del rettilineo. Il "
                  "tempo perso lì si moltiplica su tutto il dritto che segue.",
             watch="Guarda dove alzi e di quanto. Spesso è un'alzata breve e "
@@ -250,7 +250,7 @@ _HOWTO = {
                       "through these braking zones under the target.",
         ),
         "brake_late": dict(
-            what="You brake later than your best lap, but you're slower at the "
+            what="You brake later than your reference lap, but you're slower at the "
                  "apex. You arrive too fast, stay on the brake while turning, and "
                  "the car won't turn in. Brake a little earlier, just "
                  "enough to reach the apex with the brake almost off.",
@@ -267,7 +267,7 @@ _HOWTO = {
                       "this one is closed.",
         ),
         "over_brake": dict(
-            what="You use more brake than your best lap, or hold it too long, and "
+            what="You use more brake than your reference lap, or hold it too long, and "
                  "you reach the corner slower than you need to. Where you start "
                  "braking is fine as it is. What you need to change is how you "
                  "come off the pedal.",
@@ -287,7 +287,7 @@ _HOWTO = {
                       "your laps, you move on.",
         ),
         "throttle_late": dict(
-            what="On exit you open the throttle later than your best lap, or open "
+            what="On exit you open the throttle later than your reference lap, or open "
                  "it and then close it again. The reason is usually earlier, on "
                  "entry. If the wheel is still turned at the apex, you can't use "
                  "the throttle.",
@@ -323,7 +323,7 @@ _HOWTO = {
                       "least half your laps.",
         ),
         "lift": dict(
-            what="You lift off the throttle where your best lap stays flat, "
+            what="You lift off the throttle where your reference lap stays flat, "
                  "usually in a fast sweeper or a kink on the straight. The time "
                  "lost there multiplies along the whole straight that follows.",
             watch="Watch where you lift and how much. It's often a short, "
@@ -397,19 +397,19 @@ def glossary(key: str, lang: str) -> list[GlossaryEntry]:
 # nel consiglio) niente «Qui»: la frase parla del giro intero, con la maiuscola.
 _PROBLEM = {
     "it": {
-        "brake_early": "stacchi prima del tuo giro migliore, e ci perdi {s} a giro.",
-        "brake_early_m": "stacchi in media {m} prima del tuo giro migliore, e ci "
+        "brake_early": "stacchi prima del tuo giro di riferimento, e ci perdi {s} a giro.",
+        "brake_early_m": "stacchi in media {m} prima del tuo giro di riferimento, e ci "
                          "perdi {s} a giro.",
-        "brake_late": "stacchi dopo il tuo giro migliore ma all'apex sei più "
+        "brake_late": "stacchi dopo il tuo giro di riferimento ma all'apex sei più "
                       "lento, e ci perdi {s} a giro.",
-        "brake_late_m": "stacchi in media {m} dopo il tuo giro migliore ma "
+        "brake_late_m": "stacchi in media {m} dopo il tuo giro di riferimento ma "
                         "all'apex sei più lento, e ci perdi {s} a giro.",
-        "over_brake": "usi più freno del tuo giro migliore, e ci perdi {s} a giro.",
-        "throttle_late": "apri il gas più tardi del tuo giro migliore, e ci perdi "
+        "over_brake": "usi più freno del tuo giro di riferimento, e ci perdi {s} a giro.",
+        "throttle_late": "apri il gas più tardi del tuo giro di riferimento, e ci perdi "
                          "{s} a giro.",
-        "min_speed": "a centro curva vai più piano del tuo giro migliore, e ci "
+        "min_speed": "a centro curva vai più piano del tuo giro di riferimento, e ci "
                      "perdi {s} a giro.",
-        "lift": "alzi il gas dove il tuo giro migliore resta in pieno, e ci perdi "
+        "lift": "alzi il gas dove il tuo giro di riferimento resta in pieno, e ci perdi "
                 "{s} a giro.",
         "coasting": "prima di frenare passi in media {s} a giro senza gas né freno.",
         "where": "{c}. Qui {body}",
@@ -417,21 +417,21 @@ _PROBLEM = {
         "metres": "{n} metri",
     },
     "en": {
-        "brake_early": "you brake earlier than your best lap, and it costs you {s} "
+        "brake_early": "you brake earlier than your reference lap, and it costs you {s} "
                        "a lap.",
-        "brake_early_m": "you brake {m} earlier than your best lap on average, "
+        "brake_early_m": "you brake {m} earlier than your reference lap on average, "
                          "and it costs you {s} a lap.",
-        "brake_late": "you brake later than your best lap but you're slower at "
+        "brake_late": "you brake later than your reference lap but you're slower at "
                       "the apex, and it costs you {s} a lap.",
-        "brake_late_m": "you brake {m} later than your best lap on average but "
+        "brake_late_m": "you brake {m} later than your reference lap on average but "
                         "you're slower at the apex, and it costs you {s} a lap.",
-        "over_brake": "you use more brake than your best lap, and it costs you {s} "
+        "over_brake": "you use more brake than your reference lap, and it costs you {s} "
                       "a lap.",
-        "throttle_late": "you open the throttle later than your best lap, and it "
+        "throttle_late": "you open the throttle later than your reference lap, and it "
                          "costs you {s} a lap.",
-        "min_speed": "you're slower than your best lap mid-corner, and it costs "
+        "min_speed": "you're slower than your reference lap mid-corner, and it costs "
                      "you {s} a lap.",
-        "lift": "you lift where your best lap stays flat, and it costs you {s} a "
+        "lift": "you lift where your reference lap stays flat, and it costs you {s} a "
                 "lap.",
         "coasting": "before braking you spend {s} a lap on average off both "
                     "pedals.",
@@ -474,9 +474,9 @@ _VERDICT = {
         "top": ", e l'abitudine che pesa di più è {name}.",
         "end": ".",
         "first": "È la tua prima sessione qui. Il confronto arriva dalla prossima.",
-        "less": "Rispetto alla sessione prima perdi {s} in meno a giro",
-        "more": "Rispetto alla sessione prima perdi {s} in più a giro",
-        "same": "Rispetto alla sessione prima perdi lo stesso tempo a giro",
+        "less": "Rispetto alla media della sessione prima perdi {s} in meno a giro",
+        "more": "Rispetto alla media della sessione prima perdi {s} in più a giro",
+        "same": "Rispetto alla media della sessione prima perdi lo stesso tempo a giro",
         "down": "{names} in calo",
         "up": "{names} in crescita",
         "with": ", con {parts}.",
@@ -491,9 +491,9 @@ _VERDICT = {
         "end": ".",
         "first": "This is your first session here. The comparison starts with "
                  "the next one.",
-        "less": "Compared with the previous session you lose {s} less a lap",
-        "more": "Compared with the previous session you lose {s} more a lap",
-        "same": "Compared with the previous session you lose the same time a lap",
+        "less": "Compared with the previous session's average you lose {s} less a lap",
+        "more": "Compared with the previous session's average you lose {s} more a lap",
+        "same": "Compared with the previous session's average you lose the same time a lap",
         "down": "{names} going down",
         "up": "{names} going up",
         "with": ", with {parts}.",

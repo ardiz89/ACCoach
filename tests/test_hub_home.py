@@ -87,7 +87,7 @@ def test_the_home_numbers_follow_the_language(monkeypatch, tmp_path):
                            message="Freni troppo presto", cause="", detail="",
                            fix="")
     data = hub_home.HomeData(status="ok", total_gap_ms=420, laps_count=3,
-                             best_ms=101_882, consistency={"spread_ms": 180},
+                             best_ms=101_882, consistency={"spread_ms": 400, "std_ms": 180},
                              top=loss)
     try:
         for lang, gap, spread, lost in (("it", "+0,42 s", "0,18 s", "−0,4 s"),

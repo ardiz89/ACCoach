@@ -819,7 +819,7 @@ function renderCornerConsistency(rows) {
       `<span class="corner">${mark}${esc(r.name)}</span>` +
       `<span class="cons-track"><span class="cons-fill" style="width:${w}%"></span></span>` +
       `<span class="cons-nums">${t("cons.spread")} <b>${fmtDec(r.spread_kmh, 1)}</b> km/h · ` +
-      `σ ${fmtDec(r.std_kmh, 1)} · ${r.n} ${t("lbl.laps")}</span>` +
+      `${t("cons.typical")} ${fmtDec(r.std_kmh, 1)} km/h · ${r.n} ${t("lbl.laps")}</span>` +
       `</div>`;
   }).join("");
 }
@@ -1892,7 +1892,7 @@ function drawSummary(a) {
   const condLabel = (a.reference.by_conditions || {}).reason === "unjudged"
     ? t("sum.cond.unj") : t("sum.cond");
   $("summary").innerHTML =
-    (c.n >= 2 ? item(t("sum.consistency"), `σ ${fmtDec(c.std_ms / 1000, 3, "s")} · ${c.n} ${t("lbl.laps")}`) : "") +
+    (c.n >= 2 ? item(`${t("sum.consistency")} ${c.n} ${t("lbl.laps")}`, fmtDec(c.std_ms / 1000, 3, "s")) : "") +
     (condNote ? item(condLabel, condNote, "warn") : "") +
     (setupNote ? item(t("sum.setup_diff"), setupNote, "warn") : "");
 }
@@ -2387,7 +2387,7 @@ function renderSession(s) {
     numbers += item(t("ses.best"), cur.best);
     if (c.n >= 2) {
       numbers += item(t("ses.mean"), fmtMs(c.mean_ms));
-      numbers += item(t("ses.spread"), `σ ${fmtDec(c.std_ms / 1000, 3, "s")}`);
+      numbers += item(t("ses.spread"), fmtDec(c.std_ms / 1000, 3, "s"));
     }
     if (prev && prev.delta_ms != null) {
       const d = prev.delta_ms / 1000;

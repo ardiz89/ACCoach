@@ -68,9 +68,14 @@ _STRINGS = {
         "headline": "Prima di tutto",
         "lapwide": "Sul giro intero",
         "clean": "Niente di grosso da correggere",
+        # L'ultima frase dice cosa guarda questa vista: il 24/10 la Pagella
+        # diceva «perdi 0,11 s in Curva 1» e qui «niente da correggere», e chi
+        # e' nuovo concludeva che i numeri erano sbagliati.
         "clean_body": "In questo giro non ho trovato una perdita che valga "
                       "una correzione. Le differenze col riferimento stanno "
-                      "dentro lo scarto normale fra due giri dello stesso pilota.",
+                      "dentro lo scarto normale fra due giri dello stesso pilota. "
+                      "La Pagella guarda la media della sessione, e lì può "
+                      "trovare un'abitudine che su un giro solo non si vede.",
         "reference_body": "Questo è il tuo giro di riferimento e non ne hai uno "
                           "più veloce con cui confrontarlo.",
     },
@@ -80,7 +85,9 @@ _STRINGS = {
         "clean": "Nothing big to fix",
         "clean_body": "I found no loss on this lap worth a correction. The "
                       "differences from the reference sit inside the normal "
-                      "spread between two laps by the same driver.",
+                      "spread between two laps by the same driver. The Report "
+                      "card looks at the session average, and there it can find "
+                      "a habit that a single lap doesn't show.",
         "reference_body": "This is your reference lap, and you have no faster "
                           "lap to compare it with.",
     },

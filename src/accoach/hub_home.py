@@ -356,7 +356,9 @@ class HomePanel(QWidget):
         gap = ("+" + fmt_num(data.total_gap_ms / 1000.0, 2, lang, "s")
                if data.status in ("ok", "clean") else "—")
         laps = str(data.laps_count) if data.laps_count else "—"
-        spread = data.consistency.get("spread_ms", 0) if data.consistency else 0
+        # Lo scarto tipico (std), come «Scarto tipico» nel report: prima qui
+        # c'era l'escursione col nome «Costanza», e i due numeri non tornavano.
+        spread = data.consistency.get("std_ms", 0) if data.consistency else 0
         cons = (fmt_num(spread / 1000.0, 2, lang, "s")
                 if data.laps_count >= 2 else "—")
         values = {"best": best, "gap": gap, "laps": laps, "consistency": cons}

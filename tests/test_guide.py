@@ -58,7 +58,9 @@ def test_every_heading_survives(lang):
 def test_the_italian_guide_keeps_its_structure():
     """Counts, so that a block type silently ceasing to parse shows up here."""
     body, headings = render_markdown(_DOCS["it"])
-    assert len([h for h in headings if h[0] == 2]) == 9      # the nine sections
+    # Otto dal 24/10: il debrief nel terminale e i comandi sono un capitolo solo,
+    # in fondo («Dalla riga di comando»).
+    assert len([h for h in headings if h[0] == 2]) == 8
     assert body.count("<table>") == 6   # pedali + delta + colori curva + 2 di comandi + config
     assert body.count("<pre>") >= 3                          # the shell examples
     assert body.count("<blockquote>") == 4   # +1: il trail sulle stradali
@@ -133,7 +135,7 @@ def test_the_faq_quick_links_resolve():
 def test_the_page_carries_a_table_of_contents():
     page = render_page(_DOCS["it"], "it")
     assert "Indice" in page
-    assert page.count('<a href="#') >= 9
+    assert page.count('<a href="#') >= 8
 
 
 def test_the_page_title_is_the_documents_own():

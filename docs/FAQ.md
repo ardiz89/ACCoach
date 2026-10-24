@@ -11,7 +11,7 @@ on to the analysis. If you're looking for one thing, jump to
 [Install](#install), [SmartScreen](#smartscreen--security),
 [Privacy](#privacy), [the overlay](#4-reading-the-overlay),
 [lap recording](#how-lap-recording-works-and-starting-from-the-pits) or
-[what to do when something goes wrong](#9-if-something-goes-wrong).
+[what to do when something goes wrong](#7-if-something-goes-wrong).
 
 ---
 
@@ -20,29 +20,18 @@ on to the analysis. If you're looking for one thing, jump to
 - **Windows.** AC and ACC publish their telemetry through shared memory, and
   that only exists on Windows.
 - **Assetto Corsa** or **Assetto Corsa Competizione**, installed.
-- **HONE**, in one of the two ways below.
+- **HONE**, installed as below.
 
 Your laps end up in **`Documents\ACCoach\laps`**, whichever way you run HONE.
 That way the analysis always finds them.
 
 ### Install
 
-**The executable**, if you only want to use it. Download the zip from the
+**The executable.** Download the zip from the
 [Releases](https://github.com/ardiz89/ACCoach/releases) page, unzip it and run
-`HONE.exe`. You don't need Python.
+`HONE.exe`. You don't need Python. Running HONE from the source is
+covered at the end, in "From the command line".
 
-**The source**, if you develop. You need Python 3.11 or newer.
-
-```powershell
-git clone https://github.com/ardiz89/ACCoach.git
-cd ACCoach
-pip install -r requirements.txt
-python accoach_main.py live      # coach and overlay
-python accoach_main.py help      # list the commands
-```
-
-From the source you can also double-click `HONE.bat`. The first time, it sets up
-its own Python environment and installs what HONE needs.
 
 ### SmartScreen & security
 
@@ -111,7 +100,7 @@ moves through three stages, one after the other.
 
 **Before you go.** The first step, *Coach Live is on*, is ticked off as soon as
 the coach responds, usually within a couple of seconds. At that point voice and
-overlay are ready. Next comes *Connect your tablet to the engineer*. Scan the QR
+overlay are ready. Next comes *Connect a tablet, if you have one*. Scan the QR
 code with the tablet's camera. If the tablet can't read QR codes, like an iPad 3,
 type the address next to the code into the browser, key included. It opens
 the tablet view, described in "The tablet view". The
@@ -141,15 +130,6 @@ off until you press Coach Live. A coach that starts talking just because you
 opened the game would be an intrusion. The option is off by default. If you stop
 the recording by hand it stays stopped, and starts again only when you close and
 reopen the game.
-
-From the command line you do the same thing like this.
-
-```
-python accoach_main.py live      # voice coach and overlay, in one process
-```
-
-Add `--silent` if you want the overlay without the voice. With `--interactive`
-you can drag the overlay somewhere else on the screen.
 
 ---
 
@@ -951,76 +931,7 @@ A few practical details.
 
 ---
 
-## 6. The debrief in the terminal
-
-For a quick summary after the session, type this.
-
-```
-python accoach_main.py debrief [car] [track]
-```
-
-It lists the corners where you lost the most time, with the cause, and your
-consistency. It reads the saved laps, so the game can be closed.
-
----
-
-## 7. Every command
-
-From a terminal in the source folder, type `python accoach_main.py <command>`.
-The packaged app has no console window,
-so `HONE.exe <command>` runs the command but prints nothing in the terminal.
-
-**To drive you only need three commands**, the same ones you see with
-`python accoach_main.py help`.
-
-| Command | What it does |
-|---|---|
-| `live [--silent]` | **Voice coach and overlay** in one process. It's the normal way to use HONE. |
-| `web [--demo]` | The analysis in the browser, with saved laps, report and guide. |
-| `launcher` | The hub, the window with all the sections. |
-
-The other commands are tools for developing, testing on track or using a second
-screen. You don't need them to drive, and that's why they aren't on the first
-screen. You get the full, up-to-date list like this.
-
-```
-python accoach_main.py help --all
-```
-
-These are the ones you might really need.
-
-| Command | What it does |
-|---|---|
-| `debrief [car] [track]` | The text debrief after the session. The game can be closed. |
-| `coach [--silent]` | The voice coach in the terminal, without the overlay. |
-| `recorder` | Records laps only, without the coach. |
-| `monitor` | Shows the raw telemetry. |
-| `setup show <file>` | Reads an ACC setup without starting the game. |
-| `selftest` | Checks that the voice works and writes a report. |
-| `logs` | Opens the folder with the logs and crash reports. |
-| `logs --zip` | Packs the logs and some context into one file to attach to a report. **The logs go in unfiltered, except for your home folder.** Read "What's in that zip" before you send it. |
-| `find-rain` | Finds the ACC rain fields by measuring them. You need a session with changing weather. |
-
-### The configuration file
-
-Almost everything is set from **Settings**. The rest is in
-`Documents\ACCoach\config.toml`, which HONE creates on first start with a comment
-for each entry. Edit it with the app closed, because **values are read at
-startup**.
-
-These entries only exist there.
-
-| Entry | What it sets |
-|---|---|
-| `data.laps_dir` | Moves the laps folder, to another disk or a synced folder. If you leave it empty it stays `Documents\ACCoach\laps`. |
-| `acquire.hz` | How many samples per second the recorder reads. |
-| `server.host` · `server.port` · `server.hz` | Address, port and rate of the Coach without overlay. |
-| `web.port` | The port of the analysis. |
-| `logging.level` · `logging.console` | How much the logs write. |
-
----
-
-## 8. Getting the most out of it
+## 6. Getting the most out of it
 
 - **Build a good reference.** The coach compares you with your fastest clean
   lap. At first that's your first clean, complete lap, and then it's replaced
@@ -1028,13 +939,14 @@ These entries only exist there.
 - **Always use Borderless** if you want the overlay.
 - **Work on one car and one track at a time.** The reference only holds for that
   car on that track.
-- If the coach distracts you while you're learning a track, use `--silent` and
-  watch only the overlay. Turn the voice back on when you want the advice.
+- If the coach distracts you while you're learning a track, turn off **Coach
+  voice** in **Settings** and watch only the overlay. Turn it back on when you
+  want the advice.
 - Go over the **recurring mistakes** in Trends. That's where your pace improves.
 
 ---
 
-## 9. If something goes wrong
+## 7. If something goes wrong
 
 - **The overlay stays on "Waiting for the game…" and doesn't connect.** The game
   has to be running and you have to be on track, in a session. HONE only reads the
@@ -1048,11 +960,11 @@ These entries only exist there.
   `pip install pyttsx3`.
 - **Which voice you hear.** In Italian every sentence the coach and the engineer
   say on track is recorded, in two voices. The default voice is male. For the
-  female one, untick **Male voice** in **Settings**, and the other way round. In
+  female one, pick **Female** under **Voice** in **Settings**. In
   English the Windows voice always speaks, and it's more robotic.
 - **You updated and still hear the female voice.** The update doesn't change
   your `config.toml`. Earlier versions wrote `male = false` in it, and that choice
-  stays. Tick **Male voice** in **Settings**.
+  stays. Pick **Male** under **Voice** in **Settings**.
 - **No corner advice arrives.** You don't have a reference yet. One clean,
   complete lap is enough, from the line to the line. The immediate warnings arrive
   anyway.
@@ -1096,6 +1008,89 @@ can't diagnose anything, and quietly censoring one would be worse than the rest.
 The zip is an ordinary file on your disk, and `contesto.txt` inside it says this
 too. From the source, the command also prints it when it finishes. Open it and
 look before you send it.
+
+---
+
+## 8. From the command line
+
+From a terminal in the source folder, type `python accoach_main.py <command>`.
+The packaged app has no console window,
+so `HONE.exe <command>` runs the command but prints nothing in the terminal.
+
+**To drive you only need three commands**, the same ones you see with
+`python accoach_main.py help`.
+
+| Command | What it does |
+|---|---|
+| `live [--silent]` | **Voice coach and overlay** in one process. It's the normal way to use HONE. |
+| `web [--demo]` | The analysis in the browser, with saved laps, report and guide. |
+| `launcher` | The hub, the window with all the sections. |
+
+The other commands are tools for developing, testing on track or using a second
+screen. You don't need them to drive, and that's why they aren't on the first
+screen. You get the full, up-to-date list like this.
+
+```
+python accoach_main.py help --all
+```
+
+These are the ones you might really need.
+
+| Command | What it does |
+|---|---|
+| `debrief [car] [track]` | The text debrief after the session. The game can be closed. |
+| `coach [--silent]` | The voice coach in the terminal, without the overlay. |
+| `recorder` | Records laps only, without the coach. |
+| `monitor` | Shows the raw telemetry. |
+| `setup show <file>` | Reads an ACC setup without starting the game. |
+| `selftest` | Checks that the voice works and writes a report. |
+| `logs` | Opens the folder with the logs and crash reports. |
+| `logs --zip` | Packs the logs and some context into one file to attach to a report. **The logs go in unfiltered, except for your home folder.** Read "What's in that zip" before you send it. |
+| `find-rain` | Finds the ACC rain fields by measuring them. You need a session with changing weather. |
+
+
+### The debrief in the terminal
+
+For a quick summary after the session, type this.
+
+```
+python accoach_main.py debrief [car] [track]
+```
+
+It lists the corners where you lost the most time, with the cause, and your
+consistency. It reads the saved laps, so the game can be closed.
+
+### The configuration file
+
+Almost everything is set from **Settings**. The rest is in
+`Documents\ACCoach\config.toml`, which HONE creates on first start with a comment
+for each entry. Edit it with the app closed, because **values are read at
+startup**.
+
+These entries only exist there.
+
+| Entry | What it sets |
+|---|---|
+| `data.laps_dir` | Moves the laps folder, to another disk or a synced folder. If you leave it empty it stays `Documents\ACCoach\laps`. |
+| `acquire.hz` | How many samples per second the recorder reads. |
+| `server.host` · `server.port` · `server.hz` | Address, port and rate of the Coach without overlay. |
+| `web.port` | The port of the analysis. |
+| `logging.level` · `logging.console` | How much the logs write. |
+
+### From the source
+
+**The source**, if you develop. You need Python 3.11 or newer.
+
+```powershell
+git clone https://github.com/ardiz89/ACCoach.git
+cd ACCoach
+pip install -r requirements.txt
+python accoach_main.py live      # coach and overlay
+python accoach_main.py help      # list the commands
+```
+
+From the source you can also double-click `HONE.bat`. The first time, it sets up
+its own Python environment and installs what HONE needs.
 
 ---
 

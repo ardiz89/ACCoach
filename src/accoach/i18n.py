@@ -251,7 +251,7 @@ _UI: dict[str, dict[str, str]] = {
     "home.stat_best": {"en": "Best lap", "it": "Miglior giro"},
     "home.stat_gap": {"en": "Gap to ref", "it": "Distacco rif."},
     "home.stat_laps": {"en": "Valid laps", "it": "Giri validi"},
-    "home.stat_consistency": {"en": "Spread", "it": "Costanza"},
+    "home.stat_consistency": {"en": "Typical spread", "it": "Scarto tipico"},
     # phone / tablet (LAN) dialog
     "mob.title": {"en": "Open on a phone or tablet",
                   "it": "Apri su telefono o tablet"},

@@ -13,21 +13,16 @@ Questa guida ti accompagna dall'avvio al primo giro col coach, fino all'analisi.
 ## 1. Cosa ti serve
 
 - **Assetto Corsa** o **Assetto Corsa Competizione** installato.
-- **HONE**, in uno dei due modi.
-  - **L'eseguibile**, se vuoi solo usarlo. Scarica lo ZIP dalla pagina
-    Releases, scompattalo e avvia `HONE.exe`. Python non ti serve.
-    Se hai la GitHub CLI, `gh attestation verify` (lo trovi nelle note della
-    release) ti dice se lo ZIP è stato costruito dal workflow di rilascio di
-    HONE. Prima devi aver fatto l'accesso a GitHub con `gh auth login`.
-  - **Il sorgente**, se sviluppi. Ti serve Python 3.11 o più recente, poi
-    `pip install -r requirements.txt`. Dal sorgente puoi anche fare doppio clic
-    su `HONE.bat`. La prima volta prepara il suo ambiente Python e installa
-    quello che serve.
+- **HONE.** Scarica lo ZIP dalla pagina
+  Releases, scompattalo e avvia `HONE.exe`. Python non ti serve. Se vuoi
+  controllare che lo ZIP sia quello pubblicato, o usare HONE dal sorgente,
+  trovi come in fondo, in «Dalla riga di comando».
 
 I tuoi giri finiscono in **`Documenti/ACCoach/laps`**, sia dall'eseguibile sia
 dal sorgente. Così l'analisi li ritrova sempre.
 
 ---
+
 
 ## 2. Avvio in 30 secondi
 
@@ -48,7 +43,7 @@ pagina passa per tre momenti, uno dopo l'altro.
 
 **Prima di partire.** Il primo passo, *Coach Live acceso*, si spunta appena il
 coach risponde, di solito in un paio di secondi. A quel punto voce e overlay
-sono pronti. Poi viene *Collega il tablet all'ingegnere*. Inquadra il codice
+sono pronti. Poi viene *Collega un tablet, se ce l'hai*. Inquadra il codice
 QR con la fotocamera del tablet. Se il tablet non legge i QR, come un iPad 3,
 scrivi nel browser l'indirizzo accanto al codice, chiave compresa. Si
 apre la vista tablet, descritta in «La vista tablet». Il
@@ -77,15 +72,6 @@ voce e overlay restano spenti finché non premi Coach Live. Un coach che si
 mette a parlare solo perché hai aperto il gioco sarebbe un'intrusione.
 L'opzione all'inizio è spenta. Se fermi la registrazione a mano resta ferma, e
 riparte solo quando chiudi e riapri il gioco.
-
-Dalla riga di comando fai la stessa cosa così.
-
-```
-python accoach_main.py live      # coach vocale + overlay, in un solo processo
-```
-
-Aggiungi `--silent` se vuoi l'overlay senza la voce. Con `--interactive` puoi
-trascinare l'overlay in un altro punto dello schermo.
 
 ---
 
@@ -898,20 +884,46 @@ Qualche dettaglio pratico.
 
 ---
 
-## 6. Il debrief nel terminale
+## 6. Consigli per usarlo al meglio
 
-Per un riassunto veloce a fine sessione, scrivi questo.
-
-```
-python accoach_main.py debrief [auto] [pista]
-```
-
-Ti elenca le curve dove hai perso più tempo, con la causa, e la tua costanza.
-Legge i giri salvati, quindi il gioco può essere chiuso.
+- **Fai un buon riferimento.** Il coach ti confronta col tuo giro pulito più
+  veloce. All'inizio è il primo giro pulito completo, poi lo sostituisce ogni
+  volta che ne fai uno migliore.
+- **Usa sempre Borderless** se vuoi l'overlay.
+- **Lavora su un'auto e una pista per volta.** Il riferimento vale solo per
+  quell'auto su quella pista.
+- Se il coach ti distrae mentre impari una pista, spegni **Voce del coach** in
+  **Impostazioni** e guarda solo l'overlay. Riaccendila quando vuoi i consigli.
+- Rivedi gli **errori ricorrenti** nell'Andamento. È lì che migliori il passo.
 
 ---
 
-## 7. Tutti i comandi
+## 7. Se qualcosa non va
+
+- **L'overlay resta su «Aspetto il gioco…» e non si collega.** Il gioco deve
+  essere aperto e tu devi essere in pista, in una sessione. HONE legge la
+  memoria condivisa solo mentre il gioco gira.
+- **Non vedi l'overlay.** Sei a schermo intero esclusivo. Passa a
+  **Borderless**.
+- **Non senti la voce.** Lancia `python accoach_main.py selftest`, che scrive un
+  report e prova a parlare. In italiano le frasi del coach sono registrate e
+  partono anche senza pyttsx3. Per l'inglese ti serve pyttsx3, che dal sorgente
+  installi con `pip install pyttsx3`.
+- **Quale voce senti.** In italiano ogni frase che il coach e l'ingegnere dicono
+  in pista è registrata, con due voci. La voce di partenza è maschile. Per quella
+  femminile scegli **Femminile** alla voce **Voce** in **Impostazioni**.
+  In inglese parla sempre la voce di Windows, che è più robotica.
+- **Hai aggiornato e senti ancora la voce femminile.** L'aggiornamento non
+  cambia il tuo `config.toml`. Le versioni di prima ci scrivevano
+  `male = false`, e quella scelta resta. Scegli **Maschile** alla voce **Voce** in **Impostazioni**.
+- **Non arriva nessun consiglio di curva.** Ti manca il riferimento. Ti basta un giro
+  pulito completo, dal traguardo al traguardo. Gli avvisi immediati invece arrivano comunque.
+- **L'analisi non mostra i giri.** Prima devi guidarli con Coach Live o col
+  registratore. Finiscono in `Documenti/ACCoach/laps`, dove l'analisi li legge.
+
+---
+
+## 8. Dalla riga di comando
 
 Da un terminale, nella cartella del sorgente, scrivi
 `python accoach_main.py <comando>`.
@@ -947,6 +959,18 @@ Questi sono quelli che potrebbero servirti davvero.
 | `logs --zip` | Fa un solo file da allegare a una segnalazione, coi log, la versione, il commit, Python e il sistema, e le ultime auto e piste. Il file nasce anche se non ci sono log, e in quel caso lo dice. **I log entrano senza filtri, con una sola modifica.** La tua cartella di casa, dove sta il nome del tuo account Windows, diventa `%USERPROFILE%`. Il resto dei percorsi resta, compresa la cartella di rete se ne hai una. Hanno una riga con data e ora per ogni avvio di HONE, cioè il registro di quando ti sei seduto a guidare. Ci sono i tuoi tempi sul giro, piste, auto e nomi dei file aperti. Ci sono anche i crash report, con l'errore completo. È voluto, perché un log ripulito non serve a trovare un difetto. Il comando lo scrive dentro lo ZIP, e dal sorgente anche a schermo quando finisce. L'app impacchettata non ha una finestra di terminale, quindi lì a schermo non vedi niente. Aprilo e guardalo prima di mandarlo. |
 | `find-rain` | Trova i campi della pioggia di ACC misurandoli. Ti serve una sessione con meteo variabile. |
 
+
+### Il debrief nel terminale
+
+Per un riassunto veloce a fine sessione, scrivi questo.
+
+```
+python accoach_main.py debrief [auto] [pista]
+```
+
+Ti elenca le curve dove hai perso più tempo, con la causa, e la tua costanza.
+Legge i giri salvati, quindi il gioco può essere chiuso.
+
 ### Il file di configurazione
 
 Quasi tutto si regola da **Impostazioni**. Il resto sta in
@@ -963,41 +987,15 @@ Queste voci esistono solo lì.
 | `web.port` | La porta dell'analisi. |
 | `logging.level` · `logging.console` | Quanto scrivono i log. |
 
----
+### Dal sorgente e la verifica del download
 
-## 8. Consigli per usarlo al meglio
+Ti serve Python 3.11 o più recente, poi `pip install -r requirements.txt`.
+Dal sorgente puoi anche fare doppio clic su `HONE.bat`. La prima volta prepara
+il suo ambiente Python e installa quello che serve.
 
-- **Fai un buon riferimento.** Il coach ti confronta col tuo giro pulito più
-  veloce. All'inizio è il primo giro pulito completo, poi lo sostituisce ogni
-  volta che ne fai uno migliore.
-- **Usa sempre Borderless** se vuoi l'overlay.
-- **Lavora su un'auto e una pista per volta.** Il riferimento vale solo per
-  quell'auto su quella pista.
-- Se il coach ti distrae mentre impari una pista, usa `--silent` e guarda solo
-  l'overlay. Riaccendi la voce quando vuoi i consigli.
-- Rivedi gli **errori ricorrenti** nell'Andamento. È lì che migliori il passo.
+Se hai la GitHub CLI, `gh attestation verify` (lo trovi nelle note della
+release) ti dice se lo ZIP è stato costruito dal workflow di rilascio di HONE.
+Prima devi aver fatto l'accesso a GitHub con `gh auth login`.
 
 ---
 
-## 9. Se qualcosa non va
-
-- **L'overlay resta su «Aspetto il gioco…» e non si collega.** Il gioco deve
-  essere aperto e tu devi essere in pista, in una sessione. HONE legge la
-  memoria condivisa solo mentre il gioco gira.
-- **Non vedi l'overlay.** Sei a schermo intero esclusivo. Passa a
-  **Borderless**.
-- **Non senti la voce.** Lancia `python accoach_main.py selftest`, che scrive un
-  report e prova a parlare. In italiano le frasi del coach sono registrate e
-  partono anche senza pyttsx3. Per l'inglese ti serve pyttsx3, che dal sorgente
-  installi con `pip install pyttsx3`.
-- **Quale voce senti.** In italiano ogni frase che il coach e l'ingegnere dicono
-  in pista è registrata, con due voci. La voce di partenza è maschile. Per quella
-  femminile togli la spunta da **Voce maschile** in **Impostazioni**, e viceversa.
-  In inglese parla sempre la voce di Windows, che è più robotica.
-- **Hai aggiornato e senti ancora la voce femminile.** L'aggiornamento non
-  cambia il tuo `config.toml`. Le versioni di prima ci scrivevano
-  `male = false`, e quella scelta resta. Metti la spunta su **Voce maschile** in **Impostazioni**.
-- **Non arriva nessun consiglio di curva.** Ti manca il riferimento. Ti basta un giro
-  pulito completo, dal traguardo al traguardo. Gli avvisi immediati invece arrivano comunque.
-- **L'analisi non mostra i giri.** Prima devi guidarli con Coach Live o col
-  registratore. Finiscono in `Documenti/ACCoach/laps`, dove l'analisi li legge.

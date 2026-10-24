@@ -199,11 +199,11 @@
     "howto.back":      { en: `← Back to the Report card`, it: `← Torna alla Pagella` },
     "howto.noproblem": { en: `In this session I don't have a number for this fault.`,
                          it: `In questa sessione non ho un numero per questo difetto.` },
-    "howto.ref":       { en: `Everything here is measured against your best lap, {time} from {when}.`,
-                         it: `Qui tutto è misurato sul tuo giro migliore, {time} del {when}.` },
+    "howto.ref":       { en: `Everything here is measured against your reference lap, {time} from {when}.`,
+                         it: `Qui tutto è misurato sul tuo giro di riferimento, {time} del {when}.` },
     "howto.figs":      { en: `From your laps`, it: `Dai tuoi giri` },
     "howto.leg.you":   { en: `your usual lap in this session`, it: `il tuo giro solito di questa sessione` },
-    "howto.leg.best":  { en: `your best lap`, it: `il tuo giro migliore` },
+    "howto.leg.best":  { en: `your reference lap`, it: `il tuo giro di riferimento` },
     "howto.nofig":     { en: `In this session there's no corner to show you for this fault.`,
                          it: `In questa sessione non ho curve da mostrarti per questo difetto.` },
     "howto.nofig.lap": { en: `This fault isn't in one corner, it adds up over the whole lap. There's no corner to draw.`,
@@ -262,17 +262,21 @@
     "ses.sub":         { en: `{laps} {laps|lap|laps} · {valid} valid · {mins} min`,
                          it: `{laps} {laps|giro|giri} · {valid} {valid|valido|validi} · {mins} min` },
     "ses.sub_temp":    { en: `track {from} → {to}`, it: `asfalto {from} → {to}` },
-    "ses.best":        { en: `Best`, it: `Migliore` },
+    // «della sessione»: il Come si fa chiamava «migliore» il riferimento di
+    // sempre, e qui «Migliore» era un altro tempo (24/10).
+    "ses.best":        { en: `Session best`, it: `Migliore della sessione` },
     "ses.mean":        { en: `Average`, it: `Media` },
-    "ses.spread":      { en: `Consistency`, it: `Costanza` },
-    "ses.vsprev":      { en: `vs previous session`, it: `vs sessione precedente` },
+    "ses.spread":      { en: `Typical spread`, it: `Scarto tipico` },
+    // Il migliore contro il migliore: la Pagella confronta invece la perdita
+    // media, e le due cifre andavano in versi opposti senza dire perché.
+    "ses.vsprev":      { en: `vs last session's best`, it: `vs migliore della sessione prima` },
     "ses.fuel":        { en: `Fuel per lap`, it: `Benzina al giro` },
     "ses.laps":        { en: `Your laps`, it: `I tuoi giri` },
     "ses.lap_best":    { en: `best`, it: `migliore` },
     "ses.lap_out":     { en: `didn't count`, it: `non conta` },
     "ses.lap_cut":     { en: `off track`, it: `fuori pista` },
     "ses.open":        { en: `Open this lap in Compare`, it: `Apri questo giro in Confronto` },
-    "ses.changed":     { en: `What changed since last time`, it: `Cosa è cambiato dall'ultima volta` },
+    "ses.changed":     { en: `Your best lap against last session's best`, it: `Il tuo migliore contro quello della sessione prima` },
     "ses.improved":    { en: `Faster here`, it: `Qui vai più forte` },
     "ses.regressed":   { en: `Slower here`, it: `Qui hai perso` },
     "ses.first":       { en: `This is your first session on this car and track. There's nothing to compare it with yet.`,
@@ -293,7 +297,7 @@
     "st.sub_fuel":     { en: `{from} → {to} L`, it: `{from} → {to} L` },
     "st.pace":         { en: `Pace`, it: `Passo` },
     "st.best":         { en: `Best`, it: `Migliore` },
-    "st.spread":       { en: `Spread`, it: `Dispersione` },
+    "st.spread":       { en: `Fastest to slowest`, it: `Fra il più veloce e il più lento` },
     "st.drift":        { en: `Drift`, it: `Deriva` },
     "st.flat":         { en: `flat`, it: `piatta` },
     "st.fuel":         { en: `Fuel per lap`, it: `Benzina al giro` },
@@ -589,8 +593,8 @@
                          it: `Guida un giro completo e <b>valido</b> in AC o ACC.` },
     "empty.step3":     { en: `Reload this page and your lap will be here, ready to analyse.`,
                          it: `Ricarica questa pagina e trovi qui il tuo giro da analizzare.` },
-    "empty.hint":      { en: `Just want a look? From the source, <code>python accoach_main.py web --demo</code> shows sample laps.`,
-                         it: `Vuoi solo dare un'occhiata? Dal sorgente, <code>python accoach_main.py web --demo</code> ti mostra giri di esempio.` },
+    "empty.hint":      { en: `Just want a look? In the HONE window, open <b>Drive</b> and press <b>Demo without a game</b>.`,
+                         it: `Vuoi solo dare un'occhiata? Nella finestra di HONE apri <b>In pista</b> e premi <b>Demo senza gioco</b>.` },
 
     // ---- analysis page (app.js injected) ----
     "load.lap":        { en: `Loading lap…`, it: `Caricamento giro…` },
@@ -604,9 +608,10 @@
 
     "prog.validLaps":  { en: `Valid laps`, it: `Giri validi` },
     "prog.best":       { en: `Best`, it: `Migliore` },
+    "cons.typical":    { en: `typical`, it: `tipico` },
     "prog.average":    { en: `Average`, it: `Media` },
-    "prog.spread":     { en: `Spread`, it: `Escursione` },
-    "prog.sigma":      { en: `σ`, it: `σ` },
+    "prog.spread":     { en: `Fastest to slowest lap`, it: `Dal giro più veloce al più lento` },
+    "prog.sigma":      { en: `Typical spread, all laps`, it: `Scarto tipico, tutti i giri` },
     "prog.dash":       { en: `—`, it: `—` },
     "prog.noValid":    { en: `no valid lap`, it: `nessun giro valido` },
 
@@ -661,7 +666,7 @@
     "kbd.lap":         { en: `[ and ] step through the laps`,
                          it: `[ e ] scorrono i giri` },
     "lbl.laps":        { en: `laps`, it: `giri` },
-    "sum.consistency": { en: `Consistency`, it: `Costanza` },
+    "sum.consistency": { en: `Typical spread over`, it: `Scarto tipico su` },
     "sum.setup_diff":  { en: `Setup differs`, it: `Setup diverso` },
     // Why the benchmark can be slower than your best lap. Braking points move
     // 10-20 m between a cold track and a hot one, so your evening PB is the
@@ -736,8 +741,10 @@
     "phase.after":     { en: `the run after`, it: `tratto dopo` },
 
     "debrief.title":   { en: `Where to improve`, it: `Dove migliorare` },
-    "debrief.clean":   { en: `Clean lap. No corner lost you enough time to flag.`,
-                         it: `Giro pulito. In nessuna curva hai perso abbastanza tempo da segnalarlo.` },
+    // Dice cosa guarda: un giro solo. La tabella sopra mostra anche le
+    // differenze piccole in rosso, e «Giro pulito» da solo la contraddiceva.
+    "debrief.clean":   { en: `On this lap no corner crosses the threshold for a tip. The table above also shows the small differences. For the whole session, open the Report card.`,
+                         it: `In questo giro nessuna curva supera la soglia per un consiglio. La tabella sopra mostra anche le differenze piccole. Per tutta la sessione apri la Pagella.` },
 
     "ro.pos":          { en: `Pos`, it: `Pos` },
     "ro.speed":        { en: `Speed`, it: `Velocità` },

@@ -207,11 +207,14 @@ def test_problem_names_the_corner_and_the_cost(lang):
 
 
 def test_problem_reads_like_the_approved_model():
+    # «giro di riferimento» e non «giro migliore» dal 24/10: nella stessa
+    # pagina «Migliore» era anche il migliore di oggi, e i due tempi non
+    # tornavano (prova di usabilita').
     assert problem("brake_early", "Variante Alta", 290, "ms", "it", metres=14) == (
-        "Variante Alta. Qui stacchi in media 14 metri prima del tuo giro migliore, "
+        "Variante Alta. Qui stacchi in media 14 metri prima del tuo giro di riferimento, "
         "e ci perdi 0,29 s a giro.")
     assert problem("brake_early", "Variante Alta", 290, "ms", "en", metres=14) == (
-        "Variante Alta. Here you brake 14 m earlier than your best lap on average, "
+        "Variante Alta. Here you brake 14 m earlier than your reference lap on average, "
         "and it costs you 0.29 s a lap.")
 
 
