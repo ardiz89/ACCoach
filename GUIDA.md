@@ -879,6 +879,10 @@ Qualche dettaglio pratico.
   (`Documenti/ACCoach/`) e riavvia HONE. I link vecchi smettono di funzionare.
 - Se **Windows** te lo chiede al primo avvio, consenti l'accesso su **reti
   private**.
+- Se la rete di casa è **Pubblica**, il tablet non entra. HONE non la cambia
+  da solo, perché una rete Privata allenta anche altre regole di Windows, la
+  condivisione dei file compresa. Per cambiarla lancia a mano
+  `tools\setup_firewall.ps1` e rispondi `y` alla domanda.
 - Per il **Report**, cioè i giri salvati, basta che l'analisi sia accesa. La
   pagina **Ingegnere** in tempo reale ha bisogno anche di Coach Live, o del
   Backend live se guidi senza overlay.

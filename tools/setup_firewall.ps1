@@ -6,8 +6,13 @@
     With `lan = true` the web and live servers bind 0.0.0.0, but Windows Firewall
     still drops inbound connections unless a rule allows them - the phone just
     hangs on a blank page. This script opens HONE's two ports for the local
-    subnet only, and moves the active network off the Public profile (which
-    blocks inbound by default, and which our Private-scoped rule never matches).
+    subnet only (Private and Domain profiles).
+
+    It never changes the network profile on its own. A Public network blocks
+    inbound by default and our Private-scoped rule never matches it, so a tablet
+    cannot connect there. Run by hand, the script offers to switch the network to
+    Private and asks first (the default answer is no): that also loosens every
+    other Private rule on the network, file sharing included.
 
     Rules are keyed on the ports, not on python.exe: the launcher spawns whatever
     interpreter it was started with, so a program rule would break every time the
@@ -15,12 +20,12 @@
 
     Run it by hand (right-click -> "Run with PowerShell") to set things up, or
     with -Auto from HONE.bat, which checks first and only asks for elevation when
-    something is actually missing.
+    the rule is missing.
 
 .PARAMETER Auto
     Startup mode: do nothing unless LAN mode is on AND the firewall is not already
-    set up. Never pauses, and never fails the caller - HONE must start even if the
-    user dismisses the elevation prompt.
+    set up. Never pauses, never changes the network profile, and never fails the
+    caller - HONE must start even if the user dismisses the elevation prompt.
 
 .PARAMETER Undo
     Remove the rule. Leaves the network profile as it is.
@@ -93,15 +98,16 @@ function Test-RuleReady {
     return -not (Compare-Object $have $want)
 }
 
-# A Private-scoped rule simply does not apply while the network is Public, so an
-# unfixed Public profile means we are not reachable even with the rule in place.
+# A Private-scoped rule simply does not apply while the network is Public, so a
+# Public profile means a tablet cannot connect even with the rule in place. We do
+# not fix that ourselves: see "network profile" below.
 $profilePublic = $netProfile -and $netProfile.NetworkCategory -eq 'Public'
 
 # --- startup gate ----------------------------------------------------------
 if ($Auto -and -not $Undo) {
     if (-not $lan) { exit 0 }            # local-only setup: nothing to open
     if (-not $route) { exit 0 }          # offline: no network to be reachable on
-    if ((Test-RuleReady) -and -not $profilePublic) { exit 0 }   # already good
+    if (Test-RuleReady) { exit 0 }       # already good; a Public profile alone is not worth a UAC prompt
     Write-Step 'HONE: LAN mode is on but this PC is not reachable from other devices yet.' 'Yellow'
     Write-Step 'Asking for admin rights once to open the ports (see the UAC prompt).' 'Yellow'
 }
@@ -150,13 +156,21 @@ Write-Host ("Network: {0} on {1} - IP {2}" -f $netProfile.Name, $netProfile.Inte
 Write-Host ''
 
 # --- network profile -------------------------------------------------------
-# Public blocks inbound by default and is meant for cafes/airports. A home or
-# paddock network you trust enough to stream telemetry over should be Private.
+# Public blocks inbound by default and is meant for cafes/airports. Moving a
+# network to Private also loosens every other Private rule on it (file sharing
+# included), so only the person at the keyboard decides - never -Auto.
 if ($profilePublic) {
     Write-Host ("'{0}' is set to Public, which blocks incoming connections." -f $netProfile.Name) -ForegroundColor Yellow
-    Write-Host 'Switching it to Private so trusted devices on this network can connect.'
-    Set-NetConnectionProfile -InterfaceIndex $route.ifIndex -NetworkCategory Private
-    Write-Host 'Network profile -> Private' -ForegroundColor Green
+    if (-not $Auto) {
+        Write-Host 'Private would let tablets in, but it also relaxes other rules on this network (file sharing included).'
+        $answer = Read-Host 'Switch this network to Private? [y/N]'
+        if ($answer -match '^[yY]$') {
+            Set-NetConnectionProfile -InterfaceIndex $route.ifIndex -NetworkCategory Private
+            Write-Host 'Network profile -> Private' -ForegroundColor Green
+        } else {
+            Write-Host 'Leaving the network on Public.'
+        }
+    }
 } elseif ($netProfile.NetworkCategory -eq 'DomainAuthenticated') {
     Write-Host 'Network is domain-joined; leaving its profile alone.'
 } else {
@@ -177,6 +191,10 @@ New-NetFirewallRule -DisplayName $RuleName `
 Write-Host ("Firewall rule '{0}' created: TCP {1} inbound, local subnet only." -f $RuleName, ($ports -join ', ')) -ForegroundColor Green
 
 # --- what to do next -------------------------------------------------------
+if ($profilePublic -and $Auto) {
+    Write-Host 'This network is Public, so tablets cannot connect yet.' -ForegroundColor Yellow
+    Write-Host 'To change that, run tools\setup_firewall.ps1 by hand.' -ForegroundColor Yellow
+}
 Write-Host ''
 if ($ip) {
     Write-Host 'Scan the QR codes in the Devices section, or open these on your phone:'
