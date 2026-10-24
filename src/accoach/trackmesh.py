@@ -39,6 +39,7 @@ Cosa NON fa, per scelta:
 from __future__ import annotations
 
 import math
+import os
 import re
 import struct
 from array import array
@@ -124,8 +125,21 @@ _PHYS_MESHES = 12
 
 
 class _Reader:
-    def __init__(self, f):
+    def __init__(self, f, size: int):
         self.f = f
+        self.size = size
+
+    def need(self, count: int, each: int) -> int:
+        """Controlla che ``count`` elementi da almeno ``each`` byte stiano nel
+        file, prima di allocare o saltare qualcosa.
+
+        Un kn5 e' un file di un altro: un conteggio da due miliardi in 93 byte
+        faceva allocare 17 GB e bloccava la lettura per 35 s. Cio' che non puo'
+        starci nei byte che restano e' un file rotto, non un file grande.
+        """
+        if count < 0 or count * each > self.size - self.f.tell():
+            raise ValueError(f"{count} elementi non stanno nel file: non e' un kn5")
+        return count
 
     def i(self) -> int:
         return struct.unpack("<i", self.f.read(4))[0]
@@ -158,49 +172,53 @@ def _walk(path: Path, collect: bool):
     "dammi la strada" con due funzioni diverse vorrebbe dire due parser.
     """
     with path.open("rb") as f:
-        r = _Reader(f)
+        r = _Reader(f, os.fstat(f.fileno()).st_size)
         if f.read(6) != _MAGIC:
             return None
         ver = r.i()
         if ver > 5:
             r.i()
-        for _ in range(r.i()):                      # texture
+        for _ in range(r.need(r.i(), 12)):          # texture
             r.i(); r.s()
-            f.seek(r.i(), 1)
-        for _ in range(r.i()):                      # materiali
+            f.seek(r.need(r.i(), 1), 1)
+        for _ in range(r.need(r.i(), 14)):          # materiali
             r.s(); r.s(); f.read(2)
             if ver > 4:
                 r.i()
-            for _ in range(r.i()):
+            for _ in range(r.need(r.i(), 44)):
                 r.s(); f.read(4 + 8 + 12 + 16)
-            for _ in range(r.i()):
+            for _ in range(r.need(r.i(), 12)):
                 r.s(); r.i(); r.s()
 
         named = total = 0
         out = {cls: array("f") for cls in _CLASSES}
-        todo = [None]
+        # Un contatore, non una lista di segnaposto: i figli dichiarati da un
+        # file rotto non devono costare memoria prima di essere letti.
+        todo = 1
         while todo:
-            todo.pop()
+            todo -= 1
             ntype = r.i()
             name = r.s()
-            nchild = r.i()
+            nchild = r.need(r.i(), 13)              # un nodo pesa almeno 13 byte
             f.read(1)
             if ntype == 1:
                 f.read(64)
             elif ntype in (2, 3):
                 f.read(3)
                 if ntype == 3:
-                    for _ in range(r.i()):
+                    for _ in range(r.need(r.i(), 68)):
                         r.s(); f.read(64)
-                nv = r.i()
+                nv = r.need(r.i(), _VERTEX)
                 total += 1
                 cls = _class_of(name)
                 if cls:
                     named += 1
                 if collect and cls:
                     blob = f.read(nv * _VERTEX)
-                    ni = r.i()
+                    ni = r.need(r.i(), 2)
                     idx = struct.unpack(f"<{ni}H", f.read(ni * 2))
+                    if idx and max(idx) >= nv:
+                        raise ValueError("indice di vertice fuori misura: non e' un kn5")
                     # Solo pianta: la terza dimensione e' la quota, e la strada
                     # si guarda da sopra.
                     vs = [struct.unpack_from("<3f", blob, k * _VERTEX) for k in range(nv)]
@@ -210,7 +228,7 @@ def _walk(path: Path, collect: bool):
                             dst.append(vs[k][0]); dst.append(vs[k][2])
                 else:
                     f.seek(nv * _VERTEX, 1)
-                    ni = r.i()
+                    ni = r.need(r.i(), 2)
                     f.seek(ni * 2, 1)
                 r.i(); f.read(12)
                 if ntype == 2:
@@ -218,15 +236,20 @@ def _walk(path: Path, collect: bool):
                     f.read(1)
             else:
                 raise ValueError(f"nodo di tipo {ntype} a {name!r}")
-            todo.extend([None] * nchild)
+            todo += nchild
         return {"named": named, "total": total, "tris": out}
+
+
+#: Cosa puo' uscire dalla lettura di un file che non si e' scritto noi. Il
+#: ``MemoryError`` e l'``IndexError`` sono il file che mente sulle misure.
+_ILLEGGIBILE = (OSError, ValueError, struct.error, MemoryError, IndexError)
 
 
 def is_physics_model(path: Path) -> bool:
     """Questo kn5 descrive superfici, o e' quello che si guarda?"""
     try:
         got = _walk(path, collect=False)
-    except (OSError, ValueError, struct.error):
+    except _ILLEGGIBILE:
         return False
     return bool(got) and got["named"] >= _PHYS_MESHES
 
@@ -270,7 +293,10 @@ def _loaded(track: str) -> dict | None:
     key = (track or "").lower()
     if key not in _cache:
         path = physics_model(track)
-        got = _walk(path, collect=True) if path else None
+        try:
+            got = _walk(path, collect=True) if path else None
+        except _ILLEGGIBILE:
+            got = None                  # un file rotto vale come nessun file
         if not got:
             _cache[key] = None
         else:

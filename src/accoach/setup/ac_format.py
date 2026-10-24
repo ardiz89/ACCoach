@@ -64,6 +64,19 @@ AC_PARAMS: tuple[AcSpec, ...] = (
 )
 
 
+def _as_click(text: str, section: str) -> int:
+    """Il VALUE di una sezione come intero, o un errore dell'assetto.
+
+    ``float("1e400")`` e' infinito e ``int(round(inf))`` solleva un
+    ``OverflowError``; ``nan`` e un testo qualsiasi un ``ValueError``. Nessuno
+    dei due e' una risposta sensata a un file scaricato da internet.
+    """
+    try:
+        return int(round(float(text)))
+    except (ValueError, OverflowError) as e:
+        raise AcSetupError(f"valore non numerico in [{section}]") from e
+
+
 @dataclass
 class AcSetup:
     """An AC ``.ini`` setup with the same access surface as :class:`AccSetup`."""
@@ -119,7 +132,7 @@ class AcSetup:
         cell = self._value_cell(spec.sections[slot])
         if cell is None:
             raise AcSetupError(f"sezione assente: {spec.sections[slot]}")
-        return int(round(float(cell[1])))
+        return _as_click(cell[1], spec.sections[slot])
 
     def set_click(self, spec: AcSpec, slot: int, value: int) -> None:
         if not 0 <= slot < len(spec.sections):
@@ -169,7 +182,15 @@ def loads(text: str) -> AcSetup:
             cur.append([k.strip(), v.strip()])
     if not sections:
         raise AcSetupError("file non è un setup AC (.ini)")
-    return AcSetup(sections=sections, path=None)
+    setup = AcSetup(sections=sections, path=None)
+    # Si leggono tutti i valori noti adesso, cosi' un `1e400` rompe il caricamento
+    # (404 «illeggibile») e non la prima pagina che prova a mostrarlo.
+    for spec in AC_PARAMS:
+        for sec in spec.sections:
+            cell = setup._value_cell(sec)
+            if cell is not None:
+                _as_click(cell[1], sec)
+    return setup
 
 
 def load(path: Path | str) -> AcSetup:

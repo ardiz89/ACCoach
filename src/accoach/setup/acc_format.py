@@ -16,6 +16,7 @@ Only the *click* value is authoritative. Physical numbers are advisory.
 from __future__ import annotations
 
 import json
+import math
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -151,6 +152,45 @@ class SetupError(ValueError):
     """Raised when a setup document is malformed or a parameter is missing."""
 
 
+def _whole(v: Any) -> bool:
+    """Un click: un intero, o un float che e' un intero. Mai un booleano."""
+    if isinstance(v, bool):
+        return False
+    if isinstance(v, int):
+        return True
+    return isinstance(v, float) and math.isfinite(v) and v == int(v)
+
+
+def _check(raw: dict) -> None:
+    """Rifiuta subito un setup i cui parametri noti non sono numeri interi.
+
+    Il file arriva da internet: un `"tyrePressure": ["x"]` o un `1e400`
+    passavano il caricamento e facevano esplodere la prima lettura, lontano da
+    qui e con un 500. Qui l'errore e' del file e si dice col suo nome.
+    """
+    for spec in SETUP_PARAMS:
+        node: Any = raw
+        for k in spec.path:
+            node = node.get(k) if isinstance(node, dict) else None
+        if not isinstance(node, dict) or spec.key not in node:
+            continue                        # assente: lo dice `present`
+        val = node[spec.key]
+        leaves = val if isinstance(val, list) else [val]
+        if not all(_whole(x) for x in leaves):
+            raise SetupError(f"valore non intero per {spec.key}")
+
+
+def _parse(text: str) -> dict:
+    try:
+        raw = json.loads(text)
+    except RecursionError as e:             # JSON annidato centomila volte
+        raise SetupError("JSON troppo annidato") from e
+    if not isinstance(raw, dict) or "basicSetup" not in raw:
+        raise SetupError("non sembra un setup ACC")
+    _check(raw)
+    return raw
+
+
 @dataclass
 class AccSetup:
     """An ACC setup document with convenient click-level read/adjust access."""
@@ -261,17 +301,14 @@ def load(path: Path | str) -> AccSetup:
     """Load an ACC setup ``.json`` from disk."""
     path = Path(path)
     try:
-        raw = json.loads(path.read_text(encoding="utf-8"))
+        raw = _parse(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as e:
         raise SetupError(f"invalid JSON in {path.name}: {e}") from e
-    if not isinstance(raw, dict) or "basicSetup" not in raw:
-        raise SetupError(f"{path.name} non sembra un setup ACC")
+    except SetupError as e:
+        raise SetupError(f"{path.name}: {e}") from e
     return AccSetup(raw=raw, path=path)
 
 
 def loads(text: str) -> AccSetup:
     """Parse an ACC setup from a JSON string (handy for tests)."""
-    raw = json.loads(text)
-    if not isinstance(raw, dict) or "basicSetup" not in raw:
-        raise SetupError("testo non è un setup ACC")
-    return AccSetup(raw=raw, path=None)
+    return AccSetup(raw=_parse(text), path=None)
