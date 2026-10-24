@@ -174,6 +174,17 @@ def err_slot_invalid(slot, key: str, lang: str | None = None) -> str:
     return f"“{slot}” is not a valid position for “{key}”."
 
 
+def err_bad_name(name: str, lang: str | None = None) -> str:
+    """Un nome che `store.valid_name` rifiuta. La pagina mostra il testo così com'è."""
+    if _is_it(lang):
+        return (f"«{name}» non si può usare come nome di un assetto. "
+                "Togli \ / : * ? \" < > | e il punto finale, "
+                "ed evita nomi riservati di Windows come CON o NUL.")
+    return (f"“{name}” can't be used as a setup name. "
+            "Remove \ / : * ? \" < > | and any trailing dot, "
+            "and avoid Windows reserved names such as CON or NUL.")
+
+
 def err_needs_value(param: str, lang: str | None = None) -> str:
     if _is_it(lang):
         return f"Per «{param}» indica delta_clicks oppure value."

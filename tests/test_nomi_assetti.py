@@ -106,3 +106,26 @@ def test_seed_con_as_name_non_scrivibile_e_400_e_non_scrive(tmp_path, nome):
                                         "as_name": nome})
     assert r.status_code == 400, f"{nome!r}: {r.status_code} {r.text}"
     assert _file_sotto(tmp_path) == prima
+
+
+# Il 24/10, in prova sul PC: con la pagina in italiano un nome rifiutato
+# rispondeva «not a plain setup name: 'CON'», e la pagina lo mostra così com'è.
+@pytest.mark.parametrize("rotta", ["apply", "seed"])
+def test_nome_rifiutato_si_spiega_nella_lingua_della_pagina(tmp_path, rotta):
+    c, path = _client(tmp_path)
+    if rotta == "apply":
+        corpo = {"path": path, "as_name": "CON", "confirm": True,
+                 "changes": [{"param": "rearWing", "delta_clicks": -1}]}
+    else:
+        corpo = {"source": path, "track": "monza", "as_name": "CON"}
+    it = c.post(f"/api/setup/{rotta}?lang=it", json=corpo)
+    en = c.post(f"/api/setup/{rotta}?lang=en", json=corpo)
+    assert it.status_code == en.status_code == 400
+    assert it.json()["detail"] == (
+        "«CON» non si può usare come nome di un assetto. "
+        "Togli \ / : * ? \" < > | e il punto finale, "
+        "ed evita nomi riservati di Windows come CON o NUL.")
+    assert en.json()["detail"] == (
+        "“CON” can't be used as a setup name. "
+        "Remove \ / : * ? \" < > | and any trailing dot, "
+        "and avoid Windows reserved names such as CON or NUL.")

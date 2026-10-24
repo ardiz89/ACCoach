@@ -583,6 +583,10 @@ _UI: dict[str, dict[str, str]] = {
                         "it": "Il nome non può contenere < o >."},
     "marks.forbidden": {"en": "The reference can't contain < or >.",
                         "it": "Il riferimento non può contenere < o >."},
+    # La fascia della modalità demo sulle pagine che non caricano i18n.js
+    # (oggi solo /test): le altre usano `demo.banner` del catalogo JS.
+    "demo.bannerPlain": {"en": "Demo mode. Laps and alerts here are samples.",
+                         "it": "Modalità demo. Giri e avvisi qui sono di esempio."},
 }
 
 

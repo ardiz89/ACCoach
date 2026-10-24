@@ -2491,8 +2491,15 @@ def create_api(
                 f'<script nonce="{nonce}">window.HONE_LANG = "{lang}";</script>\n'
                 '  <script src="/static/i18n.js">', 1)
         if demo:
-            banner = ('<div class="demo-banner" data-i18n="demo.banner">'
-                      'These are sample laps made by HONE, not yours.</div>')
+            if '/static/i18n.js' in html:
+                banner = ('<div class="demo-banner" data-i18n="demo.banner">'
+                          'These are sample laps made by HONE, not yours.</div>')
+            else:
+                # /test e' solo in italiano e non carica i18n.js: la fascia si
+                # scrive qui, nella lingua della pagina.
+                m = re.search(r'<html lang="([a-z]{2})"', html)
+                testo = tr_ui("demo.bannerPlain", m.group(1) if m else "en")
+                banner = f'<div class="demo-banner">{testo}</div>'
             html = html.replace("<body>", '<body class="demo-mode">\n' + banner, 1)
         return Response(content=html, media_type="text/html",
                         headers={"Cache-Control": "no-cache",

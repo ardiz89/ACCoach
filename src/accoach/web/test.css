@@ -129,3 +129,11 @@ dialog h3 { margin-top:0; }
   .verdicts { grid-template-columns:1fr 1fr; }
   .card h2 { font-size:1.5rem; }
 }
+
+/* La fascia della modalità demo, iniettata dal server (vedi style.css). */
+.demo-banner {
+  position: sticky; top: 0; z-index: 100;
+  background: #FFB020; color: #1A1205;
+  text-align: center; font-weight: 700; font-size: 13px;
+  letter-spacing: .04em; padding: 6px 12px;
+}

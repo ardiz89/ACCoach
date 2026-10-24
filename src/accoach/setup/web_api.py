@@ -21,6 +21,7 @@ from .acc_format import slot_labels
 from .diff import diff
 from .labels import (
     canonical_slot,
+    err_bad_name,
     err_needs_value,
     err_slot_invalid,
     err_slot_out_of_range,
@@ -241,7 +242,7 @@ def register_setup_routes(app: FastAPI, root=DEFAULT_ROOTS) -> None:
         return out
 
     @app.post("/api/setup/seed")
-    def setup_seed(body: SeedBody) -> dict:
+    def setup_seed(body: SeedBody, lang: str | None = Query(None)) -> dict:
         """Copy a setup of the same car into ``track``, creating the folder.
 
         This is what a real engineer does arriving at a circuit with nothing on
@@ -273,8 +274,8 @@ def register_setup_routes(app: FastAPI, root=DEFAULT_ROOTS) -> None:
             out = save(setup, dest_dir, name, overwrite=False)
         except FileExistsError as e:
             raise HTTPException(409, str(e))
-        except ValueError as e:      # as_name non e' un nome: vedi `store.save`
-            raise HTTPException(400, str(e))
+        except ValueError:           # as_name non e' un nome: vedi `store.save`
+            raise HTTPException(400, err_bad_name(name, lang))
         return {"ok": True, "path": str(out), "name": out.stem,
                 "car": dest_dir.parent.name, "track": dest_dir.name,
                 "from_track": src.parent.name, "from_name": src.stem}
@@ -391,8 +392,8 @@ def register_setup_routes(app: FastAPI, root=DEFAULT_ROOTS) -> None:
             out = save(after, p.parent, body.as_name, overwrite=body.overwrite)
         except FileExistsError as e:
             raise HTTPException(409, str(e))
-        except ValueError as e:      # as_name non e' un nome: vedi `store.save`
-            raise HTTPException(400, str(e))
+        except ValueError:           # as_name non e' un nome: vedi `store.save`
+            raise HTTPException(400, err_bad_name(body.as_name, lang))
         last_written[(out.parent.parent.name.lower(),
                       out.parent.name.lower())] = out
         return {

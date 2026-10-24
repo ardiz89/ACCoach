@@ -1,4 +1,6 @@
 """api: REST endpoints over the saved-lap store."""
+from pathlib import Path
+
 from fastapi.testclient import TestClient
 
 from accoach.api import create_api
@@ -453,3 +455,15 @@ def test_web_no_browser_serves_without_opening_a_tab(monkeypatch):
     opened, served = _run_web_main(monkeypatch, ["--no-browser"],
                                    port_busy=True)
     assert opened == [] and served == []
+
+
+def test_demo_banner_on_the_test_page_speaks_its_language(tmp_path):
+    # /test carica solo test.css e niente i18n.js, ed e' una pagina in
+    # italiano: la fascia restava in inglese e senza stile (prova del 24/10).
+    _seed(tmp_path)
+    html = TestClient(create_api(tmp_path, demo=True)).get("/test").text
+    assert ('<div class="demo-banner">'
+            "Modalità demo. Giri e avvisi qui sono di esempio.</div>") in html
+    css = (Path(__file__).resolve().parent.parent
+           / "src" / "accoach" / "web" / "test.css").read_text(encoding="utf-8")
+    assert ".demo-banner" in css
