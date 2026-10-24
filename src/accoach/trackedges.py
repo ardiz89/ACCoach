@@ -235,6 +235,9 @@ def spline_path(track: str) -> Path | None:
     root = tracks_dir()
     if root is None or not track:
         return None
+    # Il nome arriva da un file di giro: non deve poter risalire.
+    if any(ch in track for ch in "/\\:") or track in (".", ".."):
+        return None
     # Lap files carry the folder name the sim reported, but not always its case.
     folder = root / track
     if not folder.is_dir():

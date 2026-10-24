@@ -17,6 +17,7 @@ this layer just puts a correct file in the right place.
 from __future__ import annotations
 
 import os
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -30,6 +31,26 @@ DEFAULT_ROOTS = (SETUPS_ROOT, AC_SETUPS_ROOT)
 
 _BACKUP_DIR = ".accoach_backup"
 _SETUP_GLOBS = ("*.json", "*.ini")
+
+
+# Nomi che Windows riserva ai dispositivi: valgono anche con un'estensione
+# (`CON.json` apre la console, non un file).
+_DEVICE_NAME = re.compile(r"(?i)(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(\..*)?")
+_BAD_CHARS = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
+
+
+def valid_name(name: str) -> bool:
+    """Un nome che Windows sa scrivere come file, e che non e' un percorso.
+
+    Si rifiuta solo quello che Windows non scrive, non tutto cio' che non e'
+    ASCII: un assetto puo' chiamarsi «Monza qualifica è». Su Linux `a*b` e'
+    un nome valido, ma lo stesso setup copiato su Windows non si aprirebbe.
+    """
+    if name in ("", ".", ".."):
+        return False
+    if _BAD_CHARS.search(name) or name[-1] in ". ":
+        return False
+    return not _DEVICE_NAME.fullmatch(name)
 
 
 def car_track_dir(car: str, track: str, root: Path | str = SETUPS_ROOT) -> Path:
@@ -101,8 +122,9 @@ def save(
     # I separatori sono elencati a mano, tutti e due, invece di chiedere a
     # `Path`: su Linux `sub\\x` e' un nome di file valido, e lo stesso setup
     # copiato su Windows diventerebbe un percorso. I due punti chiudono anche
-    # `C:nome` e i flussi alternativi di NTFS.
-    if name in ("", ".", "..") or any(ch in name for ch in "/\\:"):
+    # `C:nome` e i flussi alternativi di NTFS; il resto dell'elenco sta in
+    # `valid_name`.
+    if not valid_name(name):
         raise ValueError(f"not a plain setup name: {name!r}")
     ext = "." + getattr(setup, "ext", "json")
     if not name.endswith(ext):

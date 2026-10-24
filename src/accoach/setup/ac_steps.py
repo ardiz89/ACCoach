@@ -80,6 +80,9 @@ def cars_dir() -> Path | None:
 
 
 def _car_folder(root: Path, car_model: str) -> Path | None:
+    # Come `spline_path`: il nome dell'auto viene dal gioco, non puo' risalire.
+    if any(ch in car_model for ch in "/\\:") or car_model in (".", ".."):
+        return None
     folder = root / car_model
     if folder.is_dir():
         return folder

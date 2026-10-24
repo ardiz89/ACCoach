@@ -295,7 +295,11 @@ def _prune(d: Path, gone: list[str], manifest: dict, sidecar: dict) -> None:
         f = manifest.pop(t, None)
         sidecar.pop(t, None)
         if f and f not in keep_files:
-            (d / f).unlink(missing_ok=True)
+            # Il manifest e' un file su disco: un nome con `../` non deve
+            # cancellare fuori dalla cartella delle voci.
+            target = d / Path(f).name
+            if target.resolve().parent == d.resolve():
+                target.unlink(missing_ok=True)
     _write_json(d / "manifest.json", manifest)
     _write_json(d / "render.json", sidecar)
 

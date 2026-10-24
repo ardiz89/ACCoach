@@ -29,6 +29,7 @@ from .labels import (
     tr,
 )
 from .loader import load_any
+from . import store
 from .store import DEFAULT_ROOTS, car_track_dir, latest_backup, list_setups, save
 
 
@@ -69,6 +70,10 @@ class SeedBody(BaseModel):
 def _safe(path: str | Path, roots: list[Path]) -> Path:
     """Resolve ``path`` and ensure it stays under one of ``roots`` (no escapes)."""
     p = Path(path).resolve()
+    # Le copie di sicurezza non sono setup: da `apply`/`seed` sarebbero una
+    # destinazione, da `current`/`preview` una sorgente che nessun editor usa.
+    if store._BACKUP_DIR in p.parts:
+        raise HTTPException(403, "path outside the setup folders")
     for root in roots:
         try:
             p.relative_to(root.resolve())
@@ -166,8 +171,9 @@ def _diff_payload(changes, lang: str | None = None) -> list[dict]:
 def _load(path: Path):
     try:
         return load_any(path)
-    except (OSError, ValueError) as e:
-        raise HTTPException(404, f"setup unreadable: {e}")
+    except (OSError, ValueError):
+        # Solo il nome del file: l'eccezione porterebbe la cartella di casa.
+        raise HTTPException(404, f"setup unreadable: {Path(path).name}")
 
 
 # --- registration ----------------------------------------------------------
