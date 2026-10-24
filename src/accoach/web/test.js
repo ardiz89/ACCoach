@@ -41,8 +41,8 @@
     saved: "Salvato",
     saveError: "Il PC ha risposto con un errore.",
     saveFull: "Il PC tiene già 200 prove salvate e non ne accetta altre. " +
-              "Cancella i file vecchi dalla cartella test_runs, dentro la " +
-              "cartella dati di HONE. Intanto i risultati restano sul tablet.",
+              "Cancella i file vecchi dalla cartella test_runs, accanto alla " +
+              "cartella dei giri. Intanto i risultati restano sul tablet.",
     saveFailed: "Il salvataggio non è riuscito.",
     noCue: "Nessun avviso",
     tour1t: "Dimmi cosa stai provando",

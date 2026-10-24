@@ -71,8 +71,9 @@ string in the release notes. If they differ, **don't run the file**, and
 download it again from the official Releases page.
 
 If you have the GitHub CLI and are logged in to GitHub (`gh auth login`), the
-release notes also give a `gh attestation verify` command. It tells you whether the zip was built by this repository's
-release workflow on GitHub, not only that it matches the published one.
+release notes also give a `gh attestation verify` command. It tells you
+whether the zip was built by this repository's release workflow on GitHub,
+not only that it matches the published one.
 
 ### Privacy
 
@@ -940,8 +941,8 @@ A few practical details.
   Network & internet > Wi-Fi** (or **Ethernet**), open your network and choose
   **Private network**. If you start HONE from `HONE.bat`, you can also run
   `tools\setup_firewall.ps1` by hand and answer `y` to the question.
-- The `/test` page saves its results on the PC, in the `test_runs` folder of
-  HONE's data, and keeps 200 runs at most. If the page tells you it is full,
+- The `/test` page saves its results on the PC, in the `test_runs` folder next
+  to your laps folder, and keeps 200 runs at most. If the page tells you it is full,
   delete old files from that folder. The results stay on the tablet meanwhile.
 - For the **Report**, which shows your saved laps, the analysis only has to be
   running. The live **Engineer** page also needs Coach Live, or the Live backend
