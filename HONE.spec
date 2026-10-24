@@ -35,8 +35,8 @@ exe = EXE(
     bootloader_ignore_signals=False,
     strip=False,
     # UPX spento qui e nel COLLECT: un EXE e delle DLL compressi da un packer
-    # sono quello che gli antivirus segnalano per primo, e il file attestato
-    # dalla release deve essere quello che gira, non uno da scompattare.
+    # sono quello che gli antivirus segnalano per primo, anche quando il file
+    # e' pulito. Si evitano i falsi positivi, non c'entra la provenienza.
     upx=False,
     console=False,
     disable_windowed_traceback=False,

@@ -147,7 +147,7 @@ def test_publish_solo_sui_tag_e_con_attestazione():
 
 def test_upx_spento_nello_spec():
     # UPX comprime l'EXE e le DLL con un packer: gli antivirus lo leggono come
-    # un segnale di malware, e il file che firmiamo non e' quello che gira.
+    # un segnale di malware e segnalano anche un file pulito (falsi positivi).
     testo = SPEC.read_text(encoding="utf-8")
     valori = re.findall(r"\bupx\s*=\s*(\w+)", testo)
     assert valori == ["False", "False"], valori

@@ -89,6 +89,10 @@ def redact_home(text: str, home: Path | None = None) -> str:
     if len(parts) < 2:   # una radice («C:\») non e' una casa: sostituirla romperebbe il log
         return text
     pattern = _SEP.join(re.escape(x) for x in parts)
+    if re.match(r"[\\/]{2}", str(home)):
+        # Una casa di rete comincia con le sue due barre: se restano fuori dal
+        # pezzo sostituito, il segnaposto esce con una barra davanti.
+        pattern = _SEP + pattern
     return re.sub(pattern + r"(?![\w\-]|\.\w)", lambda _m: HOME_PLACEHOLDER, text,
                   flags=re.IGNORECASE)
 
@@ -265,10 +269,12 @@ def _disclosure(has_logs: bool) -> list[str]:
     La versione precedente diceva «No paths, machine name or account details are
     included»: vera del file che la conteneva, **falsa del pacchetto in cui quel
     file vive**. Accanto c'e' ``logs/accoach.log``, che i percorsi assoluti col
-    nome dell'account Windows li ha eccome. Non li filtriamo, ed e' una scelta:
-    un log ripulito non diagnostica niente, e una censura invisibile sarebbe
-    peggio del percorso. Ma allora va detto, e vanno tenute distinte le due
-    cose — cosa questo file lascia fuori, e cosa gli allegati portano dentro.
+    nome dell'account Windows li ha eccome. Oggi di quei percorsi si sostituisce
+    solo la cartella di casa, con ``%USERPROFILE%``, e il resto dei log resta
+    com'e' per scelta: un log ripulito non diagnostica niente, e una censura
+    invisibile sarebbe peggio del resto. Ma allora va detto, e vanno tenute
+    distinte le due cose, cioe' cosa questo file lascia fuori e cosa gli
+    allegati portano dentro.
 
     L'avviso sui log compare solo se dei log ci sono davvero: avvisare di
     allegati che non esistono sarebbe una formula di copertura, non una
@@ -296,8 +302,9 @@ def _disclosure(has_logs: bool) -> list[str]:
             "  filtered - a log with the interesting parts taken out diagnoses",
             "  nothing.",
             "  Those files carry, at least: all the other paths, and any network",
-            "  location you configured; one dated line for every single time you started",
-            "  HONE, which together are a record of when you sat down to drive,",
+            "  location you configured; one dated line for every single time you",
+            "  started HONE, which together are a record of when you sat down to",
+            "  drive,",
             "  going back as far as your oldest log; your lap times, and the",
             "  tracks and cars you drove; the names of files you opened; and",
             "  crash reports, each with a full traceback, the paths of our",
@@ -333,15 +340,15 @@ def short_notice(zip_path: Path | str) -> str:
     except (OSError, zipfile.BadZipFile):
         has_logs = False
     if not has_logs:
-        return ("Nothing was attached: there were no log files to collect.\n"
+        return ("Nothing was attached, because there were no log files to collect.\n"
                 f"{CONTEXT_NAME} inside says as much.")
     return (
-        f"Inside, logs/ goes in unfiltered, except that your home folder is\n"
-        f"replaced by {HOME_PLACEHOLDER}: the other paths, one dated line for\n"
-        "every time you started HONE, your lap times,\n"
+        "Inside, logs/ goes in unfiltered, except that your home folder is\n"
+        f"replaced by {HOME_PLACEHOLDER}. Everything else stays, such as the other\n"
+        "paths, one dated line for every time you started HONE, your lap times,\n"
         "the tracks and cars you drove, and crash reports with full tracebacks.\n"
-        f"Read {CONTEXT_NAME} in the zip for the whole list - and the zip\n"
-        "itself, before you send it."
+        f"Read {CONTEXT_NAME} in the zip for the whole list, and read the zip\n"
+        "itself before you send it."
     )
 
 

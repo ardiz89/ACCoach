@@ -66,7 +66,7 @@ tools/.dl/
 *elevenlabs*key*
 
 # La configurazione vera del pilota sta in ~/Documents/ACCoach a runtime.
-config.toml
+/config.toml
 
 # Archivi locali (storico giri, cache): dati personali, mai sorgente.
 *.db

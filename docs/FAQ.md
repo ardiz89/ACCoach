@@ -70,8 +70,8 @@ Use the name of the zip you actually downloaded. Compare the result with the
 string in the release notes. If they differ, **don't run the file**, and
 download it again from the official Releases page.
 
-If you have the GitHub CLI, the release notes also give a `gh attestation
-verify` command. It tells you whether the zip was built by this repository's
+If you have the GitHub CLI and are logged in to GitHub (`gh auth login`), the
+release notes also give a `gh attestation verify` command. It tells you whether the zip was built by this repository's
 release workflow on GitHub, not only that it matches the published one.
 
 ### Privacy
@@ -1091,7 +1091,7 @@ home folder, where your Windows account name lives, is replaced by
   files and whatever value the error carried with it.
 
 We leave all of it in on purpose. A log with the interesting parts taken out
-can't diagnose anything, and quietly censoring one would be worse than the path.
+can't diagnose anything, and quietly censoring one would be worse than the rest.
 The zip is an ordinary file on your disk, and `contesto.txt` inside it says this
 too. From the source, the command also prints it when it finishes. Open it and
 look before you send it.

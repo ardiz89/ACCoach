@@ -594,3 +594,21 @@ def test_la_dichiarazione_dice_che_la_casa_e_sostituita(tmp_path):
                               source=_con_tutto_dentro(tmp_path))
     assert "%USERPROFILE%" in _contesto(z)
     assert "%USERPROFILE%" in support.short_notice(z)
+
+
+def test_una_casa_di_rete_diventa_il_segnaposto_senza_barre_in_piu():
+    """Una casa di rete inizia con due barre che il conto dei pezzi non vede: il
+    risultato era una barra davanti al segnaposto, col server sparito."""
+    h = Path(r"\\srv\share\x")
+    r = support.redact_home
+    assert r(r"\\srv\share\x\log.txt", h) == "%USERPROFILE%\\log.txt"
+    assert r(r"aperto \\srv\share\x", h) == "aperto %USERPROFILE%"
+    assert r(r"\\srv\share\xy", h) == r"\\srv\share\xy"
+
+
+def test_una_radice_o_una_casa_vuota_non_si_sostituisce():
+    """Sostituire la radice del disco romperebbe ogni percorso del log: la
+    guardia deve lasciare il testo com'e'."""
+    testo = r"C:\Users\pilot\x e D:\giochi"
+    assert support.redact_home(testo, Path("C:\\")) == testo
+    assert support.redact_home(testo, Path("")) == testo
