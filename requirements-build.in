@@ -1,0 +1,4 @@
+# Sorgente del lock della release: le righe di requirements.txt piu' pyinstaller.
+# Non si installa da qui: si rigenera requirements.lock (vedi la sua testa).
+-r requirements.txt
+pyinstaller

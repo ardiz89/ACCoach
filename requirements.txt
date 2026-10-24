@@ -1,3 +1,7 @@
+# Il lock con versioni e impronte (3.12, quello della release e della CI) sta in
+# requirements.lock; si rigenera da requirements-build.in col comando in testa.
+# Qui restano i pavimenti: HONE.bat e il giro 3.11 della CI installano da qui.
+
 # Core
 rich>=13.7        # terminal dashboard / live data visualization
 pyttsx3>=2.90     # offline TTS for voice coaching (optional; text fallback if absent)
