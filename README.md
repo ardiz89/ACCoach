@@ -13,7 +13,7 @@ and — the part nobody else does — **why**, says it out loud and on a glancea
 overlay, then breaks the lap down corner by corner afterwards and, when you want,
 rewrites your car setup lap after lap.
 
-> 🏁 Free and complete today. Everything runs on your PC: no account, no cloud,
+> Free to use and complete today. Everything runs on your PC: no account, no cloud,
 > nothing leaves your machine.
 
 <!-- TODO: "wow" GIF here — overlay + voice through a lap, then the debrief's "why". -->
@@ -45,18 +45,18 @@ on you at once.
 
 ## What it does
 
-- 🎙️ **Live voice coach** — the single most useful call at the right moment, never
+- **Live voice coach** — the single most useful call at the right moment, never
   talking over itself. Lock-ups and wheelspin flagged instantly.
-- 📺 **On-screen overlay** — delta bar, predicted time, the current cue and the
+- **On-screen overlay** — delta bar, predicted time, the current cue and the
   focus you're working on, over the game (Borderless mode).
-- 🔧 **Race engineer** — concrete setup advice, one lever at a time, with a
+- **Race engineer** — concrete setup advice, one lever at a time, with a
   convergence loop and tyre/pressure/electronics management.
-- 🧠 **Focus / Lesson** — one weakness at a time, trained with measured praise
+- **Focus / Lesson** — one weakness at a time, trained with measured praise
   ("Turn 4: from 0.30s to 0.07s").
-- 📊 **Analysis web app** — traces, sectors, track map, the "why" debrief, trend
+- **Analysis web app** — traces, sectors, track map, the "why" debrief, trend
   over time, multi-level benchmarking (your best → theoretical ideal → PRO) and
   **systematic** vs **sporadic** weaknesses.
-- 🗣️ **Post-session debrief** — your worst corners, the cause of each, your
+- **Post-session debrief** — your worst corners, the cause of each, your
   consistency.
 
 ## Quick start
@@ -108,6 +108,9 @@ HONE is **100% offline**. Telemetry, recorded laps, analysis and voice all stay 
 your PC. No account, no network calls, nothing sent to third parties. Laps live in
 `Documents\ACCoach\`. Details in the [FAQ](docs/FAQ.md#privacy).
 
+To report a security problem, see [SECURITY.md](SECURITY.md). What changes
+from one release to the next is in [CHANGELOG.md](CHANGELOG.md).
+
 ## Free vs Pro
 
 HONE follows a **one-time freemium** model — no subscription. Everything is free
@@ -115,11 +118,11 @@ today while the product matures with the community.
 
 | | Free | Pro (coming) |
 |---|---|---|
-| Voice coach + overlay | ✅ | ✅ |
-| "Why" debrief + analysis web app | ✅ | ✅ |
-| Race engineer (setup AI) | | ✅ |
-| Focus / Lesson (training plan) | | ✅ |
-| Importable PRO references | | ✅ |
+| Voice coach + overlay | ✓ | ✓ |
+| "Why" debrief + analysis web app | ✓ | ✓ |
+| Race engineer (setup AI) | | ✓ |
+| Focus / Lesson (training plan) | | ✓ |
+| Importable PRO references | | ✓ |
 
 > Pro will be a one-time purchase, not a subscription. The model may change before
 > launch — community feedback counts.

@@ -1,0 +1,64 @@
+name: Bug report
+description: Something in HONE doesn't work as it should.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time. One problem per report, please.
+        If it's a security issue, don't open an issue: see SECURITY.md.
+  - type: input
+    id: version
+    attributes:
+      label: HONE version
+      description: The release name, or the commit if you run from source.
+      placeholder: v0.1.0, or 4a224b4
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: How do you run HONE?
+      options:
+        - HONE.exe from a release ZIP
+        - From source (HONE.bat or python)
+    validations:
+      required: true
+  - type: dropdown
+    id: sim
+    attributes:
+      label: Game
+      options:
+        - Assetto Corsa Competizione
+        - Assetto Corsa
+        - Both
+        - Neither (analysis or setup only)
+    validations:
+      required: true
+  - type: input
+    id: where
+    attributes:
+      label: Car and track
+      placeholder: mclaren_720s_gt3_evo at Imola
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you saw, and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: How to make it happen again
+      placeholder: |
+        1. Start Coach Live
+        2. Drive an out lap
+        3. ...
+  - type: markdown
+    attributes:
+      value: |
+        **Logs.** Run `HONE.exe logs --zip` (or `python accoach_main.py logs --zip`)
+        and attach the ZIP it prints. It replaces your Windows home folder with
+        `%USERPROFILE%`, but it still contains your lap times, tracks and cars.
+        Open it and read it before you attach it.

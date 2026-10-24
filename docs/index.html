@@ -8,6 +8,13 @@
 <meta property="og:title" content="HONE — Know why you're slow.">
 <meta property="og:description" content="The AI driving coach that explains the WHY. Causal diagnosis, setup engineer for AC & road cars, offline.">
 <meta property="og:type" content="website">
+<!-- Relative until the domain is live: then write the full https:// URL, which
+     most link previews require. -->
+<meta property="og:image" content="og-card.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="675">
+<meta property="og:image:alt" content="HONE. Hone every lap. Free, offline, no subscription.">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;600&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
@@ -88,6 +95,7 @@
     <a href="#why">Why</a>
     <a href="#features">Driving</a>
     <a href="#analysis">Analysis</a>
+    <a href="#privacy">Privacy</a>
     <a href="#pricing">Free / Pro</a>
     <a href="#faq">FAQ</a>
     <a href="https://github.com/ardiz89/ACCoach">GitHub</a>
@@ -105,11 +113,11 @@
     <a class="btn ghost" href="https://github.com/ardiz89/ACCoach">View source on GitHub</a>
   </div>
   <div class="pills">
-    <span class="pill">🔒 100% offline</span>
-    <span class="pill">🎙️ Neural voice</span>
-    <span class="pill">🔧 Setup engineer</span>
-    <span class="pill">🌍 Speaks your language</span>
-    <span class="pill">💸 No subscription</span>
+    <span class="pill">100% offline</span>
+    <span class="pill">Neural voice</span>
+    <span class="pill">Setup engineer</span>
+    <span class="pill">English and Italian</span>
+    <span class="pill">No subscription</span>
   </div>
 </div></div>
 
@@ -134,8 +142,8 @@
     </div>
     <div class="card">
       <div class="num">03</div>
-      <h3>Offline, free, in your language</h3>
-      <p>Everything runs on your PC, no subscription. The calls you hear most are
+      <h3>Offline, in English and Italian</h3>
+      <p>Everything runs on your PC, with no account and no subscription. The calls you hear most are
         pre-rendered in a neural voice; the ones with numbers in them fall back to
         the system voice.</p>
     </div>
@@ -148,19 +156,19 @@
   <h2>While you drive</h2>
   <p class="lead">From your first lap to your setup, a coach with a plan.</p>
   <div class="grid">
-    <div class="card"><h3>🎙️ Voice coach</h3><p>The single most useful call at the
+    <div class="card"><h3>Voice coach</h3><p>The single most useful call at the
       right moment, never talking over itself. Lock-ups and wheelspin, instantly.</p></div>
-    <div class="card"><h3>📺 Overlay</h3><p>Delta, predicted time, the current cue
+    <div class="card"><h3>Overlay</h3><p>Delta, predicted time, the current cue
       and the focus you're working on — over the game.</p></div>
-    <div class="card"><h3>🔧 Race engineer</h3><p>Concrete setup advice, one change
+    <div class="card"><h3>Race engineer</h3><p>Concrete setup advice, one change
       at a time, with tyre, pressure and electronics management.</p></div>
-    <div class="card"><h3>🧠 Focus / Lesson</h3><p>One weakness at a time, trained
+    <div class="card"><h3>Focus / Lesson</h3><p>One weakness at a time, trained
       with measured praise: “Turn 4: from 0.30s to 0.07s.” It stops teaching a
       corner once you've mastered it.</p></div>
-    <div class="card"><h3>▶️ Starts on its own</h3><p>Optional: the hub watches for
+    <div class="card"><h3>Starts on its own</h3><p>Optional: the hub watches for
       AC or ACC and starts the silent recorder when the game appears. Off by
       default, and it never starts the voice.</p></div>
-    <div class="card"><h3>🗣️ Debrief</h3><p>Your worst corners, the cause of each,
+    <div class="card"><h3>Debrief</h3><p>Your worst corners, the cause of each,
       your consistency — after every session, in the words a coach would use.</p></div>
   </div>
 </div></section>
@@ -212,10 +220,38 @@
     confirmed three independent ways, the corner keeps its number.</div>
 </div></section>
 
+<section id="privacy"><div class="wrap">
+  <h2>Your laps stay yours</h2>
+  <p class="lead">HONE has no account and no cloud, so there is nothing to sign up
+    for and nothing to leak. Here is what that means in practice.</p>
+  <div class="grid">
+    <div class="card"><h3>Nothing leaves your PC</h3><p>Telemetry, laps and setups
+      are written to your own disk. HONE makes no network calls of its own: no
+      analytics, no telemetry upload, no update check.</p></div>
+    <div class="card"><h3>The tablet needs a key</h3><p>The pages only answer this
+      PC by default. If you turn on the tablet view, a phone or tablet on your
+      Wi-Fi gets in only with the key in the QR code.</p></div>
+    <div class="card"><h3>Other websites can't reach it</h3><p>A page you open in
+      the same browser can't read your laps or write a setup. The local servers
+      check where every request comes from and refuse the rest.</p></div>
+    <div class="card"><h3>Setups only where they belong</h3><p>The engineer writes
+      only inside the game's setup folders, keeps a backup of every file it
+      replaces, and never touches the car you're driving. You load the setup
+      yourself, in the pits.</p></div>
+    <div class="card"><h3>A download you can check</h3><p>Every release publishes
+      the SHA-256 of the ZIP, and the build installs its dependencies from a
+      lock file with pinned hashes.</p></div>
+    <div class="card"><h3>Logs without your name</h3><p>When you send logs for a
+      bug report, the bundle replaces your Windows home folder with
+      <code>%USERPROFILE%</code>, and it tells you what's inside before you
+      send it.</p></div>
+  </div>
+</div></section>
+
 <section id="pricing"><div class="wrap">
   <h2>Free and Pro</h2>
-  <p class="lead">A <b>one-time</b> freemium model, no subscription. Everything is
-    free today while the product grows with the community.</p>
+  <p class="lead">A <b>one-time</b> freemium model, no subscription. Today every
+    feature is free to use while the product grows with the community.</p>
   <table>
     <tr><th>Feature</th><th class="c">Free</th><th class="c">Pro <small>(coming)</small></th></tr>
     <tr><td>Voice coach + overlay</td><td class="c yes">✓</td><td class="c yes">✓</td></tr>
@@ -266,8 +302,9 @@
         overlay can't draw over exclusive fullscreen. Same constraint as SimHub
         and Crew Chief.</p></details>
     <details><summary>How much does it cost?</summary>
-      <p>It's free and complete today. The model is one-time freemium: Free stays
-        free forever, Pro will be a one-time purchase (no subscription).</p></details>
+      <p>Nothing today: every feature is free to use. The model is one-time
+        freemium. The Free tier stays free, and Pro will be a one-time purchase
+        with no subscription.</p></details>
   </div>
 </div></section>
 
@@ -277,7 +314,7 @@
   Not affiliated with Kunos Simulazioni. ·
   <a href="https://github.com/ardiz89/ACCoach">GitHub</a> ·
   <a href="https://github.com/ardiz89/ACCoach/blob/main/docs/FAQ.md">FAQ</a>
-  <br><small>This page describes the build of 31 July 2026.</small>
+  <br><small>Last updated 24 October 2026.</small>
 </div></footer>
 </body>
 </html>
