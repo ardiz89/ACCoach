@@ -28,7 +28,7 @@
 ## Global Constraints
 
 - Il tablet è un iPad 3 con **iOS 9.3.6 / Safari 9**: `tablet.html`/`tablet.js` restano ES5 (template string ammesse), niente `fetch`, niente `.forEach` in `tablet.js`; il controllo è `tests/safari9.py`.
-- I test non toccano mai `C:\Users\undrg\Documents\ACCoach`: `tests/conftest.py` isola già config e log; il file della chiave va isolato allo stesso modo (Task 1).
+- I test non toccano mai `%USERPROFILE%\Documents\ACCoach`: `tests/conftest.py` isola già config e log; il file della chiave va isolato allo stesso modo (Task 1).
 - Mai importare o chiamare `accoach.config` contro la casa vera fuori dai test isolati.
 - Commenti in italiano, che dicono il perché; commit in italiano che finiscono con `Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>`.
 - Testi per il pilota: frasi brevi col «tu», virgola decimale, niente slogan, niente due punti a effetto, niente emoji; vale `tests/test_tono.py`.

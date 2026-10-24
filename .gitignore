@@ -51,3 +51,23 @@ tools/voce/assistente-udito.jsonl
 tools/voce/voce.log
 tools/voce/voce.err.log
 tools/voce/assistente.pid
+
+# Scaricamenti di lavoro degli strumenti (tools/.dl/): artefatti, non sorgente.
+tools/.dl/
+
+# Appunti e registri degli agenti: restano sul PC del pilota, non nel repo
+# pubblico (prima li escludeva solo .git/info/exclude, che non viaggia).
+.superpowers/
+
+# Segreti e configurazione locale: una chiave nel repo pubblico e' bruciata.
+.env*
+*.key
+.elevenlabs-key
+*elevenlabs*key*
+
+# La configurazione vera del pilota sta in ~/Documents/ACCoach a runtime.
+config.toml
+
+# Archivi locali (storico giri, cache): dati personali, mai sorgente.
+*.db
+*.sqlite*

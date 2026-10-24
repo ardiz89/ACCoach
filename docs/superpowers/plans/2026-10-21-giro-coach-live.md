@@ -18,7 +18,7 @@
 - «ACC chiuso» = `connected` falso per almeno 60 s dopo essere stato vero nella stessa corsa di Coach Live. Tre risposte mancate di fila a `/health` = «il coach non risponde».
 - Coach Live non si ferma da solo; il motore del coach non cambia.
 - Ogni testo nuovo in italiano e inglese, col tono deciso col pilota: frasi brevi col tu; numeri con la virgola e l'unità; niente slogan, niente due punti a effetto, niente emoji (✓ ▶ come icone di stato sono ammessi); mai la stessa frase in due posti; prima il fatto, poi cosa fare.
-- Mai scrivere in `C:\Users\undrg\Documents\ACCoach`; le prove usano una casa finta.
+- Mai scrivere in `%USERPROFILE%\Documents\ACCoach`; le prove usano una casa finta.
 - Ogni test nuovo deve fallire se si toglie la cosa che prova (mutazione verificata).
 
 ## Review Focus

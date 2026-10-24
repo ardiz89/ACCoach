@@ -16,7 +16,7 @@
 - Testi nuovi solo in `src/accoach/web/i18n.js`, IT + EN, prefisso `tablet.` (o `eng.` se servono anche alla pagina Ingegnere), tono: frasi brevi col tu, virgola decimale, numero + spazio + unità, niente slogan, niente due punti a effetto, niente lineette a effetto, niente «!», niente emoji, mai la stessa frase in due chiavi; ogni frase vera sul codice.
 - Bottoni e linguette alti almeno 44 px. Nessuno scorrimento a 1024 × 680, 768 × 940, 1024 × 768, 768 × 1024.
 - `render(st)` gira ~15 volte al secondo: non ricostruisce il DOM che il pilota sta toccando.
-- Mai scrivere in `C:\Users\undrg\Documents\ACCoach`; mai importare/chiamare `accoach.config` fuori dai test isolati o da una casa finta (`USERPROFILE`/`HOME` su una cartella temporanea).
+- Mai scrivere in `%USERPROFILE%\Documents\ACCoach`; mai importare/chiamare `accoach.config` fuori dai test isolati o da una casa finta (`USERPROFILE`/`HOME` su una cartella temporanea).
 - Commenti nello stile dei file vicini (italiano, il perché).
 
 ## Review Focus

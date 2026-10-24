@@ -108,7 +108,7 @@ nessun numero dove non serve.
 
 - Tutto offline. Le voci si rigenerano con Piper in locale (le voci sono in
   `tools/piper/` del worktree col main, la cartella non è nel repo).
-- Mai scrivere in `C:\Users\undrg\Documents\ACCoach`; le prove si fanno su una
+- Mai scrivere in `%USERPROFILE%\Documents\ACCoach`; le prove si fanno su una
   copia.
 - I test che fissano il testo esatto si aggiornano al testo nuovo; un test che
   controlla un significato (un numero, un nome di curva) resta e deve continuare

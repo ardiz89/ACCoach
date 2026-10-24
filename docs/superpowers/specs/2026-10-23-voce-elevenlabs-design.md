@@ -150,7 +150,7 @@ con margine per i ritocchi.
 
 ## Vincoli
 
-- Mai scrivere in `C:\Users\undrg\Documents\ACCoach`; mai importare
+- Mai scrivere in `%USERPROFILE%\Documents\ACCoach`; mai importare
   `accoach.config` fuori dai test isolati.
 - La chiave non passa mai dalla chat né dai log.
 - I test non chiamano mai l'API (rete finta).

@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - Tutto offline; nessuna risorsa esterna.
-- Mai scrivere in `C:\Users\undrg\Documents\ACCoach`: le prove sull'archivio si fanno su una copia nello scratchpad.
+- Mai scrivere in `%USERPROFILE%\Documents\ACCoach`: le prove sull'archivio si fanno su una copia nello scratchpad.
 - Ogni testo esiste in italiano e inglese.
 - Tono (deciso col pilota): frasi brevi col tu; numeri con la virgola in italiano e l'unità («0,18 s»); niente slogan, niente due punti a effetto, niente emoji; mai la stessa frase in due posti; prima il fatto, poi cosa fare.
 - Al massimo 4 difetti e 3 consigli in Pagella; si segue un consiglio alla volta.

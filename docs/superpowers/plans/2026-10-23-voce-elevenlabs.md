@@ -18,7 +18,7 @@
 - La voce non dice numeri di dettaglio, salvo «Qui perdi N decimi» (1-25) e «Benzina per circa N giri» (1-3), che restano. Lo schermo tiene i numeri.
 - Ogni frase a voce: tono del 21/10 (`tests/tono.py`, superficie `coach`, al massimo 8 parole per frase), vera sul codice, stesso significato e direzione della frase col numero.
 - La chiave dell'API: variabile d'ambiente `ELEVENLABS_API_KEY` o il file `%USERPROFILE%\.elevenlabs-key` (fuori dal repo). Mai stampata, mai nei log, mai nel repo. I test non chiamano mai la rete.
-- Mai scrivere in `C:\Users\undrg\Documents\ACCoach`; mai importare `accoach.config` fuori dai test isolati.
+- Mai scrivere in `%USERPROFILE%\Documents\ACCoach`; mai importare `accoach.config` fuori dai test isolati.
 - Inglese: invariato (SAPI5). `diagnostics.py` «Self test completato.» resta su SAPI5 di proposito.
 - Commenti nello stile dei file vicini (italiano, il perché).
 

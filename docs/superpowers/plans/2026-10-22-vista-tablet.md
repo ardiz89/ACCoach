@@ -19,7 +19,7 @@
 - Nome del file scritto: `HONE_<n>`, `n` = massimo `HONE_<k>` esistente + 1; su 409 «already exists» si prova il successivo, al massimo 4 volte (regola di `applyNow` in `engineer.js`).
 - Dopo una scrittura riuscita: `POST http://<host>:8777/engineer/applied` (best-effort).
 - Bottoni grandi almeno 44 px. Progetto a 1024 × 768 e 768 × 1024, nessuno scorrimento orizzontale.
-- Mai scrivere in `C:\Users\undrg\Documents\ACCoach`; le prove sulla copia in scratchpad.
+- Mai scrivere in `%USERPROFILE%\Documents\ACCoach`; le prove sulla copia in scratchpad.
 - Commenti nel codice nello stile dei file vicini (italiano, il perché).
 
 ## Review Focus

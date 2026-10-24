@@ -233,4 +233,4 @@ ABS già a **0**, TC a **6**, freno bias 0.75.
   nel worktree primario. Per rivedere i giri di stasera su `main` va fermato,
   altrimenti si guarda un altro build.
 - **Il canale voce** vive solo nel worktree primario: venv e modello vosk da
-  88 MB stanno lì (`C:\Users\undrg\progetti\ACCoach`), non in `whelk`.
+  88 MB stanno lì (`%USERPROFILE%\progetti\ACCoach`), non in `whelk`.

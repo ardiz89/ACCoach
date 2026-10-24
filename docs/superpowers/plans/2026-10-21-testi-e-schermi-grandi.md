@@ -19,7 +19,7 @@
 - Voce: al massimo otto parole per frase, un imperativo, nessun numero dove non serve.
 - Fuori: `web/test_plan.json`, l'aiuto CLI di `__main__.py`, i nomi di curve e circuiti.
 - I test che fissano il testo esatto si aggiornano; quelli che controllano un significato restano. Ogni test nuovo fallisce se si toglie la cosa che prova (mutazione verificata a mano).
-- Mai scrivere in `C:\Users\undrg\Documents\ACCoach`. Niente `git stash` (pila condivisa fra worktree).
+- Mai scrivere in `%USERPROFILE%\Documents\ACCoach`. Niente `git stash` (pila condivisa fra worktree).
 - Commit in italiano con `Co-Authored-By:` del modello reale.
 
 ## Review Focus
@@ -140,7 +140,7 @@ Chiavi: tutte quelle di `report_b`.
 
 - [ ] **Step 1:** togli `coach` da `PENDING` e aggiungi la regola «al massimo otto parole» per questa superficie. Rosso.
 - [ ] **Step 2:** riscrivi le frasi (italiano e `_CUE_EN`), con le espressioni regolari di `_CUE_EN` allineate.
-- [ ] **Step 3:** copia `tools/piper/` dal worktree `C:/Users/undrg/orca/workspaces/ACCoach/potenziamento-ingegnere-di-pista` (è ignorata da git) e rigenera: `python tools/render_cues.py` e `python tools/render_cues.py --male`. Togli i WAV orfani.
+- [ ] **Step 3:** copia `tools/piper/` dal worktree `C:/Users/<account>/orca/workspaces/ACCoach/potenziamento-ingegnere-di-pista` (è ignorata da git) e rigenera: `python tools/render_cues.py` e `python tools/render_cues.py --male`. Togli i WAV orfani.
 - [ ] **Step 4:** `pytest tests/test_voice_cues.py tests/test_tono.py -q` verdi + `pytest -q`; elenco prima → dopo di tutte le frasi nel report.
 - [ ] **Step 5:** commit (WAV compresi).
 

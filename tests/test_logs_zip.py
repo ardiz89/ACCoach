@@ -208,11 +208,11 @@ def _con_tutto_dentro(tmp_path: Path) -> Path:
         "2026-06-28 00:31:12 INFO accoach.recording: saved "
         "mclaren-720s__monza__1m54s3__20260628-003112.json.gz\n"
         "2026-06-28 00:25:05 ERROR accoach: crash report written to "
-        r"C:\Users\undrg\Documents\ACCoach\logs\crash-20260628-002505.log" "\n",
+        r"C:\Users\pilot\Documents\ACCoach\logs\crash-20260628-002505.log" "\n",
         encoding="utf-8")
     (logs / "crash-20260628-002505.log").write_text(
         "ACCoach 0.1.0 crash\nTraceback (most recent call last):\n"
-        r"  File C:\Users\undrg\progetti\ACCoach\src\accoach\app.py, line 1" "\n",
+        r"  File C:\Users\pilot\progetti\ACCoach\src\accoach\app.py, line 1" "\n",
         encoding="utf-8")
     return logs
 
