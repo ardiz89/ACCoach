@@ -101,3 +101,45 @@ def test_the_home_numbers_follow_the_language(monkeypatch, tmp_path):
     finally:
         # Un fallimento a metà non deve lasciare l'italiano ai test dopo.
         config.set_language("en")
+
+
+def test_an_empty_archive_offers_the_first_step_not_the_analysis(monkeypatch):
+    """Al primo avvio il bottone acceso era «Analizza», su un archivio vuoto
+    (24/10). Senza giri la Home offre di andare in pista o di provare la demo,
+    e i due bottoni chiamano chi li deve fare."""
+    from PySide6.QtWidgets import QApplication
+    monkeypatch.setattr(hub_home, "load_home_data",
+                        lambda *a, **k: hub_home.HomeData(status="empty"))
+    app = QApplication.instance() or QApplication([])  # noqa: F841
+    calls = []
+    panel = hub_home.HomePanel(on_analysis=lambda: calls.append("analysis"),
+                               on_setup=lambda: None,
+                               on_drive=lambda: calls.append("drive"),
+                               on_demo=lambda: calls.append("demo"))
+    if panel._worker is not None:
+        panel._worker.wait(3000)
+    panel._apply(hub_home.HomeData(status="empty"))
+    assert not panel._cta_drive.isHidden() and not panel._cta_demo.isHidden()
+    assert panel._cta_analysis.isHidden() and panel._cta_setup.isHidden()
+    panel._cta_drive.click()
+    panel._cta_demo.click()
+    assert calls == ["drive", "demo"]
+    panel._apply(hub_home.HomeData(status="clean", laps_count=2))
+    assert panel._cta_drive.isHidden() and not panel._cta_analysis.isHidden()
+
+
+def test_the_home_says_when_config_toml_cannot_be_read(monkeypatch, tmp_path):
+    from PySide6.QtWidgets import QApplication
+    from accoach import config
+    monkeypatch.setattr(config, "config_path", lambda: tmp_path / "config.toml")
+    (tmp_path / "config.toml").write_text("language = \n", encoding="utf-8")
+    config.load_config(reload=True)
+    monkeypatch.setattr(hub_home, "load_home_data",
+                        lambda *a, **k: hub_home.HomeData(status="empty"))
+    app = QApplication.instance() or QApplication([])  # noqa: F841
+    panel = hub_home.HomePanel(on_analysis=lambda: None, on_setup=lambda: None)
+    if panel._worker is not None:
+        panel._worker.wait(3000)
+    panel._apply(hub_home.HomeData(status="empty"))
+    assert not panel._config_note.isHidden()
+    assert "config.toml" in panel._config_note.text()

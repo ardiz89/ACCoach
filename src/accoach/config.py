@@ -253,12 +253,36 @@ def _atomic_write(path: Path, text: str) -> None:
                 pass
 
 
+def _read_toml(path: Path) -> dict:
+    """Il file come dizionario, tollerando quello che fa Blocco Note.
+
+    Il 24/10 un `config.toml` salvato col BOM (Blocco Note e PowerShell 5 lo
+    mettono) veniva scartato intero, in silenzio: lingua inglese e porte
+    predefinite, e il pilota non sapeva perche'. Il BOM UTF-8 si toglie, e un
+    file UTF-16 (il «Unicode» di Blocco Note) si legge come tale."""
+    data = path.read_bytes()
+    if data.startswith((b"\xff\xfe", b"\xfe\xff")):
+        text = data.decode("utf-16")
+    else:
+        text = data.decode("utf-8-sig")
+    return tomllib.loads(text)
+
+
+# Perche' l'ultimo `load_config` non ha potuto leggere il file (None se l'ha
+# letto): l'hub lo dice, invece di partire coi predefiniti senza spiegare.
+_problem: str | None = None
+
+
+def config_problem() -> str | None:
+    """Il motivo per cui `config.toml` non si legge, o None se va bene."""
+    return _problem
+
+
 def _parse_disk() -> Config | None:
     """The config as the file holds it now, or ``None`` if it can't be parsed.
     Never touches the shared cache."""
     try:
-        with config_path().open("rb") as fh:
-            raw = tomllib.load(fh)
+        raw = _read_toml(config_path())
     except Exception:   # noqa: BLE001 - mid-write or hand-edited file
         return None
     cfg = Config()
@@ -342,7 +366,7 @@ def write_language(lang: str) -> None:
     edits the line in place (comments and all) and refuses an unreadable file."""
     path = config_path()
     try:
-        text = path.read_text(encoding="utf-8")
+        text = path.read_text(encoding="utf-8-sig")
         tomllib.loads(text)
     except Exception as exc:   # noqa: BLE001
         raise ConfigUnreadable(str(exc)) from exc
@@ -377,20 +401,21 @@ def set_language(lang: str) -> None:
 
 def load_config(*, reload: bool = False) -> Config:
     """Return the cached config, loading (and first-run-creating) it if needed."""
-    global _cache, _baseline
+    global _cache, _baseline, _problem
     if _cache is not None and not reload:
         return _cache
 
     cfg = Config()
     path = config_path()
+    _problem = None
     if not path.exists():
         _write_default(path)
     else:
         try:
-            with path.open("rb") as fh:
-                raw = tomllib.load(fh)
+            raw = _read_toml(path)
             _merge(cfg, raw)
-        except Exception:   # noqa: BLE001 - bad TOML must not crash the app
+        except Exception as exc:   # noqa: BLE001 - bad TOML must not crash the app
+            _problem = str(exc) or type(exc).__name__
             from .logging_setup import get_logger
             get_logger("config").warning(
                 "config.toml unreadable, using defaults", exc_info=True

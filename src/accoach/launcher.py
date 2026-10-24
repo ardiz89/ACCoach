@@ -429,8 +429,10 @@ class SettingsPanel(QWidget):
         self._engineer_voice.setChecked(cfg.voice.engineer)
         row("set.engineer_voice", self._engineer_voice)
 
-        self._male = QCheckBox()
-        self._male.setChecked(cfg.voice.male)
+        self._male = QComboBox()
+        self._male.addItem(t("set.voice_male"), True)
+        self._male.addItem(t("set.voice_female"), False)
+        self._male.setCurrentIndex(0 if cfg.voice.male else 1)
         row("set.male_voice", self._male)
 
         self._radio = QCheckBox()
@@ -440,12 +442,14 @@ class SettingsPanel(QWidget):
         self._rate = QSpinBox()
         self._rate.setRange(80, 300)
         self._rate.setValue(cfg.voice.rate)
+        self._rate.setSuffix(t("set.rate_unit"))
         row("set.rate", self._rate)
 
         self._scale = QDoubleSpinBox()
         self._scale.setRange(0.5, 2.5)
         self._scale.setSingleStep(0.1)
         self._scale.setValue(cfg.overlay.scale or 1.0)
+        self._scale.setSuffix(" ×")
         row("set.scale", self._scale)
 
         self._wean = QCheckBox()
@@ -487,7 +491,16 @@ class SettingsPanel(QWidget):
         save_row.addStretch(1)
         root.addLayout(save_row)
 
-        # Divider + advanced/dev tools + guide/wizard.
+        # L'aiuto prima degli strumenti avanzati: «Come iniziare» e la guida
+        # stavano sotto «Strumenti avanzati», dove chi e' nuovo non guarda.
+        extras = QHBoxLayout()
+        extras.setSpacing(10)
+        extras.addWidget(hub.special_button("btn.get_started", _WIZARD, hub._show_wizard))
+        extras.addWidget(hub.special_button("btn.guide", _GUIDE, _open_guide))
+        extras.addStretch(1)
+        root.addLayout(extras)
+
+        # Divider + advanced/dev tools.
         line = QFrame()
         line.setProperty("role", "hline")
         line.setFixedHeight(1)
@@ -504,19 +517,24 @@ class SettingsPanel(QWidget):
         tools.addStretch(1)
         root.addLayout(tools)
 
-        extras = QHBoxLayout()
-        extras.setSpacing(10)
-        extras.addWidget(hub.special_button("btn.get_started", _WIZARD, hub._show_wizard))
-        extras.addWidget(hub.special_button("btn.guide", _GUIDE, _open_guide))
-        extras.addStretch(1)
-        root.addLayout(extras)
+        # Il coach senza overlay e l'overlay da solo: due modi avanzati di
+        # avviare il coach. Stavano in Dispositivi, sotto «Apri su telefono o
+        # tablet», con nomi che a chi e' nuovo non dicevano niente (24/10).
+        split = QHBoxLayout()
+        split.setSpacing(10)
+        split.addWidget(hub.action_button("btn.server", ["server"], console=True,
+                                          tip="tip.server"))
+        split.addWidget(hub.action_button("btn.overlay", ["overlay"],
+                                          tip="tip.overlay"))
+        split.addStretch(1)
+        root.addLayout(split)
         root.addStretch(1)
 
     def _do_save(self) -> None:
         cfg = load_config()
         cfg.voice.enabled = self._voice.isChecked()
         cfg.voice.engineer = self._engineer_voice.isChecked()
-        cfg.voice.male = self._male.isChecked()
+        cfg.voice.male = bool(self._male.currentData())
         cfg.voice.radio = self._radio.isChecked()
         cfg.voice.rate = self._rate.value()
         cfg.overlay.scale = round(self._scale.value(), 2)
@@ -541,6 +559,9 @@ class SettingsPanel(QWidget):
             mark.setToolTip(t(f"{key}.help"))
         self._pedals_hint.setText(t("set.pedals_hint"))
         self._scale_hint.setText(t("set.scale_hint"))
+        self._male.setItemText(0, t("set.voice_male"))
+        self._male.setItemText(1, t("set.voice_female"))
+        self._rate.setSuffix(t("set.rate_unit"))
         self._save.setText(t("btn.save"))
         self._devtools.setText(t("sec.devtools"))
         if self._saved_note.text():
@@ -589,18 +610,6 @@ class DevicesPanel(QWidget):
         self._poll.setInterval(2000)
         self._poll.timeout.connect(self._refresh_status)
 
-        line = QFrame()
-        line.setProperty("role", "hline")
-        line.setFixedHeight(1)
-        root.addWidget(line)
-
-        srv_row = QHBoxLayout()
-        srv_row.setSpacing(10)
-        srv_row.addWidget(hub.action_button("btn.server", ["server"], console=True,
-                                            tip="tip.server"))
-        srv_row.addWidget(hub.action_button("btn.overlay", ["overlay"]))
-        srv_row.addStretch(1)
-        root.addLayout(srv_row)
         root.addStretch(1)
 
         self._render()
@@ -748,6 +757,9 @@ class MainWindow(QWidget):
             # Ingegnere del bottone in Setup, e saltava ogni controllo — durante
             # Coach Live apriva una pagina che nessuno alimenta, in silenzio.
             on_setup=self._open_engineer,
+            on_drive=lambda: self._nav.setCurrentRow(self._NAV.index("nav.live")),
+            on_demo=partial(self._on_action, ("live", "--demo"),
+                            ["live", "--demo"], False),
         )
         self._stack.addWidget(self._home)
         self._stack.addWidget(self._build_live_page())

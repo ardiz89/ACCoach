@@ -177,6 +177,9 @@ def qss() -> str:
         border: 1px solid {b.LINE};
         border-radius: 12px;
     }}
+    /* Le etichette dentro una scheda prendevano il fondo di QWidget (INK) e
+       disegnavano un rettangolo nero sul grigio della scheda (24/10). */
+    QFrame[role="card"] QLabel {{ background: transparent; }}
     QFrame[role="hline"] {{ border: none; border-top: 1px solid {b.LINE}; }}
 
     /* --- buttons --- */
@@ -214,4 +217,16 @@ def qss() -> str:
         selection-background-color: {b.LINE};
     }}
     QCheckBox {{ spacing: 8px; }}
+    /* Una casella spenta era un quadrato e una accesa solo un segno di spunta
+       senza bordo: due disegni diversi per la stessa cosa. Ora e' sempre un
+       quadrato, pieno di ciano quando e' accesa. */
+    QCheckBox::indicator {{
+        width: 14px; height: 14px;
+        border: 1px solid {b.MUTED}; border-radius: 3px;
+        background: {b.SLATE};
+    }}
+    QCheckBox::indicator:hover {{ border-color: {b.CYAN}; }}
+    QCheckBox::indicator:checked {{
+        background: {b.CYAN}; border-color: {b.CYAN};
+    }}
     """

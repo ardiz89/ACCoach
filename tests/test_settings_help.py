@@ -57,3 +57,24 @@ def test_the_help_marks_are_wired_to_the_tooltips():
     for key, mark in panel._helps.items():
         assert mark.text() == "?"
         assert mark.toolTip() == t(f"{key}.help")
+
+
+def test_the_voice_is_a_choice_between_two_and_is_saved(tmp_path, monkeypatch):
+    """«Voce maschile» spenta non diceva quale voce restava (24/10): ora si
+    sceglie fra Maschile e Femminile, e la scelta finisce in `voice.male`."""
+    from PySide6.QtWidgets import QApplication, QComboBox
+    from accoach import config, launcher
+
+    monkeypatch.setattr(config, "config_path", lambda: tmp_path / "config.toml")
+    config.load_config(reload=True)
+    app = QApplication.instance() or QApplication([])  # noqa: F841
+    win = launcher.MainWindow()
+    try:
+        s = win._settings
+        assert isinstance(s._male, QComboBox) and s._male.count() == 2
+        s._male.setCurrentIndex(1)
+        s._do_save()
+        assert config.load_config(reload=True).voice.male is False
+        assert s._rate.suffix().strip()            # l'unità accanto al numero
+    finally:
+        win.close()

@@ -93,3 +93,37 @@ def test_the_engineer_page_reads_its_language_from_the_same_place():
     assert "window.HoneI18n.lang" in eng
     fn = _I18N[_I18N.index("function fmtNum("):]
     assert "HoneI18n.lang" in fn[:fn.index("\n  }\n")]
+
+
+# --- i nomi di auto e pista -------------------------------------------------
+
+from accoach.textfmt import display_name  # noqa: E402
+
+NAMES = [
+    ("ferrari_296_gt3", "Ferrari 296 GT3"),
+    ("brands_hatch", "Brands Hatch"),
+    ("monza", "Monza"),
+    ("ks_nurburgring", "Nurburgring"),
+    ("mclaren_720s_gt3_evo", "McLaren 720S GT3 EVO"),
+    ("bmw_m4_gt3", "BMW M4 GT3"),
+    ("HONE Demo", "HONE Demo"),
+    ("Demo Circuit", "Demo Circuit"),
+    ("", ""),
+]
+
+
+@pytest.mark.parametrize("raw,shown", NAMES)
+def test_display_name_reads_like_a_person_writes_it(raw, shown):
+    assert display_name(raw) == shown
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="serve node per eseguire il JS")
+def test_js_display_name_matches_python():
+    src = _I18N
+    body = src[src.index("  var NAME_UPPER"):]
+    body = body[:body.index("  function readLang()")]
+    raws = [r for r, _ in NAMES]
+    prog = f"{body}\nconsole.log(JSON.stringify({json.dumps(raws)}.map(displayName)));"
+    out = subprocess.run(["node", "-e", prog], capture_output=True, text=True, timeout=30)
+    assert out.returncode == 0, out.stderr
+    assert json.loads(out.stdout) == [display_name(r) for r in raws]

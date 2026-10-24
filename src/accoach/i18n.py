@@ -112,7 +112,7 @@ _UI: dict[str, dict[str, str]] = {
                             "it": "Demo senza gioco"},
     "btn.analysis": {"en": "Analysis and report", "it": "Analisi e report"},
     "btn.engineer": {"en": "Race engineer", "it": "Ingegnere di pista"},
-    "btn.server": {"en": "Live backend", "it": "Backend live"},
+    "btn.server": {"en": "Coach without overlay", "it": "Coach senza overlay"},
     "btn.debrief": {"en": "Last-lap debrief", "it": "Debrief dell'ultimo giro"},
     "btn.monitor": {"en": "Telemetry monitor", "it": "Monitor della telemetria"},
     "btn.coach_term": {"en": "Voice coach in a terminal",
@@ -120,8 +120,14 @@ _UI: dict[str, dict[str, str]] = {
     "btn.verify_g": {"en": "Check the G axes", "it": "Verifica gli assi G"},
     "btn.get_started": {"en": "Getting started", "it": "Come iniziare"},
     "tip.browser": {"en": "Opens in your browser.", "it": "Si apre nel browser."},
-    "tip.server": {"en": "Feeds a second screen, without the overlay.",
-                   "it": "Alimenta un secondo schermo, senza overlay."},
+    "tip.server": {"en": "The coach talks and feeds the tablet, with nothing "
+                         "drawn over the game.",
+                   "it": "Il coach parla e alimenta il tablet, senza niente "
+                         "disegnato sopra il gioco."},
+    "tip.overlay": {"en": "Draws the overlay over the game, for a coach that "
+                          "is already running without one.",
+                    "it": "Disegna l'overlay sopra il gioco, per un coach già "
+                          "acceso senza."},
     # First-run wizard. Was hardcoded English in a bilingual app: the very first
     # screen a new driver sees ignored the language they had just chosen.
     "wiz.title": {"en": "Welcome to HONE", "it": "Benvenuto in HONE"},
@@ -138,13 +144,13 @@ _UI: dict[str, dict[str, str]] = {
               "esclusivo l'overlay non compare."},
     "wiz.s2": {
         "en": "Open <b>Drive</b> in the sidebar and press <b>Coach Live</b>. The "
-              "panel walks you through it, first the tablet with a QR code and "
-              "then the game. When you're done, <b>I'm done</b> opens the "
-              "Report card.",
+              "panel walks you through it. A tablet is optional, and if you "
+              "have one you connect it with a QR code. When you're done, "
+              "<b>I'm done</b> opens the Report card.",
         "it": "Apri <b>In pista</b> nella barra laterale e premi <b>Coach "
-              "Live</b>. Il pannello ti accompagna passo per passo, prima il "
-              "tablet col codice QR e poi il gioco. Quando hai finito, <b>Ho "
-              "finito</b> apre la Pagella."},
+              "Live</b>. Il pannello ti accompagna passo per passo. Il tablet è "
+              "facoltativo, e se ce l'hai lo colleghi col codice QR. Quando hai "
+              "finito, <b>Ho finito</b> apre la Pagella."},
     "wiz.s3": {
         "en": "Drive one clean, complete lap. It becomes your <b>reference</b>, and the "
               "delta appears from the next lap on. Until then the coach still "
@@ -178,7 +184,7 @@ _UI: dict[str, dict[str, str]] = {
     "import.failed": {"en": "I can't read that lap. {err}",
                       "it": "Non riesco a leggere questo giro. {err}"},
     "btn.guide": {"en": "User guide", "it": "Guida all'uso"},
-    "btn.overlay": {"en": "Overlay only", "it": "Solo overlay"},
+    "btn.overlay": {"en": "Add the overlay", "it": "Aggiungi l'overlay"},
     # hub — sidebar navigation
     "nav.home": {"en": "Home", "it": "Home"},
     # "In pista" e non "Guida": in italiano collideva con la guida all'uso, e
@@ -231,6 +237,15 @@ _UI: dict[str, dict[str, str]] = {
                           "it": "Questo è il tuo giro di riferimento. Non ho un "
                                 "giro più veloce con cui confrontarlo."},
     "home.cta_analysis": {"en": "Analyze", "it": "Analizza"},
+    "home.cta_drive": {"en": "Go to Drive", "it": "Vai in pista"},
+    "home.cta_demo": {"en": "Try the demo", "it": "Prova la demo"},
+    "home.config_bad": {
+        "en": "config.toml can't be read, so HONE is using the default settings. "
+              "Fix the file or delete it, and HONE writes a new one on the next "
+              "start.",
+        "it": "config.toml non si legge, quindi HONE usa le impostazioni "
+              "predefinite. Correggi il file o cancellalo, e HONE ne scrive uno "
+              "nuovo al prossimo avvio."},
     "home.cta_debrief": {"en": "Full debrief", "it": "Debrief completo"},
     "home.cta_setup": {"en": "Try a setup", "it": "Prova un setup"},
     "home.stat_best": {"en": "Best lap", "it": "Miglior giro"},
@@ -246,9 +261,9 @@ _UI: dict[str, dict[str, str]] = {
     "mob.engineer": {"en": "Engineer", "it": "Ingegnere"},
     "mob.test": {"en": "On-track test", "it": "Test in pista"},
     "mob.test_live": {"en": "To capture the coach's cues on the test page, start "
-                            "the Live backend too.",
+                            "the Coach without overlay too.",
                       "it": "Per registrare gli avvisi del coach nella pagina di "
-                            "prova, avvia anche il Backend live."},
+                            "prova, avvia anche il Coach senza overlay."},
     "mob.scan": {"en": "Scan the code, or type the address under it into the "
                        "browser, key included.",
                  "it": "Inquadra il codice, oppure scrivi nel browser "
@@ -292,7 +307,12 @@ _UI: dict[str, dict[str, str]] = {
     "set.voice": {"en": "Coach voice", "it": "Voce del coach"},
     "set.engineer_voice": {"en": "Speak the engineer's proposals",
                            "it": "Annuncia a voce le proposte dell'ingegnere"},
-    "set.male_voice": {"en": "Male voice", "it": "Voce maschile"},
+    # Una scelta fra due voci, non una casella: «Voce maschile» spenta non
+    # diceva quale voce restava (24/10). La chiave del config resta `male`.
+    "set.male_voice": {"en": "Voice", "it": "Voce"},
+    "set.voice_male": {"en": "Male", "it": "Maschile"},
+    "set.voice_female": {"en": "Female", "it": "Femminile"},
+    "set.rate_unit": {"en": " words/min", "it": " parole/min"},
     "set.radio": {"en": "Team-radio effect", "it": "Effetto radio di pista"},
     "set.rate": {"en": "Voice speed", "it": "Velocità della voce"},
     "set.scale": {"en": "Overlay size", "it": "Grandezza dell'overlay"},
@@ -316,10 +336,10 @@ _UI: dict[str, dict[str, str]] = {
               "a voce. Arrivano fra un giro e l'altro, non mentre sei in curva. "
               "Se la spegni, le trovi comunque nella sezione Setup."},
     "set.male_voice.help": {
-        "en": "Uses the male voice instead of the female one. The words and the "
-              "timing stay the same, only the speaker changes.",
-        "it": "Usa la voce maschile al posto di quella femminile. Le parole e i "
-              "tempi restano gli stessi, cambia solo chi le dice."},
+        "en": "Who speaks the cues. The words and the timing stay the same, "
+              "only the speaker changes.",
+        "it": "Chi dice i consigli. Le parole e i tempi restano gli stessi, "
+              "cambia solo chi parla."},
     "set.radio.help": {
         "en": "Filters the voice to sound like a pit-to-car radio. It's only an "
               "effect, and it changes nothing the coach says. Off is the clearest.",
@@ -372,38 +392,38 @@ _UI: dict[str, dict[str, str]] = {
         "it": "Qualcosa sta già registrando questa sessione. Con due "
               "registratori ogni giro si salva due volte, e la copia sembra un "
               "giro vero in più. Ferma prima quello acceso."},
-    # --- lo scambio Coach Live → Backend live ------------------------------
-    # Il Backend live non può stare acceso insieme a Coach Live. Finché queste
+    # --- lo scambio Coach Live → Coach senza overlay ------------------------------
+    # Il Coach senza overlay non può stare acceso insieme a Coach Live. Finché queste
     # frasi non c'erano, il bottone era spento e muto. Dal 24/09 la pagina
     # Ingegnere la alimenta anche Coach Live, quindi le frasi dicono pure
     # questo: chi è arrivato qui cercando la pagina non ha bisogno dello scambio.
     "swap.title": {
-        "en": "The live backend can't run next to Coach Live",
-        "it": "Il Backend live non può girare insieme a Coach Live"},
+        "en": "The coach without overlay can't run next to Coach Live",
+        "it": "Il Coach senza overlay non può girare insieme a Coach Live"},
     "swap.why": {
-        "en": "The live backend records laps just like Coach Live. With both "
+        "en": "The coach without overlay records laps just like Coach Live. With both "
               "running, every lap you drive is saved twice, and afterwards the "
               "copy can't be told apart from a real lap. If you're here for the "
               "Engineer page you don't need it. While Coach Live runs, Coach "
               "Live feeds that page itself.",
-        "it": "Il Backend live registra i giri proprio come Coach Live. Con tutti "
+        "it": "Il Coach senza overlay registra i giri proprio come Coach Live. Con tutti "
               "e due accesi ogni giro che guidi si salva due volte, e dopo la "
               "copia non si distingue da un giro vero. Se sei qui per la pagina "
               "Ingegnere non ti serve. Finché Coach Live è acceso, quella pagina "
               "la alimenta lui."},
     "swap.warn": {
-        "en": "Swapping stops Coach Live and starts the live backend in its "
-              "place. The coach keeps talking and the Engineer page stays fed. "
+        "en": "Swapping stops Coach Live and starts the coach without overlay. "
+              "The coach keeps talking and the Engineer page stays fed. "
               "The overlay, though, closes with Coach Live, so you have no HUD "
-              "on track. The backend, the overlay and the web page are three "
-              "separate pieces, and you can bring the overlay back on its own "
-              "from Devices.",
-        "it": "Lo scambio ferma Coach Live e al suo posto avvia il Backend live. "
+              "on track. The coach, the overlay and the web page are three "
+              "separate pieces. You can bring the overlay back on its own "
+              "from Settings, under Advanced tools.",
+        "it": "Lo scambio ferma Coach Live e al suo posto avvia il Coach senza overlay. "
               "Il coach continua a parlare e la pagina Ingegnere resta "
               "alimentata. L'overlay però si spegne insieme a Coach Live, e in "
-              "pista resti senza HUD. Backend, overlay e pagina web sono tre "
+              "pista resti senza HUD. Coach, overlay e pagina web sono tre "
               "pezzi separati, e l'overlay si riaccende a parte da "
-              "Dispositivi."},
+              "Impostazioni, in Strumenti avanzati."},
     # Senza glifo: `⇄` (U+21C4) non c'è nei font del brand né nel ripiego di
     # sistema, e a schermo usciva come un rettangolo vuoto davanti alla frase.
     "swap.confirm": {"en": "Stop Coach Live and switch",
@@ -413,11 +433,11 @@ _UI: dict[str, dict[str, str]] = {
     # ciascuna uscita lo dicono i paragrafi sopra, non il bottone.
     "swap.cancel": {"en": "Cancel", "it": "Annulla"},
     "swap.failed": {
-        "en": "Coach Live is still running, so the live backend didn't start. "
+        "en": "Coach Live is still running, so the coach without overlay didn't start. "
               "Two recorders would have saved every lap twice. Press “Stop "
               "without opening the report”, wait for its window to close and "
               "try again.",
-        "it": "Coach Live è ancora acceso, quindi il Backend live non è partito. "
+        "it": "Coach Live è ancora acceso, quindi il Coach senza overlay non è partito. "
               "Con due registratori ogni giro si sarebbe salvato due volte. "
               "Premi «Ferma senza aprire il report», aspetta che la sua finestra "
               "si chiuda e riprova."},
@@ -451,7 +471,8 @@ _UI: dict[str, dict[str, str]] = {
               "progetto. Alzala su un monitor 4K o se stai lontano dallo schermo, "
               "abbassala se ti copre troppa pista."},
     "set.scale_hint": {
-        "en": "Both apply from the next Coach Live start.",
+        "en": "The pedal trace and the overlay size apply from the next Coach "
+              "Live start.",
         "it": "Traccia dei pedali e grandezza dell'overlay valgono dal prossimo "
               "avvio di Coach Live."},
     "btn.save": {"en": "Save", "it": "Salva"},
@@ -472,8 +493,10 @@ _UI: dict[str, dict[str, str]] = {
     "live.s1": {"en": "Coach Live is on", "it": "Coach Live acceso"},
     "live.s1_sub": {"en": "Voice and overlay are ready.",
                     "it": "Voce e overlay sono pronti."},
-    "live.s2": {"en": "Connect your tablet to the engineer",
-                "it": "Collega il tablet all'ingegnere"},
+    # Facoltativo, e lo dice il titolo: senza, chi non ha un tablet credeva di
+    # non poter partire (24/10).
+    "live.s2": {"en": "Connect a tablet, if you have one",
+                "it": "Collega un tablet, se ce l'hai"},
     "live.s2_scan": {"en": "Scan the code with the tablet's camera, or type "
                            "this address, key included.",
                      "it": "Inquadra il codice con la fotocamera del tablet, "

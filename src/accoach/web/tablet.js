@@ -10,7 +10,14 @@
 // linguette, Telemetria o Assetto (`pickTab`): la sceglie lo stato ai box, e
 // il pilota col dito.
 (function () {
-  var WS_PORT = 8777;            // il motore dal vivo; la pagina sta sulla 8778
+  // Il motore dal vivo: la porta la scrive il server nella pagina
+  // (`hone-live-port`), quella del config. Scritta qui a mano, una porta
+  // cambiata in config.toml lasciava il tablet a dire «coach spento».
+  var WS_PORT = (function () {
+    var m = document.querySelector('meta[name="hone-live-port"]');
+    var n = m ? parseInt(m.getAttribute("content"), 10) : NaN;
+    return n > 0 && n < 65536 ? n : 8777;
+  })();
   // Ogni URL verso il motore passa da qui: sul Wi-Fi porta la chiave del QR
   // (lankey.js). Il cookie varrebbe anche sulla 8777 (i cookie non guardano
   // la porta), ma un XHR cross-origin senza credenziali non lo manda.

@@ -85,7 +85,7 @@ HONE works **entirely offline**.
 - Everything is stored under `Documents\ACCoach\`. Laps are in `laps\`, logs in
   `logs\` and settings in `config.toml`.
 - HONE's parts talk to each other through two local servers, the analysis on
-  port 8778 and the live backend on port 8777. They only listen on this PC.
+  port 8778 and the coach without overlay on port 8777. They only listen on this PC.
   The exception is when you turn on access from other devices on your network,
   described in "Opening the report on a phone or tablet".
 
@@ -945,7 +945,7 @@ A few practical details.
   to your laps folder, and keeps 200 runs at most. If the page tells you it is full,
   delete old files from that folder. The results stay on the tablet meanwhile.
 - For the **Report**, which shows your saved laps, the analysis only has to be
-  running. The live **Engineer** page also needs Coach Live, or the Live backend
+  running. The live **Engineer** page also needs Coach Live, or the Coach without overlay
   if you drive without the overlay.
 - With the option off, everything stays on this PC only, at `127.0.0.1`.
 
@@ -1014,7 +1014,7 @@ These entries only exist there.
 |---|---|
 | `data.laps_dir` | Moves the laps folder, to another disk or a synced folder. If you leave it empty it stays `Documents\ACCoach\laps`. |
 | `acquire.hz` | How many samples per second the recorder reads. |
-| `server.host` · `server.port` · `server.hz` | Address, port and rate of the Live backend. |
+| `server.host` · `server.port` · `server.hz` | Address, port and rate of the Coach without overlay. |
 | `web.port` | The port of the analysis. |
 | `logging.level` · `logging.console` | How much the logs write. |
 

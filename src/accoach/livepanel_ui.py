@@ -52,6 +52,7 @@ from .livepanel import POLL_S, LiveTracker, PanelState, parse_health, report_url
 from .guard import lan_key
 from .netinfo import device_urls, display_address
 from .recording.storage import _catalog_path, _slug, laps_root
+from .textfmt import display_name
 
 # Tetto di una richiesta a /health: sotto POLL_S, cosi' una risposta lenta non
 # si accavalla alla successiva (che comunque non parte finche' c'e' questa).
@@ -696,7 +697,7 @@ class LivePanel(QWidget):
     def _combo(self, st: PanelState) -> None:
         if not (st.car or st.track):
             return
-        self._add(_bold(" · ".join(x for x in (st.track, st.car) if x)))
+        self._add(_bold(" · ".join(display_name(x) for x in (st.track, st.car) if x)))
         n = st.laps_done or 0
         laps = (t("live.no_lap_yet") if n <= 0 else
                 t("live.laps_one") if n == 1 else t("live.laps", n=n))
@@ -746,7 +747,7 @@ class LivePanel(QWidget):
                 saved += ", " + (t("live.valid_one") if v == 1
                                  else t("live.valid", n=v))
             self._add(_role(QLabel(saved), "good"))
-            where = [x for x in (st.track, st.car) if x]
+            where = [display_name(x) for x in (st.track, st.car) if x]
             if cat_total and info.get("duration_s") is not None:
                 where.append(self._minutes(info["duration_s"]))
             self._add(_hint(" · ".join(where)))

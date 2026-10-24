@@ -105,6 +105,26 @@ def test_connect_src_uses_the_configured_live_port(tmp_path, monkeypatch):
     assert "ws://testserver:9123" in c.get("/").headers["content-security-policy"]
 
 
+@pytest.mark.parametrize("page", ("/engineer", "/tablet", "/test"))
+def test_the_page_learns_the_configured_live_port(tmp_path, monkeypatch, page):
+    # Il 24/10, con la porta live cambiata in config.toml, tablet e Ingegnere
+    # bussavano ancora alla 8777 (scritta a mano nel JS) e dicevano «coach
+    # spento» col coach acceso. La porta arriva nella pagina, e il JS la legge.
+    from accoach import config
+    cfg = config.load_config()
+    monkeypatch.setattr(cfg.server, "port", 9123)
+    monkeypatch.setattr(config, "load_config", lambda *a, **k: cfg)
+    c = TestClient(create_api(tmp_path / "laps"))
+    assert '<meta name="hone-live-port" content="9123">' in c.get(page).text
+
+
+@pytest.mark.parametrize("js", ("engineer.js", "tablet.js", "test.js"))
+def test_live_port_is_read_from_the_page_not_hardcoded(js):
+    src = (_WEB / js).read_text(encoding="utf-8")
+    assert 'meta[name="hone-live-port"]' in src
+    assert not re.search(r"(WS_PORT|LIVE_PORT)\s*=\s*8777", src)
+
+
 def test_the_offline_guide_has_no_nonce():
     # La copia aperta dal disco non ha server ne' CSP: niente nonce finto.
     from accoach.guide import render_guide

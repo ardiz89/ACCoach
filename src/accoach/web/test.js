@@ -8,7 +8,12 @@
  */
 (() => {
   "use strict";
-  const LIVE_PORT = 8777;
+  // La porta del motore la scrive il server nella pagina (`hone-live-port`).
+  const LIVE_PORT = (() => {
+    const m = document.querySelector('meta[name="hone-live-port"]');
+    const n = m ? parseInt(m.getAttribute("content"), 10) : NaN;
+    return n > 0 && n < 65536 ? n : 8777;
+  })();
   // Sul Wi-Fi l'URL del motore porta la chiave del QR (lankey.js).
   const liveUrl = (u) => (window.honeLive ? window.honeLive(u) : u);
   const $ = (id) => document.getElementById(id);

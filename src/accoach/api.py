@@ -2435,21 +2435,27 @@ def create_api(
             buf.getvalue(), media_type="text/csv",
             headers={"Content-Disposition": f'attachment; filename="{stem}.csv"'})
 
+    def _live_port() -> int:
+        """La porta del motore dal vivo, dal config (la predefinita se e'
+        illeggibile). La leggono la CSP e la pagina, e devono leggere la
+        stessa: e' la porta su cui la pagina apre il WebSocket."""
+        from .config import load_config
+
+        try:
+            return int(load_config().server.port)
+        except Exception:  # pragma: no cover - config illeggibile: la predefinita
+            return 8777
+
     def _csp_headers(request: Request, nonce: str) -> dict[str, str]:
         """La CSP di una pagina, col nonce di questa risposta.
 
         La porta live si legge dal config a ogni richiesta (e' in cache): e'
         quella su cui la pagina apre il WebSocket, e una CSP che ne apre
         un'altra lascerebbe la pagina Ingegnere senza dati dal vivo."""
-        from .config import load_config
         from .guard import csp
 
-        try:
-            live = load_config().server.port
-        except Exception:  # pragma: no cover - config illeggibile: la predefinita
-            live = 8777
         return {"Content-Security-Policy":
-                csp(request.headers.get("host", ""), nonce, live)}
+                csp(request.headers.get("host", ""), nonce, _live_port())}
 
     def _serve(page: str, request: Request) -> Response:
         """Serve a web page with the app language written into it, and, in demo
@@ -2471,6 +2477,12 @@ def create_api(
         nonce = new_nonce()
         path = _WEB_DIR / page
         html = path.read_text(encoding="utf-8")
+        # La porta del motore dal vivo, per le pagine che ci aprono il
+        # WebSocket: prima stava scritta a mano (8777) in tre file JS, e una
+        # porta cambiata in config.toml le lasciava scollegate.
+        html = html.replace(
+            "<head>",
+            f'<head>\n  <meta name="hone-live-port" content="{_live_port()}">', 1)
         if '/static/i18n.js' in html:
             # Only the language is read, and the shared cache is left alone: a
             # file caught mid-write must not hand this process the defaults.

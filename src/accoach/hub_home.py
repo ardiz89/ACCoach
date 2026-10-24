@@ -30,7 +30,7 @@ from .coaching.debrief import CornerLoss
 from .i18n import t
 from .logging_setup import get_logger
 from .telemetry.snapshot import format_lap_time
-from .textfmt import fmt_num
+from .textfmt import display_name, fmt_num
 from .theme import MONO
 
 _log = get_logger("hub")
@@ -200,10 +200,16 @@ class HomePanel(QWidget):
     this panel stays ignorant of how modes are launched.
     """
 
-    def __init__(self, on_analysis, on_setup, laps_dir=None, parent=None) -> None:
+    def __init__(self, on_analysis, on_setup, laps_dir=None, parent=None, *,
+                 on_drive=None, on_demo=None) -> None:
         super().__init__(parent)
         self._on_analysis = on_analysis
         self._on_setup = on_setup
+        # Con l'archivio vuoto i bottoni dell'analisi non hanno niente da
+        # mostrare: il primo passo e' andare in pista, o provare la demo. Prima
+        # il bottone acceso era «Analizza» anche al primo avvio (24/10).
+        self._on_drive = on_drive or (lambda: None)
+        self._on_demo = on_demo or (lambda: None)
         self._laps_dir = laps_dir
         self._data: HomeData | None = None
         self._worker: _HomeWorker | None = None
@@ -222,6 +228,14 @@ class HomePanel(QWidget):
         self._session = QLabel("")
         self._session.setProperty("role", "muted")
         root.addWidget(self._session)
+
+        # config.toml che non si legge: l'app parte coi predefiniti, e lo dice
+        # qui invece di cambiare lingua e porte senza spiegare (24/10).
+        self._config_note = QLabel("")
+        self._config_note.setProperty("role", "bad")
+        self._config_note.setWordWrap(True)
+        self._config_note.hide()
+        root.addWidget(self._config_note)
 
         # Headline card — the causal "why you were slow".
         self._headline = QLabel("")
@@ -254,7 +268,13 @@ class HomePanel(QWidget):
         self._cta_debrief.clicked.connect(self._show_debrief)
         self._cta_setup = QPushButton("")
         self._cta_setup.clicked.connect(lambda: self._on_setup())
-        for b in (self._cta_analysis, self._cta_debrief, self._cta_setup):
+        self._cta_drive = QPushButton("")
+        self._cta_drive.setProperty("accent", True)
+        self._cta_drive.clicked.connect(lambda: self._on_drive())
+        self._cta_demo = QPushButton("")
+        self._cta_demo.clicked.connect(lambda: self._on_demo())
+        for b in (self._cta_drive, self._cta_demo, self._cta_analysis,
+                  self._cta_debrief, self._cta_setup):
             b.setMinimumHeight(40)
             cta.addWidget(b)
         root.addLayout(cta)
@@ -279,11 +299,22 @@ class HomePanel(QWidget):
     def _apply(self, data: HomeData) -> None:
         self._data = data
         self._session.setText(
-            f"{data.car} · {data.track}" if data.car else "")
+            f"{display_name(data.car)} · {display_name(data.track)}"
+            if data.car else "")
 
         has_debrief = bool(data.debrief_text)
         self._cta_debrief.setEnabled(has_debrief)
         self._cta_debrief.setToolTip("" if has_debrief else t("home.empty_body"))
+        # Senza giri, i bottoni sono quelli del primo passo.
+        first = data.status == "empty"
+        self._cta_drive.setVisible(first)
+        self._cta_demo.setVisible(first)
+        for b in (self._cta_analysis, self._cta_debrief, self._cta_setup):
+            b.setVisible(not first)
+        from .config import config_problem
+        problem = config_problem()
+        self._config_note.setText(t("home.config_bad") if problem else "")
+        self._config_note.setVisible(bool(problem))
 
         if data.status == "error":
             # Distinto da "empty" di proposito: «non riesco a leggere» e «non hai
@@ -362,6 +393,8 @@ class HomePanel(QWidget):
         self._cta_analysis.setText(t("home.cta_analysis"))
         self._cta_debrief.setText(t("home.cta_debrief"))
         self._cta_setup.setText(t("home.cta_setup"))
+        self._cta_drive.setText(t("home.cta_drive"))
+        self._cta_demo.setText(t("home.cta_demo"))
         labels = {"best": t("home.stat_best"), "gap": t("home.stat_gap"),
                   "laps": t("home.stat_laps"),
                   "consistency": t("home.stat_consistency")}

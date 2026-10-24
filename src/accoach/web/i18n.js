@@ -836,10 +836,10 @@
     "eng.engPrefix":   { en: `Engineer `, it: `Ingegnere ` },
 
     // La pagina la alimenta Coach Live (`app._serve_engineer_page`, la pagina
-    // Ingegnere in modalità spettatore) oppure il backend live. I due non possono
+    // Ingegnere in modalità spettatore) oppure il coach senza overlay. I due non possono
     // convivere: registrano entrambi, e insieme salverebbero ogni giro due volte.
-    "eng.hint":        { en: `This page is fed by <b>Coach Live</b>, or by the <b>live backend</b>, which you start from the hub in <b>Devices</b> → Live backend. The two can't run together, because they'd both record. The changes in <b>Setup</b> go into the setup file. They must be <b>loaded in the pits</b> and don't change the car while you drive.`,
-                         it: `Questa pagina la alimenta <b>Coach Live</b>, oppure il <b>backend live</b>, che accendi dall'hub in <b>Dispositivi</b> → Backend live. I due non possono stare accesi insieme, perché registrano entrambi. Le modifiche in <b>Setup</b> agiscono sul file di setup. Vanno <b>caricate ai box</b> e non cambiano l'auto mentre guidi.` },
+    "eng.hint":        { en: `This page is fed by <b>Coach Live</b>, or by the <b>coach without overlay</b>, which you start from the hub in <b>Settings</b> → Coach without overlay. The two can't run together, because they'd both record. The changes in <b>Setup</b> go into the setup file. They must be <b>loaded in the pits</b> and don't change the car while you drive.`,
+                         it: `Questa pagina la alimenta <b>Coach Live</b>, oppure il <b>coach senza overlay</b>, che accendi dall'hub in <b>Impostazioni</b> → Coach senza overlay. I due non possono stare accesi insieme, perché registrano entrambi. Le modifiche in <b>Setup</b> agiscono sul file di setup. Vanno <b>caricate ai box</b> e non cambiano l'auto mentre guidi.` },
 
     "setup.title":     { en: `Setup`, it: `Setup` },
     "legend2.click":   { en: `<b>click</b> = game step`, it: `<b>click</b> = scatto di gioco` },
@@ -1064,8 +1064,8 @@ Salva un setup nel gioco, poi ricarica questa pagina.` },
 
     // engineer tour
     "tour.e1.t": { en: `Live diagnosis`, it: `Diagnosi live` },
-    "tour.e1.x": { en: `Speed, gear and aids come straight from the car while Coach Live or the live backend is running.`,
-                   it: `Velocità, marcia e aiuti arrivano dall'auto quando è acceso Coach Live o il backend live.` },
+    "tour.e1.x": { en: `Speed, gear and aids come straight from the car while Coach Live or the coach without overlay is running.`,
+                   it: `Velocità, marcia e aiuti arrivano dall'auto quando è acceso Coach Live o il coach senza overlay.` },
     "tour.e2.t": { en: `Tyres`, it: `Gomme` },
     "tour.e2.x": { en: `Temperatures and pressures are colour-coded. Keep them in the green.`,
                    it: `Temperature e pressioni hanno un colore. Tienile nel verde.` },
@@ -1093,6 +1093,25 @@ Salva un setup nel gioco, poi ricarica questa pagina.` },
     if (window.HoneI18n.lang === "it") s = s.replace(".", ",");
     s = s.replace("-", "−");   // il meno dei tempi persi, non il trattino
     return unit ? s + " " + unit : s;
+  }
+
+  // A car or track name as a person reads it: the game writes "ferrari_296_gt3"
+  // and "brands_hatch", and the pages showed exactly that. Python twin:
+  // accoach.textfmt.display_name (tests/test_textfmt.py runs both).
+  var NAME_UPPER = ["amg", "amr", "bmw", "gt", "gtr", "gte", "gts", "lms", "rsr",
+                    "tcr", "evo", "dtm", "gp", "ii", "iii", "rs", "cs", "gtd",
+                    "usa", "uk"];
+  var NAME_SPECIAL = { mclaren: "McLaren" };
+  function displayName(raw) {
+    if (!raw || (raw.indexOf("_") === -1 && raw !== raw.toLowerCase())) return raw;
+    var parts = raw.split("_").filter(function (p) { return p; });
+    if (parts.length > 1 && parts[0].toLowerCase() === "ks") parts = parts.slice(1);
+    return parts.map(function (p) {
+      var low = p.toLowerCase();
+      if (NAME_SPECIAL.hasOwnProperty(low)) return NAME_SPECIAL[low];
+      if (NAME_UPPER.indexOf(low) !== -1 || /[0-9]/.test(low)) return low.toUpperCase();
+      return low.charAt(0).toUpperCase() + low.slice(1);
+    }).join(" ");
   }
 
   function readLang() {
@@ -1234,7 +1253,8 @@ Salva un setup nel gioco, poi ricarica questa pagina.` },
     applyStatic();
   }
 
-  window.HoneI18n = { lang: lang, t: t, set: set, applyStatic: applyStatic, fmtNum: fmtNum };
+  window.HoneI18n = { lang: lang, t: t, set: set, applyStatic: applyStatic, fmtNum: fmtNum,
+                     displayName: displayName };
 
   // Script lives at the end of <body>, after the header — the DOM we need is
   // already parsed, so boot immediately (and also catch the event, defensively).

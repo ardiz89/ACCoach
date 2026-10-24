@@ -244,6 +244,11 @@ async function init() {
   if (window.HoneTour) window.HoneTour.auto(tourSteps(), "hone_tour_analysis");
 }
 
+// A car or track name as a person reads it (HoneI18n.displayName; the raw id
+// is what the API wants, so only the text shown goes through this).
+const dn = (s) => (window.HoneI18n && window.HoneI18n.displayName
+                   ? window.HoneI18n.displayName(s) : s);
+
 // Build the combo dropdown from COMBOS, preserving the current selection so a
 // language switch can relabel "laps"/"best" without losing the user's place.
 function fillCombos() {
@@ -254,7 +259,7 @@ function fillCombos() {
   for (const c of COMBOS) {
     const o = document.createElement("option");
     o.value = JSON.stringify({ car: c.car, track: c.track });
-    o.textContent = `${c.car} · ${c.track}  (${c.laps} ${t("combo.laps")}, ${t("combo.best")} ${c.best})`;
+    o.textContent = `${dn(c.car)} · ${dn(c.track)}  (${c.laps} ${t("combo.laps")}, ${t("combo.best")} ${c.best})`;
     sel.appendChild(o);
   }
   if (prev) sel.value = prev;
@@ -1846,7 +1851,7 @@ function drawLapBar(a) {
   // The window title, so three windows open on three tracks are three different
   // things in the taskbar instead of three "HONE · Analysis". The distinguishing
   // part goes first: a tab strip only shows the first few characters.
-  document.title = `${a.track} · ${a.review.lap_time} — HONE`;
+  document.title = `${dn(a.track)} · ${a.review.lap_time} — HONE`;
 }
 
 // Amber, not red: going off track isn't an app error and isn't the game's own
@@ -2639,7 +2644,7 @@ function renderPagella(p, index) {
   const body = $("pag-body");
   if (!body) return;
   const ses = p.session || {};
-  const bits = [CURRENT.track, CURRENT.car, fmtWhen(ses.started_utc),
+  const bits = [dn(CURRENT.track), dn(CURRENT.car), fmtWhen(ses.started_utc),
                 tf("pag.laps", { laps: ses.laps || 0, valid: ses.valid || 0 })];
   if (ses.wet) bits.push(t("pag.wet"));
   $("pag-sub").textContent = bits.join(" · ");

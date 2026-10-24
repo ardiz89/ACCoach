@@ -2,13 +2,24 @@
 // Engineer page: live diagnosis (WebSocket) + setup editor (REST /api/setup/*).
 // Vanilla JS, no libraries — same constraint as the analysis app.
 
-const WS_PORT = 8777;            // the live backend; the page itself is on 8778
+// The live backend's port: the server writes the configured one into the page
+// (`hone-live-port`), because a port changed in config.toml left this page
+// knocking on 8777 and saying the coach was off while it ran.
+const WS_PORT = livePort();
+function livePort() {
+  const m = document.querySelector('meta[name="hone-live-port"]');
+  const n = m ? parseInt(m.getAttribute("content"), 10) : NaN;
+  return n > 0 && n < 65536 ? n : 8777;
+}
 // Ogni URL verso il motore passa da qui: sul Wi-Fi porta la chiave (lankey.js).
 // Il cookie varrebbe anche sulla 8777 (i cookie non guardano la porta), ma una
 // fetch cross-origin senza credenziali non lo manda. Senza lankey.js l'URL
 // resta com'e', e sul PC funziona lo stesso.
 const liveUrl = (u) => (window.honeLive ? window.honeLive(u) : u);
 const $ = (id) => document.getElementById(id);
+// A car or track name as a person reads it; the raw id stays in `dataset`.
+const dn = (s) => (window.HoneI18n && window.HoneI18n.displayName
+                   ? window.HoneI18n.displayName(s) : s);
 // i18n: translate a chrome string (defensive if i18n.js failed to load).
 const t = (k) => (window.HoneI18n ? window.HoneI18n.t(k) : k);
 // …e la stessa con i segnaposto riempiti. Gemella di quella in app.js: le due
@@ -112,7 +123,7 @@ async function loadCombos() {
     og.label = `${cls} (${items.length})`;
     for (const c of items) {
       const o = document.createElement("option");
-      o.textContent = `${c.car}  ·  ${c.track}  (${c.count})`;
+      o.textContent = `${dn(c.car)}  ·  ${dn(c.track)}  (${c.count})`;
       o.dataset.car = c.car; o.dataset.track = c.track;
       og.appendChild(o);
     }
@@ -286,7 +297,7 @@ function renderMissing(sources) {
       if (i === 0) radio.checked = true;
       row.appendChild(radio);
       const txt = document.createElement("span");
-      txt.textContent = `${s.track} · ${s.name}`;
+      txt.textContent = `${dn(s.track)} · ${s.name}`;
       row.appendChild(txt);
       list.appendChild(row);
     });
@@ -458,7 +469,7 @@ async function onSetupChange() {
   for (const p of data.params) {
     p.slots.forEach((s, i) => { state.base[slotKey(p.key, i)] = s.click; });
   }
-  $("setup-car").textContent = `· ${data.car} · ${data.name}`;
+  $("setup-car").textContent = `· ${dn(data.car)} · ${data.name}`;
   renderSetup(data);
   renderTray();
 }
@@ -1026,7 +1037,7 @@ function applyLive(st) {
   }
   badge.dataset.state = st.at_box ? "pit" : "on";
   $("live-text").textContent = st.at_box ? t("live.inpit") : t("live.ontrack");
-  $("live-car").textContent = `${st.car || "?"} · ${st.track || "?"}`;
+  $("live-car").textContent = `${dn(st.car) || "?"} · ${dn(st.track) || "?"}`;
   $("live-car").classList.remove("muted");
   $("g-speed").textContent = Math.round(st.speed_kmh);
   $("g-gear").textContent = st.gear;

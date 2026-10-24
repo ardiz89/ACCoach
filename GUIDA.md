@@ -892,7 +892,7 @@ Qualche dettaglio pratico.
   sul tablet.
 - Per il **Report**, cioè i giri salvati, basta che l'analisi sia accesa. La
   pagina **Ingegnere** in tempo reale ha bisogno anche di Coach Live, o del
-  Backend live se guidi senza overlay.
+  Coach senza overlay se guidi senza overlay.
 - Con l'opzione spenta, tutto resta solo su questo PC, all'indirizzo
   `127.0.0.1`.
 
@@ -959,7 +959,7 @@ Queste voci esistono solo lì.
 |---|---|
 | `data.laps_dir` | Sposta la cartella dei giri, su un altro disco o in una cartella sincronizzata. Se la lasci vuota resta `Documenti/ACCoach/laps`. |
 | `acquire.hz` | Quanti campioni al secondo legge il registratore. |
-| `server.host` · `server.port` · `server.hz` | Indirizzo, porta e frequenza del Backend live. |
+| `server.host` · `server.port` · `server.hz` | Indirizzo, porta e frequenza del Coach senza overlay. |
 | `web.port` | La porta dell'analisi. |
 | `logging.level` · `logging.console` | Quanto scrivono i log. |
 

@@ -987,7 +987,14 @@ class Overlay(QWidget):
 
 def main(argv: list[str] | None = None) -> None:
     argv = sys.argv[1:] if argv is None else argv
+    # La porta del motore e' quella del config, come per le pagine: scritta a
+    # mano (8777) l'overlay restava vuoto con una porta cambiata (24/10).
     url = DEFAULT_URL
+    try:
+        from .config import load_config
+        url = f"ws://127.0.0.1:{int(load_config().server.port)}/ws"
+    except Exception:  # pragma: no cover - config illeggibile: la predefinita
+        pass
     interactive = "--interactive" in argv or "-i" in argv
     for a in argv:
         if a.startswith("ws://") or a.startswith("wss://"):
