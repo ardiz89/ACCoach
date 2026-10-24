@@ -1,7 +1,27 @@
 """Shared pytest fixtures."""
-import pytest
+# --- la casa della suite e' una cartella temporanea --------------------------
+# Le pezze qui sotto (config, log, chiave) coprono i nomi che conoscono, e il
+# 24/10 due test sono passati da un'altra strada: hanno creato `config.toml` e
+# aperto `laps/catalog.db` nella `Documents\ACCoach` vera di chi lanciava la
+# suite. Si sposta la casa intera, prima di importare `accoach`: `Path.home()`
+# legge USERPROFILE (HOME fuori da Windows) a ogni chiamata, e le costanti
+# calcolate all'import, come le radici degli assetti, nascono gia' qui dentro.
+# Vedi tests/test_casa_finta.py.
+import atexit
+import os
+import shutil
+import tempfile
+from pathlib import Path
 
-from accoach import config
+CASA_VERA = Path.home()
+CASA_FINTA = Path(tempfile.mkdtemp(prefix="hone-casa-test-"))
+os.environ["USERPROFILE"] = str(CASA_FINTA)
+os.environ["HOME"] = str(CASA_FINTA)
+atexit.register(shutil.rmtree, CASA_FINTA, ignore_errors=True)
+
+import pytest  # noqa: E402
+
+from accoach import config  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
