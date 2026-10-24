@@ -1,4 +1,7 @@
 # Sorgente del lock della release: le righe di requirements.txt piu' pyinstaller.
+# Il lock si rigenera su Windows con Python 3.12 (pip-tools 7.6.2): pip-compile
+# toglie i marcatori di piattaforma, quindi altrove pywin32, comtypes e
+# pypiwin32 (tirati da pyttsx3) sparirebbero dal lock.
 # Non si installa da qui: si rigenera requirements.lock (vedi la sua testa).
 -r requirements.txt
 pyinstaller

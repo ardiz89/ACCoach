@@ -23,8 +23,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install --require-hashes -r requirements.lock
+          pip install --require-hashes --only-binary :all: -r requirements.lock
 
       # Dal file .spec, non da una riga di comando. La riga di comando qui
       # elencava i --add-data a mano ed era DERIVATA: ne spediva quattro dei

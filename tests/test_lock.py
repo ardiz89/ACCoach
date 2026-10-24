@@ -74,6 +74,17 @@ def test_pyinstaller_e_nel_lock_e_pyside6_sotto_612():
 def test_la_release_installa_dal_lock_con_le_impronte_e_senza_cache():
     righe = [l.split("#", 1)[0] for l in RELEASE.read_text(encoding="utf-8").splitlines()]
     codice = "\n".join(righe)
-    assert re.search(r"pip install\s+--require-hashes\s+-r\s+requirements\.lock", codice)
+    assert re.search(r"pip install\s+--require-hashes\s+--only-binary :all:\s+-r\s+requirements\.lock", codice)
     assert "requirements.txt" not in codice
     assert "cache: pip" not in codice
+
+
+def test_la_release_non_ha_altri_pip_install_senza_impronte():
+    # Un pip aggiornato al volo, senza versione ne' impronta, sarebbe la porta
+    # da cui il lock si aggira proprio nel job che costruisce l'EXE.
+    codice = "\n".join(l.split("#", 1)[0] for l in RELEASE.read_text(encoding="utf-8").splitlines())
+    installi = re.findall(r"pip\s+install\b[^\n]*", codice)
+    assert installi, "nessun pip install nella release"
+    for riga in installi:
+        assert "--require-hashes" in riga and "-r requirements.lock" in riga, riga
+        assert "--only-binary :all:" in riga, riga
