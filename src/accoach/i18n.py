@@ -255,13 +255,18 @@ _UI: dict[str, dict[str, str]] = {
                        "l'indirizzo che c'è sotto, chiave compresa."},
     # La chiave sta in Documenti\ACCoach: con l'Accesso controllato alle
     # cartelle di Windows non si crea, e un QR senza chiave porta al 401.
+    # Windows blocca un eseguibile, non «HONE»: il pacchetto scrive come
+    # HONE.exe, chi parte da HONE.bat come python.exe. Una frase sola per tutti e
+    # due, perche' il programma non lo sa dire con certezza (pythonw.exe a parte).
     "mob.no_key": {"en": "HONE can't save the network key in its folder, so "
-                         "there's no code. Allow HONE to write to the "
-                         "Documents folder in Windows Security settings.",
+                         "there's no code. In Windows Security settings, allow "
+                         "HONE.exe to write to the Documents folder, or "
+                         "python.exe if you start HONE from HONE.bat.",
                    "it": "HONE non riesce a salvare la chiave di rete nella sua "
-                         "cartella, quindi il codice non c'è. Consenti a HONE "
-                         "di scrivere nella cartella Documenti, nelle "
-                         "impostazioni di Sicurezza di Windows."},
+                         "cartella, quindi il codice non c'è. Nelle "
+                         "impostazioni di Sicurezza di Windows consenti a "
+                         "HONE.exe di scrivere nella cartella Documenti, o a "
+                         "python.exe se avvii HONE da HONE.bat."},
     "mob.off": {"en": "Turn on the option above to open these pages from your phone.",
                 "it": "Attiva l'opzione qui sopra per aprire le pagine dal telefono."},
     "mob.no_ip": {"en": "No network address found. Connect this PC to Wi-Fi or "

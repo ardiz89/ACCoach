@@ -234,11 +234,15 @@ def _leggi(path: Path) -> str:
 
     Un file valido che l'antivirus o il backup tengono aperti per un attimo non
     e' un file rovinato: leggerlo come vuoto lo farebbe spostare via, e il
-    tablet perderebbe la chiave del segnalibro.
+    tablet perderebbe la chiave del segnalibro. Un file che non e' UTF-8 (un
+    editor l'ha salvato in UTF-16) si legge invece come vuoto: non e' una chiave
+    valida e la rotazione lo toglie, invece di dare 500 su ogni pagina.
     """
     try:
         return path.read_text(encoding="utf-8").strip()
     except FileNotFoundError:
+        return ""
+    except UnicodeDecodeError:
         return ""
 
 

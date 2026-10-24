@@ -520,3 +520,13 @@ def test_the_track_test_plan_quotes_what_the_coach_says_today():
 
 def _render_placeholders(t: str) -> str:
     return re.sub(r"\{[^{}]*\}", "x", t)
+
+
+def test_senza_chiave_il_pannello_nomina_il_programma_che_windows_blocca():
+    """L'Accesso controllato alle cartelle blocca un eseguibile, non «HONE»: da
+    sorgente scrive `python.exe`, dal pacchetto `HONE.exe`. Chi legge deve
+    sapere quale mettere fra i consentiti."""
+    from accoach import i18n
+    for lang in ("it", "en"):
+        testo = i18n.t("mob.no_key", lang)
+        assert "HONE.exe" in testo and "python.exe" in testo and "HONE.bat" in testo, lang

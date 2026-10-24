@@ -698,3 +698,19 @@ def test_senza_chiave_un_corpo_enorme_e_401_non_413():
         r = c.post("/w", content=b"x" * (guard.MAX_BODY + 1),
                    headers={"content-type": "application/json"})
         assert r.status_code == 401
+
+
+def test_una_chiave_non_utf8_si_rifa_e_il_pc_non_prende_500():
+    """Un editor che salva `lan-key.txt` in UTF-16 lascia un file che
+    `read_text(utf-8)` non decodifica: era un 500 su ogni pagina, hub compreso."""
+    guard.key_path().parent.mkdir(parents=True, exist_ok=True)
+    guard.key_path().write_text("7K3M9P2QXR4T8VWZ", encoding="utf-16")
+    guard._dimentica()
+    with TestClient(_mini(), base_url="http://127.0.0.1:8778",
+                    client=("127.0.0.1", 50000)) as c:
+        assert c.get("/x").status_code == 200
+    k = guard.lan_key()
+    assert len(k) == 16 and set(k) <= _CROCKFORD
+    assert guard.key_path().read_text(encoding="utf-8").strip() == k
+    assert sorted(p.name for p in guard.key_path().parent.iterdir()) == [
+        "lan-key.txt"]

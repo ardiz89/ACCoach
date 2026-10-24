@@ -885,6 +885,10 @@ Qualche dettaglio pratico.
   **Impostazioni > Rete e Internet > Wi-Fi** (o **Ethernet**), apri la tua rete
   e scegli **Rete privata**. Se avvii HONE da `HONE.bat`, puoi lanciare anche
   `tools\setup_firewall.ps1` a mano e rispondere `y` alla domanda.
+- La pagina di prova `/test` salva i risultati sul PC, nella cartella
+  `test_runs` dei dati di HONE, e ne tiene al massimo 200. Se la pagina te lo
+  dice, cancella i file vecchi da quella cartella. Intanto i risultati restano
+  sul tablet.
 - Per il **Report**, cioè i giri salvati, basta che l'analisi sia accesa. La
   pagina **Ingegnere** in tempo reale ha bisogno anche di Coach Live, o del
   Backend live se guidi senza overlay.

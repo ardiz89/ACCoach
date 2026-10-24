@@ -40,6 +40,9 @@
     saving: "Salvo…",
     saved: "Salvato",
     saveError: "Il PC ha risposto con un errore.",
+    saveFull: "Il PC tiene già 200 prove salvate e non ne accetta altre. " +
+              "Cancella i file vecchi dalla cartella test_runs, dentro la " +
+              "cartella dati di HONE. Intanto i risultati restano sul tablet.",
     saveFailed: "Il salvataggio non è riuscito.",
     noCue: "Nessun avviso",
     tour1t: "Dimmi cosa stai provando",
@@ -225,6 +228,9 @@
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
+      // 409: il PC ha gia' il massimo di prove (`MAX_TEST_RUNS`), e dirlo serve
+      // piu' di «errore»: i risultati non sono persi, stanno nel tablet.
+      if (res.status === 409) { setSaveState(TXT.saveFull, false); return; }
       const data = await res.json();
       setSaveState(data.ok ? TXT.saved : TXT.saveError, data.ok);
     } catch (e) {

@@ -940,6 +940,9 @@ A few practical details.
   Network & internet > Wi-Fi** (or **Ethernet**), open your network and choose
   **Private network**. If you start HONE from `HONE.bat`, you can also run
   `tools\setup_firewall.ps1` by hand and answer `y` to the question.
+- The `/test` page saves its results on the PC, in the `test_runs` folder of
+  HONE's data, and keeps 200 runs at most. If the page tells you it is full,
+  delete old files from that folder. The results stay on the tablet meanwhile.
 - For the **Report**, which shows your saved laps, the analysis only has to be
   running. The live **Engineer** page also needs Coach Live, or the Live backend
   if you drive without the overlay.
