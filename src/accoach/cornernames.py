@@ -79,6 +79,13 @@ MAX_MARK = 80
 #: vietarli toglierebbe al pilota il nome giusto per una difesa che c'è già.
 FORBIDDEN = set("<>")
 
+#: Tetti al file: la `track` arriva dalla rete, e senza un limite una chiave sempre
+#: nuova faceva crescere `corner-names.json` all'infinito. 80 caratteri bastano al
+#: nome di un circuito con il suo layout; 500 piste sono molte piu' di quelle che
+#: un pilota guida davvero.
+MAX_TRACK = 80
+MAX_TRACKS = 500
+
 
 def has_forbidden(text: str) -> bool:
     return any(ch in FORBIDDEN for ch in text or "")
@@ -236,8 +243,14 @@ def _put(track: str, pos: float, text: str, kind: str, field: str,
     # protegge il file deve stare dove il file si scrive.
     if has_forbidden(text):
         raise ValueError(f"{kind}: {field} contains one of {''.join(sorted(FORBIDDEN))}")
+    if len(str(track).strip()) > MAX_TRACK:
+        raise ValueError(f"{kind}: track longer than {MAX_TRACK} characters")
     key = _key(track)
     data = _read(p)
+    # Una pista che c'e' gia' riceve nomi anche al tetto; si rifiuta solo di
+    # aprirne una nuova. Togliere un nome (testo vuoto) non crea niente.
+    if text and key not in data and len(data) >= MAX_TRACKS:
+        raise ValueError(f"{kind}: too many tracks in the names file")
 
     entry = data.get(key)
     kinds = {k: [r for r in _rows(entry, k) if isinstance(r, dict)]

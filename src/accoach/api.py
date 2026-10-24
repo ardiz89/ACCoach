@@ -95,6 +95,10 @@ def _web_dir() -> Path:
 
 _WEB_DIR = _web_dir()
 
+#: Quanti file di prova del tablet tiene `<data>/test_runs/`. Ogni `run_id` nuovo
+#: e' un file nuovo: senza tetto, chi ha la chiave riempiva il disco un POST alla volta.
+MAX_TEST_RUNS = 200
+
 
 def _pick_indices(n: int) -> list[int]:
     """Which of a lap's frames the browser gets: evenly thinned to _MAX_POINTS.
@@ -997,6 +1001,9 @@ def create_api(
         _refuse_markup(name, lang, "names.forbidden")
         try:
             cornernames.put(track, pos, name)
+        except ValueError as exc:
+            # track troppo lunga o troppe piste: il file non cresce.
+            raise HTTPException(400, str(exc))
         except OSError:
             raise HTTPException(500, "could not write the names file")
         return {"track": track, "pos": pos, "name": name,
@@ -1028,6 +1035,9 @@ def create_api(
         _refuse_markup(text, lang, "marks.forbidden")
         try:
             cornernames.put_mark(track, pos, text)
+        except ValueError as exc:
+            # track troppo lunga o troppe piste: il file non cresce.
+            raise HTTPException(400, str(exc))
         except OSError:
             raise HTTPException(500, "could not write the names file")
         return {"track": track, "pos": pos, "text": text,
@@ -2596,6 +2606,10 @@ def create_api(
         stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
         name = f"testrun__{cat}__{rid or stamp}.json"
         path = runs / name
+        # Il tablet riscrive lo stesso run_id a ogni autosave: sovrascrivere resta
+        # permesso al tetto, si rifiuta solo di creare un file in piu'.
+        if not path.exists() and sum(1 for _ in runs.glob("*.json")) >= MAX_TEST_RUNS:
+            raise HTTPException(409, "too many saved test runs")
         path.write_text(_json.dumps(payload, ensure_ascii=False, indent=2),
                         encoding="utf-8")
         return {"ok": True, "file": name, "path": str(path)}
