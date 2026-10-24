@@ -934,9 +934,11 @@ A few practical details.
 - To change the key, delete `lan-key.txt` in the HONE folder
   (`Documents\ACCoach\`) and restart HONE. Old links stop working.
 - If **Windows** asks the first time, allow access on **private networks**.
-- If your home network is set to **Public**, the tablet can't get in. HONE
+- If Windows keeps your network on **Public**, the tablet can't get in. HONE
   doesn't change that by itself, because a Private network also relaxes other
-  Windows rules, file sharing included. To change it, run
+  Windows rules, file sharing included. To change it, go to **Settings >
+  Network & internet > Wi-Fi** (or **Ethernet**), open your network and choose
+  **Private network**. If you start HONE from `HONE.bat`, you can also run
   `tools\setup_firewall.ps1` by hand and answer `y` to the question.
 - For the **Report**, which shows your saved laps, the analysis only has to be
   running. The live **Engineer** page also needs Coach Live, or the Live backend

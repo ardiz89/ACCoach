@@ -46,6 +46,13 @@ function Write-Step($msg, $colour = 'Gray') {
     Write-Host $msg -ForegroundColor $colour
 }
 
+function Write-PublicNotice {
+    # Used both at the startup gate (every start, in HONE.bat's console) and after
+    # creating the rule, so the wording lives in one place.
+    Write-Host 'This network is Public, so tablets cannot connect yet.' -ForegroundColor Yellow
+    Write-Host 'To change that, set the network to Private in Windows, or run tools\setup_firewall.ps1 by hand.' -ForegroundColor Yellow
+}
+
 # --- settings from config.toml ---------------------------------------------
 # Defaults mirror accoach.config (Config.lan, ServerCfg.port, WebCfg.port).
 $lan = $false
@@ -107,7 +114,10 @@ $profilePublic = $netProfile -and $netProfile.NetworkCategory -eq 'Public'
 if ($Auto -and -not $Undo) {
     if (-not $lan) { exit 0 }            # local-only setup: nothing to open
     if (-not $route) { exit 0 }          # offline: no network to be reachable on
-    if (Test-RuleReady) { exit 0 }       # already good; a Public profile alone is not worth a UAC prompt
+    if (Test-RuleReady) {                # already good; a Public profile alone is not worth a UAC prompt
+        if ($profilePublic) { Write-PublicNotice }
+        exit 0
+    }
     Write-Step 'HONE: LAN mode is on but this PC is not reachable from other devices yet.' 'Yellow'
     Write-Step 'Asking for admin rights once to open the ports (see the UAC prompt).' 'Yellow'
 }
@@ -160,13 +170,18 @@ Write-Host ''
 # network to Private also loosens every other Private rule on it (file sharing
 # included), so only the person at the keyboard decides - never -Auto.
 if ($profilePublic) {
-    Write-Host ("'{0}' is set to Public, which blocks incoming connections." -f $netProfile.Name) -ForegroundColor Yellow
     if (-not $Auto) {
+        Write-Host ("'{0}' is set to Public, which blocks incoming connections." -f $netProfile.Name) -ForegroundColor Yellow
         Write-Host 'Private would let tablets in, but it also relaxes other rules on this network (file sharing included).'
         $answer = Read-Host 'Switch this network to Private? [y/N]'
-        if ($answer -match '^[yY]$') {
-            Set-NetConnectionProfile -InterfaceIndex $route.ifIndex -NetworkCategory Private
-            Write-Host 'Network profile -> Private' -ForegroundColor Green
+        if ("$answer".Trim() -match '^(y|yes)$') {
+            try {
+                Set-NetConnectionProfile -InterfaceIndex $route.ifIndex -NetworkCategory Private
+                Write-Host 'Network profile -> Private' -ForegroundColor Green
+            } catch {
+                # Still create the rule below: it is right once the network is Private.
+                Write-Host ("Could not change the network profile: {0}" -f $_.Exception.Message) -ForegroundColor Yellow
+            }
         } else {
             Write-Host 'Leaving the network on Public.'
         }
@@ -191,10 +206,7 @@ New-NetFirewallRule -DisplayName $RuleName `
 Write-Host ("Firewall rule '{0}' created: TCP {1} inbound, local subnet only." -f $RuleName, ($ports -join ', ')) -ForegroundColor Green
 
 # --- what to do next -------------------------------------------------------
-if ($profilePublic -and $Auto) {
-    Write-Host 'This network is Public, so tablets cannot connect yet.' -ForegroundColor Yellow
-    Write-Host 'To change that, run tools\setup_firewall.ps1 by hand.' -ForegroundColor Yellow
-}
+if ($profilePublic -and $Auto) { Write-PublicNotice }
 Write-Host ''
 if ($ip) {
     Write-Host 'Scan the QR codes in the Devices section, or open these on your phone:'
