@@ -522,3 +522,17 @@ def test_old_sidecar_without_text_counts_as_phrase_sent_plain(env):
 
 def test_abs_is_not_respelled(env):
     assert render_voice.render_text("Alza l'ABS di uno") == "Alza l'ABS di uno"
+
+
+def test_prune_non_esce_dalla_cartella(tmp_path):
+    d = tmp_path / "voce"
+    d.mkdir()
+    fuori = tmp_path / "x.wav"
+    fuori.write_bytes(b"non toccare")
+    dentro = d / "x.wav"
+    dentro.write_bytes(b"mio")
+    manifest = {"frase": "../x.wav"}
+    render_voice._prune(d, ["frase"], manifest, {"frase": {}})
+    assert fuori.read_bytes() == b"non toccare"
+    assert not dentro.exists()          # solo il nome, dentro d
+    assert manifest == {}

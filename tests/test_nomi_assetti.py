@@ -1,16 +1,13 @@
 """Nomi che Windows non sa scrivere, e percorsi che escono dalle cartelle (Task 3)."""
 import json
-import sys
 from pathlib import Path
 
 import pytest
-from fastapi.testclient import TestClient
 
 from accoach import trackedges
-from accoach.api import create_api
 from accoach.setup import ac_steps, store
 
-from test_setup_api import CAR, TRACK, SAMPLE, _apply_con_nome, _client, _file_sotto, _seed
+from test_setup_api import SAMPLE, _apply_con_nome, _client, _file_sotto
 
 
 @pytest.mark.parametrize("nome", [
@@ -101,17 +98,11 @@ def test_spline_path_e_car_folder_rifiutano_le_risalite(tmp_path, monkeypatch):
         assert ac_steps._car_folder(auto, nome) is None, nome
 
 
-def test_prune_non_esce_dalla_cartella(tmp_path):
-    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "tools"))
-    import render_voice
-    d = tmp_path / "voce"
-    d.mkdir()
-    fuori = tmp_path / "x.wav"
-    fuori.write_bytes(b"non toccare")
-    dentro = d / "x.wav"
-    dentro.write_bytes(b"mio")
-    manifest = {"frase": "../x.wav"}
-    render_voice._prune(d, ["frase"], manifest, {"frase": {}})
-    assert fuori.read_bytes() == b"non toccare"
-    assert not dentro.exists()          # solo il nome, dentro d
-    assert manifest == {}
+@pytest.mark.parametrize("nome", ["a*b", "CON", "a/b", "fine.", "a\\b"])
+def test_seed_con_as_name_non_scrivibile_e_400_e_non_scrive(tmp_path, nome):
+    c, path = _client(tmp_path)
+    prima = _file_sotto(tmp_path)
+    r = c.post("/api/setup/seed", json={"source": path, "track": "monza",
+                                        "as_name": nome})
+    assert r.status_code == 400, f"{nome!r}: {r.status_code} {r.text}"
+    assert _file_sotto(tmp_path) == prima

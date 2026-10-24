@@ -273,6 +273,8 @@ def register_setup_routes(app: FastAPI, root=DEFAULT_ROOTS) -> None:
             out = save(setup, dest_dir, name, overwrite=False)
         except FileExistsError as e:
             raise HTTPException(409, str(e))
+        except ValueError as e:      # as_name non e' un nome: vedi `store.save`
+            raise HTTPException(400, str(e))
         return {"ok": True, "path": str(out), "name": out.stem,
                 "car": dest_dir.parent.name, "track": dest_dir.name,
                 "from_track": src.parent.name, "from_name": src.stem}
