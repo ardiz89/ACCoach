@@ -10,7 +10,8 @@
   "use strict";
   // La porta del motore la scrive il server nella pagina (`hone-live-port`).
   const LIVE_PORT = (() => {
-    const m = document.querySelector('meta[name="hone-live-port"]');
+    const m = document.querySelector
+      ? document.querySelector('meta[name="hone-live-port"]') : null;
     const n = m ? parseInt(m.getAttribute("content"), 10) : NaN;
     return n > 0 && n < 65536 ? n : 8777;
   })();
@@ -267,7 +268,11 @@
     $("l-car").textContent = st.car || "—";
     $("l-track").textContent = st.track || "—";
     $("l-speed").textContent = st.speed_kmh != null ? Math.round(st.speed_kmh) : "—";
-    $("l-delta").textContent = st.delta ? st.delta.text : "—";
+    // In italiano, con la virgola: `delta.text` è il formato dell'overlay
+    // («+0.438»), e su questa pagina italiana stonava (24/10).
+    $("l-delta").textContent = st.delta && st.delta.s != null
+      ? (st.delta.s > 0 ? "+" : st.delta.s < 0 ? "−" : "") + fmtIt(Math.abs(st.delta.s), 3)
+      : "—";
     // Auto-fill session fields the first time the game tells us what we're in.
     if (st.car && !S.car) { S.car = st.car; $("car").value = st.car; persist(); }
     if (st.track && !S.track) { S.track = st.track; $("track").value = st.track; persist(); }

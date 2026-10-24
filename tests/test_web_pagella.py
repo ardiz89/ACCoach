@@ -129,7 +129,7 @@ def test_the_session_shown_at_the_top_is_marked_as_seen():
 # --- la Pagella segue il selettore di sessione ------------------------------
 
 def test_the_pagella_follows_the_session_selector():
-    load = _body_of("async function loadPagella(combo, index)")
+    load = _body_of("async function loadPagella(combo, index, keep)")
     assert '"/api/pagella?"' in load
     assert "SESSION_I = want" in load
     assert "stale(seen) || SESSION_I !== want" in load
@@ -180,7 +180,8 @@ def test_the_advice_buttons_post_and_reload():
     body = _body_of("async function adviceAction(defect, action)")
     assert '"/api/advice"' in body and 'method: "POST"' in body
     assert "index: SESSION_I" in body
-    assert "loadPagella(CURRENT, SESSION_I)" in body
+    # `true`: la Pagella si rilegge senza svuotarsi sotto il mouse (24/10).
+    assert "loadPagella(CURRENT, SESSION_I, true)" in body
 
 
 # --- il mini-andamento: una barra fuori scala non schiaccia le altre --------
@@ -258,13 +259,13 @@ def test_the_spark_is_tall_enough_to_read():
 
 def test_the_picker_survives_a_failed_pagella():
     """Se la Pagella non arriva, dal selettore si sceglie un'altra uscita."""
-    load = _body_of("async function loadPagella(combo, index)")
+    load = _body_of("async function loadPagella(combo, index, keep)")
     failed = load.split("catch (e) {", 1)[1].split("\n  }\n", 1)[0]
     assert "fillPagellaPicker(list, want)" in failed
 
 
 def test_the_plan_buttons_go_quiet_while_another_session_loads():
-    load = _body_of("async function loadPagella(combo, index)")
+    load = _body_of("async function loadPagella(combo, index, keep)")
     pre = load[:load.index("await ")]
     assert '#pag-body [data-action]")) b.disabled = true;' in pre
 

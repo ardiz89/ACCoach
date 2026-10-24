@@ -297,9 +297,10 @@ def test_printing_hides_every_view_without_naming_them():
     # ogni selettore che riaccende dev'essere più specifico di quello che ha
     # spento — verificato per mutazione (accorciare `#view-compare > .cmp-shell`
     # a `.cmp-shell` stampa una pagina vuota).
-    assert "#view-compare > *, .cmp-shell > *, .cmp-map > *" in block
-    assert ("#view-compare, #view-compare > .cmp-shell, .cmp-shell > .cmp-map,\n"
-            "  .cmp-map > #brakesheet { display: block !important; }") in block
+    # Dal 24/10 il foglio è figlio diretto del Confronto, sotto le colonne.
+    assert '[id^="view-"], #view-compare > * { display: none !important; }' in block
+    assert ("#view-compare, #view-compare > #brakesheet "
+            "{ display: block !important; }") in block
 
 
 def test_no_two_functions_in_app_js_share_a_name():
@@ -1524,9 +1525,13 @@ def test_compare_is_a_shell_with_the_map_in_its_right_hand_column():
 
     # E stanno nella colonna GIUSTA. Senza il negativo, la mappa potrebbe finire
     # in mezzo ai grafici e ogni asserzione qui sopra resterebbe verde.
-    for el in ("map-readout", "c-map", "leg-lost", "map-missing", "brakesheet"):
+    for el in ("map-readout", "c-map", "leg-lost", "map-missing"):
         assert maps[0].find(el) is not None, f"{el} non è nella colonna della mappa"
         assert charts[0].find(el) is None, f"{el} è finito fra i grafici"
+    # La scheda frenate sta sotto le due colonne, figlia diretta del Confronto:
+    # nella colonna della mappa spezzava le parole (prova di usabilità, 24/10).
+    assert [c.id for c in compare.children].count("brakesheet") == 1
+    assert maps[0].find("brakesheet") is None and charts[0].find("brakesheet") is None
 
 
 def test_the_rail_no_longer_lists_the_map():
@@ -1695,9 +1700,9 @@ def test_narrow_screens_stack_the_columns_with_the_map_on_top():
 
 
 def test_the_braking_sheet_scrolls_inside_its_column():
-    """La scheda è una tabella larga; in una colonna da 320 px la sua larghezza
+    """La scheda è una tabella larga; su una finestra stretta la sua larghezza
     minima spingerebbe la PAGINA di lato invece di scorrere da sola."""
-    assert "overflow-x: auto" in _rule(".cmp-map #brakesheet")
+    assert "overflow-x: auto" in _rule("#view-compare > #brakesheet")
 
 
 def test_the_shortcut_row_is_exactly_as_long_as_the_tabs():
@@ -2263,9 +2268,6 @@ _EMPTY_STATE_SURVIVORS = {
         "porta il titolo «Track map», che nomina la COLONNA e non il disegno: "
         "sopra il messaggio resta un'intestazione, e il motivo le sta subito "
         "sotto (index.html lo dichiara accanto al markup)",
-    ("cmp-map", "brakesheet"):
-        "la scheda frenate è per auto+pista, non per giro: un giro senza "
-        "coordinate non la invalida, e il suo vuoto ha già le sue parole",
     ("view-line", "line-summary"):
         "renderLine la svuota — o ci scrive il «nessuna curva rilevata», che è "
         "il messaggio dell'altro nulla, non l'arredamento di questo",
@@ -2317,7 +2319,9 @@ def test_nothing_stays_on_screen_beside_a_this_lap_has_no_message(msg):
     home, kids = _housemates_of(msg)
     # Anti-vacuità: se il markup si annidasse diversamente e il contenitore
     # finisse con un figlio solo (il messaggio), il ciclo girerebbe a vuoto.
-    assert len(kids) >= 4, f"solo {len(kids)} elementi accanto a #{msg} in {home}: parser?"
+    # Tre e non quattro dal 24/10: la scheda frenate è uscita dalla colonna
+    # della mappa, che resta con legenda, disegno e messaggio.
+    assert len(kids) >= 3, f"solo {len(kids)} elementi accanto a #{msg} in {home}: parser?"
 
     for el, chain in kids:
         name = _plain_name(el)
@@ -2433,7 +2437,7 @@ def test_the_line_deviation_pointer_follows_the_line_offset_not_the_whole_tab():
 _LOADERS = sorted(set(re.findall(r"async function (load\w+)\s*\(", _APPJS)))
 # I quattro che stanno per car+track: la firma prende la combo e nient'altro.
 _PER_COMBO = [fn for fn in _LOADERS
-              if re.search(rf"async function {fn}\(combo(?:, index)?\)", _APPJS)]
+              if re.search(rf"async function {fn}\(combo(?:, index(?:, keep)?)?\)", _APPJS)]
 # I tre che stanno per giro: nessun argomento, leggono CURRENT e le tendine.
 _PER_LAP = [fn for fn in _LOADERS if f"async function {fn}()" in _APPJS]
 

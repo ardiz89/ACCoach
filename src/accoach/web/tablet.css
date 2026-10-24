@@ -250,6 +250,19 @@ body {
 }
 .t-legend { font-size: 18px; color: #8A95A3; margin-bottom: 4px; }
 .t-legend .tl { margin-right: 22px; }
+/* Il colore della linea accanto al suo nome: la striscia non aveva legenda,
+   solo i valori colorati (24/10). */
+.t-legend .tl:before {
+  content: "";
+  display: inline-block;
+  width: 16px;
+  height: 3px;
+  margin-right: 6px;
+  vertical-align: middle;
+  background: #E8EDF2;
+}
+.t-legend .thr:before { background: #34E08A; }
+.t-legend .brk:before { background: #FF4D5E; }
 .t-legend b { color: #E8EDF2; }
 .t-legend .thr b { color: #34E08A; }
 .t-legend .brk b { color: #FF4D5E; }
@@ -322,15 +335,18 @@ body {
   margin: 0;
   padding: 0;
 }
+/* Una fila di tappe, non di bottoni: col bordo tutto intorno sembravano da
+   toccare e non facevano niente (24/10). Resta solo la riga sotto. */
 .t-road-step {
   -webkit-flex: 1 1 0;
   flex: 1 1 0;
   min-width: 0;
   margin-right: 6px;
-  padding: 3px 8px;
-  border: 1px solid #232B35;
-  border-radius: 6px;
-  background: #151A21;
+  padding: 3px 2px;
+  border: 0;
+  border-bottom: 3px solid #232B35;
+  border-radius: 0;
+  background: transparent;
   color: #8A95A3;
   font-size: 16px;
   line-height: 1.25;
@@ -339,11 +355,11 @@ body {
   text-overflow: ellipsis;
 }
 .t-road-step:last-child { margin-right: 0; }
-.t-road-step.done { color: #34E08A; }
+.t-road-step.done { color: #34E08A; border-bottom-color: #34E08A; }
 .t-road-step.done .t-road-name:before { content: "\2713\00a0"; }
 /* Saltata (cieca su quest'auto, o niente da correggere): passata, ma nessuno
    l'ha chiusa, quindi niente spunta. */
-.t-road-step.skipped { border-style: dashed; }
+.t-road-step.skipped { border-bottom-style: dashed; }
 .t-road-step.skipped .t-road-name { text-decoration: line-through; }
 /* La tappa in corso prende la larghezza del suo nome: in verticale le altre
    si tagliano coi puntini, lei si legge intera. */
@@ -352,7 +368,7 @@ body {
   flex: 0 0 auto;
   max-width: 50%;
   color: #E8EDF2;
-  border-color: #22D3CE;
+  border-bottom-color: #22D3CE;
   font-weight: 700;
 }
 .t-road-text { margin-top: 4px; font-size: 18px; line-height: 1.3; }

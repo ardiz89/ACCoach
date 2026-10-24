@@ -97,10 +97,14 @@
     if (!num(v)) return "";
     return v < 26.5 ? "low" : (v <= 28.5 ? "ok" : "high");
   }
+  // Zero non e' una misura: una gomma a 0 °C e 0 psi e' un dato che il gioco
+  // (o la demo) non manda. Si mostra «–» come per il dato mancante, invece di
+  // numeri colorati che sembrano un guasto (24/10).
+  function tyreVal(v) { return num(v) && v > 0 ? v : null; }
   function renderTyres(tyres) {
     var temps = (tyres && tyres.temp) || [], press = (tyres && tyres.pressure) || [];
     for (var i = 0; i < TYRES.length; i++) {
-      var tv = temps[i], pv = press[i];
+      var tv = tyreVal(temps[i]), pv = tyreVal(press[i]);
       var te = $(TYRES[i] + "-t"), pe = $(TYRES[i] + "-p");
       te.textContent = num(tv) ? fmtN(Math.round(tv), 0, "°C") : "–";
       pe.textContent = num(pv) ? fmtN(Number(pv), 1, "psi") : "–";
@@ -645,7 +649,10 @@
       setHidden($("t-lowconf"), restore || c !== "low");
       setText($("t-lowconf"), t("eng.lowConf"));
     }
-    var msg = !has ? msgText(eng) : "";
+    // Senza una modifica la scheda Assetto ripeteva solo le fasi che stanno
+    // anche in Telemetria (24/10): ora dice che non c'e' niente da scrivere e
+    // quando ci sara'.
+    var msg = !has ? (msgText(eng) || t("tablet.noChange")) : "";
     setText($("t-msg"), msg);
     setHidden($("t-msg"), !msg);
 

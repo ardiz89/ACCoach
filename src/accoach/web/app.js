@@ -241,7 +241,7 @@ async function init() {
     else loadPagella(CURRENT, SESSION_I);
   }
   // First visit: pop the tour once data is on screen (so #vmin/#debrief exist).
-  if (window.HoneTour) window.HoneTour.auto(tourSteps(), "hone_tour_analysis");
+  if (window.HoneTour) window.HoneTour.auto(tourSteps(), "hone_tour_analysis", undefined, tourEnd());
 }
 
 // A car or track name as a person reads it (HoneI18n.displayName; the raw id
@@ -276,9 +276,11 @@ function tourSteps() {
   const flow = () => showView("flow");
   const compare = () => showView("compare");
   const pagella = () => showView("pagella");
+  // Nove passi, non undici (24/10): chi e' nuovo li legge tutti solo se sono
+  // pochi. Fuori la velocita' minima e la traiettoria, che stanno nelle loro
+  // schede e nella guida.
   return [
     { sel: "#combo", title: t("tour.a1.t"), text: t("tour.a1.x") },
-    { sel: ".tabs", title: t("tour.a2.t"), text: t("tour.a2.x") },
     // "Start here" belongs to the Pagella — targeted at #pag-head, the one
     // part of it with text in the markup (the session picker's label). The
     // verdict and the blocks under it are empty until loadPagella's fetch
@@ -286,22 +288,28 @@ function tourSteps() {
     // `before()` runs, before that fetch can ever land: a step pointed at a
     // JS-filled element is always invisible and silently ends the tour.
     { sel: "#pag-head", title: t("tour.a12.t"), text: t("tour.a12.x"), before: pagella },
+    { sel: ".tabs", title: t("tour.a2.t"), text: t("tour.a2.x") },
     { sel: "#flow-card", title: t("tour.a9.t"), text: t("tour.a9.x"), before: flow },
     { sel: "#c-delta", title: t("tour.a3.t"), text: t("tour.a3.x"), before: compare },
-    { sel: "#vmin", title: t("tour.a4.t"), text: t("tour.a4.x"), before: compare },
     { sel: "#debrief", title: t("tour.a5.t"), text: t("tour.a5.x"), before: compare },
     { sel: "#debrief", title: t("tour.a7.t"), text: t("tour.a7.x"), before: compare },
-    { sel: "#c-corner", title: t("tour.a10.t"), text: t("tour.a10.x"),
-      before: () => showView("line") },
     { sel: "#combo", title: t("tour.a8.t"), text: t("tour.a8.x") },
     { sel: ".export", title: t("tour.a6.t"), text: t("tour.a6.x") },
   ];
 }
 
+// Alla fine del tour si torna sulla scheda di partenza: i passi cambiano
+// scheda, e il tour lasciava chi e' nuovo in fondo, su Confronto o Traiettoria.
+function tourEnd() {
+  const from = VIEW || "pagella";
+  return () => showView(from);
+}
+
 function wireTour() {
   const btn = document.querySelector(".tour-help");
   if (btn && window.HoneTour) {
-    btn.onclick = () => window.HoneTour.start(tourSteps(), "hone_tour_analysis");
+    btn.onclick = () => window.HoneTour.start(tourSteps(), "hone_tour_analysis",
+                                              undefined, tourEnd());
   }
 }
 
@@ -371,7 +379,10 @@ function wireCbToggle() {
   const btn = document.createElement("button");
   btn.type = "button";
   btn.className = "cb-toggle";
-  btn.textContent = "◑";
+  // Una parola e non «◑»: il mezzo cerchio si leggeva come «tema chiaro o
+  // scuro», e chi lo cercava non lo trovava (24/10).
+  const short = () => (window.HoneI18n ? window.HoneI18n.t("cb.short") : "Colour-blind");
+  btn.textContent = short();
   const label = () => (window.HoneI18n ? window.HoneI18n.t("cb.label") : "Colour-blind palette");
   btn.title = label();
   btn.setAttribute("aria-label", label());
@@ -725,10 +736,15 @@ function renderLevels(levels) {
       const hint = lv.key === "ideal" ? t("lvl.consistency") : t("lvl.gapPro");
       gap = `<span class="lvl-gap faster">−${fmtDec(lv.gain_s, 3, "s")}</span>` +
             `<span class="lvl-hint">${hint}</span>`;
+    } else if (Math.abs(lv.gain_s) < 0.0005) {
+      // Pari, non «già battuto»: «+0,000 s vs PRO» si leggeva anche senza un
+      // giro PRO, sull'ideale che coincide col riferimento (24/10).
+      gap = `<span class="lvl-gap done">${t("lvl.reached")}</span>`;
     } else {
       const ahead = fmtDec(Math.abs(lv.gain_s), 3, "s");
+      const over = lv.key === "ideal" ? t("lvl.vsIdeal") : t("lvl.vsPro");
       gap = `<span class="lvl-gap done">${t("lvl.beaten")}</span>` +
-            `<span class="lvl-hint">+${ahead} ${t("lvl.vsPro")}</span>`;
+            `<span class="lvl-hint">+${ahead} ${over}</span>`;
     }
     rows += `<div class="lvl" data-key="${esc(lv.key)}">` +
       `<span class="lvl-label">${esc(lv.label)}</span>` +
@@ -1034,7 +1050,9 @@ function drawSectors(s) {
   // Diverging delta bars, scaled to the worst sector (min 0.05s).
   let mx = 0.05;
   for (const sec of s.sectors) mx = Math.max(mx, Math.abs(sec.delta_ms) / 1000);
-  const half = 50; // % of the bar track for one side
+  // % of the bar track for one side. 42 and not 50: at 50 the worst sector's
+  // bar ran to the edge, under its own number (24/10).
+  const half = 42;
   let rows = "";
   for (const [si, sec] of s.sectors.entries()) {
     const d = sec.delta_ms / 1000;
@@ -2411,7 +2429,10 @@ function renderSession(s) {
   const floor = Math.min.apply(null, times.concat([Infinity]));
   const worst = Math.max.apply(null, times.concat([0]));
   const span = Math.max(1, worst - floor);
+  // La riga sotto il titolo dice cosa misura la barra: senza, la barra più
+  // corta sul giro migliore si leggeva al contrario (24/10).
   $("ses-laps").innerHTML = `<h3>${t("ses.laps")}</h3>` +
+    `<p class="laps-key">${t("laps.bar")}</p>` +
     cur.laps_detail.map((l) => {
       const w = 6 + 94 * ((l.lap_time_ms - floor) / span);
       const tags = (l.is_best ? `<span class="tag best">${t("ses.lap_best")}</span>` : "") +
@@ -2597,7 +2618,7 @@ async function openAskedPagella(combo) {
   showView("pagella");
 }
 
-async function loadPagella(combo, index) {
+async function loadPagella(combo, index, keep) {
   if (!combo) return;
   const seen = EPOCH;
   // Stessa corsa del selettore delle uscite, vedi `loadSession`: l'indice con
@@ -2605,7 +2626,10 @@ async function loadPagella(combo, index) {
   const want = index || 0;
   SESSION_I = want;
   const q = new URLSearchParams({ car: combo.car, track: combo.track, index: want });
-  $("pag-verdict").textContent = t("load.pagella");
+  // `keep`: la Pagella si rilegge dopo «Lo seguo» e resta com'è finché la
+  // risposta non arriva. Il verdetto che diventava «Sto leggendo…» accorciava
+  // la pagina sotto il mouse, e il click dopo cadeva altrove (24/10).
+  if (!keep) $("pag-verdict").textContent = t("load.pagella");
   // Mentre arriva un'altra uscita i bottoni del piano parlano ancora di
   // quella di prima: un «Lo seguo» premuto adesso seguirebbe il consiglio
   // sbagliato.
@@ -2866,7 +2890,10 @@ async function adviceAction(defect, action) {
   }
   if (stale(seen)) return;
   PAG_NOTE = ok ? "" : t("pag.adv.err");
-  loadPagella(CURRENT, SESSION_I);
+  const y = window.scrollY;
+  loadPagella(CURRENT, SESSION_I, true).then(() => {
+    if (!stale(seen)) window.scrollTo(0, y);
+  });
   // Seguire, lasciare, mettere da parte, riprendere: il consiglio in corso
   // cambia, e con lui la riga e il segno sulle altre schede.
   loadAdvice();
@@ -3252,7 +3279,9 @@ function drawHowtoFigure(el, f, a, trace) {
       }
     }
     if (!isFinite(lo)) { lo = 0; hi = 1; }
-    lo = Math.floor(lo - 5); hi = Math.ceil(hi + 5);
+    // Più aria in alto: col solo +5 il tratto in pieno correva sopra
+    // l'etichetta del valore massimo e la copriva (24/10).
+    lo = Math.floor(lo - 5); hi = Math.ceil(hi + 15);
     fmt = (v) => Math.round(v) + "";
   }
   // La curva, dall'ingresso all'uscita: il resto della finestra è il margine.
@@ -3260,12 +3289,14 @@ function drawHowtoFigure(el, f, a, trace) {
   ctx.fillStyle = "rgba(120,140,170,0.10)";
   ctx.fillRect(x0, 0, projX(f.exit_pos, w, win) - x0, h);
   gridY(ctx, w, h, lo, hi, fmt);
-  // Il migliore tratteggiato come nel Confronto, il solito pieno sopra.
-  ctx.save();
-  ctx.setLineDash([5, 4]);
-  line(ctx, w, h, rf.pos, rf[trace], lo, hi, "#3fd0e0", 1.5, win);
-  ctx.restore();
+  // Il solito pieno sotto, il riferimento tratteggiato SOPRA e più spesso:
+  // dove i due giri coincidono il pieno bianco copriva il tratteggio, e chi
+  // guardava vedeva una linea sola senza sapere quale (24/10).
   line(ctx, w, h, rv.pos, rv[trace], lo, hi, "#ffffff", 1.8, win);
+  ctx.save();
+  ctx.setLineDash([6, 5]);
+  line(ctx, w, h, rf.pos, rf[trace], lo, hi, "#3fd0e0", 2.4, win);
+  ctx.restore();
 }
 
 // I due giri ritagliati alla finestra della curva, nella forma che `drawMapTo`
@@ -3414,6 +3445,7 @@ function renderStint(s) {
   const worst = Math.max.apply(null, times.concat([0]));
   const span = Math.max(1, worst - floor);
   $("st-laps").innerHTML = `<h3>${t("st.laps")}</h3>` +
+    `<p class="laps-key">${t("laps.bar")} ${t("st.laps.tyre")}</p>` +
     cur.laps_detail.map((l) => {
       const w = Math.min(100, 6 + 94 * ((l.lap_time_ms - floor) / span));
       const tags = (l.counted ? "" : `<span class="tag out">${t("st.lap_off")}</span>`) +
@@ -5897,6 +5929,7 @@ window.addEventListener("resize", () => {
 window.HoneI18nRerender = function () {
   const cb = document.querySelector(".cb-toggle");
   if (cb && window.HoneI18n) {
+    cb.textContent = window.HoneI18n.t("cb.short");
     cb.title = window.HoneI18n.t("cb.label");
     cb.setAttribute("aria-label", window.HoneI18n.t("cb.label"));
   }

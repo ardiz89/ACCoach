@@ -22,7 +22,7 @@ body {
   position:sticky; top:0; z-index:10;
   background:var(--slate); border-bottom:1px solid var(--line);
   display:flex; flex-wrap:wrap; align-items:center; gap:10px 16px;
-  padding:10px 16px; margin:0 -16px 14px;
+  padding:10px 16px; margin:0 0 14px;
 }
 .brand { display:flex; align-items:center; gap:8px; font-weight:700; font-size:1.429rem; }
 .dot { width:0.857rem; height:0.857rem; border-radius:50%; background:var(--muted); }

@@ -140,14 +140,14 @@ h1 span { color: var(--muted); font-weight: 400; }
 }
 .guide-link:hover { border-color: var(--cyan); color: var(--cyan); }
 
-/* Colour-blind palette toggle — same pill as the "?" button. */
+/* Colour-blind palette toggle — a word in a pill, like «Guida». */
 .cb-toggle {
-  width: 1.857rem; height: 1.857rem; border-radius: 50%;
+  height: 1.857rem; border-radius: 999px;
   background: var(--inset); color: var(--muted);
   border: 1px solid var(--line); cursor: pointer;
-  font-size: 1rem; line-height: 1;
+  font-size: 0.857rem; line-height: 1;
   display: inline-flex; align-items: center; justify-content: center;
-  padding: 0; margin-left: 6px;
+  padding: 0 0.714rem; margin-left: 6px;
 }
 .cb-toggle:hover { border-color: var(--cyan); color: var(--cyan); }
 .cb-toggle[aria-pressed="true"] { border-color: var(--cyan); color: var(--cyan); }
@@ -240,9 +240,12 @@ select {
   position: sticky; top: 0; z-index: 5;
   padding: 10px var(--gut);
   background: var(--inset); border-bottom: 1px solid var(--line);
-  font-family: var(--font-mono);
+  /* Le frasi nel carattere dell'interfaccia, i numeri in mono: il mono su
+     tutta la riga faceva leggere le spiegazioni come codice (24/10). */
+  font-family: var(--font-ui);
   font-variant-numeric: tabular-nums; font-size: 0.929rem; color: var(--muted);
 }
+.readout b { font-family: var(--font-mono); }
 /* Il valore congelato quando il mouse esce dal grafico: c'è ancora, ma dice
    che non è più il punto sotto al dito. */
 .readout.frozen { opacity: 0.6; }
@@ -276,7 +279,10 @@ select {
    navigazione: quindi la difesa va qui e non in un @media. Sotto i 520 px il
    blocco apposito aggiunge `gap: 0` e lo scorrimento morbido di iOS. */
 .tabs { display: flex; gap: 4px; padding: 10px var(--gut) 0; border-bottom: 1px solid var(--line);
-  background: var(--panel); overflow-x: auto; }
+  background: var(--panel); overflow-x: auto;
+  /* Una barra di scorrimento sottile e scura: quella di sistema era chiara
+     su fondo scuro e tagliava la pagina in due sul telefono (24/10). */
+  scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
 .tab {
   background: transparent; color: var(--muted);
   border: none; border-bottom: 2px solid transparent;
@@ -402,11 +408,11 @@ body:not(.railed) .rail { display: none; }
    `top` sotto le schede, che non sono sticky — basta un filo d'aria. */
 .cmp-map { position: sticky; top: 12px; min-width: 0; }
 .cmp-charts { min-width: 0; }
-/* La scheda frenate è una tabella larga, e qui vive in una colonna che può
-   scendere a 320 px: la sua larghezza minima spingerebbe la pagina di lato
-   invece di scorrere per conto proprio. La regola gemella sotto i 700 px
-   (`#line-table, #brakesheet`) resta dov'è: là vale per la pagina intera. */
-.cmp-map #brakesheet { overflow-x: auto; }
+/* La scheda frenate sta sotto le due colonne, a tutta larghezza (24/10): nella
+   colonna della mappa spezzava le parole e scorreva di lato. Resta
+   `overflow-x: auto` per le finestre strette, dove la tabella è comunque più
+   larga dello schermo. */
+#view-compare > #brakesheet { overflow-x: auto; margin-top: 20px; }
 
 /* La soglia è 1150, non 900. Fra i due numeri le due colonne ci STANNO — la
    griglia non sfonda niente — ma la seconda resta STRETTA: 337 px a 901 e
@@ -777,6 +783,12 @@ body.no-data .empty { display: block; }
 
 @media (max-width: 520px) {
   h1 { font-size: 1.286rem; }
+  /* Sul telefono le tre tendine e l'esportazione prendevano mezzo schermo,
+     una sotto l'altra, prima di qualunque contenuto (24/10). Auto e pista a
+     tutta riga, giro e confronto affiancati, l'esportazione in fondo. */
+  .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 10px; }
+  .controls label { width: auto; min-width: 0; }
+  .controls label:first-child, .controls .export { grid-column: 1 / -1; }
   .summary, .lapbar, .readout, main, .tabs, .vmin, .debrief, .levels,
   .sectors, .sec-head, .ideal, #map-readout { padding-left: 12px; padding-right: 12px; }
   .tabs { gap: 0; overflow-x: auto; -webkit-overflow-scrolling: touch; }
@@ -1230,17 +1242,16 @@ body.no-data .empty { display: block; }
   #rail, #map-missing, .tour-help, .cb-toggle, .mini-btn { display: none !important; }
   /* Il foglio vive ora dentro il Confronto, che è pieno di altra roba: i quattro
      grafici, il riepilogo, la cascata, il debrief. Si spegne per DISCENDENZA —
-     i figli diretti dei tre contenitori che portano al foglio — e si riaccende
-     la sola catena `#view-compare → .cmp-shell → .cmp-map → #brakesheet`.
+     i figli diretti del Confronto — e si riaccende la sola catena
+     `#view-compare → #brakesheet` (dal 24/10 il foglio è figlio diretto).
      Elencare a mano le sezioni della vista è esattamente ciò che, otto id fa,
      aveva lasciato stampare un pannello in più senza che nessuno se ne
      accorgesse se non stampando.
      Ogni selettore che RIACCENDE è più specifico di quello che l'ha spento —
      `!important` non basta, fra due `!important` decide ancora la specificità,
      e un `.cmp-shell` nudo perderebbe contro `#view-compare > *`. */
-  [id^="view-"], #view-compare > *, .cmp-shell > *, .cmp-map > * { display: none !important; }
-  #view-compare, #view-compare > .cmp-shell, .cmp-shell > .cmp-map,
-  .cmp-map > #brakesheet { display: block !important; }
+  [id^="view-"], #view-compare > * { display: none !important; }
+  #view-compare, #view-compare > #brakesheet { display: block !important; }
   /* Sticky su carta non ha senso e in alcuni motori sposta il blocco. */
   .cmp-map { position: static; }
   .stage { display: block; }
@@ -1479,3 +1490,6 @@ body.view-howto #lapbar { display: none; }
 .secrow.adv-hit { background: rgba(199,146,234,0.16); }
 /* Andamento: la scheda per curva o la riga del difetto che il consiglio ha indicato. */
 .weak.adv-hit, .cons-row.adv-hit, .dh-name.adv-hit { background: rgba(199,146,234,0.16); }
+
+/* La riga che spiega le barre dei giri, sotto il titolo (24/10). */
+.laps-key { margin: -4px 0 10px; font-size: 0.857rem; color: var(--muted); }

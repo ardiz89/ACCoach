@@ -219,6 +219,7 @@ async function showMissingCombo(car, track) {
   // sarebbe di nuovo il difetto, con sopra un cartello.
   state.setupPath = null; state.setupName = null;
   state.params = []; state.pending = {}; state.base = {};
+  $("btn-undo").disabled = true;
   renderTray();
   $("setup-car").textContent = "";
   $("setup").innerHTML = "";
@@ -459,9 +460,15 @@ const noSetupHTML = () => `<div class="empty2">${t("eng.noSetupBody")}</div>`;
 
 async function onSetupChange() {
   const opt = $("setup").selectedOptions[0];
-  if (!opt || !opt.dataset.path) { $("setup-body").innerHTML = noSetupHTML(); return; }
+  if (!opt || !opt.dataset.path) {
+    $("setup-body").innerHTML = noSetupHTML();
+    $("btn-undo").disabled = true;
+    return;
+  }
   state.setupPath = opt.dataset.path;
   const data = await api(`/api/setup/current?path=${encodeURIComponent(state.setupPath)}`);
+  // Acceso solo con un backup da cui ripristinare.
+  $("btn-undo").disabled = !data.has_backup;
   state.setupName = data.name;
   state.params = data.params;
   state.pending = {};
@@ -998,9 +1005,11 @@ function updateTyres(tyres) {
     const cell = $(id);
     if (!cell) return;
     const tEl = cell.querySelector(".tt"), pEl = cell.querySelector(".tp");
-    const t = temps[i], p = press[i];
-    tEl.textContent = (t == null || !isFinite(t)) ? "–" : fmtN(Math.round(t), 0, "°C");
-    pEl.textContent = (p == null || !isFinite(p)) ? "–" : fmtN(p, 1);
+    // Zero non e' una misura (vedi `tyreVal` in tablet.js): «–» come il vuoto.
+    const ok = (v) => v != null && isFinite(v) && v > 0;
+    const t = ok(temps[i]) ? temps[i] : null, p = ok(press[i]) ? press[i] : null;
+    tEl.textContent = t == null ? "–" : fmtN(Math.round(t), 0, "°C");
+    pEl.textContent = p == null ? "–" : fmtN(p, 1);
     tEl.className = "tt " + tyreTempClass(t);
     pEl.className = "tp " + tyrePsiClass(p);
   });

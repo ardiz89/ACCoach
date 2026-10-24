@@ -335,3 +335,18 @@ def test_a_slot_error_names_the_parameter_as_the_editor_does(tmp_path):
     assert "«Pressione»" in it["errors"][0] and "tyrePressure" not in it["errors"][0]
     en = c.post("/api/setup/preview", params={"lang": "en"}, json=body).json()
     assert "“Pressure”" in en["errors"][0]
+
+
+def test_current_says_whether_there_is_a_backup_to_restore(tmp_path):
+    """«Ripristina» era sempre acceso e il click rispondeva con un errore
+    (24/10): la pagina lo accende solo se `has_backup` e' vero."""
+    c, path = _client(tmp_path)
+    q = lambda p: c.get("/api/setup/current", params={"path": p}).json()
+    assert q(path)["has_backup"] is False
+    base = {"path": path, "as_name": "run1", "confirm": True,
+            "changes": [{"param": "rearWing", "delta_clicks": -1}]}
+    newp = c.post("/api/setup/apply", json=base).json()["path"]
+    assert q(newp)["has_backup"] is False
+    over = dict(base, path=newp, overwrite=True)
+    c.post("/api/setup/apply", json=over)
+    assert q(newp)["has_backup"] is True

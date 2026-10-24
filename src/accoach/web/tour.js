@@ -6,6 +6,13 @@
 //   HoneTour.start(steps, key)     same thing, namespaced
 //   HoneTour.auto(steps, key)      starts only on first visit (key absent)
 //
+// A fourth argument, `onEnd`, runs once when the tour closes (done, skip or
+// Escape): the analysis page uses it to put back the tab you were on, because
+// the steps switch tabs and the tour used to leave you on the last one.
+//
+// A click outside the card does nothing. It used to close the tour for good,
+// and a stray click on step 2 of 5 was the whole tour (24/10).
+//
 // Button labels follow the page: they come from HoneI18n ("tour.btn.next" & co.)
 // when the page loads i18n.js, and fall back to English otherwise. An optional
 // third argument overrides them outright — {skip, back, next, done, step}, any
@@ -55,7 +62,7 @@
     var css =
       ".hone-tour-root{position:fixed;inset:0;z-index:99999;" +
       "font-family:var(--font-ui,'Inter',system-ui,'Segoe UI',sans-serif);}" +
-      ".hone-tour-backdrop{position:fixed;inset:0;background:transparent;cursor:pointer;}" +
+      ".hone-tour-backdrop{position:fixed;inset:0;background:transparent;cursor:default;}" +
       ".hone-tour-hole{position:fixed;border:2px solid #22D3CE;border-radius:10px;" +
       "box-shadow:0 0 0 9999px rgba(7,10,14,0.66),0 0 18px rgba(34,211,206,0.55);" +
       "pointer-events:none;transition:left .18s ease,top .18s ease,width .18s ease,height .18s ease;}" +
@@ -95,7 +102,7 @@
     return cs.display !== "none" && cs.visibility !== "hidden";
   }
 
-  function startTour(steps, storageKey, labels) {
+  function startTour(steps, storageKey, labels, onEnd) {
     if (!Array.isArray(steps) || !steps.length) return;
     if (typeof closeCurrent === "function") closeCurrent();   // one tour at a time
     injectStyle();
@@ -145,6 +152,7 @@
       document.removeEventListener("keydown", onKey, true);
       if (root.parentNode) root.parentNode.removeChild(root);
       try { if (storageKey) localStorage.setItem(storageKey, "1"); } catch (e) {}
+      if (typeof onEnd === "function") { try { onEnd(); } catch (e) {} }
     }
     closeCurrent = finish;
 
@@ -246,7 +254,8 @@
       else if (e.key === "ArrowLeft") { e.preventDefault(); go(-1); }
     }
 
-    backdrop.addEventListener("click", finish);
+    // Un click fuori dal riquadro non chiude: per uscire ci sono «Salta» ed Esc.
+    backdrop.addEventListener("click", function (e) { e.stopPropagation(); });
     window.addEventListener("resize", onReflow, true);
     window.addEventListener("scroll", onReflow, true);
     document.addEventListener("keydown", onKey, true);
@@ -254,10 +263,10 @@
     render();
   }
 
-  function autoTour(steps, storageKey, labels) {
+  function autoTour(steps, storageKey, labels, onEnd) {
     try { if (storageKey && localStorage.getItem(storageKey)) return; }
     catch (e) { return; }
-    startTour(steps, storageKey, labels);
+    startTour(steps, storageKey, labels, onEnd);
   }
 
   window.startTour = startTour;

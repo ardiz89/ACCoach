@@ -396,7 +396,10 @@ process.stdout.write(JSON.stringify([a, b]));
                        capture_output=True, text=True, encoding="utf-8")
     assert r.returncode == 0, r.stderr
     a, b = json.loads(r.stdout)
-    assert a == {"hidden": True, "text": ""}
+    # Senza coda la riga non ripete il conteggio: dice che non c'è niente da
+    # scrivere (24/10), invece di lasciare la scheda Assetto vuota.
+    assert a["hidden"] is False and "non c'è una modifica da scrivere" in a["text"]
+    assert "giri puliti" not in a["text"]
     assert b == {"hidden": False, "text": "L'ultimo giro non conta perché sei uscito di pista."}
 
 

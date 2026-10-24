@@ -36,6 +36,7 @@
     "tour.btn.next":   { en: `Next`, it: `Avanti` },
     "tour.btn.done":   { en: `Done`, it: `Ho capito` },
     "tour.btn.step":   { en: `Step`, it: `Passo` },
+    "cb.short":        { en: `Colour-blind`, it: `Daltonici` },
     "cb.label":        { en: `Colour-blind palette (blue and orange)`,
                          it: `Colori per daltonici (blu e arancio)` },
     "demo.banner":     { en: `These are sample laps made by HONE, not yours.`, it: `Questi sono giri di esempio generati da HONE, non i tuoi.` },
@@ -272,6 +273,10 @@
     "ses.vsprev":      { en: `vs last session's best`, it: `vs migliore della sessione prima` },
     "ses.fuel":        { en: `Fuel per lap`, it: `Benzina al giro` },
     "ses.laps":        { en: `Your laps`, it: `I tuoi giri` },
+    "laps.bar":        { en: `The bar is the gap to the fastest lap, so a longer bar is a slower lap.`,
+                         it: `La barra è il distacco dal giro più veloce, quindi più è lunga più il giro è lento.` },
+    "st.laps.tyre":    { en: `The degrees are the average tyre temperature on that lap.`,
+                         it: `I gradi sono la temperatura media delle gomme in quel giro.` },
     "ses.lap_best":    { en: `best`, it: `migliore` },
     "ses.lap_out":     { en: `didn't count`, it: `non conta` },
     "ses.lap_cut":     { en: `off track`, it: `fuori pista` },
@@ -333,6 +338,10 @@
     // ---- dynamics tab (G-G, lock/spin, coasting) ----
     "dyn.readout":     { en: `Hover the charts to read G and slip at any point.`,
                          it: `Passa il mouse sui grafici per leggere G e slip in ogni punto.` },
+    // Le varianti `.touch` valgono sui dispositivi senza mouse (vedi `t`): sul
+    // tablet «passa il mouse» non si può fare, e il tocco legge lo stesso punto.
+    "dyn.readout.touch": { en: `Tap the charts to read G and slip at any point.`,
+                           it: `Tocca i grafici per leggere G e slip in ogni punto.` },
     "chart.gg":        { en: `G-G diagram <small>(each dot is a moment, the further from the centre the more grip you're using, the ring is your peak)</small>`,
                          it: `Diagramma G-G <small>(ogni punto è un istante, più è lontano dal centro più grip stai usando, l'anello è il tuo picco)</small>` },
     "chart.slip":      { en: `Locking and wheelspin <small>(slip ratio, cyan for the fronts and amber for the rears. Below zero the wheel locks, above it spins. The bar underneath is ABS or TC stepping in.)</small>`,
@@ -391,6 +400,8 @@
 
     "readout.hint":    { en: `Hover the charts to read the values point by point.`,
                          it: `Passa il mouse sui grafici per leggere i valori punto per punto.` },
+    "readout.hint.touch": { en: `Tap the charts to read the values point by point.`,
+                            it: `Tocca i grafici per leggere i valori punto per punto.` },
 
     "chart.delta":     { en: `Lap delta, in seconds <small>(above the line = slower, below = faster)</small>`,
                          it: `Delta sul giro, in secondi <small>(sopra la linea = più lento, sotto = più veloce)</small>` },
@@ -404,6 +415,8 @@
 
     "map.readout":     { en: `Red marks where you're slower than the reference, green where you're faster. Hover the map for the values.`,
                          it: `Il rosso segna dove sei più lento del riferimento, il verde dove sei più veloce. Passa il mouse sulla mappa per i valori.` },
+    "map.readout.touch": { en: `Tap the map for the values. Red is slower than the reference, green is faster.`,
+                           it: `Tocca la mappa per i valori. Rosso è più lento del riferimento, verde è più veloce.` },
     "chart.map":       { en: `Track map <small>(solid line = reviewed lap, white dashes = reference)</small>`,
                          it: `Mappa della pista <small>(linea continua = giro in esame, tratteggio bianco = riferimento)</small>` },
     "map.grad.fast":   { en: `faster`, it: `più veloce` },
@@ -454,6 +467,8 @@
     "tab.line":        { en: `Line`, it: `Traiettoria` },
     "line.readout":    { en: `Hover the corner to read your speed and how far you were from the reference line.`,
                          it: `Passa il mouse sulla curva per leggere la velocità e la distanza dalla linea di riferimento.` },
+    "line.readout.touch": { en: `Tap the corner to read your speed and how far you were from the reference line.`,
+                            it: `Tocca la curva per leggere la velocità e la distanza dalla linea di riferimento.` },
     "line.missing":    { en: `These laps were recorded before HONE saved coordinates. Drive a new lap to see your line here.`,
                          it: `Questi giri sono stati registrati prima che HONE salvasse le coordinate. Guida un giro nuovo per vedere qui la tua traiettoria.` },
     "line.leg.you":    { en: `your line`, it: `la tua traiettoria` },
@@ -564,8 +579,8 @@
     "sec.col.delta":   { en: `Δ to the reference <small>(bars to the left = faster, to the right = slower)</small>`,
                          it: `Δ sul riferimento <small>(barre a sinistra = più veloce, a destra = più lento)</small>` },
 
-    "prog.chart":      { en: `Lap times over time <small>(each dot is a lap, the green line is your best so far)</small>`,
-                         it: `Tempi sul giro nel tempo <small>(ogni punto è un giro, la linea verde è il tuo migliore fino a lì)</small>` },
+    "prog.chart":      { en: `Lap times over time <small>(one dot per lap, the oldest on the left. Higher is faster. The green line is your best so far.)</small>`,
+                         it: `Tempi sul giro nel tempo <small>(un punto per giro, il più vecchio a sinistra. Più in alto è più veloce. La linea verde è il tuo migliore fino a lì.)</small>` },
     "prog.weak":       { en: `Weak points <small>(corner by corner, train the systematic ones)</small>`,
                          it: `Punti deboli <small>(curva per curva, quelle sistematiche sono da allenare)</small>` },
     "prog.recurring":  { en: `Recurring mistakes`, it: `Errori ricorrenti` },
@@ -632,6 +647,8 @@
     "lvl.gapPro":      { en: `gap to PRO`, it: `gap dal PRO` },
     "lvl.beaten":      { en: `already beaten`, it: `già battuto` },
     "lvl.vsPro":       { en: `vs PRO`, it: `vs PRO` },
+    "lvl.vsIdeal":     { en: `vs the ideal`, it: `sull'ideale` },
+    "lvl.reached":     { en: `already reached`, it: `già raggiunto` },
 
     "trends.none":     { en: `In your recent laps no corner is a weak point.`,
                          it: `Nei tuoi ultimi giri nessuna curva è un punto debole.` },
@@ -1054,6 +1071,8 @@ Salva un setup nel gioco, poi ricarica questa pagina.` },
                             it: `Torna ai box per rimettere l'ultima modifica com'era.` },
     "tablet.full":     { en: `Full page`, it: `Pagina completa` },
     "tablet.tab.track": { en: `Telemetry`, it: `Telemetria` },
+    "tablet.noChange": { en: `No change to write for now. When the engineer proposes one you'll find it here, and you write it while stopped in the pits.`,
+                         it: `Per ora non c'è una modifica da scrivere. Quando l'ingegnere ne propone una la trovi qui, e la scrivi da fermo ai box.` },
     "tablet.tab.setup": { en: `Setup`, it: `Assetto` },
     "tablet.base":     { en: `Starting setup`, it: `Il file di partenza` },
     "tablet.noBase":   { en: `I can't find a setup for this car on this track. Save one from the game's garage.`,
@@ -1128,7 +1147,12 @@ Salva un setup nel gioco, poi ricarica questa pagina.` },
 
   var lang = readLang();
 
+  // Senza mouse (tablet, telefono) una chiave con la variante `.touch` dice
+  // «tocca» invece di «passa il mouse».
+  var TOUCH = !!(window.matchMedia && window.matchMedia("(hover: none)").matches);
+
   function t(key) {
+    if (TOUCH && CAT[key + ".touch"]) key = key + ".touch";
     var e = CAT[key];
     if (!e) return key;
     if (e[lang] != null) return e[lang];

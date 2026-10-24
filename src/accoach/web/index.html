@@ -300,14 +300,15 @@
              di tutta la pagina, accesa solo da `body.no-data`, e riusarla qui
              lasciava il messaggio a `display: none` per sempre (vedi il CSS). -->
         <div id="map-missing" class="missing hidden" data-i18n="map.missing">One of the two laps has no coordinates, so the map can't be drawn. Drive a new lap and you'll see it here.</div>
-        <!-- The braking sheet travelled here with the map rather than getting a
-             tab of its own: the drawing above already says where you brake, and
-             the sheet is the same fact as numbers. Measured across your recent
-             laps in one temperature band — see braking_points.py for why it is
-             never generalised. -->
-        <section id="brakesheet" class="debrief sheet"></section>
       </aside>
     </div>
+    <!-- The braking sheet is part of Compare rather than a tab of its own: the
+         map already says where you brake, and the sheet is the same fact as
+         numbers. Measured across your recent laps in one temperature band —
+         see braking_points.py for why it is never generalised. It sits under
+         both columns: in the map column (320 px and up) its eight columns
+         broke words in half and scrolled sideways (usability test, 24/10). -->
+    <section id="brakesheet" class="debrief sheet"></section>
   </div>
 
   <!-- The line you drove, corner by corner. The map beside Compare shows the

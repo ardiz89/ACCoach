@@ -364,7 +364,11 @@ def register_setup_routes(app: FastAPI, root=DEFAULT_ROOTS) -> None:
     def setup_current(path: str = Query(...),
                       lang: str | None = Query(None)) -> dict:
         p = _safe(path, roots)
-        return _setup_payload(_load(p), p, lang)
+        # `has_backup`: la pagina accende «Ripristina» solo se c'e' qualcosa da
+        # ripristinare. Prima era sempre acceso, e il click rispondeva con un
+        # errore (prova di usabilita', 24/10).
+        return {**_setup_payload(_load(p), p, lang),
+                "has_backup": latest_backup(p) is not None}
 
     @app.post("/api/setup/preview")
     def setup_preview(body: PreviewBody,

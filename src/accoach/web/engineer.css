@@ -293,6 +293,9 @@ button.primary { background: var(--cyan); color: #06262b; border: none; border-r
 button.primary:hover { filter: brightness(1.1); }
 button.ghost { background: transparent; color: var(--muted); border: 1px solid var(--line); border-radius: 8px; padding: 9px 16px; cursor: pointer; font-family: var(--font-ui); }
 button.ghost:hover { color: var(--text); border-color: var(--muted); }
+/* Spento quando non ha niente da fare (es. «Ripristina» senza un backup). */
+button.ghost:disabled { opacity: 0.45; cursor: default; }
+button.ghost:disabled:hover { color: var(--muted); border-color: var(--line); }
 
 /* Modal */
 .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: flex; align-items: center; justify-content: center; z-index: 50; }
