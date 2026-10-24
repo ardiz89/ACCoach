@@ -152,13 +152,19 @@ class SetupError(ValueError):
     """Raised when a setup document is malformed or a parameter is missing."""
 
 
+#: Nessun click vero si avvicina: i valori reali stanno sotto le migliaia.
+_MAX_CLICK = 2**31
+
+
 def _whole(v: Any) -> bool:
     """Un click: un intero, o un float che e' un intero. Mai un booleano."""
     if isinstance(v, bool):
         return False
+    # Un tetto: un intero da 400 cifre passa `int` ma rompe `physical` e i float.
     if isinstance(v, int):
-        return True
-    return isinstance(v, float) and math.isfinite(v) and v == int(v)
+        return abs(v) <= _MAX_CLICK
+    return (isinstance(v, float) and math.isfinite(v) and v == int(v)
+            and abs(v) <= _MAX_CLICK)
 
 
 def _check(raw: dict) -> None:

@@ -130,6 +130,7 @@ CORPI = {
     "booleano": _con(lambda r: r["basicSetup"]["strategy"].update(fuel=True)),
     "oggetto": _con(lambda r: r["basicSetup"]["strategy"].update(fuel={"a": 1})),
     "infinito": json.dumps(SAMPLE).replace('"fuel": 48', '"fuel": 1e400'),
+    "intero_enorme": json.dumps(SAMPLE).replace('"fuel": 48', '"fuel": ' + "9" * 400),
     "annidato_100000": _nesting(100_000),
 }
 
@@ -184,3 +185,17 @@ def test_assetto_ac_load_solleva_AcSetupError():
     ini = SAMPLE_INI.replace("[ARB_FRONT]\nVALUE=30", "[ARB_FRONT]\nVALUE=1e400")
     with pytest.raises(ac_format.AcSetupError):
         ac_format.loads(ini)
+
+
+def test_kn5_bloccato_non_si_ricorda_come_rotto(tmp_path, monkeypatch):
+    nomi = [f"{n}ROAD" for n in range(tm._PHYS_MESHES)]
+    p = _kn5(tmp_path, [(n, _quad(0, 0, 10, 10)) for n in nomi])
+    monkeypatch.setattr(tm, "physics_model", lambda track: p)
+    monkeypatch.setattr(tm, "_cache", {})
+    vero = tm._walk
+    def bloccato(path, collect):
+        raise PermissionError("file in uso")
+    monkeypatch.setattr(tm, "_walk", bloccato)
+    assert tm.surfaces("monza") is None
+    monkeypatch.setattr(tm, "_walk", vero)
+    assert tm.surfaces("monza") is not None

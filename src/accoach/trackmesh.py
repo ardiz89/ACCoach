@@ -241,8 +241,9 @@ def _walk(path: Path, collect: bool):
 
 
 #: Cosa puo' uscire dalla lettura di un file che non si e' scritto noi. Il
-#: ``MemoryError`` e l'``IndexError`` sono il file che mente sulle misure.
-_ILLEGGIBILE = (OSError, ValueError, struct.error, MemoryError, IndexError)
+#: ``MemoryError`` e' il file che mente sulle misure. Niente ``IndexError``: gli
+#: indici si controllano a mano (``ValueError``), cosi' un errore vero resta visibile.
+_ILLEGGIBILE = (OSError, ValueError, struct.error, MemoryError)
 
 
 def is_physics_model(path: Path) -> bool:
@@ -295,6 +296,10 @@ def _loaded(track: str) -> dict | None:
         path = physics_model(track)
         try:
             got = _walk(path, collect=True) if path else None
+        except OSError:
+            # Un kn5 bloccato un momento (AC che lo carica) non e' un kn5 rotto:
+            # non si ricorda, si riprova alla prossima richiesta.
+            return None
         except _ILLEGGIBILE:
             got = None                  # un file rotto vale come nessun file
         if not got:
