@@ -216,7 +216,15 @@ def test_lo_zip_si_carica_anche_quando_il_controllo_boccia():
 
 
 def test_la_pubblicazione_resta_appesa_al_tag():
-    """La differenza fra provare e spedire è una riga, e va difesa."""
-    publish = _step_con(RELEASE, "gh-release")
-    assert publish, "lo step che pubblica la release non c'e' piu'"
-    assert "if: startsWith(github.ref, 'refs/tags/')" in publish
+    """La differenza fra provare e spedire è una riga, e va difesa.
+
+    La riga sta sul job `publish`, non più sullo step: da quando la release è
+    divisa in due job, è il job intero (attestazione compresa) a girare solo
+    sui tag. Si guarda il job che contiene lo step che pubblica.
+    """
+    assert _step_con(RELEASE, "gh-release"), "lo step che pubblica la release non c'e' piu'"
+    testo = RELEASE.read_text(encoding="utf-8")
+    job = re.search(r"^  publish:\s*$(.*?)(?=^  [A-Za-z0-9_-]+:\s*$|\Z)", testo, re.M | re.S)
+    assert job, "il job publish non c'e' piu'"
+    assert "gh-release" in job.group(1), "la release si pubblica fuori dal job publish"
+    assert re.search(r"^    if: startsWith\(github\.ref, 'refs/tags/'\)\s*$", job.group(1), re.M)

@@ -7,17 +7,23 @@ on:
     tags: ["v*"]
   workflow_dispatch:
 
+# Per tutto il workflow si legge e basta. Chi scrive e' solo `publish`, e solo
+# sui tag: il job che esegue PyInstaller e le dipendenze di PyPI non ha mai in
+# mano un token che possa toccare il repo o le release.
 permissions:
-  contents: write          # needed to create the GitHub Release
+  contents: read
 
 jobs:
-  build-windows:
+  build:
     runs-on: windows-latest
+    outputs:
+      zip: ${{ steps.pack.outputs.zip }}
+      sha: ${{ steps.pack.outputs.sha }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5.6.0
         with:
           python-version: "3.12"
 
@@ -42,12 +48,17 @@ jobs:
       - name: Package + checksum
         id: pack
         shell: pwsh
+        # Il ref entra da `env:` e non scritto nello script: un `${{ }}` dentro
+        # `run:` viene incollato come testo prima che lo script giri, e un nome
+        # di ramo con dentro un apice diventerebbe codice.
+        env:
+          REF_NAME: ${{ github.ref_name }}
         run: |
           # Il ref finisce nel NOME di un file: su un tag e' `v0.1.0`, ma sul giro
           # a vuoto e' un ramo, e un ramo qui si chiama `fix/prova-di-build`. La
           # barra e' un separatore di cartelle, non un carattere: senza questa
           # riga la prova cadeva sul nome dello ZIP invece che sul build.
-          $ref = "${{ github.ref_name }}" -replace '[^A-Za-z0-9._-]', '-'
+          $ref = $env:REF_NAME -replace '[^A-Za-z0-9._-]', '-'
           $zip = "HONE-$ref-windows.zip"
           Compress-Archive -Path dist/HONE/* -DestinationPath $zip
           $sha = (Get-FileHash $zip -Algorithm SHA256).Hash
@@ -74,39 +85,69 @@ jobs:
       # lo ZIP serve e' l'unico in cui non lo trovi.
       - name: Upload the build for inspection
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
         with:
           name: HONE-build-${{ github.sha }}
           path: ${{ steps.pack.outputs.zip }}
           retention-days: 14
 
-      # SOLO sui tag. Senza questa guardia il `workflow_dispatch` dichiarato qui
-      # sopra -- che esiste apposta per provare il build senza spedire niente --
-      # arrivava fin qui con `github.ref_name` uguale al RAMO, e pubblicava una
-      # release pubblica intitolata «HONE main». Un giro di prova non deve poter
-      # spedire: la differenza fra provare e pubblicare e' questa riga.
-      - name: Publish release
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
+  # SOLO sui tag. Senza questa guardia il `workflow_dispatch` dichiarato qui
+  # sopra -- che esiste apposta per provare il build senza spedire niente --
+  # arrivava fin qui con `github.ref_name` uguale al RAMO, e pubblicava una
+  # release pubblica intitolata «HONE main». Un giro di prova non deve poter
+  # spedire: la differenza fra provare e pubblicare e' questa riga.
+  publish:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    # La scrittura sta tutta qui: `contents` per creare la release, `id-token`
+    # e `attestations` per firmare la provenienza dello ZIP.
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      # Lo stesso ZIP che `build` ha costruito, controllato e caricato: qui non
+      # si ricostruisce niente, si pubblica quello.
+      - name: Download the build
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4.3.0
         with:
-          files: ${{ steps.pack.outputs.zip }}
+          name: HONE-build-${{ github.sha }}
+
+      # L'impronta dice che il file e' quello pubblicato; l'attestazione dice
+      # anche DA DOVE viene: questo repo, questo workflow, questo commit. Prima
+      # della release, cosi' uno ZIP senza prova non esce nemmeno per un attimo.
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8  # v4.2.2
+        with:
+          subject-path: ${{ needs.build.outputs.zip }}
+
+      - name: Publish release
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65  # v2.6.2
+        with:
+          files: ${{ needs.build.outputs.zip }}
           name: HONE ${{ github.ref_name }}
           body: |
             **HONE ${{ github.ref_name }}** — driving coach for Assetto Corsa / ACC.
 
             ### Install
-            1. Download `${{ steps.pack.outputs.zip }}` below and unzip it.
+            1. Download `${{ needs.build.outputs.zip }}` below and unzip it.
             2. Run `HONE.exe`. On first launch Windows SmartScreen may warn (the
                app isn't signed with a paid certificate) — click **More info →
                Run anyway**.
 
             ### Verify the download (optional)
             ```powershell
-            Get-FileHash .\${{ steps.pack.outputs.zip }} -Algorithm SHA256
+            Get-FileHash .\${{ needs.build.outputs.zip }} -Algorithm SHA256
             ```
             Expected **SHA-256**:
             ```
-            ${{ steps.pack.outputs.sha }}
+            ${{ needs.build.outputs.sha }}
+            ```
+            To check that the zip was built by this repository's release
+            workflow, with the [GitHub CLI](https://cli.github.com/):
+            ```powershell
+            gh attestation verify ${{ needs.build.outputs.zip }} --repo ardiz89/ACCoach
             ```
 
             See the [FAQ](https://github.com/${{ github.repository }}/blob/main/docs/FAQ.md)

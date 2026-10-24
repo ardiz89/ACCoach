@@ -34,7 +34,10 @@ exe = EXE(
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
+    # UPX spento qui e nel COLLECT: un EXE e delle DLL compressi da un packer
+    # sono quello che gli antivirus segnalano per primo, e il file attestato
+    # dalla release deve essere quello che gira, non uno da scompattare.
+    upx=False,
     console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,
@@ -48,7 +51,7 @@ coll = COLLECT(
     a.binaries,
     a.datas,
     strip=False,
-    upx=True,
+    upx=False,
     upx_exclude=[],
     name='HONE',
 )

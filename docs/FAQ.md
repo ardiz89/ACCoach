@@ -70,6 +70,10 @@ Use the name of the zip you actually downloaded. Compare the result with the
 string in the release notes. If they differ, **don't run the file**, and
 download it again from the official Releases page.
 
+If you have the GitHub CLI, the release notes also give a `gh attestation
+verify` command. It tells you whether the zip was built by this repository's
+release workflow on GitHub, not only that it matches the published one.
+
 ### Privacy
 
 HONE works **entirely offline**.

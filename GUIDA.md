@@ -16,6 +16,8 @@ Questa guida ti accompagna dall'avvio al primo giro col coach, fino all'analisi.
 - **HONE**, in uno dei due modi.
   - **L'eseguibile**, se vuoi solo usarlo. Scarica lo ZIP dalla pagina
     Releases, scompattalo e avvia `HONE.exe`. Python non ti serve.
+    Se hai la GitHub CLI, `gh attestation verify` (lo trovi nelle note della
+    release) ti dice se lo ZIP è stato costruito su GitHub dalla release di HONE.
   - **Il sorgente**, se sviluppi. Ti serve Python 3.11 o più recente, poi
     `pip install -r requirements.txt`. Dal sorgente puoi anche fare doppio clic
     su `HONE.bat`. La prima volta prepara il suo ambiente Python e installa
