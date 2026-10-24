@@ -994,7 +994,7 @@ These are the ones you might really need.
 | `setup show <file>` | Reads an ACC setup without starting the game. |
 | `selftest` | Checks that the voice works and writes a report. |
 | `logs` | Opens the folder with the logs and crash reports. |
-| `logs --zip` | Packs the logs and some context into one file to attach to a report. **The logs go in as they are, unfiltered.** Read "What's in that zip" before you send it. |
+| `logs --zip` | Packs the logs and some context into one file to attach to a report. **The logs go in unfiltered, except for your home folder.** Read "What's in that zip" before you send it. |
 | `find-rain` | Finds the ACC rain fields by measuring them. You need a session with changing weather. |
 
 ### The configuration file
@@ -1075,11 +1075,11 @@ The first is `contesto.txt`, which we write. It has the version, the commit, you
 Python and Windows versions and the last cars and tracks you drove. It has no
 paths, no machine name and no account name, because none of that would help us.
 
-The second is your log files, which go in **exactly as they are, unfiltered**.
-At least all of this is in them.
+The second is your log files, which go in unfiltered, with one change. Your
+home folder, where your Windows account name lives, is replaced by
+`%USERPROFILE%`. At least all of this is in them.
 
-- Paths that include your Windows account name, like `C:\Users\<account>\...`,
-  and any network location you set as your laps folder.
+- All the other paths, and any network location you set as your laps folder.
 - One dated line every time you started HONE. Together they're a record of when
   you sat down to drive, going back as far as your oldest log.
 - Your lap times, the tracks and cars you drove, and the names of the files you

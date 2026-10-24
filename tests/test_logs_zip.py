@@ -495,3 +495,102 @@ def test_logs_zip_avvisa_a_schermo_senza_far_aprire_l_archivio(monkeypatch, caps
     assert _denials_of_what_the_bundle_carries(out, facts) == []
     # Dove sta scritto il resto.
     assert support.CONTEXT_NAME in out
+
+
+
+# --- la cartella di casa non esce con lo ZIP ----------------------------------
+# Decisione 5: il pacchetto resta senza filtri per tutto il resto, ma il nome
+# dell'account Windows sta nella cartella di casa e non serve a nessuna
+# diagnosi. Le prove leggono i BYTE dentro lo ZIP, non il testo che li annuncia.
+
+def _membri(zip_path: Path) -> dict[str, bytes]:
+    with zipfile.ZipFile(zip_path) as z:
+        return {n: z.read(n) for n in z.namelist()}
+
+
+def _casa(monkeypatch, casa: str) -> None:
+    monkeypatch.setattr(Path, "home", classmethod(lambda cls: Path(casa)))
+
+
+@pytest.mark.parametrize("casa", [r"C:\Users\pilota-finto", r"D:\Utenti\pilota-finto"])
+def test_il_pacchetto_non_contiene_la_casa(tmp_path, monkeypatch, casa):
+    _casa(monkeypatch, casa)
+    logs = tmp_path / "logs"
+    logs.mkdir()
+    doppia = casa.replace("\\", "\\\\")
+    barre = casa.replace("\\", "/")
+    (logs / "accoach.log").write_text(
+        f"saved {casa}\\Documents\\ACCoach\\laps\\a.json.gz\n"
+        f"repr: '{doppia}\\\\Documents'\n"
+        f"url: file:///{barre}/x\n", encoding="utf-8")
+    (logs / "crash-1.log").write_text(
+        f'  File "{casa.lower()}\\progetti\\a.py", line 1\n', encoding="utf-8")
+
+    z = support.build_log_zip(dest_dir=tmp_path / "out", source=logs)
+
+    membri = _membri(z)
+    for membro, corpo in membri.items():
+        assert b"pilota-finto" not in corpo.lower(), membro
+    log = membri["logs/accoach.log"].decode("utf-8")
+    assert "%USERPROFILE%\\Documents\\ACCoach" in log
+    assert "'%USERPROFILE%\\\\Documents'" in log
+    assert "file:///%USERPROFILE%/x" in log
+
+
+def test_redact_home_prende_slash_maiuscole_e_doppie_barre():
+    h = Path(r"C:\Users\pilot")
+    r = support.redact_home
+    assert r(r"C:\Users\pilot\x", h) == "%USERPROFILE%\\x"
+    assert r("C:/Users/pilot/x", h) == "%USERPROFILE%/x"
+    assert r(r"c:\USERS\Pilot\x", h) == "%USERPROFILE%\\x"
+    assert r("C:\\\\Users\\\\pilot\\\\x", h) == "%USERPROFILE%\\\\x"
+    assert r(r"C:\Users\pilot", h) == "%USERPROFILE%"
+    assert r(r"'C:\Users\pilot'", h) == "'%USERPROFILE%'"
+    assert r("niente da fare qui", h) == "niente da fare qui"
+
+
+def test_redact_home_non_mangia_un_altro_account():
+    h = Path(r"C:\Users\pilot")
+    # I nomi si attaccano a runtime: il test della privacy non vuole nomi fuori
+    # elenco nei file tracciati, nemmeno finti.
+    u = "C:\\Users\\"
+    uu = "C:\\\\Users\\\\"
+    for altro in (u + "pilot-two\\x", u + "pilot2", u + "pilotino",
+                  uu + "pilot_b\\\\x", u + "pilot.old\\x"):
+        assert support.redact_home(altro, h) == altro
+
+
+def test_il_resto_del_log_resta_com_e(tmp_path, monkeypatch):
+    _casa(monkeypatch, r"C:\Users\pilota-finto")
+    logs = tmp_path / "logs"
+    logs.mkdir()
+    resto = (r"2026-06-28 00:25:05 laps_dir=\\NAS\piloti\laps lap 1m54s3 "
+             r"C:\Users\pilot\x D:\giochi\ACC" "\n")
+    (logs / "accoach.log").write_bytes(
+        ("C:\\Users\\pilota-finto\\a\n" + resto).encode("utf-8"))
+
+    z = support.build_log_zip(dest_dir=tmp_path / "out", source=logs)
+
+    assert _membri(z)["logs/accoach.log"].decode("utf-8") == "%USERPROFILE%\\a\n" + resto
+
+
+def test_un_log_non_utf8_senza_la_casa_entra_byte_per_byte(tmp_path, monkeypatch):
+    _casa(monkeypatch, r"C:\Users\pilota-finto")
+    logs = tmp_path / "logs"
+    logs.mkdir()
+    grezzo = b"\xff\xfe\x00 niente casa \xe8\n"
+    (logs / "vecchio.log").write_bytes(grezzo)
+    (logs / "misto.log").write_bytes(b"\xe8 C:\\Users\\pilota-finto\\x \xff")
+
+    z = support.build_log_zip(dest_dir=tmp_path / "out", source=logs)
+
+    m = _membri(z)
+    assert m["logs/vecchio.log"] == grezzo
+    assert m["logs/misto.log"] == b"\xe8 %USERPROFILE%\\x \xff"
+
+
+def test_la_dichiarazione_dice_che_la_casa_e_sostituita(tmp_path):
+    z = support.build_log_zip(dest_dir=tmp_path / "out",
+                              source=_con_tutto_dentro(tmp_path))
+    assert "%USERPROFILE%" in _contesto(z)
+    assert "%USERPROFILE%" in support.short_notice(z)

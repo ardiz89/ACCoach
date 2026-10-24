@@ -23,16 +23,18 @@ sola lettura e solo se esiste — questo comando non deve creare niente, e non
 apre la telemetria.
 
 Il che vale per il **contesto**, non per il pacchetto: i log ci vanno dentro
-come sono, non filtrati, e i percorsi assoluti col nome dell'account Windows li
-contengono davvero. E' una scelta — un log ripulito non diagnostica niente, e
-una censura invisibile sarebbe peggio del percorso — e per questo la
-dichiarazione dentro lo ZIP tiene le due cose separate invece di promettere un
-pacchetto pulito che non e'. Vedi :func:`_disclosure`.
+non filtrati, con una sola eccezione, la cartella di casa (dove sta il nome
+dell'account Windows), che diventa ``%USERPROFILE%`` — vedi :func:`redact_home`.
+Il resto dei percorsi resta: un log ripulito non diagnostica niente, e una
+censura invisibile sarebbe peggio del percorso. Per questo la dichiarazione
+dentro lo ZIP dice la sostituzione e tiene separate le due cose invece di
+promettere un pacchetto pulito che non e'. Vedi :func:`_disclosure`.
 """
 
 from __future__ import annotations
 
 import platform
+import re
 import sqlite3
 import zipfile
 from datetime import datetime
@@ -50,6 +52,58 @@ NO_LOGS = "none - the folder was empty or did not exist"
 NO_COMBOS = "not available (no lap catalog on this machine)"
 
 _UNKNOWN_COMMIT = "unknown (not a source checkout)"
+
+
+# --- la cartella di casa ---------------------------------------------------------
+
+#: Cosa prende il posto della cartella di casa dentro i log.
+HOME_PLACEHOLDER = "%USERPROFILE%"
+
+#: Un separatore in una delle grafie in cui un log lo scrive: backslash
+#: raddoppiato (come esce da un `repr`), backslash, slash. Il raddoppiato per
+#: primo, se no un percorso raddoppiato resterebbe sostituito a meta'.
+_SEP = r"(?:\\\\|\\|/)+"
+
+
+def redact_home(text: str, home: Path | None = None) -> str:
+    """``text`` con la cartella di casa sostituita da ``%USERPROFILE%``.
+
+    Solo la casa: e' li' che sta il nome dell'account Windows, e a nessuna
+    diagnosi serve. Tutto il resto del log (altri percorsi, una cartella di rete,
+    i tempi) resta com'e' — un log ripulito non trova difetti.
+
+    Maiuscole e minuscole non contano (Windows non le distingue) e ogni
+    separatore della casa vale per tutte e tre le grafie.
+
+    La casa non deve essere il *prefisso del nome* di un altro account: con casa
+    ``C:\\Users\\<account>``, ``C:\\Users\\<account>-two`` e' un'altra cartella e non
+    diventa ``%USERPROFILE%-two``. Dopo la casa non puo' seguire un carattere
+    di nome.
+    """
+    if home is None:
+        try:
+            home = Path.home()
+        except (RuntimeError, OSError):
+            return text
+    parts = [x for x in re.split(r"[\\/]+", str(home)) if x]
+    if len(parts) < 2:   # una radice («C:\») non e' una casa: sostituirla romperebbe il log
+        return text
+    pattern = _SEP.join(re.escape(x) for x in parts)
+    return re.sub(pattern + r"(?![\w\-]|\.\w)", lambda _m: HOME_PLACEHOLDER, text,
+                  flags=re.IGNORECASE)
+
+
+def _redact_bytes(data: bytes) -> bytes:
+    """I byte di un log con la casa sostituita; gli stessi se non c'e'.
+
+    Un file non UTF-8 si legge con ``surrogateescape``: i byte che non sono
+    testo tornano identici, quindi a cambiare e' solo la casa.
+    """
+    text = data.decode("utf-8", errors="surrogateescape")
+    redacted = redact_home(text)
+    if redacted == text:
+        return data
+    return redacted.encode("utf-8", errors="surrogateescape")
 
 
 # --- il commit -----------------------------------------------------------------
@@ -236,12 +290,13 @@ def _disclosure(has_logs: bool) -> list[str]:
            "  that would help a diagnosis."]
     if has_logs:
         out += [
-            "  Everything under logs/ goes in exactly as it was written, NOT",
+            "  Everything under logs/ goes in as it was written, with one change:",
+            "  your home folder, the part of a path that holds your Windows",
+            f"  account name, is replaced by {HOME_PLACEHOLDER}. The rest is NOT",
             "  filtered - a log with the interesting parts taken out diagnoses",
             "  nothing.",
-            "  Those files carry, at least: paths, which include your Windows",
-            r"  account name (C:\Users\<account>\...) and any network location",
-            "  you configured; one dated line for every single time you started",
+            "  Those files carry, at least: all the other paths, and any network",
+            "  location you configured; one dated line for every single time you started",
             "  HONE, which together are a record of when you sat down to drive,",
             "  going back as far as your oldest log; your lap times, and the",
             "  tracks and cars you drove; the names of files you opened; and",
@@ -281,8 +336,9 @@ def short_notice(zip_path: Path | str) -> str:
         return ("Nothing was attached: there were no log files to collect.\n"
                 f"{CONTEXT_NAME} inside says as much.")
     return (
-        "Inside, logs/ goes in unfiltered: paths carrying your Windows account\n"
-        "name, one dated line for every time you started HONE, your lap times,\n"
+        f"Inside, logs/ goes in unfiltered, except that your home folder is\n"
+        f"replaced by {HOME_PLACEHOLDER}: the other paths, one dated line for\n"
+        "every time you started HONE, your lap times,\n"
         "the tracks and cars you drove, and crash reports with full tracebacks.\n"
         f"Read {CONTEXT_NAME} in the zip for the whole list - and the zip\n"
         "itself, before you send it."
@@ -312,7 +368,9 @@ def build_log_zip(dest_dir: Path | str | None = None,
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
         for p in candidates:
             try:
-                z.write(p, f"logs/{p.name}")
+                info = zipfile.ZipInfo.from_file(p, f"logs/{p.name}")
+                info.compress_type = zipfile.ZIP_DEFLATED
+                z.writestr(info, _redact_bytes(p.read_bytes()))
             except OSError:
                 # Un file tenuto aperto da un altro processo non deve far
                 # saltare il pacchetto: lo si dichiara e si va avanti.
