@@ -225,6 +225,28 @@ def test_a_clean_lap_on_cold_tyres_is_explained_once_per_session(tmp_path, monke
     assert len(voice.said) == 2
 
 
+def test_far_off_the_reference_the_line_talks_about_pace(tmp_path, monkeypatch):
+    """Molto lontano dal riferimento le gomme fredde sono la conseguenza del
+    ritmo: la frase lo dice al posto di quella sulle gomme, non in piu'."""
+    from types import SimpleNamespace
+    import accoach.engine as engine_mod
+    from accoach.engineer import Decision, DecisionKind
+    from accoach.engineer.core import LapStats
+    monkeypatch.setattr(engine_mod, "current_language", lambda: "it")
+    eng, voice = _engine_with_voice(tmp_path)
+    eng._reference = SimpleNamespace(lap_time_ms=88_745)
+    collect = Decision(DecisionKind.COLLECT, "need laps")
+    eng._announce_cold_lap(LapStats(lap_time_ms=136_402, warmed_up=False), collect)
+    eng._forget_session()
+    eng._reference = SimpleNamespace(lap_time_ms=88_745)
+    # Al 5 % dal riferimento e' la frase delle gomme.
+    eng._announce_cold_lap(LapStats(lap_time_ms=93_000, warmed_up=False), collect)
+    eng._reference = None
+    eng.close()
+    assert voice.said == [engine_mod._ENG_VOICE_SLOW["it"],
+                          engine_mod._ENG_VOICE_COLD["it"]]
+
+
 def test_the_cold_lap_line_respects_the_engineer_voice_switch(tmp_path):
     from accoach.engineer import Decision, DecisionKind
     from accoach.engineer.core import LapStats

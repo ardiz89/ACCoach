@@ -332,6 +332,19 @@
       "style": 0.0
     }
   },
+  "Con questo ritmo le gomme restano fredde. Prima prendi confidenza con la pista.": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "text": "Con questo ritmo le gomme restano fredde. Prima prendi confidenza con la pista.",
+    "voice_id": "RXoaSpLaWTEckJgPUBG3",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
   "Dai più gas qui": {
     "language_code": "it",
     "model_id": "eleven_multilingual_v2",

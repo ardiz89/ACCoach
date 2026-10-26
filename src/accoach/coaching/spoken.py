@@ -142,12 +142,14 @@ def numeric_cue_messages() -> set[str]:
 def engineer_phrases() -> set[str]:
     """Quello che dice l'ingegnere in italiano: il prefisso, la leva, il ripristino."""
     # Importati qui: `engine.py` importa il coach, e il coach non importa il motore.
-    from ..engine import _ENG_VOICE_COLD, _ENG_VOICE_PREFIX, _ENG_VOICE_REVERT
+    from ..engine import (_ENG_VOICE_COLD, _ENG_VOICE_PREFIX, _ENG_VOICE_REVERT,
+                          _ENG_VOICE_SLOW)
     from ..engineer.voice_levers import all_voice_levers
     out = {by_lang["it"] for by_tag in _ENG_VOICE_PREFIX.values()
            for by_lang in by_tag.values()}
     out.add(_ENG_VOICE_REVERT["it"])
     out.add(_ENG_VOICE_COLD["it"])
+    out.add(_ENG_VOICE_SLOW["it"])
     out.update(all_voice_levers())
     return out
 

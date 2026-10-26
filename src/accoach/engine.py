@@ -162,6 +162,18 @@ _ENG_VOICE_REVERT = {"it": "Riporta l'assetto com'era.",
 # per questo l'assetto aspettava. Si dice una volta per sessione.
 _ENG_VOICE_COLD = {"it": "Gomme ancora fredde. Questo giro non conta per l'assetto.",
                    "en": "Tyres still cold. This lap doesn't count for the setup."}
+# La stessa situazione, quando il giro e' molto lontano dal riferimento: li' le
+# gomme fredde sono la conseguenza del ritmo, e «spingi» e' il consiglio
+# sbagliato per chi sta ancora imparando la pista. Al posto dell'altra frase,
+# non in piu'.
+_ENG_VOICE_SLOW = {"it": "Con questo ritmo le gomme restano fredde. "
+                         "Prima prendi confidenza con la pista.",
+                   "en": "At this pace the tyres stay cold. "
+                         "Get to know the track first."}
+# Quanto piu' lento del riferimento vale «molto lontano»: il 25/10 i giri del
+# pilota alle prime armi erano dal 54 al 140 % sopra il riferimento, quelli di
+# chi guida da mesi stanno sotto il 3 %.
+_SLOW_FRAC = 0.10
 
 
 #: «di 2 click», «1 click di»: il numero dei click dentro una leva dello schermo.
@@ -891,7 +903,11 @@ class CoachEngine:
             return
         self._cold_spoken = True
         lang = current_language()
-        self.voice.say(_ENG_VOICE_COLD.get(lang) or _ENG_VOICE_COLD["en"])
+        ref_ms = self._reference.lap_time_ms if self._reference is not None else 0
+        slow = (ref_ms > 0 and stats.lap_time_ms > 0
+                and stats.lap_time_ms > ref_ms * (1.0 + _SLOW_FRAC))
+        table = _ENG_VOICE_SLOW if slow else _ENG_VOICE_COLD
+        self.voice.say(table.get(lang) or table["en"])
 
     def _announce_engineer(self, decision) -> None:
         """Speak a brief alert when the engineer wants a setup change.
