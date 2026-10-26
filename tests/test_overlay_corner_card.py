@@ -31,6 +31,7 @@ def _paint(app, state) -> tuple:
     """Dipinge un frame; torna (testi passati a drawText, colori passati a setBrush)."""
     drawn, brushes = [], []
     o = Overlay()
+    o._mode = "full"     # la carta della curva sta solo in «Completa»
     o._state = state
     real = o._draw_corner_card
 

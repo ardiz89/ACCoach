@@ -277,28 +277,37 @@ guida.
 
 ## 4. Leggere l'overlay
 
-- **La barra del delta** si riempie **a destra in rosso** se sei più lento del
-  riferimento, e **a sinistra in verde** se sei più veloce.
-- **In alto** trovi il tuo **PB**, cioè il giro contro cui stai correndo, e il
-  **tempo previsto** se tieni il passo. Quando arriva una staccata, quello
-  spazio lo prende il **conto alla rovescia in metri**. Al momento di frenare
-  diventa una parola sola, in rosso, **FRENA**. La soglia è in tempo e non in
-  distanza. Dieci metri sono 0,14 s a 250 km/h, e mezzo secondo in una curva
-  lenta.
-- **Un'etichetta** mostra l'ultimo consiglio detto, e sparisce da sola. Quando
-  l'ingegnere propone una modifica che si fa **solo ai box**, il coach ti
-  richiama a fine giro. Da quel momento l'etichetta diventa l'**avviso di
-  rientro**, in ambra, e non sparisce più. Resta finché non entri in corsia box,
-  o finché la modifica non è più in attesa, per esempio se viene ritirata. Un
-  richiamo che dura due secondi lo perdi se in quel momento guardavi la curva.
-  I consigli continuano ad arrivare a voce. Cedono solo quella riga, e la
-  riprendono quando l'avviso si spegne.
-- **Sotto c'è una riga sottile in ambra**, il **focus**, cioè il tema su cui
-  stai lavorando, con la curva e i decimi che ci perdi. Quando il coach è
-  passato alle parole brevi, descritte in «Un tema alla volta», lì trovi anche
-  **una parola d'esempio**, come «MENO FRENO». La frase intera resta
-  nell'etichetta e nel debrief. La riga del focus ti ricorda il tema, non tutte le
-  parole che sentirai.
+L'overlay è una piastra scura con tre righe, sempre nello stesso posto. La
+piastra serve a leggerlo anche sopra il cielo chiaro.
+
+- **In alto c'è il delta**, il numero con tre decimali e sotto la sua barra. La
+  barra si riempie **a destra in rosso** se sei più lento del riferimento, e **a
+  sinistra in verde** se sei più veloce. La barra si muove sempre, il numero si
+  riscrive circa quattro volte al secondo, così l'ultima cifra non ti balla
+  davanti.
+- **Al centro c'è la riga d'azione**, con una cosa sola alla volta.
+  - Quando arriva una staccata ci sono i **metri** che mancano. Al momento di
+    frenare diventano una parola sola, **FRENA**, in un blocco rosso, e il bordo
+    della piastra diventa rosso. La soglia è in tempo e non in distanza. Dieci
+    metri sono 0,14 s a 250 km/h, e mezzo secondo in una curva lenta.
+  - Quando l'ingegnere propone una modifica che si fa **solo ai box**, il coach
+    ti richiama a fine giro e la riga diventa **RIENTRA AI BOX**, in ambra. Non
+    sparisce da sola. Resta finché non entri in corsia box, o finché la
+    modifica non è più in attesa. Solo «FRENA» le passa davanti.
+  - Altrimenti la riga mostra **l'ultimo consiglio detto**, che sparisce da
+    solo. I consigli arrivano sempre anche a voce.
+  - Quando batti il riferimento, per qualche secondo leggi **Nuovo
+    riferimento** col tempo.
+- **In basso, solo in Completa**, a sinistra c'è il **focus**, cioè il tema su
+  cui lavori e la sua curva. A destra c'è **l'ultima curva** chiusa coi decimi.
+  Quando il coach è passato alle parole brevi, descritte in «Un tema alla
+  volta», nel focus trovi anche **la parola che senti**, come «meno freno».
+
+In **Impostazioni**, alla voce **Cosa mostra l'overlay**, scegli fra
+**Essenziale**, con le prime due righe, e **Completa**, con tutte e tre. Chi
+installa HONE parte da Essenziale. **Colori per daltonici** mette blu e arancio
+al posto di verde e rosso. L'overlay cambia da solo entro un secondo, anche con
+Coach Live acceso.
 
 ### Spostare l'overlay
 

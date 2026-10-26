@@ -36,7 +36,7 @@ from .textfmt import fmt_num
 from .theme import DISPLAY, MONO, load_fonts
 
 try:
-    from PySide6.QtCore import QPointF, Qt, QTimer, QUrl
+    from PySide6.QtCore import QPointF, QRectF, Qt, QTimer, QUrl
     from PySide6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPen, QPolygonF
     from PySide6.QtWebSockets import QWebSocket
     from PySide6.QtWidgets import QApplication, QWidget
@@ -72,6 +72,25 @@ _DELTA_BOX_H = 42
 DELTA_CLAMP_S = 1.0       # bar is full at ±1.0 s
 _BASE_W, _BASE_H = 560, 210   # design size; the window is this × the config scale
 
+# --- la piastra e le sue tre righe (coordinate base) -------------------------
+# Riga 1: numero e barra. Riga 2: la riga d'azione, una cosa alla volta.
+# Riga 3, solo in «Completa»: focus a sinistra, ultima curva a destra.
+_PLATE_X, _PLATE_Y, _PLATE_W = 40, 10, 480
+_PLATE_H_WAIT = 74
+_PLATE_H_ESSENTIAL = 118
+_PLATE_H_FULL = 160
+_ROW_X, _ROW_W = _PLATE_X + 14, _PLATE_W - 28
+_ROW_Y, _ROW_H = _PLATE_Y + 70, 34
+_ROW3_Y = _PLATE_Y + 124
+_ACCENT_W = 4
+# Lo spazio dell'ultima curva, a destra nella riga 3: pallino, nome, decimi.
+_CARD_W = 190
+# Ogni quanto si riscrive il numero del delta (la barra resta fluida).
+_DELTA_TEXT_S = 0.25
+# Quanto resta il riferimento nuovo nella riga d'azione, dopo il traguardo.
+_PB_HOLD_S = 4.0
+_MODES = ("essential", "full")
+
 # --- live pedal trace (opt-in: --pedals / config overlay.pedals) --------------
 # A rolling throttle/brake strip drawn under the HUD. It's a calibration aid:
 # trail-braking shows as the two traces overlapping (brake decaying while
@@ -91,12 +110,26 @@ _STEER_FLOOR = 0.3
 # HONE palette (see accoach.brand). QColor wants ints, so they're spelled here.
 _CYAN = QColor(0x22, 0xD3, 0xCE)     # brand mark / cue accent
 _GREEN = QColor(0x34, 0xE0, 0x8A)    # delta: faster
-_RED = QColor(0xFF, 0x4D, 0x5E)      # delta: slower / acute lock
+# Un poco piu' chiaro del rosso del report (#FF4D5E): sulla piastra arriva a
+# 5,6 di contrasto, quello di prima si fermava a 4,3.
+_RED = QColor(0xFF, 0x7A, 0x86)      # delta: slower / acute lock
 _AMBER = QColor(0xFF, 0xB0, 0x20)    # focus / advisory
 _WHITE = QColor(0xE8, 0xED, 0xF2)    # text
 _GREY = QColor(0x8A, 0x95, 0xA3)     # muted text
 _LINE = QColor(0x23, 0x2B, 0x35)     # bar track / hairlines
 _DARK = QColor(0x0B, 0x0E, 0x12, 165)  # Ink, semi-transparent backing pill
+# I testi secondari: il grigio di prima (#8A95A3) arrivava a 2,5 di contrasto
+# sul fondo di allora e a 4,6 sulla piastra nuova; questo a 7,4.
+_SOFT = QColor(0xB4, 0xBD, 0xC8)
+# La piastra unica dietro tutto, all'85 % (vedi `paintEvent`).
+_PLATE = QColor(0x0B, 0x0E, 0x12, 217)
+# La traccia della barra del delta: sulla piastra il vecchio _LINE spariva.
+_TRACK = QColor(0x3A, 0x44, 0x52)
+# Il fondo della riga d'azione, appena piu' chiaro della piastra.
+_ROW_BG = QColor(0x1A, 0x20, 0x28, 235)
+# La tavolozza per daltonici, la stessa del report (`body.cb-safe` in style.css).
+_CB_FASTER = QColor(0x3B, 0x82, 0xF6)    # blu
+_CB_SLOWER = QColor(0xF5, 0x9E, 0x0B)    # arancio
 
 # Il semaforo della curva. Le soglie stanno in coaching/analyzer.py e arrivano
 # qui già risolte in un livello: l'overlay non ha nessuna soglia da riscrivere,
@@ -233,6 +266,20 @@ def _screen_snapshot():
     return (screens, (vg.x(), vg.y(), vg.width(), vg.height()))
 
 
+def _fit_focus(fm, theme: str, name: str, word: str, room: int) -> str:
+    """La riga del focus che ci sta in ``room`` pixel: tema, curva e parola;
+    poi curva e parola; poi la curva accorciata, e la parola intera."""
+    sep = " · "
+    for parts in ([theme, name, word], [name, word]):
+        line = sep.join(x for x in parts if x)
+        if fm.horizontalAdvance(line) <= room:
+            return line
+    tail = (sep + word) if word else ""
+    short = fm.elidedText(name, Qt.ElideRight,
+                          max(0, room - fm.horizontalAdvance(tail)))
+    return short + tail
+
+
 def _pedal_readouts(thr: float, brk: float, steer: float) -> tuple[str, str, str]:
     """Le tre scritte sopra la striscia: «GAS  45 %», «FRENO   0 %», «STERZO  34 % SX».
 
@@ -291,6 +338,13 @@ class Overlay(QWidget):
         # Edge detection for the "green — flying lap" flash.
         self._prev_quiet: str = ""
         self._green_at: float = 0.0
+        # Il numero del delta mostrato e quando e' stato scritto (vedi
+        # `_delta_text`), e il riferimento nuovo da annunciare al traguardo.
+        self._delta_shown: str | None = None
+        self._delta_shown_at = 0.0
+        self._pb_text = ""
+        self._pb_seen: str | None = None
+        self._pb_at = 0.0
         # Rolling (t, throttle, brake, steer) samples for the optional pedal strip.
         self._show_pedals = pedals
         self._pedal_hist: list[tuple[float, float, float, float]] = []
@@ -308,6 +362,7 @@ class Overlay(QWidget):
         from .config import load_config
         ov = load_config().overlay
         self._scale = ov.scale if (ov.scale and ov.scale > 0) else 1.0
+        self._apply_look(ov)
         self._interactive = interactive
         self._drag_off = None
         self._base_h = _BASE_H + (_PEDAL_PANEL_H if pedals else 0)
@@ -364,6 +419,13 @@ class Overlay(QWidget):
             self._green_at = 0.0
         self._prev_quiet = quiet
 
+        # Il riferimento cambia solo al traguardo, quando un giro lo batte: e'
+        # l'unico momento in cui il PB vale la pena di leggerlo.
+        ref = (data.get("delta") or {}).get("reference")
+        if ref:
+            if self._pb_seen is not None and ref != self._pb_seen:
+                self._pb_text, self._pb_at = ref, time.monotonic()
+            self._pb_seen = ref
         self._state = data
         cue = data.get("cue")
         if cue:
@@ -428,6 +490,12 @@ class Overlay(QWidget):
         self._geometry_poll.timeout.connect(self._reposition_if_geometry_changed)
         self._geometry_poll.start(_GEOMETRY_POLL_MS)
 
+    def _apply_look(self, ov) -> None:
+        """Modalità e tavolozza dal config (all'avvio e quando cambiano)."""
+        self._mode = ov.mode if ov.mode in _MODES else "full"
+        self._faster = _CB_FASTER if ov.cb else _GREEN
+        self._slower = _CB_SLOWER if ov.cb else _RED
+
     def _follow_timer_stop(self) -> None:
         self._follow.stop()
 
@@ -438,6 +506,7 @@ class Overlay(QWidget):
         if ov is None:                       # file a meta' scrittura: al prossimo giro
             return
         scale = ov.scale if (ov.scale and ov.scale > 0) else 1.0
+        self._apply_look(ov)                 # modalità e colori: costano niente
         wanted = (ov.x, ov.y, scale)
         if wanted == self._applied:
             return
@@ -531,6 +600,16 @@ class Overlay(QWidget):
         self.apply_state(data)
 
     # --- painting ----------------------------------------------------------
+    # Il disegno del 26/10, deciso col pilota dopo l'analisi «Overlay e
+    # concentrazione»: una piastra sola, tre righe sempre nello stesso posto.
+    #
+    #   1. il numero del delta con la sua barra (o, senza delta, il perché);
+    #   2. la riga d'azione: UNA cosa alla volta, frenata, rientro o consiglio;
+    #   3. solo in «Completa»: il focus a sinistra, l'ultima curva a destra.
+    #
+    # Prima il testo stava appoggiato sul gioco senza fondo: sul cielo chiaro,
+    # dove l'overlay vive, il contrasto andava da 1,2 a 2,2 (ne serve 4,5). La
+    # piastra all'85 % lo porta sopra 4,5 per ogni colore.
     def paintEvent(self, _event) -> None:
         p = QPainter(self)
         p.setRenderHint(QPainter.Antialiasing, True)
@@ -543,14 +622,23 @@ class Overlay(QWidget):
             self._draw_pedals(p, w)
 
         if not st or not st.get("connected"):
-            self._draw_mark(p, 22, 22, 18)
-            self._set_font(p, 14, bold=True)
-            p.setPen(_GREY)
-            p.drawText(52, 14, 200, 24, Qt.AlignVCenter, "HONE")
-            self._draw_pill(p, t("overlay.waiting"), _GREY, y=78)
+            self._draw_plate(p, _PLATE_H_WAIT)
+            self._draw_mark(p, _PLATE_X + 18, _PLATE_Y + 14, 16)
+            self._set_font(p, 13, bold=True)
+            p.setPen(_SOFT)
+            p.drawText(_PLATE_X + 46, _PLATE_Y + 8, 200, 28, Qt.AlignVCenter, "HONE")
+            self._set_font(p, 15, bold=True)
+            p.setPen(_SOFT)
+            p.drawText(_PLATE_X, _PLATE_Y + 34, _PLATE_W, 30, Qt.AlignCenter,
+                       t("overlay.waiting"))
             return
 
-        self._draw_brand_header(p, w)
+        full = self._mode == "full"
+        brake_now = self._brake_seconds() is not None and \
+            self._brake_seconds() <= _BRAKE_NOW_S
+        self._draw_plate(p, _PLATE_H_FULL if full else _PLATE_H_ESSENTIAL,
+                         alarm=brake_now)
+
         delta = st.get("delta")
         quiet = st.get("quiet") or ""
         invalid = bool(st.get("lap_invalid"))
@@ -561,53 +649,118 @@ class Overlay(QWidget):
         # `off_pace` is deliberately NOT here: that lap did start at the line, the
         # number is ugly but true, and how much you dropped is worth reading.
         if invalid or quiet in _NO_DELTA_QUIET:
-            # Everything else — braking, locking, tyres — still applies. This
-            # replaces the number and nothing more.
-            #
             # "Invalidated" only wins when a delta would otherwise have been
             # there. On a first session with no reference yet, leading with it
             # implies that without the cut there'd be a number — so the driver
-            # waits for the next lap for a delta that isn't coming. The reason
-            # that would still be true after a perfect lap is the truer one.
+            # waits for the next lap for a delta that isn't coming.
             label = (t(f"quiet.{quiet}") if (delta is None and quiet)
                      else t("overlay.lap_invalid") if invalid
                      else t(f"quiet.{quiet}"))
-            self._draw_pill(p, label, _AMBER, y=78)
+            self._draw_reason(p, label)
         elif delta is None:
-            # Say WHY there's nothing to compare against. The old text assumed the
-            # only reason was "still learning the reference", which was wrong on an
-            # out-lap and read as a stuck app.
-            self._draw_pill(p, t(f"quiet.{quiet}") if quiet else t("overlay.rec"),
-                            _AMBER, y=78)
+            # Say WHY there's nothing to compare against.
+            self._draw_reason(p, t(f"quiet.{quiet}") if quiet else t("overlay.rec"))
         else:
             self._draw_delta(p, delta, w, quiet)
-            if quiet:
-                # The delta is still worth seeing (you can read how far off you
-                # are), but the coach isn't advising — say so under the number.
-                self._set_font(p, 11)
-                p.setPen(_GREY)
-                p.drawText(0, 108, w, 16, Qt.AlignHCenter, t(f"quiet.{quiet}"))
-        self._draw_green_flag(p, w, quiet)
-        if not self._draw_pit_due(p, w):
+
+        self._draw_action_row(p, w, quiet)
+        if full:
+            self._draw_focus(p, w)
+            self._draw_corner_card(p, w)
+
+    # --- the plate and the three rows -----------------------------------------
+    def _draw_plate(self, p: QPainter, height: int, alarm: bool = False) -> None:
+        """La piastra scura dietro tutto. Al momento di frenare il bordo diventa
+        rosso: la visione periferica legge il colore prima di qualunque parola."""
+        p.setPen(QPen(self._slower, 3) if alarm else Qt.NoPen)
+        p.setBrush(_PLATE)
+        p.drawRoundedRect(QRectF(_PLATE_X, _PLATE_Y, _PLATE_W, height), 12, 12)
+
+    def _draw_reason(self, p: QPainter, text: str) -> None:
+        """Senza delta, al posto del numero: perché non c'è."""
+        self._set_font(p, 15, bold=True)
+        p.setPen(_AMBER)
+        p.drawText(_PLATE_X + 12, _PLATE_Y + 8, _PLATE_W - 24, 52,
+                   Qt.AlignCenter | Qt.TextWordWrap, text)
+
+    def _brake_seconds(self) -> float | None:
+        delta = self._state.get("delta") or {}
+        metres = delta.get("brake_in_m")
+        if metres is None:
+            return None
+        speed_ms = max(1.0, (self._state.get("speed_kmh") or 0.0) / 3.6)
+        return metres / speed_ms
+
+    def _draw_action_row(self, p: QPainter, w: int, quiet: str) -> None:
+        """La riga d'azione: una cosa sola, nell'ordine in cui conta.
+
+        Frenare adesso batte tutto, poi il rientro ai box (una condizione, non un
+        evento), poi i metri alla staccata vicina, poi l'ultimo consiglio, poi i
+        metri ancora lontani, e infine il «giro lanciato» quando il coach
+        riparte. Prima la frenata stava nell'angolo in alto a destra, il punto
+        più lontano da dove guardi, e il consiglio sotto: due posti per due cose
+        che si contendono lo stesso istante."""
+        secs = self._brake_seconds()
+        if secs is not None and secs <= _BRAKE_NOW_S:
+            self._draw_brake_cue(p, w, self._brake_metres())
+            return
+        if self._draw_pit_due(p, w):
+            return
+        if secs is not None and secs <= _BRAKE_NEAR_S:
+            self._draw_brake_cue(p, w, self._brake_metres())
+            return
+        if self._cue_live():
             self._draw_cue(p, w)
-        self._draw_focus(p, w)
-        self._draw_corner_card(p, w)
+            return
+        if secs is not None:
+            self._draw_brake_cue(p, w, self._brake_metres())
+            return
+        if self._draw_new_reference(p):
+            return
+        if quiet and self._state.get("delta") is not None:
+            # The delta is still worth seeing (you can read how far off you
+            # are), but the coach isn't advising: say so, in the same row.
+            self._set_font(p, 13, bold=True)
+            p.setPen(_SOFT)
+            p.drawText(_ROW_X, _ROW_Y, _ROW_W, _ROW_H, Qt.AlignCenter,
+                       t(f"quiet.{quiet}"))
+            return
+        self._draw_green_flag(p, w, quiet)
+
+    def _brake_metres(self) -> int:
+        return int((self._state.get("delta") or {}).get("brake_in_m") or 0)
+
+    def _cue_live(self) -> bool:
+        return (self._cue is not None
+                and time.monotonic() - self._cue_at <= CUE_HOLD_S)
 
     def _draw_green_flag(self, p: QPainter, w: int, quiet: str) -> None:
         """Flash "green — flying lap" the moment the coach starts working.
 
         Without it the driver never learns when the silence ended and keeps
-        suspecting the app is broken well after it resumed. Cheapest half of the
-        fix, and the half that's usually forgotten. The edge itself is caught in
-        :meth:`apply_state`; this only draws it.
+        suspecting the app is broken well after it resumed. The edge itself is
+        caught in :meth:`apply_state`; this only draws it.
         """
         if quiet or not self._green_at:
             return
         if time.monotonic() - self._green_at > _GREEN_HOLD_S:
             return
-        self._set_font(p, 12, bold=True)
-        p.setPen(_GREEN)
-        p.drawText(0, 108, w, 16, Qt.AlignHCenter, t("quiet.green"))
+        self._set_font(p, 14, bold=True)
+        p.setPen(self._faster)
+        p.drawText(_ROW_X, _ROW_Y, _ROW_W, _ROW_H, Qt.AlignCenter, t("quiet.green"))
+
+    def _draw_new_reference(self, p: QPainter) -> bool:
+        """Il riferimento nuovo, per qualche secondo dopo il traguardo.
+
+        Il PB stava fisso in alto per tutto il giro, e lo sai già: lo si dice
+        quando cambia, e poi si toglie."""
+        if not self._pb_at or time.monotonic() - self._pb_at > _PB_HOLD_S:
+            return False
+        self._set_font(p, 14, bold=True)
+        p.setPen(self._faster)
+        p.drawText(_ROW_X, _ROW_Y, _ROW_W, _ROW_H, Qt.AlignCenter,
+                   t("overlay.new_ref").format(time=self._pb_text))
+        return True
 
     # --- the HONE mark: a cyan chevron with a green apex dot ----------------
     def _draw_mark(self, p: QPainter, x: int, y: int, h: int) -> None:
@@ -625,32 +778,16 @@ class Overlay(QWidget):
         p.setBrush(_GREEN)
         p.drawEllipse(int(x + h * 0.45 - r), int(mid_y - r), 2 * r, 2 * r)
 
-    def _draw_brand_header(self, p: QPainter, w: int) -> None:
-        self._draw_mark(p, 22, 18, 16)
-        self._set_font(p, 13, bold=True)
-        p.setPen(_WHITE)
-        p.drawText(50, 12, 220, 22, Qt.AlignVCenter, "HONE")
-        delta = self._state.get("delta") or {}
-        # When a braking point is coming up, the countdown takes the header's right
-        # slot (it's time-critical); otherwise show the reference lap time (PB).
-        brake_m = delta.get("brake_in_m")
-        if brake_m is not None:
-            self._draw_brake_cue(p, w, brake_m)
-        else:
-            self._set_font(p, 13, bold=True)
-            p.setPen(_GREY)
-            pb = delta.get("reference") or "--:--.---"
-            p.drawText(w - 240, 12, 220, 22, Qt.AlignRight | Qt.AlignVCenter, f"PB {pb}")
-
     def _draw_brake_cue(self, p: QPainter, w: int, metres: int) -> None:
-        """Countdown to the reference's next braking point.
+        """Countdown to the reference's next braking point, in the action row.
 
         Two jobs that pull against each other: be impossible to miss at the
         instant you must act, and be ignorable for the seconds before that. So it
         grows into the driver's attention instead of sitting there shouting —
         dim while the point is far, brighter as it closes, and at the moment
-        itself it stops being a number and becomes one red word. A digit you have
-        to read is the wrong thing to put in front of someone at 250 km/h.
+        itself it stops being a number and becomes one red word (and the plate's
+        border goes red). A digit you have to read is the wrong thing to put in
+        front of someone at 250 km/h.
 
         The switch is on TIME, not distance: at 250 km/h ten metres is 0.14 s and
         the cue would arrive after the braking point, while in a slow corner the
@@ -661,16 +798,14 @@ class Overlay(QWidget):
         seconds = metres / speed_ms
 
         if seconds <= _BRAKE_NOW_S:
-            # Filled red pill: peripheral vision reads the block of colour long
-            # before the eye could read a number.
-            box_w, box_h = 132, 26
-            x, y = w - 24 - box_w, 10
+            box_w = 220
+            x = _PLATE_X + (_PLATE_W - box_w) // 2
             p.setPen(Qt.NoPen)
-            p.setBrush(_RED)
-            p.drawRoundedRect(x, y, box_w, box_h, 8, 8)
-            self._set_font(p, 15, bold=True)
+            p.setBrush(self._slower)
+            p.drawRoundedRect(QRectF(x, _ROW_Y, box_w, _ROW_H), 8, 8)
+            self._set_font(p, 17, bold=True)
             p.setPen(QColor(0x0B, 0x0E, 0x12))
-            p.drawText(x, y, box_w, box_h, Qt.AlignCenter, t("overlay.brake"))
+            p.drawText(x, _ROW_Y, box_w, _ROW_H, Qt.AlignCenter, t("overlay.brake"))
             return
 
         # Approaching: metres only, no word — the word is reserved for the moment
@@ -678,92 +813,76 @@ class Overlay(QWidget):
         colour = QColor(_AMBER)
         if seconds > _BRAKE_NEAR_S:
             colour.setAlpha(150)            # far out: present, not loud
-        self._set_font(p, 15 if seconds <= _BRAKE_NEAR_S else 13, bold=True)
+        self._set_font(p, 17 if seconds <= _BRAKE_NEAR_S else 15, bold=True)
         p.setPen(colour)
-        p.drawText(w - 240, 12, 216, 22, Qt.AlignRight | Qt.AlignVCenter,
+        p.drawText(_ROW_X, _ROW_Y, _ROW_W, _ROW_H, Qt.AlignCenter,
                    f"▼ {metres} m")
+
+    def _delta_text(self, delta: dict) -> str:
+        """Il numero del delta, tre decimali e la virgola in italiano.
+
+        Si rinfresca circa quattro volte al secondo, non a ogni stato (20 al
+        secondo): l'ultima cifra che cambia di continuo e' movimento ai margini
+        dello sguardo, e non dice niente. La barra invece resta fluida, perche'
+        il verso e' la cosa che si legge a colpo d'occhio."""
+        now = time.monotonic()
+        if self._delta_shown is None or now - self._delta_shown_at >= _DELTA_TEXT_S:
+            s = float(delta.get("s", 0.0) or 0.0)
+            text = fmt_num(s, 3, current_language())
+            if s > 0 and not text.startswith("−") and text.strip("0,.") != "":
+                text = "+" + text
+            self._delta_shown = text
+            self._delta_shown_at = now
+        return self._delta_shown
 
     def _draw_delta(self, p: QPainter, delta: dict, w: int, quiet: str = "") -> None:
         ahead = delta.get("ahead", False)
-        colour = _GREEN if ahead else _RED
+        colour = self._faster if ahead else self._slower
 
-        bar_w, bar_h, y = 380, 14, 50
-        x0 = (w - bar_w) // 2
+        # Big delta number. The text carries the sign (+slower / −faster),
+        # which is the colour-blind-safe redundancy alongside the colour.
+        # The box is taller than the glyphs' line box, or Qt slices the digits.
+        self._set_font(p, _DELTA_FONT_PX, bold=True, mono=True)
+        p.setPen(colour)
+        p.drawText(_PLATE_X, _PLATE_Y + 2, _PLATE_W, _DELTA_BOX_H,
+                   Qt.AlignHCenter | Qt.AlignVCenter, self._delta_text(delta))
+
+        bar_w, bar_h, y = _PLATE_W - 60, 10, _PLATE_Y + 50
+        x0 = _PLATE_X + 30
         cx = x0 + bar_w // 2
         p.setPen(Qt.NoPen)
-        p.setBrush(_LINE)
-        p.drawRoundedRect(x0, y, bar_w, bar_h, 7, 7)
-
+        p.setBrush(_TRACK)
+        p.drawRoundedRect(x0, y, bar_w, bar_h, 5, 5)
         frac = max(-1.0, min(1.0, delta.get("s", 0.0) / DELTA_CLAMP_S))
         fill = int(abs(frac) * (bar_w // 2))
         p.setBrush(colour)
         if frac >= 0:  # slower -> fill right
-            p.drawRoundedRect(cx, y, fill, bar_h, 7, 7)
+            p.drawRoundedRect(cx, y, fill, bar_h, 5, 5)
         else:          # faster -> fill left
-            p.drawRoundedRect(cx - fill, y, fill, bar_h, 7, 7)
-        p.setPen(_GREY)
-        p.drawLine(cx, y - 2, cx, y + bar_h + 2)
+            p.drawRoundedRect(cx - fill, y, fill, bar_h, 5, 5)
+        p.setPen(_SOFT)
+        p.drawLine(cx, y - 3, cx, y + bar_h + 3)
 
-        # Big delta number. The text already carries the sign (+slower / -faster),
-        # which is the colour-blind-safe redundancy alongside the red/green.
-        # 42 high and vertically centred, not 34 top-aligned: at 28px the mono
-        # digits' line box is taller than 34, so descenders (and the digits
-        # themselves on a big delta) were clipped off the bottom. Same optical
-        # centre as before — the box grew upwards and downwards by 4.
-        self._set_font(p, _DELTA_FONT_PX, bold=True, mono=True)
-        p.setPen(colour)
-        p.drawText(0, y + bar_h - 2, w, _DELTA_BOX_H,
-                   Qt.AlignHCenter | Qt.AlignVCenter,
-                   f"{delta.get('text', '0.000')}")
-
-        # Local delta: gaining/losing RIGHT NOW (this micro-sector) — the
-        # predictive signal a cumulative number can't give. Small, under it.
-        # Skipped while the coach is holding back: it shares this line with the
-        # reason it's holding back, and the reason is the more useful of the two
-        # (a micro-delta on an out lap is measuring cold tyres against a hot lap).
-        local = delta.get("local_s", 0.0)
-        if not quiet and abs(local) >= 0.01:
-            losing = delta.get("local_losing", local > 0)
-            self._set_font(p, 11, bold=True, mono=True)
-            p.setPen(_RED if losing else _GREEN)
-            arrow = "▲" if losing else "▼"
-            p.drawText(0, y + bar_h + 38, w, 16, Qt.AlignHCenter,
-                       f"{t('overlay.now')} {arrow} {local:+.2f}")
 
     def _draw_pit_due(self, p: QPainter, w: int) -> bool:
-        """L'avviso di rientro, nella banda della pastiglia. Torna True se ha
-        preso la riga.
+        """L'avviso di rientro, nella riga d'azione. Torna True se ha preso la riga.
 
         Non sfuma e non ha un timer: è una condizione, non un evento, e finisce
-        quando entri in corsia.
-
-        La banda viene tolta a **ogni** cue, non solo ai consigli su come
-        prendere una curva: `paintEvent` non guarda la categoria. Ci finiscono
-        dentro anche bloccaggio e pattinamento, che consigli di guida non sono e
-        che a voce hanno priorità *superiore* alla chiamata ai box: la fonte
-        vera sono le costanti, `_PRIORITY_BASE = 300.0` in `events.py:74`
-        contro `_PRIORITY = 290.0` in `pitcall.py:99` (il test
-        `test_the_call_outranks_technique_advice_but_not_a_lock_up` in
-        `tests/test_pitcall.py` copre solo i *tier* — ACUTE batte ADVISORY —
-        non questi numeri). La benzina, a voce, è alla pari (290 anche in
-        `fuel.py:29`).
-
-        Non si perde informazione, perché la voce non cambia: i cue continuano a
-        essere pronunciati tutti, cedono solo la riga. A schermo però la
-        chiamata vince anche su di loro, ed è voluto: un bloccaggio lo correggi
-        al prossimo giro, un serbatoio vuoto no.
+        quando entri in corsia. Batte i consigli (la voce li dice tutti lo
+        stesso, cedono solo la riga) ma non il «FRENA» del momento: un
+        serbatoio vuoto non si corregge al prossimo giro, un muro si.
         """
         if not self._state.get("pit_due"):
             return False
-        x, y, h = 20, 126, 36
         p.setPen(Qt.NoPen)
-        p.setBrush(_DARK)
-        p.drawRoundedRect(x, y, w - 2 * x, h, 8, 8)
+        p.setBrush(_ROW_BG)
+        p.drawRoundedRect(QRectF(_ROW_X, _ROW_Y, _ROW_W, _ROW_H), 8, 8)
         p.setBrush(_AMBER)
-        p.drawRoundedRect(x, y, 4, h, 2, 2)
-        self._set_font(p, 14, bold=True)
+        p.drawRoundedRect(QRectF(_ROW_X, _ROW_Y, _ACCENT_W, _ROW_H), 2, 2)
+        self._set_font(p, 15, bold=True)
         p.setPen(_AMBER)
-        p.drawText(x + 16, y, w - 2 * x - 28, h, Qt.AlignVCenter, t("overlay.pit_due"))
+        p.drawText(_ROW_X + 16, _ROW_Y, _ROW_W - 28, _ROW_H, Qt.AlignVCenter,
+                   t("overlay.pit_due"))
         return True
 
     def _draw_cue(self, p: QPainter, w: int) -> None:
@@ -776,89 +895,89 @@ class Overlay(QWidget):
         alpha = 255 if age < CUE_HOLD_S - 0.6 else int(255 * (CUE_HOLD_S - age) / 0.6)
         alpha = max(0, alpha)
         cat = self._cue.get("category", "")
-        accent = QColor(_RED if cat in ("locked", "wheelspin") else _CYAN)
+        accent = QColor(self._slower if cat in ("locked", "wheelspin") else _CYAN)
         accent.setAlpha(alpha)
 
-        x, y, h = 20, 126, 36
-        bg = QColor(_DARK)
-        bg.setAlpha(min(_DARK.alpha(), alpha))
+        bg = QColor(_ROW_BG)
+        bg.setAlpha(min(_ROW_BG.alpha(), alpha))
         p.setPen(Qt.NoPen)
         p.setBrush(bg)
-        p.drawRoundedRect(x, y, w - 2 * x, h, 8, 8)
-        # cyan (or red) left accent bar
+        p.drawRoundedRect(QRectF(_ROW_X, _ROW_Y, _ROW_W, _ROW_H), 8, 8)
         p.setBrush(accent)
-        p.drawRoundedRect(x, y, 4, h, 2, 2)
+        p.drawRoundedRect(QRectF(_ROW_X, _ROW_Y, _ACCENT_W, _ROW_H), 2, 2)
 
         text = QColor(_WHITE)
         text.setAlpha(alpha)
         p.setPen(text)
-        self._set_font(p, 14, bold=True)
-        p.drawText(x + 16, y, w - 2 * x - 28, h, Qt.AlignVCenter,
+        self._set_font(p, 15, bold=True)
+        p.drawText(_ROW_X + 16, _ROW_Y, _ROW_W - 28, _ROW_H, Qt.AlignVCenter,
                    self._cue.get("message", ""))
 
     def _draw_focus(self, p: QPainter, w: int) -> None:
-        """A slim, persistent reminder of the one weakness being coached. Low
-        priority by design: small and quiet so it never fights the delta or an
-        acute cue, but always there to answer 'what am I working on?'."""
-        # Declutter: don't compete with an acute cue while it's on screen.
-        if self._cue is not None and (time.monotonic() - self._cue_at) < CUE_HOLD_S:
-            return
+        """Il tema su cui lavori, in basso a sinistra (solo «Completa»).
+
+        Corta e in minuscolo: «Frenata · Variante Ascari · «prima»». Era a 11 px,
+        in maiuscolo e con i decimali dentro, e una riga così non si legge in uno
+        sguardo. La parola della voce resta, perché il pilota deve sapere da dove
+        arriva «meno freno» quando la sente."""
         focus = self._state.get("focus")
         if not focus:
             return
         target = focus.get("focus")
         if not target:                       # no active focus (assessing / clean)
             return
-        name = (target.get("name") or "").upper()
-        theme = (target.get("theme") or "").upper()
-        base = target.get("baseline_ms", 0) or 0
-        # Virgola in italiano e spazio prima dell'unità, come nel resto dell'app.
-        gap = (f"  −{fmt_num(base / 1000.0, 2, current_language(), 's')}"
-               if base else "")
-        # The word the voice will use, when it is using one. The pact that
-        # agrees it is in the focus briefing, which reaches the terminal and the
-        # web page but not here — and `python -m accoach live` is overlay plus
-        # voice, so that driver would hear "less brake" out of nowhere. Last on
-        # the line on purpose: if a long corner name ever runs the text past its
-        # box, the clipping eats the new part and not the gap.
-        trigger = (target.get("trigger") or "").upper()
-        word = f" · «{trigger}»" if trigger else ""
-        y = 170
+        name = target.get("name") or ""
+        theme = (target.get("theme") or "").strip()
+        theme = theme[:1].upper() + theme[1:]
+        trigger = (target.get("trigger") or "").strip()
+        word = f"«{trigger}»" if trigger else ""
+        y = _ROW3_Y
         p.setPen(Qt.NoPen)
         p.setBrush(_AMBER)
-        p.drawEllipse(26, y + 6, 7, 7)       # amber focus dot
-        self._set_font(p, 11, bold=True)
-        p.setPen(_GREY)
-        p.drawText(42, y, w - 60, 20, Qt.AlignVCenter,
-                   f"{t('overlay.focus')} · {theme} · {name}{gap}{word}")
+        p.drawEllipse(_PLATE_X + 18, y + 8, 8, 8)
+        self._set_font(p, 13, bold=True)
+        p.setPen(_SOFT)
+        # A destra c'e' l'ultima curva, e una riga lunga ci finiva sopra. Se non
+        # ci sta si toglie prima il tema, poi si accorcia il nome coi puntini:
+        # la parola della voce resta sempre, perche' e' quella che il pilota
+        # sente e deve poter ritrovare.
+        room = _PLATE_W - 34 - _CARD_W - 16
+        line = _fit_focus(p.fontMetrics(), theme, name, word, room)
+        p.drawText(_PLATE_X + 34, y, room, 24, Qt.AlignVCenter, line)
 
     def _draw_corner_card(self, p: QPainter, w: int) -> None:
-        """L'ultima curva chiusa: nome a sinistra, decimi misurati a destra.
+        """L'ultima curva chiusa, in basso a destra (solo «Completa»): nome e
+        decimi misurati, col pallino del semaforo.
 
         Resta finché non chiudi la curva successiva. Niente dissolvenza e
         nessun timer: una durata sarebbe un numero tarato da noi, e un
         consuntivo che sparisce da solo costringe a guardarlo in fretta proprio
-        mentre stai guidando. Non compete con la voce perché non parla — è
-        l'unico posto dove anche la curva presa bene dice qualcosa.
+        mentre stai guidando.
         """
         card = self._state.get("corner")
         if not card:
             return
         colour = _CARD_COLOUR.get(card.get("level", "ok"), _GREY)
-        y = 188
+        if colour is _GREEN:
+            colour = self._faster
+        elif colour is _RED:
+            colour = self._slower
+        y = _ROW3_Y
+        right = _PLATE_X + _PLATE_W - 14
         p.setPen(Qt.NoPen)
         p.setBrush(colour)
-        p.drawEllipse(26, y + 6, 7, 7)
-        self._set_font(p, 11, bold=True)
-        p.setPen(_GREY)
-        p.drawText(42, y, w - 220, 20, Qt.AlignVCenter, str(card.get("name", "")))
+        p.drawEllipse(right - 186, y + 8, 8, 8)
+        self._set_font(p, 13, bold=True)
+        p.setPen(_SOFT)
+        p.drawText(right - 172, y, 100, 24, Qt.AlignVCenter, str(card.get("name", "")))
         # Il segno è dal punto di vista del pilota: perdere è meno tempo tuo.
-        # Meno tipografico (U+2212), come il resto dell'HUD.
+        # Meno tipografico (U+2212) e la virgola in italiano, come il resto.
         tenths = -float(card.get("lost_ms", 0.0)) / 1000.0
-        text = f"{'+' if tenths >= 0 else '−'}{abs(tenths):.2f}"
-        self._set_font(p, 13, bold=True, mono=True)
+        value = fmt_num(abs(tenths), 2, current_language())
+        text = f"{'+' if tenths >= 0 else '−'}{value}"
+        self._set_font(p, 14, bold=True, mono=True)
         p.setPen(colour)
-        p.drawText(w - 190, y, 164, 20, Qt.AlignRight | Qt.AlignVCenter, text)
+        p.drawText(right - 70, y, 70, 24, Qt.AlignRight | Qt.AlignVCenter, text)
 
     # --- live pedal trace --------------------------------------------------
     def _draw_pedals(self, p: QPainter, w: int) -> None:
@@ -990,18 +1109,6 @@ class Overlay(QWidget):
         f.setStyleHint(QFont.Monospace if mono else QFont.SansSerif)
         f.setBold(bold)
         p.setFont(f)
-
-    def _draw_pill(self, p: QPainter, text: str, colour: QColor,
-                   y: int, alpha: int = 255) -> None:
-        self._set_font(p, 15, bold=True)
-        w = _BASE_W
-        back = QColor(_DARK)
-        back.setAlpha(min(_DARK.alpha(), alpha))
-        p.setPen(Qt.NoPen)
-        p.setBrush(back)
-        p.drawRoundedRect(20, y - 4, w - 40, 30, 8, 8)
-        p.setPen(colour)
-        p.drawText(20, y - 4, w - 40, 30, Qt.AlignCenter, text)
 
     # --- drag to reposition (only in --interactive); persists to config --------
     def mousePressEvent(self, e) -> None:  # noqa: N802 (Qt naming)

@@ -454,6 +454,18 @@ class SettingsPanel(QWidget):
         self._scale.setSuffix(" ×")
         row("set.scale", self._scale)
 
+        # Essenziale o Completa, e i colori per daltonici (26/10): l'overlay li
+        # rilegge da solo mentre gira, come posizione e grandezza.
+        self._mode = QComboBox()
+        self._mode.addItem(t("set.mode_essential"), "essential")
+        self._mode.addItem(t("set.mode_full"), "full")
+        self._mode.setCurrentIndex(0 if cfg.overlay.mode == "essential" else 1)
+        row("set.overlay_mode", self._mode)
+
+        self._cb = QCheckBox()
+        self._cb.setChecked(cfg.overlay.cb)
+        row("set.overlay_cb", self._cb)
+
         self._wean = QCheckBox()
         self._wean.setChecked(cfg.overlay.wean)
         row("set.wean", self._wean)
@@ -574,6 +586,8 @@ class SettingsPanel(QWidget):
         cfg.voice.rate = self._rate.value()
         cfg.overlay.scale = round(self._scale.value(), 2)
         cfg.overlay.wean = self._wean.isChecked()
+        cfg.overlay.mode = str(self._mode.currentData())
+        cfg.overlay.cb = self._cb.isChecked()
         cfg.overlay.pedals = self._pedals.isChecked()
         cfg.autorecord = self._autorecord.isChecked()
         ok = save_config(cfg)
@@ -595,6 +609,8 @@ class SettingsPanel(QWidget):
         self._pedals_hint.setText(t("set.pedals_hint"))
         self._scale_hint.setText(t("set.scale_hint"))
         self._place_hint.setText(t("set.place_hint"))
+        self._mode.setItemText(0, t("set.mode_essential"))
+        self._mode.setItemText(1, t("set.mode_full"))
         self._male.setItemText(0, t("set.voice_male"))
         self._male.setItemText(1, t("set.voice_female"))
         self._rate.setSuffix(t("set.rate_unit"))

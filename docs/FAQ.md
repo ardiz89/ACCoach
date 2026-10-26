@@ -334,27 +334,38 @@ race, and drive.
 
 ## 4. Reading the overlay
 
-- **The delta bar** fills **to the right in red** when you're slower than the
-  reference, and **to the left in green** when you're faster.
-- **At the top** you see your **PB**, the lap you're racing against, and the
-  **predicted time** if you keep the pace. When a braking zone is coming, that
-  space goes to the **countdown in metres**. When it's time to brake it becomes
-  a single red word, **BRAKE**. The threshold is in time, not distance. Ten
-  metres is 0.14 s at 250 km/h, and half a second in a slow corner.
-- **A label** shows the last advice spoken, and fades on its own. When the
-  engineer proposes a change that can **only be made in the pits**, the coach
-  calls you in at the end of the lap. From then on the label becomes the
-  **pit-in warning**, in amber, and it doesn't fade. It stays until you enter
-  the pit lane, or until the change is no longer pending, for example if it gets
-  withdrawn. A call that lasts two seconds is one you miss if you were looking
-  at the corner. Spoken advice keeps coming. It just loses its line on the
-  overlay until the warning goes out.
-- **Below it there's a thin amber line**, the **focus**. It's the theme you're
-  working on, with the corner and the tenths it costs you. Once the coach has
-  moved to short words, described in "One theme at a time", it also shows **an
-  example word**, like "LESS BRAKE". The whole sentence stays in the label and
-  in the debrief. The focus line reminds you of the theme, not of every word
-  you'll hear.
+The overlay is a dark plate with three rows, always in the same place. The
+plate is what keeps it readable over a bright sky.
+
+- **At the top is the delta**, the number with three decimals and its bar
+  below. The bar fills **to the right in red** when you're slower than the
+  reference, and **to the left in green** when you're faster. The bar always
+  moves, while the number is rewritten about four times a second, so the last
+  digit doesn't flicker in front of you.
+- **In the middle is the action row**, with one thing at a time.
+  - When a braking zone is coming it shows the **metres** left. When it's time
+    to brake they become a single word, **BRAKE**, in a red block, and the
+    plate's border turns red. The threshold is in time, not distance. Ten
+    metres is 0.14 s at 250 km/h, and half a second in a slow corner.
+  - When the engineer proposes a change that can **only be made in the pits**,
+    the coach calls you in at the end of the lap and the row becomes **BOX THIS
+    LAP**, in amber. It doesn't fade. It stays until you enter the pit lane, or
+    until the change is no longer pending. Only BRAKE goes in front of it.
+  - Otherwise the row shows **the last advice spoken**, which fades on its own.
+    Advice always comes by voice too.
+  - When you beat your reference, for a few seconds it reads **New reference**
+    with the time.
+- **At the bottom, only in Full**, the **focus** sits on the left. It's the
+  theme you're working on and its corner. **The last corner** you closed sits
+  on the right with its tenths. The coach moves to short words, as described
+  in "One theme at a time". From then on the focus also shows **the word you
+  hear**, like "less brake".
+
+In **Settings**, under **What the overlay shows**, you choose between
+**Essential**, with the first two rows, and **Full**, with all three. A new
+install starts on Essential. **Colour-blind colours** puts blue and orange in
+place of green and red. The overlay changes by itself within a second, with
+Coach Live running too.
 
 ### Moving the overlay
 

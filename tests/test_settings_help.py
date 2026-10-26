@@ -17,8 +17,8 @@ pytest.importorskip("PySide6")
 from accoach.i18n import t                                   # noqa: E402
 
 _SETTINGS = ("set.voice", "set.engineer_voice", "set.male_voice",
-             "set.radio", "set.rate", "set.scale", "set.wean", "set.pedals",
-             "set.autorecord")
+             "set.radio", "set.rate", "set.scale", "set.overlay_mode",
+             "set.overlay_cb", "set.wean", "set.pedals", "set.autorecord")
 
 
 @pytest.mark.parametrize("key", _SETTINGS)

@@ -28,7 +28,8 @@ from PySide6.QtGui import QColor, QPainter, QPen
 from PySide6.QtWidgets import QApplication
 
 from .i18n import current_language, t
-from .overlay import _BASE_W, Overlay
+from .overlay import (_BASE_H, _BASE_W, _PEDAL_PANEL_H, _PLATE_H_ESSENTIAL,
+                      _PLATE_H_FULL, _PLATE_W, _PLATE_X, _PLATE_Y, Overlay)
 from .textfmt import fmt_num
 
 # Gli stessi limiti della casella «Grandezza dell'overlay» in Impostazioni.
@@ -82,23 +83,32 @@ class PlacementOverlay(Overlay):
         pen = QPen(_CYAN, 2, Qt.DashLine)
         p.setPen(pen)
         p.setBrush(Qt.NoBrush)
-        area_h = self.height() - _BAND_PX
-        p.drawRoundedRect(QRectF(1, 1, self.width() - 2, area_h - 2), 10, 10)
+        # Attorno alla piastra, non a tutta la finestra: la finestra e' piu'
+        # grande e trasparente, e il pilota deve vedere lo spazio che occupa
+        # davvero quello che si legge.
+        k = self._scale
+        plate_h = _PLATE_H_FULL if self._mode == "full" else _PLATE_H_ESSENTIAL
+        if self._show_pedals:
+            plate_h = _BASE_H + _PEDAL_PANEL_H - _PLATE_Y - 8
+        p.drawRoundedRect(QRectF((_PLATE_X - 4) * k, (_PLATE_Y - 4) * k,
+                                 (_PLATE_W + 8) * k, (plate_h + 8) * k), 12, 12)
         # La riga dei comandi, in basso, a grandezza fissa: si legge anche
         # quando l'overlay e' stato rimpicciolito.
         band_h = _BAND_PX - 8
+        # Subito sotto la piastra, non in fondo alla finestra: in «Essenziale»
+        # fra le due restava un vuoto che sembrava parte dell'overlay.
+        top = (_PLATE_Y + plate_h + 4) * k + 6
         p.setPen(Qt.NoPen)
         p.setBrush(_BAND)
-        p.drawRoundedRect(QRectF(4, self.height() - band_h - 4,
-                                 self.width() - 8, band_h), 8, 8)
+        p.drawRoundedRect(QRectF(4, top, self.width() - 8, band_h), 8, 8)
         self._set_font(p, 10, bold=True)
         p.setPen(_CYAN)
         scale = fmt_num(self._scale, 2, current_language())
-        p.drawText(QRectF(12, self.height() - band_h - 2, self.width() - 24, 20),
+        p.drawText(QRectF(12, top + 2, self.width() - 24, 20),
                    Qt.AlignLeft | Qt.AlignVCenter, t("place.title").format(scale=scale))
         self._set_font(p, 9)
         p.setPen(QColor(0xE8, 0xED, 0xF2))
-        p.drawText(QRectF(12, self.height() - 24, self.width() - 24, 20),
+        p.drawText(QRectF(12, top + 22, self.width() - 24, 20),
                    Qt.AlignLeft | Qt.AlignVCenter, t("place.keys"))
 
     # --- comandi ------------------------------------------------------------

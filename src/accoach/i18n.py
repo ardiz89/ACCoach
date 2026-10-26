@@ -66,6 +66,8 @@ _UI: dict[str, dict[str, str]] = {
                             "it": "Giro invalidato. Continua, senza delta."},
     "overlay.brake": {"en": "BRAKE", "it": "FRENA"},
     "overlay.pit_due": {"en": "BOX THIS LAP", "it": "RIENTRA AI BOX"},
+    # Il PB non sta piu' fisso in alto: si dice al traguardo, quando cambia.
+    "overlay.new_ref": {"en": "New reference {time}", "it": "Nuovo riferimento {time}"},
     "overlay.focus": {"en": "FOCUS", "it": "FOCUS"},
     # Il delta di questo tratto, sotto il numero grande.
     "overlay.now": {"en": "now", "it": "ora"},
@@ -316,6 +318,23 @@ _UI: dict[str, dict[str, str]] = {
     "set.radio": {"en": "Team-radio effect", "it": "Effetto radio di pista"},
     "set.rate": {"en": "Voice speed", "it": "Velocità della voce"},
     "set.scale": {"en": "Overlay size", "it": "Grandezza dell'overlay"},
+    "set.overlay_mode": {"en": "What the overlay shows", "it": "Cosa mostra l'overlay"},
+    "set.mode_essential": {"en": "Essential", "it": "Essenziale"},
+    "set.mode_full": {"en": "Full", "it": "Completa"},
+    "set.overlay_mode.help": {
+        "en": "Essential shows the delta and one line for braking, tips and the "
+              "pit call. Full adds the theme you're working on and how the last "
+              "corner went. Start with Essential while you learn a track.",
+        "it": "Essenziale mostra il delta e una riga per frenata, consigli e "
+              "rientro ai box. Completa aggiunge il tema su cui lavori e com'è "
+              "andata l'ultima curva. Parti da Essenziale mentre impari una pista."},
+    "set.overlay_cb": {"en": "Colour-blind colours", "it": "Colori per daltonici"},
+    "set.overlay_cb.help": {
+        "en": "Blue for faster and orange for slower instead of green and red, on "
+              "the overlay. The report has its own switch, at the top of the page.",
+        "it": "Blu per più veloce e arancio per più lento al posto di verde e "
+              "rosso, nell'overlay. Il report ha il suo bottone, in cima alla "
+              "pagina."},
     # One "?" per setting. Reported by the user: a field named "Overlay scale"
     # or "Reading speed" means nothing to someone who didn't build it, and the
     # panel had no help text of any kind. Each answers WHAT it does and WHEN to

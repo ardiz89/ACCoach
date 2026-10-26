@@ -28,6 +28,17 @@ def app():
     return QApplication.instance() or QApplication([])
 
 
+@pytest.fixture(autouse=True)
+def _no_fitting(monkeypatch):
+    """Qt senza schermo non ha i font veri e misura ogni testo troppo largo, quindi
+    la riga si accorcerebbe sempre. L'accorciamento lo prova il suo test, con una
+    misura finta (`test_overlay_disegno.py`); qui conta cosa c'e' nella riga."""
+    import accoach.overlay as ov_mod
+    monkeypatch.setattr(ov_mod, "_fit_focus",
+                        lambda fm, theme, name, word, room:
+                        " · ".join(x for x in (theme, name, word) if x))
+
+
 _BASE = {"connected": True, "speed_kmh": 150.0,
          "delta": {"s": 0.1, "text": "+0.100", "ahead": False}}
 
@@ -35,6 +46,7 @@ _BASE = {"connected": True, "speed_kmh": 150.0,
 def _focus_line(state: dict) -> str:
     """The single string `_draw_focus` writes for this state ("" if it draws none)."""
     o = Overlay(pedals=False)
+    o._mode = "full"     # il focus sta solo in «Completa»
     o.apply_state(dict(state))
 
     drawn: list[str] = []
@@ -72,14 +84,15 @@ def _state(**focus_fields) -> dict:
 
 
 def test_the_focus_line_shows_the_trigger_word(app):
+    # Minuscolo e corta dal 26/10: «Frenata · Variante Ascari · «meno freno»».
     line = _focus_line(_state(trigger="meno freno"))
-    assert "MENO FRENO" in line
-    assert "VARIANTE ASCARI" in line, "and it doesn't replace what was already there"
-    assert "FRENATA" in line
+    assert "«meno freno»" in line
+    assert "Variante Ascari" in line, "and it doesn't replace what was already there"
+    assert "Frenata" in line
 
 
 def test_no_trigger_leaves_the_line_as_it_was(app):
     """No word agreed (no focus theme on the gate): nothing extra, no empty quotes."""
     line = _focus_line(_state())
     assert "«" not in line
-    assert "VARIANTE ASCARI" in line
+    assert "Variante Ascari" in line

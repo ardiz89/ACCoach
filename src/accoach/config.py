@@ -61,6 +61,15 @@ class OverlayCfg:
     x: int = -1          # -1 = auto (top-centre); set by dragging in --interactive
     y: int = -1
     scale: float = 1.0
+    # Quanto mostra l'overlay: "essential" (delta e riga d'azione) o "full"
+    # (piu' focus e ultima curva). Il predefinito della classe e' "full", cioe'
+    # quello che vedeva chi guidava gia': un config scritto prima del 26/10 non
+    # ha la chiave e resta com'era. Chi installa adesso riceve "essential" dal
+    # file di partenza (`_DEFAULT_TOML`), deciso col pilota il 26/10.
+    mode: str = "full"
+    # La tavolozza per daltonici: blu e arancio al posto di verde e rosso, la
+    # stessa del report.
+    cb: bool = False
     # Live throttle/brake trace strip under the HUD — a calibration aid for
     # trail-braking and coasting ("tempo morto"). Off by default (declutters).
     pedals: bool = False
@@ -138,9 +147,11 @@ male = true          # male coach voice; false = female
 radio = true         # pit-to-car radio effect on the voice (band-pass + squelch)
 
 [overlay]
-x = -1               # overlay X (px); -1 = auto top-centre (drag it in --interactive)
+x = -1               # overlay X (px); -1 = auto top-centre (Settings > Move the overlay)
 y = -1               # overlay Y (px); -1 = auto
 scale = 1.0          # overlay scale factor
+mode = "essential"   # "essential" (delta + action row) | "full" (+ focus and last corner)
+cb = false           # colour-blind palette (blue/orange instead of green/red)
 pedals = false       # show the live throttle/brake trace strip (trail-braking + coasting)
 wean = true          # retire the braking countdown at corners you've mastered
 
@@ -216,6 +227,8 @@ radio = {b(cfg.voice.radio)}         # pit-to-car radio effect on the voice (ban
 x = {cfg.overlay.x}               # overlay X (px); -1 = auto top-centre
 y = {cfg.overlay.y}               # overlay Y (px); -1 = auto
 scale = {cfg.overlay.scale}          # overlay scale factor
+mode = "{cfg.overlay.mode}"   # "essential" (delta + action row) | "full" (+ focus and last corner)
+cb = {b(cfg.overlay.cb)}           # colour-blind palette (blue/orange instead of green/red)
 pedals = {b(cfg.overlay.pedals)}       # show the live throttle/brake trace strip (trail-braking + coasting)
 wean = {b(cfg.overlay.wean)}          # retire the braking countdown at corners you've mastered
 
@@ -419,6 +432,10 @@ def load_config(*, reload: bool = False) -> Config:
     _problem = None
     if not path.exists():
         _write_default(path)
+        # Il primo processo vede lo stesso config che ha appena scritto: senza,
+        # partiva coi predefiniti della classe (overlay "full") e solo dal
+        # secondo avvio con quelli del file ("essential").
+        _merge(cfg, tomllib.loads(_DEFAULT_TOML))
     else:
         try:
             raw = _read_toml(path)

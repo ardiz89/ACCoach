@@ -56,17 +56,15 @@ _CUE = {"message": "Bloccaggio, alleggerisci il freno", "category": "locked"}
 # Il controllo interno dei test dell'assenza. Asserire che una chiave *non* c'è
 # è verde anche su un insieme vuoto: se la spia non fosse installata, o `render`
 # non dipingesse niente, quei test resterebbero verdi senza misurare più nulla.
-# Il focus si disegna **dopo** la banda della pastiglia (`paintEvent` chiama
-# `_draw_focus` subito sotto), quindi la sua chiave nello stesso frame dice che
-# la pittura è arrivata oltre il punto che quei test guardano. Sta a y 170, sotto
-# la banda: non la tocca, e i test del pixel non lo usano.
-_FOCUS = {"focus": {"focus": {"name": "Variante Ascari", "theme": "frenata",
-                              "baseline_ms": 180.0}}}
-_CONTROL_KEY = "overlay.focus"
+# Dal 26/10 il controllo è la nota «il coach non consiglia» di un giro fuori
+# passo: è l'ultima cosa che la riga d'azione prova quando il rientro non c'è,
+# quindi la sua chiave dice che la pittura è passata proprio da lì.
+_FOCUS = {"quiet": "off_pace"}
+_CONTROL_KEY = "quiet.off_pace"
 
-# La banda della pastiglia: la barretta d'accento sta a x 20-24, y 126-162 in
+# La riga d'azione (dal 26/10): la barretta d'accento sta a x 54-58, y 80-114 in
 # coordinate base. Questo punto è dentro, lontano dagli angoli arrotondati.
-_ACCENT_X, _ACCENT_Y = 22, 144
+_ACCENT_X, _ACCENT_Y = 56, 97
 
 # Quanto si aspetta nel test della dissolvenza: due ordini di grandezza oltre la
 # durata di una pastiglia, non un margine.
@@ -95,6 +93,7 @@ def _paint(monkeypatch, state: dict, wait_s: float = 0.0) -> _Frame:
     monkeypatch.setattr(ov_mod, "t", spy_t)
 
     o = Overlay(pedals=False)
+    o._mode = "full"     # la chiave di controllo e' il focus, che sta in «Completa»
     o.apply_state(dict(state))
     clock.now += wait_s
 
