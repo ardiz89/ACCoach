@@ -156,6 +156,13 @@ _ENG_VOICE_PREFIX = {
 _ENG_VOICE_REVERT = {"it": "Riporta l'assetto com'era.",
                      "en": "Put the setup back as it was."}
 
+# Un giro pulito che l'Ingegnere non conta solo perche' le gomme sono sotto i
+# 75 °C di media. Il 25/10 un pilota lento ha fatto sei giri puliti a 65-70 °C
+# e nessuno e' entrato nel conto: il coach diceva «gomme fredde», ma non che
+# per questo l'assetto aspettava. Si dice una volta per sessione.
+_ENG_VOICE_COLD = {"it": "Gomme ancora fredde. Questo giro non conta per l'assetto.",
+                   "en": "Tyres still cold. This lap doesn't count for the setup."}
+
 
 #: «di 2 click», «1 click di»: il numero dei click dentro una leva dello schermo.
 _CLICKS = (re.compile(r"\s+di\s+\d+\s+click\b"),
@@ -448,6 +455,8 @@ class CoachEngine:
         # engine re-emits every lap (until the driver applies it) is announced
         # once, not on a loop. Reset when the engineer is rebuilt.
         self._engineer_spoken_sig: tuple | None = None
+        # La frase delle gomme fredde e' gia' stata detta in questa sessione.
+        self._cold_spoken = False
         # …and the proposal the driver has already written at the box, so the pit
         # calls go quiet for it (see _garage_change_pending).
         self._engineer_done_sig: tuple | None = None
@@ -523,6 +532,7 @@ class CoachEngine:
         self.tyretemp.reset()
         self.fuel.reset()
         self.scheduler.reset()
+        self._cold_spoken = False
 
     def acquisition_hz(self) -> float | None:
         """Measured acquisition rate when a background feed is running, else None."""
@@ -542,6 +552,7 @@ class CoachEngine:
             previous = self._engineer_decision
             self._engineer_decision = self._engineer.observe(stats)
             self._announce_engineer(self._engineer_decision)
+            self._announce_cold_lap(stats, self._engineer_decision)
             # Un ripristino non ancora eseguito torna identico a ogni giro (vedi
             # `RaceEngineer.observe`), numeri compresi, perche' il pilota deve
             # poterli rileggere. Ma la prova e' stata una: nel registro ci va
@@ -862,6 +873,25 @@ class CoachEngine:
         spans = [(c.entry_pos, c.exit_pos) for c in self._corners
                  if c.index in self._focus.mastered]
         self._comparator.set_muted_spans(spans)
+
+    def _announce_cold_lap(self, stats, decision) -> None:
+        """Dice, una volta per sessione, che un giro pulito non conta per
+        l'assetto perche' le gomme sono fredde.
+
+        Solo quando il motivo e' quello e basta: un giro tagliato o non valido
+        ha gia' il suo perche' sulla pagina, e qui si parlerebbe d'altro. E solo
+        mentre l'Ingegnere sta contando (COLLECT, EVALUATING): una proposta o un
+        ripristino hanno gia' la loro frase."""
+        if (self._cold_spoken or not self.engineer_voice or self.voice is None
+                or decision is None or stats is None):
+            return
+        if stats.unstable_why or stats.warmed_up:
+            return
+        if decision.kind not in (DecisionKind.COLLECT, DecisionKind.EVALUATING):
+            return
+        self._cold_spoken = True
+        lang = current_language()
+        self.voice.say(_ENG_VOICE_COLD.get(lang) or _ENG_VOICE_COLD["en"])
 
     def _announce_engineer(self, decision) -> None:
         """Speak a brief alert when the engineer wants a setup change.

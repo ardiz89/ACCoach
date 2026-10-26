@@ -358,6 +358,19 @@
       "style": 0.0
     }
   },
+  "Gomme ancora fredde. Questo giro non conta per l'assetto.": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "text": "Gomme ancora fredde. Questo giro non conta per l'assetto.",
+    "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
   "Gomme anteriori troppo gonfie. Togli pressione a freddo.": {
     "language_code": "it",
     "model_id": "eleven_multilingual_v2",

@@ -199,3 +199,38 @@ def test_a_focus_sends_the_trigger_to_the_ear_and_the_sentence_to_the_screen(tmp
     on_screen = cue_text(sentence)
     assert state.spoken.message == on_screen
     assert state.history[-1] == on_screen
+
+
+def test_a_clean_lap_on_cold_tyres_is_explained_once_per_session(tmp_path, monkeypatch):
+    """Il 25/10 sei giri puliti a 65-70 °C non sono entrati nel conto
+    dell'Ingegnere, e il pilota non sapeva perche' il box non arrivava mai.
+    Ora la voce lo dice, una volta sola per sessione e solo per quel motivo."""
+    import accoach.engine as engine_mod
+    from accoach.engineer import Decision, DecisionKind
+    from accoach.engineer.core import LapStats
+    monkeypatch.setattr(engine_mod, "current_language", lambda: "it")
+    eng, voice = _engine_with_voice(tmp_path)
+    collect = Decision(DecisionKind.COLLECT, "need laps")
+    cold = LapStats(lap_time_ms=150_000, stable=True, warmed_up=False)
+    cut = LapStats(lap_time_ms=150_000, stable=False, warmed_up=False,
+                   unstable_why="cut")
+    eng._announce_cold_lap(cut, collect)          # tagliato: ha il suo perché
+    eng._announce_cold_lap(cold, _propose("x"))   # una proposta ha la sua frase
+    eng._announce_cold_lap(cold, collect)
+    eng._announce_cold_lap(cold, collect)          # la seconda volta tace
+    assert voice.said == [engine_mod._ENG_VOICE_COLD["it"]]
+    eng._forget_session()                         # auto o pista nuove
+    eng._announce_cold_lap(cold, collect)
+    eng.close()
+    assert len(voice.said) == 2
+
+
+def test_the_cold_lap_line_respects_the_engineer_voice_switch(tmp_path):
+    from accoach.engineer import Decision, DecisionKind
+    from accoach.engineer.core import LapStats
+    eng, voice = _engine_with_voice(tmp_path)
+    eng.engineer_voice = False
+    eng._announce_cold_lap(LapStats(lap_time_ms=1, warmed_up=False),
+                           Decision(DecisionKind.COLLECT, "need laps"))
+    eng.close()
+    assert voice.said == []

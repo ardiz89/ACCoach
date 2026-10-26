@@ -17,8 +17,8 @@ Le fonti sono cinque, e la scansione del sorgente ne vede una sola:
 * le frasi generali di `Cue.voice` (pressioni, temperature, ABS e TC, i decimi
   oltre i 25): la scansione legge quelle scritte per intero; le quattro della
   pressione sono f-string sull'asse e sono copiate qui una per una;
-* il prefisso dell'ingegnere, il ripristino e le leve senza click
-  (`engineer/voice_levers.py`).
+* il prefisso dell'ingegnere, il ripristino, il giro che non conta per le
+  gomme fredde e le leve senza click (`engineer/voice_levers.py`).
 
 Resta fuori di proposito il «Self test completato.» di `diagnostics.py`: e' la
 prova della voce di sistema, e deve uscire da li'.
@@ -142,11 +142,12 @@ def numeric_cue_messages() -> set[str]:
 def engineer_phrases() -> set[str]:
     """Quello che dice l'ingegnere in italiano: il prefisso, la leva, il ripristino."""
     # Importati qui: `engine.py` importa il coach, e il coach non importa il motore.
-    from ..engine import _ENG_VOICE_PREFIX, _ENG_VOICE_REVERT
+    from ..engine import _ENG_VOICE_COLD, _ENG_VOICE_PREFIX, _ENG_VOICE_REVERT
     from ..engineer.voice_levers import all_voice_levers
     out = {by_lang["it"] for by_tag in _ENG_VOICE_PREFIX.values()
            for by_lang in by_tag.values()}
     out.add(_ENG_VOICE_REVERT["it"])
+    out.add(_ENG_VOICE_COLD["it"])
     out.update(all_voice_levers())
     return out
 
