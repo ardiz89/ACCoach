@@ -15,6 +15,8 @@ una **costante calcolata all'import**, usata come valore di default in una
 decina di firme. Una costante d'import non può vedere la configurazione
 dell'utente, qualunque cosa scriva.
 """
+from pathlib import Path
+
 import accoach.config as cfg_mod
 import pytest
 
@@ -56,7 +58,9 @@ def test_a_tilde_in_the_path_is_expanded(monkeypatch):
     cfg = cfg_mod.Config()
     cfg.data.laps_dir = "~/giri"
     monkeypatch.setattr(cfg_mod, "load_config", lambda *a, **k: cfg)
-    assert "~" not in str(paths.laps_dir())
+    # Non si cerca il carattere: la casa temporanea della CI ha un nome corto
+    # di Windows (RUNNER~1) che lo contiene già.
+    assert paths.laps_dir() == Path.home() / "giri"
 
 
 # --- e adesso tutti la vedono ---------------------------------------------
