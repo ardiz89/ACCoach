@@ -53,7 +53,9 @@ from .hubgate import (
     BLOCKED,
     CANCEL,
     EXPLAIN,
+    CENTER_OVERLAY as _CENTER_OVERLAY,
     GUIDE as _GUIDE,
+    PLACE_OVERLAY as _PLACE_OVERLAY,
     SWAP,
     IMPORT_PRO as _IMPORT_PRO,
     LIVE_SAFE_KEYS as _LIVE_SAFE_KEYS,
@@ -481,6 +483,20 @@ class SettingsPanel(QWidget):
         self._scale_hint = _hint(t("set.scale_hint"))
         root.addWidget(self._scale_hint)
 
+        # Dove sta l'overlay sullo schermo: lo decide il pilota trascinando una
+        # copia, perche' l'overlay vero non prende i click (26/10).
+        place_row = QHBoxLayout()
+        place_row.setSpacing(10)
+        place_row.addWidget(hub.action_button("btn.place_overlay",
+                                              list(_PLACE_OVERLAY),
+                                              tip="tip.place_overlay"))
+        place_row.addWidget(hub.special_button("btn.center_overlay",
+                                               _CENTER_OVERLAY, self._center_overlay))
+        place_row.addStretch(1)
+        root.addLayout(place_row)
+        self._place_hint = _hint(t("set.place_hint"))
+        root.addWidget(self._place_hint)
+
         save_row = QHBoxLayout()
         self._save = QPushButton(t("btn.save"))
         self._save.setProperty("accent", True)
@@ -530,6 +546,25 @@ class SettingsPanel(QWidget):
         root.addLayout(split)
         root.addStretch(1)
 
+    def _center_overlay(self) -> None:
+        """Rimette l'overlay in alto al centro: la posizione torna automatica.
+
+        Si rilegge il file prima: `save_config` scrive solo cio' che e' cambiato
+        da quando questo processo l'ha letto, e la posizione l'ha scritta la
+        copia trascinabile, un altro processo. Senza, «-1» uguale al -1 letto
+        all'avvio dell'hub non sarebbe stato scritto affatto."""
+        cfg = load_config(reload=True)
+        cfg.overlay.x, cfg.overlay.y = -1, -1
+        ok = save_config(cfg)
+        self._place_hint.setText(t("set.centered" if ok else "set.save_failed"))
+
+    def showEvent(self, event) -> None:  # noqa: N802 - Qt naming
+        """Rilegge la grandezza: «Sposta l'overlay» la cambia da un altro
+        processo, e la casella mostrerebbe quella di prima."""
+        super().showEvent(event)
+        cfg = load_config(reload=True)
+        self._scale.setValue(cfg.overlay.scale or 1.0)
+
     def _do_save(self) -> None:
         cfg = load_config()
         cfg.voice.enabled = self._voice.isChecked()
@@ -559,6 +594,7 @@ class SettingsPanel(QWidget):
             mark.setToolTip(t(f"{key}.help"))
         self._pedals_hint.setText(t("set.pedals_hint"))
         self._scale_hint.setText(t("set.scale_hint"))
+        self._place_hint.setText(t("set.place_hint"))
         self._male.setItemText(0, t("set.voice_male"))
         self._male.setItemText(1, t("set.voice_female"))
         self._rate.setSuffix(t("set.rate_unit"))

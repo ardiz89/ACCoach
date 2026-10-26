@@ -30,6 +30,11 @@ GUIDE = "__guide__"
 STOP_LIVE = "__stop_live__"
 WIZARD = "__wizard__"
 IMPORT_PRO = "__import_pro__"
+CENTER_OVERLAY = "__center_overlay__"
+# «Sposta l'overlay»: la copia trascinabile (overlay_place.py). Non legge la
+# telemetria e non registra niente, quindi resta premibile con Coach Live
+# acceso, ed e' proprio li' che serve: si sistema l'overlay col gioco aperto.
+PLACE_OVERLAY = ("overlay", "--place")
 
 # Tutto ciò che apre un `CoachEngine` o un `LapRecorder`. `server` ci è arrivato
 # tardi: il suo motore (server.py:97) registra come gli altri, ma non essendo
@@ -46,7 +51,8 @@ RECORDING_CMDS = ("recorder", "live", "coach", "compare", "server")
 # fix del traguardo contava ogni giro due volte») da un'altra porta, reso più
 # probabile dal fatto che la pagina Ingegnere chiede proprio quel bottone.
 LIVE_SAFE_KEYS = {STOP_LIVE, GUIDE, WIZARD, IMPORT_PRO,
-                  ("web",), ("web", "--engineer")}
+                  ("web",), ("web", "--engineer"),
+                  PLACE_OVERLAY, CENTER_OVERLAY}
 
 # Il bottone che durante Coach Live non puo' fare la sua cosa: il Backend live
 # non si accende, perche' sarebbe il secondo motore. Invece di restare muto

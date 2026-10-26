@@ -300,6 +300,16 @@ guida.
   nell'etichetta e nel debrief. La riga del focus ti ricorda il tema, non tutte le
   parole che sentirai.
 
+### Spostare l'overlay
+
+L'overlay non prende i click, così non ti ruba il mouse mentre guidi. Per
+spostarlo apri **Impostazioni** e premi **Sposta l'overlay**. Si apre una copia
+con un bordo tratteggiato, che trascini dove vuoi. La rotella cambia la
+grandezza. **Invio** salva, **Esc** chiude senza salvare, **R** lo rimette in
+alto al centro. Funziona anche con Coach Live acceso, e l'overlay vero si sposta
+da solo entro un secondo. Il gioco deve essere in Borderless, come per vedere
+l'overlay. **Rimetti al centro** fa la stessa cosa di R senza aprire la copia.
+
 ### La traccia dei pedali
 
 Si accende da **Impostazioni**, con **Mostra la traccia dei pedali**. All'inizio

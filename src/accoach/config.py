@@ -290,6 +290,15 @@ def _parse_disk() -> Config | None:
     return cfg
 
 
+def read_overlay() -> "OverlayCfg | None":
+    """Posizione e grandezza dell'overlay come le dice il file adesso, o None
+    se non si legge. Non tocca la cache: l'overlay di Coach Live la chiama
+    una volta al secondo per seguire «Sposta l'overlay» dall'hub, e il resto
+    del processo deve continuare a vedere il config con cui e' partito."""
+    cfg = _parse_disk()
+    return None if cfg is None else cfg.overlay
+
+
 def read_language() -> str | None:
     """The language the file says right now, or ``None`` if unreadable. Leaves
     the shared cache alone (a web page being served must not replace it)."""

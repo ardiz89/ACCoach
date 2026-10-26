@@ -122,6 +122,10 @@ _ASPECT_TOL = 0.005
 # schermata di caricamento e non si vede, mentre leggere tre rettangoli una volta
 # al secondo non costa niente. Piu' fitto non compra niente, piu' rado si vede.
 _GEOMETRY_POLL_MS = 1000
+# Ogni quanto l'overlay rilegge posizione e grandezza dal config (vedi
+# `_follow_config`): un secondo e' il tempo in cui il pilota, salvato il nuovo
+# posto, si gira a guardare.
+_FOLLOW_CONFIG_MS = 1000
 
 
 def center_panel(screens, virtual):
@@ -325,6 +329,13 @@ class Overlay(QWidget):
         if self._placed_against is None:
             self._placed_against = _screen_snapshot()
         self._watch_screens()
+        # Posizione e grandezza seguono il config mentre gira: «Sposta
+        # l'overlay» nell'hub le scrive da un altro processo, e il pilota deve
+        # vedere l'overlay vero andare li' senza riavviare Coach Live.
+        self._applied = (ov.x, ov.y, self._scale)
+        self._follow = QTimer(self)
+        self._follow.timeout.connect(self._follow_config)
+        self._follow.start(_FOLLOW_CONFIG_MS)
 
         # WebSocket client on the Qt event loop — only when a URL is given.
         # In-process callers feed it via apply_state() instead.
@@ -416,6 +427,35 @@ class Overlay(QWidget):
         self._geometry_poll = QTimer(self)
         self._geometry_poll.timeout.connect(self._reposition_if_geometry_changed)
         self._geometry_poll.start(_GEOMETRY_POLL_MS)
+
+    def _follow_timer_stop(self) -> None:
+        self._follow.stop()
+
+    def _follow_config(self) -> None:
+        """Rilegge posizione e grandezza dal file; se sono cambiate, le applica."""
+        from .config import read_overlay
+        ov = read_overlay()
+        if ov is None:                       # file a meta' scrittura: al prossimo giro
+            return
+        scale = ov.scale if (ov.scale and ov.scale > 0) else 1.0
+        wanted = (ov.x, ov.y, scale)
+        if wanted == self._applied:
+            return
+        self._applied = wanted
+        if scale != self._scale:
+            self._scale = scale
+            self.resize(int(_BASE_W * scale), int(self._base_h * scale))
+        if ov.x >= 0 and ov.y >= 0:
+            self._auto_place = False
+            self.move(ov.x, ov.y)
+            if not self._on_a_screen():
+                self._place_top_center()
+            else:
+                self._placed_against = _screen_snapshot()
+        else:
+            self._auto_place = True
+            self._place_top_center()
+        self.update()
 
     def _on_screens_changed(self, *_args) -> None:
         # New screens need watching too, or a later rearrangement goes unseen.
@@ -976,17 +1016,28 @@ class Overlay(QWidget):
         if not (self._interactive and self._drag_off is not None):
             return
         self._drag_off = None
+        # Trascinata, la posizione e' del pilota: non la si sposta piu' al
+        # primo cambio di geometria (prima `_auto_place` restava vero e
+        # l'overlay tornava al centro proprio quando si accendeva Eyefinity).
+        self._auto_place = False
+        self._placed_against = _screen_snapshot()
         try:
             from .config import load_config, save_config
             cfg = load_config()
             cfg.overlay.x, cfg.overlay.y = self.x(), self.y()
             save_config(cfg)
+            self._applied = (cfg.overlay.x, cfg.overlay.y, self._scale)
         except Exception:  # pragma: no cover - best-effort persistence
             pass
 
 
 def main(argv: list[str] | None = None) -> None:
     argv = sys.argv[1:] if argv is None else argv
+    if "--place" in argv:
+        # «Sposta l'overlay» dall'hub: la copia trascinabile, vedi overlay_place.
+        from .overlay_place import main as place
+        place(argv)
+        return
     # La porta del motore e' quella del config, come per le pagine: scritta a
     # mano (8777) l'overlay restava vuoto con una porta cambiata (24/10).
     url = DEFAULT_URL

@@ -356,6 +356,17 @@ race, and drive.
   in the debrief. The focus line reminds you of the theme, not of every word
   you'll hear.
 
+### Moving the overlay
+
+The overlay ignores clicks, so it never steals your mouse while you drive. To
+move it, open **Settings** and press **Move the overlay**. A copy opens with a
+dashed border, and you drag it wherever you like. The mouse wheel changes the
+size. **Enter** saves, **Esc** closes without saving, **R** puts it back at the
+top centre. It works with Coach Live running too, and the real overlay moves
+there by itself within a second. The game has to be in Borderless, as it does
+to show the overlay at all. **Back to the centre** does what R does without
+opening the copy.
+
 ### The pedal trace
 
 You turn it on in **Settings**, with **Show the pedal trace**. It's **off** by
