@@ -183,6 +183,26 @@ _UI: dict[str, dict[str, str]] = {
               "uno più veloce, il coach ti misura su quello."},
     "import.done": {"en": "Imported the {car} lap at {track}, {time}.",
                     "it": "Ho importato il giro di {car} a {track}, {time}."},
+    # Cosa succede dopo l'import (27/10): prima non lo diceva nessuno, e un
+    # giro PRO piu' lento del tuo si salvava senza cambiare niente.
+    "import.reference": {
+        "en": "It's faster than your best, {own}, so from now on the coach "
+              "measures you against it.",
+        "it": "È più veloce del tuo migliore, {own}, quindi da ora il coach ti "
+              "misura su questo."},
+    "import.first": {
+        "en": "You have no laps of your own with this car here yet, so the "
+              "coach measures you against this one.",
+        "it": "Non hai ancora giri tuoi con quest'auto su questa pista, quindi "
+              "il coach ti misura su questo."},
+    "import.slower": {
+        "en": "Your best, {own}, is faster, so it stays the reference. You'll "
+              "find the PRO lap in the report's comparison list.",
+        "it": "Il tuo migliore, {own}, è più veloce, quindi resta lui il "
+              "riferimento. Il giro PRO lo trovi fra i confronti del report."},
+    "import.duplicate": {
+        "en": "That PRO lap is already imported, so I didn't add it again.",
+        "it": "Questo giro PRO c'era già, quindi non l'ho aggiunto di nuovo."},
     "import.failed": {"en": "I can't read that lap. {err}",
                       "it": "Non riesco a leggere questo giro. {err}"},
     "btn.guide": {"en": "User guide", "it": "Guida all'uso"},

@@ -211,11 +211,12 @@ def _find_reference_by_scan(
     locked or corrupt catalog silently put the lap that cut the Roggia back in
     charge, with nothing on screen to say so.
     """
-    from .lap import clean_verdict
+    from .lap import clean_verdict, prefer_pro
 
     want_car, want_track = _slug(car_model), _slug(track)
     best_clean: Lap | None = None      # judged clean
     best_unknown: Lap | None = None    # never judged (legacy/AC/pre-isValidLap)
+    best_pro: Lap | None = None        # imported, not one of yours
     for path in list_lap_files(laps_dir):
         if not path.name.startswith(f"{want_track}__{want_car}__"):
             continue
@@ -227,13 +228,20 @@ def _find_reference_by_scan(
             continue
         if _slug(lap.car_model) != want_car or _slug(lap.track) != want_track:
             continue
+        if lap.source == "pro":
+            if best_pro is None or lap.lap_time_ms < best_pro.lap_time_ms:
+                best_pro = lap
+            continue
         if clean_verdict(lap.clean, lap.schema_version, lap.tyre_compound,
                          lap.recorded_utc) == 1:
             if best_clean is None or lap.lap_time_ms < best_clean.lap_time_ms:
                 best_clean = lap
         elif best_unknown is None or lap.lap_time_ms < best_unknown.lap_time_ms:
             best_unknown = lap
-    return best_clean or best_unknown
+    own = best_clean or best_unknown
+    if best_pro and prefer_pro(own.lap_time_ms if own else None, best_pro.lap_time_ms):
+        return best_pro
+    return own
 
 
 def describe_lap(lap: Lap) -> str:

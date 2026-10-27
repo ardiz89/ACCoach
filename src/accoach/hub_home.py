@@ -88,14 +88,19 @@ def load_home_data(laps_dir: Path | str | None = None,
     try:
         with LapCatalog(_catalog_path(laps_dir)) as cat:
             cat.sync(list_lap_files(laps_dir))
+            # L'ultima sessione e' l'ultima che hai guidato: un giro PRO appena
+            # importato portava la Home su un'auto e una pista mai provate.
             row = cat._conn.execute(
-                "SELECT car_model, track FROM lap ORDER BY recorded_utc DESC LIMIT 1"
+                "SELECT car_model, track FROM lap"
+                " WHERE COALESCE(source, 'own') <> 'pro'"
+                " ORDER BY recorded_utc DESC LIMIT 1"
             ).fetchone()
             if row is None:
                 return HomeData(status="empty")
             car, track = row["car_model"], row["track"]
 
-            laps = cat.laps_for(car, track)
+            laps = [r for r in cat.laps_for(car, track)
+                    if (r.get("source") or "own") != "pro"]
             valid_ms = [r["lap_time_ms"] for r in laps
                         if r["valid"] and r["lap_time_ms"] > 0]
             laps_count = len(valid_ms)

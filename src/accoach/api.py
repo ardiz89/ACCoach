@@ -558,6 +558,36 @@ def _pick_known(requested: str | None, fallback: str | None, known: set[str]) ->
     return requested if requested in known else None
 
 
+def _own(rows: list[dict]) -> list[dict]:
+    """Your laps, without the imported PRO ones (27/10).
+
+    A PRO lap sat in every list as if you had driven it: after an import it
+    became "your best lap", built the ideal lap out of its sectors, joined
+    today's session and was the lap the report opened on. It is a benchmark,
+    so it stays pickable as the comparison and in the PRO rung, and nowhere
+    else."""
+    return [r for r in rows if (r.get("source") or "own") != "pro"]
+
+
+def _valid(rows: list[dict]) -> list[dict]:
+    return [r for r in rows if r["valid"] and r["lap_time_ms"] > 0]
+
+
+def _own_valid(rows: list[dict]) -> list[dict]:
+    """Your valid laps, or the PRO ones when you have none yet: a page with
+    only an imported lap still opens, on that lap."""
+    return _valid(_own(rows)) or _valid(rows)
+
+
+def _default_review(rows: list[dict]) -> str | None:
+    """The lap a page opens on: your latest, never a lap you imported."""
+    for pool in (_own(rows), rows):
+        path = next((r["path"] for r in pool if r["valid"]), None)
+        if path:
+            return path
+    return None
+
+
 def _setup_of(lap) -> dict | None:
     """The in-car setup a lap was driven on, or None if it wasn't recorded.
 
@@ -1099,13 +1129,12 @@ def create_api(
         lg = lang or current_language()
         with _catalog() as cat:
             all_laps = cat.laps_for(car, track)
-            valid = [r for r in all_laps if r["valid"] and r["lap_time_ms"] > 0]
+            valid = _own_valid(all_laps)
             known = {r["path"] for r in all_laps}
             # The reviewed lap is resolved first because the reference is elected
             # *for it*: its track temperature is the only "current conditions"
             # this page has.
-            review_path = _pick_known(
-                lap, next((r["path"] for r in all_laps if r["valid"]), None), known)
+            review_path = _pick_known(lap, _default_review(all_laps), known)
             review_row = next((r for r in all_laps if r["path"] == review_path), None)
             mine = _conditions_of(review_row)
             review_temp = mine["road_temp"]
@@ -1120,8 +1149,11 @@ def create_api(
         # Only when the page is actually showing the elected lap: with a baseline
         # the user picked by hand, a note about the election explains a choice
         # nobody made.
+        # Un giro PRO non e' stato scelto per le condizioni: vince perche' e'
+        # piu' veloce del tuo, e una nota sulle condizioni spiegherebbe male.
+        is_pro = (elected_row or {}).get("source") == "pro"
         conditions = (_conditions_note(elected_row, fastest_row, mine)
-                      if baseline_path == elected else None)
+                      if baseline_path == elected and not is_pro else None)
 
         try:
             baseline_lap = load_lap(baseline_path)
@@ -1273,12 +1305,11 @@ def create_api(
         """
         with _catalog() as cat:
             all_laps = cat.laps_for(car, track)
-            valid = [r for r in all_laps if r["valid"] and r["lap_time_ms"] > 0]
+            valid = _own_valid(all_laps)
             elected = _elected_path(cat, car, track, valid)
         known = {r["path"] for r in all_laps}
         base_path = _pick_known(baseline, elected, known)
-        rev_path = _pick_known(
-            lap, next((r["path"] for r in all_laps if r["valid"]), None), known)
+        rev_path = _pick_known(lap, _default_review(all_laps), known)
         if base_path is None or rev_path is None:
             raise HTTPException(404, "no valid lap for this car+track")
         try:
@@ -1446,8 +1477,9 @@ def create_api(
         lg = lang or current_language()
         with _catalog() as cat:
             all_laps = cat.laps_for(car, track)
-            valid = [r for r in all_laps
-                     if r["valid"] and r["lap_time_ms"] > 0 and not _off_track(r)]
+            # Le frenate sono le tue: un giro PRO nel mucchio spostava la
+            # dispersione e il punto medio di qualcun altro dentro la tua scheda.
+            valid = [r for r in _own_valid(all_laps) if not _off_track(r)]
             elected = _elected_path(cat, car, track, valid)
         if not valid or elected is None:
             raise HTTPException(404, "no valid lap for this car+track")
@@ -1683,7 +1715,7 @@ def create_api(
         """
         lg = lang or current_language()
         with _catalog() as cat:
-            rows = cat.laps_for(car, track)
+            rows = _own(cat.laps_for(car, track))   # le sessioni sono le tue
         runs = group_sessions(rows)
         if not runs:
             return {"sessions": [], "current": None}
@@ -1773,7 +1805,7 @@ def create_api(
         """
         lg = lang or current_language()
         with _catalog() as cat:
-            rows = cat.laps_for(car, track)
+            rows = _own(cat.laps_for(car, track))
         # group_sessions hands sessions back newest-first with laps in driving
         # order, so the stints inside one session come out oldest-first: flip
         # just those, so the whole list reads newest-first like every other picker.
@@ -1800,15 +1832,14 @@ def create_api(
         """Per-sector breakdown of review vs baseline, plus the ideal lap."""
         with _catalog() as cat:
             all_laps = cat.laps_for(car, track)
-            valid = [r for r in all_laps if r["valid"] and r["lap_time_ms"] > 0]
+            valid = _own_valid(all_laps)       # il giro ideale e' fatto dei tuoi
             if not valid:
                 raise HTTPException(404, "no valid lap for this car+track")
             known = {r["path"] for r in all_laps}
             # Same election as /api/analysis, for the same reason and with the
             # same input: two tabs of one page must not disagree about which lap
             # is the benchmark.
-            review_path = _pick_known(
-                lap, next((r["path"] for r in all_laps if r["valid"]), None), known)
+            review_path = _pick_known(lap, _default_review(all_laps), known)
             review_row = next((r for r in all_laps if r["path"] == review_path), None)
             mine = _conditions_of(review_row)
             elected = _elected_path(cat, car, track, valid, mine["road_temp"],
@@ -1900,7 +1931,9 @@ def create_api(
         with _catalog() as cat:
             all_laps = cat.laps_for(car, track)
             pro_path = cat.fastest_pro_path(car, track)
-        valid = [r for r in all_laps if r["valid"] and r["lap_time_ms"] > 0]
+        # Solo i tuoi: il giro PRO ha il suo gradino, e contato qui diventava
+        # «il tuo miglior giro» e il gradino PRO risultava «raggiunto».
+        valid = _valid(_own(all_laps))
         if not valid:
             # Same shape as the full answer, empty: a caller that has to check
             # whether a key exists before reading it is a caller that will
@@ -2145,7 +2178,7 @@ def create_api(
         with _catalog() as cat:
             all_laps = cat.laps_for(car, track)
             pro_path = cat.fastest_pro_path(car, track)
-            valid = [r for r in all_laps if r["valid"] and r["lap_time_ms"] > 0]
+            valid = _valid(_own(all_laps))
             # The braking sheet has always been measured on clean laps only; a
             # drill quoting a braking point set on a lap that went off would be
             # quoting a mistake.

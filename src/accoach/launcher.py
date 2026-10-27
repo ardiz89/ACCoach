@@ -71,7 +71,6 @@ from .i18n import LANGUAGES, language_name, t
 from .guard import lan_key
 from .netinfo import device_urls, display_address, port_open, qr_png
 from .paths import base_dir
-from .telemetry.snapshot import format_lap_time
 from .theme import load_fonts, qss, tip_text, window_icon
 
 _SRC = Path(__file__).resolve().parents[1]   # .../src
@@ -957,26 +956,20 @@ class MainWindow(QWidget):
             "HONE lap (*.lap.json.gz);;All files (*)")
         if not path:
             return
-        from .recording import load_lap, save_lap
+        from .recording.pro import describe, import_pro
 
         try:
-            lap = load_lap(Path(path))
-            if lap.lap_time_ms <= 0 or not lap.samples:
-                raise ValueError("no lap time or no samples")
+            # Anche il salvataggio sta qui dentro: prima un disco pieno o una
+            # cartella senza permessi chiudeva l'import con un'eccezione muta.
+            result = import_pro(Path(path))
         except Exception as exc:  # noqa: BLE001 - any bad file lands here
             # Say which file and why. An import that fails silently is how a
             # driver ends up wondering why the reference never changed.
             self._import_note.setText(t("import.failed").format(err=exc))
             return
-        lap.valid = True          # a reference must be a complete lap
-        lap.clean = True          # imported as a trusted clean benchmark
-        lap.source = "pro"        # its own level, not one of the driver's laps
-        lap.recorded_utc = ""     # let save_lap stamp it
-        save_lap(lap)
-        # Il tempo come lo scrive il gioco («1:47.427»), non in secondi.
-        self._import_note.setText(t("import.done").format(
-            car=lap.car_model, track=lap.track,
-            time=format_lap_time(lap.lap_time_ms)))
+        # Cosa e' successo, non solo che e' successo: il riferimento cambia
+        # solo se il giro PRO e' piu' veloce del tuo migliore.
+        self._import_note.setText(describe(result, t))
 
     def _build_setup_page(self) -> QWidget:
         page, lay = _section("nav.setup")

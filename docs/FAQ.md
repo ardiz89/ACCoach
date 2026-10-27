@@ -855,8 +855,19 @@ from the dropdown, your choice holds and doesn't change.
 
 If you're a long way off the pace, your own best lap is a target that keeps you
 where you are. In the **Analysis** section of the hub there's
-**Import a PRO reference lap**. You can import a faster lap, and from then on the
-coach measures you against it.
+**Import a PRO reference lap**. The file is a HONE lap, a `.lap.json.gz`, for
+the same car and the same track.
+
+- If it's faster than your best lap, from then on the coach measures you
+  against it, whatever today's track temperature.
+- If it's slower, your best lap stays the reference. You still find the PRO lap
+  among the report's comparison laps, marked [PRO].
+- After the import the hub tells you which of the two is the reference. The same
+  lap imported twice is saved only once.
+
+A PRO lap isn't one of your laps. It doesn't count in your best lap, the ideal
+lap, your sessions, the Home page or the Report card. In **Trends**, among the
+Levels, it has its own rung, which tells you how far off it you are.
 
 > Want to try HONE without the game? `python accoach_main.py web --demo` loads
 > sample laps.

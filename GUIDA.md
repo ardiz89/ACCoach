@@ -800,8 +800,19 @@ vale la tua scelta e non cambia più.
 
 Se sei lontano dal passo, il tuo giro migliore è un bersaglio che ti tiene dove
 sei. Nella sezione **Analisi** dell'hub c'è **Importa un giro di riferimento
-PRO**. Puoi importare un giro più veloce, e da lì in poi il coach ti misura su
-quello.
+PRO**. Il file è un giro di HONE, un `.lap.json.gz`, per la stessa auto e la
+stessa pista.
+
+- Se è più veloce del tuo giro migliore, da lì in poi il coach ti misura su
+  quello, qualunque sia la temperatura della pista di oggi.
+- Se è più lento, resta il tuo giro migliore. Il giro PRO lo trovi comunque fra
+  i giri di confronto del report, con la scritta [PRO].
+- Dopo l'import l'hub ti dice quale dei due è il riferimento. Lo stesso giro
+  importato due volte si salva una volta sola.
+
+Il giro PRO non è uno dei tuoi giri. Non conta nel tuo miglior giro, nel giro
+ideale, nelle sessioni, nella Home e nella Pagella. In **Andamento**, fra i
+Livelli, ha il suo gradino, che ti dice quanto ti manca per arrivarci.
 
 > Vuoi provare HONE senza il gioco? `python accoach_main.py web --demo` carica giri
 > di esempio.

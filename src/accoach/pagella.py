@@ -285,7 +285,10 @@ class _Context:
 
 
 def _context(cat, car: str, track: str, index: int, lang: str) -> _Context:
-    rows = cat.laps_for(car, track)
+    # Le sessioni sono le tue: un giro PRO importato oggi finiva dentro la
+    # sessione di oggi.
+    rows = [r for r in cat.laps_for(car, track)
+            if (r.get("source") or "own") != "pro"]
     runs = group_sessions(rows)
     ctx = _Context(runs=runs)
     if index < 0 or (index > 0 and index >= len(runs)):

@@ -485,33 +485,23 @@ def run_import_reference(argv: list[str] | None = None, laps_dir=None) -> None:
     _utf8()
     from pathlib import Path
 
-    from .recording import laps_root, load_lap, save_lap
+    from .i18n import t
+    from .recording import laps_root
+    from .recording.pro import describe, import_pro
 
     argv = sys.argv[1:] if argv is None else argv
     laps_dir = laps_dir or laps_root()
     if not argv:
-        print("Uso: python -m accoach import-reference <file.lap.json.gz>")
+        print("python -m accoach import-reference <file.lap.json.gz>")
         return
-    src = Path(argv[0])
-    if not src.exists():
-        print(f"File non trovato: {src}")
-        return
+    # La stessa regola e le stesse frasi del bottone dell'hub, nella lingua
+    # scelta: prima qui era tutto in italiano e senza dire l'esito.
     try:
-        lap = load_lap(src)
+        result = import_pro(Path(argv[0]), laps_dir)
     except Exception as e:   # noqa: BLE001
-        print(f"Giro illeggibile: {e}")
+        print(t("import.failed").format(err=e))
         return
-    if lap.lap_time_ms <= 0 or not lap.samples:
-        print("Giro non valido (tempo o campioni mancanti).")
-        return
-
-    lap.valid = True        # a reference must be a complete lap
-    lap.clean = True         # imported as a trusted clean reference
-    lap.source = "pro"       # a first-class benchmark level, not the driver's lap
-    lap.recorded_utc = ""    # let save_lap stamp it fresh
-    dest = save_lap(lap, laps_dir)
-    print(f"✓ Reference importato: {lap.car_model} / {lap.track} "
-          f"({format_lap_time(lap.lap_time_ms)}) → {dest.name}")
+    print(describe(result, t))
 
 
 def run_dryrun(seconds: float | None = None) -> None:
