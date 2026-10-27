@@ -490,10 +490,10 @@ _UI: dict[str, dict[str, str]] = {
               "progetto. Alzala su un monitor 4K o se stai lontano dallo schermo, "
               "abbassala se ti copre troppa pista."},
     "set.scale_hint": {
-        "en": "The pedal trace and the overlay size apply from the next Coach "
-              "Live start.",
-        "it": "Traccia dei pedali e grandezza dell'overlay valgono dal prossimo "
-              "avvio di Coach Live."},
+        "en": "Size, what the overlay shows and the colours apply right away, "
+              "without Save. The pedal trace applies from the next Coach Live start.",
+        "it": "Grandezza, cosa mostra l'overlay e colori valgono subito, senza "
+              "Salva. La traccia dei pedali vale dal prossimo avvio di Coach Live."},
     # «Sposta l'overlay» (overlay_place.py) e il suo ritorno al centro.
     "btn.place_overlay": {"en": "Move the overlay", "it": "Sposta l'overlay"},
     "btn.center_overlay": {"en": "Back to the centre", "it": "Rimetti al centro"},

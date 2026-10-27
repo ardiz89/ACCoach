@@ -496,9 +496,6 @@ class Overlay(QWidget):
         self._faster = _CB_FASTER if ov.cb else _GREEN
         self._slower = _CB_SLOWER if ov.cb else _RED
 
-    def _follow_timer_stop(self) -> None:
-        self._follow.stop()
-
     def _follow_config(self) -> None:
         """Rilegge posizione e grandezza dal file; se sono cambiate, le applica."""
         from .config import read_overlay

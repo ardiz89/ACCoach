@@ -86,6 +86,12 @@ _SRC = Path(__file__).resolve().parents[1]   # .../src
 # engines talking together sound like an echo — so starting one stops the other.
 _VOICE_CMDS = {"live", "coach"}
 
+# Comandi di cui basta una finestra: un altro clic non ne apre una seconda.
+_ONE_AT_A_TIME = {tuple(_PLACE_OVERLAY)}
+
+# Quanto aspetta l'hub prima di scrivere grandezza, modalita' e colori.
+_LOOK_SAVE_MS = 300
+
 
 # --- first-run "getting started" wizard ------------------------------------
 # A marker file (not config) keeps it dead simple: present == already seen.
@@ -466,6 +472,18 @@ class SettingsPanel(QWidget):
         self._cb.setChecked(cfg.overlay.cb)
         row("set.overlay_cb", self._cb)
 
+        # Grandezza, modalita' e colori si salvano da soli (27/10): il pilota li
+        # cambiava con la copia di «Sposta l'overlay» aperta e non vedeva
+        # niente finche' non premeva Salva. Il ritardo raccoglie i clic sulle
+        # frecce in una scrittura sola.
+        self._look_timer = QTimer(self)
+        self._look_timer.setSingleShot(True)
+        self._look_timer.setInterval(_LOOK_SAVE_MS)
+        self._look_timer.timeout.connect(self._save_look)
+        self._scale.valueChanged.connect(lambda _v: self._look_timer.start())
+        self._mode.currentIndexChanged.connect(lambda _i: self._look_timer.start())
+        self._cb.toggled.connect(lambda _c: self._look_timer.start())
+
         self._wean = QCheckBox()
         self._wean.setChecked(cfg.overlay.wean)
         row("set.wean", self._wean)
@@ -570,12 +588,29 @@ class SettingsPanel(QWidget):
         ok = save_config(cfg)
         self._place_hint.setText(t("set.centered" if ok else "set.save_failed"))
 
+    def _save_look(self) -> bool:
+        """Scrive subito grandezza, modalita' e colori: l'overlay e la copia
+        da spostare li rileggono entro un secondo. Si rilegge il file prima,
+        come in `_center_overlay`."""
+        cfg = load_config(reload=True)
+        cfg.overlay.scale = round(self._scale.value(), 2)
+        cfg.overlay.mode = str(self._mode.currentData())
+        cfg.overlay.cb = self._cb.isChecked()
+        return save_config(cfg)
+
     def showEvent(self, event) -> None:  # noqa: N802 - Qt naming
         """Rilegge la grandezza: «Sposta l'overlay» la cambia da un altro
-        processo, e la casella mostrerebbe quella di prima."""
+        processo, e la casella mostrerebbe quella di prima. I segnali tacciono:
+        rimettere il valore del file non e' una scelta del pilota."""
         super().showEvent(event)
         cfg = load_config(reload=True)
+        for w in (self._scale, self._mode, self._cb):
+            w.blockSignals(True)
         self._scale.setValue(cfg.overlay.scale or 1.0)
+        self._mode.setCurrentIndex(0 if cfg.overlay.mode == "essential" else 1)
+        self._cb.setChecked(cfg.overlay.cb)
+        for w in (self._scale, self._mode, self._cb):
+            w.blockSignals(False)
 
     def _do_save(self) -> None:
         cfg = load_config()
@@ -1070,6 +1105,12 @@ class MainWindow(QWidget):
                 if a and a[0] in _VOICE_CMDS and proc.poll() is None:
                     self._kill(proc)
             self._prune()
+        # Una copia sola di «Sposta l'overlay» (27/10): ogni clic ne apriva
+        # un'altra, e il pilota se ne e' trovate sei una sopra l'altra.
+        if tuple(args) in _ONE_AT_A_TIME:
+            self._prune()
+            if any(tuple(a) == tuple(args) for _p, a in self._children):
+                return
 
         flags = 0
         if new_console and sys.platform == "win32":

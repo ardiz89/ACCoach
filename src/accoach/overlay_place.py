@@ -66,8 +66,10 @@ class PlacementOverlay(Overlay):
 
     def __init__(self) -> None:
         super().__init__(url=None, interactive=True)
-        # La copia non deve rincorrere il config che sta per scrivere lei.
-        self._follow_timer_stop()
+        # La grandezza che il config aveva l'ultima volta che l'abbiamo letto:
+        # la copia la segue solo quando cambia li', non quando la rotella la
+        # cambia qui (vedi `_follow_config`).
+        self._seen_scale = self._scale
         self._saved = False
         self.apply_state(sample_state())
         self.resize(self.width(), self.height() + _BAND_PX)
@@ -111,6 +113,23 @@ class PlacementOverlay(Overlay):
         p.drawText(QRectF(12, top + 22, self.width() - 24, 20),
                    Qt.AlignLeft | Qt.AlignVCenter, t("place.keys"))
 
+    def _follow_config(self) -> None:
+        """Segue le Impostazioni mentre e' aperta (27/10).
+
+        Prima il timer qui era fermo: il pilota cambiava grandezza o modalita'
+        nell'hub e la copia restava com'era. La posizione invece non si segue:
+        la decide il mouse, ed e' quello che la copia sta per salvare."""
+        from .config import read_overlay
+        ov = read_overlay()
+        if ov is None:                       # file a meta' scrittura: al prossimo giro
+            return
+        self._apply_look(ov)
+        scale = clamp_scale(ov.scale if (ov.scale and ov.scale > 0) else 1.0)
+        if scale != self._seen_scale:
+            self._seen_scale = scale
+            self.set_scale(scale)
+        self.update()
+
     # --- comandi ------------------------------------------------------------
     def wheelEvent(self, e) -> None:  # noqa: N802
         step = SCALE_STEP if e.angleDelta().y() > 0 else -SCALE_STEP
@@ -151,7 +170,9 @@ class PlacementOverlay(Overlay):
 
     def _write(self, x: int, y: int) -> bool:
         from .config import load_config, save_config
-        cfg = load_config()
+        # Dal file e non dalla cache: mentre la copia era aperta l'hub puo'
+        # aver scritto modalita' e colori.
+        cfg = load_config(reload=True)
         cfg.overlay.x, cfg.overlay.y = x, y
         cfg.overlay.scale = self._scale
         return save_config(cfg)

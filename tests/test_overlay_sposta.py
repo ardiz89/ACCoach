@@ -13,7 +13,7 @@ import pytest
 pytest.importorskip("PySide6")
 
 from PySide6.QtCore import Qt                                     # noqa: E402
-from PySide6.QtGui import QKeyEvent                               # noqa: E402
+from PySide6.QtGui import QKeyEvent, QShowEvent                   # noqa: E402
 from PySide6.QtWidgets import QApplication                        # noqa: E402
 
 from accoach import config                                         # noqa: E402
@@ -142,3 +142,98 @@ def test_back_to_the_centre_writes_even_after_another_process_moved_it(cfg_file)
         assert (ov.x, ov.y) == (-1, -1)
     finally:
         win.close()
+
+
+# --- 27/10: quello che il pilota ha visto provandolo ---------------------------
+
+def test_a_second_click_does_not_open_a_second_copy(cfg_file, monkeypatch):
+    """Ogni clic su «Sposta l'overlay» apriva un'altra copia: il pilota se ne
+    e' trovate sei una sopra l'altra."""
+    from accoach import launcher
+    from accoach.hubgate import PLACE_OVERLAY
+    started = []
+
+    class _Proc:
+        pid = 1
+
+        def poll(self):
+            return None                      # ancora aperta
+
+    monkeypatch.setattr(launcher.subprocess, "Popen",
+                        lambda *a, **k: started.append(a) or _Proc())
+    win = launcher.MainWindow()
+    try:
+        win._spawn(list(PLACE_OVERLAY), False)
+        win._spawn(list(PLACE_OVERLAY), False)
+        assert len(started) == 1
+        win._children = []                   # la copia e' stata chiusa
+        win._spawn(list(PLACE_OVERLAY), False)
+        assert len(started) == 2
+    finally:
+        win._children = []
+        win.close()
+
+
+def test_size_mode_and_colours_are_written_without_save(cfg_file):
+    """Prima arrivavano al file solo con Salva, e la copia aperta non cambiava."""
+    from accoach import launcher
+    win = launcher.MainWindow()
+    try:
+        s = win._settings
+        s._scale.setValue(1.4)
+        s._mode.setCurrentIndex(1)
+        s._cb.setChecked(True)
+        assert s._look_timer.isActive()      # una scrittura sola, dopo i clic
+        s._look_timer.stop()
+        s._save_look()
+        ov = config.read_overlay()
+        assert (ov.scale, ov.mode, ov.cb) == (1.4, "full", True)
+    finally:
+        win.close()
+
+
+def test_showing_settings_again_does_not_write_anything(cfg_file):
+    """Rimettere nelle caselle i valori del file non e' una scelta del pilota."""
+    from accoach import launcher
+    win = launcher.MainWindow()
+    try:
+        s = win._settings
+        disk = config.load_config(reload=True)
+        disk.overlay.scale = 1.7
+        config.save_config(disk)
+        s.showEvent(QShowEvent())
+        assert s._scale.value() == 1.7
+        assert not s._look_timer.isActive()
+    finally:
+        win.close()
+
+
+def test_the_open_copy_follows_size_and_mode_from_settings(cfg_file):
+    from accoach.overlay_place import PlacementOverlay
+    win = PlacementOverlay()
+    cfg = config.load_config(reload=True)
+    cfg.overlay.scale, cfg.overlay.mode = 1.5, "essential"
+    config.save_config(cfg)
+    win._follow_config()
+    assert win._scale == 1.5 and win._mode == "essential"
+
+
+def test_the_wheel_in_the_copy_is_not_undone_by_the_config(cfg_file):
+    """La copia segue il config solo quando cambia li'."""
+    from accoach.overlay_place import PlacementOverlay
+    win = PlacementOverlay()
+    win.set_scale(1.8)
+    win._follow_config()
+    assert win._scale == 1.8
+
+
+def test_the_copy_keeps_the_mode_chosen_while_it_was_open(cfg_file):
+    """Invio salva posizione e grandezza, non riporta indietro la modalita'
+    scritta dall'hub mentre la copia era aperta."""
+    from accoach.overlay_place import PlacementOverlay
+    win = PlacementOverlay()
+    cfg = config.load_config(reload=True)
+    cfg.overlay.mode = "full"
+    config.save_config(cfg)
+    _key(win, Qt.Key_Return)
+    assert config.read_overlay().mode == "full"

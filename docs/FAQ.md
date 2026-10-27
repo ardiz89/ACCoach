@@ -376,7 +376,9 @@ size. **Enter** saves, **Esc** closes without saving, **R** puts it back at the
 top centre. It works with Coach Live running too, and the real overlay moves
 there by itself within a second. The game has to be in Borderless, as it does
 to show the overlay at all. **Back to the centre** does what R does without
-opening the copy.
+opening the copy. There is only one copy, so pressing the button again doesn't
+open another. While it's open, the size and mode you pick in Settings show up
+straight away, without pressing Save.
 
 ### The pedal trace
 

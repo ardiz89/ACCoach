@@ -318,6 +318,9 @@ grandezza. **Invio** salva, **Esc** chiude senza salvare, **R** lo rimette in
 alto al centro. Funziona anche con Coach Live acceso, e l'overlay vero si sposta
 da solo entro un secondo. Il gioco deve essere in Borderless, come per vedere
 l'overlay. **Rimetti al centro** fa la stessa cosa di R senza aprire la copia.
+La copia è una sola, e se premi di nuovo il bottone non se ne apre un'altra.
+Mentre è aperta, grandezza e modalità scelte in Impostazioni si vedono subito,
+senza premere Salva.
 
 ### La traccia dei pedali
 
