@@ -10,6 +10,7 @@ import os
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
+from accoach.theme import tip_text  # noqa: E402
 import pytest
 
 pytest.importorskip("PySide6")
@@ -56,7 +57,7 @@ def test_the_help_marks_are_wired_to_the_tooltips():
     assert set(panel._helps) == set(_SETTINGS)
     for key, mark in panel._helps.items():
         assert mark.text() == "?"
-        assert mark.toolTip() == t(f"{key}.help")
+        assert mark.toolTip() == tip_text(t(f"{key}.help"))
 
 
 def test_the_voice_is_a_choice_between_two_and_is_saved(tmp_path, monkeypatch):

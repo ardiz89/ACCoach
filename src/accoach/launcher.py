@@ -72,7 +72,7 @@ from .guard import lan_key
 from .netinfo import device_urls, display_address, port_open, qr_png
 from .paths import base_dir
 from .telemetry.snapshot import format_lap_time
-from .theme import load_fonts, qss, window_icon
+from .theme import load_fonts, qss, tip_text, window_icon
 
 _SRC = Path(__file__).resolve().parents[1]   # .../src
 
@@ -417,7 +417,7 @@ class SettingsPanel(QWidget):
             self._labels[key] = lbl
             mark = QLabel("?")
             mark.setProperty("role", "help")
-            mark.setToolTip(t(f"{key}.help"))
+            mark.setToolTip(tip_text(t(f"{key}.help")))
             mark.setCursor(Qt.WhatsThisCursor)
             self._helps[key] = mark
             box = QWidget()
@@ -640,7 +640,7 @@ class SettingsPanel(QWidget):
         for key, lbl in self._labels.items():
             lbl.setText(t(key))
         for key, mark in self._helps.items():
-            mark.setToolTip(t(f"{key}.help"))
+            mark.setToolTip(tip_text(t(f"{key}.help")))
         self._pedals_hint.setText(t("set.pedals_hint"))
         self._scale_hint.setText(t("set.scale_hint"))
         self._place_hint.setText(t("set.place_hint"))
@@ -1160,12 +1160,12 @@ class MainWindow(QWidget):
             state = button_state(key, live=live, busy=busy)
             btn.setEnabled(state != BLOCKED)
             if state == BLOCKED:
-                btn.setToolTip(t("btn.busy_recording"))
+                btn.setToolTip(tip_text(t("btn.busy_recording")))
             elif state == EXPLAIN:
-                btn.setToolTip(t("swap.tooltip"))
+                btn.setToolTip(tip_text(t("swap.tooltip")))
             else:
                 tip = btn.property("tipKey")
-                btn.setToolTip(t(tip) if tip else "")
+                btn.setToolTip(tip_text(t(tip)) if tip else "")
             # "Stop Coach Live" is meaningless before there's one to stop, and a
             # disabled Stop sitting next to Start reads as "something is already
             # running" — the opposite of the truth. Hide it instead: the panel

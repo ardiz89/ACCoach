@@ -31,7 +31,7 @@ from .i18n import t
 from .logging_setup import get_logger
 from .telemetry.snapshot import format_lap_time
 from .textfmt import display_name, fmt_num
-from .theme import MONO
+from .theme import MONO, tip_text
 
 _log = get_logger("hub")
 
@@ -304,7 +304,7 @@ class HomePanel(QWidget):
 
         has_debrief = bool(data.debrief_text)
         self._cta_debrief.setEnabled(has_debrief)
-        self._cta_debrief.setToolTip("" if has_debrief else t("home.empty_body"))
+        self._cta_debrief.setToolTip("" if has_debrief else tip_text(t("home.empty_body")))
         # Senza giri, i bottoni sono quelli del primo passo.
         first = data.status == "empty"
         self._cta_drive.setVisible(first)

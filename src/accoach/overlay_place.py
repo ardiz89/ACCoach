@@ -27,6 +27,7 @@ from PySide6.QtCore import QRectF, Qt
 from PySide6.QtGui import QColor, QPainter, QPen
 from PySide6.QtWidgets import QApplication
 
+from .config import read_overlay
 from .i18n import current_language, t
 from .overlay import (_BASE_H, _BASE_W, _PEDAL_PANEL_H, _PLATE_H_ESSENTIAL,
                       _PLATE_H_FULL, _PLATE_W, _PLATE_X, _PLATE_Y, Overlay)
@@ -70,6 +71,12 @@ class PlacementOverlay(Overlay):
         # la copia la segue solo quando cambia li', non quando la rotella la
         # cambia qui (vedi `_follow_config`).
         self._seen_scale = self._scale
+        ov = read_overlay()
+        self._seen_pos = (ov.x, ov.y) if ov is not None else (-1, -1)
+        # Dove la copia sta quando la posizione e' automatica. Se Invio arriva
+        # senza che il pilota l'abbia spostata, resta automatica (-1) invece
+        # di diventare un punto fisso.
+        self._auto_at = self.pos() if self._seen_pos[0] < 0 else None
         self._saved = False
         self.apply_state(sample_state())
         self.resize(self.width(), self.height() + _BAND_PX)
@@ -117,9 +124,10 @@ class PlacementOverlay(Overlay):
         """Segue le Impostazioni mentre e' aperta (27/10).
 
         Prima il timer qui era fermo: il pilota cambiava grandezza o modalita'
-        nell'hub e la copia restava com'era. La posizione invece non si segue:
-        la decide il mouse, ed e' quello che la copia sta per salvare."""
-        from .config import read_overlay
+        nell'hub e la copia restava com'era. Anche la posizione si segue, ma
+        solo quando cambia nel file: «Rimetti al centro» con la copia aperta
+        non la muoveva, e Invio riscriveva la posizione di prima (27/10). Un
+        trascinamento col mouse non cambia il file, quindi non viene annullato."""
         ov = read_overlay()
         if ov is None:                       # file a meta' scrittura: al prossimo giro
             return
@@ -128,6 +136,14 @@ class PlacementOverlay(Overlay):
         if scale != self._seen_scale:
             self._seen_scale = scale
             self.set_scale(scale)
+        pos = (ov.x, ov.y)
+        if pos != self._seen_pos:
+            self._seen_pos = pos
+            if ov.x >= 0 and ov.y >= 0:
+                self.move(ov.x, ov.y)
+            else:
+                self._place_top_center()
+                self._auto_at = self.pos()
         self.update()
 
     # --- comandi ------------------------------------------------------------
@@ -178,7 +194,10 @@ class PlacementOverlay(Overlay):
         return save_config(cfg)
 
     def save_and_close(self) -> None:
-        self._saved = self._write(self.x(), self.y())
+        if self._auto_at is not None and self.pos() == self._auto_at:
+            self._saved = self._write(-1, -1)
+        else:
+            self._saved = self._write(self.x(), self.y())
         self.close()
 
     def reset_and_close(self) -> None:

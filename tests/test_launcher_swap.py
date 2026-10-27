@@ -13,6 +13,7 @@ import os
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
+from accoach.theme import tip_text  # noqa: E402
 import pytest
 
 pytest.importorskip("PySide6")
@@ -73,7 +74,7 @@ def test_the_backend_button_stays_clickable_and_says_why(hub, live):
 
     btn = _button(hub, ("server",))
     assert btn.isEnabled() is True          # non più grigio e muto
-    assert btn.toolTip() == t("swap.tooltip")
+    assert btn.toolTip() == tip_text(t("swap.tooltip"))
 
 
 def _answer(monkeypatch, hub, choice, log=None):
@@ -123,7 +124,7 @@ def test_the_engineer_page_does_not_wear_the_swap_tooltip(hub, live):
     pagina Ingegnere sarebbe falso."""
     from accoach.i18n import t
 
-    assert _button(hub, ("web", "--engineer")).toolTip() != t("swap.tooltip")
+    assert _button(hub, ("web", "--engineer")).toolTip() != tip_text(t("swap.tooltip"))
 
 
 def test_the_dialog_has_two_exits(hub):
@@ -327,5 +328,5 @@ def test_the_browser_buttons_say_it_in_their_tooltip_and_keep_it(hub):
     for key in (("web",), ("web", "--engineer")):
         btn = _button(hub, key)
         assert "(" not in btn.text()
-        assert btn.toolTip() == t("tip.browser"), key
-    assert _button(hub, ("server",)).toolTip() == t("tip.server")
+        assert btn.toolTip() == tip_text(t("tip.browser")), key
+    assert _button(hub, ("server",)).toolTip() == tip_text(t("tip.server"))

@@ -237,3 +237,43 @@ def test_the_copy_keeps_the_mode_chosen_while_it_was_open(cfg_file):
     config.save_config(cfg)
     _key(win, Qt.Key_Return)
     assert config.read_overlay().mode == "full"
+
+def test_back_to_the_centre_moves_the_open_copy(cfg_file):
+    """Con la copia aperta «Rimetti al centro» non la muoveva, e Invio
+    riscriveva la posizione di prima (27/10)."""
+    from accoach.overlay_place import PlacementOverlay
+    cfg = config.load_config(reload=True)
+    cfg.overlay.x, cfg.overlay.y = 300, 300
+    config.save_config(cfg)
+    win = PlacementOverlay()
+    assert (win.x(), win.y()) == (300, 300)
+    cfg = config.load_config(reload=True)
+    cfg.overlay.x, cfg.overlay.y = -1, -1                # il bottone dell'hub
+    config.save_config(cfg)
+    win._follow_config()
+    assert (win.x(), win.y()) != (300, 300)
+    _key(win, Qt.Key_Return)
+    ov = config.read_overlay()
+    assert (ov.x, ov.y) == (-1, -1)                      # resta automatica
+
+
+def test_a_drag_is_not_undone_by_the_config(cfg_file):
+    from accoach.overlay_place import PlacementOverlay
+    win = PlacementOverlay()
+    win.move(410, 220)
+    win._follow_config()
+    assert (win.x(), win.y()) == (410, 220)
+    _key(win, Qt.Key_Return)
+    ov = config.read_overlay()
+    assert (ov.x, ov.y) == (410, 220)
+
+
+def test_long_tooltips_wrap_and_short_ones_stay_on_one_line():
+    """Il pilota non riusciva a leggerli: una riga sola, piu' larga dello
+    schermo. Qt manda a capo solo il rich text."""
+    from accoach.theme import tip_text
+    long = tip_text("Legge i consigli ad alta voce. Spegnila per tenere solo l'overlay.")
+    assert long.startswith("<table width=")
+    assert "<p" in tip_text("Apre il report")
+    assert tip_text("") == ""
+    assert "&lt;b&gt;" in tip_text("<b>")                # il testo non e' markup
