@@ -434,9 +434,11 @@
   // chiedono solo quando cambia quello da cui dipendono, mai a ogni frame; i
   // numeri di sequenza scartano una risposta arrivata dopo una piu' nuova
   // (le leve di un file sotto il nome di un altro).
+  // Ogni quanto si richiede l'elenco degli assetti finche' e' vuoto.
+  var BASE_RETRY_MS = 3000;
   var bx = {
     car: "", track: "", combo: null,
-    baseSeq: 0, base: null, baseErr: "",
+    baseSeq: 0, base: null, baseErr: "", baseAt: 0,
     chosen: null,         // il file scelto dalla tendina; null = quello del server
     pvKey: null, pvSeq: 0, pvChanges: null, preview: null, pvErr: "",
     confirm: null,        // {key, path, name, changes, av}: cio' che la conferma nomina
@@ -476,6 +478,7 @@
 
   function loadBase() {
     var seq = ++bx.baseSeq;
+    bx.baseAt = now();
     xhr("GET", "/api/setup/base?car=" + encodeURIComponent(bx.car)
         + "&track=" + encodeURIComponent(bx.track), null, function (err, data) {
       if (seq !== bx.baseSeq) return;
@@ -616,6 +619,11 @@
       fillSelect();
       loadBase();
     } else if (entering) {
+      loadBase();
+    } else if (bx.base && !bx.base.setups.length && now() - bx.baseAt > BASE_RETRY_MS) {
+      // Su una pista nuova la cartella e' vuota finche' non salvi dal garage,
+      // e lo salvi proprio mentre sei qui (29/10, Zolder): l'elenco chiesto
+      // all'arrivo restava vuoto e la scritta non se ne andava piu'.
       loadBase();
     }
     var changes = boxChange(eng) ? changesFor(eng) : [];

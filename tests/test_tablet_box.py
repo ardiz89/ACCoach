@@ -319,3 +319,42 @@ def test_a_websocket_refused_for_the_key_says_open_from_the_qr(answer, expected)
     assert r.returncode == 0, r.stderr
     out = json.loads(r.stdout)
     assert out == dict(expected, probes=1)
+
+
+# --- un assetto salvato dal garage mentre sei ai box ---------------------------
+# Il 29/10 a Zolder: la cartella era vuota all'arrivo ai box, il pilota ha
+# salvato un assetto dal garage e la scritta «Non trovo un assetto» restava.
+
+@needs_node
+def test_an_empty_setup_list_is_asked_again_until_the_garage_saves_one():
+    harness = _BOX_HARNESS.split("window.HoneTablet.render(frame);\nreply(")[0] + r"""
+var clock = 1000;
+Date.now = function () { return clock; };
+window.HoneTablet.render(frame);
+reply(find("/api/setup/base")[0], 200, {car: null, track: null, setups: [],
+                                        base: null, last_written: null});
+window.HoneTablet.render(frame);
+out.emptySays = !$("t-nobase").hidden;
+clock += 1000;
+window.HoneTablet.render(frame);
+out.tooSoon = find("/api/setup/base").length;
+clock += 3000;
+window.HoneTablet.render(frame);
+window.HoneTablet.render(frame);
+out.askedAgain = find("/api/setup/base").length;
+reply(find("/api/setup/base")[1], 200, {car: "mclaren", track: "Zolder",
+  setups: [{name: "def", path: "S/def.json", mtime: 1}],
+  base: "S/def.json", last_written: null});
+window.HoneTablet.render(frame);
+out.goneAfterSave = $("t-nobase").hidden;
+clock += 10000;
+window.HoneTablet.render(frame);
+out.thenQuiet = find("/api/setup/base").length;
+process.stdout.write(JSON.stringify(out));
+"""
+    r = subprocess.run([_NODE, "-e", harness, str(_WEB / "i18n.js"), str(_WEB / "tablet.js")],
+                       capture_output=True, text=True, encoding="utf-8")
+    assert r.returncode == 0, r.stderr
+    out = json.loads(r.stdout)
+    assert out == {"emptySays": True, "tooSoon": 1, "askedAgain": 2,
+                   "goneAfterSave": True, "thenQuiet": 2}
