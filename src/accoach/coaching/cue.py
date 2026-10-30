@@ -51,6 +51,7 @@ class CueCategory(Enum):
     # entry, or never.
     PIT_APPROACH = "pit_approach"     # the pit entry is right there
     PIT_BRIEFING = "pit_briefing"     # you're stopped: here's what to do with it
+    LAP_INVALID = "lap_invalid"       # il giro non conta piu': cosa e' successo
 
 
 class CueTier:
@@ -81,6 +82,8 @@ def _init_tiers() -> None:
         # you and the change costs another lap. Same band as FUEL, and for the
         # same reason — both are "act now or lose the chance".
         CueCategory.PIT_IN, CueCategory.PIT_APPROACH,
+        # Un fatto del giro, non un tema da allenare: un focus non lo zittisce.
+        CueCategory.LAP_INVALID,
     }
     advisory = {
         CueCategory.TC_UP, CueCategory.ABS_UP, CueCategory.BRAKE_BIAS,

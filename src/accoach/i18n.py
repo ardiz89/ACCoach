@@ -731,6 +731,15 @@ _CUE_EN: dict[str, str] = {
     "Porta più velocità in curva": "Carry more speed through the corner",
     # fuel.py
     "Ultimo giro di benzina, rientra ai box": "Last lap of fuel, box now",
+    # lapvalid.py
+    "Giro invalidato, sei uscito largo. Al prossimo giro la tieni dentro.":
+        "Lap invalidated, you ran wide. Keep it inside next lap.",
+    "Giro invalidato, hai tagliato la curva. Il prossimo lo chiudi pulito.":
+        "Lap invalidated, you cut the corner. Make the next one clean.",
+    "Giro invalidato, limiti di pista. Ora ne fai uno pulito.":
+        "Lap invalidated, track limits. Now drive a clean one.",
+    "Giro invalidato, stesso errore di prima. Qui puoi fare meglio.":
+        "Lap invalidated, same mistake as before. You can do better here.",
     # pitcall.py
     "Modifica pronta, rientra ai box a fine giro":
         "Setup change ready, box this lap",

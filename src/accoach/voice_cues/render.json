@@ -371,6 +371,58 @@
       "style": 0.0
     }
   },
+  "Giro invalidato, hai tagliato la curva. Il prossimo lo chiudi pulito.": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "text": "Giro invalidato, <break time=\"0.3s\" /> hai tagliato la curva. Il prossimo lo chiudi pulito.",
+    "voice_id": "RXoaSpLaWTEckJgPUBG3",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Giro invalidato, limiti di pista. Ora ne fai uno pulito.": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "text": "Giro invalidato, <break time=\"0.3s\" /> limiti di pista. Ora ne fai uno pulito.",
+    "voice_id": "RXoaSpLaWTEckJgPUBG3",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Giro invalidato, sei uscito largo. Al prossimo giro la tieni dentro.": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "text": "Giro invalidato, <break time=\"0.3s\" /> sei uscito largo. Al prossimo giro la tieni dentro.",
+    "voice_id": "RXoaSpLaWTEckJgPUBG3",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Giro invalidato, stesso errore di prima. Qui puoi fare meglio.": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "text": "Giro invalidato, <break time=\"0.3s\" /> stesso errore di prima. Quì puoi fare meglio.",
+    "voice_id": "RXoaSpLaWTEckJgPUBG3",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
   "Gomme ancora fredde. Questo giro non conta per l'assetto.": {
     "language_code": "it",
     "model_id": "eleven_multilingual_v2",

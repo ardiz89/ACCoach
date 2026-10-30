@@ -42,6 +42,7 @@ from .coaching.debrief import build_lap_debrief
 from .coaching.diagnosis import build_lap_stats
 from .coaching.atwheel import WheelWatch
 from .coaching.focus import FocusCoach, FocusKind, FocusReport
+from .coaching.lapvalid import LapValidityCoach
 from .coaching.pitcall import PitCall
 from .i18n import cue_text, current_language
 from .logging_setup import get_logger
@@ -75,6 +76,8 @@ _SAFETY_CATEGORIES = {
     # exactly the state `quiet == "pit"` describes, and gating it would make the
     # one cue that only makes sense there the one cue that never arrives.
     CueCategory.PIT_IN, CueCategory.PIT_APPROACH, CueCategory.PIT_BRIEFING,
+    # Spesso il giro cade proprio quando il delta e' saltato: va detto lo stesso.
+    CueCategory.LAP_INVALID,
 }
 
 
@@ -393,7 +396,7 @@ def _name_the_corner(cue: Cue, text: str, corners, names: dict) -> str:
     Solo sullo schermo: a voce resta la frase registrata, e un WAV per ogni
     curva di ogni pista non c'e'. Fuori da una curva non si nomina niente.
     """
-    if cue.category is not CueCategory.COASTING:
+    if cue.category not in (CueCategory.COASTING, CueCategory.LAP_INVALID):
         return text
     for c in corners:
         if c.entry_pos <= cue.pos <= c.exit_pos and names.get(c.index):
@@ -442,6 +445,7 @@ class CoachEngine:
         self.braking = BrakingDetector()
         self.gears = GearDetector()
         self.fuel = FuelEngineer()
+        self.lapvalid = LapValidityCoach()
         self.advisor = SetupAdvisor()
         self.pressure = PressureAdvisor()
         self.tyretemp = TyreTempAdvisor()
@@ -557,6 +561,7 @@ class CoachEngine:
         self.pressure.reset()
         self.tyretemp.reset()
         self.fuel.reset()
+        self.lapvalid.reset()
         self.scheduler.reset()
         self._cold_spoken = False
 
@@ -1335,6 +1340,8 @@ class CoachEngine:
             _submit(pressure_cues)
         _submit(self.tyretemp.update(snap, now))
         _submit(self.fuel.update(snap, now))
+        _submit(self.lapvalid.update(snap, self._flying_lap, now, self._corners,
+                                     self._reference))
         self.pitcall.set_pending(self._garage_change_pending())
         _submit(self.pitcall.update(snap, now))
         if self.pitcall.entry_dirty and snap.track:
@@ -1411,6 +1418,7 @@ class CoachEngine:
             self._flying_lap = True
             # Ogni frase di tecnica si puo' ridire una volta: il giro e' questo.
             self.scheduler.new_lap()
+            self.lapvalid.new_lap()
 
     def _quiet_reason(self, s: TelemetrySnapshot, delta: DeltaState | None) -> str:
         """Why the coach is holding back this tick, "" if it isn't.

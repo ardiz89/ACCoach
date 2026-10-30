@@ -397,6 +397,12 @@ motivo**.
 | *Giro fuori ritmo. Riprendo dal traguardo.* | Qui il delta **resta**, perché il giro è cominciato dal traguardo. |
 | *Giro lanciato* | Si accende per un momento quando il coach ricomincia a lavorare. |
 
+Quando un giro viene invalidato, il coach te lo dice una volta, a curva finita.
+Il gioco non spiega il motivo. HONE guarda se eri più largo o più dentro del tuo
+riferimento. In una chicane, senza riferimento o
+vicino alla linea dice solo «limiti di pista». Se ripeti lo stesso errore nella
+stessa curva, te lo fa notare.
+
 Su un **giro invalidato il coach continua a parlarti**, e sparisce solo il
 delta. Un giro annullato è un giro gratis. Frenate, bloccaggi, gomme e assetto
 si leggono lo stesso, e rientrare ai box sarebbe tempo buttato.
