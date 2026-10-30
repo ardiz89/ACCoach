@@ -247,6 +247,10 @@ class Outcome:
     #: {Symptom: score change} for symptoms this change was *not* aiming at, and
     #: which the verdict therefore never looked at. Measured, never predicted.
     side_effects: tuple = ()
+    #: La modifica provata. Un ACCEPTED non la porta in `Decision.change`, che
+    #: per chi legge vuol dire «da scrivere»: senza questa il registro non
+    #: sapeva cosa aveva tenuto.
+    tested: "ProposedChange | None" = None
 
 
 class DecisionKind(Enum):
@@ -1149,6 +1153,7 @@ class RaceEngineer:
                 _median_fuel(self.window), 2),
             time_confounded=confounded,
             side_effects=self._side_effects(a),
+            tested=a.change,
         )
 
     def _revert(self, change: ProposedChange, message: str,

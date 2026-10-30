@@ -965,7 +965,7 @@ class CoachEngine:
         from datetime import datetime, timezone
 
         from .engineer.ledger import Record, append
-        change = decision.change
+        change = decision.change or out.tested
         # On a REVERTED the decision carries the *reversal*, so its clicks are
         # the opposite of the change that was actually tested.
         atom = change.changes[0] if (change and change.changes) else None

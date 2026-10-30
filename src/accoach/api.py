@@ -640,6 +640,16 @@ def _off_track(row: dict) -> bool:
     return row.get("clean") == 0
 
 
+def _on_track(rows: list[dict]) -> list[dict]:
+    """I giri che contano come misura di quanto vai forte e quanto sei costante.
+
+    Il gioco puo' dare valido un giro con un'uscita. A Zolder un taglio di
+    chicane valeva 1,5 s nel settore, e faceva un ideale mai guidato; un giro da
+    1:51 con la fermata faceva una costanza di 17 s.
+    """
+    return [r for r in rows if not _off_track(r)]
+
+
 def _fastest_clean(valid: list[dict]) -> dict | None:
     """The quickest lap that could be a reference at all, conditions aside."""
     usable = [r for r in valid if not _off_track(r)]
@@ -825,7 +835,9 @@ def _history(valid: list[dict], chrono: list[dict], track: str,
     worth a 500: the answer degrades to "no trends" rather than taking the page
     down with it, which is what the Trends tab already did.
     """
-    fastest_row = min(valid, key=lambda r: r["lap_time_ms"])
+    # Il tuo migliore e' un giro in pista, come l'ideale con cui si confronta.
+    fastest_row = (_fastest_clean(valid)
+                   or min(valid, key=lambda r: r["lap_time_ms"]))
     h = _History(fastest=fastest_row["path"], best_ms=fastest_row["lap_time_ms"])
 
     # Every valid lap, loaded once — shared by the debriefs, the tyre trend and
@@ -1172,7 +1184,8 @@ def create_api(
                                                _corner_map(car, track),
                                                _typed(track)))}
             debrief = build_lap_debrief(review, reference, corners, lg)
-            consistency = lap_time_consistency([r["lap_time_ms"] for r in valid])
+            consistency = lap_time_consistency(
+                [r["lap_time_ms"] for r in _on_track(valid)])
         except Exception:  # noqa: BLE001 - a degenerate lap shouldn't 500 the UI
             raise HTTPException(422, "lap could not be analysed")
 
@@ -1498,8 +1511,8 @@ def create_api(
         if not objs:
             raise HTTPException(404, "lap file unreadable")
         try:
-            ref_lap = next((o for o in objs if o.lap_time_ms), objs[0])
-            corners = detect_corners(load_lap(elected).samples)
+            ref_lap = load_lap(elected)
+            corners = detect_corners(ref_lap.samples)
             typed_marks = cornernames.marks_for(track)
             names = {c.index: n
                      for c, n in zip(corners, name_corners(track, corners, lg,
@@ -1868,7 +1881,10 @@ def create_api(
         objs: list = []
         try:
             objs = [load_lap(r["path"]) for r in valid]
-            ideal = ideal_lap(objs, [r["path"] for r in valid], spans)
+            on_track = [(o, r["path"]) for o, r in zip(objs, valid)
+                        if not _off_track(r)]
+            ideal = ideal_lap([o for o, _ in on_track],
+                              [p for _, p in on_track], spans)
         except (OSError, ValueError):
             objs, ideal = [], None
 
@@ -1913,7 +1929,7 @@ def create_api(
                      for r in all_laps],
         }
         if ideal:
-            your_best = min(valid, key=lambda r: r["lap_time_ms"])["lap_time_ms"]
+            your_best = _fastest_clean(valid)["lap_time_ms"]
             out["ideal"] = {
                 "best_ms": ideal.best_ms,
                 "best_from": ideal.best_from,
@@ -2054,7 +2070,7 @@ def create_api(
         # Benchmark ladder: rolling best → ideal (consistency) → PRO (skill ceiling).
         ideal_ms = pro_ms = None
         try:
-            paths = [r["path"] for r in valid if r["path"] in lap_objs]
+            paths = [r["path"] for r in _on_track(valid) if r["path"] in lap_objs]
             objs = [lap_objs[p] for p in paths]
             spans, _ = sector_spans(lap_objs.get(fastest) or load_lap(fastest))
             il = ideal_lap(objs, paths, spans)
@@ -2075,7 +2091,8 @@ def create_api(
         return {
             "car": car, "track": track,
             "laps": laps, "pb_trend": pb_trend,
-            "consistency": lap_time_consistency([r["lap_time_ms"] for r in valid]),
+            "consistency": lap_time_consistency(
+                [r["lap_time_ms"] for r in _on_track(valid)]),
             "levels": levels,
             "trends": trends,
             "recurring": recurring,
@@ -2218,7 +2235,7 @@ def create_api(
         gap = None
         try:
             best_lap = h.lap_objs.get(h.fastest)
-            paths = [r["path"] for r in valid if r["path"] in h.lap_objs]
+            paths = [r["path"] for r in _on_track(valid) if r["path"] in h.lap_objs]
             objs = [h.lap_objs[p] for p in paths]
             if best_lap is not None and objs:
                 spans, _ = sector_spans(best_lap)
