@@ -14,7 +14,10 @@ a stint doesn't leave it either silent or crying wolf.
 
 from __future__ import annotations
 
-from ..telemetry.snapshot import ACStatus, TelemetrySnapshot
+import math
+import statistics
+
+from ..telemetry.snapshot import ACStatus, SessionType, TelemetrySnapshot
 from .cue import Cue, CueCategory
 
 # A per-lap burn outside this band is a glitch (or a refuel/pit lap), not a real
@@ -27,6 +30,26 @@ _REFUEL_EPS = 0.5          # tank rising by more than this = a refuel happened
 _WARN_LAPS = (3, 2, 1)
 _MIN_LAP_SPAN = 0.7
 _PRIORITY = 290.0          # strategic and time-critical: cuts above most cues
+_MARGIN_LAPS = 1           # un giro di scorta: il rientro non e' un giro di passo
+_LITRES_STEP = 5           # la voce dice multipli di 5, sempre per eccesso
+LITRES_SAID = range(_LITRES_STEP, 125, _LITRES_STEP)   # le frasi registrate
+_LOW_LAPS = 3              # in prova i litri si dicono solo sotto questi giri
+
+
+def litres_to_add(fuel: float, per_lap: float, lap_ms: float, time_left_ms: float,
+                  max_fuel: float = 0.0) -> float | None:
+    """Litri da aggiungere per finire la sessione, o None se non si puo' dire.
+
+    Allo scadere del tempo il giro in corso si finisce: per questo si arrotonda
+    per eccesso, piu' un giro di scorta. Negativo o zero vuol dire che basta.
+    """
+    if per_lap <= 0.0 or lap_ms <= 0.0 or time_left_ms <= 0.0:
+        return None
+    laps = math.ceil(time_left_ms / lap_ms) + _MARGIN_LAPS
+    add = laps * per_lap - fuel
+    if max_fuel > 0.0:
+        add = min(add, max_fuel - fuel)
+    return add
 
 
 class FuelEngineer:
@@ -34,6 +57,8 @@ class FuelEngineer:
 
     def __init__(self) -> None:
         self._burns: list[float] = []          # recent per-lap burn, newest last
+        self._laps_ms: list[int] = []          # e il tempo degli stessi giri
+        self._was_in_lane = False
         self._lap_start_fuel = -1.0
         self._warned: set[int] = set()         # which _WARN_LAPS thresholds spoken
         self._pos_min = 1.0
@@ -60,6 +85,9 @@ class FuelEngineer:
         # with the car stationary in the box: in_pit=False, in_pit_lane=True).
         if s.in_pit or s.in_pit_lane:
             self._pit_this_lap = True
+        if s.in_pit_lane and not self._was_in_lane:
+            cues += self._litres_call(s)
+        self._was_in_lane = s.in_pit_lane
         self._pos_min = min(self._pos_min, pos)
         self._pos_max = max(self._pos_max, pos)
         self._prev_pos = pos
@@ -84,6 +112,9 @@ class FuelEngineer:
             if full_lap and not self._pit_this_lap and _PLAUSIBLE_BURN_L[0] <= burn <= _PLAUSIBLE_BURN_L[1]:
                 self._burns.append(burn)
                 del self._burns[:-_AVG_WINDOW]
+                if s.last_lap_ms > 0:
+                    self._laps_ms.append(s.last_lap_ms)
+                    del self._laps_ms[:-_AVG_WINDOW]
                 cues = self._check_warnings(fuel)
             self._lap_start_fuel = fuel
         else:
@@ -122,6 +153,32 @@ class FuelEngineer:
                 return [Cue(category=CueCategory.FUEL, message=msg,
                             priority=_PRIORITY, segment=0, pos=0.0)]
         return []
+
+    def _litres_call(self, s: TelemetrySnapshot) -> list[Cue]:
+        """Entrando in corsia box, i litri da mettere nel menu del gioco.
+
+        In gara sempre. In prova solo col serbatoio quasi vuoto: lo stop per una
+        modifica d'assetto non deve riempire, o il carico falsa la prova.
+        """
+        if not self._burns or not self._laps_ms:
+            return []
+        per_lap = sum(self._burns) / len(self._burns)
+        if s.session is not SessionType.RACE and s.fuel / per_lap > _LOW_LAPS:
+            return []
+        add = litres_to_add(s.fuel, per_lap, statistics.median(self._laps_ms),
+                            s.session_time_left_ms, s.max_fuel)
+        if add is None:
+            return []
+        if add <= 0.0:
+            return [Cue(CueCategory.FUEL, "Benzina sufficiente fino a fine sessione.",
+                        _PRIORITY, 1, s.lap_position)]
+        n = math.ceil(add / _LITRES_STEP) * _LITRES_STEP
+        if s.max_fuel > 0.0 and n > s.max_fuel - s.fuel:
+            n = math.floor((s.max_fuel - s.fuel) / _LITRES_STEP) * _LITRES_STEP
+        if n not in LITRES_SAID:
+            return []
+        return [Cue(category=CueCategory.FUEL, message=f"Aggiungi {n} litri.",
+                    priority=_PRIORITY, segment=1, pos=s.lap_position)]
 
     def _reset_lap_window(self) -> None:
         self._pos_min = 1.0

@@ -130,6 +130,11 @@ class TelemetrySnapshot:
     # directly; None on AC, which doesn't have the notion and where track limits
     # are inferred from `tyres_out` instead. None means "unknown", never "valid".
     lap_valid: bool | None = None
+    # Quanto manca alla fine della sessione, in ms: 0 se non si sa. Il manuale
+    # di ACC non dice l'unita': `diagnostics box` serve anche a controllarla.
+    session_time_left_ms: float = 0.0
+    max_fuel: float = 0.0        # capacita' del serbatoio, litri
+    tyre_wear: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0)
 
     @staticmethod
     def disconnected() -> "TelemetrySnapshot":

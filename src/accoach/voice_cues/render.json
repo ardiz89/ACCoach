@@ -48,6 +48,318 @@
       "style": 0.0
     }
   },
+  "Aggiungi 10 litri.": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "text": "Aggiungi 10 litri.",
+    "voice_id": "RXoaSpLaWTEckJgPUBG3",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Aggiungi 100 litri.": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "text": "Aggiungi 100 litri.",
+    "voice_id": "RXoaSpLaWTEckJgPUBG3",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Aggiungi 105 litri.": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "text": "Aggiungi 105 litri.",
+    "voice_id": "RXoaSpLaWTEckJgPUBG3",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Aggiungi 110 litri.": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "text": "Aggiungi 110 litri.",
+    "voice_id": "RXoaSpLaWTEckJgPUBG3",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Aggiungi 115 litri.": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "text": "Aggiungi 115 litri.",
+    "voice_id": "RXoaSpLaWTEckJgPUBG3",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Aggiungi 120 litri.": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "text": "Aggiungi 120 litri.",
+    "voice_id": "RXoaSpLaWTEckJgPUBG3",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Aggiungi 15 litri.": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "text": "Aggiungi 15 litri.",
+    "voice_id": "RXoaSpLaWTEckJgPUBG3",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Aggiungi 20 litri.": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "text": "Aggiungi 20 litri.",
+    "voice_id": "RXoaSpLaWTEckJgPUBG3",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Aggiungi 25 litri.": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "text": "Aggiungi 25 litri.",
+    "voice_id": "RXoaSpLaWTEckJgPUBG3",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Aggiungi 30 litri.": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "text": "Aggiungi 30 litri.",
+    "voice_id": "RXoaSpLaWTEckJgPUBG3",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Aggiungi 35 litri.": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "text": "Aggiungi 35 litri.",
+    "voice_id": "RXoaSpLaWTEckJgPUBG3",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Aggiungi 40 litri.": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "text": "Aggiungi 40 litri.",
+    "voice_id": "RXoaSpLaWTEckJgPUBG3",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Aggiungi 45 litri.": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "text": "Aggiungi 45 litri.",
+    "voice_id": "RXoaSpLaWTEckJgPUBG3",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Aggiungi 5 litri.": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "text": "Aggiungi 5 litri.",
+    "voice_id": "RXoaSpLaWTEckJgPUBG3",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Aggiungi 50 litri.": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "text": "Aggiungi 50 litri.",
+    "voice_id": "RXoaSpLaWTEckJgPUBG3",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Aggiungi 55 litri.": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "text": "Aggiungi 55 litri.",
+    "voice_id": "RXoaSpLaWTEckJgPUBG3",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Aggiungi 60 litri.": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "text": "Aggiungi 60 litri.",
+    "voice_id": "RXoaSpLaWTEckJgPUBG3",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Aggiungi 65 litri.": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "text": "Aggiungi 65 litri.",
+    "voice_id": "RXoaSpLaWTEckJgPUBG3",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Aggiungi 70 litri.": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "text": "Aggiungi 70 litri.",
+    "voice_id": "RXoaSpLaWTEckJgPUBG3",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Aggiungi 75 litri.": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "text": "Aggiungi 75 litri.",
+    "voice_id": "RXoaSpLaWTEckJgPUBG3",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Aggiungi 80 litri.": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "text": "Aggiungi 80 litri.",
+    "voice_id": "RXoaSpLaWTEckJgPUBG3",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Aggiungi 85 litri.": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "text": "Aggiungi 85 litri.",
+    "voice_id": "RXoaSpLaWTEckJgPUBG3",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Aggiungi 90 litri.": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "text": "Aggiungi 90 litri.",
+    "voice_id": "RXoaSpLaWTEckJgPUBG3",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Aggiungi 95 litri.": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "text": "Aggiungi 95 litri.",
+    "voice_id": "RXoaSpLaWTEckJgPUBG3",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
   "Alza il posteriore per avere più rake.": {
     "language_code": "it",
     "model_id": "eleven_multilingual_v2",
@@ -299,6 +611,19 @@
     "language_code": "it",
     "model_id": "eleven_multilingual_v2",
     "output_format": "pcm_22050",
+    "voice_id": "RXoaSpLaWTEckJgPUBG3",
+    "voice_settings": {
+      "similarity_boost": 0.7,
+      "speed": 1.1,
+      "stability": 0.3,
+      "style": 0.0
+    }
+  },
+  "Benzina sufficiente fino a fine sessione.": {
+    "language_code": "it",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_22050",
+    "text": "Benzina sufficiente fino a fine sessione.",
     "voice_id": "RXoaSpLaWTEckJgPUBG3",
     "voice_settings": {
       "similarity_boost": 0.7,

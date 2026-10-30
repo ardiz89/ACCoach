@@ -705,6 +705,55 @@ if __name__ == "__main__":
     main()
 
 
+# --- ACC: il menu box ------------------------------------------------------
+
+# Offset ricavati dal manuale di ACC (v1.7.6) contando da `isValidLap`, l'unico
+# misurato (1408). Sono un calcolo: per questo si leggono solo qui, finche' il
+# comando `verify-box` non li ha visti muoversi col menu del gioco.
+_BOX_FIELDS = (
+    ("giri stimati", 1412, "f"), ("treno nel menu", 1532, "i"),
+    ("litri nel menu", 1536, "f"), ("psi AS", 1540, "f"), ("psi AD", 1544, "f"),
+    ("psi PS", 1548, "f"), ("psi PD", 1552, "f"), ("pioggia", 1560, "i"),
+    ("pioggia 10 min", 1564, "i"), ("pioggia 30 min", 1568, "i"),
+    ("treno montato", 1572, "i"), ("treno previsto", 1576, "i"),
+)
+
+
+def box_fields(raw: bytes) -> dict[str, float]:
+    """I campi del menu box dai byte grezzi della pagina grafica."""
+    import struct as _struct
+    return {name: round(_struct.unpack_from("<" + kind, raw, off)[0], 2)
+            for name, off, kind in _BOX_FIELDS if off + 4 <= len(raw)}
+
+
+def run_box(seconds: float | None = None) -> None:
+    """Controlla il menu box di ACC: cambia litri e treno e guarda se i numeri seguono.
+
+    Stampa una riga quando un valore cambia. Serve anche per l'usura delle gomme,
+    che il manuale elenca ma che non abbiamo mai visto, e per l'unita' del tempo
+    di sessione, su cui si basano i litri suggeriti.
+    """
+    _utf8()
+    print("Menu box. In pista, cambia litri e treno nel menu del gioco.")
+    print("Ctrl+C per fermare.\n")
+    state = {"last": None}
+
+    def on_sample(s, t) -> None:
+        raw = _acc_graphics_bytes(_BOX_FIELDS[-1][1] + 4)
+        if raw is None:
+            return
+        now = box_fields(raw)
+        if now == state["last"]:
+            return
+        state["last"] = now
+        wear = " ".join(f"{w:.2f}" for w in s.tyre_wear)
+        print(f"[{t:6.1f}s] {now}\n   tempo sessione={s.session_time_left_ms:.0f} "
+              f"serbatoio={s.max_fuel:.0f} usura={wear}", flush=True)
+
+    seen = _sample_loop(on_sample, seconds, 0.5)
+    _warn_if_no_live(seen)
+
+
 # --- ACC: trovare i campi della pioggia ------------------------------------
 
 # Dove comincia a guardare: subito dopo `isValidLap`, l'ultimo campo che questo

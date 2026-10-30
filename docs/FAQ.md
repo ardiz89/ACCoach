@@ -1084,6 +1084,7 @@ These are the ones you might really need.
 | `logs` | Opens the folder with the logs and crash reports. |
 | `logs --zip` | Packs the logs and some context into one file to attach to a report. **The logs go in unfiltered, except for your home folder.** Read "What's in that zip" before you send it. |
 | `find-rain` | Finds the ACC rain fields by measuring them. You need a session with changing weather. |
+| `verify-box` | Shows litres and tyre set from the ACC pit menu, session time and wear. Change the menu and see if the numbers follow. |
 
 
 ### The debrief in the terminal

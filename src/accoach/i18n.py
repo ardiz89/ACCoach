@@ -731,6 +731,7 @@ _CUE_EN: dict[str, str] = {
     "Porta più velocità in curva": "Carry more speed through the corner",
     # fuel.py
     "Ultimo giro di benzina, rientra ai box": "Last lap of fuel, box now",
+    "Benzina sufficiente fino a fine sessione.": "Enough fuel to the end of the session.",
     # lapvalid.py
     "Giro invalidato, sei uscito largo. Al prossimo giro la tieni dentro.":
         "Lap invalidated, you ran wide. Keep it inside next lap.",
@@ -771,6 +772,7 @@ _CUE_EN_PATTERNS: list[tuple[re.Pattern, object]] = [
     # quindi «1 giro» restava in italiano e «1 decimi» diventava «1 tenths».
     (re.compile(r"^Qui perdi (\d+) decim[oi]$"),
      lambda m: f"Losing {m.group(1)} tenth{'' if m.group(1) == '1' else 's'} here"),
+    (re.compile(r"^Aggiungi (\d+) litri\.$"), r"Add \1 litres."),
     (re.compile(r"^Benzina per circa (\d+) gir[oi]\.$"),
      lambda m: f"Fuel for about {m.group(1)} lap{'' if m.group(1) == '1' else 's'}."),
     # advisor.py — ABS / TC, with or without the "dal N al N+1" detail

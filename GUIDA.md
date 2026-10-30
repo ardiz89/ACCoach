@@ -397,6 +397,11 @@ motivo**.
 | *Giro fuori ritmo. Riprendo dal traguardo.* | Qui il delta **resta**, perché il giro è cominciato dal traguardo. |
 | *Giro lanciato* | Si accende per un momento quando il coach ricomincia a lavorare. |
 
+Entrando in corsia box, in gara, l'ingegnere ti dice quanti litri mettere nel
+menu del gioco. Il conto usa consumo e tempo sul giro misurati, il tempo rimasto e
+un giro di scorta. In prova lo dice solo con benzina per tre giri o meno, perché
+uno stop per l'assetto non deve riempire il serbatoio. Il menu resta a te.
+
 Quando un giro viene invalidato, il coach te lo dice una volta, a curva finita.
 Il gioco non spiega il motivo. HONE guarda se eri più largo o più dentro del tuo
 riferimento. In una chicane, senza riferimento o
@@ -998,6 +1003,7 @@ Questi sono quelli che potrebbero servirti davvero.
 | `logs` | Apre la cartella dei log e dei crash report. |
 | `logs --zip` | Fa un solo file da allegare a una segnalazione, coi log, la versione, il commit, Python e il sistema, e le ultime auto e piste. Il file nasce anche se non ci sono log, e in quel caso lo dice. **I log entrano senza filtri, con una sola modifica.** La tua cartella di casa, dove sta il nome del tuo account Windows, diventa `%USERPROFILE%`. Il resto dei percorsi resta, compresa la cartella di rete se ne hai una. Hanno una riga con data e ora per ogni avvio di HONE, cioè il registro di quando ti sei seduto a guidare. Ci sono i tuoi tempi sul giro, piste, auto e nomi dei file aperti. Ci sono anche i crash report, con l'errore completo. È voluto, perché un log ripulito non serve a trovare un difetto. Il comando lo scrive dentro lo ZIP, e dal sorgente anche a schermo quando finisce. L'app impacchettata non ha una finestra di terminale, quindi lì a schermo non vedi niente. Aprilo e guardalo prima di mandarlo. |
 | `find-rain` | Trova i campi della pioggia di ACC misurandoli. Ti serve una sessione con meteo variabile. |
+| `verify-box` | Mostra litri e treno del menu box di ACC, tempo di sessione e usura. Cambia il menu e guarda se i numeri seguono. |
 
 
 ### Il debrief nel terminale

@@ -136,6 +136,10 @@ def numeric_cue_messages() -> set[str]:
     # fuel.py: da 1 a 3 giri (l'ultimo giro e' una frase fissa)
     for n in (1, 2, 3):
         msgs.add(f"Benzina per circa {n} {'giro' if n == 1 else 'giri'}.")
+    # fuel.py: i litri da mettere nel menu box, a multipli di 5
+    from .fuel import LITRES_SAID
+    for n in LITRES_SAID:
+        msgs.add(f"Aggiungi {n} litri.")
     return msgs
 
 
