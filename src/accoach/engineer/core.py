@@ -103,6 +103,8 @@ class LapStats:
     #: How heavy the car was, which is why a lap time from before a setup change
     #: and one from after may not be comparable at all — see `_fuel_gap`.
     fuel_l: float = 0.0
+    #: Temperatura della pista nel giro, in gradi (0.0 = non registrata).
+    road_temp: float = 0.0
     #: Quando ``stable`` e' False, quale delle due meta' e' caduta: ``"invalid"``
     #: (il gioco non ha completato il giro) o ``"cut"`` (fuori pista). Vuoto su
     #: un giro che sta in piedi. Non duplica ``stable`` — lo spiega: il pilota in
@@ -251,6 +253,11 @@ class Outcome:
     #: per chi legge vuol dire «da scrivere»: senza questa il registro non
     #: sapeva cosa aveva tenuto.
     tested: "ProposedChange | None" = None
+    #: Come per la benzina: la pista si e' mossa troppo per confrontare i tempi.
+    #: Fa scattare anche `time_confounded`, che dice solo se il tempo e' fuori.
+    temp_confounded: bool = False
+    road_temp_before: float = 0.0
+    road_temp_after: float = 0.0
 
 
 class DecisionKind(Enum):
@@ -357,6 +364,14 @@ _CLICK_BUDGET = 6                # max net clicks a single parameter may accumul
 #: for: when the evidence isn't comparable, say so and lean on the evidence that
 #: is — the symptom score, which doesn't care what the car weighs.
 _FUEL_BIAS_L = 2.0
+
+#: Gradi di pista oltre i quali i tempi prima e dopo non si confrontano.
+#:
+#: Non e' una sensibilita' misurata, e dai giri non si puo' ricavare: in 16
+#: sessioni dell'archivio la pista si e' mossa al massimo di 1,7 gradi. Sta sopra
+#: quel massimo apposta, cosi' scatta solo su una sessione fuori dal normale e non
+#: toglie il giudizio sul tempo a una sessione qualunque.
+_TEMP_BIAS_C = 3.0
 
 
 # Decision messages, per language; resolved with the active app language at the
@@ -520,6 +535,18 @@ _DECISION_MSG = {
               "dopo il serbatoio non pesava uguale, quindi decide l'obiettivo "
               "della fase e vado avanti.",
     },
+    "accepted_unjudged_temp": {
+        "en": "The track temperature moved too much to compare lap times. The "
+              "change stays, the phase target decides and I'm moving on.",
+        "it": "La pista ha cambiato troppo temperatura per confrontare i tempi. "
+              "La modifica resta, decide l'obiettivo della fase e vado avanti.",
+    },
+    "temp_confounded": {
+        "en": " I left the lap time out of this, because the track went from "
+              "{a} to {b} degrees.",
+        "it": " Il tempo sul giro l'ho lasciato fuori, perché la pista è passata "
+              "da {a} a {b} gradi.",
+    },
     "fuel_confounded": {
         "en": " I left the lap time out of this, because the tank had {a} L "
               "before and {b} L after. That's not the same car.",
@@ -671,6 +698,10 @@ def _fuel_tail(outcome: "Outcome", lang: str) -> str:
     """
     if not outcome.time_confounded:
         return ""
+    if outcome.temp_confounded:
+        return _msg("temp_confounded", lang,
+                    a=fmt_num(outcome.road_temp_before, 0, lang),
+                    b=fmt_num(outcome.road_temp_after, 0, lang))
     return _msg("fuel_confounded", lang,
                 a=fmt_num(outcome.fuel_before_l, 0, lang),
                 b=fmt_num(outcome.fuel_after_l, 0, lang))
@@ -703,6 +734,11 @@ def _median_score(window: list[LapStats], symptom: Symptom) -> float:
     return statistics.median([s.symptom_scores.get(symptom, 0.0) for s in window])
 
 
+def _median_temp(window: list[LapStats]) -> float:
+    vals = [s.road_temp for s in window if s.road_temp > 0]
+    return statistics.median(vals) if vals else 0.0
+
+
 def _median_fuel(window: list[LapStats]) -> float:
     """Typical tank load over a window; 0.0 when the laps predate v11."""
     vals = [s.fuel_l for s in window if s.fuel_l > 0]
@@ -721,6 +757,7 @@ class _Active:
     prediction: "Prediction | None" = None
     remedy_rank: int = 0
     base_fuel: float = 0.0
+    base_temp: float = 0.0
     #: Every symptom's score at the moment the change was applied, so the
     #: verdict can also report what moved that nobody was aiming at.
     base_scores: dict = field(default_factory=dict)
@@ -986,6 +1023,7 @@ class RaceEngineer:
             prediction=self._pending_prediction,
             remedy_rank=self.remedy_idx.get(sym, 0) if sym else 0,
             base_fuel=_median_fuel(self.window),
+            base_temp=_median_temp(self.window),
             # Every symptom on the books, not just the target: the verdict is
             # about one of them, the ledger is about all of them.
             base_scores=self._all_scores(),
@@ -1140,8 +1178,15 @@ class RaceEngineer:
         gap = after - a.base_fuel
         return round(gap, 2), abs(gap) >= _FUEL_BIAS_L
 
+    def _temp_moved(self, a: "_Active") -> bool:
+        """La pista si e' mossa troppo fra le due finestre? Non sapere non e' si'."""
+        after = _median_temp(self.window)
+        return (a.base_temp > 0 and after > 0
+                and abs(after - a.base_temp) >= _TEMP_BIAS_C)
+
     def _outcome(self, a: "_Active", *, kept: bool, score_after: float) -> Outcome:
         gap, confounded = self._fuel_gap(a)
+        temp_moved = self._temp_moved(a)
         return Outcome(
             prediction=a.prediction or self._predict(a.change),
             score_after=round(score_after, 3),
@@ -1151,7 +1196,10 @@ class RaceEngineer:
             fuel_before_l=round(a.base_fuel, 2),
             fuel_after_l=round(a.base_fuel + gap, 2) if gap else round(
                 _median_fuel(self.window), 2),
-            time_confounded=confounded,
+            time_confounded=confounded or temp_moved,
+            temp_confounded=temp_moved,
+            road_temp_before=round(a.base_temp, 1),
+            road_temp_after=round(_median_temp(self.window), 1),
             side_effects=self._side_effects(a),
             tested=a.change,
         )
@@ -1290,7 +1338,8 @@ class RaceEngineer:
         band_ok = d_time <= band
 
         _gap, fuel_confounded = self._fuel_gap(a)
-        if fuel_confounded:
+        temp_moved = self._temp_moved(a)
+        if fuel_confounded or temp_moved:
             # The two windows weren't driven at the same weight, so their times
             # aren't comparable. Suspending the veto rather than guessing at a
             # correction: converting litres to seconds needs a sensitivity we
@@ -1311,7 +1360,8 @@ class RaceEngineer:
             # remains the real authority, exactly as it is when the time is
             # usable. Reverting instead would put the gate straight back into
             # proposing the same change, forever.
-            key = ("accepted_unjudged" if fuel_confounded
+            key = ("accepted_unjudged_temp" if temp_moved
+                   else "accepted_unjudged" if fuel_confounded
                    else "accepted_structural")
             return Decision(DecisionKind.ACCEPTED, _msg(key, lang), outcome=out)
 

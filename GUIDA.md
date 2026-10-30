@@ -90,7 +90,8 @@ giro il coach ti avvisa quando sbagli in assoluto.
 - Se l'auto **sottosterza** senti «L'anteriore scivola, entra più piano».
 - Se l'auto **sovrasterza** senti «Sovrasterzo, in uscita apri il gas piano».
 - Se **veleggi**, cioè non premi né freno né gas, senti «Veleggi, passa subito
-  dal freno al gas».
+  dal freno al gas». Lo senti al massimo una volta ogni tre giri, salvo che sia
+  il tema su cui stai lavorando. Sullo schermo la frase dice anche la curva.
 - Se molli il freno troppo presto, senza **trail braking**, senti «Molli presto
   il freno, tienine un filo all'inserimento».
 

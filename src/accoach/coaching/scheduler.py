@@ -37,6 +37,9 @@ _DEFAULT_ACUTE_INTERVAL_S = 1.5      # acute cues may speak this soon after the 
 _DEFAULT_REPEAT_SUPPRESS_S = 20.0
 _DEFAULT_TECHNIQUE_STALE_S = 2.5     # technique/advisory cue older than this is dropped
 _ACUTE_STALE_MARGIN_S = 1.5          # acute window = min_interval + this (survives 1 carry)
+# Quanti giri passano fra una volta e l'altra. «Veleggi» capita in quasi ogni
+# giro: a Zolder (29/10) e' stato detto 12 volte in 13 giri, sopra tutto il resto.
+_REST_LAPS = {CueCategory.COASTING: 3}
 
 
 class CueScheduler:
@@ -63,6 +66,8 @@ class CueScheduler:
         self._focus_corner: int | None = None
         # Cosa e' gia' stato DETTO in questo giro, per categoria. Vedi `new_lap`.
         self._said_this_lap: set[CueCategory] = set()
+        self._lap_no = 0
+        self._last_said_lap: dict[CueCategory, int] = {}
 
     def new_lap(self) -> None:
         """Il pilota ha passato il traguardo: ogni frase si puo' ridire una volta.
@@ -78,6 +83,7 @@ class CueScheduler:
         Lo chiama il motore sul traguardo, con la stessa regola del registratore.
         """
         self._said_this_lap.clear()
+        self._lap_no += 1
 
     def set_focus(self, theme: str | None) -> None:
         """Limit on-track technique advice to one theme — the attention budget.
@@ -150,6 +156,15 @@ class CueScheduler:
         if cue.category not in self._said_this_lap:
             return False
         # Senza focus `_focus_theme` e' None, e nessun tema e' None.
+        on_theme = theme_key(cue.category) == self._focus_theme
+        return not (on_theme or self._at_focus_corner(cue))
+
+    def _resting(self, cue: Cue) -> bool:
+        """Un consiglio ricorrente detto da poco, e che non e' il focus."""
+        rest = _REST_LAPS.get(cue.category)
+        last = self._last_said_lap.get(cue.category)
+        if rest is None or last is None or self._lap_no - last >= rest:
+            return False
         on_theme = theme_key(cue.category) == self._focus_theme
         return not (on_theme or self._at_focus_corner(cue))
 
@@ -235,7 +250,7 @@ class CueScheduler:
                 continue
             if self._off_theme(cue):
                 continue
-            if self._repeat_this_lap(cue):
+            if self._repeat_this_lap(cue) or self._resting(cue):
                 continue
             last = self._recent.get(cue.dedup_key())
             if last is not None and now - last < self.repeat_suppress_s:
@@ -258,6 +273,7 @@ class CueScheduler:
         self._last_spoken_at = now
         self._recent[chosen.dedup_key()] = now
         self._said_this_lap.add(chosen.category)
+        self._last_said_lap[chosen.category] = self._lap_no
         return chosen
 
     def reset(self) -> None:

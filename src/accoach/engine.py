@@ -37,7 +37,7 @@ from .coaching import (
     Voice,
 )
 from .coaching.analyzer import corner_level
-from .coaching.cue import CueCategory, gates_voice, theme_key, trigger_text
+from .coaching.cue import Cue, CueCategory, gates_voice, theme_key, trigger_text
 from .coaching.debrief import build_lap_debrief
 from .coaching.diagnosis import build_lap_stats
 from .coaching.atwheel import WheelWatch
@@ -385,6 +385,20 @@ def _corner_labels(car: str, track: str, corners: list[Corner],
     except Exception:
         return {}
     return dict(enumerate(names))
+
+
+def _name_the_corner(cue: Cue, text: str, corners, names: dict) -> str:
+    """Sullo schermo «Veleggi» dice dove, perche' vale per ogni curva.
+
+    Solo sullo schermo: a voce resta la frase registrata, e un WAV per ogni
+    curva di ogni pista non c'e'. Fuori da una curva non si nomina niente.
+    """
+    if cue.category is not CueCategory.COASTING:
+        return text
+    for c in corners:
+        if c.entry_pos <= cue.pos <= c.exit_pos and names.get(c.index):
+            return f"{names[c.index]}. {text}"
+    return text
 
 
 class CoachEngine:
@@ -992,6 +1006,9 @@ class CoachEngine:
                 fuel_before_l=out.fuel_before_l,
                 fuel_after_l=out.fuel_after_l,
                 time_confounded=out.time_confounded,
+                temp_confounded=out.temp_confounded,
+                road_temp_before=out.road_temp_before,
+                road_temp_after=out.road_temp_after,
                 side_effects={str(sym): d for sym, d in out.side_effects},
             ))
         except Exception:  # noqa: BLE001 - evidence for us, never a live failure
@@ -1335,6 +1352,8 @@ class CoachEngine:
             spoken.message = cue_text(spoken.message)
             voice_text, screen_text = _spoken_forms(
                 spoken, self.scheduler.focus_theme, current_language())
+            screen_text = _name_the_corner(spoken, screen_text, self._corners,
+                                           self._corner_names)
             spoken.message = screen_text
             # La traccia di cio' che il coach ha DETTO, con accanto il tema che
             # stava filtrando. Esiste perche' il 10/08, in pista, due prove sono

@@ -151,7 +151,9 @@ coach warns you when you do something that's wrong on any lap.
 - If the car **oversteers**, you hear "Oversteer, open the throttle gently on
   exit".
 - If you **coast**, with neither brake nor throttle pressed, you hear "You're
-  coasting, go straight from brake to throttle".
+  coasting, go straight from brake to throttle". You hear it once every three
+  laps at most, unless it's the theme you're working on. On screen the line also
+  names the corner.
 - If you let go of the brake too early, without **trail braking**, you hear
   "Releasing too early, trail the brake to turn-in".
 

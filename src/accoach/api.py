@@ -42,6 +42,7 @@ from .coaching import (
     trail_brake_for,
 )
 from .coaching.phases import PHASES
+from .coaching.debrief import mark_runs_wide
 from .coaching.training import MIN_LAPS as _TRAIN_MIN_LAPS, assess as _assess_training
 from .coaching.trends import session_recap, session_series
 from .comparison import Reference
@@ -650,6 +651,24 @@ def _on_track(rows: list[dict]) -> list[dict]:
     return [r for r in rows if not _off_track(r)]
 
 
+def _wide_corners(rows: list[dict], corners, laps: dict | None = None) -> dict[int, int]:
+    """Quante delle uscite recenti sono finite in ogni curva."""
+    recent = sorted(rows, key=lambda r: r["recorded_utc"] or "")[-_RECENT_LAPS:]
+    out: dict[int, int] = {}
+    for r in recent:
+        if not _off_track(r):
+            continue
+        try:
+            lap = (laps or {}).get(r["path"]) or load_lap(r["path"])
+        except (OSError, ValueError):
+            continue
+        for c in corners:
+            if lap.lost_at is not None and c.entry_pos <= lap.lost_at <= c.exit_pos:
+                out[c.index] = out.get(c.index, 0) + 1
+                break
+    return out
+
+
 def _fastest_clean(valid: list[dict]) -> dict | None:
     """The quickest lap that could be a reference at all, conditions aside."""
     usable = [r for r in valid if not _off_track(r)]
@@ -811,6 +830,7 @@ class _History:
     fastest: str = ""
     best_ms: int = 0
     corners: list = field(default_factory=list)
+    wide: dict = field(default_factory=dict)   # uscite recenti per curva
     names: dict = field(default_factory=dict)
     #: The corner map these laps agree on, built here because this is the one
     #: place that already has every lap in memory. The caller persists it so the
@@ -858,6 +878,7 @@ def _history(valid: list[dict], chrono: list[dict], track: str,
         h.names = {c.index: n for c, n in
                    zip(h.corners, name_corners(track, h.corners, lg, h.corner_map,
                                                cornernames.for_track(track)))}
+        h.wide = _wide_corners(valid, h.corners, h.lap_objs)
         tally: dict[str, dict] = {}
         recent = {r["path"] for r in chrono[-_RECENT_LAPS:]}
         for r in chrono[-_SERIES_LAPS:]:
@@ -867,6 +888,7 @@ def _history(valid: list[dict], chrono: list[dict], track: str,
             if lp is None:
                 continue
             deb = build_lap_debrief(lp, reference, h.corners, lg)
+            mark_runs_wide(deb.losses, h.wide, lg)
             h.session_dated.append((r["recorded_utc"] or "", deb))
             if r["path"] not in recent:
                 continue          # sotto: solo la finestra dei trend, invariata
@@ -1184,6 +1206,7 @@ def create_api(
                                                _corner_map(car, track),
                                                _typed(track)))}
             debrief = build_lap_debrief(review, reference, corners, lg)
+            mark_runs_wide(debrief.losses, _wide_corners(valid, corners), lg)
             consistency = lap_time_consistency(
                 [r["lap_time_ms"] for r in _on_track(valid)])
         except Exception:  # noqa: BLE001 - a degenerate lap shouldn't 500 the UI
@@ -2277,7 +2300,7 @@ def create_api(
         """
         if not indices:
             return {}
-        out = {i: CornerFacts() for i in indices}
+        out = {i: CornerFacts(runs_wide=h.wide.get(i, 0)) for i in indices}
 
         for i in indices:
             live = [x.min_speed_live for d in h.debriefs for x in d.losses

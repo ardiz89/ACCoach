@@ -175,6 +175,36 @@ def explain_loss(category: CueCategory, st: CornerStats,
     return detail.format(**kw), fix
 
 
+#: Quante uscite recenti nella stessa curva fanno uno schema e non un errore.
+RUNS_WIDE_MIN = 2
+
+_RUNS_WIDE = {
+    "en": ("Stay on track at the exit first",
+           " You went off at this corner {n} times in your recent laps.",
+           "Leave the braking point where it is for now. Open the throttle "
+           "only when you can straighten the wheel."),
+    "it": ("Prima resta in pista all'uscita",
+           " Sei uscito di pista in questa curva {n} volte negli ultimi giri.",
+           "Per ora non spostare il punto di frenata. Apri il gas solo quando "
+           "puoi raddrizzare lo sterzo."),
+}
+
+
+def mark_runs_wide(losses: list, wide: dict, lang: str | None = None) -> None:
+    """Niente «frena più tardi» dove continui a uscire di pista.
+
+    A Zolder (29/10) il report lo chiedeva a Curva 2, dove quattro giri erano
+    finiti fuori: entrare piu' veloce peggiora proprio quello. Il tempo perso
+    resta quello misurato, cambia solo cosa ti si chiede di fare.
+    """
+    msg, detail, fix = _RUNS_WIDE[_lang(lang)]
+    for x in losses:
+        n = wide.get(x.index, 0)
+        if x.category is CueCategory.BRAKE_LATER and n >= RUNS_WIDE_MIN:
+            x.message, x.fix = msg, fix
+            x.detail += detail.format(n=n)
+
+
 @dataclass(slots=True)
 class CornerLoss:
     """One corner's contribution to the lap's time loss."""
