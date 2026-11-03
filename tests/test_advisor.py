@@ -120,3 +120,42 @@ def test_a_lap_out_of_the_pit_lane_is_not_judged():
     assert out == [], "consiglio d'assetto dedotto dal giro d'uscita"
     out, _ = _drive_lap(adv, ev, now=now)
     assert [c.category for c in out] == [CueCategory.TC_UP]
+
+
+def _lap_with(snap, events):
+    adv = SetupAdvisor()
+    now = 0.0
+    for seg in range(20):
+        adv.update(replace(snap, lap_position=seg / 20 + 0.001), events.get(seg, []), now)
+        now += 0.1
+    return adv.update(replace(snap, lap_position=0.01), [], now)
+
+
+def test_no_abs_means_no_advice_to_raise_it():
+    """ABS a 0: l'auto non ce l'ha, o e' spento. Nei giri in archivio la
+    Ferrari SF25 (F1, AC) lo registra a 0, e il coach le avrebbe detto «alza
+    l'ABS da 0 a 1». Meglio zitti: i bloccaggi li dice gia' il coach in curva."""
+    out = _lap_with(replace(_BASE, abs_level=0),
+                    {2: [_lock(2)], 7: [_lock(7)], 12: [_lock(12)]})
+    assert out == []
+
+
+def test_no_tc_means_no_advice_to_raise_it():
+    out = _lap_with(replace(_BASE, tc_level=0),
+                    {3: [_spin(3)], 8: [_spin(8)], 14: [_spin(14)]})
+    assert out == []
+
+
+def test_with_abs_on_the_advice_is_still_there():
+    out = _lap_with(replace(_BASE, abs_level=1),
+                    {2: [_lock(2)], 7: [_lock(7)], 12: [_lock(12)]})
+    assert len(out) == 1 and out[0].category is CueCategory.ABS_UP
+
+
+def test_without_abs_a_spin_everywhere_is_still_advised():
+    """Bloccaggi e pattinamenti nello stesso giro, ABS a 0: tacere sull'ABS non
+    deve far tacere anche il TC."""
+    ev = {2: [_lock(2)], 7: [_lock(7)], 12: [_lock(12)], 15: [_lock(15)],
+          3: [_spin(3)], 8: [_spin(8)], 14: [_spin(14)]}
+    out = _lap_with(replace(_BASE, abs_level=0), ev)
+    assert len(out) == 1 and out[0].category is CueCategory.TC_UP
