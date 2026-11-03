@@ -117,3 +117,48 @@ def test_a_lap_without_g_data_still_says_nothing():
     ref = _lap([(100.0, 0.0)] * 200)
     env = _envelope(ref)
     assert _grip_state([_S(1.0)] * 20, env, 100.0).ratio == 0.0
+
+
+# --- nel debrief: la fascia è quella del riferimento -------------------------
+
+def _g_by_ref_band(spd):
+    """G del riferimento per fascia: 1,0 fra 120 e 160, 2,0 fra 160 e 200."""
+    band = int(spd // 40)
+    return {3: 1.0, 4: 2.0}.get(band, 1.5)
+
+
+def test_the_debrief_picks_the_band_of_the_reference_speed():
+    """Il riferimento fa la curva 0 a una mediana di circa 187 km/h (fascia
+    160-200, limite 2,0); tu, 40 km/h più piano, a circa 147 (fascia 120-160,
+    limite 1,0). Con 1,9 G il tuo grip vale 95 % contro la sua fascia; con la
+    tua fascia sarebbe 1,9/1,0, tagliato a 100 %. Chi va più piano non deve
+    essere misurato contro un limite più basso."""
+    import statistics
+    from dataclasses import replace
+
+    import synth
+    from accoach.coaching.debrief import build_lap_debrief
+    from accoach.track import detect_corners
+
+    ref_lap = synth.build_lap(n=2001)
+    ref_lap.samples[:] = [replace(s, g_lat=_g_by_ref_band(s.speed_kmh), g_long=0.0)
+                          for s in ref_lap.samples]
+    mine = synth.build_lap(slow_corner=0, amt=40, n=2001)
+    ref = Reference(ref_lap)
+    corners = detect_corners(ref_lap.samples)
+    c0 = corners[0]
+    mine.samples[:] = [replace(s, g_lat=1.9 if c0.entry_pos <= s.pos <= c0.exit_pos
+                               else 0.5, g_long=0.0) for s in mine.samples]
+
+    inside = [s for s in mine.samples if c0.entry_pos <= s.pos <= c0.exit_pos]
+    ref_med = statistics.median(ref.point_at(s.pos).speed_kmh for s in inside)
+    my_med = statistics.median(s.speed_kmh for s in inside)
+    env = _grip_envelope(mine, ref)
+    # La premessa del test: le due mediane cadono in fasce diverse, entrambe vere.
+    assert int(ref_med // 40) == 4 and int(my_med // 40) == 3
+    assert env.at(ref_med) == pytest.approx(2.0)
+    assert env.at(my_med) == pytest.approx(1.0)
+
+    deb = build_lap_debrief(mine, ref, corners, "it")
+    loss = next(l for l in deb.losses if l.index == c0.index)
+    assert loss.grip.ratio == pytest.approx(1.9 / 2.0)

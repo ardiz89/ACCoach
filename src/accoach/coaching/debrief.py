@@ -729,9 +729,10 @@ _GRIP_BAND_KMH = 40.0
 #: il p95 è basso e direbbe «sei al limite» a chiunque passi di lì (Review
 #: Focus 4). Il 50 è della Decisione 5; sulla copia dell'archivio (13 auto+pista,
 #: riferimento il giro più veloce) le fasce sotto soglia sono quasi solo 40-80
-#: km/h (13-46 campioni: tornanti e chicane lente) e la ricaduta riguarda 41
-#: curve su 612. Con l'inviluppo per fascia 100 curve su 612 (16,3 %) cambiano
-#: stato: 64 da niente a «al limite», 24 da «al limite» a niente.
+#: km/h (13-46 campioni: tornanti e chicane lente) e la ricaduta riguarda 13
+#: curve su 612. Con l'inviluppo per fascia, scelto dalla velocità mediana del
+#: riferimento, 96 curve su 612 (15,7 %) cambiano stato: 59 da niente a «al
+#: limite», 26 da «al limite» a niente.
 _GRIP_BAND_MIN_SAMPLES = 50
 
 
@@ -745,7 +746,7 @@ class GripEnvelope:
     """
 
     whole: float = 0.0
-    bands: dict = field(default_factory=dict)   # indice di fascia -> p95
+    bands: dict[int, float] = field(default_factory=dict)   # fascia -> p95
 
     def at(self, speed_kmh: float | None) -> float:
         if speed_kmh is None:
@@ -1066,9 +1067,13 @@ def build_lap_debrief(lap: Lap, reference: Reference, corners: list[Corner],
         # …and whether there was any grip left to do it with. Misurato una volta
         # sola: la stessa cosa scrive la frase e sceglie l'esercizio, così le due
         # metà dell'app non possono più dire il contrario l'una dell'altra.
-        # Il limite a quella velocità: la fascia della mediana della curva.
+        # Il limite a quella velocità: la fascia della velocità mediana del
+        # riferimento PRINCIPALE in questa curva, la stessa velocità con cui
+        # l'inviluppo è messo in fascia. Con la tua, chi passa più piano
+        # finirebbe misurato contro una fascia più bassa.
+        ref_speeds = [reference.point_at(s.pos).speed_kmh for s in inside]
         grip = _grip_state(inside, envelope,
-                           statistics.median(s.speed_kmh for s in inside))
+                           statistics.median(ref_speeds) if ref_speeds else None)
         detail += _grip_detail(grip, cue.category, lg)
         # Il gesto che fai diverso, contro lo stesso giro della perdita. Prima
         # del confronto, che resta l'ultima frase: dice contro chi e' tutto.
