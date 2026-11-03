@@ -301,6 +301,8 @@ piastra serve a leggerlo anche sopra il cielo chiaro.
     riferimento** col tempo.
 - **In basso, solo in Completa**, a sinistra c'è il **focus**, cioè il tema su
   cui lavori e la sua curva. A destra c'è **l'ultima curva** chiusa coi decimi.
+  Il consiglio a voce e l'ultima curva misurano ogni curva col **tuo gesto
+  migliore** in quella curva. Il delta in alto resta sul riferimento.
   Quando il coach è passato alle parole brevi, descritte in «Un tema alla
   volta», nel focus trovi anche **la parola che senti**, come «meno freno».
 

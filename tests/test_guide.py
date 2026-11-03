@@ -209,3 +209,20 @@ def test_both_documents_are_shipped_in_the_exe(build):
         text = (_ROOT / delega.group(1)).read_text(encoding="utf-8")
     assert "GUIDA.md" in text
     assert "docs/FAQ.md" in text
+
+
+
+@pytest.mark.parametrize("lang,words", (
+    ("it", ("gesto", "migliore", "consiglio a voce", "delta")),
+    ("en", ("your best through", "voice advice", "delta")),
+))
+def test_the_overlay_section_says_what_the_live_coach_compares_with(lang, words):
+    """Dal vivo il consiglio e l'ultima curva usano il gesto migliore di ogni
+    curva, il delta no. La guida lo diceva solo per il report: chi guarda
+    l'overlay leggeva un numero d'ultima curva diverso dal delta senza sapere
+    perche'."""
+    doc = _DOCS[lang]
+    start = doc.index("## 4. ")
+    section = doc[start:doc.index("\n## ", start + 1)].lower()
+    for w in words:
+        assert w in section, f"manca «{w}» nella sezione dell'overlay ({lang})"

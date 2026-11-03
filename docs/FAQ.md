@@ -359,7 +359,9 @@ plate is what keeps it readable over a bright sky.
     with the time.
 - **At the bottom, only in Full**, the **focus** sits on the left. It's the
   theme you're working on and its corner. **The last corner** you closed sits
-  on the right with its tenths. The coach moves to short words, as described
+  on the right with its tenths. Voice advice and the last corner measure each
+  corner against **your best through that corner**. The delta at the top stays
+  on the reference. The coach moves to short words, as described
   in "One theme at a time". From then on the focus also shows **the word you
   hear**, like "less brake".
 
