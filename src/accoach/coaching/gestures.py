@@ -19,7 +19,7 @@ Una curva con meno di 4 giri con un valore non conta.
 from __future__ import annotations
 
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from ..recording.lap import LapSample
 from .thresholds import PEDAL_OFF
@@ -69,13 +69,33 @@ STEER_NOISE = 1.0
 _GEAR_SCORE = 1.0
 
 
+#: Oltre questa frazione dei campioni del giro con ``abs_active > 0`` il
+#: canale ABS e' bloccato, non e' un pilota che frena. Sulla copia
+#: dell'archivio due giri stanno al 100% (Imola, 26/06) e il piu' alto dopo
+#: di loro al 10,2%: il taglio a meta' sta nel vuoto fra i due.
+_ABS_STUCK_FRAC = 0.5
+
+
 @dataclass(frozen=True, slots=True)
 class Gestures:
     release_s: float | None
     pickup_s: float | None
     apex_gear: str | None
-    abs_s: float
+    abs_s: float | None     # None = canale ABS di quel giro non affidabile
     steer_reversals: int
+
+
+def abs_trusted(lap_samples: list[LapSample]) -> bool:
+    """Se il canale ABS del giro intero si puo' leggere (vedi _ABS_STUCK_FRAC)."""
+    if not lap_samples:
+        return True
+    on = sum(1 for s in lap_samples if s.abs_active > 0)
+    return on <= _ABS_STUCK_FRAC * len(lap_samples)
+
+
+def without_abs(g: Gestures) -> Gestures:
+    """Le stesse misure senza l'ABS: ``compare`` non lo confronta."""
+    return replace(g, abs_s=None)
 
 
 def _release_s(samples: list[LapSample]) -> float | None:

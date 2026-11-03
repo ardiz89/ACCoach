@@ -363,3 +363,58 @@ def test_report_endpoint_carries_the_gesture(tmp_path):
     assert abs(g["live"] - 0.224) < 0.01 and abs(g["ref"] - 0.8) < 0.01
     assert "Rilasci il freno in 0,2 s" in by_index[0]["detail"]
     assert all(x["gesture"] is None for i, x in by_index.items() if i != 0)
+
+
+# --- Fix 1 del Task 3: canale ABS bloccato ----------------------------------
+
+def test_abs_trusted_cuts_at_half_the_lap():
+    from accoach.coaching.gestures import abs_trusted
+    lap = [_s(i * 100, abs_=1.0 if i < 5 else 0.0) for i in range(10)]
+    assert abs_trusted(lap) is True                # 5 su 10: ancora leggibile
+    lap[5].abs_active = 1.0
+    assert abs_trusted(lap) is False               # 6 su 10: bloccato
+    assert abs_trusted([]) is True
+
+
+def _abs_case(whole_lap):
+    import synth
+    from accoach.track import detect_corners
+    ref_lap = synth.build_lap()
+    corners = detect_corners(ref_lap.samples)
+    review = synth.build_lap(slow_corner=0, amt=30)
+    c = corners[0]
+    for s in review.samples:
+        if whole_lap or c.entry_pos <= s.pos <= c.exit_pos:
+            s.abs_active = 1.0
+    return review, ref_lap, corners
+
+
+def test_a_lap_with_abs_always_on_does_not_say_abs():
+    """Due giri dell'archivio hanno l'ABS a 1,0 su ogni campione: e' il
+    canale bloccato, non un gesto. Lo stesso ABS solo nella curva parla."""
+    from accoach.coaching.debrief import build_lap_debrief
+    from accoach.comparison import Reference
+    review, ref_lap, corners = _abs_case(whole_lap=True)
+    loss = _corner(build_lap_debrief(review, Reference(ref_lap), corners, "it"), 0)
+    assert loss is not None
+    assert loss.gesture is None or loss.gesture.kind != "abs"
+    assert "L'ABS lavora" not in loss.detail
+
+    review, ref_lap, corners = _abs_case(whole_lap=False)
+    loss = _corner(build_lap_debrief(review, Reference(ref_lap), corners, "it"), 0)
+    assert loss.gesture is not None and loss.gesture.kind == "abs"
+
+
+def test_a_reference_with_abs_always_on_does_not_say_abs():
+    from accoach.coaching.debrief import build_lap_debrief
+    from accoach.comparison import Reference
+    import synth
+    from accoach.track import detect_corners
+    ref_lap = synth.build_lap()
+    for s in ref_lap.samples:
+        s.abs_active = 1.0
+    corners = detect_corners(ref_lap.samples)
+    review = synth.build_lap(slow_corner=0, amt=30)
+    loss = _corner(build_lap_debrief(review, Reference(ref_lap), corners, "it"), 0)
+    assert loss is not None
+    assert "L'ABS lavora" not in loss.detail

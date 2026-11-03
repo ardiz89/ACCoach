@@ -33,7 +33,7 @@ from .chain import link_corners
 from .phases import phase_note, split_loss
 from .cue import CueCategory, theme_key
 from .diagnosis import corner_symptoms, dominant_symptom
-from .gestures import GestureNote, compare, measure
+from .gestures import GestureNote, abs_trusted, compare, measure, without_abs
 from .thresholds import PEDAL_OFF
 from .tuning import tuning_for_car
 from ..i18n import current_language
@@ -267,7 +267,14 @@ def _corner_gesture(lap: Lap, cref: Reference, c: Corner) -> GestureNote | None:
     live, ref = span(lap.samples), span(cref.lap.samples)
     if len(live) < 2 or len(ref) < 2:
         return None      # un lato senza campioni misurerebbe zeri, non gesti
-    return compare(measure(live), measure(ref))
+    g_live, g_ref = measure(live), measure(ref)
+    # Un canale ABS bloccato su tutto il giro (due giri dell'archivio) non e'
+    # un gesto: su quel giro l'ABS non si confronta.
+    if not abs_trusted(lap.samples):
+        g_live = without_abs(g_live)
+    if not abs_trusted(cref.lap.samples):
+        g_ref = without_abs(g_ref)
+    return compare(g_live, g_ref)
 
 
 #: Quante uscite recenti nella stessa curva fanno uno schema e non un errore.
