@@ -218,7 +218,8 @@ _ORDER = (
 #: report dice un gesto solo se agisce nel tratto dove va il tempo: dire
 #: «correggi lo sterzo» in una curva persa in staccata manda il pilota nel
 #: posto sbagliato. Sulla copia dell'archivio, con il filtro e il rumore fra
-#: coppie di giri, parlano 206 perdite di curva su 612 (33,7%).
+#: coppie di giri, parlavano 206 perdite di curva su 612 (33,7%); col verso
+#: (``_ONLY_WHEN_MORE``) 159 (26,0%).
 PHASE_OF = {
     "release": ("entry",),
     "abs": ("entry",),
@@ -226,6 +227,16 @@ PHASE_OF = {
     "steer": ("apex",),
     "pickup": ("exit", "after"),
 }
+
+
+#: I gesti che spiegano un tempo perso solo in un verso: piu' correzioni di
+#: sterzo, gas aperto piu' piano, piu' ABS. Il contrario e' un gesto fatto
+#: meglio del riferimento. Con la differenza assoluta, sulla copia
+#: dell'archivio, 57 frasi di sterzo su 142 dicevano «correggi» a chi
+#: correggeva meno, e 22 di gas su 32 a chi apriva piu' in fretta. Rilascio e
+#: marcia restano nei due versi: troppo in fretta o troppo piano, una marcia
+#: piu' alta o piu' bassa, perdono tutti.
+_ONLY_WHEN_MORE = frozenset({"steer", "pickup", "abs"})
 
 
 def compare(live: Gestures, ref: Gestures,
@@ -238,6 +249,8 @@ def compare(live: Gestures, ref: Gestures,
     supera il suo rumore. Con ``phase`` restano in gara solo i gesti che
     agiscono in quel tratto (``PHASE_OF``), prima di scegliere il piu' alto:
     un gesto del tratto giusto vince anche contro uno piu' grande altrove.
+    Sterzo, gas e ABS restano in gara solo se da te sono di piu'
+    (``_ONLY_WHEN_MORE``), anche questo prima di scegliere.
     """
     best: GestureNote | None = None
     for kind, attr, noise in _ORDER:
@@ -245,6 +258,8 @@ def compare(live: Gestures, ref: Gestures,
             continue
         a, b = getattr(live, attr), getattr(ref, attr)
         if a is None or b is None:
+            continue
+        if kind in _ONLY_WHEN_MORE and not a > b:
             continue
         if noise is None:
             if not (a.isdigit() and b.isdigit()) or a == b:

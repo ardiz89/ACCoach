@@ -211,6 +211,45 @@ def test_compare_slower_side_also_counts():
     assert note.kind == "release" and abs(note.score - 2.0) < 1e-9
 
 
+# --- il verso: si dice solo il gesto che puo' spiegare la perdita ----------
+# Revisione finale: con |tu - lui| il report diceva «correggi lo sterzo» in 57
+# curve su 142 dove lo correggevi MENO del riferimento, e «apri il gas» in 22
+# su 32 dove lo aprivi PIU' in fretta. Un gesto fatto meglio non spiega un
+# tempo perso.
+
+def test_steer_is_said_only_when_you_correct_more():
+    more = compare(_g(steer=2 + 3 * STEER_NOISE), _g())
+    assert more is not None and more.kind == "steer"
+    assert compare(_g(steer=0), _g(steer=3 * STEER_NOISE)) is None
+
+
+def test_pickup_is_said_only_when_you_open_slower():
+    slower = compare(_g(pickup=0.5 + 2 * PICKUP_NOISE_S), _g())
+    assert slower is not None and slower.kind == "pickup"
+    assert compare(_g(pickup=0.5), _g(pickup=0.5 + 2 * PICKUP_NOISE_S)) is None
+
+
+def test_abs_is_said_only_when_it_works_more_in_your_lap():
+    more = compare(_g(abs_=0.2 + 2 * ABS_NOISE_S), _g())
+    assert more is not None and more.kind == "abs"
+    assert compare(_g(abs_=0.0), _g(abs_=2 * ABS_NOISE_S)) is None
+
+
+def test_release_and_gear_are_said_either_way():
+    # rilasciare troppo in fretta e troppo piano perdono tutti e due
+    assert compare(_g(release=1.0 + 2 * RELEASE_NOISE_S), _g()).kind == "release"
+    assert compare(_g(release=3.0 - 2 * RELEASE_NOISE_S), _g(release=3.0)).kind == "release"
+    assert compare(_g(gear="4"), _g(gear="3")).kind == "gear"
+    assert compare(_g(gear="2"), _g(gear="3")).kind == "gear"
+
+
+def test_a_wrong_way_gesture_does_not_hide_a_right_way_one():
+    # lo sterzo «meglio» ha il rapporto piu' alto, ma non conta: resta il gas
+    live = _g(steer=0, pickup=0.5 + 1.5 * PICKUP_NOISE_S)
+    note = compare(live, _g(steer=2 + 5 * STEER_NOISE))
+    assert note is not None and note.kind == "pickup"
+
+
 # --- Task 3: il report dice il gesto (coaching/debrief.py) -----------------
 
 def _shape_release(lap, corner, steps):
