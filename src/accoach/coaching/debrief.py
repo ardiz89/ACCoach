@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 from ..comparison.reference import Reference
 from ..engineer import Balance, Phase, Speed, Symptom
@@ -34,6 +35,11 @@ from .diagnosis import corner_symptoms, dominant_symptom
 from .tuning import tuning_for_car
 from ..i18n import current_language
 from ..textfmt import fmt_num
+
+if TYPE_CHECKING:
+    # Solo per il tipo: `corner_refs` importa `_next_entry` da qui, e a runtime
+    # basta che l'oggetto risponda a `.at()`.
+    from .corner_refs import CornerBests
 
 _C = CueCategory
 # Handling-cause vocabulary, per language. La curva apre la frase («In questa
@@ -175,6 +181,23 @@ def explain_loss(category: CueCategory, st: CornerStats,
     return detail.format(**kw), fix
 
 
+# La curva misurata col tuo gesto migliore lì e non col riferimento principale
+# (coaching/corner_refs.py). Va detto: i numeri della curva sono contro un altro
+# giro, e senza la frase il pilota li leggerebbe contro quello in cima alla pagina.
+_COMPARED = {
+    "en": " Compared with your best through this corner, from the {lap} lap.",
+    "it": " Confronto con la tua migliore in questa curva, dal giro in {lap}.",
+}
+
+
+def compared_text(lap_time_ms: int, lang: str) -> str:
+    """La frase del confronto, col tempo del giro nel formato della lingua."""
+    lap = format_lap_time(lap_time_ms)
+    if lang == "it":
+        lap = lap.replace(".", ",")
+    return _COMPARED.get(lang, _COMPARED["en"]).format(lap=lap)
+
+
 #: Quante uscite recenti nella stessa curva fanno uno schema e non un errore.
 RUNS_WIDE_MIN = 2
 
@@ -238,6 +261,9 @@ class CornerLoss:
     # stessa curva in cui il debrief aveva appena spiegato che la gomma è già
     # impegnata. Vedi `GripState` per perché sono tre numeri e non un booleano.
     grip: "GripState" = field(default_factory=lambda: GripState())
+    # Il tempo del giro con cui questa curva è stata confrontata, quando non è il
+    # riferimento principale ma il tuo gesto migliore lì. 0 = il principale.
+    compared_ms: int = 0
 
     @property
     def label(self) -> str:
@@ -793,8 +819,16 @@ def _top_speed_note(lap: Lap, reference: Reference, corners: list[Corner],
 
 
 def build_lap_debrief(lap: Lap, reference: Reference, corners: list[Corner],
-                      lang: str | None = None) -> LapDebrief:
-    """Break ``lap`` down against ``reference`` over the given ``corners``."""
+                      lang: str | None = None,
+                      corner_refs: CornerBests | None = None) -> LapDebrief:
+    """Break ``lap`` down against ``reference`` over the given ``corners``.
+
+    Con ``corner_refs`` ogni curva che ha un tuo gesto migliore si misura contro
+    quello: perdita, fasi, statistiche e frenata, e il dettaglio lo dice.
+    L'inviluppo di aderenza, le curve concatenate e le note sul giro restano sul
+    principale (Decisione 6 del piano del 2026-11-03). Solo il report del giro
+    rivisto lo passa; focus, tendenze e pagella no.
+    """
     lg = _lang(lang)
     # Read once for the whole debrief, not once per corner: the same JSON, and
     # this runs on every lap the live coach closes.
@@ -809,6 +843,11 @@ def build_lap_debrief(lap: Lap, reference: Reference, corners: list[Corner],
         inside = [s for s in lap.samples if c.entry_pos <= s.pos <= c.exit_pos]
         if len(inside) < 2:
             continue
+        # Il metro di questa curva: il tuo gesto migliore se c'è, se no il
+        # principale. Solo la curva: aderenza, catene e note restano sul
+        # principale (`reference`).
+        ref_c = corner_refs.at(c.apex_pos) if corner_refs is not None else None
+        cref = ref_c.reference if ref_c is not None else reference
 
         # Loss is measured from this corner's entry to the NEXT corner's entry, so
         # the following straight is credited here — a poor exit shows up as time
@@ -817,17 +856,17 @@ def build_lap_debrief(lap: Lap, reference: Reference, corners: list[Corner],
         end = _next_entry(c, corners)
         window = [s for s in lap.samples if c.entry_pos <= s.pos < end] or inside
         first, last = window[0], window[-1]
-        delta_entry = first.t_ms - reference.time_at(first.pos)
-        delta_exit = last.t_ms - reference.time_at(last.pos)
+        delta_entry = first.t_ms - cref.time_at(first.pos)
+        delta_exit = last.t_ms - cref.time_at(last.pos)
         lost = delta_exit - delta_entry
         # The same window, cut into the four stretches of the corner. Computed
         # here rather than later so it can only ever be a split of *this* number.
-        phases = split_loss(window, reference, c)
+        phases = split_loss(window, cref, c)
 
         thr_live = _mean([s.throttle for s in inside])
         brk_live = _mean([s.brake for s in inside])
         vmin_live = min(s.speed_kmh for s in inside)
-        refs = [reference.point_at(s.pos) for s in inside]
+        refs = [cref.point_at(s.pos) for s in inside]
         thr_ref = _mean([r.throttle for r in refs])
         brk_ref = _mean([r.brake for r in refs])
         vmin_ref = min(r.speed_kmh for r in refs)
@@ -835,11 +874,11 @@ def build_lap_debrief(lap: Lap, reference: Reference, corners: list[Corner],
         # Did you brake meaningfully earlier than the reference? Same rule as the
         # live analyzer, on purpose: the two used to differ only by accident.
         live_onset = _onset(inside, lambda s: s.brake)
-        ref_onset = _onset(inside, lambda s: reference.point_at(s.pos).brake)
+        ref_onset = _onset(inside, lambda s: cref.point_at(s.pos).brake)
         braking_early = _braked_early(
             -1.0 if live_onset is None else live_onset,
             -1.0 if ref_onset is None else ref_onset,
-            reference.point_at(live_onset).brake if live_onset is not None else -1.0,
+            cref.point_at(live_onset).brake if live_onset is not None else -1.0,
         )
         braking_late = _braked_late(-1.0 if live_onset is None else live_onset,
                                     -1.0 if ref_onset is None else ref_onset)
@@ -868,13 +907,15 @@ def build_lap_debrief(lap: Lap, reference: Reference, corners: list[Corner],
             detail = f"{cause} {detail}"
 
         # Braking decomposition (earliness in metres + peak pressure).
-        detail += _braking_detail(lap, reference, inside, refs, cue.category,
+        detail += _braking_detail(lap, cref, inside, refs, cue.category,
                                   lg, typed_marks)
         # …and whether there was any grip left to do it with. Misurato una volta
         # sola: la stessa cosa scrive la frase e sceglie l'esercizio, così le due
         # metà dell'app non possono più dire il contrario l'una dell'altra.
         grip = _grip_state(inside, envelope)
         detail += _grip_detail(grip, cue.category, lg)
+        if ref_c is not None:
+            detail += compared_text(ref_c.lap_time_ms, lg)
 
         losses.append(CornerLoss(
             index=c.index, entry_pos=c.entry_pos, apex_pos=c.apex_pos,
@@ -893,6 +934,7 @@ def build_lap_debrief(lap: Lap, reference: Reference, corners: list[Corner],
             name=corner_name(lap.track, c.index, c.apex_pos, lg, c.direction,
                              typed),
             grip=grip,
+            compared_ms=ref_c.lap_time_ms if ref_c is not None else 0,
         ))
 
     losses.sort(key=lambda x: x.lost_ms, reverse=True)

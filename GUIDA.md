@@ -817,6 +817,17 @@ esempio «Scelto per le condizioni» e «asfalto a 12,0 °C, mentre il tuo
 1:39.000 era a 32,0 °C». Se il giro di confronto lo scegli tu dalla tendina,
 vale la tua scelta e non cambia più.
 
+
+Nel debrief del report ogni curva si misura col **tuo gesto migliore** in quella
+curva. È il tuo giro che l'ha fatta più in fretta, fra i tuoi venti più veloci
+nelle stesse condizioni. Vale solo se batte il riferimento di almeno mezzo
+decimo in quella curva. Il dettaglio lo dice con «Confronto con la tua migliore
+in questa curva», insieme al tempo di quel giro. Il delta a schermo resta sul
+riferimento, perché misura il giro intero e non una curva sola. Per questo i
+numeri di una curva possono essere più alti di prima. Prima la curva si misurava
+contro il riferimento, che lì era più lento del tuo meglio. Se il giro di
+confronto lo scegli tu dalla tendina, o è un giro PRO, ogni curva usa quello.
+
 Se sei lontano dal passo, il tuo giro migliore è un bersaglio che ti tiene dove
 sei. Nella sezione **Analisi** dell'hub c'è **Importa un giro di riferimento
 PRO**. Il file è un giro di HONE, un `.lap.json.gz`, per la stessa auto e la

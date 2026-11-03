@@ -12,6 +12,7 @@ new files, so it doesn't touch the live-coaching code.
 
 from __future__ import annotations
 
+import logging
 import re
 import statistics
 import sys
@@ -42,6 +43,7 @@ from .coaching import (
     trail_brake_for,
 )
 from .coaching.phases import PHASES
+from .coaching.corner_refs import POOL_SIZE, CornerBests
 from .coaching.debrief import mark_runs_wide
 from .coaching.training import MIN_LAPS as _TRAIN_MIN_LAPS, assess as _assess_training
 from .coaching.trends import session_recap, session_series
@@ -52,8 +54,9 @@ from .i18n import current_language
 from .i18n import t as tr_ui
 from .recording import laps_root, load_lap
 from .recording.catalog import LapCatalog, _GRIP_BAND, _TEMP_BAND_C
-from .recording.lap import SAMPLE_FIELDS
-from .recording.storage import _catalog_path, _slug, list_lap_files
+from .recording.lap import SAMPLE_FIELDS, Lap
+from .recording.storage import (_catalog_path, _slug, list_lap_files,
+                                reference_pool)
 from .sectors import ideal_lap, sector_spans, sector_times
 from .sessions import group_sessions, parse_utc
 from .stints import MIN_TREND_LAPS, pace_of, split_stints, tyre_trace
@@ -73,6 +76,8 @@ from .trajectory import (
     line_points,
     tag_text,
 )
+
+_log = logging.getLogger(__name__)
 
 PORT = 8778
 _MAX_POINTS = 600   # downsample traces for the browser
@@ -724,6 +729,38 @@ def _elected_path(cat, car: str, track: str, valid: list[dict],
     return min(valid, key=lambda r: r["lap_time_ms"])["path"] if valid else None
 
 
+def _corner_bests_for(reference: Reference, corners: list, review: Lap,
+                      car: str, track: str, laps_dir: Path,
+                      conditions: dict) -> CornerBests | None:
+    """Il gesto migliore di ogni curva per il report del giro rivisto.
+
+    Il bacino si filtra con le condizioni che hanno eletto il riferimento
+    (``conditions`` = `_conditions_of` del giro rivisto), come fa il motore dal
+    vivo. Il giro rivisto può stare nel bacino ed essere il migliore in una
+    curva: lì confrontarlo con sé stesso darebbe zero, cioè «niente da
+    imparare», e la curva sparirebbe. Si salta, e quella curva resta sul
+    principale.
+
+    Un bonus, non un requisito: se il bacino non si costruisce il report resta
+    quello col solo principale, mai un errore.
+    """
+    try:
+        bests = CornerBests(reference, corners)
+        for other in reference_pool(car, track, laps_dir,
+                                    conditions["road_temp"], conditions["grip"],
+                                    conditions["compound"], POOL_SIZE):
+            if (other.lap_time_ms == review.lap_time_ms
+                    and other.recorded_utc == review.recorded_utc
+                    and (review.recorded_utc or other.samples == review.samples)):
+                continue                 # il giro rivisto, letto dal bacino
+            bests.offer(other)
+        return bests
+    except Exception:  # noqa: BLE001 - senza bacino vale il principale
+        _log.warning("corner bests for the report failed; main reference only",
+                     exc_info=True)
+        return None
+
+
 def _conditions_note(elected: dict | None, fastest: dict | None,
                      review: dict | None) -> dict | None:
     """Why the baseline isn't your fastest lap, when the reason is the conditions.
@@ -1205,7 +1242,14 @@ def create_api(
                      zip(corners, name_corners(track, corners, lg,
                                                _corner_map(car, track),
                                                _typed(track)))}
-            debrief = build_lap_debrief(review, reference, corners, lg)
+            # Il gesto migliore per curva solo contro il riferimento eletto: un
+            # giro scelto a mano si confronta così com'è, e un PRO non si
+            # mescola coi tuoi giri.
+            corner_refs = (_corner_bests_for(reference, corners, review, car,
+                                             track, laps_dir, mine)
+                           if baseline_path == elected and not is_pro else None)
+            debrief = build_lap_debrief(review, reference, corners, lg,
+                                        corner_refs=corner_refs)
             mark_runs_wide(debrief.losses, _wide_corners(valid, corners), lg)
             consistency = lap_time_consistency(
                 [r["lap_time_ms"] for r in _on_track(valid)])

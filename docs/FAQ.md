@@ -863,6 +863,17 @@ temperature of both. For example "Chosen for conditions" and "track at 12.0 °C,
 while your 1:39.000 was set at 32.0 °C". If you pick the comparison lap yourself
 from the dropdown, your choice holds and doesn't change.
 
+
+In the report's debrief each corner is measured against **your best through
+that corner**. It's the lap of yours that took it fastest, among your twenty
+quickest laps in the same conditions. It only counts if it beats the reference
+there by at least half a tenth. The detail says so with "Compared with your best
+through this corner", together with that lap's time. The on-screen delta stays
+on the reference, because it measures the whole lap and not one corner. That's
+why a corner's numbers can be higher than before. Before, you were measured
+against a lap that was slower there than your best. If you pick the comparison
+lap yourself from the dropdown, or it's a PRO lap, every corner uses that.
+
 If you're a long way off the pace, your own best lap is a target that keeps you
 where you are. In the **Analysis** section of the hub there's
 **Import a PRO reference lap**. The file is a HONE lap, a `.lap.json.gz`, for

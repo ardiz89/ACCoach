@@ -752,3 +752,185 @@ def test_motore_chiudere_non_aspetta_una_costruzione_in_volo(tmp_path, monkeypat
         fut.result(timeout=5)                    # e finisce da sé
     finally:
         gate.set()
+
+
+# --- Task 6: il report dice con cosa confronta ------------------------------
+
+_IT_SENTENCE = "Confronto con la tua migliore in questa curva, dal giro in 1:48,912."
+_EN_SENTENCE = "Compared with your best through this corner, from the 1:48.912 lap."
+
+
+def _report_setup():
+    """Il principale è lento nella curva 2; ``best`` l'ha presa meglio.
+
+    Il tempo di ``best`` è solo l'etichetta del suo giro: è quello che la frase
+    stampa, e scalare l'orologio per arrivarci cambierebbe proprio le finestre
+    che si misurano."""
+    main = synth.build_lap(slow_corner=1, amt=20)
+    best = synth.build_lap()
+    best.lap_time_ms = 108_912
+    bests, corners = _bests(main)
+    assert bests.offer(best) is True
+    review = synth.build_lap(slow_corner=1, amt=30)
+    return main, best, bests, corners, review
+
+
+def _loss(deb, index):
+    return next((x for x in deb.losses if x.index == index), None)
+
+
+def test_report_corner_two_is_measured_against_its_best_gesture():
+    from accoach.coaching.debrief import build_lap_debrief
+    main, best, bests, corners, review = _report_setup()
+    deb = build_lap_debrief(review, Reference(main), corners, "it",
+                            corner_refs=bests)
+    # La stessa curva misurata direttamente contro `best`: perdita, fasi,
+    # statistiche e causa devono essere quelle, non quelle del principale.
+    alone = build_lap_debrief(review, Reference(best), corners, "it")
+    got, want = _loss(deb, 1), _loss(alone, 1)
+    assert got is not None and want is not None
+    assert got.lost_ms == want.lost_ms
+    assert got.phases == want.phases
+    assert got.category is want.category and got.message == want.message
+    assert got.min_speed_live == want.min_speed_live
+    assert got.min_speed_ref == want.min_speed_ref
+    assert got.compared_ms == 108_912
+    assert got.detail == f"{want.detail} {_IT_SENTENCE}"
+    # Contro il principale la stessa curva perde meno: il metro è cambiato.
+    plain = _loss(build_lap_debrief(review, Reference(main), corners, "it"), 1)
+    assert plain is None or plain.lost_ms < got.lost_ms
+    # La curva 1 resta sul principale, e non dice niente del confronto.
+    for x in deb.losses:
+        if x.index != 1:
+            assert x.compared_ms == 0
+            assert "Confronto con" not in x.detail
+
+
+def test_report_sentence_in_english():
+    from accoach.coaching.debrief import build_lap_debrief
+    main, _best, bests, corners, review = _report_setup()
+    deb = build_lap_debrief(review, Reference(main), corners, "en",
+                            corner_refs=bests)
+    assert _loss(deb, 1).detail.endswith(" " + _EN_SENTENCE)
+
+
+def test_report_without_corner_refs_is_todays_debrief():
+    from accoach.coaching.debrief import build_lap_debrief
+    main, _best, _bests_, corners, review = _report_setup()
+    ref = Reference(main)
+    today = build_lap_debrief(review, ref, corners, "it")
+    assert today.losses, "the review lap must lose somewhere"
+    empty = CornerBests(ref, corners)            # nessun giro offerto
+    for other in (build_lap_debrief(review, ref, corners, "it", corner_refs=None),
+                  build_lap_debrief(review, ref, corners, "it",
+                                    corner_refs=empty)):
+        assert other == today                    # campo per campo
+        assert all(x.compared_ms == 0 for x in other.losses)
+
+
+def _debrief_calls(path):
+    import ast
+    from pathlib import Path
+    src = Path(__file__).resolve().parents[1] / "src" / "accoach" / path
+    tree = ast.parse(src.read_text(encoding="utf-8"))
+    return [n for n in ast.walk(tree) if isinstance(n, ast.Call)
+            and getattr(n.func, "id", getattr(n.func, "attr", "")) == "build_lap_debrief"]
+
+
+def test_focus_trends_and_pagella_keep_the_main_reference():
+    """Decisione 6: il gesto migliore vale solo per il debrief del giro rivisto.
+
+    Il focus tiene fermo il suo metro apposta (`engine.py`), e pagella e
+    tendenze confrontano giri fra loro: un metro diverso per curva li
+    renderebbe incomparabili."""
+    for path in ("engine.py", "pagella.py"):
+        calls = _debrief_calls(path)
+        assert calls, f"{path} must still build debriefs"
+        for call in calls:
+            assert len(call.args) <= 4, f"{path}:{call.lineno}"
+            assert all(k.arg != "corner_refs" for k in call.keywords), \
+                f"{path}:{call.lineno} passes corner_refs"
+    # Nell'API la passa una chiamata sola: quella del giro rivisto.
+    with_refs = [c for c in _debrief_calls("api.py")
+                 if any(k.arg == "corner_refs" for k in c.keywords)]
+    assert len(with_refs) == 1
+
+
+# --- Task 6: l'endpoint del report ------------------------------------------
+
+def _report_archive(tmp_path):
+    """Principale lento in curva 2, un giro più lento ma migliore lì, e il
+    giro da rivedere. Tutti puliti, stessa auto, pista, mescola."""
+    from accoach.recording.storage import save_lap
+    main = synth.build_lap(slow_corner=1, amt=20, clean=True)
+    best = synth.build_lap(slow_corner=0, amt=40, clean=True)
+    review = synth.build_lap(slow_corner=1, amt=30, clean=True)
+    assert best.lap_time_ms > main.lap_time_ms, "main must stay the reference"
+    assert review.lap_time_ms > main.lap_time_ms
+    paths = {}
+    for name, lap, minute in (("main", main, 1), ("best", best, 2),
+                              ("review", review, 3)):
+        lap.recorded_utc = f"2026-11-01T10:{minute:02d}:00+00:00"
+        paths[name] = str(save_lap(lap, tmp_path))
+    return paths, {"main": main, "best": best, "review": review}
+
+
+def _api_analysis(tmp_path, **kw):
+    from fastapi.testclient import TestClient
+    from accoach.api import create_api
+    c = TestClient(create_api(tmp_path))
+    r = c.get("/api/analysis", params={"car": "ferrari_488_gt3",
+                                       "track": "monza", "lang": "it", **kw})
+    assert r.status_code == 200, r.text
+    return r.json()
+
+
+def test_report_endpoint_says_which_lap_it_compares_with(tmp_path):
+    from accoach.telemetry.snapshot import format_lap_time
+    paths, laps = _report_archive(tmp_path)
+    data = _api_analysis(tmp_path, lap=paths["review"])
+    assert data["reference"]["path"] == paths["main"]
+    when = format_lap_time(laps["best"].lap_time_ms).replace(".", ",")
+    sentence = f"Confronto con la tua migliore in questa curva, dal giro in {when}."
+    said = [x for x in data["losses"] if sentence in x["detail"]]
+    assert [x["index"] for x in said] == [1]
+
+
+def test_report_endpoint_a_lap_picked_by_hand_is_compared_as_is(tmp_path):
+    paths, _ = _report_archive(tmp_path)
+    data = _api_analysis(tmp_path, lap=paths["review"], baseline=paths["best"])
+    assert data["reference"]["path"] == paths["best"]
+    assert all("Confronto con" not in x["detail"] for x in data["losses"])
+
+
+def test_report_endpoint_a_broken_pool_is_no_corner_refs(tmp_path, monkeypatch):
+    import accoach.api as api
+
+    def boom(*a, **kw):
+        raise RuntimeError("pool down")
+
+    monkeypatch.setattr(api, "reference_pool", boom)
+    paths, _ = _report_archive(tmp_path)
+    data = _api_analysis(tmp_path, lap=paths["review"])
+    assert all("Confronto con" not in x["detail"] for x in data["losses"])
+
+
+def test_report_never_compares_the_reviewed_lap_with_itself(tmp_path):
+    """Il giro rivisto sta nel bacino, e in una curva può essere il migliore.
+    Lì non si confronta con sé stesso: vale il principale."""
+    from accoach.api import _corner_bests_for
+    paths, laps = _report_archive(tmp_path)
+    main = laps["main"]
+    corners = detect_corners(main.samples)
+    apex = corners[1].apex_pos
+    no_cond = {"road_temp": None, "grip": None, "compound": None}
+
+    # Rivedendo un altro giro, `best` prende la curva 2.
+    held = _corner_bests_for(Reference(main), corners, laps["review"],
+                             "ferrari_488_gt3", "monza", tmp_path, no_cond)
+    assert held.at(apex) is not None
+    assert held.at(apex).lap_time_ms == laps["best"].lap_time_ms
+    # Rivedendo `best` stesso, la curva 2 resta sul principale.
+    alone = _corner_bests_for(Reference(main), corners, laps["best"],
+                              "ferrari_488_gt3", "monza", tmp_path, no_cond)
+    assert alone.at(apex) is None
