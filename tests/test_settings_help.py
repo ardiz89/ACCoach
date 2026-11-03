@@ -19,7 +19,8 @@ from accoach.i18n import t                                   # noqa: E402
 
 _SETTINGS = ("set.voice", "set.engineer_voice", "set.male_voice",
              "set.radio", "set.rate", "set.scale", "set.overlay_mode",
-             "set.overlay_cb", "set.wean", "set.pedals", "set.autorecord")
+             "set.overlay_cb", "set.wean", "set.pedals", "set.pedal_view",
+             "set.autorecord")
 
 
 @pytest.mark.parametrize("key", _SETTINGS)

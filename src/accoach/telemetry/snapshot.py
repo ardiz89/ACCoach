@@ -59,7 +59,7 @@ class TelemetrySnapshot:
     # Non radianti, come diceva questa riga: sui giri veri la Formula si ferma a
     # 1.0 esatto e la GT3 sta fra 0.33 e 0.9, cioe' un comando normalizzato
     # (ACC lo documenta cosi'). Le scritte «34 %» lo leggono in questo senso.
-    steer_angle: float       # -1..1 (fraction of full lock), +left
+    steer_angle: float       # -1..1 (fraction of full lock), +right (measured 03/11)
     gear: str                # "R" / "N" / "1".."8"
 
     # --- engine / speed ---

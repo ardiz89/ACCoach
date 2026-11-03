@@ -70,7 +70,8 @@ def test_the_strip_draws_the_steering_left_up(app):
     rows = {}
     # A destra la linea finisce sul fondo, dove i pedali a zero le passano
     # sopra (sono disegnati dopo, apposta): li' i pedali si mettono a fondo.
-    for name, steer, ped in (("left", 0.6, 0.0), ("right", -0.6, 1.0),
+    # Il gioco da' lo sterzo positivo a destra (misurato il 03/11).
+    for name, steer, ped in (("left", -0.6, 0.0), ("right", 0.6, 1.0),
                              ("dritto", 0.0, 0.0)):
         o._steer_scale = 0.6
         o._pedal_hist = [(now - 5.0, ped, ped, steer), (now, ped, ped, steer)]
@@ -117,11 +118,11 @@ def test_an_old_backend_without_steering_still_draws_the_pedals(app):
 
 
 @pytest.mark.parametrize("lang,steer,want", [
-    ("it", 0.34, "STERZO  34 % SX"),
-    ("it", -0.5, "STERZO  50 % DX"),
+    ("it", 0.34, "STERZO  34 % DX"),
+    ("it", -0.5, "STERZO  50 % SX"),
     ("it", 0.0, "STERZO   0 %"),
-    ("en", 0.34, "STEER  34 % L"),
-    ("en", -1.0, "STEER 100 % R"),
+    ("en", 0.34, "STEER  34 % R"),
+    ("en", -1.0, "STEER 100 % L"),
 ])
 def test_the_readout_says_which_way_in_words_not_arrows(lang, steer, want):
     """Le frecce di prima (◀ ▶) erano simboli: ora la parte e' scritta, e la

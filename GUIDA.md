@@ -335,7 +335,7 @@ che si colora da solo.
 
 | Nastro | Cosa stai facendo |
 |---|---|
-| **ambra** | Premi tutti e due i pedali, quindi **stai facendo trail braking**. |
+| **ambra** | Freni ancora col volante girato, quindi **stai facendo trail braking**. |
 | **grigio** | Non premi nessun pedale, ed è **tempo regalato**. |
 | niente | Rilascio pulito. Hai mollato il freno e ripreso il gas senza vuoti. |
 
@@ -343,7 +343,14 @@ In alto a destra trovi la stessa cosa in una parola, **TRAIL**, oppure
 **COAST** col cronometro di quanto stai veleggiando.
 
 Il coach il trail braking te lo **dice**, ma a cose fatte. Qui lo **vedi mentre lo fai**, ed è l'unico modo di correggere un
-rilascio. Dove le due tracce si sovrappongono c'è il tuo trail braking.
+rilascio. La linea bianca è lo sterzo, con la sinistra in alto.
+
+In **Impostazioni**, alla voce **Come si vedono i pedali**, puoi scegliere le
+**barre** al posto della traccia. Le barre mostrano freno, gas e sterzo in questo
+istante, con la percentuale dentro. La tacca ciano su freno e gas è quanto
+premeva il tuo giro di riferimento in quel punto della pista. In frenata guardi
+se stai sopra o sotto la tacca. In ingresso curva guardi se la tua barra scende
+con lei o crolla prima. Senza un riferimento la tacca non c'è.
 
 > Sulle auto stradali il consiglio a voce sul trail braking è **spento**. Lì
 > portare il freno fino all'inserimento fa girare l'auto, e senza carico

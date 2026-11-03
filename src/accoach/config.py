@@ -73,6 +73,9 @@ class OverlayCfg:
     # Live throttle/brake trace strip under the HUD — a calibration aid for
     # trail-braking and coasting ("tempo morto"). Off by default (declutters).
     pedals: bool = False
+    # Come si mostrano i pedali: "trace" (la striscia degli ultimi secondi) o
+    # "bars" (adesso, con la tacca del riferimento). Chiesto dal pilota il 03/11.
+    pedal_view: str = "trace"
     # Retire the braking countdown at corners you've mastered, the way fast
     # drivers peel the reference line and braking markers away one at a time as
     # they learn a track (two independent drivers described exactly this on
@@ -153,6 +156,7 @@ scale = 1.0          # overlay scale factor
 mode = "essential"   # "essential" (delta + action row) | "full" (+ focus and last corner)
 cb = false           # colour-blind palette (blue/orange instead of green/red)
 pedals = false       # show the live throttle/brake trace strip (trail-braking + coasting)
+pedal_view = "trace" # pedals as "trace" (last seconds) or "bars" (now, with the reference mark)
 wean = true          # retire the braking countdown at corners you've mastered
 
 [logging]
@@ -230,6 +234,7 @@ scale = {cfg.overlay.scale}          # overlay scale factor
 mode = "{cfg.overlay.mode}"   # "essential" (delta + action row) | "full" (+ focus and last corner)
 cb = {b(cfg.overlay.cb)}           # colour-blind palette (blue/orange instead of green/red)
 pedals = {b(cfg.overlay.pedals)}       # show the live throttle/brake trace strip (trail-braking + coasting)
+pedal_view = "{cfg.overlay.pedal_view}" # pedals as "trace" (last seconds) or "bars" (now, with the reference mark)
 wean = {b(cfg.overlay.wean)}          # retire the braking countdown at corners you've mastered
 
 [logging]

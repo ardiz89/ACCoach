@@ -4038,9 +4038,10 @@ function drawInputs(a, cx) {
   crosshair(ctx, w, h, cx);
 }
 
-// Steering trace, symmetric around zero (left = up, right = down). Scale is
-// ±max|steer| across both laps so the two traces share an axis. Defensive:
-// the channel may be absent on older laps.
+// Steering trace, symmetric around zero (left = up, right = down). The game's
+// sign is positive to the RIGHT (measured 03/11 against the corners' direction),
+// so it's drawn negated. Scale is ±max|steer| across both laps so the two traces
+// share an axis. Defensive: the channel may be absent on older laps.
 function drawSteer(a, cx) {
   const cv = $("c-steer");
   if (!cv) return;
@@ -4065,11 +4066,11 @@ function drawSteer(a, cx) {
   if (Array.isArray(sf) && sf.length) {
     ctx.save();
     ctx.setLineDash([4, 3]); ctx.globalAlpha = 0.6;
-    line(ctx, w, h, rf.pos, sf, -m, m, "#22D3CE", 1.2);
+    line(ctx, w, h, rf.pos, sf.map((v) => -v), -m, m, "#22D3CE", 1.2);
     ctx.restore();
   }
   // Your steering (white, solid).
-  line(ctx, w, h, rv.pos, sv, -m, m, "#ffffff", 1.5);
+  line(ctx, w, h, rv.pos, sv.map((v) => -v), -m, m, "#ffffff", 1.5);
   axisLabel(ctx, w, h, t("line.left"), t("line.right"), true);
   crosshair(ctx, w, h, cx);
 }
@@ -4377,8 +4378,10 @@ function drawYaw(a, cx) {
   gridY(ctx, w, h, -ms, ms, (v) => (Math.abs(v) < 1e-9 ? "0" : fmtDec(v, 2)));
   ctx.strokeStyle = "rgba(255,255,255,0.25)";
   ctx.beginPath(); ctx.moveTo(0, h / 2); ctx.lineTo(w, h / 2); ctx.stroke();
-  line(ctx, w, h, pos, yw.map((v) => -v * k), -ms, ms, "#FFB020", 1.4);
-  line(ctx, w, h, pos, st, -ms, ms, "#ffffff", 1.5);
+  // Sinistra in alto per tutte e due: lo sterzo del gioco e' positivo a destra,
+  // la rotazione ha il segno opposto (balance._YAW_SIGN).
+  line(ctx, w, h, pos, yw.map((v) => v * k), -ms, ms, "#FFB020", 1.4);
+  line(ctx, w, h, pos, st.map((v) => -v), -ms, ms, "#ffffff", 1.5);
   axisLabel(ctx, w, h, t("line.left"), t("line.right"), true);
   crosshair(ctx, w, h, cx);
 }

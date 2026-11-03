@@ -1101,8 +1101,9 @@ function tracePush(st) {
   $("tr-brk").textContent = pct(brk);
   // Positivo a sinistra (serialize.py). Quasi dritto: solo il numero.
   const v = pct(Math.abs(steer));
-  $("tr-steer").textContent = steer > 0.02 ? tf("trace.steerLeft", { v })
-                            : steer < -0.02 ? tf("trace.steerRight", { v }) : v;
+  // positivo a destra, come lo da' il gioco (misurato sul verso delle curve)
+  $("tr-steer").textContent = steer > 0.02 ? tf("trace.steerRight", { v })
+                            : steer < -0.02 ? tf("trace.steerLeft", { v }) : v;
   traceDraw(now);
 }
 
@@ -1146,7 +1147,7 @@ function traceDraw(now) {
     ctx.stroke();
   };
   // lo sterzo per primo, cosi' i pedali gli restano sopra
-  draw((s) => 0.5 + s[3] * k, col("--text", "#E8EDF2"), 1.5);
+  draw((s) => 0.5 - s[3] * k, col("--text", "#E8EDF2"), 1.5);   // sinistra in alto
   draw((s) => s[2], col("--red", "#FF4D5E"), 2);
   draw((s) => s[1], col("--green", "#34E08A"), 2);
 }

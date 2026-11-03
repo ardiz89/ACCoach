@@ -79,6 +79,7 @@ _UI: dict[str, dict[str, str]] = {
     "overlay.steer_right": {"en": "R", "it": "DX"},
     "overlay.trail": {"en": "TRAIL", "it": "TRAIL"},
     "overlay.coast": {"en": "COAST", "it": "COAST"},
+    "overlay.ref_mark": {"en": "REFERENCE", "it": "RIFERIMENTO"},
     # terminal coach
     "coach.title": {"en": "voice coach", "it": "coach vocale"},
     "coach.listening": {"en": "Listening. Drive and I'll coach you.",
@@ -487,18 +488,30 @@ _UI: dict[str, dict[str, str]] = {
               "insieme a Coach Live, e per fare lo scambio in un passo."},
     "set.pedals": {"en": "Show the pedal trace", "it": "Mostra la traccia dei pedali"},
     "set.pedals.help": {
-        "en": "A strip under the overlay shows your throttle (green) and brake "
-              "(red) as you use them. The ribbon under it turns amber while both "
-              "pedals are down, which is trail braking. It turns grey while "
-              "neither is, and that's time you're giving away. It's the only "
-              "place where you watch your brake release as you do it, instead "
-              "of being told about it afterwards.",
-        "it": "Una striscia sotto l'overlay mostra il gas (verde) e il freno "
-              "(rosso) mentre li usi. Il nastro sotto diventa ambra quando premi "
-              "tutti e due i pedali, cioè quando fai trail braking. Diventa "
-              "grigio quando non ne premi nessuno, e quello è tempo regalato. È "
+        "en": "A panel under the overlay shows your throttle (green), brake "
+              "(red) and steering as you use them. It turns amber while you're "
+              "still braking with the wheel turned, which is trail braking. It "
+              "turns grey while you press neither pedal, and that's time you're "
+              "giving away. It's the only place where you watch your brake "
+              "release as you do it, instead of being told about it afterwards.",
+        "it": "Un pannello sotto l'overlay mostra gas (verde), freno (rosso) e "
+              "sterzo mentre li usi. Diventa ambra quando freni ancora col "
+              "volante girato, cioè quando fai trail braking. Diventa grigio "
+              "quando non premi nessun pedale, e quello è tempo regalato. È "
               "l'unico posto dove vedi il rilascio del freno mentre lo fai, "
               "invece di sentirtelo raccontare dopo."},
+    "set.pedal_view": {"en": "How the pedals show", "it": "Come si vedono i pedali"},
+    "set.pedal_view_trace": {"en": "Trace", "it": "Traccia"},
+    "set.pedal_view_bars": {"en": "Bars", "it": "Barre"},
+    "set.pedal_view.help": {
+        "en": "The trace draws the last few seconds, so you see the shape of "
+              "your release on the next straight. The bars show this instant, "
+              "with the percentage inside. The cyan mark is what your reference "
+              "lap was pressing at this point of the track.",
+        "it": "La traccia disegna gli ultimi secondi, così sul rettilineo dopo "
+              "vedi la forma del rilascio. Le barre mostrano questo istante, con "
+              "la percentuale dentro. La tacca ciano è quanto premeva il tuo giro "
+              "di riferimento in questo punto della pista."},
     "set.pedals_hint": {
         "en": "The pedal trace makes the overlay taller.",
         "it": "La traccia dei pedali allunga l'overlay."},

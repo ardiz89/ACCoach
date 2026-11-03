@@ -394,7 +394,7 @@ a ribbon that colours itself.
 
 | Ribbon | What you're doing |
 |---|---|
-| **amber** | You're pressing both pedals, so **you're trail braking**. |
+| **amber** | You're still braking with the wheel turned, so **you're trail braking**. |
 | **grey** | You're pressing neither pedal, and that's **time you're giving away**. |
 | nothing | A clean release. You let go of the brake and picked up the throttle with no gap. |
 
@@ -402,8 +402,15 @@ At the top right you get the same thing in one word, **TRAIL**, or **COAST** wit
 a timer for how long you've been coasting.
 
 The coach **tells** you about trail braking, but after the fact. Here you **see
-it while you do it**, and that's the only way to correct a release. Where the two
-traces overlap, that's your trail braking.
+it while you do it**, and that's the only way to correct a release. The white line
+is the steering, with left at the top.
+
+In **Settings**, under **How the pedals show**, you can pick **bars** instead of
+the trace. The bars show brake, throttle and steering right now, with the
+percentage inside. The cyan mark on brake and throttle is what your reference lap
+was pressing at that point of the track. Under braking, check whether you're above
+or below the mark. Into the corner, check whether your bar comes down with it or
+drops first. Without a reference there's no mark.
 
 > On road cars the spoken advice about trail braking is **off**. There, carrying
 > the brake into the turn rotates the car, and without aerodynamic downforce a

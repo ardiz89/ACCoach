@@ -263,7 +263,7 @@ def run_yaw(seconds: float | None = None) -> None:
     — the one assumption ``balance.py`` makes for oversteer detection (``_YAW_SIGN``).
 
     In a clean, grippy corner (off the brakes, no big slide) steering and yaw must
-    point the *same* way: turn left (steer > 0) and the car yaws left. If the data
+    point the *same* way: turn right (steer > 0) and the car yaws right. If the data
     shows them consistently opposite, ``_YAW_SIGN`` must be flipped to -1.
     """
     _utf8()
@@ -287,7 +287,7 @@ def run_yaw(seconds: float | None = None) -> None:
         if not clean_corner:
             return
         stats["agree" if s.steer_angle * s.yaw_rate > 0 else "disagree"] += 1
-        stats["left" if s.steer_angle > 0 else "right"] += 1
+        stats["right" if s.steer_angle > 0 else "left"] += 1
 
     seen = _sample_loop(on_sample, seconds, 0.02)
     _warn_if_no_live(seen)

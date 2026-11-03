@@ -21,8 +21,9 @@ the first corner of the first lap. Same debounce/one-shot/dedup machinery.
 
 ⚠ Calibration (do this once, live, like the g-axis and lock-up checks)
 ---------------------------------------------------------------------
-The oversteer test assumes ``steer_angle`` (+left) and ``yaw_rate`` share a sign
-convention: a steady left-hand corner should give *same-sign* steer and yaw, so
+The oversteer test assumes ``steer_angle`` (+right, measured 03/11) and
+``yaw_rate`` share a sign convention: a steady corner should give *same-sign*
+steer and yaw, so
 the opposite-sign test only trips on genuine countersteer. If a clean corner ever
 fires OVERSTEER constantly, the yaw sign is inverted on this title — flip
 ``_YAW_SIGN`` to -1. The magnitude thresholds (``_STEER_*``, ``_YAW_*``) are

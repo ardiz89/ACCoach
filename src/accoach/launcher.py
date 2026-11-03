@@ -495,6 +495,15 @@ class SettingsPanel(QWidget):
         self._pedals.setChecked(cfg.overlay.pedals)
         row("set.pedals", self._pedals)
 
+        # Traccia o barre (03/11): si rilegge mentre l'overlay gira, come la
+        # modalita', perche' non cambia l'altezza della finestra.
+        self._pedal_view = QComboBox()
+        self._pedal_view.addItem(t("set.pedal_view_trace"), "trace")
+        self._pedal_view.addItem(t("set.pedal_view_bars"), "bars")
+        self._pedal_view.setCurrentIndex(1 if cfg.overlay.pedal_view == "bars" else 0)
+        row("set.pedal_view", self._pedal_view)
+        self._pedal_view.currentIndexChanged.connect(lambda _i: self._look_timer.start())
+
         self._autorecord = QCheckBox()
         self._autorecord.setChecked(cfg.autorecord)
         row("set.autorecord", self._autorecord)
@@ -595,6 +604,7 @@ class SettingsPanel(QWidget):
         cfg.overlay.scale = round(self._scale.value(), 2)
         cfg.overlay.mode = str(self._mode.currentData())
         cfg.overlay.cb = self._cb.isChecked()
+        cfg.overlay.pedal_view = str(self._pedal_view.currentData())
         return save_config(cfg)
 
     def showEvent(self, event) -> None:  # noqa: N802 - Qt naming
@@ -603,12 +613,13 @@ class SettingsPanel(QWidget):
         rimettere il valore del file non e' una scelta del pilota."""
         super().showEvent(event)
         cfg = load_config(reload=True)
-        for w in (self._scale, self._mode, self._cb):
+        for w in (self._scale, self._mode, self._cb, self._pedal_view):
             w.blockSignals(True)
         self._scale.setValue(cfg.overlay.scale or 1.0)
         self._mode.setCurrentIndex(0 if cfg.overlay.mode == "essential" else 1)
         self._cb.setChecked(cfg.overlay.cb)
-        for w in (self._scale, self._mode, self._cb):
+        self._pedal_view.setCurrentIndex(1 if cfg.overlay.pedal_view == "bars" else 0)
+        for w in (self._scale, self._mode, self._cb, self._pedal_view):
             w.blockSignals(False)
 
     def _do_save(self) -> None:
@@ -623,6 +634,7 @@ class SettingsPanel(QWidget):
         cfg.overlay.mode = str(self._mode.currentData())
         cfg.overlay.cb = self._cb.isChecked()
         cfg.overlay.pedals = self._pedals.isChecked()
+        cfg.overlay.pedal_view = str(self._pedal_view.currentData())
         cfg.autorecord = self._autorecord.isChecked()
         ok = save_config(cfg)
         # A page may have changed the language since the hub started: follow it
@@ -645,6 +657,8 @@ class SettingsPanel(QWidget):
         self._place_hint.setText(t("set.place_hint"))
         self._mode.setItemText(0, t("set.mode_essential"))
         self._mode.setItemText(1, t("set.mode_full"))
+        self._pedal_view.setItemText(0, t("set.pedal_view_trace"))
+        self._pedal_view.setItemText(1, t("set.pedal_view_bars"))
         self._male.setItemText(0, t("set.voice_male"))
         self._male.setItemText(1, t("set.voice_female"))
         self._rate.setSuffix(t("set.rate_unit"))
