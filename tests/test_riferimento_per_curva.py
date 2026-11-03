@@ -998,3 +998,24 @@ def test_pool_cache_reloads_a_rewritten_file_and_stays_bounded(tmp_path,
     cache.get(paths["review"])
     assert len(cache._laps) == 2
     assert cache.get(str(tmp_path / "missing.lap.json.gz")) is None
+
+
+def test_report_survives_corner_refs_that_break_the_debrief(tmp_path,
+                                                            monkeypatch, caplog):
+    """Il gesto migliore è un bonus: se fa cadere il debrief, il report si
+    rifà col solo principale invece di rispondere 422."""
+    import logging
+    import accoach.api as api
+
+    class _Broken:
+        def at(self, pos):
+            raise RuntimeError("corner refs down")
+
+    monkeypatch.setattr(api, "_corner_bests_for", lambda *a, **kw: _Broken())
+    paths, _ = _report_archive(tmp_path)
+    with caplog.at_level(logging.WARNING):
+        data = _api_analysis(tmp_path, lap=paths["review"])
+    assert data["losses"], "the report must still list its corners"
+    assert all("Confronto con" not in x["detail"] for x in data["losses"])
+    assert any("corner refs" in r.getMessage() for r in caplog.records
+               if r.levelno >= logging.WARNING)

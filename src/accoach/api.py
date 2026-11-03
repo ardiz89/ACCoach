@@ -1302,8 +1302,19 @@ def create_api(
             corner_refs = (_corner_bests_for(reference, corners, review, car,
                                              track, laps_dir, mine)
                            if baseline_path == elected and not is_pro else None)
-            debrief = build_lap_debrief(review, reference, corners, lg,
-                                        corner_refs=corner_refs)
+            try:
+                debrief = build_lap_debrief(review, reference, corners, lg,
+                                            corner_refs=corner_refs)
+            except Exception:  # noqa: BLE001 - il gesto migliore è un bonus
+                if corner_refs is None:
+                    raise
+                # Un difetto dei riferimenti per curva non deve costare il
+                # report: si rifà col solo principale, come senza bacino. E
+                # sparisce anche per le velocità minime più sotto.
+                _log.warning("debrief with corner refs failed; main reference "
+                             "only", exc_info=True)
+                corner_refs = None
+                debrief = build_lap_debrief(review, reference, corners, lg)
             mark_runs_wide(debrief.losses, _wide_corners(valid, corners), lg)
             consistency = lap_time_consistency(
                 [r["lap_time_ms"] for r in _on_track(valid)])
