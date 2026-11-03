@@ -16,7 +16,6 @@ is — the other thing a coach harps on.
 from __future__ import annotations
 
 import math
-import statistics
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
@@ -730,9 +729,10 @@ _GRIP_BAND_KMH = 40.0
 #: Focus 4). Il 50 è della Decisione 5; sulla copia dell'archivio (13 auto+pista,
 #: riferimento il giro più veloce) le fasce sotto soglia sono quasi solo 40-80
 #: km/h (13-46 campioni: tornanti e chicane lente) e la ricaduta riguarda 13
-#: curve su 612. Con l'inviluppo per fascia, scelto dalla velocità mediana del
-#: riferimento, 96 curve su 612 (15,7 %) cambiano stato: 59 da niente a «al
-#: limite», 26 da «al limite» a niente.
+#: curve su 612. Con ogni campione misurato contro la fascia della velocità
+#: del riferimento in quel punto, contro l'inviluppo unico di prima 66 curve
+#: su 612 (10,8 %) cambiano stato: 44 diventano «al limite», 16 non lo sono
+#: più. Con la fascia della sola velocità mediana erano 96 (15,7 %).
 _GRIP_BAND_MIN_SAMPLES = 50
 
 
@@ -816,40 +816,59 @@ class GripState:
 
 
 def _grip_state(inside: list, envelope: "GripEnvelope | float",
-                speed_kmh: float | None = None) -> GripState:
+                speed_kmh: "float | list | None" = None) -> GripState:
     """Measure the corner against the envelope. No wording, no decisions.
 
-    ``speed_kmh`` is the corner's median speed: it picks the band of the
-    envelope. A bare number is a limit already chosen (used by the tests).
+    ``speed_kmh`` is the main reference's speed at each sample of ``inside``
+    (one per sample): every sample's G is divided by the envelope's band at
+    that speed. A single number applies to every sample; a bare float
+    envelope is a limit already chosen (used by the tests).
     """
-    if isinstance(envelope, GripEnvelope):
-        envelope = envelope.at(speed_kmh)
-    if envelope < _GRIP_MIN_G or not inside:
+    if not inside:
         return GripState()
+    if isinstance(envelope, GripEnvelope):
+        if envelope.whole < _GRIP_MIN_G:
+            return GripState()
+        speeds = (speed_kmh if isinstance(speed_kmh, (list, tuple))
+                  else [speed_kmh] * len(inside))
+        # Una fascia senza G utili misurerebbe ogni campione contro quasi zero:
+        # prende il limite del giro, come una fascia che non c'e'.
+        limits = [lim if lim >= _GRIP_MIN_G else envelope.whole
+                  for lim in (envelope.at(v) for v in speeds)]
+    else:
+        if envelope < _GRIP_MIN_G:
+            return GripState()
+        limits = [envelope] * len(inside)
+    gs = [_combined_g(s.g_lat, s.g_long) for s in inside]
+    if max(gs) <= 0.0:
+        return GripState()             # lap recorded before the G channels
+    # Per campione e non per curva (2026-11-03). Con la fascia della velocita'
+    # mediana del riferimento, una curva lenta preceduta da una staccata veloce
+    # misurava il G della frenata ad alta velocita' contro il limite basso
+    # dell'apex, e finiva «al limite» per la frenata: sulla copia dell'archivio
+    # 59 curve nuove «al limite», 26 col picco in una fascia piu' alta. Ogni G
+    # si divide per il limite del riferimento a quella velocita', poi il p95.
     # The SAME percentile as the envelope, not the raw maximum. Comparing a peak
     # against a 95th percentile is comparing two different statistics: on real
     # laps it produced "you're at 120% of the grip", which is nonsense on its
     # face and would have cost the driver their trust in the whole line.
-    peak = _percentile([_combined_g(s.g_lat, s.g_long) for s in inside], _GRIP_PCTL)
-    if peak <= 0.0:
-        return GripState()             # lap recorded before the G channels
+    per = [g / lim for g, lim in zip(gs, limits)]
     # The envelope is an estimate, so a corner can still read slightly over it.
     # Clamp the number rather than print an impossible one: "at 104% of the grip"
     # invites a question whose honest answer is "the limit is approximate".
-    ratio = min(1.0, peak / envelope)
+    ratio = min(1.0, _percentile(per, _GRIP_PCTL))
 
-    braking = [s for s in inside if s.brake > _PEDAL_OFF]
+    braking = [i for i, s in enumerate(inside) if s.brake > _PEDAL_OFF]
     early = braking[:max(1, len(braking) // 3)]
-    early_peak = _percentile([_combined_g(s.g_lat, s.g_long) for s in early],
-                             _GRIP_PCTL) if early else 0.0
-    saturated_early = bool(early) and min(1.0, early_peak / envelope) >= _GRIP_AT_LIMIT
+    early_peak = _percentile([per[i] for i in early], _GRIP_PCTL) if early else 0.0
+    saturated_early = bool(early) and min(1.0, early_peak) >= _GRIP_AT_LIMIT
 
     # The coast is the one *before* the brake: a lift on the way out is a
     # different fault with a different drill, and counting it here would block
     # "brake later" on corners where the entry was fine.
     coast_s = 0.0
     if braking:
-        first_brake = inside.index(braking[0])
+        first_brake = braking[0]
         run_start = None
         for s in inside[:first_brake]:
             if s.throttle < _PEDAL_OFF and s.brake < _PEDAL_OFF:
@@ -1067,13 +1086,12 @@ def build_lap_debrief(lap: Lap, reference: Reference, corners: list[Corner],
         # …and whether there was any grip left to do it with. Misurato una volta
         # sola: la stessa cosa scrive la frase e sceglie l'esercizio, così le due
         # metà dell'app non possono più dire il contrario l'una dell'altra.
-        # Il limite a quella velocità: la fascia della velocità mediana del
-        # riferimento PRINCIPALE in questa curva, la stessa velocità con cui
+        # Il limite a quella velocità, campione per campione: la fascia della
+        # velocità del riferimento PRINCIPALE in quel punto, la stessa con cui
         # l'inviluppo è messo in fascia. Con la tua, chi passa più piano
         # finirebbe misurato contro una fascia più bassa.
         ref_speeds = [reference.point_at(s.pos).speed_kmh for s in inside]
-        grip = _grip_state(inside, envelope,
-                           statistics.median(ref_speeds) if ref_speeds else None)
+        grip = _grip_state(inside, envelope, ref_speeds)
         detail += _grip_detail(grip, cue.category, lg)
         # Il gesto che fai diverso, contro lo stesso giro della perdita. Prima
         # del confronto, che resta l'ultima frase: dice contro chi e' tutto.

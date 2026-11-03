@@ -119,6 +119,40 @@ def test_a_lap_without_g_data_still_says_nothing():
     assert _grip_state([_S(1.0)] * 20, env, 100.0).ratio == 0.0
 
 
+# --- per campione: ogni G contro il limite alla velocità del riferimento lì ---
+
+def test_heavy_high_speed_braking_does_not_put_a_slow_corner_at_the_limit():
+    """La staccata da 230 km/h e l'apex a 90: con la fascia della mediana (90)
+    il 1,6 G della frenata si misurava contro 1,2 e faceva «al limite» da
+    solo (59 curve dell'archivio, 26 col picco in una fascia più alta). Ogni
+    campione si misura contro il limite alla sua velocità: 1,6 su 2,0 e 0,9
+    su 1,2, cioè l'80 % e il 75 %. Non al limite, e la staccata non è satura."""
+    env = _envelope(_ref_slow_and_fast())
+    inside = [_S(1.6, t_ms=i * 50) for i in range(10)] + \
+             [_S(0.9, brake=0.0, t_ms=500 + i * 50) for i in range(30)]
+    speeds = [230.0] * 10 + [90.0] * 30
+    st = _grip_state(inside, env, speeds)
+    assert st.ratio == pytest.approx(0.8)
+    assert not st.at_limit
+    assert not st.saturated_early
+
+
+def test_braking_at_the_limit_of_its_own_speed_is_still_saturated():
+    """L'altra metà della regola: 1,95 G a 230 km/h è il 97,5 % del 2,0 di
+    quella fascia, e la staccata resta satura anche con l'apex lento."""
+    env = _envelope(_ref_slow_and_fast())
+    inside = [_S(1.95, t_ms=i * 50) for i in range(10)] + \
+             [_S(0.9, brake=0.0, t_ms=500 + i * 50) for i in range(30)]
+    st = _grip_state(inside, env, [230.0] * 10 + [90.0] * 30)
+    assert st.at_limit and st.saturated_early
+
+
+def test_a_missing_reference_speed_falls_back_to_the_whole_lap():
+    env = _envelope(_ref_slow_and_fast())
+    st = _grip_state([_S(1.15)] * 20, env, [None] * 20)
+    assert st.ratio == pytest.approx(1.15 / 2.0)
+
+
 # --- nel debrief: la fascia è quella del riferimento -------------------------
 
 def _g_by_ref_band(spd):
@@ -130,9 +164,10 @@ def _g_by_ref_band(spd):
 def test_the_debrief_picks_the_band_of_the_reference_speed():
     """Il riferimento fa la curva 0 a una mediana di circa 187 km/h (fascia
     160-200, limite 2,0); tu, 40 km/h più piano, a circa 147 (fascia 120-160,
-    limite 1,0). Con 1,9 G il tuo grip vale 95 % contro la sua fascia; con la
-    tua fascia sarebbe 1,9/1,0, tagliato a 100 %. Chi va più piano non deve
-    essere misurato contro un limite più basso."""
+    limite 1,0). In ogni punto tieni il 95 % del limite del riferimento a
+    quella velocità: il tuo grip vale 95 %. Con la tua velocità ogni punto
+    finirebbe in una fascia più bassa, e il numero tagliato a 100 %. Chi va
+    più piano non deve essere misurato contro un limite più basso."""
     import statistics
     from dataclasses import replace
 
@@ -147,18 +182,23 @@ def test_the_debrief_picks_the_band_of_the_reference_speed():
     ref = Reference(ref_lap)
     corners = detect_corners(ref_lap.samples)
     c0 = corners[0]
-    mine.samples[:] = [replace(s, g_lat=1.9 if c0.entry_pos <= s.pos <= c0.exit_pos
-                               else 0.5, g_long=0.0) for s in mine.samples]
+    env = _grip_envelope(mine, ref)      # dalle posizioni, non dalle G di mine
+    mine.samples[:] = [replace(
+        s, g_lat=0.95 * env.at(ref.point_at(s.pos).speed_kmh)
+        if c0.entry_pos <= s.pos <= c0.exit_pos else 0.5, g_long=0.0)
+        for s in mine.samples]
 
     inside = [s for s in mine.samples if c0.entry_pos <= s.pos <= c0.exit_pos]
-    ref_med = statistics.median(ref.point_at(s.pos).speed_kmh for s in inside)
+    ref_speeds = [ref.point_at(s.pos).speed_kmh for s in inside]
+    ref_med = statistics.median(ref_speeds)
     my_med = statistics.median(s.speed_kmh for s in inside)
-    env = _grip_envelope(mine, ref)
     # La premessa del test: le due mediane cadono in fasce diverse, entrambe vere.
     assert int(ref_med // 40) == 4 and int(my_med // 40) == 3
     assert env.at(ref_med) == pytest.approx(2.0)
     assert env.at(my_med) == pytest.approx(1.0)
+    # Contro la tua velocità sarebbe «al limite», tagliato.
+    assert _grip_state(inside, env, [s.speed_kmh for s in inside]).ratio == 1.0
 
     deb = build_lap_debrief(mine, ref, corners, "it")
     loss = next(l for l in deb.losses if l.index == c0.index)
-    assert loss.grip.ratio == pytest.approx(1.9 / 2.0)
+    assert loss.grip.ratio == pytest.approx(0.95)
