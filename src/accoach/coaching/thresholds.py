@@ -15,3 +15,8 @@ SIGNIF_LOSS_MS = 120.0
 # Fraction of the laps considered in which a significant loss must recur for the
 # corner to count as *systematic* (a weakness to train) rather than *sporadic*.
 RECUR_FRAC = 0.5
+
+# Pedal considered released below this. Lived in debrief.py; moved here because
+# debrief and gestures both read it and gestures cannot import debrief (debrief
+# imports gestures), so one definition and no second copy.
+PEDAL_OFF = 0.05

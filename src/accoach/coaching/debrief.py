@@ -33,6 +33,7 @@ from .chain import link_corners
 from .phases import phase_note, split_loss
 from .cue import CueCategory, theme_key
 from .diagnosis import corner_symptoms, dominant_symptom
+from .thresholds import PEDAL_OFF
 from .tuning import tuning_for_car
 from ..i18n import current_language
 from ..textfmt import fmt_num
@@ -642,7 +643,7 @@ def _grip_envelope(lap: Lap, reference: Reference) -> float:
 #: Both pedals off for longer than this, before the brake, is a real coast and
 #: not the brake-to-throttle handover. Same numbers the live coach uses
 #: (``coaching/braking.py``) rather than a second opinion about the same thing.
-_PEDAL_OFF = 0.05
+_PEDAL_OFF = PEDAL_OFF
 _COAST_MIN_S = 0.2
 
 
