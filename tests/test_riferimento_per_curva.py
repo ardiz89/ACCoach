@@ -321,3 +321,123 @@ def test_reference_pool_catalogo_inutilizzabile_da_vuoto(tmp_path):
     _pool_dir(tmp_path)
     _catalog_path(tmp_path).write_bytes(b"questo non e' sqlite" * 50)
     assert reference_pool("ferrari_488_gt3", "monza", tmp_path) == []
+
+
+# --- Task 4: dal vivo ogni curva si misura col suo gesto migliore -----------
+
+def _live_setup(*, with_refs: bool):
+    """Il principale e' lento nella curva 2; un altro giro l'ha presa meglio."""
+    from accoach.coaching.analyzer import CoachAnalyzer
+    from accoach.comparison import LapComparator
+    main = synth.build_lap(slow_corner=1, amt=20)
+    bests, corners = _bests(main)
+    assert bests.offer(synth.build_lap()) is True
+    an = CoachAnalyzer()
+    an.set_corners(corners)
+    if with_refs:
+        an.set_corner_refs(bests)
+    return an, LapComparator(Reference(main)), main, corners
+
+
+def _drive(an, cmp, lap, *, until=None, start=0.0, on_frame=None):
+    """Ricalca ``lap`` frame per frame; ritorna tutti i cue emessi."""
+    out = []
+    for smp in lap.samples:
+        if smp.pos < start:
+            continue
+        if until is not None and smp.pos > until:
+            break
+        s = synth.snap(pos=smp.pos, current_lap_ms=smp.t_ms,
+                       speed_kmh=smp.speed_kmh, throttle=smp.throttle,
+                       brake=smp.brake, steer_angle=smp.steer_angle, gear=smp.gear)
+        out += an.update(s, cmp.compare(s))
+        if on_frame is not None:
+            on_frame(smp.pos)
+    return out
+
+
+def test_live_corner_two_loses_against_its_best_gesture_corner_one_does_not():
+    from accoach.coaching.cue import CueCategory
+    an, cmp, main, corners = _live_setup(with_refs=True)
+    _drive(an, cmp, main)
+    # Il giro ricalca il principale: sul principale non perde nulla, ma nella
+    # curva 2 un tuo giro ha fatto meglio, ed e' quello il metro.
+    assert set(an._advice) == {1}
+    adv = an._advice[1]
+    assert adv.category is not CueCategory.GOOD
+    assert adv.priority >= 120.0
+    # Il riquadro dell'ultima curva confronta col gesto migliore anche lui.
+    assert an.last_corner is not None and an.last_corner.index == 1
+    assert an.last_corner.lost_ms >= 120.0
+
+
+def test_live_without_corner_refs_the_same_lap_gives_no_advice():
+    an, cmp, main, _ = _live_setup(with_refs=False)
+    _drive(an, cmp, main)
+    assert an._advice == {}
+    assert an.last_corner is not None and abs(an.last_corner.lost_ms) < 120.0
+    # set_corner_refs(None) e' lo stesso che non averlo mai chiamato.
+    an2, cmp2, main2, _ = _live_setup(with_refs=True)
+    an2.set_corner_refs(None)
+    _drive(an2, cmp2, main2)
+    assert an2._advice == {}
+
+
+def test_live_corner_ref_phases_split_the_same_loss():
+    """Regola del controllore: i tagli di fase leggono il delta del segmento."""
+    from accoach.coaching import analyzer as analyzer_mod
+    an, cmp, main, _ = _live_setup(with_refs=True)
+    seen = []
+    real = analyzer_mod.classify_corner
+
+    def spy(st, index, pos):
+        if index == 1:
+            seen.append(st)
+        return real(st, index, pos)
+
+    import pytest
+    mp = pytest.MonkeyPatch()
+    mp.setattr(analyzer_mod, "classify_corner", spy)
+    try:
+        _drive(an, cmp, main)
+    finally:
+        mp.undo()
+    assert seen
+    st = seen[0]
+    assert st.lost_ms >= 120.0
+    assert abs(sum(st.phase_ms.values()) - st.lost_ms) < 1e-6
+    # Il riferimento della curva 2 e' piu' veloce in curva: anche i canali del
+    # riferimento sono i suoi, non quelli del principale.
+    assert st.min_speed_ref - st.min_speed_live >= 6.0
+
+
+def test_live_new_corner_refs_keep_the_advice_on_its_corner():
+    """Review Focus 5: un consiglio sulla curva 2 resta sulla curva 2."""
+    an, cmp, main, corners = _live_setup(with_refs=True)
+    _drive(an, cmp, main)
+    adv = an._advice[1]
+    card = an.last_corner
+    fresh, _ = _bests(main)            # nuovi riferimenti, nessuna curva vinta
+    an.set_corner_refs(fresh)
+    assert an._advice == {1: adv}
+    assert an.last_corner is card
+    an.reset()                         # come fa il motore dopo un giro salvato
+    # Il giro dopo, avvicinandosi alla curva 2, il consiglio esce li'.
+    cues = _drive(an, cmp, main, until=corners[1].entry_pos)
+    spoken = [c for c in cues if c.category is adv.category]
+    assert len(spoken) == 1 and spoken[0].segment == 1
+
+
+def test_live_a_zone_in_progress_keeps_the_ref_it_started_with():
+    an, cmp, main, corners = _live_setup(with_refs=True)
+    apex = corners[1].apex_pos
+    swapped = []
+
+    def swap(pos):
+        if not swapped and pos >= apex:
+            an.set_corner_refs(None)   # a meta' curva: la zona tiene il suo
+            swapped.append(pos)
+
+    _drive(an, cmp, main, on_frame=swap)
+    assert swapped
+    assert set(an._advice) == {1}

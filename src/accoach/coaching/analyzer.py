@@ -30,12 +30,17 @@ the difference is clearly outside noise, and otherwise falls back to a plain
 from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
+from typing import TYPE_CHECKING
 
 from ..comparison import DeltaState
 from ..telemetry.snapshot import TelemetrySnapshot
 from ..track import Corner
 from .cue import Cue, CueCategory
 from .diagnosis import _APEX_HALF
+
+if TYPE_CHECKING:
+    from ..comparison.reference import ReferencePoint
+    from .corner_refs import CornerBests, CornerRef
 
 # Tuning. Thresholds are intentionally above sensor/driving noise.
 _BRAKE_ON = 0.15            # brake pedal fraction that counts as "braking"
@@ -289,6 +294,10 @@ class _Seg:
     mid: float = 0.0
     delta_apex_in: float | None = None
     delta_apex_out: float | None = None
+    # Il gesto migliore di questa curva (`corner_refs`), scelto all'ingresso e
+    # tenuto fino all'uscita. Con lui la zona misura il suo delta e i canali del
+    # riferimento su quel giro; senza, sul riferimento principale come sempre.
+    ref: CornerRef | None = None
 
 
 class CoachAnalyzer:
@@ -315,6 +324,9 @@ class CoachAnalyzer:
         # Su AC il campo è None e questo resta False: lì i limiti di pista si
         # deducono da `tyres_out`, e «non lo so» non è «hai tagliato».
         self._lap_cut = False
+        # Il gesto migliore di ogni curva, o None (Decisione 6: vale per il
+        # consiglio e il riquadro dell'ultima curva, non per il delta a schermo).
+        self._bests: CornerBests | None = None
         self._set_fixed_zones()
 
     def reset(self) -> None:
@@ -334,6 +346,17 @@ class CoachAnalyzer:
         nascondere e basta la farebbe riapparire identica dopo il pit stop, con
         addosso un numero di dieci minuti fa."""
         self.last_corner = None
+
+    def set_corner_refs(self, bests: CornerBests | None) -> None:
+        """Confronta ogni curva col suo gesto migliore (None = col principale).
+
+        Non tocca consigli, annunci, difetti, la carta né le zone: le curve sono
+        le stesse, cambia solo il metro delle prossime. Un consiglio misurato col
+        metro di prima resta vero per la curva in cui è stato misurato, e la zona
+        in corso tiene il riferimento con cui è cominciata — cambiarlo a metà
+        sottrarrebbe due orologi diversi.
+        """
+        self._bests = bests
 
     def set_corners(self, corners: list[Corner]) -> None:
         """Use detected corners as the zones (or fall back to fixed segments)."""
@@ -433,7 +456,7 @@ class CoachAnalyzer:
             self._seg = None
         # Entering a zone.
         if zone_idx >= 0 and self._seg is None:
-            self._seg = self._new_segment(zone_idx, delta)
+            self._seg = self._new_segment(zone_idx, s, delta)
         if self._seg is not None:
             self._accumulate(self._seg, s, delta)
 
@@ -492,19 +515,26 @@ class CoachAnalyzer:
                 # non usciva mai.
                 cues.append(replace(adv, pos=pos))
 
-    def _new_segment(self, index: int, delta: DeltaState) -> _Seg:
-        return _Seg(index=index, delta_start=delta.delta_ms, delta_last=delta.delta_ms,
-                    mid=self._zones[index][2])
+    def _new_segment(self, index: int, s: TelemetrySnapshot,
+                     delta: DeltaState) -> _Seg:
+        mid = self._zones[index][2]
+        ref = self._bests.at(mid) if self._bests is not None else None
+        seg = _Seg(index=index, mid=mid, ref=ref)
+        d, _rp = _seg_delta(seg, s, delta)
+        seg.delta_start = seg.delta_last = d
+        return seg
 
     def _accumulate(self, seg: _Seg, s: TelemetrySnapshot, delta: DeltaState) -> None:
         seg.n += 1
-        seg.delta_last = delta.delta_ms
+        # Un delta solo per tutto: perdita, tagli di fase e canali leggono lo
+        # stesso riferimento, cosi' le fasi risommano proprio `lost_ms`.
+        d, rp = _seg_delta(seg, s, delta)
+        seg.delta_last = d
         pos = s.lap_position
         if seg.delta_apex_in is None and pos >= seg.mid - _APEX_HALF:
-            seg.delta_apex_in = delta.delta_ms
+            seg.delta_apex_in = d
         if seg.delta_apex_out is None and pos >= seg.mid + _APEX_HALF:
-            seg.delta_apex_out = delta.delta_ms
-        rp = delta.reference_point
+            seg.delta_apex_out = d
         seg.throttle_live += s.throttle
         seg.throttle_ref += rp.throttle
         seg.brake_live += s.brake
@@ -559,6 +589,21 @@ class CoachAnalyzer:
             return None
         self.last_corner = CornerCard(index=seg.index, lost_ms=st.lost_ms)
         return cue
+
+
+def _seg_delta(seg: _Seg, s: TelemetrySnapshot,
+               delta: DeltaState) -> tuple[float, ReferencePoint]:
+    """Il delta di questo frame e il punto del riferimento, per questa zona.
+
+    Con il gesto migliore della curva si leggono sul suo giro, con la stessa
+    sottrazione di `LapComparator.compare`; senza, quelli del principale che il
+    comparatore ha già calcolato.
+    """
+    if seg.ref is None:
+        return delta.delta_ms, delta.reference_point
+    pos = s.lap_position
+    ref = seg.ref.reference
+    return float(s.current_lap_ms) - ref.time_at(pos), ref.point_at(pos)
 
 
 def _live_phases(seg: _Seg) -> dict[str, float]:
