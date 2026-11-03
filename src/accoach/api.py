@@ -13,12 +13,9 @@ new files, so it doesn't touch the live-coaching code.
 from __future__ import annotations
 
 import logging
-import os
 import re
 import statistics
 import sys
-import threading
-from collections import OrderedDict
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -46,7 +43,6 @@ from .coaching import (
     trail_brake_for,
 )
 from .coaching.phases import PHASES
-from .coaching.corner_refs import POOL_SIZE, CornerBests
 from .coaching.debrief import mark_runs_wide
 from .coaching.training import MIN_LAPS as _TRAIN_MIN_LAPS, assess as _assess_training
 from .coaching.trends import session_recap, session_series
@@ -57,9 +53,9 @@ from .i18n import current_language
 from .i18n import t as tr_ui
 from .recording import laps_root, load_lap
 from .recording.catalog import LapCatalog, _GRIP_BAND, _TEMP_BAND_C
-from .recording.lap import SAMPLE_FIELDS, Lap
-from .recording.storage import (_catalog_path, _slug, list_lap_files,
-                                pool_lap_ok, reference_pool_paths)
+from .recording.lap import SAMPLE_FIELDS
+from .recording.storage import _catalog_path, _slug, list_lap_files
+from .corner_pool import conditions_of as _conditions_of, corner_bests_for
 from .sectors import ideal_lap, sector_spans, sector_times
 from .sessions import group_sessions, parse_utc
 from .stints import MIN_TREND_LAPS, pace_of, split_stints, tyre_trace
@@ -683,21 +679,6 @@ def _fastest_clean(valid: list[dict]) -> dict | None:
     return min(usable, key=lambda r: r["lap_time_ms"]) if usable else None
 
 
-def _conditions_of(row: dict | None) -> dict:
-    """The conditions a lap was driven in, with "never recorded" as absence.
-
-    A zero temperature, a zero grip and an empty compound all mean the same
-    thing — the field wasn't there when this lap was saved — and every rule
-    downstream treats unknown as "can't be called similar".
-    """
-    row = row or {}
-    return {
-        "road_temp": row.get("road_temp") or None,
-        "grip": row.get("grip") or None,
-        "compound": row.get("tyre_compound") or None,
-    }
-
-
 def _elected_path(cat, car: str, track: str, valid: list[dict],
                   road_temp: float | None = None,
                   grip: float | None = None,
@@ -730,89 +711,6 @@ def _elected_path(cat, car: str, track: str, valid: list[dict],
     if elected is not None:
         return elected
     return min(valid, key=lambda r: r["lap_time_ms"])["path"] if valid else None
-
-
-#: Quanti giri del bacino il report tiene in memoria. Due bacini pieni: basta
-#: per passare da un giro all'altro della stessa pista senza ricaricare niente.
-_POOL_CACHE_SIZE = 2 * POOL_SIZE
-
-
-class _PoolCache:
-    """I giri del bacino già caricati, per file e data di modifica.
-
-    Il report costruisce il bacino a ogni ``/api/analysis``, e la vista «Come
-    si fa» ne chiede diverse insieme: ricaricare venti file ogni volta è il
-    tempo che il pilota aspetta. Un file riscritto ha un'altra data e si
-    ricarica. FastAPI serve le chiamate su più thread, quindi un lucchetto; il
-    caricamento sta fuori dal lucchetto, così un file lento non ferma gli altri.
-    I giri si leggono e basta: nessuno li modifica.
-    """
-
-    def __init__(self, size: int = _POOL_CACHE_SIZE) -> None:
-        self._size = size
-        self._laps: OrderedDict[tuple[str, int], Lap] = OrderedDict()
-        self._lock = threading.Lock()
-
-    def get(self, path: str) -> Lap | None:
-        try:
-            key = (str(path), os.stat(path).st_mtime_ns)
-        except OSError:
-            return None
-        with self._lock:
-            lap = self._laps.get(key)
-            if lap is not None:
-                self._laps.move_to_end(key)
-                return lap
-        try:
-            lap = load_lap(path)
-        except Exception:  # noqa: BLE001 - un file rotto si salta, come nel bacino
-            _log.debug("pool lap %s does not load; skipped", path, exc_info=True)
-            return None
-        with self._lock:
-            self._laps[key] = lap
-            self._laps.move_to_end(key)
-            while len(self._laps) > self._size:
-                self._laps.popitem(last=False)
-        return lap
-
-
-_POOL_CACHE = _PoolCache()
-
-
-def _corner_bests_for(reference: Reference, corners: list, review: Lap,
-                      car: str, track: str, laps_dir: Path,
-                      conditions: dict) -> CornerBests | None:
-    """Il gesto migliore di ogni curva per il report del giro rivisto.
-
-    Il bacino si filtra con le condizioni che hanno eletto il riferimento
-    (``conditions`` = `_conditions_of` del giro rivisto), come fa il motore dal
-    vivo. Il giro rivisto può stare nel bacino ed essere il migliore in una
-    curva: lì confrontarlo con sé stesso darebbe zero, cioè «niente da
-    imparare», e la curva sparirebbe. Si salta, e quella curva resta sul
-    principale.
-
-    Un bonus, non un requisito: se il bacino non si costruisce il report resta
-    quello col solo principale, mai un errore.
-    """
-    try:
-        bests = CornerBests(reference, corners)
-        for path in reference_pool_paths(car, track, laps_dir,
-                                         conditions["road_temp"],
-                                         conditions["grip"],
-                                         conditions["compound"], POOL_SIZE):
-            other = _POOL_CACHE.get(path)
-            if other is None or not pool_lap_ok(other, car, track):
-                continue
-            if (other.lap_time_ms == review.lap_time_ms
-                    and other.recorded_utc == review.recorded_utc
-                    and (review.recorded_utc or other.samples == review.samples)):
-                continue                 # il giro rivisto, letto dal bacino
-            bests.offer(other)
-        return bests
-    except Exception:  # noqa: BLE001 - senza bacino vale il principale
-        _log.warning("corner bests for the report failed; main reference only",
-                     exc_info=True)
-        return None
 
 
 def _conditions_note(elected: dict | None, fastest: dict | None,
@@ -1299,8 +1197,9 @@ def create_api(
             # Il gesto migliore per curva solo contro il riferimento eletto: un
             # giro scelto a mano si confronta così com'è, e un PRO non si
             # mescola coi tuoi giri.
-            corner_refs = (_corner_bests_for(reference, corners, review, car,
-                                             track, laps_dir, mine)
+            corner_refs = (corner_bests_for(reference, corners, review, car,
+                                            track, laps_dir, mine,
+                                            review_path=review_path)
                            if baseline_path == elected and not is_pro else None)
             try:
                 debrief = build_lap_debrief(review, reference, corners, lg,

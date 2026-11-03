@@ -9,6 +9,7 @@ I giri vengono da ``synth.build_lap``: due curve, entry 0,1875 e 0,5875. Il
 giro lento in una curva perde tempo in tutta la zona ``synth._ZONES``.
 """
 from dataclasses import replace
+from pathlib import Path
 
 from accoach.coaching.corner_refs import (
     MIN_GAIN_MS,
@@ -310,7 +311,7 @@ def test_reference_pool_carica_i_giri_e_salta_quelli_rotti(tmp_path):
     assert len(ok) == 15
     assert all(lap.lap_time_ms > 0 and lap.source == "own" for lap in ok)
     victim = _pool_paths(tmp_path, compound="dry_compound")[0]
-    open(victim, "wb").write(b"non e' un giro")
+    Path(victim).write_bytes(b"non e' un giro")
     again = reference_pool("ferrari_488_gt3", "monza", tmp_path,
                            compound="dry_compound")
     assert len(again) == 14
@@ -904,12 +905,12 @@ def test_report_endpoint_a_lap_picked_by_hand_is_compared_as_is(tmp_path):
 
 
 def test_report_endpoint_a_broken_pool_is_no_corner_refs(tmp_path, monkeypatch):
-    import accoach.api as api
+    import accoach.corner_pool as corner_pool
 
     def boom(*a, **kw):
         raise RuntimeError("pool down")
 
-    monkeypatch.setattr(api, "reference_pool_paths", boom)
+    monkeypatch.setattr(corner_pool, "reference_pool_paths", boom)
     paths, _ = _report_archive(tmp_path)
     data = _api_analysis(tmp_path, lap=paths["review"])
     assert all("Confronto con" not in x["detail"] for x in data["losses"])
@@ -918,7 +919,7 @@ def test_report_endpoint_a_broken_pool_is_no_corner_refs(tmp_path, monkeypatch):
 def test_report_never_compares_the_reviewed_lap_with_itself(tmp_path):
     """Il giro rivisto sta nel bacino, e in una curva può essere il migliore.
     Lì non si confronta con sé stesso: vale il principale."""
-    from accoach.api import _corner_bests_for
+    from accoach.corner_pool import corner_bests_for as _corner_bests_for
     paths, laps = _report_archive(tmp_path)
     main = laps["main"]
     corners = detect_corners(main.samples)
@@ -961,6 +962,7 @@ def test_report_second_call_loads_no_pool_lap_again(tmp_path, monkeypatch):
     """Il bacino si tiene in memoria per file e data: riaprire il report non
     ricarica i giri che ha già."""
     import accoach.api as api
+    import accoach.corner_pool as corner_pool
     paths, _ = _report_archive(tmp_path)
     loaded = []
     real = api.load_lap
@@ -970,6 +972,7 @@ def test_report_second_call_loads_no_pool_lap_again(tmp_path, monkeypatch):
         return real(path)
 
     monkeypatch.setattr(api, "load_lap", spy)
+    monkeypatch.setattr(corner_pool, "load_lap", spy)
     mine = {paths["review"], paths["main"]}     # review e riferimento, ogni volta
     _api_analysis(tmp_path, lap=paths["review"])
     first = [p for p in loaded if p not in mine]
@@ -983,12 +986,13 @@ def test_report_second_call_loads_no_pool_lap_again(tmp_path, monkeypatch):
 def test_pool_cache_reloads_a_rewritten_file_and_stays_bounded(tmp_path,
                                                                monkeypatch):
     import os
-    import accoach.api as api
+    import accoach.corner_pool as corner_pool
     paths, _ = _report_archive(tmp_path)
     loads = []
-    real = api.load_lap
-    monkeypatch.setattr(api, "load_lap", lambda p: loads.append(p) or real(p))
-    cache = api._PoolCache(size=2)
+    real = corner_pool.load_lap
+    monkeypatch.setattr(corner_pool, "load_lap",
+                        lambda p: loads.append(p) or real(p))
+    cache = corner_pool.PoolCache(size=2)
     a = cache.get(paths["main"])
     assert cache.get(paths["main"]) is a and len(loads) == 1
     st = os.stat(paths["main"])
@@ -1011,7 +1015,7 @@ def test_report_survives_corner_refs_that_break_the_debrief(tmp_path,
         def at(self, pos):
             raise RuntimeError("corner refs down")
 
-    monkeypatch.setattr(api, "_corner_bests_for", lambda *a, **kw: _Broken())
+    monkeypatch.setattr(api, "corner_bests_for", lambda *a, **kw: _Broken())
     paths, _ = _report_archive(tmp_path)
     with caplog.at_level(logging.WARNING):
         data = _api_analysis(tmp_path, lap=paths["review"])
@@ -1019,3 +1023,112 @@ def test_report_survives_corner_refs_that_break_the_debrief(tmp_path,
     assert all("Confronto con" not in x["detail"] for x in data["losses"])
     assert any("corner refs" in r.getMessage() for r in caplog.records
                if r.levelno >= logging.WARNING)
+
+
+# --- La Home dell'hub e il report dicono la stessa cosa sullo stesso giro ---
+
+def test_home_and_report_agree_on_the_same_lap(tmp_path, monkeypatch):
+    """La Home costruiva il debrief del giro più recente senza gesto migliore,
+    il report sì: due classifiche diverse per lo stesso giro. Ora usano gli
+    stessi riferimenti per curva."""
+    import accoach.coaching as coaching
+    from accoach.hub_home import load_home_data
+    paths, _ = _report_archive(tmp_path)
+    seen = []
+    real = coaching.build_lap_debrief
+
+    def spy(*a, **kw):
+        out = real(*a, **kw)
+        seen.append(out)
+        return out
+
+    monkeypatch.setattr(coaching, "build_lap_debrief", spy)
+    home = load_home_data(tmp_path, lang="it")
+    assert home.status == "ok" and seen
+    data = _api_analysis(tmp_path)           # lo stesso giro: il più recente
+    report = [(x["index"], x["category"], x["lost_s"]) for x in data["losses"][:3]]
+    mine = [(x.index, x.category.value, round(x.lost_ms / 1000, 3))
+            for x in seen[-1].losses[:3]]
+    assert any("Confronto con" in x["detail"] for x in data["losses"])
+    assert mine == report
+    assert any(x.compared_ms for x in seen[-1].losses)
+
+
+def test_home_uses_no_corner_refs_against_a_pro_reference(tmp_path):
+    """Come il report: contro un giro PRO il gesto migliore si spegne."""
+    from accoach.corner_pool import elected_own_reference
+    from accoach.recording.catalog import LapCatalog
+    from accoach.recording.storage import list_lap_files
+    paths, laps = _report_archive(tmp_path)
+    with LapCatalog(_catalog_path(tmp_path)) as cat:
+        cat.sync(list_lap_files(tmp_path))
+        rows = cat.laps_for("ferrari_488_gt3", "monza")
+        review_row = next(r for r in rows if r["path"] == paths["review"])
+        assert elected_own_reference(cat, "ferrari_488_gt3", "monza", rows,
+                                     review_row, paths["main"])
+        # Un riferimento che non è quello eletto (scelto a mano): niente.
+        assert not elected_own_reference(cat, "ferrari_488_gt3", "monza", rows,
+                                         review_row, paths["best"])
+        for r in rows:
+            if r["path"] == paths["main"]:
+                r["source"] = "pro"
+        assert not elected_own_reference(cat, "ferrari_488_gt3", "monza", rows,
+                                         review_row, paths["main"])
+
+
+def test_corner_bests_skip_the_reviewed_lap_by_path(tmp_path):
+    """Il giro rivisto si riconosce dal file, non da tempo e ora: con il path
+    conta solo quello."""
+    from accoach.corner_pool import corner_bests_for
+    paths, laps = _report_archive(tmp_path)
+    main = laps["main"]
+    corners = detect_corners(main.samples)
+    apex = corners[1].apex_pos
+    no_cond = {"road_temp": None, "grip": None, "compound": None}
+    # Il giro passato è `review`, ma il file rivisto è quello di `best`: si
+    # salta `best`, e la curva 2 resta sul principale.
+    held = corner_bests_for(Reference(main), corners, laps["review"],
+                            "ferrari_488_gt3", "monza", tmp_path, no_cond,
+                            review_path=paths["best"])
+    assert held.at(apex) is None
+    kept = corner_bests_for(Reference(main), corners, laps["review"],
+                            "ferrari_488_gt3", "monza", tmp_path, no_cond,
+                            review_path=paths["review"])
+    assert kept.at(apex) is not None
+
+
+def test_pool_paths_can_skip_the_catalog_sync(tmp_path, monkeypatch):
+    from accoach.recording import storage
+    from accoach.recording.catalog import LapCatalog
+    _report_archive(tmp_path)
+    with LapCatalog(_catalog_path(tmp_path)) as cat:
+        cat.sync(storage.list_lap_files(tmp_path))
+    syncs = []
+    real = LapCatalog.sync
+    monkeypatch.setattr(LapCatalog, "sync",
+                        lambda self, files: syncs.append(1) or real(self, files))
+    got = storage.reference_pool_paths("ferrari_488_gt3", "monza", tmp_path,
+                                       sync=False)
+    assert len(got) == 3 and syncs == []
+    storage.reference_pool_paths("ferrari_488_gt3", "monza", tmp_path)
+    assert syncs == [1]                       # il motore resta com'era
+
+
+def test_report_and_home_do_not_sync_the_catalog_again_for_the_pool(
+        tmp_path, monkeypatch):
+    """L'endpoint e la Home hanno appena sincronizzato il catalogo: il bacino
+    non lo rifà."""
+    import accoach.corner_pool as corner_pool
+    from accoach.hub_home import load_home_data
+    calls = []
+    real = corner_pool.reference_pool_paths
+
+    def spy(*a, **kw):
+        calls.append(kw.get("sync", True))
+        return real(*a, **kw)
+
+    monkeypatch.setattr(corner_pool, "reference_pool_paths", spy)
+    paths, _ = _report_archive(tmp_path)
+    _api_analysis(tmp_path, lap=paths["review"])
+    load_home_data(tmp_path, lang="it")
+    assert calls == [False, False]

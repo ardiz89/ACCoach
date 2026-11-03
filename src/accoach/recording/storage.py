@@ -208,18 +208,24 @@ def reference_pool_paths(
     grip: float | None = None,
     compound: str | None = None,
     limit: int = 20,
+    sync: bool = True,
 ) -> list[str]:
     """I file del bacino di :func:`reference_pool`, senza caricarli.
 
     Serve a chi tiene già in memoria i giri che ha caricato (il report): sa
     quali file servono e carica solo quelli nuovi. ``[]`` se il catalogo non si
-    può usare, come per il bacino."""
+    può usare, come per il bacino.
+
+    ``sync=False`` per chi ha appena sincronizzato il catalogo (il report e la
+    Home lo fanno a ogni richiesta): rifarlo voleva dire rileggere la cartella
+    una seconda volta per niente. Il motore tiene il default."""
     laps_dir = Path(laps_dir) if laps_dir else laps_root()
     try:
         from .catalog import LapCatalog
 
         with LapCatalog(_catalog_path(laps_dir)) as cat:
-            cat.sync(list_lap_files(laps_dir))
+            if sync:
+                cat.sync(list_lap_files(laps_dir))
             return list(cat.reference_pool_paths(car_model, track, road_temp,
                                                  grip, compound, limit))
     except Exception:
