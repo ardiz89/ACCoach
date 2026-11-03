@@ -226,3 +226,15 @@ def test_the_overlay_section_says_what_the_live_coach_compares_with(lang, words)
     section = doc[start:doc.index("\n## ", start + 1)].lower()
     for w in words:
         assert w in section, f"manca «{w}» nella sezione dell'overlay ({lang})"
+
+
+# --- i gesti per curva e il grip per velocità (paragrafo del report) --------
+
+@pytest.mark.parametrize("lang,phrase", (
+    ("it", "Per ogni curva ne nomina una sola"),
+    ("en", "It names at most one gesture per corner"),
+))
+def test_the_guide_explains_the_corner_gestures(lang, phrase):
+    """La guida deve dire che il gesto è uno per curva e solo sopra il rumore."""
+    flat = " ".join(_DOCS[lang].split())
+    assert phrase in flat
