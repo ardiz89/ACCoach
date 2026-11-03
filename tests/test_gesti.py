@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from accoach.coaching.gestures import Gestures, measure
+from accoach.coaching.gestures import (
+    ABS_NOISE_S, PICKUP_NOISE_S, RELEASE_NOISE_S, STEER_NOISE, GestureNote,
+    Gestures, compare, measure)
 from accoach.recording.lap import LapSample
 
 
@@ -97,9 +99,17 @@ def test_old_lap_without_channels_is_zero():
 
 
 def test_steer_sawtooth_counts_four():
-    vals = [0.0, 0.05, 0.0, 0.05, 0.0, 0.05]
+    vals = [0.0, 0.1, 0.0, 0.1, 0.0, 0.1]
     g = measure(_series(len(vals), steer=lambda i: vals[i]))
     assert g.steer_reversals == 4
+
+
+def test_steer_straight_noise_is_zero():
+    # Task 2: sul rettilineo di confronto le oscillazioni arrivano a 0,056
+    # (90 percentile); con 0,02 il giro tipico contava 5 inversioni lì.
+    vals = [0.0, 0.05, 0.0, 0.05, 0.0, 0.05]
+    g = measure(_series(len(vals), steer=lambda i: vals[i]))
+    assert g.steer_reversals == 0
 
 
 def test_steer_tiny_oscillation_is_zero():
@@ -114,3 +124,89 @@ def test_empty_and_tiny_input():
         assert isinstance(g, Gestures)
         assert (g.release_s, g.pickup_s, g.abs_s, g.steer_reversals) == (
             None, None, 0.0, 0)
+
+
+# --- compare: quanto un gesto e' diverso dal rumore (Task 2) ---
+
+def _g(release=1.0, pickup=0.5, gear="3", abs_=0.2, steer=2):
+    return Gestures(release_s=release, pickup_s=pickup, apex_gear=gear,
+                    abs_s=abs_, steer_reversals=steer)
+
+
+def test_compare_identical_is_none():
+    assert compare(_g(), _g()) is None
+
+
+def test_compare_under_noise_is_none():
+    # ogni misura poco sotto la sua soglia -> niente da dire
+    live = _g(release=1.0 + 0.9 * RELEASE_NOISE_S,
+              pickup=0.5 + 0.9 * PICKUP_NOISE_S,
+              abs_=0.2 + 0.9 * ABS_NOISE_S,
+              steer=2)
+    assert compare(live, _g()) is None
+
+
+def test_compare_exactly_at_noise_is_none():
+    # alla soglia e' ancora rumore: serve superarla
+    live = _g(release=1.0 + RELEASE_NOISE_S)
+    assert compare(live, _g()) is None
+
+
+def test_compare_release_beats_gear():
+    # rilascio a 2x la soglia, marcia diversa (rapporto 1,0) -> vince il rilascio
+    live = _g(release=1.0 + 2 * RELEASE_NOISE_S, gear="4")
+    note = compare(live, _g())
+    assert isinstance(note, GestureNote)
+    assert note.kind == "release"
+    assert abs(note.score - 2.0) < 1e-9
+    assert abs(note.live - (1.0 + 2 * RELEASE_NOISE_S)) < 1e-9
+    assert note.ref == 1.0
+
+
+def test_compare_gear_alone_is_said():
+    # Decisione 2: una marcia diversa e' un gesto diverso anche da sola
+    note = compare(_g(gear="4"), _g(gear="3"))
+    assert note is not None
+    assert (note.kind, note.live, note.ref, note.score) == ("gear", "4", "3", 1.0)
+
+
+def test_compare_gear_non_numeric_ignored():
+    # un «N» o una marcia mancante non e' una marcia diversa
+    assert compare(_g(gear="N"), _g(gear="3")) is None
+    assert compare(_g(gear=None), _g(gear="3")) is None
+
+
+def test_compare_none_on_one_side_not_compared():
+    # tu freni, lui no: il rilascio non si confronta
+    assert compare(_g(release=3.0), _g(release=None)) is None
+    assert compare(_g(pickup=None), _g(pickup=5.0)) is None
+
+
+def test_compare_highest_ratio_wins():
+    live = _g(release=1.0 + 1.5 * RELEASE_NOISE_S,
+              abs_=0.2 + 3 * ABS_NOISE_S,
+              steer=2 + 2 * STEER_NOISE)
+    note = compare(live, _g())
+    assert note.kind == "abs" and abs(note.score - 3.0) < 1e-9
+
+
+def test_compare_tie_follows_corner_order():
+    # stesso rapporto (2,0 esatto: riferimento a zero) su tutte le misure:
+    # vince l'ordine della curva, freno, ABS, marcia, sterzo, gas
+    zero = _g(release=0.0, pickup=0.0, abs_=0.0, steer=0)
+    two = dict(release=2 * RELEASE_NOISE_S, pickup=2 * PICKUP_NOISE_S,
+               abs_=2 * ABS_NOISE_S, steer=int(2 * STEER_NOISE))
+    assert compare(_g(**two), zero).kind == "release"
+    two["release"] = 0.0
+    assert compare(_g(**two), zero).kind == "abs"
+    two["abs_"] = 0.0
+    assert compare(_g(**two), zero).kind == "steer"
+    two["steer"] = 0
+    assert compare(_g(**two), zero).kind == "pickup"
+
+
+def test_compare_slower_side_also_counts():
+    # la differenza e' assoluta: anche rilasciare piu' in fretta e' diverso
+    note = compare(_g(release=1.0 - 2 * RELEASE_NOISE_S + 2.0),
+                   _g(release=3.0))
+    assert note.kind == "release" and abs(note.score - 2.0) < 1e-9
