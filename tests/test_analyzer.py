@@ -16,7 +16,7 @@ import synth
 def _stats(lost, **kw):
     base = dict(throttle_live=1.0, throttle_ref=1.0, brake_live=0.0, brake_ref=0.0,
                 min_speed_live=100.0, min_speed_ref=100.0, braking_early=False,
-                braking_late=False)
+                braking_late=False, phase_ms=None)
     base.update(kw)
     return CornerStats(lost_ms=lost, **base)
 
@@ -219,7 +219,7 @@ def test_the_level_never_contradicts_the_voice():
         st = CornerStats(lost_ms=lost, throttle_live=1.0, throttle_ref=1.0,
                          brake_live=0.0, brake_ref=0.0, min_speed_live=100.0,
                          min_speed_ref=100.0, braking_early=False,
-                         braking_late=False)
+                         braking_late=False, phase_ms=None)
         assert classify_corner(st, 0, 0.3) is not None
         assert corner_level(lost) in ("warn", "bad")
     assert corner_level(-_GAIN_MS) == "gain"

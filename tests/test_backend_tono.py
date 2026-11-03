@@ -28,7 +28,7 @@ LANGS = ("it", "en")
 
 _STATS = CornerStats(lost_ms=184.0, throttle_live=0.455, throttle_ref=0.724,
                      brake_live=0.312, brake_ref=0.187, min_speed_live=96.4,
-                     min_speed_ref=103.8, braking_early=True, braking_late=False)
+                     min_speed_ref=103.8, braking_early=True, braking_late=False, phase_ms=None)
 
 
 def _debrief_texts(lang):

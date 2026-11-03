@@ -119,7 +119,7 @@ def _time_loss(lost_ms):
     return classify_corner(CornerStats(
         lost_ms=lost_ms, throttle_live=1.0, throttle_ref=1.0, brake_live=0.0,
         brake_ref=0.0, min_speed_live=100.0, min_speed_ref=100.0,
-        braking_early=False, braking_late=False), 0, 0.3)
+        braking_early=False, braking_late=False, phase_ms=None), 0, 0.3)
 
 
 def _fuel_cues(levels):

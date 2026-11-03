@@ -24,7 +24,7 @@ def test_debrief_content_translates_to_italian():
     st = CornerStats(lost_ms=300, throttle_live=0.5, throttle_ref=0.5,
                      brake_live=0.0, brake_ref=0.0, min_speed_live=120.0,
                      min_speed_ref=128.0, braking_early=False,
-                     braking_late=False)
+                     braking_late=False, phase_ms=None)
     detail_it, _ = explain_loss(CueCategory.CARRY_SPEED, st, "it")
     assert "All'apex la tua velocità minima è 120 km/h" in detail_it
     detail_en, _ = explain_loss(CueCategory.CARRY_SPEED, st, "en")
@@ -50,7 +50,7 @@ def test_debrief_ranks_the_slow_corner_first():
 def _stats(**kw):
     base = dict(lost_ms=200.0, throttle_live=0.6, throttle_ref=0.9, brake_live=0.5,
                 brake_ref=0.2, min_speed_live=90.0, min_speed_ref=110.0,
-                braking_early=False, braking_late=False)
+                braking_early=False, braking_late=False, phase_ms=None)
     base.update(kw)
     return CornerStats(**base)
 

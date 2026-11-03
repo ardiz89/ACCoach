@@ -849,6 +849,9 @@ def build_lap_debrief(lap: Lap, reference: Reference, corners: list[Corner],
             brake_live=brk_live, brake_ref=brk_ref,
             min_speed_live=vmin_live, min_speed_ref=vmin_ref,
             braking_early=braking_early, braking_late=braking_late,
+            # Le stesse fasi che il report pubblica: la causa la sceglie il
+            # costo del suo tratto, con la regola del vivo.
+            phase_ms={p.phase: p.lost_ms for p in phases} or None,
         )
         cue = classify_corner(stats, c.index, c.apex_pos)
         if cue is None or cue.category == CueCategory.GOOD:

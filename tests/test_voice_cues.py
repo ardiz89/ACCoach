@@ -59,12 +59,12 @@ def test_the_numeric_cues_have_a_neural_wav_for_what_the_detectors_say():
         st = CornerStats(lost_ms=tenths * 100.0 - 20.0, throttle_live=1.0,
                          throttle_ref=1.0, brake_live=0.0, brake_ref=0.0,
                          min_speed_live=100.0, min_speed_ref=100.0,
-                         braking_early=False, braking_late=False)
+                         braking_early=False, braking_late=False, phase_ms=None)
         said.add(classify_corner(st, 0, 0.3).message)
     said.add(classify_corner(CornerStats(
         lost_ms=130.0, throttle_live=1.0, throttle_ref=1.0, brake_live=0.0,
         brake_ref=0.0, min_speed_live=100.0, min_speed_ref=100.0,
-        braking_early=False, braking_late=False), 0, 0.3).message)
+        braking_early=False, braking_late=False, phase_ms=None), 0, 0.3).message)
     assert said <= spoken.numeric_cue_messages(), said - spoken.numeric_cue_messages()
     assert "Qui perdi 1 decimo" in said
     man = _manifest()
