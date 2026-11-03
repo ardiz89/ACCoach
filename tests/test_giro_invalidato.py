@@ -169,3 +169,19 @@ def test_from_the_engine_it_is_said_once(tmp_path):
     detti = [g for g, c in s.detti if c is CueCategory.LAP_INVALID]
     assert detti == [2], f"giro invalidato detto ai giri {detti}"
     s.eng.close()
+
+
+def test_a_real_reference_does_not_crash_the_coach():
+    """Il motore passa un `Reference`, non un giro: i test sopra sostituivano
+    `line_points` e non se ne accorgevano. Il 01/11 a Imola e' finito nel log
+    come eccezione non gestita («'Reference' has no len()»), e il lato della
+    linea non si e' piu' calcolato per tutta la sessione."""
+    from accoach.comparison.reference import Reference
+    ref = Reference(synth.build_lap())
+    c = LapValidityCoach()
+    p0, p1 = CORNER.entry_pos + 0.01, CORNER.entry_pos + 0.02
+    x0, z0 = synth._track_xz(p0)
+    x1, z1 = synth._track_xz(p1)
+    c.update(frame(p0, x=x0, z=z0), True, 0.0, [CORNER], ref)
+    c.update(frame(p1, valid=False, x=x1, z=z1), True, 0.1, [CORNER], ref)
+    assert c._ref_points, "la linea del riferimento non si e' letta"

@@ -71,7 +71,9 @@ class LapValidityCoach:
             return None
         if reference is not self._ref:
             self._ref = reference
-            self._ref_points = line_points(reference)
+            # Il motore passa un `Reference`, che tiene il giro in `.lap`: i
+            # campioni sono li' (01/11, «'Reference' has no len()»).
+            self._ref_points = line_points(getattr(reference, "lap", reference))
         if not has_line(self._ref_points):
             return None
         here = [LinePoint(pos=s.lap_position, x=x, z=z, speed_kmh=s.speed_kmh, brake=0.0)
