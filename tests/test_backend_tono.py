@@ -16,6 +16,7 @@ from accoach.coaching import chain, debrief, phases, training
 from accoach.coaching.analyzer import CornerStats
 from accoach.coaching.cue import CueCategory as C
 from accoach.coaching.debrief import CornerLoss, GripState, LapDebrief
+from accoach.coaching.gestures import GestureNote
 from accoach.coaching.plan import Goal, GoalProgress, TrainingPlan
 from accoach.engineer import Balance, Phase, Speed, Symptom
 from accoach.trajectory import _TAGS, tag_text
@@ -29,6 +30,24 @@ LANGS = ("it", "en")
 _STATS = CornerStats(lost_ms=184.0, throttle_live=0.455, throttle_ref=0.724,
                      brake_live=0.312, brake_ref=0.187, min_speed_live=96.4,
                      min_speed_ref=103.8, braking_early=True, braking_late=False, phase_ms=None)
+
+
+#: Tutte le forme di ``debrief.gesture_text``: ogni tipo, il singolare dello
+#: sterzo, e i lati a zero (nessuna correzione, «di colpo», ABS «mai»).
+_GESTURE_NOTES = [
+    GestureNote("release", 0.24, 0.81, 1.5),
+    GestureNote("release", 0.04, 0.81, 1.5),
+    GestureNote("release", 1.24, 0.0, 1.5),
+    GestureNote("pickup", 1.24, 0.51, 1.5),
+    GestureNote("pickup", 1.24, 0.0, 1.5),
+    GestureNote("gear", "3", "2", 1.0),
+    GestureNote("gear", "1", "12", 1.0),
+    GestureNote("abs", 1.54, 0.42, 3.0),
+    GestureNote("abs", 1.54, 0.0, 3.0),
+    GestureNote("steer", 4, 1, 3.0),
+    GestureNote("steer", 4, 0, 3.0),
+    GestureNote("steer", 1, 0, 1.5),
+]
 
 
 def _debrief_texts(lang):
@@ -49,6 +68,8 @@ def _debrief_texts(lang):
     out.append(debrief.brake_early_text(12.4, lang))
     out.append(debrief._BRAKE_LANDMARK[lang].format(lm="al cordolo"))
     out.append(debrief.brake_peak_text(0.823, 0.971, lang))
+    # Ogni forma della frase del gesto, anche coi lati a zero.
+    out += [debrief.gesture_text(n, lang) for n in _GESTURE_NOTES]
     out.append(debrief.top_speed_message(6.2, lang))
     out += [debrief._TOP_SPEED_AERO[lang], debrief._TOP_SPEED_EXIT[lang]]
     for theme in ("braking", "traction", "cornering", "line"):

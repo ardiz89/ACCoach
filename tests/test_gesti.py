@@ -320,9 +320,9 @@ def test_gesture_sentences_one_per_kind():
         (GestureNote("gear", "3", "2", 1.0),
          "All'apex sei in 3ª, il riferimento in 2ª.",
          "At the apex you're in 3rd, the reference in 2nd."),
-        (GestureNote("abs", 1.5, 0.0, 4.0),
-         "L'ABS lavora 1,5 s, nel riferimento 0,0 s.",
-         "ABS is active for 1.5 s, in the reference 0.0 s."),
+        (GestureNote("abs", 1.5, 0.4, 4.0),
+         "L'ABS lavora 1,5 s, nel riferimento 0,4 s.",
+         "ABS is active for 1.5 s, in the reference 0.4 s."),
         (GestureNote("steer", 4, 1, 3.0),
          "Correggi lo sterzo 4 volte, il riferimento 1.",
          "You correct the steering 4 times, the reference 1."),
@@ -342,6 +342,35 @@ def test_gesture_sentence_ordinals_and_singular():
         " Correggi lo sterzo una volta, il riferimento 3."
     assert gesture_text(GestureNote("steer", 1, 3, 2.0), "en") == \
         " You correct the steering once, the reference 3."
+
+
+def test_gesture_sentences_with_a_zero_side():
+    """Revisione finale: «Correggi lo sterzo 0 volte», «Apri il gas in 0,0 s»
+    e «L'ABS lavora 0,0 s» si leggono male. Un lato a zero ha la sua frase."""
+    from accoach.coaching.debrief import gesture_text
+    cases = [
+        (GestureNote("steer", 3, 0, 1.5),
+         "Correggi lo sterzo 3 volte, il riferimento nessuna.",
+         "You correct the steering 3 times, the reference none."),
+        (GestureNote("steer", 1, 0, 1.5),
+         "Correggi lo sterzo una volta, il riferimento nessuna.",
+         "You correct the steering once, the reference none."),
+        (GestureNote("release", 0.04, 0.8, 1.5),
+         "Rilasci il freno di colpo, il riferimento in 0,8 s.",
+         "You release the brake at once, the reference in 0.8 s."),
+        (GestureNote("release", 1.2, 0.0, 1.5),
+         "Rilasci il freno in 1,2 s, il riferimento di colpo.",
+         "You release the brake in 1.2 s, the reference at once."),
+        (GestureNote("pickup", 1.24, 0.0, 1.5),
+         "Apri il gas in 1,2 s, il riferimento di colpo.",
+         "You open the throttle in 1.2 s, the reference at once."),
+        (GestureNote("abs", 1.5, 0.0, 4.0),
+         "L'ABS lavora 1,5 s, nel riferimento mai.",
+         "ABS works for 1.5 s, never in the reference."),
+    ]
+    for note, it, en in cases:
+        assert gesture_text(note, "it") == " " + it
+        assert gesture_text(note, "en") == " " + en
 
 
 def test_gesture_uses_the_corner_reference_and_stays_before_the_comparison():

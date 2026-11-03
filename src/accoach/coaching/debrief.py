@@ -204,22 +204,37 @@ def compared_text(lap_time_ms: int, lang: str) -> str:
 # Il gesto della curva diverso dal riferimento piu' del rumore
 # (coaching/gestures.py). Uno solo per curva, e solo nel report: la voce non
 # ne sa niente. I secondi con un decimale, come li legge chi guida.
+#
+# Un lato a zero ha la sua forma: «0 volte», «in 0,0 s» e «0,0 s di ABS» si
+# leggono come un errore del programma. Un tempo che a un decimale fa 0,0
+# diventa «di colpo»; il riferimento senza correzioni «nessuna», senza ABS
+# «mai». Col verso di ``compare`` il tuo lato di sterzo, gas e ABS e' sempre
+# il piu' grande, quindi lo zero li' e' solo del riferimento; il rilascio
+# conta nei due versi e puo' essere a zero da tutte e due le parti.
 _GESTURE = {
     "en": {
-        "release": " You release the brake in {live} s, the reference in {ref} s.",
-        "pickup": " You open the throttle in {live} s, the reference in {ref} s.",
+        "release": " You release the brake {live}, the reference {ref}.",
+        "pickup": " You open the throttle {live}, the reference {ref}.",
         "gear": " At the apex you're in {live}, the reference in {ref}.",
         "abs": " ABS is active for {live} s, in the reference {ref} s.",
+        "abs_never": " ABS works for {live} s, never in the reference.",
         "steer": " You correct the steering {live} times, the reference {ref}.",
         "steer_one": " You correct the steering once, the reference {ref}.",
+        "seconds": "in {x} s",
+        "at_once": "at once",
+        "none": "none",
     },
     "it": {
-        "release": " Rilasci il freno in {live} s, il riferimento in {ref} s.",
-        "pickup": " Apri il gas in {live} s, il riferimento in {ref} s.",
+        "release": " Rilasci il freno {live}, il riferimento {ref}.",
+        "pickup": " Apri il gas {live}, il riferimento {ref}.",
         "gear": " All'apex sei in {live}ª, il riferimento in {ref}ª.",
         "abs": " L'ABS lavora {live} s, nel riferimento {ref} s.",
+        "abs_never": " L'ABS lavora {live} s, nel riferimento mai.",
         "steer": " Correggi lo sterzo {live} volte, il riferimento {ref}.",
         "steer_one": " Correggi lo sterzo una volta, il riferimento {ref}.",
+        "seconds": "in {x} s",
+        "at_once": "di colpo",
+        "none": "nessuna",
     },
 }
 
@@ -242,11 +257,22 @@ def gesture_text(note: GestureNote, lang: str) -> str:
             live, ref = _ordinal_en(live), _ordinal_en(ref)
     elif kind == "steer":
         live, ref = str(int(note.live)), str(int(note.ref))
+        if int(note.ref) == 0:
+            ref = table["none"]
         if int(note.live) == 1:
             kind = "steer_one"
-    else:
+    elif kind == "abs":
         live = fmt_num(float(note.live), 1, lang)
         ref = fmt_num(float(note.ref), 1, lang)
+        if ref == fmt_num(0.0, 1, lang):      # lo zero come si stampa
+            kind = "abs_never"
+    else:
+        def when(x: float) -> str:
+            text = fmt_num(x, 1, lang)
+            if text == fmt_num(0.0, 1, lang):    # lo zero come si stampa
+                return table["at_once"]
+            return table["seconds"].format(x=text)
+        live, ref = when(float(note.live)), when(float(note.ref))
     return table[kind].format(live=live, ref=ref)
 
 
