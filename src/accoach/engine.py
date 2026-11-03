@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import re
 import threading
+from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -41,6 +42,7 @@ from .coaching.cue import Cue, CueCategory, gates_voice, theme_key, trigger_text
 from .coaching.debrief import build_lap_debrief
 from .coaching.diagnosis import build_lap_stats
 from .coaching.atwheel import WheelWatch
+from .coaching.corner_refs import POOL_SIZE, CornerBests
 from .coaching.focus import FocusCoach, FocusKind, FocusReport
 from .coaching.lapvalid import LapValidityCoach
 from .coaching.pitcall import PitCall
@@ -50,6 +52,7 @@ from .comparison import DeltaState, LapComparator, Reference
 from .engineer import DecisionKind, RaceEngineer, classify, engineer_for
 from .recording import Lap, LapRecorder, find_reference_lap, laps_root, save_lap
 from .recording.recorder import StartLineWatcher
+from .recording.storage import reference_pool
 from .telemetry import SharedMemoryReader, TelemetrySnapshot
 from .telemetry.snapshot import ACStatus
 from .telemetry.feed import TelemetryFeed
@@ -353,6 +356,24 @@ def _load_reference(car: str, track: str, laps_dir: Path | str,
     return ref if ref.usable else None
 
 
+def _build_corner_bests(main: Reference, corners: list[Corner],
+                        car: str, track: str, laps_dir: Path,
+                        road_temp: float | None, grip: float | None,
+                        compound: str | None) -> CornerBests:
+    """Il gesto migliore di ogni curva, dal bacino. Gira sul thread del bacino.
+
+    Il ``CornerBests`` nasce qui e qui riceve i giri del bacino; al tick passa
+    finito, e da lì in poi lo tocca solo il tick (non è thread-safe). Auto,
+    pista e condizioni sono quelle che hanno eletto ``main`` in
+    `_load_reference`, così il bacino si rilassa come si è rilassato lui.
+    """
+    bests = CornerBests(main, corners)
+    for other in reference_pool(car, track, laps_dir,
+                                road_temp, grip, compound, POOL_SIZE):
+        bests.offer(other)
+    return bests
+
+
 def _corner_labels(car: str, track: str, corners: list[Corner],
                    laps_dir: Path | str) -> dict[int, str]:
     """Nome di ogni **zona** dell'analyzer, nell'ordine in cui l'analyzer le indicizza.
@@ -515,6 +536,74 @@ class CoachEngine:
         self._cmd_lock = threading.Lock()
         self._applied_pending = False
 
+        # Il gesto migliore di ogni curva (coaching/corner_refs.py). Il bacino
+        # si carica fuori dal tick. Misurato il 03/11 sulla copia dell'archivio
+        # (Monza, 720S): `load_lap` 6,5 ms a giro, 133 ms per 20 giri; il
+        # bacino intero 118-273 ms col catalogo, più 10 ms di confronti. Ogni
+        # giro sta sotto i 50 ms, la somma no: dentro un tick a 20 Hz sarebbero
+        # da 2 a 5 frame saltati a ogni nuovo riferimento, e crescerebbero con
+        # l'archivio. Un solo lavoratore, creato alla prima costruzione.
+        self._pool: ThreadPoolExecutor | None = None
+        #: La costruzione in volo e il riferimento per cui è partita.
+        self._bests_future: Future | None = None
+        self._bests_token: tuple | None = None
+        #: I giri salvati mentre la costruzione era in volo: il bacino può non
+        #: averli visti, e al passaggio di mano si offrono.
+        self._bests_waiting: list[Lap] = []
+        #: I gesti migliori consegnati all'analyzer; li tocca solo il tick.
+        self._bests: CornerBests | None = None
+
+    def _drop_corner_bests(self) -> None:
+        """Il riferimento è cambiato: i gesti di prima misuravano altre zone."""
+        self.analyzer.set_corner_refs(None)
+        self._bests = None
+        self._bests_waiting = []
+        self._bests_token = None
+        if self._bests_future is not None:
+            self._bests_future.cancel()      # se è già partita, la butta il token
+            self._bests_future = None
+
+    def _start_corner_bests(self, car: str, track: str) -> None:
+        """Parte la costruzione per il riferimento di adesso, se ha senso."""
+        ref = self._reference
+        if ref is None or ref.lap.source == "pro" or not self._corners:
+            return                           # Decisione 5: spento
+        if self._pool is None:
+            self._pool = ThreadPoolExecutor(max_workers=1,
+                                            thread_name_prefix="hone-bacino")
+        self._bests_token = _reference_token(ref)
+        # Le stesse curve date a `analyzer.set_corners`: le finestre del
+        # CornerBests devono essere le zone dell'analyzer, non un altro calcolo.
+        self._bests_future = self._pool.submit(
+            _build_corner_bests, ref, self._corners, car, track, self.laps_dir,
+            self._road_temp, self._grip, self._compound)
+
+    def _take_corner_bests(self) -> None:
+        """Nel tick: se la costruzione è finita, passa all'analyzer.
+
+        Non aspetta mai. Una costruzione per un riferimento che non è più quello
+        di adesso si butta; un errore del bacino lascia il principale e basta.
+        """
+        fut = self._bests_future
+        if fut is None or not fut.done():
+            return
+        self._bests_future = None
+        waiting, self._bests_waiting = self._bests_waiting, []
+        if fut.cancelled():
+            return
+        if self._bests_token != _reference_token(self._reference):
+            return
+        try:
+            bests = fut.result()
+        except Exception:
+            _log.warning("gesti migliori per curva non costruiti; resta il "
+                         "riferimento principale", exc_info=True)
+            return
+        for lap in waiting:
+            bests.offer(lap)
+        self._bests = bests
+        self.analyzer.set_corner_refs(bests)
+
     def _rebuild_reference(self, car: str, track: str) -> None:
         # Today's track temperature decides which past lap is a fair benchmark:
         # a personal best set on a rubbered-in evening track is the wrong target
@@ -543,6 +632,10 @@ class CoachEngine:
         # accanto.
         self.analyzer.set_corners(corners)
         self.analyzer.reset()
+        # I gesti migliori di prima misuravano le zone del riferimento di
+        # prima: si spengono subito, e i nuovi arrivano dal thread del bacino.
+        self._drop_corner_bests()
+        self._start_corner_bests(car, track)
         # Il comparatore nuovo non sa quali staccate il pilota ha gia' imparato.
         self._update_wean()
 
@@ -1267,6 +1360,10 @@ class CoachEngine:
                 save_lap(lap, self.laps_dir)
                 saved = [lap]
 
+        # Prima dei giri salvati: un giro di questo tick si offre ai gesti
+        # appena arrivati, non si mette in coda per una costruzione già finita.
+        self._take_corner_bests()
+
         for lap in saved:
             self.saved_laps += 1
             # Use the LAP's own car/track, not snap's: between completing the lap
@@ -1275,6 +1372,15 @@ class CoachEngine:
             if lap.car_model and (lap.car_model, lap.track) != self._key:
                 continue                                            # not this session
             self._observe_lap(lap)
+            # Prima di `_rebuild_reference`, che quasi sempre esce subito perché
+            # il principale è lo stesso: il giro può aver preso una curva, e il
+            # bacino non si ricarica per un giro solo. Se invece diventa lui il
+            # principale, `_rebuild_reference` butta tutto e riparte comunque.
+            if self._bests is not None:
+                if self._bests.offer(lap):
+                    self.analyzer.set_corner_refs(self._bests)
+            elif self._bests_future is not None:
+                self._bests_waiting.append(lap)
             self._rebuild_reference(lap.car_model, lap.track)        # chase the new best
         if saved:
             # Dopo il riferimento, non dentro `_observe_lap`: la curva si dice
@@ -1437,6 +1543,11 @@ class CoachEngine:
         return ""
 
     def close(self) -> None:
+        # Senza aspettare: una costruzione in volo finisce da sé, chi è in coda
+        # non parte. Il bacino è un vantaggio, non vale l'attesa di chi chiude.
+        if self._pool is not None:
+            self._pool.shutdown(wait=False, cancel_futures=True)
+            self._pool = None
         if self.voice is not None:
             self.voice.close()
         # Stop the feed before closing the reader it polls.

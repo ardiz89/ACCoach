@@ -441,3 +441,314 @@ def test_live_a_zone_in_progress_keeps_the_ref_it_started_with():
     _drive(an, cmp, main, on_frame=swap)
     assert swapped
     assert set(an._advice) == {1}
+
+
+# --- Task 5: il motore li tiene aggiornati senza fermare il tick ------------
+#
+# Il bacino si carica su un thread del motore. Qui non si aspetta mai a tempo:
+# si aspetta il Future della costruzione, poi un tick fa il passaggio di mano,
+# come dal vivo.
+
+class _Feed:
+    """Il feed dal vivo, guidato a mano: l'ultimo frame e i giri appena salvati."""
+
+    def __init__(self) -> None:
+        from accoach.telemetry.snapshot import TelemetrySnapshot
+        self.snap = TelemetrySnapshot.disconnected()
+        self.saved: list = []
+
+    def latest(self):
+        return self.snap
+
+    def drain_saved(self):
+        out, self.saved = self.saved, []
+        return out
+
+
+def _own(laps_dir, lap, minute):
+    """Un giro tuo, pulito, salvato come lo salva il feed."""
+    lap.clean = True
+    lap.recorded_utc = f"2026-11-02T10:{minute:02d}:00+00:00"
+    save_lap(lap, laps_dir)
+    return lap
+
+
+def _engine(laps_dir):
+    from accoach.engine import CoachEngine
+    feed = _Feed()
+    return CoachEngine(feed=feed, voice=None, laps_dir=laps_dir), feed
+
+
+def _tick(eng, feed, saved=(), **kw):
+    feed.snap = synth.snap(pos=0.05, is_acc=True, **kw)
+    feed.saved = list(saved)
+    eng.tick(0.0)
+
+
+def _last_corner(eng):
+    return max(eng._corners, key=lambda c: c.entry_pos)
+
+
+def _gated_pool(monkeypatch, *, empty=False):
+    """Il bacino che aspetta un via: la costruzione resta in volo finché il
+    test non la libera. ``empty``: finita, non trova nessun giro."""
+    import threading
+    from accoach import engine as engine_mod
+    started, gate = threading.Event(), threading.Event()
+    real = engine_mod.reference_pool
+
+    def pool(*a, **kw):
+        started.set()
+        assert gate.wait(5)
+        return [] if empty else real(*a, **kw)
+
+    monkeypatch.setattr(engine_mod, "reference_pool", pool)
+    return started, gate
+
+
+def _spy_set(eng):
+    seen = []
+    real_set = eng.analyzer.set_corner_refs
+
+    def spy(bests):
+        seen.append(bests)
+        real_set(bests)
+
+    eng.analyzer.set_corner_refs = spy
+    return seen
+
+
+def _settle(eng, feed):
+    """Il primo tick fa partire la costruzione. Se non è già passata di mano
+    nello stesso tick, si aspetta il suo Future e un altro tick la passa."""
+    _tick(eng, feed)
+    fut = eng._bests_future
+    if fut is not None:
+        fut.result(timeout=5)
+        _tick(eng, feed)
+
+
+def test_motore_nuovo_riferimento_costruisce_i_gesti_migliori(tmp_path,
+                                                             monkeypatch):
+    import threading
+    from accoach import engine as engine_mod
+    threads = []
+    real = engine_mod.reference_pool
+
+    def where(*a, **kw):
+        threads.append(threading.current_thread())
+        return real(*a, **kw)
+
+    monkeypatch.setattr(engine_mod, "reference_pool", where)
+    main = _own(tmp_path, synth.build_lap(slow_corner=1, amt=10), 1)
+    other = _own(tmp_path, synth.build_lap(slow_corner=0, amt=30), 2)
+    eng, feed = _engine(tmp_path)
+    try:
+        _settle(eng, feed)
+        assert eng._reference.lap.lap_time_ms == main.lap_time_ms
+        # Il bacino si è caricato una volta, e non sul thread del tick.
+        assert len(threads) == 1
+        assert threads[0] is not threading.current_thread()
+        bests = eng.analyzer._bests
+        assert bests is not None and bests.main is eng._reference
+        # Costruito dalle stesse curve date all'analyzer.
+        got = bests.at(_last_corner(eng).apex_pos)
+        assert got is not None and got.reference.lap.lap_time_ms == other.lap_time_ms
+        first = min(eng._corners, key=lambda c: c.entry_pos)
+        assert bests.at(first.apex_pos) is None
+        assert eng._bests_future is None          # passato di mano una volta sola
+    finally:
+        eng.close()
+
+
+def test_motore_il_tick_non_aspetta_e_i_giri_salvati_intanto_contano(tmp_path,
+                                                                     monkeypatch):
+    started, gate = _gated_pool(monkeypatch, empty=True)
+    _own(tmp_path, synth.build_lap(slow_corner=1, amt=10), 1)
+    eng, feed = _engine(tmp_path)
+    try:
+        _tick(eng, feed)
+        fut = eng._bests_future
+        assert started.wait(5)
+        _tick(eng, feed)
+        assert not fut.done() and eng.analyzer._bests is None   # il tick va avanti
+        other = _own(tmp_path, synth.build_lap(slow_corner=0, amt=30), 2)
+        _tick(eng, feed, saved=[other])
+        assert eng._bests_future is fut          # stesso riferimento: nessun'altra
+        gate.set()
+        fut.result(timeout=5)
+        _tick(eng, feed)
+        # Il bacino era vuoto: la curva l'ha presa il giro salvato nel frattempo.
+        got = eng.analyzer._bests.at(_last_corner(eng).apex_pos)
+        assert got is not None and got.reference.lap is other
+    finally:
+        gate.set()
+        eng.close()
+
+
+def test_motore_un_giro_salvato_piu_veloce_in_una_curva_vale_subito(tmp_path,
+                                                                    monkeypatch):
+    from accoach import engine as engine_mod
+    calls = []
+    real = engine_mod.reference_pool
+
+    def counting(*a, **kw):
+        calls.append(a)
+        return real(*a, **kw)
+
+    monkeypatch.setattr(engine_mod, "reference_pool", counting)
+    _own(tmp_path, synth.build_lap(slow_corner=1, amt=10), 1)
+    eng, feed = _engine(tmp_path)
+    try:
+        _settle(eng, feed)
+        bests = eng.analyzer._bests
+        c1 = _last_corner(eng)
+        assert bests is not None and bests.at(c1.apex_pos) is None
+        seen = _spy_set(eng)
+        other = _own(tmp_path, synth.build_lap(slow_corner=0, amt=30), 2)
+        _tick(eng, feed, saved=[other])
+        assert seen == [bests]                   # subito, nello stesso tick
+        assert eng.analyzer._bests.at(c1.apex_pos).reference.lap is other
+        assert len(calls) == 1                   # il bacino non si ricarica
+        assert eng._bests_future is None
+        # Un giro che non batte niente non chiama nessuno.
+        slow = _own(tmp_path, synth.build_lap(slow_corner=1, amt=30), 3)
+        _tick(eng, feed, saved=[slow])
+        assert seen == [bests]
+    finally:
+        eng.close()
+
+
+def test_motore_riferimento_pro_niente_gesti_migliori(tmp_path):
+    from accoach.recording.pro import import_pro
+    laps = tmp_path / "laps"
+    _own(laps, synth.build_lap(slow_corner=1, amt=10), 1)
+    _own(laps, synth.build_lap(slow_corner=0, amt=30), 2)
+    eng, feed = _engine(laps)
+    try:
+        _settle(eng, feed)
+        assert eng.analyzer._bests is not None
+        # Arriva un giro PRO più veloce: diventa il principale al prossimo giro.
+        pro = synth.build_lap()
+        synth.retime(pro, 95_000)
+        pro.recorded_utc = "2026-01-01T09:00:00+00:00"
+        out = tmp_path / "fuori"
+        out.mkdir()
+        import_pro(save_lap(pro, out), laps)
+        slow = _own(laps, synth.build_lap(slow_corner=1, amt=30), 3)
+        _tick(eng, feed, saved=[slow])
+        assert eng._reference.lap.source == "pro"
+        assert eng.analyzer._bests is None
+        assert eng._bests_future is None         # nessuna costruzione per un PRO
+    finally:
+        eng.close()
+
+
+def test_motore_auto_nuova_spegne_i_gesti_migliori(tmp_path):
+    _own(tmp_path, synth.build_lap(slow_corner=1, amt=10), 1)
+    _own(tmp_path, synth.build_lap(slow_corner=0, amt=30), 2)
+    eng, feed = _engine(tmp_path)
+    try:
+        _settle(eng, feed)
+        assert eng.analyzer._bests is not None
+        _tick(eng, feed, car_model="porsche_992_gt3_r")
+        assert eng._reference is None
+        assert eng.analyzer._bests is None and eng._bests_future is None
+    finally:
+        eng.close()
+
+
+def test_motore_una_costruzione_per_un_riferimento_vecchio_si_butta(tmp_path,
+                                                                    monkeypatch):
+    started, gate = _gated_pool(monkeypatch)
+    _own(tmp_path, synth.build_lap(slow_corner=1, amt=10), 1)
+    eng, feed = _engine(tmp_path)
+    try:
+        _tick(eng, feed)
+        fut_a = eng._bests_future
+        assert started.wait(5)                   # A sta caricando il bacino
+        seen = _spy_set(eng)
+        best = _own(tmp_path, synth.build_lap(), 2)     # nuovo miglior giro
+        _tick(eng, feed, saved=[best])
+        assert eng._reference.lap.lap_time_ms == best.lap_time_ms
+        assert seen == [None]                    # spento subito, prima del bacino
+        fut_b = eng._bests_future
+        assert fut_b is not None and fut_b is not fut_a
+        gate.set()
+        built_a = fut_a.result(timeout=5)        # A finisce, ma è vecchio
+        assert built_a.main.lap.lap_time_ms != best.lap_time_ms
+        fut_b.result(timeout=5)
+        _tick(eng, feed)
+        assert built_a not in seen
+        assert eng.analyzer._bests is not None
+        assert eng.analyzer._bests.main is eng._reference
+    finally:
+        gate.set()
+        eng.close()
+
+
+def test_motore_passaggio_di_mano_controlla_il_riferimento(tmp_path,
+                                                          monkeypatch):
+    """La costruzione si lega al riferimento per cui è partita: se all'arrivo il
+    riferimento è un altro, si butta anche se è l'unica in volo."""
+    started, gate = _gated_pool(monkeypatch)
+    _own(tmp_path, synth.build_lap(slow_corner=1, amt=10), 1)
+    _own(tmp_path, synth.build_lap(slow_corner=0, amt=30), 2)
+    eng, feed = _engine(tmp_path)
+    try:
+        _tick(eng, feed)
+        fut = eng._bests_future
+        assert started.wait(5)
+        eng._bests_token = ("2020-01-01T00:00:00+00:00", 1)   # un altro giro
+        gate.set()
+        assert fut.result(timeout=5) is not None
+        _tick(eng, feed)
+        assert eng.analyzer._bests is None and eng._bests_future is None
+    finally:
+        gate.set()
+        eng.close()
+
+
+def test_motore_un_errore_nel_bacino_non_ferma_il_tick(tmp_path, monkeypatch):
+    import logging
+    from accoach import engine as engine_mod
+
+    def broken(*a, **kw):
+        raise RuntimeError("disco staccato")
+
+    monkeypatch.setattr(engine_mod, "reference_pool", broken)
+    records = []
+    handler = logging.Handler()
+    handler.emit = records.append
+    log = logging.getLogger("accoach.coach")
+    log.addHandler(handler)
+    _own(tmp_path, synth.build_lap(slow_corner=1, amt=10), 1)
+    eng, feed = _engine(tmp_path)
+    try:
+        _tick(eng, feed)
+        fut = eng._bests_future
+        if fut is not None:                      # non ancora passata di mano
+            assert isinstance(fut.exception(timeout=5), RuntimeError)
+            _tick(eng, feed)                     # non solleva
+        assert eng.analyzer._bests is None and eng._bests_future is None
+        assert any(r.levelno == logging.WARNING for r in records)
+    finally:
+        log.removeHandler(handler)
+        eng.close()
+
+
+def test_motore_chiudere_non_aspetta_una_costruzione_in_volo(tmp_path, monkeypatch):
+    started, gate = _gated_pool(monkeypatch)
+    _own(tmp_path, synth.build_lap(slow_corner=1, amt=10), 1)
+    eng, feed = _engine(tmp_path)
+    try:
+        _tick(eng, feed)
+        assert started.wait(5)
+        fut = eng._bests_future
+        eng.close()                              # ritorna con il bacino in volo
+        assert eng._pool is None
+        assert not fut.done()                    # chiudere non l'ha aspettata
+        gate.set()
+        fut.result(timeout=5)                    # e finisce da sé
+    finally:
+        gate.set()
