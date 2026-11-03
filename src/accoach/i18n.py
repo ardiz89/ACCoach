@@ -536,18 +536,20 @@ _UI: dict[str, dict[str, str]] = {
         "it": "Apre una copia dell'overlay da trascinare. Funziona col gioco in "
               "Borderless, anche con Coach Live acceso."},
     "set.place_hint": {
-        "en": "Drag the copy where you want it and press Enter. The Coach Live "
-              "overlay moves there by itself.",
-        "it": "Trascina la copia dove vuoi e premi Invio. L'overlay di Coach Live "
-              "si sposta da solo."},
+        "en": "Drag the copy where you want it. The position is saved when you "
+              "let go, and the Coach Live overlay moves there by itself.",
+        "it": "Trascina la copia dove vuoi. La posizione si salva quando lasci il "
+              "mouse, e l'overlay di Coach Live si sposta da solo."},
     "set.centered": {"en": "The overlay is back at the top centre.",
                      "it": "L'overlay è tornato in alto al centro."},
     "place.title": {"en": "Move the overlay · size {scale}",
                     "it": "Sposta l'overlay · grandezza {scale}"},
-    "place.keys": {"en": "Drag with the mouse. Wheel for the size. Enter saves, "
-                         "Esc cancels, R puts it back at the centre.",
-                   "it": "Trascina col mouse. Rotella per la grandezza. Invio "
-                         "salva, Esc annulla, R lo rimette al centro."},
+    "place.keys": {"en": "Drag with the mouse and wheel for the size, both "
+                         "saved by themselves. Enter or Esc closes, R puts it "
+                         "back at the centre.",
+                   "it": "Trascina col mouse e usa la rotella per la grandezza, "
+                         "si salvano da sole. Invio o Esc chiude, R lo rimette al "
+                         "centro."},
     "place.theme": {"en": "Braking", "it": "Frenata"},
     "btn.save": {"en": "Save", "it": "Salva"},
     "set.saved": {"en": "Saved.", "it": "Salvato."},

@@ -11,19 +11,24 @@ riavviare niente.
 
 Comandi, scritti anche dentro la finestra:
 
-* trascina col mouse per spostarla;
-* rotella per la grandezza (passi da 0,05, fra 0,5 e 2,5 come in Impostazioni);
-* Invio o doppio clic salva e chiude;
-* Esc chiude senza salvare;
+* trascina col mouse per spostarla: la posizione si salva quando lasci;
+* rotella per la grandezza (passi da 0,05, fra 0,5 e 2,5 come in Impostazioni),
+  salvata da sola poco dopo l'ultimo scatto;
+* Invio, doppio clic o Esc chiude;
 * R la rimette in alto al centro dello schermo di mezzo, e la posizione torna
   automatica.
+
+Fino al 03/11 si salvava solo con Invio. Il pilota trascinava la copia e poi
+chiudeva l'hub, che la chiude con se': la posizione andava persa. E con la
+posizione automatica nel file, «Rimetti al centro» riscriveva lo stesso -1, la
+copia non vedeva nessun cambio e restava dove l'avevi lasciata.
 """
 from __future__ import annotations
 
 import signal
 import sys
 
-from PySide6.QtCore import QRectF, Qt
+from PySide6.QtCore import QRectF, Qt, QTimer
 from PySide6.QtGui import QColor, QPainter, QPen
 from PySide6.QtWidgets import QApplication
 
@@ -35,6 +40,8 @@ from .textfmt import fmt_num
 
 # Gli stessi limiti della casella «Grandezza dell'overlay» in Impostazioni.
 SCALE_MIN, SCALE_MAX, SCALE_STEP = 0.5, 2.5, 0.05
+# Gli scatti della rotella diventano una scrittura sola, come in Impostazioni.
+_SIZE_SAVE_MS = 300
 
 _CYAN = QColor(0x22, 0xD3, 0xCE)
 # La riga dei comandi sta SOTTO l'overlay, in pixel veri: dentro la sua area
@@ -78,6 +85,10 @@ class PlacementOverlay(Overlay):
         # di diventare un punto fisso.
         self._auto_at = self.pos() if self._seen_pos[0] < 0 else None
         self._saved = False
+        self._save_timer = QTimer(self)
+        self._save_timer.setSingleShot(True)
+        self._save_timer.setInterval(_SIZE_SAVE_MS)
+        self._save_timer.timeout.connect(self._save_here)
         self.apply_state(sample_state())
         self.resize(self.width(), self.height() + _BAND_PX)
         self.setFocusPolicy(Qt.StrongFocus)
@@ -126,8 +137,9 @@ class PlacementOverlay(Overlay):
         Prima il timer qui era fermo: il pilota cambiava grandezza o modalita'
         nell'hub e la copia restava com'era. Anche la posizione si segue, ma
         solo quando cambia nel file: «Rimetti al centro» con la copia aperta
-        non la muoveva, e Invio riscriveva la posizione di prima (27/10). Un
-        trascinamento col mouse non cambia il file, quindi non viene annullato."""
+        non la muoveva, e Invio riscriveva la posizione di prima (27/10). Quello
+        che la copia scrive da se' lo segna come gia' visto in `_write`, quindi
+        non la fa saltare."""
         ov = read_overlay()
         if ov is None:                       # file a meta' scrittura: al prossimo giro
             return
@@ -160,14 +172,26 @@ class PlacementOverlay(Overlay):
         self._scale = new
         self.resize(int(_BASE_W * new), int(self._base_h * new) + _BAND_PX)
         self.move(centre.x() - self.width() // 2, centre.y() - self.height() // 2)
+        self._save_timer.start()
         self.update()
 
     def mouseReleaseEvent(self, e) -> None:  # noqa: N802
-        # Qui il rilascio sposta e basta: si salva con Invio, non a ogni tocco.
+        # Lasciata, la posizione si salva: l'overlay di Coach Live la segue, e
+        # chiudere l'hub (che chiude la copia) non la perde piu'.
+        dragged = self._drag_off is not None
         self._drag_off = None
+        if dragged:
+            self._save_here()
 
     def mouseDoubleClickEvent(self, e) -> None:  # noqa: N802
         self.save_and_close()
+
+    def closeEvent(self, e) -> None:  # noqa: N802
+        # Una grandezza ancora in attesa si scrive lo stesso, anche con Esc.
+        if self._save_timer.isActive():
+            self._save_timer.stop()
+            self._save_here()
+        super().closeEvent(e)
 
     def keyPressEvent(self, e) -> None:  # noqa: N802
         key = e.key()
@@ -191,13 +215,26 @@ class PlacementOverlay(Overlay):
         cfg = load_config(reload=True)
         cfg.overlay.x, cfg.overlay.y = x, y
         cfg.overlay.scale = self._scale
-        return save_config(cfg)
+        ok = save_config(cfg)
+        if ok:
+            # Scritto da noi: `_follow_config` non lo deve prendere per un
+            # cambio arrivato dall'hub.
+            self._seen_pos, self._seen_scale = (x, y), clamp_scale(self._scale)
+        return ok
 
-    def save_and_close(self) -> None:
+    def _save_here(self) -> bool:
+        """Salva dove sta la copia adesso. Se non l'hai spostata dalla
+        posizione automatica, resta automatica (-1) invece di diventare un
+        punto fisso."""
         if self._auto_at is not None and self.pos() == self._auto_at:
             self._saved = self._write(-1, -1)
         else:
             self._saved = self._write(self.x(), self.y())
+        return self._saved
+
+    def save_and_close(self) -> None:
+        self._save_timer.stop()
+        self._save_here()
         self.close()
 
     def reset_and_close(self) -> None:

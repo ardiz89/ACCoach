@@ -315,8 +315,8 @@ Coach Live acceso.
 L'overlay non prende i click, così non ti ruba il mouse mentre guidi. Per
 spostarlo apri **Impostazioni** e premi **Sposta l'overlay**. Si apre una copia
 con un bordo tratteggiato, che trascini dove vuoi. La rotella cambia la
-grandezza. **Invio** salva, **Esc** chiude senza salvare, **R** lo rimette in
-alto al centro. Funziona anche con Coach Live acceso, e l'overlay vero si sposta
+grandezza. Posizione e grandezza si salvano da sole, appena lasci il mouse.
+**Invio** o **Esc** chiude la copia, **R** lo rimette in alto al centro. Funziona anche con Coach Live acceso, e l'overlay vero si sposta
 da solo entro un secondo. Il gioco deve essere in Borderless, come per vedere
 l'overlay. **Rimetti al centro** fa la stessa cosa di R senza aprire la copia.
 La copia è una sola, e se premi di nuovo il bottone non se ne apre un'altra.

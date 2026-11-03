@@ -277,3 +277,105 @@ def test_long_tooltips_wrap_and_short_ones_stay_on_one_line():
     assert "<p" in tip_text("Apre il report")
     assert tip_text("") == ""
     assert "&lt;b&gt;" in tip_text("<b>")                # il testo non e' markup
+
+
+# --- 03/11: trascinata e mai salvata -----------------------------------------
+
+def _drag(win, x, y):
+    """Un trascinamento vero: premi, muovi, lascia."""
+    from PySide6.QtCore import QPointF
+    from PySide6.QtGui import QMouseEvent
+    start = win.frameGeometry().topLeft()
+    grab = QPointF(start.x() + 10, start.y() + 10)
+    to = QPointF(x + 10, y + 10)
+    for kind, at in ((QMouseEvent.MouseButtonPress, grab),
+                     (QMouseEvent.MouseMove, to),
+                     (QMouseEvent.MouseButtonRelease, to)):
+        ev = QMouseEvent(kind, at, at, Qt.LeftButton,
+                         Qt.NoButton if kind == QMouseEvent.MouseButtonRelease
+                         else Qt.LeftButton, Qt.NoModifier)
+        {QMouseEvent.MouseButtonPress: win.mousePressEvent,
+         QMouseEvent.MouseMove: win.mouseMoveEvent,
+         QMouseEvent.MouseButtonRelease: win.mouseReleaseEvent}[kind](ev)
+
+
+def test_a_drag_is_saved_when_you_let_go(cfg_file):
+    """Il pilota trascinava la copia e chiudeva l'hub: la posizione si salvava
+    solo con Invio, e chiudendo l'hub la copia moriva senza scrivere niente."""
+    from accoach.overlay_place import PlacementOverlay
+    win = PlacementOverlay()
+    _drag(win, 500, 300)
+    ov = config.read_overlay()
+    assert (ov.x, ov.y) == (500, 300)
+
+
+def test_back_to_the_centre_after_a_drag_moves_the_copy(cfg_file):
+    """Il caso visto il 03/11: posizione automatica, copia trascinata, poi
+    «Rimetti al centro». Il file diceva gia' -1, quindi la copia non vedeva
+    nessun cambio e restava dov'era."""
+    from accoach import launcher
+    from accoach.overlay_place import PlacementOverlay
+    hub = launcher.MainWindow()
+    try:
+        win = PlacementOverlay()
+        auto = win.pos()
+        _drag(win, 500, 300)
+        hub._settings._center_overlay()
+        win._follow_config()
+        assert win.pos() == auto
+        assert (config.read_overlay().x, config.read_overlay().y) == (-1, -1)
+    finally:
+        hub.close()
+
+
+def test_the_wheel_saves_the_size_by_itself(cfg_file):
+    from accoach.overlay_place import PlacementOverlay
+    win = PlacementOverlay()
+    win.set_scale(1.4)
+    assert win._save_timer.isActive()
+    win._save_timer.stop()
+    win._save_here()
+    assert config.read_overlay().scale == 1.4
+    win._follow_config()
+    assert win._scale == 1.4
+
+
+def test_closing_with_a_size_still_pending_writes_it(cfg_file):
+    """La rotella e poi subito Esc, o l'hub chiuso: la grandezza c'e' lo stesso."""
+    from accoach.overlay_place import PlacementOverlay
+    win = PlacementOverlay()
+    win.set_scale(1.6)
+    _key(win, Qt.Key_Escape)
+    assert config.read_overlay().scale == 1.6
+
+
+def test_its_own_save_does_not_make_the_copy_jump(cfg_file):
+    from accoach.overlay_place import PlacementOverlay
+    win = PlacementOverlay()
+    _drag(win, 420, 260)
+    win._follow_config()
+    assert (win.x(), win.y()) == (420, 260)
+
+
+def test_changing_the_mode_keeps_the_size_set_with_the_wheel(cfg_file):
+    """La rotella nella copia scrive 1,6; poi in Impostazioni cambi modalita'.
+    La casella della grandezza dice ancora 1,0, e non la deve riscrivere."""
+    from accoach import launcher
+    from accoach.overlay_place import PlacementOverlay
+    hub = launcher.MainWindow()
+    try:
+        win = PlacementOverlay()
+        win.set_scale(1.6)
+        win._save_timer.stop()
+        win._save_here()
+        s = hub._settings
+        s._mode.setCurrentIndex(1 - s._mode.currentIndex())
+        s._look_timer.stop()
+        s._save_look()
+        assert config.read_overlay().scale == 1.6
+        s._scale.setValue(1.2)                 # questa invece e' una scelta
+        s._look_timer.stop()
+        s._save_look()
+        assert config.read_overlay().scale == 1.2
+    finally:
+        hub.close()

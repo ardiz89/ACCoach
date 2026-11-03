@@ -458,6 +458,10 @@ class SettingsPanel(QWidget):
         self._scale.setValue(cfg.overlay.scale or 1.0)
         self._scale.setSuffix(" ×")
         row("set.scale", self._scale)
+        # La grandezza che la casella mostrava l'ultima volta che era uguale al
+        # file. La rotella della copia la cambia da un altro processo: se la
+        # casella non e' stata toccata, cambiare modalita' non la riscrive.
+        self._scale_synced = round(self._scale.value(), 2)
 
         # Essenziale o Completa, e i colori per daltonici (26/10): l'overlay li
         # rilegge da solo mentre gira, come posizione e grandezza.
@@ -601,11 +605,16 @@ class SettingsPanel(QWidget):
         da spostare li rileggono entro un secondo. Si rilegge il file prima,
         come in `_center_overlay`."""
         cfg = load_config(reload=True)
-        cfg.overlay.scale = round(self._scale.value(), 2)
+        scale = round(self._scale.value(), 2)
+        if scale != self._scale_synced:      # la casella l'hai toccata tu
+            cfg.overlay.scale = scale
         cfg.overlay.mode = str(self._mode.currentData())
         cfg.overlay.cb = self._cb.isChecked()
         cfg.overlay.pedal_view = str(self._pedal_view.currentData())
-        return save_config(cfg)
+        ok = save_config(cfg)
+        if ok:
+            self._scale_synced = scale
+        return ok
 
     def showEvent(self, event) -> None:  # noqa: N802 - Qt naming
         """Rilegge la grandezza: «Sposta l'overlay» la cambia da un altro
@@ -616,6 +625,7 @@ class SettingsPanel(QWidget):
         for w in (self._scale, self._mode, self._cb, self._pedal_view):
             w.blockSignals(True)
         self._scale.setValue(cfg.overlay.scale or 1.0)
+        self._scale_synced = round(self._scale.value(), 2)
         self._mode.setCurrentIndex(0 if cfg.overlay.mode == "essential" else 1)
         self._cb.setChecked(cfg.overlay.cb)
         self._pedal_view.setCurrentIndex(1 if cfg.overlay.pedal_view == "bars" else 0)
@@ -629,7 +639,9 @@ class SettingsPanel(QWidget):
         cfg.voice.male = bool(self._male.currentData())
         cfg.voice.radio = self._radio.isChecked()
         cfg.voice.rate = self._rate.value()
-        cfg.overlay.scale = round(self._scale.value(), 2)
+        scale = round(self._scale.value(), 2)
+        if scale != self._scale_synced:      # come in `_save_look`
+            cfg.overlay.scale = scale
         cfg.overlay.wean = self._wean.isChecked()
         cfg.overlay.mode = str(self._mode.currentData())
         cfg.overlay.cb = self._cb.isChecked()
@@ -637,6 +649,8 @@ class SettingsPanel(QWidget):
         cfg.overlay.pedal_view = str(self._pedal_view.currentData())
         cfg.autorecord = self._autorecord.isChecked()
         ok = save_config(cfg)
+        if ok:
+            self._scale_synced = scale
         # A page may have changed the language since the hub started: follow it
         # first, so the note is in the language the hub is showing.
         self._hub.follow_language()
