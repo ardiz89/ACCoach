@@ -909,7 +909,7 @@ def test_report_endpoint_a_broken_pool_is_no_corner_refs(tmp_path, monkeypatch):
     def boom(*a, **kw):
         raise RuntimeError("pool down")
 
-    monkeypatch.setattr(api, "reference_pool", boom)
+    monkeypatch.setattr(api, "reference_pool_paths", boom)
     paths, _ = _report_archive(tmp_path)
     data = _api_analysis(tmp_path, lap=paths["review"])
     assert all("Confronto con" not in x["detail"] for x in data["losses"])
@@ -934,3 +934,67 @@ def test_report_never_compares_the_reviewed_lap_with_itself(tmp_path):
     alone = _corner_bests_for(Reference(main), corners, laps["best"],
                               "ferrari_488_gt3", "monza", tmp_path, no_cond)
     assert alone.at(apex) is None
+
+
+def test_report_corner_speeds_use_the_same_reference_as_the_corner(tmp_path):
+    """La colonna «Rif.» delle velocità minime e la scheda della curva leggono
+    lo stesso giro: una curva confrontata col gesto migliore non ha due
+    velocità di riferimento sulla stessa pagina."""
+    paths, laps = _report_archive(tmp_path)
+    data = _api_analysis(tmp_path, lap=paths["review"])
+    speeds = {x["index"]: x for x in data["corner_speeds"]}
+    compared = [x for x in data["losses"] if "Confronto con" in x["detail"]]
+    assert compared, "the archive must have a compared corner"
+    for x in compared:
+        assert speeds[x["index"]]["vmin_ref"] == x["vmin_ref"]
+    # E la curva confrontata ha davvero un riferimento diverso dal principale.
+    main_ref = Reference(laps["main"])
+    corners = detect_corners(laps["main"].samples)
+    c = next(c for c in corners if c.index == compared[0]["index"])
+    inside = [s for s in laps["review"].samples
+              if c.entry_pos <= s.pos <= c.exit_pos]
+    main_vmin = round(min(main_ref.point_at(s.pos).speed_kmh for s in inside), 0)
+    assert speeds[c.index]["vmin_ref"] != main_vmin
+
+
+def test_report_second_call_loads_no_pool_lap_again(tmp_path, monkeypatch):
+    """Il bacino si tiene in memoria per file e data: riaprire il report non
+    ricarica i giri che ha già."""
+    import accoach.api as api
+    paths, _ = _report_archive(tmp_path)
+    loaded = []
+    real = api.load_lap
+
+    def spy(path):
+        loaded.append(str(path))
+        return real(path)
+
+    monkeypatch.setattr(api, "load_lap", spy)
+    mine = {paths["review"], paths["main"]}     # review e riferimento, ogni volta
+    _api_analysis(tmp_path, lap=paths["review"])
+    first = [p for p in loaded if p not in mine]
+    assert first, "the first call must load the pool"
+    loaded.clear()
+    data = _api_analysis(tmp_path, lap=paths["review"])
+    assert [p for p in loaded if p not in mine] == []
+    assert any("Confronto con" in x["detail"] for x in data["losses"])
+
+
+def test_pool_cache_reloads_a_rewritten_file_and_stays_bounded(tmp_path,
+                                                               monkeypatch):
+    import os
+    import accoach.api as api
+    paths, _ = _report_archive(tmp_path)
+    loads = []
+    real = api.load_lap
+    monkeypatch.setattr(api, "load_lap", lambda p: loads.append(p) or real(p))
+    cache = api._PoolCache(size=2)
+    a = cache.get(paths["main"])
+    assert cache.get(paths["main"]) is a and len(loads) == 1
+    st = os.stat(paths["main"])
+    os.utime(paths["main"], ns=(st.st_atime_ns, st.st_mtime_ns + 10_000_000))
+    assert cache.get(paths["main"]) is not a and len(loads) == 2
+    cache.get(paths["best"])
+    cache.get(paths["review"])
+    assert len(cache._laps) == 2
+    assert cache.get(str(tmp_path / "missing.lap.json.gz")) is None

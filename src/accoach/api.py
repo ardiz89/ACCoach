@@ -13,9 +13,12 @@ new files, so it doesn't touch the live-coaching code.
 from __future__ import annotations
 
 import logging
+import os
 import re
 import statistics
 import sys
+import threading
+from collections import OrderedDict
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -56,7 +59,7 @@ from .recording import laps_root, load_lap
 from .recording.catalog import LapCatalog, _GRIP_BAND, _TEMP_BAND_C
 from .recording.lap import SAMPLE_FIELDS, Lap
 from .recording.storage import (_catalog_path, _slug, list_lap_files,
-                                reference_pool)
+                                pool_lap_ok, reference_pool_paths)
 from .sectors import ideal_lap, sector_spans, sector_times
 from .sessions import group_sessions, parse_utc
 from .stints import MIN_TREND_LAPS, pace_of, split_stints, tyre_trace
@@ -729,6 +732,53 @@ def _elected_path(cat, car: str, track: str, valid: list[dict],
     return min(valid, key=lambda r: r["lap_time_ms"])["path"] if valid else None
 
 
+#: Quanti giri del bacino il report tiene in memoria. Due bacini pieni: basta
+#: per passare da un giro all'altro della stessa pista senza ricaricare niente.
+_POOL_CACHE_SIZE = 2 * POOL_SIZE
+
+
+class _PoolCache:
+    """I giri del bacino già caricati, per file e data di modifica.
+
+    Il report costruisce il bacino a ogni ``/api/analysis``, e la vista «Come
+    si fa» ne chiede diverse insieme: ricaricare venti file ogni volta è il
+    tempo che il pilota aspetta. Un file riscritto ha un'altra data e si
+    ricarica. FastAPI serve le chiamate su più thread, quindi un lucchetto; il
+    caricamento sta fuori dal lucchetto, così un file lento non ferma gli altri.
+    I giri si leggono e basta: nessuno li modifica.
+    """
+
+    def __init__(self, size: int = _POOL_CACHE_SIZE) -> None:
+        self._size = size
+        self._laps: OrderedDict[tuple[str, int], Lap] = OrderedDict()
+        self._lock = threading.Lock()
+
+    def get(self, path: str) -> Lap | None:
+        try:
+            key = (str(path), os.stat(path).st_mtime_ns)
+        except OSError:
+            return None
+        with self._lock:
+            lap = self._laps.get(key)
+            if lap is not None:
+                self._laps.move_to_end(key)
+                return lap
+        try:
+            lap = load_lap(path)
+        except Exception:  # noqa: BLE001 - un file rotto si salta, come nel bacino
+            _log.debug("pool lap %s does not load; skipped", path, exc_info=True)
+            return None
+        with self._lock:
+            self._laps[key] = lap
+            self._laps.move_to_end(key)
+            while len(self._laps) > self._size:
+                self._laps.popitem(last=False)
+        return lap
+
+
+_POOL_CACHE = _PoolCache()
+
+
 def _corner_bests_for(reference: Reference, corners: list, review: Lap,
                       car: str, track: str, laps_dir: Path,
                       conditions: dict) -> CornerBests | None:
@@ -746,9 +796,13 @@ def _corner_bests_for(reference: Reference, corners: list, review: Lap,
     """
     try:
         bests = CornerBests(reference, corners)
-        for other in reference_pool(car, track, laps_dir,
-                                    conditions["road_temp"], conditions["grip"],
-                                    conditions["compound"], POOL_SIZE):
+        for path in reference_pool_paths(car, track, laps_dir,
+                                         conditions["road_temp"],
+                                         conditions["grip"],
+                                         conditions["compound"], POOL_SIZE):
+            other = _POOL_CACHE.get(path)
+            if other is None or not pool_lap_ok(other, car, track):
+                continue
             if (other.lap_time_ms == review.lap_time_ms
                     and other.recorded_utc == review.recorded_utc
                     and (review.recorded_utc or other.samples == review.samples)):
@@ -1264,7 +1318,12 @@ def create_api(
             if not inside:
                 continue
             vmin_live = min(s.speed_kmh for s in inside)
-            vmin_ref = min(reference.point_at(s.pos).speed_kmh for s in inside)
+            # Lo stesso metro della scheda della curva: se il debrief l'ha
+            # confrontata col tuo gesto migliore, anche la colonna «Rif.» lo usa,
+            # o la pagina darebbe due velocità di riferimento per una curva.
+            held = corner_refs.at(c.apex_pos) if corner_refs is not None else None
+            cref = held.reference if held is not None else reference
+            vmin_ref = min(cref.point_at(s.pos).speed_kmh for s in inside)
             corner_speeds.append({
                 "index": c.index,
                 "name": names.get(c.index, f"Corner {c.index + 1}"),

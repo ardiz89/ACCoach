@@ -200,6 +200,42 @@ def find_reference_lap(
     return _find_reference_by_scan(car_model, track, laps_dir)
 
 
+def reference_pool_paths(
+    car_model: str,
+    track: str,
+    laps_dir: Path | str | None = None,
+    road_temp: float | None = None,
+    grip: float | None = None,
+    compound: str | None = None,
+    limit: int = 20,
+) -> list[str]:
+    """I file del bacino di :func:`reference_pool`, senza caricarli.
+
+    Serve a chi tiene già in memoria i giri che ha caricato (il report): sa
+    quali file servono e carica solo quelli nuovi. ``[]`` se il catalogo non si
+    può usare, come per il bacino."""
+    laps_dir = Path(laps_dir) if laps_dir else laps_root()
+    try:
+        from .catalog import LapCatalog
+
+        with LapCatalog(_catalog_path(laps_dir)) as cat:
+            cat.sync(list_lap_files(laps_dir))
+            return list(cat.reference_pool_paths(car_model, track, road_temp,
+                                                 grip, compound, limit))
+    except Exception:
+        _log.debug("catalog pool lookup failed; no pool", exc_info=True)
+        return []
+
+
+def pool_lap_ok(lap: Lap, car_model: str, track: str) -> bool:
+    """La conferma di un giro del bacino: il file vince sull'indice, come per
+    il riferimento principale."""
+    return (lap.valid and lap.lap_time_ms > 0 and lap.clean is not False
+            and lap.source != "pro"
+            and _slug(lap.car_model) == _slug(car_model)
+            and _slug(lap.track) == _slug(track))
+
+
 def reference_pool(
     car_model: str,
     track: str,
@@ -221,31 +257,15 @@ def reference_pool(
     is waiting on, to rebuild a *bonus*; without a pool the coach simply keeps
     the main reference. A file that fails to load is skipped, never raised.
     """
-    laps_dir = Path(laps_dir) if laps_dir else laps_root()
-    want_car, want_track = _slug(car_model), _slug(track)
-    try:
-        from .catalog import LapCatalog
-
-        with LapCatalog(_catalog_path(laps_dir)) as cat:
-            cat.sync(list_lap_files(laps_dir))
-            paths = cat.reference_pool_paths(car_model, track, road_temp,
-                                             grip, compound, limit)
-    except Exception:
-        _log.debug("catalog pool lookup failed; no pool", exc_info=True)
-        return []
-
     pool: list[Lap] = []
-    for path in paths:
+    for path in reference_pool_paths(car_model, track, laps_dir, road_temp,
+                                     grip, compound, limit):
         try:
             lap = load_lap(path)
         except Exception:
             _log.debug("pool lap %s does not load; skipped", path, exc_info=True)
             continue
-        # Same confirmation as the main reference: the file wins over the index.
-        if (lap.valid and lap.lap_time_ms > 0 and lap.clean is not False
-                and lap.source != "pro"
-                and _slug(lap.car_model) == want_car
-                and _slug(lap.track) == want_track):
+        if pool_lap_ok(lap, car_model, track):
             pool.append(lap)
     return pool
 
