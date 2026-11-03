@@ -9,11 +9,17 @@ Ogni misura che non si puo' fare e' ``None`` (rilascio e gas) oppure neutra
 ha i campi a 0 e non deve produrre frasi.
 
 ``compare`` dice quale gesto di un giro e' diverso dal riferimento piu' del
-rumore. Le soglie sono misurate sulla copia dell'archivio (139 curve, 16 coppie
-auto+pista, 144 giri validi e non sporchi): per ogni coppia le curve di
+rumore. Le soglie sono misurate sulla copia dell'archivio (16 coppie
+auto+pista, giri validi e non sporchi): per ogni coppia le curve di
 ``detect_corners`` sul giro piu' veloce, per ogni curva la differenza assoluta
-di ogni giro dalla mediana dei giri, poi il 75 percentile su tutte le curve.
-Una curva con meno di 4 giri con un valore non conta.
+fra **due giri tuoi** (tutte le coppie di giri), poi il 75 percentile su
+tutte le curve. Una curva con meno di 4 giri con un valore non conta.
+
+Perche' coppie: il report confronta due giri, il tuo e quello del
+riferimento, e ognuno porta il suo rumore. Il rumore e' quanto due tuoi giri
+differiscono tre volte su quattro. La prima misura prendeva lo scarto di un
+giro solo dalla mediana (0,399 s, 0,438 s, 0,377 s, 1,0): era la meta' del
+confronto, e faceva parlare 544 perdite di curva su 612.
 """
 
 from __future__ import annotations
@@ -43,26 +49,28 @@ _STEER_HYST = 0.07
 _GEAR_WINDOW_S = 0.25
 
 
-#: Rumore del rilascio del freno: 75 percentile di |giro - mediana della
-#: curva|, misurato 0,399 s su 885 valori (mediana dello scarto 0,180 s).
-RELEASE_NOISE_S = 0.399
+#: Rumore del rilascio del freno: 75 percentile di |giro i - giro j| nella
+#: stessa curva, misurato 0,735 s su 9778 coppie in 66 curve (mediana
+#: 0,341 s).
+RELEASE_NOISE_S = 0.735
 
-#: Rumore della ripresa del gas fino a 0,9: misurato 0,438 s su 1033 valori
-#: (mediana dello scarto 0,109 s).
-PICKUP_NOISE_S = 0.438
+#: Rumore della ripresa del gas fino a 0,9: misurato 0,965 s su 11299 coppie
+#: in 80 curve (mediana 0,233 s).
+PICKUP_NOISE_S = 0.965
 
-#: Rumore dei secondi di ABS: misurato 0,377 s su 853 valori (mediana dello
-#: scarto 0,135 s). Escluse le curve dove l'ABS e' 0 in tutti i giri: li'
-#: misurano un'auto che non entra in ABS, non quanto varia il pilota, e
-#: con i loro scarti a 0 la soglia scendeva a 0,298 s su 1119 valori.
+#: Rumore dei secondi di ABS: misurato 0,540 s su 10076 coppie in 48 curve
+#: (mediana 0,225 s), senza i giri col canale bloccato (``abs_trusted``).
+#: Escluse le curve dove l'ABS e' 0 in tutti i giri: li' misurano un'auto
+#: che non entra in ABS, non quanto varia il pilota.
 #: Nessun buco di campioni piu' lungo di 3 volte l'intervallo mediano del
 #: giro mentre l'ABS e' attivo (0 casi su 119 giri con ABS), quindi
 #: ``_abs_s`` non tronca gli intervalli.
-ABS_NOISE_S = 0.377
+ABS_NOISE_S = 0.540
 
-#: Rumore delle inversioni di sterzo con l'isteresi 0,07: misurato 1,0 su
-#: 1119 valori (mediana dello scarto 0). Una inversione in piu' e' rumore.
-STEER_NOISE = 1.0
+#: Rumore delle inversioni di sterzo con l'isteresi 0,07: misurato 2 su
+#: 12719 coppie in 85 curve (mediana 1). Due correzioni di scarto fra due
+#: tuoi giri sono ancora rumore.
+STEER_NOISE = 2.0
 
 #: La marcia non ha soglia (Decisione 2): diversa vale 1,0, cioe' meno di
 #: qualunque altra misura sopra il suo rumore.
@@ -206,16 +214,35 @@ _ORDER = (
 )
 
 
-def compare(live: Gestures, ref: Gestures) -> GestureNote | None:
+#: Il tratto della curva (coaching/phases.py) in cui ogni gesto agisce. Il
+#: report dice un gesto solo se agisce nel tratto dove va il tempo: dire
+#: «correggi lo sterzo» in una curva persa in staccata manda il pilota nel
+#: posto sbagliato. Sulla copia dell'archivio, con il filtro e il rumore fra
+#: coppie di giri, parlano 206 perdite di curva su 612 (33,7%).
+PHASE_OF = {
+    "release": ("entry",),
+    "abs": ("entry",),
+    "gear": ("apex",),
+    "steer": ("apex",),
+    "pickup": ("exit", "after"),
+}
+
+
+def compare(live: Gestures, ref: Gestures,
+            phase: str | None = None) -> GestureNote | None:
     """Il gesto con il rapporto piu' alto fra differenza e rumore, o None.
 
     Una misura None da una parte sola (tu freni, lui no) non si confronta.
     Una misura alla soglia e' ancora rumore: serve superarla. La marcia conta
     solo se e' un numero da tutte e due le parti, e solo se nient'altro
-    supera il suo rumore.
+    supera il suo rumore. Con ``phase`` restano in gara solo i gesti che
+    agiscono in quel tratto (``PHASE_OF``), prima di scegliere il piu' alto:
+    un gesto del tratto giusto vince anche contro uno piu' grande altrove.
     """
     best: GestureNote | None = None
     for kind, attr, noise in _ORDER:
+        if phase is not None and phase not in PHASE_OF[kind]:
+            continue
         a, b = getattr(live, attr), getattr(ref, attr)
         if a is None or b is None:
             continue

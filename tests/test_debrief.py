@@ -231,6 +231,6 @@ def test_a_lap_without_gesture_channels_gives_todays_debrief(monkeypatch):
     now = build_lap_debrief(review, reference, corners, "it")
     assert now.losses, "the review lap must lose somewhere"
     assert all(x.gesture is None for x in now.losses)
-    monkeypatch.setattr(debrief_mod, "compare", lambda live, ref: None)
+    monkeypatch.setattr(debrief_mod, "compare", lambda *a: None)
     today = build_lap_debrief(review, reference, corners, "it")
     assert now == today

@@ -224,12 +224,12 @@ def _shape_release(lap, corner, steps):
     return lap
 
 
-def _release_case(live_steps=4, ref_steps=16):
+def _release_case(live_steps=4, ref_steps=29):
     import synth
     from accoach.track import detect_corners
     ref_lap = synth.build_lap(n=2001)            # passo 50 ms
     corners = detect_corners(ref_lap.samples)
-    _shape_release(ref_lap, corners[0], ref_steps)              # 0,80 s
+    _shape_release(ref_lap, corners[0], ref_steps)              # sotto 0,05 al passo 28, 1,40 s
     review = synth.build_lap(slow_corner=0, amt=30, n=2001)    # passo 56 ms
     _shape_release(review, corners[0], live_steps)             # 0,224 s
     return review, ref_lap, corners
@@ -247,7 +247,7 @@ def test_debrief_says_the_brake_release_in_italian():
     assert loss is not None
     assert loss.gesture is not None and loss.gesture.kind == "release"
     assert loss.detail.endswith(
-        " Rilasci il freno in 0,2 s, il riferimento in 0,8 s.")
+        " Rilasci il freno in 0,2 s, il riferimento in 1,4 s.")
 
 
 def test_debrief_says_the_brake_release_in_english():
@@ -256,7 +256,7 @@ def test_debrief_says_the_brake_release_in_english():
     review, ref_lap, corners = _release_case()
     loss = _corner(build_lap_debrief(review, Reference(ref_lap), corners, "en"), 0)
     assert loss.detail.endswith(
-        " You release the brake in 0.2 s, the reference in 0.8 s.")
+        " You release the brake in 0.2 s, the reference in 1.4 s.")
 
 
 def test_release_within_noise_says_nothing():
@@ -320,7 +320,7 @@ def test_gesture_uses_the_corner_reference_and_stays_before_the_comparison():
     corners = detect_corners(main.samples)
     _shape_release(main, corners[0], 4)
     best = synth.build_lap(n=2001)
-    _shape_release(best, corners[0], 16)
+    _shape_release(best, corners[0], 29)
     best.lap_time_ms = 108_912
     bests = CornerBests(Reference(main), corners)
     assert bests.offer(best) is True
@@ -335,7 +335,7 @@ def test_gesture_uses_the_corner_reference_and_stays_before_the_comparison():
                                      corner_refs=bests), 0)
     assert loss.gesture is not None and loss.gesture.kind == "release"
     assert loss.detail.endswith(
-        " Rilasci il freno in 0,2 s, il riferimento in 0,8 s."
+        " Rilasci il freno in 0,2 s, il riferimento in 1,4 s."
         " Confronto con la tua migliore in questa curva, dal giro in 1:48,912.")
 
 
@@ -360,7 +360,7 @@ def test_report_endpoint_carries_the_gesture(tmp_path):
     by_index = {x["index"]: x for x in r.json()["losses"]}
     g = by_index[0]["gesture"]
     assert g["kind"] == "release"
-    assert abs(g["live"] - 0.224) < 0.01 and abs(g["ref"] - 0.8) < 0.01
+    assert abs(g["live"] - 0.224) < 0.01 and abs(g["ref"] - 1.4) < 0.01
     assert "Rilasci il freno in 0,2 s" in by_index[0]["detail"]
     assert all(x["gesture"] is None for i, x in by_index.items() if i != 0)
 
@@ -401,6 +401,7 @@ def test_a_lap_with_abs_always_on_does_not_say_abs():
     assert "L'ABS lavora" not in loss.detail
 
     review, ref_lap, corners = _abs_case(whole_lap=False)
+    review.abs_level = ref_lap.abs_level = 3
     loss = _corner(build_lap_debrief(review, Reference(ref_lap), corners, "it"), 0)
     assert loss.gesture is not None and loss.gesture.kind == "abs"
 
@@ -418,3 +419,97 @@ def test_a_reference_with_abs_always_on_does_not_say_abs():
     loss = _corner(build_lap_debrief(review, Reference(ref_lap), corners, "it"), 0)
     assert loss is not None
     assert "L'ABS lavora" not in loss.detail
+
+
+# --- Fix 2 del Task 3: il gesto agisce nel tratto dove va il tempo ----------
+
+def _slow_between(lap, lo, hi, ms):
+    """``lap`` con ``ms`` in piu' fra ``lo`` e ``hi``, tenuti anche dopo:
+    la perdita della curva sta tutta in quel tratto."""
+    for s in lap.samples:
+        if s.pos <= lo:
+            continue
+        s.t_ms = int(round(s.t_ms + (ms if s.pos >= hi else ms * (s.pos - lo) / (hi - lo))))
+    lap.lap_time_ms += ms
+    return lap
+
+
+def _phase_case(stretches):
+    """Riferimento che rilascia piano (1,40 s), giro che rilascia di colpo
+    (0,20 s) e perde 300 ms divisi fra i tratti ``stretches``."""
+    import synth
+    from accoach.coaching.diagnosis import _APEX_HALF
+    from accoach.track import detect_corners
+    ref_lap = synth.build_lap(n=2001)
+    corners = detect_corners(ref_lap.samples)
+    c = corners[0]
+    _shape_release(ref_lap, c, 29)
+    review = synth.build_lap(n=2001)
+    _shape_release(review, c, 4)
+    cuts = {"entry": (c.entry_pos, c.apex_pos - _APEX_HALF),
+            "apex": (c.apex_pos - _APEX_HALF, c.apex_pos + _APEX_HALF),
+            "exit": (c.apex_pos + _APEX_HALF, c.exit_pos),
+            "after": (c.exit_pos, corners[1].entry_pos - 0.01)}
+    for name in stretches:
+        _slow_between(review, *cuts[name], 300 / len(stretches))
+    return review, ref_lap, corners, c
+
+
+def test_a_loss_on_entry_names_the_release_not_a_bigger_steer_at_the_apex():
+    from accoach.coaching.debrief import build_lap_debrief
+    from accoach.coaching.gestures import compare, measure
+    from accoach.comparison import Reference
+    review, ref_lap, corners, c = _phase_case(["entry"])
+    # Una sega di sterzo all'apex: decine di correzioni, rapporto molto
+    # piu' alto del rilascio.
+    for i, s in enumerate(x for x in review.samples
+                          if abs(x.pos - c.apex_pos) <= 0.02):
+        s.steer_angle += 0.1 if (i // 2) % 2 else 0.0
+    span = lambda lap: [s for s in lap.samples if c.entry_pos <= s.pos <= c.exit_pos]
+    assert compare(measure(span(review)), measure(span(ref_lap))).kind == "steer"
+    loss = _corner(build_lap_debrief(review, Reference(ref_lap), corners, "it"), 0)
+    assert [p.phase for p in loss.phases if p.lost_ms > 0] == ["entry"]
+    assert loss.gesture is not None and loss.gesture.kind == "release"
+    assert "Rilasci il freno in 0,2 s, il riferimento in 1,4 s." in loss.detail
+    assert "Correggi lo sterzo" not in loss.detail
+
+
+def test_a_loss_in_the_wrong_phase_says_nothing():
+    from accoach.coaching.debrief import build_lap_debrief
+    from accoach.comparison import Reference
+    review, ref_lap, corners, _c = _phase_case(["after"])
+    loss = _corner(build_lap_debrief(review, Reference(ref_lap), corners, "it"), 0)
+    assert loss is not None
+    assert loss.gesture is None                    # il rilascio e' un gesto d'ingresso
+
+
+def test_a_corner_with_no_dominant_phase_gets_no_gesture():
+    from accoach.coaching.debrief import build_lap_debrief
+    from accoach.coaching.phases import dominant_phase
+    from accoach.comparison import Reference
+    review, ref_lap, corners, _c = _phase_case(["entry", "apex", "exit", "after"])
+    loss = _corner(build_lap_debrief(review, Reference(ref_lap), corners, "it"), 0)
+    assert loss is not None
+    assert dominant_phase(loss.phases, loss.lost_ms) is None
+    assert loss.phase_note == ""
+    assert loss.gesture is None
+    assert "Rilasci il freno" not in loss.detail
+
+
+def test_abs_is_compared_only_with_the_same_known_abs_level():
+    from accoach.coaching.debrief import build_lap_debrief
+    from accoach.comparison import Reference
+    said = {}
+    for live, ref in ((3, 3), (2, 3), (-1, -1), (3, -1)):
+        review, ref_lap, corners = _abs_case(whole_lap=False)
+        review.abs_level, ref_lap.abs_level = live, ref
+        loss = _corner(build_lap_debrief(review, Reference(ref_lap), corners, "it"), 0)
+        said[(live, ref)] = loss.gesture is not None and loss.gesture.kind == "abs"
+    assert said == {(3, 3): True, (2, 3): False, (-1, -1): False, (3, -1): False}
+
+
+def test_noise_is_the_pair_p75_measured_on_the_archive():
+    # 75 percentile di |giro i - giro j| nella stessa curva, copia
+    # dell'archivio: 9778, 11299, 10076 e 12719 coppie.
+    assert (RELEASE_NOISE_S, PICKUP_NOISE_S, ABS_NOISE_S, STEER_NOISE) == (
+        0.735, 0.965, 0.540, 2.0)

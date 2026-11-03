@@ -30,7 +30,7 @@ from .analyzer import (_BRAKE_ON, _LOSS_MS, CornerStats, _braked_early,
                        _braked_late, classify_corner, corner_zones,
                        phases_priceable)
 from .chain import link_corners
-from .phases import phase_note, split_loss
+from .phases import dominant_phase, phase_note, split_loss
 from .cue import CueCategory, theme_key
 from .diagnosis import corner_symptoms, dominant_symptom
 from .gestures import GestureNote, abs_trusted, compare, measure, without_abs
@@ -250,7 +250,8 @@ def gesture_text(note: GestureNote, lang: str) -> str:
     return table[kind].format(live=live, ref=ref)
 
 
-def _corner_gesture(lap: Lap, cref: Reference, c: Corner) -> GestureNote | None:
+def _corner_gesture(lap: Lap, cref: Reference, c: Corner,
+                    phase: str | None) -> GestureNote | None:
     """Il gesto di questa curva contro il giro del suo riferimento.
 
     I campioni del riferimento vengono dal suo giro (``cref.lap``) fra
@@ -259,7 +260,13 @@ def _corner_gesture(lap: Lap, cref: Reference, c: Corner) -> GestureNote | None:
     Il tratto iniziale che riparte da ~1,0 si toglie da tutte e due le parti,
     come fa ``Reference``: dentro una curva vicino al traguardo metterebbe
     campioni con l'orologio a zero in mezzo a quelli veri.
+
+    ``phase`` e' il tratto che domina la perdita (``dominant_phase``): senza,
+    niente gesto, e con lui solo i gesti che agiscono li'.
     """
+    if phase is None:
+        return None      # il tempo e' sparso: nessun posto dove mandarti
+
     def span(samples):
         return [s for s in strip_leading_wrap(samples)
                 if c.entry_pos <= s.pos <= c.exit_pos]
@@ -270,11 +277,15 @@ def _corner_gesture(lap: Lap, cref: Reference, c: Corner) -> GestureNote | None:
     g_live, g_ref = measure(live), measure(ref)
     # Un canale ABS bloccato su tutto il giro (due giri dell'archivio) non e'
     # un gesto: su quel giro l'ABS non si confronta.
-    if not abs_trusted(lap.samples):
+    # E l'ABS si confronta solo fra due giri con lo stesso livello noto: con
+    # livelli diversi la frase misurerebbe l'assetto, non il piede (117 frasi
+    # ABS su 223 dell'archivio, con le soglie provate nel giro di correzioni).
+    same_abs = lap.abs_level >= 0 and lap.abs_level == cref.lap.abs_level
+    if not same_abs or not abs_trusted(lap.samples):
         g_live = without_abs(g_live)
-    if not abs_trusted(cref.lap.samples):
+    if not same_abs or not abs_trusted(cref.lap.samples):
         g_ref = without_abs(g_ref)
-    return compare(g_live, g_ref)
+    return compare(g_live, g_ref, phase)
 
 
 #: Quante uscite recenti nella stessa curva fanno uno schema e non un errore.
@@ -1006,7 +1017,7 @@ def build_lap_debrief(lap: Lap, reference: Reference, corners: list[Corner],
         detail += _grip_detail(grip, cue.category, lg)
         # Il gesto che fai diverso, contro lo stesso giro della perdita. Prima
         # del confronto, che resta l'ultima frase: dice contro chi e' tutto.
-        gesture = _corner_gesture(lap, cref, c)
+        gesture = _corner_gesture(lap, cref, c, dominant_phase(phases, lost))
         if gesture is not None:
             detail += gesture_text(gesture, lg)
         if ref_c is not None:
