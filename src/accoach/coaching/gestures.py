@@ -51,12 +51,14 @@ RELEASE_NOISE_S = 0.399
 #: (mediana dello scarto 0,109 s).
 PICKUP_NOISE_S = 0.438
 
-#: Rumore dei secondi di ABS: misurato 0,298 s su 1119 valori (mediana dello
-#: scarto 0,098 s). Contano anche le curve dove nessuno tocca l'ABS (scarto
-#: 0): senza di loro sarebbe 0,377 s su 853. Nessun buco di campioni piu'
-#: lungo di 3 volte l'intervallo mediano del giro mentre l'ABS e' attivo (0
-#: casi su 119 giri con ABS), quindi ``_abs_s`` non tronca gli intervalli.
-ABS_NOISE_S = 0.298
+#: Rumore dei secondi di ABS: misurato 0,377 s su 853 valori (mediana dello
+#: scarto 0,135 s). Escluse le curve dove l'ABS e' 0 in tutti i giri: li'
+#: misurano un'auto che non entra in ABS, non quanto varia il pilota, e
+#: con i loro scarti a 0 la soglia scendeva a 0,298 s su 1119 valori.
+#: Nessun buco di campioni piu' lungo di 3 volte l'intervallo mediano del
+#: giro mentre l'ABS e' attivo (0 casi su 119 giri con ABS), quindi
+#: ``_abs_s`` non tronca gli intervalli.
+ABS_NOISE_S = 0.377
 
 #: Rumore delle inversioni di sterzo con l'isteresi 0,07: misurato 1,0 su
 #: 1119 valori (mediana dello scarto 0). Una inversione in piu' e' rumore.
@@ -163,7 +165,6 @@ def measure(samples: list[LapSample]) -> Gestures:
         abs_s=_abs_s(samples),
         steer_reversals=_steer_reversals(samples),
     )
-
 
 
 @dataclass(frozen=True, slots=True)

@@ -207,6 +207,5 @@ def test_compare_tie_follows_corner_order():
 
 def test_compare_slower_side_also_counts():
     # la differenza e' assoluta: anche rilasciare piu' in fretta e' diverso
-    note = compare(_g(release=1.0 - 2 * RELEASE_NOISE_S + 2.0),
-                   _g(release=3.0))
+    note = compare(_g(release=3.0 - 2 * RELEASE_NOISE_S), _g(release=3.0))
     assert note.kind == "release" and abs(note.score - 2.0) < 1e-9
