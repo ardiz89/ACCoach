@@ -16,6 +16,7 @@ is — the other thing a coach harps on.
 from __future__ import annotations
 
 import math
+import statistics
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
@@ -566,7 +567,8 @@ _GRIP_MIN_G = 0.3         # below this the lap has no usable G data at all
 #
 # Secondo motivo, geografico: l'inviluppo è il 95° percentile del riferimento su
 # **tutto il giro** (vedi `_grip_envelope`), non in questa curva. Dire «qui» era
-# sbagliato anche a voler difendere il resto.
+# sbagliato anche a voler difendere il resto. Dal 2026-11-03 è per fascia di
+# velocità, ma resta su tutto il giro: i suoi picchi a quella velocità, ovunque.
 #
 # Quello che resta è ciò che la misura dimostra davvero: a parità di gomma, una
 # staccata più tarda dovrebbe uscire dall'aderenza che stai già spendendo.
@@ -719,16 +721,60 @@ def _percentile(vals: list[float], q: float) -> float:
     return ordered[min(len(ordered) - 1, int(len(ordered) * q))]
 
 
-def _grip_envelope(lap: Lap, reference: Reference) -> float:
+#: L'aderenza cresce con la velocità (carico aerodinamico), e un inviluppo unico
+#: lo fissano le curve veloci: una curva lenta presa al limite leggeva «58 %».
+#: Fasce di 40 km/h (Decisione 5 del piano del 2026-11-03), a partire da 0.
+_GRIP_BAND_KMH = 40.0
+#: Sotto questi campioni la fascia prende l'inviluppo del giro: con pochi punti
+#: il p95 è basso e direbbe «sei al limite» a chiunque passi di lì (Review
+#: Focus 4). Il 50 è della Decisione 5; sulla copia dell'archivio (13 auto+pista,
+#: riferimento il giro più veloce) le fasce sotto soglia sono quasi solo 40-80
+#: km/h (13-46 campioni: tornanti e chicane lente) e la ricaduta riguarda 41
+#: curve su 612. Con l'inviluppo per fascia 100 curve su 612 (16,3 %) cambiano
+#: stato: 64 da niente a «al limite», 24 da «al limite» a niente.
+_GRIP_BAND_MIN_SAMPLES = 50
+
+
+@dataclass(frozen=True, slots=True)
+class GripEnvelope:
+    """Il limite di aderenza del riferimento, per fascia di velocità.
+
+    ``whole`` è l'inviluppo di sempre, su tutto il giro; ``bands`` ha solo le
+    fasce con abbastanza campioni. ``at`` sceglie, e ricade sul giro dove la
+    fascia non c'è o la velocità manca.
+    """
+
+    whole: float = 0.0
+    bands: dict = field(default_factory=dict)   # indice di fascia -> p95
+
+    def at(self, speed_kmh: float | None) -> float:
+        if speed_kmh is None:
+            return self.whole
+        return self.bands.get(int(speed_kmh // _GRIP_BAND_KMH), self.whole)
+
+
+def _grip_envelope(lap: Lap, reference: Reference) -> GripEnvelope:
     """How much grip this car actually has, measured off the reference lap.
 
     The 95th percentile of combined G rather than the maximum: a kerb or a bump
     spikes |g| far past anything the tyre can hold through a corner, and one
     such sample would make every corner look like it had spare grip.
+
+    Same samples as always (the reference at each position of the reviewed
+    lap), binned by the *reference's* speed there: it is his limit at that
+    speed that the corner is measured against.
     """
-    return _percentile([_combined_g(reference.point_at(s.pos).g_lat,
-                                    reference.point_at(s.pos).g_long)
-                        for s in lap.samples], _GRIP_PCTL)
+    whole: list[float] = []
+    binned: dict[int, list[float]] = {}
+    for s in lap.samples:
+        r = reference.point_at(s.pos)
+        g = _combined_g(r.g_lat, r.g_long)
+        whole.append(g)
+        binned.setdefault(int(max(0.0, r.speed_kmh) // _GRIP_BAND_KMH), []).append(g)
+    return GripEnvelope(
+        whole=_percentile(whole, _GRIP_PCTL),
+        bands={b: _percentile(v, _GRIP_PCTL) for b, v in binned.items()
+               if len(v) >= _GRIP_BAND_MIN_SAMPLES})
 
 
 #: Both pedals off for longer than this, before the brake, is a real coast and
@@ -768,8 +814,15 @@ class GripState:
         return self.ratio >= _GRIP_AT_LIMIT
 
 
-def _grip_state(inside: list, envelope: float) -> GripState:
-    """Measure the corner against the envelope. No wording, no decisions."""
+def _grip_state(inside: list, envelope: "GripEnvelope | float",
+                speed_kmh: float | None = None) -> GripState:
+    """Measure the corner against the envelope. No wording, no decisions.
+
+    ``speed_kmh`` is the corner's median speed: it picks the band of the
+    envelope. A bare number is a limit already chosen (used by the tests).
+    """
+    if isinstance(envelope, GripEnvelope):
+        envelope = envelope.at(speed_kmh)
     if envelope < _GRIP_MIN_G or not inside:
         return GripState()
     # The SAME percentile as the envelope, not the raw maximum. Comparing a peak
@@ -1013,7 +1066,9 @@ def build_lap_debrief(lap: Lap, reference: Reference, corners: list[Corner],
         # …and whether there was any grip left to do it with. Misurato una volta
         # sola: la stessa cosa scrive la frase e sceglie l'esercizio, così le due
         # metà dell'app non possono più dire il contrario l'una dell'altra.
-        grip = _grip_state(inside, envelope)
+        # Il limite a quella velocità: la fascia della mediana della curva.
+        grip = _grip_state(inside, envelope,
+                           statistics.median(s.speed_kmh for s in inside))
         detail += _grip_detail(grip, cue.category, lg)
         # Il gesto che fai diverso, contro lo stesso giro della perdita. Prima
         # del confronto, che resta l'ultima frase: dice contro chi e' tutto.
