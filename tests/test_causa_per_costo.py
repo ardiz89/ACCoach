@@ -140,3 +140,111 @@ def test_debrief_passes_its_phases(monkeypatch):
         assert st.phase_ms is not None
         assert set(st.phase_ms) == {"entry", "apex", "exit", "after"}
         assert abs(sum(st.phase_ms.values()) - st.lost_ms) < 1.0
+
+
+# --- La finestra dell'apex deve stare dentro la curva -------------------------
+#
+# La finestra dell'apex e' larga 2 x _APEX_HALF. Sulla copia dell'archivio 89
+# zone dal vivo su 149 finiscono prima di `apex + _APEX_HALF`: l'uscita vale 0,
+# e «dai piu' gas» non poteva mai pagare (143 -> 37 consigli). Dove la finestra
+# non ci sta, le fasi non si danno e resta l'ordine di sempre.
+
+
+def _corner(entry, apex, exit_, index=0):
+    from accoach.track import Corner
+    return Corner(index=index, entry_pos=entry, apex_pos=apex, exit_pos=exit_)
+
+
+def test_phases_priceable_only_when_the_apex_window_fits():
+    from accoach.coaching.analyzer import phases_priceable
+    h = _APEX_HALF
+    assert phases_priceable(0.20, 0.40, 0.30)                  # dentro
+    assert phases_priceable(0.30 - h, 0.30 + h, 0.30)          # bordi esatti
+    assert not phases_priceable(0.20, 0.30 + h / 2, 0.30)      # finisce prima
+    assert not phases_priceable(0.30 - h / 2, 0.40, 0.30)      # comincia dopo
+
+
+def test_live_phases_with_uncrossed_cuts():
+    from accoach.coaching.analyzer import _live_phases, _Seg
+    # Nessun taglio passato: tutto all'ingresso, apex ed exit a zero.
+    seg = _Seg(index=0, mid=0.5)
+    seg.delta_start, seg.delta_last = 10.0, 50.0
+    assert _live_phases(seg) == {"entry": 40.0, "apex": 0.0, "exit": 0.0,
+                                 "after": 0.0}
+    # Passato solo l'ingresso della finestra: l'uscita vale 0.
+    seg.delta_apex_in = 20.0
+    assert _live_phases(seg) == {"entry": 10.0, "apex": 30.0, "exit": 0.0,
+                                 "after": 0.0}
+
+
+# Curva 0 accorciata a mano: la zona finisce 5 millesimi dopo l'apex, prima di
+# `apex + _APEX_HALF`. Il riferimento di synth da' gas pieno da 0,31; il giro
+# dal vivo resta senza gas in tutta la zona e ci perde 300 ms.
+_SHORT = (0.30, 0.37, 0.375)
+
+
+def _short_corners(ref):
+    return [_corner(*_SHORT, index=0), detect_corners(ref.lap.samples)[1]]
+
+
+def _no_throttle_lap():
+    lap = synth.build_lap()
+    lo, _apex, hi = _SHORT
+    for smp in lap.samples:
+        if lo <= smp.pos <= hi:
+            smp.throttle = 0.0
+        if smp.pos >= lo:
+            smp.t_ms += int(300 * min(1.0, (smp.pos - lo) / (hi - lo)))
+    return lap
+
+
+def _live_categories(ref, corners, lap):
+    an = CoachAnalyzer()
+    an.set_corners(corners)
+    cmp = LapComparator(ref)
+    out: dict[int, CueCategory | None] = {}
+    real = analyzer_mod.classify_corner
+
+    def spy(st, index, pos):
+        cue = real(st, index, pos)
+        out[index] = (cue.category if cue else None, st.phase_ms)
+        return cue
+
+    analyzer_mod.classify_corner = spy
+    try:
+        for smp in lap.samples:
+            s = synth.snap(pos=smp.pos, current_lap_ms=smp.t_ms,
+                           speed_kmh=smp.speed_kmh, throttle=smp.throttle,
+                           brake=smp.brake, steer_angle=smp.steer_angle,
+                           gear=smp.gear)
+            an.update(s, cmp.compare(s))
+    finally:
+        analyzer_mod.classify_corner = real
+    return out
+
+
+def test_live_zone_shorter_than_the_apex_window_keeps_the_old_order():
+    ref = Reference(synth.build_lap())
+    corners = _short_corners(ref)
+    an = CoachAnalyzer()
+    an.set_corners(corners)
+    lo, hi, mid = an._zones[0]
+    assert hi < mid + _APEX_HALF, "la zona deve finire prima della finestra"
+
+    got = _live_categories(ref, corners, _no_throttle_lap())
+    category, phase_ms = got[0]
+    assert phase_ms is None
+    assert category is CueCategory.MORE_THROTTLE
+
+
+def test_live_and_debrief_agree_on_a_short_corner():
+    from accoach.coaching import debrief as debrief_mod
+    ref = Reference(synth.build_lap())
+    corners = _short_corners(ref)
+    lap = _no_throttle_lap()
+    live = _live_categories(ref, corners, lap)[0][0]
+
+    db = debrief_mod.build_lap_debrief(lap, ref, corners, "it")
+    by_index = {c.index: c.category for c in db.losses}
+    assert live is CueCategory.MORE_THROTTLE
+    assert by_index.get(0) is live

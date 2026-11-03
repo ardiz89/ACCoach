@@ -27,7 +27,8 @@ from ..track import Corner
 from ..cornernames import for_track, marks_for
 from ..trackdata import corner_name, landmark_at
 from .analyzer import (_BRAKE_ON, _LOSS_MS, CornerStats, _braked_early,
-                       _braked_late, classify_corner)
+                       _braked_late, classify_corner, corner_zones,
+                       phases_priceable)
 from .chain import link_corners
 from .phases import phase_note, split_loss
 from .cue import CueCategory, theme_key
@@ -838,6 +839,9 @@ def build_lap_debrief(lap: Lap, reference: Reference, corners: list[Corner],
     tuning = tuning_for_car(lap.car_model)      # class-dependent symptom bands
     envelope = _grip_envelope(lap, reference)   # this car's grip, measured
     losses: list[CornerLoss] = []
+    # Le stesse zone del vivo: le fasi si prezzano solo dove la finestra
+    # dell'apex sta dentro la curva, con la regola del vivo.
+    zone_hi = {(lo, mid): hi for lo, hi, mid in corner_zones(corners)}
 
     for c in corners:
         inside = [s for s in lap.samples if c.entry_pos <= s.pos <= c.exit_pos]
@@ -890,7 +894,12 @@ def build_lap_debrief(lap: Lap, reference: Reference, corners: list[Corner],
             braking_early=braking_early, braking_late=braking_late,
             # Le stesse fasi che il report pubblica: la causa la sceglie il
             # costo del suo tratto, con la regola del vivo.
-            phase_ms={p.phase: p.lost_ms for p in phases} or None,
+            # Dove la finestra dell'apex non sta nella curva, nessuna fase:
+            # l'ordine di sempre, come dal vivo (`phases_priceable`).
+            phase_ms=({p.phase: p.lost_ms for p in phases} or None)
+            if phases_priceable(c.entry_pos,
+                                zone_hi.get((c.entry_pos, c.apex_pos), c.exit_pos),
+                                c.apex_pos) else None,
         )
         cue = classify_corner(stats, c.index, c.apex_pos)
         if cue is None or cue.category == CueCategory.GOOD:

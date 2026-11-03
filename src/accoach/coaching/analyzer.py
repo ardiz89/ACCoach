@@ -362,16 +362,7 @@ class CoachAnalyzer:
         """Use detected corners as the zones (or fall back to fixed segments)."""
         previous = self._zones
         if corners:
-            zones = sorted(
-                (c.entry_pos, c.exit_pos, c.apex_pos) for c in corners
-            )
-            # Clip any overlap introduced by entry/exit extension.
-            for i in range(len(zones) - 1):
-                lo, hi, mid = zones[i]
-                next_lo = zones[i + 1][0]
-                if hi >= next_lo:
-                    zones[i] = (lo, max(lo, next_lo - 1e-4), mid)
-            self._zones = zones
+            self._zones = corner_zones(corners)
         else:
             self._set_fixed_zones()
         # Consigli e difetti sono indicizzati per zona, e un layout nuovo sposta
@@ -565,7 +556,11 @@ class CoachAnalyzer:
             braking_early=_braked_early(
                 seg.live_brake_onset, seg.ref_brake_onset, seg.ref_brake_at_onset),
             braking_late=_braked_late(seg.live_brake_onset, seg.ref_brake_onset),
-            phase_ms=_live_phases(seg),
+            # Le fasi solo dove la finestra dell'apex sta dentro la zona: se
+            # no un taglio cade fuori e la sua fase vale 0 per costruzione.
+            phase_ms=(_live_phases(seg)
+                      if phases_priceable(*self._zones[seg.index][:2], seg.mid)
+                      else None),
         )
         cue = classify_corner(st, seg.index, _seg_pos(seg, self))
         if self._lap_cut and cue is not None and cue.category is CueCategory.GOOD:
@@ -589,6 +584,37 @@ class CoachAnalyzer:
             return None
         self.last_corner = CornerCard(index=seg.index, lost_ms=st.lost_ms)
         return cue
+
+
+def corner_zones(corners: list[Corner]) -> list[tuple[float, float, float]]:
+    """Le zone delle curve, ``(lo, hi, apex)`` ordinate per ingresso.
+
+    Una zona va da ``entry_pos`` a ``min(exit_pos, ingresso della curva dopo)``:
+    l'estensione di ingresso e uscita puo' sovrapporre due curve, e un frame
+    deve stare in una zona sola. La usa anche il debrief per sapere se le fasi
+    di una curva si possono prezzare (:func:`phases_priceable`).
+    """
+    zones = sorted((c.entry_pos, c.exit_pos, c.apex_pos) for c in corners)
+    for i in range(len(zones) - 1):
+        lo, hi, mid = zones[i]
+        next_lo = zones[i + 1][0]
+        if hi >= next_lo:
+            zones[i] = (lo, max(lo, next_lo - 1e-4), mid)
+    return zones
+
+
+def phases_priceable(lo: float, hi: float, apex: float) -> bool:
+    """La finestra dell'apex (``apex ± _APEX_HALF``) sta tutta in ``[lo, hi]``?
+
+    Se no, le fasi di quella curva non dicono quale causa costa di piu': una
+    zona che finisce prima di ``apex + _APEX_HALF`` ha l'uscita a 0, e «dai piu'
+    gas» non puo' pagare mai. Sulla copia dell'archivio succedeva a 89 zone dal
+    vivo su 149 (finiscono prima) e a 56 (cominciano dopo ``apex - _APEX_HALF``):
+    «dai piu' gas» scendeva da 143 a 37 e «frena piu' tardi» da 16 a 4. Li' resta
+    l'ordine fisso di sempre. Una regola sola, chiamata dal vivo e dal debrief,
+    cosi' voce e report scelgono la stessa causa sulla stessa curva.
+    """
+    return lo <= apex - _APEX_HALF and apex + _APEX_HALF <= hi
 
 
 def _seg_delta(seg: _Seg, s: TelemetrySnapshot,
