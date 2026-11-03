@@ -1,8 +1,8 @@
 """Le cinque misure dei gesti del pilota in una curva.
 
 Modulo puro: riceve i campioni gia' tagliati alla curva (da ``entry_pos`` a
-``exit_pos``) e non sa niente di giri, riferimenti o frasi. La frase sta
-altrove (Task 3).
+``exit_pos``) e non sa niente di giri, riferimenti o frasi. La frase la
+scrive ``debrief.gesture_text``.
 
 Ogni misura che non si puo' fare e' ``None`` (rilascio e gas) oppure neutra
 (ABS 0,0 s, sterzo 0 inversioni): un giro registrato prima dei canali ABS o G

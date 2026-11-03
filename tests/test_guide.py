@@ -238,3 +238,18 @@ def test_the_guide_explains_the_corner_gestures(lang, phrase):
     """La guida deve dire che il gesto è uno per curva e solo sopra il rumore."""
     flat = " ".join(_DOCS[lang].split())
     assert phrase in flat
+
+@pytest.mark.parametrize("lang,phrases", (
+    ("it", ("Per il gas conta anche il tratto subito dopo la curva",
+            "su quel giro l'ABS non si confronta",
+            "solo se da te sono di più")),
+    ("en", ("For the throttle the stretch just after the corner counts too",
+            "on that lap ABS isn't compared",
+            "only if you do more of them")),
+))
+def test_the_guide_says_the_after_stretch_the_stuck_abs_and_the_direction(lang, phrases):
+    """Il gas si misura anche dopo la curva, un canale ABS bloccato non si
+    confronta, e sterzo, gas e ABS si dicono in un verso solo."""
+    flat = " ".join(_DOCS[lang].split())
+    for p in phrases:
+        assert p in flat, p

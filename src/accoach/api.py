@@ -383,6 +383,12 @@ _STINT_TEXT = {
 }
 
 
+def _gesture_value(v):
+    """Un lato del gesto per il JSON: un numero a tre decimali, la marcia
+    com'e' (una stringa, «3» o «N»: arrotondarla non avrebbe senso)."""
+    return v if isinstance(v, str) else round(float(v), 3)
+
+
 def _pace_notes(lg: str, litres: float | None, fuel_known: bool, trend,
                 counted: int, needed: int) -> list[str]:
     """Le note sul passo e sulla benzina, coi numeri nel formato della lingua."""
@@ -1308,10 +1314,14 @@ def create_api(
                            for p in x.phases],
                 "phase_note": x.phase_note,
                 # Il gesto che la frase nel `detail` dice, come dato
-                # (coaching/gestures.py). None quasi sempre.
+                # (coaching/gestures.py). None quasi sempre. Secondi e
+                # correzioni a tre decimali come le fasi; la marcia resta una
+                # stringa («3», «N»), come la misura la scrive.
                 "gesture": None if x.gesture is None else {
-                    "kind": x.gesture.kind, "live": x.gesture.live,
-                    "ref": x.gesture.ref, "score": round(x.gesture.score, 2)},
+                    "kind": x.gesture.kind,
+                    "live": _gesture_value(x.gesture.live),
+                    "ref": _gesture_value(x.gesture.ref),
+                    "score": round(x.gesture.score, 2)},
                 "vmin_live": round(x.min_speed_live, 0),
                 "vmin_ref": round(x.min_speed_ref, 0),
                 "apex": x.apex_pos,

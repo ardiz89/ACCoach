@@ -429,6 +429,10 @@ def test_report_endpoint_carries_the_gesture(tmp_path):
     g = by_index[0]["gesture"]
     assert g["kind"] == "release"
     assert abs(g["live"] - 0.224) < 0.01 and abs(g["ref"] - 1.4) < 0.01
+    # I secondi a tre decimali, come le fasi; la marcia resta una stringa.
+    for side in ("live", "ref"):
+        assert g[side] == round(g[side], 3)
+        assert len(repr(g[side]).partition(".")[2]) <= 3
     assert "Rilasci il freno in 0,2 s" in by_index[0]["detail"]
     assert all(x["gesture"] is None for i, x in by_index.items() if i != 0)
 
@@ -455,6 +459,30 @@ def _abs_case(whole_lap):
         if whole_lap or c.entry_pos <= s.pos <= c.exit_pos:
             s.abs_active = 1.0
     return review, ref_lap, corners
+
+
+def test_abs_trusted_is_measured_once_per_lap_not_per_corner(monkeypatch):
+    """Il canale ABS bloccato e' un fatto del giro: si misura una volta per
+    il giro rivisto e una per ogni giro di riferimento, non a ogni curva."""
+    import synth
+    from accoach.coaching import debrief
+    from accoach.coaching.diagnosis import _APEX_HALF
+    from accoach.comparison import Reference
+    from accoach.track import detect_corners
+    ref_lap = synth.build_lap(n=2001)
+    review = synth.build_lap(n=2001)
+    corners = detect_corners(ref_lap.samples)
+    for lap in (review, ref_lap):
+        lap.abs_level = 2              # stesso livello noto: l'ABS si confronta
+    for c in corners:                  # una perdita d'ingresso in ogni curva
+        _slow_between(review, c.entry_pos, c.apex_pos - _APEX_HALF, 300)
+    calls = []
+    real = debrief.abs_trusted
+    monkeypatch.setattr(debrief, "abs_trusted",
+                        lambda samples: calls.append(id(samples)) or real(samples))
+    deb = debrief.build_lap_debrief(review, Reference(ref_lap), corners, "it")
+    assert len(deb.losses) >= 2
+    assert sorted(calls) == sorted({id(review.samples), id(ref_lap.samples)})
 
 
 def test_a_lap_with_abs_always_on_does_not_say_abs():

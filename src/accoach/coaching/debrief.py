@@ -277,7 +277,8 @@ def gesture_text(note: GestureNote, lang: str) -> str:
 
 
 def _corner_gesture(lap: Lap, cref: Reference, c: Corner,
-                    phase: str | None) -> GestureNote | None:
+                    phase: str | None,
+                    trusted: dict | None = None) -> GestureNote | None:
     """Il gesto di questa curva contro il giro del suo riferimento.
 
     I campioni del riferimento vengono dal suo giro (``cref.lap``) fra
@@ -289,6 +290,10 @@ def _corner_gesture(lap: Lap, cref: Reference, c: Corner,
 
     ``phase`` e' il tratto che domina la perdita (``dominant_phase``): senza,
     niente gesto, e con lui solo i gesti che agiscono li'.
+
+    ``trusted`` e' la memoria di ``abs_trusted`` per il debrief, per giro: il
+    canale bloccato e' un fatto del giro, non della curva, e cosi' si misura
+    una volta per il giro rivisto e una per ogni giro di riferimento.
     """
     if phase is None:
         return None      # il tempo e' sparso: nessun posto dove mandarti
@@ -306,10 +311,17 @@ def _corner_gesture(lap: Lap, cref: Reference, c: Corner,
     # E l'ABS si confronta solo fra due giri con lo stesso livello noto: con
     # livelli diversi la frase misurerebbe l'assetto, non il piede (117 frasi
     # ABS su 223 dell'archivio, con le soglie provate nel giro di correzioni).
+    cache = {} if trusted is None else trusted
+
+    def ok(l: Lap) -> bool:
+        if id(l) not in cache:
+            cache[id(l)] = abs_trusted(l.samples)
+        return cache[id(l)]
+
     same_abs = lap.abs_level >= 0 and lap.abs_level == cref.lap.abs_level
-    if not same_abs or not abs_trusted(lap.samples):
+    if not same_abs or not ok(lap):
         g_live = without_abs(g_live)
-    if not same_abs or not abs_trusted(cref.lap.samples):
+    if not same_abs or not ok(cref.lap):
         g_ref = without_abs(g_ref)
     return compare(g_live, g_ref, phase)
 
@@ -1029,6 +1041,7 @@ def build_lap_debrief(lap: Lap, reference: Reference, corners: list[Corner],
     titles = _CATEGORY_TITLE.get(lg, _CATEGORY_TITLE["en"])
     tuning = tuning_for_car(lap.car_model)      # class-dependent symptom bands
     envelope = _grip_envelope(lap, reference)   # this car's grip, measured
+    abs_ok: dict = {}       # abs_trusted per giro, una volta (_corner_gesture)
     losses: list[CornerLoss] = []
     # Le stesse zone del vivo: le fasi si prezzano solo dove la finestra
     # dell'apex sta dentro la curva, con la regola del vivo.
@@ -1121,7 +1134,8 @@ def build_lap_debrief(lap: Lap, reference: Reference, corners: list[Corner],
         detail += _grip_detail(grip, cue.category, lg)
         # Il gesto che fai diverso, contro lo stesso giro della perdita. Prima
         # del confronto, che resta l'ultima frase: dice contro chi e' tutto.
-        gesture = _corner_gesture(lap, cref, c, dominant_phase(phases, lost))
+        gesture = _corner_gesture(lap, cref, c, dominant_phase(phases, lost),
+                                  abs_ok)
         if gesture is not None:
             detail += gesture_text(gesture, lg)
         if ref_c is not None:

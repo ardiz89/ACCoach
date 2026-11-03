@@ -880,11 +880,15 @@ The report can add one sentence to a corner about the gesture you do differently
 from that corner's reference. There are five measures. They are how long the brake
 release takes and how quickly you open the throttle. Then the gear at the apex,
 the time in ABS and steering corrections. It names at most one gesture per corner. It names it
-only if it sits where the time goes, meaning entry, apex or exit. It also names it
+only if it sits where the time goes, meaning entry, apex or exit. For the throttle
+the stretch just after the corner counts too. It also names it
 only if it differs by more than two of your own laps usually differ there. Below
-that threshold the report stays silent. ABS is compared only between laps with the
+that threshold the report stays silent. Steering, throttle and ABS are named only if
+you do more of them than the reference. Correcting less or opening the throttle faster doesn't
+explain lost time. Brake release and gear count both ways. ABS is compared only between laps with the
 same ABS level set. On AC the game doesn't report the level, so ABS isn't compared
-there. The grip of a corner is now compared with the car's limit at that speed,
+there. A lap with ABS on for more than half of it has a stuck channel, and on that
+lap ABS isn't compared. The grip of a corner is now compared, point by point, with the car's limit at that speed,
 measured on the reference. Before, there was a single limit for the whole lap.
 
 If you're a long way off the pace, your own best lap is a target that keeps you

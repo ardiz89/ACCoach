@@ -834,11 +834,15 @@ Il report può aggiungere a una curva una frase sul gesto che fai diverso dal
 riferimento di quella curva. Le misure sono cinque. Sono quanto dura il rilascio del
 freno e quanto in fretta apri il gas. Poi la marcia al punto di corda, il tempo in
 ABS e le correzioni di sterzo. Per ogni curva ne nomina una sola. La nomina solo se cade
-dove va il tempo, cioè ingresso, punto di corda o uscita. La nomina inoltre solo se
+dove va il tempo, cioè ingresso, punto di corda o uscita. Per il gas conta anche il
+tratto subito dopo la curva. La nomina inoltre solo se
 differisce più di quanto due tuoi giri differiscono di solito in quel punto. Sotto
-quella soglia il report tace. L'ABS si confronta solo fra giri con lo stesso livello
+quella soglia il report tace. Sterzo, gas e ABS li nomina solo se da te sono di più.
+Correggere meno o aprire il gas più in fretta non spiega un tempo perso. Il rilascio e la marcia
+contano nei due versi. L'ABS si confronta solo fra giri con lo stesso livello
 di ABS impostato. Su AC il gioco non dice il livello, quindi lì l'ABS non si
-confronta. L'aderenza di una curva si confronta ora col limite dell'auto a quella
+confronta. Un giro con l'ABS acceso per più di metà del giro ha il canale bloccato,
+e su quel giro l'ABS non si confronta. L'aderenza di una curva si confronta ora, punto per punto, col limite dell'auto a quella
 velocità, misurato sul riferimento. Prima c'era un solo limite per tutto il giro.
 
 Se sei lontano dal passo, il tuo giro migliore è un bersaglio che ti tiene dove
