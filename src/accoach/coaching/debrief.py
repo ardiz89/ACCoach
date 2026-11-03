@@ -21,7 +21,7 @@ from typing import TYPE_CHECKING
 
 from ..comparison.reference import Reference
 from ..engineer import Balance, Phase, Speed, Symptom
-from ..recording.lap import Lap
+from ..recording.lap import Lap, strip_leading_wrap
 from ..telemetry.snapshot import format_lap_time
 from ..track import Corner
 from ..cornernames import for_track, marks_for
@@ -33,6 +33,7 @@ from .chain import link_corners
 from .phases import phase_note, split_loss
 from .cue import CueCategory, theme_key
 from .diagnosis import corner_symptoms, dominant_symptom
+from .gestures import GestureNote, compare, measure
 from .thresholds import PEDAL_OFF
 from .tuning import tuning_for_car
 from ..i18n import current_language
@@ -200,6 +201,75 @@ def compared_text(lap_time_ms: int, lang: str) -> str:
     return _COMPARED.get(lang, _COMPARED["en"]).format(lap=lap)
 
 
+# Il gesto della curva diverso dal riferimento piu' del rumore
+# (coaching/gestures.py). Uno solo per curva, e solo nel report: la voce non
+# ne sa niente. I secondi con un decimale, come li legge chi guida.
+_GESTURE = {
+    "en": {
+        "release": " You release the brake in {live} s, the reference in {ref} s.",
+        "pickup": " You open the throttle in {live} s, the reference in {ref} s.",
+        "gear": " At the apex you're in {live}, the reference in {ref}.",
+        "abs": " ABS is active for {live} s, in the reference {ref} s.",
+        "steer": " You correct the steering {live} times, the reference {ref}.",
+        "steer_one": " You correct the steering once, the reference {ref}.",
+    },
+    "it": {
+        "release": " Rilasci il freno in {live} s, il riferimento in {ref} s.",
+        "pickup": " Apri il gas in {live} s, il riferimento in {ref} s.",
+        "gear": " All'apex sei in {live}ª, il riferimento in {ref}ª.",
+        "abs": " L'ABS lavora {live} s, nel riferimento {ref} s.",
+        "steer": " Correggi lo sterzo {live} volte, il riferimento {ref}.",
+        "steer_one": " Correggi lo sterzo una volta, il riferimento {ref}.",
+    },
+}
+
+
+def _ordinal_en(gear: str) -> str:
+    n = int(gear)
+    suffix = {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
+    if 10 <= n % 100 <= 20:
+        suffix = "th"
+    return f"{n}{suffix}"
+
+
+def gesture_text(note: GestureNote, lang: str) -> str:
+    """La frase del gesto, con lo spazio davanti come le altre del dettaglio."""
+    table = _GESTURE.get(lang, _GESTURE["en"])
+    kind = note.kind
+    if kind == "gear":
+        live, ref = str(note.live), str(note.ref)
+        if lang != "it":
+            live, ref = _ordinal_en(live), _ordinal_en(ref)
+    elif kind == "steer":
+        live, ref = str(int(note.live)), str(int(note.ref))
+        if int(note.live) == 1:
+            kind = "steer_one"
+    else:
+        live = fmt_num(float(note.live), 1, lang)
+        ref = fmt_num(float(note.ref), 1, lang)
+    return table[kind].format(live=live, ref=ref)
+
+
+def _corner_gesture(lap: Lap, cref: Reference, c: Corner) -> GestureNote | None:
+    """Il gesto di questa curva contro il giro del suo riferimento.
+
+    I campioni del riferimento vengono dal suo giro (``cref.lap``) fra
+    ``entry_pos`` ed ``exit_pos``: con ``corner_refs`` e' il gesto migliore
+    della curva, cosi' frase e perdita parlano dello stesso giro (Decisione 4).
+    Il tratto iniziale che riparte da ~1,0 si toglie da tutte e due le parti,
+    come fa ``Reference``: dentro una curva vicino al traguardo metterebbe
+    campioni con l'orologio a zero in mezzo a quelli veri.
+    """
+    def span(samples):
+        return [s for s in strip_leading_wrap(samples)
+                if c.entry_pos <= s.pos <= c.exit_pos]
+
+    live, ref = span(lap.samples), span(cref.lap.samples)
+    if len(live) < 2 or len(ref) < 2:
+        return None      # un lato senza campioni misurerebbe zeri, non gesti
+    return compare(measure(live), measure(ref))
+
+
 #: Quante uscite recenti nella stessa curva fanno uno schema e non un errore.
 RUNS_WIDE_MIN = 2
 
@@ -266,6 +336,9 @@ class CornerLoss:
     # Il tempo del giro con cui questa curva è stata confrontata, quando non è il
     # riferimento principale ma il tuo gesto migliore lì. 0 = il principale.
     compared_ms: int = 0
+    # L'unico gesto di questa curva diverso dal riferimento piu' del rumore
+    # (coaching/gestures.py). None quasi sempre: sotto soglia non si dice niente.
+    gesture: GestureNote | None = None
 
     @property
     def label(self) -> str:
@@ -924,6 +997,11 @@ def build_lap_debrief(lap: Lap, reference: Reference, corners: list[Corner],
         # metà dell'app non possono più dire il contrario l'una dell'altra.
         grip = _grip_state(inside, envelope)
         detail += _grip_detail(grip, cue.category, lg)
+        # Il gesto che fai diverso, contro lo stesso giro della perdita. Prima
+        # del confronto, che resta l'ultima frase: dice contro chi e' tutto.
+        gesture = _corner_gesture(lap, cref, c)
+        if gesture is not None:
+            detail += gesture_text(gesture, lg)
         if ref_c is not None:
             detail += compared_text(ref_c.lap_time_ms, lg)
 
@@ -945,6 +1023,7 @@ def build_lap_debrief(lap: Lap, reference: Reference, corners: list[Corner],
                              typed),
             grip=grip,
             compared_ms=ref_c.lap_time_ms if ref_c is not None else 0,
+            gesture=gesture,
         ))
 
     losses.sort(key=lambda x: x.lost_ms, reverse=True)

@@ -215,3 +215,22 @@ def test_one_tenth_is_singular_in_the_debrief_too():
                 min_speed_live=100.0, min_speed_ref=100.0)
     assert "3 decimi " in explain_loss(CueCategory.TIME_LOSS, st, "it")[0]
     assert "3 tenths " in explain_loss(CueCategory.TIME_LOSS, st, "en")[0]
+
+
+def test_a_lap_without_gesture_channels_gives_todays_debrief(monkeypatch):
+    """Review Focus 1: senza ABS, G e marcia (campi a 0 o «N») e con gli
+    stessi pedali del riferimento, nessun gesto: il debrief e' quello di
+    prima, campo per campo, come se il confronto dei gesti non ci fosse."""
+    import accoach.coaching.debrief as debrief_mod
+    ref_lap = synth.build_lap()
+    review = synth.build_lap(slow_corner=0, amt=30)
+    for s in ref_lap.samples + review.samples:
+        s.gear, s.abs_active, s.g_lat, s.g_long = "N", 0.0, 0.0, 0.0
+    reference = Reference(ref_lap)
+    corners = detect_corners(ref_lap.samples)
+    now = build_lap_debrief(review, reference, corners, "it")
+    assert now.losses, "the review lap must lose somewhere"
+    assert all(x.gesture is None for x in now.losses)
+    monkeypatch.setattr(debrief_mod, "compare", lambda live, ref: None)
+    today = build_lap_debrief(review, reference, corners, "it")
+    assert now == today

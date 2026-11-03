@@ -1307,6 +1307,11 @@ def create_api(
                 "phases": [{"phase": p.phase, "lost_s": round(p.lost_ms / 1000.0, 3)}
                            for p in x.phases],
                 "phase_note": x.phase_note,
+                # Il gesto che la frase nel `detail` dice, come dato
+                # (coaching/gestures.py). None quasi sempre.
+                "gesture": None if x.gesture is None else {
+                    "kind": x.gesture.kind, "live": x.gesture.live,
+                    "ref": x.gesture.ref, "score": round(x.gesture.score, 2)},
                 "vmin_live": round(x.min_speed_live, 0),
                 "vmin_ref": round(x.min_speed_ref, 0),
                 "apex": x.apex_pos,
