@@ -482,11 +482,34 @@ class LapCatalog:
                        road_temp: float | None, grip: float | None,
                        compound: str | None):
         """The election of :meth:`best_reference_path` among your own laps."""
+        rows = self._own_rows(car_model, track, road_temp, grip, compound, 1)
+        return rows[0] if rows else None
+
+    def reference_pool_paths(self, car_model: str, track: str,
+                             road_temp: float | None = None,
+                             grip: float | None = None,
+                             compound: str | None = None,
+                             limit: int = 20) -> list[str]:
+        """Paths of your fastest trustworthy laps in the conditions that elected
+        the main reference: the pool the per-corner bests are picked from.
+
+        Same filter and same relaxation as :meth:`_own_reference` (it is the same
+        loop), so the pool is the set of laps the reference was chosen among. The
+        first step that finds anything wins, and its ``limit`` fastest laps come
+        back in the reference's own order (confirmed clean first, then time).
+        """
+        rows = self._own_rows(car_model, track, road_temp, grip, compound, limit)
+        return [r["path"] for r in rows]
+
+    def _own_rows(self, car_model: str, track: str,
+                  road_temp: float | None, grip: float | None,
+                  compound: str | None, limit: int) -> list:
+        """Up to ``limit`` own laps of the first relaxation step with any."""
         base = """SELECT path, lap_time_ms FROM lap
                   WHERE car_key = ? AND track_key = ? AND valid = 1
                         AND lap_time_ms > 0 AND clean <> 0
                         AND COALESCE(source, 'own') <> 'pro'"""
-        order = " ORDER BY (clean = 1) DESC, lap_time_ms ASC LIMIT 1"
+        order = " ORDER BY (clean = 1) DESC, lap_time_ms ASC LIMIT ?"
         keys = (self._slug(car_model), self._slug(track))
 
         # Only conditions we actually know about. A zero or an empty string is
@@ -509,13 +532,13 @@ class LapCatalog:
             if use in tried:
                 continue                     # same query as a stricter attempt
             tried.add(use)
-            row = self._conn.execute(
+            rows = self._conn.execute(
                 base + "".join(known[c][0] for c in use) + order,
-                (*keys, *(p for c in use for p in known[c][1])),
-            ).fetchone()
-            if row:
-                return row
-        return None
+                (*keys, *(p for c in use for p in known[c][1]), int(limit)),
+            ).fetchall()
+            if rows:
+                return rows
+        return []
 
     def fastest_pro_path(self, car_model: str, track: str) -> str | None:
         """Path of the fastest imported PRO benchmark lap, or ``None`` if none."""

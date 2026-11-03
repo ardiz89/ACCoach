@@ -200,6 +200,56 @@ def find_reference_lap(
     return _find_reference_by_scan(car_model, track, laps_dir)
 
 
+def reference_pool(
+    car_model: str,
+    track: str,
+    laps_dir: Path | str | None = None,
+    road_temp: float | None = None,
+    grip: float | None = None,
+    compound: str | None = None,
+    limit: int = 20,
+) -> list[Lap]:
+    """Your fastest trustworthy laps in the conditions of the main reference.
+
+    The pool the per-corner bests are picked from (:mod:`coaching.corner_refs`):
+    same catalog query and same relaxation as :func:`find_reference_lap`, but up
+    to ``limit`` laps instead of one. Loads every file, so call it from a worker
+    thread, never from the tick.
+
+    Catalog only: if the catalog can't be used the answer is ``[]``, with no
+    directory scan. A scan would load the whole archive on a thread the driver
+    is waiting on, to rebuild a *bonus*; without a pool the coach simply keeps
+    the main reference. A file that fails to load is skipped, never raised.
+    """
+    laps_dir = Path(laps_dir) if laps_dir else laps_root()
+    want_car, want_track = _slug(car_model), _slug(track)
+    try:
+        from .catalog import LapCatalog
+
+        with LapCatalog(_catalog_path(laps_dir)) as cat:
+            cat.sync(list_lap_files(laps_dir))
+            paths = cat.reference_pool_paths(car_model, track, road_temp,
+                                             grip, compound, limit)
+    except Exception:
+        _log.debug("catalog pool lookup failed; no pool", exc_info=True)
+        return []
+
+    pool: list[Lap] = []
+    for path in paths:
+        try:
+            lap = load_lap(path)
+        except Exception:
+            _log.debug("pool lap %s does not load; skipped", path, exc_info=True)
+            continue
+        # Same confirmation as the main reference: the file wins over the index.
+        if (lap.valid and lap.lap_time_ms > 0 and lap.clean is not False
+                and lap.source != "pro"
+                and _slug(lap.car_model) == want_car
+                and _slug(lap.track) == want_track):
+            pool.append(lap)
+    return pool
+
+
 def _find_reference_by_scan(
     car_model: str, track: str, laps_dir: Path,
 ) -> Lap | None:

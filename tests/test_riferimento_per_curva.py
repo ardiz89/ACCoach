@@ -19,6 +19,8 @@ from accoach.coaching.corner_refs import (
     window_ms,
 )
 from accoach.comparison import Reference
+from accoach.recording.catalog import LapCatalog
+from accoach.recording.storage import _catalog_path, list_lap_files, save_lap
 from accoach.track import detect_corners
 
 import synth
@@ -222,3 +224,100 @@ def test_the_last_corners_window_runs_to_the_line():
     ref = bests.at(0.999)
     assert ref is not None and ref is bests.at(corners[1].apex_pos)
     assert bests.at(1.0) is ref
+
+
+# --- Decisione 7: il bacino dal catalogo ------------------------------------
+
+def _pool_lap(tmp_path, ms, *, clean=True, compound="dry_compound",
+              source="own", road_temp=0.0, grip=0.0):
+    lap = synth.build_lap(clean=clean, compound=compound)
+    synth.retime(lap, ms)
+    lap.source = source
+    lap.road_temp = road_temp
+    lap.grip = grip
+    lap.recorded_utc = f"2026-11-01T10:{(ms // 1000) % 60:02d}:{ms % 60:02d}+00:00"
+    return save_lap(lap, tmp_path)
+
+
+def _pool_dir(tmp_path):
+    """25 giri: 15 buoni all'asciutto, 3 tagliati, 2 PRO, 5 sul bagnato."""
+    for i in range(15):
+        _pool_lap(tmp_path, 101_000 + i * 700, road_temp=20.0 if i < 4 else 0.0)
+    for i in range(3):
+        _pool_lap(tmp_path, 99_000 + i * 700, clean=False)        # i piu' veloci
+    for i in range(2):
+        _pool_lap(tmp_path, 97_000 + i * 700, source="pro")
+    for i in range(5):
+        _pool_lap(tmp_path, 98_000 + i * 700, compound="wet_compound",
+                  road_temp=20.0)
+
+
+def _pool_paths(tmp_path, **kw):
+    db = _catalog_path(tmp_path)
+    with LapCatalog(db) as cat:
+        cat.sync(list_lap_files(tmp_path))
+        return cat.reference_pool_paths("ferrari_488_gt3", "monza", **kw)
+
+
+def _times(paths):
+    import re
+    out = []
+    for p in paths:
+        m = re.search(r"(\d+)m(\d+)s(\d{3})", str(p))
+        out.append((int(m.group(1)) * 60 + int(m.group(2))) * 1000 + int(m.group(3)))
+    return out
+
+
+def test_bacino_solo_giri_tuoi_puliti_stessa_mescola_in_ordine(tmp_path):
+    _pool_dir(tmp_path)
+    paths = _pool_paths(tmp_path, compound="dry_compound")
+    assert len(paths) == 15
+    times = _times(paths)
+    assert times == sorted(times)
+    assert min(times) >= 101_000          # niente tagliati, PRO o bagnato
+
+
+def test_bacino_senza_condizioni_prende_tutto_il_pulito(tmp_path):
+    _pool_dir(tmp_path)
+    paths = _pool_paths(tmp_path)
+    assert len(paths) == 20               # 15 + 5 bagnato, limite 20
+    assert len(_pool_paths(tmp_path, limit=3)) == 3
+
+
+def test_bacino_si_rilassa_come_il_riferimento(tmp_path):
+    _pool_dir(tmp_path)
+    # Temperatura 20 + asciutto: solo i 4 giri con temperatura nota.
+    assert len(_pool_paths(tmp_path, road_temp=20.0, compound="dry_compound")) == 4
+    # Nessun giro a 50 gradi: cade la temperatura, resta la mescola.
+    assert len(_pool_paths(tmp_path, road_temp=50.0, compound="dry_compound")) == 15
+    # Mescola mai vista: cade la mescola per ultima, resta la temperatura.
+    got = _pool_paths(tmp_path, road_temp=20.0, compound="slick_x")
+    assert len(got) == 9                  # 4 asciutti + 5 bagnati a 20 gradi
+    # Il grip cade per primo: nessun giro ne ha, la mescola regge.
+    assert len(_pool_paths(tmp_path, grip=0.9, compound="dry_compound")) == 15
+
+
+def test_bacino_senza_giri_e_vuoto(tmp_path):
+    with LapCatalog(_catalog_path(tmp_path)) as cat:
+        assert cat.reference_pool_paths("ferrari_488_gt3", "monza") == []
+
+
+def test_reference_pool_carica_i_giri_e_salta_quelli_rotti(tmp_path):
+    from accoach.recording.storage import reference_pool
+    _pool_dir(tmp_path)
+    ok = reference_pool("ferrari_488_gt3", "monza", tmp_path,
+                        compound="dry_compound")
+    assert len(ok) == 15
+    assert all(lap.lap_time_ms > 0 and lap.source == "own" for lap in ok)
+    victim = _pool_paths(tmp_path, compound="dry_compound")[0]
+    open(victim, "wb").write(b"non e' un giro")
+    again = reference_pool("ferrari_488_gt3", "monza", tmp_path,
+                           compound="dry_compound")
+    assert len(again) == 14
+
+
+def test_reference_pool_catalogo_inutilizzabile_da_vuoto(tmp_path):
+    from accoach.recording.storage import reference_pool
+    _pool_dir(tmp_path)
+    _catalog_path(tmp_path).write_bytes(b"questo non e' sqlite" * 50)
+    assert reference_pool("ferrari_488_gt3", "monza", tmp_path) == []
