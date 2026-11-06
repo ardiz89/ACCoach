@@ -1381,6 +1381,70 @@ def create_api(
         except (OSError, ValueError):
             raise HTTPException(404, "lap file unreadable")
 
+    @app.get("/api/mapbg")
+    def mapbg(
+        request: Request,
+        car: str = Query(...),
+        track: str = Query(...),
+        lap: str | None = Query(None),
+    ) -> dict:
+        """Se per questo giro c'e' uno sfondo dal gioco, e come posarlo.
+
+        Solo per chi sta su questo PC: i tasselli vengono dai file di AC e non
+        escono dalla macchina. Ogni rifiuto ha il suo motivo, la pagina in tutti
+        i casi tiene la mappa di sempre.
+        """
+        from . import trackart, trackedges
+        from .guard import is_local_client
+        if not is_local_client(request.client.host if request.client else None):
+            return {"ok": False, "reason": "remote"}
+        if trackedges.tracks_dir() is None:
+            return {"ok": False, "reason": "no_ac"}
+        with _catalog() as cat:
+            all_laps = cat.laps_for(car, track)
+            known = {r["path"] for r in all_laps}
+            review_path = _pick_known(lap, _default_review(all_laps), known)
+        if review_path is None:
+            raise HTTPException(404, "no valid lap for this car+track")
+        try:
+            review = load_lap(review_path)
+        except (OSError, ValueError):
+            raise HTTPException(404, "lap file unreadable")
+        if not _has_map(review):
+            return {"ok": False, "reason": "no_fit"}
+        got = trackedges.ac_fit(line_points(review))
+        if got is None:
+            return {"ok": False, "reason": "no_fit"}
+        spline, fit = got
+        key = trackart.art_key(spline)
+        if key is None:
+            return {"ok": False, "reason": "no_model"}
+        return {
+            "ok": True, "key": key,
+            "fit": {"scale": fit.scale, "cos": fit.cos, "sin": fit.sin,
+                    "dx": fit.dx, "dz": fit.dz, "mirror": bool(fit.mirror)},
+            "levels": list(trackart.LEVELS_M), "tile_px": trackart.TILE_PX,
+        }
+
+    @app.get("/api/mapbg/tile/{key}/{level}/{tx}/{tz}")
+    def mapbg_tile(request: Request, key: str, level: int, tx: int, tz: int):
+        """Un tassello JPEG dello sfondo; 204 se li' non c'e' niente da disegnare."""
+        from . import trackart
+        from .guard import is_local_client
+        if not is_local_client(request.client.host if request.client else None):
+            raise HTTPException(403, "local only")
+        if (not re.fullmatch(r"[0-9a-f]{16}", key)
+                or not 0 <= level < len(trackart.LEVELS_M)):
+            raise HTTPException(404, "unknown tile")
+        try:
+            data = trackart.tile(key, level, tx, tz)
+        except (KeyError, ValueError):
+            raise HTTPException(404, "unknown tile")
+        if not data:
+            return Response(status_code=204)
+        return Response(content=data, media_type="image/jpeg",
+                        headers={"Cache-Control": "private, max-age=86400"})
+
     @app.get("/api/trajectory")
     def trajectory(
         car: str = Query(...),
