@@ -484,6 +484,9 @@
     // strada, presa dal modello con cui il gioco decide dove sei.
     "line.leg.mesh":   { en: `the track, its kerbs and what's beside it, as the game describes them`,
                          it: `la pista, i cordoli e cosa c'è di fianco, come li descrive il gioco` },
+    // Al posto delle due sopra quando sotto le linee c'e' la grafica del gioco.
+    "line.leg.photo":  { en: `The background is the track seen from above, taken from Assetto Corsa's files.`,
+                         it: `Lo sfondo è la pista vista dall'alto, presa dai file di Assetto Corsa.` },
     "line.leg.apex":   { en: `your slowest point`, it: `il tuo punto più lento` },
     "line.leg.apexref":{ en: `the reference's`, it: `quello del riferimento` },
     "chart.offset":    { en: `Where you were on the road <small>(metres from the reference line, above = to its right, below = to its left)</small>`,

@@ -253,3 +253,16 @@ def test_the_guide_says_the_after_stretch_the_stuck_abs_and_the_direction(lang, 
     flat = " ".join(_DOCS[lang].split())
     for p in phrases:
         assert p in flat, p
+
+
+# --- lo sfondo della mappa (la pista vista dall'alto) -----------------------
+
+@pytest.mark.parametrize("lang,phrase", (
+    ("it", "vista dall'alto"),
+    ("en", "seen from above"),
+))
+def test_the_guide_says_the_map_has_the_track_seen_from_above(lang, phrase):
+    """Lo sfondo della mappa viene dai file di AC: la guida dice da dove, e che
+    sugli altri dispositivi la mappa resta senza."""
+    flat = " ".join(_DOCS[lang].split())
+    assert phrase in flat

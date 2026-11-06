@@ -2527,12 +2527,16 @@ def test_every_loader_is_accounted_for():
     # `loadAdvice` e' l'undicesimo: il consiglio in corso, per car+track ma
     # senza argomenti (legge CURRENT), quindi lo rilancia `loadCombo` — che sale
     # a ogni cambio di giro, di riferimento e di lingua — e non `reloadViewData`.
+    # `loadMapBg` e' il dodicesimo: lo sfondo della mappa, per giro e senza
+    # argomenti come la Traiettoria. Lo rilancia `loadCombo` a ogni giro nuovo;
+    # buttato, la mappa resta quella di sempre fino al giro dopo.
     assert set(_LOADERS) == {"loadBraking", "loadCombo", "loadLine", "loadProgress",
                              "loadSectors", "loadSession", "loadStint", "loadPagella",
-                             "loadHowto", "loadDefectHistory", "loadAdvice"}
+                             "loadHowto", "loadDefectHistory", "loadAdvice", "loadMapBg"}
     assert set(_PER_COMBO) == {"loadProgress", "loadSession", "loadStint", "loadPagella",
                                "loadHowto", "loadDefectHistory"}
-    assert set(_PER_LAP) == {"loadBraking", "loadLine", "loadSectors", "loadAdvice"}
+    assert set(_PER_LAP) == {"loadBraking", "loadLine", "loadSectors", "loadAdvice",
+                             "loadMapBg"}
 
 
 def test_every_async_function_that_waits_is_accounted_for():

@@ -580,6 +580,15 @@ Le schede stanno in tre gruppi, nell'ordine in cui di solito le leggi.
   ferma** mentre scorri i grafici. Se passi il mouse sul delta, lo stesso punto
   si accende anche sulla mappa.
 
+  Sotto le linee c'è la **pista vista dall'alto**, presa dai file di Assetto
+  Corsa che hai sul PC. Serve AC installato con quella pista, e vale anche per
+  i giri di ACC sulla stessa pista. Se AC non ha la pista, la mappa è quella di
+  sempre. La prima volta lo sfondo si prepara, poi resta pronto per le volte
+  dopo. Da vicino il paesaggio è sfocato, perché il gioco lo tiene così. Con la
+  **rotella** ingrandisci intorno al mouse, e trascinando sposti la vista. Con
+  un **doppio clic** torni al giro intero. Sul tablet e sugli altri dispositivi
+  la mappa resta senza sfondo.
+
   Sotto la mappa trovi **Le tue frenate**, il riquadro dei tuoi punti di frenata
   curva per curva. Per ogni curva leggi **a che velocità freni**, in che marcia,
   quanto è lunga la staccata e che minima porti. La velocità è un riferimento

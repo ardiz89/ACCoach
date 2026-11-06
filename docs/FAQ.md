@@ -631,6 +631,15 @@ The tabs come in three groups, in the order you usually read them.
   lap, a red cross marks where you lost it. The map **stays put** while you scroll
   the charts. Hover over the delta and the same point lights up on the map.
 
+  Under the lines there's the **track seen from above**, taken from the Assetto
+  Corsa files on your PC. It needs AC installed with that track, and it works
+  for ACC laps on the same track too. If AC doesn't have the track, the map is
+  the usual one. The first time the background gets prepared, then it stays
+  ready. Up close the scenery is blurry, because the game keeps it that way.
+  Use the **mouse wheel** to zoom in around the pointer, and drag to move. A
+  **double-click** takes you back to the whole lap. On the tablet and on other
+  devices the map stays without a background.
+
   Under the map there's **Your braking points**, the panel with your braking
   points corner by corner. For each corner you read **the speed you brake at**, in which
   gear, how long the braking zone is and your minimum speed. Speed is a reference

@@ -1273,14 +1273,17 @@ function drawAdvMarksOnMap(ctx, hit, corners) {
     const apex = adviceApexIn(c);
     if (apex === null || !pos || !pos.length) continue;
     const k = nearest(pos, apex);
-    drawAdvMark(ctx, hit.X(hit.rv.x[k]), hit.Y(hit.rv.z[k]));
+    drawAdvMark(ctx, hit.X(hit.rv.x[k]), hit.Y(hit.rv.z[k]), hit.photo);
   }
 }
 
 // Full track map (the right-hand column of Compare). Wrapper around drawMapTo
-// that also publishes the screen transform for the map's own hover.
+// that also publishes the screen transform for the map's own hover. It is the
+// only map with the zoom and the track seen from above under it.
 function drawMap(a, cx) {
-  const hit = drawMapTo($("c-map"), $("map-missing"), a, cx);
+  MAP_LAST_CX = cx;
+  const hit = drawMapTo($("c-map"), $("map-missing"), a, cx, "delta",
+                        { view: MAP_VIEW, bg: MAPBG });
   if (hit) MAP_HIT = hit;
   // Il segno del consiglio in corso sulle sue curve, al punto del loro apice
   // sul giro in esame. Il contesto e' quello di `setup()`, gia' scalato.
@@ -1424,12 +1427,254 @@ function drawRailList() {
   if (whole) whole.onclick = () => { setRange(null); redrawCurrentView(); };
 }
 
+// --- la pista vista dall'alto, sotto la mappa grande --------------------------
+//
+// Lo sfondo e' la grafica del gioco vista dall'alto, a tasselli (trackart.py).
+// Si posa con trasformazioni affini nella convenzione di `setTransform`,
+// `[a, b, c, d, e, f]`: x' = a*x + c*z + e, y' = b*x + d*z + f. Tre passaggi,
+// e nessuno e' stimato: dal pixel del tassello al modello (la griglia), dal
+// modello al giro (il fit di trackedges, lo stesso che posa i bordi), dal giro
+// allo schermo (le stesse X/Y con cui si disegnano le linee). Se uno dei tre
+// manca, lo sfondo manca: la mappa resta quella di sempre.
+
+//: Metri per pixel dei livelli dei tasselli (trackart.LEVELS_M).
+const MAPBG_LEVELS = [0.1, 0.2, 0.4, 0.8, 1.6, 3.2];
+//: Lo zoom della mappa grande si ferma qui: oltre, un metro e' piu' grande di
+//: quello che il tassello piu' fine sa dire.
+const MAP_MAX_PX_PER_M = 10;
+const MAPBG_FILTER = "saturate(0.55) brightness(0.62)";
+const MAP_HALO = "rgba(0,0,0,0.65)";
+
+let MAPBG = null;          // la risposta di /api/mapbg del giro corrente, o null
+let MAPBG_TILES = new Map();   // "key/L/tx/tz" -> {img, ok}; ok null = in arrivo
+let MAPBG_TILES_KEY = null;
+let MAPBG_RAF = 0;
+// Lo zoom della mappa grande: k = 1 e' il giro intero, (cx, cz) il centro in
+// coordinate del giro. Ogni giro nuovo riparte dal giro intero.
+let MAP_VIEW = { k: 1, cx: 0, cz: 0 };
+let MAP_LAST_CX = null;    // l'ultimo mirino disegnato, per ridisegnare uguale
+let LINE_LAST_CX = null;
+
+// P dopo Q: prima Q, poi P.
+function affCompose(P, Q) {
+  return [P[0] * Q[0] + P[2] * Q[1], P[1] * Q[0] + P[3] * Q[1],
+          P[0] * Q[2] + P[2] * Q[3], P[1] * Q[2] + P[3] * Q[3],
+          P[0] * Q[4] + P[2] * Q[5] + P[4], P[1] * Q[4] + P[3] * Q[5] + P[5]];
+}
+
+function affApply(A, x, z) {
+  return [A[0] * x + A[2] * z + A[4], A[1] * x + A[3] * z + A[5]];
+}
+
+// Dal modello del gioco allo schermo: `fit` come `trackedges.Fit.apply` (lo
+// specchio prima, poi rotazione, scala e spostamento), seguito da `A`, che
+// porta il giro sullo schermo.
+function mapBgAffine(fit, A) {
+  const m = fit.mirror ? -1 : 1, S = fit.scale;
+  const F = [S * fit.cos * m, S * fit.sin * m, -S * fit.sin, S * fit.cos, fit.dx, fit.dz];
+  return affCompose(A, F);
+}
+
+// Il livello piu' fine il cui metro per pixel non scende sotto quello dello
+// schermo: un pixel di tassello per pixel fisico, non di piu'. Oltre il piu'
+// largo si tiene il piu' largo.
+function mapBgLevel(pxPerM, dpr, levels = MAPBG_LEVELS) {
+  const want = 1 / (pxPerM * (dpr || 1));
+  for (let L = 0; L < levels.length; L++) {
+    if (levels[L] >= want * (1 - 1e-9)) return L;
+  }
+  return levels.length - 1;
+}
+
+// La tua linea sopra la pista vera. La sua larghezza dice il distacco, e alla
+// scala del giro intero una linea da 7 px e' piu' larga della strada (vedi «NO
+// ASPHALT HERE» in drawMapTo): disegnata sopra l'asfalto vero, direbbe che
+// l'auto e' uscita dove non e' uscita. Quindi la mezza larghezza non supera
+// 1,5 m, ma la linea non scende sotto 1,5 px, che e' quanto serve per vederla.
+function lineWidthOnPhoto(tt, s) {
+  return Math.max(1.5, Math.min(2 + 5 * tt, 3 * s));
+}
+
+function mapLineWidth(tt, s, photo) {
+  return photo ? lineWidthOnPhoto(tt, s) : 2 + 5 * tt;
+}
+
+// Scala e centro della mappa per `view`. A k = 1 e' l'inquadratura di sempre,
+// il giro intero con 24 px di margine; sopra, la stessa scala per k, attorno a
+// (cx, cz). `A` porta il giro sullo schermo, ed e' la stessa cosa di `mapXY`.
+function mapView(box, w, h, view, m = 24) {
+  const spanX = box.maxX - box.minX || 1, spanZ = box.maxZ - box.minZ || 1;
+  const s0 = Math.min((w - 2 * m) / spanX, (h - 2 * m) / spanZ);
+  const kmax = Math.max(1, MAP_MAX_PX_PER_M / s0);
+  const k = Math.min(kmax, Math.max(1, (view && view.k) || 1));
+  let cx = (box.minX + box.maxX) / 2, cz = (box.minZ + box.maxZ) / 2;
+  if (k > 1 && view) {
+    // Il centro resta dentro il giro: trascinando non ci si perde nel vuoto.
+    cx = Math.min(box.maxX, Math.max(box.minX, view.cx));
+    cz = Math.min(box.maxZ, Math.max(box.minZ, view.cz));
+  }
+  const s = s0 * k;
+  return { s0, s, k, cx, cz, A: [-s, 0, 0, -s, cx * s + w / 2, h / 2 + cz * s] };
+}
+
+// AC/ACC world coordinates are left-handed, so a raw top-down (x, -z) view
+// comes out mirrored left-right (Suzuka T1 would bend the wrong way). X is
+// flipped too so the map matches what you see from the cockpit, and +z is up.
+function mapXY(v, w, h) {
+  return { X: (x) => (v.cx - x) * v.s + w / 2, Y: (z) => h / 2 - (z - v.cz) * v.s };
+}
+
+// Uno scatto di rotella: il punto del giro sotto il cursore resta sotto il
+// cursore. Sotto il giro intero non si va.
+function mapZoomAt(view, box, w, h, px, py, f) {
+  const v = mapView(box, w, h, view);
+  const x = v.cx - (px - w / 2) / v.s, z = v.cz + (h / 2 - py) / v.s;
+  const k = Math.min(Math.max(1, MAP_MAX_PX_PER_M / v.s0), Math.max(1, v.k * f));
+  if (k <= 1) return { k: 1, cx: 0, cz: 0 };
+  const s = v.s0 * k;
+  return { k, cx: x + (px - w / 2) / s, cz: z - (h / 2 - py) / s };
+}
+
+// Lo sfondo di questo giro, chiesto una volta dopo l'analisi, con lo stesso
+// giro della Traiettoria (CURRENT e la tendina). Qualunque risposta che non sia
+// un sì pieno lascia la mappa di sempre, in silenzio.
+async function loadMapBg() {
+  if (!CURRENT) return;
+  const seen = EPOCH;
+  const q = new URLSearchParams({ car: CURRENT.car, track: CURRENT.track });
+  const lap = $("lap").value;
+  if (lap) q.set("lap", lap);
+  let r;
+  try { r = await getJSON("/api/mapbg?" + q.toString()); }
+  catch (e) { return; }
+  if (stale(seen)) return;
+  if (!r || r.ok !== true) return;
+  const f = r.fit || {};
+  const num = (v) => typeof v === "number" && isFinite(v);
+  if (!/^[0-9a-f]{16}$/.test(r.key || "") || !["scale", "cos", "sin", "dx", "dz"].every((k) => num(f[k]))
+      || !(f.scale > 0) || !Array.isArray(r.levels) || !r.levels.length
+      || !r.levels.every((l) => num(l) && l > 0) || !(r.tile_px > 0)) return;
+  // I tasselli restano finche' resta la pista: un altro giro sulla stessa
+  // pista li riusa, un'altra pista li butta.
+  if (MAPBG_TILES_KEY !== r.key) { MAPBG_TILES = new Map(); MAPBG_TILES_KEY = r.key; }
+  MAPBG = r;
+  mapBgRedrawSoon();
+}
+
+// Un tassello: l'immagine se e' arrivata, altrimenti null. `ask` decide se
+// chiederlo; uno vuoto (204) o fallito resta segnato e non si richiede piu'.
+function mapBgTile(bg, L, tx, tz, ask) {
+  const id = bg.key + "/" + L + "/" + tx + "/" + tz;
+  const got = MAPBG_TILES.get(id);
+  if (got) return got.ok ? got.img : null;
+  if (!ask) return null;
+  const img = new Image();
+  const entry = { img, ok: null };
+  img.onload = () => { entry.ok = true; mapBgRedrawSoon(); };
+  img.onerror = () => { entry.ok = false; };
+  MAPBG_TILES.set(id, entry);
+  img.src = "/api/mapbg/tile/" + id;
+  return null;
+}
+
+// Quando arriva un tassello la vista si ridisegna, al massimo una volta per
+// frame anche se ne arrivano dieci insieme.
+function mapBgRedrawSoon() {
+  if (MAPBG_RAF) return;
+  MAPBG_RAF = requestAnimationFrame(() => {
+    MAPBG_RAF = 0;
+    if (!DATA) return;
+    if (VIEW === "compare") drawMap(DATA, MAP_LAST_CX);
+    if (VIEW === "line" && LINE && LINE.corners[LINE_I]) {
+      LINE_HIT = drawCornerZoom(LINE, LINE.corners[LINE_I], LINE_LAST_CX);
+      cornerRoadLegend(LINE);
+    }
+  });
+}
+
+// Lo sfondo sotto tutto il resto, attenuato. `A` porta il giro sullo schermo
+// (pixel CSS). Restituisce true se almeno un tassello e' stato disegnato: fino
+// ad allora la mappa e' quella di sempre, linee comprese.
+//
+// Sotto il livello giusto si posano quelli piu' larghi gia' arrivati, mai
+// chiesti apposta: durante uno zoom lo sfondo resta, un po' sfocato, invece di
+// sparire finche' arrivano i tasselli nuovi.
+function mapBgDraw(ctx, bg, A, w, h) {
+  const T = mapBgAffine(bg.fit, A);
+  const det = T[0] * T[3] - T[1] * T[2];
+  if (!det || !isFinite(det)) return false;
+  const pxPerM = Math.sqrt(Math.abs(det));
+  const levels = bg.levels, P = bg.tile_px;
+  const want = mapBgLevel(pxPerM, window.devicePixelRatio || 1, levels);
+  // Lo schermo nel modello: gli angoli della tela portati indietro.
+  const inv = [T[3] / det, -T[1] / det, -T[2] / det, T[0] / det,
+               (T[2] * T[5] - T[3] * T[4]) / det, (T[1] * T[4] - T[0] * T[5]) / det];
+  let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+  for (const [px, py] of [[0, 0], [w, 0], [0, h], [w, h]]) {
+    const p = affApply(inv, px, py);
+    x0 = Math.min(x0, p[0]); x1 = Math.max(x1, p[0]);
+    z0 = Math.min(z0, p[1]); z1 = Math.max(z1, p[1]);
+  }
+  let drawn = false;
+  ctx.save();
+  ctx.filter = MAPBG_FILTER;
+  for (let L = levels.length - 1; L >= want; L--) {
+    const mpp = levels[L], side = P * mpp;
+    const t0 = Math.floor(x0 / side), t1 = Math.floor(x1 / side);
+    const u0 = Math.floor(z0 / side), u1 = Math.floor(z1 / side);
+    if ((t1 - t0 + 1) * (u1 - u0 + 1) > 400) continue;
+    // Un pixel CSS in pixel di tassello: i tasselli si sovrappongono di tanto,
+    // cosi' fra uno e l'altro non resta il filo della tela.
+    const seam = Math.min(2, 1 / (pxPerM * mpp));
+    for (let tx = t0; tx <= t1; tx++) {
+      for (let tz = u0; tz <= u1; tz++) {
+        const img = mapBgTile(bg, L, tx, tz, L === want);
+        if (!img) continue;
+        ctx.save();
+        ctx.transform(T[0], T[1], T[2], T[3], T[4], T[5]);
+        // Il pixel (0, 0) del tassello e' x minima e z massima.
+        ctx.transform(mpp, 0, 0, -mpp, tx * side, (tz + 1) * side);
+        ctx.drawImage(img, 0, 0, P + seam, P + seam);
+        ctx.restore();
+        drawn = true;
+      }
+    }
+  }
+  ctx.restore();
+  return drawn;
+}
+
+// Sopra lo sfondo ogni linea e ogni segno ha un bordo scuro, largo 2 px in piu':
+// le linee si leggono prima della pista. `haloStroke` va chiamata col percorso
+// gia' costruito e prima del tratto vero, `haloFill` prima del riempimento.
+function haloStroke(ctx, on) {
+  if (!on) return;
+  ctx.save();
+  ctx.strokeStyle = MAP_HALO; ctx.lineWidth = ctx.lineWidth + 2;
+  ctx.stroke();
+  ctx.restore();
+}
+
+function haloFill(ctx, on) {
+  if (!on) return;
+  ctx.save();
+  ctx.setLineDash([]);
+  ctx.strokeStyle = MAP_HALO; ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.restore();
+}
+
 // Render the delta-coloured racing line + braking points to ``canvas``; returns
 // the screen transform {rv, X, Y} so a hover can map cursor → nearest sample,
 // or null when there's no map. ``missing`` (optional) is a placeholder element
 // to toggle when the lap has no coordinates.
-function drawMapTo(canvas, missing, a, cx, mode) {
+//
+// ``opts`` is only for the big map: ``view`` is its zoom (MAP_VIEW) and ``bg``
+// the track seen from above (MAPBG). Every other map — the rail, the flow, the
+// balance ribbon — passes nothing and is drawn exactly as before.
+function drawMapTo(canvas, missing, a, cx, mode, opts) {
   mode = mode || "delta";
+  opts = opts || {};
   if (!canvas) return null;
   if (!a.has_map) {
     if (missing) missing.classList.remove("hidden");
@@ -1452,15 +1697,15 @@ function drawMapTo(canvas, missing, a, cx, mode) {
     }
   };
   scan(rv.x, rv.z); scan(rf.x, rf.z);
-  const m = 24, spanX = maxX - minX || 1, spanZ = maxZ - minZ || 1;
-  const s = Math.min((w - 2 * m) / spanX, (h - 2 * m) / spanZ);
-  const offX = (w - spanX * s) / 2, offZ = (h - spanZ * s) / 2;
-  // AC/ACC world coordinates are left-handed, so a raw top-down (x, -z) view
-  // comes out mirrored left-right (Suzuka T1 would bend the wrong way). Flip X
-  // too so the map matches what you see from the cockpit. Braking points, start
-  // and the hover marker all go through X()/Y(), so they stay in register.
-  const X = (x) => (maxX - x) * s + offX;
-  const Y = (z) => h - ((z - minZ) * s + offZ);   // flip so +z is up
+  // Mirrored and with +z up (see `mapXY`). Braking points, start, the hover
+  // marker and the zoom all go through X()/Y(), so they stay in register.
+  const box = { minX, maxX, minZ, maxZ };
+  const view = mapView(box, w, h, opts.view);
+  const s = view.s;
+  const { X, Y } = mapXY(view, w, h);
+
+  // The track seen from above, under everything else.
+  const photo = opts.bg ? mapBgDraw(ctx, opts.bg, view.A, w, h) : false;
 
   // NO ASPHALT HERE, and it is a decision rather than an omission. Drawing the
   // road under the whole lap was tried on 2026-08-04 and taken straight back
@@ -1475,6 +1720,10 @@ function drawMapTo(canvas, missing, a, cx, mode) {
   // The zoomed corner keeps its asphalt because there the scale is real: a
   // corner fills the box and the line is a thread across it. Same rule as the
   // magnified gap — a drawing that overstates is worse than one that omits.
+  //
+  // The track seen from above (`mapBgDraw`) is real ground too, so the same
+  // rule holds over it: with the photo under it the line's half-width is capped
+  // at 1.5 m (`lineWidthOnPhoto`), and the line stays on the asphalt it drove.
 
   // Reference racing line: faint dashed.
   ctx.save();
@@ -1485,6 +1734,7 @@ function drawMapTo(canvas, missing, a, cx, mode) {
     const px = X(rf.x[i]), py = Y(rf.z[i]);
     i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
   }
+  haloStroke(ctx, photo);
   ctx.stroke();
   ctx.restore();
 
@@ -1504,17 +1754,34 @@ function drawMapTo(canvas, missing, a, cx, mode) {
   // red while normal corner gaps still span the gradient.
   const mx = robustScale(sd, 90, 12, 45);
   ctx.lineCap = "round"; ctx.lineJoin = "round";
+  const widthAt = (i) => {
+    if (mode === "balance") return 3;
+    const tt = Math.min(1, Math.abs(sd[i] || 0) / (mx || 1));
+    return mapLineWidth(tt, s, photo);   // 2px at parity -> 7px at biggest gap
+  };
+  // The dark edge goes under the WHOLE line first: drawn segment by segment
+  // with the colour, each edge would cut across the segment before it.
+  if (photo) {
+    ctx.save();
+    ctx.strokeStyle = MAP_HALO;
+    for (let i = 1; i < rv.x.length; i++) {
+      ctx.beginPath();
+      ctx.moveTo(X(rv.x[i - 1]), Y(rv.z[i - 1]));
+      ctx.lineTo(X(rv.x[i]), Y(rv.z[i]));
+      ctx.lineWidth = widthAt(i) + 2;
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
   for (let i = 1; i < rv.x.length; i++) {
     ctx.beginPath();
     ctx.moveTo(X(rv.x[i - 1]), Y(rv.z[i - 1]));
     ctx.lineTo(X(rv.x[i]), Y(rv.z[i]));
+    ctx.lineWidth = widthAt(i);
     if (mode === "balance") {
-      ctx.lineWidth = 3;
       ctx.strokeStyle = balanceColor(bal[i] || 0);
     } else {
       const dv = sd[i] || 0;        // + = faster than ref here, - = slower
-      const tt = Math.min(1, Math.abs(dv) / (mx || 1));
-      ctx.lineWidth = 2 + 5 * tt;   // 2px at parity -> 7px at biggest gap
       // deltaColor treats +t as "slow" (red): slower here means dv<0, so negate.
       ctx.strokeStyle = deltaColor(-dv, mx);
     }
@@ -1533,7 +1800,7 @@ function drawMapTo(canvas, missing, a, cx, mode) {
         const px = X(rv.x[i]), py = Y(rv.z[i]);
         ctx.beginPath();
         ctx.moveTo(px, py - 6); ctx.lineTo(px - 5, py - 14); ctx.lineTo(px + 5, py - 14);
-        ctx.closePath(); ctx.fill();
+        ctx.closePath(); haloFill(ctx, photo); ctx.fill();
       }
     }
   }
@@ -1543,7 +1810,7 @@ function drawMapTo(canvas, missing, a, cx, mode) {
     for (let i = 1; i < rbk.length; i++) {
       if (rbk[i] >= 0.5 && rbk[i - 1] < 0.5) {
         const px = X(rf.x[i]), py = Y(rf.z[i]);
-        ctx.beginPath(); ctx.arc(px, py, 4.5, 0, 6.283); ctx.stroke();
+        ctx.beginPath(); ctx.arc(px, py, 4.5, 0, 6.283); haloStroke(ctx, photo); ctx.stroke();
       }
     }
   }
@@ -1561,6 +1828,7 @@ function drawMapTo(canvas, missing, a, cx, mode) {
     ctx.beginPath();
     ctx.moveTo(px - 6, py - 6); ctx.lineTo(px + 6, py + 6);
     ctx.moveTo(px + 6, py - 6); ctx.lineTo(px - 6, py + 6);
+    haloStroke(ctx, photo);
     ctx.stroke();
     ctx.restore();
   }
@@ -1609,6 +1877,9 @@ function drawMapTo(canvas, missing, a, cx, mode) {
   for (const c of a.corners || []) {
     const i = nearest(rv.pos, c.apex);
     const lx = X(rv.x[i]) + 6, ly = Y(rv.z[i]) - 4;
+    // Ingranditi, gli apici fuori dalla tela non si scrivono: `rectOf` li
+    // spingerebbe sul bordo, e il nome starebbe su una curva che non e' la sua.
+    if (view.k > 1 && (lx - 6 < 0 || lx - 6 > w || ly + 4 < 0 || ly + 4 > h)) continue;
     // Il rettangolo del testo così come `fillText` lo scrive: da (lx, ly) in
     // avanti in larghezza, e verso l'alto in altezza (`textBaseline` è quello
     // di default, "alphabetic": il testo sta SOPRA `ly`, non sotto).
@@ -1630,7 +1901,13 @@ function drawMapTo(canvas, missing, a, cx, mode) {
       const rShort = rectOf(short);
       if (!overlaps(rShort)) { label = short; rect = rShort; }
     }
-    if (label) { ctx.fillText(label, rect.x0, ly); placedLabels.push(rect); }
+    if (label) {
+      if (photo) {
+        ctx.save(); ctx.strokeStyle = MAP_HALO; ctx.lineWidth = 3; ctx.lineJoin = "round";
+        ctx.strokeText(label, rect.x0, ly); ctx.restore();
+      }
+      ctx.fillText(label, rect.x0, ly); placedLabels.push(rect);
+    }
   }
 
   // Start/finish + direction of travel. A white dot with an "S/F" label (kept
@@ -1644,20 +1921,25 @@ function drawMapTo(canvas, missing, a, cx, mode) {
   // direction arrow (begins just ahead of the dot)
   ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 2;
   const tipX = sx + ux * 26, tipY = sy + uy * 26;
-  ctx.beginPath(); ctx.moveTo(sx + ux * 8, sy + uy * 8); ctx.lineTo(tipX, tipY); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(sx + ux * 8, sy + uy * 8); ctx.lineTo(tipX, tipY);
+  haloStroke(ctx, photo); ctx.stroke();
   const ah = 6, px = -uy, py = ux;   // perpendicular for the arrowhead
   ctx.fillStyle = "#ffffff";
   ctx.beginPath();
   ctx.moveTo(tipX, tipY);
   ctx.lineTo(tipX - ux * ah + px * ah * 0.6, tipY - uy * ah + py * ah * 0.6);
   ctx.lineTo(tipX - ux * ah - px * ah * 0.6, tipY - uy * ah - py * ah * 0.6);
-  ctx.closePath(); ctx.fill();
+  ctx.closePath(); haloFill(ctx, photo); ctx.fill();
   // start/finish dot + label
   if (!a.window) {
     // Su una curva ritagliata (`howtoMapSlice`) il primo campione è l'inizio
     // della curva, non il traguardo: la freccia del verso resta, «S/F» no.
-    ctx.beginPath(); ctx.arc(sx, sy, 5, 0, 6.283); ctx.fill();
+    ctx.beginPath(); ctx.arc(sx, sy, 5, 0, 6.283); haloFill(ctx, photo); ctx.fill();
     ctx.font = "bold " + canvasFont(12) + "px " + UI_FONT;
+    if (photo) {
+      ctx.save(); ctx.strokeStyle = MAP_HALO; ctx.lineWidth = 3; ctx.lineJoin = "round";
+      ctx.strokeText("S/F", sx - ux * 14 - 6, sy - uy * 14 + 4); ctx.restore();
+    }
     ctx.fillText("S/F", sx - ux * 14 - 6, sy - uy * 14 + 4);
   }
 
@@ -1665,11 +1947,13 @@ function drawMapTo(canvas, missing, a, cx, mode) {
   if (cx != null) {
     const i = nearest(rv.pos, cx);
     ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.arc(X(rv.x[i]), Y(rv.z[i]), 6, 0, 6.283); ctx.stroke();
+    ctx.beginPath(); ctx.arc(X(rv.x[i]), Y(rv.z[i]), 6, 0, 6.283);
+    haloStroke(ctx, photo); ctx.stroke();
   }
 
-  // Hand back the screen transform so a hover can find the nearest sample.
-  return { rv, X, Y };
+  // Hand back the screen transform so a hover can find the nearest sample, and
+  // what the zoom needs to move it.
+  return { rv, X, Y, photo, view, box, w, h };
 }
 
 // The comparison lap, but only when the driver actually chose it. Unpinned, the
@@ -1760,9 +2044,15 @@ async function loadCombo(combo, lapPath, baselinePath) {
   }
   if (stale(seen)) return;
   DATA = a;
+  // Un giro nuovo riparte dal giro intero, e lo sfondo e' quello del giro: si
+  // chiede di nuovo, e solo per un giro che ha una mappa. Finche' non arriva
+  // (e se non arriva mai) la mappa e' quella di sempre.
+  MAP_VIEW = { k: 1, cx: 0, cz: 0 };
+  MAPBG = null;
   buildDistance(a);       // this lap's metres, for every chart's x-axis
   FLOW_STEP = 0;          // a new lap is a new explanation, from the top
   fillLaps(a);
+  if (a.has_map) loadMapBg();
   drawLapBar(a);
   drawSummary(a);
   drawCornerSpeeds(a);
@@ -2960,7 +3250,7 @@ function advMarkHTML(titled = true) {
   return titled ? `<span class="adv-mark" title="${escAttr(t("adv.mark.title"))}"></span>`
                 : `<span class="adv-mark"></span>`;
 }
-function drawAdvMark(ctx, x, y) {
+function drawAdvMark(ctx, x, y, halo) {
   if (ADV_COL === null) {
     ADV_COL = getComputedStyle(document.body).getPropertyValue("--adv").trim() || "#C792EA";
   }
@@ -2971,6 +3261,7 @@ function drawAdvMark(ctx, x, y) {
   // Il contesto dei canvas e' gia' scalato da `setup()` per il pixel ratio:
   // 4 px qui sono 4 px di schermo, come le altre etichette.
   ctx.arc(x, y, 4, 0, Math.PI * 2);
+  if (halo) haloFill(ctx, true);
   ctx.fill();
   ctx.restore();
 }
@@ -4859,27 +5150,10 @@ function renderLine(cx) {
                  c.kind ? t("line.kind." + c.kind) : ""].filter(Boolean).join(" · ");
   renderCornerTitle(L, c, shape);
 
-  // The road is in the legend only when it is on the drawing — and it is named
-  // "asphalt", never "track limits": a clean lap uses the kerbs and sits a
-  // couple of metres past this line (see SPIKE-BORDI.md).
-  const legRoad = $("leg-road");
-  if (legRoad) {
-    const mesh = LINE_MAG > 1 ? null : (L.corners[LINE_I] || {}).line;
-    const surf = mesh && mesh.road;
-    const road = LINE_MAG > 1 ? null : L.edges;
-    legRoad.classList.toggle("hidden", !(surf || road));
-    if (surf) {
-      // Con le superfici del gioco i cordoli CI SONO: dire il contrario
-      // sarebbe una didascalia che contraddice il proprio disegno.
-      $("leg-road-text").textContent = t("line.leg.mesh");
-    } else if (road) {
-      $("leg-road-text").textContent = tf("line.leg.road", { m: road.width_m });
-    }
-  }
-
   renderLineFacts(c);
   renderLineTable(L);
   LINE_HIT = drawCornerZoom(L, c, cx);
+  cornerRoadLegend(L);
   drawOffsetTrace(L, c, cx);
   drawCurvature(L, c, cx);
   updateLineReadout(L, cx);
@@ -5105,6 +5379,30 @@ function renderLineTable(L) {
   };
 }
 
+// The road is in the legend only when it is on the drawing — and it is named
+// "asphalt", never "track limits": a clean lap uses the kerbs and sits a
+// couple of metres past this line (see SPIKE-BORDI.md). Written AFTER the
+// drawing, because only the drawing knows whether the track seen from above
+// made it under the lines: until its tiles arrive the ground is the old one.
+function cornerRoadLegend(L) {
+  const legRoad = $("leg-road");
+  if (!legRoad) return;
+  const mesh = LINE_MAG > 1 ? null : (L.corners[LINE_I] || {}).line;
+  const surf = mesh && mesh.road;
+  const road = LINE_MAG > 1 ? null : L.edges;
+  const photo = !!(LINE_HIT && LINE_HIT.photo);
+  legRoad.classList.toggle("hidden", !(photo || surf || road));
+  if (photo) {
+    $("leg-road-text").textContent = t("line.leg.photo");
+  } else if (surf) {
+    // Con le superfici del gioco i cordoli CI SONO: dire il contrario
+    // sarebbe una didascalia che contraddice il proprio disegno.
+    $("leg-road-text").textContent = t("line.leg.mesh");
+  } else if (road) {
+    $("leg-road-text").textContent = tf("line.leg.road", { m: road.width_m });
+  }
+}
+
 // One corner, zoomed. The two lines with the area between them shaded: the band
 // IS the difference, which is the one thing a driver wants from this picture and
 // the one thing two overlaid lines at track scale never show.
@@ -5261,13 +5559,27 @@ function drawCornerZoom(L, c, cx) {
   const X = (x) => (maxX - x) * sc + offX;
   const Y = (z) => h - ((z - minZ) * sc + offZ);
 
+  // The track seen from above, when there is one and the gap is at true scale:
+  // it takes the place of the asphalt below, under the same `turn`. The lap is
+  // carried to the screen by the turn first and then by X/Y, written out as
+  // the two affine maps they are. At ×3 there is no ground, real or drawn.
+  let photo = false;
+  if (MAPBG && LINE_MAG === 1) {
+    const turnA = [best.ca, best.sa, -best.sa, best.ca,
+                   -cx0 * best.ca + cz0 * best.sa, -cx0 * best.sa - cz0 * best.ca];
+    const screenA = [-sc, 0, 0, -sc, maxX * sc + offX, h + minZ * sc - offZ];
+    photo = mapBgDraw(ctx, MAPBG, affCompose(screenA, turnA), w, h);
+  }
+
   // The asphalt first, so everything else is drawn ON the road rather than
   // beside it. Two sources, and the better one wins: the game's own collision
   // model gives the road as a POLYGON with its kerbs, while the AI spline can
   // only give a corridor around the AI's own line — which on a chicane is a
   // smoothed-out version of a road that is not smooth.
-  if (shapes) drawSurfaces(ctx, shapes, X, Y);
-  else drawRoad(ctx, road, X, Y, 1.5);
+  if (!photo) {
+    if (shapes) drawSurfaces(ctx, shapes, X, Y);
+    else drawRoad(ctx, road, X, Y, 1.5);
+  }
 
   // The band between the lines.
   ctx.beginPath();
@@ -5292,6 +5604,7 @@ function drawCornerZoom(L, c, cx) {
     const px = X(ref.x[i]), py = Y(ref.z[i]);
     i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
   }
+  haloStroke(ctx, photo);
   ctx.stroke();
   ctx.restore();
 
@@ -5303,6 +5616,7 @@ function drawCornerZoom(L, c, cx) {
     const px = X(yx[i]), py = Y(yz[i]);
     i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
   }
+  haloStroke(ctx, photo);
   ctx.stroke();
 
   // The two pedals, same encoding as the track map: yours filled, the
@@ -5347,10 +5661,10 @@ function drawCornerZoom(L, c, cx) {
     ctx.beginPath();
     if (up) { ctx.moveTo(px, py + 6); ctx.lineTo(px - 5, py + 14); ctx.lineTo(px + 5, py + 14); }
     else { ctx.moveTo(px, py - 6); ctx.lineTo(px - 5, py - 14); ctx.lineTo(px + 5, py - 14); }
-    ctx.closePath(); ctx.fill();
+    ctx.closePath(); haloFill(ctx, photo); ctx.fill();
   };
   const ring = (px, py) => {
-    ctx.beginPath(); ctx.arc(px, py, 4.5, 0, 6.283); ctx.stroke();
+    ctx.beginPath(); ctx.arc(px, py, 4.5, 0, 6.283); haloStroke(ctx, photo); ctx.stroke();
   };
   const yb = firstAt(you, "brake", BRAKE_ON, null);
   const yt = firstAt(you, "throttle", THROTTLE_ON, c.apex_you || c.apex);
@@ -5377,9 +5691,10 @@ function drawCornerZoom(L, c, cx) {
   };
   const ai = at(you, c.apex_you), ri = at(ref, c.apex_ref);
   ctx.fillStyle = "#22D3CE";
-  ctx.beginPath(); ctx.arc(X(yx[ai]), Y(yz[ai]), 5, 0, 6.283); ctx.fill();
+  ctx.beginPath(); ctx.arc(X(yx[ai]), Y(yz[ai]), 5, 0, 6.283); haloFill(ctx, photo); ctx.fill();
   ctx.strokeStyle = "rgba(255,255,255,0.85)"; ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.arc(X(ref.x[ri]), Y(ref.z[ri]), 5.5, 0, 6.283); ctx.stroke();
+  ctx.beginPath(); ctx.arc(X(ref.x[ri]), Y(ref.z[ri]), 5.5, 0, 6.283);
+  haloStroke(ctx, photo); ctx.stroke();
 
   // Direction of travel, from the first samples of your line.
   const k = Math.min(6, yx.length - 1);
@@ -5388,14 +5703,14 @@ function drawCornerZoom(L, c, cx) {
   const sx = X(yx[0]), sy = Y(yz[0]);
   const tipX = sx + ux * 22, tipY = sy + uy * 22;
   ctx.strokeStyle = "rgba(255,255,255,0.75)"; ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(tipX, tipY); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(tipX, tipY); haloStroke(ctx, photo); ctx.stroke();
   const ah = 6, nx = -uy, ny = ux;
   ctx.fillStyle = "rgba(255,255,255,0.75)";
   ctx.beginPath();
   ctx.moveTo(tipX, tipY);
   ctx.lineTo(tipX - ux * ah + nx * ah * 0.6, tipY - uy * ah + ny * ah * 0.6);
   ctx.lineTo(tipX - ux * ah - nx * ah * 0.6, tipY - uy * ah - ny * ah * 0.6);
-  ctx.closePath(); ctx.fill();
+  ctx.closePath(); haloFill(ctx, photo); ctx.fill();
 
   // Scale bar — without it the zoom level is unknowable and "2 m wide" has no
   // size on screen. Rounded to a number a human reads off a ruler.
@@ -5424,9 +5739,10 @@ function drawCornerZoom(L, c, cx) {
   if (cx != null) {
     const i = at(you, cx);
     ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.arc(X(yx[i]), Y(yz[i]), 7, 0, 6.283); ctx.stroke();
+    ctx.beginPath(); ctx.arc(X(yx[i]), Y(yz[i]), 7, 0, 6.283); haloStroke(ctx, photo); ctx.stroke();
   }
-  return { pos: you.pos, X: (i) => X(yx[i]), Y: (i) => Y(yz[i]) };
+  LINE_LAST_CX = cx;
+  return { pos: you.pos, X: (i) => X(yx[i]), Y: (i) => Y(yz[i]), photo };
 }
 
 // One line of canvas text, cut with an ellipsis rather than run off the edge.
@@ -5820,8 +6136,50 @@ function wireHover() {
 
   const map = $("c-map");
   if (map) {
+    // Lo zoom della mappa grande: rotella intorno al cursore, trascinamento per
+    // spostare, doppio clic per tornare al giro intero. Mirino, croce, segni e
+    // frenate passano tutti da X/Y, quindi seguono da soli.
+    let drag = null;
+    const zoomRedraw = () => { if (DATA && VIEW === "compare") mapBgRedrawSoon(); };
+    map.addEventListener("wheel", (e) => {
+      const hit = MAP_HIT;
+      if (!DATA || !hit || !hit.view) return;
+      const f = e.deltaY < 0 ? 1.25 : e.deltaY > 0 ? 1 / 1.25 : 1;
+      // Al giro intero la rotella all'indietro scorre la pagina come sempre:
+      // una mappa grande che si mangia lo scorrimento intrappola il mouse.
+      if (f === 1 || (f < 1 && MAP_VIEW.k <= 1)) return;
+      e.preventDefault();
+      const rect = map.getBoundingClientRect();
+      MAP_VIEW = mapZoomAt(MAP_VIEW, hit.box, hit.w, hit.h,
+                           e.clientX - rect.left, e.clientY - rect.top, f);
+      zoomRedraw();
+    }, { passive: false });
+    map.addEventListener("mousedown", (e) => {
+      if (e.button !== 0 || !MAP_HIT || !MAP_HIT.view || MAP_HIT.view.k <= 1) return;
+      drag = { x: e.clientX, y: e.clientY };
+      map.style.cursor = "grabbing";
+      e.preventDefault();
+    });
+    window.addEventListener("mouseup", () => {
+      if (drag) { drag = null; map.style.cursor = ""; }
+    });
+    map.addEventListener("dblclick", () => {
+      MAP_VIEW = { k: 1, cx: 0, cz: 0 };
+      zoomRedraw();
+    });
     map.addEventListener("mousemove", (e) => {
       if (!DATA) return;
+      if (drag && MAP_HIT && MAP_HIT.view) {
+        // Il centro si sposta col contenuto: verso destra il giro va a destra.
+        // Dalla vista corrente, non dall'ultimo disegno: fra due frame arrivano
+        // piu' movimenti, e nessuno va perso.
+        const v = mapView(MAP_HIT.box, MAP_HIT.w, MAP_HIT.h, MAP_VIEW);
+        MAP_VIEW = { k: v.k, cx: v.cx + (e.clientX - drag.x) / v.s,
+                     cz: v.cz + (e.clientY - drag.y) / v.s };
+        drag = { x: e.clientX, y: e.clientY };
+        zoomRedraw();
+        return;
+      }
       const p = nearestPos(MAP_HIT, map, e);
       if (p != null) hoverTo(p);
     });

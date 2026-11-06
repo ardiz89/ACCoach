@@ -438,7 +438,7 @@ def test_the_figures_reuse_the_compare_drawing_cut_to_the_corner():
     # La mappa ritagliata non scrive «S/F» all'inizio della curva.
     sl = _body_of("function howtoMapSlice(a, win, f)")
     assert "window: true" in sl
-    dm = _body_of("function drawMapTo(canvas, missing, a, cx, mode)")
+    dm = _body_of("function drawMapTo(canvas, missing, a, cx, mode, opts)")
     assert "// start/finish dot + label\n  if (!a.window) {" in dm
 
 
