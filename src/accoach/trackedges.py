@@ -705,6 +705,32 @@ def _by_shape(points):
     return best, best_at
 
 
+def ac_fit(points):
+    """Come `_by_shape`, ma solo fra le piste di AC: (percorso della linea, Fit).
+
+    Lo sfondo grafico viene dalla cartella del gioco e va posato con la linea
+    dell'IA di quella stessa cartella: un circuito del bundle, anche se vince in
+    `edges_and_fit`, non dice nulla su dove stanno i file di AC. Stessa
+    tolleranza sulla lunghezza, stesso criterio: vince il migliore.
+    """
+    want = _lap_length(points)
+    if want <= 0:
+        return None
+    best: tuple[Path, Fit] | None = None
+    best_p95 = float("inf")
+    for name, path in all_splines():
+        length = _length_of(path)
+        if not length or abs(length - want) / want > _LENGTH_TOL:
+            continue
+        got = _at_path(path, name)
+        if got is None:
+            continue
+        at = fit(got, points)
+        if at is not None and at.p95_m < best_p95:
+            best, best_p95 = (path, at), at.p95_m
+    return best
+
+
 def edges_for(track: str, points=None) -> TrackEdges | None:
     """The asphalt for ``track``, laid under ``points`` when they are given.
 
