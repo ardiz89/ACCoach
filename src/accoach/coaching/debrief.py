@@ -771,6 +771,14 @@ _GRIP_BAND_KMH = 40.0
 #: del riferimento in quel punto, contro l'inviluppo unico di prima 66 curve
 #: su 612 (10,8 %) cambiano stato: 44 diventano «al limite», 16 non lo sono
 #: più. Con la fascia della sola velocità mediana erano 96 (15,7 %).
+#: Poi la fascia più alta: quasi tutta rettilineo, dava 0,57 G sopra i 320
+#: km/h alla SF25 di Spa contro 4,43 sul giro. Una fascia non scende sotto le
+#: più lente, fino all'inviluppo del giro: rispetto alle fasce libere cambiano
+#: 22 curve su 612 (3,6 %), tutte via da «al limite», e 23 esercizi «frena
+#: più tardi» si sbloccano. Contro l'inviluppo unico cambiano 60 curve (9,8 %),
+#: e nessuna staccata diventa satura per colpa delle fasce. Senza il tetto
+#: del giro cambiavano 88 curve (14,4 %): una fascia lenta con p95 sopra il
+#: giro (M3 a Suzuka, 1,48 contro 1,37) alzava tutte quelle veloci.
 _GRIP_BAND_MIN_SAMPLES = 50
 
 
@@ -802,6 +810,13 @@ def _grip_envelope(lap: Lap, reference: Reference) -> GripEnvelope:
     Same samples as always (the reference at each position of the reviewed
     lap), binned by the *reference's* speed there: it is his limit at that
     speed that the corner is measured against.
+
+    A band never sits below a slower one, up to the whole-lap envelope. Grip
+    does not fall with speed (the wings add load), and a fast band is mostly
+    straight, where the G only says the car went straight. The floor stops at
+    the whole lap because a slow band's p95 also catches kerbs and the end
+    of heavy braking, and without the cap it lifted every faster band above
+    the limit used before bands existed.
     """
     whole: list[float] = []
     binned: dict[int, list[float]] = {}
@@ -810,10 +825,16 @@ def _grip_envelope(lap: Lap, reference: Reference) -> GripEnvelope:
         g = _combined_g(r.g_lat, r.g_long)
         whole.append(g)
         binned.setdefault(int(max(0.0, r.speed_kmh) // _GRIP_BAND_KMH), []).append(g)
-    return GripEnvelope(
-        whole=_percentile(whole, _GRIP_PCTL),
-        bands={b: _percentile(v, _GRIP_PCTL) for b, v in binned.items()
-               if len(v) >= _GRIP_BAND_MIN_SAMPLES})
+    whole_p = _percentile(whole, _GRIP_PCTL)
+    bands: dict[int, float] = {}
+    floor = 0.0
+    for b in sorted(binned):
+        if len(binned[b]) < _GRIP_BAND_MIN_SAMPLES:
+            continue
+        p = _percentile(binned[b], _GRIP_PCTL)
+        floor = max(floor, p)
+        bands[b] = max(p, min(floor, whole_p))
+    return GripEnvelope(whole=whole_p, bands=bands)
 
 
 #: Both pedals off for longer than this, before the brake, is a real coast and

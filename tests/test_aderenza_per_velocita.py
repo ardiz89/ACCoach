@@ -119,6 +119,33 @@ def test_a_lap_without_g_data_still_says_nothing():
     assert _grip_state([_S(1.0)] * 20, env, 100.0).ratio == 0.0
 
 
+def test_a_fast_band_that_is_mostly_straight_keeps_the_slower_limit():
+    """Il difetto della revisione finale: sopra i 320 km/h la SF25 a Spa aveva
+    0,65 G di p95 contro 4,38 sul giro, perché lassù è quasi tutto rettilineo.
+    Le prime frenate da quella velocità risultavano «al limite» e l'esercizio
+    «frena più tardi» si bloccava. Il grip non cala con la velocità: la fascia
+    alta prende almeno il limite delle più lente."""
+    straight = [(290.0 + 20.0 * i / 200, 0.3) for i in range(200)]   # 290-309
+    env = _envelope(_lap([(60.0 + 60.0 * i / 200, 1.2) for i in range(200)]
+                         + [(130.0 + 120.0 * i / 200, 2.0) for i in range(200)]
+                         + straight))
+    assert env.at(300.0) == pytest.approx(2.0)
+    assert env.at(90.0) == pytest.approx(1.2)      # le lente restano le loro
+    assert not _grip_state([_S(0.6)] * 20, env, 300.0).at_limit
+
+
+def test_the_floor_stops_at_the_whole_lap_envelope():
+    """Una fascia lenta può avere un p95 sopra il giro: cordoli e code di
+    frenata. Sulla M3 a Suzuka 1,48 contro 1,37. Senza tetto alzava tutte le
+    fasce veloci sopra il limite che si usava prima delle fasce."""
+    spikes = [(60.0 + 19.0 * i / 60, 2.5) for i in range(60)]        # 60-79
+    fast = [(130.0 + 110.0 * i / 1440, 1.5) for i in range(1440)]    # 130-239
+    env = _envelope(_lap(spikes + fast))
+    assert env.whole == pytest.approx(1.5)
+    assert env.at(70.0) == pytest.approx(2.5)      # la fascia lenta resta sua
+    assert env.at(200.0) == pytest.approx(1.5)
+
+
 # --- per campione: ogni G contro il limite alla velocità del riferimento lì ---
 
 def test_heavy_high_speed_braking_does_not_put_a_slow_corner_at_the_limit():
@@ -156,9 +183,11 @@ def test_a_missing_reference_speed_falls_back_to_the_whole_lap():
 # --- nel debrief: la fascia è quella del riferimento -------------------------
 
 def _g_by_ref_band(spd):
-    """G del riferimento per fascia: 1,0 fra 120 e 160, 2,0 fra 160 e 200."""
+    """G del riferimento per fascia: 1,0 fra 120 e 160, 2,0 fra 160 e 200.
+    Crescente con la velocità, come il grip vero: una fascia non scende mai
+    sotto una più lenta."""
     band = int(spd // 40)
-    return {3: 1.0, 4: 2.0}.get(band, 1.5)
+    return 0.8 if band < 3 else {3: 1.0, 4: 2.0}.get(band, 2.5)
 
 
 def test_the_debrief_picks_the_band_of_the_reference_speed():

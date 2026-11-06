@@ -843,7 +843,7 @@ contano nei due versi. L'ABS si confronta solo fra giri con lo stesso livello
 di ABS impostato. Su AC il gioco non dice il livello, quindi lì l'ABS non si
 confronta. Un giro con l'ABS acceso per più di metà del giro ha il canale bloccato,
 e su quel giro l'ABS non si confronta. L'aderenza di una curva si confronta ora, punto per punto, col limite dell'auto a quella
-velocità, misurato sul riferimento. Prima c'era un solo limite per tutto il giro.
+velocità, misurato sul riferimento. Prima c'era un solo limite per tutto il giro. Il limite non scende salendo di velocità, perché sui rettilinei il grip non si misura.
 
 Se sei lontano dal passo, il tuo giro migliore è un bersaglio che ti tiene dove
 sei. Nella sezione **Analisi** dell'hub c'è **Importa un giro di riferimento
