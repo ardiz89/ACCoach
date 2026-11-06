@@ -6,6 +6,8 @@ di quella stessa cartella.
 """
 import math
 
+import pytest
+
 from accoach import trackart as ta
 from accoach import trackedges as te
 
@@ -280,3 +282,160 @@ def test_an_empty_tile_is_none(tmp_path):
     assert ta.render_tile(scene, 0, 5, 0) is None
     assert ta.render_tile(scene, 0, -1, -1) is None
     assert ta.render_tile(ta.Scene([], None), 3, 0, 0) is None
+
+
+# --- la cache dei tasselli ----------------------------------------------------
+
+@pytest.fixture
+def cache(tmp_path, monkeypatch):
+    """Una pista con due kn5 finti, la casa finta e `read` che conta."""
+    monkeypatch.setattr(ta.paths, "base_dir", lambda: tmp_path / "casa")
+    monkeypatch.setattr("accoach.trackmesh.is_physics_model", lambda p: p.name == "col.kn5")
+    track = tmp_path / "pista"
+    spline = _spline_file(track)
+    for n in ("art.kn5", "col.kn5"):
+        (track / n).write_bytes(b"x" * 10)
+    (track / "models.ini").write_text(
+        "[MODEL_0]\nFILE=art.kn5\n[MODEL_1]\nFILE=col.kn5\n", encoding="utf-8")
+    tex, mat = _solid("red", (200, 30, 20))
+    model = _model(tmp_path, [_quad("ground", -1, -1, SIDE0 + 1, SIDE0 + 1)], [tex], [mat])
+    reads = []
+
+    def fake_read(path, position=(0, 0, 0), rotation_deg=(0, 0, 0)):
+        reads.append(path.name)
+        return model
+
+    monkeypatch.setattr(ta.kn5visual, "read", fake_read)
+    ta._known.clear()
+    ta._scene, ta._scene_key = None, None
+    yield track, spline, reads
+    ta._known.clear()
+    ta._scene, ta._scene_key = None, None
+
+
+def test_the_cache_lives_under_the_hone_folder(cache, tmp_path):
+    assert ta.cache_dir() == tmp_path / "casa" / "cache" / "mapbg"
+
+
+def test_the_key_is_16_hex_and_none_without_files(cache, tmp_path):
+    track, spline, _ = cache
+    key = ta.art_key(spline)
+    assert key is not None and len(key) == 16 and int(key, 16) >= 0
+    assert ta.art_key(_spline_file(tmp_path / "x" / "vuota")) is None
+
+
+def test_touching_a_track_file_changes_the_key(cache):
+    import os
+    track, spline, _ = cache
+    before = ta.art_key(spline)
+    assert ta.art_key(spline) == before
+    st = (track / "art.kn5").stat()
+    os.utime(track / "art.kn5", ns=(st.st_atime_ns, st.st_mtime_ns + 5_000_000_000))
+    assert ta.art_key(spline) != before
+    # anche il modello di collisione conta
+    mid = ta.art_key(spline)
+    (track / "col.kn5").write_bytes(b"x" * 11)
+    assert ta.art_key(spline) != mid
+
+
+def test_an_unknown_key_raises(cache):
+    with pytest.raises(KeyError):
+        ta.tile("0123456789abcdef", 0, 0, 0)
+    with pytest.raises(KeyError):
+        ta.tile("../../etc", 0, 0, 0)
+
+
+def test_a_tile_is_rendered_once_then_read_from_disk(cache, monkeypatch):
+    track, spline, reads = cache
+    key = ta.art_key(spline)
+    calls = []
+    real = ta.render_tile
+    monkeypatch.setattr(ta, "render_tile", lambda *a: calls.append(a) or real(*a))
+    first = ta.tile(key, 0, 0, 0)
+    second = ta.tile(key, 0, 0, 0)
+    assert first is not None and first[:2] == b"\xff\xd8" and second == first
+    assert len(calls) == 1
+    assert (ta.cache_dir() / key / "0" / "0" / "0.jpg").is_file()
+    assert not list(ta.cache_dir().rglob("*.tmp"))
+
+
+def test_the_road_uses_the_collision_model_of_the_track(cache):
+    track, spline, reads = cache
+    ta.tile(ta.art_key(spline), 0, 0, 0)
+    assert sorted(set(reads)) == ["art.kn5", "col.kn5"]
+    assert ta._scene.road is not None
+
+
+def test_an_empty_tile_is_remembered_as_empty(cache, monkeypatch):
+    track, spline, _ = cache
+    key = ta.art_key(spline)
+    calls = []
+    real = ta.render_tile
+    monkeypatch.setattr(ta, "render_tile", lambda *a: calls.append(a) or real(*a))
+    assert ta.tile(key, 0, 9, 9) is None
+    assert ta.tile(key, 0, 9, 9) is None
+    assert len(calls) == 1
+    assert (ta.cache_dir() / key / "0" / "9" / "9.none").is_file()
+
+
+def test_a_locked_file_is_not_remembered_as_missing(cache, monkeypatch):
+    track, spline, _ = cache
+    key = ta.art_key(spline)
+    good = ta.kn5visual.read
+    state = {"n": 0}
+
+    def flaky(*a, **k):
+        state["n"] += 1
+        if state["n"] == 1:
+            raise OSError("in uso da AC")
+        return good(*a, **k)
+
+    monkeypatch.setattr(ta.kn5visual, "read", flaky)
+    assert ta.scene_for(key) is None
+    assert not list(ta.cache_dir().rglob("*.none"))
+    assert ta.scene_for(key) is not None
+
+
+def test_a_locked_file_leaves_no_placeholder(cache, monkeypatch):
+    track, spline, _ = cache
+    key = ta.art_key(spline)
+    monkeypatch.setattr(ta.kn5visual, "read", lambda *a, **k: (_ for _ in ()).throw(OSError("x")))
+    assert ta.tile(key, 0, 0, 0) is None
+    assert not ta.cache_dir().exists() or not list(ta.cache_dir().rglob("*"))
+
+
+def test_only_one_scene_is_kept(cache, tmp_path):
+    track, spline, _ = cache
+    k1 = ta.art_key(spline)
+    s1 = ta.scene_for(k1)
+    assert ta.scene_for(k1) is s1
+    other = tmp_path / "altra"
+    sp2 = _spline_file(other)
+    (other / "z.kn5").write_bytes(b"y")
+    k2 = ta.art_key(sp2)
+    assert k2 != k1 and ta.scene_for(k2) is not s1
+    assert ta._scene_key == k2
+
+
+def test_bad_coordinates_never_reach_the_filesystem(cache):
+    track, spline, _ = cache
+    key = ta.art_key(spline)
+    for bad in ((9, 0, 0), (-1, 0, 0), (0, "../x", 0), (0, 0, 1.5)):
+        with pytest.raises(ValueError):
+            ta.tile(key, *bad)
+
+
+def test_concurrent_requests_render_once_and_write_whole_files(cache, monkeypatch):
+    import threading
+    track, spline, _ = cache
+    key = ta.art_key(spline)
+    calls = []
+    real = ta.render_tile
+    monkeypatch.setattr(ta, "render_tile", lambda *a: calls.append(a) or real(*a))
+    out = []
+    ts = [threading.Thread(target=lambda: out.append(ta.tile(key, 0, 0, 0))) for _ in range(6)]
+    for t in ts:
+        t.start()
+    for t in ts:
+        t.join()
+    assert len(calls) == 1 and len(out) == 6 and len(set(out)) == 1 and out[0]

@@ -9,8 +9,13 @@ lettura: niente viene mai scritto nella cartella del gioco.
 from __future__ import annotations
 
 import configparser
+import hashlib
 import io
 import math
+import os
+import re
+import tempfile
+import threading
 from collections import OrderedDict
 from dataclasses import dataclass
 from pathlib import Path
@@ -18,7 +23,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-from . import kn5visual
+from . import kn5visual, paths
 
 
 @dataclass(frozen=True)
@@ -426,3 +431,187 @@ def render_tile(scene: Scene, level: int, tx: int, tz: int) -> Image.Image | Non
     img[:] = _EMPTY
     img[pix[win]] = np.clip(col[win, :3] + 0.5, 0, 255).astype(np.uint8)
     return Image.fromarray(img.reshape(TILE_PX, TILE_PX, 3), "RGB")
+
+
+# --- la cache dei tasselli ----------------------------------------------------
+# Decisioni 3 (parte) e 7 del piano. Un tassello si disegna una volta e poi si
+# legge da disco: <cache>/<chiave>/<livello>/<tx>/<tz>.jpg, oppure `.none` se non
+# c'e' niente da disegnare. La cache si puo' cancellare e si ricostruisce.
+
+#: Cambia quando cambia il modo di disegnare: i tasselli vecchi non valgono piu'.
+ART_VERSION = 1
+_JPEG_QUALITY = 85
+_KEY_RE = re.compile(r"[0-9a-f]{16}")
+
+#: Chiave -> linea IA da cui si e' calcolata: cosi' `scene_for` ritrova i file.
+_known: dict[str, Path] = {}
+#: Una sola scena in memoria. Il lock serve la lettura dei kn5, il disegno e la
+#: cache delle texture della scena, che non e' thread-safe: i tasselli arrivano
+#: dal pool di FastAPI. Disegnare uno alla volta tiene anche bassa la memoria
+#: (ogni disegno ne usa un centinaio di MB), e chi aspetta trova il tassello
+#: gia' su disco.
+_lock = threading.RLock()
+_scene_key: str | None = None
+_scene: Scene | None = None
+
+
+def cache_dir() -> Path:
+    return paths.base_dir() / "cache" / "mapbg"
+
+
+def _collision_path(spline: Path) -> Path | None:
+    """Il modello di collisione nella cartella della pista, o None."""
+    from .trackmesh import is_physics_model
+
+    folder = spline.parent.parent
+    seen: list[Path] = []
+    try:
+        for d in (folder, folder.parent):
+            seen += sorted(d.glob("*.kn5"))
+        # i piccoli per primi, come `trackmesh.physics_model`
+        for p in sorted(dict.fromkeys(seen), key=lambda p: p.stat().st_size):
+            if is_physics_model(p):
+                return p
+    except OSError:
+        return None
+    return None
+
+
+def _files_of(spline: Path) -> tuple[list[ArtFile], ArtFile | None]:
+    """I kn5 grafici e il modello di collisione, messo nello stesso sistema."""
+    art = art_files(spline)
+    col = _collision_path(spline)
+    if col is None:
+        return art, None
+    for a in art:
+        if a.path == col:
+            return art, a
+    return art, ArtFile(col, _ZERO, _ZERO)
+
+
+def art_key(spline: Path) -> str | None:
+    """La chiave dei tasselli di questa pista, o None se non ha file grafici.
+
+    Dipende dai file usati, dalla loro dimensione e data, e da ART_VERSION: se
+    la pista cambia, i tasselli si rifanno.
+    """
+    art, col = _files_of(Path(spline))
+    if not art:
+        return None
+    files = list(dict.fromkeys([a.path for a in art] + ([col.path] if col else [])))
+    h = hashlib.sha1()
+    try:
+        for p in files:
+            st = p.stat()
+            h.update(f"{p}|{st.st_size}|{st.st_mtime_ns}\n".encode("utf-8", "replace"))
+    except OSError:
+        return None
+    h.update(f"v{ART_VERSION}".encode())
+    key = h.hexdigest()[:16]
+    with _lock:
+        _known[key] = Path(spline)
+    return key
+
+
+def scene_for(key: str) -> Scene | None:
+    """La scena della chiave, letta dai file (al massimo una in memoria).
+
+    None se la chiave non e' nota o un file non si apre ora (AC lo sta
+    caricando): non si ricorda come "pista senza sfondo", si riprova.
+    """
+    global _scene_key, _scene
+    with _lock:
+        if _scene_key == key and _scene is not None:
+            return _scene
+        spline = _known.get(key)
+        if spline is None:
+            return None
+        art, col = _files_of(spline)
+        loaded: dict[Path, kn5visual.Model | None] = {}
+        for a in art + ([col] if col else []):
+            if a.path in loaded:
+                continue
+            try:
+                loaded[a.path] = kn5visual.read(a.path, a.position, a.rotation_deg)
+            except OSError:
+                return None
+            except ValueError:
+                loaded[a.path] = None       # non e' un kn5: non lo sara' piu' tardi
+        models = [loaded[a.path] for a in art if loaded.get(a.path) is not None]
+        road = loaded.get(col.path) if col else None
+        _scene, _scene_key = None, None     # libera la vecchia prima di crearne una
+        _scene = Scene(models, road)
+        _scene_key = key
+        return _scene
+
+
+def _tile_path(key: str, level: int, tx: int, tz: int) -> Path:
+    if not _KEY_RE.fullmatch(key):
+        raise KeyError(key)
+    for v in (level, tx, tz):
+        if type(v) is not int:
+            raise ValueError("coordinate del tassello non intere")
+    if not 0 <= level < len(LEVELS_M):
+        raise ValueError("livello fuori misura")
+    return cache_dir() / key / str(level) / str(tx) / str(tz)
+
+
+def _read_cached(base: Path) -> tuple[bool, bytes | None]:
+    """(trovato, byte): `.none` e' trovato con None."""
+    try:
+        return True, base.with_suffix(".jpg").read_bytes()
+    except OSError:
+        pass
+    if base.with_suffix(".none").exists():
+        return True, None
+    return False, None
+
+
+def _store(base: Path, data: bytes | None) -> None:
+    """Scrive in un file temporaneo e lo sostituisce: mai un file a meta'."""
+    target = base.with_suffix(".none" if data is None else ".jpg")
+    try:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        fd, tmp = tempfile.mkstemp(dir=target.parent, suffix=".tmp")
+        try:
+            with os.fdopen(fd, "wb") as f:
+                f.write(data or b"")
+            os.replace(tmp, target)
+        except BaseException:
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
+            raise
+    except OSError:
+        pass            # senza disco il tassello si rifa': lo sfondo non manca
+
+
+def tile(key: str, level: int, tx: int, tz: int) -> bytes | None:
+    """I byte JPEG del tassello, o None se non c'e' niente da disegnare.
+
+    Solleva KeyError se la chiave non e' nota (mai calcolata da `art_key` in
+    questa sessione). Se i file non si leggono ora da' None senza ricordarlo.
+    """
+    base = _tile_path(key, level, tx, tz)
+    found, data = _read_cached(base)
+    if found:
+        return data
+    if key not in _known:
+        raise KeyError(key)
+    with _lock:
+        found, data = _read_cached(base)        # un altro lo ha fatto mentre si aspettava
+        if found:
+            return data
+        scene = scene_for(key)
+        if scene is None:
+            return None
+        img = render_tile(scene, level, tx, tz)
+        if img is None:
+            data = None
+        else:
+            buf = io.BytesIO()
+            img.save(buf, "JPEG", quality=_JPEG_QUALITY)
+            data = buf.getvalue()
+        _store(base, data)
+        return data
