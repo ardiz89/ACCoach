@@ -889,7 +889,7 @@ explain lost time. Brake release and gear count both ways. ABS is compared only 
 same ABS level set. On AC the game doesn't report the level, so ABS isn't compared
 there. A lap with ABS on for more than half of it has a stuck channel, and on that
 lap ABS isn't compared. The grip of a corner is now compared, point by point, with the car's limit at that speed,
-measured on the reference. Before, there was a single limit for the whole lap. The limit never drops as speed rises, because grip can't be measured on a straight.
+measured on the reference. Before, there was a single limit for the whole lap. A band's limit never drops below a slower band's, but never exceeds the whole-lap limit. Grip can't be measured on a straight.
 
 If you're a long way off the pace, your own best lap is a target that keeps you
 where you are. In the **Analysis** section of the hub there's

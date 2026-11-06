@@ -121,7 +121,7 @@ def test_a_lap_without_g_data_still_says_nothing():
 
 def test_a_fast_band_that_is_mostly_straight_keeps_the_slower_limit():
     """Il difetto della revisione finale: sopra i 320 km/h la SF25 a Spa aveva
-    0,65 G di p95 contro 4,38 sul giro, perché lassù è quasi tutto rettilineo.
+    0,57 G di p95 contro 4,43 sul giro, perché lassù è quasi tutto rettilineo.
     Le prime frenate da quella velocità risultavano «al limite» e l'esercizio
     «frena più tardi» si bloccava. Il grip non cala con la velocità: la fascia
     alta prende almeno il limite delle più lente."""

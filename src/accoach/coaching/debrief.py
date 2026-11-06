@@ -797,7 +797,7 @@ class GripEnvelope:
     def at(self, speed_kmh: float | None) -> float:
         if speed_kmh is None:
             return self.whole
-        return self.bands.get(int(speed_kmh // _GRIP_BAND_KMH), self.whole)
+        return self.bands.get(int(max(0.0, speed_kmh) // _GRIP_BAND_KMH), self.whole)
 
 
 def _grip_envelope(lap: Lap, reference: Reference) -> GripEnvelope:
