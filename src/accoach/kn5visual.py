@@ -61,6 +61,10 @@ class Model:
     materials: list[Material] = field(default_factory=list)
     #: nome -> (offset, lunghezza) dei byte della texture nel file
     textures: dict[str, tuple[int, int]] = field(default_factory=dict)
+    #: Per mesh: il gioco la disegna? Le mesh del modello di collisione e
+    #: qualche aiuto del modello grafico hanno `isRenderable` a 0: si leggono lo
+    #: stesso (la strada serve per l'altezza) ma non si disegnano.
+    mesh_visible: list[bool] = field(default_factory=list)
 
 
 def _placement(position, rotation_deg) -> np.ndarray:
@@ -103,6 +107,7 @@ def _read(path: Path, place: np.ndarray) -> Model:
     materials: list[Material] = []
     tris, uvs, mats, meshes = [], [], [], []
     mesh_names: list[str] = []
+    mesh_visible: list[bool] = []
     with path.open("rb") as f:
         r = _Reader(f, os.fstat(f.fileno()).st_size)
         if f.read(6) != _MAGIC:
@@ -146,7 +151,7 @@ def _read(path: Path, place: np.ndarray) -> Model:
             ntype = r.i()
             name = r.s()
             nchild = r.need(r.i(), 13)              # un nodo pesa almeno 13 byte
-            f.seek(1, 1)
+            active = f.read(1) != b"\x00"
             if ntype == 1:
                 raw = f.read(64)
                 if len(raw) != 64:
@@ -159,7 +164,7 @@ def _read(path: Path, place: np.ndarray) -> Model:
                 continue
             if ntype not in (2, 3):
                 raise ValueError(f"nodo di tipo {ntype} a {name!r}")
-            f.seek(3, 1)
+            flags = f.read(3)                       # ombre, visibile, trasparente
             if ntype == 3:
                 for _ in range(r.need(r.i(), 68)):  # ossa: nome + matrice
                     r.s(); f.seek(64, 1)
@@ -181,6 +186,8 @@ def _read(path: Path, place: np.ndarray) -> Model:
                     pos, uv = kept
                     k = len(mesh_names)
                     mesh_names.append(name)
+                    # l'ultimo byte della coda e' `isRenderable`
+                    mesh_visible.append(active and flags[1:2] != b"\x00" and tail[-1] != 0)
                     tris.append(pos); uvs.append(uv)
                     mats.append(np.full(len(pos), mat if 0 <= mat < len(materials) else -1,
                                         np.int32))
@@ -193,9 +200,10 @@ def _read(path: Path, place: np.ndarray) -> Model:
     if tris:
         return Model(path, np.concatenate(tris), np.concatenate(uvs),
                      np.concatenate(mats), np.concatenate(meshes),
-                     mesh_names, materials, textures)
+                     mesh_names, materials, textures, mesh_visible)
     return Model(path, np.zeros((0, 3, 3), np.float32), np.zeros((0, 3, 2), np.float32),
-                 np.zeros(0, np.int32), np.zeros(0, np.int32), mesh_names, materials, textures)
+                 np.zeros(0, np.int32), np.zeros(0, np.int32), mesh_names, materials, textures,
+                 mesh_visible)
 
 
 def _flat_triangles(blob: bytes, nv: int, rawi: bytes, ni: int, M: np.ndarray):

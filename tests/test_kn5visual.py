@@ -24,8 +24,8 @@ def _translate(x, y, z):
     return (1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, x, y, z, 1)
 
 
-def mesh(name, verts, mat=0, uvs=None, nv=None):
-    return ("mesh", name, verts, mat, uvs, nv)
+def mesh(name, verts, mat=0, uvs=None, nv=None, renderable=True):
+    return ("mesh", name, verts, mat, uvs, nv, renderable)
 
 
 def dummy(name, children, matrix=_IDENT):
@@ -58,7 +58,7 @@ def _node(n):
         out += struct.pack(f"<{len(verts)}H", *range(len(verts)))
         out += struct.pack("<i", 0) + b"\x00" * 12
         return out
-    _, name, verts, mat, uvs, nv = n
+    _, name, verts, mat, uvs, nv, renderable = n
     out += struct.pack("<i", 2) + _s(name) + struct.pack("<i", 0) + b"\x01"
     out += b"\x01\x01\x00"
     out += struct.pack("<i", len(verts) if nv is None else nv)
@@ -70,7 +70,7 @@ def _node(n):
     out += struct.pack(f"<{len(verts)}H", *range(len(verts)))
     out += struct.pack("<i", mat)
     out += b"\x00" * 12
-    out += b"\x00" * 16 + b"\x01"
+    out += b"\x00" * 16 + (b"\x01" if renderable else b"\x00")   # sfera, isRenderable
     return out
 
 
@@ -201,6 +201,19 @@ def test_skinned_meshes_are_skipped(tmp_path):
     m = kv.read(p)
     assert m.mesh_names == ["ground"]
     assert float(m.tris[:, :, 0].min()) == pytest.approx(5.0)
+
+
+def test_a_mesh_the_game_does_not_render_is_read_and_marked(tmp_path):
+    """Il modello di collisione del Monza (`2.kn5`) sta in `models.ini` come
+    gli altri, ma tutte le sue mesh hanno `isRenderable` a 0. Disegnate,
+    stendevano sull'asfalto la loro mappa delle normali, azzurra."""
+    p = _kn5(tmp_path, dummy("root", [
+        mesh("1ROAD_a", _flat(0, 0, 1, 1), renderable=False),
+        mesh("asphalt", _flat(0, 0, 1, 1)),
+    ]))
+    m = kv.read(p)
+    assert m.mesh_names == ["1ROAD_a", "asphalt"]
+    assert m.mesh_visible == [False, True]
 
 
 def test_an_empty_model_gives_empty_arrays(tmp_path):
