@@ -1535,6 +1535,15 @@ function mapZoomAt(view, box, w, h, px, py, f) {
   return { k, cx: x + (px - w / 2) / s, cz: z - (h / 2 - py) / s };
 }
 
+// Quanto zooma un evento della rotella: x1,25 per ogni scatto da 100 px, in
+// proporzione a deltaY. Cosi' un trackpad (tanti eventi piccoli) e una rotella
+// che salta (pochi eventi grandi) fanno lo stesso gesto. deltaMode 1 conta
+// righe, 2 pagine. Un evento solo non va oltre x4 ne' sotto 1/4.
+function mapWheelFactor(deltaY, deltaMode) {
+  const px = deltaY * (deltaMode === 1 ? 40 : deltaMode === 2 ? 800 : 1);
+  return Math.min(4, Math.max(0.25, Math.pow(1.25, -px / 100)));
+}
+
 // Lo sfondo di questo giro, chiesto una volta dopo l'analisi, con lo stesso
 // giro della Traiettoria (CURRENT e la tendina). Qualunque risposta che non sia
 // un sì pieno lascia la mappa di sempre, in silenzio.
@@ -6144,7 +6153,7 @@ function wireHover() {
     map.addEventListener("wheel", (e) => {
       const hit = MAP_HIT;
       if (!DATA || !hit || !hit.view) return;
-      const f = e.deltaY < 0 ? 1.25 : e.deltaY > 0 ? 1 / 1.25 : 1;
+      const f = mapWheelFactor(e.deltaY, e.deltaMode);
       // Al giro intero la rotella all'indietro scorre la pagina come sempre:
       // una mappa grande che si mangia lo scorrimento intrappola il mouse.
       if (f === 1 || (f < 1 && MAP_VIEW.k <= 1)) return;

@@ -1416,6 +1416,8 @@ def create_api(
         if got is None:
             return {"ok": False, "reason": "no_fit"}
         spline, fit = got
+        if fit.p95_m > trackart.BG_FIT_P95_M:
+            return {"ok": False, "reason": "no_fit"}     # l'auto andrebbe fuori strada
         key = trackart.art_key(spline)
         if key is None:
             return {"ok": False, "reason": "no_model"}

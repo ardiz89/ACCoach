@@ -309,6 +309,10 @@ def cache(tmp_path, monkeypatch):
     ta._known.clear()
     ta._scene, ta._scene_key = None, None
     yield track, spline, reads
+    timer = getattr(ta, "_timer", None)
+    if timer is not None:
+        timer.cancel()
+        ta._timer = None
     ta._known.clear()
     ta._scene, ta._scene_key = None, None
 
@@ -439,3 +443,64 @@ def test_concurrent_requests_render_once_and_write_whole_files(cache, monkeypatc
     for t in ts:
         t.join()
     assert len(calls) == 1 and len(out) == 6 and len(set(out)) == 1 and out[0]
+
+
+# --- la memoria: la scena non resta per sempre -------------------------------
+
+def test_the_scene_is_kept_five_minutes_after_the_last_tile():
+    assert ta.SCENE_IDLE_S == 300
+
+
+def test_an_idle_scene_is_released_and_the_next_tile_reloads_it(cache):
+    import time
+    track, spline, reads = cache
+    key = ta.art_key(spline)
+    assert ta.tile(key, 0, 0, 0) is not None
+    loaded = len(reads)
+    assert ta._scene is not None
+    ta._release_if_idle(now=time.monotonic() + ta.SCENE_IDLE_S - 5)
+    assert ta._scene is not None, "usata da poco: resta"
+    ta._release_if_idle(now=time.monotonic() + ta.SCENE_IDLE_S + 1)
+    assert ta._scene is None and ta._scene_key is None
+    assert key in ta._known, "la chiave resta nota: il tassello dopo la ricarica"
+    ta.tile(key, 0, 1, 1)
+    assert len(reads) > loaded and ta._scene is not None
+
+
+def test_a_tile_on_disk_after_the_release_does_not_reload_the_scene(cache):
+    import time
+    track, spline, reads = cache
+    key = ta.art_key(spline)
+    first = ta.tile(key, 0, 0, 0)
+    loaded = len(reads)
+    ta._release_if_idle(now=time.monotonic() + ta.SCENE_IDLE_S + 1)
+    assert ta.tile(key, 0, 0, 0) == first
+    assert len(reads) == loaded and ta._scene is None
+
+
+def test_the_timer_releases_the_scene_by_itself(cache, monkeypatch):
+    import time
+    track, spline, reads = cache
+    monkeypatch.setattr(ta, "SCENE_IDLE_S", 0.05)
+    ta.tile(ta.art_key(spline), 0, 0, 0)
+    until = time.monotonic() + 5
+    while ta._scene is not None and time.monotonic() < until:
+        time.sleep(0.01)
+    assert ta._scene is None
+
+
+def test_a_big_texture_is_reduced_to_the_level_side(tmp_path, monkeypatch):
+    # Anche una texture a palette (modo P) arriva ridotta e in RGBA.
+    monkeypatch.setattr(ta, "_TEX_SIDE", (4,) * 6)
+    from PIL import Image
+    import io
+    im = Image.new("P", (16, 8), 0)
+    im.putpalette([200, 30, 20] + [0] * 765)
+    buf = io.BytesIO()
+    im.save(buf, "PNG")
+    m = _model(tmp_path, [_quad("ground", 0, 0, 10, 10)], [("p.png", buf.getvalue())],
+               [("p", "ksPerPixel", 0, 0, [("txDiffuse", "p.png")])])
+    arr = ta.Scene([m], None).texture(0, 0)
+    assert arr.shape == (2, 4, 4) and arr.dtype.name == "uint8"
+    assert (abs(arr[..., :3].astype(int) - (200, 30, 20)) <= 2).all()
+    assert (arr[..., 3] == 255).all()

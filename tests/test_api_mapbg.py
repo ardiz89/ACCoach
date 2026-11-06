@@ -43,10 +43,10 @@ def _ask(c):
     return c.get("/api/mapbg", params={"car": CAR, "track": TRACK})
 
 
-def _ac(monkeypatch, fit=True, key=KEY):
+def _ac(monkeypatch, fit=True, key=KEY, p95=1.0):
     monkeypatch.setattr(trackedges, "tracks_dir", lambda: Path("x"))
     f = trackedges.Fit(scale=1.0, cos=1.0, sin=0.0, dx=2.0, dz=3.0,
-                       p95_m=1.0, mirror=False)
+                       p95_m=p95, mirror=False)
     monkeypatch.setattr(trackedges, "ac_fit",
                         lambda pts: (Path("s.ai"), f) if fit else None)
     monkeypatch.setattr(trackart, "art_key", lambda spline: key)
@@ -68,6 +68,23 @@ def test_without_ac_the_reason_is_no_ac(tmp_path, monkeypatch):
 def test_a_bundled_only_track_is_no_fit(tmp_path, monkeypatch):
     _ac(monkeypatch, fit=False)
     assert _ask(_client(tmp_path)).json() == {"ok": False, "reason": "no_fit"}
+
+
+def test_the_background_has_its_own_tighter_gate():
+    # Riconoscere il circuito tollera 35 m; posare una foto sotto la linea no.
+    assert trackart.BG_FIT_P95_M == 10.0
+    assert trackart.BG_FIT_P95_M < trackedges._FIT_P95_M
+
+
+def test_a_loose_fit_is_no_fit_for_the_background(tmp_path, monkeypatch):
+    # 12 m al 95-esimo: l'auto finirebbe fuori dall'asfalto della foto.
+    _ac(monkeypatch, p95=12.0)
+    assert _ask(_client(tmp_path)).json() == {"ok": False, "reason": "no_fit"}
+
+
+def test_a_tight_fit_gets_the_background(tmp_path, monkeypatch):
+    _ac(monkeypatch, p95=6.0)
+    assert _ask(_client(tmp_path)).json()["ok"] is True
 
 
 def test_a_lap_without_coordinates_is_no_fit(tmp_path, monkeypatch):

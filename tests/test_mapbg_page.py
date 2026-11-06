@@ -40,7 +40,7 @@ eval(asVar(line(/^const MAPBG_LEVELS = /)));
 eval(asVar(line(/^const MAP_MAX_PX_PER_M = /)));
 for (const f of ["affCompose", "affApply", "mapBgAffine", "mapBgLevel",
                  "lineWidthOnPhoto", "mapLineWidth", "mapView", "mapXY",
-                 "mapZoomAt"]) eval(grab(f));
+                 "mapZoomAt", "mapWheelFactor"]) eval(grab(f));
 const job = JSON.parse(fs.readFileSync(0, "utf8"));
 const out = {};
 out.level = job.level.map((a) => mapBgLevel(a[0], a[1]));
@@ -64,6 +64,7 @@ out.zoom = job.zoom.map((c) => {
   const x = v0.cx - (c.px - c.w / 2) / v0.s, z = v0.cz + (c.h / 2 - c.py) / v0.s;
   return { k: v1.k, s: v1.s, s0: v1.s0, before: [xy0.X(x), xy0.Y(z)], after: [xy1.X(x), xy1.Y(z)] };
 });
+out.wheel = job.wheel.map((a) => mapWheelFactor(a[0], a[1]));
 console.log(JSON.stringify(out));
 """
 
@@ -78,7 +79,7 @@ def _run(tmp_path, job):
 
 
 def _job(**kw):
-    job = {"level": [], "photo": [], "today": [], "points": [], "zoom": []}
+    job = {"level": [], "photo": [], "today": [], "points": [], "zoom": [], "wheel": []}
     job.update(kw)
     return job
 
@@ -157,6 +158,22 @@ def test_the_wheel_zooms_around_the_cursor_and_stops_at_ten_px_per_metre(tmp_pat
     assert abs(first["after"][1] - first["before"][1]) < 0.01
     assert abs(top["s"] - 10) < 1e-9
     assert out_of_whole["k"] == 1, "sotto il giro intero non si va"
+
+
+@needs_node
+def test_the_wheel_zoom_follows_how_far_the_wheel_turned(tmp_path):
+    out = _run(tmp_path, _job(wheel=[[-100, 0], [100, 0], [-3, 1], [-10, 0], [-5000, 0],
+                                     [5000, 0], [-1, 2], [0, 0]]))
+    want = [1.25, 0.8, 1.25 ** 1.2, 1.25 ** 0.1, 4, 0.25, 4, 1]
+    for got, w in zip(out["wheel"], want):
+        assert abs(got - w) < 1e-9, (out["wheel"], want)
+
+
+def test_the_wheel_handler_uses_the_factor():
+    i = _JS.index('map.addEventListener("wheel"')
+    body = _JS[i:i + 900]
+    assert "mapWheelFactor(e.deltaY, e.deltaMode)" in body
+    assert "f < 1 && MAP_VIEW.k <= 1" in body, "all'indietro al giro intero scorre la pagina"
 
 
 def test_the_background_is_dimmed_as_chosen():

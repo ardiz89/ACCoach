@@ -16,6 +16,7 @@ import os
 import re
 import tempfile
 import threading
+import time
 from collections import OrderedDict
 from dataclasses import dataclass
 from pathlib import Path
@@ -105,6 +106,14 @@ def art_files(spline: Path) -> list[ArtFile]:
 # un ordinamento, non un ciclo per triangolo. Lo spike che girava un ciclo
 # Python per triangolo impiegava 118 s per il Monza a 1 m per pixel.
 
+#: Oltre questo scarto (95-esimo percentile, in metri) fra la linea del giro e
+#: quella dell'IA, lo sfondo non si posa. Riconoscere il circuito ne tollera 35
+#: (`trackedges._FIT_P95_M`), ma sotto una foto la linea deve stare
+#: sull'asfalto. Misurato il 2026-11-06 sui giri del pilota: Spa, Suzuka, Monza
+#: e Brands Hatch stanno fra 2,4 e 5,7 m, col 98,8-100 % della linea sulla
+#: strada del modello di collisione. Il Nurburgring di ACC su ks_nurburgring da'
+#: 18,8 e 25,9 m, col 77 % sulla strada; spa_1998 14,5 m.
+BG_FIT_P95_M = 10.0
 #: Metri per pixel dei sei livelli, dal piu' fitto al piu' largo.
 LEVELS_M = (0.1, 0.2, 0.4, 0.8, 1.6, 3.2)
 TILE_PX = 512
@@ -241,14 +250,7 @@ class Scene:
         data = kn5visual.texture_bytes(self.models[i], name)
         if data is not None:
             try:
-                im = Image.open(io.BytesIO(data))
-                im.load()
-                im = im.convert("RGBA")
-                if max(im.size) > side:
-                    f = side / max(im.size)
-                    im = im.resize((max(1, round(im.width * f)), max(1, round(im.height * f))),
-                                   Image.Resampling.BOX)
-                arr = np.asarray(im, dtype=np.uint8)
+                arr = _decode(data, side)
             except Exception:       # noqa: BLE001 - BC7, DDS strani, byte rotti: grigio
                 arr = None
         self._tex[key] = arr
@@ -257,6 +259,28 @@ class Scene:
             _, old = self._tex.popitem(last=False)
             self._tex_bytes -= 0 if old is None else old.nbytes
         return arr
+
+
+def _decode(data: bytes, side: int) -> np.ndarray:
+    """Una texture in RGBA uint8, col lato al massimo `side`.
+
+    Si riduce prima di convertire: a piena risoluzione in memoria c'e' solo la
+    copia decodificata, mai anche quella convertita. Una 8192 x 8192 sono
+    256 MB; convertirla prima di ridurla ne chiedeva altri 256.
+    """
+    with Image.open(io.BytesIO(data)) as im:
+        im.draft("RGBA", (side, side))          # solo JPEG: decodifica gia' ridotta
+        im.load()
+        cur = im
+        if max(cur.size) > side:
+            if cur.mode not in ("RGB", "RGBA", "L", "LA"):
+                cur = cur.convert("RGBA")
+            f = side / max(cur.size)
+            cur = cur.resize((max(1, round(cur.width * f)), max(1, round(cur.height * f))),
+                             Image.Resampling.BOX)
+        if cur.mode != "RGBA":
+            cur = cur.convert("RGBA")
+        return np.asarray(cur, dtype=np.uint8)
 
 
 def _fragments(P: np.ndarray, x0: float, z1: float, mpp: float, splat: bool):
@@ -453,6 +477,53 @@ _known: dict[str, Path] = {}
 _lock = threading.RLock()
 _scene_key: str | None = None
 _scene: Scene | None = None
+#: Dopo tanti secondi senza disegnare un tassello la scena si libera, texture
+#: comprese: sul Monza sono 131 MB piu' fino a _TEX_BUDGET di texture. I
+#: tasselli su disco si servono anche senza; il primo da disegnare la ricarica.
+SCENE_IDLE_S = 300.0
+_last_use = 0.0
+_timer: threading.Timer | None = None
+
+
+def _touch() -> None:
+    """La scena e' appena servita: il conto alla rovescia riparte da qui."""
+    global _last_use
+    with _lock:
+        _last_use = time.monotonic()
+        if _timer is None:
+            _arm(SCENE_IDLE_S)
+
+
+def _arm(delay: float) -> None:
+    global _timer
+    _timer = threading.Timer(delay, _on_timer)
+    _timer.daemon = True
+    _timer.start()
+
+
+def _on_timer() -> None:
+    global _timer
+    with _lock:
+        _timer = None
+        left = _release_if_idle()
+        if left > 0:
+            _arm(left)
+
+
+def _release_if_idle(now: float | None = None) -> float:
+    """Libera la scena se e' ferma da SCENE_IDLE_S; i secondi che mancano, o 0.
+
+    Le chiavi gia' note restano: il tassello dopo ricarica la scena.
+    """
+    global _scene, _scene_key
+    with _lock:
+        if _scene is None:
+            return 0.0
+        left = SCENE_IDLE_S - ((time.monotonic() if now is None else now) - _last_use)
+        if left > 0:
+            return left
+        _scene, _scene_key = None, None
+        return 0.0
 
 
 def cache_dir() -> Path:
@@ -606,7 +677,10 @@ def tile(key: str, level: int, tx: int, tz: int) -> bytes | None:
         scene = scene_for(key)
         if scene is None:
             return None
-        img = render_tile(scene, level, tx, tz)
+        try:
+            img = render_tile(scene, level, tx, tz)
+        finally:
+            _touch()
         if img is None:
             data = None
         else:
