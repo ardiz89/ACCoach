@@ -68,6 +68,29 @@ def _last_corner(track: str, text: str, start: int, end: int) -> str | None:
     return next(iter(names)) if len(names) == 1 else None
 
 
+_FOLLOW = re.compile(r" (?:into|at|for|in|through|alla|alle|al|per) (?:the )?")
+
+
+def _corners_in(track: str, text: str, start: int, end: int) -> set[str]:
+    return {name for name, aliases in vocab.CORNERS.get(track, {}).items()
+            if any(vocab.alias_regex(a).search(text, start, end) for a in aliases)}
+
+
+def _corner_after(track: str, text: str, start: int, end: int) -> str | None:
+    """La curva detta subito dopo il valore: «... into tosa», «... alla tosa».
+
+    Fra il valore e la curva c'è solo la preposizione (e «the»): nessuna virgola, nessun
+    «then». Se due curve combaciano nello stesso punto è ambiguo.
+    """
+    m = _FOLLOW.match(text, start, end)
+    if not m:
+        return None
+    names = {name for name, aliases in vocab.CORNERS.get(track, {}).items()
+             for a in aliases
+             if vocab.alias_regex(a).match(text, m.end(), end)}
+    return next(iter(names)) if len(names) == 1 else None
+
+
 def check_fact(track: str, fact: dict, body: str, segments: list | None = None) -> str | None:
     type_ = fact.get("type")
     if type_ not in vocab.TYPES:
@@ -111,20 +134,29 @@ def check_fact(track: str, fact: dict, body: str, segments: list | None = None) 
         if any(n not in cited for n in re.findall(r"[0-9]+", value)):
             return "numero_non_citato"
 
+    # Un errore si descrive proprio con le negazioni: per `mistake` non contano.
     before = " ".join(nbody[:j].split()[-NEAR_WORDS:])
     after = " ".join(nbody[q_end:].split()[:NEAR_WORDS])
     around = f"{before} {quote} {after}"
-    if vocab.NEGATION.search(around) or vocab.NEGATION.search(sentence):
-        return "negazione"
-    if type_ in ("apex", "kerb") and (vocab.NEGATIVE_SENSE.search(around)
-                                     or vocab.NEGATIVE_SENSE.search(sentence)):
-        return "negazione"
+    if type_ != "mistake":
+        if vocab.NEGATION.search(around) or vocab.NEGATION.search(sentence):
+            return "negazione"
+        if type_ in ("apex", "kerb") and (vocab.NEGATIVE_SENSE.search(around)
+                                         or vocab.NEGATIVE_SENSE.search(sentence)):
+            return "negazione"
 
     # Il segno del valore: da lì all'indietro, la prima curva nominata è quella del fatto.
+    # Oppure, nella stessa frase, la curva subito dopo il valore con una preposizione.
     got = vocab.locate(type_, quote) if type_ not in ("line", "mistake") else None
     mark = j + got[1] if got else q_end
     window = bisect.bisect_left(idx, idx[j] - CONTEXT_CHARS)  # idx cresce: primo carattere nella finestra
-    if _last_corner(track, nbody, window, mark) != fact.get("corner"):
+    corner = _last_corner(track, nbody, window, mark)
+    if got:
+        follow = _corner_after(track, nbody, j + got[2], ne)
+        if follow is not None:
+            # Un'altra curva prima del valore, nella stessa frase, la rende ambigua.
+            corner = follow if _corners_in(track, nbody, ns, mark) <= {follow} else None
+    if corner != fact.get("corner"):
         return "curva_non_trovata"
 
     if type_ in ("line", "mistake"):

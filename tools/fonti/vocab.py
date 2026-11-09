@@ -154,7 +154,11 @@ def board_numbers(s: str) -> list[re.Match]:
     return [m for m in _NUMBER.finditer(s) if len(re.sub(r"[^0-9]", "", m.group())) >= 2]
 
 
-def _brake(q: str) -> tuple[str, int] | None:
+_BOARD_WORD = re.compile(
+    r"\s*(?:m|metre|metres|meter|meters|mt)?\s*(?:board|boards|marker|markers|sign|signs)\b")
+
+
+def _brake(q: str) -> tuple[str, int, int] | None:
     if NEGATION.search(q) or HEDGE.search(q):
         return None
     multi = board_numbers(q)
@@ -168,7 +172,8 @@ def _brake(q: str) -> tuple[str, int] | None:
             return None
         if NOT_BOARD_UNIT.match(q, m.end()) or relative_near(q, [m.start()]):
             return None
-        return f"board:{int(m.group())}", m.start()
+        word = _BOARD_WORD.match(q, m.end())
+        return f"board:{int(m.group())}", m.start(), word.end() if word else m.end()
     if len(mentioned) != 1:
         return None
     slug = next(iter(mentioned))
@@ -176,7 +181,7 @@ def _brake(q: str) -> tuple[str, int] | None:
     m = re.search(rf"(?:{_BRAKE_EN}|{_BRAKE_IT})(?P<obj>{alts})(?![a-z0-9])", q)
     if not m or relative_near(q, [m.start("obj")]):
         return None
-    return f"object:{slug}", m.start("obj")
+    return f"object:{slug}", m.start("obj"), m.end("obj")
 
 
 # --- marce ------------------------------------------------------------------
@@ -214,7 +219,7 @@ def _gear_tokens(q: str) -> list[re.Match]:
     return [m for m in _GEAR_LIKE.finditer(q) if m.start() not in adverbs]
 
 
-def _gear(q: str) -> tuple[str, int] | None:
+def _gear(q: str) -> tuple[str, int, int] | None:
     if NEGATION.search(q) or HEDGE.search(q):
         return None
     tokens = _gear_tokens(q)
@@ -222,6 +227,9 @@ def _gear(q: str) -> tuple[str, int] | None:
         return None
     m = tokens[0]
     tok, at = m.group(), m.start()
+
+    word = re.compile(rf"\s+{_GEAR}\b").match(q, m.end())
+    end = word.end() if word else m.end()
 
     def here(pattern: str) -> bool:
         return any(x.start("t") == at for x in re.finditer(pattern, q))
@@ -235,7 +243,7 @@ def _gear(q: str) -> tuple[str, int] | None:
         ok = (here(rf"\b{_DIGIT_LEAD}\s+{t}(?!\w)")
               or here(rf"\b{_GEAR}\s+{t}(?!\w)")
               or here(rf"(?<![\w.,]){t}\s*{_GEAR}\b"))
-        return (tok, at) if ok else None
+        return (tok, at, end) if ok else None
     digit = _ORD_WORD.get(tok) or (tok[0] if len(tok) == 3 and tok[0] in "123456" else None)
     if digit is None:
         return None
@@ -243,16 +251,16 @@ def _gear(q: str) -> tuple[str, int] | None:
           or here(rf"\b{_GEAR}\s+{t}\b{_NOUN_AFTER_ORD}")
           or here(rf"\b{_ORD_LEAD}\s+{t}\b{_NOUN_AFTER_ORD}")
           or (tok in _ORD_IT_IN and here(rf"\bin\s+{t}\b{_NOUN_AFTER_ORD}")))
-    return (digit, at) if ok else None
+    return (digit, at, end) if ok else None
 
 
 # --- apice e cordolo ----------------------------------------------------------
 
-def _adjacent(a: str, b: str, q: str) -> int | None:
+def _adjacent(a: str, b: str, q: str) -> tuple[int, int] | None:
     """Dove a e b stanno vicini: in mezzo al più una parola, solo spazi o trattini."""
     gap = r"[ -]+(?:[\w']+[ -]+)?"
     m = re.search(rf"\b(?:{a}){gap}(?:{b})\b|\b(?:{b}){gap}(?:{a})\b", q)
-    return m.start() if m else None
+    return m.span() if m else None
 
 
 def _present(kinds: dict[str, str], q: str) -> set[str]:
@@ -266,7 +274,7 @@ _APEX_KINDS = {
 }
 
 
-def _apex(q: str) -> tuple[str, int] | None:
+def _apex(q: str) -> tuple[str, int, int] | None:
     if NEGATION.search(q) or NEGATIVE_SENSE.search(q):
         return None
     kinds = _present(_APEX_KINDS, q)
@@ -274,7 +282,7 @@ def _apex(q: str) -> tuple[str, int] | None:
         return None
     k = next(iter(kinds))
     at = _adjacent(_APEX_KINDS[k], r"apex|apexes|apexing|apice|apici", q)
-    return None if at is None else (k, at)
+    return None if at is None else (k, *at)
 
 
 _KERB = r"kerb|kerbs|curb|curbs|cordolo|cordoli"
@@ -285,7 +293,7 @@ _KERB_POS = {
 }
 
 
-def _kerb(q: str) -> tuple[str, int] | None:
+def _kerb(q: str) -> tuple[str, int, int] | None:
     if NEGATIVE_SENSE.search(q):
         return None
     pos = _present(_KERB_POS, q)
@@ -294,20 +302,20 @@ def _kerb(q: str) -> tuple[str, int] | None:
             rf"^(?:you\s+)?(?:don't use|do not use|dont use|never use|avoid|no|without)\s+"
             rf"(?:the\s+|any\s+)?(?:{_KERB})$"
             rf"|^(?:non usare|non toccare|non prendere|evita|senza)\s+(?:il\s+|i\s+)?(?:{_KERB})$", q)
-        return ("none", 0) if none and not pos else None
+        return ("none", 0, len(q)) if none and not pos else None
     if len(pos) != 1:
         return None
     p = next(iter(pos))
     at = _adjacent(_KERB_POS[p], _KERB, q)
-    return None if at is None else (p, at)
+    return None if at is None else (p, *at)
 
 
 _NORMALIZERS = {"brake": _brake, "gear": _gear, "apex": _apex, "kerb": _kerb}
 TYPES = ("brake", "gear", "apex", "kerb", "line", "mistake")
 
 
-def locate(type_: str, quote: str) -> tuple[str, int] | None:
-    """Valore e posizione del suo segno nella citazione già normalizzata con `fold`."""
+def locate(type_: str, quote: str) -> tuple[str, int, int] | None:
+    """Valore, inizio e fine del suo segno nella citazione già normalizzata con `fold`."""
     fn = _NORMALIZERS.get(type_)
     return fn(quote) if fn else None
 

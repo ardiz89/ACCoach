@@ -390,8 +390,9 @@ def test_curva_prima_del_valore():
         == "curva_non_trovata"
     assert _c("brake at the 100 board, then flat to tosa", "board:100", "brake", body,
               corner="Villeneuve") is None
-    assert _c("brake at the 100 board into tosa", "board:100", "brake") == "curva_non_trovata"
-    assert _c("use the exit kerb at tosa", "exit", "kerb") == "curva_non_trovata"
+    # Round 3: la curva subito dopo il valore, con una preposizione, nella stessa frase.
+    assert _c("brake at the 100 board into tosa", "board:100", "brake") is None
+    assert _c("use the exit kerb at tosa", "exit", "kerb") is None
     assert _c("brake at the 100 board into tosa, down to second gear", "2", "gear") is None
 
 
@@ -507,3 +508,65 @@ def test_frase_con_piu_fatti(q, value, type_):
 def test_relative_vicino_alla_frenata(q):
     n = re.search(r"[0-9]+", q).group()
     assert _c(q, f"board:{n}", "brake") is not None
+
+
+# --- Round 3: la curva dopo il valore, e gli errori ---------------------------
+
+
+@pytest.mark.parametrize("q,value,type_", [
+    ("brake at the 100 board into tosa", "board:100", "brake"),
+    ("use the exit kerb at tosa", "exit", "kerb"),
+    ("frena al cartello dei 100 alla tosa", "board:100", "brake"),
+    ("take a late apex at the tosa", "late", "apex"),
+    ("go down to second gear for tosa", "2", "gear"),
+    ("brake at the bridge into tosa", "object:bridge", "brake"),
+])
+def test_curva_subito_dopo_il_valore(q, value, type_):
+    assert _c(q, value, type_) is None
+    assert _c(q, value, type_, corner="Piratella") == "curva_non_trovata"
+
+
+@pytest.mark.parametrize("q,body", [
+    ("brake at the 100 board, then flat to tosa", None),
+    ("brake at the 100 board then flat into tosa", None),
+    ("brake at the 100 board and then into tosa", None),
+    ("brake at the 100 board; into tosa", None),
+    ("brake at the 100 board flat into tosa", None),
+    ("villeneuve: brake at the 100 board into tosa", None),
+    ("brake at the 100 board into tosa", "villeneuve: brake at the 100 board into tosa"),
+])
+def test_curva_dopo_il_valore_rifiutata(q, body):
+    assert _c(q, "board:100", "brake", body) == "curva_non_trovata"
+
+
+def test_curva_dopo_il_valore_ambigua_anche_per_la_prima():
+    q = "villeneuve: brake at the 100 board into tosa"
+    assert _c(q, "board:100", "brake", corner="Villeneuve") == "curva_non_trovata"
+
+
+def test_curva_dopo_il_valore_batte_la_frase_prima():
+    body = "piratella is tricky. brake at the 100 board into tosa"
+    q = "brake at the 100 board into tosa"
+    assert _c(q, "board:100", "brake", body) is None
+    assert _c(q, "board:100", "brake", body, corner="Piratella") == "curva_non_trovata"
+
+
+def test_curva_dopo_il_valore_frase_diversa():
+    body = "after villeneuve you brake at the 100 board. then tosa is easy"
+    q = "after villeneuve you brake at the 100 board"
+    assert _c(q, "board:100", "brake", body) == "curva_non_trovata"
+
+
+def test_errore_ammette_le_negazioni():
+    q = "at tosa the classic mistake is braking too late"
+    assert _c(q, q, "mistake") is None
+    q2 = "at tosa people don't lift and spin"
+    assert _c(q2, q2, "mistake") is None
+    assert _c(q, "braking too late", "mistake") == "valore_diverso"
+    assert _c(q, q, "mistake", corner="Rivazza") == "curva_non_trovata"
+    assert _c(q, q, "line") == "negazione"
+
+
+def test_curva_dopo_il_valore_stessa_curva_prima():
+    q = "at tosa brake at the 100 board into tosa"
+    assert _c(q, "board:100", "brake") is None
