@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+import urllib.error
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -53,11 +54,15 @@ def cmd_collect(args) -> int:
             return 0
         try:
             client = apify.Apify(apify.load_token(Path(args.env_file) if args.env_file else None))
-            r = collect.collect(conn, client, args.track, plan)
+            r = collect.collect(conn, client, args.track, plan, force=args.force)
         except (apify.TokenMissing, apify.CapReached, apify.ApifyError) as e:
             print(str(e), file=sys.stderr)
             return 1
-        print(f"Nuove fonti: {r['sources']}, nuovi testi: {r['texts']}, speso: {r['spent_usd']:.2f} USD.")
+        except (urllib.error.URLError, TimeoutError, ConnectionError):
+            print("Rete non raggiungibile o troppo lenta: riprova fra poco. "
+                  "Le voci già finite non si ripagano.", file=sys.stderr)
+            return 1
+        print(f"Nuove fonti: {r['sources']}, nuovi testi: {r['texts']}, voci già finite: {r['skipped']}, speso: {r['spent_usd']:.2f} USD.")
         return 0
     finally:
         conn.close()
@@ -78,6 +83,7 @@ def build_parser() -> argparse.ArgumentParser:
     c.add_argument("--plan", required=True, metavar="FILE")
     c.add_argument("--env-file", metavar="PATH")
     c.add_argument("--dry-run", action="store_true")
+    c.add_argument("--force", action="store_true", help="rifà anche le voci già finite")
     c.set_defaults(func=cmd_collect)
     for name in PLANNED:
         sub.add_parser(name, help="non ancora disponibile").set_defaults(func=cmd_non_disponibile)

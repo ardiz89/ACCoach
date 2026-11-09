@@ -44,3 +44,15 @@ def test_status_conta_righe(tmp_path):
                        capture_output=True, text=True)
     assert r.returncode == 0
     assert "sources" in r.stdout and "spend" in r.stdout
+
+
+def test_stesso_testo_due_autori_due_righe(tmp_path):
+    conn = db.open_db(tmp_path / "f.sqlite")
+    conn.execute("INSERT INTO sources(platform, url) VALUES ('reddit', 'https://example.org/t')")
+    sid = conn.execute("SELECT id FROM sources").fetchone()[0]
+    h1, n1 = db.add_text(conn, sid, "comment", "uno", "Frena al cento")
+    h2, n2 = db.add_text(conn, sid, "comment", "due", "Frena al cento")
+    h3, n3 = db.add_text(conn, sid, "comment", "due", "Frena al cento")
+    assert h1 == h2 == h3 and (n1, n2, n3) == (True, True, False)
+    assert conn.execute("SELECT COUNT(*) FROM texts").fetchone()[0] == 2
+    conn.close()

@@ -10,7 +10,7 @@ from pathlib import Path
 
 SCHEMA_VERSION = 1
 
-TABLES = ("sources", "texts", "results", "facts", "rejects", "spend")
+TABLES = ("sources", "texts", "results", "facts", "rejects", "spend", "collect_runs")
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS sources(
@@ -20,10 +20,12 @@ CREATE TABLE IF NOT EXISTS sources(
     author TEXT, title TEXT, published TEXT, game TEXT, track TEXT, meta_json TEXT
 );
 CREATE TABLE IF NOT EXISTS texts(
-    sha256 TEXT PRIMARY KEY,
+    id INTEGER PRIMARY KEY,
+    sha256 TEXT NOT NULL,
     source_id INTEGER,
     kind TEXT CHECK (kind IN ('transcript','post','comment')),
-    author TEXT, body TEXT, segments_json TEXT, collected_at TEXT
+    author TEXT, body TEXT, segments_json TEXT, collected_at TEXT,
+    UNIQUE(sha256, source_id, author)
 );
 CREATE TABLE IF NOT EXISTS results(
     id INTEGER PRIMARY KEY,
@@ -45,6 +47,10 @@ CREATE TABLE IF NOT EXISTS spend(
     track TEXT PRIMARY KEY,
     baseline_usd REAL, last_usd REAL, cap_usd REAL
 );
+CREATE TABLE IF NOT EXISTS collect_runs(
+    track TEXT, entry_key TEXT, finished_at TEXT, items INTEGER, spent_usd REAL,
+    PRIMARY KEY(track, entry_key)
+);
 """
 
 
@@ -61,7 +67,7 @@ def open_db(path: Path) -> sqlite3.Connection:
 
 def add_text(conn: sqlite3.Connection, source_id: int, kind: str, author: str,
              body: str, segments: list | None = None) -> tuple[str, bool]:
-    """Salva un testo; `(sha256, nuovo)`. Lo stesso `body` non si duplica."""
+    """Salva un testo; `(sha256, nuovo)`. Stesso testo, fonte e autore non si duplica."""
     sha = hashlib.sha256(body.encode("utf-8")).hexdigest()
     seg = json.dumps(segments, ensure_ascii=False) if segments is not None else None
     cur = conn.execute(

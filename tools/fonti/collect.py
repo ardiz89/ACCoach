@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import sqlite3
+from datetime import datetime, timezone
 
 from tools.fonti import apify, db
 
@@ -89,10 +91,21 @@ def _reddit(conn, item, track) -> tuple[int, int]:
     return 0, 0
 
 
+def entry_key(voce: dict) -> str:
+    canon = json.dumps({"actor": voce["actor"], "input": voce["input"], "max_items": voce["max_items"]},
+                       sort_keys=True, ensure_ascii=False)
+    return hashlib.sha256(canon.encode("utf-8")).hexdigest()
+
+
 def collect(conn: sqlite3.Connection, client: apify.Apify, track: str, plan: list[dict],
-            cap_usd: float = apify.CAP_USD) -> dict:
-    ns = nt = 0
+            cap_usd: float = apify.CAP_USD, force: bool = False) -> dict:
+    ns = nt = saltate = 0
     for voce in plan:
+        chiave = entry_key(voce)
+        if not force and conn.execute("SELECT 1 FROM collect_runs WHERE track=? AND entry_key=?",
+                                      (track, chiave)).fetchone():
+            saltate += 1
+            continue
         resto = apify.guard(conn, client, track, cap_usd)
         items = client.run(voce["actor"], voce["input"], voce["max_items"], max_charge_usd=resto)
         for it in items:
@@ -101,9 +114,17 @@ def collect(conn: sqlite3.Connection, client: apify.Apify, track: str, plan: lis
             else:
                 a, b = _reddit(conn, it, track)
             ns, nt = ns + a, nt + b
+        prima = conn.execute("SELECT last_usd FROM spend WHERE track=?", (track,)).fetchone()[0]
+        dopo = client.usage_usd()
+        conn.execute("UPDATE spend SET last_usd=? WHERE track=?", (dopo, track))
+        conn.execute("INSERT OR REPLACE INTO collect_runs(track, entry_key, finished_at, items, spent_usd)"
+                     " VALUES (?,?,?,?,?)",
+                     (track, chiave, datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                      len(items), round(dopo - prima, 4)))
+        conn.commit()
     uso = client.usage_usd()
     riga = conn.execute("SELECT baseline_usd FROM spend WHERE track=?", (track,)).fetchone()
     base = riga[0] if riga else uso
     conn.execute("UPDATE spend SET last_usd=? WHERE track=?", (uso, track))
     conn.commit()
-    return {"sources": ns, "texts": nt, "spent_usd": round(uso - base, 4)}
+    return {"sources": ns, "texts": nt, "spent_usd": round(uso - base, 4), "skipped": saltate}

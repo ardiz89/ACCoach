@@ -3,6 +3,8 @@ import json
 import sys
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
@@ -56,3 +58,48 @@ def test_raccolta_rilanciata_non_duplica(tmp_path):
     r = collect.collect(conn, client, "imola", PIANO)
     assert r["texts"] == 0 and r["sources"] == 0
     assert db.count_rows(conn) == prima
+
+
+def test_rilancio_non_chiama_run(tmp_path):
+    conn, chiamate = _conn(tmp_path), []
+    client = apify.Apify("tok-di-prova", http=_http(chiamate))
+    collect.collect(conn, client, "imola", PIANO)
+    assert len(chiamate) == 2
+    r = collect.collect(conn, client, "imola", PIANO)
+    assert len(chiamate) == 2 and r["skipped"] == 2
+    assert conn.execute("SELECT COUNT(*) FROM collect_runs").fetchone()[0] == 2
+    collect.collect(conn, client, "imola", PIANO, force=True)
+    assert len(chiamate) == 4
+
+
+def test_tetto_a_meta_piano(tmp_path):
+    conn, chiamate = _conn(tmp_path), []
+    base = _http(chiamate)
+
+    def http(method, url, headers, body):
+        if url.endswith("/users/me/limits"):
+            uso = 0.54 if not chiamate else 2.60  # la prima voce sfonda il tetto
+            return 200, json.dumps({"data": {"current": {"monthlyUsageUsd": uso}}}).encode()
+        return base(method, url, headers, body)
+
+    with pytest.raises(apify.CapReached):
+        collect.collect(conn, apify.Apify("tok-di-prova", http=http), "imola", PIANO)
+    assert len(chiamate) == 1
+    righe = conn.execute("SELECT entry_key FROM collect_runs").fetchall()
+    assert righe == [(collect.entry_key(PIANO[0]),)]
+
+
+def test_errore_di_rete_senza_traceback(tmp_path, monkeypatch, capsys):
+    import urllib.error
+    from tools.fonti import fonti
+
+    def rotto(self, *a, **k):
+        raise urllib.error.URLError("giu")
+
+    monkeypatch.setenv("APIFY_API_TOKEN", "tok-di-prova")
+    monkeypatch.setattr(apify.Apify, "usage_usd", rotto)
+    piano = tmp_path / "p.json"
+    piano.write_text(json.dumps(PIANO), encoding="utf-8")
+    rc = fonti.main(["--db", str(tmp_path / "d"), "collect", "--track", "imola", "--plan", str(piano)])
+    err = capsys.readouterr().err
+    assert rc == 1 and "Rete" in err and "tok-di-prova" not in err and "Traceback" not in err
