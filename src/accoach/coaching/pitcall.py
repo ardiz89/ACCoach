@@ -141,6 +141,10 @@ _APPROACH = "Ingresso box qui davanti, rientra"
 # Si dice da fermi, quindi può essere più lunga di una frase in curva; ogni
 # frase resta sotto le otto parole. I nomi sono quelli dei bottoni della pagina
 # Ingegnere («Prepara la modifica», «Applica»), come `eng.pitTodo` sullo schermo.
+# L'Ingegnere tiene ferma la prova finche' non dici ai box quale assetto hai
+# caricato (`RaceEngineer._held_base`). Senza una parola un pilota che guida a
+# voce non lo saprebbe mai: due volte per attesa, vedi `HoldCall`.
+_HOLD = "Rientra ai box, scegli l'assetto."
 _BRIEFING = ("Sei ai box. Apri la pagina Ingegnere nel browser. "
              "Prepara la modifica e applicala. "
              "Ricarica il setup dal garage prima di uscire.")
@@ -408,3 +412,56 @@ class PitCall:
                     and now - self._last_track_t <= _ENTRY_MAX_GAP_S):
                 self.note_pit_entry(prev)
             self._last_track_pos = None
+
+
+class HoldCall:
+    """La chiamata ai box quando l'Ingegnere aspetta la tua risposta.
+
+    Le gomme hanno smentito la modifica e l'Ingegnere non giudica la prova
+    finche' non dici ai box quale assetto hai caricato. Quell'attesa non porta
+    una modifica, quindi `PitCall` non la vede. Si dice due volte al massimo:
+    quando l'attesa comincia e al traguardo dopo, se aspetta ancora. Solo in
+    pista: ai box la domanda e' gia' sullo schermo.
+
+    Il motore dice se l'attesa c'e' (`update`) e quando passi il traguardo
+    (`new_lap`), con la stessa regola del registratore.
+    """
+
+    def __init__(self) -> None:
+        self._held = False
+        self._lines = 0             # traguardi passati, contati dal motore
+        self._start_line = 0        # i traguardi quando l'attesa e' cominciata
+        self._said = 0              # quante volte e' stata emessa in questa attesa
+
+    def new_lap(self) -> None:
+        self._lines += 1
+
+    def update(self, s: TelemetrySnapshot, held: bool) -> list[Cue]:
+        if not held:
+            self._held = False
+            self._said = 0
+            return []
+        on_track = (s.connected and s.status == ACStatus.LIVE
+                    and not s.in_pit and not s.in_pit_lane)
+        if not self._held:
+            # L'attesa comincia ora: la prima volta, se sei in pista.
+            self._held = True
+            self._start_line = self._lines
+            self._said = 1
+            return [self._cue(s)] if on_track else []
+        if self._said < 2 and self._lines > self._start_line:
+            # Il primo traguardo dopo: l'ultima volta, anche se qui sei ai box
+            # e quindi tace. Un'attesa non si ricorda all'infinito.
+            self._said = 2
+            return [self._cue(s)] if on_track else []
+        return []
+
+    def reset(self) -> None:
+        self._held = False
+        self._said = 0
+
+    @staticmethod
+    def _cue(s: TelemetrySnapshot) -> Cue:
+        # Come le chiamate di `PitCall`: appartiene al giro, non a un punto.
+        return Cue(category=CueCategory.PIT_IN, message=_HOLD,
+                   priority=_PRIORITY, segment=-1, pos=s.lap_position)

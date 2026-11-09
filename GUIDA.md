@@ -933,7 +933,8 @@ dell'ingegnere».
   partenza non era quello in macchina. Allora la prova non la giudica e non la
   scrive nel registro, e non c'è niente da scrivere sul file. Finché non
   rispondi, i giri che fai non contano per la base, perché in macchina c'è
-  ancora l'assetto dubbio. Ai box ricarica l'assetto che guidavi prima della
+  ancora l'assetto dubbio. L'ingegnere ti chiama ai box a voce, subito e al
+  traguardo dopo. Ai box ricarica l'assetto che guidavi prima della
   modifica. La pagina ti rifà la domanda, anche se la ricarichi, e tu scegli
   l'assetto che hai caricato davvero. HONE se lo ricorda come file di
   partenza per quell'auto e quella pista. Poi l'ingegnere rifà la base coi

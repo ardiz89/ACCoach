@@ -760,6 +760,7 @@ _CUE_EN: dict[str, str] = {
     "Modifica pronta, rientra ai box a fine giro":
         "Setup change ready, box this lap",
     "Ingresso box qui davanti, rientra": "Pit entry just ahead, come in",
+    "Rientra ai box, scegli l'assetto.": "Come into the pits, choose the setup.",
     "Sei ai box. Apri la pagina Ingegnere nel browser. "
     "Prepara la modifica e applicala. "
     "Ricarica il setup dal garage prima di uscire.":

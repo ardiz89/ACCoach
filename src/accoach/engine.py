@@ -46,7 +46,7 @@ from .coaching.atwheel import WheelWatch
 from .coaching.corner_refs import POOL_SIZE, CornerBests
 from .coaching.focus import FocusCoach, FocusKind, FocusReport
 from .coaching.lapvalid import LapValidityCoach
-from .coaching.pitcall import PitCall
+from .coaching.pitcall import HoldCall, PitCall
 from .i18n import cue_text, current_language
 from .logging_setup import get_logger
 from .comparison import DeltaState, LapComparator, Reference
@@ -473,6 +473,8 @@ class CoachEngine:
         self.pressure = PressureAdvisor()
         self.tyretemp = TyreTempAdvisor()
         self.pitcall = PitCall()
+        # L'Ingegnere che aspetta la risposta sull'assetto (vedi coaching/pitcall.py).
+        self.holdcall = HoldCall()
         # Watches the dials so an "al volo" change can finish by being *done*
         # rather than by being clicked on a web page (see coaching/atwheel.py).
         self.wheelwatch = WheelWatch()
@@ -1327,6 +1329,7 @@ class CoachEngine:
             # (see coaching/pitcall.py — it's learned, so a track never visited
             # simply has no approach call until the first time you come in).
             self.pitcall.reset()
+            self.holdcall.reset()
             for pos in self._load_pit_entry(snap.track):
                 self.pitcall.note_pit_entry(pos)
             self.pitcall.mark_entry_saved()
@@ -1482,6 +1485,13 @@ class CoachEngine:
                                      self._reference))
         self.pitcall.set_pending(self._garage_change_pending())
         _submit(self.pitcall.update(snap, now))
+        # L'attesa di `confirm_base` non porta una modifica, quindi la
+        # chiamata sopra non la vede, e `_announce_engineer` nemmeno: senza
+        # questa chi guida a voce non saprebbe mai che l'Ingegnere aspetta.
+        d = self._engineer_decision
+        _submit(self.holdcall.update(
+            snap, self.engineer_voice and d is not None
+            and bool(getattr(d, "confirm_base", False))))
         if self.pitcall.entry_dirty and snap.track:
             self._save_pit_entry(snap.track)
         spoken = self.scheduler.poll(now)
@@ -1558,6 +1568,7 @@ class CoachEngine:
             # Ogni frase di tecnica si puo' ridire una volta: il giro e' questo.
             self.scheduler.new_lap()
             self.lapvalid.new_lap()
+            self.holdcall.new_lap()
 
     def _quiet_reason(self, s: TelemetrySnapshot, delta: DeltaState | None) -> str:
         """Why the coach is holding back this tick, "" if it isn't.

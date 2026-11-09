@@ -979,7 +979,8 @@ road".
   wasn't the one on your car. Then the engineer doesn't judge the test or log
   it, and there's nothing to write on the file. Until you answer, the laps
   you drive don't count towards the baseline, because the doubtful setup is
-  still on the car. In the pits, reload the setup you were driving before the
+  still on the car. The engineer calls you in by voice, right away and again
+  at the next line. In the pits, reload the setup you were driving before the
   change. The page asks again, even if you reload it, and you pick the setup
   you actually loaded. HONE remembers it as the starting file for that car
   and track. Then the engineer takes a new baseline from the laps after you
