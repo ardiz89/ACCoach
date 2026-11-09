@@ -282,7 +282,7 @@ def _focus_log_line(report: FocusReport | None, *, counted: bool = True,
         riga = f"focus | nessuno | stato={stato}"
     else:
         riga = (f"focus | {focus.name} | tema={_focus_theme_key(report)} "
-                f"| perdi {focus.baseline_ms:.0f} ms")
+                f"| base {focus.baseline_ms:.0f} ms")
     if counted:
         return riga
     # Il resto della riga descrive il giro *precedente*, che sotto un focus
@@ -1410,9 +1410,18 @@ class CoachEngine:
         # anyway, so it needs no gate of its own here.
         unrepresentative = bool(quiet) and quiet != "no_reference"
 
+        # Sul giro di uscita dai box le gomme sono fredde e pattinare e' normale:
+        # l'08/11 «Pattini in uscita» dopo ogni uscita. Lo si toglie qui, dove si
+        # sa che giro e': il rilevatore non ha idea di cosa sia un giro, e lo
+        # scheduler riceverebbe una regola in piu' sul traguardo. Solo il
+        # pattinamento: un bloccaggio, o la benzina, restano veri anche li'.
+        on_out_lap = quiet in ("pit", "out_lap")
+
         def _submit(cues: list[Cue]) -> None:
             kept = cues if not unrepresentative else [
                 c for c in cues if c.category in _SAFETY_CATEGORIES]
+            if on_out_lap:
+                kept = [c for c in kept if c.category is not CueCategory.WHEELSPIN]
             self.scheduler.submit_all(kept, now)
 
         # Corner advice (needs a reference) + acute events (don't) + the aid

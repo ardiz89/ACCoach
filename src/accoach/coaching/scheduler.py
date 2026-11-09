@@ -40,6 +40,12 @@ _ACUTE_STALE_MARGIN_S = 1.5          # acute window = min_interval + this (survi
 # Quanti giri passano fra una volta e l'altra. «Veleggi» capita in quasi ogni
 # giro: a Zolder (29/10) e' stato detto 12 volte in 13 giri, sopra tutto il resto.
 _REST_LAPS = {CueCategory.COASTING: 3}
+# La stessa categoria non si ridice entro questi secondi, QUALUNQUE sia il tratto.
+# Il limite per tratto (`repeat_suppress_s`) non basta: l'08/11 «Pattini in
+# uscita» e' stato detto a 1,5 e a 1,6 s di distanza, perche' in uscita di curva
+# l'auto cambia tratto e quindi `dedup_key`. 1,5 s e' proprio `acute_interval_s`.
+# Vale per tutte le categorie, anche le urgenti: sono quelle che si ripetevano.
+SAME_CATEGORY_S = 5.0
 
 
 class CueScheduler:
@@ -58,6 +64,7 @@ class CueScheduler:
         self._pending: list[tuple[Cue, float | None]] = []
         self._last_spoken_at: float = -1e9
         self._recent: dict[tuple, float] = {}  # dedup_key -> last spoken time
+        self._recent_category: dict[CueCategory, float] = {}  # category -> last spoken
         # The theme the session is working on, as an English key, or None while
         # no focus has been elected. See `set_focus`.
         self._focus_theme: str | None = None
@@ -255,6 +262,9 @@ class CueScheduler:
             last = self._recent.get(cue.dedup_key())
             if last is not None and now - last < self.repeat_suppress_s:
                 continue
+            last_cat = self._recent_category.get(cue.category)
+            if last_cat is not None and now - last_cat < SAME_CATEGORY_S:
+                continue
             chosen = cue
             break
 
@@ -272,6 +282,7 @@ class CueScheduler:
         ]
         self._last_spoken_at = now
         self._recent[chosen.dedup_key()] = now
+        self._recent_category[chosen.category] = now
         self._said_this_lap.add(chosen.category)
         self._last_said_lap[chosen.category] = self._lap_no
         return chosen

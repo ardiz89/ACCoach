@@ -446,6 +446,11 @@ Three things look like faults and aren't.
   against, and a made-up number would be worse than none. It also disappears in
   the pits, on the out-lap and on off-pace laps.
 
+The coach also never repeats the same kind of call within **five seconds**, even
+if you are in a different part of the track. On the out-lap it stays quiet about
+wheelspin, because with cold tyres it is normal. It speaks about it again from
+the first time you cross the line.
+
 The spoken advice **doesn't change**. It always comes at the entry of the same
 corner, on the next lap, where you can still do something about it. The number is
 an account after the fact, and that's why it can be missing.

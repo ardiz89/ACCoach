@@ -212,6 +212,9 @@ def theme_label(category: CueCategory, lang: str) -> str:
 # the same ones for that mistake. The full sentence still goes to the screen and
 # to the debrief — the eye gets the detail, the ear gets the word.
 #
+# TIME_LOSS has none on purpose: it speaks the whole recorded sentence with the
+# number ("Qui perdi N decimi"), which is what the driver needs to hear.
+#
 # Only technique cues have one. An acute call is already short and must stay
 # literal ("Bloccaggio!"), and an advisory is spoken at the finish line, where
 # there is room for a sentence.
@@ -224,7 +227,6 @@ TRIGGER: dict[CueCategory, dict[str, str]] = {
     CueCategory.PARTIAL_THROTTLE: {"it": "tutto gas", "en": "full throttle"},
     CueCategory.COASTING: {"it": "veleggi", "en": "coasting"},
     CueCategory.CARRY_SPEED: {"it": "porta velocità", "en": "carry speed"},
-    CueCategory.TIME_LOSS: {"it": "qui perdi", "en": "losing here"},
     CueCategory.LIMITER: {"it": "cambia", "en": "shift"},
     CueCategory.GEAR_TOO_TALL: {"it": "scala", "en": "downshift"},
 }

@@ -114,6 +114,11 @@ riferimento**, il tuo più veloce fra quelli validi.
 > un'uscita di pista, il coach **tace** sui consigli tecnici. Restano solo gli
 > avvisi di sicurezza.
 
+Il coach non ti ripete la stessa frase a raffica. La stessa categoria di
+avviso non torna prima di **cinque secondi**, anche in un altro punto della
+pista. Nel giro di uscita dai box tace sul pattinamento, perché con le gomme
+fredde è normale. Ne riparla dal primo passaggio sulla linea.
+
 ### Un tema alla volta
 
 Dopo qualche giro completo, anche sporco, il coach smette di commentarti tutto
