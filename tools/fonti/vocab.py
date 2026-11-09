@@ -374,11 +374,15 @@ ROLE_CONTEXT = (r"(?:championship|campionato|league|lega|series|serie|gt\W+world
                 r"|esports|endurance|team|scuderia)")
 # La parola del campionato o del team entro le 6 parole che seguono.
 _NEAR_CONTEXT = rf"(?:\W+[\w']+){{0,5}}?\W+{ROLE_CONTEXT}\b"
+# Un coach dice chi o cosa allena: «I teach you to brake», «I coach myself» non bastano.
+COACH_OBJECTS = (r"(?:drivers|driving|sim racing|racing|people to drive|students|clients"
+                 r"|racecraft|guida|piloti)")
+# L'oggetto entro le 4 parole che seguono il verbo.
+_NEAR_OBJECT = rf"(?:\W+[\w']+){{0,3}}?\W+{COACH_OBJECTS}\b"
 ROLE_PATTERNS = {
     "coach": [re.compile(p) for p in (
         r"\bi(?:'m| am) (?:an? )?(?:(?:driver|driving|sim racing) )?(?:coach|instructor)\b",
-        r"\bi coach\b",
-        r"\bi teach\b",
+        r"\bi (?:coach|teach)\b" + _NEAR_OBJECT,
         r"\b(?:sono|faccio) (?:il |un |l')?(?:coach|istruttore)\b",
         r"\binsegno (?:a guidare|guida|ai piloti)\b",
     )],

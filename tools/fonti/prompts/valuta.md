@@ -38,7 +38,11 @@ Return ONLY this JSON object. No prose, no Markdown fences, no extra keys:
   `coach` and `pilota` need a reason with `"field": "role"` quoting the speaker saying
   it about themselves, in the first person, not negated:
   - `coach`: "I'm a (driver/driving/sim racing) coach", "I am an instructor",
-    "I coach", "I teach", "sono/faccio il coach", "faccio l'istruttore",
+    "I coach" or "I teach" followed within 4 words by who or what is coached:
+    drivers, driving, racing, sim racing, people to drive, students, clients,
+    racecraft, guida, piloti ("I coach drivers in ACC", "I teach racecraft to
+    students"; not "I teach you to brake", "I coach myself"),
+    "sono/faccio il coach", "faccio l'istruttore",
     "insegno a guidare", "insegno guida", "insegno ai piloti";
   - `pilota`: "I race in/for", "I drive for", "I'm a driver for", "corro nel/per/in",
     each followed within 6 words by a series or team word: championship, campionato,

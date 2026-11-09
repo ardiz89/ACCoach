@@ -801,3 +801,31 @@ def test_ruolo_con_campionato_team_o_guida(tmp_path, body, role, quote):
     sha = _rate_job(c, tmp_path, body)
     assert agents.ingest(c, _scrivi(tmp_path, _rate(sha, body, role, quote)), "m") == {"facts": 0, "rejects": 0}
     c.close()
+
+
+# --- round 5 ------------------------------------------------------------------------
+
+@pytest.mark.parametrize("body, quote, ok", [
+    # «I teach» e «I coach» senza chi o cosa si allena non dicono che chi parla è un coach.
+    ("Today I teach you to brake at Rivazza.", "I teach you to brake", False),
+    ("Honestly I coach myself with replays at Imola.", "I coach myself with replays", False),
+    ("I teach you to brake later, then we talk about racing.",
+     "I teach you to brake later, then we talk about racing", False),   # oltre 4 parole
+    ("I coach drivers in ACC at Imola every week.", "I coach drivers in ACC", True),
+    ("I teach sim racing on weekends at Imola.", "I teach sim racing on", True),
+    ("I teach racecraft to students at Imola.", "I teach racecraft to students", True),
+    ("I coach a few clients in ACC.", "I coach a few clients", True),
+    # Sonda P7: l'apostrofo tipografico si normalizza già, la presentazione vera entra.
+    ("Hi, I\u2019m a driver coach for ACC players.", "I\u2019m a driver coach for", True),
+])
+def test_coach_dice_chi_allena(tmp_path, body, quote, ok):
+    c = db.open_db(tmp_path / "f.sqlite")
+    sha = _rate_job(c, tmp_path, body)
+    d = _rate(sha, body, "coach", quote)
+    if ok:
+        assert agents.ingest(c, _scrivi(tmp_path, d), "m") == {"facts": 0, "rejects": 0}
+    else:
+        with pytest.raises(agents.AnswerRejected) as e:
+            agents.ingest(c, _scrivi(tmp_path, d), "m")
+        assert e.value.reason == "ruolo_non_citato"
+    c.close()
