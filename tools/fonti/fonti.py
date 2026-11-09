@@ -97,6 +97,11 @@ def cmd_ingest(args) -> int:
                 rifiutati += 1
                 print(f"{Path(f).name}: rifiutato ({e.reason})", file=sys.stderr)
                 continue
+            except Exception as e:  # un file guasto non ferma gli altri
+                rifiutati += 1
+                print(f"{Path(f).name}: errore inatteso ({type(e).__name__}), passo al prossimo.",
+                      file=sys.stderr)
+                continue
             print(f"{Path(f).name}: fatti {r['facts']}, scarti {r['rejects']}.")
         return 1 if rifiutati else 0
     finally:

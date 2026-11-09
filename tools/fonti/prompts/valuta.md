@@ -4,7 +4,9 @@ prompt_version: 1
 
 You receive one job file (`rate-*.job.json`) with `body`, `segments`, `meta` and
 `track`. Say who is speaking and what they state about themselves. Your answer is read
-by a program, and every quote is checked against `body` character for character.
+by a program. Every quote is checked against `body` character for character, and
+every claim you make must have its own quote. One claim without its quote and the
+whole answer is thrown away.
 
 ## Output
 
@@ -15,30 +17,39 @@ Return ONLY this JSON object. No prose, no Markdown fences, no extra keys:
  "speaker": {"name": "...", "role": "pilota|coach|anonimo"},
  "lap_time": "1:41.2" or null,
  "car": "..." or null,
- "reasons": [{"claim": "...", "quote": "...", "offset": 0}]}
+ "reasons": [{"field": "name|role|lap_time|car", "claim": "...", "quote": "...", "offset": 0}]}
 ```
 
-- `speaker.name`: the name the speaker gives for themselves in `body`, or the channel
-  or user name in `meta` if the body names no one. Empty string if unknown.
+- `speaker.name`:
+  - the name the speaker gives for themselves in `body`; it needs a reason with
+    `"field": "name"` whose quote contains that name exactly;
+  - or the author or channel name exactly as it appears in `meta` (`author`); then no
+    quote is needed;
+  - otherwise the empty string `""`.
 - `speaker.role`:
   - `coach` only if the text states they coach or teach driving;
   - `pilota` only if the text states they race (a series, a team, a result);
   - `anonimo` in every other case.
+  `coach` and `pilota` need a reason with `"field": "role"` quoting that statement.
 - `lap_time`: a lap time the speaker states for their own lap at this track, copied as
-  written; otherwise null.
-- `car`: the car the speaker states they drive, copied as written; otherwise null.
-- `reasons`: one entry for each claim above that is not empty or `anonimo` (name from
-  the body, role, lap time, car). `claim` says in a few words what the quote supports.
-  `quote` is copied character for character from `body`, the shortest clause of 4 or
-  more words that supports that claim. `offset` is the character index in `body` where
-  the quote starts.
+  written; otherwise null. Not null needs a reason with `"field": "lap_time"` whose
+  quote contains the lap time exactly as you wrote it.
+- `car`: the car the speaker states they drive, copied as written; otherwise null. Not
+  null needs a reason with `"field": "car"` whose quote contains the car exactly as you
+  wrote it.
+- Each reason:
+  - `field` says which claim it supports;
+  - `claim` says in a few words what the quote shows;
+  - `quote` is copied character for character from `body`: the shortest clause of 4
+    or more words that supports the claim;
+  - `offset` is the character index in `body` where the quote starts (0-based).
 
 ## Rules
 
 1. Never infer a role from skill, speed or confidence. Only a stated fact counts.
 2. Never translate or paraphrase a quote.
-3. A claim without a supporting quote in `body` is left out: role `anonimo`,
-   `lap_time` null, `car` null.
-4. If the text is not about Imola in Assetto Corsa Competizione (ACC), still answer,
-   with role `anonimo`, `lap_time` null, `car` null and `"reasons": []`, unless the
-   speaker's identity is stated.
+3. A claim you cannot quote is left out: name `""`, role `anonimo`, `lap_time` null,
+   `car` null. That is always a valid answer.
+4. If the text is not about Imola in Assetto Corsa Competizione (ACC), answer name
+   `""` (or the `meta` author), role `anonimo`, `lap_time` null, `car` null and
+   `"reasons": []`.

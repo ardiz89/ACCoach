@@ -1,5 +1,6 @@
 """Lavoro degli agenti (tools/fonti.agents): coda, istruzioni, ingest congelato."""
 import json
+import sqlite3
 import sys
 from pathlib import Path
 
@@ -13,14 +14,17 @@ from tools.fonti import agents, db, fonti  # noqa: E402
 
 FIX = ROOT / "tests" / "fixtures" / "fonti"
 CORPO = "At Acque Minerali I go down to third gear and it works great."
+COACH = "I coach drivers in ACC and at Imola my best is 1:41.2 with the Ferrari 296 GT3."
 SEGS = [{"start_s": 1.0, "text": "Into Tosa you brake at the 100 board"},
         {"start_s": 5.5, "text": "Stay left through Acque Minerali"}]
 TRASCRITTO = " ".join(s["text"] for s in SEGS)
+FATTO = {"corner": "Acque Minerali", "type": "gear", "value": "3",
+         "quote": "down to third gear", "offset": 23}
 
 
-def _fonte(conn, url, game="acc", platform="reddit", track="imola"):
+def _fonte(conn, url, game="acc", platform="reddit", track="imola", author="a"):
     conn.execute("INSERT INTO sources(platform, url, author, title, published, game, track, meta_json)"
-                 " VALUES (?,?,?,?,?,?,?,?)", (platform, url, "a", "t", "2026-05-01", game, track, "{}"))
+                 " VALUES (?,?,?,?,?,?,?,?)", (platform, url, author, "t", "2026-05-01", game, track, "{}"))
     conn.commit()
     return conn.execute("SELECT id FROM sources WHERE url=?", (url,)).fetchone()[0]
 
@@ -37,18 +41,50 @@ def conn(tmp_path):
     c.close()
 
 
-def _risposta(tmp_path, nome, **cambi):
-    d = json.loads((FIX / nome).read_text(encoding="utf-8"))
-    d.update(cambi)
-    p = tmp_path / f"r-{nome}"
+def _scrivi(tmp_path, d, nome="r.json"):
+    p = tmp_path / nome
     p.write_text(json.dumps(d), encoding="utf-8")
     return p
 
 
+def _risposta(tmp_path, nome, **cambi):
+    d = json.loads((FIX / nome).read_text(encoding="utf-8"))
+    d.update(cambi)
+    return _scrivi(tmp_path, d, f"r-{nome}")
+
+
+def _estrai(sha, facts):
+    return {"sha256": sha, "kind": "extract", "facts": facts}
+
+
+def _proponi(conn, tmp_path, kind="extract", track="imola"):
+    return agents.pending(conn, kind, track, tmp_path / f"jobs-{kind}-{track}")
+
+
+def _job_factcheck(conn, key, bodies, version="1"):
+    payload = {"kind": "factcheck", "sha256": key, "track": "imola", "prompt_version": version,
+               "texts": [{"sha256": "x", "body": b, "segments": None, "meta": []} for b in bodies]}
+    conn.execute("INSERT INTO jobs(kind, key, track, prompt_version, payload_json, created_at)"
+                 " VALUES ('factcheck', ?, 'imola', ?, ?, 'ora')", (key, version, json.dumps(payload)))
+    conn.commit()
+
+
+def _coach(conn, tmp_path):
+    sid = _fonte(conn, "https://yt/coach", platform="youtube", author="Canale Coach")
+    sha, _ = db.add_text(conn, sid, "transcript", "Coach Uno", COACH)
+    _proponi(conn, tmp_path, "rate")
+    return sha
+
+
+def _stato(conn):
+    return db.count_rows(conn)
+
+
+# --- pending ------------------------------------------------------------------
+
 def test_pending_solo_acc_e_non_congelati(conn, tmp_path):
-    out = tmp_path / "jobs"
-    jobs = agents.pending(conn, "extract", "imola", out)
-    assert [p.name for p in jobs] == [f"extract-{'97ee69d68d55'}.job.json"]
+    jobs = _proponi(conn, tmp_path)
+    assert [p.name for p in jobs] == ["extract-97ee69d68d55.job.json"]
     job = json.loads(jobs[0].read_text(encoding="utf-8"))
     assert set(job) == {"kind", "sha256", "track", "prompt_version", "body", "segments", "meta", "corners"}
     assert job["body"] == CORPO and job["kind"] == "extract" and "Acque Minerali" in job["corners"]
@@ -58,79 +94,180 @@ def test_pending_solo_acc_e_non_congelati(conn, tmp_path):
     assert len(agents.pending(conn, "rate", "imola", tmp_path / "jobs3")) == 1
 
 
-def test_pending_deterministico(conn, tmp_path):
+def test_pending_deterministico_e_ricordato(conn, tmp_path):
     a = agents.pending(conn, "extract", "imola", tmp_path / "a")[0].read_bytes()
     b = agents.pending(conn, "extract", "imola", tmp_path / "b")[0].read_bytes()
     assert a == b
+    righe = conn.execute("SELECT kind, key, track, prompt_version, payload_json FROM jobs").fetchall()
+    assert len(righe) == 1 and righe[0][:4] == ("extract", "97ee69d68d556536e78db575c4c7097e98af762fadd034b6c52a1c1856598a0d",
+                                                "imola", "1")
+    assert json.loads(righe[0][4]) == json.loads(a)
 
 
-def test_ingest_fixture(conn):
+def test_prompt_version_letta_dal_file(conn, tmp_path, monkeypatch):
+    for nome in agents.PROMPT_FILES.values():
+        prima = (agents.PROMPTS_DIR / nome).read_text(encoding="utf-8").splitlines()[0]
+        assert prima == "prompt_version: 1"
+    finta = tmp_path / "prompts"
+    finta.mkdir()
+    for nome in agents.PROMPT_FILES.values():
+        (finta / nome).write_text("prompt_version: 7\nIstruzioni.\n", encoding="utf-8")
+    monkeypatch.setattr(agents, "PROMPTS_DIR", finta)
+    job = json.loads(_proponi(conn, tmp_path)[0].read_text(encoding="utf-8"))
+    assert job["prompt_version"] == "7"
+
+
+def test_pending_salta_segmenti_illeggibili(conn, tmp_path):
+    sid = _fonte(conn, "https://yt/rotto", platform="youtube")
+    conn.execute("INSERT INTO texts(sha256, source_id, kind, author, body, segments_json)"
+                 " VALUES ('s7', ?, 'transcript', 'x', ?, '{rotto')", (sid, CORPO))
+    conn.commit()
+    assert [p.name for p in _proponi(conn, tmp_path)] == ["extract-97ee69d68d55.job.json"]
+
+
+# --- ingest extract -------------------------------------------------------------
+
+def test_ingest_fixture(conn, tmp_path):
+    _proponi(conn, tmp_path)
     r = agents.ingest(conn, FIX / "risposta_estrai.json", "claude-test")
     assert r == {"facts": 1, "rejects": 1}
     f = conn.execute("SELECT track, corner, type, value, quote, offset, author FROM facts").fetchall()
     assert f == [("imola", "Acque Minerali", "gear", "3", "down to third gear", 23, "u_uno")]
     assert [x[0] for x in conn.execute("SELECT reason FROM rejects")] == ["citazione_assente"]
     model, pv = conn.execute("SELECT model, prompt_version FROM results").fetchone()
-    assert model == "claude-test" and pv == agents.prompt_version("extract")
+    assert model == "claude-test" and pv == "1"
+
+
+def test_lavoro_non_proposto_rifiutato(conn, tmp_path):
+    with pytest.raises(agents.AnswerRejected) as e:
+        agents.ingest(conn, FIX / "risposta_estrai.json", "m")
+    assert e.value.reason == "lavoro_ignoto"
+    assert conn.execute("SELECT COUNT(*) FROM results").fetchone()[0] == 0
 
 
 def test_stesso_testo_due_autori_due_fatti(conn, tmp_path):
-    altra = _fonte(conn, "https://r/acc2")
-    db.add_text(conn, altra, "comment", "u_due", CORPO)
-    r = agents.ingest(conn, FIX / "risposta_estrai.json", "claude-test")
-    assert r == {"facts": 2, "rejects": 1}
+    db.add_text(conn, _fonte(conn, "https://r/acc2"), "comment", "u_due", CORPO)
+    _proponi(conn, tmp_path)
+    assert agents.ingest(conn, FIX / "risposta_estrai.json", "m") == {"facts": 2, "rejects": 1}
     assert sorted(conn.execute("SELECT author FROM facts").fetchall()) == [("u_due",), ("u_uno",)]
+
+
+def test_stesso_testo_da_fonte_non_acc_niente_fatto(conn, tmp_path):
+    # Sonda 1: lo stesso testo anche da una fonte «altro» non dà una riga a quella fonte.
+    db.add_text(conn, _fonte(conn, "https://r/altro2", game="altro"), "comment", "ir_user", CORPO)
+    _proponi(conn, tmp_path)
+    assert agents.ingest(conn, FIX / "risposta_estrai.json", "m") == {"facts": 1, "rejects": 1}
+    giochi = conn.execute("SELECT f.author, s.game FROM facts f JOIN sources s ON s.id = f.source_id").fetchall()
+    assert giochi == [("u_uno", "acc")]
+
+
+def test_testo_solo_non_acc_mai_accettato(tmp_path):
+    # Sonda 1b: un testo che esiste solo da una fonte non ACC non diventa mai un fatto.
+    c = db.open_db(tmp_path / "f.sqlite")
+    sha, _ = db.add_text(c, _fonte(c, "https://r/ir", game="altro"), "comment", "ir_user", CORPO)
+    assert _proponi(c, tmp_path) == []
+    with pytest.raises(agents.AnswerRejected) as e:
+        agents.ingest(c, _scrivi(tmp_path, _estrai(sha, [FATTO])), "m")
+    assert e.value.reason == "lavoro_ignoto"
+    # Anche se il lavoro esistesse, senza righe ACC della pista il testo non c'è.
+    c.execute("INSERT INTO jobs VALUES ('extract', ?, 'imola', '1', '{}', 'ora')", (sha,))
+    c.commit()
+    with pytest.raises(agents.AnswerRejected) as e:
+        agents.ingest(c, _scrivi(tmp_path, _estrai(sha, [FATTO])), "m")
+    assert e.value.reason == "testo_ignoto"
+    assert _stato(c)["results"] == 0
+    c.close()
+
+
+def test_stesso_testo_due_piste_solo_quella_del_lavoro(tmp_path):
+    # Sonda 1c: lo stesso testo su Imola e su Monza; il fatto vale per la pista del lavoro.
+    c = db.open_db(tmp_path / "f.sqlite")
+    sha, _ = db.add_text(c, _fonte(c, "https://r/i"), "comment", "x", CORPO)
+    db.add_text(c, _fonte(c, "https://r/m", track="monza"), "comment", "y", CORPO)
+    _proponi(c, tmp_path)
+    assert agents.ingest(c, _scrivi(tmp_path, _estrai(sha, [FATTO])), "m") == {"facts": 1, "rejects": 0}
+    assert c.execute("SELECT track, author FROM facts").fetchall() == [("imola", "x")]
+    assert c.execute("SELECT COUNT(*) FROM rejects").fetchone()[0] == 0
+    c.close()
 
 
 def test_trascritto_con_segmenti_e_start_s(conn, tmp_path):
     sid = _fonte(conn, "https://yt/v1", platform="youtube")
     sha, _ = db.add_text(conn, sid, "transcript", "Canale", TRASCRITTO, SEGS)
-    risposta = {"sha256": sha, "kind": "extract", "facts": [
+    _proponi(conn, tmp_path)
+    # L'offset dichiarato (33) cade ancora nel primo sottotitolo; la citazione vera
+    # comincia a 37, nel secondo: `start_s` segue la citazione, non l'offset (sonda 5).
+    risposta = _estrai(sha, [
         {"corner": "Tosa", "type": "brake", "value": "board:100",
          "quote": "brake at the 100 board", "offset": 14},
         {"corner": "Acque Minerali", "type": "line", "value": "Stay left through Acque Minerali",
-         "quote": "Stay left through Acque Minerali", "offset": 37}]}
-    p = tmp_path / "t.json"
-    p.write_text(json.dumps(risposta), encoding="utf-8")
-    assert agents.ingest(conn, p, "m") == {"facts": 2, "rejects": 0}
+         "quote": "Stay left through Acque Minerali", "offset": 33}])
+    assert agents.ingest(conn, _scrivi(tmp_path, risposta), "m") == {"facts": 2, "rejects": 0}
     assert conn.execute("SELECT corner, start_s FROM facts ORDER BY offset").fetchall() == [
         ("Tosa", 1.0), ("Acque Minerali", 5.5)]
-    jobs = [json.loads(p.read_text(encoding="utf-8"))
-            for p in agents.pending(conn, "rate", "imola", tmp_path / "j")]
+    jobs = [json.loads(p.read_text(encoding="utf-8")) for p in _proponi(conn, tmp_path, "rate")]
     assert [j["sha256"] for j in jobs] == sorted(j["sha256"] for j in jobs)
     assert next(j for j in jobs if j["sha256"] == sha)["segments"] == SEGS
 
 
-def _stato(conn):
-    return db.count_rows(conn)
+def test_segmenti_illeggibili_rifiutati(conn, tmp_path):
+    # Sonda 7: segmenti guasti nel database danno un rifiuto, non un'eccezione qualsiasi.
+    _proponi(conn, tmp_path)
+    conn.execute("UPDATE texts SET segments_json='{rotto' WHERE author='u_uno'")
+    conn.commit()
+    with pytest.raises(agents.AnswerRejected) as e:
+        agents.ingest(conn, FIX / "risposta_estrai.json", "m")
+    assert e.value.reason == "segmenti_illeggibili"
 
+
+def test_fatto_ripetuto_scartato(conn, tmp_path):
+    # Sonda 8: lo stesso fatto due volte nella stessa risposta entra una volta.
+    _proponi(conn, tmp_path)
+    sha = json.loads((FIX / "risposta_estrai.json").read_text(encoding="utf-8"))["sha256"]
+    assert agents.ingest(conn, _scrivi(tmp_path, _estrai(sha, [FATTO, FATTO])), "m") == {"facts": 1, "rejects": 1}
+    assert [r for (r,) in conn.execute("SELECT reason FROM rejects")] == ["fatto_duplicato"]
+
+
+def test_nessun_fatto_si_congela(conn, tmp_path):
+    # Sonda 9: «niente da estrarre» è una risposta: si congela e il testo non torna in coda.
+    _proponi(conn, tmp_path)
+    sha = json.loads((FIX / "risposta_estrai.json").read_text(encoding="utf-8"))["sha256"]
+    assert agents.ingest(conn, _scrivi(tmp_path, _estrai(sha, [])), "m") == {"facts": 0, "rejects": 0}
+    assert conn.execute("SELECT COUNT(*) FROM results").fetchone()[0] == 1
+    assert _proponi(conn, tmp_path / "di-nuovo") == []
+
+
+# --- schema, congelamento, versioni -----------------------------------------------
 
 def test_json_malformato_rifiutato_intero(conn, tmp_path):
+    _proponi(conn, tmp_path)
     prima = _stato(conn)
     tronco = tmp_path / "tronco.json"
     tronco.write_text((FIX / "risposta_estrai.json").read_text(encoding="utf-8")[:80], encoding="utf-8")
-    with pytest.raises(agents.AnswerRejected):
+    with pytest.raises(agents.AnswerRejected) as e:
         agents.ingest(conn, tronco, "m")
+    assert e.value.reason == "json_malformato"
     with pytest.raises(agents.AnswerRejected):
         agents.ingest(conn, _risposta(tmp_path, "risposta_estrai.json", extra=1), "m")
     d = json.loads((FIX / "risposta_estrai.json").read_text(encoding="utf-8"))
     d["facts"][0]["note"] = "in più"
-    p = tmp_path / "chiave_fatto.json"
-    p.write_text(json.dumps(d), encoding="utf-8")
     with pytest.raises(agents.AnswerRejected):
-        agents.ingest(conn, p, "m")
+        agents.ingest(conn, _scrivi(tmp_path, d, "chiave_fatto.json"), "m")
     with pytest.raises(agents.AnswerRejected):
         agents.ingest(conn, _risposta(tmp_path, "risposta_valuta.json",
                                       speaker={"name": "x", "role": "pilota esperto"}), "m")
+    v = json.loads((FIX / "risposta_valuta.json").read_text(encoding="utf-8"))
+    v["reasons"][0]["field"] = "team"
+    with pytest.raises(agents.AnswerRejected) as e:
+        agents.ingest(conn, _scrivi(tmp_path, v, "campo.json"), "m")
+    assert e.value.reason == "schema_errato:reasons[].field"
     with pytest.raises(agents.AnswerRejected):
         agents.ingest(conn, _risposta(tmp_path, "risposta_factcheck.json", verdict="forse"), "m")
-    with pytest.raises(agents.AnswerRejected) as e:
-        agents.ingest(conn, _risposta(tmp_path, "risposta_estrai.json", sha256="0" * 64), "m")
-    assert e.value.reason == "testo_ignoto"
     assert _stato(conn) == prima
 
 
-def test_gia_congelato(conn):
+def test_gia_congelato(conn, tmp_path):
+    _proponi(conn, tmp_path)
     agents.ingest(conn, FIX / "risposta_estrai.json", "claude-test")
     prima = _stato(conn)
     with pytest.raises(agents.AnswerRejected) as e:
@@ -141,27 +278,150 @@ def test_gia_congelato(conn):
     assert agents.ingest(conn, FIX / "risposta_estrai.json", "altro-modello") == {"facts": 1, "rejects": 1}
 
 
-def test_rate_e_factcheck_citazioni_solo_presenti(conn):
-    assert agents.ingest(conn, FIX / "risposta_valuta.json", "m") == {"facts": 0, "rejects": 1}
-    assert agents.ingest(conn, FIX / "risposta_factcheck.json", "m") == {"facts": 0, "rejects": 0}
-    reasons = [x[0] for x in conn.execute("SELECT reason FROM rejects")]
-    assert reasons == ["citazione_assente"]
-    kinds = sorted(k for (k,) in conn.execute("SELECT kind FROM results"))
-    assert kinds == ["factcheck", "rate"]
-
-
-def test_prompt_version_letta_dal_file(conn, tmp_path, monkeypatch):
-    for kind, nome in agents.PROMPT_FILES.items():
-        prima = (agents.PROMPTS_DIR / nome).read_text(encoding="utf-8").splitlines()[0]
-        assert prima == "prompt_version: 1"
+def test_versione_dal_lavoro_non_dal_file(conn, tmp_path, monkeypatch):
+    _proponi(conn, tmp_path)  # versione 1
     finta = tmp_path / "prompts"
     finta.mkdir()
     for nome in agents.PROMPT_FILES.values():
-        (finta / nome).write_text("prompt_version: 7\nIstruzioni.\n", encoding="utf-8")
+        (finta / nome).write_text("prompt_version: 2\n", encoding="utf-8")
     monkeypatch.setattr(agents, "PROMPTS_DIR", finta)
-    job = json.loads(agents.pending(conn, "extract", "imola", tmp_path / "j")[0].read_text(encoding="utf-8"))
-    assert job["prompt_version"] == "7"
+    agents.ingest(conn, FIX / "risposta_estrai.json", "m")
+    assert conn.execute("SELECT prompt_version FROM results").fetchall() == [("1",)]
 
+
+def test_due_versioni_aperte_vince_la_piu_nuova(conn, tmp_path, monkeypatch):
+    _proponi(conn, tmp_path)  # versione 1
+    finta = tmp_path / "prompts"
+    finta.mkdir()
+    for nome in agents.PROMPT_FILES.values():
+        (finta / nome).write_text("prompt_version: 10\n", encoding="utf-8")
+    monkeypatch.setattr(agents, "PROMPTS_DIR", finta)
+    _proponi(conn, tmp_path / "v10")
+    agents.ingest(conn, FIX / "risposta_estrai.json", "m")
+    agents.ingest(conn, FIX / "risposta_estrai.json", "m")
+    versioni = [v for (v,) in conn.execute("SELECT prompt_version FROM results ORDER BY id")]
+    assert versioni == ["10", "1"]
+    with pytest.raises(agents.AnswerRejected) as e:
+        agents.ingest(conn, FIX / "risposta_estrai.json", "m")
+    assert e.value.reason == "gia_congelato"
+
+
+def test_errore_di_scrittura_non_lascia_nulla(conn, tmp_path):
+    # Sonda 5: se una scrittura fallisce a metà, non resta niente.
+    _proponi(conn, tmp_path)
+    conn.execute("CREATE TRIGGER boom BEFORE INSERT ON rejects BEGIN SELECT RAISE(ABORT, 'boom'); END")
+    conn.commit()
+    prima = _stato(conn)
+    with pytest.raises(sqlite3.DatabaseError):
+        agents.ingest(conn, FIX / "risposta_estrai.json", "m")
+    assert _stato(conn) == prima
+
+
+def test_transazione_di_chi_chiama_non_si_tocca(conn, tmp_path):
+    # Sonda 6: l'ingest non salva né annulla quello che chi chiama aveva in sospeso.
+    _proponi(conn, tmp_path)
+    conn.execute("INSERT INTO spend(track, baseline_usd, last_usd, cap_usd) VALUES ('imola', 0, 0, 2)")
+    agents.ingest(conn, FIX / "risposta_estrai.json", "m")
+    altra = sqlite3.connect(str(tmp_path / "f.sqlite"))
+    try:
+        assert altra.execute("SELECT COUNT(*) FROM spend").fetchone()[0] == 0
+    finally:
+        altra.close()
+    assert conn.in_transaction
+    conn.rollback()
+    assert conn.execute("SELECT COUNT(*) FROM spend").fetchone()[0] == 0
+    # Fallito l'ingest, quello che chi chiama ha in sospeso resta.
+    conn.execute("INSERT INTO spend(track, baseline_usd, last_usd, cap_usd) VALUES ('imola', 0, 0, 2)")
+    with pytest.raises(agents.AnswerRejected):
+        agents.ingest(conn, _risposta(tmp_path, "risposta_estrai.json", extra=1), "m")
+    conn.commit()
+    assert conn.execute("SELECT COUNT(*) FROM spend").fetchone()[0] == 1
+
+
+# --- rate -----------------------------------------------------------------------
+
+def test_rate_citato_entra(conn, tmp_path):
+    _coach(conn, tmp_path)
+    assert agents.ingest(conn, FIX / "risposta_valuta.json", "m") == {"facts": 0, "rejects": 0}
+    payload = json.loads(conn.execute("SELECT payload_json FROM results WHERE kind='rate'").fetchone()[0])
+    assert payload["speaker"] == {"name": "Coach Uno", "role": "coach"}
+
+
+@pytest.mark.parametrize("cambio, motivo", [
+    # Sonda 3: ruolo, tempo e auto inventati senza una citazione.
+    ({"reasons": []}, "ruolo_non_citato"),
+    ({"speaker": {"name": "Mario Rossi", "role": "anonimo"}, "lap_time": None, "car": None,
+      "reasons": []}, "nome_non_citato"),
+    ({"lap_time": "1:39.0"}, "tempo_non_citato"),
+    ({"car": "Porsche 992 GT3 R"}, "auto_non_citata"),
+    # Sonda 3b: una citazione inventata.
+    ({"reasons": [{"field": "role", "claim": "races", "quote": "I race in GT World Challenge",
+                   "offset": 0}]}, "citazione_assente"),
+    ({"reasons": [{"field": "role", "claim": "coach", "quote": "I coach drivers in ACC",
+                   "offset": 30}]}, "offset_errato"),
+])
+def test_rate_senza_citazione_rifiutato_intero(conn, tmp_path, cambio, motivo):
+    _coach(conn, tmp_path)
+    prima = _stato(conn)
+    with pytest.raises(agents.AnswerRejected) as e:
+        agents.ingest(conn, _risposta(tmp_path, "risposta_valuta.json", **cambio), "m")
+    assert e.value.reason == motivo
+    assert _stato(conn) == prima
+
+
+def test_rate_nome_citato_o_autore(conn, tmp_path):
+    _coach(conn, tmp_path)
+    # Il nome del canale nella fonte basta, senza citazione.
+    assert agents.ingest(conn, _risposta(tmp_path, "risposta_valuta.json",
+                                         speaker={"name": "Canale Coach", "role": "coach"}), "m1")
+    # Un nome detto nel testo si cita con field=name.
+    sid = _fonte(conn, "https://r/luca")
+    body = "Hi, my name is Luca Bianchi and I drive ACC at Imola."
+    sha, _ = db.add_text(conn, sid, "comment", "u_luca", body)
+    _proponi(conn, tmp_path / "luca", "rate")
+    d = {"sha256": sha, "kind": "rate", "speaker": {"name": "Luca Bianchi", "role": "anonimo"},
+         "lap_time": None, "car": None,
+         "reasons": [{"field": "name", "claim": "gives their name",
+                      "quote": "my name is Luca Bianchi", "offset": 4}]}
+    assert agents.ingest(conn, _scrivi(tmp_path, d, "luca.json"), "m") == {"facts": 0, "rejects": 0}
+    d["reasons"][0]["field"] = "car"
+    with pytest.raises(agents.AnswerRejected) as e:
+        agents.ingest(conn, _scrivi(tmp_path, d, "luca2.json"), "m2")
+    assert e.value.reason == "nome_non_citato"
+
+
+# --- factcheck --------------------------------------------------------------------
+
+KEY = json.loads((FIX / "risposta_factcheck.json").read_text(encoding="utf-8"))["fact_key"]
+
+
+def test_factcheck_citato_nei_testi_del_lavoro(conn, tmp_path):
+    _job_factcheck(conn, KEY, [CORPO])
+    assert agents.ingest(conn, FIX / "risposta_factcheck.json", "m") == {"facts": 0, "rejects": 0}
+    assert conn.execute("SELECT kind, sha256 FROM results").fetchall() == [("factcheck", KEY)]
+
+
+def test_factcheck_rifiutato_intero(conn, tmp_path):
+    # Sonda 4: un fact_key mai proposto, una citazione da un testo fuori dal lavoro,
+    # un offset sbagliato e una citazione inventata: niente si congela.
+    db.add_text(conn, _fonte(conn, "https://r/monza", track="monza"), "comment", "m",
+                "At the Ascari chicane you stay flat out in sixth.")
+    prima = _stato(conn)
+    with pytest.raises(agents.AnswerRejected) as e:
+        agents.ingest(conn, _risposta(tmp_path, "risposta_factcheck.json", fact_key="deadbeef"), "m")
+    assert e.value.reason == "lavoro_ignoto"
+    _job_factcheck(conn, KEY, [CORPO])
+    prima = _stato(conn)
+    for cambio, motivo in [({"quote": "you stay flat out in", "offset": 22}, "citazione_assente"),
+                           ({"offset": 999}, "offset_errato"),
+                           ({"quote": "totally made up words here", "offset": 0}, "citazione_assente")]:
+        with pytest.raises(agents.AnswerRejected) as e:
+            agents.ingest(conn, _risposta(tmp_path, "risposta_factcheck.json", **cambio), "m")
+        assert e.value.reason == motivo
+    assert _stato(conn) == prima
+
+
+# --- comando ----------------------------------------------------------------------
 
 def test_cli_pending_e_ingest(conn, tmp_path, capsys):
     dbp = tmp_path / "f.sqlite"
@@ -174,3 +434,26 @@ def test_cli_pending_e_ingest(conn, tmp_path, capsys):
     assert fonti.main(["--db", str(dbp), "ingest", "--model", "m",
                        str(FIX / "risposta_estrai.json")]) == 1
     assert "gia_congelato" in capsys.readouterr().err
+
+
+def test_cli_errore_inatteso_passa_al_prossimo(conn, tmp_path, capsys, monkeypatch):
+    dbp = tmp_path / "f.sqlite"
+    fonti.main(["--db", str(dbp), "pending", "--kind", "extract", "--track", "imola",
+                "--out", str(tmp_path / "cli")])
+    vera = agents.ingest
+    visti = []
+
+    def finta(c, path, model):
+        visti.append(Path(path).name)
+        if len(visti) == 1:
+            raise KeyError("guasto")
+        return vera(c, path, model)
+
+    monkeypatch.setattr(agents, "ingest", finta)
+    rotto = _scrivi(tmp_path, {}, "primo.json")
+    assert fonti.main(["--db", str(dbp), "ingest", "--model", "m", str(rotto),
+                       str(FIX / "risposta_estrai.json")]) == 1
+    assert visti == ["primo.json", "risposta_estrai.json"]
+    err = capsys.readouterr().err
+    assert "primo.json: errore inatteso (KeyError)" in err
+    assert conn.execute("SELECT COUNT(*) FROM results").fetchone()[0] == 1

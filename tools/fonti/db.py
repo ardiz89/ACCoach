@@ -10,7 +10,7 @@ from pathlib import Path
 
 SCHEMA_VERSION = 1
 
-TABLES = ("sources", "texts", "results", "facts", "rejects", "spend", "collect_runs")
+TABLES = ("sources", "texts", "results", "facts", "rejects", "spend", "collect_runs", "jobs")
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS sources(
@@ -50,6 +50,10 @@ CREATE TABLE IF NOT EXISTS spend(
 CREATE TABLE IF NOT EXISTS collect_runs(
     track TEXT, entry_key TEXT, finished_at TEXT, items INTEGER, spent_usd REAL,
     PRIMARY KEY(track, entry_key)
+);
+CREATE TABLE IF NOT EXISTS jobs(
+    kind TEXT, key TEXT, track TEXT, prompt_version TEXT, payload_json TEXT, created_at TEXT,
+    PRIMARY KEY(kind, key, prompt_version)
 );
 """
 

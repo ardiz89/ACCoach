@@ -196,11 +196,37 @@ def check_fact(track: str, fact: dict, body: str, segments: list | None = None) 
     return None if got[0] == value else "valore_diverso"
 
 
-def check_quote(quote: str, body: str) -> str | None:
-    """Solo la presenza: la citazione c'è nel testo, a confini di parola, e ha 4 parole."""
+
+def locate_quote(quote: str, body: str, offset: int | None = None) -> tuple[str | None, int | None]:
+    """Dove sta la citazione nel testo grezzo: `(motivo, inizio)`.
+
+    Normalizzata e a confini di parola come in `check_fact`, almeno 4 parole. Con
+    `offset`, conta solo l'occorrenza entro OFFSET_SLACK caratteri, la più vicina.
+    """
     q = norm_text(str(quote or ""))
-    if not q or not _quote_regex(q).search(norm_text(str(body))):
-        return "citazione_assente"
+    body = str(body)
+    nbody, idx = vocab.norm_map(body)
+    starts = [m.start() for m in _quote_regex(q).finditer(nbody)] if q else []
+    if not starts:
+        return "citazione_assente", None
     if len(q.split()) < MIN_WORDS:
-        return "citazione_corta"
-    return None
+        return "citazione_corta", None
+    if offset is None:
+        return None, idx[starts[0]]
+    if not isinstance(offset, int) or isinstance(offset, bool):
+        return "offset_errato", None
+    near = [j for j in starts if abs(idx[j] - offset) <= OFFSET_SLACK]
+    if not near:
+        return "offset_errato", None
+    return None, idx[min(near, key=lambda k: abs(idx[k] - offset))]
+
+
+def check_quote(quote: str, body: str, offset: int | None = None) -> str | None:
+    """Solo l'aggancio al testo: presenza, 4 parole e, se dato, l'offset."""
+    return locate_quote(quote, body, offset)[0]
+
+
+def contains(quote: str, phrase: str) -> bool:
+    """La frase (un nome, un tempo, un'auto) sta nella citazione, a confini di parola."""
+    p = norm_text(str(phrase or ""))
+    return bool(p) and _quote_regex(p).search(norm_text(str(quote or ""))) is not None
