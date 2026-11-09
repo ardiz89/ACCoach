@@ -31,7 +31,7 @@ It consumes :class:`LapStats` (the diagnosis) and never touches telemetry.
 from __future__ import annotations
 
 import statistics
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from enum import Enum
 
 from ..i18n import current_language
@@ -290,6 +290,10 @@ class Decision:
     #: stesso numero due volte con due frasi diverse, o perdeva il perche'.
     #: None su tutto il resto: il messaggio va letto intero.
     tail: str | None = None
+    #: Su un verdetto: le gomme non si sono mosse come la modifica prevedeva,
+    #: quindi forse il file di partenza non era quello in macchina. Il tablet e
+    #: la pagina Ingegnere, letto questo, richiedono quale assetto hai caricato.
+    confirm_base: bool = False
 
 
 # --- the profile contract --------------------------------------------------
@@ -372,6 +376,13 @@ _FUEL_BIAS_L = 2.0
 #: quel massimo apposta, cosi' scatta solo su una sessione fuori dal normale e non
 #: toglie il giudizio sul tempo a una sessione qualunque.
 _TEMP_BIAS_C = 3.0
+
+#: Lo scarto minimo, in psi a caldo, fra lo spostamento misurato delle gomme e
+#: quello previsto (click per psi per click) oltre il quale si dubita del file
+#: di partenza. Si confronta con ``max(questo, |previsto|)``: il 08/11 i giri
+#: hanno detto -0,5 e -0,6 per -0,8 previsti (risposta buona) e +2,2 per +0,5
+#: (13 click scritti al posto di 5, sopra il file sbagliato).
+_BASE_PSI = 0.8
 
 
 # Decision messages, per language; resolved with the active app language at the
@@ -477,6 +488,26 @@ _DECISION_MSG = {
     "revert_structural": {
         "en": "The change made the lap time worse, so it comes off.",
         "it": "La modifica ha peggiorato il tempo sul giro, quindi va tolta.",
+    },
+    # Le gomme si sono mosse lontano da quanto valeva la modifica: il file di
+    # partenza forse non era quello in macchina (`_base_moved`).
+    "base_moved_front": {
+        "en": "When hot, the front tyres moved by {moved}, and the change was "
+              "worth {worth}.",
+        "it": "A caldo le gomme anteriori si sono mosse di {moved}, e la "
+              "modifica valeva {worth}.",
+    },
+    "base_moved_rear": {
+        "en": "When hot, the rear tyres moved by {moved}, and the change was "
+              "worth {worth}.",
+        "it": "A caldo le gomme posteriori si sono mosse di {moved}, e la "
+              "modifica valeva {worth}.",
+    },
+    "base_ask": {
+        "en": "Maybe the starting file wasn't the one on your car. In the pits, "
+              "pick the setup you actually loaded.",
+        "it": "Forse il file di partenza non era quello che hai in macchina. Ai "
+              "box scegli l'assetto che hai caricato davvero.",
     },
     "accepted_resolved": {
         "en": "The {sym} is fixed. It was {a}, now it's {b}.",
@@ -745,6 +776,29 @@ def _median_fuel(window: list[LapStats]) -> float:
     return statistics.median(vals) if vals else 0.0
 
 
+def _median_pressures(window: list[LapStats]) -> dict:
+    """La pressione a caldo tipica di ogni asse, solo per gli assi che i giri
+    dicono: ``{"front": 25.8}``. Un asse senza numeri non c'e', non vale 0."""
+    out = {}
+    for axle in ("front", "rear"):
+        vals = [float(s.pressures_hot[axle]) for s in window
+                if isinstance(s.pressures_hot, dict)
+                and isinstance(s.pressures_hot.get(axle), (int, float))
+                and not isinstance(s.pressures_hot.get(axle), bool)
+                and s.pressures_hot[axle] > 0]
+        if vals:
+            out[axle] = statistics.median(vals)
+    return out
+
+
+def _signed_psi(v: float, lang: str) -> str:
+    """Uno spostamento di pressione col segno: «+2,2 psi», «−0,8 psi»."""
+    text = fmt_num(v, 1, lang)
+    if not text.startswith("−") and text != fmt_num(0, 1, lang):
+        text = "+" + text
+    return text + " psi"
+
+
 # --- the engine ------------------------------------------------------------
 
 @dataclass
@@ -761,6 +815,9 @@ class _Active:
     #: Every symptom's score at the moment the change was applied, so the
     #: verdict can also report what moved that nobody was aiming at.
     base_scores: dict = field(default_factory=dict)
+    #: La pressione a caldo di ogni asse prima della modifica (mediana della
+    #: finestra), per controllare che le gomme si muovano come previsto.
+    base_pressures: dict = field(default_factory=dict)
 
 
 class RaceEngineer:
@@ -1027,6 +1084,7 @@ class RaceEngineer:
             # Every symptom on the books, not just the target: the verdict is
             # about one of them, the ledger is about all of them.
             base_scores=self._all_scores(),
+            base_pressures=_median_pressures(self.window),
         )
         # The reference shifts when the setup changes — restart the window so the
         # verdict is measured only on post-change laps.
@@ -1328,6 +1386,51 @@ class RaceEngineer:
                             _msg("evaluating", lang, laps=_laps_left(need, lang))
                             + tail, tail=tail)
 
+        # Prima del verdetto: un ripristino svuota la finestra.
+        moved = self._base_moved(a, lang)
+        d = self._verdict(a, lang)
+        if not moved:
+            return d
+        asked = replace(d, message=f"{d.message} {moved}", confirm_base=True)
+        # Un ripristino si ripete a ogni giro (`observe`): con la domanda.
+        if self._held_revert is d:
+            self._held_revert = asked
+        return asked
+
+    def _base_moved(self, a: "_Active", lang: str) -> str:
+        """Le gomme hanno risposto alla modifica di pressione come previsto?
+
+        Per ogni asse cambiato: lo spostamento misurato a caldo (mediana dei
+        giri dopo meno quella dei giri prima) contro quello previsto (click per
+        psi per click). Oltre ``max(_BASE_PSI, |previsto|)`` di scarto la
+        risposta e' la frase che lo dice e chiede il file vero; se no "".
+        Il 08/11 `HONE_3` doveva valere +0,5 psi e gli anteriori sono saliti di
+        2,2: la modifica era stata scritta sopra un file che non era in
+        macchina. Senza pressioni misurate, o senza il passo, non si dice niente.
+        """
+        after = _median_pressures(self.window)
+        out = []
+        for axle, axle_slots in (("front", FRONT), ("rear", REAR)):
+            mine = [c for c in a.change.changes
+                    if c.param == "tyrePressure" and c.slot in axle_slots]
+            clicks = {c.delta_clicks for c in mine}
+            if len(clicks) != 1 or axle not in after or axle not in a.base_pressures:
+                continue
+            ppc = self.steps.psi_per_click(tuple(sorted(c.slot for c in mine)))
+            if not ppc:
+                continue
+            predicted = clicks.pop() * ppc
+            measured = after[axle] - a.base_pressures[axle]
+            if abs(measured - predicted) > max(_BASE_PSI, abs(predicted)):
+                out.append(_msg(f"base_moved_{axle}", lang,
+                                moved=_signed_psi(measured, lang),
+                                worth=_signed_psi(predicted, lang)))
+        if not out:
+            return ""
+        return " ".join(out + [_msg("base_ask", lang)])
+
+    def _verdict(self, a: "_Active", lang: str) -> Decision:
+        """Il verdetto di una prova finita: tenuta o da rimettere."""
         new_time = _median_time(self.window)
         new_score = _median_score(self.window, a.symptom)
         d_time = new_time - a.base_time

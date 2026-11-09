@@ -56,19 +56,22 @@ def test_box_write_end_to_end(tmp_path):
 
     # Il gioco scrive auto e pista come vuole: la pagina le manda come arrivano.
     base = c.get("/api/setup/base", params={"car": CAR.upper(), "track": TRACK.lower()}).json()
-    assert base["base"] and base["last_written"] is None
+    # Il primo file non si indovina: lo sceglie il pilota dalla tendina.
+    assert base["base"] is None and base["confirm"] is True
+    assert base["last_written"] is None
+    chosen = base["setups"][0]["path"]
 
     eng = {"kind": "propose", "tag": "BOX",
            "change": [{"param": "tyrePressure", "slot": None, "delta_clicks": 2}]}
     changes = _call("changesFor", [[eng]])[0]
     prev = c.post("/api/setup/preview", params={"lang": "it"},
-                  json={"path": base["base"], "changes": changes}).json()
+                  json={"path": chosen, "changes": changes}).json()
     assert prev["ok"], prev
     assert prev["diff"][0]["new_click"] == prev["diff"][0]["old_click"] + 2
 
     name = _call("nextName", [[[s["name"] for s in base["setups"]]]])[0]
     r = c.post("/api/setup/apply", params={"lang": "it"},
-               json={"path": base["base"], "as_name": name, "confirm": True,
+               json={"path": chosen, "as_name": name, "confirm": True,
                      "changes": changes})
     assert r.status_code == 200, r.text
     assert r.json()["name"] == "HONE_1" and r.json()["reload_hint"]
@@ -77,7 +80,7 @@ def test_box_write_end_to_end(tmp_path):
     assert written["basicSetup"]["tyres"]["tyrePressure"][0] == 59
 
     after = c.get("/api/setup/base", params={"car": CAR, "track": TRACK}).json()
-    assert after["last_written"] == "HONE_1"
+    assert after["last_written"] == "HONE_1" and after["confirm"] is False
     assert Path(after["base"]).name == "HONE_1.json"
     # Il prossimo nome e' il successivo: la pagina non riscrive sopra HONE_1.
     assert _call("nextName", [[[s["name"] for s in after["setups"]]]])[0] == "HONE_2"

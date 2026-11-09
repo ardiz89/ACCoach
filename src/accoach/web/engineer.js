@@ -59,6 +59,13 @@ const state = {
   pending: {},                   // key "param#slot" -> delta (clicks)
   autoSelected: false,
   lastWritten: null,             // file name written this session (box reminder)
+  // La domanda «Quale assetto hai caricato?» aperta: il server non sa su che
+  // file lavorare (`confirm` di /api/setup/base), o le gomme non hanno
+  // risposto come la modifica prevedeva (`confirm_base`). Finche' resta aperta
+  // la tendina parte vuota e i bottoni che scrivono sono spenti.
+  askBase: false,
+  askedFor: null,                // il verdetto che ha gia' fatto la domanda
+  setups: [],                    // l'ultimo elenco di /api/setup/list
   lastLive: null,                // last live payload, for re-render on lang switch
   // Quale auto/pista crediamo tu stia guidando, e da dove lo sappiamo:
   // "live" (telemetria) batte "archive" (ultimo giro registrato). Serve perché
@@ -367,18 +374,52 @@ async function onComboChange(prefer) {
   state.missing = null;            // si sta aprendo una combo che esiste
   state.car = opt.dataset.car; state.track = opt.dataset.track;
   await loadClass(state.car);   // sets state.alVolo before the setup renders
-  const list = await api(`/api/setup/list?car=${encodeURIComponent(state.car)}` +
-                         `&track=${encodeURIComponent(state.track)}`);
+  const q = `car=${encodeURIComponent(state.car)}&track=${encodeURIComponent(state.track)}`;
+  const list = await api(`/api/setup/list?${q}`);
+  // Il file di partenza lo dice il processo web: l'ultimo che HONE ha scritto.
+  // Se non ne ha scritto nessuno non si indovina (08/11: il piu' recente per
+  // data era un altro assetto, e la modifica e' venuta di 13 click invece di
+  // 5). Dopo una scrittura `prefer` e' il file scritto e non si chiede.
+  let ask = false;
+  if (!prefer) {
+    try {
+      const b = await api(`/api/setup/base?${q}`);
+      if (b && b.confirm) ask = true;
+      else if (b && b.last_written) prefer = b.last_written;
+    } catch (e) { /* senza risposta resta la prima voce, come prima */ }
+  }
+  state.askBase = ask;
+  state.setups = list;
+  fillSetups(list, prefer);
+  await onSetupChange();
+  loadRecord();                 // best-effort: il registro non blocca la pagina
+}
+
+// La tendina dei file, dal piu' recente. Con la domanda aperta c'e' in cima
+// una voce senza file, ed e' quella scelta: la tendina parte vuota.
+function fillSetups(list, prefer) {
   const sel = $("setup");
   sel.innerHTML = "";
-  for (const s of list) {
+  if (state.askBase && list.length) {
+    const none = document.createElement("option");
+    none.value = ""; none.textContent = ""; none.selected = true;
+    sel.appendChild(none);
+  }
+  const rows = list.slice().sort((a, b) => (b.mtime || 0) - (a.mtime || 0));
+  for (const s of rows) {
     const o = document.createElement("option");
     o.textContent = s.name; o.dataset.path = s.path;
     sel.appendChild(o);
     if (prefer && s.name === prefer) sel.value = o.value;
   }
+}
+
+// Le gomme non hanno risposto come la modifica prevedeva (`confirm_base`):
+// forse il file di partenza non era quello in macchina. Si rifa' la domanda.
+async function askAgain() {
+  state.askBase = true;
+  fillSetups(state.setups || [], null);
   await onSetupChange();
-  loadRecord();                 // best-effort: il registro non blocca la pagina
 }
 
 // ---- il registro: quante modifiche hanno davvero funzionato ---------------
@@ -457,14 +498,30 @@ async function loadClass(car) {
 // Shown when a car/track has no setup files at all — explain where HONE looks
 // so the contradiction ("choose a setup" with an empty dropdown) is resolved.
 const noSetupHTML = () => `<div class="empty2">${t("eng.noSetupBody")}</div>`;
+function askBaseText() {
+  return `${t("tablet.askBase")} ${t("eng.askBaseBody")}`;
+}
+function askBaseHTML() {
+  return `<div class="empty2">${esc(askBaseText())}</div>`;
+}
 
 async function onSetupChange() {
   const opt = $("setup").selectedOptions[0];
   if (!opt || !opt.dataset.path) {
-    $("setup-body").innerHTML = noSetupHTML();
+    if (state.askBase && state.setups.length) {
+      // La domanda aperta: nessun file, niente da modificare, niente da scrivere.
+      state.setupPath = null; state.setupName = null;
+      state.params = []; state.pending = {}; state.base = {};
+      $("setup-body").innerHTML = askBaseHTML();
+      renderTray();
+      paintWriteLock();
+    } else {
+      $("setup-body").innerHTML = noSetupHTML();
+    }
     $("btn-undo").disabled = true;
     return;
   }
+  state.askBase = false;
   state.setupPath = opt.dataset.path;
   const data = await api(`/api/setup/current?path=${encodeURIComponent(state.setupPath)}`);
   // Acceso solo con un backup da cui ripristinare.
@@ -713,6 +770,8 @@ function rerender() {
 
 // Take the engine's proposed change and pre-fill the editor's +/- with it.
 function prepareChange(changes) {
+  // Senza un file di partenza non c'e' niente su cui preparare la modifica.
+  if (state.askBase) { showToast(askBaseText(), true); return; }
   let applied = 0, missing = 0;
   for (const c of changes) {
     const slot = c.slot == null ? 0 : c.slot;
@@ -856,9 +915,12 @@ function writeLocked() { return inPista(state.lastLive); }
 // quando il vassoio o il riquadro dell'ingegnere si ridisegnano.
 function paintWriteLock() {
   const lock = writeLocked();
+  // Senza un file di partenza (la domanda aperta) non si scrive. «L'ho già
+  // rimesso» non scrive un file, e resta come prima.
+  const noBase = !state.setupPath;
   for (const id of ["btn-apply", "btn-write", "modal-ok", "es-restored"]) {
     const el = $(id);
-    if (el) el.disabled = lock;
+    if (el) el.disabled = lock || (noBase && id !== "es-restored");
   }
   const line = $("write-lock");
   if (line) {
@@ -1315,6 +1377,12 @@ function renderRoad(eng) {
 // advice. Falls back to the live coach cue until the diagnosis block exists.
 function renderEngineer(st) {
   const eng = st.engineer;
+  // Le gomme non hanno risposto come previsto: si richiede il file di
+  // partenza, una volta per verdetto (un ripristino torna uguale a ogni frame).
+  if (eng && eng.confirm_base) {
+    const k = `${eng.kind}|${eng.message || ""}`;
+    if (k !== state.askedFor) { state.askedFor = k; askAgain(); }
+  }
   const av = $("av-now");
   if (eng && eng.tag === "AV" && eng.change) {
     av.hidden = false;

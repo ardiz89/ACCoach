@@ -900,10 +900,13 @@ dell'ingegnere».
   modifica com'era. Se tocchi l'avviso passi ad Assetto.
 - **Assetto.** La pagina mostra la fase e le leve da cambiare, una per riga,
   dal valore di adesso a quello nuovo. Sotto trovi il perché e il grado di
-  fiducia. Come file di partenza HONE propone l'ultimo assetto che ha scritto
-  per quell'auto e quella pista da quando è partito il processo web. Se non ne
-  ha scritto nessuno, propone il file modificato più di recente. Dalla lista
-  puoi sceglierne un altro. Premi *Scrivi la modifica* e conferma. HONE crea
+  fiducia. Come file di partenza HONE usa l'ultimo assetto che ha scritto per
+  quell'auto e quella pista da quando è partito il processo web. Se non ne ha
+  scritto nessuno non tira a indovinare. La pagina ti chiede «Quale assetto hai
+  caricato in ACC?» e la lista parte vuota. Finché non scegli il file, il
+  bottone per scrivere resta spento. Dopo un riavvio di HONE la domanda torna.
+  Dalla lista puoi sempre sceglierne un altro. Premi *Scrivi la modifica* e
+  conferma. HONE crea
   un file nuovo e non tocca il tuo. Poi la pagina ti mostra in grande il nome
   del file, da caricare dal garage del gioco. Se non trova un assetto per
   quell'auto su quella pista, ti chiede di salvarne uno dal garage.
@@ -916,11 +919,18 @@ dell'ingegnere».
   scrive un file che rimette i valori di prima. Se hai già ricaricato nel
   garage del gioco il file di prima, premi *L'ho già rimesso com'era*. Anche
   questo bottone funziona solo ai box.
+- **Le gomme fanno da controllo.** Quando finisce la prova di una pressione,
+  l'ingegnere confronta quanto si sono mosse le gomme a caldo con quanto
+  valeva la modifica. Se lo scarto supera 0,8 psi, o la modifica stessa quando
+  è più grande, te lo dice coi due numeri. Vuol dire che forse il file di
+  partenza non era quello in macchina. Ai box la pagina ti rifà la domanda, e
+  tu scegli l'assetto che hai caricato davvero.
 
 La pagina completa dell'ingegnere segue la stessa regola. I bottoni che
 scrivono si spengono quando stai guidando e non sei fermo ai box, anche in
 pausa in pista. Col gioco spento o nei menu puoi scrivere lo stesso, per
-preparare un assetto senza guidare.
+preparare un assetto senza guidare. Anche lì il primo file di partenza lo
+scegli tu, e la domanda torna quando le gomme non rispondono come previsto.
 
 Per il resto, ad esempio per lo storico delle prove, usa la pagina completa
 dell'ingegnere. Resta su `/engineer`, e il collegamento *Pagina completa* in

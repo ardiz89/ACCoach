@@ -426,6 +426,7 @@ body {
 .t-msg { font-size: 22px; line-height: 1.35; margin-bottom: 12px; }
 
 .t-base-row { margin-bottom: 12px; }
+.t-ask { font-size: 22px; color: #FFB020; margin-bottom: 6px; }
 .t-select {
   display: block;
   box-sizing: border-box;

@@ -1161,6 +1161,9 @@ class CoachEngine:
             # can never be finished (AC reports every aid level as -1).
             "watched": self.wheelwatch.armed,
             "confidence": d.confidence,
+            # Le gomme non hanno risposto come la modifica prevedeva: il tablet
+            # e la pagina Ingegnere richiedono quale assetto hai caricato.
+            "confirm_base": bool(getattr(d, "confirm_base", False)),
             # 1-based corner labels the proposal is anchored to ("Corners 7, 9").
             "corners": [i + 1 for i in corners],
             # The bar the change will be judged against, so the driver reads it

@@ -309,10 +309,15 @@ def register_setup_routes(app: FastAPI, root=DEFAULT_ROOTS) -> None:
 
         La pagina non deve indovinarlo: a un tablet fermo ai box l'unica
         domanda sensata e' «su quale assetto?», e la risposta onesta e' quello
-        che l'Ingegnere ha scritto per ultimo (la catena di prove parte da li),
-        se no il piu' recente per data (l'ultimo che il pilota ha salvato dal
-        garage). Auto e pista si cercano in minuscolo, come `sameName` in
-        `engineer.js`: il gioco non scrive i nomi sempre allo stesso modo.
+        che l'Ingegnere ha scritto per ultimo (la catena di prove parte da li).
+        Se non ne ha scritto nessuno non si indovina: ``base`` e' None,
+        ``confirm`` e' True e la pagina lo chiede al pilota. Il 08/11 il piu'
+        recente per data era `HONE_2`, il pilota guidava `720sEVO_Imola_0`, e
+        la modifica scritta sopra il file sbagliato ha mosso gli anteriori di
+        13 click invece di 5. L'elenco va dal piu' recente, che di solito e'
+        quello appena salvato dal garage. Auto e pista si cercano in minuscolo,
+        come `sameName` in `engineer.js`: il gioco non scrive i nomi sempre
+        allo stesso modo.
         """
         car_l, track_l = car.strip().lower(), track.strip().lower()
         car_dir = track_dir = None
@@ -331,16 +336,17 @@ def register_setup_routes(app: FastAPI, root=DEFAULT_ROOTS) -> None:
                               + sorted(t.glob("*.ini")) if p.is_file()]
         if not found:
             return {"car": None, "track": None, "setups": [], "base": None,
-                    "last_written": None}
+                    "last_written": None, "confirm": False}
         setups = [{"name": p.stem, "path": str(p), "mtime": p.stat().st_mtime}
                   for p in found]
+        setups.sort(key=lambda x: x["mtime"], reverse=True)
         written = last_written.get((car_l, track_l))
         if written is not None and written.is_file():
             return {"car": car_dir, "track": track_dir, "setups": setups,
-                    "base": str(written), "last_written": written.stem}
-        newest = max(setups, key=lambda x: x["mtime"])
+                    "base": str(written), "last_written": written.stem,
+                    "confirm": False}
         return {"car": car_dir, "track": track_dir, "setups": setups,
-                "base": newest["path"], "last_written": None}
+                "base": None, "last_written": None, "confirm": True}
 
     @app.get("/api/setup/class")
     def setup_class(car: str = Query(...),

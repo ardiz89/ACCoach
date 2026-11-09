@@ -895,6 +895,9 @@
 
     // ---- engineer page (engineer.js injected) ----
     "eng.noSetupOpt":  { en: `(no setup found)`, it: `(nessun setup trovato)` },
+    // Va dopo la domanda (`tablet.askBase`), che non si ripete qui.
+    "eng.askBaseBody": { en: `Pick the file from the list above. Until you do, I don't write anything.`,
+                         it: `Scegli il file dalla lista qui sopra. Finché non lo scegli non scrivo niente.` },
     // Una riga per cartella: il `\n` dopo ogni `<br>` chiude la frase anche per
     // chi la conta (tests/tono.py), come la chiude l'a capo per chi la legge.
     "eng.noSetupBody": { en: `I found no setup files for this car and track.<br>
@@ -1078,6 +1081,9 @@ Salva un setup nel gioco, poi ricarica questa pagina.` },
                          it: `Per ora non c'è una modifica da scrivere. Quando l'ingegnere ne propone una la trovi qui, e la scrivi da fermo ai box.` },
     "tablet.tab.setup": { en: `Setup`, it: `Assetto` },
     "tablet.base":     { en: `Starting setup`, it: `Il file di partenza` },
+    // Senza un file scritto da HONE il primo non si indovina (08/11): lo
+    // sceglie il pilota, e lo stesso quando le gomme non rispondono.
+    "tablet.askBase":  { en: `Which setup did you load in ACC?`, it: `Quale assetto hai caricato in ACC?` },
     "tablet.noBase":   { en: `I can't find a setup for this car on this track. Save one from the game's garage.`,
                          it: `Non trovo un assetto di questa auto per questa pista. Salvane uno dal garage del gioco.` },
     "tablet.write":    { en: `Write the change`, it: `Scrivi la modifica` },

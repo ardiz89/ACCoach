@@ -945,10 +945,12 @@ road".
   the last change back as it was. Tapping the call takes you to Setup.
 - **Setup.** The page shows the phase and the levers to change, one per row,
   from the current value to the new one. Below are the reason and the
-  confidence. As the starting file, HONE offers the last setup it wrote for
+  confidence. As the starting file, HONE uses the last setup it wrote for
   that car and track since the web process started. If it hasn't written one,
-  it offers the most recently modified file. You can pick another from the
-  list. Press *Write the change* and confirm. HONE creates a new file and
+  it doesn't guess. The page asks "Which setup did you load in ACC?" and the
+  list starts empty. Until you pick the file, the write button stays off.
+  After HONE restarts the question comes back. You can always pick another
+  file from the list. Press *Write the change* and confirm. HONE creates a new file and
   leaves yours alone. The page then shows the file name in large type, to load
   from the game's garage. If it can't find a setup for that car on that track,
   it asks you to save one from the garage.
@@ -961,10 +963,17 @@ road".
   with the previous values. If you've already reloaded the previous file in the
   game's garage, press *I've already put it back*. This button too only works
   in the pits.
+- **The tyres double as a check.** When the test of a pressure change ends,
+  the engineer compares how far the hot tyres moved with what the change was
+  worth. If the gap is over 0.8 psi, or over the change itself when that is
+  bigger, it tells you both numbers. It means the starting file probably
+  wasn't the one on your car. In the pits the page asks again, and you pick
+  the setup you actually loaded.
 - **The full Engineer page follows the same rule.** Its writing buttons switch
   off when you're driving and not stopped in the pits, even paused on track.
   With the game off or in the menus you can still write, to prepare a setup
-  without driving.
+  without driving. There too you pick the first starting file, and the
+  question comes back when the tyres don't respond as expected.
 
 For anything else, such as the history of the trials, use the full engineer
 page. It stays at `/engineer`, and the *Full page* link at the bottom of the

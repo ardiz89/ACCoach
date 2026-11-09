@@ -441,6 +441,11 @@
     car: "", track: "", combo: null,
     baseSeq: 0, base: null, baseErr: "", baseAt: 0,
     chosen: null,         // il file scelto dalla tendina; null = quello del server
+    // La domanda «Quale assetto hai caricato?» aperta: il server non sa su
+    // quale file lavorare (`confirm`), o le gomme non hanno risposto come la
+    // modifica prevedeva (`confirm_base`). Resta finche' il pilota non sceglie.
+    ask: false,
+    askedFor: null,       // il verdetto che ha gia' fatto la domanda una volta
     pvKey: null, pvSeq: 0, pvChanges: null, preview: null, pvErr: "",
     confirm: null,        // {key, path, name, changes, av}: cio' che la conferma nomina
     writing: false,
@@ -469,6 +474,7 @@
 
   function basePath() {
     if (bx.chosen) return bx.chosen;
+    if (bx.ask) return null;
     return (bx.base && bx.base.base) || null;
   }
   function setupNames() {
@@ -489,6 +495,8 @@
       var still = false, s = (bx.base && bx.base.setups) || [];
       for (var i = 0; i < s.length; i++) if (s[i].path === bx.chosen) still = true;
       if (!still) bx.chosen = null;
+      // Il server non sa su che file lavorare: non si indovina, si chiede.
+      if (bx.base && bx.base.confirm && !bx.chosen) bx.ask = true;
       fillSelect();
       paintBox();
     });
@@ -499,6 +507,14 @@
   function fillSelect() {
     var sel = $("t-base"), s = (bx.base && bx.base.setups) || [], cur = basePath();
     sel.innerHTML = "";
+    // Con la domanda aperta la tendina parte vuota: una voce senza file, scelta.
+    if (!cur && bx.ask) {
+      var none = document.createElement("option");
+      none.value = "";
+      none.textContent = "";
+      none.selected = true;
+      sel.appendChild(none);
+    }
     for (var i = 0; i < s.length; i++) {
       var o = document.createElement("option");
       o.value = s[i].path;
@@ -579,11 +595,27 @@
     }
   }
 
+  // Un verdetto con `confirm_base`: le gomme non si sono mosse come previsto,
+  // forse il file di partenza non era quello in macchina. Si rifa' la domanda,
+  // una volta per verdetto: un ripristino torna uguale a ogni frame.
+  function askAgain(eng) {
+    if (!eng || !eng.confirm_base) return;
+    var k = String(eng.kind) + "|" + String(eng.message || "");
+    if (k === bx.askedFor) return;
+    bx.askedFor = k;
+    bx.ask = true;
+    bx.chosen = null;
+    fillSelect();
+  }
+
   // Le regole, a ogni frame: chiedere la base entrando in Assetto (o ai box) o
   // se cambiano auto e pista, l'anteprima se cambiano file o leve. Poi si
   // dipinge.
   function boxFrame(st, m, tab) {
     var atBox = m !== "off" && !!st.at_box;
+    // Prima di tutto il resto: il verdetto arriva a fine giro, in pista, e il
+    // frame dopo puo' non portarlo piu'. La domanda aspetta i box.
+    if (m !== "off") askAgain(st.engineer || null);
     // Riparti dai box: il file scritto e l'errore erano di quella sosta.
     // Spento non conta come partenza ne' come sosta: box, spento, pista e'
     // ripartire lo stesso.
@@ -613,6 +645,8 @@
     var car = String(st.car || ""), track = String(st.track || "");
     var combo = car + "|" + track;
     if (combo !== bx.combo) {
+      // La domanda di un'altra auto o pista non vale qui: la rifa' il server.
+      if (bx.combo !== null) bx.ask = false;
       bx.combo = combo; bx.car = car; bx.track = track;
       bx.chosen = null; bx.base = null;
       // Il file scritto e l'errore erano di un'altra auto o pista.
@@ -666,7 +700,11 @@
     setHidden($("t-msg"), !msg);
 
     var setups = (bx.base && bx.base.setups) || [];
-    setHidden($("t-base-row"), !has);
+    // La domanda si vede anche senza una modifica: il file scelto ora e'
+    // quello su cui poggera' la prossima.
+    setHidden($("t-base-row"), !has && !bx.ask);
+    setText($("t-ask"), t("tablet.askBase"));
+    setHidden($("t-ask"), !bx.ask || !setups.length);
     setHidden($("t-base"), !setups.length);
     setHidden($("t-nobase"), !bx.base || setups.length > 0);
 
@@ -747,7 +785,9 @@
     bx.confirm = null;
     bx.done = { name: (res && res.name) || "", hint: (res && res.reload_hint) || "",
                 key: c.av };
+    // Il file appena scritto e' quello da caricare: la domanda e' chiusa.
     bx.chosen = null;
+    bx.ask = false;
     postApplied();
     loadBase();
     paintBox();
@@ -899,6 +939,7 @@
     // Un altro file di partenza: l'anteprima si rifa' al frame dopo.
     $("t-base").onchange = function () {
       bx.chosen = $("t-base").value || null;
+      if (bx.chosen) bx.ask = false;
       if (last) redraw();
     };
     // Cambio di lingua dalla pagina: i testi fissi li rifa' i18n.js, quelli
