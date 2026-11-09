@@ -56,3 +56,15 @@ def test_stesso_testo_due_autori_due_righe(tmp_path):
     assert h1 == h2 == h3 and (n1, n2, n3) == (True, True, False)
     assert conn.execute("SELECT COUNT(*) FROM texts").fetchone()[0] == 2
     conn.close()
+
+
+def test_readme_dice_come_si_usa():
+    # M5, L14: token, ordine dei comandi, file di risposta e cambio di prompt_version.
+    testo = (ROOT / "tools" / "fonti" / "README.md").read_text(encoding="utf-8")
+    for pezzo in ("APIFY_API_TOKEN", "export APIFY_API_TOKEN=", ".apify-key", "--env-file",
+                  ".answer.json", "```json", "--model", "prompt_version", "--force --only"):
+        assert pezzo in testo, pezzo
+    ordine = ["check-actors", "--dry-run", "pending --kind extract", "pending --kind rate",
+              "consensus --track", "pending --kind factcheck", "export --track", "review --track"]
+    posti = [testo.index(x) for x in ordine]
+    assert posti == sorted(posti)

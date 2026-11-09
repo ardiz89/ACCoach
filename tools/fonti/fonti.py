@@ -1,8 +1,10 @@
 """Fonti pubbliche per pista: raccolta, estrazione, consenso, esportazione.
 
-    python tools/fonti/fonti.py --db <cartella o file> status
+    python tools/fonti/fonti.py check-actors --plan FILE
+    python tools/fonti/fonti.py --db <cartella o file> collect --track imola --plan FILE
 
-Il database sta dove dici tu con `--db`: nessun valore predefinito.
+Il database sta dove dici tu con `--db`: nessun valore predefinito. Il token, l'ordine
+dei comandi e i file di risposta degli agenti sono in tools/fonti/README.md.
 """
 
 from __future__ import annotations
