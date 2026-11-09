@@ -142,17 +142,24 @@ def _frozen_any_model(conn, key: str, kind: str, version: str, track: str) -> bo
                         " AND track=?", (key, kind, version, track)).fetchone() is not None
 
 
-def _own_shas(conn, track: str, entry: dict) -> list[str]:
-    """Gli sha256 dei testi da cui viene il fatto: una verifica non si conferma su questi."""
-    values = [v.get("value") for v in entry.get("values") or [] if isinstance(v, dict)]
+def _author_id(platform, author) -> str:
+    """Un autore si identifica con `platform:author` in minuscolo, come nel consenso."""
+    return f"{platform or ''}:{author or ''}".lower()
+
+
+def _own_sources(conn, track: str, entry: dict) -> tuple[list[str], list[str]]:
+    """Sha256 dei testi e autori da cui viene il fatto: una verifica non si conferma su questi."""
+    values = [v.get("value") for v in entry.get("values") or []
+              if isinstance(v, dict) and isinstance(v.get("value"), str)]
     if not values:
-        return []
+        return [], []
     marks = ",".join("?" * len(values))
     rows = conn.execute(
-        "SELECT DISTINCT r.sha256 FROM facts f JOIN results r ON r.id = f.result_id"
+        "SELECT r.sha256, s.platform, f.author FROM facts f JOIN results r ON r.id = f.result_id"
+        " LEFT JOIN sources s ON s.id = f.source_id"
         f" WHERE f.track=? AND f.corner=? AND f.type=? AND f.value IN ({marks})",
         (track, entry.get("corner"), entry.get("type"), *values)).fetchall()
-    return sorted(r[0] for r in rows)
+    return (sorted({r[0] for r in rows}), sorted({_author_id(r[1], r[2]) for r in rows}))
 
 
 def _mentions(track: str, corner: str, body: str) -> bool:
@@ -191,12 +198,18 @@ def pending(conn: sqlite3.Connection, kind: str, track: str, out_dir: Path) -> l
                     or _frozen_any_model(conn, key, kind, version, track)):
                 continue
             corner = entry["corner"]
+            own_shas, own_authors = _own_sources(conn, track, entry)
+            if not own_shas:
+                # Senza le fonti del fatto non si può escludere l'autoconferma: meglio fermarsi.
+                raise RuntimeError(f"pending factcheck: non trovo le fonti del fatto {key[:12]} "
+                                   f"({corner}, {entry.get('type')}); la voce del consenso ha "
+                                   "una forma inattesa?")
             others = [{"sha256": sha, "body": t["body"], "segments": t["segments"], "meta": t["meta"]}
                       for sha, t in sorted(texts.items()) if _mentions(track, corner, t["body"])]
             jobs.append((key, {"kind": kind, "sha256": key, "track": track,
                                "prompt_version": version, "body": None, "segments": None,
                                "meta": [], "corners": [corner], "fact": entry,
-                               "fact_sha256s": _own_shas(conn, track, entry),
+                               "fact_sha256s": own_shas, "fact_authors": own_authors,
                                "texts": others}))
     jobs.sort(key=lambda x: x[0])
     with _atomic(conn):
@@ -330,9 +343,11 @@ def _is_vocab_only(car: str) -> bool:
     return not rest
 
 
-def _proves_role(role: str, quote: str) -> bool:
-    return (not vocab.negated(quote)
-            and any(verify.contains(quote, cue) for cue in vocab.ROLE_CUES[role]))
+def _names_in(quote: str, name: str) -> bool:
+    """Il nome sta nella citazione subito dopo una presentazione («my name is», «sono»...)."""
+    leads = "|".join(re.escape(x) for x in vocab.NAME_LEADS)
+    return re.search(rf"(?<![\w'])(?:{leads})\s+{re.escape(vocab.fold(name))}(?!\w)",
+                     vocab.fold(quote)) is not None
 
 
 def _check_rate(d: dict, body: str, authors: set[str]) -> None:
@@ -351,12 +366,14 @@ def _check_rate(d: dict, body: str, authors: set[str]) -> None:
     if name:
         if _is_vocab_name(name):
             raise AnswerRejected("nome_non_citato")
-        if name not in authors and not any(verify.contains(q, name) for q in by_field["name"]):
+        if name not in authors and not any(_names_in(q, name) for q in by_field["name"]):
             raise AnswerRejected("nome_non_citato")
     role = d["speaker"]["role"]
-    if role != "anonimo" and not any(_proves_role(role, q) for q in by_field["role"]):
+    if role != "anonimo" and not any(vocab.proves_role(role, q) for q in by_field["role"]):
         raise AnswerRejected("ruolo_non_citato")
-    if d["lap_time"] is not None and not any(verify.contains(q, d["lap_time"]) for q in by_field["lap_time"]):
+    if d["lap_time"] is not None and (
+            not vocab.LAP_TIME.fullmatch(d["lap_time"])
+            or not any(verify.contains(q, d["lap_time"]) for q in by_field["lap_time"])):
         raise AnswerRejected("tempo_non_citato")
     if d["car"] is not None and (_is_vocab_only(d["car"])
                                  or not any(verify.contains(q, d["car"]) for q in by_field["car"])):
@@ -364,12 +381,22 @@ def _check_rate(d: dict, body: str, authors: set[str]) -> None:
 
 
 def _check_factcheck(d: dict, payload: dict) -> None:
-    """La citazione deve stare in un testo del lavoro che non sia una fonte del fatto stesso."""
-    own = set(payload.get("fact_sha256s") or [])
+    """La citazione deve stare in un testo del lavoro che non sia una fonte del fatto stesso.
+
+    Né lo stesso testo (sha256) né un altro testo dello stesso autore: senza l'elenco
+    delle fonti del fatto non si può escludere l'autoconferma, e si rifiuta.
+    """
+    own = payload.get("fact_sha256s")
+    if not isinstance(own, list) or not own:
+        raise AnswerRejected("fonti_del_fatto_ignote")
+    own = set(own)
+    own_authors = set(payload.get("fact_authors") or [])
     reasons = []
     for t in payload.get("texts") or []:
         bad = verify.check_quote(d["quote"], t.get("body") or "", d["offset"])
-        if bad is None and t.get("sha256") not in own:
+        authors = {_author_id(m.get("platform"), m.get("author"))
+                   for m in t.get("meta") or [] if isinstance(m, dict)}
+        if bad is None and t.get("sha256") not in own and not (authors & own_authors):
             return
         reasons.append("autoconferma" if bad is None else bad)
     for r in ("autoconferma", "offset_errato", "citazione_corta"):

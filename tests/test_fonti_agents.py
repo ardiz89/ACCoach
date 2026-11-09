@@ -64,12 +64,16 @@ def _proponi(conn, tmp_path, kind="extract", track="imola"):
     return agents.pending(conn, kind, track, tmp_path / f"jobs-{kind}-{track}")
 
 
-def _job_factcheck(conn, key, bodies, version="1", own=()):
-    """`bodies`: testi o coppie (sha256, testo); `own`: gli sha256 delle fonti del fatto."""
-    coppie = [x if isinstance(x, tuple) else (f"t{i}", x) for i, x in enumerate(bodies)]
+def _job_factcheck(conn, key, bodies, version="1", own=("fonte-del-fatto",), own_authors=()):
+    """`bodies`: testi o tuple (sha256, testo[, autore reddit]); `own`: le fonti del fatto."""
+    terne = []
+    for i, x in enumerate(bodies):
+        x = x if isinstance(x, tuple) else (f"t{i}", x)
+        terne.append((x[0], x[1], x[2] if len(x) > 2 else f"autore{i}"))
     payload = {"kind": "factcheck", "sha256": key, "track": "imola", "prompt_version": version,
-               "fact_sha256s": sorted(own),
-               "texts": [{"sha256": sha, "body": b, "segments": None, "meta": []} for sha, b in coppie]}
+               "fact_sha256s": sorted(own), "fact_authors": sorted(own_authors),
+               "texts": [{"sha256": sha, "body": b, "segments": None,
+                          "meta": [{"platform": "reddit", "author": a}]} for sha, b, a in terne]}
     conn.execute("INSERT INTO jobs(kind, key, track, prompt_version, payload_json, created_at)"
                  " VALUES ('factcheck', ?, 'imola', ?, ?, 'ora')", (key, version, json.dumps(payload)))
     conn.commit()
@@ -583,7 +587,168 @@ def test_pending_factcheck_elenca_le_fonti_del_fatto(conn, tmp_path, monkeypatch
     monkeypatch.setattr(pacchetto, "consensus", finto, raising=False)
     job = json.loads(agents.pending(conn, "factcheck", "imola", tmp_path / "fc")[0].read_text(encoding="utf-8"))
     assert job["fact_sha256s"] == [own]
+    assert job["fact_authors"] == ["reddit:u_uno"]
     assert [t["sha256"] for t in job["texts"]] == [own]
     with pytest.raises(agents.AnswerRejected) as e:
         agents.ingest(conn, FIX / "risposta_factcheck.json", "m")
     assert e.value.reason == "autoconferma"
+
+
+# --- round 3 ------------------------------------------------------------------------
+
+def _rate_job(c, tmp_path, body, author="x"):
+    sha, _ = db.add_text(c, _fonte(c, f"https://r/{abs(hash(body))}"), "comment", author, body)
+    agents.pending(c, "rate", "imola", tmp_path / f"jr-{sha[:6]}")
+    return sha
+
+
+def _rate(sha, body, role="anonimo", role_q=None, name="", lap=None, lap_q=None, name_q=None):
+    reasons = []
+    for field, q in (("role", role_q), ("lap_time", lap_q), ("name", name_q)):
+        if q:
+            reasons.append({"field": field, "claim": "c", "quote": q, "offset": body.index(q)})
+    return {"sha256": sha, "kind": "rate", **ECO, "speaker": {"name": name, "role": role},
+            "lap_time": lap, "car": None, "reasons": reasons}
+
+
+@pytest.mark.parametrize("body, role, quote", [
+    # Sonde H1-H5: una parola del ruolo non detta in prima persona non prova nulla.
+    ("The racing line through Tosa goes wide on exit.", "pilota", "The racing line through Tosa"),
+    ("I use the Coach Dave setup at Imola for practice.", "coach", "I use the Coach Dave"),
+    ("My coach told me to brake later at Rivazza.", "coach", "My coach told me to"),
+    ("In the race yesterday I was slow at Piratella.", "pilota", "In the race yesterday I"),
+    ("Watch this team video about Variante Alta lines.", "pilota", "Watch this team video"),
+    ("Il mio coach dice di frenare tardi alla Tosa.", "coach", "Il mio coach dice di"),
+    ("I am not a driver coach, just a fan.", "coach", "I am not a driver coach"),
+])
+def test_ruolo_solo_in_prima_persona(tmp_path, body, role, quote):
+    c = db.open_db(tmp_path / "f.sqlite")
+    sha = _rate_job(c, tmp_path, body)
+    with pytest.raises(agents.AnswerRejected) as e:
+        agents.ingest(c, _scrivi(tmp_path, _rate(sha, body, role, quote)), "m")
+    assert e.value.reason == "ruolo_non_citato"
+    assert _stato(c)["results"] == 0
+    c.close()
+
+
+@pytest.mark.parametrize("body, role, quote", [
+    ("I'm a driver coach and Imola is my home track.", "coach", "I'm a driver coach"),
+    ("I am an instructor at a sim school, Imola weekly.", "coach", "I am an instructor at"),
+    ("Faccio l'istruttore di guida e Imola la conosco.", "coach", "Faccio l'istruttore di guida"),
+    ("I race in GT World Challenge and Imola is tough.", "pilota", "I race in GT World"),
+    ("Sono un pilota di ACC e corro a Imola.", "pilota", "Sono un pilota di"),
+    ("Corro nel campionato italiano su ACC da due anni.", "pilota", "Corro nel campionato italiano"),
+])
+def test_ruolo_detto_in_prima_persona(tmp_path, body, role, quote):
+    c = db.open_db(tmp_path / "f.sqlite")
+    sha = _rate_job(c, tmp_path, body)
+    assert agents.ingest(c, _scrivi(tmp_path, _rate(sha, body, role, quote)), "m") == {"facts": 0, "rejects": 0}
+    c.close()
+
+
+@pytest.mark.parametrize("lap, quote", [
+    ("third", "down to third gear today."),   # sonda H6
+    ("1:41", "my best lap is 1:41 or 101.2"),
+    ("101.2", "my best lap is 1:41 or 101.2"),
+])
+def test_tempo_sul_giro_nel_formato(tmp_path, lap, quote):
+    c = db.open_db(tmp_path / "f.sqlite")
+    body = "At Acque Minerali I go down to third gear today. And my best lap is 1:41 or 101.2 here."
+    sha = _rate_job(c, tmp_path, body)
+    with pytest.raises(agents.AnswerRejected) as e:
+        agents.ingest(c, _scrivi(tmp_path, _rate(sha, body, lap=lap, lap_q=quote)), "m")
+    assert e.value.reason == "tempo_non_citato"
+    c.close()
+
+
+def test_tempo_sul_giro_valido(tmp_path):
+    c = db.open_db(tmp_path / "f.sqlite")
+    body = "On ACC my best lap at Imola is 1:41,234 in the evening."
+    sha = _rate_job(c, tmp_path, body)
+    d = _rate(sha, body, lap="1:41,234", lap_q="my best lap at Imola is 1:41,234")
+    assert agents.ingest(c, _scrivi(tmp_path, d), "m") == {"facts": 0, "rejects": 0}
+    c.close()
+
+
+@pytest.mark.parametrize("name, quote, ok", [
+    ("Honestly", "Honestly I go flat through", False),   # sonda H7
+    ("Marco Neri", "Marco Neri says brake later", False),
+    ("Marco Neri", "I'm Marco Neri and I", True),
+    ("Marco Neri", "mi chiamo Marco Neri e", True),
+    ("Marco", "my name is Marco Neri", True),           # il nome di battesimo detto basta
+])
+def test_nome_solo_dopo_una_presentazione(tmp_path, name, quote, ok):
+    c = db.open_db(tmp_path / "f.sqlite")
+    body = ("Honestly I go flat through the Tamburello chicane. Marco Neri says brake later. "
+            "I'm Marco Neri and I race. Ciao, mi chiamo Marco Neri e guido. Yes my name is Marco Neri ok.")
+    sha = _rate_job(c, tmp_path, body)
+    d = _rate(sha, body, name=name, name_q=quote)
+    if ok:
+        assert agents.ingest(c, _scrivi(tmp_path, d), "m") == {"facts": 0, "rejects": 0}
+    else:
+        with pytest.raises(agents.AnswerRejected) as e:
+            agents.ingest(c, _scrivi(tmp_path, d), "m")
+        assert e.value.reason == "nome_non_citato"
+    c.close()
+
+
+def test_nome_da_autore_del_testo_resta(tmp_path):
+    # Sonda H8: l'autore della riga basta per il nome, il ruolo detto in prima persona entra.
+    c = db.open_db(tmp_path / "f.sqlite")
+    body = "I coach drivers in ACC at Imola every week."
+    sha = _rate_job(c, tmp_path, body, author="x")
+    d = _rate(sha, body, "coach", "I coach drivers in ACC", name="x")
+    assert agents.ingest(c, _scrivi(tmp_path, d), "m") == {"facts": 0, "rejects": 0}
+    c.close()
+
+
+def test_factcheck_senza_fonti_del_fatto_rifiutato(conn, tmp_path):
+    _job_factcheck(conn, KEY, [CORPO], own=())
+    with pytest.raises(agents.AnswerRejected) as e:
+        agents.ingest(conn, FIX / "risposta_factcheck.json", "m")
+    assert e.value.reason == "fonti_del_fatto_ignote"
+    # Anche un payload senza la chiave.
+    conn.execute("UPDATE jobs SET payload_json=? WHERE kind='factcheck'",
+                 (json.dumps({"texts": [{"sha256": "t0", "body": CORPO, "meta": []}]}),))
+    conn.commit()
+    with pytest.raises(agents.AnswerRejected) as e:
+        agents.ingest(conn, FIX / "risposta_factcheck.json", "m")
+    assert e.value.reason == "fonti_del_fatto_ignote"
+    assert _stato(conn)["results"] == 0
+
+
+def test_factcheck_stesso_autore_altro_testo_autoconferma(conn, tmp_path):
+    altro = "Second opinion: I go down to third gear there too."
+    q = "I go down to third gear"
+    _job_factcheck(conn, KEY, [("proprio", CORPO, "u_uno"), ("altro", altro, "U_Uno")],
+                   own=["proprio"], own_authors=["reddit:u_uno"])
+    d = json.loads((FIX / "risposta_factcheck.json").read_text(encoding="utf-8"))
+    d.update(quote=q, offset=altro.index(q))
+    with pytest.raises(agents.AnswerRejected) as e:
+        agents.ingest(conn, _scrivi(tmp_path, d), "m")
+    assert e.value.reason == "autoconferma"
+
+
+def _finto_consensus(monkeypatch, values):
+    import types
+
+    import tools.fonti as pacchetto
+    finto = types.ModuleType("tools.fonti.consensus")
+    finto.build = lambda c, track: [{"corner": "Acque Minerali", "type": "gear", "state": "verificato",
+                                     "values": values, "fact_key": KEY}]
+    monkeypatch.setitem(sys.modules, "tools.fonti.consensus", finto)
+    monkeypatch.setattr(pacchetto, "consensus", finto, raising=False)
+
+
+@pytest.mark.parametrize("values", [
+    [],                    # sonde 4c/4d: la voce non ha valori
+    [{"val": "3"}],        # sonda F1: la forma della voce è cambiata
+    [{"value": "4"}],      # nessun fatto con quel valore
+])
+def test_pending_factcheck_senza_fonti_si_ferma(conn, tmp_path, monkeypatch, values):
+    _proponi(conn, tmp_path)
+    agents.ingest(conn, FIX / "risposta_estrai.json", "m")
+    _finto_consensus(monkeypatch, values)
+    with pytest.raises(RuntimeError, match="fonti del fatto"):
+        agents.pending(conn, "factcheck", "imola", tmp_path / "fc")
+    assert conn.execute("SELECT COUNT(*) FROM jobs WHERE kind='factcheck'").fetchone()[0] == 0

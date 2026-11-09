@@ -25,7 +25,8 @@ Return ONLY this JSON object. No prose, no Markdown fences, no extra keys:
   version of the job is thrown away.
 - `speaker.name`:
   - the name the speaker gives for themselves in `body`; it needs a reason with
-    `"field": "name"` whose quote contains that name exactly;
+    `"field": "name"` whose quote has the name right after "I'm", "I am",
+    "my name is", "sono" or "mi chiamo";
   - or the author of this text exactly as it appears in `meta` (`author`); then no
     quote is needed;
   - never a corner name or a word of the advice (a gear, a brake marker, apex, kerb);
@@ -34,13 +35,16 @@ Return ONLY this JSON object. No prose, no Markdown fences, no extra keys:
   - `coach` only if the text states they coach or teach driving;
   - `pilota` only if the text states they race (a series, a team, a result);
   - `anonimo` in every other case.
-  `coach` and `pilota` need a reason with `"field": "role"` quoting that statement,
-  not negated, and containing one of these words:
-  - `coach`: coach, coaching, instructor, istruttore, insegno, "i teach", "driver coach";
-  - `pilota`: race, racing, racer, team, championship, campionato, gara, pilota,
-    "driver for".
+  `coach` and `pilota` need a reason with `"field": "role"` quoting the speaker saying
+  it about themselves, in the first person, not negated:
+  - `coach`: "I'm a (driver) coach", "I am an instructor", "I coach", "I teach",
+    "sono/faccio il coach", "faccio l'istruttore", "insegno";
+  - `pilota`: "I race in/for/with", "I drive for", "I'm a (sim) racer",
+    "I'm a driver for", "corro in/nel/con/per", "sono (un) pilota".
+  A word alone does not count: "the racing line", "the Coach Dave setup",
+  "my coach told me", "in the race", "this team" say nothing about the speaker.
 - `lap_time`: a lap time the speaker states for their own lap at this track, copied as
-  written; otherwise null. Not null needs a reason with `"field": "lap_time"` whose
+  written, in the form `m:ss.d` (`1:41.2`, `1:41,234`); otherwise null. Not null needs a reason with `"field": "lap_time"` whose
   quote contains the lap time exactly as you wrote it.
 - `car`: the car the speaker states they drive, copied as written; otherwise null. Not
   null needs a reason with `"field": "car"` whose quote contains the car exactly as you

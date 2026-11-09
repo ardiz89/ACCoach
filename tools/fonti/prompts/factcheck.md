@@ -27,7 +27,8 @@ Return ONLY this JSON object. No prose, no Markdown fences, no extra keys:
 - `reason`: one short sentence, in English, saying why.
 - `quote`: the passage that supports your verdict, copied character for character from
   one `body` in `texts`, the shortest clause of 4 or more words. It must come from a
-  text whose `sha256` is NOT in `fact_sha256s`: those are the texts the fact comes
+  text whose `sha256` is NOT in `fact_sha256s` and whose author (`platform:author` in
+  `meta`) is NOT in `fact_authors`: those are the texts and the authors the fact comes
   from, and a fact cannot confirm itself. Never translate or
   paraphrase.
 - `offset`: the character index in that `body` where the quote starts.

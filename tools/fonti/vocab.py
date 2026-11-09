@@ -365,12 +365,45 @@ def sentence_reason(type_: str, sentence: str, at: int) -> str | None:
 
 # --- chi parla ------------------------------------------------------------------
 
-# Un ruolo si prova solo con una di queste parole nella citazione, e senza negazione.
-ROLE_CUES = {
-    "coach": ["coach", "coaching", "instructor", "istruttore", "insegno", "i teach", "driver coach"],
-    "pilota": ["race", "racing", "racer", "team", "championship", "campionato", "gara", "pilota",
-               "driver for"],
+# Un ruolo si prova solo detto in prima persona: una di queste forme nella citazione già
+# normalizzata con `fold`, senza negazione. Una parola sola («race», «coach») non basta:
+# «the racing line», «the Coach Dave setup» non dicono niente di chi parla.
+ROLE_PATTERNS = {
+    "coach": [re.compile(p) for p in (
+        r"\bi(?:'m| am) (?:an? )?(?:(?:driver|driving|sim racing) )?(?:coach|instructor)\b",
+        r"\bi coach\b",
+        r"\bi teach\b",
+        r"\b(?:sono|faccio) (?:il |un |l')?(?:coach|istruttore)\b",
+        r"\binsegno\b",
+    )],
+    "pilota": [re.compile(p) for p in (
+        r"\bi race (?:in|for|with)\b",
+        r"\bi drive for\b",
+        r"\bi(?:'m| am) a (?:sim )?racer\b",
+        r"\bi(?:'m| am) a driver for\b",
+        r"\bcorro (?:in|nel|con|per)\b",
+        r"\bsono (?:un )?pilota\b",
+    )],
 }
+# Frasi che non provano mai un ruolo: si tolgono dalla citazione prima di cercare le forme.
+ROLE_EXCLUDED = ("racing line", "race line", "coach dave", "my coach", "il mio coach",
+                 "mio istruttore")
+
+
+def proves_role(role: str, quote: str) -> bool:
+    """La citazione dice in prima persona che chi parla ha quel ruolo."""
+    q = fold(quote)
+    if NEGATION.search(q):
+        return False
+    for phrase in ROLE_EXCLUDED:
+        q = alias_regex(phrase).sub(" ", q)
+    return any(p.search(q) for p in ROLE_PATTERNS.get(role, []))
+
+
+# Un tempo sul giro come si scrive: «1:41.2», «1:41,234».
+LAP_TIME = re.compile(r"[0-9]{1,2}:[0-9]{2}[.,][0-9]{1,3}")
+# Un nome detto nel testo vale solo dopo una presentazione.
+NAME_LEADS = ("i'm", "i am", "my name is", "sono", "mi chiamo")
 
 # Parole del vocabolario dei fatti: un nome o un'auto fatti di queste non sono un nome
 # né un'auto, ma un pezzo di consiglio copiato nel campo sbagliato.
