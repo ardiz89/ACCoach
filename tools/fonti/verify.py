@@ -17,6 +17,7 @@ OFFSET_SLACK = 5     # di quanto l'offset dichiarato può mancare l'inizio vero 
 NEAR_WORDS = 5       # parole prima e dopo la citazione in cui una negazione conta
 MIN_WORDS = 4
 _TERMINATORS = ".!?…"
+_LINE_BREAKS = "\n\r\v\f\x85  "
 
 
 def norm_text(s: str) -> str:
@@ -32,13 +33,14 @@ def _quote_regex(quote: str) -> re.Pattern:
 def _boundaries(body: str, segments) -> list[int] | None:
     """Indici grezzi dove una frase finisce; None se i segmenti non tornano col testo.
 
-    La frase finisce a «.», «!», «?» o a un a capo (il punto fra due cifre no). Nei
-    sottotitoli senza punteggiatura la frase è il segmento.
+    La frase finisce a «.», «!», «?», «…» o a un a capo di qualunque tipo (il punto fra
+    due cifre no). Con i sottotitoli anche la fine di ogni segmento chiude la frase, che
+    il testo abbia punteggiatura o no.
     """
     ends = [i for i, c in enumerate(body)
-            if c in "\n\r!?…" or (c == "." and not (0 < i < len(body) - 1
-                                                    and body[i - 1].isdigit() and body[i + 1].isdigit()))]
-    if not segments or any(c in body for c in _TERMINATORS):
+            if c in _LINE_BREAKS + "!?…" or (c == "." and not (0 < i < len(body) - 1
+                                                             and body[i - 1].isdigit() and body[i + 1].isdigit()))]
+    if not segments:
         return ends
     cursor = 0
     for seg in segments:
@@ -89,6 +91,25 @@ def _corner_after(track: str, text: str, start: int, end: int) -> str | None:
              for a in aliases
              if vocab.alias_regex(a).match(text, m.end(), end)}
     return next(iter(names)) if len(names) == 1 else None
+
+
+def _other_gear(track: str, text: str, window: int, ns: int, ne: int,
+                mark: int, corner: str | None) -> bool:
+    """Un'altra marcia nella frase che non è chiaramente di un'altra curva.
+
+    Due marce si separano solo se fra loro è nominata una curva e la curva di ciascuna
+    (l'ultima nominata prima) esiste ed è diversa: «tosa second gear, piratella in third».
+    """
+    for p in vocab.gear_positions(text[ns:ne]):
+        other = ns + p
+        if other == mark:
+            continue
+        a, b = sorted((mark, other))
+        ca = corner if a == mark else _last_corner(track, text, window, a)
+        cb = corner if b == mark else _last_corner(track, text, window, b)
+        if not (_corners_in(track, text, a, b) and ca and cb and ca != cb):
+            return True
+    return False
 
 
 def check_fact(track: str, fact: dict, body: str, segments: list | None = None) -> str | None:
@@ -158,6 +179,12 @@ def check_fact(track: str, fact: dict, body: str, segments: list | None = None) 
             corner = follow if _corners_in(track, nbody, ns, mark) <= {follow} else None
     if corner != fact.get("corner"):
         return "curva_non_trovata"
+    # Un consiglio descrittivo non ha un segno: se la frase fino alla fine della citazione
+    # nomina due curve, non si sa a quale va.
+    if type_ in ("line", "mistake") and len(_corners_in(track, nbody, min(ns, j), q_end)) > 1:
+        return "curva_non_trovata"
+    if type_ == "gear" and got and _other_gear(track, nbody, min(window, ns), ns, ne, mark, corner):
+        return "valore_non_normalizzabile"
 
     if type_ in ("line", "mistake"):
         return None if norm_text(value) == quote else "valore_diverso"

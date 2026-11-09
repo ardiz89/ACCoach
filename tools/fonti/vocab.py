@@ -55,7 +55,8 @@ CORNERS: dict[str, dict[str, list[str]]] = {
 
 
 def alias_regex(alias: str) -> re.Pattern:
-    return re.compile(r"(?<![a-z0-9])" + re.escape(alias) + r"(?![a-z0-9])")
+    # «tosa-like» non è la Tosa: dopo il nome niente lettera, nemmeno dietro un trattino.
+    return re.compile(r"(?<![a-z0-9])" + re.escape(alias) + r"(?![a-z0-9])(?!-[^\W\d_])")
 
 
 # --- normalizzazione del testo ----------------------------------------------
@@ -219,17 +220,9 @@ def _gear_tokens(q: str) -> list[re.Match]:
     return [m for m in _GEAR_LIKE.finditer(q) if m.start() not in adverbs]
 
 
-def _gear(q: str) -> tuple[str, int, int] | None:
-    if NEGATION.search(q) or HEDGE.search(q):
-        return None
-    tokens = _gear_tokens(q)
-    if len(tokens) != 1:
-        return None
-    m = tokens[0]
+def _gear_value(q: str, m: re.Match) -> str | None:
+    """La marcia del segno m, se sta accanto a un attacco («down to», «shift») o a «gear»."""
     tok, at = m.group(), m.start()
-
-    word = re.compile(rf"\s+{_GEAR}\b").match(q, m.end())
-    end = word.end() if word else m.end()
 
     def here(pattern: str) -> bool:
         return any(x.start("t") == at for x in re.finditer(pattern, q))
@@ -243,7 +236,7 @@ def _gear(q: str) -> tuple[str, int, int] | None:
         ok = (here(rf"\b{_DIGIT_LEAD}\s+{t}(?!\w)")
               or here(rf"\b{_GEAR}\s+{t}(?!\w)")
               or here(rf"(?<![\w.,]){t}\s*{_GEAR}\b"))
-        return (tok, at, end) if ok else None
+        return tok if ok else None
     digit = _ORD_WORD.get(tok) or (tok[0] if len(tok) == 3 and tok[0] in "123456" else None)
     if digit is None:
         return None
@@ -251,7 +244,26 @@ def _gear(q: str) -> tuple[str, int, int] | None:
           or here(rf"\b{_GEAR}\s+{t}\b{_NOUN_AFTER_ORD}")
           or here(rf"\b{_ORD_LEAD}\s+{t}\b{_NOUN_AFTER_ORD}")
           or (tok in _ORD_IT_IN and here(rf"\bin\s+{t}\b{_NOUN_AFTER_ORD}")))
-    return (digit, at, end) if ok else None
+    return digit if ok else None
+
+
+def gear_positions(s: str) -> list[int]:
+    """Dove, nel testo già normalizzato, c'è un segno che vale come marcia."""
+    return [m.start() for m in _gear_tokens(s) if _gear_value(s, m)]
+
+
+def _gear(q: str) -> tuple[str, int, int] | None:
+    if NEGATION.search(q) or HEDGE.search(q):
+        return None
+    tokens = _gear_tokens(q)
+    if len(tokens) != 1:
+        return None
+    m = tokens[0]
+    value = _gear_value(q, m)
+    if value is None:
+        return None
+    word = re.compile(rf"\s+{_GEAR}\b").match(q, m.end())
+    return value, m.start(), word.end() if word else m.end()
 
 
 # --- apice e cordolo ----------------------------------------------------------

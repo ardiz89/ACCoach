@@ -570,3 +570,68 @@ def test_errore_ammette_le_negazioni():
 def test_curva_dopo_il_valore_stessa_curva_prima():
     q = "at tosa brake at the 100 board into tosa"
     assert _c(q, "board:100", "brake") is None
+
+
+# --- Round 4: una curva per frase, i sottotitoli dividono le frasi -----------
+
+
+@pytest.mark.parametrize("q,body,type_", [
+    ("on the exit of villeneuve stay wide to set up tosa", None, "line"),
+    ("stay wide on exit so tosa", "villeneuve: stay wide on exit so tosa", "mistake"),
+])
+def test_descrittivi_due_curve(q, body, type_):
+    assert _c(q, q, type_, body) == "curva_non_trovata"
+    assert _c(q, q, type_, body, corner="Villeneuve") == "curva_non_trovata"
+
+
+def test_descrittivi_una_curva_sola_restano():
+    q = "on the exit of tosa stay wide"
+    assert _c(q, q, "line") is None
+    body = "villeneuve is fine. at tosa stay wide on exit"
+    q2 = "at tosa stay wide on exit"
+    assert _c(q2, q2, "line", body) is None
+
+
+def test_segmenti_dividono_anche_con_punteggiatura():
+    body = "is this right? at villeneuve brake hard at the 100 board then tosa"
+    segs = [{"start_s": 0.0, "text": "at villeneuve brake hard"},
+            {"start_s": 2.0, "text": "at the 100 board then tosa"}]
+    q = "villeneuve brake hard at the 100 board"
+    assert _c(q, "board:100", "brake", body, corner="Villeneuve") is None  # senza segmenti
+    assert _c(q, "board:100", "brake", body, corner="Villeneuve", segments=segs) \
+        == "citazione_oltre_frase"
+
+
+@pytest.mark.parametrize("sep", ["\u2028", "\u2029", "\x85", "\v", "\f"])
+def test_altri_a_capo_dividono(sep):
+    body = f"so brake at the 100 board{sep}into tosa"
+    q = "brake at the 100 board into tosa"
+    f = fatto(q, "board:100", "brake", "Tosa", body.index("brake"))
+    assert verify.check_fact("imola", f, body) == "citazione_oltre_frase"
+    assert verify.check_fact("imola", f, body.replace(sep, " ")) is None
+
+
+def test_alias_seguito_da_trattino_e_lettera():
+    q = "brake at the 100 board into tosa-like corners"
+    assert _c(q, "board:100", "brake") == "curva_non_trovata"
+    assert not vocab.alias_regex("tosa").search("tosa-like")
+    assert vocab.alias_regex("tosa").search("tosa's")
+    assert vocab.alias_regex("tosa").search("tosa-2")
+    q2 = "at tosa's exit, brake at the 100 board"
+    assert _c(q2, "board:100", "brake") is None
+
+
+def test_gear_seconda_marcia_nella_frase():
+    body = "at tosa go down to 2 gear 3"
+    assert _c("at tosa go down to 2 gear", "2", "gear", body) == "valore_non_normalizzabile"
+    body2 = "at tosa second gear, tosa in third gear"
+    assert _c("at tosa second gear", "2", "gear", body2) == "valore_non_normalizzabile"
+    body3 = "go down to second gear for tosa, then third gear"
+    assert _c("go down to second gear for tosa", "2", "gear", body3) == "valore_non_normalizzabile"
+
+
+def test_gear_seconda_marcia_altra_curva():
+    body = "at tosa second gear, piratella in third gear"
+    assert _c("at tosa second gear", "2", "gear", body) is None
+    assert _c("piratella in third gear", "3", "gear", body, corner="Piratella") is None
+    assert _c("piratella in third gear", "3", "gear", body) == "curva_non_trovata"
