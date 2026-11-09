@@ -1,0 +1,10 @@
+[
+ {"id": "vid001", "title": "ACC Imola hotlap 720S", "url": "https://www.youtube.com/watch?v=vid001",
+  "channelName": "Pilota Uno", "date": "2026-05-01T10:00:00.000Z",
+  "text": "Giro veloce a Imola con la 720S su Assetto Corsa Competizione.",
+  "subtitles": [{"srtUrl": "https://example.org/s1.srt", "type": "auto_generated", "language": "en",
+    "srt": "1\n00:00:01,000 --> 00:00:03,500\nBrake at the 100 board for Tamburello\n\n2\n00:01:35,400 --> 00:01:38,000\nStay left through Acque Minerali\n"}]},
+ {"id": "vid002", "title": "iRacing Imola guide", "url": "https://www.youtube.com/watch?v=vid002",
+  "channelName": "Altro Canale", "date": "2026-04-01T10:00:00.000Z", "text": "Guida per iRacing.",
+  "subtitles": null}
+]
