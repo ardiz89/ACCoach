@@ -893,8 +893,10 @@ dai box. Su Assetto compare un segno quando c'è una modifica da fare ai box. In
 tutte e due, sopra la fase, c'è la strada descritta in «La strada
 dell'ingegnere».
 
-- **Telemetria.** Vedi velocità, marcia, TC, ABS e mappa motore, temperatura e
-  pressione delle quattro gomme, e la striscia di gas, freno e sterzo degli
+- **Telemetria.** Vedi velocità, marcia e benzina. La benzina è la
+  percentuale del serbatoio, con sotto «≈ N giri» al consumo medio. Vedi due
+  trattini finché HONE non ha misurato un giro. Poi ci sono TC, ABS e mappa motore. Vedi anche
+  temperatura e pressione delle quattro gomme, e la striscia di gas, freno e sterzo degli
   ultimi 8 s. Sotto ci sono la strada e la fase su cui lavora l'ingegnere. Una
   modifica da fare dal volante compare in un riquadro. Il bottone *L'ho
   cambiato* c'è solo dove HONE non legge la manopola, come spiegato in «I

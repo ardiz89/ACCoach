@@ -69,6 +69,21 @@ class FuelEngineer:
     def reset(self) -> None:
         self.__init__()
 
+    @property
+    def per_lap(self) -> float | None:
+        """Consumo medio al giro (media mobile), None finche' non e' misurato."""
+        if not self._burns:
+            return None
+        per_lap = sum(self._burns) / len(self._burns)
+        return per_lap if per_lap > 0.0 else None
+
+    def laps_left(self, fuel: float) -> int | None:
+        """Giri interi (per difetto) che la benzina in serbatoio permette."""
+        per_lap = self.per_lap
+        if per_lap is None:
+            return None
+        return max(0, int(fuel / per_lap))
+
     def update(self, s: TelemetrySnapshot, now: float) -> list[Cue]:
         if not (s.connected and s.status == ACStatus.LIVE):
             return []
@@ -185,6 +200,21 @@ class FuelEngineer:
         self._pos_max = 0.0
         self._prev_pos = -1.0
         self._pit_this_lap = False
+
+
+def fuel_block(eng: FuelEngineer, s: TelemetrySnapshot) -> dict | None:
+    """Il carburante nello stato dal vivo: litri, percentuale intera, giri.
+
+    ``pct`` e' None se la capacita' non si conosce (``max_fuel`` 0), ``laps`` e'
+    None finche' non c'e' un consumo misurato. Tutto il blocco e' None se il
+    gioco non manda dati.
+    """
+    if not (s.connected and s.status == ACStatus.LIVE):
+        return None
+    pct = None
+    if s.max_fuel > 0.0:
+        pct = max(0, min(100, round(100.0 * s.fuel / s.max_fuel)))
+    return {"litres": round(s.fuel, 1), "pct": pct, "laps": eng.laps_left(s.fuel)}
 
 
 def burned(lap) -> float | None:

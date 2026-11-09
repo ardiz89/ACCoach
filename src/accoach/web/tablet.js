@@ -818,6 +818,17 @@
     setAttr($("t-tab-setup"), "data-mark", mark ? "1" : "0");
   }
 
+  // La benzina: la percentuale grande, sotto «≈ N giri». «–» quando il dato non c'e'.
+  function renderFuel(f) {
+    var pct = f && num(f.pct) ? fmtN(Math.round(f.pct), 0) : "–";
+    var laps = "–";
+    if (f && num(f.laps)) {
+      laps = tf(Number(f.laps) === 1 ? "tablet.fuelLap" : "tablet.fuelLaps", {n: String(f.laps)});
+    }
+    $("t-fuel").textContent = pct;
+    $("t-fuel-laps").textContent = laps;
+  }
+
   function render(st) {
     last = st;
     var m = mode(st);
@@ -843,6 +854,7 @@
     var eng = st.engineer || null;
     $("t-speed").textContent = num(st.speed_kmh) ? fmtN(Math.round(st.speed_kmh), 0) : "–";
     $("t-gear").textContent = st.gear == null ? "–" : String(st.gear);
+    renderFuel(st.fuel);
     $("t-tc").textContent = aid(st.aids && st.aids.tc);
     $("t-abs").textContent = aid(st.aids && st.aids.abs);
     $("t-map").textContent = aid(st.aids && st.aids.engine_map);

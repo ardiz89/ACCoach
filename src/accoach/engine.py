@@ -38,6 +38,7 @@ from .coaching import (
     Voice,
 )
 from .coaching.analyzer import corner_level
+from .coaching.fuel import fuel_block
 from .coaching.cue import Cue, CueCategory, gates_voice, theme_key, trigger_text
 from .coaching.debrief import build_lap_debrief
 from .coaching.diagnosis import build_lap_stats
@@ -324,6 +325,7 @@ class EngineState:
     history: list[str]           # recent spoken cue messages, newest last
     engineer: dict | None = None  # latest race-engineer decision (setup advice)
     focus: dict | None = None     # latest Focus/Lesson report (driver coaching)
+    fuel: dict | None = None      # litres, pct, laps left (the tablet's third big number)
     # L'ultima curva chiusa: indice, nome, millisecondi persi, semaforo. Un
     # consuntivo muto — la voce resta invariata e arriva al giro dopo, che è
     # quando può ancora cambiare qualcosa. I due non si pestano i piedi: questo
@@ -1506,6 +1508,7 @@ class CoachEngine:
             history=list(self.history),
             engineer=self._engineer_block(),
             focus=self._focus_block(),
+            fuel=fuel_block(self.fuel, snap),
             corner=self._corner_block(),
             pit_due=self.pitcall.calling,
             quiet=quiet,

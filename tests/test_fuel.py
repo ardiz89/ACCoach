@@ -135,3 +135,32 @@ def test_out_lap_is_not_counted():
     out, now = _lap(eng, 9.2, now)
     out, now = _lap(eng, 6.7, now)
     assert any("2 giri" in c.message for c in out)
+
+
+# --- i numeri che il tablet legge (sezione C) ---------------------------------
+
+def test_per_lap_is_none_until_a_lap_is_measured():
+    eng = FuelEngineer()
+    assert eng.per_lap is None
+    assert eng.laps_left(30.0) is None
+    _lap(eng, 12.0)                     # solo la linea di base
+    assert eng.per_lap is None
+
+
+def test_per_lap_is_the_rolling_average_and_laps_left_floor():
+    eng = FuelEngineer()
+    out, now = _lap(eng, 12.0)
+    out, now = _lap(eng, 9.5, now)      # 2,5
+    out, now = _lap(eng, 6.5, now)      # 3,0
+    assert eng.per_lap == 2.75
+    assert eng.laps_left(11.0) == 4     # esatto
+    assert eng.laps_left(10.9) == 3     # per difetto
+    assert eng.laps_left(0.0) == 0
+
+
+def test_pit_laps_do_not_count_in_per_lap():
+    eng = FuelEngineer()
+    out, now = _lap(eng, 12.0)
+    out, now = _lap(eng, 9.5, now)
+    out, now = _lap(eng, 8.0, now, in_pit_lane=True)
+    assert eng.per_lap == 2.5

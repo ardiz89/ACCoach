@@ -176,6 +176,10 @@ body {
   font-feature-settings: "tnum";
 }
 .t-gear .t-num { color: #22D3CE; }
+/* La terza cifra: 96 px perche' velocita', marcia e benzina ("100") stiano
+   in 1024 punti accanto alle gomme; "≈ N giri" sta sotto, piu' piccolo. */
+.t-fuel .t-num { font-size: 96px; color: #F5B83D; }
+.t-fuel .t-fuel-laps { font-size: 22px; color: #E6EAF0; margin-top: 0; }
 .t-unit { font-size: 20px; color: #8A95A3; margin-top: 4px; }
 
 /* 440 px: la gomma porta temperatura e pressione con l'unita', «84 °C

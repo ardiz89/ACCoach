@@ -1066,6 +1066,9 @@ Salva un setup nel gioco, poi ricarica questa pagina.` },
     "eng.avDone":      { en: `I've changed it`, it: `L'ho cambiato` },
 
     // ---- tablet view (tablet.html): the rest it borrows from the engineer page
+    "tablet.fuel":     { en: `Fuel %`, it: `Benzina %` },
+    "tablet.fuelLaps": { en: `≈ {n} laps`, it: `≈ {n} giri` },
+    "tablet.fuelLap":  { en: `≈ {n} lap`, it: `≈ {n} giro` },
     "tablet.title":    { en: `HONE · Tablet`, it: `HONE · Tablet` },
     "tablet.off":      { en: `The coach isn't running. This page reconnects by itself.`,
                          it: `Il coach non è acceso. La pagina si ricollega da sola.` },

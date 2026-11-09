@@ -939,7 +939,9 @@ enter or leave the pits. Setup shows a mark when there's a change to make in the
 pits. On both tabs, above the phase, is the road described in "The engineer's
 road".
 
-- **Telemetry.** You see speed, gear, TC, ABS and engine map, and the temperature
+- **Telemetry.** You see speed, gear and fuel. Fuel is the tank
+  percentage, with "≈ N laps" below it at your average burn. You see two dashes
+  until HONE has measured a lap. Then there are TC, ABS and engine map, and the temperature
   and pressure of the four tyres. A strip shows throttle, brake and steering
   from the last 8 s. Below it are the road and the phase the engineer is on.
   A change to make from the wheel appears in a box. The *I've changed it* button
