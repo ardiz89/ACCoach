@@ -382,9 +382,10 @@ def test_game_of(titolo, desc, sub, atteso):
 
 @pytest.mark.parametrize("testi,atteso", [
     (("ACC Imola GT3 guide", "", ""), "gt3"),
-    (("Imola hotlap", "Porsche 992 GT3 R setup", ""), "gt3"),
+    # N1: la descrizione e il flair non assegnano mai la classe, possono solo toglierla.
+    (("Imola hotlap", "Porsche 992 GT3 R setup", ""), "ignota"),
     (("Imola GT4 tips", "", ""), "gt4"),
-    (("Imola", "", "GT4"), "gt4"),
+    (("Imola", "", "GT4"), "ignota"),
     (("GT3 vs GT4 at Imola", "", ""), "ignota"),
     (("Imola guide", "", ""), "ignota"),
     (("Imola gt30 gt3x", "", ""), "ignota"),
@@ -444,3 +445,173 @@ def test_database_vecchio_riceve_le_colonne(tmp_path):
     assert c.execute("SELECT car_class FROM sources").fetchone() == ("gt3",)
     assert c.execute("PRAGMA user_version").fetchone()[0] == db.SCHEMA_VERSION == 2
     c.close()
+
+
+
+# --- round 2 -------------------------------------------------------------------------
+
+# N1: le cinque sonde della revisione, più i modelli non GT3 di ACC.
+@pytest.mark.parametrize("titolo,desc,atteso", [
+    ("ACC Imola Porsche 992 GT3 Cup onboard", "", "altra"),
+    ("Lamborghini Huracan Super Trofeo EVO2 at Imola ACC", "", "altra"),
+    ("ACC Imola guide", "Driving the Ferrari 296 GT3 today", "ignota"),
+    ("ACC Imola GT3 hotlap", "Next week the GT4 Alpine A110", "ignota"),
+    ("ACC Imola GT3 hotlap", "Also try the Porsche Cup", "ignota"),
+    ("Ginetta G55 at Imola, ACC", "", "gt4"),
+    ("BMW M2 CS Racing TCX at Imola ACC", "", "altra"),
+    ("Ferrari 488 Challenge Evo Imola", "", "altra"),
+    ("McLaren 570S at Imola", "", "gt4"),
+    ("Porsche 718 Cayman GT4 Clubsport Imola", "", "gt4"),
+    ("Maserati MC at Imola", "", "gt4"),
+    ("KTM X-Bow at Imola", "", "gt4"),
+    ("Imola trofeo GT3", "", "ignota"),
+    ("ACC Imola GT2 guide", "", "altra"),
+    ("ACC Imola GT3 guide", "#acc #simracing", "gt3"),
+])
+def test_classe_solo_dal_titolo(titolo, desc, atteso):
+    assert collect.car_class_of(titolo, desc, "") == atteso
+
+
+@pytest.mark.parametrize("corpo,atteso", [
+    ("In the GT4 I brake at the 150 board.", "gt4"),
+    ("With the 992 Cup I brake at the 100.", "altra"),
+    ("GT3 or GT4, brake at the 100.", "ignota"),
+    ("I brake at the 100 board.", None),
+    ("In the GT3 I brake at the 100 board.", None),   # un testo non assegna la GT3
+])
+def test_classe_del_testo(corpo, atteso):
+    assert collect.text_class_of(corpo) == atteso
+
+
+def test_commento_che_dice_gt4_ha_la_sua_classe(tmp_path):
+    # N2: il post dice GT3, il commento parla di GT4: per i fatti del commento vale GT4.
+    items = [
+        {"dataType": "post", "id": "t3_abc", "url": "https://www.reddit.com/r/x/comments/abc/t/",
+         "username": "u_uno", "title": "ACC Imola GT3 braking", "body": "Where?",
+         "parsedCommunityName": "ACCompetizione"},
+        {"dataType": "comment", "id": "t1_c1", "postId": "t3_abc",
+         "url": "https://www.reddit.com/r/x/comments/abc/t/c1/", "username": "u_due",
+         "body": "In my GT4 I brake at the 150 board.", "parsedCommunityName": "ACCompetizione"},
+        {"dataType": "comment", "id": "t1_c2", "postId": "t3_abc",
+         "url": "https://www.reddit.com/r/x/comments/abc/t/c2/", "username": "u_tre",
+         "body": "I brake at the 100 board.", "parsedCommunityName": "ACCompetizione"},
+    ]
+    conn = _conn(tmp_path)
+    collect.collect(conn, _client(Finto(items={"trudax~reddit-scraper-lite": items})), "imola", PIANO[1:])
+    assert conn.execute("SELECT car_class FROM sources").fetchall() == [("gt3",)]
+    per_testo = dict(conn.execute("SELECT author, car_class FROM texts").fetchall())
+    assert per_testo == {"u_uno": None, "u_due": "gt4", "u_tre": None}
+
+
+def test_database_vecchio_classe_per_testo(tmp_path):
+    p = tmp_path / "v.sqlite"
+    v = sqlite3.connect(str(p))
+    v.execute("CREATE TABLE texts(id INTEGER PRIMARY KEY, sha256 TEXT NOT NULL, source_id INTEGER,"
+              " kind TEXT, author TEXT, body TEXT, segments_json TEXT, collected_at TEXT,"
+              " UNIQUE(sha256, source_id, author))")
+    v.execute("INSERT INTO texts(sha256, source_id, kind, author, body) VALUES"
+              " ('s', 1, 'comment', 'a', 'In the GT4 I brake at the 150.')")
+    v.commit()
+    v.close()
+    c = db.open_db(p)
+    assert c.execute("SELECT car_class FROM texts").fetchone() == ("gt4",)
+    c.close()
+
+
+# 1: i sottotitoli, nei formati che l'attore documenta.
+SRT = "1\n00:00:01,000 --> 00:00:03,000\nBrake at the 100 board for Tosa\n"
+VTT = ("WEBVTT\n\n00:01.500 --> 00:03.000\n<c>Brake at the 100 board</c> for Tosa\n\n"
+       "01:00:02.000 --> 01:00:04.000\nStay left\n")
+
+
+@pytest.mark.parametrize("sub,campo,corpo,start", [
+    ({"srt": SRT, "language": "en"}, "srt", "Brake at the 100 board for Tosa", 1.0),
+    ({"vtt": VTT}, "vtt", "Brake at the 100 board for Tosa Stay left", 1.5),
+    ({"plaintext": "Brake at the 100 board for Tosa."}, "plaintext",
+     "Brake at the 100 board for Tosa.", None),
+    ({"text": "Brake at the 100 board for Tosa."}, "text", "Brake at the 100 board for Tosa.", None),
+])
+def test_sottotitoli_nei_campi_documentati(tmp_path, sub, campo, corpo, start):
+    item = {"id": "v1", "title": "ACC Imola GT3", "url": "https://www.youtube.com/watch?v=v1",
+            "channelName": "C", "subtitles": [{"srtUrl": "https://x/s", **sub}]}
+    conn = _conn(tmp_path)
+    r = collect.collect(conn, _client(Finto(items={"streamers~youtube-scraper": [item]})), "imola", PIANO[:1])
+    assert r["subtitle_fields"] == {campo: 1}
+    body, segs = conn.execute("SELECT body, segments_json FROM texts").fetchone()
+    assert body == corpo
+    assert (json.loads(segs)[0]["start_s"] if segs else None) == start
+
+
+def test_sottotitoli_campo_ignoto_detto(tmp_path, monkeypatch, capsys):
+    from tools.fonti import fonti
+
+    item = {"id": "v1", "title": "ACC Imola GT3", "url": "https://www.youtube.com/watch?v=v1",
+            "channelName": "C", "subtitles": [{"srtUrl": "https://x/s", "content": "boh"}]}
+    monkeypatch.setenv("APIFY_API_TOKEN", TOK)
+    monkeypatch.setattr(apify, "_urllib_http", Finto(items={"streamers~youtube-scraper": [item]}))
+    piano = tmp_path / "p.json"
+    piano.write_text(json.dumps(PIANO[:1]), encoding="utf-8")
+    fonti.main(["--db", str(tmp_path / "d"), "collect", "--track", "imola", "--plan", str(piano)])
+    out = capsys.readouterr()
+    assert "Sottotitoli letti da: nessuno 1." in out.out
+    assert "content" in out.out and "srtUrl" in out.out
+
+
+def test_piano_imola_solo_sottotitoli_esistenti():
+    piano = json.loads((ROOT / "tools" / "fonti" / "piani" / "imola.json").read_text(encoding="utf-8"))
+    yt = next(v for v in piano if v["platform"] == "youtube")
+    assert yt["input"]["transcriptionAndSubtitle"] == "ALWAYS_SUBTITLES"
+
+
+# 6: una corsa finita male non è finita.
+@pytest.mark.parametrize("stato", ["FAILED", "ABORTED", "TIMED-OUT"])
+def test_corsa_fallita_non_segnata_finita(tmp_path, monkeypatch, capsys, stato):
+    from tools.fonti import fonti
+
+    f = Finto(stato=stato)
+    monkeypatch.setenv("APIFY_API_TOKEN", TOK)
+    monkeypatch.setattr(apify, "_urllib_http", f)
+    piano = tmp_path / "p.json"
+    piano.write_text(json.dumps(PIANO[:1]), encoding="utf-8")
+    assert fonti.main(["--db", str(tmp_path / "d"), "collect", "--track", "imola", "--plan", str(piano)]) == 1
+    err = capsys.readouterr().err
+    assert f"Voce 1" in err and stato in err
+    conn = db.open_db(tmp_path / "d" / "fonti.sqlite")
+    assert conn.execute("SELECT finished_at FROM collect_runs").fetchone() == (None,)
+    assert conn.execute("SELECT COUNT(*) FROM raw_items").fetchone()[0] == 2   # pagati, salvati
+    conn.close()
+
+
+# 7: tre errori diversi dello schema.
+@pytest.mark.parametrize("codice,frase", [
+    (401, "token non valido o senza permesso"),
+    (403, "token non valido o senza permesso"),
+    (404, "attore non trovato"),
+    (200, "schema non trovato"),
+])
+def test_check_actors_distingue_gli_errori(codice, frase):
+    def http(method, url, headers, body):
+        if codice == 200:
+            return 200, json.dumps({"data": {"actorDefinition": {}}}).encode()
+        return codice, b"{}"
+
+    piano = [{"platform": "youtube", "actor": "a/b", "max_items": 1, "input": {}}]
+    problemi = collect.check_actors(apify.Apify(TOK, http=http), piano)
+    assert len(problemi) == 1 and frase in problemi[0], problemi
+    for altra in {"token non valido o senza permesso", "attore non trovato", "schema non trovato"} - {frase}:
+        assert altra not in problemi[0]
+
+
+# N3: un titolo che nomina un altro simulatore non è su ACC.
+@pytest.mark.parametrize("titolo", [
+    "ACC vs iRacing at Imola", "ACC and LMU Imola", "Le Mans Ultimate vs ACC Imola",
+    "ACC or AMS2 at Imola", "rF2 and ACC Imola", "Gran Turismo 7 vs ACC Imola",
+    "GT7 ACC Imola comparison", "F1 24 and ACC at Imola", "ACC vs rFactor 2 Imola",
+])
+def test_altro_simulatore_nel_titolo(titolo):
+    assert collect.game_of(titolo, "", "ACCompetizione") == "altro"
+
+
+def test_gt3_e_f1_non_si_confondono():
+    assert collect.game_of("ACC Imola GT3 hotlap", "", "") == "acc"
+    assert collect.game_of("ACC Imola F12 setup", "", "") == "acc"

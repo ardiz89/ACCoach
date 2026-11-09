@@ -30,7 +30,9 @@ class CapReached(Exception):
 
 
 class ApifyError(Exception):
-    pass
+    def __init__(self, message: str, status: int | None = None):
+        super().__init__(message)
+        self.status = status
 
 
 class RunPending(ApifyError):
@@ -106,7 +108,7 @@ class Apify:
         data = json.dumps(body).encode("utf-8") if body is not None else None
         status, raw = self._http(method, url, headers, data)
         if status >= 400:
-            raise ApifyError(f"Apify ha risposto {status} a {method} {url.split('?')[0]}")
+            raise ApifyError(f"Apify ha risposto {status} a {method} {url.split('?')[0]}", status)
         return json.loads(raw.decode("utf-8")) if raw else None
 
     def usage_usd(self) -> float:
@@ -141,11 +143,11 @@ class Apify:
         return out if isinstance(out, list) else []
 
     def input_schema(self, actor_id) -> dict | None:
-        """Lo schema d'ingresso della build predefinita dell'attore. Gratis: nessuna corsa."""
-        try:
-            d = self._call("GET", f"{API}/acts/{_actor(actor_id)}/builds/default")
-        except ApifyError:
-            return None
+        """Lo schema d'ingresso della build predefinita dell'attore. Gratis: nessuna corsa.
+
+        None se la build non ha uno schema; ApifyError (con `status`) se Apify rifiuta.
+        """
+        d = self._call("GET", f"{API}/acts/{_actor(actor_id)}/builds/default")
         build = (d or {}).get("data") or {}
         schema = (build.get("actorDefinition") or {}).get("input")
         if schema is None and isinstance(build.get("inputSchema"), str):

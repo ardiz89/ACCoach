@@ -105,12 +105,21 @@ def cmd_collect(args) -> int:
             return 1
         print(f"Nuove fonti: {r['sources']}, nuovi testi: {r['texts']}, voci già finite: {r['skipped']}, "
               f"elementi illeggibili: {r['bad_items']}, speso: {r['spent_usd']:.2f} USD.")
+        if r["subtitle_fields"]:
+            campi = ", ".join(f"{k} {n}" for k, n in sorted(r["subtitle_fields"].items()))
+            print(f"Sottotitoli letti da: {campi}.")
+        if r["subtitle_keys"]:
+            print(f"Chiavi dei sottotitoli senza un campo noto: {', '.join(r['subtitle_keys'])}.")
+        for i, stato in r["failed"]:
+            v = plan[i - 1]
+            print(f"Voce {i} ({v['platform']}, {v['actor']}): la corsa è finita con stato {stato}. "
+                  "Non la segno finita. Gli elementi arrivati restano in raw_items.", file=sys.stderr)
         for i in r["empty"]:
             v = plan[i - 1]
             print(f"Voce {i} ({v['platform']}, {v['actor']}): 0 testi. Non la segno finita. "
                   "Controlla l'input con check-actors, poi rilancia con --force --only "
                   f"{i}.", file=sys.stderr)
-        return 1 if r["empty"] else 0
+        return 1 if r["empty"] or r["failed"] else 0
     finally:
         conn.close()
 

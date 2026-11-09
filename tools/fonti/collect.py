@@ -23,14 +23,34 @@ from tools.fonti import apify, db
 
 # ACC si riconosce solo dal titolo o dal sottoreddit: un hashtag nella descrizione no.
 _ACC = re.compile(r"assetto corsa competizione|\bacc\b", re.IGNORECASE)
-# Un titolo che nomina anche l'altro gioco parla di tutti e due: non è una fonte su ACC.
-_MIXED = re.compile(r"\bac\s+vs\.?\s+acc\b|\bacc\s+vs\.?\s+ac\b|\bac1\b|\bassetto corsa 1\b",
-                    re.IGNORECASE)
-_GT3 = re.compile(r"(?<![a-z0-9])gt3(?![a-z0-9])")
-_GT4 = re.compile(r"(?<![a-z0-9])gt4(?![a-z0-9])")
-_TS = re.compile(r"(\d+):(\d+):(\d+)[,.](\d+)")
+# Un titolo che nomina anche un altro gioco parla di tutti e due: non è una fonte su ACC.
+_MIXED = re.compile(
+    r"\bac\s+vs\.?\s+acc\b|\bacc\s+vs\.?\s+ac\b|\bac1\b|\bassetto corsa 1\b"
+    r"|\biracing\b|\blmu\b|\ble mans ultimate\b|\bams\s?2\b|\bautomobilista\b"
+    r"|\brf2\b|\brfactor\b|\bgran turismo\b|\bgt7\b|\bf1\b",
+    re.IGNORECASE)
+
+
+def _w(*words: str) -> re.Pattern:
+    """Parole intere, nel testo già in minuscolo."""
+    return re.compile(r"(?<![a-z0-9])(?:" + "|".join(words) + r")(?![a-z0-9])")
+
+
+_GT3 = _w("gt3")
+# Classi che in ACC non sono GT3, con i modelli che le nominano senza dirlo.
+_NOT_GT3 = {
+    "gt4": _w("gt4", "ginetta", "g55", "alpine", "a110", "ktm", "x-bow", "xbow", "camaro",
+              "570s", "cayman", "718", "maserati"),
+    "altra": _w("gt3 cup", "cup", "trofeo", "super trofeo", "gt2", "m2", "tcx",
+                "488 challenge", "challenge evo"),
+}
+_GT3_CUP = _w("gt3 cup")
+_TS = re.compile(r"(?:(\d+):)?(\d+):(\d+)[,.](\d+)")
+_TAG = re.compile(r"<[^>]*>")
 _POST_ID = re.compile(r"/comments/([A-Za-z0-9]+)")
-CLASSES = ("gt3", "gt4", "ignota")
+CLASSES = ("gt3", "gt4", "altra", "ignota")
+# I campi dei sottotitoli dell'attore YouTube, in ordine di preferenza: con i tempi prima.
+SUBTITLE_FIELDS = ("srt", "vtt", "plaintext", "text")
 
 
 def game_of(title: str, description: str, subreddit: str) -> str:
@@ -43,28 +63,78 @@ def game_of(title: str, description: str, subreddit: str) -> str:
     return "acc" if _ACC.search(title) else "altro"
 
 
+def _classes_named(text) -> set[str]:
+    """Le classi che il testo nomina: gt3, gt4, altra. «GT3 Cup» non è una GT3."""
+    t = str(text or "").lower()
+    out = {k for k, rx in _NOT_GT3.items() if rx.search(t)}
+    if _GT3.search(_GT3_CUP.sub(" ", t)):
+        out.add("gt3")
+    return out
+
+
 def car_class_of(title, description, extra) -> str:
-    """`gt3` o `gt4` se la fonte ne nomina una sola, a parola intera; altrimenti `ignota`."""
-    text = " ".join(str(x or "") for x in (title, description, extra)).lower()
-    gt3, gt4 = bool(_GT3.search(text)), bool(_GT4.search(text))
-    if gt3 != gt4:
-        return "gt3" if gt3 else "gt4"
-    return "ignota"
+    """La classe della fonte. Solo il titolo la assegna, se nomina una classe sola.
+
+    La descrizione e `extra` (flair, sottoreddit) non assegnano mai: se nominano un'altra
+    classe la tolgono, e la fonte resta `ignota`.
+    """
+    named = _classes_named(title)
+    if len(named) != 1:
+        return "ignota"
+    klass = next(iter(named))
+    if _classes_named(f"{description or ''} {extra or ''}") - {klass}:
+        return "ignota"
+    return klass
+
+
+def text_class_of(body) -> str | None:
+    """La classe che un testo dice per sé, se diversa dalla GT3; None se non ne dice.
+
+    Un testo che nomina la GT3 e un'altra classe è `ignota`. Un testo che nomina solo la
+    GT3 non assegna niente: vale la classe della fonte.
+    """
+    named = _classes_named(body)
+    if not named - {"gt3"}:
+        return None
+    return next(iter(named)) if len(named) == 1 else "ignota"
 
 
 def parse_srt(srt: str) -> list[dict]:
+    """Sottotitoli SRT o WebVTT: un segmento per blocco, con l'inizio in secondi."""
     segs = []
-    for blocco in re.split(r"\n\s*\n", (srt or "").strip()):
+    for blocco in re.split(r"\n\s*\n", (srt or "").replace("\r\n", "\n").strip()):
         righe = [r for r in blocco.splitlines() if r.strip()]
         for i, r in enumerate(righe):
             if "-->" in r:
                 m = _TS.search(r)
-                testo = " ".join(x.strip() for x in righe[i + 1:])
+                testo = " ".join(_TAG.sub("", x).strip() for x in righe[i + 1:]).strip()
                 if m and testo:
-                    h, mi, s, ms = (int(x) for x in m.groups())
+                    h, mi, s, ms = (int(x or 0) for x in m.groups())
                     segs.append({"start_s": round(h * 3600 + mi * 60 + s + ms / 1000, 3), "text": testo})
                 break
     return segs
+
+
+def subtitles_of(item: dict) -> tuple[str, str | None, list[dict] | None, list[str]]:
+    """`(campo, corpo, segmenti, chiavi viste)` dai sottotitoli dell'elemento.
+
+    Il campo è quello trovato fra SUBTITLE_FIELDS, oppure `nessuno`. Le chiavi viste
+    servono a capire la forma vera dell'uscita quando nessun campo torna.
+    """
+    subs = item.get("subtitles") or []
+    subs = [x for x in subs if isinstance(x, dict)] if isinstance(subs, list) else []
+    keys = sorted({k for x in subs for k in x})
+    for campo in SUBTITLE_FIELDS:
+        raw = next((x[campo] for x in subs if isinstance(x.get(campo), str) and x[campo].strip()), None)
+        if raw is None:
+            continue
+        if campo in ("srt", "vtt"):
+            segs = parse_srt(raw)
+            if segs:
+                return campo, " ".join(sg["text"] for sg in segs), segs, keys
+            continue
+        return campo, " ".join(raw.split()), None, keys
+    return "nessuno", None, None, keys
 
 
 def _source(conn, platform, url, author, title, published, game, track, meta, car_class,
@@ -109,23 +179,25 @@ def thread_url(post_id: str) -> str:
     return f"https://www.reddit.com/comments/{post_id}/"
 
 
-def _youtube(conn, item, track) -> tuple[int, int, bool]:
+def _youtube(conn, item, track, seen: dict | None = None) -> tuple[int, int, bool]:
     """`(fonte nuova, testo nuovo, c'è un testo)` per un video."""
-    subs = item.get("subtitles") or []
-    srt = next((s.get("srt") for s in subs if isinstance(s, dict) and s.get("srt")), None)
     title, desc = item.get("title"), item.get("text")
     sid, nuova = _source(conn, "youtube", item.get("url"), item.get("channelName"), title,
                          item.get("date"), game_of(title, desc, ""), track,
                          {"video_id": item.get("id")}, car_class_of(title, desc, ""))
-    segs = parse_srt(srt) if srt else []
-    if not segs:
+    campo, corpo, segs, keys = subtitles_of(item)
+    if seen is not None:
+        seen["fields"][campo] = seen["fields"].get(campo, 0) + 1
+        if campo == "nessuno":
+            seen["keys"].update(keys)
+    if not corpo:
         return int(nuova), 0, False
-    corpo = " ".join(s["text"] for s in segs)
-    nt = int(db.add_text(conn, sid, "transcript", item.get("channelName") or "", corpo, segs)[1])
+    nt = int(db.add_text(conn, sid, "transcript", item.get("channelName") or "", corpo, segs,
+                         car_class=text_class_of(corpo))[1])
     return int(nuova), nt, True
 
 
-def _reddit(conn, item, track) -> tuple[int, int, bool]:
+def _reddit(conn, item, track, seen: dict | None = None) -> tuple[int, int, bool]:
     """`(fonte nuova, testo nuovo, c'è un testo)` per un post o un commento."""
     tipo = item.get("dataType")
     if tipo not in ("post", "comment"):
@@ -145,14 +217,16 @@ def _reddit(conn, item, track) -> tuple[int, int, bool]:
         testo = f"{title or ''}\n{corpo}".strip()
         if not testo:
             return int(nuova), 0, False
-        return int(nuova), int(db.add_text(conn, sid, "post", item.get("username") or "", testo)[1]), True
+        return int(nuova), int(db.add_text(conn, sid, "post", item.get("username") or "", testo,
+                                           car_class=text_class_of(corpo))[1]), True
     if not corpo:
         return 0, 0, False
     # Il post del thread può arrivare dopo: intanto una fonte minima, che il post completerà.
     sid, nuova = _source(conn, "reddit", thread_url(pid), None, None, item.get("createdAt"),
                          game_of("", "", sub), track, {"subreddit": sub, "post_id": pid},
-                         car_class_of("", "", sub), full=False)
-    return int(nuova), int(db.add_text(conn, sid, "comment", item.get("username") or "", corpo)[1]), True
+                         "ignota", full=False)
+    return int(nuova), int(db.add_text(conn, sid, "comment", item.get("username") or "", corpo,
+                                       car_class=text_class_of(corpo))[1]), True
 
 
 def entry_key(voce: dict) -> str:
@@ -182,6 +256,8 @@ def collect(conn: sqlite3.Connection, client: apify.Apify, track: str, plan: lis
         raise ValueError(f"Il piano ha {len(plan)} voci: --only va da 1 a {len(plan)}.")
     ns = nt = saltate = guasti = 0
     vuote: list[int] = []
+    fallite: list[tuple[int, str]] = []
+    seen: dict = {"fields": {}, "keys": set()}
     for i, voce in enumerate(plan, 1):
         if only is not None and i != only:
             continue
@@ -224,7 +300,7 @@ def collect(conn: sqlite3.Connection, client: apify.Apify, track: str, plan: lis
             try:
                 if not isinstance(it, dict):
                     raise TypeError("non è un oggetto")
-                a, b, c = leggi(conn, it, track)
+                a, b, c = leggi(conn, it, track, seen)
             except Exception as e:  # un elemento guasto non ferma il lotto
                 conn.rollback()
                 guasti += 1
@@ -232,6 +308,10 @@ def collect(conn: sqlite3.Connection, client: apify.Apify, track: str, plan: lis
                      "Resta in raw_items.")
                 continue
             ns, nt, con_testo = ns + a, nt + b, con_testo + int(c)
+        stato = run.get("status")
+        if stato != "SUCCEEDED":
+            fallite.append((i, str(stato)))   # i dati pagati restano, la voce no
+            continue
         if not con_testo:
             vuote.append(i)
             continue
@@ -242,7 +322,8 @@ def collect(conn: sqlite3.Connection, client: apify.Apify, track: str, plan: lis
         conn.execute("UPDATE spend SET last_usd=? WHERE track=?", (client.usage_usd(), track))
         conn.commit()
     return {"sources": ns, "texts": nt, "spent_usd": round(apify.spent(conn, track), 4),
-            "skipped": saltate, "bad_items": guasti, "empty": vuote}
+            "skipped": saltate, "bad_items": guasti, "empty": vuote, "failed": fallite,
+            "subtitle_fields": seen["fields"], "subtitle_keys": sorted(seen["keys"])}
 
 
 def _type_ok(kind, value) -> bool:
@@ -262,9 +343,18 @@ def check_actors(client: apify.Apify, plan: list[dict]) -> list[str]:
     problemi = []
     for i, voce in enumerate(plan, 1):
         actor = voce["actor"]
-        schema = client.input_schema(actor)
+        try:
+            schema = client.input_schema(actor)
+        except apify.ApifyError as e:
+            if getattr(e, "status", None) in (401, 403):
+                problemi.append(f"voce {i} ({actor}): token non valido o senza permesso.")
+            elif getattr(e, "status", None) == 404:
+                problemi.append(f"voce {i} ({actor}): attore non trovato. Controlla il nome.")
+            else:
+                problemi.append(f"voce {i} ({actor}): Apify ha risposto {getattr(e, 'status', '?')}.")
+            continue
         if schema is None:
-            problemi.append(f"voce {i} ({actor}): schema non trovato. Controlla il nome dell'attore.")
+            problemi.append(f"voce {i} ({actor}): schema non trovato nella build dell'attore.")
             continue
         props = schema.get("properties") or {}
         for k, v in sorted((voce.get("input") or {}).items()):

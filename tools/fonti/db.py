@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS texts(
     sha256 TEXT NOT NULL,
     source_id INTEGER,
     kind TEXT CHECK (kind IN ('transcript','post','comment')),
-    author TEXT, body TEXT, segments_json TEXT, collected_at TEXT,
+    author TEXT, body TEXT, segments_json TEXT, collected_at TEXT, car_class TEXT,
     UNIQUE(sha256, source_id, author)
 );
 CREATE TABLE IF NOT EXISTS results(
@@ -87,6 +87,11 @@ def open_db(path: Path) -> sqlite3.Connection:
         from tools.fonti.collect import car_class_of
         for sid, title in conn.execute("SELECT id, title FROM sources").fetchall():
             conn.execute("UPDATE sources SET car_class=? WHERE id=?", (car_class_of(title, "", ""), sid))
+    if _add_column(conn, "texts", "car_class", "TEXT"):
+        # La classe che un testo dice per sé (un commento GT4 in un thread GT3).
+        from tools.fonti.collect import text_class_of
+        for tid, body in conn.execute("SELECT id, body FROM texts").fetchall():
+            conn.execute("UPDATE texts SET car_class=? WHERE id=?", (text_class_of(body), tid))
     conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
     conn.commit()
     return conn
@@ -115,15 +120,15 @@ def newest_versions(conn: sqlite3.Connection, kind: str, track: str) -> dict[str
 
 
 def add_text(conn: sqlite3.Connection, source_id: int, kind: str, author: str,
-             body: str, segments: list | None = None) -> tuple[str, bool]:
+             body: str, segments: list | None = None, car_class: str | None = None) -> tuple[str, bool]:
     """Salva un testo; `(sha256, nuovo)`. Stesso testo, fonte e autore non si duplica."""
     sha = hashlib.sha256(body.encode("utf-8")).hexdigest()
     seg = json.dumps(segments, ensure_ascii=False) if segments is not None else None
     cur = conn.execute(
-        "INSERT OR IGNORE INTO texts(sha256, source_id, kind, author, body, segments_json, collected_at)"
-        " VALUES (?,?,?,?,?,?,?)",
+        "INSERT OR IGNORE INTO texts(sha256, source_id, kind, author, body, segments_json, collected_at,"
+        " car_class) VALUES (?,?,?,?,?,?,?,?)",
         (sha, source_id, kind, author, body, seg,
-         datetime.now(timezone.utc).isoformat(timespec="seconds")))
+         datetime.now(timezone.utc).isoformat(timespec="seconds"), car_class))
     conn.commit()
     return sha, cur.rowcount == 1
 
