@@ -204,8 +204,9 @@ def cmd_consensus(args) -> int:
             print(f"{curva}:")
         valori = ", ".join(
             f"{v['value']} ({v['n']} {'autore' if v['n'] == 1 else 'autori'})"
-            for v in e["values"])
-        print(f"  {e['type']}: {e['state']}, {valori}")
+            for v in e["values"]) or "nessun valore GT3"
+        altre = ", ".join(v["value"] for v in e.get("others") or [])
+        print(f"  {e['type']}: {e['state']}, {valori}" + (f"; altre classi: {altre}" if altre else ""))
     stati = [e["state"] for e in entries]
     conti = ", ".join(f"{s} {stati.count(s)}" for s in ("verificato", "conteso", "singolo", "descrittivo"))
     print(f"Totale: {conti}.")

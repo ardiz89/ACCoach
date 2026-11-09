@@ -54,6 +54,8 @@ T = {
     "open_at": "apri a {t}",
     "open": "apri la fonte",
     "no_link": "link non sicuro, non lo apro",
+    "others": "Altre classi o classe ignota",
+    "others_why": "Non contano per la GT3. Se dicono un altro valore, la voce è contesa.",
 }
 TESTI = tuple(WHY.values()) + tuple(T.values()) + tuple(CLASS_LABELS.values())
 
@@ -152,7 +154,11 @@ def _fact(e: dict, section: str, checks) -> str:
                          f', {_e(c.get("model"))}</p>')
         note = "".join(parts)
     values = e["values"] if section != "verificato" else e["values"][:1]
-    return f'<li class="fact">{head}{note}{"".join(_value(v) for v in values)}</li>'
+    others = ""
+    if e.get("others"):
+        others = (f'<p class="mute"><b>{T["others"]}</b>. {T["others_why"]}</p>'
+                  + "".join(_value(v) for v in e["others"]))
+    return f'<li class="fact">{head}{note}{"".join(_value(v) for v in values)}{others}</li>'
 
 
 def _section_of(e: dict, checks) -> str:

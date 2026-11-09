@@ -44,9 +44,9 @@ class Banco:
         self.conn.commit()
         return self.conn.execute("SELECT id FROM sources WHERE url=?", (url,)).fetchone()[0]
 
-    def testo(self, url, author, body, facts=(), platform="reddit", segments=None):
+    def testo(self, url, author, body, facts=(), platform="reddit", segments=None, classe="gt3"):
         kind = "transcript" if platform == "youtube" else "comment"
-        sha, _ = db.add_text(self.conn, self.fonte(url, platform, author), kind, author, body,
+        sha, _ = db.add_text(self.conn, self.fonte(url, platform, author, classe), kind, author, body,
                              segments)
         if facts:
             agents.pending(self.conn, "extract", "imola", self._dir("je"))
@@ -377,3 +377,16 @@ def test_review_spesa_dalla_corsa(b, tmp_path):
     b.conn.commit()
     page = review.render(b.conn, "imola", tmp_path / "x.html").read_text(encoding="utf-8")
     assert "0,70 $" in page
+
+
+def test_review_altre_classi_in_una_riga_a_parte(b, tmp_path):
+    # N4: chi parla di un'altra classe si vede, a parte, e la voce non esce.
+    _riempi(b)
+    b.testo("https://r/g4", "gquattro", "Honestly at Acque Minerali I go down to fourth gear.",
+            [(AM, "gear", "4", "down to fourth gear")], classe="gt4")
+    page = review.render(b.conn, "imola", tmp_path / "x.html").read_text(encoding="utf-8")
+    assert review.T["others"] in page
+    assert page.index(review.T["others"]) < page.index("gquattro")
+    assert export.export(b.conn, "imola", tmp_path / "o") == 0
+    for frase in review.TESTI:
+        assert tono.violations(frase, "it") == [], frase

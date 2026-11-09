@@ -10,9 +10,13 @@ Tutto è deterministico e si ricalcola dal database a ogni chiamata.
   anche se è corto. `n` di ogni valore è il numero di persone.
 - Contano solo i risultati `extract` della versione più alta proposta in `jobs` per
   (kind, testo, pista), da qualsiasi modello, e solo le fonti ACC di quella pista.
-- `brake` e `gear` contano solo i fatti di fonti GT3 (`sources.car_class = 'gt3'`): il
-  cartello di frenata e la marcia di una GT4 non valgono per una GT3. Gli altri tipi
-  contano tutte le fonti ACC.
+- La classe di un fatto è quella del suo testo (`texts.car_class`, se il testo ne dice
+  una) o altrimenti quella della fonte (`sources.car_class`).
+- `brake` e `gear` votano solo con i fatti GT3: il cartello di frenata e la marcia di
+  una GT4 non valgono per una GT3. I fatti di un'altra classe o di classe ignota stanno
+  in `others`: non fanno mai un `verificato`, ma se sostengono un valore diverso dal
+  vincitore GT3 la voce diventa `conteso`. Gli altri tipi contano tutte le fonti ACC e
+  hanno `others` vuoto.
 - Un autore è affidabile se una valutazione `rate` (della versione più alta) di uno
   dei suoi testi su quella pista lo dice `coach` con un nome, oppure `pilota` con un
   nome e un tempo sul giro. Le valutazioni sono già verificate dall'ingest. Se il
@@ -47,16 +51,21 @@ def fact_key(track: str, corner: str, type_: str, value: str) -> str:
 
 
 def _rows(conn: sqlite3.Connection, track: str) -> list[tuple]:
-    """I fatti validi: risultato della versione più recente, fonte ACC di quella pista."""
+    """I fatti validi: risultato della versione più recente, fonte ACC di quella pista.
+
+    L'ultima colonna è la classe del fatto: quella del testo se la dice, se no della fonte.
+    """
     newest = db.newest_versions(conn, "extract", track)
     rows = conn.execute(
         "SELECT r.sha256, r.prompt_version, f.corner, f.type, f.value, f.quote, f.start_s,"
-        " f.author, s.platform, s.url, s.car_class FROM facts f JOIN results r ON r.id = f.result_id"
+        " f.author, s.platform, s.url, COALESCE(t.car_class, s.car_class)"
+        " FROM facts f JOIN results r ON r.id = f.result_id"
         " JOIN sources s ON s.id = f.source_id"
+        " LEFT JOIN texts t ON t.sha256 = r.sha256 AND t.source_id = f.source_id"
+        " AND t.author IS f.author"
         " WHERE r.kind='extract' AND r.track=? AND f.track=? AND s.game='acc' AND s.track=?",
         (track, track, track)).fetchall()
-    return [r for r in rows if newest.get(r[0]) == r[1]
-            and (r[3] not in GT3_ONLY or r[10] == "gt3")]
+    return [r for r in rows if newest.get(r[0]) == r[1]]
 
 
 def _reliable_authors(conn: sqlite3.Connection, track: str) -> set[str]:
@@ -169,33 +178,42 @@ def _source_key(s: dict):
             s["car_class"] or "")
 
 
+def _values(by_value: dict[str, dict], people: dict[str, str]) -> list[dict]:
+    values = []
+    for value, g in by_value.items():
+        sources = sorted(({"url": u, "start_s": s, "quote": q, "car_class": c}
+                          for u, s, q, c in g["sources"]), key=_source_key)
+        values.append({"value": value, "authors": sorted(g["texts"]), "sources": sources,
+                       "n": _count(g["texts"], people)})
+    values.sort(key=lambda v: (-v["n"], v["value"]))
+    return values
+
+
 def build(conn: sqlite3.Connection, track: str) -> list[dict]:
     """Una voce per (curva, tipo), nell'ordine delle curve della pista e poi dei tipi."""
-    groups: dict[tuple[str, str], dict[str, dict]] = {}
+    groups: dict[tuple[str, str], dict[str, dict[str, dict]]] = {}
     for sha, _v, corner, type_, value, quote, start_s, author, platform, url, klass in _rows(conn, track):
-        val = groups.setdefault((corner, type_), {}).setdefault(
-            value, {"texts": {}, "sources": set()})
+        klass = klass or "ignota"
+        side = "others" if type_ in GT3_ONLY and klass != "gt3" else "values"
+        g = groups.setdefault((corner, type_), {"values": {}, "others": {}})[side]
+        val = g.setdefault(value, {"texts": {}, "sources": set()})
         val["texts"].setdefault(db.author_id(platform, author), set()).add(sha)
-        val["sources"].add((url, start_s, quote, klass or "ignota"))
+        val["sources"].add((url, start_s, quote, klass))
     reliable = _reliable_authors(conn, track)
     people = _people(conn, track)
 
     corner_order = {c: i for i, c in enumerate(vocab.CORNERS.get(track, {}))}
     type_order = {t: i for i, t in enumerate(vocab.TYPES)}
     out = []
-    for (corner, type_), by_value in groups.items():
-        values = []
-        for value, g in by_value.items():
-            sources = sorted(({"url": u, "start_s": s, "quote": q, "car_class": c}
-                              for u, s, q, c in g["sources"]),
-                             key=_source_key)
-            values.append({"value": value, "authors": sorted(g["texts"]), "sources": sources,
-                           "n": _count(g["texts"], people)})
-        values.sort(key=lambda v: (-v["n"], v["value"]))
-        state = _state(type_, values, reliable)
+    for (corner, type_), sides in groups.items():
+        values = _values(sides["values"], people)
+        others = _values(sides["others"], people)
+        state = _state(type_, values, reliable) if values else "singolo"
+        if state == "verificato" and any(o["value"] != values[0]["value"] for o in others):
+            state = "conteso"   # un'altra classe dice altro: per la GT3 non è sicuro
         key = fact_key(track, corner, type_, values[0]["value"]) if state == "verificato" else None
         out.append({"corner": corner, "type": type_, "state": state, "fact_key": key,
-                    "values": values})
+                    "values": values, "others": others})
     out.sort(key=lambda e: (corner_order.get(e["corner"], len(corner_order)), e["corner"],
                             type_order.get(e["type"], len(type_order)), e["type"]))
     return out

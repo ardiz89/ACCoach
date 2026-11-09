@@ -31,8 +31,9 @@ Return ONLY this JSON object. No prose, no Markdown fences, no extra keys:
   text contradicts it or the quotes do not mean what the fact says.
 - `reason`: one short sentence, in English, saying why.
 - `quote`: the passage that supports your verdict, copied character for character from
-  one `body` in `texts`, the shortest clause of 4 or more words, inside one piece (never
-  across a `[…]` line). Never translate or paraphrase.
+  one `body` in `texts`, the shortest clause of 4 or more words, inside one piece. A
+  quote that contains `[…]` or crosses that line is thrown away. Never translate or
+  paraphrase.
   - For `confermato` it must come from a text whose `sha256` is NOT in `fact_sha256s`
     and whose author (`platform:author` in `meta`) is NOT in `fact_authors`: those are
     the texts and the authors the fact comes from, and a fact cannot confirm itself.

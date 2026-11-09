@@ -995,3 +995,19 @@ def test_una_regola_una_copia():
         assert not hasattr(vocab, nome)
     assert "che non c'è ancora" not in inspect.getsource(agents)
     assert "(sha256, kind, prompt_version, model, track)" in agents.__doc__
+
+
+@pytest.mark.parametrize("verdetto", ["confermato", "respinto"])
+@pytest.mark.parametrize("q", ["Then relax a bit.\n[…]\nCoffee time now",
+                               "[…] Coffee time now. Later"])
+def test_factcheck_citazione_oltre_il_taglio(conn, tmp_path, monkeypatch, verdetto, q):
+    # 8: una citazione che contiene «[…]» o passa sopra il taglio non regge.
+    _fatto_di_u_uno(conn, tmp_path, monkeypatch)
+    sha, _ = db.add_text(conn, _fonte(conn, "https://r/lungo"), "comment", "u_lungo", LUNGO)
+    job = json.loads(agents.pending(conn, "factcheck", "imola", tmp_path / "fc")[0].read_text(encoding="utf-8"))
+    corpo = {t["sha256"]: t["body"] for t in job["texts"]}[sha]
+    d = json.loads((FIX / "risposta_factcheck.json").read_text(encoding="utf-8"))
+    d.update(fact_key=KEY, verdict=verdetto, quote=q, offset=corpo.index(q.split()[0]))
+    with pytest.raises(agents.AnswerRejected) as e:
+        agents.ingest(conn, _scrivi(tmp_path, d), "m")
+    assert e.value.reason == "citazione_oltre_taglio"

@@ -459,6 +459,13 @@ def _check_factcheck(d: dict, payload: dict) -> None:
     l'autoconferma, e il confermato si rifiuta.
     """
     texts = [t for t in payload.get("texts") or [] if isinstance(t, dict)]
+    # Il taglio non è testo della fonte: una citazione che lo contiene o lo scavalca non regge.
+    if GAP.strip() in d["quote"] or any(
+            GAP.strip() in (t.get("body") or "")[a:b]
+            for t in texts
+            for _, a, b in [verify.quote_span(d["quote"], t.get("body") or "", d["offset"])]
+            if a is not None):
+        raise AnswerRejected("citazione_oltre_taglio")
     if d["verdict"] == "respinto":
         reasons = [verify.check_quote(d["quote"], t.get("body") or "", d["offset"]) for t in texts]
         if None in reasons:

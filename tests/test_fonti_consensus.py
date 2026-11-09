@@ -428,7 +428,7 @@ def test_ordinamento_deterministico(tmp_path):
 def test_forma_della_voce(b):
     _gear(b, "https://r/1", "uno")
     e = b.build()[0]
-    assert set(e) == {"corner", "type", "state", "values", "fact_key"}
+    assert set(e) == {"corner", "type", "state", "values", "fact_key", "others"}
     v = e["values"][0]
     assert set(v) == {"value", "authors", "sources", "n"}
     assert v["n"] == 1
@@ -520,7 +520,10 @@ def test_frenata_e_marcia_solo_da_fonti_gt3(b, classe):
     for url, autore, pre in (("https://r/6", "sei", "At"), ("https://r/7", "sette", "Honestly at")):
         b.testo(url, autore, f"{pre} Acque Minerali {kerb} every lap.", [("kerb", "exit", kerb)])
     voci = b.build()
-    assert {e["type"] for e in voci} == {"kerb"}
+    for t in ("brake", "gear"):
+        e = _voce(voci, type_=t)
+        assert e["values"] == [] and e["state"] == "singolo" and e["fact_key"] is None
+        assert e["others"], t
     assert _voce(voci, type_="kerb")["state"] == "verificato"
 
 
@@ -531,3 +534,45 @@ def test_frenata_conta_solo_le_fonti_gt3(b):
     e = _voce(b.build(), type_="brake")
     assert e["values"][0]["authors"] == ["reddit:uno"]
     assert [s["car_class"] for s in e["values"][0]["sources"]] == ["gt3"]
+
+
+# --- round 2: classe per testo e altre classi -----------------------------------------
+
+def _classe_testo(b, autore, classe):
+    b.conn.execute("UPDATE texts SET car_class=? WHERE author=?", (classe, autore))
+    b.conn.commit()
+
+
+def test_testo_gt4_in_fonte_gt3_rende_conteso(b):
+    # N2, N4: il commento dice GT4 e un altro cartello: non vota, ma contende.
+    _brake(b, "https://r/1", "uno")
+    _brake(b, "https://r/2", "due", prefix="Honestly at")
+    b.coach("https://r/c", "Coach Uno", None)
+    _brake(b, "https://r/3", "tre", 150)
+    _classe_testo(b, "tre", "gt4")
+    e = _voce(b.build(), type_="brake")
+    assert e["state"] == "conteso" and e["fact_key"] is None
+    assert [v["value"] for v in e["values"]] == ["board:100"]
+    assert [(o["value"], o["authors"]) for o in e["others"]] == [("board:150", ["reddit:tre"])]
+    assert e["others"][0]["sources"][0]["car_class"] == "gt4"
+
+
+def test_altre_classi_con_lo_stesso_valore_non_contendono(b):
+    _brake(b, "https://r/1", "uno")
+    _brake(b, "https://r/2", "due", prefix="Honestly at")
+    b.coach("https://r/c", "Coach Uno", None)
+    b.classe = "ignota"
+    _brake(b, "https://r/3", "tre", prefix="Well at")
+    e = _voce(b.build(), type_="brake")
+    assert e["state"] == "verificato" and e["fact_key"]
+    assert "reddit:tre" not in e["values"][0]["authors"]
+    assert [o["value"] for o in e["others"]] == ["board:100"]
+
+
+def test_altre_classi_non_toccano_gli_altri_tipi(b):
+    kerb = "use the kerb on exit"
+    b.classe = "gt4"
+    for url, autore, pre in (("https://r/6", "sei", "At"), ("https://r/7", "sette", "Honestly at")):
+        b.testo(url, autore, f"{pre} Acque Minerali {kerb} every lap.", [("kerb", "exit", kerb)])
+    e = _voce(b.build(), type_="kerb")
+    assert e["state"] == "verificato" and e["others"] == []

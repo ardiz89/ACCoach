@@ -62,6 +62,10 @@ Imola è `tools/fonti/piani/imola.json`.
    - Una voce che non dà nemmeno un testo non si segna finita. Il comando te lo dice.
      Controlla l'input con `check-actors`, poi rifai solo quella voce con
      `--force --only N`. I numeri delle voci partono da 1, come nel dry-run.
+   - Una corsa finita con stato FAILED, ABORTED o TIMED-OUT non si segna finita. Il
+     comando dice lo stato. Gli elementi arrivati restano in `raw_items`.
+   - Per YouTube il comando dice da quale campo ha letto i sottotitoli: `srt`, `vtt`,
+     `plaintext` o `text`. Se non ne trova nessuno, elenca le chiavi che ha visto.
 
 4. Guarda quante righe hai.
 
@@ -94,8 +98,14 @@ Imola è `tools/fonti/piani/imola.json`.
    F consensus --track imola
    ```
 
-   Frenata e marcia contano solo le fonti GT3. La classe si legge dal titolo, dalla
-   descrizione o dal flair. Gli altri tipi contano tutte le fonti ACC.
+   Frenata e marcia votano solo con le fonti GT3. Gli altri tipi contano tutte le fonti
+   ACC.
+
+   - La classe la dà solo il titolo. GT3 Cup, Trofeo, GT2, M2, TCX e i modelli GT4 non
+     sono GT3.
+   - Descrizione e flair non danno la classe. Se nominano un'altra classe, la tolgono.
+   - Un commento che dice un'altra classe, per esempio «gt4», ha la sua classe.
+   - Le altre classi non votano. Se dicono un valore diverso, la voce diventa contesa.
 
 8. Fai controllare i fatti verificati.
 
