@@ -165,6 +165,9 @@ body {
   align-items: center;
   margin-right: 24px;
 }
+/* L'ultima cifra non ha niente accanto: i suoi 24 px servono alla benzina.
+   A 1024 punti velocita', marcia e "100" stanno a pochi px dal bordo. */
+.t-big:last-child { margin-right: 0; }
 /* Cifre tutte larghe uguali: Safari di iOS 9 non conosce
    font-variant-numeric, e la velocita' ballerebbe a ogni frame. */
 .t-num {

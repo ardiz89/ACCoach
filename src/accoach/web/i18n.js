@@ -1086,7 +1086,7 @@ Salva un setup nel gioco, poi ricarica questa pagina.` },
     "tablet.base":     { en: `Starting setup`, it: `Il file di partenza` },
     // Senza un file scritto da HONE il primo non si indovina (08/11): lo
     // sceglie il pilota, e lo stesso quando le gomme non rispondono.
-    "tablet.askBase":  { en: `Which setup did you load in ACC?`, it: `Quale assetto hai caricato in ACC?` },
+    "tablet.askBase":  { en: `Which setup did you load in the game?`, it: `Quale assetto hai caricato nel gioco?` },
     "tablet.noBase":   { en: `I can't find a setup for this car on this track. Save one from the game's garage.`,
                          it: `Non trovo un assetto di questa auto per questa pista. Salvane uno dal garage del gioco.` },
     "tablet.write":    { en: `Write the change`, it: `Scrivi la modifica` },

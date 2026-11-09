@@ -104,13 +104,23 @@ def _messages():
     eng = RaceEngineer(GT3_PROFILE, min_stable=3)
     _until(eng, lambda: _lap(press={"front": 24.73, "rear": 26.5}))
     eng.mark_applied()
-    d = _until(eng, lambda: _lap(time_ms=101950), DecisionKind.REVERTED)
+    # Le gomme a caldo restano dove erano: il controllo della base non scatta
+    # (lo spostamento nullo non supera mai la modifica stessa).
+    low = {"front": 24.73, "rear": 26.5}
+    d = _until(eng, lambda: _lap(time_ms=101950, press=low), DecisionKind.REVERTED)
     out += [d.message, d.change.rationale]
     eng = RaceEngineer(GT3_PROFILE, min_stable=3)
-    _until(eng, lambda: _lap(press={"front": 24.73, "rear": 26.5}, fuel=20.4))
+    _until(eng, lambda: _lap(press=low, fuel=20.4))
     eng.mark_applied()
-    out.append(_until(eng, lambda: _lap(time_ms=101950, fuel=58.7),
+    out.append(_until(eng, lambda: _lap(time_ms=101950, fuel=58.7, press=low),
                       DecisionKind.ACCEPTED).message)
+    # Le gomme si muovono lontano dalla modifica: niente verdetto, si richiede.
+    eng = RaceEngineer(GT3_PROFILE, min_stable=3)
+    _until(eng, lambda: _lap(press=low))
+    eng.mark_applied()
+    d = _until(eng, lambda: _lap(press=PRESS_OK), DecisionKind.STAND_DOWN)
+    assert d.confirm_base
+    out.append(d.message)
     # Le fasi che si chiudono, fino in fondo.
     eng = RaceEngineer(GT3_PROFILE, min_stable=3)
     for _ in range(12):

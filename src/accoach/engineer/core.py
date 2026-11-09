@@ -504,10 +504,14 @@ _DECISION_MSG = {
               "modifica valeva {worth}.",
     },
     "base_ask": {
-        "en": "Maybe the starting file wasn't the one on your car. In the pits, "
-              "pick the setup you actually loaded.",
-        "it": "Forse il file di partenza non era quello che hai in macchina. Ai "
-              "box scegli l'assetto che hai caricato davvero.",
+        "en": "Maybe the starting file wasn't the one on your car, so I won't "
+              "judge this test or log it. In the pits, reload the setup you "
+              "were driving before the change. Then I'll start the baseline "
+              "again.",
+        "it": "Forse il file di partenza non era quello che hai in macchina, "
+              "quindi questa prova non la giudico e non la registro. Ai box "
+              "ricarica l'assetto che guidavi prima della modifica. Poi rifaccio "
+              "la base.",
     },
     "accepted_resolved": {
         "en": "The {sym} is fixed. It was {a}, now it's {b}.",
@@ -1386,16 +1390,23 @@ class RaceEngineer:
                             _msg("evaluating", lang, laps=_laps_left(need, lang))
                             + tail, tail=tail)
 
-        # Prima del verdetto: un ripristino svuota la finestra.
+        # Prima del verdetto, sulla finestra di adesso.
         moved = self._base_moved(a, lang)
-        d = self._verdict(a, lang)
         if not moved:
-            return d
-        asked = replace(d, message=f"{d.message} {moved}", confirm_base=True)
-        # Un ripristino si ripete a ogni giro (`observe`): con la domanda.
-        if self._held_revert is d:
-            self._held_revert = asked
-        return asked
+            return self._verdict(a, lang)
+        # Le gomme non hanno risposto come la modifica: la prova non e' quella
+        # che crediamo. L'08/11 valeva 5 click ed erano 13. Giudicarla
+        # scriverebbe nel registro una prova mai fatta, e un ripristino di 5
+        # click sopra il file scelto darebbe un assetto sbagliato in ogni caso.
+        # Quindi niente verdetto, niente registro, niente da scrivere: il
+        # pilota ricarica l'assetto di prima e la base riparte da giri nuovi.
+        self.window = []
+        self._offs = []
+        self.active = None
+        self._pending = None
+        self._pending_is_revert = False
+        self._pending_prediction = None
+        return Decision(DecisionKind.STAND_DOWN, moved, confirm_base=True)
 
     def _base_moved(self, a: "_Active", lang: str) -> str:
         """Le gomme hanno risposto alla modifica di pressione come previsto?

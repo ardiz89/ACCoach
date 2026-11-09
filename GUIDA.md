@@ -894,10 +894,11 @@ tutte e due, sopra la fase, c'è la strada descritta in «La strada
 dell'ingegnere».
 
 - **Telemetria.** Vedi velocità, marcia e benzina. La benzina è la
-  percentuale del serbatoio, con sotto «≈ N giri» al consumo medio. Vedi due
-  trattini finché HONE non ha misurato un giro. Poi ci sono TC, ABS e mappa motore. Vedi anche
-  temperatura e pressione delle quattro gomme, e la striscia di gas, freno e sterzo degli
-  ultimi 8 s. Sotto ci sono la strada e la fase su cui lavora l'ingegnere. Una
+  percentuale del serbatoio, con sotto «≈ N giri» al consumo medio. Sotto vedi
+  un trattino finché HONE non ha misurato il consumo di un giro. Poi ci sono
+  TC, ABS e mappa motore. Vedi anche temperatura e pressione delle quattro
+  gomme, e la striscia di gas, freno e sterzo degli ultimi 8 s. Sotto ci sono
+  la strada e la fase su cui lavora l'ingegnere. Una
   modifica da fare dal volante compare in un riquadro. Il bottone *L'ho
   cambiato* c'è solo dove HONE non legge la manopola, come spiegato in «I
   consigli di setup».
@@ -910,11 +911,11 @@ dell'ingegnere».
   fiducia. Come file di partenza HONE usa l'ultimo assetto che ha scritto per
   quell'auto e quella pista da quando è partito il processo web. Se non ne ha
   scritto nessuno non tira a indovinare. La pagina ti chiede «Quale assetto hai
-  caricato in ACC?» e la lista parte vuota. Finché non scegli il file, il
+  caricato nel gioco?» e la lista parte vuota. Finché non scegli il file, il
   bottone per scrivere resta spento. Dopo un riavvio di HONE la domanda torna.
   Dalla lista puoi sempre sceglierne un altro. Premi *Scrivi la modifica* e
-  conferma. HONE crea
-  un file nuovo e non tocca il tuo. Poi la pagina ti mostra in grande il nome
+  conferma. HONE crea un file nuovo e non tocca il tuo. Poi la pagina ti
+  mostra in grande il nome
   del file, da caricare dal garage del gioco. Se non trova un assetto per
   quell'auto su quella pista, ti chiede di salvarne uno dal garage.
 - **In pista Assetto si legge.** La modifica, il file di partenza e le leve li
@@ -930,8 +931,11 @@ dell'ingegnere».
   l'ingegnere confronta quanto si sono mosse le gomme a caldo con quanto
   valeva la modifica. Se lo scarto supera 0,8 psi, o la modifica stessa quando
   è più grande, te lo dice coi due numeri. Vuol dire che forse il file di
-  partenza non era quello in macchina. Ai box la pagina ti rifà la domanda, e
-  tu scegli l'assetto che hai caricato davvero.
+  partenza non era quello in macchina. Allora la prova non la giudica e non la
+  scrive nel registro, e non c'è niente da scrivere sul file. Ai box ricarica
+  l'assetto che guidavi prima della modifica. La pagina ti rifà la domanda, e
+  tu scegli l'assetto che hai caricato davvero. Poi l'ingegnere rifà la base
+  con giri nuovi.
 
 La pagina completa dell'ingegnere segue la stessa regola. I bottoni che
 scrivono si spengono quando stai guidando e non sei fermo ai box, anche in

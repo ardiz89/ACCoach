@@ -45,3 +45,10 @@ def test_page_has_the_fuel_block_and_keys():
     js = (_WEB / "i18n.js").read_text(encoding="utf-8")
     for k in ("tablet.fuel", "tablet.fuelLaps", "tablet.fuelLap"):
         assert '"%s"' % k in js
+
+
+def test_the_last_big_number_has_no_right_margin():
+    """Revisione finale: a 1024 punti velocita', marcia e «100» stavano a pochi
+    px dal bordo. I 24 px dopo l'ultima cifra non separano niente."""
+    css = (_WEB / "tablet.css").read_text(encoding="utf-8")
+    assert re.search(r"\.t-big:last-child\s*\{\s*margin-right:\s*0;", css)

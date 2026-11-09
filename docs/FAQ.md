@@ -940,9 +940,10 @@ pits. On both tabs, above the phase, is the road described in "The engineer's
 road".
 
 - **Telemetry.** You see speed, gear and fuel. Fuel is the tank
-  percentage, with "≈ N laps" below it at your average burn. You see two dashes
-  until HONE has measured a lap. Then there are TC, ABS and engine map, and the temperature
-  and pressure of the four tyres. A strip shows throttle, brake and steering
+  percentage, with "≈ N laps" below it at your average burn. Below it you see
+  a dash until HONE has measured one lap's burn. Then there are TC, ABS and
+  engine map, and the temperature and pressure of the four tyres. A strip
+  shows throttle, brake and steering
   from the last 8 s. Below it are the road and the phase the engineer is on.
   A change to make from the wheel appears in a box. The *I've changed it* button
   is there only where HONE can't read the dial, as explained in "Setup advice".
@@ -954,11 +955,12 @@ road".
   from the current value to the new one. Below are the reason and the
   confidence. As the starting file, HONE uses the last setup it wrote for
   that car and track since the web process started. If it hasn't written one,
-  it doesn't guess. The page asks "Which setup did you load in ACC?" and the
-  list starts empty. Until you pick the file, the write button stays off.
+  it doesn't guess. The page asks "Which setup did you load in the game?" and
+  the list starts empty. Until you pick the file, the write button stays off.
   After HONE restarts the question comes back. You can always pick another
-  file from the list. Press *Write the change* and confirm. HONE creates a new file and
-  leaves yours alone. The page then shows the file name in large type, to load
+  file from the list. Press *Write the change* and confirm. HONE creates a new
+  file and leaves yours alone. The page then shows the file name in large
+  type, to load
   from the game's garage. If it can't find a setup for that car on that track,
   it asks you to save one from the garage.
 - **On track, Setup is for reading.** You see the change, the starting file
@@ -974,8 +976,11 @@ road".
   the engineer compares how far the hot tyres moved with what the change was
   worth. If the gap is over 0.8 psi, or over the change itself when that is
   bigger, it tells you both numbers. It means the starting file probably
-  wasn't the one on your car. In the pits the page asks again, and you pick
-  the setup you actually loaded.
+  wasn't the one on your car. Then the engineer doesn't judge the test or log
+  it, and there's nothing to write on the file. In the pits, reload the setup
+  you were driving before the change. The page asks again, and you pick the
+  setup you actually loaded. Then the engineer takes a new baseline on fresh
+  laps.
 - **The full Engineer page follows the same rule.** Its writing buttons switch
   off when you're driving and not stopped in the pits, even paused on track.
   With the game off or in the menus you can still write, to prepare a setup

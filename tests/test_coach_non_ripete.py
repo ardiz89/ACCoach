@@ -25,6 +25,27 @@ def test_stessa_categoria_a_1_5_secondi_in_un_altro_tratto_non_si_ripete():
     assert sch.poll(101.5) is None
 
 
+def _parla_fino_a(sch, start, end, step=0.1):
+    detti = []
+    t = start
+    while t <= end + 1e-9:
+        c = sch.poll(round(t, 2))
+        if c is not None:
+            detti.append((round(t, 2), c.category))
+        t += step
+    return detti
+
+
+def test_la_ripetizione_fermata_si_butta_non_si_rimanda():
+    # La revisione finale: rimandata, l'urgente vive 5,5 s e usciva a 105,1.
+    for cat in (CueCategory.WHEELSPIN, CueCategory.LOCKED):
+        sch = CueScheduler()
+        sch.submit(_cue(cat, segment=4), now=100.0)
+        assert sch.poll(100.0) is not None
+        sch.submit(_cue(cat, segment=5), now=101.5)
+        assert _parla_fino_a(sch, 100.1, 106.0) == []
+
+
 def test_stessa_categoria_a_5_1_secondi_si_dice():
     sch = CueScheduler()
     sch.submit(_cue(CueCategory.WHEELSPIN, segment=4), now=100.0)

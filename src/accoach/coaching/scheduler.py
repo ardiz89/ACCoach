@@ -230,6 +230,10 @@ class CueScheduler:
     def _is_stale(self, cue: Cue, queued_at: float | None, now: float) -> bool:
         return queued_at is not None and (now - queued_at) > self._stale_limit(cue)
 
+    def _same_category_recent(self, cue: Cue, now: float) -> bool:
+        last_cat = self._recent_category.get(cue.category)
+        return last_cat is not None and now - last_cat < SAME_CATEGORY_S
+
     def poll(self, now: float) -> Cue | None:
         """Return the cue to speak right now, or ``None``."""
         # Drop stale cues every tick, independent of the speak gap, so the queue
@@ -251,6 +255,17 @@ class CueScheduler:
         # Most urgent first: tier dominates, priority breaks ties within a tier
         # (so a big corner time-loss can't jump ahead of an acute safety call).
         self._pending.sort(key=lambda ct: ct[0].rank(), reverse=True)
+        # Fermate dalla regola dei 5 s: si buttano, non si rimandano. Rimandata,
+        # un'urgente vive 5,5 s e la ripetizione usciva comunque, a 5,1 s, spesso
+        # nella curva dopo. Il riepilogo box resta: e' uno stato, non un evento.
+        self._pending = [
+            (c, t0) for (c, t0) in self._pending
+            if c.category == CueCategory.PIT_BRIEFING
+            or not self._same_category_recent(c, now)
+        ]
+        if not self._pending:
+            return None
+
         chosen: Cue | None = None
         for cue, _t0 in self._pending:
             if acute_only and cue.tier != CueTier.ACUTE:
@@ -262,8 +277,7 @@ class CueScheduler:
             last = self._recent.get(cue.dedup_key())
             if last is not None and now - last < self.repeat_suppress_s:
                 continue
-            last_cat = self._recent_category.get(cue.category)
-            if last_cat is not None and now - last_cat < SAME_CATEGORY_S:
+            if self._same_category_recent(cue, now):
                 continue
             chosen = cue
             break

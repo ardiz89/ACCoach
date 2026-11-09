@@ -65,6 +65,10 @@ const state = {
   // la tendina parte vuota e i bottoni che scrivono sono spenti.
   askBase: false,
   askedFor: null,                // il verdetto che ha gia' fatto la domanda
+  // La domanda del verdetto e' ancora senza risposta. `askBase` lo riscrive
+  // ogni `onComboChange`, che al primo frame dal vivo parte sempre: senza
+  // questo, ricaricando la pagina la domanda spariva in silenzio.
+  askVerdict: false,
   setups: [],                    // l'ultimo elenco di /api/setup/list
   lastLive: null,                // last live payload, for re-render on lang switch
   // Quale auto/pista crediamo tu stia guidando, e da dove lo sappiamo:
@@ -380,17 +384,27 @@ async function onComboChange(prefer) {
   // Se non ne ha scritto nessuno non si indovina (08/11: il piu' recente per
   // data era un altro assetto, e la modifica e' venuta di 13 click invece di
   // 5). Dopo una scrittura `prefer` e' il file scritto e non si chiede.
+  const wrote = !!prefer;
   let ask = false;
   if (!prefer) {
     try {
       const b = await api(`/api/setup/base?${q}`);
       if (b && b.confirm) ask = true;
       else if (b && b.last_written) prefer = b.last_written;
-    } catch (e) { /* senza risposta resta la prima voce, come prima */ }
+    } catch (e) {
+      // Senza risposta non si indovina: si chiede, come senza `last_written`.
+      ask = true;
+    }
+  }
+  // Un verdetto dice di richiedere il file e il pilota non ha ancora scelto:
+  // la domanda resta. Una scrittura (`prefer`) la chiude.
+  if (state.askVerdict) {
+    if (!wrote && liveConfirmKey() === state.askedFor) ask = true;
+    else state.askVerdict = false;
   }
   state.askBase = ask;
   state.setups = list;
-  fillSetups(list, prefer);
+  fillSetups(list, ask ? null : prefer);
   await onSetupChange();
   loadRecord();                 // best-effort: il registro non blocca la pagina
 }
@@ -416,8 +430,11 @@ function fillSetups(list, prefer) {
 
 // Le gomme non hanno risposto come la modifica prevedeva (`confirm_base`):
 // forse il file di partenza non era quello in macchina. Si rifa' la domanda.
+// Butta le modifiche ancora da scrivere: dopo un verdetto la proposta cambia
+// comunque, e quelle partivano da un file che forse non e' in macchina.
 async function askAgain() {
   state.askBase = true;
+  state.askVerdict = true;
   fillSetups(state.setups || [], null);
   await onSetupChange();
 }
@@ -522,6 +539,7 @@ async function onSetupChange() {
     return;
   }
   state.askBase = false;
+  state.askVerdict = false;        // un file scelto chiude la domanda
   state.setupPath = opt.dataset.path;
   const data = await api(`/api/setup/current?path=${encodeURIComponent(state.setupPath)}`);
   // Acceso solo con un backup da cui ripristinare.
@@ -1375,14 +1393,22 @@ function renderRoad(eng) {
 
 // Render the structured engineer block (st.engineer) — proposal + at-the-wheel
 // advice. Falls back to the live coach cue until the diagnosis block exists.
+// La chiave del verdetto che chiede il file di partenza, nell'ultimo frame.
+function confirmKey(eng) {
+  return eng && eng.confirm_base ? `${eng.kind}|${eng.message || ""}` : null;
+}
+function liveConfirmKey() {
+  return confirmKey(state.lastLive && state.lastLive.engineer);
+}
+
 function renderEngineer(st) {
   const eng = st.engineer;
   // Le gomme non hanno risposto come previsto: si richiede il file di
   // partenza, una volta per verdetto (un ripristino torna uguale a ogni frame).
-  if (eng && eng.confirm_base) {
-    const k = `${eng.kind}|${eng.message || ""}`;
-    if (k !== state.askedFor) { state.askedFor = k; askAgain(); }
-  }
+  // La chiave e' quella di `confirmKey`, scritta qui perche' i banchi di prova
+  // prendono `renderEngineer` da sola.
+  const k = eng && eng.confirm_base ? `${eng.kind}|${eng.message || ""}` : null;
+  if (k && k !== state.askedFor) { state.askedFor = k; askAgain(); }
   const av = $("av-now");
   if (eng && eng.tag === "AV" && eng.change) {
     av.hidden = false;

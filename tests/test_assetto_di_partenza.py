@@ -9,12 +9,15 @@ aveva un `last_written` e proponeva il file piu' recente per data, `HONE_2`
 Due rimedi. Il primo file si sceglie, non si propone: la tendina parte vuota
 e il tasto per scrivere resta spento. E la risposta delle gomme si controlla:
 quando si chiude la prova di una pressione, uno spostamento a caldo lontano da
-quello previsto vuol dire che la base non era quella, e la pagina richiede.
+quello previsto vuol dire che la base non era quella. Allora la prova non si
+giudica e non si registra: il pilota ricarica l'assetto di prima, la pagina
+richiede il file e la base riparte da giri nuovi.
 """
 import json
 import shutil
 import subprocess
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -23,6 +26,7 @@ from accoach.engineer import Decision, DecisionKind, LapStats, RaceEngineer
 from accoach.engineer.core import FRONT, AtomicChange, ProposedChange
 from accoach.engineer.profiles import GT3_PROFILE
 from accoach import config
+from accoach.engineer import ledger
 from accoach.telemetry.snapshot import TelemetrySnapshot
 from test_tablet_box import _BOX_HARNESS
 
@@ -64,12 +68,47 @@ def _italiano(monkeypatch, tmp_path):
 def test_0811_predicted_plus_half_measured_plus_2_2_asks_for_the_base():
     """HONE_3: +5 click (0,1 psi l'uno) previsti +0,5, misurati +2,2."""
     _, d = _test_pressure(5, 25.8, 28.0)
-    assert d.kind is DecisionKind.ACCEPTED
+    assert d.kind is DecisionKind.STAND_DOWN
     assert d.confirm_base is True
     assert "+2,2 psi" in d.message and "+0,5 psi" in d.message
     assert "anteriori" in d.message
     assert "Quale assetto hai caricato" not in d.message   # la domanda la fa la pagina
-    assert "ai box" in d.message.lower()
+    assert "ai box ricarica l'assetto che guidavi prima" in d.message.lower()
+    assert "non la giudico e non la registro" in d.message
+
+
+@pytest.mark.parametrize("time_after", [100000, 103000])
+def test_when_the_tyres_disagree_the_test_is_not_judged_nor_recorded(time_after, monkeypatch):
+    """Ne' tenuta ne' bocciata, che il giro sia uguale o piu' lento: nessun
+    verdetto, nessuna voce nel registro, niente da scrivere sul file."""
+    eng, d = _test_pressure(5, 25.8, 28.0, time_after=time_after)
+    assert d.kind is DecisionKind.STAND_DOWN and d.confirm_base is True
+    assert d.outcome is None and d.change is None
+    assert eng.history == [] and eng.applied_clicks == {}
+    assert eng.active is None and eng._held_revert is None
+    written = []
+    monkeypatch.setattr(ledger, "append", lambda rec, *a: written.append(rec))
+    CoachEngine._log_engineer_outcome(None, SimpleNamespace(car_model="mclaren",
+                                                            track="Imola"), d)
+    assert written == []
+
+
+def test_when_the_tyres_disagree_no_ledger_file_is_written(tmp_path, monkeypatch):
+    path = tmp_path / "engineer_log.jsonl"
+    monkeypatch.setattr(ledger, "ledger_path", lambda: path)
+    _, d = _test_pressure(5, 25.8, 28.0)
+    CoachEngine._log_engineer_outcome(None, SimpleNamespace(car_model="mclaren",
+                                                            track="Imola"), d)
+    assert not path.exists()
+
+
+def test_after_the_stand_down_the_baseline_restarts_on_fresh_laps():
+    eng, d = _test_pressure(5, 25.8, 28.0)
+    assert eng.window == []
+    nxt = eng.observe(_lap(25.8))
+    assert nxt.kind is DecisionKind.COLLECT
+    assert nxt.confirm_base is False
+    assert len(eng.window) == 1
 
 
 @pytest.mark.parametrize("measured_after", [25.3, 25.2])
@@ -100,13 +139,11 @@ def test_without_hot_pressures_nothing_is_said():
     assert d.confirm_base is False
 
 
-def test_a_held_restore_keeps_asking_lap_after_lap():
-    """Un giro piu' lento boccia la prova: il ripristino tenuto porta la
-    domanda anche ai giri dopo, perche' e' lo stesso verdetto."""
-    eng, d = _test_pressure(5, 25.8, 28.0, time_after=103000)
-    assert d.kind is DecisionKind.REVERTED and d.confirm_base is True
-    again = eng.observe(_lap(28.0))
-    assert again is d
+def test_a_slower_lap_with_the_tyres_agreeing_is_still_reverted():
+    """Il controllo delle gomme non tocca il verdetto quando non scatta."""
+    _, d = _test_pressure(5, 25.8, 26.3, time_after=103000)
+    assert d.kind is DecisionKind.REVERTED and d.confirm_base is False
+    assert d.outcome is not None
 
 
 def test_english_message():
@@ -192,7 +229,7 @@ out.askAfter = !$("t-ask").hidden;
 out.writeOn = !$("t-write").disabled;
 """)
     assert out["ask"] is True
-    assert out["askText"] == "Quale assetto hai caricato in ACC?"
+    assert out["askText"] == "Quale assetto hai caricato nel gioco?"
     # La tendina parte vuota: la prima voce non e' un file ed e' quella scelta.
     assert out["opts"][0] == ["", True]
     assert [v for v, _ in out["opts"][1:]] == ["S/HONE_2.json", "S/i0.json"]
@@ -327,20 +364,23 @@ els.combo = { selectedOptions: [{ dataset: { car: "mclaren", track: "Imola" } }]
 var $ = (id) => els[id] || (els[id] = { dataset: {}, hidden: false, disabled: false,
                                          textContent: "", innerHTML: "" });
 var state = { car: null, track: null, setupPath: null, params: [], base: {}, pending: {},
-              lastLive: null };
-var LIST = [], BASE = null, CURRENT = null;
+              lastLive: null, askBase: false, askedFor: null, askVerdict: false, setups: [] };
+var LIST = [], BASE = null, CURRENT = null, BASE_FAILS = false;
 const asked = [];
 var api = async (url) => {
   asked.push(url);
   if (url.indexOf("/api/setup/list") === 0) return LIST;
-  if (url.indexOf("/api/setup/base") === 0) return BASE;
+  if (url.indexOf("/api/setup/base") === 0) {
+    if (BASE_FAILS) throw new Error("503");
+    return BASE;
+  }
   if (url.indexOf("/api/setup/current") === 0) return CURRENT;
   throw new Error(url);
 };
 var loadClass = async () => {}, loadRecord = () => {}, renderSetup = () => {},
     renderTray = () => {}, showToast = () => {}, dn = (s) => s;
 for (const f of ["onComboChange", "fillSetups", "esc", "askBaseText", "askBaseHTML", "onSetupChange", "askAgain",
-                 "inPista", "writeLocked", "paintWriteLock"]) {
+                 "confirmKey", "liveConfirmKey", "inPista", "writeLocked", "paintWriteLock"]) {
   eval(grab(f));
 }
 function snap() {
@@ -354,7 +394,7 @@ function snap() {
 }
 (async () => {
   const sc = JSON.parse(fs.readFileSync(0, "utf8"));
-  LIST = sc.list; BASE = sc.base;
+  LIST = sc.list; BASE = sc.base; BASE_FAILS = !!sc.baseFails;
   CURRENT = { name: "x", car: "mclaren", has_backup: false, params: [], groups: [] };
   const out = {};
   await onComboChange(sc.prefer);
@@ -368,6 +408,22 @@ function snap() {
   if (sc.again) {
     await askAgain();
     out.again = snap();
+  }
+  if (sc.reload) {
+    // Pagina ricaricata con un verdetto `confirm_base` nel frame: il latch di
+    // `renderEngineer` chiede, poi il primo frame dal vivo riapre la combo
+    // (`maybeAutoSelect` -> `onComboChange`), e `last_written` c'e'.
+    state.lastLive = { engineer: sc.reload };
+    state.askedFor = confirmKey(sc.reload);
+    await askAgain();
+    await onComboChange();
+    out.reload = snap();
+    if (sc.pickAfter) {
+      els.setup.value = sc.pickAfter;
+      await onSetupChange();
+      await onComboChange();
+      out.reloadPicked = snap();
+    }
   }
   console.log(JSON.stringify(out));
 })();
@@ -395,7 +451,7 @@ def test_engineer_page_asks_for_the_first_file():
     assert s["opts"][0][1] is True and s["opts"][0][0] == ""
     assert [v for v, _ in s["opts"][1:]] == ["S/HONE_2.json", "S/i0.json"]
     assert s["path"] is None
-    assert "Quale assetto hai caricato in ACC?" in s["body"]
+    assert "Quale assetto hai caricato nel gioco?" in s["body"]
     assert s["apply"] and s["write"] and s["ok"]
     assert s["restored"] is False          # «L'ho già rimesso» non scrive niente
     p = out["picked"]
@@ -435,7 +491,38 @@ def test_engineer_page_reads_confirm_base_from_the_frame():
     src = (_WEB / "engineer.js").read_text(encoding="utf-8")
     body = src[src.index("function renderEngineer("):]
     body = body[:body.index("\n}")]
-    assert "confirm_base" in body and "askAgain" in body
+    assert "eng.confirm_base" in body and "askAgain" in body
+
+
+_VERDICT = {"kind": "stand_down", "confirm_base": True,
+            "message": "Le gomme anteriori si sono mosse di +2,2 psi."}
+
+
+@needs_node
+def test_engineer_page_keeps_the_question_after_a_reload():
+    """Il primo frame dal vivo riapre la combo e `last_written` c'e': prima la
+    domanda spariva in silenzio e la pagina preselezionava HONE_2."""
+    out = _engineer(base={"base": "S/HONE_2.json", "last_written": "HONE_2",
+                          "confirm": False, "setups": []},
+                    reload=_VERDICT, pickAfter="720sEVO_Imola_0")
+    r = out["reload"]
+    assert r["opts"][0] == ["", True]
+    assert r["path"] is None
+    assert r["apply"] and r["write"]
+    # Scelto un file la domanda si chiude, anche se la combo si riapre.
+    p = out["reloadPicked"]
+    assert p["path"] == "S/HONE_2.json"
+    assert all(v for v, _ in p["opts"])
+
+
+@needs_node
+def test_engineer_page_asks_when_the_base_call_fails():
+    """Senza risposta di /api/setup/base non si indovina il piu' recente."""
+    out = _engineer(base=None, baseFails=True)
+    s = out["start"]
+    assert s["opts"][0] == ["", True]
+    assert s["path"] is None
+    assert s["apply"] and s["write"]
 
 
 def test_strings_in_both_languages():
@@ -443,5 +530,5 @@ def test_strings_in_both_languages():
     for key in ('"tablet.askBase"', '"eng.askBaseBody"'):
         block = cat[cat.index(key):][:400]
         assert "en:" in block and "it:" in block, key
-    assert "Quale assetto hai caricato in ACC?" in cat
+    assert "Quale assetto hai caricato nel gioco?" in cat
     assert 'id="t-ask"' in (_WEB / "tablet.html").read_text(encoding="utf-8")
