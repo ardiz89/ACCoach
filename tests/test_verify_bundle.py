@@ -156,7 +156,7 @@ def test_il_controllo_legge_i_payload_veri_dal_nostro_spec():
     sorgenti = [src for src, _dest in coppie]
     assert sorgenti == ["src/accoach/web", "src/accoach/voice_cues",
                         "src/accoach/tracks", "src/accoach/voice_cues_male",
-                        "GUIDA.md", "docs/FAQ.md"]
+                        "src/accoach/trackfacts", "GUIDA.md", "docs/FAQ.md"]
 
 
 def test_il_workflow_non_tiene_una_seconda_copia_dell_elenco():

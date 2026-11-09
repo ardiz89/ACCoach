@@ -18,7 +18,7 @@ if str(ROOT) not in sys.path:
 
 from tools.fonti import db  # noqa: E402
 
-PLANNED = ("export", "review")
+DEFAULT_FACTS = ROOT / "src" / "accoach" / "trackfacts"
 
 
 def _db_path(arg: str) -> Path:
@@ -134,9 +134,29 @@ def cmd_consensus(args) -> int:
     return 0
 
 
-def cmd_non_disponibile(args) -> int:
-    print(f"{args.cmd}: non ancora disponibile", file=sys.stderr)
-    return 2
+def cmd_export(args) -> int:
+    from tools.fonti import export
+
+    conn = db.open_db(_db_path(args.db))
+    try:
+        n = export.export(conn, args.track, Path(args.out) if args.out else DEFAULT_FACTS)
+        path = export.target(Path(args.out) if args.out else DEFAULT_FACTS, args.track)
+    finally:
+        conn.close()
+    print(f"Fatti esportati: {n}, in {path}.")
+    return 0
+
+
+def cmd_review(args) -> int:
+    from tools.fonti import review
+
+    conn = db.open_db(_db_path(args.db))
+    try:
+        path = review.render(conn, args.track, Path(args.out))
+    finally:
+        conn.close()
+    print(f"Pagina di controllo scritta in {path}.")
+    return 0
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -163,8 +183,15 @@ def build_parser() -> argparse.ArgumentParser:
     k = sub.add_parser("consensus", help="il consenso fra autori, curva per curva")
     k.add_argument("--track", required=True)
     k.set_defaults(func=cmd_consensus)
-    for name in PLANNED:
-        sub.add_parser(name, help="non ancora disponibile").set_defaults(func=cmd_non_disponibile)
+    x = sub.add_parser("export", help="esporta i fatti confermati nel pacchetto dell'app")
+    x.add_argument("--track", required=True)
+    x.add_argument("--out", metavar="DIR|FILE",
+                   help="cartella o file .json (predefinito: src/accoach/trackfacts)")
+    x.set_defaults(func=cmd_export)
+    r = sub.add_parser("review", help="scrive la pagina di controllo per il pilota")
+    r.add_argument("--track", required=True)
+    r.add_argument("--out", required=True, metavar="FILE")
+    r.set_defaults(func=cmd_review)
     return ap
 
 
