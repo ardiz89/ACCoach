@@ -15,9 +15,12 @@ Return ONLY this JSON object. No prose, no Markdown fences, no extra keys:
 
 ```
 {"sha256": "<the job's sha256>", "kind": "extract",
+ "prompt_version": "<the job's prompt_version>", "track": "<the job's track>",
  "facts": [{"corner": "...", "type": "...", "value": "...", "quote": "...", "offset": 0}]}
 ```
 
+- `prompt_version` and `track`: copy them from the job, unchanged. An answer to an old
+  version of the job is thrown away.
 - `corner`: one name from `corners`, exactly as written there.
 - `type`: one of `brake`, `gear`, `apex`, `kerb`, `line`, `mistake`.
 - `value`:

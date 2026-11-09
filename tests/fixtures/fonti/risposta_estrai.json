@@ -1,6 +1,8 @@
 {
  "sha256": "97ee69d68d556536e78db575c4c7097e98af762fadd034b6c52a1c1856598a0d",
  "kind": "extract",
+ "prompt_version": "1",
+ "track": "imola",
  "facts": [
   {"corner": "Acque Minerali", "type": "gear", "value": "3", "quote": "down to third gear", "offset": 23},
   {"corner": "Acque Minerali", "type": "brake", "value": "board:150", "quote": "brake at the 150 board", "offset": 0}

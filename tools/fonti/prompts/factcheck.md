@@ -16,14 +16,19 @@ Return ONLY this JSON object. No prose, no Markdown fences, no extra keys:
 
 ```
 {"fact_key": "<fact.fact_key>", "kind": "factcheck",
+ "prompt_version": "<the job's prompt_version>", "track": "<the job's track>",
  "verdict": "confermato|respinto", "reason": "...", "quote": "...", "offset": 0}
 ```
 
+- `prompt_version` and `track`: copy them from the job, unchanged. An answer to an old
+  version of the job is thrown away.
 - `verdict`: `confermato` if the texts support the fact as stated, `respinto` if any
   text contradicts it or the quotes do not mean what the fact says.
 - `reason`: one short sentence, in English, saying why.
 - `quote`: the passage that supports your verdict, copied character for character from
-  one `body` in `texts`, the shortest clause of 4 or more words. Never translate or
+  one `body` in `texts`, the shortest clause of 4 or more words. It must come from a
+  text whose `sha256` is NOT in `fact_sha256s`: those are the texts the fact comes
+  from, and a fact cannot confirm itself. Never translate or
   paraphrase.
 - `offset`: the character index in that `body` where the quote starts.
 

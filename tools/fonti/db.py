@@ -31,8 +31,8 @@ CREATE TABLE IF NOT EXISTS results(
     id INTEGER PRIMARY KEY,
     sha256 TEXT,
     kind TEXT CHECK (kind IN ('extract','rate','factcheck')),
-    prompt_version TEXT, model TEXT, payload_json TEXT, frozen_at TEXT,
-    UNIQUE(sha256, kind, prompt_version, model)
+    prompt_version TEXT, model TEXT, payload_json TEXT, frozen_at TEXT, track TEXT,
+    UNIQUE(sha256, kind, prompt_version, model, track)
 );
 CREATE TABLE IF NOT EXISTS facts(
     id INTEGER PRIMARY KEY,
@@ -53,7 +53,7 @@ CREATE TABLE IF NOT EXISTS collect_runs(
 );
 CREATE TABLE IF NOT EXISTS jobs(
     kind TEXT, key TEXT, track TEXT, prompt_version TEXT, payload_json TEXT, created_at TEXT,
-    PRIMARY KEY(kind, key, prompt_version)
+    PRIMARY KEY(kind, key, track, prompt_version)
 );
 """
 
@@ -64,6 +64,9 @@ def open_db(path: Path) -> sqlite3.Connection:
     path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(path))
     conn.executescript(_SCHEMA)
+    # Un database creato prima della colonna `track` nei risultati la riceve vuota.
+    if "track" not in {r[1] for r in conn.execute("PRAGMA table_info(results)")}:
+        conn.execute("ALTER TABLE results ADD COLUMN track TEXT")
     conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
     conn.commit()
     return conn

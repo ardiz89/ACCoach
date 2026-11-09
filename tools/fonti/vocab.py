@@ -361,3 +361,24 @@ def sentence_reason(type_: str, sentence: str, at: int) -> str | None:
             if UNIT_AFTER_DIGIT.match(rest) and not re.match(rf"\s*{_GEAR}\b", rest):
                 return "valore_non_normalizzabile"
     return None
+
+
+# --- chi parla ------------------------------------------------------------------
+
+# Un ruolo si prova solo con una di queste parole nella citazione, e senza negazione.
+ROLE_CUES = {
+    "coach": ["coach", "coaching", "instructor", "istruttore", "insegno", "i teach", "driver coach"],
+    "pilota": ["race", "racing", "racer", "team", "championship", "campionato", "gara", "pilota",
+               "driver for"],
+}
+
+# Parole del vocabolario dei fatti: un nome o un'auto fatti di queste non sono un nome
+# né un'auto, ma un pezzo di consiglio copiato nel campo sbagliato.
+VOCAB_TERMS: tuple[str, ...] = tuple(sorted(
+    {a for corners in CORNERS.values() for aliases in corners.values() for a in aliases}
+    | {p for phrases in OBJECTS.values() for p in phrases}
+    | {w for words in _ORD.values() for w in words}
+    | {"gear", "gears", "marcia", "marce", "board", "boards", "marker", "markers",
+       "apex", "apexes", "apice", "apici", "early", "middle", "mid", "late", "later",
+       "kerb", "kerbs", "curb", "curbs", "cordolo", "cordoli", "entry", "exit",
+       "ingresso", "uscita", "brake", "braking", "frenata", "staccata"}))

@@ -14,29 +14,37 @@ Return ONLY this JSON object. No prose, no Markdown fences, no extra keys:
 
 ```
 {"sha256": "<the job's sha256>", "kind": "rate",
+ "prompt_version": "<the job's prompt_version>", "track": "<the job's track>",
  "speaker": {"name": "...", "role": "pilota|coach|anonimo"},
  "lap_time": "1:41.2" or null,
  "car": "..." or null,
  "reasons": [{"field": "name|role|lap_time|car", "claim": "...", "quote": "...", "offset": 0}]}
 ```
 
+- `prompt_version` and `track`: copy them from the job, unchanged. An answer to an old
+  version of the job is thrown away.
 - `speaker.name`:
   - the name the speaker gives for themselves in `body`; it needs a reason with
     `"field": "name"` whose quote contains that name exactly;
-  - or the author or channel name exactly as it appears in `meta` (`author`); then no
+  - or the author of this text exactly as it appears in `meta` (`author`); then no
     quote is needed;
+  - never a corner name or a word of the advice (a gear, a brake marker, apex, kerb);
   - otherwise the empty string `""`.
 - `speaker.role`:
   - `coach` only if the text states they coach or teach driving;
   - `pilota` only if the text states they race (a series, a team, a result);
   - `anonimo` in every other case.
-  `coach` and `pilota` need a reason with `"field": "role"` quoting that statement.
+  `coach` and `pilota` need a reason with `"field": "role"` quoting that statement,
+  not negated, and containing one of these words:
+  - `coach`: coach, coaching, instructor, istruttore, insegno, "i teach", "driver coach";
+  - `pilota`: race, racing, racer, team, championship, campionato, gara, pilota,
+    "driver for".
 - `lap_time`: a lap time the speaker states for their own lap at this track, copied as
   written; otherwise null. Not null needs a reason with `"field": "lap_time"` whose
   quote contains the lap time exactly as you wrote it.
 - `car`: the car the speaker states they drive, copied as written; otherwise null. Not
   null needs a reason with `"field": "car"` whose quote contains the car exactly as you
-  wrote it.
+  wrote it. A gear, a corner or a brake marker is not a car.
 - Each reason:
   - `field` says which claim it supports;
   - `claim` says in a few words what the quote shows;

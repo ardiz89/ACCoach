@@ -7,8 +7,9 @@ negli scarti; per `rate` e `factcheck` basta una citazione che non regge e la ri
 intera si rifiuta. Un risultato si congela per (sha256, kind, prompt_version, model):
 un secondo ingest della stessa chiave si rifiuta.
 
-Ogni lavoro proposto da `pending` si ricorda nella tabella `jobs`: l'ingest accetta
-solo risposte a un lavoro proposto, e la versione del prompt la prende da lì.
+Ogni lavoro proposto da `pending` si ricorda nella tabella `jobs`, per pista. La
+risposta ripete `prompt_version` e `track` del lavoro; l'ingest accetta solo la
+versione più alta proposta per (kind, key, track) e la congela con quella pista.
 """
 
 from __future__ import annotations
@@ -29,11 +30,14 @@ ROLES = ("pilota", "coach", "anonimo")
 VERDICTS = ("confermato", "respinto")
 FIELDS = ("name", "role", "lap_time", "car")
 
+_ECHO = {"prompt_version", "track"}  # ogni risposta ripete versione e pista del lavoro
 _KEYS = {
-    "extract": {"sha256", "kind", "facts"},
-    "rate": {"sha256", "kind", "speaker", "lap_time", "car", "reasons"},
-    "factcheck": {"fact_key", "kind", "verdict", "reason", "quote", "offset"},
+    "extract": {"sha256", "kind", "facts"} | _ECHO,
+    "rate": {"sha256", "kind", "speaker", "lap_time", "car", "reasons"} | _ECHO,
+    "factcheck": {"fact_key", "kind", "verdict", "reason", "quote", "offset"} | _ECHO,
 }
+_FILLERS = {"the", "a", "an", "in", "at", "to", "into", "on", "of", "and", "il", "lo", "la", "i",
+            "gli", "le", "un", "una", "di", "da", "al", "alla", "allo", "ai", "e"}
 _FACT_KEYS = {"corner", "type", "value", "quote", "offset"}
 _SPEAKER_KEYS = {"name", "role"}
 _REASON_KEYS = {"field", "claim", "quote", "offset"}
@@ -133,9 +137,22 @@ def _texts_by_sha(rows: list[tuple]) -> dict[str, dict]:
     return {k: v for k, v in out.items() if k not in bad}
 
 
-def _frozen_any_model(conn, key: str, kind: str, version: str) -> bool:
-    return conn.execute("SELECT 1 FROM results WHERE sha256=? AND kind=? AND prompt_version=?",
-                        (key, kind, version)).fetchone() is not None
+def _frozen_any_model(conn, key: str, kind: str, version: str, track: str) -> bool:
+    return conn.execute("SELECT 1 FROM results WHERE sha256=? AND kind=? AND prompt_version=?"
+                        " AND track=?", (key, kind, version, track)).fetchone() is not None
+
+
+def _own_shas(conn, track: str, entry: dict) -> list[str]:
+    """Gli sha256 dei testi da cui viene il fatto: una verifica non si conferma su questi."""
+    values = [v.get("value") for v in entry.get("values") or [] if isinstance(v, dict)]
+    if not values:
+        return []
+    marks = ",".join("?" * len(values))
+    rows = conn.execute(
+        "SELECT DISTINCT r.sha256 FROM facts f JOIN results r ON r.id = f.result_id"
+        f" WHERE f.track=? AND f.corner=? AND f.type=? AND f.value IN ({marks})",
+        (track, entry.get("corner"), entry.get("type"), *values)).fetchall()
+    return sorted(r[0] for r in rows)
 
 
 def _mentions(track: str, corner: str, body: str) -> bool:
@@ -155,7 +172,7 @@ def pending(conn: sqlite3.Connection, kind: str, track: str, out_dir: Path) -> l
     jobs: list[tuple[str, dict]] = []
     if kind in ("extract", "rate"):
         for sha in sorted(texts):
-            if _frozen_any_model(conn, sha, kind, version):
+            if _frozen_any_model(conn, sha, kind, version, track):
                 continue
             t = texts[sha]
             jobs.append((sha, {"kind": kind, "sha256": sha, "track": track,
@@ -171,7 +188,7 @@ def pending(conn: sqlite3.Connection, kind: str, track: str, out_dir: Path) -> l
         for entry in consensus.build(conn, track):
             key = entry.get("fact_key")
             if (entry.get("state") != "verificato" or not key
-                    or _frozen_any_model(conn, key, kind, version)):
+                    or _frozen_any_model(conn, key, kind, version, track)):
                 continue
             corner = entry["corner"]
             others = [{"sha256": sha, "body": t["body"], "segments": t["segments"], "meta": t["meta"]}
@@ -179,6 +196,7 @@ def pending(conn: sqlite3.Connection, kind: str, track: str, out_dir: Path) -> l
             jobs.append((key, {"kind": kind, "sha256": key, "track": track,
                                "prompt_version": version, "body": None, "segments": None,
                                "meta": [], "corners": [corner], "fact": entry,
+                               "fact_sha256s": _own_shas(conn, track, entry),
                                "texts": others}))
     jobs.sort(key=lambda x: x[0])
     with _atomic(conn):
@@ -218,6 +236,8 @@ def _validate(d) -> str:
         raise AnswerRejected("schema_errato:kind")
     kind = d["kind"]
     _exact(d, _KEYS[kind], kind)
+    _str(d["prompt_version"], "prompt_version", empty_ok=False)
+    _str(d["track"], "track", empty_ok=False)
     if kind == "extract":
         _str(d["sha256"], "sha256", empty_ok=False)
         if not isinstance(d["facts"], list):
@@ -260,17 +280,19 @@ def _validate(d) -> str:
 
 # --- l'ingest -----------------------------------------------------------------
 
-def _open_job(conn, kind: str, key: str, model: str) -> tuple[str, str, dict]:
-    """(track, prompt_version, payload) del lavoro più nuovo non ancora congelato per il modello."""
-    rows = conn.execute("SELECT prompt_version, track, payload_json FROM jobs WHERE kind=? AND key=?",
-                        (kind, key)).fetchall()
+def _open_job(conn, kind: str, key: str, track: str, version: str, model: str) -> dict:
+    """Il payload del lavoro aperto: la versione più alta proposta per (kind, key, track)."""
+    rows = conn.execute("SELECT prompt_version, payload_json FROM jobs WHERE kind=? AND key=? AND track=?",
+                        (kind, key, track)).fetchall()
     if not rows:
         raise AnswerRejected("lavoro_ignoto")
-    for version, track, payload in sorted(rows, key=lambda r: _version_order(r[0]), reverse=True):
-        if not conn.execute("SELECT 1 FROM results WHERE sha256=? AND kind=? AND prompt_version=?"
-                            " AND model=?", (key, kind, version, model)).fetchone():
-            return track, version, json.loads(payload)
-    raise AnswerRejected("gia_congelato")
+    newest, payload = max(rows, key=lambda r: _version_order(r[0]))
+    if version != newest:
+        raise AnswerRejected("versione_superata")
+    if conn.execute("SELECT 1 FROM results WHERE sha256=? AND kind=? AND prompt_version=?"
+                    " AND model=? AND track=?", (key, kind, version, model, track)).fetchone():
+        raise AnswerRejected("gia_congelato")
+    return json.loads(payload)
 
 
 def _start_s(body: str, segments, at: int | None) -> float | None:
@@ -289,8 +311,36 @@ def _start_s(body: str, segments, at: int | None) -> float | None:
     return best
 
 
+def _vocab_hits(text: str) -> str:
+    """Il testo, normalizzato, con ogni parola del vocabolario dei fatti tolta."""
+    t = vocab.fold(text)
+    for term in sorted(vocab.VOCAB_TERMS, key=len, reverse=True):
+        t = vocab.alias_regex(term).sub(" ", t)
+    return t
+
+
+def _is_vocab_name(name: str) -> bool:
+    """Il nome è, o contiene, una curva o una parola del vocabolario."""
+    return _vocab_hits(name) != vocab.fold(name)
+
+
+def _is_vocab_only(car: str) -> bool:
+    """L'auto è fatta solo di parole del vocabolario (e di riempitivi)."""
+    rest = [w for w in re.findall(r"[\w']+", _vocab_hits(car)) if w not in _FILLERS]
+    return not rest
+
+
+def _proves_role(role: str, quote: str) -> bool:
+    return (not vocab.negated(quote)
+            and any(verify.contains(quote, cue) for cue in vocab.ROLE_CUES[role]))
+
+
 def _check_rate(d: dict, body: str, authors: set[str]) -> None:
-    """Ogni citazione regge e ogni affermazione non vuota ha la sua; altrimenti si rifiuta tutto."""
+    """Ogni citazione regge e ogni affermazione non vuota ha la sua; altrimenti si rifiuta tutto.
+
+    `authors` sono solo gli autori delle righe di quel testo (`texts.author`), mai
+    l'autore della fonte: in un thread l'autore del post non è chi ha scritto il commento.
+    """
     by_field: dict[str, list[str]] = {f: [] for f in FIELDS}
     for r in d["reasons"]:
         bad = verify.check_quote(r["quote"], body, r["offset"])
@@ -298,24 +348,31 @@ def _check_rate(d: dict, body: str, authors: set[str]) -> None:
             raise AnswerRejected(bad)
         by_field[r["field"]].append(r["quote"])
     name = d["speaker"]["name"].strip()
-    if name and name not in authors and not any(verify.contains(q, name) for q in by_field["name"]):
-        raise AnswerRejected("nome_non_citato")
-    if d["speaker"]["role"] != "anonimo" and not by_field["role"]:
+    if name:
+        if _is_vocab_name(name):
+            raise AnswerRejected("nome_non_citato")
+        if name not in authors and not any(verify.contains(q, name) for q in by_field["name"]):
+            raise AnswerRejected("nome_non_citato")
+    role = d["speaker"]["role"]
+    if role != "anonimo" and not any(_proves_role(role, q) for q in by_field["role"]):
         raise AnswerRejected("ruolo_non_citato")
     if d["lap_time"] is not None and not any(verify.contains(q, d["lap_time"]) for q in by_field["lap_time"]):
         raise AnswerRejected("tempo_non_citato")
-    if d["car"] is not None and not any(verify.contains(q, d["car"]) for q in by_field["car"]):
+    if d["car"] is not None and (_is_vocab_only(d["car"])
+                                 or not any(verify.contains(q, d["car"]) for q in by_field["car"])):
         raise AnswerRejected("auto_non_citata")
 
 
 def _check_factcheck(d: dict, payload: dict) -> None:
+    """La citazione deve stare in un testo del lavoro che non sia una fonte del fatto stesso."""
+    own = set(payload.get("fact_sha256s") or [])
     reasons = []
     for t in payload.get("texts") or []:
         bad = verify.check_quote(d["quote"], t.get("body") or "", d["offset"])
-        if bad is None:
+        if bad is None and t.get("sha256") not in own:
             return
-        reasons.append(bad)
-    for r in ("offset_errato", "citazione_corta"):
+        reasons.append("autoconferma" if bad is None else bad)
+    for r in ("autoconferma", "offset_errato", "citazione_corta"):
         if r in reasons:
             raise AnswerRejected(r)
     raise AnswerRejected("citazione_assente")
@@ -331,7 +388,8 @@ def ingest(conn: sqlite3.Connection, answer_path: Path, model: str) -> dict:
         raise AnswerRejected("json_malformato") from None
     kind = _validate(d)
     key = d["fact_key"] if kind == "factcheck" else d["sha256"]
-    track, version, payload = _open_job(conn, kind, key, model)
+    track, version = d["track"], d["prompt_version"]
+    payload = _open_job(conn, kind, key, track, version, model)
 
     facts: list[tuple] = []
     rejects: list[tuple[str, dict]] = []
@@ -347,7 +405,7 @@ def ingest(conn: sqlite3.Connection, answer_path: Path, model: str) -> dict:
         except _BadSegments:
             raise AnswerRejected("segmenti_illeggibili") from None
         if kind == "rate":
-            authors = {a.strip() for r in rows for a in (r[4], r[10]) if isinstance(a, str) and a.strip()}
+            authors = {r[4].strip() for r in rows if isinstance(r[4], str) and r[4].strip()}
             _check_rate(d, body, authors)
         else:
             seen: set[str] = set()
@@ -369,9 +427,10 @@ def ingest(conn: sqlite3.Connection, answer_path: Path, model: str) -> dict:
 
     with _atomic(conn):
         cur = conn.execute(
-            "INSERT INTO results(sha256, kind, prompt_version, model, payload_json, frozen_at)"
-            " VALUES (?,?,?,?,?,?)",
-            (key, kind, version, model, json.dumps(d, sort_keys=True, ensure_ascii=False), _now()))
+            "INSERT INTO results(sha256, kind, prompt_version, model, payload_json, frozen_at, track)"
+            " VALUES (?,?,?,?,?,?,?)",
+            (key, kind, version, model, json.dumps(d, sort_keys=True, ensure_ascii=False), _now(),
+             track))
         rid = cur.lastrowid
         conn.executemany(
             "INSERT INTO facts(result_id, track, corner, type, value, quote, offset, start_s,"

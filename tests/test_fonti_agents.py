@@ -53,17 +53,23 @@ def _risposta(tmp_path, nome, **cambi):
     return _scrivi(tmp_path, d, f"r-{nome}")
 
 
-def _estrai(sha, facts):
-    return {"sha256": sha, "kind": "extract", "facts": facts}
+ECO = {"prompt_version": "1", "track": "imola"}
+
+
+def _estrai(sha, facts, **eco):
+    return {"sha256": sha, "kind": "extract", "facts": facts, **ECO, **eco}
 
 
 def _proponi(conn, tmp_path, kind="extract", track="imola"):
     return agents.pending(conn, kind, track, tmp_path / f"jobs-{kind}-{track}")
 
 
-def _job_factcheck(conn, key, bodies, version="1"):
+def _job_factcheck(conn, key, bodies, version="1", own=()):
+    """`bodies`: testi o coppie (sha256, testo); `own`: gli sha256 delle fonti del fatto."""
+    coppie = [x if isinstance(x, tuple) else (f"t{i}", x) for i, x in enumerate(bodies)]
     payload = {"kind": "factcheck", "sha256": key, "track": "imola", "prompt_version": version,
-               "texts": [{"sha256": "x", "body": b, "segments": None, "meta": []} for b in bodies]}
+               "fact_sha256s": sorted(own),
+               "texts": [{"sha256": sha, "body": b, "segments": None, "meta": []} for sha, b in coppie]}
     conn.execute("INSERT INTO jobs(kind, key, track, prompt_version, payload_json, created_at)"
                  " VALUES ('factcheck', ?, 'imola', ?, ?, 'ora')", (key, version, json.dumps(payload)))
     conn.commit()
@@ -297,13 +303,19 @@ def test_due_versioni_aperte_vince_la_piu_nuova(conn, tmp_path, monkeypatch):
         (finta / nome).write_text("prompt_version: 10\n", encoding="utf-8")
     monkeypatch.setattr(agents, "PROMPTS_DIR", finta)
     _proponi(conn, tmp_path / "v10")
-    agents.ingest(conn, FIX / "risposta_estrai.json", "m")
-    agents.ingest(conn, FIX / "risposta_estrai.json", "m")
-    versioni = [v for (v,) in conn.execute("SELECT prompt_version FROM results ORDER BY id")]
-    assert versioni == ["10", "1"]
+    # Sonda V: solo la versione più alta è aperta; la stessa risposta non si congela due volte.
     with pytest.raises(agents.AnswerRejected) as e:
         agents.ingest(conn, FIX / "risposta_estrai.json", "m")
+    assert e.value.reason == "versione_superata"
+    v10 = _risposta(tmp_path, "risposta_estrai.json", prompt_version="10")
+    agents.ingest(conn, v10, "m")
+    with pytest.raises(agents.AnswerRejected) as e:
+        agents.ingest(conn, v10, "m")
     assert e.value.reason == "gia_congelato"
+    with pytest.raises(agents.AnswerRejected) as e:
+        agents.ingest(conn, FIX / "risposta_estrai.json", "m")
+    assert e.value.reason == "versione_superata"
+    assert conn.execute("SELECT prompt_version, track FROM results").fetchall() == [("10", "imola")]
 
 
 def test_errore_di_scrittura_non_lascia_nulla(conn, tmp_path):
@@ -371,15 +383,19 @@ def test_rate_senza_citazione_rifiutato_intero(conn, tmp_path, cambio, motivo):
 
 def test_rate_nome_citato_o_autore(conn, tmp_path):
     _coach(conn, tmp_path)
-    # Il nome del canale nella fonte basta, senza citazione.
-    assert agents.ingest(conn, _risposta(tmp_path, "risposta_valuta.json",
-                                         speaker={"name": "Canale Coach", "role": "coach"}), "m1")
+    # Sonda N2: l'autore della fonte (il canale, l'autore del post) non è chi parla.
+    with pytest.raises(agents.AnswerRejected) as e:
+        agents.ingest(conn, _risposta(tmp_path, "risposta_valuta.json",
+                                      speaker={"name": "Canale Coach", "role": "coach"}), "m1")
+    assert e.value.reason == "nome_non_citato"
+    # L'autore della riga del testo sì, senza citazione.
+    assert agents.ingest(conn, FIX / "risposta_valuta.json", "m1") == {"facts": 0, "rejects": 0}
     # Un nome detto nel testo si cita con field=name.
     sid = _fonte(conn, "https://r/luca")
     body = "Hi, my name is Luca Bianchi and I drive ACC at Imola."
     sha, _ = db.add_text(conn, sid, "comment", "u_luca", body)
     _proponi(conn, tmp_path / "luca", "rate")
-    d = {"sha256": sha, "kind": "rate", "speaker": {"name": "Luca Bianchi", "role": "anonimo"},
+    d = {"sha256": sha, "kind": "rate", **ECO, "speaker": {"name": "Luca Bianchi", "role": "anonimo"},
          "lap_time": None, "car": None,
          "reasons": [{"field": "name", "claim": "gives their name",
                       "quote": "my name is Luca Bianchi", "offset": 4}]}
@@ -457,3 +473,117 @@ def test_cli_errore_inatteso_passa_al_prossimo(conn, tmp_path, capsys, monkeypat
     err = capsys.readouterr().err
     assert "primo.json: errore inatteso (KeyError)" in err
     assert conn.execute("SELECT COUNT(*) FROM results").fetchone()[0] == 1
+
+
+def test_lavoro_ricorda_la_pista(tmp_path):
+    # Sonda T: lo stesso testo proposto per due piste; ognuna ha il suo lavoro.
+    c = db.open_db(tmp_path / "f.sqlite")
+    sha, _ = db.add_text(c, _fonte(c, "https://r/i"), "comment", "x", CORPO)
+    db.add_text(c, _fonte(c, "https://r/m", track="monza"), "comment", "y", CORPO)
+    _proponi(c, tmp_path, track="imola")
+    _proponi(c, tmp_path, track="monza")
+    assert sorted(t for (t,) in c.execute("SELECT track FROM jobs")) == ["imola", "monza"]
+    assert agents.ingest(c, _scrivi(tmp_path, _estrai(sha, [FATTO])), "m") == {"facts": 1, "rejects": 0}
+    assert c.execute("SELECT track FROM results").fetchall() == [("imola",)]
+    assert c.execute("SELECT track, author FROM facts").fetchall() == [("imola", "x")]
+    # Imola è fatto, Monza resta da fare.
+    assert agents.pending(c, "extract", "imola", tmp_path / "ri") == []
+    assert len(agents.pending(c, "extract", "monza", tmp_path / "rm")) == 1
+    with pytest.raises(agents.AnswerRejected) as e:
+        agents.ingest(c, _scrivi(tmp_path, _estrai(sha, [FATTO], track="spa"), "spa.json"), "m")
+    assert e.value.reason == "lavoro_ignoto"
+    c.close()
+
+
+def test_database_vecchio_riceve_la_pista(tmp_path):
+    p = tmp_path / "vecchio.sqlite"
+    v = sqlite3.connect(str(p))
+    v.execute("CREATE TABLE results(id INTEGER PRIMARY KEY, sha256 TEXT, kind TEXT, prompt_version TEXT,"
+              " model TEXT, payload_json TEXT, frozen_at TEXT, UNIQUE(sha256, kind, prompt_version, model))")
+    v.commit()
+    v.close()
+    c = db.open_db(p)
+    assert "track" in {r[1] for r in c.execute("PRAGMA table_info(results)")}
+    c.close()
+
+
+RATE_BODY = ("I am not a coach. At Acque Minerali I go down to third gear. "
+             "I coach drivers in ACC and the Tosa kerb is fine.")
+
+
+def _r(field, quote):
+    return {"field": field, "claim": "c", "quote": quote, "offset": RATE_BODY.index(quote)}
+
+
+@pytest.mark.parametrize("speaker, car, reasons, motivo", [
+    # Sonda N1: una citazione vera che non dice nulla del ruolo.
+    ({"name": "", "role": "coach"}, None, [_r("role", "I go down to third")], "ruolo_non_citato"),
+    # Una parola del ruolo negata non prova il ruolo.
+    ({"name": "", "role": "coach"}, None, [_r("role", "I am not a coach")], "ruolo_non_citato"),
+    # Sonda N3: il nome è una curva, anche se citato o se è l'autore della riga.
+    ({"name": "Acque Minerali", "role": "anonimo"}, None, [_r("name", "At Acque Minerali I")],
+     "nome_non_citato"),
+    ({"name": "Tosa Racer", "role": "anonimo"}, None, [], "nome_non_citato"),
+    # Sonda N4: l'auto è un pezzo del consiglio.
+    ({"name": "", "role": "anonimo"}, "third gear", [_r("car", "down to third gear")], "auto_non_citata"),
+    ({"name": "", "role": "anonimo"}, "the Tosa kerb", [_r("car", "and the Tosa kerb is")],
+     "auto_non_citata"),
+])
+def test_rate_ruolo_nome_auto_veri(tmp_path, speaker, car, reasons, motivo):
+    c = db.open_db(tmp_path / "f.sqlite")
+    sha, _ = db.add_text(c, _fonte(c, "https://r/n", author="op_user"), "comment", "Tosa Racer", RATE_BODY)
+    _proponi(c, tmp_path, "rate")
+    d = {"sha256": sha, "kind": "rate", **ECO, "speaker": speaker, "lap_time": None, "car": car,
+         "reasons": reasons}
+    prima = _stato(c)
+    with pytest.raises(agents.AnswerRejected) as e:
+        agents.ingest(c, _scrivi(tmp_path, d), "m")
+    assert e.value.reason == motivo
+    assert _stato(c) == prima
+    # Con un ruolo provato dalle parole giuste la valutazione entra.
+    ok = {**d, "speaker": {"name": "", "role": "coach"}, "car": None,
+          "reasons": [_r("role", "I coach drivers in ACC")]}
+    assert agents.ingest(c, _scrivi(tmp_path, ok, "ok.json"), "m") == {"facts": 0, "rejects": 0}
+    c.close()
+
+
+def test_factcheck_non_si_conferma_da_solo(conn, tmp_path):
+    # Sonda 4d: la citazione sta solo nel testo da cui viene il fatto.
+    own = json.loads((FIX / "risposta_estrai.json").read_text(encoding="utf-8"))["sha256"]
+    _job_factcheck(conn, KEY, [(own, CORPO)], own=[own])
+    prima = _stato(conn)
+    with pytest.raises(agents.AnswerRejected) as e:
+        agents.ingest(conn, FIX / "risposta_factcheck.json", "m")
+    assert e.value.reason == "autoconferma"
+    assert _stato(conn) == prima
+
+
+def test_factcheck_conferma_da_un_altro_testo(conn, tmp_path):
+    own = json.loads((FIX / "risposta_estrai.json").read_text(encoding="utf-8"))["sha256"]
+    altro = "Second opinion: I go down to third gear there too."
+    q = "I go down to third gear"
+    _job_factcheck(conn, KEY, [(own, CORPO), ("altro", altro)], own=[own])
+    d = json.loads((FIX / "risposta_factcheck.json").read_text(encoding="utf-8"))
+    d.update(quote=q, offset=altro.index(q))
+    assert agents.ingest(conn, _scrivi(tmp_path, d), "m") == {"facts": 0, "rejects": 0}
+
+
+def test_pending_factcheck_elenca_le_fonti_del_fatto(conn, tmp_path, monkeypatch):
+    import types
+
+    import tools.fonti as pacchetto
+    _proponi(conn, tmp_path)
+    agents.ingest(conn, FIX / "risposta_estrai.json", "m")
+    own = json.loads((FIX / "risposta_estrai.json").read_text(encoding="utf-8"))["sha256"]
+    finto = types.ModuleType("tools.fonti.consensus")
+    finto.build = lambda c, track: [{"corner": "Acque Minerali", "type": "gear", "state": "verificato",
+                                     "values": [{"value": "3", "authors": [], "sources": []}],
+                                     "fact_key": KEY}]
+    monkeypatch.setitem(sys.modules, "tools.fonti.consensus", finto)
+    monkeypatch.setattr(pacchetto, "consensus", finto, raising=False)
+    job = json.loads(agents.pending(conn, "factcheck", "imola", tmp_path / "fc")[0].read_text(encoding="utf-8"))
+    assert job["fact_sha256s"] == [own]
+    assert [t["sha256"] for t in job["texts"]] == [own]
+    with pytest.raises(agents.AnswerRejected) as e:
+        agents.ingest(conn, FIX / "risposta_factcheck.json", "m")
+    assert e.value.reason == "autoconferma"
