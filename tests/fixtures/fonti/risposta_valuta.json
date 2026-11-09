@@ -1,0 +1,11 @@
+{
+ "sha256": "97ee69d68d556536e78db575c4c7097e98af762fadd034b6c52a1c1856598a0d",
+ "kind": "rate",
+ "speaker": {"name": "", "role": "anonimo"},
+ "lap_time": null,
+ "car": null,
+ "reasons": [
+  {"claim": "talks about Acque Minerali", "quote": "At Acque Minerali I go", "offset": 0},
+  {"claim": "is a coach", "quote": "I am a professional coach", "offset": 0}
+ ]
+}

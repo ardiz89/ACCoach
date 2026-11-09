@@ -18,7 +18,7 @@ if str(ROOT) not in sys.path:
 
 from tools.fonti import db  # noqa: E402
 
-PLANNED = ("pending", "ingest", "consensus", "export", "review")
+PLANNED = ("consensus", "export", "review")
 
 
 def _db_path(arg: str) -> Path:
@@ -68,6 +68,41 @@ def cmd_collect(args) -> int:
         conn.close()
 
 
+def cmd_pending(args) -> int:
+    from tools.fonti import agents
+
+    conn = db.open_db(_db_path(args.db))
+    try:
+        try:
+            jobs = agents.pending(conn, args.kind, args.track, Path(args.out))
+        except RuntimeError as e:
+            print(str(e), file=sys.stderr)
+            return 1
+        print(f"Lavori {args.kind} da fare: {len(jobs)}, in {args.out}.")
+        return 0
+    finally:
+        conn.close()
+
+
+def cmd_ingest(args) -> int:
+    from tools.fonti import agents
+
+    conn = db.open_db(_db_path(args.db))
+    rifiutati = 0
+    try:
+        for f in args.files:
+            try:
+                r = agents.ingest(conn, Path(f), args.model)
+            except agents.AnswerRejected as e:
+                rifiutati += 1
+                print(f"{Path(f).name}: rifiutato ({e.reason})", file=sys.stderr)
+                continue
+            print(f"{Path(f).name}: fatti {r['facts']}, scarti {r['rejects']}.")
+        return 1 if rifiutati else 0
+    finally:
+        conn.close()
+
+
 def cmd_non_disponibile(args) -> int:
     print(f"{args.cmd}: non ancora disponibile", file=sys.stderr)
     return 2
@@ -85,6 +120,15 @@ def build_parser() -> argparse.ArgumentParser:
     c.add_argument("--dry-run", action="store_true")
     c.add_argument("--force", action="store_true", help="rifà anche le voci già finite")
     c.set_defaults(func=cmd_collect)
+    p = sub.add_parser("pending", help="scrive i lavori per gli agenti")
+    p.add_argument("--kind", required=True, choices=("extract", "rate", "factcheck"))
+    p.add_argument("--track", required=True)
+    p.add_argument("--out", required=True, metavar="DIR")
+    p.set_defaults(func=cmd_pending)
+    i = sub.add_parser("ingest", help="congela le risposte degli agenti")
+    i.add_argument("--model", required=True)
+    i.add_argument("files", nargs="+", metavar="FILE")
+    i.set_defaults(func=cmd_ingest)
     for name in PLANNED:
         sub.add_parser(name, help="non ancora disponibile").set_defaults(func=cmd_non_disponibile)
     return ap

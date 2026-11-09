@@ -194,3 +194,13 @@ def check_fact(track: str, fact: dict, body: str, segments: list | None = None) 
     if reason:
         return reason
     return None if got[0] == value else "valore_diverso"
+
+
+def check_quote(quote: str, body: str) -> str | None:
+    """Solo la presenza: la citazione c'è nel testo, a confini di parola, e ha 4 parole."""
+    q = norm_text(str(quote or ""))
+    if not q or not _quote_regex(q).search(norm_text(str(body))):
+        return "citazione_assente"
+    if len(q.split()) < MIN_WORDS:
+        return "citazione_corta"
+    return None
