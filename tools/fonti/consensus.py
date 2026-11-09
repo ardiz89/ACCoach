@@ -5,7 +5,8 @@ Tutto è deterministico e si ricalcola dal database a ogni chiamata.
 - Un autore è `platform:author` in minuscolo. Due autori sono indipendenti solo se
   sono diversi e non hanno mai pubblicato lo stesso testo: due account che hanno
   scritto un corpo identico, byte per byte, in un testo ACC qualsiasi della pista
-  sono una persona sola. `n` di ogni valore è il numero di persone.
+  sono una persona sola, se quel corpo ha almeno LINK_MIN_WORDS parole (un «Thanks!»
+  uguale non lega nessuno). `n` di ogni valore è il numero di persone.
 - Contano solo i risultati `extract` della versione più alta proposta in `jobs` per
   (kind, testo, pista), da qualsiasi modello, e solo le fonti ACC di quella pista.
 - Un autore è affidabile se una valutazione `rate` (della versione più alta) di uno
@@ -29,9 +30,11 @@ import hashlib
 import json
 import sqlite3
 
-from tools.fonti import vocab
+from tools.fonti import verify, vocab
 
 DESCRIPTIVE = ("line", "mistake")
+# Un testo identico lega due account solo se ha almeno tante parole: «Thanks!» non basta.
+LINK_MIN_WORDS = 8
 
 
 def _version_order(v: str):
@@ -112,10 +115,13 @@ def _people(conn: sqlite3.Connection, track: str) -> dict[str, str]:
         return a
 
     owner: dict[str, str] = {}
-    for sha, platform, author in conn.execute(
-            "SELECT t.sha256, s.platform, t.author FROM texts t JOIN sources s ON s.id = t.source_id"
+    for sha, platform, author, body in conn.execute(
+            "SELECT t.sha256, s.platform, t.author, t.body FROM texts t"
+            " JOIN sources s ON s.id = t.source_id"
             " WHERE s.game='acc' AND s.track=? ORDER BY t.sha256, s.platform, t.author", (track,)):
         aid = find(_author_id(platform, author))
+        if len(verify.norm_text(body or "").split()) < LINK_MIN_WORDS:
+            continue
         if sha in owner:
             other = find(owner[sha])
             if other != aid:

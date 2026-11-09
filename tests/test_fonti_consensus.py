@@ -258,7 +258,7 @@ def test_valutazione_condivisa_va_a_chi_si_chiama_cosi(b):
 
 def test_same_person_linked_elsewhere(b):
     # Due account che hanno pubblicato lo stesso testo, anche su altro, sono una persona.
-    shared = "Totally unrelated identical post about setup."
+    shared = "Totally unrelated identical post about my setup for the wet race."
     db.add_text(b.conn, b.fonte("https://r/x1", author="alt1"), "comment", "alt1", shared)
     db.add_text(b.conn, b.fonte("https://r/x2", author="alt2"), "comment", "alt2", shared)
     _gear(b, "https://r/g1", "alt1")
@@ -268,9 +268,29 @@ def test_same_person_linked_elsewhere(b):
     assert e["values"][0]["authors"] == ["reddit:alt1", "reddit:alt2"]
 
 
+def test_un_grazie_uguale_non_fa_una_persona(b):
+    for i in range(5):
+        u = f"fan{i}"
+        db.add_text(b.conn, b.fonte(f"https://r/grazie{i}", author=u), "comment", u, "Thanks!")
+    _gear(b, "https://r/g1", "fan0")
+    _gear(b, "https://r/g2", "fan1", prefix="Honestly at")
+    e = _voce(b.build())
+    assert e["state"] == "verificato" and e["values"][0]["n"] == 2
+
+
+@pytest.mark.parametrize("words, linked", [(7, False), (8, True)])
+def test_soglia_di_parole_per_il_legame(b, words, linked):
+    shared = " ".join(["setup"] * (words - 1) + ["here."])
+    db.add_text(b.conn, b.fonte("https://r/x1", author="alt1"), "comment", "alt1", shared)
+    db.add_text(b.conn, b.fonte("https://r/x2", author="alt2"), "comment", "alt2", shared)
+    _gear(b, "https://r/g1", "alt1")
+    _gear(b, "https://r/g2", "alt2", prefix="Honestly at")
+    assert _voce(b.build())["values"][0]["n"] == (1 if linked else 2)
+
+
 def test_legame_fuori_dalla_pista_non_conta(b):
     # Il testo identico sta su un'altra pista o su un altro gioco: non lega i due account.
-    shared = "Totally unrelated identical post about setup."
+    shared = "Totally unrelated identical post about my setup for the wet race."
     db.add_text(b.conn, b.fonte("https://r/x1", author="alt1", track="monza"), "comment", "alt1",
                 shared)
     db.add_text(b.conn, b.fonte("https://r/x2", author="alt2", game="altro"), "comment", "alt2",
