@@ -62,6 +62,10 @@ def cmd_collect(args) -> int:
             print("Rete non raggiungibile o troppo lenta: riprova fra poco. "
                   "Le voci già finite non si ripagano.", file=sys.stderr)
             return 1
+        except Exception as e:  # mai str(e): potrebbe contenere il token
+            print(f"Errore inatteso ({type(e).__name__}): la raccolta si ferma. "
+                  "Le voci già finite non si ripagano.", file=sys.stderr)
+            return 1
         print(f"Nuove fonti: {r['sources']}, nuovi testi: {r['texts']}, voci già finite: {r['skipped']}, speso: {r['spent_usd']:.2f} USD.")
         return 0
     finally:

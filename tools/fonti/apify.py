@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sqlite3
 import urllib.error
 import urllib.request
@@ -25,22 +26,37 @@ class ApifyError(Exception):
     pass
 
 
+_TOKEN = re.compile(r"[!-~]+")  # una riga, ASCII stampabile, niente spazi dentro
+
+
+def _valid(tok: str, where: str) -> str:
+    """Il token pulito, o TokenMissing con un messaggio che non lo contiene mai."""
+    tok = tok.strip()
+    if not _TOKEN.fullmatch(tok):
+        raise TokenMissing(f"Il token Apify in {where} non è valido. "
+                           "Deve stare su una riga sola, senza spazi e solo in ASCII.")
+    return tok
+
+
 def load_token(env_file: Path | None) -> str:
     """Variabile APIFY_API_TOKEN, poi il file env, poi ~/.apify-key."""
-    tok = os.environ.get("APIFY_API_TOKEN", "").strip()
-    if tok:
-        return tok
+    tok = os.environ.get("APIFY_API_TOKEN", "")
+    if tok.strip():
+        return _valid(tok, "APIFY_API_TOKEN")
     if env_file is not None and Path(env_file).is_file():
         for riga in Path(env_file).read_text(encoding="utf-8-sig").splitlines():
             k, sep, v = riga.partition("=")
+            k = k.strip()
+            if k.startswith("export "):
+                k = k[len("export "):].strip()
             v = v.strip().strip("\"'")
-            if sep and k.strip() == "APIFY_API_TOKEN" and v:
-                return v
+            if sep and k == "APIFY_API_TOKEN" and v:
+                return _valid(v, "file env")
     chiave = Path.home() / ".apify-key"
     if chiave.is_file():
-        tok = chiave.read_text(encoding="utf-8-sig").strip()
-        if tok:
-            return tok
+        tok = chiave.read_text(encoding="utf-8-sig")
+        if tok.strip():
+            return _valid(tok, "~/.apify-key")
     raise TokenMissing("Token Apify non trovato: variabile APIFY_API_TOKEN, file env o ~/.apify-key.")
 
 

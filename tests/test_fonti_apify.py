@@ -65,3 +65,60 @@ def test_guard_base_e_tetto(tmp_path):
 ])
 def test_game_of(titolo, sub, atteso):
     assert collect.game_of(titolo, "", sub) == atteso
+
+
+# --- correzione finale: il token non esce mai (I1, L10) -----------------------------
+
+@pytest.mark.parametrize("contenuto", [
+    "tok-di-prova\ntok-vecchio\n",      # due righe: una chiave nuova e una vecchia
+    "tok di prova\n",                   # uno spazio dentro
+    "tok-di-pròva\n",                   # non ASCII
+    "tok-di-\tprova",                   # tabulazione
+])
+def test_token_guasto_rifiutato_senza_eco(monkeypatch, tmp_path, contenuto):
+    casa = _casa(monkeypatch, tmp_path)
+    (casa / ".apify-key").write_text(contenuto, encoding="utf-8")
+    with pytest.raises(apify.TokenMissing) as e:
+        apify.load_token(None)
+    for pezzo in ("tok-di", "prova", "vecchio", "pròva"):
+        assert pezzo not in str(e.value)
+
+
+def test_token_guasto_in_variabile_e_file_env(monkeypatch, tmp_path):
+    _casa(monkeypatch, tmp_path)
+    monkeypatch.setenv("APIFY_API_TOKEN", "tok-di-prova\naltro")
+    with pytest.raises(apify.TokenMissing) as e:
+        apify.load_token(None)
+    assert "tok-di-prova" not in str(e.value)
+    monkeypatch.delenv("APIFY_API_TOKEN")
+    env = tmp_path / ".env"
+    env.write_text('APIFY_API_TOKEN="tok di prova"\n', encoding="utf-8")
+    with pytest.raises(apify.TokenMissing) as e:
+        apify.load_token(env)
+    assert "tok di prova" not in str(e.value)
+
+
+def test_token_da_riga_export(monkeypatch, tmp_path):
+    _casa(monkeypatch, tmp_path)
+    env = tmp_path / ".env"
+    env.write_text("# commento\nexport APIFY_API_TOKEN='tok-di-prova'\n", encoding="utf-8")
+    assert apify.load_token(env) == TOK
+
+
+def test_collect_errore_inatteso_stampa_solo_il_tipo(monkeypatch, tmp_path, capsys):
+    from tools.fonti import fonti
+
+    monkeypatch.setenv("APIFY_API_TOKEN", TOK)
+
+    def rotto(self, *a, **k):
+        raise ValueError(f"Invalid header value b'Bearer {TOK}'")
+
+    monkeypatch.setattr(apify.Apify, "usage_usd", rotto)
+    piano = tmp_path / "p.json"
+    piano.write_text(json.dumps([{"platform": "youtube", "actor": "a/b", "input": {},
+                                  "max_items": 1}]), encoding="utf-8")
+    rc = fonti.main(["--db", str(tmp_path / "d"), "collect", "--track", "imola", "--plan", str(piano)])
+    cattura = capsys.readouterr()
+    assert rc == 1
+    assert TOK not in cattura.err and TOK not in cattura.out and "Traceback" not in cattura.err
+    assert "ValueError" in cattura.err
