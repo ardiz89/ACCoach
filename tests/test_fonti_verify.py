@@ -14,6 +14,11 @@ from accoach.trackdata import _CORNERS  # noqa: E402
 from tools.fonti import verify, vocab  # noqa: E402
 
 
+def _valore(type_, quote):
+    """Il valore che la citazione sostiene, come lo legge il verificatore."""
+    got = vocab.locate(type_, vocab.fold(quote))
+    return got[0] if got else None
+
 def fatto(quote, value, type_="brake", corner="Acque Minerali", offset=0):
     return {"corner": corner, "type": type_, "value": value, "quote": quote, "offset": offset}
 
@@ -92,44 +97,44 @@ def test_nessun_numero_di_curva_negli_alias():
 
 @pytest.mark.parametrize("q", ["third gear", "3rd gear", "in terza", "down to 3"])
 def test_gear_parole(q):
-    assert vocab.normalize("gear", q) == "3"
+    assert _valore("gear", q) == "3"
     qq = "acque minerali " + q
     assert verify.check_fact("imola", fatto(qq, "3", "gear"), qq) is None
 
 
 def test_gear_non_confonde_tempi():
-    assert vocab.normalize("gear", "lose 3 seconds in 3 seconds") is None
-    assert vocab.normalize("gear", "second corner") is None
+    assert _valore("gear", "lose 3 seconds in 3 seconds") is None
+    assert _valore("gear", "second corner") is None
 
 
 @pytest.mark.parametrize("q", ["the 100 board", "100 metre board", "100m marker",
                                "cartello dei 100", "100 sign"])
 def test_board_forme(q):
-    assert vocab.normalize("brake", q) == "board:100"
+    assert _valore("brake", q) == "board:100"
 
 
 def test_board_solo_valori_ammessi_e_oggetti():
-    assert vocab.normalize("brake", "the 120 board") is None
-    assert vocab.normalize("brake", "the 1000 board") is None
-    assert vocab.normalize("brake", "brake at the bridge") == "object:bridge"
-    assert vocab.normalize("brake", "frena all'inizio del cordolo") == "object:kerb_start"
-    assert vocab.normalize("brake", "the bridge or the 100 board") is None
+    assert _valore("brake", "the 120 board") is None
+    assert _valore("brake", "the 1000 board") is None
+    assert _valore("brake", "brake at the bridge") == "object:bridge"
+    assert _valore("brake", "frena all'inizio del cordolo") == "object:kerb_start"
+    assert _valore("brake", "the bridge or the 100 board") is None
 
 
 def test_apex_e_kerb():
-    assert vocab.normalize("apex", "take a late apex here") == "late"
-    assert vocab.normalize("apex", "apice anticipato") == "early"
-    assert vocab.normalize("apex", "early apex then late apex") is None
-    assert vocab.normalize("apex", "brake late, then turn in") is None
-    assert vocab.normalize("kerb", "use the kerb on exit") == "exit"
-    assert vocab.normalize("kerb", "don't use the kerb") == "none"
-    assert vocab.normalize("kerb", "cordolo in ingresso") == "entry"
+    assert _valore("apex", "take a late apex here") == "late"
+    assert _valore("apex", "apice anticipato") == "early"
+    assert _valore("apex", "early apex then late apex") is None
+    assert _valore("apex", "brake late, then turn in") is None
+    assert _valore("kerb", "use the kerb on exit") == "exit"
+    assert _valore("kerb", "don't use the kerb") == "none"
+    assert _valore("kerb", "cordolo in ingresso") == "entry"
 
 
 def test_descrittivi_non_votati():
     q = "tosa you want to stay wide and be patient"
     for t in ("line", "mistake"):
-        assert vocab.normalize(t, q) is None
+        assert _valore(t, q) is None
         assert verify.check_fact("imola", fatto(q, q, t, "Tosa"), q) is None
         assert verify.check_fact("imola", fatto(q, q, t, "Rivazza"), q) == "curva_non_trovata"
         assert verify.check_fact("imola", fatto("stay narrow", q, t, "Tosa"), q) == "citazione_assente"
@@ -245,20 +250,20 @@ def test_curva_ultima_dentro_la_citazione():
     "brake at the 100 board if you have the grip",
 ])
 def test_brake_ambiguo(q):
-    assert vocab.normalize("brake", q) is None
+    assert _valore("brake", q) is None
     qq = "tosa " + q
     for b in vocab.BOARDS:
         assert verify.check_fact("imola", fatto(qq, f"board:{b}", corner="Tosa"), qq) is not None
 
 
 def test_brake_senza_parola_cartello():
-    assert vocab.normalize("brake", "brake at the 150 into tosa") == "board:150"
+    assert _valore("brake", "brake at the 150 into tosa") == "board:150"
 
 
 @pytest.mark.parametrize("q", ["brake after the bridge", "the bridge is on the left",
                                "brake before the bridge", "frena dopo il ponte"])
 def test_oggetto_solo_con_frase_di_frenata(q):
-    assert vocab.normalize("brake", q) is None
+    assert _valore("brake", q) is None
 
 
 @pytest.mark.parametrize("q,atteso", [
@@ -266,7 +271,7 @@ def test_oggetto_solo_con_frase_di_frenata(q):
     ("brake when you reach the bridge", "object:bridge"), ("frena al ponte", "object:bridge"),
 ])
 def test_oggetto_frasi_ammesse(q, atteso):
-    assert vocab.normalize("brake", q) == atteso
+    assert _valore("brake", q) == atteso
 
 
 @pytest.mark.parametrize("q", [
@@ -276,7 +281,7 @@ def test_oggetto_frasi_ammesse(q, atteso):
     "nella terza curva", "in 2 corners", "in 3 seconds", "in 4 m", "in second place", "maybe third gear", "terza o quarta marcia",
 ])
 def test_gear_ambiguo(q):
-    assert vocab.normalize("gear", q) is None
+    assert _valore("gear", q) is None
 
 
 @pytest.mark.parametrize("q,atteso", [
@@ -284,7 +289,7 @@ def test_gear_ambiguo(q):
     ("scala in seconda", "2"), ("4 gear", "4"), ("marcia 2", "2"),
 ])
 def test_gear_contesti_ammessi(q, atteso):
-    assert vocab.normalize("gear", q) == atteso
+    assert _valore("gear", q) == atteso
 
 
 @pytest.mark.parametrize("q,type_,value", [
@@ -304,7 +309,7 @@ def test_gear_contesti_ammessi(q, atteso):
     ("exit kerb then apex kerb", "kerb", "exit"),
 ])
 def test_apex_kerb_non_accettati(q, type_, value):
-    assert vocab.normalize(type_, q) != value
+    assert _valore(type_, q) != value
     qq = "tosa " + q
     assert verify.check_fact("imola", fatto(qq, value, type_, "Tosa"), qq) is not None
 
@@ -315,7 +320,7 @@ def test_apex_kerb_non_accettati(q, type_, value):
     ("kerb on exit", "kerb", "exit"),
 ])
 def test_apex_kerb_adiacenti(q, type_, value):
-    assert vocab.normalize(type_, q) == value
+    assert _valore(type_, q) == value
     qq = "at tosa take the " + q
     assert verify.check_fact("imola", fatto(qq, value, type_, "Tosa"), qq) is None
 

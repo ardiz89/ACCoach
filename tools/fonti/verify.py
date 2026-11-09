@@ -197,28 +197,51 @@ def check_fact(track: str, fact: dict, body: str, segments: list | None = None) 
 
 
 
-def locate_quote(quote: str, body: str, offset: int | None = None) -> tuple[str | None, int | None]:
-    """Dove sta la citazione nel testo grezzo: `(motivo, inizio)`.
+def quote_span(quote: str, body: str, offset: int | None = None
+               ) -> tuple[str | None, int | None, int | None]:
+    """Dove sta la citazione nel testo grezzo: `(motivo, inizio, fine)`.
 
     Normalizzata e a confini di parola come in `check_fact`, almeno 4 parole. Con
     `offset`, conta solo l'occorrenza entro OFFSET_SLACK caratteri, la più vicina.
+    `body[inizio:fine]` è il pezzo del testo che la citazione copia.
     """
     q = norm_text(str(quote or ""))
     body = str(body)
     nbody, idx = vocab.norm_map(body)
     starts = [m.start() for m in _quote_regex(q).finditer(nbody)] if q else []
     if not starts:
-        return "citazione_assente", None
+        return "citazione_assente", None, None
     if len(q.split()) < MIN_WORDS:
-        return "citazione_corta", None
+        return "citazione_corta", None, None
     if offset is None:
-        return None, idx[starts[0]]
-    if not isinstance(offset, int) or isinstance(offset, bool):
-        return "offset_errato", None
-    near = [j for j in starts if abs(idx[j] - offset) <= OFFSET_SLACK]
-    if not near:
-        return "offset_errato", None
-    return None, idx[min(near, key=lambda k: abs(idx[k] - offset))]
+        j = starts[0]
+    elif not isinstance(offset, int) or isinstance(offset, bool):
+        return "offset_errato", None, None
+    else:
+        near = [k for k in starts if abs(idx[k] - offset) <= OFFSET_SLACK]
+        if not near:
+            return "offset_errato", None, None
+        j = min(near, key=lambda k: abs(idx[k] - offset))
+    return None, idx[j], idx[j + len(q) - 1] + 1
+
+
+def locate_quote(quote: str, body: str, offset: int | None = None) -> tuple[str | None, int | None]:
+    """`(motivo, inizio)` di `quote_span`."""
+    reason, start, _ = quote_span(quote, body, offset)
+    return reason, start
+
+
+def sentences(body: str) -> list[tuple[int, int]]:
+    """Le frasi del testo grezzo come `(inizio, fine)`, con le regole di `check_fact`.
+
+    Una frase fatta solo di spazi non conta.
+    """
+    out, start = [], 0
+    for end in [*(_boundaries(body, None) or []), len(body) - 1]:
+        if end + 1 > start and body[start:end + 1].strip():
+            out.append((start, end + 1))
+        start = max(start, end + 1)
+    return out
 
 
 def check_quote(quote: str, body: str, offset: int | None = None) -> str | None:

@@ -19,7 +19,7 @@ import json
 import sqlite3
 from pathlib import Path
 
-from tools.fonti import consensus
+from tools.fonti import consensus, db
 
 VERSION = 1
 QUOTE_WORDS = 15
@@ -32,7 +32,7 @@ def cut(text: str | None, words: int = QUOTE_WORDS) -> str:
 
 def factchecks(conn: sqlite3.Connection, track: str) -> dict[str, dict[str, list[dict]]]:
     """Per ogni fact_key, i payload dei controlli validi divisi per verdetto."""
-    newest = consensus._newest(conn, "factcheck", track)
+    newest = db.newest_versions(conn, "factcheck", track)
     out: dict[str, dict[str, list[dict]]] = {}
     for key, version, model, payload in conn.execute(
             "SELECT sha256, prompt_version, model, payload_json FROM results"

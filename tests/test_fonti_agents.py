@@ -79,10 +79,17 @@ def _job_factcheck(conn, key, bodies, version="1", own=("fonte-del-fatto",), own
     conn.commit()
 
 
+def _apri_rate(conn, sha, track="imola"):
+    """Il lavoro `rate` come lo scrive pending, senza chiedere che l'autore abbia un fatto."""
+    conn.execute("INSERT OR REPLACE INTO jobs(kind, key, track, prompt_version, payload_json, created_at)"
+                 " VALUES ('rate', ?, ?, ?, '{}', 'ora')", (sha, track, agents.prompt_version("rate")))
+    conn.commit()
+
+
 def _coach(conn, tmp_path):
     sid = _fonte(conn, "https://yt/coach", platform="youtube", author="Canale Coach")
     sha, _ = db.add_text(conn, sid, "transcript", "Coach Uno", COACH)
-    _proponi(conn, tmp_path, "rate")
+    _apri_rate(conn, sha)
     return sha
 
 
@@ -398,7 +405,7 @@ def test_rate_nome_citato_o_autore(conn, tmp_path):
     sid = _fonte(conn, "https://r/luca")
     body = "Hi, my name is Luca Bianchi and I drive ACC at Imola."
     sha, _ = db.add_text(conn, sid, "comment", "u_luca", body)
-    _proponi(conn, tmp_path / "luca", "rate")
+    _apri_rate(conn, sha)
     d = {"sha256": sha, "kind": "rate", **ECO, "speaker": {"name": "Luca Bianchi", "role": "anonimo"},
          "lap_time": None, "car": None,
          "reasons": [{"field": "name", "claim": "gives their name",
@@ -479,8 +486,10 @@ def test_cli_errore_inatteso_passa_al_prossimo(conn, tmp_path, capsys, monkeypat
     assert conn.execute("SELECT COUNT(*) FROM results").fetchone()[0] == 1
 
 
-def test_lavoro_ricorda_la_pista(tmp_path):
+def test_lavoro_ricorda_la_pista(tmp_path, monkeypatch):
     # Sonda T: lo stesso testo proposto per due piste; ognuna ha il suo lavoro.
+    from tools.fonti import vocab
+    monkeypatch.setitem(vocab.CORNERS, "monza", vocab.CORNERS["imola"])  # curve finte per Monza
     c = db.open_db(tmp_path / "f.sqlite")
     sha, _ = db.add_text(c, _fonte(c, "https://r/i"), "comment", "x", CORPO)
     db.add_text(c, _fonte(c, "https://r/m", track="monza"), "comment", "y", CORPO)
@@ -536,7 +545,7 @@ def _r(field, quote):
 def test_rate_ruolo_nome_auto_veri(tmp_path, speaker, car, reasons, motivo):
     c = db.open_db(tmp_path / "f.sqlite")
     sha, _ = db.add_text(c, _fonte(c, "https://r/n", author="op_user"), "comment", "Tosa Racer", RATE_BODY)
-    _proponi(c, tmp_path, "rate")
+    _apri_rate(c, sha)
     d = {"sha256": sha, "kind": "rate", **ECO, "speaker": speaker, "lap_time": None, "car": car,
          "reasons": reasons}
     prima = _stato(c)
@@ -573,22 +582,16 @@ def test_factcheck_conferma_da_un_altro_testo(conn, tmp_path):
 
 
 def test_pending_factcheck_elenca_le_fonti_del_fatto(conn, tmp_path, monkeypatch):
-    import types
-
-    import tools.fonti as pacchetto
     _proponi(conn, tmp_path)
     agents.ingest(conn, FIX / "risposta_estrai.json", "m")
     own = json.loads((FIX / "risposta_estrai.json").read_text(encoding="utf-8"))["sha256"]
-    finto = types.ModuleType("tools.fonti.consensus")
-    finto.build = lambda c, track: [{"corner": "Acque Minerali", "type": "gear", "state": "verificato",
-                                     "values": [{"value": "3", "authors": [], "sources": []}],
-                                     "fact_key": KEY}]
-    monkeypatch.setitem(sys.modules, "tools.fonti.consensus", finto)
-    monkeypatch.setattr(pacchetto, "consensus", finto, raising=False)
+    altro = "Second opinion: at Acque Minerali I go down to third gear there too."
+    sha2, _ = db.add_text(conn, _fonte(conn, "https://r/altro-acc"), "comment", "u_due", altro)
+    _finto_consensus(monkeypatch, [{"value": "3", "authors": [], "sources": []}])
     job = json.loads(agents.pending(conn, "factcheck", "imola", tmp_path / "fc")[0].read_text(encoding="utf-8"))
     assert job["fact_sha256s"] == [own]
     assert job["fact_authors"] == ["reddit:u_uno"]
-    assert [t["sha256"] for t in job["texts"]] == [own]
+    assert sorted(t["sha256"] for t in job["texts"]) == sorted([own, sha2])
     with pytest.raises(agents.AnswerRejected) as e:
         agents.ingest(conn, FIX / "risposta_factcheck.json", "m")
     assert e.value.reason == "autoconferma"
@@ -598,7 +601,7 @@ def test_pending_factcheck_elenca_le_fonti_del_fatto(conn, tmp_path, monkeypatch
 
 def _rate_job(c, tmp_path, body, author="x"):
     sha, _ = db.add_text(c, _fonte(c, f"https://r/{abs(hash(body))}"), "comment", author, body)
-    agents.pending(c, "rate", "imola", tmp_path / f"jr-{sha[:6]}")
+    _apri_rate(c, sha)
     return sha
 
 
@@ -829,3 +832,166 @@ def test_coach_dice_chi_allena(tmp_path, body, quote, ok):
             agents.ingest(c, _scrivi(tmp_path, d), "m")
         assert e.value.reason == "ruolo_non_citato"
     c.close()
+
+
+# --- correzione finale ------------------------------------------------------------
+
+def _fatto_di_u_uno(conn, tmp_path, monkeypatch):
+    """Il fatto della fixture (Acque Minerali, gear 3, da u_uno) come voce verificata."""
+    _proponi(conn, tmp_path)
+    agents.ingest(conn, FIX / "risposta_estrai.json", "m")
+    _finto_consensus(monkeypatch, [{"value": "3", "authors": [], "sources": []}])
+    return json.loads((FIX / "risposta_estrai.json").read_text(encoding="utf-8"))["sha256"]
+
+
+def test_respinto_puo_citare_il_testo_del_fatto(conn, tmp_path):
+    # I2: il veto legge il contesto del fatto stesso, ironia o correzione dello stesso autore.
+    own = json.loads((FIX / "risposta_estrai.json").read_text(encoding="utf-8"))["sha256"]
+    altro = "Second opinion: third gear works there too, at Acque Minerali."
+    _job_factcheck(conn, KEY, [(own, CORPO, "u_uno"), ("altro", altro)], own=[own],
+                   own_authors=["reddit:u_uno"])
+    d = json.loads((FIX / "risposta_factcheck.json").read_text(encoding="utf-8"))
+    d.update(verdict="respinto", reason="it is ironic", quote="I go down to third gear",
+             offset=CORPO.index("I go down to third gear"))
+    assert agents.ingest(conn, _scrivi(tmp_path, d), "m-a") == {"facts": 0, "rejects": 0}
+    # Lo stesso testo per un confermato resta un'autoconferma.
+    d.update(verdict="confermato")
+    with pytest.raises(agents.AnswerRejected) as e:
+        agents.ingest(conn, _scrivi(tmp_path, d, "c.json"), "m-b")
+    assert e.value.reason == "autoconferma"
+    # Un respinto con una citazione fuori dai testi del lavoro no.
+    d.update(verdict="respinto", quote="totally made up words here", offset=0)
+    with pytest.raises(agents.AnswerRejected) as e:
+        agents.ingest(conn, _scrivi(tmp_path, d, "x.json"), "m-c")
+    assert e.value.reason == "citazione_assente"
+
+
+def test_factcheck_senza_testo_indipendente_non_si_scrive(conn, tmp_path, monkeypatch, capsys):
+    # M3: con i soli testi del fatto un confermato è impossibile: il lavoro non si scrive.
+    _fatto_di_u_uno(conn, tmp_path, monkeypatch)
+    db.add_text(conn, _fonte(conn, "https://r/stesso"), "comment", "U_Uno",
+                "Again at Acque Minerali I go down to third gear.")
+    assert agents.pending(conn, "factcheck", "imola", tmp_path / "fc") == []
+    assert conn.execute("SELECT COUNT(*) FROM jobs WHERE kind='factcheck'").fetchone()[0] == 0
+    err = capsys.readouterr().err
+    assert "Acque Minerali" in err and "indipendente" in err
+
+
+LUNGO = ("Hello there. Nice day today. I like fast cars. At Acque Minerali I take third. "
+         "Then relax a bit. Lunch is great. Some more words. Coffee time now. "
+         "Later at Acque Minerali stay left. Bye now.")
+
+
+def test_factcheck_taglia_i_testi_attorno_alla_curva(conn, tmp_path, monkeypatch):
+    own = _fatto_di_u_uno(conn, tmp_path, monkeypatch)
+    sha, _ = db.add_text(conn, _fonte(conn, "https://r/lungo"), "comment", "u_lungo", LUNGO)
+    job = json.loads(agents.pending(conn, "factcheck", "imola", tmp_path / "fc")[0].read_text(encoding="utf-8"))
+    corpi = {t["sha256"]: t["body"] for t in job["texts"]}
+    assert corpi[own] == CORPO
+    assert corpi[sha] == ("I like fast cars. At Acque Minerali I take third. Then relax a bit."
+                          "\n[…]\n"
+                          "Coffee time now. Later at Acque Minerali stay left. Bye now.")
+    # La citazione si cerca nel testo del lavoro, tagliato com'è.
+    d = json.loads((FIX / "risposta_factcheck.json").read_text(encoding="utf-8"))
+    q = "At Acque Minerali I take third"
+    d.update(fact_key=KEY, quote=q, offset=corpi[sha].index(q))
+    assert agents.ingest(conn, _scrivi(tmp_path, d), "m") == {"facts": 0, "rejects": 0}
+
+
+def test_extract_solo_testi_che_nominano_una_curva(conn, tmp_path):
+    # M4: «Thanks!» non darà mai un fatto: niente lavoro.
+    db.add_text(conn, _fonte(conn, "https://r/grazie"), "comment", "u_grazie", "Thanks a lot, mate!")
+    db.add_text(conn, _fonte(conn, "https://r/tamb"), "comment", "u_t", "Tamburelo is fast.")
+    nomi = sorted(json.loads(p.read_text(encoding="utf-8"))["body"] for p in _proponi(conn, tmp_path))
+    assert nomi == [CORPO, "Tamburelo is fast."]
+
+
+def test_rate_solo_per_autori_con_un_fatto(conn, tmp_path):
+    # M4: il rate serve solo a pesare un fatto, quindi viene dopo l'estrazione.
+    db.add_text(conn, _fonte(conn, "https://r/senza"), "comment", "u_senza",
+                "At Tosa I coach drivers in ACC.")
+    assert agents.pending(conn, "rate", "imola", tmp_path / "r0") == []
+    _proponi(conn, tmp_path)
+    agents.ingest(conn, FIX / "risposta_estrai.json", "m")
+    jobs = [json.loads(p.read_text(encoding="utf-8"))
+            for p in agents.pending(conn, "rate", "imola", tmp_path / "r1")]
+    assert [j["body"] for j in jobs] == [CORPO]
+
+
+def test_citazione_salvata_come_nel_testo(tmp_path):
+    # L5: si salva il pezzo del testo, non la stringa dell'agente.
+    c = db.open_db(tmp_path / "f.sqlite")
+    body = "At Acque Minerali I go DOWN  to Third gear and it works."
+    sha, _ = db.add_text(c, _fonte(c, "https://r/maiusc"), "comment", "x", body)
+    _proponi(c, tmp_path)
+    f = dict(FATTO, quote="down to third gear", offset=body.index("DOWN"))
+    assert agents.ingest(c, _scrivi(tmp_path, _estrai(sha, [f])), "m")["facts"] == 1
+    assert c.execute("SELECT quote FROM facts").fetchone() == ("DOWN  to Third gear",)
+    c.close()
+
+
+def test_lavori_vecchi_tolti_dalla_cartella(conn, tmp_path):
+    # L11: un lavoro congelato non resta nella cartella, quelli di un'altra pista sì.
+    out = tmp_path / "jobs"
+    vecchio = agents.pending(conn, "extract", "imola", out)[0]
+    monza = out / "extract-aaaaaaaaaaaa.job.json"
+    monza.write_text(json.dumps({"kind": "extract", "track": "monza"}), encoding="utf-8")
+    rate = out / "rate-bbbbbbbbbbbb.job.json"
+    rate.write_text(json.dumps({"kind": "rate", "track": "imola"}), encoding="utf-8")
+    agents.ingest(conn, FIX / "risposta_estrai.json", "m")
+    assert agents.pending(conn, "extract", "imola", out) == []
+    assert not vecchio.exists() and monza.exists() and rate.exists()
+
+
+@pytest.mark.parametrize("testo, ok", [
+    ("```json\n{risposta}\n```\n", True),
+    ("```\n{risposta}\n```", True),
+    ("Here it is:\n```json\n{risposta}\n```", False),
+    ("```json\n{risposta}\n```\n```json\n{risposta}\n```", False),
+])
+def test_risposta_in_un_recinto(conn, tmp_path, testo, ok):
+    # M5: un solo recinto ```json si toglie, il resto è JSON malformato.
+    _proponi(conn, tmp_path)
+    p = tmp_path / "f.answer.json"
+    p.write_text(testo.replace("{risposta}", (FIX / "risposta_estrai.json").read_text(encoding="utf-8")),
+                 encoding="utf-8")
+    if ok:
+        assert agents.ingest(conn, p, "m") == {"facts": 1, "rejects": 1}
+    else:
+        with pytest.raises(agents.AnswerRejected) as e:
+            agents.ingest(conn, p, "m")
+        assert e.value.reason == "json_malformato"
+
+
+def test_cli_ingest_dice_verdetto_e_ruolo(conn, tmp_path, capsys):
+    # L12: per rate e factcheck si stampa il ruolo o il verdetto, non «fatti 0».
+    dbp = tmp_path / "f.sqlite"
+    _coach(conn, tmp_path)
+    _job_factcheck(conn, KEY, [CORPO])
+    assert fonti.main(["--db", str(dbp), "ingest", "--model", "m", str(FIX / "risposta_valuta.json"),
+                       str(FIX / "risposta_factcheck.json")]) == 0
+    out = capsys.readouterr().out
+    assert "risposta_valuta.json: ruolo coach, nome Coach Uno." in out
+    assert "risposta_factcheck.json: verdetto confermato." in out
+
+
+def test_prompt_senza_pista_scritta():
+    # L13: la pista la dice il lavoro.
+    for nome in agents.PROMPT_FILES.values():
+        testo = (agents.PROMPTS_DIR / nome).read_text(encoding="utf-8")
+        assert "Imola" not in testo, nome
+
+
+def test_una_regola_una_copia():
+    # L6, L7: ordine delle versioni, autore e versione più nuova stanno solo in db.
+    import inspect
+
+    from tools.fonti import consensus, export, vocab
+    for m in (agents, consensus, export):
+        src = inspect.getsource(m)
+        for nome in ("def _version_order", "def _author_id", "def _newest", "consensus._newest"):
+            assert nome not in src, (m.__name__, nome)
+    for nome in ("normalize", "negated", "negative_sense"):
+        assert not hasattr(vocab, nome)
+    assert "che non c'è ancora" not in inspect.getsource(agents)
+    assert "(sha256, kind, prompt_version, model, track)" in agents.__doc__

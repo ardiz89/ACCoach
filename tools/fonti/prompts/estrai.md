@@ -45,7 +45,7 @@ Return ONLY this JSON object. No prose, no Markdown fences, no extra keys:
    another track or a car-specific setup you cannot tie to the text.
 6. The corner must be named in the text near the quote, before it or right after the
    value ("brake at the 100 board into Tosa").
-7. If the text is not about Imola in Assetto Corsa Competizione (ACC), or states no
+7. If the text is not about the job's `track` in Assetto Corsa Competizione (ACC), or states no
    such fact, return `"facts": []`.
 8. When in doubt, leave the fact out. A missing fact costs nothing; an invented one is
    a defect.

@@ -169,7 +169,7 @@ def cmd_ingest(args) -> int:
                 print(f"{Path(f).name}: errore inatteso ({type(e).__name__}), passo al prossimo.",
                       file=sys.stderr)
                 continue
-            print(f"{Path(f).name}: fatti {r['facts']}, scarti {r['rejects']}.")
+            print(f"{Path(f).name}: {agents.summary(Path(f), r)}")
         return 1 if rifiutati else 0
     finally:
         conn.close()

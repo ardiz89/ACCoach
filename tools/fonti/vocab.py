@@ -1,6 +1,6 @@
 """Vocabolario chiuso: alias delle curve e normalizzazione dei valori (italiano e inglese).
 
-Tutto è deterministico. Nel dubbio `normalize` dà `None`: un valore ambiguo, negato
+Tutto è deterministico. Nel dubbio `locate` dà `None`: un valore ambiguo, negato
 o detto in modo diverso dalle forme ammesse non si sceglie. Le cifre sono solo quelle
 ASCII: una cifra a larghezza piena o araba non è un numero citato.
 """
@@ -116,14 +116,6 @@ RELATIVE = re.compile(
     r"|più tardi|piu tardi|in anticipo|in ritardo|than|too|troppo|early|late|presto|tardi)\b")
 RELATIVE_WORDS = 3  # distanza massima, in parole, dal numero o dal verbo della frenata
 _BRAKE_VERB = re.compile(r"\b(?:brak\w*|fren\w*|stacc\w*)\b")
-
-
-def negated(text: str) -> bool:
-    return bool(NEGATION.search(fold(text)))
-
-
-def negative_sense(text: str) -> bool:
-    return bool(NEGATIVE_SENSE.search(fold(text)))
 
 
 def _word_index(s: str, pos: int) -> int:
@@ -330,12 +322,6 @@ def locate(type_: str, quote: str) -> tuple[str, int, int] | None:
     """Valore, inizio e fine del suo segno nella citazione già normalizzata con `fold`."""
     fn = _NORMALIZERS.get(type_)
     return fn(quote) if fn else None
-
-
-def normalize(type_: str, quote: str) -> str | None:
-    """Valore canonico che la citazione sostiene, o `None` se non c'è, è ambiguo o negato."""
-    got = locate(type_, fold(quote))
-    return got[0] if got else None
 
 
 def sentence_reason(type_: str, sentence: str, at: int) -> str | None:

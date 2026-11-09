@@ -31,38 +31,20 @@ import hashlib
 import json
 import sqlite3
 
-from tools.fonti import verify, vocab
+from tools.fonti import db, verify, vocab
 
 DESCRIPTIVE = ("line", "mistake")
 # Un testo identico lega due account solo se ha almeno tante parole: «Thanks!» non basta.
 LINK_MIN_WORDS = 8
 
 
-def _version_order(v: str):
-    return (0, int(v), "") if v.isdigit() else (1, 0, v)
-
-
-def _author_id(platform, author) -> str:
-    return f"{platform or ''}:{author or ''}".lower()
-
-
 def fact_key(track: str, corner: str, type_: str, value: str) -> str:
     return hashlib.sha256(f"{track}|{corner}|{type_}|{value}".encode("utf-8")).hexdigest()
 
 
-def _newest(conn: sqlite3.Connection, kind: str, track: str) -> dict[str, str]:
-    """Per ogni chiave di quel `kind`, la versione più alta proposta in `jobs`."""
-    out: dict[str, str] = {}
-    for key, version in conn.execute(
-            "SELECT key, prompt_version FROM jobs WHERE kind=? AND track=?", (kind, track)):
-        if key not in out or _version_order(version) > _version_order(out[key]):
-            out[key] = version
-    return out
-
-
 def _rows(conn: sqlite3.Connection, track: str) -> list[tuple]:
     """I fatti validi: risultato della versione più recente, fonte ACC di quella pista."""
-    newest = _newest(conn, "extract", track)
+    newest = db.newest_versions(conn, "extract", track)
     rows = conn.execute(
         "SELECT r.sha256, r.prompt_version, f.corner, f.type, f.value, f.quote, f.start_s,"
         " f.author, s.platform, s.url FROM facts f JOIN results r ON r.id = f.result_id"
@@ -74,7 +56,7 @@ def _rows(conn: sqlite3.Connection, track: str) -> list[tuple]:
 
 def _reliable_authors(conn: sqlite3.Connection, track: str) -> set[str]:
     """Gli autori che una valutazione recente dice coach con nome o pilota con nome e tempo."""
-    newest = _newest(conn, "rate", track)
+    newest = db.newest_versions(conn, "rate", track)
     good: set[str] = set()
     for sha, version, payload in conn.execute(
             "SELECT sha256, prompt_version, payload_json FROM results WHERE kind='rate' AND track=?",
@@ -90,7 +72,7 @@ def _reliable_authors(conn: sqlite3.Connection, track: str) -> set[str]:
         named = isinstance(name, str) and bool(name.strip())
         if not (named and (role == "coach" or (role == "pilota" and lap is not None))):
             continue
-        rows = sorted({(_author_id(p, a), (a or "").strip().casefold()) for p, a in conn.execute(
+        rows = sorted({(db.author_id(p, a), (a or "").strip().casefold()) for p, a in conn.execute(
             "SELECT s.platform, t.author FROM texts t JOIN sources s ON s.id = t.source_id"
             " WHERE t.sha256=? AND s.game='acc' AND s.track=?", (sha, track))})
         if len({aid for aid, _ in rows}) > 1:
@@ -120,7 +102,7 @@ def _people(conn: sqlite3.Connection, track: str) -> dict[str, str]:
             "SELECT t.sha256, s.platform, t.author, t.body FROM texts t"
             " JOIN sources s ON s.id = t.source_id"
             " WHERE s.game='acc' AND s.track=? ORDER BY t.sha256, s.platform, t.author", (track,)):
-        aid = find(_author_id(platform, author))
+        aid = find(db.author_id(platform, author))
         if len(verify.norm_text(body or "").split()) < LINK_MIN_WORDS:
             continue
         if sha in owner:
@@ -187,7 +169,7 @@ def build(conn: sqlite3.Connection, track: str) -> list[dict]:
     for sha, _v, corner, type_, value, quote, start_s, author, platform, url in _rows(conn, track):
         val = groups.setdefault((corner, type_), {}).setdefault(
             value, {"texts": {}, "sources": set()})
-        val["texts"].setdefault(_author_id(platform, author), set()).add(sha)
+        val["texts"].setdefault(db.author_id(platform, author), set()).add(sha)
         val["sources"].add((url, start_s, quote))
     reliable = _reliable_authors(conn, track)
     people = _people(conn, track)

@@ -75,6 +75,6 @@ Return ONLY this JSON object. No prose, no Markdown fences, no extra keys:
 2. Never translate or paraphrase a quote.
 3. A claim you cannot quote is left out: name `""`, role `anonimo`, `lap_time` null,
    `car` null. That is always a valid answer.
-4. If the text is not about Imola in Assetto Corsa Competizione (ACC), answer name
+4. If the text is not about the job's `track` in Assetto Corsa Competizione (ACC), answer name
    `""` (or the `meta` author), role `anonimo`, `lap_time` null, `car` null and
    `"reasons": []`.

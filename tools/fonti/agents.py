@@ -4,8 +4,18 @@ Gli agenti (subagenti Claude) leggono un `*.job.json` e rispondono con un JSON d
 schema del loro `kind`. La risposta si accetta intera o si rifiuta intera. Per
 `extract` ogni fatto passa poi per il verificatore e quelli che non reggono finiscono
 negli scarti; per `rate` e `factcheck` basta una citazione che non regge e la risposta
-intera si rifiuta. Un risultato si congela per (sha256, kind, prompt_version, model):
+intera si rifiuta. Un risultato si congela per (sha256, kind, prompt_version, model, track):
 un secondo ingest della stessa chiave si rifiuta.
+
+L'ordine è extract, poi rate, poi consenso, poi factcheck:
+
+- `extract` si propone solo per i testi che nominano almeno una curva della pista;
+- `rate` solo per i testi il cui autore ha già un fatto: la valutazione serve solo a
+  pesare un fatto. Il testo può non nominare curve: un coach si presenta anche altrove;
+- `factcheck` solo per una voce `verificato` con almeno un testo indipendente. Ogni
+  testo del lavoro è tagliato alle frasi che nominano la curva, più una prima e una
+  dopo. Un `confermato` deve citare un testo indipendente dal fatto; un `respinto`
+  può citare qualsiasi testo del lavoro, anche quelli del fatto stesso.
 
 Ogni lavoro proposto da `pending` si ricorda nella tabella `jobs`, per pista. La
 risposta ripete `prompt_version` e `track` del lavoro; l'ingest accetta solo la
@@ -17,11 +27,12 @@ from __future__ import annotations
 import json
 import re
 import sqlite3
+import sys
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
-from tools.fonti import verify, vocab
+from tools.fonti import db, verify, vocab
 
 PROMPTS_DIR = Path(__file__).resolve().parent / "prompts"
 PROMPT_FILES = {"extract": "estrai.md", "rate": "valuta.md", "factcheck": "factcheck.md"}
@@ -42,6 +53,9 @@ _FACT_KEYS = {"corner", "type", "value", "quote", "offset"}
 _SPEAKER_KEYS = {"name", "role"}
 _REASON_KEYS = {"field", "claim", "quote", "offset"}
 _VERSION = re.compile(r"^prompt_version:\s*(\S+)\s*$")
+# Un solo recinto Markdown attorno alla risposta si toglie; il resto deve essere JSON.
+_FENCE = re.compile(r"\A\s*```(?:json)?[ \t]*\r?\n(.*?)\r?\n?```\s*\Z", re.DOTALL)
+GAP = "\n[…]\n"  # fra due pezzi di un testo tagliato per il factcheck
 
 
 class AnswerRejected(Exception):
@@ -83,10 +97,6 @@ def prompt_version(kind: str) -> str:
     if not m:
         raise ValueError(f"{path.name}: la prima riga deve essere «prompt_version: N»")
     return m.group(1)
-
-
-def _version_order(v: str):
-    return (0, int(v), "") if v.isdigit() else (1, 0, v)
 
 
 # --- i testi ------------------------------------------------------------------
@@ -142,11 +152,6 @@ def _frozen_any_model(conn, key: str, kind: str, version: str, track: str) -> bo
                         " AND track=?", (key, kind, version, track)).fetchone() is not None
 
 
-def _author_id(platform, author) -> str:
-    """Un autore si identifica con `platform:author` in minuscolo, come nel consenso."""
-    return f"{platform or ''}:{author or ''}".lower()
-
-
 def _own_sources(conn, track: str, entry: dict) -> tuple[list[str], list[str]]:
     """Sha256 dei testi e autori da cui viene il fatto: una verifica non si conferma su questi."""
     values = [v.get("value") for v in entry.get("values") or []
@@ -159,12 +164,58 @@ def _own_sources(conn, track: str, entry: dict) -> tuple[list[str], list[str]]:
         " LEFT JOIN sources s ON s.id = f.source_id"
         f" WHERE f.track=? AND f.corner=? AND f.type=? AND f.value IN ({marks})",
         (track, entry.get("corner"), entry.get("type"), *values)).fetchall()
-    return (sorted({r[0] for r in rows}), sorted({_author_id(r[1], r[2]) for r in rows}))
+    return (sorted({r[0] for r in rows}), sorted({db.author_id(r[1], r[2]) for r in rows}))
 
 
 def _mentions(track: str, corner: str, body: str) -> bool:
     text = vocab.fold(body)
     return any(vocab.alias_regex(a).search(text) for a in vocab.CORNERS.get(track, {}).get(corner, []))
+
+
+def _mentions_any(track: str, body: str) -> bool:
+    return any(_mentions(track, c, body) for c in vocab.CORNERS.get(track, {}))
+
+
+def _authors_with_facts(conn, track: str) -> set[str]:
+    return {db.author_id(p, a) for p, a in conn.execute(
+        "SELECT s.platform, f.author FROM facts f JOIN sources s ON s.id = f.source_id"
+        " WHERE f.track=? AND s.game='acc' AND s.track=?", (track, track))}
+
+
+def excerpt(track: str, corner: str, body: str) -> str:
+    """Le frasi che nominano la curva, più una prima e una dopo; i pezzi staccati con GAP.
+
+    Se restano tutte le frasi, il testo torna intero e identico.
+    """
+    frasi = verify.sentences(body)
+    keep: set[int] = set()
+    for i, (a, b) in enumerate(frasi):
+        if _mentions(track, corner, body[a:b]):
+            keep.update(k for k in (i - 1, i, i + 1) if 0 <= k < len(frasi))
+    if len(keep) == len(frasi):
+        return body
+    pezzi, run = [], []
+    for i in sorted(keep):
+        if run and i != run[-1] + 1:
+            pezzi.append(run)
+            run = []
+        run.append(i)
+    if run:
+        pezzi.append(run)
+    return GAP.join(body[frasi[r[0]][0]:frasi[r[-1]][1]].strip() for r in pezzi)
+
+
+def _clean_out_dir(out_dir: Path, kind: str, track: str, keep: set[Path]) -> None:
+    """Toglie i `.job.json` di quel kind e di quella pista che non sono più da fare."""
+    for p in sorted(out_dir.glob(f"{kind}-*.job.json")):
+        if p in keep:
+            continue
+        try:
+            d = json.loads(p.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+            continue
+        if isinstance(d, dict) and d.get("kind") == kind and d.get("track") == track:
+            p.unlink()
 
 
 # --- la coda ------------------------------------------------------------------
@@ -178,20 +229,23 @@ def pending(conn: sqlite3.Connection, kind: str, track: str, out_dir: Path) -> l
     texts = _texts_by_sha(_acc_rows(conn, track))
     jobs: list[tuple[str, dict]] = []
     if kind in ("extract", "rate"):
+        with_facts = _authors_with_facts(conn, track) if kind == "rate" else set()
         for sha in sorted(texts):
+            t = texts[sha]
+            if kind == "extract" and not _mentions_any(track, t["body"]):
+                continue  # senza una curva il verificatore non accetterà mai niente
+            if kind == "rate" and not {db.author_id(m["platform"], m["author"])
+                                       for m in t["meta"]} & with_facts:
+                continue  # nessun fatto da pesare. Il ruolo può stare in un testo senza curve.
             if _frozen_any_model(conn, sha, kind, version, track):
                 continue
-            t = texts[sha]
             jobs.append((sha, {"kind": kind, "sha256": sha, "track": track,
                                "prompt_version": version, "body": t["body"],
                                "segments": t["segments"], "meta": t["meta"],
                                "corners": corners}))
     else:
-        try:
-            from tools.fonti import consensus
-        except ImportError as e:
-            raise RuntimeError("pending factcheck: serve tools/fonti/consensus.py "
-                               "(consensus.build), che non c'è ancora") from e
+        from tools.fonti import consensus
+
         for entry in consensus.build(conn, track):
             key = entry.get("fact_key")
             if (entry.get("state") != "verificato" or not key
@@ -204,8 +258,18 @@ def pending(conn: sqlite3.Connection, kind: str, track: str, out_dir: Path) -> l
                 raise RuntimeError(f"pending factcheck: non trovo le fonti del fatto {key[:12]} "
                                    f"({corner}, {entry.get('type')}); la voce del consenso ha "
                                    "una forma inattesa?")
-            others = [{"sha256": sha, "body": t["body"], "segments": t["segments"], "meta": t["meta"]}
-                      for sha, t in sorted(texts.items()) if _mentions(track, corner, t["body"])]
+            others, independent = [], 0
+            for sha, t in sorted(texts.items()):
+                if not _mentions(track, corner, t["body"]):
+                    continue
+                authors = {db.author_id(m["platform"], m["author"]) for m in t["meta"]}
+                independent += int(sha not in own_shas and not authors & set(own_authors))
+                others.append({"sha256": sha, "body": excerpt(track, corner, t["body"]),
+                               "segments": None, "meta": t["meta"]})
+            if not independent:
+                print(f"Factcheck saltato: {corner}, {entry.get('type')} ({key[:12]}) non ha "
+                      "nessun testo indipendente da citare.", file=sys.stderr)
+                continue
             jobs.append((key, {"kind": kind, "sha256": key, "track": track,
                                "prompt_version": version, "body": None, "segments": None,
                                "meta": [], "corners": [corner], "fact": entry,
@@ -225,6 +289,7 @@ def pending(conn: sqlite3.Connection, kind: str, track: str, out_dir: Path) -> l
         p = out_dir / f"{kind}-{key[:12]}.job.json"
         p.write_text(_dumps(job), encoding="utf-8", newline="\n")
         paths.append(p)
+    _clean_out_dir(out_dir, kind, track, set(paths))
     return paths
 
 
@@ -299,7 +364,7 @@ def _open_job(conn, kind: str, key: str, track: str, version: str, model: str) -
                         (kind, key, track)).fetchall()
     if not rows:
         raise AnswerRejected("lavoro_ignoto")
-    newest, payload = max(rows, key=lambda r: _version_order(r[0]))
+    newest, payload = max(rows, key=lambda r: db.version_order(r[0]))
     if version != newest:
         raise AnswerRejected("versione_superata")
     if conn.execute("SELECT 1 FROM results WHERE sha256=? AND kind=? AND prompt_version=?"
@@ -385,38 +450,66 @@ def _check_rate(d: dict, body: str, authors: set[str]) -> None:
 
 
 def _check_factcheck(d: dict, payload: dict) -> None:
-    """La citazione deve stare in un testo del lavoro che non sia una fonte del fatto stesso.
+    """La citazione deve stare in un testo del lavoro.
 
-    Né lo stesso testo (sha256) né un altro testo dello stesso autore: senza l'elenco
-    delle fonti del fatto non si può escludere l'autoconferma, e si rifiuta.
+    Un `respinto` può citare qualsiasi testo del lavoro, anche uno da cui viene il fatto:
+    l'ironia o la correzione dello stesso autore stanno proprio lì. Un `confermato` deve
+    citare un testo indipendente: né lo stesso testo (sha256) né un altro testo dello
+    stesso autore. Senza l'elenco delle fonti del fatto non si può escludere
+    l'autoconferma, e il confermato si rifiuta.
     """
-    own = payload.get("fact_sha256s")
-    if not isinstance(own, list) or not own:
-        raise AnswerRejected("fonti_del_fatto_ignote")
-    own = set(own)
-    own_authors = set(payload.get("fact_authors") or [])
-    reasons = []
-    for t in payload.get("texts") or []:
-        bad = verify.check_quote(d["quote"], t.get("body") or "", d["offset"])
-        authors = {_author_id(m.get("platform"), m.get("author"))
-                   for m in t.get("meta") or [] if isinstance(m, dict)}
-        if bad is None and t.get("sha256") not in own and not (authors & own_authors):
+    texts = [t for t in payload.get("texts") or [] if isinstance(t, dict)]
+    if d["verdict"] == "respinto":
+        reasons = [verify.check_quote(d["quote"], t.get("body") or "", d["offset"]) for t in texts]
+        if None in reasons:
             return
-        reasons.append("autoconferma" if bad is None else bad)
+    else:
+        own = payload.get("fact_sha256s")
+        if not isinstance(own, list) or not own:
+            raise AnswerRejected("fonti_del_fatto_ignote")
+        own = set(own)
+        own_authors = set(payload.get("fact_authors") or [])
+        reasons = []
+        for t in texts:
+            bad = verify.check_quote(d["quote"], t.get("body") or "", d["offset"])
+            authors = {db.author_id(m.get("platform"), m.get("author"))
+                       for m in t.get("meta") or [] if isinstance(m, dict)}
+            if bad is None and t.get("sha256") not in own and not (authors & own_authors):
+                return
+            reasons.append("autoconferma" if bad is None else bad)
     for r in ("autoconferma", "offset_errato", "citazione_corta"):
         if r in reasons:
             raise AnswerRejected(r)
     raise AnswerRejected("citazione_assente")
 
 
+def read_answer(answer_path: Path) -> dict:
+    """Il JSON della risposta; un solo recinto ```json attorno si toglie."""
+    try:
+        raw = Path(answer_path).read_text(encoding="utf-8-sig")
+        m = _FENCE.match(raw)
+        return json.loads(m.group(1) if m else raw)
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        raise AnswerRejected("json_malformato") from None
+
+
+def summary(answer_path: Path, result: dict) -> str:
+    """Una riga per l'uscita di ingest: i fatti per extract, il ruolo o il verdetto per gli altri."""
+    d = read_answer(answer_path)
+    if d.get("kind") == "rate":
+        sp = d.get("speaker") or {}
+        nome = f", nome {sp['name']}" if sp.get("name") else ""
+        return f"ruolo {sp.get('role')}{nome}."
+    if d.get("kind") == "factcheck":
+        return f"verdetto {d.get('verdict')}."
+    return f"fatti {result['facts']}, scarti {result['rejects']}."
+
+
 def ingest(conn: sqlite3.Connection, answer_path: Path, model: str) -> dict:
     """Congela una risposta e ne verifica ogni fatto; `{"facts": n, "rejects": m}`."""
     if not isinstance(model, str) or not model.strip():
         raise AnswerRejected("modello_mancante")
-    try:
-        d = json.loads(Path(answer_path).read_text(encoding="utf-8-sig"))
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
-        raise AnswerRejected("json_malformato") from None
+    d = read_answer(answer_path)
     kind = _validate(d)
     key = d["fact_key"] if kind == "factcheck" else d["sha256"]
     track, version = d["track"], d["prompt_version"]
@@ -450,10 +543,11 @@ def ingest(conn: sqlite3.Connection, answer_path: Path, model: str) -> dict:
                 if bad:
                     rejects.append((bad, f))
                     continue
-                _, at = verify.locate_quote(f["quote"], body, f["offset"])
+                _, at, end = verify.quote_span(f["quote"], body, f["offset"])
                 start_s = _start_s(body, segments, at)
+                quote = body[at:end]  # il pezzo del testo, non la stringa dell'agente
                 for r in rows:
-                    facts.append((track, f["corner"], f["type"], f["value"], f["quote"], f["offset"],
+                    facts.append((track, f["corner"], f["type"], f["value"], quote, f["offset"],
                                   start_s, r[4], r[9]))
 
     with _atomic(conn):

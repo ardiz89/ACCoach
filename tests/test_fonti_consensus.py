@@ -236,9 +236,9 @@ def test_reliability_leaks_via_shared_sha(b):
     sb, _ = db.add_text(b.conn, b.fonte("https://r/b", author="reposterB"), "comment",
                         "reposterB", body)
     assert sa == sb
-    b.valuta(sa, body, "coach", "I coach drivers in ACC", name="coachA")
     _brake(b, "https://r/b2", "reposterB")
     _brake(b, "https://r/c", "anonC", prefix="Honestly at")
+    b.valuta(sa, body, "coach", "I coach drivers in ACC", name="coachA")
     e = _voce(b.build(), type_="brake")
     assert e["state"] == "singolo"
     assert e["values"][0]["authors"] == ["reddit:anonc", "reddit:reposterb"]
@@ -250,9 +250,9 @@ def test_valutazione_condivisa_va_a_chi_si_chiama_cosi(b):
     body = "I coach drivers in ACC every week. My tip for the slow corners."
     sa, _ = db.add_text(b.conn, b.fonte("https://r/a", author="CoachA"), "comment", "CoachA", body)
     db.add_text(b.conn, b.fonte("https://r/b", author="reposterB"), "comment", "reposterB", body)
-    b.valuta(sa, body, "coach", "I coach drivers in ACC", name="CoachA")
     _brake(b, "https://r/a2", "CoachA")
     _brake(b, "https://r/c", "anonC", prefix="Honestly at")
+    b.valuta(sa, body, "coach", "I coach drivers in ACC", name="CoachA")
     assert _voce(b.build(), type_="brake")["state"] == "verificato"
 
 
@@ -294,6 +294,7 @@ def test_nome_con_spazi_combacia(b):
     body = "I coach drivers in ACC every week. My tip for the slow corners."
     sa, _ = db.add_text(b.conn, b.fonte("https://r/a", author="CoachA"), "comment", "CoachA ", body)
     db.add_text(b.conn, b.fonte("https://r/b", author="reposterB"), "comment", "reposterB", body)
+    _brake(b, "https://r/a2", "CoachA ")   # il rate si propone solo a chi ha un fatto
     b.valuta(sa, body, "coach", "I coach drivers in ACC", name="CoachA")
     assert consensus._reliable_authors(b.conn, "imola") == {"reddit:coacha "}
 
