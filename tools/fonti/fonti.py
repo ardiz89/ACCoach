@@ -18,7 +18,7 @@ if str(ROOT) not in sys.path:
 
 from tools.fonti import db  # noqa: E402
 
-PLANNED = ("consensus", "export", "review")
+PLANNED = ("export", "review")
 
 
 def _db_path(arg: str) -> Path:
@@ -108,6 +108,32 @@ def cmd_ingest(args) -> int:
         conn.close()
 
 
+def cmd_consensus(args) -> int:
+    from tools.fonti import consensus
+
+    conn = db.open_db(_db_path(args.db))
+    try:
+        entries = consensus.build(conn, args.track)
+    finally:
+        conn.close()
+    if not entries:
+        print(f"Nessun fatto per {args.track}.")
+        return 0
+    curva = None
+    for e in entries:
+        if e["corner"] != curva:
+            curva = e["corner"]
+            print(f"{curva}:")
+        valori = ", ".join(
+            f"{v['value']} ({len(v['authors'])} {'autore' if len(v['authors']) == 1 else 'autori'})"
+            for v in e["values"])
+        print(f"  {e['type']}: {e['state']}, {valori}")
+    stati = [e["state"] for e in entries]
+    conti = ", ".join(f"{s} {stati.count(s)}" for s in ("verificato", "conteso", "singolo", "descrittivo"))
+    print(f"Totale: {conti}.")
+    return 0
+
+
 def cmd_non_disponibile(args) -> int:
     print(f"{args.cmd}: non ancora disponibile", file=sys.stderr)
     return 2
@@ -134,6 +160,9 @@ def build_parser() -> argparse.ArgumentParser:
     i.add_argument("--model", required=True)
     i.add_argument("files", nargs="+", metavar="FILE")
     i.set_defaults(func=cmd_ingest)
+    k = sub.add_parser("consensus", help="il consenso fra autori, curva per curva")
+    k.add_argument("--track", required=True)
+    k.set_defaults(func=cmd_consensus)
     for name in PLANNED:
         sub.add_parser(name, help="non ancora disponibile").set_defaults(func=cmd_non_disponibile)
     return ap
