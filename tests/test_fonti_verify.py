@@ -19,15 +19,15 @@ def fatto(quote, value, type_="brake", corner="Acque Minerali", offset=0):
 
 
 def test_fatto_valido():
-    q = "brake at the 100 board into acque minerali"
+    q = "at acque minerali brake at the 100 board"
     assert verify.check_fact("imola", fatto(q, "board:100"), "so " + q + " ok") is None
 
 
 def test_citazione_normalizzata_e_parola_cambiata():
-    body = "you brake at the 100 board into acque minerali's"
-    q = "brake  at the 100 board into acque minerali’s"
+    body = "at acque minerali's you brake at the 100 board"
+    q = "acque minerali’s you brake  at the 100 board"
     assert verify.check_fact("imola", fatto(q, "board:100"), body) is None
-    q2 = "brake at the 150 board into acque minerali"
+    q2 = "acque minerali's you brake at the 150 board"
     assert verify.check_fact("imola", fatto(q2, "board:150"), body) == "citazione_assente"
 
 
@@ -39,7 +39,7 @@ def test_numero_non_citato():
 
 
 def test_valore_diverso_e_non_normalizzabile():
-    q2 = "brake at the 100 board or the 150 board into acque minerali"
+    q2 = "at acque minerali brake at the 100 board or the 150 board"
     assert verify.check_fact("imola", fatto(q2, "board:100"), q2) == "valore_non_normalizzabile"
     q5 = "acque minerali: apex late and also 100 m"
     assert verify.check_fact("imola", fatto(q5, "early", "apex"), q5) == "valore_diverso"
@@ -193,7 +193,7 @@ def test_offset_errato(offset):
 
 def test_offset_vicino_e_seconda_occorrenza():
     q = "tosa brake at the 100 board"
-    body = "so at   " + q + " and later again at " + q
+    body = "so at   " + q + ". and again at " + q
     first = body.index(q)
     second = body.rindex(q)
     for off in (first, first - 5, first + 5, second, second + 4):
@@ -225,8 +225,8 @@ def test_curva_e_l_ultima_nominata():
 def test_curva_ultima_dentro_la_citazione():
     q = "after tosa, at piratella brake at the 100 board"
     assert verify.check_fact("imola", fatto(q, "board:100", corner="Tosa"), q) == "curva_non_trovata"
-    # «after» è anche una parola relativa della frenata: qui il fatto non entra comunque.
-    assert verify.check_fact("imola", fatto(q, "board:100", corner="Piratella"), q) == "valore_non_normalizzabile"
+    # «after» è lontano dalla frenata e dal numero: per Piratella il fatto entra.
+    assert verify.check_fact("imola", fatto(q, "board:100", corner="Piratella"), q) is None
     q2 = "leave tosa, at piratella brake at the 100 board"
     assert verify.check_fact("imola", fatto(q2, "board:100", corner="Tosa"), q2) == "curva_non_trovata"
     assert verify.check_fact("imola", fatto(q2, "board:100", corner="Piratella"), q2) is None
@@ -271,7 +271,7 @@ def test_oggetto_frasi_ammesse(q, atteso):
 
 @pytest.mark.parametrize("q", [
     "wait a second", "alla prima curva", "tosa is the 1st corner after the straight",
-    "first brake then second gear", "in 2 laps", "down to 5 kph",
+    "in 2 laps", "down to 5 kph",
     "third or fourth gear", "in 3 or 4", "not in third", "3rd", "use third",
     "nella terza curva", "in 2 corners", "in 3 seconds", "in 4 m", "in second place", "maybe third gear", "terza o quarta marcia",
 ])
@@ -330,3 +330,180 @@ def test_descrittivi_valore_uguale_alla_citazione(t):
     q = "tosa you want to stay wide and be patient"
     assert verify.check_fact("imola", fatto(q, "stay wide", t, "Tosa"), q) == "valore_diverso"
     assert verify.check_fact("imola", fatto(q, "Tosa  you want to stay wide and be patient", t, "Tosa"), q) is None
+
+
+# --- Round 2: la frase intera ------------------------------------------------
+
+
+def _c(quote, value, type_, body=None, corner="Tosa", segments=None):
+    body = quote if body is None else body
+    off = max(body.lower().find(quote.lower()), 0)
+    f = fatto(quote, value, type_, corner, off)
+    if segments is None:
+        return verify.check_fact("imola", f, body)
+    return verify.check_fact("imola", f, body, segments=segments)
+
+
+def test_citazione_oltre_frase():
+    body = "after villeneuve you brake at the 100 board. then tosa is easy"
+    assert _c("you brake at the 100 board. then tosa is easy", "board:100", "brake", body) \
+        == "citazione_oltre_frase"
+    body2 = "tosa: brake at the 100 board\nsecond gear"
+    assert _c("tosa: brake at the 100 board second gear", "board:100", "brake", body2) \
+        == "citazione_oltre_frase"
+    body3 = "tosa! brake at the 100 board? yes"
+    assert _c("tosa! brake at the 100 board", "board:100", "brake", body3) == "citazione_oltre_frase"
+    # Il punto finale della citazione e il punto decimale non sono attraversamenti.
+    assert _c("at tosa brake at the 100 board.", "board:100", "brake") is None
+
+
+def test_frase_dai_segmenti_senza_punteggiatura():
+    segs = [{"start_s": 0.0, "text": "at tosa brake at the 100 board"},
+            {"start_s": 2.0, "text": "or later it depends"}]
+    body = " ".join(s["text"] for s in segs)
+    q = "at tosa brake at the 100 board"
+    assert _c(q, "board:100", "brake", body) is not None  # senza segmenti è una frase sola
+    assert _c(q, "board:100", "brake", body, segments=segs) is None
+    assert _c("tosa brake at the 100 board or later", "board:100", "brake", body, segments=segs) \
+        == "citazione_oltre_frase"
+
+
+@pytest.mark.parametrize("quote,value,type_,body", [
+    ("make at tosa and brake at the 100 board", "board:100", "brake",
+     "don't make the mistake lots of people make at tosa and brake at the 100 board"),
+    ("at tosa you brake at the 100 board", "board:100", "brake",
+     "at tosa you brake at the 100 board or later, it depends"),
+    ("at tosa go down to second gear", "2", "gear", "at tosa go down to second gear or third"),
+    ("at tosa you brake at the 100", "board:100", "brake", "at tosa you brake at the 100 kph point"),
+    ("at tosa you brake at the 100", "board:100", "brake",
+     "at tosa you brake at the 100 metres mark, the 100 board is too late"),
+    ("at tosa brake at the 100 board", "board:100", "brake", "at tosa brake at the 100 board. no!"),
+    ("at tosa use the exit kerb", "exit", "kerb", "at tosa use the exit kerb, it is a mistake"),
+])
+def test_controlli_sulla_frase_intera(quote, value, type_, body):
+    assert _c(quote, value, type_, body) is not None
+
+
+def test_curva_prima_del_valore():
+    body = "villeneuve: brake at the 100 board, then flat to tosa"
+    assert _c("brake at the 100 board, then flat to tosa", "board:100", "brake", body) \
+        == "curva_non_trovata"
+    assert _c("brake at the 100 board, then flat to tosa", "board:100", "brake", body,
+              corner="Villeneuve") is None
+    assert _c("brake at the 100 board into tosa", "board:100", "brake") == "curva_non_trovata"
+    assert _c("use the exit kerb at tosa", "exit", "kerb") == "curva_non_trovata"
+    assert _c("brake at the 100 board into tosa, down to second gear", "2", "gear") is None
+
+
+@pytest.mark.parametrize("q", [
+    "tosa: don´t use the exit kerb", "tosa: don`t use the exit kerb", "tosa: donʼt use the exit kerb",
+    "tosa: don′t use the exit kerb", "tosa: don＇t use the exit kerb",
+])
+def test_apostrofi_varianti(q):
+    assert verify.norm_text(q) == "tosa: don't use the exit kerb"
+    assert _c(q, "exit", "kerb") == "negazione"
+
+
+@pytest.mark.parametrize("q,value,type_", [
+    ("tosa: shouldnt use the exit kerb", "exit", "kerb"),
+    ("tosa: you cant use the exit kerb", "exit", "kerb"),
+    ("tosa: you cannot use the exit kerb", "exit", "kerb"),
+    ("tosa: you can not use the exit kerb", "exit", "kerb"),
+    ("tosa: stay away from the exit kerb", "exit", "kerb"),
+    ("tosa: keep off the exit kerb", "exit", "kerb"),
+    ("tosa: stay clear of the exit kerb", "exit", "kerb"),
+    ("tosa: watch out for the exit kerb", "exit", "kerb"),
+    ("tosa: careful with the exit kerb", "exit", "kerb"),
+    ("tosa: a late apex is too slow here", "late", "apex"),
+    ("tosa: the late apex is a mistake", "late", "apex"),
+    ("tosa: a late apex is bad", "late", "apex"),
+    ("tosa: people use third gear here, wrong", "3", "gear"),
+    ("alla tosa evitate la terza marcia", "3", "gear"),
+    ("alla tosa evitando il cordolo in uscita", "exit", "kerb"),
+    ("alla tosa nessun cordolo in uscita", "exit", "kerb"),
+    ("alla tosa niente cordolo in uscita", "exit", "kerb"),
+    ("alla tosa lascia stare il cordolo in uscita", "exit", "kerb"),
+    ("alla tosa stai lontano dal cordolo in uscita", "exit", "kerb"),
+    ("alla tosa guai a usare il cordolo in uscita", "exit", "kerb"),
+    ("alla tosa neanche la terza marcia", "3", "gear"),
+    ("alla tosa nemmeno la terza marcia", "3", "gear"),
+    ("alla tosa mica la terza marcia", "3", "gear"),
+    ("alla tosa né la terza marcia", "3", "gear"),
+    ("alla tosa sbagliato frenare al cartello dei 100", "board:100", "brake"),
+    ("alla tosa scordati di frenare ai 100", "board:100", "brake"),
+    ("alla tosa non dimenticare: frena ai 100", "board:100", "brake"),
+    ("alla tosa attenzione al cordolo in uscita", "exit", "kerb"),
+    ("alla tosa occhio al cordolo in uscita", "exit", "kerb"),
+    ("alla tosa è un errore il cordolo in uscita", "exit", "kerb"),
+])
+def test_negazioni_nuove(q, value, type_):
+    assert _c(q, value, type_) == "negazione"
+
+
+def test_negazione_senza_parole_inventate():
+    # «\w+nt» non è una negazione: «want», «point», «front» restano parole normali.
+    assert _c("tosa, you want a late apex here", "late", "apex") is None
+    assert _c("at tosa the front goes, take a late apex", "late", "apex") is None
+
+
+@pytest.mark.parametrize("q,value", [
+    ("at tosa you lose time in 2 places", "2"), ("at tosa i'll explain in 3 steps", "3"),
+    ("into the second chicane after tosa", "2"), ("tosa in the second run i was quicker", "2"),
+    ("tosa: in 3 now", "3"), ("tosa: into 3 then", "3"), ("tosa: in second, then", "2"),
+    ("tosa: down to the second", "2"), ("tosa, brake around the 100 board and grab second", "2"),
+    ("tosa: down to ３rd gear", "3"), ("tosa: in ３ gear now", "3"), ("tosa: in ٣ gear now", "3"),
+    ("tosa: first, then second gear", "2"),
+])
+def test_gear_contesti_stretti(q, value):
+    assert _c(q, value, "gear") is not None
+
+
+@pytest.mark.parametrize("q,value", [
+    ("first you brake at the 100 board for tosa then second gear", "2"),
+    ("tosa: first we brake, then second gear", "2"),
+    # Round 2: «first» avverbio seguito da un verbo non è una marcia.
+    ("tosa: first brake then second gear", "2"),
+    ("alla tosa frena al cartello dei 100 e scala in seconda", "2"),
+    ("into tosa i'm in third gear", "3"),
+    ("tosa: shift down to 2", "2"), ("tosa: shift to 3 here", "3"),
+    ("tosa: shift into second here", "2"), ("tosa: into 4th here", "4"),
+])
+def test_gear_contesti_ammessi_frase(q, value):
+    assert _c(q, value, "gear") is None
+
+
+def test_numeri_unicode_non_sono_cifre():
+    assert _c("tosa: brake at the １００ board", "board:100", "brake") is not None
+
+
+def test_spazi_unicode_normalizzati():
+    assert _c("tosa: brake\xa0at the 100\xa0board", "board:100", "brake", "tosa: brake at the 100 board") is None
+    assert _c("tosa: brake at the 100 board", "board:100", "brake", "tosa: brake\xa0at the 100 board") is None
+
+
+@pytest.mark.parametrize("q,value,type_", [
+    ("tosa, brake at the 100 board, second gear and a late apex", "board:100", "brake"),
+    ("tosa, brake at the 100 board, second gear and a late apex", "2", "gear"),
+    ("tosa, brake at the 100 board, second gear and a late apex", "late", "apex"),
+    ("tosa: 100 board, second gear, late apex", "board:100", "brake"),
+    ("tosa: 100 board, second gear, late apex", "2", "gear"),
+    ("tosa: 100 board, second gear, late apex", "late", "apex"),
+    ("tosa, brake at the 100, second gear, use the exit kerb", "exit", "kerb"),
+    ("so for tosa we're braking at the 100 board", "board:100", "brake"),
+    ("alla tosa frena al cartello dei 100 e scala in seconda", "board:100", "brake"),
+    ("tosa, brake at the 100 board and go down to second gear", "2", "gear"),
+    ("for tosa i brake at the 100 board in second gear", "2", "gear"),
+    ("after tosa, at piratella brake at the 100 board", "board:100", "brake"),
+])
+def test_frase_con_piu_fatti(q, value, type_):
+    corner = "Piratella" if "piratella" in q else "Tosa"
+    assert _c(q, value, type_, corner=corner) is None
+
+
+@pytest.mark.parametrize("q", [
+    "tosa: brake 50 metres later", "tosa: brake later at the 100 board",
+    "tosa: brake just after the 100 board", "tosa: the 100 board, but brake later",
+])
+def test_relative_vicino_alla_frenata(q):
+    n = re.search(r"[0-9]+", q).group()
+    assert _c(q, f"board:{n}", "brake") is not None

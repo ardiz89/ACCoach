@@ -1,7 +1,8 @@
 """Vocabolario chiuso: alias delle curve e normalizzazione dei valori (italiano e inglese).
 
 Tutto è deterministico. Nel dubbio `normalize` dà `None`: un valore ambiguo, negato
-o detto in modo diverso dalle forme ammesse non si sceglie.
+o detto in modo diverso dalle forme ammesse non si sceglie. Le cifre sono solo quelle
+ASCII: una cifra a larghezza piena o araba non è un numero citato.
 """
 
 from __future__ import annotations
@@ -57,53 +58,106 @@ def alias_regex(alias: str) -> re.Pattern:
     return re.compile(r"(?<![a-z0-9])" + re.escape(alias) + r"(?![a-z0-9])")
 
 
-def _norm(s: str) -> str:
-    s = s.lower().replace("’", "'").replace("‘", "'")
-    s = s.replace("“", '"').replace("”", '"')
-    return re.sub(r"\s+", " ", s).strip()
+# --- normalizzazione del testo ----------------------------------------------
+
+_WS = re.compile(r"\s")
+# Ogni variante di apostrofo diventa «'», le virgolette tipografiche «"».
+_FOLD = {c: "'" for c in "’‘‛´`ʼ′＇"} | {"“": '"', "”": '"'}
 
 
-# Negazioni e parole che rovesciano il senso. Una sola basta a non decidere.
+def norm_map(s: str) -> tuple[str, list[int]]:
+    """Testo normalizzato e, per ogni suo carattere, l'indice nel testo grezzo.
+
+    Minuscolo, apostrofi e virgolette dritti, ogni sequenza di spazi ridotta a uno,
+    niente spazi in testa e in coda.
+    """
+    out: list[str] = []
+    idx: list[int] = []
+    ws_at: int | None = None
+    for i, c in enumerate(s):
+        if _WS.match(c):
+            if ws_at is None:
+                ws_at = i
+            continue
+        if ws_at is not None:
+            if out:
+                out.append(" ")
+                idx.append(ws_at)
+            ws_at = None
+        for ch in c.lower():
+            out.append(_FOLD.get(ch, ch))
+            idx.append(i)
+    return "".join(out), idx
+
+
+def fold(s: str) -> str:
+    return norm_map(s)[0]
+
+
+# --- parole che rovesciano o indeboliscono ------------------------------------
+
+_CONTRACTIONS = ("can", "won", "shouldn", "didn", "doesn", "isn", "aren", "wouldn",
+                 "couldn", "don", "haven", "hasn", "mustn", "wasn", "weren")
 NEGATION = re.compile(
-    r"\b(?:not|don't|dont|do not|never|avoid\w*|stay off|instead|no|non|mai|evita|evitare"
-    r"|senza|without|nor|neither)\b|\w+n't\b")
+    r"\b(?:" + "|".join(f"{c}'?t" for c in _CONTRACTIONS) + r""
+    r"|not|do not|cannot|can not|never|avoid\w*|stay off|stay away|keep off|keep away"
+    r"|stay clear|watch out|careful\w*|mistakes?|wrong|too slow|bad|instead|no|nor|neither"
+    r"|without"
+    r"|non|mai|senza|evit\w*|nessun\w*|niente|neanche|nemmeno|neppure|mica|né|lascia stare"
+    r"|lontan\w*|guai|sbagli\w*|errore|errori|scordat\w*|dimentic\w*|attenzione|occhio)\b")
 NEGATIVE_SENSE = re.compile(
     r"\b(?:kill\w*|will cost|costs? you|dangerous|pericolos\w*|crash\w*|spin\w*)\b")
+# Condizionali e incertezze: il valore non è un consiglio fermo.
+HEDGE = re.compile(r"\b(?:maybe|perhaps|might|could|if|unless|or|either|forse|magari|se|oppure|o)\b")
+# Parole che spostano la frenata rispetto al punto detto.
+RELATIVE = re.compile(
+    r"\b(?:later|earlier|sooner|after|past|beyond|before|ahead|behind|dopo|oltre|prima"
+    r"|più tardi|piu tardi|in anticipo|in ritardo|than|too|troppo|early|late|presto|tardi)\b")
+RELATIVE_WORDS = 3  # distanza massima, in parole, dal numero o dal verbo della frenata
+_BRAKE_VERB = re.compile(r"\b(?:brak\w*|fren\w*|stacc\w*)\b")
 
 
 def negated(text: str) -> bool:
-    return bool(NEGATION.search(_norm(text)))
+    return bool(NEGATION.search(fold(text)))
 
 
 def negative_sense(text: str) -> bool:
-    return bool(NEGATIVE_SENSE.search(_norm(text)))
+    return bool(NEGATIVE_SENSE.search(fold(text)))
 
 
-def _uniq(found: set[str]) -> str | None:
-    return next(iter(found)) if len(found) == 1 else None
+def _word_index(s: str, pos: int) -> int:
+    """Indice della parola che contiene `pos` (o della prima dopo)."""
+    return len(re.findall(r"[\w']+", s[:pos])) - (1 if re.search(r"[\w']$", s[:pos]) else 0)
+
+
+def relative_near(s: str, anchors: list[int]) -> bool:
+    """Una parola relativa sta entro RELATIVE_WORDS parole da un'ancora o da un verbo di frenata."""
+    words = [_word_index(s, p) for p in anchors]
+    words += [_word_index(s, m.start()) for m in _BRAKE_VERB.finditer(s)]
+    return any(abs(_word_index(s, m.start()) - w) <= RELATIVE_WORDS
+               for m in RELATIVE.finditer(s) for w in words)
 
 
 # --- frenata ----------------------------------------------------------------
 
-_NUMBER = re.compile(r"\d+(?:[.,]\d+)*")
-_NOT_BOARD_UNIT = re.compile(
+_NUMBER = re.compile(r"[0-9]+(?:[.,][0-9]+)*")
+NOT_BOARD_UNIT = re.compile(
     r"\s*(?:kph|kmh|km|mph|ms\b|s\b|sec|second|secondi|lap|giri\b|giro\b|%|psi|bar\b"
     r"|rpm|kg|click|tenth|decim|deg|°|gradi|st\b|nd\b|rd\b|th\b|x\b|percent|per cent)")
-_RELATIVE = re.compile(
-    r"\b(?:later|earlier|sooner|after|past|beyond|before|ahead|behind|dopo|oltre|prima"
-    r"|più tardi|piu tardi|in anticipo|in ritardo|than|too|troppo|early|late|presto|tardi)\b")
-# Condizionali e incertezze: il valore non è un consiglio fermo.
-HEDGE = re.compile(r"\b(?:maybe|perhaps|might|could|if|unless|or|either|forse|magari|se|oppure|o)\b")
 _BRAKE_EN = r"\b(?:brake|brakes|braking)\s+(?:hard\s+)?(?:at|by|when you reach|as you reach)\s+(?:the\s+)?"
 _BRAKE_IT = (r"\b(?:frena|frenare|frenata|frenate|stacca|staccare|staccata)\s+"
              r"(?:al|alla|allo|ai|agli|sul|sulla|sullo|all'|sull')\s*")
 
 
-def _brake(q: str) -> str | None:
-    if NEGATION.search(q) or _RELATIVE.search(q) or HEDGE.search(q):
+def board_numbers(s: str) -> list[re.Match]:
+    """Ogni numero di due o più cifre: in una frase di frenata deve essercene uno solo."""
+    return [m for m in _NUMBER.finditer(s) if len(re.sub(r"[^0-9]", "", m.group())) >= 2]
+
+
+def _brake(q: str) -> tuple[str, int] | None:
+    if NEGATION.search(q) or HEDGE.search(q):
         return None
-    # Ogni numero di due o più cifre conta: deve essercene uno solo, ed è il cartello.
-    multi = [m for m in _NUMBER.finditer(q) if len(re.sub(r"\D", "", m.group())) >= 2]
+    multi = board_numbers(q)
     mentioned = {slug for slug, phrases in OBJECTS.items()
                  if any(alias_regex(p).search(q) for p in phrases)}
     if multi:
@@ -112,16 +166,17 @@ def _brake(q: str) -> str | None:
         m = multi[0]
         if not m.group().isdigit() or int(m.group()) not in BOARDS:
             return None
-        if _NOT_BOARD_UNIT.match(q, m.end()):
+        if NOT_BOARD_UNIT.match(q, m.end()) or relative_near(q, [m.start()]):
             return None
-        return f"board:{int(m.group())}"
+        return f"board:{int(m.group())}", m.start()
     if len(mentioned) != 1:
         return None
     slug = next(iter(mentioned))
     alts = "|".join(re.escape(p) for p in OBJECTS[slug])
-    if re.search(rf"(?:{_BRAKE_EN}|{_BRAKE_IT})(?:{alts})(?![a-z0-9])", q):
-        return f"object:{slug}"
-    return None
+    m = re.search(rf"(?:{_BRAKE_EN}|{_BRAKE_IT})(?P<obj>{alts})(?![a-z0-9])", q)
+    if not m or relative_near(q, [m.start("obj")]):
+        return None
+    return f"object:{slug}", m.start("obj")
 
 
 # --- marce ------------------------------------------------------------------
@@ -132,51 +187,72 @@ _ORD = {
     "5": ["fifth", "5th", "quinta", "quinto"], "6": ["sixth", "6th", "sesta", "sesto"],
 }
 _ORD_WORD = {w: d for d, ws in _ORD.items() for w in ws}
+_ORD_IT_IN = {"prima", "seconda", "terza", "quarta", "quinta", "sesta"}  # «in seconda»
 # Tutto quello che somiglia a una marcia: ordinali in parole o «Nth», e cifre sole.
 _GEAR_LIKE = re.compile(
-    r"\b(?:" + "|".join(_ORD_WORD) + r"|\d+(?:st|nd|rd|th))\b"
-    r"|(?<![\w.,])\d(?![\w]|[.,]\d)")
+    r"\b(?:" + "|".join(_ORD_WORD) + r"|[0-9]+(?:st|nd|rd|th))\b"
+    r"|(?<![\w.,])[0-9](?!\w|[.,][0-9])")
+# «first» avverbio: a inizio frase o inciso, seguito da un soggetto o da un verbo.
+_FIRST_ADVERB = re.compile(
+    r"(?:^|[,;:.!?]\s*|\b(?:and|then)\s+)first\s+"
+    r"(?:you|we|i|i'm|you're|we're|they|let's|lets|brake|braking|turn|lift|go|get|take|look"
+    r"|make|focus|try|keep|use)\b")
 _GEAR = r"(?:gear|gears|marcia|marce)"
-_LEAD = r"(?:shift down to|shift down into|shift to|shift into|down to|into|in)"
-_UNIT_AFTER_DIGIT = (
-    r"(?!\s*(?:laps?\b|giri\b|giro\b|kph|km/h|kmh|km\b|mph|corners?\b|curva\b|curve\b"
+_DIGIT_LEAD = r"(?:down to|shift(?:\s+(?:down|up))?(?:\s+(?:to|into))?)"
+_ORD_LEAD = r"(?:down to|shift(?:\s+(?:down|up))?(?:\s+(?:to|into))?|into)"
+UNIT_AFTER_DIGIT = re.compile(
+    r"\s*(?:laps?\b|giri\b|giro\b|kph|km/h|kmh|km\b|mph|corners?\b|curva\b|curve\b"
     r"|seconds?\b|secs?\b|s\b|secondi\b|metres?\b|meters?\b|metri\b|m\b|mt\b|tenths?\b"
-    r"|decimi\b|%|psi\b|bar\b|clicks?\b|rpm\b|or\b|o\b|and\b|e\b|to\b))")
+    r"|decimi\b|%|psi\b|bar\b|clicks?\b|rpm\b|or\b|o\b|and\b|e\b|to\b)")
 _NOUN_AFTER_ORD = (
     r"(?!\s+(?:place|position|posizione|corners?|curva|curve|laps?|giro|sector|settore"
-    r"|time|volta|half|part|apex|brak\w*|or|o|and|e)\b)")
+    r"|time|volta|half|part|apex|brak\w*|or|o|and|e|chicane|run|step|steps)\b)")
 
 
-def _gear(q: str) -> str | None:
+def _gear_tokens(q: str) -> list[re.Match]:
+    adverbs = {m.start() + m.group().index("first") for m in _FIRST_ADVERB.finditer(q)}
+    return [m for m in _GEAR_LIKE.finditer(q) if m.start() not in adverbs]
+
+
+def _gear(q: str) -> tuple[str, int] | None:
     if NEGATION.search(q) or HEDGE.search(q):
         return None
-    tokens = _GEAR_LIKE.findall(q)
+    tokens = _gear_tokens(q)
     if len(tokens) != 1:
         return None
-    tok = tokens[0]
-    t = re.escape(tok)
+    m = tokens[0]
+    tok, at = m.group(), m.start()
+
+    def here(pattern: str) -> bool:
+        return any(x.start("t") == at for x in re.finditer(pattern, q))
+
+    t = rf"(?P<t>{re.escape(tok)})"
     if tok.isdigit():
         if tok not in "123456":
             return None
-        ok = (re.search(rf"\b{_LEAD}\s+{t}(?!\w){_UNIT_AFTER_DIGIT}", q)
-              or re.search(rf"\b{_GEAR}\s+{t}(?!\w){_UNIT_AFTER_DIGIT}", q)
-              or re.search(rf"(?<![\w.,]){t}\s*{_GEAR}\b", q))
-        return tok if ok else None
-    digit = _ORD_WORD.get(tok) or (tok[0] if tok[0] in "123456" and len(tok) == 3 else None)
+        if UNIT_AFTER_DIGIT.match(q, m.end()) and not re.match(rf"\s*{_GEAR}\b", q[m.end():]):
+            return None
+        ok = (here(rf"\b{_DIGIT_LEAD}\s+{t}(?!\w)")
+              or here(rf"\b{_GEAR}\s+{t}(?!\w)")
+              or here(rf"(?<![\w.,]){t}\s*{_GEAR}\b"))
+        return (tok, at) if ok else None
+    digit = _ORD_WORD.get(tok) or (tok[0] if len(tok) == 3 and tok[0] in "123456" else None)
     if digit is None:
         return None
-    ok = (re.search(rf"\b{t}\s+{_GEAR}\b", q)
-          or re.search(rf"\b{_GEAR}\s+{t}\b{_NOUN_AFTER_ORD}", q)
-          or re.search(rf"\b{_LEAD}\s+(?:the\s+)?{t}\b{_NOUN_AFTER_ORD}", q))
-    return digit if ok else None
+    ok = (here(rf"\b{t}\s+{_GEAR}\b")
+          or here(rf"\b{_GEAR}\s+{t}\b{_NOUN_AFTER_ORD}")
+          or here(rf"\b{_ORD_LEAD}\s+{t}\b{_NOUN_AFTER_ORD}")
+          or (tok in _ORD_IT_IN and here(rf"\bin\s+{t}\b{_NOUN_AFTER_ORD}")))
+    return (digit, at) if ok else None
 
 
 # --- apice e cordolo ----------------------------------------------------------
 
-def _adjacent(a: str, b: str, q: str) -> bool:
-    """a e b vicini: in mezzo al più una parola, solo spazi o trattini (niente virgole)."""
+def _adjacent(a: str, b: str, q: str) -> int | None:
+    """Dove a e b stanno vicini: in mezzo al più una parola, solo spazi o trattini."""
     gap = r"[ -]+(?:[\w']+[ -]+)?"
-    return bool(re.search(rf"\b(?:{a}){gap}(?:{b})\b|\b(?:{b}){gap}(?:{a})\b", q))
+    m = re.search(rf"\b(?:{a}){gap}(?:{b})\b|\b(?:{b}){gap}(?:{a})\b", q)
+    return m.start() if m else None
 
 
 def _present(kinds: dict[str, str], q: str) -> set[str]:
@@ -190,14 +266,15 @@ _APEX_KINDS = {
 }
 
 
-def _apex(q: str) -> str | None:
+def _apex(q: str) -> tuple[str, int] | None:
     if NEGATION.search(q) or NEGATIVE_SENSE.search(q):
         return None
     kinds = _present(_APEX_KINDS, q)
     if len(kinds) != 1:
         return None
     k = next(iter(kinds))
-    return k if _adjacent(_APEX_KINDS[k], r"apex|apexes|apexing|apice|apici", q) else None
+    at = _adjacent(_APEX_KINDS[k], r"apex|apexes|apexing|apice|apici", q)
+    return None if at is None else (k, at)
 
 
 _KERB = r"kerb|kerbs|curb|curbs|cordolo|cordoli"
@@ -208,7 +285,7 @@ _KERB_POS = {
 }
 
 
-def _kerb(q: str) -> str | None:
+def _kerb(q: str) -> tuple[str, int] | None:
     if NEGATIVE_SENSE.search(q):
         return None
     pos = _present(_KERB_POS, q)
@@ -217,18 +294,50 @@ def _kerb(q: str) -> str | None:
             rf"^(?:you\s+)?(?:don't use|do not use|dont use|never use|avoid|no|without)\s+"
             rf"(?:the\s+|any\s+)?(?:{_KERB})$"
             rf"|^(?:non usare|non toccare|non prendere|evita|senza)\s+(?:il\s+|i\s+)?(?:{_KERB})$", q)
-        return "none" if none and not pos else None
+        return ("none", 0) if none and not pos else None
     if len(pos) != 1:
         return None
     p = next(iter(pos))
-    return p if _adjacent(_KERB_POS[p], _KERB, q) else None
+    at = _adjacent(_KERB_POS[p], _KERB, q)
+    return None if at is None else (p, at)
 
 
 _NORMALIZERS = {"brake": _brake, "gear": _gear, "apex": _apex, "kerb": _kerb}
 TYPES = ("brake", "gear", "apex", "kerb", "line", "mistake")
 
 
+def locate(type_: str, quote: str) -> tuple[str, int] | None:
+    """Valore e posizione del suo segno nella citazione già normalizzata con `fold`."""
+    fn = _NORMALIZERS.get(type_)
+    return fn(quote) if fn else None
+
+
 def normalize(type_: str, quote: str) -> str | None:
     """Valore canonico che la citazione sostiene, o `None` se non c'è, è ambiguo o negato."""
-    fn = _NORMALIZERS.get(type_)
-    return fn(_norm(quote)) if fn else None
+    got = locate(type_, fold(quote))
+    return got[0] if got else None
+
+
+def sentence_reason(type_: str, sentence: str, at: int) -> str | None:
+    """Controlli sulla frase intera che contiene la citazione; `at` è il segno del valore."""
+    if NEGATION.search(sentence):
+        return "negazione"
+    if type_ in ("apex", "kerb") and NEGATIVE_SENSE.search(sentence):
+        return "negazione"
+    if type_ in ("brake", "gear") and HEDGE.search(sentence):
+        return "valore_non_normalizzabile"
+    if type_ == "brake":
+        nums = board_numbers(sentence)
+        if len(nums) > 1:
+            return "valore_non_normalizzabile"
+        if nums and NOT_BOARD_UNIT.match(sentence, nums[0].end()):
+            return "valore_non_normalizzabile"
+        if relative_near(sentence, [at]):
+            return "valore_non_normalizzabile"
+    if type_ == "gear":
+        m = re.match(r"[0-9]+", sentence[at:])
+        if m and m.group().isdigit() and len(m.group()) == 1:
+            rest = sentence[at + 1:]
+            if UNIT_AFTER_DIGIT.match(rest) and not re.match(rf"\s*{_GEAR}\b", rest):
+                return "valore_non_normalizzabile"
+    return None
