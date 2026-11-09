@@ -6,7 +6,8 @@ Tutto è deterministico e si ricalcola dal database a ogni chiamata.
   sono diversi e non hanno mai pubblicato lo stesso testo: due account che hanno
   scritto un corpo identico, byte per byte, in un testo ACC qualsiasi della pista
   sono una persona sola, se quel corpo ha almeno LINK_MIN_WORDS parole (un «Thanks!»
-  uguale non lega nessuno). `n` di ogni valore è il numero di persone.
+  uguale non lega nessuno). Un testo che sostiene il valore lega sempre i suoi autori,
+  anche se è corto. `n` di ogni valore è il numero di persone.
 - Contano solo i risultati `extract` della versione più alta proposta in `jobs` per
   (kind, testo, pista), da qualsiasi modello, e solo le fonti ACC di quella pista.
 - Un autore è affidabile se una valutazione `rate` (della versione più alta) di uno
@@ -89,7 +90,7 @@ def _reliable_authors(conn: sqlite3.Connection, track: str) -> set[str]:
         named = isinstance(name, str) and bool(name.strip())
         if not (named and (role == "coach" or (role == "pilota" and lap is not None))):
             continue
-        rows = sorted({(_author_id(p, a), (a or "").casefold()) for p, a in conn.execute(
+        rows = sorted({(_author_id(p, a), (a or "").strip().casefold()) for p, a in conn.execute(
             "SELECT s.platform, t.author FROM texts t JOIN sources s ON s.id = t.source_id"
             " WHERE t.sha256=? AND s.game='acc' AND s.track=?", (sha, track))})
         if len({aid for aid, _ in rows}) > 1:
@@ -131,6 +132,35 @@ def _people(conn: sqlite3.Connection, track: str) -> dict[str, str]:
     return {a: find(a) for a in list(parent)}
 
 
+def _count(author_texts: dict[str, set[str]], people: dict[str, str]) -> int:
+    """Le persone dietro un valore.
+
+    Si parte dalle persone di `_people` (legami da testi lunghi altrove) e si uniscono
+    sempre gli autori che condividono un testo a sostegno del valore, lungo o corto.
+    """
+    parent: dict[str, str] = {}
+
+    def find(a):
+        parent.setdefault(a, a)
+        while parent[a] != a:
+            parent[a] = parent[parent[a]]
+            a = parent[a]
+        return a
+
+    owner: dict[str, str] = {}
+    for a in sorted(author_texts):
+        root = find(people.get(a, a))
+        for sha in sorted(author_texts[a]):
+            if sha in owner:
+                other = find(owner[sha])
+                if other != root:
+                    parent[max(root, other)] = min(root, other)
+                    root = find(root)
+            else:
+                owner[sha] = root
+    return len({find(people.get(a, a)) for a in author_texts})
+
+
 def _state(type_: str, values: list[dict], reliable: set[str]) -> str:
     if type_ in DESCRIPTIVE:
         return "descrittivo"
@@ -156,8 +186,8 @@ def build(conn: sqlite3.Connection, track: str) -> list[dict]:
     groups: dict[tuple[str, str], dict[str, dict]] = {}
     for sha, _v, corner, type_, value, quote, start_s, author, platform, url in _rows(conn, track):
         val = groups.setdefault((corner, type_), {}).setdefault(
-            value, {"authors": set(), "sources": set()})
-        val["authors"].add(_author_id(platform, author))
+            value, {"texts": {}, "sources": set()})
+        val["texts"].setdefault(_author_id(platform, author), set()).add(sha)
         val["sources"].add((url, start_s, quote))
     reliable = _reliable_authors(conn, track)
     people = _people(conn, track)
@@ -170,8 +200,8 @@ def build(conn: sqlite3.Connection, track: str) -> list[dict]:
         for value, g in by_value.items():
             sources = sorted(({"url": u, "start_s": s, "quote": q} for u, s, q in g["sources"]),
                              key=_source_key)
-            values.append({"value": value, "authors": sorted(g["authors"]), "sources": sources,
-                           "n": len({people.get(a, a) for a in g["authors"]})})
+            values.append({"value": value, "authors": sorted(g["texts"]), "sources": sources,
+                           "n": _count(g["texts"], people)})
         values.sort(key=lambda v: (-v["n"], v["value"]))
         state = _state(type_, values, reliable)
         key = fact_key(track, corner, type_, values[0]["value"]) if state == "verificato" else None

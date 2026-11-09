@@ -268,6 +268,36 @@ def test_same_person_linked_elsewhere(b):
     assert e["values"][0]["authors"] == ["reddit:alt1", "reddit:alt2"]
 
 
+def test_testo_corto_a_sostegno_e_una_persona(b):
+    body = f"Acque Minerali: {MARCIA}."
+    sa, _ = db.add_text(b.conn, b.fonte("https://r/s1", author="alt1"), "comment", "alt1", body)
+    sb, _ = db.add_text(b.conn, b.fonte("https://r/s2", author="alt2"), "comment", "alt2", body)
+    assert sa == sb
+    b.estrai(sa, body, [("gear", "3", MARCIA)])
+    e = _voce(b.build())
+    assert e["state"] == "singolo" and e["values"][0]["n"] == 1
+
+
+def test_frenata_corta_ripostata_dal_coach_non_si_verifica(b):
+    b.coach("https://r/coach", "coachA", None)
+    body = f"Acque Minerali, {FRENA_100}."
+    s1, _ = db.add_text(b.conn, b.fonte("https://r/k1", author="coachA"), "comment", "coachA", body)
+    db.add_text(b.conn, b.fonte("https://r/k2", author="coachA_alt"), "comment", "coachA_alt", body)
+    b.estrai(s1, body, [("brake", "board:100", FRENA_100)])
+    e = _voce(b.build(), type_="brake")
+    assert e["state"] != "verificato" and e["values"][0]["n"] == 1
+    assert e["values"][0]["authors"] == ["reddit:coacha", "reddit:coacha_alt"]
+
+
+def test_nome_con_spazi_combacia(b):
+    # L'autore salvato con uno spazio in coda è comunque chi parla.
+    body = "I coach drivers in ACC every week. My tip for the slow corners."
+    sa, _ = db.add_text(b.conn, b.fonte("https://r/a", author="CoachA"), "comment", "CoachA ", body)
+    db.add_text(b.conn, b.fonte("https://r/b", author="reposterB"), "comment", "reposterB", body)
+    b.valuta(sa, body, "coach", "I coach drivers in ACC", name="CoachA")
+    assert consensus._reliable_authors(b.conn, "imola") == {"reddit:coacha "}
+
+
 def test_un_grazie_uguale_non_fa_una_persona(b):
     for i in range(5):
         u = f"fan{i}"
