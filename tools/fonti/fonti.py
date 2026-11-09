@@ -36,40 +36,103 @@ def cmd_status(args) -> int:
     return 0
 
 
+_NET = "Rete non raggiungibile o troppo lenta: riprova fra poco. Le voci già finite non si ripagano."
+
+
+def _client(args):
+    from tools.fonti import apify
+
+    return apify.Apify(apify.load_token(Path(args.env_file) if args.env_file else None))
+
+
+def _apify_errors(fn):
+    """Esegue `fn`; un errore si stampa in una riga, mai col testo di un'eccezione ignota."""
+    from tools.fonti import apify
+
+    try:
+        return fn()
+    except (apify.TokenMissing, apify.CapReached, apify.ApifyError) as e:
+        print(str(e), file=sys.stderr)  # messaggi nostri: mai il token
+    except (urllib.error.URLError, TimeoutError, ConnectionError):
+        print(_NET, file=sys.stderr)
+    return None
+
+
+def _dry_run(conn, args, plan) -> int:
+    from tools.fonti import apify, collect
+
+    fatte = collect.finished(conn, args.track)
+    totale = 0.0
+    for i, v in enumerate(plan, 1):
+        prezzo = v.get("cost_per_item_usd")
+        if isinstance(prezzo, (int, float)) and not isinstance(prezzo, bool):
+            stima = prezzo * v["max_items"]
+            totale += stima
+            testo = f"stima {stima:.2f} USD"
+        else:
+            testo = "stima ignota: manca cost_per_item_usd"
+        finita = " [già finita]" if collect.entry_key(v) in fatte else ""
+        print(f"voce {i} {v['platform']}: {v['actor']} (max {v['max_items']} voci), {testo}{finita}")
+    print(f"Stima totale: {totale:.2f} USD.")
+    speso = apify.spent(conn, args.track)
+    print(f"Resto del budget: {apify.CAP_USD - speso:.2f} USD (tetto {apify.CAP_USD:.2f}).")
+    return 0
+
+
 def cmd_collect(args) -> int:
     import json
 
-    from tools.fonti import apify, collect
+    from tools.fonti import collect
 
     plan = json.loads(Path(args.plan).read_text(encoding="utf-8"))
     conn = db.open_db(_db_path(args.db))
     try:
         if args.dry_run:
-            for v in plan:
-                print(f"{v['platform']}: {v['actor']} (max {v['max_items']} voci)")
-            riga = conn.execute("SELECT baseline_usd, last_usd FROM spend WHERE track=?",
-                                (args.track,)).fetchone()
-            speso = (riga[1] - riga[0]) if riga else 0.0
-            print(f"Resto del budget: {apify.CAP_USD - speso:.2f} USD (tetto {apify.CAP_USD:.2f}).")
-            return 0
+            return _dry_run(conn, args, plan)
+        if args.only is not None and not 1 <= args.only <= len(plan):
+            print(f"Il piano ha {len(plan)} voci: --only va da 1 a {len(plan)}.", file=sys.stderr)
+            return 1
         try:
-            client = apify.Apify(apify.load_token(Path(args.env_file) if args.env_file else None))
-            r = collect.collect(conn, client, args.track, plan, force=args.force)
-        except (apify.TokenMissing, apify.CapReached, apify.ApifyError) as e:
-            print(str(e), file=sys.stderr)
-            return 1
-        except (urllib.error.URLError, TimeoutError, ConnectionError):
-            print("Rete non raggiungibile o troppo lenta: riprova fra poco. "
-                  "Le voci già finite non si ripagano.", file=sys.stderr)
-            return 1
+            r = _apify_errors(lambda: collect.collect(conn, _client(args), args.track, plan,
+                                                      force=args.force, only=args.only))
         except Exception as e:  # mai str(e): potrebbe contenere il token
             print(f"Errore inatteso ({type(e).__name__}): la raccolta si ferma. "
                   "Le voci già finite non si ripagano.", file=sys.stderr)
             return 1
-        print(f"Nuove fonti: {r['sources']}, nuovi testi: {r['texts']}, voci già finite: {r['skipped']}, speso: {r['spent_usd']:.2f} USD.")
-        return 0
+        if r is None:
+            return 1
+        print(f"Nuove fonti: {r['sources']}, nuovi testi: {r['texts']}, voci già finite: {r['skipped']}, "
+              f"elementi illeggibili: {r['bad_items']}, speso: {r['spent_usd']:.2f} USD.")
+        for i in r["empty"]:
+            v = plan[i - 1]
+            print(f"Voce {i} ({v['platform']}, {v['actor']}): 0 testi. Non la segno finita. "
+                  "Controlla l'input con check-actors, poi rilancia con --force --only "
+                  f"{i}.", file=sys.stderr)
+        return 1 if r["empty"] else 0
     finally:
         conn.close()
+
+
+def cmd_check_actors(args) -> int:
+    import json
+
+    from tools.fonti import collect
+
+    plan = json.loads(Path(args.plan).read_text(encoding="utf-8"))
+    try:
+        problemi = _apify_errors(lambda: collect.check_actors(_client(args), plan))
+    except Exception as e:  # mai str(e): potrebbe contenere il token
+        print(f"Errore inatteso ({type(e).__name__}): il controllo si ferma.", file=sys.stderr)
+        return 1
+    if problemi is None:
+        return 1
+    for riga in problemi:
+        print(riga)
+    if problemi:
+        print(f"Problemi trovati: {len(problemi)}. Correggi il piano prima di pagare.")
+        return 1
+    print("Nessun problema: ogni chiave del piano è nello schema dell'attore.")
+    return 0
 
 
 def cmd_pending(args) -> int:
@@ -165,7 +228,8 @@ def cmd_review(args) -> int:
 
 def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(prog="fonti", description=__doc__.splitlines()[0])
-    ap.add_argument("--db", required=True, metavar="PATH", help="cartella o file del database")
+    ap.add_argument("--db", metavar="PATH", help="cartella o file del database (serve a tutti i "
+                    "comandi tranne check-actors)")
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("status", help="righe per tabella").set_defaults(func=cmd_status)
     c = sub.add_parser("collect", help="raccoglie le fonti con Apify")
@@ -174,7 +238,12 @@ def build_parser() -> argparse.ArgumentParser:
     c.add_argument("--env-file", metavar="PATH")
     c.add_argument("--dry-run", action="store_true")
     c.add_argument("--force", action="store_true", help="rifà anche le voci già finite")
+    c.add_argument("--only", type=int, metavar="N", help="solo la voce numero N del piano (da 1)")
     c.set_defaults(func=cmd_collect)
+    a = sub.add_parser("check-actors", help="confronta il piano con lo schema degli attori (gratis)")
+    a.add_argument("--plan", required=True, metavar="FILE")
+    a.add_argument("--env-file", metavar="PATH")
+    a.set_defaults(func=cmd_check_actors)
     p = sub.add_parser("pending", help="scrive i lavori per gli agenti")
     p.add_argument("--kind", required=True, choices=("extract", "rate", "factcheck"))
     p.add_argument("--track", required=True)
@@ -200,7 +269,10 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv=None) -> int:
-    args = build_parser().parse_args(argv)
+    ap = build_parser()
+    args = ap.parse_args(argv)
+    if args.cmd != "check-actors" and not args.db:
+        ap.error("--db è obbligatorio per questo comando")
     return args.func(args)
 
 

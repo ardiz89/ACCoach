@@ -8,16 +8,18 @@ import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
-TABLES = ("sources", "texts", "results", "facts", "rejects", "spend", "collect_runs", "jobs")
+TABLES = ("sources", "texts", "results", "facts", "rejects", "spend", "collect_runs", "jobs",
+          "raw_items")
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS sources(
     id INTEGER PRIMARY KEY,
     platform TEXT CHECK (platform IN ('youtube','reddit')),
     url TEXT UNIQUE,
-    author TEXT, title TEXT, published TEXT, game TEXT, track TEXT, meta_json TEXT
+    author TEXT, title TEXT, published TEXT, game TEXT, track TEXT, meta_json TEXT,
+    car_class TEXT
 );
 CREATE TABLE IF NOT EXISTS texts(
     id INTEGER PRIMARY KEY,
@@ -45,11 +47,16 @@ CREATE TABLE IF NOT EXISTS rejects(
 );
 CREATE TABLE IF NOT EXISTS spend(
     track TEXT PRIMARY KEY,
-    baseline_usd REAL, last_usd REAL, cap_usd REAL
+    baseline_usd REAL, last_usd REAL, cap_usd REAL, runs_usd REAL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS collect_runs(
-    track TEXT, entry_key TEXT, finished_at TEXT, items INTEGER, spent_usd REAL,
+    track TEXT, entry_key TEXT, finished_at TEXT, items INTEGER, spent_usd REAL, run_id TEXT,
     PRIMARY KEY(track, entry_key)
+);
+CREATE TABLE IF NOT EXISTS raw_items(
+    id INTEGER PRIMARY KEY,
+    track TEXT, entry_key TEXT, item_json TEXT, fetched_at TEXT,
+    UNIQUE(track, entry_key, item_json)
 );
 CREATE TABLE IF NOT EXISTS jobs(
     kind TEXT, key TEXT, track TEXT, prompt_version TEXT, payload_json TEXT, created_at TEXT,
@@ -58,18 +65,53 @@ CREATE TABLE IF NOT EXISTS jobs(
 """
 
 
+def _add_column(conn: sqlite3.Connection, table: str, column: str, decl: str) -> bool:
+    """Aggiunge la colonna a un database creato prima di lei; True se l'ha aggiunta."""
+    if column in {r[1] for r in conn.execute(f"PRAGMA table_info({table})")}:
+        return False
+    conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {decl}")
+    return True
+
+
 def open_db(path: Path) -> sqlite3.Connection:
-    """Apre (e crea se manca) il database; `user_version` = 1."""
+    """Apre (e crea se manca) il database, e porta uno vecchio allo schema di adesso."""
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(path))
     conn.executescript(_SCHEMA)
-    # Un database creato prima della colonna `track` nei risultati la riceve vuota.
-    if "track" not in {r[1] for r in conn.execute("PRAGMA table_info(results)")}:
-        conn.execute("ALTER TABLE results ADD COLUMN track TEXT")
+    _add_column(conn, "results", "track", "TEXT")
+    _add_column(conn, "collect_runs", "run_id", "TEXT")
+    _add_column(conn, "spend", "runs_usd", "REAL DEFAULT 0")
+    if _add_column(conn, "sources", "car_class", "TEXT"):
+        # Le fonti già raccolte prendono la classe dal titolo, la sola cosa salvata.
+        from tools.fonti.collect import car_class_of
+        for sid, title in conn.execute("SELECT id, title FROM sources").fetchall():
+            conn.execute("UPDATE sources SET car_class=? WHERE id=?", (car_class_of(title, "", ""), sid))
     conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
     conn.commit()
     return conn
+
+
+# --- regole condivise ------------------------------------------------------------
+
+def version_order(v: str):
+    """L'ordine delle prompt_version: i numeri come numeri, poi il resto in ordine di testo."""
+    return (0, int(v), "") if v.isdigit() else (1, 0, v)
+
+
+def author_id(platform, author) -> str:
+    """Un autore si identifica con `platform:author` in minuscolo."""
+    return f"{platform or ''}:{author or ''}".lower()
+
+
+def newest_versions(conn: sqlite3.Connection, kind: str, track: str) -> dict[str, str]:
+    """Per ogni chiave di quel `kind`, la versione più alta proposta in `jobs`."""
+    out: dict[str, str] = {}
+    for key, version in conn.execute(
+            "SELECT key, prompt_version FROM jobs WHERE kind=? AND track=?", (kind, track)):
+        if key not in out or version_order(version) > version_order(out[key]):
+            out[key] = version
+    return out
 
 
 def add_text(conn: sqlite3.Connection, source_id: int, kind: str, author: str,

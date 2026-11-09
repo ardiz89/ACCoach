@@ -1,11 +1,18 @@
-"""Cliente Apify minimo: token, uso mensile, tetto di spesa per pista."""
+"""Cliente Apify minimo: token, corse asincrone, schema degli attori, tetto di spesa per pista.
+
+Una corsa si avvia, si aspetta a passi limitati e se ne legge il dataset per id. Chi
+chiama salva l'id prima di aspettare: se l'attesa finisce prima della corsa, il
+prossimo `collect` riprende quella corsa invece di pagarne un'altra.
+"""
 
 from __future__ import annotations
 
 import json
+import math
 import os
 import re
 import sqlite3
+import urllib.parse
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -24,6 +31,23 @@ class CapReached(Exception):
 
 class ApifyError(Exception):
     pass
+
+
+class RunPending(ApifyError):
+    """La corsa è ancora in corso dopo le attese previste: si riprende al prossimo collect."""
+
+
+TERMINAL = ("SUCCEEDED", "FAILED", "ABORTED", "TIMED-OUT")
+WAIT_S = 60   # quanto aspetta Apify a ogni domanda sullo stato (il suo massimo)
+POLLS = 30    # quante domande al massimo: mezz'ora per corsa
+
+
+def _actor(actor_id: str) -> str:
+    return urllib.parse.quote(actor_id.replace("/", "~"), safe="~")
+
+
+def _id(x: str) -> str:
+    return urllib.parse.quote(str(x), safe="")
 
 
 _TOKEN = re.compile(r"[!-~]+")  # una riga, ASCII stampabile, niente spazi dentro
@@ -89,12 +113,58 @@ class Apify:
         d = self._call("GET", f"{API}/users/me/limits")
         return float(d["data"]["current"]["monthlyUsageUsd"])
 
-    def run(self, actor_id, run_input, max_items, max_charge_usd=None) -> list[dict]:
-        url = f"{API}/acts/{actor_id.replace('/', '~')}/run-sync-get-dataset-items?maxItems={int(max_items)}"
+    def start_run(self, actor_id, run_input, max_items, max_charge_usd=None) -> dict:
+        """Avvia la corsa e torna subito: l'oggetto corsa di Apify (con `id`)."""
+        url = f"{API}/acts/{_actor(actor_id)}/runs?maxItems={int(max_items)}"
         if max_charge_usd is not None:
-            url += f"&maxTotalChargeUsd={max(max_charge_usd, 0.01):.2f}"
-        out = self._call("POST", url, run_input)
+            # Per difetto al centesimo: la quota non si sfora arrotondando.
+            url += f"&maxTotalChargeUsd={max(math.floor(max_charge_usd * 100) / 100, 0.01):.2f}"
+        d = self._call("POST", url, run_input)
+        run = (d or {}).get("data") or {}
+        if not run.get("id"):
+            raise ApifyError(f"Apify non ha dato l'id della corsa di {actor_id}.")
+        return run
+
+    def wait_run(self, run_id, polls: int = POLLS) -> dict:
+        """Aspetta la fine della corsa a passi di WAIT_S secondi; RunPending se non arriva."""
+        for _ in range(max(int(polls), 1)):
+            d = self._call("GET", f"{API}/actor-runs/{_id(run_id)}?waitForFinish={WAIT_S}")
+            run = (d or {}).get("data") or {}
+            if run.get("status") in TERMINAL:
+                return run
+        raise RunPending(f"La corsa {run_id} è ancora in corso su Apify. Rilancia collect più "
+                         "tardi: la riprendo senza pagarla di nuovo.")
+
+    def dataset_items(self, run_id, limit: int) -> list[dict]:
+        url = f"{API}/actor-runs/{_id(run_id)}/dataset/items?format=json&clean=true&limit={int(limit)}"
+        out = self._call("GET", url)
         return out if isinstance(out, list) else []
+
+    def input_schema(self, actor_id) -> dict | None:
+        """Lo schema d'ingresso della build predefinita dell'attore. Gratis: nessuna corsa."""
+        try:
+            d = self._call("GET", f"{API}/acts/{_actor(actor_id)}/builds/default")
+        except ApifyError:
+            return None
+        build = (d or {}).get("data") or {}
+        schema = (build.get("actorDefinition") or {}).get("input")
+        if schema is None and isinstance(build.get("inputSchema"), str):
+            try:
+                schema = json.loads(build["inputSchema"])
+            except ValueError:
+                schema = None
+        return schema if isinstance(schema, dict) else None
+
+
+def spent(conn: sqlite3.Connection, track: str) -> float:
+    """La spesa della pista: la più alta fra il conto (in ritardo) e la somma delle corse."""
+    riga = conn.execute("SELECT baseline_usd, last_usd, runs_usd FROM spend WHERE track=?",
+                        (track,)).fetchone()
+    if riga is None:
+        return 0.0
+    base, last, runs = riga
+    conto = (last - base) if base is not None and last is not None else 0.0
+    return max(conto, runs or 0.0, 0.0)
 
 
 def guard(conn: sqlite3.Connection, client: Apify, track: str, cap_usd: float = CAP_USD) -> float:
@@ -102,14 +172,13 @@ def guard(conn: sqlite3.Connection, client: Apify, track: str, cap_usd: float = 
     uso = client.usage_usd()
     riga = conn.execute("SELECT baseline_usd FROM spend WHERE track=?", (track,)).fetchone()
     if riga is None:
-        conn.execute("INSERT INTO spend(track, baseline_usd, last_usd, cap_usd) VALUES (?,?,?,?)",
-                     (track, uso, uso, cap_usd))
-        base = uso
+        conn.execute("INSERT INTO spend(track, baseline_usd, last_usd, cap_usd, runs_usd)"
+                     " VALUES (?,?,?,?,0)", (track, uso, uso, cap_usd))
     else:
-        base = riga[0]
         conn.execute("UPDATE spend SET last_usd=?, cap_usd=? WHERE track=?", (uso, cap_usd, track))
     conn.commit()
-    resto = cap_usd - (uso - base)
+    speso = spent(conn, track)
+    resto = cap_usd - speso
     if resto <= 0:
-        raise CapReached(f"Tetto Apify raggiunto per {track}: spesi {uso - base:.2f} di {cap_usd:.2f} USD.")
+        raise CapReached(f"Tetto Apify raggiunto per {track}: spesi {speso:.2f} di {cap_usd:.2f} USD.")
     return resto

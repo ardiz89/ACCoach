@@ -15,8 +15,8 @@ FONTI = ROOT / "tools" / "fonti" / "fonti.py"
 def test_schema_creato(tmp_path):
     conn = db.open_db(tmp_path / "fonti.sqlite")
     nomi = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-    assert {"sources", "texts", "results", "facts", "rejects", "spend"} <= nomi
-    assert conn.execute("PRAGMA user_version").fetchone()[0] == 1
+    assert {"sources", "texts", "results", "facts", "rejects", "spend", "raw_items"} <= nomi
+    assert conn.execute("PRAGMA user_version").fetchone()[0] == 2
     conn.close()
 
 
