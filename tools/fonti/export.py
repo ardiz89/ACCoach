@@ -8,9 +8,10 @@ Esce solo una voce `verificato` del consenso che il controllo ha confermato:
 - un `verificato` senza controllo non esce: il controllo è un veto e una conferma
   del contesto, non una prova in più.
 
-`line` e `mistake` (descrittivi) non escono mai. Il file è deterministico: ordine
-del consenso, citazioni tagliate a QUOTE_WORDS parole, `json.dumps(sort_keys=True,
-ensure_ascii=False, indent=1)` e fine riga `\\n`.
+`line` e `mistake` (descrittivi) non escono mai. `brake` e `gear` escono con
+`"car_class": "gt3"`: il consenso li conta solo da fonti GT3. Il file è deterministico:
+ordine del consenso, citazioni tagliate a QUOTE_WORDS parole e QUOTE_CHARS caratteri,
+`json.dumps(sort_keys=True, ensure_ascii=False, indent=1)` e fine riga `\\n`.
 """
 
 from __future__ import annotations
@@ -23,11 +24,12 @@ from tools.fonti import consensus, db
 
 VERSION = 1
 QUOTE_WORDS = 15
+QUOTE_CHARS = 300
 
 
 def cut(text: str | None, words: int = QUOTE_WORDS) -> str:
-    """Le prime `words` parole del testo, con gli spazi normalizzati."""
-    return " ".join(str(text or "").split()[:words])
+    """Le prime `words` parole, spazi normalizzati, al massimo QUOTE_CHARS caratteri."""
+    return " ".join(str(text or "").split()[:words])[:QUOTE_CHARS]
 
 
 def factchecks(conn: sqlite3.Connection, track: str) -> dict[str, dict[str, list[dict]]]:
@@ -81,8 +83,11 @@ def facts(conn: sqlite3.Connection, track: str) -> list[dict]:
         if status(e, checks) != "confermato":
             continue
         top = e["values"][0]
-        out.append({"corner": e["corner"], "type": e["type"], "value": top["value"],
-                    "n": top["n"], "sources": _sources(top)})
+        item = {"corner": e["corner"], "type": e["type"], "value": top["value"],
+                "n": top["n"], "sources": _sources(top)}
+        if e["type"] in consensus.GT3_ONLY:
+            item["car_class"] = "gt3"
+        out.append(item)
     return out
 
 

@@ -36,11 +36,11 @@ class Banco:
         self.n += 1
         return self.tmp / f"{nome}-{self.n}"
 
-    def fonte(self, url, platform, author):
+    def fonte(self, url, platform, author, classe="gt3"):
         self.conn.execute(
             "INSERT OR IGNORE INTO sources(platform, url, author, title, published, game, track,"
-            " meta_json) VALUES (?,?,?,?,?,?,?,?)",
-            (platform, url, author, "t", "2026-05-01", "acc", "imola", "{}"))
+            " meta_json, car_class) VALUES (?,?,?,?,?,?,?,?,?)",
+            (platform, url, author, "t", "2026-05-01", "acc", "imola", "{}", classe))
         self.conn.commit()
         return self.conn.execute("SELECT id FROM sources WHERE url=?", (url,)).fetchone()[0]
 
@@ -241,3 +241,139 @@ def test_cli_export_e_review(b, tmp_path, capsys):
                        "--out", str(pagina)]) == 0
     assert ">Verificati<" in pagina.read_text(encoding="utf-8")
     assert "1" in capsys.readouterr().out
+
+
+# --- correzione finale ------------------------------------------------------------------
+
+def test_export_frenata_e_marcia_dicono_gt3(b, tmp_path):
+    # I5: la classe esce con la frenata e la marcia; gli altri tipi non la portano.
+    _riempi(b)
+    kerb = "use the kerb on exit"
+    for url, autore, pre in (("https://r/k1", "k1", "At"), ("https://r/k2", "k2", "Honestly at")):
+        b.testo(url, autore, f"{pre} Tosa {kerb} every lap.", [(TOSA, "kerb", "exit", kerb)])
+    terzo = "In my league at Tosa the quick guys use the kerb on exit too."
+    b.testo("https://r/k3", "k3", terzo)
+    b.factcheck(TOSA, "kerb", "confermato", terzo, "the quick guys use the kerb on exit")
+    export.export(b.conn, "imola", tmp_path / "o")
+    fatti = {(f["corner"], f["type"]): f for f in _carica(tmp_path / "o" / "imola.json")["facts"]}
+    assert fatti[(AM, "gear")]["car_class"] == "gt3"
+    assert "car_class" not in fatti[(TOSA, "kerb")]
+
+
+def test_export_respinto_dal_testo_del_fatto(b, tmp_path):
+    # I2: il veto che cita il testo del fatto stesso blocca l'esportazione.
+    _riempi(b)
+    own = "Honestly at Acque Minerali I go down to third gear and it works."
+    b.factcheck(AM, "gear", "respinto", own, "I go down to third gear", model="m2")
+    assert export.export(b.conn, "imola", tmp_path / "o") == 0
+
+
+def _due_banchi(tmp_path, ordine):
+    passi = {
+        "a": lambda bb: bb.testo("https://r/1", "uno", "At Acque Minerali I go down to third gear and it works great.",
+                                 [(AM, "gear", "3", "down to third gear")]),
+        "b": lambda bb: bb.testo("https://r/2", "due", "Honestly at Acque Minerali I go down to third gear and it works.",
+                                 [(AM, "gear", "3", "down to third gear")]),
+        "c": lambda bb: bb.testo("https://www.youtube.com/watch?v=x", "Tre",
+                                 "At Acque Minerali I go down to third gear and it works fine.",
+                                 [(AM, "gear", "3", "down to third gear")], platform="youtube",
+                                 segments=[{"text": "At Acque Minerali I go down to third gear and it works fine.",
+                                            "start_s": 12.0}]),
+        "d": lambda bb: bb.testo("https://r/7", "sette", TERZO_AM),
+    }
+    bb = Banco(tmp_path)
+    for k in ordine:
+        passi[k](bb)
+    bb.factcheck(AM, "gear", "confermato", TERZO_AM, "the quick guys go down to third gear")
+    export.export(bb.conn, "imola", tmp_path / "o")
+    bb.conn.close()
+    return (tmp_path / "o" / "imola.json").read_bytes()
+
+
+def test_export_non_dipende_dall_ordine_di_inserimento(tmp_path):
+    # L4: stessi dati, ordine diverso, stessi byte.
+    (tmp_path / "1").mkdir()
+    (tmp_path / "2").mkdir()
+    uno = _due_banchi(tmp_path / "1", "abcd")
+    due = _due_banchi(tmp_path / "2", "dcba")
+    assert uno == due and json.loads(uno)["facts"]
+
+
+def test_factcheck_di_una_versione_vecchia_ignorato(b, tmp_path, monkeypatch):
+    # L4: dopo un cambio di prompt_version conta solo il controllo della versione nuova.
+    _riempi(b)
+    assert export.export(b.conn, "imola", tmp_path / "o1") == 1
+    finta = tmp_path / "prompts"
+    finta.mkdir()
+    for nome in agents.PROMPT_FILES.values():
+        (finta / nome).write_text("prompt_version: 2\n", encoding="utf-8")
+    monkeypatch.setattr(agents, "PROMPTS_DIR", finta)
+    agents.pending(b.conn, "factcheck", "imola", tmp_path / "jf2")
+    # Il confermato della versione 1 non vale più: niente esce finché manca il nuovo.
+    assert export.export(b.conn, "imola", tmp_path / "o2") == 0
+    # Il respinto vecchio di Rivazza non conta più: il nuovo confermato la fa uscire.
+    b.factcheck(RIV, "gear", "confermato", TERZO_RIV, "the quick guys go down to second gear")
+    d = _carica(tmp_path / "o3" / "imola.json") if export.export(b.conn, "imola", tmp_path / "o3") else None
+    assert [(f["corner"], f["value"]) for f in d["facts"]] == [(RIV, "2")]
+
+
+def test_citazione_al_massimo_300_caratteri(b, tmp_path):
+    # L3: una parola lunghissima (un URL, un token) non passa intera.
+    lunga = "x" * 400
+    q = f"down to third gear {lunga}"
+    for url, autore, pre in (("https://r/1", "uno", "At Acque Minerali I go"),
+                             ("https://r/2", "due", "Honestly at Acque Minerali I go")):
+        b.testo(url, autore, f"{pre} {q}.", [(AM, "gear", "3", q)])
+    b.testo("https://r/7", "sette", TERZO_AM)
+    b.factcheck(AM, "gear", "confermato", TERZO_AM, "the quick guys go down to third gear")
+    export.export(b.conn, "imola", tmp_path / "o")
+    src = _carica(tmp_path / "o" / "imola.json")["facts"][0]["sources"]
+    assert src and all(len(s["quote"]) <= export.QUOTE_CHARS == 300 for s in src)
+    page = review.render(b.conn, "imola", tmp_path / "x.html").read_text(encoding="utf-8")
+    assert lunga not in page
+
+
+@pytest.mark.parametrize("url, atteso", [
+    ("javascript:alert(1)", None),
+    ("data:text/html,ciao", None),
+    ("https://r/ok", "https://r/ok"),
+    ("http://r/ok", "http://r/ok"),
+])
+def test_review_link_solo_http(b, tmp_path, url, atteso):
+    # L1: un link che non è http(s) non diventa cliccabile.
+    b.testo(url, "uno", "At Tosa I go down to second gear and it works great.",
+            [(TOSA, "gear", "2", "down to second gear")])
+    hrefs = _hrefs(review.render(b.conn, "imola", tmp_path / "x.html").read_text(encoding="utf-8"))
+    assert hrefs == ([atteso] if atteso else [])
+
+
+def test_review_t_gia_presente(b, tmp_path):
+    # L2: il minuto si sostituisce, non si aggiunge un secondo t=.
+    assert review.link("https://www.youtube.com/watch?v=abc&t=30s", 95.4) == \
+        "https://www.youtube.com/watch?v=abc&t=95s"
+    assert review.link("https://youtu.be/abc?t=30", 61.9) == "https://youtu.be/abc?t=61s"
+    assert review.link("https://www.youtube.com/watch?t=5&v=abc", 7.0) == \
+        "https://www.youtube.com/watch?v=abc&t=7s"
+
+
+def test_review_mostra_la_classe(b, tmp_path):
+    # I5: la pagina dice la classe d'auto di ogni fonte.
+    b.testo("https://r/1", "uno", "At Tosa use the kerb on exit every lap.",
+            [(TOSA, "kerb", "exit", "use the kerb on exit")])
+    b.conn.execute("UPDATE sources SET car_class='gt4' WHERE url='https://r/1'")
+    b.conn.commit()
+    b.testo("https://r/2", "due", "At Tosa I go down to second gear and it works great.",
+            [(TOSA, "gear", "2", "down to second gear")])
+    page = review.render(b.conn, "imola", tmp_path / "x.html").read_text(encoding="utf-8")
+    assert "GT4" in page and "GT3" in page
+    for frase in review.TESTI:
+        assert tono.violations(frase, "it") == [], frase
+
+
+def test_review_spesa_dalla_corsa(b, tmp_path):
+    # M1: la pagina dice la spesa più alta fra il conto e le corse.
+    b.conn.execute("INSERT INTO spend(track, baseline_usd, last_usd, cap_usd, runs_usd)"
+                   " VALUES ('imola', 1.0, 1.0, 2.0, 0.7)")
+    b.conn.commit()
+    page = review.render(b.conn, "imola", tmp_path / "x.html").read_text(encoding="utf-8")
+    assert "0,70 $" in page

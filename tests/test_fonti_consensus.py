@@ -30,6 +30,7 @@ class Banco:
         self.tmp = tmp_path
         self.conn = db.open_db(tmp_path / "f.sqlite")
         self.n = 0
+        self.classe = "gt3"   # la classe d'auto delle fonti nuove
 
     def _dir(self, nome):
         self.n += 1
@@ -38,8 +39,8 @@ class Banco:
     def fonte(self, url, platform="reddit", author="a", game="acc", track="imola"):
         self.conn.execute(
             "INSERT OR IGNORE INTO sources(platform, url, author, title, published, game, track,"
-            " meta_json) VALUES (?,?,?,?,?,?,?,?)",
-            (platform, url, author, "t", "2026-05-01", game, track, "{}"))
+            " meta_json, car_class) VALUES (?,?,?,?,?,?,?,?,?)",
+            (platform, url, author, "t", "2026-05-01", game, track, "{}", self.classe))
         self.conn.commit()
         return self.conn.execute("SELECT id FROM sources WHERE url=?", (url,)).fetchone()[0]
 
@@ -431,8 +432,9 @@ def test_forma_della_voce(b):
     v = e["values"][0]
     assert set(v) == {"value", "authors", "sources", "n"}
     assert v["n"] == 1
-    assert set(v["sources"][0]) == {"url", "start_s", "quote"}
-    assert v["sources"][0] == {"url": "https://r/1", "start_s": None, "quote": MARCIA}
+    assert set(v["sources"][0]) == {"url", "start_s", "quote", "car_class"}
+    assert v["sources"][0] == {"url": "https://r/1", "start_s": None, "quote": MARCIA,
+                                 "car_class": "gt3"}
 
 
 # --- il fact-check legge il consenso ---------------------------------------------------
@@ -501,3 +503,31 @@ def test_cli_conta_le_persone(b, capsys):
 def test_cli_consensus_vuoto(tmp_path, capsys):
     assert fonti.main(["--db", str(tmp_path / "f.sqlite"), "consensus", "--track", "imola"]) == 0
     assert "Nessun fatto" in capsys.readouterr().out
+
+
+# --- I5: la classe d'auto ------------------------------------------------------------
+
+@pytest.mark.parametrize("classe", ["gt4", "ignota", None])
+def test_frenata_e_marcia_solo_da_fonti_gt3(b, classe):
+    # Due fonti GT4 indipendenti e un coach dicono «100»: per un pilota GT3 non vale.
+    b.classe = classe
+    _brake(b, "https://r/1", "uno")
+    _brake(b, "https://r/2", "due", prefix="Honestly at")
+    b.coach("https://r/3", "Coach Uno", None)
+    _gear(b, "https://r/4", "quattro")
+    _gear(b, "https://r/5", "cinque", prefix="Honestly at")
+    kerb = "use the kerb on exit"
+    for url, autore, pre in (("https://r/6", "sei", "At"), ("https://r/7", "sette", "Honestly at")):
+        b.testo(url, autore, f"{pre} Acque Minerali {kerb} every lap.", [("kerb", "exit", kerb)])
+    voci = b.build()
+    assert {e["type"] for e in voci} == {"kerb"}
+    assert _voce(voci, type_="kerb")["state"] == "verificato"
+
+
+def test_frenata_conta_solo_le_fonti_gt3(b):
+    _brake(b, "https://r/1", "uno")
+    b.classe = "gt4"
+    _brake(b, "https://r/2", "due", prefix="Honestly at")
+    e = _voce(b.build(), type_="brake")
+    assert e["values"][0]["authors"] == ["reddit:uno"]
+    assert [s["car_class"] for s in e["values"][0]["sources"]] == ["gt3"]

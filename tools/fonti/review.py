@@ -12,7 +12,7 @@ import math
 import sqlite3
 from pathlib import Path
 
-from tools.fonti import consensus, export
+from tools.fonti import apify, consensus, export
 
 QUOTE_WORDS = export.QUOTE_WORDS
 
@@ -24,6 +24,7 @@ SECTIONS = (
     ("descrittivo", "Descrittivi"),
 )
 
+CLASS_LABELS = {"gt3": "GT3", "gt4": "GT4", "ignota": "classe ignota"}
 TYPE_LABELS = {"brake": "frenata", "gear": "marcia", "apex": "corda", "kerb": "cordolo",
                "line": "linea", "mistake": "errore"}
 
@@ -52,8 +53,9 @@ T = {
     "quoted": "Cita",
     "open_at": "apri a {t}",
     "open": "apri la fonte",
+    "no_link": "link non sicuro, non lo apro",
 }
-TESTI = tuple(WHY.values()) + tuple(T.values())
+TESTI = tuple(WHY.values()) + tuple(T.values()) + tuple(CLASS_LABELS.values())
 
 _CSS = """
 :root{--bg:#f7f7f5;--fg:#1d1d1b;--mute:#6b6b66;--line:#d9d9d4;--ok:#1f7a3a;--no:#a3261b;--card:#fff}
@@ -93,13 +95,24 @@ def _author(aid: str) -> str:
     return f"{name} ({platform})" if platform else name
 
 
+def safe(url) -> bool:
+    """Solo un link http o https diventa cliccabile."""
+    return isinstance(url, str) and url.lower().startswith(("http://", "https://"))
+
+
 def link(url: str, start_s) -> str:
-    """L'URL della fonte, per YouTube al secondo giusto (arrotondato per difetto)."""
+    """L'URL della fonte, per YouTube al secondo giusto (arrotondato per difetto).
+
+    Un `t=` già presente si sostituisce: ne resta uno solo, in fondo.
+    """
     url = url or ""
     if start_s is None or not ("youtube.com" in url or "youtu.be" in url):
         return url
-    sep = "&" if "?" in url else "?"
-    return f"{url}{sep}t={int(math.floor(start_s))}s"
+    base, _, rest = url.partition("?")
+    query, hash_, frag = rest.partition("#")
+    parts = [x for x in query.split("&") if x and not x.startswith("t=")]
+    parts.append(f"t={int(math.floor(start_s))}s")
+    return f"{base}?{'&'.join(parts)}{hash_}{frag}"
 
 
 def _clock(start_s) -> str:
@@ -109,8 +122,13 @@ def _clock(start_s) -> str:
 
 def _source(s: dict) -> str:
     text = T["open_at"].format(t=_clock(s["start_s"])) if s["start_s"] is not None else T["open"]
+    klass = CLASS_LABELS.get(s.get("car_class") or "ignota", CLASS_LABELS["ignota"])
+    if safe(s["url"]):
+        where = f'<a href="{_e(link(s["url"], s["start_s"]))}">{_e(text)}</a>'
+    else:
+        where = f'<span class="mute">{_e(T["no_link"])}</span>'
     return (f'<li><q>{_e(export.cut(s["quote"], QUOTE_WORDS))}</q> '
-            f'<a href="{_e(link(s["url"], s["start_s"]))}">{_e(text)}</a></li>')
+            f'<span class="n">{_e(klass)}</span> {where}</li>')
 
 
 def _value(v: dict) -> str:
@@ -148,7 +166,7 @@ def _header(conn: sqlite3.Connection, track: str) -> str:
                        (track,)).fetchone()
     if row and row[0] is not None and row[1] is not None:
         cap = row[2] if row[2] is not None else 0.0
-        spend = T["spent"].format(spent=money(max(row[1] - row[0], 0.0)), cap=money(cap))
+        spend = T["spent"].format(spent=money(apify.spent(conn, track)), cap=money(cap))
     else:
         spend = T["unspent"]
     rejects = conn.execute(

@@ -10,6 +10,9 @@ Tutto è deterministico e si ricalcola dal database a ogni chiamata.
   anche se è corto. `n` di ogni valore è il numero di persone.
 - Contano solo i risultati `extract` della versione più alta proposta in `jobs` per
   (kind, testo, pista), da qualsiasi modello, e solo le fonti ACC di quella pista.
+- `brake` e `gear` contano solo i fatti di fonti GT3 (`sources.car_class = 'gt3'`): il
+  cartello di frenata e la marcia di una GT4 non valgono per una GT3. Gli altri tipi
+  contano tutte le fonti ACC.
 - Un autore è affidabile se una valutazione `rate` (della versione più alta) di uno
   dei suoi testi su quella pista lo dice `coach` con un nome, oppure `pilota` con un
   nome e un tempo sul giro. Le valutazioni sono già verificate dall'ingest. Se il
@@ -34,6 +37,7 @@ import sqlite3
 from tools.fonti import db, verify, vocab
 
 DESCRIPTIVE = ("line", "mistake")
+GT3_ONLY = ("brake", "gear")   # tipi che cambiano con la classe d'auto
 # Un testo identico lega due account solo se ha almeno tante parole: «Thanks!» non basta.
 LINK_MIN_WORDS = 8
 
@@ -47,11 +51,12 @@ def _rows(conn: sqlite3.Connection, track: str) -> list[tuple]:
     newest = db.newest_versions(conn, "extract", track)
     rows = conn.execute(
         "SELECT r.sha256, r.prompt_version, f.corner, f.type, f.value, f.quote, f.start_s,"
-        " f.author, s.platform, s.url FROM facts f JOIN results r ON r.id = f.result_id"
+        " f.author, s.platform, s.url, s.car_class FROM facts f JOIN results r ON r.id = f.result_id"
         " JOIN sources s ON s.id = f.source_id"
         " WHERE r.kind='extract' AND r.track=? AND f.track=? AND s.game='acc' AND s.track=?",
         (track, track, track)).fetchall()
-    return [r for r in rows if newest.get(r[0]) == r[1]]
+    return [r for r in rows if newest.get(r[0]) == r[1]
+            and (r[3] not in GT3_ONLY or r[10] == "gt3")]
 
 
 def _reliable_authors(conn: sqlite3.Connection, track: str) -> set[str]:
@@ -160,17 +165,18 @@ def _state(type_: str, values: list[dict], reliable: set[str]) -> str:
 
 
 def _source_key(s: dict):
-    return (s["url"] or "", s["start_s"] is None, s["start_s"] or 0.0, s["quote"] or "")
+    return (s["url"] or "", s["start_s"] is None, s["start_s"] or 0.0, s["quote"] or "",
+            s["car_class"] or "")
 
 
 def build(conn: sqlite3.Connection, track: str) -> list[dict]:
     """Una voce per (curva, tipo), nell'ordine delle curve della pista e poi dei tipi."""
     groups: dict[tuple[str, str], dict[str, dict]] = {}
-    for sha, _v, corner, type_, value, quote, start_s, author, platform, url in _rows(conn, track):
+    for sha, _v, corner, type_, value, quote, start_s, author, platform, url, klass in _rows(conn, track):
         val = groups.setdefault((corner, type_), {}).setdefault(
             value, {"texts": {}, "sources": set()})
         val["texts"].setdefault(db.author_id(platform, author), set()).add(sha)
-        val["sources"].add((url, start_s, quote))
+        val["sources"].add((url, start_s, quote, klass or "ignota"))
     reliable = _reliable_authors(conn, track)
     people = _people(conn, track)
 
@@ -180,7 +186,8 @@ def build(conn: sqlite3.Connection, track: str) -> list[dict]:
     for (corner, type_), by_value in groups.items():
         values = []
         for value, g in by_value.items():
-            sources = sorted(({"url": u, "start_s": s, "quote": q} for u, s, q in g["sources"]),
+            sources = sorted(({"url": u, "start_s": s, "quote": q, "car_class": c}
+                              for u, s, q, c in g["sources"]),
                              key=_source_key)
             values.append({"value": value, "authors": sorted(g["texts"]), "sources": sources,
                            "n": _count(g["texts"], people)})
