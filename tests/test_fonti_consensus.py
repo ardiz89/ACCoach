@@ -197,7 +197,7 @@ def test_testo_identico_di_due_account_conta_uno(b):
     b.estrai(sha, body, [("gear", "3", MARCIA)])
     e = _voce(b.build())
     assert e["values"][0]["authors"] == ["reddit:due", "reddit:uno"]
-    assert e["state"] == "singolo"
+    assert e["state"] == "singolo" and e["values"][0]["n"] == 1
 
 
 def test_due_modelli_stesso_autore_conta_uno(b):
@@ -226,6 +226,61 @@ def test_solo_la_versione_piu_recente(b, tmp_path, monkeypatch):
     b.estrai(sha, body, [("gear", "3", MARCIA)])
     e = _voce(b.build())
     assert e["state"] == "singolo" and e["values"][0]["authors"] == ["reddit:uno"]
+
+
+def test_reliability_leaks_via_shared_sha(b):
+    # Il coach A scrive di sé; B ripubblica lo stesso testo, byte per byte. La valutazione
+    # di quel testo dice «coachA»: B non diventa affidabile per averlo ricopiato.
+    body = "I coach drivers in ACC every week. My tip for the slow corners."
+    sa, _ = db.add_text(b.conn, b.fonte("https://r/a", author="coachA"), "comment", "coachA", body)
+    sb, _ = db.add_text(b.conn, b.fonte("https://r/b", author="reposterB"), "comment",
+                        "reposterB", body)
+    assert sa == sb
+    b.valuta(sa, body, "coach", "I coach drivers in ACC", name="coachA")
+    _brake(b, "https://r/b2", "reposterB")
+    _brake(b, "https://r/c", "anonC", prefix="Honestly at")
+    e = _voce(b.build(), type_="brake")
+    assert e["state"] == "singolo"
+    assert e["values"][0]["authors"] == ["reddit:anonc", "reddit:reposterb"]
+
+
+def test_valutazione_condivisa_va_a_chi_si_chiama_cosi(b):
+    # Stesso testo ripostato, ma questa volta i fatti li ha scritti il coach: è lui
+    # (nome uguale a meno delle maiuscole) che diventa affidabile.
+    body = "I coach drivers in ACC every week. My tip for the slow corners."
+    sa, _ = db.add_text(b.conn, b.fonte("https://r/a", author="CoachA"), "comment", "CoachA", body)
+    db.add_text(b.conn, b.fonte("https://r/b", author="reposterB"), "comment", "reposterB", body)
+    b.valuta(sa, body, "coach", "I coach drivers in ACC", name="CoachA")
+    _brake(b, "https://r/a2", "CoachA")
+    _brake(b, "https://r/c", "anonC", prefix="Honestly at")
+    assert _voce(b.build(), type_="brake")["state"] == "verificato"
+
+
+def test_same_person_linked_elsewhere(b):
+    # Due account che hanno pubblicato lo stesso testo, anche su altro, sono una persona.
+    shared = "Totally unrelated identical post about setup."
+    db.add_text(b.conn, b.fonte("https://r/x1", author="alt1"), "comment", "alt1", shared)
+    db.add_text(b.conn, b.fonte("https://r/x2", author="alt2"), "comment", "alt2", shared)
+    _gear(b, "https://r/g1", "alt1")
+    _gear(b, "https://r/g2", "alt2", prefix="Honestly at")
+    e = _voce(b.build())
+    assert e["state"] == "singolo" and e["values"][0]["n"] == 1
+    assert e["values"][0]["authors"] == ["reddit:alt1", "reddit:alt2"]
+
+
+def test_legame_fuori_dalla_pista_non_conta(b):
+    # Il testo identico sta su un'altra pista o su un altro gioco: non lega i due account.
+    shared = "Totally unrelated identical post about setup."
+    db.add_text(b.conn, b.fonte("https://r/x1", author="alt1", track="monza"), "comment", "alt1",
+                shared)
+    db.add_text(b.conn, b.fonte("https://r/x2", author="alt2", game="altro"), "comment", "alt2",
+                shared)
+    db.add_text(b.conn, b.fonte("https://r/x3", author="alt2", track="monza"), "comment", "alt2",
+                shared)
+    _gear(b, "https://r/g1", "alt1")
+    _gear(b, "https://r/g2", "alt2", prefix="Honestly at")
+    e = _voce(b.build())
+    assert e["state"] == "verificato" and e["values"][0]["n"] == 2
 
 
 # --- conteso e singolo -----------------------------------------------------------
@@ -323,7 +378,8 @@ def test_forma_della_voce(b):
     e = b.build()[0]
     assert set(e) == {"corner", "type", "state", "values", "fact_key"}
     v = e["values"][0]
-    assert set(v) == {"value", "authors", "sources"}
+    assert set(v) == {"value", "authors", "sources", "n"}
+    assert v["n"] == 1
     assert set(v["sources"][0]) == {"url", "start_s", "quote"}
     assert v["sources"][0] == {"url": "https://r/1", "start_s": None, "quote": MARCIA}
 
@@ -378,6 +434,17 @@ def test_cli_consensus(b, capsys):
     out = capsys.readouterr().out
     assert AM in out and "verificato" in out and "singolo" in out
     assert "board:150" in out
+    assert "3 (2 autori)" in out
+
+
+def test_cli_conta_le_persone(b, capsys):
+    body = f"At Acque Minerali I go {MARCIA} and it works great."
+    sha, _ = db.add_text(b.conn, b.fonte("https://r/1"), "comment", "uno", body)
+    db.add_text(b.conn, b.fonte("https://r/2"), "comment", "due", body)
+    b.estrai(sha, body, [("gear", "3", MARCIA)])
+    assert fonti.main(["--db", str(b.tmp / "f.sqlite"), "consensus", "--track", "imola"]) == 0
+    out = capsys.readouterr().out
+    assert "gear: singolo, 3 (1 autore)" in out
 
 
 def test_cli_consensus_vuoto(tmp_path, capsys):

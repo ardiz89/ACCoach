@@ -125,7 +125,7 @@ def cmd_consensus(args) -> int:
             curva = e["corner"]
             print(f"{curva}:")
         valori = ", ".join(
-            f"{v['value']} ({len(v['authors'])} {'autore' if len(v['authors']) == 1 else 'autori'})"
+            f"{v['value']} ({v['n']} {'autore' if v['n'] == 1 else 'autori'})"
             for v in e["values"])
         print(f"  {e['type']}: {e['state']}, {valori}")
     stati = [e["state"] for e in entries]
