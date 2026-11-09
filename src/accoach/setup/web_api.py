@@ -58,6 +58,12 @@ class UndoBody(BaseModel):
     path: str
 
 
+class BaseBody(BaseModel):
+    """Il file che il pilota dice di aver caricato nel gioco."""
+
+    path: str
+
+
 class SeedBody(BaseModel):
     """Copy an existing setup of the same car into a track that has none."""
 
@@ -347,6 +353,22 @@ def register_setup_routes(app: FastAPI, root=DEFAULT_ROOTS) -> None:
                     "confirm": False}
         return {"car": car_dir, "track": track_dir, "setups": setups,
                 "base": None, "last_written": None, "confirm": True}
+
+    @app.post("/api/setup/base")
+    def setup_base_set(body: BaseBody) -> dict:
+        """La risposta del pilota a «Quale assetto hai caricato nel gioco?».
+
+        Da qui e' quello il file di partenza per quell'auto e quella pista,
+        al posto dell'ultimo scritto: se le gomme hanno smentito la prova,
+        quel file e' proprio quello di cui non ci si fida piu'. Lo stesso
+        posto dove `setup_apply` segna il file scritto, quindi la GET sopra
+        risponde con questo e non chiede piu'.
+        """
+        p = _safe(body.path, roots)
+        if not p.is_file():
+            raise HTTPException(404, "setup not found")
+        last_written[(p.parent.parent.name.lower(), p.parent.name.lower())] = p
+        return {"ok": True, "path": str(p), "name": p.stem}
 
     @app.get("/api/setup/class")
     def setup_class(car: str = Query(...),

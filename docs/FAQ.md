@@ -977,10 +977,13 @@ road".
   worth. If the gap is over 0.8 psi, or over the change itself when that is
   bigger, it tells you both numbers. It means the starting file probably
   wasn't the one on your car. Then the engineer doesn't judge the test or log
-  it, and there's nothing to write on the file. In the pits, reload the setup
-  you were driving before the change. The page asks again, and you pick the
-  setup you actually loaded. Then the engineer takes a new baseline on fresh
-  laps.
+  it, and there's nothing to write on the file. Until you answer, the laps
+  you drive don't count towards the baseline, because the doubtful setup is
+  still on the car. In the pits, reload the setup you were driving before the
+  change. The page asks again, even if you reload it, and you pick the setup
+  you actually loaded. HONE remembers it as the starting file for that car
+  and track. Then the engineer takes a new baseline from the laps after you
+  leave the pits.
 - **The full Engineer page follows the same rule.** Its writing buttons switch
   off when you're driving and not stopped in the pits, even paused on track.
   With the game off or in the menus you can still write, to prepare a setup

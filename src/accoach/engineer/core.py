@@ -857,6 +857,11 @@ class RaceEngineer:
         #: ripristino e numeri) finche' `mark_applied` non dice che la macchina
         #: e' tornata com'era. E' quello che `observe` ripete a ogni giro.
         self._held_revert: Decision | None = None
+        #: Le gomme non hanno risposto come la modifica (`_base_moved`): la
+        #: prova non si giudica, e finche' il pilota non dice ai box quale
+        #: assetto ha caricato (`base_confirmed`) i giri non fanno base. E'
+        #: quello che `observe` ripete a ogni giro, con `confirm_base`.
+        self._held_base: Decision | None = None
         #: Symptoms whose remedies all failed — the engine's own "this is you,
         #: not the car" call. Recorded because it is a claim we make and have
         #: never checked (see ledger.py).
@@ -979,6 +984,8 @@ class RaceEngineer:
         if self._held_revert is not None or (
                 self._pending is not None and self._pending_is_revert):
             out["stage"] = "restore"
+        elif self._held_base is not None:
+            pass        # la base si rifa' dopo la risposta: nessun contatore
         elif self.active is not None:
             out.update(stage="test", have=self.active.laps_seen,
                        need=self.min_stable)
@@ -1006,6 +1013,10 @@ class RaceEngineer:
         # metteva in attesa il rimedio successivo SOPRA quello bocciato.
         if self._held_revert is not None:
             return self._held_revert
+        # Lo stesso per la base da richiedere: il giro e' stato guidato con un
+        # assetto che non sappiamo quale sia, e non fa base.
+        if self._held_base is not None:
+            return self._held_base
 
         # A dry↔wet switch invalidates everything measured either side of it: a
         # baseline driven on slicks and a re-test driven on wets are two
@@ -1399,14 +1410,35 @@ class RaceEngineer:
         # scriverebbe nel registro una prova mai fatta, e un ripristino di 5
         # click sopra il file scelto darebbe un assetto sbagliato in ogni caso.
         # Quindi niente verdetto, niente registro, niente da scrivere: il
-        # pilota ricarica l'assetto di prima e la base riparte da giri nuovi.
+        # pilota ricarica l'assetto di prima, lo dice ai box, e solo allora la
+        # base riparte da giri nuovi. Fino ad allora la decisione resta questa,
+        # a ogni giro: i giri in pista hanno ancora l'assetto sospetto.
         self.window = []
         self._offs = []
         self.active = None
         self._pending = None
         self._pending_is_revert = False
         self._pending_prediction = None
-        return Decision(DecisionKind.STAND_DOWN, moved, confirm_base=True)
+        self._held_base = Decision(DecisionKind.STAND_DOWN, moved,
+                                   confirm_base=True)
+        return self._held_base
+
+    def base_confirmed(self) -> Decision | None:
+        """Il pilota ha detto ai box quale assetto ha caricato.
+
+        Scioglie la decisione tenuta da `_base_moved` e rifa' la base da zero:
+        contano solo i giri dopo questa risposta. Il giro d'uscita dai box non
+        arriva qui, perche' il registratore non registra la corsia box (vedi
+        `recorder._recording_allowed`). Senza niente da sciogliere torna None.
+        """
+        if self._held_base is None:
+            return None
+        self._held_base = None
+        self.window = []
+        self._offs = []
+        self._skipped = None
+        return Decision(DecisionKind.COLLECT,
+                        _msg("collect", n=self.min_stable, have=0))
 
     def _base_moved(self, a: "_Active", lang: str) -> str:
         """Le gomme hanno risposto alla modifica di pressione come previsto?

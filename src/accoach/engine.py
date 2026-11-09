@@ -537,6 +537,9 @@ class CoachEngine:
         # they can't race _observe_lap, which also mutates the engineer.
         self._cmd_lock = threading.Lock()
         self._applied_pending = False
+        # Il pilota ha detto ai box quale assetto ha caricato (POST
+        # /engineer/base): scioglie la base tenuta da `_base_moved`.
+        self._base_pending = False
 
         # Il gesto migliore di ogni curva (coaching/corner_refs.py). Il bacino
         # si carica fuori dal tick. Misurato il 03/11 sulla copia dell'archivio
@@ -1265,6 +1268,12 @@ class CoachEngine:
         with self._cmd_lock:
             self._applied_pending = True
 
+    def mark_base_confirmed(self) -> None:
+        """Il pilota ha risposto «quale assetto hai caricato» ai box. Come
+        :meth:`mark_setup_applied`: qui solo il segnale, il lavoro nel tick."""
+        with self._cmd_lock:
+            self._base_pending = True
+
     def tick(self, now: float) -> EngineState:
         if self._feed is not None:
             # Acquisition + recording happen on the feed thread; here we just
@@ -1349,6 +1358,15 @@ class CoachEngine:
         with self._cmd_lock:
             apply_setup = self._applied_pending
             self._applied_pending = False
+            base_answered = self._base_pending
+            self._base_pending = False
+        if base_answered and self._engineer is not None:
+            # La decisione tenuta portava `confirm_base` a ogni frame: dopo la
+            # risposta non deve piu', o le pagine richiederebbero da capo.
+            freed = self._engineer.base_confirmed()
+            if freed is not None:
+                self._engineer_decision = freed
+                self._save_engineer_state()
         if apply_setup and self._engineer is not None:
             self._engineer.mark_applied()
             # The change has been written: stop calling the driver in for it.

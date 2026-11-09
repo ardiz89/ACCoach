@@ -96,3 +96,34 @@ def test_list_carries_mtime(tmp_path):
     for r in rows:
         assert {"name", "path", "mtime"} <= set(r)
         assert isinstance(r["mtime"], (int, float))
+
+
+def test_the_pilots_answer_becomes_the_base(tmp_path):
+    """Revisione finale, 3b: la risposta alla domanda va al server. Da li'
+    la GET risponde con quel file, senza chiedere, anche dopo un ricaricamento."""
+    client, d, a, b = _setup(tmp_path)
+    r = client.post("/api/setup/base", json={"path": str(a)})
+    assert r.status_code == 200 and r.json()["name"] == "a"
+    out = _base(client)
+    assert out["base"] == str(a) and out["confirm"] is False
+
+
+def test_the_answer_replaces_the_suspect_last_written(tmp_path):
+    """Le gomme hanno smentito la prova scritta su `HONE_1`: il pilota dice
+    di avere `a` in macchina, e da li' si parte da `a`."""
+    client, d, a, b = _setup(tmp_path)
+    _apply(client, b)
+    assert _base(client)["last_written"] == "HONE_1"
+    client.post("/api/setup/base", json={"path": str(a)})
+    out = _base(client)
+    assert out["base"] == str(a) and out["confirm"] is False
+
+
+def test_the_answer_must_be_a_setup_under_the_root(tmp_path):
+    client, d, a, b = _setup(tmp_path)
+    assert client.post("/api/setup/base",
+                       json={"path": str(tmp_path / "x.json")}).status_code == 403
+    assert client.post("/api/setup/base",
+                       json={"path": str(d / "nope.json")}).status_code == 404
+    assert _base(client)["confirm"] is True
+

@@ -102,12 +102,35 @@ def test_when_the_tyres_disagree_no_ledger_file_is_written(tmp_path, monkeypatch
     assert not path.exists()
 
 
-def test_after_the_stand_down_the_baseline_restarts_on_fresh_laps():
+def test_a_flying_lap_during_the_hold_does_not_enter_the_baseline():
+    """Rilettura, 3a: dopo la smentita il pilota e' ancora in pista con
+    l'assetto sospetto. Quei giri non fanno base, e la risposta resta quella."""
     eng, d = _test_pressure(5, 25.8, 28.0)
     assert eng.window == []
+    for _ in range(4):
+        again = eng.observe(_lap(28.0))
+        assert again is d and again.confirm_base is True
+    assert eng.window == []
+    assert eng.progress()["stage"] == "diagnose"
+
+
+def test_the_baseline_starts_only_after_the_answer():
+    eng, d = _test_pressure(5, 25.8, 28.0)
+    eng.observe(_lap(28.0))
+    freed = eng.base_confirmed()
+    assert freed.kind is DecisionKind.COLLECT and freed.confirm_base is False
+    assert eng.window == []
     nxt = eng.observe(_lap(25.8))
-    assert nxt.kind is DecisionKind.COLLECT
-    assert nxt.confirm_base is False
+    assert nxt is not d and nxt.confirm_base is False
+    assert len(eng.window) == 1
+    # Una seconda risposta non ha niente da sciogliere.
+    assert eng.base_confirmed() is None
+
+
+def test_without_a_hold_the_answer_changes_nothing():
+    eng = RaceEngineer(GT3_PROFILE, min_stable=3)
+    eng.window = [_lap(25.8)]
+    assert eng.base_confirmed() is None
     assert len(eng.window) == 1
 
 
@@ -159,6 +182,49 @@ class _Dead:
 
     def close(self):
         pass
+
+
+def test_confirm_base_stays_on_the_frames_until_the_answer(tmp_path):
+    """Rilettura, 3b: a ogni frame, cosi' un ricaricamento di una delle due
+    pagine richiede. Dopo la risposta (POST /engineer/base) non piu'."""
+    eng = CoachEngine(reader=_Dead(), laps_dir=tmp_path, engineer_voice=False)
+    try:
+        eng._engineer, d = _test_pressure(5, 25.8, 28.0)
+        eng._engineer_decision = d
+        for t in range(3):
+            eng.tick(float(t))
+            assert eng._engineer_block()["confirm_base"] is True
+        eng._engineer_decision = eng._engineer.observe(_lap(28.0))   # un altro giro
+        assert eng._engineer_block()["confirm_base"] is True
+        eng.mark_base_confirmed()
+        assert eng._engineer_block()["confirm_base"] is True         # fino al tick
+        eng.tick(5.0)
+        block = eng._engineer_block()
+        assert block["confirm_base"] is False and block["kind"] == "collect"
+    finally:
+        eng.close()
+
+
+def test_the_server_passes_the_answer_to_the_engine():
+    from fastapi.testclient import TestClient
+    from accoach.server import create_app
+
+    class _Motore:
+        answered = 0
+
+        def tick(self, now):
+            return None
+
+        def close(self):
+            pass
+
+        def mark_base_confirmed(self):
+            self.answered += 1
+
+    m = _Motore()
+    with TestClient(create_app(engine=m, hz=50)) as c:
+        assert c.post("/engineer/base", json={}).json() == {"ok": True}
+    assert m.answered == 1
 
 
 def test_the_live_frame_carries_confirm_base(tmp_path):
@@ -239,6 +305,33 @@ out.writeOn = !$("t-write").disabled;
     assert out["previewPath"] == "S/i0.json"
     assert out["askAfter"] is False
     assert out["writeOn"] is True
+
+
+@needs_node
+def test_tablet_sends_the_answer_at_the_box():
+    """La risposta va al server (il nuovo file di partenza) e al motore (che
+    scioglie la prova smentita). Scelta in pista, parte al primo frame ai box."""
+    out = _tablet(r"""
+var track = {connected: true, at_box: false, car: "mclaren", track: "Imola"};
+window.HoneTablet.render(frame);
+reply(find("/api/setup/base")[0], 200, {car: "mclaren", track: "Imola", setups: SETUPS,
+  base: null, last_written: null, confirm: true});
+window.HoneTablet.render(track);
+$("t-base").value = "S/i0.json";
+$("t-base").onchange();
+out.onTrack = find("/api/setup/base").filter(function (x) { return x.method === "POST"; }).length
+  + find("/engineer/base").length;
+window.HoneTablet.render(frame);
+var p = find("/api/setup/base").filter(function (x) { return x.method === "POST"; });
+out.posted = p.map(function (x) { return JSON.parse(x.body); });
+out.engine = find("/engineer/base").length;
+window.HoneTablet.render(frame);
+out.engineAgain = find("/engineer/base").length;
+""")
+    assert out["onTrack"] == 0
+    assert out["posted"] == [{"path": "S/i0.json"}]
+    assert out["engine"] == 1
+    assert out["engineAgain"] == 1
 
 
 @needs_node
@@ -366,9 +459,13 @@ var $ = (id) => els[id] || (els[id] = { dataset: {}, hidden: false, disabled: fa
 var state = { car: null, track: null, setupPath: null, params: [], base: {}, pending: {},
               lastLive: null, askBase: false, askedFor: null, askVerdict: false, setups: [] };
 var LIST = [], BASE = null, CURRENT = null, BASE_FAILS = false;
+var location = { hostname: "pc" }, WS_PORT = 8777, liveUrl = (u) => u, liveRefused = () => {};
+const posted = [], fetched = [];
+var fetch = async (u, o) => { fetched.push(u); return { status: 200 }; };
 const asked = [];
-var api = async (url) => {
+var api = async (url, opts) => {
   asked.push(url);
+  if (opts && opts.method === "POST") { posted.push([url, JSON.parse(opts.body)]); return { ok: true }; }
   if (url.indexOf("/api/setup/list") === 0) return LIST;
   if (url.indexOf("/api/setup/base") === 0) {
     if (BASE_FAILS) throw new Error("503");
@@ -380,7 +477,7 @@ var api = async (url) => {
 var loadClass = async () => {}, loadRecord = () => {}, renderSetup = () => {},
     renderTray = () => {}, showToast = () => {}, dn = (s) => s;
 for (const f of ["onComboChange", "fillSetups", "esc", "askBaseText", "askBaseHTML", "onSetupChange", "askAgain",
-                 "confirmKey", "liveConfirmKey", "inPista", "writeLocked", "paintWriteLock"]) {
+                 "confirmKey", "liveConfirmKey", "sendAnswer", "inPista", "writeLocked", "paintWriteLock"]) {
   eval(grab(f));
 }
 function snap() {
@@ -400,10 +497,20 @@ function snap() {
   await onComboChange(sc.prefer);
   out.start = snap();
   out.askedBase = asked.filter((u) => u.indexOf("/api/setup/base") === 0).length;
+  if (sc.onTrack) state.lastLive = { connected: true, status: "LIVE", at_box: false };
   if (sc.pick) {
     els.setup.value = sc.pick;
     await onSetupChange();
     out.picked = snap();
+    out.postedAtPick = posted.slice();
+    out.fetchedAtPick = fetched.slice();
+    if (sc.onTrack) {
+      state.lastLive = { connected: true, status: "LIVE", at_box: true };
+      sendAnswer();
+      await null;
+      out.postedAtBox = posted.slice();
+      out.fetchedAtBox = fetched.slice();
+    }
   }
   if (sc.again) {
     await askAgain();
@@ -457,6 +564,30 @@ def test_engineer_page_asks_for_the_first_file():
     p = out["picked"]
     assert p["path"] == "S/i0.json"
     assert not (p["apply"] or p["write"] or p["ok"])
+
+
+@needs_node
+def test_engineer_page_sends_the_answer_to_the_server_and_the_engine():
+    out = _engineer(base={"base": None, "last_written": None, "confirm": True,
+                          "setups": []}, pick="720sEVO_Imola_0")
+    assert out["postedAtPick"] == [["/api/setup/base", {"path": "S/i0.json"}]]
+    assert out["fetchedAtPick"] == ["http://pc:8777/engineer/base"]
+
+
+@needs_node
+def test_engineer_page_on_track_keeps_the_answer_for_the_box():
+    out = _engineer(base={"base": None, "last_written": None, "confirm": True,
+                          "setups": []}, pick="720sEVO_Imola_0", onTrack=True)
+    assert out["postedAtPick"] == [] and out["fetchedAtPick"] == []
+    assert out["postedAtBox"] == [["/api/setup/base", {"path": "S/i0.json"}]]
+    assert out["fetchedAtBox"] == ["http://pc:8777/engineer/base"]
+
+
+@needs_node
+def test_engineer_page_without_a_question_sends_nothing():
+    out = _engineer(base={"base": "S/HONE_2.json", "last_written": "HONE_2",
+                          "confirm": False, "setups": []}, pick="720sEVO_Imola_0")
+    assert out["postedAtPick"] == [] and out["fetchedAtPick"] == []
 
 
 @needs_node

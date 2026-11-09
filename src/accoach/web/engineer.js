@@ -69,6 +69,9 @@ const state = {
   // ogni `onComboChange`, che al primo frame dal vivo parte sempre: senza
   // questo, ricaricando la pagina la domanda spariva in silenzio.
   askVerdict: false,
+  // La risposta alla domanda, da dire al server e al motore da fermo ai box
+  // (`sendAnswer`).
+  answer: null,
   setups: [],                    // l'ultimo elenco di /api/setup/list
   lastLive: null,                // last live payload, for re-render on lang switch
   // Quale auto/pista crediamo tu stia guidando, e da dove lo sappiamo:
@@ -538,8 +541,10 @@ async function onSetupChange() {
     $("btn-undo").disabled = true;
     return;
   }
+  if (state.askBase) state.answer = opt.dataset.path;   // e' la risposta
   state.askBase = false;
   state.askVerdict = false;        // un file scelto chiude la domanda
+  sendAnswer();
   state.setupPath = opt.dataset.path;
   const data = await api(`/api/setup/current?path=${encodeURIComponent(state.setupPath)}`);
   // Acceso solo con un backup da cui ripristinare.
@@ -1137,6 +1142,7 @@ function applyLive(st) {
   tracePush(st);
 
   renderEngineer(st);
+  sendAnswer();                   // scelto in pista: si dice al primo frame ai box
   renderFocus(st);
   renderPitReminder(st);
   paintWriteLock();               // dopo renderEngineer: conta se `es-restored` e' visibile
@@ -1393,6 +1399,25 @@ function renderRoad(eng) {
 
 // Render the structured engineer block (st.engineer) — proposal + at-the-wheel
 // advice. Falls back to the live coach cue until the diagnosis block exists.
+// La risposta a «Quale assetto hai caricato nel gioco?». Il server la tiene
+// come file di partenza per quell'auto e pista, cosi' un ricaricamento non
+// ripropone il file di cui le gomme hanno detto di non fidarsi. Il motore
+// scioglie la prova smentita e rifa' la base dai giri dopo. In pista aspetta:
+// il file si ricarica ai box, e la base parte da li'.
+function sendAnswer() {
+  if (!state.answer || writeLocked()) return;
+  const path = state.answer;
+  state.answer = null;
+  api("/api/setup/base", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ path }),
+  }).catch((e) => showToast(e.message, true));
+  fetch(liveUrl(`http://${location.hostname}:${WS_PORT}/engineer/base`),
+        { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" })
+    .then(liveRefused)
+    .catch(() => { /* motore spento: non c'e' niente da sciogliere */ });
+}
+
 // La chiave del verdetto che chiede il file di partenza, nell'ultimo frame.
 function confirmKey(eng) {
   return eng && eng.confirm_base ? `${eng.kind}|${eng.message || ""}` : null;

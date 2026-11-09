@@ -898,10 +898,9 @@ dell'ingegnere».
   un trattino finché HONE non ha misurato il consumo di un giro. Poi ci sono
   TC, ABS e mappa motore. Vedi anche temperatura e pressione delle quattro
   gomme, e la striscia di gas, freno e sterzo degli ultimi 8 s. Sotto ci sono
-  la strada e la fase su cui lavora l'ingegnere. Una
-  modifica da fare dal volante compare in un riquadro. Il bottone *L'ho
-  cambiato* c'è solo dove HONE non legge la manopola, come spiegato in «I
-  consigli di setup».
+  la strada e la fase su cui lavora l'ingegnere. Una modifica da fare dal
+  volante compare in un riquadro. Il bottone *L'ho cambiato* c'è solo dove
+  HONE non legge la manopola, come spiegato in «I consigli di setup».
 - **Avviso di rientro.** Quando l'ingegnere ha una modifica da fare ai box, in
   alto compare l'invito a rientrare a fine giro. La telemetria resta sotto. Per
   una modifica respinta l'avviso è simile e ti dice di rimettere l'ultima
@@ -915,9 +914,9 @@ dell'ingegnere».
   bottone per scrivere resta spento. Dopo un riavvio di HONE la domanda torna.
   Dalla lista puoi sempre sceglierne un altro. Premi *Scrivi la modifica* e
   conferma. HONE crea un file nuovo e non tocca il tuo. Poi la pagina ti
-  mostra in grande il nome
-  del file, da caricare dal garage del gioco. Se non trova un assetto per
-  quell'auto su quella pista, ti chiede di salvarne uno dal garage.
+  mostra in grande il nome del file, da caricare dal garage del gioco. Se non
+  trova un assetto per quell'auto su quella pista, ti chiede di salvarne uno
+  dal garage.
 - **In pista Assetto si legge.** La modifica, il file di partenza e le leve li
   vedi anche mentre giri, ma i bottoni si accendono solo quando sei fermo ai
   box. Quando scrivi il file, l'ingegnere comincia a contare i giri di prova.
@@ -932,10 +931,13 @@ dell'ingegnere».
   valeva la modifica. Se lo scarto supera 0,8 psi, o la modifica stessa quando
   è più grande, te lo dice coi due numeri. Vuol dire che forse il file di
   partenza non era quello in macchina. Allora la prova non la giudica e non la
-  scrive nel registro, e non c'è niente da scrivere sul file. Ai box ricarica
-  l'assetto che guidavi prima della modifica. La pagina ti rifà la domanda, e
-  tu scegli l'assetto che hai caricato davvero. Poi l'ingegnere rifà la base
-  con giri nuovi.
+  scrive nel registro, e non c'è niente da scrivere sul file. Finché non
+  rispondi, i giri che fai non contano per la base, perché in macchina c'è
+  ancora l'assetto dubbio. Ai box ricarica l'assetto che guidavi prima della
+  modifica. La pagina ti rifà la domanda, anche se la ricarichi, e tu scegli
+  l'assetto che hai caricato davvero. HONE se lo ricorda come file di
+  partenza per quell'auto e quella pista. Poi l'ingegnere rifà la base coi
+  giri dopo l'uscita dai box.
 
 La pagina completa dell'ingegnere segue la stessa regola. I bottoni che
 scrivono si spengono quando stai guidando e non sei fermo ai box, anche in

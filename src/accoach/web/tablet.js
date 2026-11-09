@@ -408,6 +408,20 @@
     xhr("POST", liveUrl("http://" + location.hostname + ":" + WS_PORT + "/engineer/applied"), {}, appliedRefused);
   }
 
+  // La risposta a «Quale assetto hai caricato nel gioco?». Il server la tiene
+  // come file di partenza per quell'auto e pista, cosi' un ricaricamento non
+  // ripropone il file di cui le gomme hanno detto di non fidarsi. Il motore
+  // scioglie la prova smentita e rifa' la base coi giri dopo l'uscita.
+  function sendAnswer() {
+    if (!bx.answer || !atBoxNow()) return;
+    var p = bx.answer;
+    bx.answer = null;
+    xhr("POST", "/api/setup/base", { path: p }, function (err) {
+      if (err) { bx.err = t("eng.loadErr") + err.detail; paintBox(); }
+    });
+    xhr("POST", liveUrl("http://" + location.hostname + ":" + WS_PORT + "/engineer/base"), {}, appliedRefused);
+  }
+
   // ---- la schermata dei box -------------------------------------------------
   // Il nome della via corta di engineer.js (`nextAutoName`): HONE_1, HONE_2…,
   // uno piu' del piu' alto gia' nella cartella. Ai box non si digita un nome.
@@ -446,6 +460,10 @@
     // modifica prevedeva (`confirm_base`). Resta finche' il pilota non sceglie.
     ask: false,
     askedFor: null,       // il verdetto che ha gia' fatto la domanda una volta
+    // La risposta alla domanda, da dire al server e al motore. Parte solo da
+    // fermo ai box: e' li' che il file si ricarica, e il motore rifa' la base
+    // da quel momento (`sendAnswer`).
+    answer: null,
     pvKey: null, pvSeq: 0, pvChanges: null, preview: null, pvErr: "",
     confirm: null,        // {key, path, name, changes, av}: cio' che la conferma nomina
     writing: false,
@@ -616,6 +634,8 @@
     // Prima di tutto il resto: il verdetto arriva a fine giro, in pista, e il
     // frame dopo puo' non portarlo piu'. La domanda aspetta i box.
     if (m !== "off") askAgain(st.engineer || null);
+    // Scelto in pista, si dice al primo frame fermo ai box.
+    if (m !== "off") sendAnswer();
     // Riparti dai box: il file scritto e l'errore erano di quella sosta.
     // Spento non conta come partenza ne' come sosta: box, spento, pista e'
     // ripartire lo stesso.
@@ -648,7 +668,7 @@
       // La domanda di un'altra auto o pista non vale qui: la rifa' il server.
       if (bx.combo !== null) bx.ask = false;
       bx.combo = combo; bx.car = car; bx.track = track;
-      bx.chosen = null; bx.base = null;
+      bx.chosen = null; bx.base = null; bx.answer = null;
       // Il file scritto e l'errore erano di un'altra auto o pista.
       bx.done = null; bx.err = "";
       fillSelect();
@@ -950,8 +970,14 @@
     $("t-restored").onclick = confirmRestored;
     // Un altro file di partenza: l'anteprima si rifa' al frame dopo.
     $("t-base").onchange = function () {
+      var asking = bx.ask;
       bx.chosen = $("t-base").value || null;
-      if (bx.chosen) bx.ask = false;
+      if (bx.chosen) {
+        // Un file scelto con la domanda aperta e' la risposta.
+        if (asking) bx.answer = bx.chosen;
+        bx.ask = false;
+      }
+      sendAnswer();
       if (last) redraw();
     };
     // Cambio di lingua dalla pagina: i testi fissi li rifa' i18n.js, quelli
