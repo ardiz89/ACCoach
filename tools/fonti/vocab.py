@@ -368,32 +368,46 @@ def sentence_reason(type_: str, sentence: str, at: int) -> str | None:
 # Un ruolo si prova solo detto in prima persona: una di queste forme nella citazione già
 # normalizzata con `fold`, senza negazione. Una parola sola («race», «coach») non basta:
 # «the racing line», «the Coach Dave setup» non dicono niente di chi parla.
+# Pilota vuol dire un campionato o un team: «I race in public lobbies», «corro con la
+# Ferrari», «sono un pilota della domenica» non sono un pilota.
+ROLE_CONTEXT = (r"(?:championship|campionato|league|lega|series|serie|gt\W+world|gtwc|lfm|sro"
+                r"|esports|endurance|team|scuderia)")
+# La parola del campionato o del team entro le 6 parole che seguono.
+_NEAR_CONTEXT = rf"(?:\W+[\w']+){{0,5}}?\W+{ROLE_CONTEXT}\b"
 ROLE_PATTERNS = {
     "coach": [re.compile(p) for p in (
         r"\bi(?:'m| am) (?:an? )?(?:(?:driver|driving|sim racing) )?(?:coach|instructor)\b",
         r"\bi coach\b",
         r"\bi teach\b",
         r"\b(?:sono|faccio) (?:il |un |l')?(?:coach|istruttore)\b",
-        r"\binsegno\b",
+        r"\binsegno (?:a guidare|guida|ai piloti)\b",
     )],
     "pilota": [re.compile(p) for p in (
-        r"\bi race (?:in|for|with)\b",
-        r"\bi drive for\b",
-        r"\bi(?:'m| am) a (?:sim )?racer\b",
-        r"\bi(?:'m| am) a driver for\b",
-        r"\bcorro (?:in|nel|con|per)\b",
-        r"\bsono (?:un )?pilota\b",
+        r"\bi race (?:in|for)\b" + _NEAR_CONTEXT,
+        r"\bi drive for\b" + _NEAR_CONTEXT,
+        r"\bi(?:'m| am) a driver for\b" + _NEAR_CONTEXT,
+        r"\bcorro (?:nel|per|in)\b" + _NEAR_CONTEXT,
+        rf"^(?=.*\b{ROLE_CONTEXT}\b).*\bsono (?:un )?pilota\b",
     )],
 }
 # Frasi che non provano mai un ruolo: si tolgono dalla citazione prima di cercare le forme.
 ROLE_EXCLUDED = ("racing line", "race line", "coach dave", "my coach", "il mio coach",
-                 "mio istruttore")
+                 "mio istruttore", "della domenica")
+# Parole riferite: chi parla dice il ruolo di un altro, o lo cita. Vale nella citazione
+# e nelle 6 parole che la precedono nel testo.
+REPORTED = re.compile(r"[\"«»„]|\b(?:says|said|dice|disse|ha detto|secondo lui|according to)\b")
 
 
-def proves_role(role: str, quote: str) -> bool:
-    """La citazione dice in prima persona che chi parla ha quel ruolo."""
+def proves_role(role: str, quote: str, before: str = "") -> bool:
+    """La citazione dice in prima persona che chi parla ha quel ruolo.
+
+    `before` è il testo che precede la citazione: se nelle sue ultime 6 parole qualcuno
+    «dice» o apre le virgolette, il ruolo è riferito e non vale.
+    """
     q = fold(quote)
-    if NEGATION.search(q):
+    if NEGATION.search(q) or REPORTED.search(q):
+        return False
+    if REPORTED.search(" ".join(fold(before).split()[-6:])):
         return False
     for phrase in ROLE_EXCLUDED:
         q = alias_regex(phrase).sub(" ", q)

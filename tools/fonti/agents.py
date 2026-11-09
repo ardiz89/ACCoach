@@ -357,11 +357,14 @@ def _check_rate(d: dict, body: str, authors: set[str]) -> None:
     l'autore della fonte: in un thread l'autore del post non è chi ha scritto il commento.
     """
     by_field: dict[str, list[str]] = {f: [] for f in FIELDS}
+    before: dict[str, str] = {}   # citazione del ruolo -> testo che la precede
     for r in d["reasons"]:
-        bad = verify.check_quote(r["quote"], body, r["offset"])
+        bad, start = verify.locate_quote(r["quote"], body, r["offset"])
         if bad:
             raise AnswerRejected(bad)
         by_field[r["field"]].append(r["quote"])
+        if r["field"] == "role":
+            before[r["quote"]] = body[:start]
     name = d["speaker"]["name"].strip()
     if name:
         if _is_vocab_name(name):
@@ -369,7 +372,8 @@ def _check_rate(d: dict, body: str, authors: set[str]) -> None:
         if name not in authors and not any(_names_in(q, name) for q in by_field["name"]):
             raise AnswerRejected("nome_non_citato")
     role = d["speaker"]["role"]
-    if role != "anonimo" and not any(vocab.proves_role(role, q) for q in by_field["role"]):
+    if role != "anonimo" and not any(vocab.proves_role(role, q, before[q])
+                                    for q in by_field["role"]):
         raise AnswerRejected("ruolo_non_citato")
     if d["lap_time"] is not None and (
             not vocab.LAP_TIME.fullmatch(d["lap_time"])

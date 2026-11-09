@@ -636,7 +636,6 @@ def test_ruolo_solo_in_prima_persona(tmp_path, body, role, quote):
     ("I am an instructor at a sim school, Imola weekly.", "coach", "I am an instructor at"),
     ("Faccio l'istruttore di guida e Imola la conosco.", "coach", "Faccio l'istruttore di guida"),
     ("I race in GT World Challenge and Imola is tough.", "pilota", "I race in GT World"),
-    ("Sono un pilota di ACC e corro a Imola.", "pilota", "Sono un pilota di"),
     ("Corro nel campionato italiano su ACC da due anni.", "pilota", "Corro nel campionato italiano"),
 ])
 def test_ruolo_detto_in_prima_persona(tmp_path, body, role, quote):
@@ -752,3 +751,53 @@ def test_pending_factcheck_senza_fonti_si_ferma(conn, tmp_path, monkeypatch, val
     with pytest.raises(RuntimeError, match="fonti del fatto"):
         agents.pending(conn, "factcheck", "imola", tmp_path / "fc")
     assert conn.execute("SELECT COUNT(*) FROM jobs WHERE kind='factcheck'").fetchone()[0] == 0
+
+
+# --- round 4 ------------------------------------------------------------------------
+
+@pytest.mark.parametrize("body, role, quote", [
+    # Sonde P1-P8: forme generiche, un «insegno» qualsiasi, parole riferite da altri.
+    ("Honestly I'm a sim racer and Tosa is hard.", "pilota", "I'm a sim racer and"),
+    ("Io corro con la Ferrari alla Tosa di solito.", "pilota", "Io corro con la Ferrari"),
+    ("I race in public lobbies at Imola mostly.", "pilota", "I race in public lobbies"),
+    ("Oggi ti insegno a frenare alla Rivazza bene.", "coach", "Oggi ti insegno a frenare"),
+    ("He always says I am a driving coach lol.", "coach", "says I am a driving coach"),
+    ("Sono un pilota della domenica su ACC.", "pilota", "Sono un pilota della domenica"),
+    ("Corro in ACC da due anni ormai.", "pilota", "Corro in ACC da due"),
+    # «sono pilota» senza campionato né team nella citazione.
+    ("Sono un pilota di ACC e corro a Imola.", "pilota", "Sono un pilota di"),
+    # Il campionato più in là di sei parole non conta.
+    ("I race in lobbies most nights and weekends with friends in a championship.", "pilota",
+     "I race in lobbies most nights and weekends with friends in a championship"),
+    # Le parole riferite: virgolette nella citazione o «said» nelle sei parole prima.
+    ('My friend wrote "I am a driving coach for ACC" yesterday.', "coach",
+     '"I am a driving coach'),
+    ("My friend Marco said that I am a driving coach for ACC.", "coach", "I am a driving coach"),
+    ("Secondo lui sono un pilota del campionato LFM, magari.", "pilota",
+     "sono un pilota del campionato LFM"),
+    ("According to Marco I race in the LFM championship.", "pilota", "I race in the LFM championship"),
+])
+def test_ruolo_generico_o_riferito_rifiutato(tmp_path, body, role, quote):
+    c = db.open_db(tmp_path / "f.sqlite")
+    sha = _rate_job(c, tmp_path, body)
+    with pytest.raises(agents.AnswerRejected) as e:
+        agents.ingest(c, _scrivi(tmp_path, _rate(sha, body, role, quote)), "m")
+    assert e.value.reason == "ruolo_non_citato"
+    assert _stato(c)["results"] == 0
+    c.close()
+
+
+@pytest.mark.parametrize("body, role, quote", [
+    ("I race in the LFM championship at Imola.", "pilota", "I race in the LFM championship"),
+    ("Corro per il team Rossi su ACC da anni.", "pilota", "Corro per il team Rossi"),
+    ("I drive for Scuderia Blu in ACC.", "pilota", "I drive for Scuderia Blu"),
+    ("I'm a driver for a GTWC esports team.", "pilota", "I'm a driver for a GTWC"),
+    ("Sono un pilota del campionato LFM su ACC.", "pilota", "Sono un pilota del campionato"),
+    ("Io insegno guida sportiva a Imola.", "coach", "Io insegno guida sportiva"),
+    ("Da anni insegno ai piloti GT come frenare.", "coach", "Da anni insegno ai piloti"),
+])
+def test_ruolo_con_campionato_team_o_guida(tmp_path, body, role, quote):
+    c = db.open_db(tmp_path / "f.sqlite")
+    sha = _rate_job(c, tmp_path, body)
+    assert agents.ingest(c, _scrivi(tmp_path, _rate(sha, body, role, quote)), "m") == {"facts": 0, "rejects": 0}
+    c.close()

@@ -37,12 +37,21 @@ Return ONLY this JSON object. No prose, no Markdown fences, no extra keys:
   - `anonimo` in every other case.
   `coach` and `pilota` need a reason with `"field": "role"` quoting the speaker saying
   it about themselves, in the first person, not negated:
-  - `coach`: "I'm a (driver) coach", "I am an instructor", "I coach", "I teach",
-    "sono/faccio il coach", "faccio l'istruttore", "insegno";
-  - `pilota`: "I race in/for/with", "I drive for", "I'm a (sim) racer",
-    "I'm a driver for", "corro in/nel/con/per", "sono (un) pilota".
+  - `coach`: "I'm a (driver/driving/sim racing) coach", "I am an instructor",
+    "I coach", "I teach", "sono/faccio il coach", "faccio l'istruttore",
+    "insegno a guidare", "insegno guida", "insegno ai piloti";
+  - `pilota`: "I race in/for", "I drive for", "I'm a driver for", "corro nel/per/in",
+    each followed within 6 words by a series or team word: championship, campionato,
+    league, lega, series, serie, GT World, GTWC, LFM, SRO, esports, endurance, team,
+    scuderia ("I race in the LFM championship", "corro per il team Rossi");
+    "sono (un) pilota" only if the same quote has one of those words.
   A word alone does not count: "the racing line", "the Coach Dave setup",
   "my coach told me", "in the race", "this team" say nothing about the speaker.
+  Racing without a series or team is not `pilota`: "I'm a sim racer",
+  "I race in public lobbies", "corro con la Ferrari", "sono un pilota della domenica".
+  Reported words are not the speaker: a role quote with a quotation mark, or with
+  "says", "said", "dice", "disse", "ha detto", "secondo lui", "according to" in it or in
+  the 6 words before it, does not count.
 - `lap_time`: a lap time the speaker states for their own lap at this track, copied as
   written, in the form `m:ss.d` (`1:41.2`, `1:41,234`); otherwise null. Not null needs a reason with `"field": "lap_time"` whose
   quote contains the lap time exactly as you wrote it.
