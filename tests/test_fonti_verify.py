@@ -701,3 +701,19 @@ def test_nessun_alias_vale_per_due_curve_su_nessuna_pista():
             for a in alias:
                 assert a not in visti, f"{track}: {a!r} in {visti.get(a)} e {nome}"
                 visti[a] = nome
+
+
+# 10/11: le frasi delle guide di Monza e Silverstone.
+@pytest.mark.parametrize("q,atteso", [
+    ("shift down to third and aim to get", "3"),
+    ("start braking and switch to second", "2"),
+    ("change down to third and aim to get your", "3"),
+    ("shifting down to first use all of the apex", "1"),
+    ("drop down to fourth through the kink", "4"),
+    ("second and third gear are both fine", None),
+    ("down to second or third gear", None),
+    ("first and second corners are tricky", None),
+])
+def test_marce_delle_guide(q, atteso):
+    got = vocab.locate("gear", q)
+    assert (got[0] if got else None) == atteso

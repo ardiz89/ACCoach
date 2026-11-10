@@ -66,8 +66,14 @@ _EXTRA = {
     # parole comuni: lì contano i due autori e il controllo.
     "Farm Curve": ["farm"],
     "Maggotts": ["maggots"],
-    "Becketts": ["beckets"],
-    "Luffield": ["luffield corner"],
+    "Becketts": ["beckets", "beckett", "beckett's", "becket's"],
+    "Luffield": ["luffield corner", "luffa"],
+    # Storpiature dei sottotitoli trovate il 10/11.
+    "Abbey": ["abby"],
+    "Copse": ["cops", "cops corner"],
+    "Stowe": ["stow", "stove", "stow corner"],
+    "Brooklands": ["brooklyn's", "brooklyns"],
+    "Vale": ["veil"],
 }
 
 # I numeri di curva di Imola come li usano le guide su ACC raccolte il 10/11 (Yorkie065,
@@ -276,15 +282,21 @@ _FIRST_ADVERB = re.compile(
     r"(?:you|we|i|i'm|you're|we're|they|let's|lets|brake|braking|turn|lift|go|get|take|look"
     r"|make|focus|try|keep|use)\b")
 _GEAR = r"(?:gear|gears|marcia|marce)"
-_DIGIT_LEAD = r"(?:down to|shift(?:\s+(?:down|up))?(?:\s+(?:to|into))?)"
-_ORD_LEAD = r"(?:down to|shift(?:\s+(?:down|up))?(?:\s+(?:to|into))?|into)"
+# Gli attacchi di una marcia: «down to», «shift (down) to», «shifting down to»,
+# «switch (down) to», «drop (down) to» (10/11: le guide di Monza e Silverstone).
+_LEAD_VERB = r"(?:shift(?:ing|s)?|switch(?:ing|es)?|drop(?:ping|s)?)"
+_DIGIT_LEAD = r"(?:down to|" + _LEAD_VERB + r"(?:\s+(?:down|up))?(?:\s+(?:to|into))?)"
+_ORD_LEAD = r"(?:down to|" + _LEAD_VERB + r"(?:\s+(?:down|up))?(?:\s+(?:to|into))?|into)"
 UNIT_AFTER_DIGIT = re.compile(
     r"\s*(?:laps?\b|giri\b|giro\b|kph|km/h|kmh|km\b|mph|corners?\b|curva\b|curve\b"
     r"|seconds?\b|secs?\b|s\b|secondi\b|metres?\b|meters?\b|metri\b|m\b|mt\b|tenths?\b"
     r"|decimi\b|%|psi\b|bar\b|clicks?\b|rpm\b|or\b|o\b|and\b|e\b|to\b)")
 _NOUN_AFTER_ORD = (
     r"(?!\s+(?:place|position|posizione|corners?|curva|curve|laps?|giro|sector|settore"
-    r"|time|volta|half|part|apex|brak\w*|or|o|and|e|chicane|run|step|steps)\b)")
+    r"|time|volta|half|part|apex|brak\w*|chicane|run|step|steps)\b"
+    # «and»/«or» bloccano solo se dopo viene un'altra marcia («second and third»):
+    # «shift down to third and aim…» è una marcia sola (10/11).
+    r"|\s+(?:or|o|and|e)\s+(?:the\s+)?(?:" + "|".join(_ORD_WORD) + r"|[0-9]\b))")
 
 
 def _gear_tokens(q: str) -> list[re.Match]:
