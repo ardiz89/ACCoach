@@ -681,6 +681,23 @@ def _wide_corners(rows: list[dict], corners, laps: dict | None = None) -> dict[i
     return out
 
 
+def _rounded_summary(summary) -> dict:
+    """Una curva della sessione per la pagina: ms a un decimale, metri e km/h
+    a due, come le altre risposte."""
+    d = dataclasses.asdict(summary)
+
+    def r(v, n):
+        return None if v is None else round(v, n)
+
+    d["lost_total_ms"] = r(d["lost_total_ms"], 1)
+    d["phases_ms"] = {k: r(v, 1) for k, v in d["phases_ms"].items()}
+    for k in ("brake_m", "brake_spread_m", "brake_kmh", "apex_shift_m"):
+        d[k] = r(d[k], 2)
+    if d["line_m"] is not None:
+        d["line_m"] = {k: r(v, 2) for k, v in d["line_m"].items()}
+    return d
+
+
 def _fastest_clean(valid: list[dict]) -> dict | None:
     """The quickest lap that could be a reference at all, conditions aside."""
     usable = [r for r in valid if not _off_track(r)]
@@ -1848,22 +1865,28 @@ def create_api(
         pilota: rinominare una curva non le stacca i fatti.
         """
         lg = lang or current_language()
+
+        def _empty(at: int | None) -> dict:
+            # Le stesse chiavi della risposta piena: la pagina non indovina.
+            return {"index": at, "laps": 0, "skipped": 0, "reference": None,
+                    "corners": [], "has_sources": False}
+
         with _catalog() as cat:
             all_laps = cat.laps_for(car, track)
             runs = group_sessions(_own(all_laps))
             if not runs:
-                return {"corners": [], "laps": 0}
+                return _empty(None)
             index = max(0, min(index, len(runs) - 1))
             cur = runs[index]
             best = cur.best
             if best is None:
-                return {"corners": [], "laps": 0, "index": index}
+                return _empty(index)
             valid = _own_valid(all_laps)
             cond = _conditions_of(best)
             elected = _elected_path(cat, car, track, valid, cond["road_temp"],
                                     cond["grip"], cond["compound"])
         if elected is None:
-            return {"corners": [], "laps": 0, "index": index}
+            return _empty(index)
         elected_row = next((r for r in all_laps if r["path"] == elected), None)
         is_pro = (elected_row or {}).get("source") == "pro"
 
@@ -1885,6 +1908,10 @@ def create_api(
                                                        None, None))}
         except Exception:  # noqa: BLE001 - a degenerate lap shouldn't 500 the UI
             raise HTTPException(422, "lap could not be analysed")
+        # Dove continui a uscire, niente «frena più tardi», come /api/analysis:
+        # contato su tutto l'archivio, perché i giri sporchi non sono giri
+        # validi della sessione e qui non si vedrebbero mai.
+        wide = _wide_corners(valid, corners)
 
         per_lap: list[LapCorners] = []
         skipped = 0
@@ -1910,6 +1937,7 @@ def create_api(
                     _log.warning("debrief with corner refs failed; main "
                                  "reference only", exc_info=True)
                     debrief = build_lap_debrief(lap, reference, corners, lg)
+                mark_runs_wide(debrief.losses, wide, lg)
                 per_lap.append(LapCorners(
                     path=row["path"],
                     losses=debrief.losses,
@@ -1930,7 +1958,7 @@ def create_api(
                                              f"Corner {summary.index + 1}")
             sources = trackfacts.for_corner(facts, catalog_name)
             out.append({
-                **dataclasses.asdict(summary),
+                **_rounded_summary(summary),
                 "name": names.get(summary.index, f"Corner {summary.index + 1}"),
                 "catalog_name": catalog_name,
                 "apex": apex.get(summary.index),

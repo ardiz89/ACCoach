@@ -58,6 +58,8 @@ def test_sessione_vuota(tmp_path):
     assert r.status_code == 200
     j = r.json()
     assert j["corners"] == [] and j["laps"] == 0
+    assert j == {"index": None, "laps": 0, "skipped": 0, "reference": None,
+                 "corners": [], "has_sources": False}
 
 
 def test_curve_della_sessione(tmp_path):
@@ -136,3 +138,68 @@ def test_un_giro_guasto_si_salta(tmp_path, monkeypatch):
     assert r.status_code == 200
     j = r.json()
     assert j["skipped"] == 1 and j["laps"] == 2
+
+
+def _brake_later_session(d):
+    """Il riferimento frena tardi in curva 1; l'altro giro frena al solito
+    punto e perde lì: la causa è «frena più tardi»."""
+    ref = synth.build_lap()
+    for s in ref.samples:
+        if 0.15 <= s.pos < 0.26:
+            s.brake = 0.0
+    ref.recorded_utc, ref.valid, ref.clean = "2026-07-20T18:00:00+00:00", True, True
+    save_lap(ref, d)
+    lap = synth.build_lap()
+    for s in lap.samples:
+        if s.pos >= 0.25:
+            s.t_ms += 400
+    lap.lap_time_ms += 400
+    lap.recorded_utc, lap.valid, lap.clean = "2026-07-20T18:03:00+00:00", True, True
+    save_lap(lap, d)
+
+
+def _corner0(j):
+    return next(c for c in j["corners"] if c["index"] == 0)
+
+
+def test_dove_esci_non_dice_frena_piu_tardi(tmp_path):
+    d = _laps_dir(tmp_path)
+    _brake_later_session(d)
+    plain = _get(TestClient(create_api(d))).json()
+    assert _corner0(plain)["cause"] == "brake_later"
+    assert _corner0(plain)["cause_message"] == "Frena più tardi"
+
+    # Due uscite recenti in curva 1, un'altra sera: giri sporchi, quindi fuori
+    # dalla sessione, ma contano come in /api/analysis.
+    for day in (18, 19):
+        off = synth.build_lap()
+        synth.retime(off, 110_000)
+        off.recorded_utc = f"2026-07-{day}T18:00:00+00:00"
+        off.valid, off.clean, off.lost_at = True, False, 0.31
+        save_lap(off, d)
+    j = _get(TestClient(create_api(d))).json()
+    assert j["laps"] == 2
+    c0 = _corner0(j)
+    assert c0["cause"] == "brake_later"
+    assert c0["cause_message"] == "Prima resta in pista all'uscita"
+
+
+def test_numeri_arrotondati():
+    from accoach.coaching.corner_session import CornerSummary
+    s = CornerSummary(index=0, laps=3, lost_total_ms=123.456789, laps_losing=2,
+                      phases_ms={"entry": 10.0444, "apex": 3.1666},
+                      brake_m=101.23456, brake_spread_m=4.56789,
+                      brake_kmh=212.34567, line_m={"entry": 0.123456,
+                                                   "apex": -1.98765,
+                                                   "exit": 2.0},
+                      apex_shift_m=3.33333)
+    d = api_mod._rounded_summary(s)
+    assert d["lost_total_ms"] == 123.5
+    assert d["phases_ms"] == {"entry": 10.0, "apex": 3.2}
+    assert (d["brake_m"], d["brake_spread_m"], d["brake_kmh"],
+            d["apex_shift_m"]) == (101.23, 4.57, 212.35, 3.33)
+    assert d["line_m"] == {"entry": 0.12, "apex": -1.99, "exit": 2.0}
+    empty = api_mod._rounded_summary(CornerSummary(index=1, laps=1,
+                                                   lost_total_ms=0.0,
+                                                   laps_losing=0))
+    assert empty["brake_m"] is None and empty["line_m"] is None
