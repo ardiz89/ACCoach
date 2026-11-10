@@ -563,6 +563,8 @@ Le schede stanno in tre gruppi, nell'ordine in cui di solito le leggi.
   che HONE leggesse il serbatoio non compare, perché non lo sappiamo, e non
   vuol dire zero litri. Non compare nemmeno sui giri in cui hai rifornito,
   perché in mezzo c'è un rifornimento e non un consumo.
+- **Curva per curva** mette in fila le curve di una sessione intera, dalla
+  peggiore alla migliore. È spiegata più sotto.
 - **Il giro spiegato** ti mostra il giro una cosa alla volta, invece di cinque
   grafici insieme. Ti dice cosa ti è costato di più, perché, e cosa fare, col
   grafico ritagliato sul tratto di cui parla. Sono al massimo tre passi. Se sei
@@ -774,6 +776,34 @@ curva.
   in curva vai come il riferimento, non sei tu a essere più lento, e devi
   guardare ala e rapporti. Se sei più lento anche in curva, è velocità
   d'uscita e l'assetto non c'entra.
+
+### Curva per curva
+
+La scheda guarda tutti i giri validi di una sessione, non un giro solo. Ogni
+curva è una riga, e in cima c'è quella dove hai perso di più. Il selettore in
+alto sceglie la sessione, come nella Pagella.
+
+Aprendo una riga trovi quattro blocchi.
+
+- **Quanto e dove perdi.** Il tempo perso in tutta la sessione, in quanti giri,
+  la perdita mediana per fase e la causa che torna più spesso. Si misura contro
+  il tuo gesto migliore in quella curva, se c'è, altrimenti contro il
+  riferimento. In alto la pagina dice qual è il giro di riferimento, che può
+  venire da un'altra sessione.
+- **La tua frenata.** Dove attacchi il freno rispetto al punto più lento, quanto
+  cambia da un giro all'altro, la velocità di stacco e la marcia più bassa.
+- **La tua traiettoria.** Lo scarto tipico dalla linea del riferimento in
+  ingresso, all'apex e in uscita, dentro o fuori, e dove cade il tuo apice. Due
+  bottoni aprono nel Confronto il tuo giro migliore in quella curva e il giro più
+  tipico.
+- **Cosa dicono le fonti.** Su Imola e Spa, quello che dicono guide e video
+  pubblici su quella curva, con la citazione breve e il link al punto del video.
+  **Una fonte dice** è quello che ha detto un autore solo, e non è un
+  riferimento. **Le fonti non concordano** mette accanto i valori diversi.
+
+Le fonti non diventano mai un obiettivo. La pagina non ti dice a che cartello
+frenare, perché non sappiamo dove sta il cartello sulla mappa. Confronta solo la
+marcia, e lo dice così, per esempio «Tu in terza, una fonte in seconda.»
 
 ### Curva per sessione
 

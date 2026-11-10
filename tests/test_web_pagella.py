@@ -45,7 +45,7 @@ def _i18n_entry(key: str) -> str:
 
 def test_the_tabs_follow_today_why_over_time_in_that_order():
     assert re.findall(r'data-view="([\w-]+)"', _nav()) == [
-        "pagella", "session", "flow",
+        "pagella", "session", "corners", "flow",
         "compare", "line", "sectors", "dynamics",
         "progress", "stint",
     ]
@@ -56,7 +56,7 @@ def test_the_three_groups_are_visible_in_the_bar_and_hold_their_tabs():
         r'<div class="tab-group"[^>]*data-i18n-label="(tabgroup\.\w+)"[^>]*>(.*?)</div>',
         _nav(), re.S)
     assert [(k, re.findall(r'data-view="([\w-]+)"', body)) for k, body in groups] == [
-        ("tabgroup.today", ["pagella", "session", "flow"]),
+        ("tabgroup.today", ["pagella", "session", "corners", "flow"]),
         ("tabgroup.why", ["compare", "line", "sectors", "dynamics"]),
         ("tabgroup.time", ["progress", "stint"]),
     ]

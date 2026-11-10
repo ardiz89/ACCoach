@@ -614,6 +614,8 @@ The tabs come in three groups, in the order you usually read them.
   it doesn't appear, because we don't know it, and that doesn't mean zero litres.
   It doesn't appear on laps where you refuelled either, because there's a refuel
   in the middle and not a consumption.
+- **Corner by corner** lines up the corners of a whole session, worst first.
+  It's described further down.
 - **Lap explained** shows you the lap one thing at a time, instead of five
   charts at once. It tells you what cost you most, why, and what to do, with the
   chart cropped to the stretch it's talking about. It's three steps at most. If
@@ -823,6 +825,33 @@ corner.
   you're as fast as the reference in the corners, it isn't you who's slower, and
   you should look at the wing and the gearing. If you're slower in the corners
   too, it's exit speed, and the setup has nothing to do with it.
+
+### Corner by corner
+
+This tab looks at every valid lap of a session, not at one lap. Each corner is a
+row, and the one where you lost the most is at the top. The picker at the top
+chooses the session, as on the Report card.
+
+Open a row and you get four blocks.
+
+- **How much and where you lose.** The time lost over the whole session, on how
+  many laps, the median loss per phase and the cause that comes back most often.
+  It's measured against your own best attempt at that corner, when there is one,
+  and otherwise against the reference. At the top the page says which lap is the
+  reference, and it can come from another session.
+- **Your braking.** Where you start braking relative to the slowest point, how
+  much that moves from lap to lap, the speed you brake at and your lowest gear.
+- **Your line.** The typical gap to the reference line on entry, at the apex and
+  on exit, inside or outside, and where your apex falls. Two buttons open your
+  best lap at that corner and your most typical lap in Compare.
+- **What the sources say.** On Imola and Spa, what public guides and videos say
+  about that corner, with the short quote and a link to that moment of the
+  video. **One source says** is what a single author said, and it's not a
+  reference. **The sources disagree** puts the different values side by side.
+
+The sources never become a target. The page never tells you which board to brake
+at, because we don't know where the board sits on the map. It compares only the
+gear, and says so like this, for example "You in third, one source in second."
 
 ### Corner by session
 

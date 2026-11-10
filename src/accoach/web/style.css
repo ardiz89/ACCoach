@@ -1322,6 +1322,27 @@ body.view-pagella #lapbar { display: none; }
   border-bottom: 1px solid var(--line);
 }
 .pag-corners li { display: flex; justify-content: space-between; gap: 12px; padding: 2px 0; font-size: 1rem; color: var(--muted); }
+/* Curva per curva: le righe sono quelle dei difetti della Pagella
+   (`.pag-defect`), e una riga aperta mostra i quattro blocchi affiancati
+   quando c'è spazio. Le fonti prendono tutta la larghezza. «Una fonte dice»
+   ha il colore del testo, mai quello del riferimento: solo il riferimento
+   ha il filo dell'accento. */
+.cpc-blocks {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
+  gap: 4px 24px; padding: 4px 0 10px 16px; border-bottom: 1px solid var(--line);
+}
+.cpc-block p { margin: 2px 0; }
+.cpc-block.cpc-sources { grid-column: 1 / -1; }
+.cpc-phases { display: flex; flex-wrap: wrap; gap: 2px 14px; }
+.cpc-laps { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.cpc-group h5 { margin: 8px 0 2px; font-size: 0.929rem; font-weight: 600; color: var(--muted); }
+.cpc-items, .cpc-quotes, .cpc-vals { list-style: none; margin: 0; padding: 0; }
+.cpc-src { margin: 4px 0; padding: 2px 0 2px 10px; border-left: 2px solid var(--line); }
+.cpc-src.ref { border-left-color: var(--cyan); }
+.cpc-src.single { color: var(--text); }
+.cpc-src.disputed { border-left-style: dashed; }
+.cpc-src a { color: inherit; }
+.cpc-quotes li, .cpc-vals .cpc-quotes li { font-size: 0.929rem; color: var(--muted); }
 /* Il mini-andamento: una barra per sessione, la più vecchia a sinistra; la
    barra di oggi prende il colore della freccia. Una barra fuori scala (un
    fuori scala isolato, vedi sparkBars) resta a piena altezza con un taglio

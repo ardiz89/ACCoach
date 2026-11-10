@@ -341,6 +341,15 @@ function redrawCurrentView() {
   }
   else if (VIEW === "flow") { if (DATA) renderFlow(DATA); }
   else if (VIEW === "session") { if (CURRENT) loadSession(CURRENT, SESSION_I); }
+  // Curva per curva si ridisegna dalla risposta che c'è, se parla ancora della
+  // stessa uscita nella stessa lingua: rileggerla rifarebbe il debrief di ogni
+  // giro della sessione a ogni resize.
+  else if (VIEW === "corners") {
+    if (CURRENT) {
+      if (CORNERS && CORNERS.key === cornersKey(CURRENT, SESSION_I)) renderCorners(CORNERS.p, CORNERS.list);
+      else loadCorners(CURRENT, SESSION_I);
+    }
+  }
   // Refetched, like the Pagella: the notes strip is written by the backend in the
   // requested language, so repainting a cached payload would leave the one
   // paragraph on the tab in the language you just left.
@@ -421,8 +430,9 @@ const RAIL_VIEWS = ["flow", "compare", "line", "sectors", "dynamics"];
 // È lo stesso principio per cui il rail non vive sulle schede dove cliccare una
 // curva non cambierebbe niente. Con undici schede la riga finiva in "-"; con
 // dieci in "0"; con le nove della Pagella (Com'è andata e Allenamento sono
-// confluite lì) finisce in "9". Quando torna una decima si rimette "0".
-const KEY_ROW = "123456789";
+// confluite lì) finiva in "9". Con Curva per curva sono tornate dieci, e
+// la riga finisce di nuovo in "0".
+const KEY_ROW = "1234567890";
 
 // Non dentro `showView` da sola: al primo caricamento `init()` non ci passa
 // affatto quando la vista salvata coincide con quella già attiva in HTML (o
@@ -1993,6 +2003,7 @@ function reloadViewData(combo) {
   if (VIEW === "pagella") loadPagella(combo, SESSION_I);
   if (VIEW === "howto") loadHowto(combo, SESSION_I);
   if (VIEW === "session") loadSession(combo, SESSION_I);
+  if (VIEW === "corners") loadCorners(combo, SESSION_I);
   if (VIEW === "stint") loadStint(combo, STINT_I);
 }
 
@@ -2767,6 +2778,302 @@ function renderSession(s) {
         (prev.regressed.length ? `<h4>${t("ses.regressed")}</h4>` + rows(prev.regressed, "down") : "")
       : `<div class="nothing">${t("ses.nomoves")}</div>`);
   }
+}
+
+// --- Curva per curva: la sessione intera, una riga per curva ----------------
+// Tutto il contenuto viene da /api/corners: perdite, fasi e cause dei tuoi
+// giri, e i fatti delle fonti pubbliche (`trackfacts`). Qui si disegna e basta.
+// Due regole del pilota stanno anche qui: «Una fonte dice» non ha mai il colore
+// del riferimento, e la pagina non compone mai una frase che mette un cartello
+// come punto di frenata. I valori delle fonti sono etichette, non istruzioni.
+// Segue il selettore delle uscite (`SESSION_I`), come Pagella e Sessione.
+
+// L'ultima risposta, con la sua chiave: il resize ridisegna da qui, perché
+// rileggerla rifarebbe il debrief di ogni giro della sessione.
+let CORNERS = null;
+// Le curve aperte, per indice: un ridisegno non le richiude.
+let CPC_OPEN = new Set();
+
+function cornersKey(combo, index) {
+  return [combo.car, combo.track, index, LANG()].join("|");
+}
+
+async function loadCorners(combo, index) {
+  if (!combo) return;
+  const seen = EPOCH;
+  // La stessa corsa del selettore delle uscite di `loadSession`.
+  const want = index || 0;
+  SESSION_I = want;
+  const q = new URLSearchParams({ car: combo.car, track: combo.track, index: want });
+  $("cpc-ref").textContent = "";
+  $("cpc-body").innerHTML = `<div class="nothing">${t("corners.loading")}</div>`;
+  const listing = getJSON("/api/sessions?" + q.toString()).catch(() => null);
+  let p = null;
+  try { p = await getJSON("/api/corners?" + q.toString()); }
+  catch (e) { p = null; }
+  const list = await listing;
+  if (stale(seen) || SESSION_I !== want) return;
+  if (!p) {
+    CORNERS = null;
+    fillCornersPicker(list, want);
+    $("cpc-sub").textContent = "";
+    $("cpc-body").innerHTML = `<div class="nothing">${loadFailed("corners.err")}</div>`;
+    return;
+  }
+  // Il server riporta l'indice dentro le uscite che ci sono.
+  if (p.index != null) SESSION_I = p.index;
+  const key = cornersKey(combo, SESSION_I);
+  if (!CORNERS || CORNERS.key !== key) CPC_OPEN = new Set();
+  CORNERS = { key, p, list };
+  renderCorners(p, list);
+}
+
+function fillCornersPicker(list, index) {
+  const pick = $("cpc-select");
+  pick.innerHTML = sessionOptions((list && list.sessions) || [], index);
+  pick.onchange = () => loadCorners(CURRENT, parseInt(pick.value, 10));
+}
+
+function renderCorners(p, list) {
+  const body = $("cpc-body");
+  if (!body) return;
+  const at = p.index == null ? SESSION_I : p.index;
+  fillCornersPicker(list, at);
+  const runs = (list && list.sessions) || [];
+  const bits = [dn(CURRENT.track), dn(CURRENT.car)];
+  if (runs[at]) bits.push(fmtWhen(runs[at].started_utc));
+  bits.push(tf("corners.laps", { n: p.laps || 0 }));
+  $("cpc-sub").textContent = bits.join(" · ");
+  // Il riferimento può venire da un'altra sessione: si dice quale giro è.
+  $("cpc-ref").textContent = p.reference
+    ? tf("corners.ref", { time: fmtMs(p.reference.lap_time_ms) }) : "";
+
+  const notes = [];
+  if (!p.laps) notes.push(t("corners.none"));
+  else if (p.laps === 1) notes.push(t("corners.one"));
+  if (p.skipped > 0) notes.push(tf("corners.skipped", { n: Number(p.skipped) }));
+  const head = notes.map((x) => `<div class="nothing">${x}</div>`).join("");
+  const corners = p.laps ? (p.corners || []) : [];
+  body.innerHTML = head + (corners.length
+    ? `<section class="pag-box cpc-list">${corners.map((c) => cpcCorner(c, p)).join("")}</section>`
+    : "");
+
+  for (const d of body.querySelectorAll("details.cpc-corner")) {
+    d.ontoggle = () => {
+      const i = Number(d.dataset.i);
+      if (d.open) CPC_OPEN.add(i); else CPC_OPEN.delete(i);
+    };
+  }
+  for (const b of body.querySelectorAll(".cpc-open")) {
+    b.onclick = () => openLapInCompare(b.dataset.path);
+  }
+}
+
+// Una curva: la riga che si apre, e dentro i quattro blocchi.
+function cpcCorner(c, p) {
+  const lostS = (c.lost_total_ms || 0) / 1000;
+  // Solo span: la riga finisce dentro un <summary>, che non vuole blocchi.
+  const line = `<span class="pag-name"><b>${esc(c.name)}</b>` +
+    `<span class="pag-small">${tf("corners.row.laps", { k: Number(c.laps_losing), n: Number(c.laps) })}</span></span>` +
+    `<span class="pag-cost"><span class="num${lostS > 0 ? " loss" : ""}">${fmtSgn(lostS, 2, "s")}</span></span>`;
+
+  // 1. Quanto e dove perdi.
+  let lost = `<p>${tf("corners.lost", { s: fmtSgn(lostS, 2, "s") })} ` +
+    (c.laps_losing > 0 ? tf("corners.losing", { k: Number(c.laps_losing), n: Number(c.laps) })
+                       : t("corners.nolose")) + `</p>`;
+  const ph = c.phases_ms || {};
+  const phases = ["entry", "apex", "exit", "after"].filter((k) => ph[k] != null);
+  if (phases.length) {
+    lost += `<p class="cpc-phases"><span class="pag-small">${t("corners.phases")}</span>` +
+      phases.map((k) => {
+        const v = ph[k] / 1000;
+        return `<span>${t("phase." + k)} <span class="num${v > 0 ? " loss" : ""}">${fmtSgn(v, 2, "s")}</span></span>`;
+      }).join("") + `</p>`;
+  }
+  if (c.cause) {
+    lost += `<p>${esc(c.cause_message)} <span class="pag-small">` +
+      `${tf("corners.cause.laps", { k: Number(c.cause_laps), n: Number(c.laps_losing) })}</span></p>`;
+  } else if (c.laps_losing > 0) {
+    lost += `<p class="pag-small">${t("corners.cause.none")}</p>`;
+  }
+
+  // 2. La tua frenata. Solo i tuoi numeri: il cartello delle fonti non si
+  // confronta, non sappiamo a quanti metri sta sulla mappa.
+  let brake = "";
+  if (c.brake_m != null) {
+    brake += `<p>${c.brake_spread_m != null && c.laps > 1
+      ? tf("corners.brake", { m: fmtDec(c.brake_m, 0), spread: fmtDec(c.brake_spread_m, 0) })
+      : tf("corners.brake.one", { m: fmtDec(c.brake_m, 0) })}</p>`;
+  }
+  if (c.brake_kmh != null) brake += `<p>${tf("corners.brake.kmh", { kmh: fmtDec(c.brake_kmh, 0) })}</p>`;
+  if (c.gear_min) brake += `<p>${tf("corners.brake.gear", { gear: cpcGear(c.gear_min) })}</p>`;
+  if (!brake) brake = `<p class="pag-small">${t("corners.brake.none")}</p>`;
+
+  // 3. La tua traiettoria.
+  // I due giri, il migliore qui e il più tipico, si aprono nel Confronto.
+  let lineHTML = "";
+  const lm = c.line_m;
+  const fact = (k, v) => `<p class="cpc-fact"><span class="pag-small">${k}</span> <span>${v}</span></p>`;
+  if (lm) {
+    lineHTML += `<p class="pag-small">${t("corners.line.sub")}</p>` +
+      fact(t("line.f.entry"), cpcSide(lm.entry, c.sided)) +
+      fact(t("line.f.apexoff"), cpcSide(lm.apex, c.sided)) +
+      fact(t("line.f.exit"), cpcSide(lm.exit, c.sided));
+    if (c.apex_shift_m != null) {
+      const sh = c.apex_shift_m;
+      lineHTML += fact(t("corners.line.shift"), Math.abs(sh) < 0.5 ? t("line.sameSpot")
+        : `${fmtDec(Math.abs(sh), 0, "m")} ${sh < 0 ? t("line.earlier") : t("line.later")}`);
+    }
+    if (c.sided === false) lineHTML += `<p class="pag-small">${t("corners.line.unsided")}</p>`;
+  } else {
+    lineHTML = `<p class="pag-small">${t("corners.line.none")}</p>`;
+  }
+  const open = (path, key) => path
+    ? `<button type="button" class="flow-btn cpc-open" data-path="${esc(path)}" ` +
+      `title="${escAttr(t("corners.open"))}">${t(key)}</button>` : "";
+  const laps = open(c.best_path, "corners.best") +
+    (c.typical_path !== c.best_path ? open(c.typical_path, "corners.typical") : "");
+  if (laps) lineHTML += `<p class="cpc-laps">${laps}</p>`;
+
+  const block = (key, inner, cls) =>
+    `<section class="cpc-block${cls ? " " + cls : ""}"><h4>${t(key)}</h4>${inner}</section>`;
+  const blocks = block("corners.h.lost", lost) + block("corners.h.brake", brake) +
+    block("corners.h.line", lineHTML) +
+    (p.has_sources ? block("corners.h.sources", cpcSources(c), "cpc-sources") : "");
+  const i = Number(c.index);
+  return `<details class="pag-defect cpc-corner" data-i="${i}"${CPC_OPEN.has(i) ? " open" : ""}>` +
+    `<summary class="pag-row">${line}</summary><div class="cpc-blocks">${blocks}</div></details>`;
+}
+
+// Metri col verso: dentro o fuori dove la curva ha un lato interno, altrimenti
+// destra o sinistra della linea (le chicane, vedi `offWord`).
+function cpcSide(m, sided) {
+  if (m == null || !isFinite(m)) return "–";
+  const v = Math.abs(m);
+  if (v < 0.15) return t("line.same");
+  const word = sided !== false ? (m > 0 ? t("line.in") : t("line.out"))
+                               : (m > 0 ? t("line.right") : t("line.left"));
+  return `${fmtDec(v, 1, "m")} ${word}`;
+}
+
+// «terza», non «3»: la marcia come la dici. Una marcia che non è un numero
+// (folle, retro) resta com'è, escapata.
+function cpcGear(g) {
+  const s = g == null ? "" : String(g);
+  return /^[1-6]$/.test(s) ? t("corners.gear." + s) : esc(s);
+}
+
+// Il valore di una fonte come etichetta: «cartello dei 100», «il ponte»,
+// «ritardato». Una tabella fissa; un valore che non conosce resta il testo
+// grezzo, escapato. Mai un verbo: non è un consiglio.
+function cpcValue(type, value) {
+  const v = value == null ? "" : String(value);
+  const known = (k) => (t(k) !== k ? t(k) : null);
+  let m;
+  if (type === "brake" && (m = /^board:(\d+)$/.exec(v))) return tf("corners.v.board", { n: m[1] });
+  if (type === "brake" && (m = /^object:(\w+)$/.exec(v))) {
+    return known("corners.v.obj." + m[1]) || esc(v);
+  }
+  if (type === "gear") return cpcGear(v);
+  if ((type === "apex" || type === "kerb") && /^\w+$/.test(v)) {
+    return known(`corners.v.${type}.${v}`) || esc(v);
+  }
+  return esc(v);
+}
+
+function cpcType(type) {
+  const k = "corners.type." + type;
+  return t(k) !== k ? t(k) : esc(type);
+}
+
+// Il link della fonte, per YouTube al secondo giusto come la pagina di
+// revisione delle fonti (`tools/fonti/review.py`): un `t=` già presente si
+// sostituisce. Solo http e https diventano un link.
+const YT_SECONDS = "s";
+function cpcLink(url, start) {
+  if (typeof url !== "string" || !/^https?:\/\//i.test(url)) return null;
+  const sec = Number(start);
+  if (start == null || !isFinite(sec) || !/youtube\.com|youtu\.be/i.test(url)) return url;
+  const hashAt = url.indexOf("#");
+  const frag = hashAt >= 0 ? url.slice(hashAt) : "";
+  const bare = hashAt >= 0 ? url.slice(0, hashAt) : url;
+  const qAt = bare.indexOf("?");
+  const base = qAt >= 0 ? bare.slice(0, qAt) : bare;
+  const parts = (qAt >= 0 ? bare.slice(qAt + 1) : "").split("&")
+    .filter((x) => x && x.indexOf("t=") !== 0);
+  // Il parametro di YouTube («t=28s»), non un numero da leggere.
+  parts.push(`t=${Math.floor(sec)}${YT_SECONDS}`);
+  return base + "?" + parts.join("&") + frag;
+}
+
+function cpcClock(start) {
+  const s = Math.floor(Number(start));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+}
+
+// Le citazioni brevi già nel file esportato, ognuna col suo link.
+function cpcQuotes(sources) {
+  return `<ul class="cpc-quotes">` + (sources || []).map((s) => {
+    const href = cpcLink(s.url, s.start_s);
+    const timed = s.start_s != null && isFinite(Number(s.start_s));
+    const label = timed ? tf("corners.src.openAt", { clock: cpcClock(s.start_s) })
+                        : t("corners.src.open");
+    return `<li><q>${esc(s.quote)}</q>` +
+      (href ? ` <a href="${esc(href)}" target="_blank" rel="noopener">${esc(label)}</a>` : "") +
+      `</li>`;
+  }).join("") + `</ul>`;
+}
+
+function cpcAuthors(n) {
+  return `<span class="pag-small">${tf("corners.src.authors", { n: Number(n) || 0 })}</span>`;
+}
+
+// Una voce di un gruppo: cosa dice (tipo e valore), quanti autori, le citazioni.
+// Traiettoria ed errori non hanno un valore da etichettare: parla la citazione.
+function cpcSourceItem(it, cls) {
+  // Sotto «Errori che altri segnalano qui» la parola «Errore» sarebbe un
+  // doppione: resta solo quanti autori.
+  const what = it.type === "mistake" ? ""
+    : it.type === "line" ? cpcType(it.type)
+    : `${cpcType(it.type)} · ${cpcValue(it.type, it.value)}`;
+  return `<li class="cpc-src ${cls}"><div class="cpc-what">${what} ${cpcAuthors(it.n)}</div>` +
+    `${cpcQuotes(it.sources)}</li>`;
+}
+
+// Una voce contesa o smentita: tutti i valori, ognuno coi suoi autori.
+function cpcDisputedItem(it) {
+  const why = it.why === "respinto" ? t("corners.src.rejected") : t("corners.src.contested");
+  const reason = it.reason ? ` <q>${esc(it.reason)}</q>` : "";
+  const vals = (it.values || []).map((v) =>
+    `<li><div class="cpc-what">${cpcValue(it.type, v.value)} ${cpcAuthors(v.n)}</div>` +
+    `${cpcQuotes(v.sources)}</li>`).join("");
+  return `<li class="cpc-src disputed"><div class="cpc-what">${cpcType(it.type)}</div>` +
+    `<p class="pag-small">${why}${reason}</p><ul class="cpc-vals">${vals}</ul></li>`;
+}
+
+// 4. Cosa dicono le fonti, in tre gruppi più gli errori. Il confronto della
+// marcia è l'unico: un fatto accanto alla tua guida, senza giudizio.
+function cpcSources(c) {
+  const src = c.sources || {};
+  const ref = src.reference || [], single = src.single || [];
+  const disp = src.disputed || [], mis = src.mistakes || [];
+  if (!ref.length && !single.length && !disp.length && !mis.length) {
+    return `<p class="pag-small">${t("corners.src.nothing")}</p>`;
+  }
+  let h = "";
+  const gc = c.gear_compare;
+  if (gc) {
+    h += `<p class="cpc-gear">${tf(gc.state === "reference" ? "corners.gear.reference" : "corners.gear.single",
+      { you: cpcGear(gc.you), source: cpcGear(gc.source) })}</p>`;
+  }
+  const group = (key, items) =>
+    `<div class="cpc-group"><h5>${t(key)}</h5><ul class="cpc-items">${items}</ul></div>`;
+  h += group("corners.src.ref", ref.length ? ref.map((x) => cpcSourceItem(x, "ref")).join("")
+    : `<li class="pag-small">${t("corners.src.ref.none")}</li>`);
+  if (single.length) h += group("corners.src.single", single.map((x) => cpcSourceItem(x, "single")).join(""));
+  if (disp.length) h += group("corners.src.disputed", disp.map(cpcDisputedItem).join(""));
+  if (mis.length) h += group("corners.src.mistakes", mis.map((x) => cpcSourceItem(x, "single")).join(""));
+  return h;
 }
 
 // --- La Pagella: la prima pagina del report --------------------------------
