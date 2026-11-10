@@ -1,0 +1,390 @@
+{
+ "disputed": [],
+ "facts": [],
+ "single": [
+  {
+   "corner": "Esses",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "really make sure you don't go too deep in any single turn",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/1dvwcu5/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "mistake",
+   "value": "really make sure you don't go too deep in any single turn"
+  },
+  {
+   "car_class": "gt3_presunta",
+   "corner": "Degner 1",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "shift down to third and roll off the brake",
+     "start_s": 218.319,
+     "url": "https://www.youtube.com/watch?v=PChZf2re2Rk"
+    }
+   ],
+   "state": "singolo",
+   "type": "gear",
+   "value": "3"
+  },
+  {
+   "corner": "Degner 1",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "In degna 1 (the sharp right hander) make more use of the exit curb",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/mepegn/"
+    }
+   ],
+   "state": "singolo",
+   "type": "kerb",
+   "value": "exit"
+  },
+  {
+   "corner": "Degner 1",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "smashing the inside curve with your right front wheel",
+     "start_s": 222.239,
+     "url": "https://www.youtube.com/watch?v=PChZf2re2Rk"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "line",
+   "value": "smashing the inside curve with your right front wheel"
+  },
+  {
+   "corner": "Degner 2",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "aiming to hit the inside curb with your right tires",
+     "start_s": 241.92,
+     "url": "https://www.youtube.com/watch?v=PChZf2re2Rk"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "line",
+   "value": "aiming to hit the inside curb with your right tires"
+  },
+  {
+   "car_class": "gt3_presunta",
+   "corner": "Hairpin",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "I gear down to first for the hairpin",
+     "start_s": 952.0,
+     "url": "https://www.youtube.com/watch?v=jW5qDFIwHiM"
+    }
+   ],
+   "state": "singolo",
+   "type": "gear",
+   "value": "1"
+  },
+  {
+   "corner": "Hairpin",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "you can actually commit to the apex quite early",
+     "start_s": 1025.542,
+     "url": "https://www.youtube.com/watch?v=h5XXr-P8KoM"
+    }
+   ],
+   "state": "singolo",
+   "type": "apex",
+   "value": "early"
+  },
+  {
+   "corner": "Hairpin",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "you want a late apex to open up the straight afterwards",
+     "start_s": 187.2,
+     "url": "https://www.youtube.com/watch?v=Lc27VmjVhe0"
+    }
+   ],
+   "state": "singolo",
+   "type": "apex",
+   "value": "late"
+  },
+  {
+   "corner": "Hairpin",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "Hair pin line to try, outside curb 4th to 1st to outside",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/1b58qef/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "line",
+   "value": "Hair pin line to try, outside curb 4th to 1st to outside"
+  },
+  {
+   "corner": "Hairpin",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "at apex throttle steer towards outside curb",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/1b58qef/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "line",
+   "value": "at apex throttle steer towards outside curb"
+  },
+  {
+   "corner": "Hairpin",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "do it like a late entry into the hairpin like a v turn",
+     "start_s": 329.68,
+     "url": "https://www.youtube.com/watch?v=ZMaODbOtEZM"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "line",
+   "value": "do it like a late entry into the hairpin like a v turn"
+  },
+  {
+   "corner": "Hairpin",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "turn earlier into to the hairpin to make better use of the track camber",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/mepegn/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "line",
+   "value": "turn earlier into to the hairpin to make better use of the track camber"
+  },
+  {
+   "car_class": "gt3",
+   "corner": "Spoon",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "braking just before it now shifting to Third",
+     "start_s": 193.019,
+     "url": "https://www.youtube.com/watch?v=akVfZWL_g18"
+    }
+   ],
+   "state": "singolo",
+   "type": "gear",
+   "value": "3"
+  },
+  {
+   "corner": "Spoon",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "Aim for the last third of the inside curb for a late apex.",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/1ol3rko/"
+    }
+   ],
+   "state": "singolo",
+   "type": "apex",
+   "value": "late"
+  },
+  {
+   "corner": "Spoon",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "spoon is very tricky you have to break very very late",
+     "start_s": 343.039,
+     "url": "https://www.youtube.com/watch?v=ZMaODbOtEZM"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "line",
+   "value": "spoon is very tricky you have to break very very late"
+  },
+  {
+   "car_class": "gt3_presunta",
+   "corner": "130R",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "roll into the corner gently in fifth gear",
+     "start_s": 351.68,
+     "url": "https://www.youtube.com/watch?v=PChZf2re2Rk"
+    }
+   ],
+   "state": "singolo",
+   "type": "gear",
+   "value": "5"
+  },
+  {
+   "corner": "130R",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "You can do 130R with just a split second lift",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/1ekre0v/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "line",
+   "value": "You can do 130R with just a split second lift"
+  },
+  {
+   "corner": "130R",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "aim to hit the curb with just the left front wheel",
+     "start_s": 356.16,
+     "url": "https://www.youtube.com/watch?v=PChZf2re2Rk"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "line",
+   "value": "aim to hit the curb with just the left front wheel"
+  },
+  {
+   "corner": "130R",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "at the 50 meter board turn in keep the throttle planted",
+     "start_s": 263.84,
+     "url": "https://www.youtube.com/watch?v=Lc27VmjVhe0"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "line",
+   "value": "at the 50 meter board turn in keep the throttle planted"
+  },
+  {
+   "corner": "130R",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "you are back on throttle before the apex",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/1qcup49/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "mistake",
+   "value": "you are back on throttle before the apex"
+  },
+  {
+   "corner": "Casio Triangle",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "getting late apex so you can open this up",
+     "start_s": 301.6,
+     "url": "https://www.youtube.com/watch?v=Lc27VmjVhe0"
+    }
+   ],
+   "state": "singolo",
+   "type": "apex",
+   "value": "late"
+  },
+  {
+   "corner": "Casio Triangle",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "Cut the chicane as much as possible",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/1ekre0v/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "line",
+   "value": "Cut the chicane as much as possible"
+  },
+  {
+   "corner": "Casio Triangle",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "put two wheels all the way over the green part of the curb",
+     "start_s": 377.28,
+     "url": "https://www.youtube.com/watch?v=PChZf2re2Rk"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "line",
+   "value": "put two wheels all the way over the green part of the curb"
+  },
+  {
+   "corner": "Casio Triangle",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "try turn into the first corner of the chicane later to set yourself up better",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/mepegn/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "line",
+   "value": "try turn into the first corner of the chicane later to set yourself up better"
+  },
+  {
+   "corner": "Casio Triangle",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "you can cut the first half of this chicane so much",
+     "start_s": 446.639,
+     "url": "https://www.youtube.com/watch?v=2xFlSZq5Syg"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "line",
+   "value": "you can cut the first half of this chicane so much"
+  },
+  {
+   "corner": "Casio Triangle",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "You went in too deep to the first turn, compromising the last corner.",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/1ol3rko/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "mistake",
+   "value": "You went in too deep to the first turn, compromising the last corner."
+  },
+  {
+   "corner": "Casio Triangle",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "important not to get the car too much over the curve",
+     "start_s": 299.919,
+     "url": "https://www.youtube.com/watch?v=6ksdiNQTcRE"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "mistake",
+   "value": "important not to get the car too much over the curve"
+  }
+ ],
+ "track": "suzuka",
+ "version": 3
+}

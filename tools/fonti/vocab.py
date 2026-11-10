@@ -74,6 +74,18 @@ _EXTRA = {
     "Stowe": ["stow", "stove", "stow corner"],
     "Brooklands": ["brooklyn's", "brooklyns"],
     "Vale": ["veil"],
+    # Suzuka. «Hairpin» e «Esses» sono parole comuni, ma a Suzuka c'è una curva sola così.
+    "Esses": ["s curves", "s-curves", "the esses", "s curve"],
+    "Dunlop": ["dunlop curve", "dunlop corner"],
+    "Degner 1": ["first degner", "degner one", "degner curve 1", "digna one", "dner one",
+                 "degna 1", "first degna"],
+    "Degner 2": ["second degner", "degner two", "degner curve 2", "decker 2", "deckner two",
+                 "second degna", "degna 2"],
+    "Hairpin": ["suzuka hairpin", "hair pin"],
+    "Spoon": ["spoon curve", "spoon corner"],
+    "130R": ["130 r", "one thirty r", "130 are", "130 or"],
+    "Casio Triangle": ["casio", "casio chicane", "final chicane", "last chicane",
+                       "chicane"],  # l'unica chicane
 }
 
 # I numeri di curva di Imola come li usano le guide su ACC raccolte il 10/11 (Yorkie065,
@@ -106,6 +118,7 @@ TRACK_NAMES: dict[str, tuple[str, ...]] = {
     "spa": ("spa", "francorchamps", "spa-francorchamps"),
     "monza": ("monza",),
     "silverstone": ("silverstone",),
+    "suzuka": ("suzuka",),
 }
 _WORDS = {1: "one", 2: "two", 3: "three", 4: "four", 5: "five", 6: "six", 7: "seven", 9: "nine",
           11: "eleven", 12: "twelve", 14: "fourteen", 15: "fifteen", 17: "seventeen",
