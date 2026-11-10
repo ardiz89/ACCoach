@@ -137,6 +137,8 @@ Imola è `tools/fonti/piani/imola.json`.
    ```
 
    Esce solo un verificato con almeno un controllo `confermato` e nessun `respinto`.
+   Un `non_confermato` (nessun altro testo lo dice, nessuno lo smentisce) esce in `single`,
+   come «una fonte dice». Un `respinto` vuol dire che un testo lo smentisce.
    In `disputed` escono a parte le voci contese e quelle respinte, con le loro fonti.
 
 ## Lavori e risposte

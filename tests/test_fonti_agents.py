@@ -64,7 +64,7 @@ def _proponi(conn, tmp_path, kind="extract", track="imola"):
     return agents.pending(conn, kind, track, tmp_path / f"jobs-{kind}-{track}")
 
 
-def _job_factcheck(conn, key, bodies, version="1", own=("fonte-del-fatto",), own_authors=()):
+def _job_factcheck(conn, key, bodies, version="2", own=("fonte-del-fatto",), own_authors=()):
     """`bodies`: testi o tuple (sha256, testo[, autore reddit]); `own`: le fonti del fatto."""
     terne = []
     for i, x in enumerate(bodies):
@@ -128,7 +128,9 @@ def test_pending_deterministico_e_ricordato(conn, tmp_path):
 def test_prompt_version_letta_dal_file(conn, tmp_path, monkeypatch):
     for nome in agents.PROMPT_FILES.values():
         prima = (agents.PROMPTS_DIR / nome).read_text(encoding="utf-8").splitlines()[0]
-        assert prima == "prompt_version: 1"
+        # 10/11: il controllo è alla versione 2 (il verdetto non_confermato).
+        attesa = "prompt_version: 2" if nome == agents.PROMPT_FILES["factcheck"] else "prompt_version: 1"
+        assert prima == attesa
     finta = tmp_path / "prompts"
     finta.mkdir()
     for nome in agents.PROMPT_FILES.values():

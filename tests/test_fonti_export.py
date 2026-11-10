@@ -306,7 +306,7 @@ def test_factcheck_di_una_versione_vecchia_ignorato(b, tmp_path, monkeypatch):
     finta = tmp_path / "prompts"
     finta.mkdir()
     for nome in agents.PROMPT_FILES.values():
-        (finta / nome).write_text("prompt_version: 2\n", encoding="utf-8")
+        (finta / nome).write_text("prompt_version: 3\n", encoding="utf-8")
     monkeypatch.setattr(agents, "PROMPTS_DIR", finta)
     agents.pending(b.conn, "factcheck", "imola", tmp_path / "jf2")
     # Il confermato della versione 1 non vale più: niente esce finché manca il nuovo.
@@ -469,3 +469,19 @@ def test_disputed_reason_e_la_citazione_tagliata(b, tmp_path):
     d = _carica(tmp_path / "o" / "imola.json")
     x = next(i for i in d["disputed"] if i["corner"] == "Variante Alta")
     assert len(lungo.split()) > 15 and x["reason"] == " ".join(lungo.split()[:15])
+
+
+# --- 10/11: non confermato non è respinto ---------------------------------------------
+
+def test_solo_non_confermato_esce_come_singolo(b, tmp_path):
+    for url, autore, pre in (("https://r/1", "uno", "At"), ("https://r/2", "due", "Honestly at")):
+        b.testo(url, autore, f"{pre} Tosa I go down to second gear and it works.",
+                [(TOSA, "gear", "2", "down to second gear")])
+    b.testo("https://r/3", "tre", "At Tosa the quick guys keep it tight every lap.")
+    b.factcheck(TOSA, "gear", "non_confermato", "At Tosa I go down to second gear and it works.",
+                "down to second gear")
+    export.export(b.conn, "imola", tmp_path / "o")
+    d = _carica(tmp_path / "o" / "imola.json")
+    assert d["facts"] == [] and d["disputed"] == []
+    s = [x for x in d["single"] if (x["corner"], x["type"]) == (TOSA, "gear")]
+    assert len(s) == 1 and s[0]["state"] == "non_confermato" and s[0]["n"] == 2

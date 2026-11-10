@@ -56,15 +56,19 @@ def factchecks(conn: sqlite3.Connection, track: str) -> dict[str, dict[str, list
         except (TypeError, ValueError):
             continue
         verdict = d.get("verdict") if isinstance(d, dict) else None
-        if verdict not in ("confermato", "respinto"):
+        if verdict not in ("confermato", "respinto", "non_confermato"):
             continue
         d = dict(d, model=model)
-        out.setdefault(key, {"confermato": [], "respinto": []})[verdict].append(d)
+        out.setdefault(key, {"confermato": [], "respinto": [], "non_confermato": []})[verdict].append(d)
     return out
 
 
 def status(entry: dict, checks: dict[str, dict[str, list[dict]]]) -> str | None:
-    """`confermato`, `respinto` o None (nessun controllo) per una voce verificata."""
+    """`confermato`, `respinto`, `non_confermato` o None (nessun controllo).
+
+    `respinto` vince su tutto (qualcuno lo smentisce); poi `confermato`; `non_confermato`
+    vuol dire che nessun altro testo lo dice e nessuno lo smentisce.
+    """
     if entry.get("state") != "verificato" or not entry.get("fact_key"):
         return None
     c = checks.get(entry["fact_key"])
@@ -72,7 +76,9 @@ def status(entry: dict, checks: dict[str, dict[str, list[dict]]]) -> str | None:
         return None
     if c["respinto"]:
         return "respinto"
-    return "confermato" if c["confermato"] else None
+    if c["confermato"]:
+        return "confermato"
+    return "non_confermato" if c.get("non_confermato") else None
 
 
 def _sources(value: dict) -> list[dict]:
@@ -108,14 +114,25 @@ def _klass(value: dict) -> str:
 
 
 def single(conn: sqlite3.Connection, track: str) -> list[dict]:
-    """Le voci con una fonte sola o descrittive: ogni valore con le sue fonti."""
+    """Le voci con una fonte sola o descrittive: ogni valore con le sue fonti.
+
+    Anche i `verificato` che il controllo non ha confermato (`non_confermato`): lo dicono
+    più autori, ma nessun altro testo, e restano «una fonte dice».
+    """
+    checks = factchecks(conn, track)
     out = []
     for e in consensus.build(conn, track):
-        if e["state"] not in ("singolo", "descrittivo") or not e["values"]:
+        if not e["values"]:
             continue
-        for v in e["values"]:
+        if e["state"] in ("singolo", "descrittivo"):
+            state = e["state"]
+        elif e["state"] == "verificato" and status(e, checks) == "non_confermato":
+            state = "non_confermato"
+        else:
+            continue
+        for v in (e["values"] if state != "non_confermato" else e["values"][:1]):
             value = cut(v["value"]) if e["type"] in consensus.DESCRIPTIVE else v["value"]
-            item = {"corner": e["corner"], "type": e["type"], "state": e["state"],
+            item = {"corner": e["corner"], "type": e["type"], "state": state,
                     "value": value, "n": v["n"], "sources": _sources(v)}
             if e["type"] in consensus.GT3_ONLY:
                 item["car_class"] = _klass(v)

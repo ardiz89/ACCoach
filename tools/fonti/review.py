@@ -21,6 +21,7 @@ SECTIONS = (
     ("conteso", "Contesi"),
     ("singolo", "Una fonte sola"),
     ("respinto", "Respinti dal controllo"),
+    ("non_confermato", "Non confermati dal controllo"),
     ("descrittivo", "Descrittivi"),
 )
 
@@ -36,6 +37,8 @@ WHY = {
     "singolo": ("Non bastano persone indipendenti. "
                 "Sulla frenata serve anche un coach o un pilota con il suo tempo."),
     "respinto": "Un controllo su altri testi l'ha smentito, quindi non esce nell'app.",
+    "non_confermato": ("Nessun altro testo lo dice e nessuno lo smentisce. "
+                       "Nell'app esce come una fonte dice."),
     "descrittivo": "Linea ed errori non hanno un valore fisso. Li leggi tu e non escono nell'app.",
 }
 T = {
@@ -178,8 +181,8 @@ def _fact(e: dict, section: str, checks) -> str:
 
 
 def _section_of(e: dict, checks) -> str:
-    if e["state"] == "verificato" and export.status(e, checks) == "respinto":
-        return "respinto"
+    if e["state"] == "verificato" and export.status(e, checks) in ("respinto", "non_confermato"):
+        return export.status(e, checks)
     return e["state"]
 
 

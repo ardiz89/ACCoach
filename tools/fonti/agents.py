@@ -38,7 +38,7 @@ PROMPTS_DIR = Path(__file__).resolve().parent / "prompts"
 PROMPT_FILES = {"extract": "estrai.md", "rate": "valuta.md", "factcheck": "factcheck.md"}
 KINDS = tuple(PROMPT_FILES)
 ROLES = ("pilota", "coach", "anonimo")
-VERDICTS = ("confermato", "respinto")
+VERDICTS = ("confermato", "respinto", "non_confermato")
 FIELDS = ("name", "role", "lap_time", "car")
 
 _ECHO = {"prompt_version", "track"}  # ogni risposta ripete versione e pista del lavoro
@@ -470,7 +470,7 @@ def _check_factcheck(d: dict, payload: dict) -> None:
             for _, a, b in [verify.quote_span(d["quote"], t.get("body") or "", d["offset"])]
             if a is not None):
         raise AnswerRejected("citazione_oltre_taglio")
-    if d["verdict"] == "respinto":
+    if d["verdict"] in ("respinto", "non_confermato"):
         reasons = [verify.check_quote(d["quote"], t.get("body") or "", d["offset"]) for t in texts]
         if None in reasons:
             return
