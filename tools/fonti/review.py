@@ -12,7 +12,7 @@ import math
 import sqlite3
 from pathlib import Path
 
-from tools.fonti import apify, consensus, export
+from tools.fonti import apify, consensus, export, vocab
 
 QUOTE_WORDS = export.QUOTE_WORDS
 
@@ -55,6 +55,7 @@ T = {
     "open_at": "apri a {t}",
     "open": "apri la fonte",
     "no_link": "link non sicuro, non lo apro",
+    "by_number": "curva dal numero",
     "others": "Altre classi o classe ignota",
     "others_why": "Non contano per la GT3. Se dicono un altro valore, la voce è contesa.",
 }
@@ -123,9 +124,23 @@ def _clock(start_s) -> str:
     return f"{s // 60}:{s % 60:02d}"
 
 
+_NUMBERS = {a for aliases in vocab.NUMBER_ALIASES.values() for a in aliases}
+_NAMES = {a for corners in vocab.CORNERS.values() for aliases in corners.values()
+          for a in aliases} - _NUMBERS
+
+
+def by_number(quote) -> bool:
+    """La citazione chiama la curva solo col numero («turn 7»), senza il nome."""
+    q = vocab.fold(str(quote or ""))
+    has = lambda aliases: any(vocab.alias_regex(a).search(q) for a in aliases)  # noqa: E731
+    return has(_NUMBERS) and not has(_NAMES)
+
+
 def _source(s: dict) -> str:
     text = T["open_at"].format(t=_clock(s["start_s"])) if s["start_s"] is not None else T["open"]
     klass = CLASS_LABELS.get(s.get("car_class") or "ignota", CLASS_LABELS["ignota"])
+    if by_number(s["quote"]):
+        klass = f'{klass} · {T["by_number"]}'
     if safe(s["url"]):
         where = f'<a href="{_e(link(s["url"], s["start_s"]))}">{_e(text)}</a>'
     else:

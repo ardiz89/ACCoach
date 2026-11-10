@@ -33,25 +33,72 @@ OBJECTS = {
                   "cordolo d'apice"],
 }
 
-# Nomi canonici e ordine vengono da trackdata. Gli alias sono solo i nomi e le loro
-# storpiature nei sottotitoli: nessun numero di curva («t5», «turn 5», «curva 5»),
-# perché la numerazione non ha una fonte. Mai un alias che valga per due curve.
+# Nomi canonici e ordine vengono da trackdata. Gli alias sono i nomi, le loro
+# storpiature nei sottotitoli e i numeri di curva di TURNS. Mai un alias che valga per
+# due curve.
 _EXTRA = {
     "Tamburello": ["tamburelo", "tamburrello"],
     "Villeneuve": ["villenueve", "villeneuf", "villa neuve"],
     "Tosa": [],
-    "Piratella": ["pirattela", "piratela"],
-    "Acque Minerali": ["acqua minerale", "acque minerale", "aqua minerale", "acqua minerali"],
+    "Piratella": ["pirattela", "piratela", "paratella"],
+    "Acque Minerali": ["acqua minerale", "acque minerale", "aqua minerale", "acqua minerali",
+                       "aqua minerali", "aqua mineral"],
     "Variante Alta": ["alta chicane"],
     "Rivazza": ["rivaza", "revazza", "rivazzas"],
 }
 
-CORNERS: dict[str, dict[str, list[str]]] = {
+# I numeri di curva di Imola come li usano le guide su ACC raccolte il 10/11 (Yorkie065,
+# Tobias Pfeffer, SimRacingSetups, Luke Morris): la 2 è la prima frenata, la 7 il
+# tornante a sinistra, dopo la 9 l'Acque Minerali. Deciso dal pilota il 10/11. Solo le
+# curve dove quelle guide concordano: le pieghe 1, 8, 10, 13, 16 e 19 restano fuori,
+# perché le fonti esterne le numerano in modi diversi.
+TURNS: dict[str, dict[str, tuple[int, ...]]] = {
     "imola": {
-        name: sorted({name.lower(), *_EXTRA.get(name, [])})
-        for name, _pos in _CORNERS["imola"]
+        "Tamburello": (2, 3, 4),
+        "Villeneuve": (5, 6),
+        "Tosa": (7,),
+        "Piratella": (9,),
+        "Acque Minerali": (11, 12),
+        "Variante Alta": (14, 15),
+        "Rivazza": (17, 18),
     }
 }
+_WORDS = {2: "two", 3: "three", 4: "four", 5: "five", 6: "six", 7: "seven", 9: "nine",
+          11: "eleven", 12: "twelve", 14: "fourteen", 15: "fifteen", 17: "seventeen",
+          18: "eighteen"}
+
+
+def turn_aliases(track: str) -> dict[str, list[str]]:
+    """Per ogni curva gli alias numerici: «turn 7», «turn seven», «t7», «curva 7»."""
+    out = {}
+    for name, nums in TURNS.get(track, {}).items():
+        out[name] = sorted({a for n in nums for a in (f"turn {n}", f"turn {_WORDS[n]}", f"t{n}",
+                                                      f"curva {n}")})
+    return out
+
+
+CORNERS: dict[str, dict[str, list[str]]] = {
+    track: {
+        name: sorted({name.lower(), *_EXTRA.get(name, []), *turn_aliases(track).get(name, [])})
+        for name, _pos in _CORNERS[track]
+    }
+    for track in ("imola",)
+}
+# Gli alias che chiamano la curva col numero: la pagina di controllo li segna.
+NUMBER_ALIASES: dict[str, set[str]] = {
+    track: {a for aliases in turn_aliases(track).values() for a in aliases} for track in TURNS
+}
+
+
+def mask_numbers(track: str, text: str) -> str:
+    """Il testo con gli alias numerici delle curve coperti da «_», stessa lunghezza.
+
+    «turn 17, brake at the 100» ha un numero solo, quello del cartello: il 17 è il nome
+    della curva. Le posizioni non cambiano, quindi gli offset restano buoni.
+    """
+    for a in sorted(NUMBER_ALIASES.get(track, ()), key=len, reverse=True):
+        text = alias_regex(a).sub(lambda m: "_" * len(m.group()), text)
+    return text
 
 
 def alias_regex(alias: str) -> re.Pattern:

@@ -85,14 +85,35 @@ def test_curva_nel_contesto():
                              pre2 + q) == "curva_non_trovata"
 
 
-def test_nessun_numero_di_curva_negli_alias():
-    # I numeri di curva erano inventati, senza una fonte: fuori tutti.
-    for alias in vocab.CORNERS["imola"].values():
-        for a in alias:
-            assert not re.search(r"\d", a), a
-    q = "turn 10 brake at the 100 board"
+def test_numeri_di_curva_delle_guide_acc():
+    # Il pilota, il 10/11: i numeri delle guide su ACC, solo dove concordano.
+    assert vocab.TURNS["imola"] == {
+        "Tamburello": (2, 3, 4), "Villeneuve": (5, 6), "Tosa": (7,), "Piratella": (9,),
+        "Acque Minerali": (11, 12), "Variante Alta": (14, 15), "Rivazza": (17, 18)}
+    assert {"turn 7", "turn seven", "t7", "curva 7"} <= set(vocab.CORNERS["imola"]["Tosa"])
+
+
+@pytest.mark.parametrize("q", ["turn 1 brake at the 100 board", "turn 10 brake at the 100 board",
+                               "turn 13 brake at the 100 board", "turn 19 brake at the 100 board",
+                               "t8 brake at the 100 board"])
+def test_pieghe_senza_numero(q):
+    # Le pieghe dove le fonti non concordano non hanno numero: nessuna curva.
     for nome, _ in _CORNERS["imola"]:
         assert verify.check_fact("imola", fatto(q, "board:100", corner=nome), q) == "curva_non_trovata"
+
+
+@pytest.mark.parametrize("q,curva", [
+    ("for turn seven brake at the 100 board", "Tosa"),
+    ("for turn 17 brake at the 100 board", "Rivazza"),
+    ("for T11 brake at the 50 board", "Acque Minerali"),
+    ("for turn 2 brake at the 100 board", "Tamburello"),
+    ("into turn six get into second gear", "Villeneuve"),
+])
+def test_curva_dal_numero(q, curva):
+    tipo, v = ("gear", "2") if "gear" in q else ("brake", "board:50" if "T11" in q else "board:100")
+    assert verify.check_fact("imola", fatto(q, v, tipo, corner=curva), q) is None
+    altra = "Tamburello" if curva != "Tamburello" else "Tosa"
+    assert verify.check_fact("imola", fatto(q, v, tipo, corner=altra), q) == "curva_non_trovata"
 
 
 @pytest.mark.parametrize("q", ["third gear", "3rd gear", "in terza", "down to 3"])

@@ -404,3 +404,12 @@ def test_export_gt3_presunta_e_pagina(b, tmp_path):
     assert fatti[(AM, "gear")]["car_class"] == "gt3_presunta"
     page = review.render(b.conn, "imola", tmp_path / "x.html").read_text(encoding="utf-8")
     assert "GT3 presunta" in page
+
+
+def test_review_segna_la_curva_dal_numero():
+    # La pagina dice quando la curva viene dal numero delle guide, non dal nome.
+    assert review.by_number("For turn 7 brake at the 100 board")
+    assert not review.by_number("For turn 7, the Tosa, brake at the 100 board")
+    assert not review.by_number("At Tosa brake at the 100 board")
+    assert tono.violations(review.T["by_number"], "it") == []
+

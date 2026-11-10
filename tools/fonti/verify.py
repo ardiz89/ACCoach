@@ -94,13 +94,13 @@ def _corner_after(track: str, text: str, start: int, end: int) -> str | None:
 
 
 def _other_gear(track: str, text: str, window: int, ns: int, ne: int,
-                mark: int, corner: str | None) -> bool:
+                mark: int, corner: str | None, masked: str | None = None) -> bool:
     """Un'altra marcia nella frase che non è chiaramente di un'altra curva.
 
     Due marce si separano solo se fra loro è nominata una curva e la curva di ciascuna
     (l'ultima nominata prima) esiste ed è diversa: «tosa second gear, piratella in third».
     """
-    for p in vocab.gear_positions(text[ns:ne]):
+    for p in vocab.gear_positions((masked or text)[ns:ne]):
         other = ns + p
         if other == mark:
             continue
@@ -149,9 +149,13 @@ def check_fact(track: str, fact: dict, body: str, segments: list | None = None) 
     ns, ne = bisect.bisect_left(idx, s_raw), bisect.bisect_left(idx, e_raw)
     sentence = nbody[ns:ne]
 
+    # I numeri di curva («turn 17») sono nomi, non valori: coperti per leggere il valore.
+    # La curva si cerca sempre nel testo vero.
+    mquote = vocab.mask_numbers(track, quote)
+    msentence = vocab.mask_numbers(track, sentence)
     value = str(fact.get("value", ""))
     if type_ != "gear":  # le marce si dicono anche a parole
-        cited = set(re.findall(r"(?<![0-9])[0-9]+(?![0-9])", quote))
+        cited = set(re.findall(r"(?<![0-9])[0-9]+(?![0-9])", mquote))
         if any(n not in cited for n in re.findall(r"[0-9]+", value)):
             return "numero_non_citato"
 
@@ -168,7 +172,7 @@ def check_fact(track: str, fact: dict, body: str, segments: list | None = None) 
 
     # Il segno del valore: da lì all'indietro, la prima curva nominata è quella del fatto.
     # Oppure, nella stessa frase, la curva subito dopo il valore con una preposizione.
-    got = vocab.locate(type_, quote) if type_ not in ("line", "mistake") else None
+    got = vocab.locate(type_, mquote) if type_ not in ("line", "mistake") else None
     mark = j + got[1] if got else q_end
     window = bisect.bisect_left(idx, idx[j] - CONTEXT_CHARS)  # idx cresce: primo carattere nella finestra
     corner = _last_corner(track, nbody, window, mark)
@@ -183,14 +187,15 @@ def check_fact(track: str, fact: dict, body: str, segments: list | None = None) 
     # nomina due curve, non si sa a quale va.
     if type_ in ("line", "mistake") and len(_corners_in(track, nbody, min(ns, j), q_end)) > 1:
         return "curva_non_trovata"
-    if type_ == "gear" and got and _other_gear(track, nbody, min(window, ns), ns, ne, mark, corner):
+    if type_ == "gear" and got and _other_gear(track, nbody, min(window, ns), ns, ne, mark, corner,
+                                              vocab.mask_numbers(track, nbody)):
         return "valore_non_normalizzabile"
 
     if type_ in ("line", "mistake"):
         return None if norm_text(value) == quote else "valore_diverso"
     if got is None:
         return "valore_non_normalizzabile"
-    reason = vocab.sentence_reason(type_, sentence, mark - ns)
+    reason = vocab.sentence_reason(type_, msentence, mark - ns)
     if reason:
         return reason
     return None if got[0] == value else "valore_diverso"
