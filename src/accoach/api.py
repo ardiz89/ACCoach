@@ -45,7 +45,7 @@ from .coaching import (
 )
 from .coaching.phases import PHASES
 from .coaching.corner_session import LapCorners, aggregate as aggregate_corners
-from .coaching.debrief import mark_runs_wide
+from .coaching.debrief import corner_deltas, mark_runs_wide
 from .coaching.training import MIN_LAPS as _TRAIN_MIN_LAPS, assess as _assess_training
 from .coaching.trends import session_recap, session_series
 from .comparison import Reference
@@ -1928,15 +1928,20 @@ def create_api(
                         _log.warning("corner refs failed; main reference only",
                                      exc_info=True)
                         corner_refs = None
+                # Perdite e delta con lo stesso metro: il gesto migliore se
+                # c'è, il principale da solo se col gesto il debrief cade.
                 try:
                     debrief = build_lap_debrief(lap, reference, corners, lg,
                                                 corner_refs=corner_refs)
+                    deltas = corner_deltas(lap, reference, corners,
+                                           corner_refs)
                 except Exception:  # noqa: BLE001 - come /api/analysis
                     if corner_refs is None:
                         raise
                     _log.warning("debrief with corner refs failed; main "
                                  "reference only", exc_info=True)
                     debrief = build_lap_debrief(lap, reference, corners, lg)
+                    deltas = corner_deltas(lap, reference, corners)
                 mark_runs_wide(debrief.losses, wide, lg)
                 per_lap.append(LapCorners(
                     path=row["path"],
@@ -1944,6 +1949,7 @@ def create_api(
                     brakes=brake_points_of_lap(lap, corners),
                     lines=build_line_report(lap, baseline_lap, corners,
                                             names).corners,
+                    deltas=deltas,
                 ))
             except Exception:  # noqa: BLE001 - un giro guasto non costa la pagina
                 _log.warning("lap %s skipped in /api/corners", row.get("path"),

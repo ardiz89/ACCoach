@@ -77,6 +77,9 @@ def test_the_exact_italian_copy():
                  "{n} {n|giro non analizzato|giri non analizzati}."):
         assert text in it.values(), text
     assert it["corners.brake"] == "{m} m prima del punto più lento, ±{spread} m."
+    # Le fasi vengono solo dai giri che perdono: la riga lo dice.
+    assert it["corners.phases"] == "Mediana per fase, nei giri in cui perdi"
+    assert _CORNERS["corners.phases"]["en"] == "Median by phase, on the laps where you lose"
     gears = [it[f"corners.gear.{n}"] for n in range(1, 7)]
     assert gears == ["prima", "seconda", "terza", "quarta", "quinta", "sesta"]
     # «Tu: terza. Una fonte: seconda.» del piano, senza i due punti che il

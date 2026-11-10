@@ -785,8 +785,10 @@ alto sceglie la sessione, come nella Pagella.
 
 Aprendo una riga trovi quattro blocchi.
 
-- **Quanto e dove perdi.** Il tempo perso in tutta la sessione, in quanti giri,
-  la perdita mediana per fase e la causa che torna più spesso. Si misura contro
+- **Quanto e dove perdi.** Il tempo perso in tutta la sessione, al netto dei
+  giri in cui lì guadagni, e in quanti giri perdi. Contano tutti i giri, anche
+  quelli in cui vai forte. La perdita mediana per fase e la causa che torna più
+  spesso vengono solo dai giri in cui perdi. Si misura contro
   il tuo gesto migliore in quella curva, se c'è, altrimenti contro il
   riferimento. In alto la pagina dice qual è il giro di riferimento, che può
   venire da un'altra sessione.

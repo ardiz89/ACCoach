@@ -274,7 +274,7 @@
     "corners.lost": { en: `{s} over the whole session.`, it: `{s} in tutta la sessione.` },
     "corners.losing": { en: `You lose time in {k} of {n} {n|lap|laps}.`, it: `Perdi tempo in {k} su {n} {n|giro|giri}.` },
     "corners.nolose": { en: `You don't lose time here on any lap.`, it: `Qui non perdi tempo in nessun giro.` },
-    "corners.phases": { en: `Median by phase`, it: `Mediana per fase` },
+    "corners.phases": { en: `Median by phase, on the laps where you lose`, it: `Mediana per fase, nei giri in cui perdi` },
     "corners.cause.laps": { en: `{k} {k|lap|laps} out of {n}.`, it: `{k} {k|giro|giri} su {n}.` },
     "corners.cause.none": { en: `No single cause comes back in at least half of the laps that lose time.`, it: `Nessuna causa torna in almeno metà dei giri che perdono tempo.` },
     "corners.brake": { en: `{m} m before the slowest point, ±{spread} m.`, it: `{m} m prima del punto più lento, ±{spread} m.` },

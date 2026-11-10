@@ -834,9 +834,10 @@ chooses the session, as on the Report card.
 
 Open a row and you get four blocks.
 
-- **How much and where you lose.** The time lost over the whole session, on how
-  many laps, the median loss per phase and the cause that comes back most often.
-  It's measured against your own best attempt at that corner, when there is one,
+- **How much and where you lose.** The time lost over the whole session, net of
+  the laps where you gain there, and on how many laps you lose. Every lap counts,
+  the fast ones too. The median loss per phase and the cause that comes back most
+  often come only from the laps where you lose. It's measured against your own best attempt at that corner, when there is one,
   and otherwise against the reference. At the top the page says which lap is the
   reference, and it can come from another session.
 - **Your braking.** Where you start braking relative to the slowest point, how

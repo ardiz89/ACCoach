@@ -203,3 +203,41 @@ def test_numeri_arrotondati():
                                                    lost_total_ms=0.0,
                                                    laps_losing=0))
     assert empty["brake_m"] is None and empty["line_m"] is None
+
+
+def _beats_reference_session(d):
+    """Il riferimento (il giro più veloce) perde un po' in curva 1 e vince in
+    curva 2; gli altri due giri in curva 1 vanno più forte di lui."""
+    _lap(d, "2026-07-20T18:00:00+00:00", amt=10, corner=0)   # riferimento
+    _lap(d, "2026-07-20T18:03:00+00:00", amt=40, corner=1)
+    _lap(d, "2026-07-20T18:06:00+00:00", amt=40, corner=1)
+
+
+def test_curva_dove_batti_il_riferimento_resta(tmp_path, monkeypatch):
+    """Contro il solo principale: in curva 1 due giri su tre guadagnano. La
+    curva resta, coi giri giusti, e il totale e' netto."""
+    d = _laps_dir(tmp_path)
+    _beats_reference_session(d)
+
+    def no_refs(*a, **kw):
+        raise RuntimeError("niente gesto migliore")
+
+    monkeypatch.setattr(api_mod, "corner_bests_for", no_refs)
+    j = _get(TestClient(create_api(d))).json()
+    assert j["laps"] == 3
+    c0 = _corner0(j)
+    assert (c0["laps"], c0["laps_losing"]) == (3, 0)
+    assert c0["lost_total_ms"] == -292.0      # due giri a -146, il riferimento 0
+    assert c0["cause"] is None
+    c1 = next(c for c in j["corners"] if c["index"] == 1)
+    assert (c1["laps"], c1["laps_losing"], c1["lost_total_ms"]) == (3, 2, 1360.0)
+    assert [c["index"] for c in j["corners"]] == [1, 0]
+
+
+def test_ogni_giro_conta_anche_col_gesto_migliore(tmp_path):
+    """Col gesto migliore la curva 1 si misura sul giro che lì va più forte:
+    perde solo il riferimento, ma i giri in curva restano tre."""
+    d = _laps_dir(tmp_path)
+    _beats_reference_session(d)
+    c0 = _corner0(_get(TestClient(create_api(d))).json())
+    assert (c0["laps"], c0["laps_losing"]) == (3, 1)

@@ -27,8 +27,9 @@ def line(index=0, entry=1.0, apex=2.0, exit_=3.0, off=False, sided=True,
                       sided=sided, off_here=off)
 
 
-def lap(path, losses=(), brakes=(), lines=()):
-    return LapCorners(path, list(losses), list(brakes), list(lines))
+def lap(path, losses=(), brakes=(), lines=(), deltas=None):
+    return LapCorners(path, list(losses), list(brakes), list(lines),
+                      dict(deltas or {}))
 
 
 def test_ordine_per_tempo_perso():
@@ -103,3 +104,93 @@ def test_dentro_fuori_e_destra_sinistra_non_si_mescolano():
     assert s.sided is True and s.line_m["apex"] == 2.0
     solo = aggregate([lap("b", [loss(0, 100)], lines=[line(apex=-9.0, sided=False)])])[0]
     assert solo.sided is False and solo.line_m["apex"] == -9.0
+
+
+# --- ogni giro in ogni curva, non solo quelli che perdono -------------------
+
+def test_conta_anche_i_giri_che_guadagnano():
+    # 60 ms e' sotto la soglia del debrief, -300 e' un guadagno: nessuno dei
+    # due ha una riga di perdita, ma sono giri in quella curva.
+    laps = [lap("a", deltas={0: 60.0}),
+            lap("b", deltas={0: -300.0}),
+            lap("c", [loss(0, 130)], deltas={0: 130.0})]
+    s = aggregate(laps)[0]
+    assert s.laps == 3 and s.laps_losing == 1
+    assert s.lost_total_ms == -110
+    assert s.best_path == "b"
+    assert s.typical_path == "a"          # mediana 60
+
+
+def test_curva_mai_persa_resta_in_elenco():
+    laps = [lap("a", [loss(1, 400)], deltas={0: -50.0, 1: 400.0}),
+            lap("b", deltas={0: -20.0, 1: 10.0})]
+    out = aggregate(laps)
+    assert [s.index for s in out] == [1, 0]
+    s0 = out[1]
+    assert (s0.laps, s0.laps_losing, s0.lost_total_ms) == (2, 0, -70)
+    assert s0.cause is None and s0.best_path == "a"
+
+
+def test_soglia_come_nel_debrief():
+    from accoach.coaching.analyzer import _LOSS_MS
+    from accoach.coaching import corner_session
+    assert corner_session.NOISE_MS == _LOSS_MS
+
+
+def test_tipico_a_pari_distanza_il_primo():
+    laps = [lap("a", deltas={0: 100.0}), lap("b", deltas={0: 300.0})]
+    assert aggregate(laps)[0].typical_path == "a"
+
+
+def test_causa_e_fasi_solo_dai_giri_che_perdono():
+    A = CueCategory.BRAKE_LATER
+    laps = [lap("a", [loss(0, 200, A, phases=[("entry", 200)])],
+                deltas={0: 200.0}),
+            lap("b", deltas={0: -100.0}),
+            lap("c", deltas={0: -150.0})]
+    s = aggregate(laps)[0]
+    assert s.laps == 3 and s.laps_losing == 1
+    assert s.cause == "brake_later" and s.cause_laps == 1
+    assert s.phases_ms == {"entry": 200}
+
+
+def test_corner_deltas_uguale_al_debrief():
+    import synth
+    from accoach.comparison.reference import Reference
+    from accoach.coaching.debrief import build_lap_debrief, corner_deltas
+    from accoach.track import detect_corners
+    base = synth.build_lap()
+    ref = Reference(base)
+    corners = detect_corners(base.samples)
+    for slow in (0, 1):
+        live = synth.build_lap(slow_corner=slow, amt=25)
+        deltas = corner_deltas(live, ref, corners)
+        assert set(deltas) == {c.index for c in corners}
+        losses = build_lap_debrief(live, ref, corners, "it").losses
+        assert losses
+        for x in losses:
+            assert deltas[x.index] == x.lost_ms
+
+
+def test_corner_deltas_col_gesto_migliore():
+    import synth
+    from accoach.comparison.reference import Reference
+    from accoach.coaching.corner_refs import CornerRef
+    from accoach.coaching.debrief import build_lap_debrief, corner_deltas
+    from accoach.track import detect_corners
+    base = synth.build_lap()
+    ref = Reference(base)
+    corners = detect_corners(base.samples)
+    other = Reference(synth.build_lap(slow_corner=1, amt=30))
+
+    class Refs:
+        def at(self, pos):
+            return CornerRef(other, 0.0, 0.0, other.lap_time_ms)
+
+    live = synth.build_lap(slow_corner=0, amt=40)
+    plain = corner_deltas(live, ref, corners)
+    deltas = corner_deltas(live, ref, corners, Refs())
+    assert deltas != plain
+    for x in build_lap_debrief(live, ref, corners, "it",
+                               corner_refs=Refs()).losses:
+        assert deltas[x.index] == x.lost_ms

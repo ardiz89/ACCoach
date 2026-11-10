@@ -12,9 +12,12 @@ from statistics import median
 
 from ..braking_points import BrakePoint
 from ..trajectory import CornerLine
+from .analyzer import _LOSS_MS
 from .debrief import CornerLoss
 
-NOISE_MS = 50.0   # un giro «perde» in una curva sopra questa soglia
+# Un giro «perde» in una curva sopra questa soglia: la stessa del debrief, così
+# «perdi tempo» vuol dire la stessa cosa in tutto il report.
+NOISE_MS = _LOSS_MS
 
 
 @dataclass
@@ -23,6 +26,10 @@ class LapCorners:
     losses: list[CornerLoss]
     brakes: list[BrakePoint]
     lines: list[CornerLine]
+    # Ogni curva, persa o guadagnata (debrief.corner_deltas). Le righe di
+    # `losses` ci sono solo dove perdi: senza questi la sessione vedrebbe solo
+    # i giri che perdono.
+    deltas: dict[int, float] = field(default_factory=dict)
 
 
 @dataclass
@@ -58,10 +65,12 @@ def _cause(rows):
     return cat.value, count[cat], msg
 
 
-def _summarize(index, rows, brakes, lines) -> CornerSummary:
-    lost = [x.lost_ms for _, x in rows]
+def _summarize(index, rows, deltas, brakes, lines) -> CornerSummary:
+    """``deltas``: (giro, ms) per ogni giro che passa di qui, guadagni compresi.
+    ``rows``: (giro, riga del debrief) solo dove perdi: causa e fasi."""
+    lost = [v for _, v in deltas]
     n_losing = sum(1 for v in lost if v > NOISE_MS)
-    s = CornerSummary(index=index, laps=len(rows), lost_total_ms=sum(lost),
+    s = CornerSummary(index=index, laps=len(deltas), lost_total_ms=sum(lost),
                       laps_losing=n_losing)
 
     per_phase: dict[str, list[float]] = {}
@@ -98,24 +107,34 @@ def _summarize(index, rows, brakes, lines) -> CornerSummary:
         s.apex_shift_m = median(ln.apex_shift_m for ln in used)
         s.sided = all(ln.sided for ln in used)
 
-    s.best_path = min(rows, key=lambda r: r[1].lost_ms)[0]
+    # min() tiene il primo a pari valore: a pari distanza, il giro prima.
+    s.best_path = min(deltas, key=lambda r: r[1])[0]
     med = median(lost)
-    s.typical_path = min(rows, key=lambda r: abs(r[1].lost_ms - med))[0]
+    s.typical_path = min(deltas, key=lambda r: abs(r[1] - med))[0]
     return s
 
 
 def aggregate(laps: list[LapCorners]) -> list[CornerSummary]:
     rows: dict[int, list] = {}
+    deltas: dict[int, list] = {}
     brakes: dict[int, list] = {}
     lines: dict[int, list] = {}
     for lp in laps:
         for x in lp.losses:
             rows.setdefault(x.index, []).append((lp.path, x))
+        # Senza deltas (un chiamante vecchio) valgono le righe di perdita.
+        if lp.deltas:
+            for i, v in lp.deltas.items():
+                deltas.setdefault(i, []).append((lp.path, v))
+        else:
+            for x in lp.losses:
+                deltas.setdefault(x.index, []).append((lp.path, x.lost_ms))
         for b in lp.brakes:
             brakes.setdefault(b.index, []).append(b)
         for ln in lp.lines:
             lines.setdefault(ln.index, []).append(ln)
-    out = [_summarize(i, r, brakes.get(i, []), lines.get(i, []))
-           for i, r in rows.items()]
+    out = [_summarize(i, rows.get(i, []), d, brakes.get(i, []),
+                      lines.get(i, []))
+           for i, d in deltas.items()]
     out.sort(key=lambda s: (-s.lost_total_ms, s.index))
     return out

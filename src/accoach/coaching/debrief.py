@@ -1043,6 +1043,51 @@ def _top_speed_note(lap: Lap, reference: Reference, corners: list[Corner],
     )
 
 
+def _corner_window(lap: Lap, reference: Reference, c: Corner,
+                   corners: list[Corner], corner_refs: CornerBests | None):
+    """La finestra di una curva e quanto ci hai perso: una regola sola.
+
+    ``(inside, window, ref_c, cref, lost)``, o ``None`` sotto i due campioni.
+    La usano il debrief e :func:`corner_deltas`, così i due numeri non possono
+    dirsi diversi.
+    """
+    inside = [s for s in lap.samples if c.entry_pos <= s.pos <= c.exit_pos]
+    if len(inside) < 2:
+        return None
+    # Il metro di questa curva: il tuo gesto migliore se c'è, se no il
+    # principale. Solo la curva: aderenza, catene e note restano sul
+    # principale (`reference`).
+    ref_c = corner_refs.at(c.apex_pos) if corner_refs is not None else None
+    cref = ref_c.reference if ref_c is not None else reference
+
+    # Loss is measured from this corner's entry to the NEXT corner's entry, so
+    # the following straight is credited here — a poor exit shows up as time
+    # bled down the straight, attributed to the corner that caused it. The
+    # input/balance analysis still uses only the corner region (inside).
+    end = _next_entry(c, corners)
+    window = [s for s in lap.samples if c.entry_pos <= s.pos < end] or inside
+    first, last = window[0], window[-1]
+    delta_entry = first.t_ms - cref.time_at(first.pos)
+    delta_exit = last.t_ms - cref.time_at(last.pos)
+    return inside, window, ref_c, cref, delta_exit - delta_entry
+
+
+def corner_deltas(lap: Lap, reference: Reference, corners: list[Corner],
+                  corner_refs: CornerBests | None = None) -> dict[int, float]:
+    """Per OGNI curva, i ms persi (positivi) o guadagnati (negativi).
+
+    Lo stesso numero del ``lost_ms`` del debrief, ma anche dove il debrief
+    tace: sotto la soglia o dove vai bene. Senza le curve con meno di due
+    campioni.
+    """
+    out: dict[int, float] = {}
+    for c in corners:
+        w = _corner_window(lap, reference, c, corners, corner_refs)
+        if w is not None:
+            out[c.index] = w[4]
+    return out
+
+
 def build_lap_debrief(lap: Lap, reference: Reference, corners: list[Corner],
                       lang: str | None = None,
                       corner_refs: CornerBests | None = None) -> LapDebrief:
@@ -1069,25 +1114,10 @@ def build_lap_debrief(lap: Lap, reference: Reference, corners: list[Corner],
     zone_hi = {(lo, mid): hi for lo, hi, mid in corner_zones(corners)}
 
     for c in corners:
-        inside = [s for s in lap.samples if c.entry_pos <= s.pos <= c.exit_pos]
-        if len(inside) < 2:
+        w = _corner_window(lap, reference, c, corners, corner_refs)
+        if w is None:
             continue
-        # Il metro di questa curva: il tuo gesto migliore se c'è, se no il
-        # principale. Solo la curva: aderenza, catene e note restano sul
-        # principale (`reference`).
-        ref_c = corner_refs.at(c.apex_pos) if corner_refs is not None else None
-        cref = ref_c.reference if ref_c is not None else reference
-
-        # Loss is measured from this corner's entry to the NEXT corner's entry, so
-        # the following straight is credited here — a poor exit shows up as time
-        # bled down the straight, attributed to the corner that caused it. The
-        # input/balance analysis below still uses only the corner region (inside).
-        end = _next_entry(c, corners)
-        window = [s for s in lap.samples if c.entry_pos <= s.pos < end] or inside
-        first, last = window[0], window[-1]
-        delta_entry = first.t_ms - cref.time_at(first.pos)
-        delta_exit = last.t_ms - cref.time_at(last.pos)
-        lost = delta_exit - delta_entry
+        inside, window, ref_c, cref, lost = w
         # The same window, cut into the four stretches of the corner. Computed
         # here rather than later so it can only ever be a split of *this* number.
         phases = split_loss(window, cref, c)
