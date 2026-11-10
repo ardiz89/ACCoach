@@ -1,0 +1,317 @@
+{
+ "disputed": [],
+ "facts": [
+  {
+   "car_class": "gt3_presunta",
+   "corner": "Variante Ascari",
+   "n": 2,
+   "sources": [
+    {
+     "quote": "down into third chucking the car in",
+     "start_s": 469.97,
+     "url": "https://www.youtube.com/watch?v=jC6sz9DIwBk"
+    },
+    {
+     "quote": "Shift down to third, trail brake and",
+     "start_s": 194.32,
+     "url": "https://www.youtube.com/watch?v=zZNVsQnuTL8"
+    }
+   ],
+   "type": "gear",
+   "value": "3"
+  }
+ ],
+ "single": [
+  {
+   "car_class": "gt3_presunta",
+   "corner": "Variante del Rettifilo",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "Switch all the way down to first gear",
+     "start_s": 37.32,
+     "url": "https://www.youtube.com/watch?v=zZNVsQnuTL8"
+    }
+   ],
+   "state": "singolo",
+   "type": "gear",
+   "value": "1"
+  },
+  {
+   "corner": "Curva Grande",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "just keep a tight line",
+     "start_s": 112.52,
+     "url": "https://www.youtube.com/watch?v=zZNVsQnuTL8"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "line",
+   "value": "just keep a tight line"
+  },
+  {
+   "car_class": "gt3_presunta",
+   "corner": "Variante della Roggia",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "As you reach the 150 m board, start braking",
+     "start_s": 120.24,
+     "url": "https://www.youtube.com/watch?v=zZNVsQnuTL8"
+    }
+   ],
+   "state": "singolo",
+   "type": "brake",
+   "value": "board:150"
+  },
+  {
+   "corner": "Lesmo 1",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "power through using all the exit curb on",
+     "start_s": 151.44,
+     "url": "https://www.youtube.com/watch?v=zZNVsQnuTL8"
+    }
+   ],
+   "state": "singolo",
+   "type": "kerb",
+   "value": "exit"
+  },
+  {
+   "corner": "Lesmo 1",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "you understeered so that made you hesitant to get on throttle",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/1wph4sq/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "mistake",
+   "value": "you understeered so that made you hesitant to get on throttle"
+  },
+  {
+   "corner": "Lesmo 2",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "use all the exit curb available to you",
+     "start_s": 169.36,
+     "url": "https://www.youtube.com/watch?v=zZNVsQnuTL8"
+    }
+   ],
+   "state": "singolo",
+   "type": "kerb",
+   "value": "exit"
+  },
+  {
+   "corner": "Lesmo 2",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "Hit the apex on lesmo 2 and the dip should give you the right amount",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/1q56ab4/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "line",
+   "value": "Hit the apex on lesmo 2 and the dip should give you the right amount"
+  },
+  {
+   "corner": "Lesmo 2",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "if you cut it correctly it helps swing you out with a higher exit speed",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/1q1fka0/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "line",
+   "value": "if you cut it correctly it helps swing you out with a higher exit speed"
+  },
+  {
+   "corner": "Lesmo 2",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "you can eat some of the curb to get on throttle sooner too",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/1wph4sq/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "line",
+   "value": "you can eat some of the curb to get on throttle sooner too"
+  },
+  {
+   "corner": "Variante Ascari",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "Keep on the left as much as possible",
+     "start_s": 198.72,
+     "url": "https://www.youtube.com/watch?v=zZNVsQnuTL8"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "line",
+   "value": "Keep on the left as much as possible"
+  },
+  {
+   "corner": "Variante Ascari",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "Try to hit ascari flat out once you made your entry",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/1x60324/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "line",
+   "value": "Try to hit ascari flat out once you made your entry"
+  },
+  {
+   "corner": "Variante Ascari",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "You need a better angle on ascari so you can essentially turn into and cut",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/1q56ab4/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "line",
+   "value": "You need a better angle on ascari so you can essentially turn into and cut"
+  },
+  {
+   "corner": "Variante Ascari",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "and get the car as straight as possible",
+     "start_s": 308.58,
+     "url": "https://www.youtube.com/watch?v=2XOtOD0HmO0"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "line",
+   "value": "and get the car as straight as possible"
+  },
+  {
+   "corner": "Variante Ascari",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "you should always be flat out through ascari in any gt3",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/1x60324/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "line",
+   "value": "you should always be flat out through ascari in any gt3"
+  },
+  {
+   "corner": "Variante Ascari",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "and spin out mid-thought",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/1htmjbj/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "mistake",
+   "value": "and spin out mid-thought"
+  },
+  {
+   "car_class": "gt3_presunta",
+   "corner": "Parabolica",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "start braking right as you reach the 100 m board",
+     "start_s": 224.68,
+     "url": "https://www.youtube.com/watch?v=zZNVsQnuTL8"
+    }
+   ],
+   "state": "singolo",
+   "type": "brake",
+   "value": "board:100"
+  },
+  {
+   "car_class": "gt3_presunta",
+   "corner": "Parabolica",
+   "n": 2,
+   "sources": [
+    {
+     "quote": "early apex in third gear",
+     "start_s": 230.72,
+     "url": "https://www.youtube.com/watch?v=O7R-abglkZ0"
+    },
+    {
+     "quote": "slowing the car down into third gear",
+     "start_s": 577.16,
+     "url": "https://www.youtube.com/watch?v=jC6sz9DIwBk"
+    }
+   ],
+   "state": "non_confermato",
+   "type": "gear",
+   "value": "3"
+  },
+  {
+   "corner": "Parabolica",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "early apex in third gear",
+     "start_s": 230.72,
+     "url": "https://www.youtube.com/watch?v=O7R-abglkZ0"
+    }
+   ],
+   "state": "singolo",
+   "type": "apex",
+   "value": "early"
+  },
+  {
+   "corner": "Parabolica",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "you can definitely take a slightly wider line and carry more speed",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/1x60324/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "line",
+   "value": "you can definitely take a slightly wider line and carry more speed"
+  },
+  {
+   "corner": "Parabolica",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "you also hit the throttle a bit late",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/1wph4sq/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "mistake",
+   "value": "you also hit the throttle a bit late"
+  }
+ ],
+ "track": "monza",
+ "version": 3
+}
