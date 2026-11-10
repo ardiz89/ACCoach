@@ -93,3 +93,13 @@ def test_fuori_pista_non_conta_per_la_linea():
     laps = [lap("a", [loss(0)], lines=[line(0, 1, 2, 3)]),
             lap("b", [loss(0)], lines=[line(0, 99, 99, 99, off=True)])]
     assert aggregate(laps)[0].line_m == {"entry": 1, "apex": 2, "exit": 3}
+
+
+def test_dentro_fuori_e_destra_sinistra_non_si_mescolano():
+    laps = [lap("a", [loss(0, 100)], lines=[line(apex=1.0, sided=True)]),
+            lap("b", [loss(0, 100)], lines=[line(apex=-9.0, sided=False)]),
+            lap("c", [loss(0, 100)], lines=[line(apex=3.0, sided=True)])]
+    s = aggregate(laps)[0]
+    assert s.sided is True and s.line_m["apex"] == 2.0
+    solo = aggregate([lap("b", [loss(0, 100)], lines=[line(apex=-9.0, sided=False)])])[0]
+    assert solo.sided is False and solo.line_m["apex"] == -9.0

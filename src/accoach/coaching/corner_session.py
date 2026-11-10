@@ -87,6 +87,10 @@ def _summarize(index, rows, brakes, lines) -> CornerSummary:
                              key=lambda g: (not g.isdigit(), g))
 
     used = [ln for ln in lines if not ln.off_here]
+    # Dentro/fuori e destra/sinistra non si mescolano: se ci sono linee col verso
+    # si usano solo quelle, altrimenti quelle senza, e `sided` lo dice.
+    if any(ln.sided for ln in used):
+        used = [ln for ln in used if ln.sided]
     if used:
         s.line_m = {"entry": median(ln.entry_m for ln in used),
                     "apex": median(ln.apex_m for ln in used),
