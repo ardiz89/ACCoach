@@ -65,12 +65,16 @@ def _valid(tok: str, where: str) -> str:
 
 
 def load_token(env_file: Path | None) -> str:
-    """Variabile APIFY_API_TOKEN, poi il file env, poi ~/.apify-key."""
+    """Variabile APIFY_API_TOKEN, poi il file env (o un file col solo token), poi ~/.apify-key."""
     tok = os.environ.get("APIFY_API_TOKEN", "")
     if tok.strip():
         return _valid(tok, "APIFY_API_TOKEN")
     if env_file is not None and Path(env_file).is_file():
-        for riga in Path(env_file).read_text(encoding="utf-8-sig").splitlines():
+        righe = [r for r in Path(env_file).read_text(encoding="utf-8-sig").splitlines() if r.strip()]
+        # Un file con una riga sola e senza «=» è il token stesso.
+        if len(righe) == 1 and "=" not in righe[0]:
+            return _valid(righe[0], "file del token")
+        for riga in righe:
             k, sep, v = riga.partition("=")
             k = k.strip()
             if k.startswith("export "):

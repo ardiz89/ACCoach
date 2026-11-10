@@ -122,3 +122,14 @@ def test_collect_errore_inatteso_stampa_solo_il_tipo(monkeypatch, tmp_path, caps
     assert rc == 1
     assert TOK not in cattura.err and TOK not in cattura.out and "Traceback" not in cattura.err
     assert "ValueError" in cattura.err
+
+
+def test_file_col_solo_token(tmp_path, monkeypatch):
+    monkeypatch.delenv("APIFY_API_TOKEN", raising=False)
+    f = tmp_path / "chiave.txt"
+    f.write_text("apify_api_abc123DEF\n", encoding="utf-8")
+    assert apify.load_token(f) == "apify_api_abc123DEF"
+    f.write_text("apify_api_abc\napify_api_def\n", encoding="utf-8")
+    with pytest.raises(apify.TokenMissing) as e:
+        apify.load_token(f)
+    assert "apify_api_abc" not in str(e.value)
