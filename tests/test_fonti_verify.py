@@ -93,6 +93,17 @@ def test_numeri_di_curva_delle_guide_acc():
     assert {"turn 7", "turn seven", "t7", "curva 7"} <= set(vocab.CORNERS["imola"]["Tosa"])
 
 
+def test_piste_numerate_la_curva_e_il_numero():
+    # COTA nel catalogo ha i numeri della mappa: il nome è «Corner N», come nel report.
+    assert set(vocab.CORNERS["austin"]) == {f"Corner {n}" for n in range(1, 21)}
+    assert {"turn 11", "turn eleven", "t11", "curva 11", "corner 11"} <= set(
+        vocab.CORNERS["austin"]["Corner 11"])
+    q = "into turn 11 brake at the 100 board"
+    assert verify.check_fact("austin", fatto(q, "board:100", corner="Corner 11"), q) is None
+    assert verify.check_fact("austin", fatto(q, "board:100", corner="Corner 12"),
+                             q) == "curva_non_trovata"
+
+
 def test_silverstone_solo_copse_ha_un_numero():
     # Su ACC la curva 1 di Silverstone è Copse, non Abbey: le fonti concordano solo lì.
     assert vocab.TURNS["silverstone"] == {"Copse": (1,)}

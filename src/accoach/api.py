@@ -1904,7 +1904,7 @@ def create_api(
                                                _corner_map(car, track),
                                                _typed(track)))}
             # La chiave delle fonti non cambia con la lingua: sulle piste numerate
-            # il catalogo dà «Curva 3» in italiano, e i fatti dicono «Turn 3».
+            # il catalogo dà «Curva 3» in italiano, e i fatti dicono «Corner 3».
             catalog_names = {c.index: n for c, n in
                              zip(corners, name_corners(track, corners, "en",
                                                        None, None))}

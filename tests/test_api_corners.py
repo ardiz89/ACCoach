@@ -138,7 +138,7 @@ def test_pista_numerata_fonti_in_ogni_lingua(tmp_path, monkeypatch):
     it = c.get("/api/corners", params={**params, "lang": "it"}).json()["corners"]
     en = c.get("/api/corners", params={**params, "lang": "en"}).json()["corners"]
     assert it and [x["catalog_name"] for x in it] == [x["catalog_name"] for x in en]
-    assert all(not x["catalog_name"].startswith("Curva") for x in it)
+    assert all(x["catalog_name"].startswith("Corner ") for x in it)
 
 
 def test_un_giro_guasto_si_salta(tmp_path, monkeypatch):

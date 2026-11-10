@@ -186,11 +186,31 @@ TRACK_NAMES: dict[str, tuple[str, ...]] = {
     "monza": ("monza",),
     "silverstone": ("silverstone",),
     "suzuka": ("suzuka",),
-    "mountpanorama": ("bathurst", "mount panorama", "mt panorama"),    "zandvoort": ("zandvoort",),    "brandshatch": ("brands hatch", "brands"),    "catalunya": ("barcelona", "barcellona", "catalunya", "catalonia", "montmelo"),
+    "mountpanorama": ("bathurst", "mount panorama", "mt panorama"),
+    "zandvoort": ("zandvoort",),
+    "brandshatch": ("brands hatch", "brands"),
+    "catalunya": ("barcelona", "barcellona", "catalunya", "catalonia", "montmelo"),
 }
 _WORDS = {1: "one", 2: "two", 3: "three", 4: "four", 5: "five", 6: "six", 7: "seven",
-          8: "eight", 9: "nine", 10: "ten", 11: "eleven", 12: "twelve", 14: "fourteen",
-          15: "fifteen", 17: "seventeen", 18: "eighteen"}
+          8: "eight", 9: "nine", 10: "ten", 11: "eleven", 12: "twelve", 13: "thirteen",
+          14: "fourteen", 15: "fifteen", 16: "sixteen", 17: "seventeen", 18: "eighteen",
+          19: "nineteen", 20: "twenty"}
+
+
+def _numbered(track: str) -> bool:
+    return all(isinstance(n, int) for n, _pos in _CORNERS[track])
+
+
+# Sulle piste numerate (COTA, Red Bull Ring, Nürburgring…) il catalogo ha il numero
+# pubblicato sulla mappa della pista, e il report lo chiama «Corner N» in inglese: è il
+# nome che leggono le fonti. Il numero è il nome della curva, quindi è anche il suo alias.
+for _track in _CORNERS:
+    if _numbered(_track):
+        TURNS[_track] = {f"Corner {n}": (n,) for n, _pos in _CORNERS[_track]}
+
+
+def _catalog_name(track: str, name: str | int) -> str:
+    return f"Corner {name}" if isinstance(name, int) else name
 
 
 def turn_aliases(track: str) -> dict[str, list[str]]:
@@ -198,18 +218,19 @@ def turn_aliases(track: str) -> dict[str, list[str]]:
     out = {}
     for name, nums in TURNS.get(track, {}).items():
         out[name] = sorted({a for n in nums for a in (f"turn {n}", f"turn {_WORDS[n]}", f"t{n}",
-                                                      f"curva {n}")})
+                                                      f"curva {n}", f"corner {n}",
+                                                      f"corner {_WORDS[n]}")})
     return out
 
 
 CORNERS: dict[str, dict[str, list[str]]] = {
     track: {
-        name: sorted({name.lower(), *_EXTRA.get(name, []), *turn_aliases(track).get(name, [])})
+        _catalog_name(track, name): sorted({
+            _catalog_name(track, name).lower(), *_EXTRA.get(_catalog_name(track, name), []),
+            *turn_aliases(track).get(_catalog_name(track, name), [])})
         for name, _pos in _CORNERS[track]
     }
-    # Solo le piste con le curve per nome: quelle numerate (COTA, Red Bull Ring…)
-    # hanno nel catalogo un numero, e il report lo traduce in «Curva N».
-    for track in _CORNERS if all(isinstance(n, str) for n, _pos in _CORNERS[track])
+    for track in _CORNERS
 }
 # Gli alias che chiamano la curva col numero: la pagina di controllo li segna.
 NUMBER_ALIASES: dict[str, set[str]] = {
