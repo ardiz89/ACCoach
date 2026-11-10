@@ -87,6 +87,26 @@ _EXTRA = {
                         "force elbow", "the elbow"],  # a Bathurst il gomito è uno solo
     "The Chase": ["chase corner"],
     "Murray's Corner": ["murray's", "murrays corner", "murray"],
+    # Zandvoort: «hairpin» no, perché a Zandvoort i tornanti sono due (Tarzan e Hugenholtz).
+    "Tarzanbocht": ["tarzan", "tarzan corner", "tarzan bocht"],
+    "Gerlachbocht": ["gerlach"],
+    "Hugenholtzbocht": ["hugenholtz", "hogan halls"],
+    "Slotemakerbocht": ["slotemaker"],
+    "Mastersbocht": ["masters corner", "masters bocht"],
+    "Hans Ernst": ["hans ernst bocht", "hans ernstbocht"],
+    "Arie Luyendijkbocht": ["arie luyendijk", "luyendijk", "ariel indict curve"],
+    # Brands Hatch. «Dingle Dell» non è nel catalogo; «clear» da solo è una parola comune.
+    "Paddock Hill Bend": ["paddock hill", "paddock", "paddical", "paddock bend hill",
+                          "paddock kill bend"],
+    "Druids": ["druid", "druids hairpin"],
+    "Graham Hill Bend": ["graham hill", "gram he'll bend"],
+    "Surtees": [],
+    "Hawthorn Bend": ["hawthorn", "hawthorns", "hawthorne", "hawthornes"],
+    "Westfield Bend": ["westfield", "wesfields", "west field"],
+    "Sheene Curve": ["sheene", "sheen", "sheens", "xin curve"],
+    "Stirling's": ["stirlings", "stirling", "stirling's bend", "sterling's", "sterlings"],
+    "Clearways": ["clearway"],
+    "Clark Curve": ["clark", "clarks", "clark's"],
     # Suzuka. «Hairpin» e «Esses» sono parole comuni, ma a Suzuka c'è una curva sola così.
     "Esses": ["s curves", "s-curves", "the esses", "s curve"],
     "Dunlop": ["dunlop curve", "dunlop corner"],
@@ -135,6 +155,17 @@ TURNS: dict[str, dict[str, tuple[int, ...]]] = {
         "The Dipper": (14,),
         "Forrest's Elbow": (18,),
     },
+    # Brands Hatch: Surtees 4 (Yorkie065, djperijey), Sheene 7 (djperijey, Vida8943);
+    # Hawthorn 5, Stirling's 8 e Clark 9 da djperijey, Westfield 6 da una fonte Reddit,
+    # in chiaro, senza contraddizioni.
+    "brandshatch": {
+        "Surtees": (4,),
+        "Hawthorn Bend": (5,),
+        "Westfield Bend": (6,),
+        "Sheene Curve": (7,),
+        "Stirling's": (8,),
+        "Clark Curve": (9,),
+    },
 }
 # I nomi della pista: una fonte è di quella pista solo se il titolo ne dice uno. Una
 # ricerca «ACC Imola» riporta anche guide di Spa, e un «turn 7» di Spa non è la Tosa.
@@ -144,11 +175,11 @@ TRACK_NAMES: dict[str, tuple[str, ...]] = {
     "monza": ("monza",),
     "silverstone": ("silverstone",),
     "suzuka": ("suzuka",),
-    "mountpanorama": ("bathurst", "mount panorama", "mt panorama"),
+    "mountpanorama": ("bathurst", "mount panorama", "mt panorama"),    "zandvoort": ("zandvoort",),    "brandshatch": ("brands hatch", "brands"),    "catalunya": ("barcelona", "barcellona", "catalunya", "catalonia", "montmelo"),
 }
-_WORDS = {1: "one", 2: "two", 3: "three", 4: "four", 5: "five", 6: "six", 7: "seven", 9: "nine",
-          11: "eleven", 12: "twelve", 14: "fourteen", 15: "fifteen", 17: "seventeen",
-          18: "eighteen"}
+_WORDS = {1: "one", 2: "two", 3: "three", 4: "four", 5: "five", 6: "six", 7: "seven",
+          8: "eight", 9: "nine", 11: "eleven", 12: "twelve", 14: "fourteen", 15: "fifteen",
+          17: "seventeen", 18: "eighteen"}
 
 
 def turn_aliases(track: str) -> dict[str, list[str]]:

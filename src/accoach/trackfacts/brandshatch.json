@@ -1,0 +1,431 @@
+{
+ "disputed": [],
+ "facts": [
+  {
+   "car_class": "gt3_presunta",
+   "corner": "Stirling's",
+   "n": 2,
+   "sources": [
+    {
+     "quote": "shifting down through the gears into second",
+     "start_s": 538.209,
+     "url": "https://www.youtube.com/watch?v=DcXotcvOpXI"
+    },
+    {
+     "quote": "going down to second gear here",
+     "start_s": 229.5,
+     "url": "https://www.youtube.com/watch?v=LI18Hrv7_xU"
+    }
+   ],
+   "type": "gear",
+   "value": "2"
+  }
+ ],
+ "single": [
+  {
+   "car_class": "gt3_presunta",
+   "corner": "Paddock Hill Bend",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "the other one change down to third and",
+     "start_s": 49.68,
+     "url": "https://www.youtube.com/watch?v=pcrD5g7v95w"
+    }
+   ],
+   "state": "singolo",
+   "type": "gear",
+   "value": "3"
+  },
+  {
+   "corner": "Paddock Hill Bend",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "giving yourself a nice late apex",
+     "start_s": 51.28,
+     "url": "https://www.youtube.com/watch?v=pcrD5g7v95w"
+    }
+   ],
+   "state": "singolo",
+   "type": "apex",
+   "value": "late"
+  },
+  {
+   "corner": "Paddock Hill Bend",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "we want to take a nice sweeping line from the outside into our apex",
+     "start_s": 133.68,
+     "url": "https://www.youtube.com/watch?v=DcXotcvOpXI"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "line",
+   "value": "we want to take a nice sweeping line from the outside into our apex"
+  },
+  {
+   "corner": "Paddock Hill Bend",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "braking way too early and hard for paddock bend hill",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/1hqkvkf/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "mistake",
+   "value": "braking way too early and hard for paddock bend hill"
+  },
+  {
+   "car_class": "gt3_presunta",
+   "corner": "Druids",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "changing down to first gear there are",
+     "start_s": 64.4,
+     "url": "https://www.youtube.com/watch?v=pcrD5g7v95w"
+    }
+   ],
+   "state": "singolo",
+   "type": "gear",
+   "value": "1"
+  },
+  {
+   "corner": "Druids",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "i would suggest going for a u-shape",
+     "start_s": 71.84,
+     "url": "https://www.youtube.com/watch?v=pcrD5g7v95w"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "line",
+   "value": "i would suggest going for a u-shape"
+  },
+  {
+   "corner": "Druids",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "they stay on the inside too long at druids",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/1rernvd/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "mistake",
+   "value": "they stay on the inside too long at druids"
+  },
+  {
+   "car_class": "gt3_presunta",
+   "corner": "Graham Hill Bend",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "second gear turn in and aim to hit the",
+     "start_s": 95.2,
+     "url": "https://www.youtube.com/watch?v=pcrD5g7v95w"
+    }
+   ],
+   "state": "singolo",
+   "type": "gear",
+   "value": "2"
+  },
+  {
+   "car_class": "gt3_presunta",
+   "corner": "Surtees",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "you can be shifting down into second gear",
+     "start_s": 290.04,
+     "url": "https://www.youtube.com/watch?v=DcXotcvOpXI"
+    }
+   ],
+   "state": "singolo",
+   "type": "gear",
+   "value": "2"
+  },
+  {
+   "corner": "Surtees",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "we'll be looking to hook up this late apex",
+     "start_s": 295.53,
+     "url": "https://www.youtube.com/watch?v=DcXotcvOpXI"
+    }
+   ],
+   "state": "singolo",
+   "type": "apex",
+   "value": "late"
+  },
+  {
+   "corner": "Surtees",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "Get far more inside on entry so you can brake in a straight line",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/uhkljw/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "line",
+   "value": "Get far more inside on entry so you can brake in a straight line"
+  },
+  {
+   "car_class": "gt3_presunta",
+   "corner": "Hawthorn Bend",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "shifting down to third",
+     "start_s": 152.4,
+     "url": "https://www.youtube.com/watch?v=pcrD5g7v95w"
+    }
+   ],
+   "state": "singolo",
+   "type": "gear",
+   "value": "3"
+  },
+  {
+   "car_class": "gt3_presunta",
+   "corner": "Hawthorn Bend",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "we'll just drop the cart down into fourth gear",
+     "start_s": 365.37,
+     "url": "https://www.youtube.com/watch?v=DcXotcvOpXI"
+    }
+   ],
+   "state": "singolo",
+   "type": "gear",
+   "value": "4"
+  },
+  {
+   "corner": "Hawthorn Bend",
+   "n": 2,
+   "sources": [
+    {
+     "quote": "Trail brake and hit a late apex",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/1sq018r/"
+    },
+    {
+     "quote": "aim for late apex on this particular",
+     "start_s": 154.959,
+     "url": "https://www.youtube.com/watch?v=pcrD5g7v95w"
+    }
+   ],
+   "state": "non_confermato",
+   "type": "apex",
+   "value": "late"
+  },
+  {
+   "corner": "Hawthorn Bend",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "You need to be using much of the kerb on turn 5",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/ub134y/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "line",
+   "value": "You need to be using much of the kerb on turn 5"
+  },
+  {
+   "corner": "Hawthorn Bend",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "Far too passive on exit",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/uhkljw/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "mistake",
+   "value": "Far too passive on exit"
+  },
+  {
+   "corner": "Hawthorn Bend",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "For T5 you braked very early",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/1sq018r/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "mistake",
+   "value": "For T5 you braked very early"
+  },
+  {
+   "car_class": "gt3_presunta",
+   "corner": "Westfield Bend",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "one board shift to third",
+     "start_s": 176.319,
+     "url": "https://www.youtube.com/watch?v=pcrD5g7v95w"
+    }
+   ],
+   "state": "singolo",
+   "type": "gear",
+   "value": "3"
+  },
+  {
+   "corner": "Westfield Bend",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "Take a lot more apex kerb and run wider on exit",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/uhkljw/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "line",
+   "value": "Take a lot more apex kerb and run wider on exit"
+  },
+  {
+   "car_class": "gt3_presunta",
+   "corner": "Sheene Curve",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "just as we're coming up to the 50 meter board",
+     "start_s": 462.96,
+     "url": "https://www.youtube.com/watch?v=DcXotcvOpXI"
+    }
+   ],
+   "state": "singolo",
+   "type": "brake",
+   "value": "board:50"
+  },
+  {
+   "car_class": "gt3_presunta",
+   "corner": "Sheene Curve",
+   "n": 2,
+   "sources": [
+    {
+     "quote": "break briefly and shift down to third",
+     "start_s": 188.56,
+     "url": "https://www.youtube.com/watch?v=pcrD5g7v95w"
+    },
+    {
+     "quote": "get into third gear",
+     "start_s": 402.24,
+     "url": "https://www.youtube.com/watch?v=yqVqvfQ7mdg"
+    }
+   ],
+   "state": "non_confermato",
+   "type": "gear",
+   "value": "3"
+  },
+  {
+   "corner": "Sheene Curve",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "You basically need to be turning the corner before you can even see it",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/1rernvd/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "line",
+   "value": "You basically need to be turning the corner before you can even see it"
+  },
+  {
+   "corner": "Sheene Curve",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "its super easy to dip a wheel off tracks and have your lap ruined",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/1rernvd/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "mistake",
+   "value": "its super easy to dip a wheel off tracks and have your lap ruined"
+  },
+  {
+   "corner": "Stirling's",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "towards the mid corner apex",
+     "start_s": 208.72,
+     "url": "https://www.youtube.com/watch?v=pcrD5g7v95w"
+    }
+   ],
+   "state": "singolo",
+   "type": "apex",
+   "value": "middle"
+  },
+  {
+   "corner": "Stirling's",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "your front end bites and pulls you too far over the apex kerb",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/uhkljw/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "mistake",
+   "value": "your front end bites and pulls you too far over the apex kerb"
+  },
+  {
+   "car_class": "gt3_presunta",
+   "corner": "Clark Curve",
+   "n": 2,
+   "sources": [
+    {
+     "quote": "I will be shifting down into third gear",
+     "start_s": 594.279,
+     "url": "https://www.youtube.com/watch?v=DcXotcvOpXI"
+    },
+    {
+     "quote": "board shift down third and roll in",
+     "start_s": 228.239,
+     "url": "https://www.youtube.com/watch?v=pcrD5g7v95w"
+    }
+   ],
+   "state": "non_confermato",
+   "type": "gear",
+   "value": "3"
+  },
+  {
+   "corner": "Clark Curve",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "T9 you can run out further towards the curb",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/ub134y/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "line",
+   "value": "T9 you can run out further towards the curb"
+  }
+ ],
+ "track": "brandshatch",
+ "version": 3
+}
