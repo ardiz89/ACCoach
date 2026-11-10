@@ -847,8 +847,10 @@ Open a row and you get four blocks.
   best lap at that corner and your most typical lap in Compare.
 - **What the sources say.** On Imola and Spa, what public guides and videos say
   about that corner, with the short quote and a link to that moment of the
-  video. **One source says** is what a single author said, and it's not a
-  reference. **The sources disagree** puts the different values side by side.
+  video. **One source says** is what the check against the sources didn't
+  confirm, even when more than one author says it. Next to it you read how many
+  authors say it. It's not a reference. **The sources disagree** puts the
+  different values side by side.
 
 The sources never become a target. The page never tells you which board to brake
 at, because we don't know where the board sits on the map. It compares only the

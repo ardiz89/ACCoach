@@ -137,3 +137,22 @@ def test_una_fonte_dice_is_never_styled_as_a_reference():
 def test_the_guides_describe_the_tab():
     assert "Curva per curva" in (ROOT / "GUIDA.md").read_text(encoding="utf-8")
     assert "Corner by corner" in (ROOT / "docs" / "FAQ.md").read_text(encoding="utf-8")
+
+
+def _flat(path):
+    return " ".join(path.read_text(encoding="utf-8").split())
+
+
+def test_una_fonte_dice_is_what_the_check_did_not_confirm():
+    # Il gruppo puo' avere due autori: non e' «un autore solo», e' quello che
+    # il controllo non ha confermato, col numero di autori accanto.
+    guida = _flat(ROOT / "GUIDA.md")
+    faq = _flat(ROOT / "docs" / "FAQ.md")
+    assert "un autore solo" not in guida
+    assert "a single author said" not in faq
+    assert ("**Una fonte dice** è quello che il controllo sulle fonti non ha "
+            "confermato, anche quando lo dice più di un autore.") in guida
+    assert ("**One source says** is what the check against the sources didn't "
+            "confirm, even when more than one author says it.") in faq
+    assert "quanti autori lo dicono" in guida
+    assert "how many authors say it" in faq

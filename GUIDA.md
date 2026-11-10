@@ -800,8 +800,10 @@ Aprendo una riga trovi quattro blocchi.
   tipico.
 - **Cosa dicono le fonti.** Su Imola e Spa, quello che dicono guide e video
   pubblici su quella curva, con la citazione breve e il link al punto del video.
-  **Una fonte dice** è quello che ha detto un autore solo, e non è un
-  riferimento. **Le fonti non concordano** mette accanto i valori diversi.
+  **Una fonte dice** è quello che il controllo sulle fonti non ha confermato,
+  anche quando lo dice più di un autore. Accanto leggi quanti autori lo dicono.
+  Non è un riferimento. **Le fonti non concordano** mette accanto i valori
+  diversi.
 
 Le fonti non diventano mai un obiettivo. La pagina non ti dice a che cartello
 frenare, perché non sappiamo dove sta il cartello sulla mappa. Confronta solo la
