@@ -1,0 +1,455 @@
+{
+ "facts": [],
+ "single": [
+  {
+   "car_class": "gt3_presunta",
+   "corner": "Tamburello",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "turn two break between the 100 m board",
+     "start_s": 28.439,
+     "url": "https://www.youtube.com/watch?v=RJEPZK-ItHY"
+    }
+   ],
+   "state": "singolo",
+   "type": "brake",
+   "value": "board:100"
+  },
+  {
+   "car_class": "gt3_presunta",
+   "corner": "Tamburello",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "and shifting down into second gear",
+     "start_s": 108.72,
+     "url": "https://www.youtube.com/watch?v=wfXPfnH_yTw"
+    }
+   ],
+   "state": "singolo",
+   "type": "gear",
+   "value": "2"
+  },
+  {
+   "corner": "Tamburello",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "Open the corner fully by placing your right tyres on the right entry curb.",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/1e0o76p/"
+    }
+   ],
+   "state": "singolo",
+   "type": "kerb",
+   "value": "entry"
+  },
+  {
+   "corner": "Tamburello",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "Use all the track on entry before you make your first left.",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/1e0o76p/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "line",
+   "value": "Use all the track on entry before you make your first left."
+  },
+  {
+   "car_class": "gt3_presunta",
+   "corner": "Villeneuve",
+   "n": 2,
+   "sources": [
+    {
+     "quote": "says 50 hit the brakes you can brake",
+     "start_s": 133.12,
+     "url": "https://www.youtube.com/watch?v=BzjWkCfJzYM"
+    },
+    {
+     "quote": "turn five uh break at the 50 m board",
+     "start_s": 122.119,
+     "url": "https://www.youtube.com/watch?v=RJEPZK-ItHY"
+    }
+   ],
+   "state": "singolo",
+   "type": "brake",
+   "value": "board:50"
+  },
+  {
+   "car_class": "gt3_presunta",
+   "corner": "Villeneuve",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "down into third gear and try to touch",
+     "start_s": 127.719,
+     "url": "https://www.youtube.com/watch?v=RJEPZK-ItHY"
+    }
+   ],
+   "state": "singolo",
+   "type": "gear",
+   "value": "3"
+  },
+  {
+   "corner": "Villeneuve",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "You went too wide at the second part of Villeneuve",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/kvnz6y/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "mistake",
+   "value": "You went too wide at the second part of Villeneuve"
+  },
+  {
+   "corner": "Villeneuve",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "hitting this will compromise your exit",
+     "start_s": 154.16,
+     "url": "https://www.youtube.com/watch?v=BzjWkCfJzYM"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "mistake",
+   "value": "hitting this will compromise your exit"
+  },
+  {
+   "car_class": "gt3_presunta",
+   "corner": "Tosa",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "be here referencing the 50 meter board",
+     "start_s": 304.56,
+     "url": "https://www.youtube.com/watch?v=wfXPfnH_yTw"
+    }
+   ],
+   "state": "singolo",
+   "type": "brake",
+   "value": "board:50"
+  },
+  {
+   "car_class": "gt3_presunta",
+   "corner": "Tosa",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "second gear and turn in early as there's",
+     "start_s": 178.8,
+     "url": "https://www.youtube.com/watch?v=RJEPZK-ItHY"
+    }
+   ],
+   "state": "singolo",
+   "type": "gear",
+   "value": "2"
+  },
+  {
+   "corner": "Tosa",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "up a late apex in the corner mainly",
+     "start_s": 316.4,
+     "url": "https://www.youtube.com/watch?v=wfXPfnH_yTw"
+    }
+   ],
+   "state": "singolo",
+   "type": "apex",
+   "value": "late"
+  },
+  {
+   "corner": "Tosa",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "holding 10%-30% throttle before you even reach the apex",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/1e0o76p/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "mistake",
+   "value": "holding 10%-30% throttle before you even reach the apex"
+  },
+  {
+   "corner": "Tosa",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "just left a bit late and turned in a bit late",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/195zwve/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "mistake",
+   "value": "just left a bit late and turned in a bit late"
+  },
+  {
+   "car_class": "gt3_presunta",
+   "corner": "Piratella",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "Piratella should be taken in 2nd gear",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/ul37tz/"
+    }
+   ],
+   "state": "singolo",
+   "type": "gear",
+   "value": "2"
+  },
+  {
+   "corner": "Piratella",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "hit more of the apex curb",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/1nsu6tr/"
+    }
+   ],
+   "state": "singolo",
+   "type": "kerb",
+   "value": "apex"
+  },
+  {
+   "corner": "Piratella",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "I tend to understeer off the track at Piratella",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/tqdf7r/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "mistake",
+   "value": "I tend to understeer off the track at Piratella"
+  },
+  {
+   "corner": "Piratella",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "The car just understeers off the track",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/tqdf7r/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "mistake",
+   "value": "The car just understeers off the track"
+  },
+  {
+   "corner": "Piratella",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "You left half meter on entry",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/195zwve/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "mistake",
+   "value": "You left half meter on entry"
+  },
+  {
+   "corner": "Piratella",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "You're off the brakes a bit too suddenly",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/1e0o76p/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "mistake",
+   "value": "You're off the brakes a bit too suddenly"
+  },
+  {
+   "car_class": "gt3_presunta",
+   "corner": "Acque Minerali",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "break down into fourth gear",
+     "start_s": 420.8,
+     "url": "https://www.youtube.com/watch?v=wfXPfnH_yTw"
+    }
+   ],
+   "state": "singolo",
+   "type": "gear",
+   "value": "4"
+  },
+  {
+   "corner": "Acque Minerali",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "Coast over the apex curb",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/1nsu6tr/"
+    }
+   ],
+   "state": "singolo",
+   "type": "kerb",
+   "value": "apex"
+  },
+  {
+   "corner": "Acque Minerali",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "In Aqua Minerali I am coasting through the first kink and brake on the short",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/10zy0d9/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "line",
+   "value": "In Aqua Minerali I am coasting through the first kink and brake on the short"
+  },
+  {
+   "corner": "Acque Minerali",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "just tried the earlier braking on minerali and really felt a lot more smooth on",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/10zy0d9/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "line",
+   "value": "just tried the earlier braking on minerali and really felt a lot more smooth on"
+  },
+  {
+   "corner": "Acque Minerali",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "You are braking before the kink which makes you overall slower",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/10zy0d9/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "mistake",
+   "value": "You are braking before the kink which makes you overall slower"
+  },
+  {
+   "corner": "Acque Minerali",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "You broke a bit too much and left a lot of space between the two",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/195zwve/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "mistake",
+   "value": "You broke a bit too much and left a lot of space between the two"
+  },
+  {
+   "corner": "Acque Minerali",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "You're way too slow through the shallow right (11) because you brake too much.",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/1e0o76p/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "mistake",
+   "value": "You're way too slow through the shallow right (11) because you brake too much."
+  },
+  {
+   "corner": "Variante Alta",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "I could've gained more time if I didn't mess up Variante Alta",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/pzaaam/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "mistake",
+   "value": "I could've gained more time if I didn't mess up Variante Alta"
+  },
+  {
+   "corner": "Variante Alta",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "You were a bit hesitant to turn in",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/195zwve/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "mistake",
+   "value": "You were a bit hesitant to turn in"
+  },
+  {
+   "car_class": "gt3_presunta",
+   "corner": "Rivazza",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "get into second gear and pray break",
+     "start_s": 455.28,
+     "url": "https://www.youtube.com/watch?v=RJEPZK-ItHY"
+    }
+   ],
+   "state": "singolo",
+   "type": "gear",
+   "value": "2"
+  },
+  {
+   "corner": "Rivazza",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "The turn in issue again and you left space on exit",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/195zwve/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "mistake",
+   "value": "The turn in issue again and you left space on exit"
+  },
+  {
+   "corner": "Rivazza",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "you left space on entry and weren't been as close to the apex as you",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/195zwve/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "mistake",
+   "value": "you left space on entry and weren't been as close to the apex as you"
+  }
+ ],
+ "track": "imola",
+ "version": 2
+}
