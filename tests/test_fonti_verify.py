@@ -692,3 +692,12 @@ def test_line_col_numero_di_curva():
 def test_minerali_da_solo(nome):
     q = f"into {nome} I go down to fourth gear"
     assert verify.check_fact("imola", fatto(q, "4", "gear"), q) is None
+
+
+def test_nessun_alias_vale_per_due_curve_su_nessuna_pista():
+    for track, corners in vocab.CORNERS.items():
+        visti = {}
+        for nome, alias in corners.items():
+            for a in alias:
+                assert a not in visti, f"{track}: {a!r} in {visti.get(a)} e {nome}"
+                visti[a] = nome

@@ -54,6 +54,20 @@ _EXTRA = {
     "Fagnes": ["les fagnes", "lyfagna"],
     "Stavelot": ["stavalo"],
     "Bus Stop": ["bus stop chicane"],
+    # Monza.
+    "Variante del Rettifilo": ["rettifilo", "prima variante", "first chicane", "turn 1 chicane"],
+    "Curva Grande": ["curva grande"],
+    "Variante della Roggia": ["roggia", "seconda variante", "second chicane"],
+    "Lesmo 1": ["first lesmo", "lesmo one", "prima di lesmo"],
+    "Lesmo 2": ["second lesmo", "lesmo two", "seconda di lesmo"],
+    "Variante Ascari": ["ascari", "ascari chicane"],
+    "Parabolica": ["curva parabolica", "alboreto", "curva alboreto"],
+    # Silverstone: solo grafie del nome. Club, Vale, Village e The Loop sono anche
+    # parole comuni: lì contano i due autori e il controllo.
+    "Farm Curve": ["farm"],
+    "Maggotts": ["maggots"],
+    "Becketts": ["beckets"],
+    "Luffield": ["luffield corner"],
 }
 
 # I numeri di curva di Imola come li usano le guide su ACC raccolte il 10/11 (Yorkie065,
@@ -77,6 +91,8 @@ TURNS: dict[str, dict[str, tuple[int, ...]]] = {
 TRACK_NAMES: dict[str, tuple[str, ...]] = {
     "imola": ("imola", "enzo e dino ferrari", "santerno"),
     "spa": ("spa", "francorchamps", "spa-francorchamps"),
+    "monza": ("monza",),
+    "silverstone": ("silverstone",),
 }
 _WORDS = {2: "two", 3: "three", 4: "four", 5: "five", 6: "six", 7: "seven", 9: "nine",
           11: "eleven", 12: "twelve", 14: "fourteen", 15: "fifteen", 17: "seventeen",
@@ -97,7 +113,9 @@ CORNERS: dict[str, dict[str, list[str]]] = {
         name: sorted({name.lower(), *_EXTRA.get(name, []), *turn_aliases(track).get(name, [])})
         for name, _pos in _CORNERS[track]
     }
-    for track in ("imola", "spa")
+    # Solo le piste con le curve per nome: quelle numerate (COTA, Red Bull Ring…)
+    # hanno nel catalogo un numero, e il report lo traduce in «Curva N».
+    for track in _CORNERS if all(isinstance(n, str) for n, _pos in _CORNERS[track])
 }
 # Gli alias che chiamano la curva col numero: la pagina di controllo li segna.
 NUMBER_ALIASES: dict[str, set[str]] = {
