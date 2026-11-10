@@ -576,3 +576,16 @@ def test_altre_classi_non_toccano_gli_altri_tipi(b):
         b.testo(url, autore, f"{pre} Acque Minerali {kerb} every lap.", [("kerb", "exit", kerb)])
     e = _voce(b.build(), type_="kerb")
     assert e["state"] == "verificato" and e["others"] == []
+
+
+# --- 10/11: GT3 presunta -------------------------------------------------------------
+
+def test_gt3_presunta_vota_per_la_frenata(b):
+    # Il pilota, il 10/11: una fonte ACC che non nomina classi vale come GT3.
+    b.classe = "gt3_presunta"
+    _brake(b, "https://r/1", "uno")
+    _brake(b, "https://r/2", "due", prefix="Honestly at")
+    b.coach("https://r/3", "Coach Uno", None)
+    e = _voce(b.build(), type_="brake")
+    assert e["state"] == "verificato" and e["fact_key"] and e["others"] == []
+    assert {s["car_class"] for s in e["values"][0]["sources"]} == {"gt3_presunta"}

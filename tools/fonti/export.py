@@ -9,7 +9,8 @@ Esce solo una voce `verificato` del consenso che il controllo ha confermato:
   del contesto, non una prova in più.
 
 `line` e `mistake` (descrittivi) non escono mai. `brake` e `gear` escono con
-`"car_class": "gt3"`: il consenso li conta solo da fonti GT3. Il file è deterministico:
+`"car_class": "gt3"`, o `"gt3_presunta"` se nessuna fonte dichiara la GT3: il
+consenso li conta solo da fonti GT3, dichiarate o presunte. Il file è deterministico:
 ordine del consenso, citazioni tagliate a QUOTE_WORDS parole e QUOTE_CHARS caratteri,
 `json.dumps(sort_keys=True, ensure_ascii=False, indent=1)` e fine riga `\\n`.
 """
@@ -86,7 +87,9 @@ def facts(conn: sqlite3.Connection, track: str) -> list[dict]:
         item = {"corner": e["corner"], "type": e["type"], "value": top["value"],
                 "n": top["n"], "sources": _sources(top)}
         if e["type"] in consensus.GT3_ONLY:
-            item["car_class"] = "gt3"
+            # «gt3» se almeno una fonte la dichiara, se no «gt3_presunta».
+            declared = any(s.get("car_class") == "gt3" for s in top["sources"])
+            item["car_class"] = "gt3" if declared else "gt3_presunta"
         out.append(item)
     return out
 

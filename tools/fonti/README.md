@@ -104,6 +104,10 @@ Imola è `tools/fonti/piani/imola.json`.
    - La classe la dà solo il titolo. GT3 Cup, Trofeo, GT2, M2, TCX e i modelli GT4 non
      sono GT3.
    - Descrizione e flair non danno la classe. Se nominano un'altra classe, la tolgono.
+   - Una fonte che non nomina nessuna classe è «GT3 presunta» e vota come la GT3. In ACC
+     la classe di base è la GT3: l'ha deciso il pilota il 10/11.
+   - Il gioco lo dicono il titolo o il sottoreddit. La descrizione vale solo col nome
+     intero o con «in ACC», e se non nomina un altro gioco.
    - Un commento che dice un'altra classe, per esempio «gt4», ha la sua classe.
    - Le altre classi non votano. Se dicono un valore diverso, la voce diventa contesa.
 

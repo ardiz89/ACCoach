@@ -12,7 +12,7 @@ Tutto è deterministico e si ricalcola dal database a ogni chiamata.
   (kind, testo, pista), da qualsiasi modello, e solo le fonti ACC di quella pista.
 - La classe di un fatto è quella del suo testo (`texts.car_class`, se il testo ne dice
   una) o altrimenti quella della fonte (`sources.car_class`).
-- `brake` e `gear` votano solo con i fatti GT3: il cartello di frenata e la marcia di
+- `brake` e `gear` votano solo con i fatti GT3, dichiarata o presunta (`GT3_CLASSES`): il cartello di frenata e la marcia di
   una GT4 non valgono per una GT3. I fatti di un'altra classe o di classe ignota stanno
   in `others`: non fanno mai un `verificato`, ma se sostengono un valore diverso dal
   vincitore GT3 la voce diventa `conteso`. Gli altri tipi contano tutte le fonti ACC e
@@ -42,6 +42,9 @@ from tools.fonti import db, verify, vocab
 
 DESCRIPTIVE = ("line", "mistake")
 GT3_ONLY = ("brake", "gear")   # tipi che cambiano con la classe d'auto
+# Le classi che votano per la GT3: dichiarata, o presunta perché la fonte ACC non ne
+# nomina nessuna (deciso dal pilota il 10/11).
+GT3_CLASSES = ("gt3", "gt3_presunta")
 # Un testo identico lega due account solo se ha almeno tante parole: «Thanks!» non basta.
 LINK_MIN_WORDS = 8
 
@@ -194,7 +197,7 @@ def build(conn: sqlite3.Connection, track: str) -> list[dict]:
     groups: dict[tuple[str, str], dict[str, dict[str, dict]]] = {}
     for sha, _v, corner, type_, value, quote, start_s, author, platform, url, klass in _rows(conn, track):
         klass = klass or "ignota"
-        side = "others" if type_ in GT3_ONLY and klass != "gt3" else "values"
+        side = "others" if type_ in GT3_ONLY and klass not in GT3_CLASSES else "values"
         g = groups.setdefault((corner, type_), {"values": {}, "others": {}})[side]
         val = g.setdefault(value, {"texts": {}, "sources": set()})
         val["texts"].setdefault(db.author_id(platform, author), set()).add(sha)

@@ -313,7 +313,8 @@ def test_dry_run_stima(tmp_path, capsys):
 def test_piano_imola_ha_il_prezzo():
     piano = json.loads((ROOT / "tools" / "fonti" / "piani" / "imola.json").read_text(encoding="utf-8"))
     prezzi = {v["platform"]: v["cost_per_item_usd"] for v in piano}
-    assert prezzi == {"youtube": 0.004, "reddit": 0.0034}
+    # Reddit: automation-lab, piano FREE, il prezzo del post (il commento costa meno).
+    assert prezzi == {"youtube": 0.004, "reddit": 0.0012}
 
 
 # --- I4: lo schema degli attori -------------------------------------------------------
@@ -383,12 +384,12 @@ def test_game_of(titolo, desc, sub, atteso):
 @pytest.mark.parametrize("testi,atteso", [
     (("ACC Imola GT3 guide", "", ""), "gt3"),
     # N1: la descrizione e il flair non assegnano mai la classe, possono solo toglierla.
-    (("Imola hotlap", "Porsche 992 GT3 R setup", ""), "ignota"),
+    (("Imola hotlap", "Porsche 992 GT3 R setup", ""), "gt3_presunta"),
     (("Imola GT4 tips", "", ""), "gt4"),
     (("Imola", "", "GT4"), "ignota"),
     (("GT3 vs GT4 at Imola", "", ""), "ignota"),
-    (("Imola guide", "", ""), "ignota"),
-    (("Imola gt30 gt3x", "", ""), "ignota"),
+    (("Imola guide", "", ""), "gt3_presunta"),
+    (("Imola gt30 gt3x", "", ""), "gt3_presunta"),
 ])
 def test_classe_dalla_fonte(testi, atteso):
     assert collect.car_class_of(*testi) == atteso
@@ -454,7 +455,7 @@ def test_database_vecchio_riceve_le_colonne(tmp_path):
 @pytest.mark.parametrize("titolo,desc,atteso", [
     ("ACC Imola Porsche 992 GT3 Cup onboard", "", "altra"),
     ("Lamborghini Huracan Super Trofeo EVO2 at Imola ACC", "", "altra"),
-    ("ACC Imola guide", "Driving the Ferrari 296 GT3 today", "ignota"),
+    ("ACC Imola guide", "Driving the Ferrari 296 GT3 today", "gt3_presunta"),
     ("ACC Imola GT3 hotlap", "Next week the GT4 Alpine A110", "ignota"),
     ("ACC Imola GT3 hotlap", "Also try the Porsche Cup", "ignota"),
     ("Ginetta G55 at Imola, ACC", "", "gt4"),
@@ -615,3 +616,68 @@ def test_altro_simulatore_nel_titolo(titolo):
 def test_gt3_e_f1_non_si_confondono():
     assert collect.game_of("ACC Imola GT3 hotlap", "", "") == "acc"
     assert collect.game_of("ACC Imola F12 setup", "", "") == "acc"
+
+
+# --- 10/11: GT3 presunta, ACC nella descrizione, l'attore Reddit nuovo ------------------
+
+@pytest.mark.parametrize("titolo,desc,extra,atteso", [
+    # Il pilota, il 10/11: in ACC una fonte che non nomina nessuna classe conta come GT3.
+    ("Imola In-Depth Track Guide", "Episode 16 of the series", "", "gt3_presunta"),
+    ("Imola guide", "Next week the GT4 cars", "", "ignota"),
+    ("Imola guide", "", "Porsche Cup", "ignota"),
+    ("Imola guide", "Ginetta G55 setup in the notes", "", "ignota"),
+    ("Imola GT3 guide", "", "", "gt3"),
+    ("Imola GT4 guide", "", "", "gt4"),
+])
+def test_gt3_presunta_se_nessuna_classe(titolo, desc, extra, atteso):
+    assert collect.car_class_of(titolo, desc, extra) == atteso
+
+
+@pytest.mark.parametrize("desc,atteso", [
+    ("Episode 16, where we break down each circuit in ACC and look at the tips", "acc"),
+    ("A lap around Imola in Assetto Corsa Competizione.", "acc"),
+    ("My setup for ACC is in the notes.", "acc"),
+    ("ACC version soon", "altro"),
+    ("#acc #imola", "altro"),
+    ("Each circuit in ACC and in iRacing", "altro"),
+    ("Each circuit in ACC #iracing", "altro"),
+    ("We drive it in AC vs ACC", "altro"),
+    ("Accelerate in access mode", "altro"),
+])
+def test_acc_dalla_descrizione(desc, atteso):
+    assert collect.game_of("Imola In-Depth Track Guide", desc, "") == atteso
+
+
+AUTOLAB = "automation-lab~reddit-scraper"
+POST_AL = {"type": "post", "id": "tqdf7r", "author": "u_uno", "subreddit": "ACCompetizione",
+           "title": "Roast my Imola lap, 1.43.9 in the AMG", "selfText": "Any tips?",
+           "linkFlairText": "", "createdAt": "2022-03-28T16:39:19.622Z",
+           "url": "https://www.reddit.com/r/ACCompetizione/comments/tqdf7r/roast_my_imola_lap/",
+           "permalink": "https://www.reddit.com/r/ACCompetizione/comments/tqdf7r/roast_my_imola_lap/"}
+COMMENTO_AL = {"type": "comment", "id": "i2gg1bm", "author": "u_due", "postId": "tqdf7r",
+               "parentId": "t3_tqdf7r", "createdAt": "2022-03-28T16:44:36.298000+0000",
+               "body": "At Acque Minerali I brake at the 100 board.",
+               "permalink": "https://www.reddit.com/r/ACCompetizione/comments/tqdf7r/comment/i2gg1bm/",
+               "postTitle": "Roast my Imola lap, 1.43.9 in the AMG"}
+PIANO_AL = [{"actor": "automation-lab/reddit-scraper", "platform": "reddit", "max_items": 10,
+             "input": {"searchQuery": "Imola", "searchSubreddit": "ACCompetizione"}}]
+
+
+@pytest.mark.parametrize("ordine", [(POST_AL, COMMENTO_AL), (COMMENTO_AL, POST_AL)])
+def test_attore_reddit_automation_lab(tmp_path, ordine):
+    # La forma vista nella prova pagata del 10/11: type, author, selfText, subreddit nel post.
+    conn = _conn(tmp_path)
+    r = collect.collect(conn, _client(Finto(items={AUTOLAB: list(ordine)})), "imola", PIANO_AL)
+    assert r["sources"] == 1 and r["texts"] == 2
+    righe = conn.execute("SELECT url, author, title, game, car_class FROM sources").fetchall()
+    assert righe == [("https://www.reddit.com/comments/tqdf7r/", "u_uno",
+                      "Roast my Imola lap, 1.43.9 in the AMG", "acc", "gt3_presunta")]
+    testi = sorted(conn.execute("SELECT kind, author, body FROM texts").fetchall())
+    assert testi == [("comment", "u_due", "At Acque Minerali I brake at the 100 board."),
+                     ("post", "u_uno", "Roast my Imola lap, 1.43.9 in the AMG\nAny tips?")]
+
+
+def test_commento_automation_lab_senza_post_prende_il_sottoreddit(tmp_path):
+    conn = _conn(tmp_path)
+    collect.collect(conn, _client(Finto(items={AUTOLAB: [COMMENTO_AL]})), "imola", PIANO_AL)
+    assert conn.execute("SELECT game, car_class FROM sources").fetchall() == [("acc", "ignota")]

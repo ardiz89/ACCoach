@@ -21,8 +21,12 @@ from datetime import datetime, timezone
 
 from tools.fonti import apify, db
 
-# ACC si riconosce solo dal titolo o dal sottoreddit: un hashtag nella descrizione no.
+# ACC si riconosce dal titolo o dal sottoreddit: un hashtag nella descrizione no.
 _ACC = re.compile(r"assetto corsa competizione|\bacc\b", re.IGNORECASE)
+# Nella descrizione conta solo una frase che dice il gioco: il nome intero, o «in ACC»
+# («each circuit in ACC»). «ACC version soon» o «#acc» non bastano.
+_DESC_ACC = re.compile(r"(?<!#)\bassetto corsa competizione\b"
+                       r"|\b(?:in|on|for|using|with)\s+(?:the\s+)?acc\b", re.IGNORECASE)
 # Un titolo che nomina anche un altro gioco parla di tutti e due: non è una fonte su ACC.
 _MIXED = re.compile(
     r"\bac\s+vs\.?\s+acc\b|\bacc\s+vs\.?\s+ac\b|\bac1\b|\bassetto corsa 1\b"
@@ -48,19 +52,29 @@ _GT3_CUP = _w("gt3 cup")
 _TS = re.compile(r"(?:(\d+):)?(\d+):(\d+)[,.](\d+)")
 _TAG = re.compile(r"<[^>]*>")
 _POST_ID = re.compile(r"/comments/([A-Za-z0-9]+)")
-CLASSES = ("gt3", "gt4", "altra", "ignota")
+# `gt3_presunta`: la fonte non nomina nessuna classe, e in ACC la classe di base è la GT3
+# (deciso dal pilota il 10/11).
+GT3_PRESUNTA = "gt3_presunta"
+CLASSES = ("gt3", GT3_PRESUNTA, "gt4", "altra", "ignota")
 # I campi dei sottotitoli dell'attore YouTube, in ordine di preferenza: con i tempi prima.
 SUBTITLE_FIELDS = ("srt", "vtt", "plaintext", "text")
 
 
 def game_of(title: str, description: str, subreddit: str) -> str:
-    """`acc` o `altro`. La descrizione non conta mai: lì stanno gli hashtag di tutti i giochi."""
+    """`acc` o `altro`.
+
+    Il titolo basta se nomina ACC. Se non lo nomina, vale la descrizione con una frase
+    di `_DESC_ACC`, purché non nomini un altro gioco, nemmeno con un hashtag.
+    """
     title = title or ""
     if _MIXED.search(title):
         return "altro"
     if (subreddit or "").lower() == "accompetizione":
         return "acc"
-    return "acc" if _ACC.search(title) else "altro"
+    if _ACC.search(title):
+        return "acc"
+    desc = description or ""
+    return "acc" if _DESC_ACC.search(desc) and not _MIXED.search(desc) else "altro"
 
 
 def _classes_named(text) -> set[str]:
@@ -76,9 +90,13 @@ def car_class_of(title, description, extra) -> str:
     """La classe della fonte. Solo il titolo la assegna, se nomina una classe sola.
 
     La descrizione e `extra` (flair, sottoreddit) non assegnano mai: se nominano un'altra
-    classe la tolgono, e la fonte resta `ignota`.
+    classe la tolgono, e la fonte resta `ignota`. Se nessuno dei tre nomina una classe
+    diversa dalla GT3, la fonte è `gt3_presunta`: in ACC la classe di base è la GT3.
     """
     named = _classes_named(title)
+    if not named:
+        return GT3_PRESUNTA if not _classes_named(f"{description or ''} {extra or ''}") - {"gt3"} \
+            else "ignota"
     if len(named) != 1:
         return "ignota"
     klass = next(iter(named))
@@ -164,15 +182,39 @@ def _source(conn, platform, url, author, title, published, game, track, meta, ca
 
 def _post_id(item: dict) -> str | None:
     """L'id del post del thread: dal campo dell'elemento, o dal suo permalink."""
-    tipo = item.get("dataType")
+    tipo = _kind(item)
+    if tipo != "post" and isinstance(item.get("postId"), str) \
+            and re.fullmatch(r"[A-Za-z0-9]+", item["postId"]):
+        return item["postId"]   # automation-lab: l'id del post senza «t3_»
     for campo in (("id",) if tipo == "post" else ("postId", "parentId")):
         v = item.get(campo)
         if isinstance(v, str) and (tipo == "post" or v.startswith("t3_")):
             v = v[3:] if v.startswith("t3_") else v
             if re.fullmatch(r"[A-Za-z0-9]+", v):
                 return v
-    m = _POST_ID.search(item.get("url") or "")
+    m = _POST_ID.search(item.get("url") or item.get("permalink") or "")
     return m.group(1) if m else None
+
+
+# Due attori, due forme: trudax (dataType, username, body, parsedCommunityName) e
+# automation-lab (type, author, selfText per il post, subreddit solo nel post).
+_SUB_IN_URL = re.compile(r"reddit\.com/r/([A-Za-z0-9_]+)/")
+
+
+def _kind(item: dict):
+    return item.get("dataType") or item.get("type")
+
+
+def _subreddit(item: dict) -> str:
+    sub = item.get("parsedCommunityName") or item.get("communityName") or item.get("subreddit")
+    if sub:
+        return str(sub)
+    m = _SUB_IN_URL.search(item.get("permalink") or item.get("url") or "")
+    return m.group(1) if m else ""
+
+
+def _user(item: dict):
+    return item.get("username") or item.get("author")
 
 
 def thread_url(post_id: str) -> str:
@@ -199,25 +241,25 @@ def _youtube(conn, item, track, seen: dict | None = None) -> tuple[int, int, boo
 
 def _reddit(conn, item, track, seen: dict | None = None) -> tuple[int, int, bool]:
     """`(fonte nuova, testo nuovo, c'è un testo)` per un post o un commento."""
-    tipo = item.get("dataType")
+    tipo = _kind(item)
     if tipo not in ("post", "comment"):
         return 0, 0, False
-    sub = item.get("parsedCommunityName") or item.get("communityName") or ""
-    corpo = (item.get("body") or "").strip()
+    sub = _subreddit(item)
+    corpo = (item.get("body") or item.get("selfText") or "").strip()
     pid = _post_id(item)
     if pid is None:
         raise ValueError("post senza id")
     if tipo == "post":
         title = item.get("title")
         flair = item.get("flair") or item.get("linkFlairText")
-        sid, nuova = _source(conn, "reddit", thread_url(pid), item.get("username"), title,
+        sid, nuova = _source(conn, "reddit", thread_url(pid), _user(item), title,
                              item.get("createdAt"), game_of(title, corpo, sub), track,
                              {"subreddit": sub, "post_id": pid, "flair": flair},
                              car_class_of(title, corpo, f"{flair or ''} {sub}"))
         testo = f"{title or ''}\n{corpo}".strip()
         if not testo:
             return int(nuova), 0, False
-        return int(nuova), int(db.add_text(conn, sid, "post", item.get("username") or "", testo,
+        return int(nuova), int(db.add_text(conn, sid, "post", _user(item) or "", testo,
                                            car_class=text_class_of(corpo))[1]), True
     if not corpo:
         return 0, 0, False
@@ -225,7 +267,7 @@ def _reddit(conn, item, track, seen: dict | None = None) -> tuple[int, int, bool
     sid, nuova = _source(conn, "reddit", thread_url(pid), None, None, item.get("createdAt"),
                          game_of("", "", sub), track, {"subreddit": sub, "post_id": pid},
                          "ignota", full=False)
-    return int(nuova), int(db.add_text(conn, sid, "comment", item.get("username") or "", corpo,
+    return int(nuova), int(db.add_text(conn, sid, "comment", _user(item) or "", corpo,
                                        car_class=text_class_of(corpo))[1]), True
 
 

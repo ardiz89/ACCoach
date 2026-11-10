@@ -24,7 +24,8 @@ SECTIONS = (
     ("descrittivo", "Descrittivi"),
 )
 
-CLASS_LABELS = {"gt3": "GT3", "gt4": "GT4", "ignota": "classe ignota"}
+CLASS_LABELS = {"gt3": "GT3", "gt3_presunta": "GT3 presunta", "gt4": "GT4",
+                "altra": "altra classe", "ignota": "classe ignota"}
 TYPE_LABELS = {"brake": "frenata", "gear": "marcia", "apex": "corda", "kerb": "cordolo",
                "line": "linea", "mistake": "errore"}
 

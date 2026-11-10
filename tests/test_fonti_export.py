@@ -390,3 +390,17 @@ def test_review_altre_classi_in_una_riga_a_parte(b, tmp_path):
     assert export.export(b.conn, "imola", tmp_path / "o") == 0
     for frase in review.TESTI:
         assert tono.violations(frase, "it") == [], frase
+
+
+# --- 10/11: GT3 presunta -------------------------------------------------------------
+
+def test_export_gt3_presunta_e_pagina(b, tmp_path):
+    # Se nessuna fonte dichiara la GT3, il file e la pagina dicono «presunta».
+    _riempi(b)
+    b.conn.execute("UPDATE sources SET car_class='gt3_presunta'")
+    b.conn.commit()
+    export.export(b.conn, "imola", tmp_path / "o")
+    fatti = {(f["corner"], f["type"]): f for f in _carica(tmp_path / "o" / "imola.json")["facts"]}
+    assert fatti[(AM, "gear")]["car_class"] == "gt3_presunta"
+    page = review.render(b.conn, "imola", tmp_path / "x.html").read_text(encoding="utf-8")
+    assert "GT3 presunta" in page
