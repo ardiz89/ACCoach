@@ -63,6 +63,11 @@ TURNS: dict[str, dict[str, tuple[int, ...]]] = {
         "Rivazza": (17, 18),
     }
 }
+# I nomi della pista: una fonte è di quella pista solo se il titolo ne dice uno. Una
+# ricerca «ACC Imola» riporta anche guide di Spa, e un «turn 7» di Spa non è la Tosa.
+TRACK_NAMES: dict[str, tuple[str, ...]] = {
+    "imola": ("imola", "enzo e dino ferrari", "santerno"),
+}
 _WORDS = {2: "two", 3: "three", 4: "four", 5: "five", 6: "six", 7: "seven", 9: "nine",
           11: "eleven", 12: "twelve", 14: "fourteen", 15: "fifteen", 17: "seventeen",
           18: "eighteen"}

@@ -124,6 +124,18 @@ def cmd_collect(args) -> int:
         conn.close()
 
 
+def cmd_retrack(args) -> int:
+    from tools.fonti import collect
+
+    conn = db.open_db(_db_path(args.db))
+    try:
+        n = collect.retrack(conn, args.track)
+    finally:
+        conn.close()
+    print(f"Fonti tolte da {args.track}: {n}, perché il titolo non nomina la pista.")
+    return 0
+
+
 def cmd_check_actors(args) -> int:
     import json
 
@@ -252,6 +264,9 @@ def build_parser() -> argparse.ArgumentParser:
     c.add_argument("--force", action="store_true", help="rifà anche le voci già finite")
     c.add_argument("--only", type=int, metavar="N", help="solo la voce numero N del piano (da 1)")
     c.set_defaults(func=cmd_collect)
+    t = sub.add_parser("retrack", help="toglie la pista alle fonti il cui titolo non la nomina")
+    t.add_argument("--track", required=True)
+    t.set_defaults(func=cmd_retrack)
     a = sub.add_parser("check-actors", help="confronta il piano con lo schema degli attori (gratis)")
     a.add_argument("--plan", required=True, metavar="FILE")
     a.add_argument("--env-file", metavar="PATH")

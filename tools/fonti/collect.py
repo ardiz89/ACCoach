@@ -19,7 +19,7 @@ import sqlite3
 import sys
 from datetime import datetime, timezone
 
-from tools.fonti import apify, db
+from tools.fonti import apify, db, vocab
 
 # ACC si riconosce dal titolo o dal sottoreddit: un hashtag nella descrizione no.
 _ACC = re.compile(r"assetto corsa competizione|\bacc\b", re.IGNORECASE)
@@ -75,6 +75,22 @@ def game_of(title: str, description: str, subreddit: str) -> str:
         return "acc"
     desc = description or ""
     return "acc" if _DESC_ACC.search(desc) and not _MIXED.search(desc) else "altro"
+
+
+def track_of(title, track: str) -> str | None:
+    """`track` se il titolo nomina la pista (vocab.TRACK_NAMES), se no None."""
+    t = vocab.fold(str(title or ""))
+    names = vocab.TRACK_NAMES.get(track, (track,))
+    return track if any(vocab.alias_regex(n).search(t) for n in names) else None
+
+
+def retrack(conn: sqlite3.Connection, track: str) -> int:
+    """Toglie la pista alle fonti salvate il cui titolo non la nomina. Quante ne toglie."""
+    via = [sid for sid, title in conn.execute("SELECT id, title FROM sources WHERE track=?", (track,))
+           if track_of(title, track) is None]
+    conn.executemany("UPDATE sources SET track=NULL WHERE id=?", [(s,) for s in via])
+    conn.commit()
+    return len(via)
 
 
 def _classes_named(text) -> set[str]:
@@ -225,7 +241,7 @@ def _youtube(conn, item, track, seen: dict | None = None) -> tuple[int, int, boo
     """`(fonte nuova, testo nuovo, c'è un testo)` per un video."""
     title, desc = item.get("title"), item.get("text")
     sid, nuova = _source(conn, "youtube", item.get("url"), item.get("channelName"), title,
-                         item.get("date"), game_of(title, desc, ""), track,
+                         item.get("date"), game_of(title, desc, ""), track_of(title, track),
                          {"video_id": item.get("id")}, car_class_of(title, desc, ""))
     campo, corpo, segs, keys = subtitles_of(item)
     if seen is not None:
@@ -253,7 +269,7 @@ def _reddit(conn, item, track, seen: dict | None = None) -> tuple[int, int, bool
         title = item.get("title")
         flair = item.get("flair") or item.get("linkFlairText")
         sid, nuova = _source(conn, "reddit", thread_url(pid), _user(item), title,
-                             item.get("createdAt"), game_of(title, corpo, sub), track,
+                             item.get("createdAt"), game_of(title, corpo, sub), track_of(title, track),
                              {"subreddit": sub, "post_id": pid, "flair": flair},
                              car_class_of(title, corpo, f"{flair or ''} {sub}"))
         testo = f"{title or ''}\n{corpo}".strip()
@@ -265,7 +281,8 @@ def _reddit(conn, item, track, seen: dict | None = None) -> tuple[int, int, bool
         return 0, 0, False
     # Il post del thread può arrivare dopo: intanto una fonte minima, che il post completerà.
     sid, nuova = _source(conn, "reddit", thread_url(pid), None, None, item.get("createdAt"),
-                         game_of("", "", sub), track, {"subreddit": sub, "post_id": pid},
+                         game_of("", "", sub), track_of(item.get("postTitle"), track),
+                         {"subreddit": sub, "post_id": pid},
                          "ignota", full=False)
     return int(nuova), int(db.add_text(conn, sid, "comment", _user(item) or "", corpo,
                                        car_class=text_class_of(corpo))[1]), True
@@ -360,6 +377,7 @@ def collect(conn: sqlite3.Connection, client: apify.Apify, track: str, plan: lis
         conn.execute("UPDATE collect_runs SET finished_at=?, items=? WHERE track=? AND entry_key=?",
                      (quando, len(items), track, chiave))
         conn.commit()
+    retrack(conn, track)
     if conn.execute("SELECT 1 FROM spend WHERE track=?", (track,)).fetchone():
         conn.execute("UPDATE spend SET last_usd=? WHERE track=?", (client.usage_usd(), track))
         conn.commit()

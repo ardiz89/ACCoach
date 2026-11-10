@@ -681,3 +681,40 @@ def test_commento_automation_lab_senza_post_prende_il_sottoreddit(tmp_path):
     conn = _conn(tmp_path)
     collect.collect(conn, _client(Finto(items={AUTOLAB: [COMMENTO_AL]})), "imola", PIANO_AL)
     assert conn.execute("SELECT game, car_class FROM sources").fetchall() == [("acc", "ignota")]
+
+
+# --- 10/11: la pista dal titolo -----------------------------------------------------
+
+@pytest.mark.parametrize("titolo,atteso", [
+    ("ACC Imola Hotlap 1:43.697", "imola"),
+    ("Autodromo Enzo e Dino Ferrari track guide", "imola"),
+    ("How to be fast at Spa Francorchamps on Assetto Corsa Competizione", None),
+    ("5 EASY TIPS to get faster in ACC", None),
+    ("Imolaland", None),
+    (None, None),
+])
+def test_pista_dal_titolo(titolo, atteso):
+    # Una ricerca «ACC Imola» riporta anche Spa: un «turn 7» di Spa non è la Tosa.
+    assert collect.track_of(titolo, "imola") == atteso
+
+
+def test_video_di_unaltra_pista_non_e_di_imola(tmp_path):
+    items = [{"id": "v1", "url": "https://www.youtube.com/watch?v=v1", "channelName": "Canale",
+              "title": "How to be fast at Spa | Assetto Corsa Competizione", "text": "",
+              "subtitles": [{"srt": "1\n00:00:01,000 --> 00:00:03,000\nturn 7 brake at the 100 board\n"}]}]
+    conn = _conn(tmp_path)
+    collect.collect(conn, _client(Finto(items={"streamers~youtube-scraper": items})), "imola", PIANO[:1])
+    assert conn.execute("SELECT game, track FROM sources").fetchall() == [("acc", None)]
+
+
+def test_retrack_toglie_le_fonti_vecchie(tmp_path):
+    conn = _conn(tmp_path)
+    for url, titolo in (("https://y/1", "ACC Imola guide"), ("https://y/2", "ACC Spa guide")):
+        conn.execute("INSERT INTO sources(platform, url, title, game, track) VALUES"
+                     " ('youtube', ?, ?, 'acc', 'imola')", (url, titolo))
+    conn.commit()
+    assert collect.retrack(conn, "imola") == 1
+    assert collect.retrack(conn, "imola") == 0
+    assert conn.execute("SELECT url, track FROM sources ORDER BY url").fetchall() == [
+        ("https://y/1", "imola"), ("https://y/2", None)]
+
