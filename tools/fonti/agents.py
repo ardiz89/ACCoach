@@ -242,7 +242,9 @@ def pending(conn: sqlite3.Connection, kind: str, track: str, out_dir: Path) -> l
             jobs.append((sha, {"kind": kind, "sha256": sha, "track": track,
                                "prompt_version": version, "body": t["body"],
                                "segments": t["segments"], "meta": t["meta"],
-                               "corners": corners}))
+                               "corners": corners,
+                               "turns": {c: list(n) for c, n in
+                                         vocab.TURNS.get(track, {}).items()}}))
     else:
         from tools.fonti import consensus
 
