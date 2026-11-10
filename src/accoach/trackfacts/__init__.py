@@ -2,16 +2,21 @@
 from __future__ import annotations
 
 import json
+import re
 import logging
 from pathlib import Path
 
 log = logging.getLogger(__name__)
 
 KNOWN_VERSIONS = (2, 3)
+# Il nome della pista arriva dall'indirizzo della pagina: mai un percorso.
+_TRACK = re.compile(r"[a-z0-9_]+")
 
 
 def load(track: str, root: Path | None = None) -> dict | None:
     """Il file dei fatti della pista, o None se manca o non si legge."""
+    if not isinstance(track, str) or not _TRACK.fullmatch(track):
+        return None
     path = Path(root or Path(__file__).parent) / f"{track}.json"
     try:
         text = path.read_text("utf-8")

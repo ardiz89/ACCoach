@@ -1,4 +1,5 @@
 """Il lettore dei fatti dalle fonti (trackfacts)."""
+import pytest
 import json
 
 from accoach import trackfacts
@@ -93,3 +94,8 @@ def test_file_veri_si_leggono():
     for t in ("imola", "spa"):
         d = trackfacts.load(t)
         assert isinstance(d, dict) and d["version"] == 3
+
+
+@pytest.mark.parametrize("track", ["../imola", "imola/../spa", "C:/x", "", "Imola"])
+def test_load_mai_un_percorso(track):
+    assert trackfacts.load(track) is None
