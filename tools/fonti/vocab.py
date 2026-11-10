@@ -45,6 +45,15 @@ _EXTRA = {
                        "aqua minerali", "aqua mineral", "minerali", "minerale"],
     "Variante Alta": ["alta chicane"],
     "Rivazza": ["rivaza", "revazza", "rivazzas", "rivatsa"],
+    # Spa: nel catalogo Eau Rouge e Raidillon sono una curva sola.
+    "La Source": [],
+    "Raidillon": ["eau rouge", "eau rouge raidillon"],
+    "Les Combes": [],
+    "Rivage": [],
+    "Pouhon": [],
+    "Fagnes": [],
+    "Stavelot": [],
+    "Bus Stop": ["bus stop chicane"],
 }
 
 # I numeri di curva di Imola come li usano le guide su ACC raccolte il 10/11 (Yorkie065,
@@ -67,6 +76,7 @@ TURNS: dict[str, dict[str, tuple[int, ...]]] = {
 # ricerca «ACC Imola» riporta anche guide di Spa, e un «turn 7» di Spa non è la Tosa.
 TRACK_NAMES: dict[str, tuple[str, ...]] = {
     "imola": ("imola", "enzo e dino ferrari", "santerno"),
+    "spa": ("spa", "francorchamps", "spa-francorchamps"),
 }
 _WORDS = {2: "two", 3: "three", 4: "four", 5: "five", 6: "six", 7: "seven", 9: "nine",
           11: "eleven", 12: "twelve", 14: "fourteen", 15: "fifteen", 17: "seventeen",
@@ -87,7 +97,7 @@ CORNERS: dict[str, dict[str, list[str]]] = {
         name: sorted({name.lower(), *_EXTRA.get(name, []), *turn_aliases(track).get(name, [])})
         for name, _pos in _CORNERS[track]
     }
-    for track in ("imola",)
+    for track in ("imola", "spa")
 }
 # Gli alias che chiamano la curva col numero: la pagina di controllo li segna.
 NUMBER_ALIASES: dict[str, set[str]] = {

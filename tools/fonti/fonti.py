@@ -77,7 +77,7 @@ def _dry_run(conn, args, plan) -> int:
         print(f"voce {i} {v['platform']}: {v['actor']} (max {v['max_items']} voci), {testo}{finita}")
     print(f"Stima totale: {totale:.2f} USD.")
     speso = apify.spent(conn, args.track)
-    print(f"Resto del budget: {apify.CAP_USD - speso:.2f} USD (tetto {apify.CAP_USD:.2f}).")
+    print(f"Resto del budget: {args.cap_usd - speso:.2f} USD (tetto {args.cap_usd:.2f}).")
     return 0
 
 
@@ -96,7 +96,8 @@ def cmd_collect(args) -> int:
             return 1
         try:
             r = _apify_errors(lambda: collect.collect(conn, _client(args), args.track, plan,
-                                                      force=args.force, only=args.only))
+                                                      cap_usd=args.cap_usd, force=args.force,
+                                                      only=args.only))
         except Exception as e:  # mai str(e): potrebbe contenere il token
             print(f"Errore inatteso ({type(e).__name__}): la raccolta si ferma. "
                   "Le voci già finite non si ripagano.", file=sys.stderr)
@@ -275,6 +276,8 @@ def build_parser() -> argparse.ArgumentParser:
     c.add_argument("--dry-run", action="store_true")
     c.add_argument("--force", action="store_true", help="rifà anche le voci già finite")
     c.add_argument("--only", type=int, metavar="N", help="solo la voce numero N del piano (da 1)")
+    c.add_argument("--cap-usd", type=float, default=2.0, metavar="USD",
+                   help="tetto di spesa Apify per questa pista (predefinito 2, quello di Imola)")
     c.set_defaults(func=cmd_collect)
     t = sub.add_parser("retrack", help="toglie la pista alle fonti il cui titolo non la nomina")
     t.add_argument("--track", required=True)

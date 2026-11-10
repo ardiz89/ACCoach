@@ -718,3 +718,23 @@ def test_retrack_toglie_le_fonti_vecchie(tmp_path):
     assert conn.execute("SELECT url, track FROM sources ORDER BY url").fetchall() == [
         ("https://y/1", "imola"), ("https://y/2", None)]
 
+
+# --- 10/11: Spa e il tetto per pista -------------------------------------------------
+
+def test_spa_ha_le_sue_curve_e_il_suo_nome():
+    from tools.fonti import vocab
+    assert list(vocab.CORNERS["spa"])[:2] == ["La Source", "Raidillon"]
+    assert "eau rouge" in vocab.CORNERS["spa"]["Raidillon"]
+    assert collect.track_of("ACC Spa-Francorchamps track guide", "spa") == "spa"
+    assert collect.track_of("ACC Imola track guide", "spa") is None
+
+
+def test_dry_run_col_tetto_della_pista(tmp_path, capsys):
+    from tools.fonti import fonti
+
+    piano = tmp_path / "p.json"
+    piano.write_text(json.dumps([dict(PIANO[0], cost_per_item_usd=0.004, max_items=25)]),
+                     encoding="utf-8")
+    assert fonti.main(["--db", str(tmp_path / "d"), "collect", "--track", "spa", "--plan",
+                       str(piano), "--dry-run", "--cap-usd", "0.5"]) == 0
+    assert "tetto 0.50" in capsys.readouterr().out
