@@ -74,6 +74,19 @@ _EXTRA = {
     "Stowe": ["stow", "stove", "stow corner"],
     "Brooklands": ["brooklyn's", "brooklyns"],
     "Vale": ["veil"],
+    # Mount Panorama: «chase», «hell» e «skyline» da soli sono parole comuni.
+    "Hell Corner": ["hell's corner", "hells corner"],
+    "Griffins Bend": ["griffin's bend", "griffins", "griffin's"],
+    "The Cutting": ["cutting"],
+    "Quarry Corner": ["quarry"],
+    "Reid Park": ["reed park", "reeve park"],
+    "Sulman Park": ["salmon park"],
+    "McPhillamy Park": ["mcphillamy", "mcfillamy park", "mcfarlane park"],
+    "The Dipper": ["dipper"],
+    "Forrest's Elbow": ["forest elbow", "forrest elbow", "forest's elbow", "forrests elbow",
+                        "force elbow", "the elbow"],  # a Bathurst il gomito è uno solo
+    "The Chase": ["chase corner"],
+    "Murray's Corner": ["murray's", "murrays corner", "murray"],
     # Suzuka. «Hairpin» e «Esses» sono parole comuni, ma a Suzuka c'è una curva sola così.
     "Esses": ["s curves", "s-curves", "the esses", "s curve"],
     "Dunlop": ["dunlop curve", "dunlop corner"],
@@ -110,6 +123,18 @@ TURNS: dict[str, dict[str, tuple[int, ...]]] = {
     "silverstone": {
         "Copse": (1,),
     },
+    # Mount Panorama: la 1 è la prima staccata dopo il traguardo per Yorkie065, Track
+    # Titan, Yas Heat, Luke Morris e Salt_Slip_9038; la 2 è Griffins Bend per Yorkie065 e SideMax Motorworks; Skyline 11
+    # (Track Titan), The Dipper 14 e Forrest's Elbow 18 (Yorkie065) li dice una guida
+    # sola, in chiaro, e nessuna fonte del 10/11 li contraddice. The Chase e Murray's no:
+    # lì le guide contano le pieghe in modi diversi.
+    "mountpanorama": {
+        "Hell Corner": (1,),
+        "Griffins Bend": (2,),
+        "Skyline": (11,),
+        "The Dipper": (14,),
+        "Forrest's Elbow": (18,),
+    },
 }
 # I nomi della pista: una fonte è di quella pista solo se il titolo ne dice uno. Una
 # ricerca «ACC Imola» riporta anche guide di Spa, e un «turn 7» di Spa non è la Tosa.
@@ -119,6 +144,7 @@ TRACK_NAMES: dict[str, tuple[str, ...]] = {
     "monza": ("monza",),
     "silverstone": ("silverstone",),
     "suzuka": ("suzuka",),
+    "mountpanorama": ("bathurst", "mount panorama", "mt panorama"),
 }
 _WORDS = {1: "one", 2: "two", 3: "three", 4: "four", 5: "five", 6: "six", 7: "seven", 9: "nine",
           11: "eleven", 12: "twelve", 14: "fourteen", 15: "fifteen", 17: "seventeen",
