@@ -12,6 +12,7 @@ new files, so it doesn't touch the live-coaching code.
 
 from __future__ import annotations
 
+import dataclasses
 import logging
 import re
 import statistics
@@ -23,7 +24,7 @@ from fastapi import Body, FastAPI, HTTPException, Query, Request
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from .braking_points import build_sheet
+from .braking_points import brake_points_of_lap, build_sheet
 from .coaching import (
     CornerFacts,
     CueCategory,
@@ -43,11 +44,12 @@ from .coaching import (
     trail_brake_for,
 )
 from .coaching.phases import PHASES
+from .coaching.corner_session import LapCorners, aggregate as aggregate_corners
 from .coaching.debrief import mark_runs_wide
 from .coaching.training import MIN_LAPS as _TRAIN_MIN_LAPS, assess as _assess_training
 from .coaching.trends import session_recap, session_series
 from .comparison import Reference
-from . import cornernames, pagella
+from . import cornernames, pagella, trackfacts
 from .cornermap import learn_from
 from .i18n import current_language
 from .i18n import t as tr_ui
@@ -1829,6 +1831,120 @@ def create_api(
                 "corner_s": round(r.worst_ms / 1000.0, 3),
             } for r in recap.laps],
         }, False
+
+    @app.get("/api/corners")
+    def corners_of_session(
+        car: str = Query(...),
+        track: str = Query(...),
+        index: int = Query(0),               # 0 = the most recent run
+        lang: str | None = Query(None),
+    ) -> dict:
+        """La sessione, curva per curva, con quello che dicono le fonti.
+
+        La sessione e' quella di /api/sessions (stesso raggruppamento, stesso
+        indice), i giri sono i suoi giri validi, e il riferimento e' quello che
+        /api/analysis eleggerebbe per il giro migliore della sessione. Le fonti
+        si abbinano al nome del catalogo per posizione, mai al nome scritto dal
+        pilota: rinominare una curva non le stacca i fatti.
+        """
+        lg = lang or current_language()
+        with _catalog() as cat:
+            all_laps = cat.laps_for(car, track)
+            runs = group_sessions(_own(all_laps))
+            if not runs:
+                return {"corners": [], "laps": 0}
+            index = max(0, min(index, len(runs) - 1))
+            cur = runs[index]
+            best = cur.best
+            if best is None:
+                return {"corners": [], "laps": 0, "index": index}
+            valid = _own_valid(all_laps)
+            cond = _conditions_of(best)
+            elected = _elected_path(cat, car, track, valid, cond["road_temp"],
+                                    cond["grip"], cond["compound"])
+        if elected is None:
+            return {"corners": [], "laps": 0, "index": index}
+        elected_row = next((r for r in all_laps if r["path"] == elected), None)
+        is_pro = (elected_row or {}).get("source") == "pro"
+
+        try:
+            baseline_lap = load_lap(elected)
+        except (OSError, ValueError):
+            raise HTTPException(404, "lap file unreadable")
+        reference = Reference(baseline_lap)
+        if not reference.usable:
+            raise HTTPException(422, "comparison lap has too few samples")
+        try:
+            corners = detect_corners(baseline_lap.samples)
+            names = {c.index: n for c, n in
+                     zip(corners, name_corners(track, corners, lg,
+                                               _corner_map(car, track),
+                                               _typed(track)))}
+            catalog_names = {c.index: n for c, n in
+                             zip(corners, name_corners(track, corners, lg,
+                                                       None, None))}
+        except Exception:  # noqa: BLE001 - a degenerate lap shouldn't 500 the UI
+            raise HTTPException(422, "lap could not be analysed")
+
+        per_lap: list[LapCorners] = []
+        skipped = 0
+        for row in cur.valid_laps:
+            try:
+                lap = load_lap(row["path"])
+                corner_refs = None
+                if not is_pro:
+                    try:
+                        corner_refs = corner_bests_for(
+                            reference, corners, lap, car, track, laps_dir,
+                            _conditions_of(row), review_path=row["path"])
+                    except Exception:  # noqa: BLE001 - il gesto migliore è un bonus
+                        _log.warning("corner refs failed; main reference only",
+                                     exc_info=True)
+                        corner_refs = None
+                try:
+                    debrief = build_lap_debrief(lap, reference, corners, lg,
+                                                corner_refs=corner_refs)
+                except Exception:  # noqa: BLE001 - come /api/analysis
+                    if corner_refs is None:
+                        raise
+                    _log.warning("debrief with corner refs failed; main "
+                                 "reference only", exc_info=True)
+                    debrief = build_lap_debrief(lap, reference, corners, lg)
+                per_lap.append(LapCorners(
+                    path=row["path"],
+                    losses=debrief.losses,
+                    brakes=brake_points_of_lap(lap, corners),
+                    lines=build_line_report(lap, baseline_lap, corners,
+                                            names).corners,
+                ))
+            except Exception:  # noqa: BLE001 - un giro guasto non costa la pagina
+                _log.warning("lap %s skipped in /api/corners", row.get("path"),
+                             exc_info=True)
+                skipped += 1
+
+        facts = trackfacts.load(track)
+        apex = {c.index: round(c.apex_pos, 4) for c in corners}
+        out = []
+        for summary in aggregate_corners(per_lap):
+            catalog_name = catalog_names.get(summary.index,
+                                             f"Corner {summary.index + 1}")
+            sources = trackfacts.for_corner(facts, catalog_name)
+            out.append({
+                **dataclasses.asdict(summary),
+                "name": names.get(summary.index, f"Corner {summary.index + 1}"),
+                "catalog_name": catalog_name,
+                "apex": apex.get(summary.index),
+                "sources": sources,
+                "gear_compare": trackfacts.gear_compare(summary.gear_min, sources),
+            })
+        return {
+            "index": index,
+            "laps": len(per_lap),
+            "skipped": skipped,
+            "reference": {"path": elected, "lap_time_ms": reference.lap_time_ms},
+            "corners": out,
+            "has_sources": facts is not None,
+        }
 
     @app.get("/api/sessions")
     def sessions(

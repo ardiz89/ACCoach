@@ -851,10 +851,28 @@ def test_focus_trends_and_pagella_keep_the_main_reference():
             assert len(call.args) <= 4, f"{path}:{call.lineno}"
             assert all(k.arg != "corner_refs" for k in call.keywords), \
                 f"{path}:{call.lineno} passes corner_refs"
-    # Nell'API la passa una chiamata sola: quella del giro rivisto.
-    with_refs = [c for c in _debrief_calls("api.py")
-                 if any(k.arg == "corner_refs" for k in c.keywords)]
-    assert len(with_refs) == 1
+    # Nell'API la passano solo i giri rivisti: quello del report (`analysis`)
+    # e ogni giro della sessione curva per curva (`corners_of_session`, dove
+    # ogni giro e' un giro rivisto, come vuole lo spec della vista curva).
+    import ast
+    from pathlib import Path
+    src = Path(__file__).resolve().parents[1] / "src" / "accoach" / "api.py"
+    tree = ast.parse(src.read_text(encoding="utf-8"))
+    owners = []
+    for fn in ast.walk(tree):
+        if not isinstance(fn, ast.FunctionDef):
+            continue
+        for n in ast.walk(fn):
+            if (isinstance(n, ast.Call)
+                    and getattr(n.func, "id", "") == "build_lap_debrief"
+                    and any(k.arg == "corner_refs" for k in n.keywords)):
+                owners.append(fn.name)
+    # ast.walk visita anche le funzioni annidate: si tiene la piu' interna.
+    inner = {"analysis", "corners_of_session"}
+    assert sorted(o for o in owners if o in inner) == ["analysis",
+                                                       "corners_of_session"]
+    assert len([c for c in _debrief_calls("api.py")
+                if any(k.arg == "corner_refs" for k in c.keywords)]) == 2
 
 
 # --- Task 6: l'endpoint del report ------------------------------------------
