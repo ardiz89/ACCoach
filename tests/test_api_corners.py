@@ -91,7 +91,10 @@ def test_solo_la_sessione_scelta(tmp_path):
     assert _get(c, index=99).json()["index"] == 1     # fuori scala: l'ultima
 
 
-def test_senza_fatti_niente_fonti(tmp_path):
+def test_senza_fatti_niente_fonti(tmp_path, monkeypatch):
+    # Una pista senza file dei fatti (dal 10/11 Monza ne ha uno: si simula l'assenza).
+    import accoach.trackfacts as tf
+    monkeypatch.setattr(tf, "load", lambda track, root=None: None)
     j = _get(_three(tmp_path)).json()
     assert j["has_sources"] is False
     for c in j["corners"]:
