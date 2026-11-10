@@ -125,6 +125,22 @@ def test_fonti_abbinate_per_posizione(tmp_path, monkeypatch):
     assert all(not x["sources"]["single"] for x in others)
 
 
+def test_pista_numerata_fonti_in_ogni_lingua(tmp_path, monkeypatch):
+    # Sulle piste numerate il nome di catalogo è «Turn N» in ogni lingua: è la chiave
+    # dei fatti, e in italiano la pagina non deve perdere le fonti.
+    d = _laps_dir(tmp_path)
+    for when in ("2026-07-20T18:00:00+00:00", "2026-07-20T18:03:00+00:00"):
+        lap = synth.build_lap()
+        lap.track, lap.recorded_utc, lap.valid, lap.clean = "austin", when, True, True
+        save_lap(lap, d)
+    c = TestClient(create_api(d))
+    params = {"car": CAR, "track": "austin"}
+    it = c.get("/api/corners", params={**params, "lang": "it"}).json()["corners"]
+    en = c.get("/api/corners", params={**params, "lang": "en"}).json()["corners"]
+    assert it and [x["catalog_name"] for x in it] == [x["catalog_name"] for x in en]
+    assert all(not x["catalog_name"].startswith("Curva") for x in it)
+
+
 def test_un_giro_guasto_si_salta(tmp_path, monkeypatch):
     c = _three(tmp_path)
     real = api_mod.build_line_report

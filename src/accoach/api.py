@@ -1903,8 +1903,10 @@ def create_api(
                      zip(corners, name_corners(track, corners, lg,
                                                _corner_map(car, track),
                                                _typed(track)))}
+            # La chiave delle fonti non cambia con la lingua: sulle piste numerate
+            # il catalogo dà «Curva 3» in italiano, e i fatti dicono «Turn 3».
             catalog_names = {c.index: n for c, n in
-                             zip(corners, name_corners(track, corners, lg,
+                             zip(corners, name_corners(track, corners, "en",
                                                        None, None))}
         except Exception:  # noqa: BLE001 - a degenerate lap shouldn't 500 the UI
             raise HTTPException(422, "lap could not be analysed")
