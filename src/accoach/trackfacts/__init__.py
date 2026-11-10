@@ -6,18 +6,26 @@ import re
 import logging
 from pathlib import Path
 
+from ..trackdata import _key
+
 log = logging.getLogger(__name__)
 
 KNOWN_VERSIONS = (2, 3)
 # Il nome della pista arriva dall'indirizzo della pagina: mai un percorso.
-_TRACK = re.compile(r"[a-z0-9_]+")
+# Si controlla com'è arrivato, prima di ridurlo alla chiave: «../imola» senza
+# punti e barre diventerebbe «imola».
+_TRACK = re.compile(r"[a-z0-9_-]+")
 
 
 def load(track: str, root: Path | None = None) -> dict | None:
     """Il file dei fatti della pista, o None se manca o non si legge."""
-    # Il catalogo dei giri scrive la pista come la dà il gioco («Imola»).
+    # Il catalogo dei giri scrive la pista come la dà il gioco («Imola»,
+    # «ks_imola»): la stessa chiave dei nomi curva (trackdata._key).
     track = track.strip().lower() if isinstance(track, str) else ""
     if not _TRACK.fullmatch(track):
+        return None
+    track = _key(track)
+    if not track:
         return None
     path = Path(root or Path(__file__).parent) / f"{track}.json"
     try:

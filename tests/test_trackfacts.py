@@ -96,7 +96,8 @@ def test_file_veri_si_leggono():
         assert isinstance(d, dict) and d["version"] == 3
 
 
-@pytest.mark.parametrize("track", ["../imola", "imola/../spa", "C:/x", ""])
+@pytest.mark.parametrize("track", ["../imola", "imola/../spa", "C:/x", "",
+                                   "../ks_imola", "ks_imola/..", "imola.json"])
 def test_load_mai_un_percorso(track):
     assert trackfacts.load(track) is None
 
@@ -104,3 +105,13 @@ def test_load_mai_un_percorso(track):
 def test_load_col_nome_del_gioco():
     # Il catalogo dei giri dice «Imola»: è la stessa pista.
     assert trackfacts.load("Imola")["track"] == "imola"
+
+
+@pytest.mark.parametrize("track", ["ks_imola", "KS_IMOLA", "ks-imola", "imola"])
+def test_load_con_la_chiave_di_trackdata(track):
+    # AC chiama Imola «ks_imola»: la stessa chiave dei nomi curva.
+    assert trackfacts.load(track)["track"] == "imola"
+
+
+def test_load_spa_col_nome_di_ac():
+    assert trackfacts.load("ks_spa")["track"] == "spa"
