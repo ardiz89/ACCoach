@@ -104,7 +104,9 @@ def test_pending_solo_acc_e_non_congelati(conn, tmp_path):
     assert [p.name for p in jobs] == ["extract-97ee69d68d55.job.json"]
     job = json.loads(jobs[0].read_text(encoding="utf-8"))
     assert set(job) == {"kind", "sha256", "track", "prompt_version", "body", "segments", "meta", "corners",
-                        "turns"}
+                        "turns", "aliases"}
+    assert "aqua minerale" in job["aliases"]["Acque Minerali"]
+    assert "acque minerali" not in job["aliases"]["Acque Minerali"]
     assert job["turns"]["Tosa"] == [7]
     assert job["body"] == CORPO and job["kind"] == "extract" and "Acque Minerali" in job["corners"]
     agents.ingest(conn, FIX / "risposta_estrai.json", "claude-test")

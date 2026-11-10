@@ -47,12 +47,12 @@ _EXTRA = {
     "Rivazza": ["rivaza", "revazza", "rivazzas", "rivatsa"],
     # Spa: nel catalogo Eau Rouge e Raidillon sono una curva sola.
     "La Source": [],
-    "Raidillon": ["eau rouge", "eau rouge raidillon"],
+    "Raidillon": ["eau rouge", "eau rouge raidillon", "radillon", "radillion"],
     "Les Combes": [],
     "Rivage": [],
-    "Pouhon": [],
-    "Fagnes": [],
-    "Stavelot": [],
+    "Pouhon": ["puyon", "puan", "poo on"],
+    "Fagnes": ["les fagnes", "lyfagna"],
+    "Stavelot": ["stavalo"],
     "Bus Stop": ["bus stop chicane"],
 }
 

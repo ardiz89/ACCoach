@@ -4,8 +4,9 @@ prompt_version: 1
 
 You receive one job file (`extract-*.job.json`). It has `body` (the text), `segments`
 (subtitles, or null), `meta` (where the text comes from), `track`, `corners` (the
-only corner names you may use, spelled exactly as listed) and `turns` (for each corner,
-the turn numbers that mean it, for example `"Tosa": [7]`).
+only corner names you may use, spelled exactly as listed), `aliases` (for each corner,
+the other spellings that mean it, for example `"Raidillon": ["eau rouge", "radillon"]`)
+and `turns` (for each corner, the turn numbers that mean it, for example `"Tosa": [7]`).
 
 Your answer is read by a program, not a person. A deterministic verifier checks every
 fact against `body`. Anything it cannot find character for character is thrown away.
@@ -45,8 +46,8 @@ Return ONLY this JSON object. No prose, no Markdown fences, no extra keys:
 5. Leave out anything negated, hedged ("maybe", "if", "or"), or about another game,
    another track or a car-specific setup you cannot tie to the text.
 6. The corner must be named in the text near the quote, before it or right after the
-   value ("brake at the 100 board into Tosa"). A turn number from `turns` counts as the
-   name: "turn 7", "turn seven", "T7" or "curva 7" is Tosa when `turns` says
+   value ("brake at the 100 board into Tosa"). A spelling from `aliases` counts as the name
+   too. A turn number from `turns` counts as the name: "turn 7", "turn seven", "T7" or "curva 7" is Tosa when `turns` says
    `"Tosa": [7]`. Write the corner's name from `corners` in `corner`, never the number.
    A turn number that is not in `turns` names no corner: leave that fact out.
 7. If the text is not about the job's `track` in Assetto Corsa Competizione (ACC), or states no

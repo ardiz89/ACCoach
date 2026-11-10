@@ -243,6 +243,8 @@ def pending(conn: sqlite3.Connection, kind: str, track: str, out_dir: Path) -> l
                                "prompt_version": version, "body": t["body"],
                                "segments": t["segments"], "meta": t["meta"],
                                "corners": corners,
+                               "aliases": {c: [a for a in vocab.CORNERS[track][c]
+                                               if a != c.lower()] for c in corners},
                                "turns": {c: list(n) for c, n in
                                          vocab.TURNS.get(track, {}).items()}}))
     else:
