@@ -4,8 +4,13 @@
   {
    "car_class": "gt3_presunta",
    "corner": "Variante Ascari",
-   "n": 2,
+   "n": 3,
    "sources": [
+    {
+     "quote": "change down to third and aim to get your",
+     "start_s": 169.04,
+     "url": "https://www.youtube.com/watch?v=O7R-abglkZ0"
+    },
     {
      "quote": "down into third chucking the car in",
      "start_s": 469.97,
@@ -65,6 +70,36 @@
    "state": "singolo",
    "type": "brake",
    "value": "board:150"
+  },
+  {
+   "car_class": "gt3_presunta",
+   "corner": "Variante della Roggia",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "start braking and switch to second",
+     "start_s": 120.24,
+     "url": "https://www.youtube.com/watch?v=zZNVsQnuTL8"
+    }
+   ],
+   "state": "singolo",
+   "type": "gear",
+   "value": "2"
+  },
+  {
+   "car_class": "gt3_presunta",
+   "corner": "Lesmo 1",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "Shift down to third and you want to turn in",
+     "start_s": 142.6,
+     "url": "https://www.youtube.com/watch?v=zZNVsQnuTL8"
+    }
+   ],
+   "state": "singolo",
+   "type": "gear",
+   "value": "3"
   },
   {
    "corner": "Lesmo 1",

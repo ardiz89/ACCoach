@@ -187,6 +187,21 @@
    "value": "2"
   },
   {
+   "car_class": "gt3_presunta",
+   "corner": "Stavelot",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "change down to second and turn in as the curb ends",
+     "start_s": 289.68,
+     "url": "https://www.youtube.com/watch?v=8mv7HYAcSms"
+    }
+   ],
+   "state": "singolo",
+   "type": "gear",
+   "value": "2"
+  },
+  {
    "corner": "Stavelot",
    "n": 1,
    "sources": [
