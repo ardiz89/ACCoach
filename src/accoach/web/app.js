@@ -2887,7 +2887,8 @@ function cpcCorner(c, p) {
     lost += `<p class="cpc-phases"><span class="pag-small">${t("corners.phases")}</span>` +
       phases.map((k) => {
         const v = ph[k] / 1000;
-        return `<span>${t("phase." + k)} <span class="num${v > 0 ? " loss" : ""}">${fmtSgn(v, 2, "s")}</span></span>`;
+        // «cpc-loss», non «loss»: «.loss» è la scheda della cascata e la impagina come un riquadro.
+        return `<span>${t("phase." + k)} <span class="num${v > 0 ? " cpc-loss" : ""}">${fmtSgn(v, 2, "s")}</span></span>`;
       }).join("") + `</p>`;
   }
   if (c.cause) {

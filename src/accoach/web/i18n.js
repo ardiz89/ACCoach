@@ -285,7 +285,7 @@
     "corners.line.sub": { en: `Typical gap to the reference line, over your laps.`, it: `Scarto tipico dalla linea del riferimento, sui tuoi giri.` },
     "corners.line.unsided": { en: `There's no single inside here, so right and left are relative to the line.`, it: `Qui non c'è un solo lato interno, quindi destra e sinistra sono rispetto alla linea.` },
     "corners.line.none": { en: `Without coordinates the line can't be measured.`, it: `Senza coordinate la traiettoria non si misura.` },
-    "corners.line.shift": { en: `Apex vs the reference`, it: `Apice rispetto al riferimento` },
+    "corners.line.shift": { en: `Apex vs the reference`, it: `Apex rispetto al riferimento` },
     "corners.best": { en: `Your best lap here`, it: `Il tuo giro migliore qui` },
     "corners.typical": { en: `Your most typical lap`, it: `Il tuo giro più tipico` },
     "corners.open": { en: `Open it in Compare`, it: `Aprilo nel Confronto` },

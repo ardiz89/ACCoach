@@ -1333,7 +1333,9 @@ body.view-pagella #lapbar { display: none; }
 }
 .cpc-block p { margin: 2px 0; }
 .cpc-block.cpc-sources { grid-column: 1 / -1; }
-.cpc-phases { display: flex; flex-wrap: wrap; gap: 2px 14px; }
+.cpc-phases { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 14px; }
+.cpc-phases > .pag-small { flex-basis: 100%; }
+.pag-shell .num.cpc-loss { color: var(--red); }
 .cpc-laps { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
 .cpc-group h5 { margin: 8px 0 2px; font-size: 0.929rem; font-weight: 600; color: var(--muted); }
 .cpc-items, .cpc-quotes, .cpc-vals { list-style: none; margin: 0; padding: 0; }
