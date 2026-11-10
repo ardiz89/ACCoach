@@ -109,6 +109,8 @@ Imola è `tools/fonti/piani/imola.json`.
    - Il gioco lo dicono il titolo o il sottoreddit. La descrizione vale solo col nome
      intero o con «in ACC», e se non nomina un altro gioco.
    - Un commento che dice un'altra classe, per esempio «gt4», ha la sua classe.
+   - Un canale YouTube con un tempo sul giro nel titolo, per esempio «Imola 1:39.2», è un
+     pilota con tempo, quindi affidabile per le frenate. Conta solo la forma coi due punti.
    - Le altre classi non votano. Se dicono un valore diverso, la voce diventa contesa.
 
 8. Fai controllare i fatti verificati.

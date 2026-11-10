@@ -589,3 +589,38 @@ def test_gt3_presunta_vota_per_la_frenata(b):
     e = _voce(b.build(), type_="brake")
     assert e["state"] == "verificato" and e["fact_key"] and e["others"] == []
     assert {s["car_class"] for s in e["values"][0]["sources"]} == {"gt3_presunta"}
+
+
+# --- 10/11: il tempo nel titolo -----------------------------------------------------
+
+def _titolo(b, url, titolo):
+    b.conn.execute("UPDATE sources SET title=? WHERE url=?", (titolo, url))
+    b.conn.commit()
+
+
+@pytest.mark.parametrize("titolo,verificato", [
+    ("Imola 1:39.2 - Ferrari 296 GT3 - GO Setups | ACC 1.10.2", True),
+    ("ACC Imola Hotlap 1:43,697 | Onboard", True),
+    ("ACC | FERRARI 296 GT3 | IMOLA | HOTLAP | 1.39.867 | v1.10", False),   # senza i due punti
+    ("ACC Imola guide | ACC 1.10.2", False),
+    ("Imola 11:39.2:4", False),
+])
+def test_tempo_nel_titolo_rende_affidabile(b, titolo, verificato):
+    # Il pilota, il 10/11: un canale con un tempo nel titolo è un pilota con tempo.
+    for url, autore, pre in (("https://y/1", "Canale Uno", "At"), ("https://r/2", "due", "Honestly at")):
+        body = f"{pre} Acque Minerali you {FRENA_100}."
+        b.testo(url, autore, body, [("brake", "board:100", FRENA_100)],
+                platform="youtube" if url.startswith("https://y") else "reddit")
+    _titolo(b, "https://y/1", titolo)
+    e = _voce(b.build(), type_="brake")
+    assert (e["state"] == "verificato") is verificato, e["state"]
+
+
+def test_tempo_nel_titolo_solo_youtube_e_acc(b):
+    for url, autore, pre, plat in (("https://r/1", "uno", "At", "reddit"),
+                                   ("https://r/2", "due", "Honestly at", "reddit")):
+        b.testo(url, autore, f"{pre} Acque Minerali you {FRENA_100}.",
+                [("brake", "board:100", FRENA_100)], platform=plat)
+    _titolo(b, "https://r/1", "My Imola lap 1:43.4")
+    assert _voce(b.build(), type_="brake")["state"] == "singolo"
+

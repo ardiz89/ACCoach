@@ -22,6 +22,10 @@ Tutto è deterministico e si ricalcola dal database a ogni chiamata.
   nome e un tempo sul giro. Le valutazioni sono già verificate dall'ingest. Se il
   testo valutato l'hanno pubblicato più account, conta solo quello che si chiama
   come `speaker.name` (senza badare a maiuscole); se nessuno, nessuno.
+- È affidabile anche un canale YouTube con un tempo sul giro nel titolo di un suo
+  video ACC di quella pista («Imola 1:39.2 - Ferrari 296 GT3»): un pilota con nome e
+  tempo, letto dal codice senza AI (deciso dal pilota il 10/11). Solo la forma con i
+  due punti: «1.10.2» è la versione del gioco.
 - Per i tipi con vocabolario:
   - `conteso`: due valori con almeno 2 autori ciascuno, oppure un valore con almeno
     2 autori e un altro con un autore affidabile;
@@ -36,11 +40,14 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import sqlite3
 
 from tools.fonti import db, verify, vocab
 
 DESCRIPTIVE = ("line", "mistake")
+# Un tempo sul giro nel titolo di un video, come numero a sé: «1:39.2», «1:43,697».
+TITLE_LAP = re.compile(r"(?<![0-9:.,])" + vocab.LAP_TIME.pattern + r"(?![0-9:])")
 GT3_ONLY = ("brake", "gear")   # tipi che cambiano con la classe d'auto
 # Le classi che votano per la GT3: dichiarata, o presunta perché la fonte ACC non ne
 # nomina nessuna (deciso dal pilota il 10/11).
@@ -96,6 +103,11 @@ def _reliable_authors(conn: sqlite3.Connection, track: str) -> set[str]:
             # Un testo ripostato da più account: la valutazione va solo a chi parla.
             rows = [(aid, a) for aid, a in rows if a == name.strip().casefold()]
         good.update(aid for aid, _ in rows)
+    for author, title in conn.execute(
+            "SELECT author, title FROM sources WHERE platform='youtube' AND game='acc' AND track=?",
+            (track,)):
+        if (author or "").strip() and TITLE_LAP.search(title or ""):
+            good.add(db.author_id("youtube", author))
     return good
 
 
