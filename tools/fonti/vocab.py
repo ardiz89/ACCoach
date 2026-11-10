@@ -95,6 +95,11 @@ _EXTRA = {
     "Mastersbocht": ["masters corner", "masters bocht"],
     "Hans Ernst": ["hans ernst bocht", "hans ernstbocht"],
     "Arie Luyendijkbocht": ["arie luyendijk", "luyendijk", "ariel indict curve"],
+    # Barcellona: «Elf» e «Seat» sono anche parole comuni, nessun alias in più.
+    "Repsol": ["repsol corner"],
+    "Campsa": ["campsa corner"],
+    "La Caixa": ["caixa"],
+    "Banc Sabadell": ["sabadell"],
     # Brands Hatch. «Dingle Dell» non è nel catalogo; «clear» da solo è una parola comune.
     "Paddock Hill Bend": ["paddock hill", "paddock", "paddical", "paddock bend hill",
                           "paddock kill bend"],
@@ -166,6 +171,12 @@ TURNS: dict[str, dict[str, tuple[int, ...]]] = {
         "Stirling's": (8,),
         "Clark Curve": (9,),
     },
+    # Barcellona: Michael Romagnoli Esport chiama tornante la 5 e «the hairpin» la 10, cioè
+    # Seat e La Caixa. Gli altri numeri delle guide non si legano a un nome con un dato.
+    "catalunya": {
+        "Seat": (5,),
+        "La Caixa": (10,),
+    },
 }
 # I nomi della pista: una fonte è di quella pista solo se il titolo ne dice uno. Una
 # ricerca «ACC Imola» riporta anche guide di Spa, e un «turn 7» di Spa non è la Tosa.
@@ -178,8 +189,8 @@ TRACK_NAMES: dict[str, tuple[str, ...]] = {
     "mountpanorama": ("bathurst", "mount panorama", "mt panorama"),    "zandvoort": ("zandvoort",),    "brandshatch": ("brands hatch", "brands"),    "catalunya": ("barcelona", "barcellona", "catalunya", "catalonia", "montmelo"),
 }
 _WORDS = {1: "one", 2: "two", 3: "three", 4: "four", 5: "five", 6: "six", 7: "seven",
-          8: "eight", 9: "nine", 11: "eleven", 12: "twelve", 14: "fourteen", 15: "fifteen",
-          17: "seventeen", 18: "eighteen"}
+          8: "eight", 9: "nine", 10: "ten", 11: "eleven", 12: "twelve", 14: "fourteen",
+          15: "fifteen", 17: "seventeen", 18: "eighteen"}
 
 
 def turn_aliases(track: str) -> dict[str, list[str]]:
