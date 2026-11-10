@@ -96,6 +96,11 @@ def test_file_veri_si_leggono():
         assert isinstance(d, dict) and d["version"] == 3
 
 
-@pytest.mark.parametrize("track", ["../imola", "imola/../spa", "C:/x", "", "Imola"])
+@pytest.mark.parametrize("track", ["../imola", "imola/../spa", "C:/x", ""])
 def test_load_mai_un_percorso(track):
     assert trackfacts.load(track) is None
+
+
+def test_load_col_nome_del_gioco():
+    # Il catalogo dei giri dice «Imola»: è la stessa pista.
+    assert trackfacts.load("Imola")["track"] == "imola"

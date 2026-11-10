@@ -15,7 +15,9 @@ _TRACK = re.compile(r"[a-z0-9_]+")
 
 def load(track: str, root: Path | None = None) -> dict | None:
     """Il file dei fatti della pista, o None se manca o non si legge."""
-    if not isinstance(track, str) or not _TRACK.fullmatch(track):
+    # Il catalogo dei giri scrive la pista come la dà il gioco («Imola»).
+    track = track.strip().lower() if isinstance(track, str) else ""
+    if not _TRACK.fullmatch(track):
         return None
     path = Path(root or Path(__file__).parent) / f"{track}.json"
     try:
