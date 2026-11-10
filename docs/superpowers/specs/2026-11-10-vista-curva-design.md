@@ -48,9 +48,11 @@ la peggiore in cima. Una riga si apre in quattro blocchi.
      segnalano qui».
 
    Dove il confronto è un fatto, la riga lo mette accanto alla tua guida senza
-   giudicare: «Tu: terza. Una fonte: seconda.» Vale solo per la marcia, l'apice
-   (anticipato, centrale, ritardato) e il cordolo. Il cartello di frenata non si
-   confronta: non sappiamo a quanti metri sta il cartello dei 100 sulla mappa di ACC.
+   giudicare: «Tu: terza. Una fonte: seconda.» Vale solo per la marcia *[corretto
+   scrivendo il piano: il nostro spostamento d'apice è rispetto al tuo riferimento,
+   non all'apice geometrico che le fonti chiamano anticipato o ritardato, e il
+   cordolo non lo misuriamo]*. Il cartello di frenata non si confronta: non sappiamo
+   a quanti metri sta il cartello dei 100 sulla mappa di ACC.
 
 ## Cosa non deve mai succedere
 
