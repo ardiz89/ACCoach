@@ -171,6 +171,20 @@
    "n": 1,
    "sources": [
     {
+     "quote": "We brake in a straight line as long as possible",
+     "start_s": 225.699,
+     "url": "https://www.youtube.com/watch?v=cq-899D_xEM"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "line",
+   "value": "We brake in a straight line as long as possible"
+  },
+  {
+   "corner": "Tosa",
+   "n": 1,
+   "sources": [
+    {
      "quote": "holding 10%-30% throttle before you even reach the apex",
      "start_s": null,
      "url": "https://www.reddit.com/comments/1e0o76p/"
@@ -377,6 +391,20 @@
    "state": "descrittivo",
    "type": "mistake",
    "value": "You're way too slow through the shallow right (11) because you brake too much."
+  },
+  {
+   "corner": "Acque Minerali",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "very easy to get a slide on the exit of turn 12",
+     "start_s": 305.84,
+     "url": "https://www.youtube.com/watch?v=BzjWkCfJzYM"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "mistake",
+   "value": "very easy to get a slide on the exit of turn 12"
   },
   {
    "corner": "Variante Alta",
