@@ -390,8 +390,10 @@ def test_frase_dai_segmenti_senza_punteggiatura():
     q = "at tosa brake at the 100 board"
     assert _c(q, "board:100", "brake", body) is not None  # senza segmenti è una frase sola
     assert _c(q, "board:100", "brake", body, segments=segs) is None
+    # 10/11: senza punteggiatura una citazione può prendere due righe, ma la frase è
+    # allora fatta di tutte e due: il dubbio della seconda riga scarta il fatto.
     assert _c("tosa brake at the 100 board or later", "board:100", "brake", body, segments=segs) \
-        == "citazione_oltre_frase"
+        == "valore_non_normalizzabile"
 
 
 @pytest.mark.parametrize("quote,value,type_,body", [
@@ -618,13 +620,30 @@ def test_descrittivi_una_curva_sola_restano():
     assert _c(q2, q2, "line", body) is None
 
 
-def test_segmenti_dividono_anche_con_punteggiatura():
-    body = "is this right? at villeneuve brake hard at the 100 board then tosa"
-    segs = [{"start_s": 0.0, "text": "at villeneuve brake hard"},
-            {"start_s": 2.0, "text": "at the 100 board then tosa"}]
+def test_sottotitoli_con_punteggiatura_vanno_a_capo_a_meta_frase():
+    # 10/11: le righe di sottotitoli punteggiati sono a capo, la frase finisce al punto.
+    segs = [{"start_s": 0.0, "text": "For Les Combes, brake before the 100 m"},
+            {"start_s": 2.0, "text": "board. Then at Villeneuve brake hard at the"},
+            {"start_s": 4.0, "text": "100 board. Stay left."}]
+    body = " ".join(x["text"] for x in segs)
+    q = "at Villeneuve brake hard at the 100 board"
+    assert _c(q, "board:100", "brake", body, corner="Villeneuve", segments=segs) is None
+    q2 = "brake hard at the 100 board. Stay left"
+    assert _c(q2, "board:100", "brake", body, corner="Villeneuve", segments=segs) \
+        == "citazione_oltre_frase"
+
+
+def test_senza_punteggiatura_al_massimo_due_righe():
+    # Un «?» sperduto in un testo lungo non lo rende punteggiato: le righe restano confini,
+    # e una citazione ne attraversa al massimo una.
+    segs = [{"start_s": float(i), "text": t} for i, t in enumerate(
+        ["is this right", "at villeneuve brake hard", "at the 100 board then", "you go flat " * 40])]
+    segs[0]["text"] += "?"
+    body = " ".join(x["text"] for x in segs)
     q = "villeneuve brake hard at the 100 board"
-    assert _c(q, "board:100", "brake", body, corner="Villeneuve") is None  # senza segmenti
-    assert _c(q, "board:100", "brake", body, corner="Villeneuve", segments=segs) \
+    assert _c(q, "board:100", "brake", body, corner="Villeneuve", segments=segs) is None
+    q3 = "villeneuve brake hard at the 100 board then you go flat"
+    assert _c(q3, "board:100", "brake", body, corner="Villeneuve", segments=segs) \
         == "citazione_oltre_frase"
 
 

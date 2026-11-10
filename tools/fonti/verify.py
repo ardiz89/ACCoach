@@ -30,16 +30,38 @@ def _quote_regex(quote: str) -> re.Pattern:
     return re.compile(pre + re.escape(quote) + post)
 
 
+# Sottotitoli con almeno un punto ogni tanti caratteri: hanno la punteggiatura, e la
+# fine della riga è solo un a capo. Senza, le righe sono l'unico confine che c'è.
+PUNCTUATED_CHARS = 400
+# Nei sottotitoli senza punteggiatura una citazione può stare su due righe di fila.
+SOFT_SEGMENTS = 2
+
+
+def _terminators(body: str) -> list[int]:
+    return [i for i, c in enumerate(body)
+            if c in _LINE_BREAKS + "!?…" or (c == "." and not (0 < i < len(body) - 1
+                                                             and body[i - 1].isdigit() and body[i + 1].isdigit()))]
+
+
+def _punctuated(body: str) -> bool:
+    stops = sum(1 for i in _terminators(body) if body[i] not in _LINE_BREAKS)
+    return stops * PUNCTUATED_CHARS >= len(body)
+
+
+def _soft(body: str, segments) -> bool:
+    """Le righe dei sottotitoli sono confini «morbidi»: il testo non ha punteggiatura."""
+    return bool(segments) and not _punctuated(body)
+
+
 def _boundaries(body: str, segments) -> list[int] | None:
     """Indici grezzi dove una frase finisce; None se i segmenti non tornano col testo.
 
     La frase finisce a «.», «!», «?», «…» o a un a capo di qualunque tipo (il punto fra
-    due cifre no). Con i sottotitoli anche la fine di ogni segmento chiude la frase, che
-    il testo abbia punteggiatura o no.
+    due cifre no). Sottotitoli con la punteggiatura: le righe vanno a capo a metà frase,
+    quindi contano solo i punti. Sottotitoli senza: la fine di ogni riga chiude la frase,
+    e `check_fact` lascia passare una citazione su SOFT_SEGMENTS righe di fila.
     """
-    ends = [i for i, c in enumerate(body)
-            if c in _LINE_BREAKS + "!?…" or (c == "." and not (0 < i < len(body) - 1
-                                                             and body[i - 1].isdigit() and body[i + 1].isdigit()))]
+    ends = _terminators(body)
     if not segments:
         return ends
     cursor = 0
@@ -51,7 +73,8 @@ def _boundaries(body: str, segments) -> list[int] | None:
         if at < 0:
             return None
         cursor = at + len(text)
-        ends.append(cursor)
+        if not _punctuated(body):
+            ends.append(cursor)
     return sorted(set(ends))
 
 
@@ -142,10 +165,13 @@ def check_fact(track: str, fact: dict, body: str, segments: list | None = None) 
     core = len(quote.rstrip(_TERMINATORS + " "))
     first, last = idx[j], idx[j + max(core, 1) - 1]
     k = bisect.bisect_left(ends, first)
-    if k < len(ends) and ends[k] <= last:
+    inside = bisect.bisect_right(ends, last) - k
+    allowed = SOFT_SEGMENTS - 1 if _soft(body, segments) else 0
+    if inside > allowed:
         return "citazione_oltre_frase"
     s_raw = ends[k - 1] + 1 if k > 0 else 0
-    e_raw = ends[k] if k < len(ends) else len(body)
+    k_end = k + inside   # la frase arriva alla prima fine dopo la citazione
+    e_raw = ends[k_end] if k_end < len(ends) else len(body)
     ns, ne = bisect.bisect_left(idx, s_raw), bisect.bisect_left(idx, e_raw)
     sentence = nbody[ns:ne]
 
