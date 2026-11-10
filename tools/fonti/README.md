@@ -106,6 +106,13 @@ Imola è `tools/fonti/piani/imola.json`.
    - Descrizione e flair non danno la classe. Se nominano un'altra classe, la tolgono.
    - Una fonte che non nomina nessuna classe è «GT3 presunta» e vota come la GT3. In ACC
      la classe di base è la GT3: l'ha deciso il pilota il 10/11.
+   - Le curve si riconoscono dal nome o dal numero delle guide su ACC, per esempio «turn 7»
+     per la Tosa. La tabella è `vocab.TURNS`, decisa dal pilota il 10/11. Le pieghe dove le
+     fonti non concordano non hanno numero. La pagina segna «curva dal numero».
+   - Una fonte è della pista solo se il titolo la nomina: una ricerca «ACC Imola» riporta
+     anche guide di Spa. `F retrack --track imola` sistema le fonti già salvate.
+   - Dopo una correzione del verificatore o degli alias, `F reverify --track imola` rifà
+     fatti e scarti dalle risposte già congelate, senza richiamare gli agenti.
    - Il gioco lo dicono il titolo o il sottoreddit. La descrizione vale solo col nome
      intero o con «in ACC», e se non nomina un altro gioco.
    - Un commento che dice un'altra classe, per esempio «gt4», ha la sua classe.
