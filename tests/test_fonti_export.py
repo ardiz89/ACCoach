@@ -448,7 +448,7 @@ def test_export_contesi_e_respinti_a_parte(b, tmp_path):
     disp = {(x["corner"], x["type"]): x for x in d["disputed"]}
     riv = disp[(RIV, "gear")]
     assert riv["why"] == "respinto" and "2" in [v["value"] for v in riv["values"]]
-    assert riv["reason"] == "il testo dice respinto"
+    assert riv["reason"] == "the quick guys go down to second gear"
     assert all(v["sources"] and v["n"] >= 1 for v in riv["values"])
     vil = disp[("Villeneuve", "gear")]
     assert vil["why"] == "conteso" and "reason" not in vil
@@ -456,3 +456,16 @@ def test_export_contesi_e_respinti_a_parte(b, tmp_path):
     for k in ((RIV, "gear"), ("Villeneuve", "gear")):
         assert k not in {(f["corner"], f["type"]) for f in d["facts"]}
         assert k not in {(f["corner"], f["type"]) for f in d["single"]}
+
+
+def test_disputed_reason_e_la_citazione_tagliata(b, tmp_path):
+    lungo = ("At Variante Alta I go down to second gear and honestly the quick guys all do "
+             "the same thing every single lap of the race")
+    for u, a in (("https://r/v1", "v1"), ("https://r/v2", "v2")):
+        b.testo(u, a, a + " " + lungo, [("Variante Alta", "gear", "2", "down to second gear")])
+    b.testo("https://r/v3", "v3", lungo)
+    b.factcheck("Variante Alta", "gear", "respinto", lungo, lungo)
+    export.export(b.conn, "imola", tmp_path / "o")
+    d = _carica(tmp_path / "o" / "imola.json")
+    x = next(i for i in d["disputed"] if i["corner"] == "Variante Alta")
+    assert len(lungo.split()) > 15 and x["reason"] == " ".join(lungo.split()[:15])

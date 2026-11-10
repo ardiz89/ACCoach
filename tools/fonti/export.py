@@ -15,7 +15,7 @@ pilota il 10/11). Ogni valore porta i suoi autori in `n` e le sue fonti.
 
 In `disputed` escono le fonti in disaccordo: le voci `conteso` del consenso e i
 `verificato` che il controllo ha respinto (`why` è `conteso` o `respinto`; nel secondo
-caso `reason` è la motivazione del primo controllo che ha respinto). Mai un riferimento.
+caso `reason` è la citazione tagliata del primo controllo che ha respinto, se c'è). Mai un riferimento.
 
 In `facts`, `line` e `mistake` non escono mai. `brake` e `gear` escono con
 `"car_class": "gt3"`, o `"gt3_presunta"` se nessuna fonte dichiara la GT3: il
@@ -134,7 +134,7 @@ def disputed(conn: sqlite3.Connection, track: str) -> list[dict]:
             why, reason = "conteso", None
         elif status(e, checks) == "respinto":
             why = "respinto"
-            reason = cut(checks[e["fact_key"]]["respinto"][0].get("reason"))
+            reason = cut(checks[e["fact_key"]]["respinto"][0].get("quote")) or None
         else:
             continue
         item = {"corner": e["corner"], "type": e["type"], "why": why,
