@@ -93,6 +93,19 @@ def test_numeri_di_curva_delle_guide_acc():
     assert {"turn 7", "turn seven", "t7", "curva 7"} <= set(vocab.CORNERS["imola"]["Tosa"])
 
 
+def test_silverstone_solo_copse_ha_un_numero():
+    # Su ACC la curva 1 di Silverstone è Copse, non Abbey: le fonti concordano solo lì.
+    assert vocab.TURNS["silverstone"] == {"Copse": (1,)}
+    q = "t1 (copse): brake at the 100 board"
+    assert verify.check_fact("silverstone", fatto(q, "board:100", corner="Copse"), q) is None
+    q = "turn 1 brake at the 100 board"
+    assert verify.check_fact("silverstone", fatto(q, "board:100", corner="Abbey"),
+                             q) == "curva_non_trovata"
+    q = "turn 10 brake at the 100 board"
+    assert verify.check_fact("silverstone", fatto(q, "board:100", corner="Copse"),
+                             q) == "curva_non_trovata"
+
+
 @pytest.mark.parametrize("q", ["turn 1 brake at the 100 board", "turn 10 brake at the 100 board",
                                "turn 13 brake at the 100 board", "turn 19 brake at the 100 board",
                                "t8 brake at the 100 board"])

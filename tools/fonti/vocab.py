@@ -90,7 +90,14 @@ TURNS: dict[str, dict[str, tuple[int, ...]]] = {
         "Acque Minerali": (11, 12),
         "Variante Alta": (14, 15),
         "Rivazza": (17, 18),
-    }
+    },
+    # Silverstone su ACC parte dalla vecchia zona box: la curva 1 è Copse, non Abbey come
+    # in F1 (Scuderia Fantozzi lo dice in chiaro, e così ScallionForward2838 e
+    # FatherJack_Hackett). Sul resto le fonti del 10/11 numerano in modi diversi
+    # (Yorkie065: Loop 14; ScallionForward2838: Luffield 14), quindi resta solo Copse.
+    "silverstone": {
+        "Copse": (1,),
+    },
 }
 # I nomi della pista: una fonte è di quella pista solo se il titolo ne dice uno. Una
 # ricerca «ACC Imola» riporta anche guide di Spa, e un «turn 7» di Spa non è la Tosa.
@@ -100,7 +107,7 @@ TRACK_NAMES: dict[str, tuple[str, ...]] = {
     "monza": ("monza",),
     "silverstone": ("silverstone",),
 }
-_WORDS = {2: "two", 3: "three", 4: "four", 5: "five", 6: "six", 7: "seven", 9: "nine",
+_WORDS = {1: "one", 2: "two", 3: "three", 4: "four", 5: "five", 6: "six", 7: "seven", 9: "nine",
           11: "eleven", 12: "twelve", 14: "fourteen", 15: "fifteen", 17: "seventeen",
           18: "eighteen"}
 
