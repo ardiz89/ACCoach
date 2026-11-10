@@ -76,7 +76,12 @@ def test_the_exact_italian_copy():
                  "Nessun giro valido in questa sessione.",
                  "{n} {n|giro non analizzato|giri non analizzati}."):
         assert text in it.values(), text
-    assert it["corners.brake"] == "{m} m prima del punto più lento, ±{spread} m."
+    # La dispersione e' max - min: «±» la leggerebbe come meta' dell'intervallo.
+    assert it["corners.brake"] == ("{m} m prima del punto più lento, e "
+                                   "fra un giro e l'altro cambia di {spread} m.")
+    assert _CORNERS["corners.brake"]["en"] == ("{m} m before the slowest point, "
+                                               "and it varies by {spread} m from lap to lap.")
+    assert not any("±" in v[lg] for v in _CORNERS.values() for lg in ("en", "it"))
     # Le fasi vengono solo dai giri che perdono: la riga lo dice.
     assert it["corners.phases"] == "Mediana per fase, nei giri in cui perdi"
     assert _CORNERS["corners.phases"]["en"] == "Median by phase, on the laps where you lose"
