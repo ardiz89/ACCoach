@@ -1,0 +1,309 @@
+{
+ "disputed": [],
+ "facts": [],
+ "single": [
+  {
+   "car_class": "gt3_presunta",
+   "corner": "Corner 1",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "break straight just before the line at the 100 m sign",
+     "start_s": 41.719,
+     "url": "https://www.youtube.com/watch?v=IFYkT_KV08w"
+    }
+   ],
+   "state": "singolo",
+   "type": "brake",
+   "value": "board:100"
+  },
+  {
+   "car_class": "gt3_presunta",
+   "corner": "Corner 1",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "take corner one in second gear for better acceleration out of it",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/1mw7eq5/"
+    }
+   ],
+   "state": "singolo",
+   "type": "gear",
+   "value": "2"
+  },
+  {
+   "car_class": "gt3_presunta",
+   "corner": "Corner 1",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "Also, 3rd gear is better there",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/1n27qsx/"
+    }
+   ],
+   "state": "singolo",
+   "type": "gear",
+   "value": "3"
+  },
+  {
+   "corner": "Corner 1",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "T1: Sliding, can use more outside kerb",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/1iedzuc/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "line",
+   "value": "T1: Sliding, can use more outside kerb"
+  },
+  {
+   "corner": "Corner 1",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "We need to get on the gas early.",
+     "start_s": 250.511,
+     "url": "https://www.youtube.com/watch?v=Y6jOq5V21e0"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "line",
+   "value": "We need to get on the gas early."
+  },
+  {
+   "corner": "Corner 1",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "this corner really benefits from a later turn in",
+     "start_s": 47.039,
+     "url": "https://www.youtube.com/watch?v=IFYkT_KV08w"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "line",
+   "value": "this corner really benefits from a later turn in"
+  },
+  {
+   "corner": "Corner 1",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "You lose most of the time by having a slow exit from t1.",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/1o51yh1/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "mistake",
+   "value": "You lose most of the time by having a slow exit from t1."
+  },
+  {
+   "corner": "Corner 1",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "it is really easy to go over track limits",
+     "start_s": 63.8,
+     "url": "https://www.youtube.com/watch?v=IFYkT_KV08w"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "mistake",
+   "value": "it is really easy to go over track limits"
+  },
+  {
+   "corner": "Corner 2",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "key to turn 2 is a late turn in",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/1abucup/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "line",
+   "value": "key to turn 2 is a late turn in"
+  },
+  {
+   "car_class": "gt3_presunta",
+   "corner": "Corner 3",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "break just before the line at the 100 m sign",
+     "start_s": 96.96,
+     "url": "https://www.youtube.com/watch?v=IFYkT_KV08w"
+    }
+   ],
+   "state": "singolo",
+   "type": "brake",
+   "value": "board:100"
+  },
+  {
+   "car_class": "gt3_presunta",
+   "corner": "Corner 3",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "get into first gear for engine brake",
+     "start_s": 98.84,
+     "url": "https://www.youtube.com/watch?v=_F3HJcmzQHA"
+    }
+   ],
+   "state": "singolo",
+   "type": "gear",
+   "value": "1"
+  },
+  {
+   "corner": "Corner 3",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "T3, try a later turn in",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/1n27qsx/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "line",
+   "value": "T3, try a later turn in"
+  },
+  {
+   "corner": "Corner 3",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "in T3 for example, you still full brakes on the apex",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/1n27qsx/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "mistake",
+   "value": "in T3 for example, you still full brakes on the apex"
+  },
+  {
+   "car_class": "gt3_presunta",
+   "corner": "Corner 4",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "get into second gear this is quite a late Apex",
+     "start_s": 132.76,
+     "url": "https://www.youtube.com/watch?v=_F3HJcmzQHA"
+    }
+   ],
+   "state": "singolo",
+   "type": "gear",
+   "value": "2"
+  },
+  {
+   "corner": "Corner 5",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "T5: On throttle too early, causing understeer mid corner",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/1iedzuc/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "mistake",
+   "value": "T5: On throttle too early, causing understeer mid corner"
+  },
+  {
+   "corner": "Corner 6",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "T6 (first left in S2), you need to turn in earlier",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/1n27qsx/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "line",
+   "value": "T6 (first left in S2), you need to turn in earlier"
+  },
+  {
+   "corner": "Corner 7",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "guide the car into a mid Corner Apex",
+     "start_s": 315.88,
+     "url": "https://www.youtube.com/watch?v=9vp7SrDjlTA"
+    }
+   ],
+   "state": "singolo",
+   "type": "apex",
+   "value": "middle"
+  },
+  {
+   "corner": "Corner 7",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "T7 you ran a little too deep",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/1o51yh1/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "mistake",
+   "value": "T7 you ran a little too deep"
+  },
+  {
+   "car_class": "gt3_presunta",
+   "corner": "Corner 9",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "get into third gear and go on the curb precisely",
+     "start_s": 239.879,
+     "url": "https://www.youtube.com/watch?v=_F3HJcmzQHA"
+    }
+   ],
+   "state": "singolo",
+   "type": "gear",
+   "value": "3"
+  },
+  {
+   "corner": "Corner 9",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "T9, be more on the curb, like get your right hand tires on the curb",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/1o51yh1/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "line",
+   "value": "T9, be more on the curb, like get your right hand tires on the curb"
+  },
+  {
+   "corner": "Corner 10",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "T10 you can turn in slightly earlier and hit all of the sausage curb",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/1o51yh1/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "line",
+   "value": "T10 you can turn in slightly earlier and hit all of the sausage curb"
+  }
+ ],
+ "track": "redbullring",
+ "version": 3
+}

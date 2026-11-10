@@ -201,6 +201,18 @@ _WORDS = {1: "one", 2: "two", 3: "three", 4: "four", 5: "five", 6: "six", 7: "se
           19: "nineteen", 20: "twenty"}
 
 
+# Alias di una pista sola: sulle piste numerate «Corner 7» è il nome di curve diverse.
+_EXTRA_TRACK: dict[str, dict[str, list[str]]] = {
+    # Nürburgring: i nomi delle curve come li lega ai numeri barthale000, senza
+    # contraddizioni. «Ford» no (è anche una marca), Schumacher S no (sono due curve).
+    "nurburgring": {
+        "Corner 7": ["dunlop", "dunlop hairpin", "dunlop kehre"],
+        "Corner 11": ["warsteiner"],
+        "Corner 15": ["coca cola", "coca-cola"],
+    },
+}
+
+
 def _numbered(track: str) -> bool:
     return all(isinstance(n, int) for n, _pos in _CORNERS[track])
 
@@ -231,6 +243,7 @@ CORNERS: dict[str, dict[str, list[str]]] = {
     track: {
         _catalog_name(track, name): sorted({
             _catalog_name(track, name).lower(), *_EXTRA.get(_catalog_name(track, name), []),
+            *_EXTRA_TRACK.get(track, {}).get(_catalog_name(track, name), []),
             *turn_aliases(track).get(_catalog_name(track, name), [])})
         for name, _pos in _CORNERS[track]
     }
