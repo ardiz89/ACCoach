@@ -119,7 +119,7 @@ def test_export_solo_confermati(b, tmp_path):
     out = tmp_path / "trackfacts"
     assert export.export(b.conn, "imola", out) == 1
     d = _carica(out / "imola.json")
-    assert d["track"] == "imola" and d["version"] == 2
+    assert d["track"] == "imola" and d["version"] == 3
     assert [(f["corner"], f["type"], f["value"], f["n"]) for f in d["facts"]] == [(AM, "gear", "3", 2)]
     urls = [s["url"] for s in d["facts"][0]["sources"]]
     assert urls == ["https://r/2", "https://www.youtube.com/watch?v=abc"]
@@ -434,3 +434,25 @@ def test_export_singoli_a_parte(b, tmp_path):
     verificati = {(f["corner"], f["type"]) for f in d["facts"]}
     assert not verificati & set(singoli)
     assert all(s["sources"] and "body" not in s for s in d["single"])
+
+
+def test_export_contesi_e_respinti_a_parte(b, tmp_path):
+    _riempi(b)
+    for i, (a, v, w) in enumerate([("a1", "second", "2"), ("a2", "second", "2"),
+                                   ("a3", "fourth", "4"), ("a4", "fourth", "4")]):
+        body = f"At Villeneuve I go down to {v} gear and it works {'great' if i % 2 else 'fine'}."
+        b.testo(f"https://r/c{i}", a, body, [("Villeneuve", "gear", w, f"down to {v} gear")])
+    export.export(b.conn, "imola", tmp_path / "o")
+    d = _carica(tmp_path / "o" / "imola.json")
+    assert d["version"] == 3
+    disp = {(x["corner"], x["type"]): x for x in d["disputed"]}
+    riv = disp[(RIV, "gear")]
+    assert riv["why"] == "respinto" and "2" in [v["value"] for v in riv["values"]]
+    assert riv["reason"] == "il testo dice respinto"
+    assert all(v["sources"] and v["n"] >= 1 for v in riv["values"])
+    vil = disp[("Villeneuve", "gear")]
+    assert vil["why"] == "conteso" and "reason" not in vil
+    assert sorted(v["value"] for v in vil["values"]) == ["2", "4"]
+    for k in ((RIV, "gear"), ("Villeneuve", "gear")):
+        assert k not in {(f["corner"], f["type"]) for f in d["facts"]}
+        assert k not in {(f["corner"], f["type"]) for f in d["single"]}

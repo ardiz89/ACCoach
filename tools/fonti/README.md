@@ -137,6 +137,7 @@ Imola è `tools/fonti/piani/imola.json`.
    ```
 
    Esce solo un verificato con almeno un controllo `confermato` e nessun `respinto`.
+   In `disputed` escono a parte le voci contese e quelle respinte, con le loro fonti.
 
 ## Lavori e risposte
 

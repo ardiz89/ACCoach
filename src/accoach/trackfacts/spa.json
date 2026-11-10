@@ -1,4 +1,30 @@
 {
+ "disputed": [
+  {
+   "corner": "Bus Stop",
+   "reason": "An independent ACC track guide (TraxionGG, Audi R8) says to shift all the way down",
+   "type": "gear",
+   "values": [
+    {
+     "n": 2,
+     "sources": [
+      {
+       "quote": "break as hard as possible second gear",
+       "start_s": 396.16,
+       "url": "https://www.youtube.com/watch?v=4YX-55DKnso"
+      },
+      {
+       "quote": "shifting down into second gear",
+       "start_s": 424.36,
+       "url": "https://www.youtube.com/watch?v=V6xhn7XqxHA"
+      }
+     ],
+     "value": "2"
+    }
+   ],
+   "why": "respinto"
+  }
+ ],
  "facts": [],
  "single": [
   {
@@ -190,5 +216,5 @@
   }
  ],
  "track": "spa",
- "version": 2
+ "version": 3
 }

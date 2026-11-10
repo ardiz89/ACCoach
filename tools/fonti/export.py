@@ -13,6 +13,10 @@ quello che dice una fonte sola, o più fonti senza le condizioni del verificato.
 report le mostra come «una fonte dice» e non ne fa mai un riferimento (deciso dal
 pilota il 10/11). Ogni valore porta i suoi autori in `n` e le sue fonti.
 
+In `disputed` escono le fonti in disaccordo: le voci `conteso` del consenso e i
+`verificato` che il controllo ha respinto (`why` è `conteso` o `respinto`; nel secondo
+caso `reason` è la motivazione del primo controllo che ha respinto). Mai un riferimento.
+
 In `facts`, `line` e `mistake` non escono mai. `brake` e `gear` escono con
 `"car_class": "gt3"`, o `"gt3_presunta"` se nessuna fonte dichiara la GT3: il
 consenso li conta solo da fonti GT3, dichiarate o presunte. Il file è deterministico:
@@ -28,7 +32,7 @@ from pathlib import Path
 
 from tools.fonti import consensus, db
 
-VERSION = 2   # 2: la lista `single`
+VERSION = 3   # 2: la lista `single`; 3: la lista `disputed`
 QUOTE_WORDS = 15
 QUOTE_CHARS = 300
 
@@ -119,9 +123,34 @@ def single(conn: sqlite3.Connection, track: str) -> list[dict]:
     return out
 
 
-def dumps(track: str, items: list[dict], singles: list[dict] | None = None) -> str:
+def disputed(conn: sqlite3.Connection, track: str) -> list[dict]:
+    """Le voci contese o respinte dal controllo: tutti i valori, con le loro fonti."""
+    checks = factchecks(conn, track)
+    out = []
+    for e in consensus.build(conn, track):
+        if not e["values"]:
+            continue
+        if e["state"] == "conteso":
+            why, reason = "conteso", None
+        elif status(e, checks) == "respinto":
+            why = "respinto"
+            reason = cut(checks[e["fact_key"]]["respinto"][0].get("reason"))
+        else:
+            continue
+        item = {"corner": e["corner"], "type": e["type"], "why": why,
+                "values": [{"value": cut(v["value"]) if e["type"] in consensus.DESCRIPTIVE
+                            else v["value"], "n": v["n"], "sources": _sources(v)}
+                           for v in e["values"]]}
+        if reason is not None:
+            item["reason"] = reason
+        out.append(item)
+    return out
+
+
+def dumps(track: str, items: list[dict], singles: list[dict] | None = None,
+          disputes: list[dict] | None = None) -> str:
     return json.dumps({"track": track, "version": VERSION, "facts": items,
-                       "single": singles or []},
+                       "single": singles or [], "disputed": disputes or []},
                       sort_keys=True, ensure_ascii=False, indent=1) + "\n"
 
 
@@ -136,5 +165,5 @@ def export(conn: sqlite3.Connection, track: str, out: Path) -> int:
     items = facts(conn, track)
     path = target(out, track)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(dumps(track, items, single(conn, track)), encoding="utf-8", newline="\n")
+    path.write_text(dumps(track, items, single(conn, track), disputed(conn, track)), encoding="utf-8", newline="\n")
     return len(items)
