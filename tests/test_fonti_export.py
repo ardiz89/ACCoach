@@ -119,7 +119,7 @@ def test_export_solo_confermati(b, tmp_path):
     out = tmp_path / "trackfacts"
     assert export.export(b.conn, "imola", out) == 1
     d = _carica(out / "imola.json")
-    assert d["track"] == "imola" and d["version"] == 1
+    assert d["track"] == "imola" and d["version"] == 2
     assert [(f["corner"], f["type"], f["value"], f["n"]) for f in d["facts"]] == [(AM, "gear", "3", 2)]
     urls = [s["url"] for s in d["facts"][0]["sources"]]
     assert urls == ["https://r/2", "https://www.youtube.com/watch?v=abc"]
@@ -413,3 +413,24 @@ def test_review_segna_la_curva_dal_numero():
     assert not review.by_number("At Tosa brake at the 100 board")
     assert tono.violations(review.T["by_number"], "it") == []
 
+
+# --- 10/11: quello che dice una fonte sola ---------------------------------------------
+
+def test_export_singoli_a_parte(b, tmp_path):
+    # Il pilota, il 10/11: i fatti con una fonte sola escono a parte, mai fra i verificati.
+    _riempi(b)
+    b.testo("https://r/s1", "solo", "At Villeneuve I go down to second gear and it works.",
+            [("Villeneuve", "gear", "2", "down to second gear")])
+    b.testo("https://r/s2", "errore", "At Tosa you turned in a bit too late every lap.",
+            [(TOSA, "mistake", "you turned in a bit too late", "you turned in a bit too late")])
+    export.export(b.conn, "imola", tmp_path / "o")
+    d = _carica(tmp_path / "o" / "imola.json")
+    singoli = {(s["corner"], s["type"]): s for s in d["single"]}
+    assert singoli[("Villeneuve", "gear")]["state"] == "singolo" and singoli[("Villeneuve", "gear")]["n"] == 1
+    assert singoli[("Villeneuve", "gear")]["car_class"] == "gt3"
+    assert singoli[(TOSA, "mistake")]["state"] == "descrittivo"
+    assert singoli[(TOSA, "mistake")]["value"] == "you turned in a bit too late"
+    assert (TOSA, "gear") in singoli and (RIV, "gear") not in singoli   # respinto: né qui né là
+    verificati = {(f["corner"], f["type"]) for f in d["facts"]}
+    assert not verificati & set(singoli)
+    assert all(s["sources"] and "body" not in s for s in d["single"])

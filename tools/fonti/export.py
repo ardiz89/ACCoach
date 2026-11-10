@@ -8,7 +8,12 @@ Esce solo una voce `verificato` del consenso che il controllo ha confermato:
 - un `verificato` senza controllo non esce: il controllo è un veto e una conferma
   del contesto, non una prova in più.
 
-`line` e `mistake` (descrittivi) non escono mai. `brake` e `gear` escono con
+A parte, in `single`, escono le voci `singolo` e `descrittivo` (linea, errore tipico):
+quello che dice una fonte sola, o più fonti senza le condizioni del verificato. Il
+report le mostra come «una fonte dice» e non ne fa mai un riferimento (deciso dal
+pilota il 10/11). Ogni valore porta i suoi autori in `n` e le sue fonti.
+
+In `facts`, `line` e `mistake` non escono mai. `brake` e `gear` escono con
 `"car_class": "gt3"`, o `"gt3_presunta"` se nessuna fonte dichiara la GT3: il
 consenso li conta solo da fonti GT3, dichiarate o presunte. Il file è deterministico:
 ordine del consenso, citazioni tagliate a QUOTE_WORDS parole e QUOTE_CHARS caratteri,
@@ -23,7 +28,7 @@ from pathlib import Path
 
 from tools.fonti import consensus, db
 
-VERSION = 1
+VERSION = 2   # 2: la lista `single`
 QUOTE_WORDS = 15
 QUOTE_CHARS = 300
 
@@ -88,14 +93,35 @@ def facts(conn: sqlite3.Connection, track: str) -> list[dict]:
                 "n": top["n"], "sources": _sources(top)}
         if e["type"] in consensus.GT3_ONLY:
             # «gt3» se almeno una fonte la dichiara, se no «gt3_presunta».
-            declared = any(s.get("car_class") == "gt3" for s in top["sources"])
-            item["car_class"] = "gt3" if declared else "gt3_presunta"
+            item["car_class"] = _klass(top)
         out.append(item)
     return out
 
 
-def dumps(track: str, items: list[dict]) -> str:
-    return json.dumps({"track": track, "version": VERSION, "facts": items},
+def _klass(value: dict) -> str:
+    declared = any(s.get("car_class") == "gt3" for s in value["sources"])
+    return "gt3" if declared else "gt3_presunta"
+
+
+def single(conn: sqlite3.Connection, track: str) -> list[dict]:
+    """Le voci con una fonte sola o descrittive: ogni valore con le sue fonti."""
+    out = []
+    for e in consensus.build(conn, track):
+        if e["state"] not in ("singolo", "descrittivo") or not e["values"]:
+            continue
+        for v in e["values"]:
+            value = cut(v["value"]) if e["type"] in consensus.DESCRIPTIVE else v["value"]
+            item = {"corner": e["corner"], "type": e["type"], "state": e["state"],
+                    "value": value, "n": v["n"], "sources": _sources(v)}
+            if e["type"] in consensus.GT3_ONLY:
+                item["car_class"] = _klass(v)
+            out.append(item)
+    return out
+
+
+def dumps(track: str, items: list[dict], singles: list[dict] | None = None) -> str:
+    return json.dumps({"track": track, "version": VERSION, "facts": items,
+                       "single": singles or []},
                       sort_keys=True, ensure_ascii=False, indent=1) + "\n"
 
 
@@ -110,5 +136,5 @@ def export(conn: sqlite3.Connection, track: str, out: Path) -> int:
     items = facts(conn, track)
     path = target(out, track)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(dumps(track, items), encoding="utf-8", newline="\n")
+    path.write_text(dumps(track, items, single(conn, track)), encoding="utf-8", newline="\n")
     return len(items)
