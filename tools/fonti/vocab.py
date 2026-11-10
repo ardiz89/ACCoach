@@ -37,14 +37,14 @@ OBJECTS = {
 # storpiature nei sottotitoli e i numeri di curva di TURNS. Mai un alias che valga per
 # due curve.
 _EXTRA = {
-    "Tamburello": ["tamburelo", "tamburrello"],
+    "Tamburello": ["tamburelo", "tamburrello", "tamborello", "tambrella"],
     "Villeneuve": ["villenueve", "villeneuf", "villa neuve"],
     "Tosa": [],
-    "Piratella": ["pirattela", "piratela", "paratella"],
+    "Piratella": ["pirattela", "piratela", "paratella", "puritella"],
     "Acque Minerali": ["acqua minerale", "acque minerale", "aqua minerale", "acqua minerali",
-                       "aqua minerali", "aqua mineral"],
+                       "aqua minerali", "aqua mineral", "minerali", "minerale"],
     "Variante Alta": ["alta chicane"],
-    "Rivazza": ["rivaza", "revazza", "rivazzas"],
+    "Rivazza": ["rivaza", "revazza", "rivazzas", "rivatsa"],
 }
 
 # I numeri di curva di Imola come li usano le guide su ACC raccolte il 10/11 (Yorkie065,

@@ -514,6 +514,64 @@ def summary(answer_path: Path, result: dict) -> str:
     return f"fatti {result['facts']}, scarti {result['rejects']}."
 
 
+def _verify_extract(track: str, d: dict, rows: list, segments) -> tuple[list[tuple], list]:
+    """I fatti e gli scarti di una risposta di estrazione, col verificatore di adesso."""
+    body = rows[0][1]
+    facts: list[tuple] = []
+    rejects: list[tuple[str, dict]] = []
+    seen: set[str] = set()
+    for f in d["facts"]:
+        canon = json.dumps(f, sort_keys=True, ensure_ascii=False)
+        if canon in seen:
+            rejects.append(("fatto_duplicato", f))
+            continue
+        seen.add(canon)
+        bad = verify.check_fact(track, f, body, segments)
+        if bad:
+            rejects.append((bad, f))
+            continue
+        _, at, end = verify.quote_span(f["quote"], body, f["offset"])
+        start_s = _start_s(body, segments, at)
+        quote = body[at:end]  # il pezzo del testo, non la stringa dell'agente
+        for r in rows:
+            facts.append((track, f["corner"], f["type"], f["value"], quote, f["offset"],
+                          start_s, r[4], r[9]))
+    return facts, rejects
+
+
+def reverify(conn: sqlite3.Connection, track: str) -> dict:
+    """Rifà fatti e scarti delle estrazioni congelate di `track` col verificatore di adesso.
+
+    Le risposte degli agenti non cambiano: cambia solo il controllo, che è codice. Serve
+    quando si correggono il verificatore o gli alias. Un testo che non è più di quella
+    pista perde i suoi fatti. `{"facts": n, "rejects": m}` dopo.
+    """
+    out = {"facts": 0, "rejects": 0}
+    results = conn.execute("SELECT id, sha256, payload_json FROM results"
+                           " WHERE kind='extract' AND track=? ORDER BY id", (track,)).fetchall()
+    with _atomic(conn):
+        for rid, sha, payload in results:
+            conn.execute("DELETE FROM facts WHERE result_id=?", (rid,))
+            conn.execute("DELETE FROM rejects WHERE result_id=?", (rid,))
+            rows = _acc_rows(conn, track, sha)
+            if not rows:
+                continue
+            try:
+                segments = next((s for s in (_segments(r[2]) for r in rows) if s), None)
+            except _BadSegments:
+                continue
+            facts, rejects = _verify_extract(track, json.loads(payload), rows, segments)
+            conn.executemany(
+                "INSERT INTO facts(result_id, track, corner, type, value, quote, offset, start_s,"
+                " author, source_id) VALUES (?,?,?,?,?,?,?,?,?,?)", [(rid, *f) for f in facts])
+            conn.executemany("INSERT INTO rejects(result_id, reason, item_json) VALUES (?,?,?)",
+                             [(rid, reason, json.dumps(it, sort_keys=True, ensure_ascii=False))
+                              for reason, it in rejects])
+            out["facts"] += len(facts)
+            out["rejects"] += len(rejects)
+    return out
+
+
 def ingest(conn: sqlite3.Connection, answer_path: Path, model: str) -> dict:
     """Congela una risposta e ne verifica ogni fatto; `{"facts": n, "rejects": m}`."""
     if not isinstance(model, str) or not model.strip():
@@ -541,23 +599,7 @@ def ingest(conn: sqlite3.Connection, answer_path: Path, model: str) -> dict:
             authors = {r[4].strip() for r in rows if isinstance(r[4], str) and r[4].strip()}
             _check_rate(d, body, authors)
         else:
-            seen: set[str] = set()
-            for f in d["facts"]:
-                canon = json.dumps(f, sort_keys=True, ensure_ascii=False)
-                if canon in seen:
-                    rejects.append(("fatto_duplicato", f))
-                    continue
-                seen.add(canon)
-                bad = verify.check_fact(track, f, body, segments)
-                if bad:
-                    rejects.append((bad, f))
-                    continue
-                _, at, end = verify.quote_span(f["quote"], body, f["offset"])
-                start_s = _start_s(body, segments, at)
-                quote = body[at:end]  # il pezzo del testo, non la stringa dell'agente
-                for r in rows:
-                    facts.append((track, f["corner"], f["type"], f["value"], quote, f["offset"],
-                                  start_s, r[4], r[9]))
+            facts, rejects = _verify_extract(track, d, rows, segments)
 
     with _atomic(conn):
         cur = conn.execute(

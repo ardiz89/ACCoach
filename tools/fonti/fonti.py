@@ -136,6 +136,18 @@ def cmd_retrack(args) -> int:
     return 0
 
 
+def cmd_reverify(args) -> int:
+    from tools.fonti import agents
+
+    conn = db.open_db(_db_path(args.db))
+    try:
+        r = agents.reverify(conn, args.track)
+    finally:
+        conn.close()
+    print(f"Verifica rifatta su {args.track}: fatti {r['facts']}, scarti {r['rejects']}.")
+    return 0
+
+
 def cmd_check_actors(args) -> int:
     import json
 
@@ -267,6 +279,9 @@ def build_parser() -> argparse.ArgumentParser:
     t = sub.add_parser("retrack", help="toglie la pista alle fonti il cui titolo non la nomina")
     t.add_argument("--track", required=True)
     t.set_defaults(func=cmd_retrack)
+    v = sub.add_parser("reverify", help="rifà la verifica delle estrazioni già congelate")
+    v.add_argument("--track", required=True)
+    v.set_defaults(func=cmd_reverify)
     a = sub.add_parser("check-actors", help="confronta il piano con lo schema degli attori (gratis)")
     a.add_argument("--plan", required=True, metavar="FILE")
     a.add_argument("--env-file", metavar="PATH")

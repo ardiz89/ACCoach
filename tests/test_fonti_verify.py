@@ -661,3 +661,15 @@ def test_gear_seconda_marcia_altra_curva():
     assert _c("at tosa second gear", "2", "gear", body) is None
     assert _c("piratella in third gear", "3", "gear", body, corner="Piratella") is None
     assert _c("piratella in third gear", "3", "gear", body) == "curva_non_trovata"
+
+
+def test_line_col_numero_di_curva():
+    # La linea e' la citazione: il numero di curva nel valore e' un nome, non un numero.
+    q = "for turn 7 brake in a straight line as long as possible"
+    assert verify.check_fact("imola", fatto(q, q, "line", corner="Tosa"), q) is None
+
+
+@pytest.mark.parametrize("nome", ["minerali", "minerale"])
+def test_minerali_da_solo(nome):
+    q = f"into {nome} I go down to fourth gear"
+    assert verify.check_fact("imola", fatto(q, "4", "gear"), q) is None

@@ -156,7 +156,7 @@ def check_fact(track: str, fact: dict, body: str, segments: list | None = None) 
     value = str(fact.get("value", ""))
     if type_ != "gear":  # le marce si dicono anche a parole
         cited = set(re.findall(r"(?<![0-9])[0-9]+(?![0-9])", mquote))
-        if any(n not in cited for n in re.findall(r"[0-9]+", value)):
+        if any(n not in cited for n in re.findall(r"[0-9]+", vocab.mask_numbers(track, norm_text(value)))):
             return "numero_non_citato"
 
     # Un errore si descrive proprio con le negazioni: per `mistake` non contano.

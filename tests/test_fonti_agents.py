@@ -1013,3 +1013,19 @@ def test_factcheck_citazione_oltre_il_taglio(conn, tmp_path, monkeypatch, verdet
     with pytest.raises(agents.AnswerRejected) as e:
         agents.ingest(conn, _scrivi(tmp_path, d), "m")
     assert e.value.reason == "citazione_oltre_taglio"
+
+
+# --- 10/11: la verifica si rifà --------------------------------------------------------
+
+def test_reverify_rifa_fatti_e_scarti_e_rispetta_la_pista(conn, tmp_path):
+    _proponi(conn, tmp_path)
+    agents.ingest(conn, FIX / "risposta_estrai.json", "claude-test")
+    prima = conn.execute("SELECT corner, type, value, quote FROM facts").fetchall()
+    assert agents.reverify(conn, "imola") == {"facts": 1, "rejects": 1}
+    assert conn.execute("SELECT corner, type, value, quote FROM facts").fetchall() == prima
+    assert agents.reverify(conn, "imola") == {"facts": 1, "rejects": 1}   # ripetibile
+    conn.execute("UPDATE sources SET track=NULL")
+    conn.commit()
+    assert agents.reverify(conn, "imola") == {"facts": 0, "rejects": 0}
+    assert conn.execute("SELECT COUNT(*) FROM results").fetchone()[0] == 1   # la risposta resta
+
