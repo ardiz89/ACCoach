@@ -1,4 +1,4 @@
-prompt_version: 2
+prompt_version: 3
 
 # Fact-check one verified fact (kind: factcheck)
 
@@ -6,6 +6,14 @@ You receive one job file (`factcheck-*.job.json`). It has `fact` (corner, type, 
 values with their authors and quotes, and `fact_key`) and `texts`: the ACC texts of the
 job's `track` that name that corner, each with `body` and `meta`. The texts the fact
 comes from are there too, so you can read them in context.
+
+The corner may be named by any of its `aliases`, numbers included: «turn eight» and
+«t8» are the corner if they are in the list. An author may count the corners in
+another way: if their own text shows it, their number is not this corner.
+
+`other_values` lists the passages where a code scan found another value right after
+the corner's name (`sha256` of the text, `passage`, `values`). The scan does not
+understand meaning. Read every one of them in its text.
 
 Each `body` is an excerpt: only the sentences that name the corner, plus one sentence
 before and one after. Separate pieces of the same text are joined by a line with `[…]`.
@@ -50,6 +58,10 @@ Return ONLY this JSON object. No prose, no Markdown fences, no extra keys:
 
 ## Rules
 
+0. Before you confirm, go through `other_values`. If one of them gives another value
+   for this corner, in the same game and car class, even with a hedge («third, in
+   some cars second»), answer `respinto` and quote it. If it is about another corner,
+   another car class or not a value at all, say so in `reason`.
 1. Never infer beyond what the texts say.
 2. If you cannot find an independent supporting quote, answer `non_confermato`, unless
    a text contradicts the fact: then `respinto`.

@@ -15,7 +15,10 @@ L'ordine è extract, poi rate, poi consenso, poi factcheck:
 - `factcheck` solo per una voce `verificato` con almeno un testo indipendente. Ogni
   testo del lavoro è tagliato alle frasi che nominano la curva, più una prima e una
   dopo. Un `confermato` deve citare un testo indipendente dal fatto; un `respinto`
-  può citare qualsiasi testo del lavoro, anche quelli del fatto stesso.
+  può citare qualsiasi testo del lavoro, anche quelli del fatto stesso. Il lavoro porta
+  anche gli alias della curva, numeri compresi, e in `other_values` i pezzi dove il
+  codice legge un altro valore vicino al nome della curva: il controllo li deve leggere tutti
+  (deciso dal pilota l'11/11, dopo la Stirling's di Brands Hatch).
 
 Ogni lavoro proposto da `pending` si ricorda nella tabella `jobs`, per pista. La
 risposta ripete `prompt_version` e `track` del lavoro; l'ingest accetta solo la
@@ -182,6 +185,49 @@ def _authors_with_facts(conn, track: str) -> set[str]:
         " WHERE f.track=? AND s.game='acc' AND s.track=?", (track, track))}
 
 
+DISSENT_CHARS = 400  # quanto testo dopo il nome della curva guarda la ricerca degli altri valori
+DISSENT_BEFORE = 25  # e quanto prima: «down to first for the bus stop», non la curva di prima
+
+
+def other_values(track: str, corner: str, entry: dict, body: str) -> list[tuple[str, list[str]]]:
+    """I pezzi dove il codice legge, vicino al nome della curva, un valore diverso dal fatto.
+
+    Da ogni volta che il testo nomina la curva fino alla curva seguente, al più
+    DISSENT_CHARS caratteri: «for turn eight break before the board… get into third»
+    (TraxionGG a Spa dice la marcia della Bus Stop 330 caratteri dopo il nome).
+    E prima del nome, fino alla curva precedente, al più DISSENT_BEFORE caratteri.
+    Il codice legge i valori senza i controlli di senso: è un indizio per il controllo,
+    che deve leggere ogni pezzo e decidere. `(pezzo del testo, valori diversi)`.
+    """
+    value = (entry.get("values") or [{}])[0].get("value")
+    type_ = entry.get("type")
+    if type_ in ("line", "mistake") or value is None:  # i descrittivi non hanno un valore
+        return []
+    nbody, idx = vocab.norm_map(body)
+    if not nbody:
+        return []
+    masked = vocab.mask_numbers(track, nbody)
+    names = vocab.CORNERS.get(track, {})
+    here = sorted((m.start(), m.end()) for a in names.get(corner, [])
+                  for m in vocab.alias_regex(a).finditer(nbody))
+    elsewhere = sorted((m.start(), m.end()) for c, aliases in names.items() if c != corner
+                       for a in aliases for m in vocab.alias_regex(a).finditer(nbody))
+    spans: list[list[int]] = []
+    for at, end in here:
+        start = max([e for b, e in elsewhere if e <= at] + [at - DISSENT_BEFORE, 0])
+        stop = min([b for b, _ in elsewhere if b >= end] + [end + DISSENT_CHARS, len(nbody)])
+        if spans and start <= spans[-1][1]:
+            spans[-1][1] = max(spans[-1][1], stop)
+        else:
+            spans.append([start, stop])
+    out = []
+    for start, stop in spans:
+        got = vocab.values_in(type_, masked[start:stop]) - {value}
+        if got:
+            out.append((body[idx[start]:idx[stop - 1] + 1].strip(), sorted(got)))
+    return out
+
+
 def excerpt(track: str, corner: str, body: str) -> str:
     """Le frasi che nominano la curva, più una prima e una dopo; i pezzi staccati con GAP.
 
@@ -270,6 +316,9 @@ def pending(conn: sqlite3.Connection, kind: str, track: str, out_dir: Path) -> l
                 independent += int(sha not in own_shas and not authors & set(own_authors))
                 others.append({"sha256": sha, "body": excerpt(track, corner, t["body"]),
                                "segments": None, "meta": t["meta"]})
+            dissent = [{"sha256": o["sha256"], "passage": s, "values": v}
+                       for o in others
+                       for s, v in other_values(track, corner, entry, o["body"])]
             if not independent:
                 print(f"Factcheck saltato: {corner}, {entry.get('type')} ({key[:12]}) non ha "
                       "nessun testo indipendente da citare.", file=sys.stderr)
@@ -278,7 +327,8 @@ def pending(conn: sqlite3.Connection, kind: str, track: str, out_dir: Path) -> l
                                "prompt_version": version, "body": None, "segments": None,
                                "meta": [], "corners": [corner], "fact": entry,
                                "fact_sha256s": own_shas, "fact_authors": own_authors,
-                               "texts": others}))
+                               "aliases": list(vocab.CORNERS[track][corner]),
+                               "other_values": dissent, "texts": others}))
     jobs.sort(key=lambda x: x[0])
     with _atomic(conn):
         for key, job in jobs:
@@ -536,6 +586,9 @@ def _verify_extract(track: str, d: dict, rows: list, segments) -> tuple[list[tup
         start_s = _start_s(body, segments, at)
         quote = body[at:end]  # il pezzo del testo, non la stringa dell'agente
         for r in rows:
+            if verify.counted_otherwise(track, db.author_id(r[5], r[4]), f, body):
+                rejects.append(("numerazione_diversa", f))  # il suo «turn N» è un'altra curva
+                continue
             facts.append((track, f["corner"], f["type"], f["value"], quote, f["offset"],
                           start_s, r[4], r[9]))
     return facts, rejects

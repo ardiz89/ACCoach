@@ -82,10 +82,15 @@ def status(entry: dict, checks: dict[str, dict[str, list[dict]]]) -> str | None:
 
 
 def _sources(value: dict) -> list[dict]:
+    """Le fonti di un valore. Una fonte che non è GT3 porta la sua classe (`gt4`, `altra`,
+    `ignota`): traiettoria ed errori contano tutte le fonti ACC, e la pagina deve dire
+    quando un consiglio viene da un'altra auto (deciso dal pilota l'11/11)."""
     seen, out = set(), []
     for s in value["sources"]:
         item = {"url": s["url"], "start_s": s["start_s"], "quote": cut(s["quote"])}
-        k = (item["url"], item["start_s"], item["quote"])
+        if (s.get("car_class") or "ignota") not in consensus.GT3_CLASSES:
+            item["car_class"] = s.get("car_class") or "ignota"
+        k = (item["url"], item["start_s"], item["quote"], item.get("car_class"))
         if k not in seen:
             seen.add(k)
             out.append(item)

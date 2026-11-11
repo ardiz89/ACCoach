@@ -3019,10 +3019,17 @@ function cpcQuotes(sources) {
     const timed = s.start_s != null && isFinite(Number(s.start_s));
     const label = timed ? tf("corners.src.openAt", { clock: cpcClock(s.start_s) })
                         : t("corners.src.open");
-    return `<li><q>${esc(s.quote)}</q>` +
+    // Una fonte di un'altra auto (traiettoria ed errori contano tutte le fonti ACC).
+    const cls = s.car_class ? ` <span class="pag-small">${esc(cpcClass(s.car_class))}</span>` : "";
+    return `<li><q>${esc(s.quote)}</q>${cls}` +
       (href ? ` <a href="${esc(href)}" target="_blank" rel="noopener">${esc(label)}</a>` : "") +
       `</li>`;
   }).join("") + `</ul>`;
+}
+
+function cpcClass(c) {
+  if (c === "gt4") return t("corners.src.class.gt4");
+  return t(c === "altra" ? "corners.src.class.other" : "corners.src.class.unclear");
 }
 
 function cpcAuthors(n) {

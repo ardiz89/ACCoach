@@ -64,7 +64,7 @@ def _proponi(conn, tmp_path, kind="extract", track="imola"):
     return agents.pending(conn, kind, track, tmp_path / f"jobs-{kind}-{track}")
 
 
-def _job_factcheck(conn, key, bodies, version="2", own=("fonte-del-fatto",), own_authors=()):
+def _job_factcheck(conn, key, bodies, version="3", own=("fonte-del-fatto",), own_authors=()):
     """`bodies`: testi o tuple (sha256, testo[, autore reddit]); `own`: le fonti del fatto."""
     terne = []
     for i, x in enumerate(bodies):
@@ -128,8 +128,8 @@ def test_pending_deterministico_e_ricordato(conn, tmp_path):
 def test_prompt_version_letta_dal_file(conn, tmp_path, monkeypatch):
     for nome in agents.PROMPT_FILES.values():
         prima = (agents.PROMPTS_DIR / nome).read_text(encoding="utf-8").splitlines()[0]
-        # 10/11: il controllo è alla versione 2 (il verdetto non_confermato).
-        attesa = "prompt_version: 2" if nome == agents.PROMPT_FILES["factcheck"] else "prompt_version: 1"
+        # 11/11: il controllo è alla versione 3 (alias e altri valori nel lavoro).
+        attesa = "prompt_version: 3" if nome == agents.PROMPT_FILES["factcheck"] else "prompt_version: 1"
         assert prima == attesa
     finta = tmp_path / "prompts"
     finta.mkdir()
@@ -598,6 +598,8 @@ def test_pending_factcheck_elenca_le_fonti_del_fatto(conn, tmp_path, monkeypatch
     assert job["fact_sha256s"] == [own]
     assert job["fact_authors"] == ["reddit:u_uno"]
     assert sorted(t["sha256"] for t in job["texts"]) == sorted([own, sha2])
+    assert "turn 11" in job["aliases"] and "acque minerali" in job["aliases"]
+    assert job["other_values"] == []   # tutti e due dicono terza
     with pytest.raises(agents.AnswerRejected) as e:
         agents.ingest(conn, FIX / "risposta_factcheck.json", "m")
     assert e.value.reason == "autoconferma"
@@ -1033,3 +1035,36 @@ def test_reverify_rifa_fatti_e_scarti_e_rispetta_la_pista(conn, tmp_path):
     assert agents.reverify(conn, "imola") == {"facts": 0, "rejects": 0}
     assert conn.execute("SELECT COUNT(*) FROM results").fetchone()[0] == 1   # la risposta resta
 
+
+
+def test_altri_valori_vicino_alla_curva():
+    # 11/11, Brands Hatch: Tobias Pfeffer chiama la Stirling's «turn eight» e dice terza.
+    # Conta il testo dopo il nome, anche oltre il punto: il nome sta in una frase, la
+    # marcia nella seguente.
+    entry = {"type": "gear", "values": [{"value": "2"}]}
+    body = ("for turn eight break before the board with the orange marking on the guard rail. "
+            "Get into third gear, in some cars you can also use second gear. "
+            "Then clark curve, fourth gear.")
+    got = agents.other_values("brandshatch", "Stirling's", entry, body)
+    assert [v for _, v in got] == [["3"]]
+    assert "turn eight break" in got[0][0] and "third gear" in got[0][0]
+    # Il pezzo si ferma alla curva seguente: la quarta della Clark non è della Stirling's.
+    assert "fourth" not in got[0][0]
+    # Lo stesso valore del fatto non è un altro valore: per un fatto «terza» resta la seconda.
+    assert [v for _, v in agents.other_values(
+        "brandshatch", "Stirling's", {"type": "gear", "values": [{"value": "3"}]}, body)] == [["2"]]
+    # I descrittivi non hanno un valore da contraddire.
+    assert agents.other_values("brandshatch", "Stirling's", {"type": "line", "values": [{"value": "x"}]},
+                               body) == []
+
+
+def test_altri_cartelli_vicino_alla_curva():
+    entry = {"type": "brake", "values": [{"value": "board:50"}]}
+    body = "Tosa, brake at the 100 board. Then piratella, brake at the 150 board."
+    assert [v for _, v in agents.other_values("imola", "Tosa", entry, body)] == [["board:100"]]
+
+    # Il valore detto prima del nome conta, ma non quello della curva precedente.
+    entry = {"type": "gear", "values": [{"value": "2"}]}
+    body = "out of tosa in third gear, then go down to first for piratella"
+    got = agents.other_values("imola", "Piratella", entry, body)
+    assert [v for _, v in got] == [["1"]] and "third" not in got[0][0]

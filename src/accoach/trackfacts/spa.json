@@ -147,6 +147,7 @@
    "n": 1,
    "sources": [
     {
+     "car_class": "ignota",
      "quote": "you need to trailbrake especially into rivage",
      "start_s": 360.08,
      "url": "https://www.youtube.com/watch?v=_ExkV2PDiUE"
@@ -206,6 +207,7 @@
    "n": 1,
    "sources": [
     {
+     "car_class": "ignota",
      "quote": "we go over the curb at stavalo",
      "start_s": 664.72,
      "url": "https://www.youtube.com/watch?v=_ExkV2PDiUE"
@@ -220,6 +222,7 @@
    "n": 1,
    "sources": [
     {
+     "car_class": "ignota",
      "quote": "braking nice and early for the bus stop",
      "start_s": 888.16,
      "url": "https://www.youtube.com/watch?v=_ExkV2PDiUE"

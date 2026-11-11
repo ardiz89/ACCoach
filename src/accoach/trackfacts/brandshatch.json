@@ -1,26 +1,31 @@
 {
- "disputed": [],
- "facts": [
+ "disputed": [
   {
-   "car_class": "gt3_presunta",
    "corner": "Stirling's",
-   "n": 2,
-   "sources": [
+   "reason": "get into third gear in some cars you can also use second gear",
+   "type": "gear",
+   "values": [
     {
-     "quote": "shifting down through the gears into second",
-     "start_s": 538.209,
-     "url": "https://www.youtube.com/watch?v=DcXotcvOpXI"
-    },
-    {
-     "quote": "going down to second gear here",
-     "start_s": 229.5,
-     "url": "https://www.youtube.com/watch?v=LI18Hrv7_xU"
+     "n": 2,
+     "sources": [
+      {
+       "quote": "shifting down through the gears into second",
+       "start_s": 538.209,
+       "url": "https://www.youtube.com/watch?v=DcXotcvOpXI"
+      },
+      {
+       "quote": "going down to second gear here",
+       "start_s": 229.5,
+       "url": "https://www.youtube.com/watch?v=LI18Hrv7_xU"
+      }
+     ],
+     "value": "2"
     }
    ],
-   "type": "gear",
-   "value": "2"
+   "why": "respinto"
   }
  ],
+ "facts": [],
  "single": [
   {
    "car_class": "gt3_presunta",

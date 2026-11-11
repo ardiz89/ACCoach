@@ -161,10 +161,11 @@ TURNS: dict[str, dict[str, tuple[int, ...]]] = {
         "The Dipper": (14,),
         "Forrest's Elbow": (18,),
     },
-    # Brands Hatch: Surtees 4 (Yorkie065, reshp2), Sheene 7 (Yorkie065, reshp2,
-    # stephen27898); Hawthorn 5, Westfield 6, Stirling's 8 e Clark 9 solo da reshp2, in
-    # chiaro. Contro: GoodE19 conta una curva in più (la sua 5 è Surtees, la sua 7
-    # Westfield).
+    # Brands Hatch: reshp2 lega in chiaro i numeri 4-9 ai nomi («T4 (Surtees)»). Yorkie065
+    # conta uguale («turn four sees us entering into surtees», «turn seven xin curve»,
+    # 8 la penultima, 9 l'ultima), Tobias Pfeffer anche (la sua 8 ha la barriera con
+    # il segno arancione della Stirling's di Yorkie065), stephen27898 dice «Sheene's or
+    # turn 7». Contro: GoodE19 conta una curva in più (OTHER_COUNT).
     "brandshatch": {
         "Surtees": (4,),
         "Hawthorn Bend": (5,),
@@ -175,6 +176,24 @@ TURNS: dict[str, dict[str, tuple[int, ...]]] = {
     },
     # Barcellona: nessun numero. Nessun testo del 10/11 dice «Seat» o «La Caixa»: legare
     # la 5 e la 10 ai nomi era conoscenza del circuito, non un dato delle fonti.
+}
+# Chi conta le curve in un altro modo, e da che numero comincia a contare diverso: da lì
+# in poi il suo «turn N» non è la nostra curva N, e un suo fatto la cui curva si legge
+# solo dal numero si scarta. Si tiene la numerazione della maggioranza (deciso dal
+# pilota l'11/11; Imola resta quella che ha scelto lui il 10/11). Gli autori sono
+# `platform:author` in minuscolo.
+OTHER_COUNT: dict[str, dict[str, int]] = {
+    # Imola: Luke Morris e Yas Heat chiamano «turn one» la staccata del Tamburello;
+    # SimRacingSetups e wongispicklejar mettono la Piratella all'8 e la Rivazza al 14.
+    "imola": {"youtube:luke morris sim racing": 1, "youtube:yas heat": 1,
+              "youtube:simracingsetups": 1, "reddit:wongispicklejar": 1},
+    # Brands Hatch: GoodE19 «turn 7 (the second of the 3 fast rights)», cioè Westfield.
+    "brandshatch": {"reddit:goode19": 1},
+    # Nürburgring: Ohne Speed salta dalla 4 alla 6 e mette la chicane alla 14 e 15;
+    # Yorkie065, JohnnyLight416 e ItsMopy la mettono alla 13 e 14.
+    "nurburgring": {"youtube:ohne speed": 5},
+    # Red Bull Ring: cnp92 conta sei curve, la sua 6 è «second to last corner».
+    "redbullring": {"reddit:cnp92": 2},
 }
 # I nomi della pista: una fonte è di quella pista solo se il titolo ne dice uno. Una
 # ricerca «ACC Imola» riporta anche guide di Spa, e un «turn 7» di Spa non è la Tosa.
@@ -548,6 +567,24 @@ def locate(type_: str, quote: str) -> tuple[str, int, int] | None:
     """Valore, inizio e fine del suo segno nella citazione già normalizzata con `fold`."""
     fn = _NORMALIZERS.get(type_)
     return fn(quote) if fn else None
+
+
+def values_in(type_: str, s: str) -> set[str]:
+    """Ogni valore di quel tipo che il testo sembra dire, senza i controlli di senso.
+
+    Il testo è già passato da `fold` e `mask_numbers`. Serve al controllo dei fatti per
+    cercare chi dice un altro valore: una marcia o un cartello diversi vicino alla curva.
+    Gli oggetti (il ponte, il cartello arancione) non si contano: nominarli non vuol dire
+    frenarci.
+    """
+    if type_ == "gear":
+        return {v for m in _gear_tokens(s) if (v := _gear_value(s, m))}
+    if type_ == "brake":
+        return {f"board:{int(m.group())}" for m in board_numbers(s)
+                if m.group().isdigit() and int(m.group()) in BOARDS
+                and not NOT_BOARD_UNIT.match(s, m.end())}
+    got = locate(type_, s)
+    return {got[0]} if got else set()
 
 
 def sentence_reason(type_: str, sentence: str, at: int) -> str | None:

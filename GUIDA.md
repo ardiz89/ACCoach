@@ -801,10 +801,13 @@ Aprendo una riga trovi quattro blocchi.
 - **Cosa dicono le fonti.** Sulle dodici piste di ACC, quello che dicono guide e
   video pubblici su quella curva, con la citazione breve e il link al punto del
   video. **Riferimento** è quello che dicono almeno due autori indipendenti e che
-  un controllo sulle fonti ha confermato. Oggi sono pochi. **Una fonte dice** è quello che il controllo sulle fonti non ha confermato,
-  anche quando lo dice più di un autore. Accanto leggi quanti autori lo dicono.
-  Non è un riferimento. **Le fonti non concordano** mette accanto i valori
-  diversi.
+  un controllo sulle fonti ha confermato. Oggi sono pochi. **Una fonte dice** è
+  quello che il controllo sulle fonti non ha confermato, anche quando lo dice più
+  di un autore. Accanto leggi quanti autori lo dicono. Non è un riferimento. **Le
+  fonti non concordano** mette accanto i valori diversi.
+- Marce e frenate vengono solo da fonti sulle GT3. Traiettoria ed errori vengono
+  da tutte le fonti su ACC. Se una fonte parla di un'altra auto, accanto leggi
+  «Su una GT4», «Su un'altra classe d'auto» o «Classe d'auto non chiara».
 
 Le fonti non diventano mai un obiettivo. La pagina non ti dice a che cartello
 frenare, perché non sappiamo dove sta il cartello sulla mappa. Confronta solo la

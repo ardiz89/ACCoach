@@ -1,31 +1,6 @@
 {
  "disputed": [],
- "facts": [
-  {
-   "car_class": "gt3_presunta",
-   "corner": "Variante Ascari",
-   "n": 3,
-   "sources": [
-    {
-     "quote": "change down to third and aim to get your",
-     "start_s": 169.04,
-     "url": "https://www.youtube.com/watch?v=O7R-abglkZ0"
-    },
-    {
-     "quote": "down into third chucking the car in",
-     "start_s": 469.97,
-     "url": "https://www.youtube.com/watch?v=jC6sz9DIwBk"
-    },
-    {
-     "quote": "Shift down to third, trail brake and",
-     "start_s": 194.32,
-     "url": "https://www.youtube.com/watch?v=zZNVsQnuTL8"
-    }
-   ],
-   "type": "gear",
-   "value": "3"
-  }
- ],
+ "facts": [],
  "single": [
   {
    "car_class": "gt3_presunta",
@@ -162,6 +137,7 @@
    "n": 1,
    "sources": [
     {
+     "car_class": "altra",
      "quote": "if you cut it correctly it helps swing you out with a higher exit speed",
      "start_s": null,
      "url": "https://www.reddit.com/comments/1q1fka0/"
@@ -184,6 +160,31 @@
    "state": "descrittivo",
    "type": "line",
    "value": "you can eat some of the curb to get on throttle sooner too"
+  },
+  {
+   "car_class": "gt3_presunta",
+   "corner": "Variante Ascari",
+   "n": 3,
+   "sources": [
+    {
+     "quote": "change down to third and aim to get your",
+     "start_s": 169.04,
+     "url": "https://www.youtube.com/watch?v=O7R-abglkZ0"
+    },
+    {
+     "quote": "down into third chucking the car in",
+     "start_s": 469.97,
+     "url": "https://www.youtube.com/watch?v=jC6sz9DIwBk"
+    },
+    {
+     "quote": "Shift down to third, trail brake and",
+     "start_s": 194.32,
+     "url": "https://www.youtube.com/watch?v=zZNVsQnuTL8"
+    }
+   ],
+   "state": "non_confermato",
+   "type": "gear",
+   "value": "3"
   },
   {
    "corner": "Variante Ascari",

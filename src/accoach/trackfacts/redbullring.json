@@ -66,6 +66,7 @@
    "n": 1,
    "sources": [
     {
+     "car_class": "ignota",
      "quote": "We need to get on the gas early.",
      "start_s": 250.511,
      "url": "https://www.youtube.com/watch?v=Y6jOq5V21e0"
@@ -205,20 +206,6 @@
    "value": "2"
   },
   {
-   "corner": "Corner 5",
-   "n": 1,
-   "sources": [
-    {
-     "quote": "T5: On throttle too early, causing understeer mid corner",
-     "start_s": null,
-     "url": "https://www.reddit.com/comments/1iedzuc/"
-    }
-   ],
-   "state": "descrittivo",
-   "type": "mistake",
-   "value": "T5: On throttle too early, causing understeer mid corner"
-  },
-  {
    "corner": "Corner 6",
    "n": 1,
    "sources": [
@@ -237,6 +224,7 @@
    "n": 1,
    "sources": [
     {
+     "car_class": "altra",
      "quote": "guide the car into a mid Corner Apex",
      "start_s": 315.88,
      "url": "https://www.youtube.com/watch?v=9vp7SrDjlTA"

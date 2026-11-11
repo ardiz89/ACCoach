@@ -63,13 +63,8 @@
   {
    "car_class": "gt3_presunta",
    "corner": "Villeneuve",
-   "n": 2,
+   "n": 1,
    "sources": [
-    {
-     "quote": "says 50 hit the brakes you can brake",
-     "start_s": 133.12,
-     "url": "https://www.youtube.com/watch?v=BzjWkCfJzYM"
-    },
     {
      "quote": "turn five uh break at the 50 m board",
      "start_s": 122.119,
@@ -108,20 +103,6 @@
    "state": "descrittivo",
    "type": "mistake",
    "value": "You went too wide at the second part of Villeneuve"
-  },
-  {
-   "corner": "Villeneuve",
-   "n": 1,
-   "sources": [
-    {
-     "quote": "hitting this will compromise your exit",
-     "start_s": 154.16,
-     "url": "https://www.youtube.com/watch?v=BzjWkCfJzYM"
-    }
-   ],
-   "state": "descrittivo",
-   "type": "mistake",
-   "value": "hitting this will compromise your exit"
   },
   {
    "car_class": "gt3_presunta",
@@ -392,20 +373,6 @@
    "state": "descrittivo",
    "type": "mistake",
    "value": "You're way too slow through the shallow right (11) because you brake too much."
-  },
-  {
-   "corner": "Acque Minerali",
-   "n": 1,
-   "sources": [
-    {
-     "quote": "very easy to get a slide on the exit of turn 12",
-     "start_s": 305.84,
-     "url": "https://www.youtube.com/watch?v=BzjWkCfJzYM"
-    }
-   ],
-   "state": "descrittivo",
-   "type": "mistake",
-   "value": "very easy to get a slide on the exit of turn 12"
   },
   {
    "corner": "Variante Alta",

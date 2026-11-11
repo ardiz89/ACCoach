@@ -228,6 +228,26 @@ def check_fact(track: str, fact: dict, body: str, segments: list | None = None) 
 
 
 
+def counted_otherwise(track: str, author_id: str, fact: dict, body: str) -> bool:
+    """Il fatto è di chi conta le curve in un altro modo, e la curva la dice solo il numero.
+
+    Vale per gli autori di `vocab.OTHER_COUNT`, sulle curve il cui numero arriva dove la
+    loro numerazione diverge. Si guarda la citazione e i CONTEXT_CHARS caratteri prima:
+    se lì nessun nome della curva è un nome vero, la curva l'ha data il numero.
+    """
+    start_at = vocab.OTHER_COUNT.get(track, {}).get(author_id)
+    nums = vocab.TURNS.get(track, {}).get(fact.get("corner"))
+    if start_at is None or not nums or max(nums) < start_at:
+        return False
+    _, at, end = quote_span(fact.get("quote"), body, fact.get("offset"))
+    if at is None:
+        return False
+    text = vocab.fold(str(body)[max(0, at - CONTEXT_CHARS):end])
+    numbers = vocab.NUMBER_ALIASES.get(track, set())
+    names = [a for a in vocab.CORNERS.get(track, {}).get(fact["corner"], []) if a not in numbers]
+    return not any(vocab.alias_regex(a).search(text) for a in names)
+
+
 def quote_span(quote: str, body: str, offset: int | None = None
                ) -> tuple[str | None, int | None, int | None]:
     """Dove sta la citazione nel testo grezzo: `(motivo, inizio, fine)`.

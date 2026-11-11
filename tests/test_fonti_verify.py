@@ -773,3 +773,31 @@ def test_nome_di_persona_e_curva_di_un_altra_pista():
 def test_oltre_venti_curve_solo_le_cifre(monkeypatch):
     monkeypatch.setitem(vocab.TURNS, "prova", {"Corner 23": (23,)})
     assert vocab.turn_aliases("prova")["Corner 23"] == ["corner 23", "curva 23", "t23", "turn 23"]
+
+
+def test_chi_conta_diverso_perde_le_curve_dette_col_numero():
+    # Ohne Speed conta diverso dalla 5 in poi: la sua «turn six» non è la nostra Corner 6.
+    body = "for turn six we first going to make a small curve using this road"
+    f = fatto(body, body, type_="line", corner="Corner 6")
+    assert verify.check_fact("nurburgring", f, body) is None
+    assert verify.counted_otherwise("nurburgring", "youtube:ohne speed", f, body)
+    # Lo stesso testo di un altro autore resta buono.
+    assert not verify.counted_otherwise("nurburgring", "youtube:yorkie065", f, body)
+    # Prima del numero da cui diverge, la sua numerazione è quella di tutti.
+    b3 = "for turn three there's not much preparation time here"
+    assert not verify.counted_otherwise(
+        "nurburgring", "youtube:ohne speed", fatto(b3, b3, type_="line", corner="Corner 3"), b3)
+
+
+def test_chi_conta_diverso_tiene_le_curve_dette_col_nome():
+    # Se la curva la dice il nome, il numero di quell'autore non conta.
+    body = "into the dunlop hairpin, turn eight for him, brake at the 100 board"
+    q = "brake at the 100 board"
+    f = fatto(q, "board:100", corner="Corner 7", offset=body.index(q))
+    assert not verify.counted_otherwise("nurburgring", "youtube:ohne speed", f, body)
+    imola = "turn two is tamburello, brake at the 100 board"
+    f = fatto(q, "board:100", corner="Tamburello", offset=imola.index(q))
+    assert not verify.counted_otherwise("imola", "youtube:yas heat", f, imola)
+    solo_numero = "turn two, brake at the 100 board"
+    f = fatto(q, "board:100", corner="Tamburello", offset=solo_numero.index(q))
+    assert verify.counted_otherwise("imola", "youtube:yas heat", f, solo_numero)

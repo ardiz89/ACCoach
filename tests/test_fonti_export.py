@@ -306,7 +306,7 @@ def test_factcheck_di_una_versione_vecchia_ignorato(b, tmp_path, monkeypatch):
     finta = tmp_path / "prompts"
     finta.mkdir()
     for nome in agents.PROMPT_FILES.values():
-        (finta / nome).write_text("prompt_version: 3\n", encoding="utf-8")
+        (finta / nome).write_text("prompt_version: 4\n", encoding="utf-8")
     monkeypatch.setattr(agents, "PROMPTS_DIR", finta)
     agents.pending(b.conn, "factcheck", "imola", tmp_path / "jf2")
     # Il confermato della versione 1 non vale più: niente esce finché manca il nuovo.
@@ -485,3 +485,20 @@ def test_solo_non_confermato_esce_come_singolo(b, tmp_path):
     assert d["facts"] == [] and d["disputed"] == []
     s = [x for x in d["single"] if (x["corner"], x["type"]) == (TOSA, "gear")]
     assert len(s) == 1 and s[0]["state"] == "non_confermato" and s[0]["n"] == 2
+
+
+def test_fonte_non_gt3_porta_la_sua_classe(b, tmp_path):
+    # 11/11: traiettoria ed errori contano tutte le fonti ACC; la pagina deve sapere
+    # quando un consiglio viene da una GT4. Una fonte GT3, dichiarata o presunta, non
+    # porta niente.
+    q4 = "at rivazza stay wide on entry and wait for the car"
+    b.testo("https://r/gt4", "quattro", "In the GT4 " + q4 + " every lap.",
+            [(RIV, "line", q4, q4)], classe="gt4")
+    q3 = "at tosa use all the exit kerb you can find"
+    b.testo("https://r/gt3", "tre", "Honestly " + q3 + " there.", [(TOSA, "line", q3, q3)],
+            classe="gt3_presunta")
+    export.export(b.conn, "imola", tmp_path / "o")
+    d = _carica(tmp_path / "o" / "imola.json")
+    per_curva = {s["corner"]: s["sources"] for s in d["single"]}
+    assert [s.get("car_class") for s in per_curva[RIV]] == ["gt4"]
+    assert "car_class" not in per_curva[TOSA][0]
