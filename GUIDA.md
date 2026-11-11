@@ -798,9 +798,10 @@ Aprendo una riga trovi quattro blocchi.
   ingresso, all'apex e in uscita, dentro o fuori, e dove cade il tuo apice. Due
   bottoni aprono nel Confronto il tuo giro migliore in quella curva e il giro più
   tipico.
-- **Cosa dicono le fonti.** Su Imola e Spa, quello che dicono guide e video
-  pubblici su quella curva, con la citazione breve e il link al punto del video.
-  **Una fonte dice** è quello che il controllo sulle fonti non ha confermato,
+- **Cosa dicono le fonti.** Sulle dodici piste di ACC, quello che dicono guide e
+  video pubblici su quella curva, con la citazione breve e il link al punto del
+  video. **Riferimento** è quello che dicono almeno due autori indipendenti e che
+  un controllo sulle fonti ha confermato. Oggi sono pochi. **Una fonte dice** è quello che il controllo sulle fonti non ha confermato,
   anche quando lo dice più di un autore. Accanto leggi quanti autori lo dicono.
   Non è un riferimento. **Le fonti non concordano** mette accanto i valori
   diversi.

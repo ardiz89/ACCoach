@@ -845,9 +845,11 @@ Open a row and you get four blocks.
 - **Your line.** The typical gap to the reference line on entry, at the apex and
   on exit, inside or outside, and where your apex falls. Two buttons open your
   best lap at that corner and your most typical lap in Compare.
-- **What the sources say.** On Imola and Spa, what public guides and videos say
-  about that corner, with the short quote and a link to that moment of the
-  video. **One source says** is what the check against the sources didn't
+- **What the sources say.** On the twelve ACC tracks, what public guides and
+  videos say about that corner, with the short quote and a link to that moment
+  of the video. **Reference** is what at least two independent authors say and
+  a check against the sources confirmed. Today there are few of them. **One
+  source says** is what the check against the sources didn't
   confirm, even when more than one author says it. Next to it you read how many
   authors say it. It's not a reference. **The sources disagree** puts the
   different values side by side.
