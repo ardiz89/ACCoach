@@ -230,8 +230,33 @@ def tracks_dir() -> Path | None:
     return None
 
 
+_YEAR = re.compile(r"(?<!\d)(19|20)\d\d(?!\d)")
+
+
+def _layout_rank(folder: Path, spline: Path) -> tuple[int, int, str]:
+    """Quale layout viene prima, a parità di forma.
+
+    Prima la linea della pista stessa, poi i layout senza un anno nel nome. Al
+    Red Bull Ring quattro layout hanno la stessa linea dell'IA e si posano
+    identici (5,09 m sul giro del 02/08). In ordine alfabetico vinceva
+    «austria_f1_2021», la scenografia di un mod F1; «layout_gp» è quella del
+    gioco. A Silverstone lo stesso con «silverstone_f1_2021» e «gp».
+    """
+    layout = spline.parent.parent
+    if layout == folder:
+        return (0, 0, "")
+    return (1, 1 if _YEAR.search(layout.name) else 0, layout.name.lower())
+
+
+def layout_splines(folder: Path) -> list[Path]:
+    """Le linee dell'IA di una pista, una per layout, nell'ordine di `_layout_rank`."""
+    found = [folder / "ai" / "fast_lane.ai"] if (folder / "ai" / "fast_lane.ai").exists() else []
+    found += folder.glob("*/ai/fast_lane.ai")
+    return sorted(found, key=lambda p: _layout_rank(folder, p))
+
+
 def spline_path(track: str) -> Path | None:
-    """The AI line for ``track``: its own, or the first layout that has one."""
+    """The AI line for ``track``: its own, or the first layout by `_layout_rank`."""
     root = tracks_dir()
     if root is None or not track:
         return None
@@ -245,24 +270,23 @@ def spline_path(track: str) -> Path | None:
                        if p.is_dir() and p.name.lower() == track.lower()), None)
         if folder is None:
             return None
-    direct = folder / "ai" / "fast_lane.ai"
-    if direct.exists():
-        return direct
-    return next(iter(sorted(folder.glob("*/ai/fast_lane.ai"))), None)
+    return next(iter(layout_splines(folder)), None)
 
 
 def all_splines() -> list[tuple[str, Path]]:
-    """Every installed track that has an AI line, by folder name."""
+    """Every AI line installed, one per layout, by folder name.
+
+    Tutti i layout, non il primo: un giro sull'Indy di Brands Hatch si posa
+    solo sulla linea dell'Indy. Dentro una pista l'ordine è `_layout_rank`, e
+    chi sceglie per forma tiene il primo a parità di punteggio.
+    """
     root = tracks_dir()
     if root is None:
         return []
     out = []
     for p in sorted(root.iterdir()):
-        if not p.is_dir():
-            continue
-        got = spline_path(p.name)
-        if got is not None:
-            out.append((p.name, got))
+        if p.is_dir():
+            out += [(p.name, s) for s in layout_splines(p)]
     return out
 
 

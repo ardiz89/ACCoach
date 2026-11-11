@@ -504,3 +504,45 @@ def test_a_big_texture_is_reduced_to_the_level_side(tmp_path, monkeypatch):
     assert arr.shape == (2, 4, 4) and arr.dtype.name == "uint8"
     assert (abs(arr[..., :3].astype(int) - (200, 30, 20)) <= 2).all()
     assert (arr[..., 3] == 255).all()
+
+
+# --- quale layout ------------------------------------------------------------
+
+def _layouts(root, names, pts):
+    track = root / "ks_pista"
+    for n in names:
+        (track / n).mkdir(parents=True)
+        _spline_of(track / n, pts)
+    return track
+
+
+def test_a_parita_di_forma_vince_il_layout_senza_anno(tmp_path, monkeypatch):
+    """Al Red Bull Ring quattro layout hanno la stessa linea: vinceva il primo
+    in ordine alfabetico, la scenografia di un mod F1 2021."""
+    _layouts(tmp_path, ["austria_f1_2021", "layout_gp", "styria_f1_2021"], _loop())
+    monkeypatch.setattr(te, "tracks_dir", lambda: tmp_path)
+    monkeypatch.setattr(te, "bundled_tracks", lambda: [])
+    te._cache.clear()
+    assert te.spline_path("ks_pista").parent.parent.name == "layout_gp"
+    path, _ = te.ac_fit(_moved(_loop(), deg=20.0, dx=100.0))
+    assert path.parent.parent.name == "layout_gp"
+
+
+def test_ogni_layout_si_prova_non_solo_il_primo(tmp_path, monkeypatch):
+    """Un giro sull'Indy si posa sulla linea dell'Indy, anche se il GP viene prima."""
+    track = _layouts(tmp_path, ["gp"], _loop())
+    (track / "indy").mkdir()
+    corta = [(x * 0.6, z * 0.6) for x, z in _loop(wobble=0.4)]
+    _spline_of(track / "indy", corta)
+    monkeypatch.setattr(te, "tracks_dir", lambda: tmp_path)
+    monkeypatch.setattr(te, "bundled_tracks", lambda: [])
+    te._cache.clear()
+    assert [p.parent.parent.name for _, p in te.all_splines()] == ["gp", "indy"]
+    path, _ = te.ac_fit(_moved(corta, deg=-35.0, dz=250.0))
+    assert path.parent.parent.name == "indy"
+
+
+def test_la_linea_della_pista_stessa_viene_prima_dei_layout(tmp_path):
+    track = _layouts(tmp_path, ["layout_gp"], _loop())
+    _spline_of(track, _loop())
+    assert te.layout_splines(track)[0] == track / "ai" / "fast_lane.ai"
