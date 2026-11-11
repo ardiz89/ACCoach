@@ -27,7 +27,8 @@ def _kn5(tmp_path, meshes, name="phys.kn5", version=6):
     """Un kn5 minimo: niente texture, niente materiali, mesh in fila.
 
     ``meshes`` è [(nome, [(x, y, z), ...])] e i vertici vengono presi a
-    triangoli nell'ordine dato.
+    triangoli nell'ordine dato. Con ``("skin", nome, vertici)`` la mesh ha le
+    ossa: un osso, e vertici da 76 byte.
     """
     def s(t):
         b = t.encode("utf-8")
@@ -41,7 +42,20 @@ def _kn5(tmp_path, meshes, name="phys.kn5", version=6):
     # radice: un dummy con tutti i figli
     out += struct.pack("<i", 1) + s("root") + struct.pack("<i", len(meshes)) + b"\x01"
     out += b"\x00" * 64
-    for nm, verts in meshes:
+    for m in meshes:
+        if m[0] == "skin":
+            _, nm, verts = m
+            out += struct.pack("<i", 3) + s(nm) + struct.pack("<i", 0) + b"\x01"
+            out += b"\x01\x01\x00"
+            out += struct.pack("<i", 1) + s("bone") + b"\x00" * 64
+            out += struct.pack("<i", len(verts))
+            for (x, y, z) in verts:
+                out += struct.pack("<3f", x, y, z) + b"\x00" * (76 - 12)
+            out += struct.pack("<i", len(verts))
+            out += struct.pack(f"<{len(verts)}H", *range(len(verts)))
+            out += struct.pack("<i", 0) + b"\x00" * 12
+            continue
+        nm, verts = m
         out += struct.pack("<i", 2) + s(nm) + struct.pack("<i", 0) + b"\x01"
         out += b"\x01\x01\x00"                  # castShadows, visible, transparent
         out += struct.pack("<i", len(verts))
@@ -87,6 +101,19 @@ def test_a_visual_model_is_refused(tmp_path):
 def test_a_physics_model_is_accepted(tmp_path):
     p = _kn5(tmp_path, [(f"1ASPH_{i}", _quad(0, i, 10, i + 1)) for i in range(12)])
     assert tm.is_physics_model(p) is True
+
+
+def test_una_mesh_con_le_ossa_non_sposta_la_lettura(tmp_path):
+    """Il vertice di una mesh con le ossa pesa 76 byte, non 44 (misurato in
+    kn5visual su driver.kn5). Letta a 44, ogni mesh dopo esce spostata."""
+    road = [(f"1ASPH_{i}", _quad(0, i, 10, i + 1)) for i in range(12)]
+    p = _kn5(tmp_path, [("skin", "1ASPH_bandiera", _quad(0, 50, 1, 51))] + road)
+    assert tm.is_physics_model(p) is True
+    got = tm._walk(p, collect=True)
+    asph = got["tris"][tm._class_of("1ASPH_0")]
+    # 12 quadrati da due triangoli, 3 vertici da (x, z): la bandiera non c'è.
+    assert len(asph) == 12 * 2 * 3 * 2
+    assert max(asph[1::2]) <= 12.0
 
 
 @pytest.mark.parametrize("blob", [b"", b"nope", b"sc6969" + b"\x00" * 4])
