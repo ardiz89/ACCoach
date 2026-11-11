@@ -149,3 +149,24 @@ def test_an_unreadable_previous_lap_does_not_break_the_view(tmp_path):
     if cur["previous"]:
         assert cur["previous"]["improved"] == []
         assert cur["previous"]["regressed"] == []
+
+
+# --- i giri con una sosta ----------------------------------------------------
+
+def test_un_giro_con_la_sosta_non_fa_la_costanza(tmp_path):
+    _lap(tmp_path, "2026-07-20T18:00:00+00:00")
+    _lap(tmp_path, "2026-07-20T18:03:00+00:00", amt=10)
+    lap = synth.stop_at(synth.build_lap(), 0.3, 106_000)
+    lap.recorded_utc, lap.valid, lap.clean = "2026-07-20T18:08:00+00:00", True, True
+    save_lap(lap, tmp_path)
+    cur = _get(_client(tmp_path))["current"]
+    assert cur["valid"] == 3                 # il giro resta nella sessione
+    assert cur["consistency"]["n"] == 2      # ma non nella costanza
+    assert cur["consistency"]["spread_ms"] < 106_000
+    assert cur["stopped"] == 1
+
+
+def test_senza_soste_niente_da_dire(tmp_path):
+    _lap(tmp_path, "2026-07-20T18:00:00+00:00")
+    _lap(tmp_path, "2026-07-20T18:03:00+00:00", amt=10)
+    assert _get(_client(tmp_path))["current"]["stopped"] == 0

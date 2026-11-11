@@ -194,3 +194,15 @@ def test_corner_deltas_col_gesto_migliore():
     for x in build_lap_debrief(live, ref, corners, "it",
                                corner_refs=Refs()).losses:
         assert deltas[x.index] == x.lost_ms
+
+
+def test_ordine_per_giro_tipico_non_per_somma():
+    # Curva 0: un giro solo perde tanto (una sosta, un errore). Curva 2: tutti
+    # i giri perdono un po'. Di solito si perde di più alla 2.
+    laps = [lap("a", deltas={0: 9000, 2: 300}),
+            lap("b", deltas={0: 10, 2: 300}),
+            lap("c", deltas={0: 10, 2: 300})]
+    out = aggregate(laps)
+    assert [s.index for s in out] == [2, 0]
+    assert out[0].lost_median_ms == 300 and out[1].lost_median_ms == 10
+    assert out[1].lost_total_ms == 9020

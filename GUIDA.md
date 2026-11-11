@@ -554,7 +554,8 @@ Le schede stanno in tre gruppi, nell'ordine in cui di solito le leggi.
   sessione nuova. Altrimenti il report riapre l'ultima scheda che guardavi.
 - **Sessione** racconta una sola uscita. Trovi i giri nell'ordine in cui li hai
   guidati. Ci sono anche quelli tagliati o non validi, che però non fanno
-  media. Poi il migliore, la costanza, la temperatura dell'asfalto, e
+  media. Nemmeno un giro con l'auto ferma per più di 5 secondi fa media e
+  scarto, e sotto il titolo leggi quanti sono. Poi il migliore, la costanza, la temperatura dell'asfalto, e
   **cosa è cambiato dall'ultima volta** con la stessa auto sulla stessa pista,
   curva per curva. Con un clic su un giro lo apri in Confronto. Le sessioni le
   deduciamo dagli orari, e una pausa lunga vale come sessione nuova.
@@ -780,13 +781,19 @@ curva.
 ### Curva per curva
 
 La scheda guarda tutti i giri validi di una sessione, non un giro solo. Ogni
-curva è una riga, e in cima c'è quella dove hai perso di più. Il selettore in
-alto sceglie la sessione, come nella Pagella.
+curva è una riga. Il numero a destra è quanto perdi lì in un giro tipico, cioè
+la mediana dei tuoi giri. In cima c'è la curva dove di solito perdi di più. Un
+giro con un errore grosso non sposta la classifica. Il selettore in alto sceglie
+la sessione, come nella Pagella.
+
+Un giro con l'auto ferma per più di 5 secondi non conta. Il gioco lo dà valido,
+ma quel tempo è una sosta e non guida. In cima alla scheda leggi quanti giri
+sono rimasti fuori. Una testacoda ripresa subito invece conta.
 
 Aprendo una riga trovi quattro blocchi.
 
-- **Quanto e dove perdi.** Il tempo perso in tutta la sessione, al netto dei
-  giri in cui lì guadagni, e in quanti giri perdi. Contano tutti i giri, anche
+- **Quanto e dove perdi.** Il tempo perso in un giro tipico, poi in tutta la
+  sessione al netto dei giri in cui lì guadagni, e in quanti giri perdi. Contano tutti i giri, anche
   quelli in cui vai forte. La perdita mediana per fase e la causa che torna più
   spesso vengono solo dai giri in cui perdi. Si misura contro
   il tuo gesto migliore in quella curva, se c'è, altrimenti contro il

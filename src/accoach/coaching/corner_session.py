@@ -1,8 +1,8 @@
 """La sessione, curva per curva: i tuoi giri aggregati per curva.
 
 Nessun I/O. Prende per ogni giro le righe gia' calcolate (perdite, frenate,
-traiettoria) e per ogni curva dice quanto hai perso in tutto, dove, perche'
-«di solito» e come sono fatte la frenata e la linea tipiche.
+traiettoria) e per ogni curva dice quanto perdi di solito in un giro, quanto
+in tutto, dove, perche' «di solito» e come sono fatte la frenata e la linea tipiche.
 """
 from __future__ import annotations
 
@@ -38,6 +38,9 @@ class CornerSummary:
     laps: int
     lost_total_ms: float
     laps_losing: int
+    # Quanto perdi qui in un giro di solito, guadagni compresi. Ordina le curve:
+    # la somma la sposta un giro solo, la mediana no.
+    lost_median_ms: float = 0.0
     phases_ms: dict[str, float] = field(default_factory=dict)
     cause: str | None = None
     cause_message: str = ""
@@ -71,7 +74,7 @@ def _summarize(index, rows, deltas, brakes, lines) -> CornerSummary:
     lost = [v for _, v in deltas]
     n_losing = sum(1 for v in lost if v > NOISE_MS)
     s = CornerSummary(index=index, laps=len(deltas), lost_total_ms=sum(lost),
-                      laps_losing=n_losing)
+                      laps_losing=n_losing, lost_median_ms=median(lost))
 
     per_phase: dict[str, list[float]] = {}
     for _, x in rows:
@@ -109,8 +112,8 @@ def _summarize(index, rows, deltas, brakes, lines) -> CornerSummary:
 
     # min() tiene il primo a pari valore: a pari distanza, il giro prima.
     s.best_path = min(deltas, key=lambda r: r[1])[0]
-    med = median(lost)
-    s.typical_path = min(deltas, key=lambda r: abs(r[1] - med))[0]
+    s.typical_path = min(deltas,
+                         key=lambda r: abs(r[1] - s.lost_median_ms))[0]
     return s
 
 
@@ -136,5 +139,5 @@ def aggregate(laps: list[LapCorners]) -> list[CornerSummary]:
     out = [_summarize(i, rows.get(i, []), d, brakes.get(i, []),
                       lines.get(i, []))
            for i, d in deltas.items()]
-    out.sort(key=lambda s: (-s.lost_total_ms, s.index))
+    out.sort(key=lambda s: (-s.lost_median_ms, -s.lost_total_ms, s.index))
     return out

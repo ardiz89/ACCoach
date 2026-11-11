@@ -58,8 +58,8 @@ def test_sessione_vuota(tmp_path):
     assert r.status_code == 200
     j = r.json()
     assert j["corners"] == [] and j["laps"] == 0
-    assert j == {"index": None, "laps": 0, "skipped": 0, "reference": None,
-                 "corners": [], "has_sources": False}
+    assert j == {"index": None, "laps": 0, "skipped": 0, "stopped": 0,
+                 "reference": None, "corners": [], "has_sources": False}
 
 
 def test_curve_della_sessione(tmp_path):
@@ -70,8 +70,8 @@ def test_curve_della_sessione(tmp_path):
     assert j["reference"]["path"] and j["reference"]["lap_time_ms"] > 0
     corners = j["corners"]
     assert corners
-    lost = [c["lost_total_ms"] for c in corners]
-    assert lost == sorted(lost, reverse=True)
+    typical = [c["lost_median_ms"] for c in corners]
+    assert typical == sorted(typical, reverse=True)
     assert corners[0]["index"] == 1          # la curva rallentata, per prima
     for c in corners:
         for key in ("phases_ms", "brake_m", "line_m", "name", "catalog_name",
@@ -309,3 +309,15 @@ def test_ogni_giro_conta_anche_col_gesto_migliore(tmp_path):
     _beats_reference_session(d)
     c0 = _corner0(_get(TestClient(create_api(d))).json())
     assert (c0["laps"], c0["laps_losing"]) == (3, 1)
+
+
+def test_un_giro_con_la_sosta_resta_fuori(tmp_path):
+    d = _laps_dir(tmp_path)
+    _lap(d, "2026-07-20T18:00:00+00:00")
+    _lap(d, "2026-07-20T18:03:00+00:00", amt=20, corner=1)
+    lap = synth.stop_at(synth.build_lap(), 0.3, 106_000)
+    lap.recorded_utc, lap.valid, lap.clean = "2026-07-20T18:06:00+00:00", True, True
+    save_lap(lap, d)
+    j = _get(TestClient(create_api(d))).json()
+    assert (j["laps"], j["stopped"], j["skipped"]) == (2, 1, 0)
+    assert all(c["laps"] <= 2 for c in j["corners"])

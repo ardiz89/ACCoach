@@ -59,7 +59,7 @@ from .recording.lap import SAMPLE_FIELDS
 from .recording.storage import _catalog_path, _slug, list_lap_files
 from .corner_pool import conditions_of as _conditions_of, corner_bests_for
 from .sectors import ideal_lap, sector_spans, sector_times
-from .sessions import group_sessions, parse_utc
+from .sessions import group_sessions, parse_utc, stood_still
 from .stints import MIN_TREND_LAPS, pace_of, split_stints, tyre_trace
 from .telemetry.snapshot import format_lap_time
 from .textfmt import fmt_num
@@ -663,6 +663,28 @@ def _on_track(rows: list[dict]) -> list[dict]:
     return [r for r in rows if not _off_track(r)]
 
 
+_STOOD: dict[tuple[str, float], bool] = {}
+
+
+def _stood_still_row(row: dict) -> bool:
+    """Il giro del catalogo ha una sosta (`sessions.stood_still`)?
+
+    Il catalogo non lo sa: si legge il file, una volta per versione del file.
+    Un file che non si legge non è una sosta: decide chi lo carica dopo.
+    """
+    path = row["path"]
+    try:
+        key = (path, Path(path).stat().st_mtime)
+    except OSError:
+        return False
+    if key not in _STOOD:
+        try:
+            _STOOD[key] = stood_still(load_lap(path))
+        except Exception:  # noqa: BLE001 - un file guasto non è una sosta
+            return False
+    return _STOOD[key]
+
+
 def _wide_corners(rows: list[dict], corners, laps: dict | None = None) -> dict[int, int]:
     """Quante delle uscite recenti sono finite in ogni curva."""
     recent = sorted(rows, key=lambda r: r["recorded_utc"] or "")[-_RECENT_LAPS:]
@@ -690,6 +712,7 @@ def _rounded_summary(summary) -> dict:
         return None if v is None else round(v, n)
 
     d["lost_total_ms"] = r(d["lost_total_ms"], 1)
+    d["lost_median_ms"] = r(d["lost_median_ms"], 1)
     d["phases_ms"] = {k: r(v, 1) for k, v in d["phases_ms"].items()}
     for k in ("brake_m", "brake_spread_m", "brake_kmh", "apex_shift_m"):
         d[k] = r(d[k], 2)
@@ -1868,8 +1891,8 @@ def create_api(
 
         def _empty(at: int | None) -> dict:
             # Le stesse chiavi della risposta piena: la pagina non indovina.
-            return {"index": at, "laps": 0, "skipped": 0, "reference": None,
-                    "corners": [], "has_sources": False}
+            return {"index": at, "laps": 0, "skipped": 0, "stopped": 0,
+                    "reference": None, "corners": [], "has_sources": False}
 
         with _catalog() as cat:
             all_laps = cat.laps_for(car, track)
@@ -1919,9 +1942,15 @@ def create_api(
 
         per_lap: list[LapCorners] = []
         skipped = 0
+        stopped = 0
         for row in cur.valid_laps:
             try:
                 lap = load_lap(row["path"])
+                # Una sosta non è guida: 106 s fermo alla Druids facevano di
+                # quella curva la peggiore della sera.
+                if stood_still(lap):
+                    stopped += 1
+                    continue
                 corner_refs = None
                 if not is_pro:
                     try:
@@ -1979,6 +2008,7 @@ def create_api(
             "index": index,
             "laps": len(per_lap),
             "skipped": skipped,
+            "stopped": stopped,
             "reference": {"path": elected, "lap_time_ms": reference.lap_time_ms},
             "corners": out,
             "has_sources": facts is not None,
@@ -2008,7 +2038,9 @@ def create_api(
         cur = runs[index]
         best = cur.best
         temps = cur.road_temps
-        valid_ms = [l["lap_time_ms"] for l in cur.valid_laps]
+        # La costanza è della guida: un giro con una sosta non la misura.
+        moving = [l for l in cur.valid_laps if not _stood_still_row(l)]
+        valid_ms = [l["lap_time_ms"] for l in moving]
 
         prev = runs[index + 1] if index + 1 < len(runs) else None
         prev_best = prev.best if prev else None
@@ -2038,6 +2070,7 @@ def create_api(
                 "road_temp_from": min(temps) if temps else None,
                 "road_temp_to": max(temps) if temps else None,
                 "consistency": lap_time_consistency(valid_ms),
+                "stopped": len(cur.valid_laps) - len(moving),
                 "recap": recap,
                 # Why there is no recap — but only when the answer is verified.
                 # True means the run's own best lap has a clock that doesn't

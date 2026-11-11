@@ -2704,6 +2704,8 @@ function renderSession(s) {
     bits.push(tf("ses.sub_temp", { from: fmtDec(cur.road_temp_from, 1, "°C"),
                                    to: fmtDec(cur.road_temp_to, 1, "°C") }));
   }
+  // La costanza non conta i giri con una sosta: si dice quanti.
+  if (cur.stopped > 0) bits.push(tf("ses.stopped", { n: Number(cur.stopped) }));
   $("ses-sub").textContent = bits.join("  ·  ");
 
   const item = (k, v, cls) =>
@@ -2852,6 +2854,7 @@ function renderCorners(p, list) {
   if (!p.laps) notes.push(t("corners.none"));
   else if (p.laps === 1) notes.push(t("corners.one"));
   if (p.skipped > 0) notes.push(tf("corners.skipped", { n: Number(p.skipped) }));
+  if (p.stopped > 0) notes.push(tf("corners.stopped", { n: Number(p.stopped) }));
   const head = notes.map((x) => `<div class="nothing">${x}</div>`).join("");
   const corners = p.laps ? (p.corners || []) : [];
   body.innerHTML = head + (corners.length
@@ -2871,14 +2874,17 @@ function renderCorners(p, list) {
 
 // Una curva: la riga che si apre, e dentro i quattro blocchi.
 function cpcCorner(c, p) {
+  // A destra il giro tipico: la somma la sposta un giro solo, come una sosta.
+  const medS = (c.lost_median_ms || 0) / 1000;
   const lostS = (c.lost_total_ms || 0) / 1000;
   // Solo span: la riga finisce dentro un <summary>, che non vuole blocchi.
   const line = `<span class="pag-name"><b>${esc(c.name)}</b>` +
     `<span class="pag-small">${tf("corners.row.laps", { k: Number(c.laps_losing), n: Number(c.laps) })}</span></span>` +
-    `<span class="pag-cost"><span class="num${lostS > 0 ? " loss" : ""}">${fmtSgn(lostS, 2, "s")}</span></span>`;
+    `<span class="pag-cost"><span class="num${medS > 0 ? " loss" : ""}">${fmtSgn(medS, 2, "s")}</span></span>`;
 
   // 1. Quanto e dove perdi.
-  let lost = `<p>${tf("corners.lost", { s: fmtSgn(lostS, 2, "s") })} ` +
+  let lost = `<p>${tf("corners.median", { s: fmtSgn(medS, 2, "s") })} ` +
+    `${tf("corners.lost", { s: fmtSgn(lostS, 2, "s") })} ` +
     (c.laps_losing > 0 ? tf("corners.losing", { k: Number(c.laps_losing), n: Number(c.laps) })
                        : t("corners.nolose")) + `</p>`;
   const ph = c.phases_ms || {};
