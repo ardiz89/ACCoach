@@ -467,6 +467,12 @@ giro rispetto al tuo giro di riferimento, e dove si concentra. Lo confronta con
 la sessione prima, con la stessa auto sulla stessa pista. Se una sessione prima
 non c'è, lo scrive.
 
+Un giro con l'auto ferma per più di 5 secondi non fa media né difetti. Il gioco
+lo dà valido, ma quel tempo è una sosta e non guida. Gli errori di quel giro
+invece li conta, perché sono successi. Vale anche per la scheda Sessione, per
+Curva per curva e per la costanza dell'Andamento. Nella scheda Sessione leggi
+sotto il titolo quanti giri sono rimasti fuori.
+
 Poi trovi quattro blocchi, in quest'ordine.
 
 - **I tuoi difetti principali.** Sono abitudini di guida che si ripetono in più
@@ -554,8 +560,7 @@ Le schede stanno in tre gruppi, nell'ordine in cui di solito le leggi.
   sessione nuova. Altrimenti il report riapre l'ultima scheda che guardavi.
 - **Sessione** racconta una sola uscita. Trovi i giri nell'ordine in cui li hai
   guidati. Ci sono anche quelli tagliati o non validi, che però non fanno
-  media. Nemmeno un giro con l'auto ferma per più di 5 secondi fa media e
-  scarto, e sotto il titolo leggi quanti sono. Poi il migliore, la costanza, la temperatura dell'asfalto, e
+  media. Poi il migliore, la costanza, la temperatura dell'asfalto, e
   **cosa è cambiato dall'ultima volta** con la stessa auto sulla stessa pista,
   curva per curva. Con un clic su un giro lo apri in Confronto. Le sessioni le
   deduciamo dagli orari, e una pausa lunga vale come sessione nuova.
@@ -786,9 +791,9 @@ la mediana dei tuoi giri. In cima c'è la curva dove di solito perdi di più. Un
 giro con un errore grosso non sposta la classifica. Il selettore in alto sceglie
 la sessione, come nella Pagella.
 
-Un giro con l'auto ferma per più di 5 secondi non conta. Il gioco lo dà valido,
-ma quel tempo è una sosta e non guida. In cima alla scheda leggi quanti giri
-sono rimasti fuori. Una testacoda ripresa subito invece conta.
+Un giro con l'auto ferma per più di 5 secondi non conta, come nella Pagella. In
+cima alla scheda leggi quanti giri sono rimasti fuori. Una testacoda ripresa
+subito invece conta.
 
 Aprendo una riga trovi quattro blocchi.
 

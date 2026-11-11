@@ -170,3 +170,14 @@ def test_senza_soste_niente_da_dire(tmp_path):
     _lap(tmp_path, "2026-07-20T18:00:00+00:00")
     _lap(tmp_path, "2026-07-20T18:03:00+00:00", amt=10)
     assert _get(_client(tmp_path))["current"]["stopped"] == 0
+
+
+def test_un_giro_con_la_sosta_non_entra_nella_sintesi(tmp_path):
+    _lap(tmp_path, "2026-07-20T18:00:00+00:00")
+    _lap(tmp_path, "2026-07-20T18:03:00+00:00", amt=10)
+    lap = synth.stop_at(synth.build_lap(), 0.3, 106_000)
+    lap.recorded_utc, lap.valid, lap.clean = "2026-07-20T18:08:00+00:00", True, True
+    save_lap(lap, tmp_path)
+    recap = _get(_client(tmp_path))["current"]["recap"]
+    assert recap is not None and len(recap["laps"]) == 1
+    assert recap["gain_avg_s"] < 10

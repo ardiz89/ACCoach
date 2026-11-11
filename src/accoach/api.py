@@ -658,9 +658,11 @@ def _on_track(rows: list[dict]) -> list[dict]:
 
     Il gioco puo' dare valido un giro con un'uscita. A Zolder un taglio di
     chicane valeva 1,5 s nel settore, e faceva un ideale mai guidato; un giro da
-    1:51 con la fermata faceva una costanza di 17 s.
+    1:51 con la fermata faceva una costanza di 17 s. Nemmeno un giro con una
+    sosta (`sessions.stood_still`) misura la guida, anche se il gioco lo dà
+    pulito: a Brands Hatch 106 s fermo alla Druids.
     """
-    return [r for r in rows if not _off_track(r)]
+    return [r for r in rows if not _off_track(r) and not _stood_still_row(r)]
 
 
 _STOOD: dict[tuple[str, float], bool] = {}
@@ -1829,9 +1831,13 @@ def create_api(
         lap_objs = []
         for row in others:
             try:
-                lap_objs.append(load_lap(row["path"]))
+                lap = load_lap(row["path"])
             except Exception:  # noqa: BLE001 - one bad lap should not sink the run
                 continue
+            # Una sosta non è guida: in media faceva 36 s da guadagnare a giro.
+            if stood_still(lap):
+                continue
+            lap_objs.append(lap)
             kept.append(row)
         if not lap_objs:
             return None, False
