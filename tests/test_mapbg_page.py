@@ -46,7 +46,7 @@ for (const f of ["affCompose", "affApply", "mapBgAffine", "mapBgLevel",
 const job = JSON.parse(fs.readFileSync(0, "utf8"));
 const out = {};
 out.level = job.level.map((a) => mapBgLevel(a[0], a[1]));
-out.photo = job.photo.map((a) => lineWidthOnPhoto(a[0], a[1]));
+out.photo = job.photo.map((a) => mapLineWidth(a[0], a[1], true));
 out.today = job.today.map((a) => mapLineWidth(a[0], a[1], false));
 out.points = [];
 for (const c of job.points) {
@@ -134,11 +134,25 @@ def test_the_level_follows_the_zoom(tmp_path):
 @needs_node
 def test_the_line_stays_inside_the_road_at_full_lap_scale(tmp_path):
     out = _run(tmp_path, _job(photo=[[1, 0.87], [1, 3], [0, 0.87], [0, 0.3]]))
-    assert out["photo"][0] <= 2.61 + 1e-9
-    assert out["photo"][1] == 7
-    assert out["photo"][2] == 2
+    assert out["photo"][0] == pytest.approx(2.61)    # 3 m di strada a 0,87 px/m
+    assert out["photo"][1] == 3
     # mai piu' sottile di 1,5 px: una linea che sparisce non si legge
     assert out["photo"][3] == 1.5
+
+
+@needs_node
+def test_sopra_la_pista_lo_spessore_non_dice_il_distacco(tmp_path):
+    """Scelto dal pilota l'11/11: con lo sfondo il distacco lo dice il colore."""
+    out = _run(tmp_path, _job(photo=[[0, 0.87], [1, 0.87], [0, 10], [1, 10]]))
+    assert out["photo"][0] == out["photo"][1]
+    assert out["photo"][2] == out["photo"][3] == 3
+
+
+def test_la_legenda_dice_che_sopra_la_pista_conta_il_colore():
+    block = _I18N[_I18N.index('"map.grad.note.photo"'):][:400]
+    assert "lo scarto di velocità lo dice il colore" in block
+    body = _JS[_JS.index("function drawMap("):][:2500]
+    assert '"map.grad.note.photo"' in body and "hit.photo" in body
 
 
 @needs_node

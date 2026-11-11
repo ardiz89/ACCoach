@@ -1157,6 +1157,8 @@ function deltaColor(d, m) {
   // slower (d>0) -> Delta Red, faster (d<0) -> Delta Green, near-zero -> pale.
   // Colour is doubled up with segment width (see drawMap) so the read survives
   // red/green colour-blindness — the line gets THICKER the bigger the gap.
+  // Not over the track seen from above: there the width is fixed and the
+  // colour-blind palette (PAL) carries the read alone.
   const t = Math.max(-1, Math.min(1, d / (m || 1)));
   // Near-zero delta is neutral grey, not a faint "slower" tint: a segment where
   // you neither gain nor lose shouldn't read as a (tiny) loss.
@@ -1308,6 +1310,13 @@ function drawMap(a, cx) {
   if (ro) ro.classList.toggle("hidden", !a.has_map);
   const legend = $("map-legend");
   if (legend) legend.classList.toggle("hidden", !a.has_map);
+  // Con la pista sotto lo spessore e' fisso: la nota dice che conta il colore.
+  const note = $("map-grad-note");
+  if (note) {
+    const key = hit && hit.photo ? "map.grad.note.photo" : "map.grad.note";
+    note.setAttribute("data-i18n", key);
+    note.textContent = t(key);
+  }
   // The cross is on the drawing only on a lap that was actually thrown away. A
   // legend entry for a mark that isn't there sends the reader hunting for it,
   // so the entry comes and goes with the mark.
@@ -1509,17 +1518,18 @@ function mapBgLevel(pxPerM, dpr, levels = MAPBG_LEVELS) {
   return levels.length - 1;
 }
 
-// La tua linea sopra la pista vera. La sua larghezza dice il distacco, e alla
-// scala del giro intero una linea da 7 px e' piu' larga della strada (vedi «NO
-// ASPHALT HERE» in drawMapTo): disegnata sopra l'asfalto vero, direbbe che
-// l'auto e' uscita dove non e' uscita. Quindi la mezza larghezza non supera
-// 1,5 m, ma la linea non scende sotto 1,5 px, che e' quanto serve per vederla.
-function lineWidthOnPhoto(tt, s) {
-  return Math.max(1.5, Math.min(2 + 5 * tt, 3 * s));
+// La tua linea sopra la pista vera: lo spessore e' sempre lo stesso, e il
+// distacco lo dice solo il colore (scelto dal pilota l'11/11). Alla scala del
+// giro intero la larghezza col distacco era schiacciata dal tetto e non diceva
+// piu' niente, e una linea da 7 px e' piu' larga della strada (vedi «NO ASPHALT
+// HERE» in drawMapTo). La mezza larghezza non supera 1,5 m, e la linea non
+// scende sotto 1,5 px, che e' quanto serve per vederla.
+function lineWidthOnPhoto(s) {
+  return Math.max(1.5, Math.min(3, 3 * s));
 }
 
 function mapLineWidth(tt, s, photo) {
-  return photo ? lineWidthOnPhoto(tt, s) : 2 + 5 * tt;
+  return photo ? lineWidthOnPhoto(s) : 2 + 5 * tt;
 }
 
 // Scala e centro della mappa per `view`. A k = 1 e' l'inquadratura di sempre,
@@ -1815,9 +1825,11 @@ function drawMapTo(canvas, missing, a, cx, mode, opts) {
   ctx.stroke();
   ctx.restore();
 
-  // Your line: in "delta" mode colour each segment by the delta AND scale its
-  // width by |delta| (thicker = more time lost, so the read survives red/green
-  // colour-blindness). In "balance" mode colour by handling (blue understeer /
+  // Your line: in "delta" mode colour each segment by the delta AND, without
+  // the background, scale its width by |delta| (thicker = more time lost, so
+  // the read survives red/green colour-blindness). Over the background the
+  // width is fixed and only the colour speaks (`lineWidthOnPhoto`). In
+  // "balance" mode colour by handling (blue understeer /
   // red oversteer) at constant width — the balance ribbon.
   const bal = rv.balance || [];
   // Heatmap signal: the LOCAL speed gap vs the reference at each point (km/h),

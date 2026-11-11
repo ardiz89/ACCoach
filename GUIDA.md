@@ -597,7 +597,9 @@ Le schede stanno in tre gruppi, nell'ordine in cui di solito le leggi.
   Corsa che hai sul PC. Serve AC installato con quella pista, e vale anche per
   i giri di ACC sulla stessa pista. Se AC non ha la pista, la mappa è quella di
   sempre. La prima volta lo sfondo si prepara, poi resta pronto per le volte
-  dopo. Da vicino il paesaggio è sfocato, perché il gioco lo tiene così. Con la
+  dopo. Da vicino il paesaggio è sfocato, perché il gioco lo tiene così. Sopra
+  la pista la tua linea ha sempre lo stesso spessore, e il distacco lo leggi
+  solo dal colore. Senza sfondo la linea è anche più spessa dove perdi. Con la
   **rotella** ingrandisci intorno al mouse, e trascinando sposti la vista. Con
   un **doppio clic** torni al giro intero. Sul tablet e sugli altri dispositivi
   la mappa resta senza sfondo.

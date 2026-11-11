@@ -501,6 +501,8 @@
     "map.grad.slow":   { en: `slower`, it: `più lento` },
     "map.grad.note":   { en: `the line is thicker where the speed gap is bigger`,
                          it: `la linea è più spessa dove lo scarto di velocità è maggiore` },
+    "map.grad.note.photo": { en: `over the track the line keeps one width, and the colour shows the speed gap`,
+                             it: `sopra la pista lo spessore resta uguale, e lo scarto di velocità lo dice il colore` },
     "map.leg.you":     { en: `your braking`, it: `la tua frenata` },
     "map.leg.ref":     { en: `reference braking`, it: `frenata di riferimento` },
     "map.missing":     { en: `One of the two laps has no coordinates, so the map can't be drawn. Drive a new lap and you'll see it here.`,
