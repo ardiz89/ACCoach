@@ -766,6 +766,7 @@
     "kbd.lap":         { en: `[ and ] step through the laps`,
                          it: `[ e ] scorrono i giri` },
     "lbl.laps":        { en: `laps`, it: `giri` },
+    "lbl.nlaps":       { en: `{n} {n|lap|laps}`, it: `{n} {n|giro|giri}` },
     "sum.consistency": { en: `Typical spread over`, it: `Scarto tipico su` },
     "sum.setup_diff":  { en: `Setup differs`, it: `Setup diverso` },
     // Why the benchmark can be slower than your best lap. Braking points move

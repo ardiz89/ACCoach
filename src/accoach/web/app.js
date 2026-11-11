@@ -3217,7 +3217,7 @@ function fmtSecs(v, unit) {
 function sessionOptions(runs, index) {
   return runs.map((x, i) =>
     `<option value="${i}"${i === index ? " selected" : ""}>` +
-    `${fmtWhen(x.started_utc)} · ${x.laps} ${t("lbl.laps")}` +
+    `${fmtWhen(x.started_utc)} · ${tf("lbl.nlaps", { n: Number(x.laps) })}` +
     `${x.best ? " · " + x.best : ""}</option>`).join("");
 }
 
@@ -4075,7 +4075,7 @@ function renderStint(s) {
   // refuel and the split would never know.
   pick.innerHTML = s.stints.map((x, i) =>
     `<option value="${i}"${i === s.index ? " selected" : ""}>` +
-    `${fmtWhen(x.started_utc)} · ${x.laps} ${t("lbl.laps")}` +
+    `${fmtWhen(x.started_utc)} · ${tf("lbl.nlaps", { n: Number(x.laps) })}` +
     `${x.fuel_used != null ? " · " + fmtDec(x.fuel_used, 1, "L") : ""}` +
     `${x.verified ? "" : " · " + t("st.unverified")}</option>`).join("");
   pick.onchange = () => loadStint(CURRENT, parseInt(pick.value, 10));

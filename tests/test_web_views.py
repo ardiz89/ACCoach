@@ -2742,3 +2742,11 @@ def test_the_stint_tyre_drift_is_written_with_catalogue_sentences():
         entry = _I18NJS[_I18NJS.index(f'"{key}"'):]
         entry = entry[:entry.index("},")]
         assert "en:" in entry and "it:" in entry and "{f}" in entry and "{r}" in entry
+
+
+def test_il_selettore_delle_sessioni_dice_un_giro_al_singolare():
+    """«1 laps» e «1 giri» nella tendina delle sessioni (11/11)."""
+    i18n = (WEB / "i18n.js").read_text(encoding="utf-8")
+    assert '"lbl.nlaps":       { en: `{n} {n|lap|laps}`, it: `{n} {n|giro|giri}` }' in i18n
+    body = _APPJS[_APPJS.index("function sessionOptions("):][:400]
+    assert 'tf("lbl.nlaps"' in body and 't("lbl.laps")' not in body
