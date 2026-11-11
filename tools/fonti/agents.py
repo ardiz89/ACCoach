@@ -393,22 +393,22 @@ def _start_s(body: str, segments, at: int | None) -> float | None:
     return best
 
 
-def _vocab_hits(text: str) -> str:
+def _vocab_hits(text: str, track: str | None = None) -> str:
     """Il testo, normalizzato, con ogni parola del vocabolario dei fatti tolta."""
     t = vocab.fold(text)
-    for term in sorted(vocab.VOCAB_TERMS, key=len, reverse=True):
+    for term in sorted(vocab.vocab_terms(track), key=len, reverse=True):
         t = vocab.alias_regex(term).sub(" ", t)
     return t
 
 
-def _is_vocab_name(name: str) -> bool:
-    """Il nome è, o contiene, una curva o una parola del vocabolario."""
-    return _vocab_hits(name) != vocab.fold(name)
+def _is_vocab_name(name: str, track: str | None = None) -> bool:
+    """Il nome è, o contiene, una curva della pista o una parola del vocabolario."""
+    return _vocab_hits(name, track) != vocab.fold(name)
 
 
-def _is_vocab_only(car: str) -> bool:
+def _is_vocab_only(car: str, track: str | None = None) -> bool:
     """L'auto è fatta solo di parole del vocabolario (e di riempitivi)."""
-    rest = [w for w in re.findall(r"[\w']+", _vocab_hits(car)) if w not in _FILLERS]
+    rest = [w for w in re.findall(r"[\w']+", _vocab_hits(car, track)) if w not in _FILLERS]
     return not rest
 
 
@@ -419,7 +419,7 @@ def _names_in(quote: str, name: str) -> bool:
                      vocab.fold(quote)) is not None
 
 
-def _check_rate(d: dict, body: str, authors: set[str]) -> None:
+def _check_rate(d: dict, body: str, authors: set[str], track: str | None = None) -> None:
     """Ogni citazione regge e ogni affermazione non vuota ha la sua; altrimenti si rifiuta tutto.
 
     `authors` sono solo gli autori delle righe di quel testo (`texts.author`), mai
@@ -436,7 +436,7 @@ def _check_rate(d: dict, body: str, authors: set[str]) -> None:
             before[r["quote"]] = body[:start]
     name = d["speaker"]["name"].strip()
     if name:
-        if _is_vocab_name(name):
+        if _is_vocab_name(name, track):
             raise AnswerRejected("nome_non_citato")
         if name not in authors and not any(_names_in(q, name) for q in by_field["name"]):
             raise AnswerRejected("nome_non_citato")
@@ -448,7 +448,7 @@ def _check_rate(d: dict, body: str, authors: set[str]) -> None:
             not vocab.LAP_TIME.fullmatch(d["lap_time"])
             or not any(verify.contains(q, d["lap_time"]) for q in by_field["lap_time"])):
         raise AnswerRejected("tempo_non_citato")
-    if d["car"] is not None and (_is_vocab_only(d["car"])
+    if d["car"] is not None and (_is_vocab_only(d["car"], track)
                                  or not any(verify.contains(q, d["car"]) for q in by_field["car"])):
         raise AnswerRejected("auto_non_citata")
 
@@ -599,7 +599,7 @@ def ingest(conn: sqlite3.Connection, answer_path: Path, model: str) -> dict:
             raise AnswerRejected("segmenti_illeggibili") from None
         if kind == "rate":
             authors = {r[4].strip() for r in rows if isinstance(r[4], str) and r[4].strip()}
-            _check_rate(d, body, authors)
+            _check_rate(d, body, authors, track)
         else:
             facts, rejects = _verify_extract(track, d, rows, segments)
 

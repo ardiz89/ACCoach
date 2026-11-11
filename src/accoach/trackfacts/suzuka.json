@@ -263,20 +263,6 @@
    "n": 1,
    "sources": [
     {
-     "quote": "at the 50 meter board turn in keep the throttle planted",
-     "start_s": 263.84,
-     "url": "https://www.youtube.com/watch?v=Lc27VmjVhe0"
-    }
-   ],
-   "state": "descrittivo",
-   "type": "line",
-   "value": "at the 50 meter board turn in keep the throttle planted"
-  },
-  {
-   "corner": "130R",
-   "n": 1,
-   "sources": [
-    {
      "quote": "you are back on throttle before the apex",
      "start_s": null,
      "url": "https://www.reddit.com/comments/1qcup49/"
@@ -305,34 +291,6 @@
    "n": 1,
    "sources": [
     {
-     "quote": "Cut the chicane as much as possible",
-     "start_s": null,
-     "url": "https://www.reddit.com/comments/1ekre0v/"
-    }
-   ],
-   "state": "descrittivo",
-   "type": "line",
-   "value": "Cut the chicane as much as possible"
-  },
-  {
-   "corner": "Casio Triangle",
-   "n": 1,
-   "sources": [
-    {
-     "quote": "put two wheels all the way over the green part of the curb",
-     "start_s": 377.28,
-     "url": "https://www.youtube.com/watch?v=PChZf2re2Rk"
-    }
-   ],
-   "state": "descrittivo",
-   "type": "line",
-   "value": "put two wheels all the way over the green part of the curb"
-  },
-  {
-   "corner": "Casio Triangle",
-   "n": 1,
-   "sources": [
-    {
      "quote": "try turn into the first corner of the chicane later to set yourself up better",
      "start_s": null,
      "url": "https://www.reddit.com/comments/mepegn/"
@@ -341,48 +299,6 @@
    "state": "descrittivo",
    "type": "line",
    "value": "try turn into the first corner of the chicane later to set yourself up better"
-  },
-  {
-   "corner": "Casio Triangle",
-   "n": 1,
-   "sources": [
-    {
-     "quote": "you can cut the first half of this chicane so much",
-     "start_s": 446.639,
-     "url": "https://www.youtube.com/watch?v=2xFlSZq5Syg"
-    }
-   ],
-   "state": "descrittivo",
-   "type": "line",
-   "value": "you can cut the first half of this chicane so much"
-  },
-  {
-   "corner": "Casio Triangle",
-   "n": 1,
-   "sources": [
-    {
-     "quote": "You went in too deep to the first turn, compromising the last corner.",
-     "start_s": null,
-     "url": "https://www.reddit.com/comments/1ol3rko/"
-    }
-   ],
-   "state": "descrittivo",
-   "type": "mistake",
-   "value": "You went in too deep to the first turn, compromising the last corner."
-  },
-  {
-   "corner": "Casio Triangle",
-   "n": 1,
-   "sources": [
-    {
-     "quote": "important not to get the car too much over the curve",
-     "start_s": 299.919,
-     "url": "https://www.youtube.com/watch?v=6ksdiNQTcRE"
-    }
-   ],
-   "state": "descrittivo",
-   "type": "mistake",
-   "value": "important not to get the car too much over the curve"
   }
  ],
  "track": "suzuka",

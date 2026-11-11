@@ -741,3 +741,35 @@ def test_nessun_alias_vale_per_due_curve_su_nessuna_pista():
 def test_marce_delle_guide(q, atteso):
     got = vocab.locate("gear", q)
     assert (got[0] if got else None) == atteso
+
+
+def test_numero_dentro_il_nome_non_e_un_cartello():
+    # «130R» non è un cartello dei 130: il cartello della frase è quello dei 100.
+    q = "into 130r brake at the 100 board"
+    assert verify.check_fact("suzuka", fatto(q, "board:100", corner="130R"), q) is None
+    assert "130 or" not in vocab.CORNERS["suzuka"]["130R"]
+
+
+def test_alias_che_sbagliavano_curva():
+    # Il controllo dell'11/11 sui testi: «griffins» è anche Griffin's Mount, «cutting»
+    # anche «tagliare», e a Suzuka «chicane» da sola non è sempre la Casio. Le 18
+    # «paddock» di Brands Hatch invece sono tutte la Paddock Hill Bend.
+    assert "griffins" not in vocab.CORNERS["mountpanorama"]["Griffins Bend"]
+    assert "cutting" not in vocab.CORNERS["mountpanorama"]["The Cutting"]
+    assert "chicane" not in vocab.CORNERS["suzuka"]["Casio Triangle"]
+    assert "paddock" in vocab.CORNERS["brandshatch"]["Paddock Hill Bend"]
+    assert "brands" not in vocab.TRACK_NAMES["brandshatch"]
+    assert "catalunya" not in vocab.TURNS
+
+
+def test_nome_di_persona_e_curva_di_un_altra_pista():
+    from tools.fonti import agents
+    # Jim Clark è un nome valido su Imola; a Brands Hatch «Clark» è una curva.
+    assert not agents._is_vocab_name("Jim Clark", "imola")
+    assert agents._is_vocab_name("Jim Clark", "brandshatch")
+    assert agents._is_vocab_name("Tosa Racer", "imola")
+
+
+def test_oltre_venti_curve_solo_le_cifre(monkeypatch):
+    monkeypatch.setitem(vocab.TURNS, "prova", {"Corner 23": (23,)})
+    assert vocab.turn_aliases("prova")["Corner 23"] == ["corner 23", "curva 23", "t23", "turn 23"]

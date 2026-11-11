@@ -76,8 +76,8 @@ _EXTRA = {
     "Vale": ["veil"],
     # Mount Panorama: «chase», «hell» e «skyline» da soli sono parole comuni.
     "Hell Corner": ["hell's corner", "hells corner"],
-    "Griffins Bend": ["griffin's bend", "griffins", "griffin's"],
-    "The Cutting": ["cutting"],
+    "Griffins Bend": ["griffin's bend"],  # «griffins» da solo è anche Griffin's Mount
+    "The Cutting": [],  # «cutting» è anche «tagliare»
     "Quarry Corner": ["quarry"],
     "Reid Park": ["reed park", "reeve park"],
     "Sulman Park": ["salmon park"],
@@ -121,16 +121,16 @@ _EXTRA = {
                  "second degna", "degna 2"],
     "Hairpin": ["suzuka hairpin", "hair pin"],
     "Spoon": ["spoon curve", "spoon corner"],
-    "130R": ["130 r", "one thirty r", "130 are", "130 or"],
-    "Casio Triangle": ["casio", "casio chicane", "final chicane", "last chicane",
-                       "chicane"],  # l'unica chicane
+    "130R": ["130 r", "one thirty r"],
+    "Casio Triangle": ["casio", "casio chicane", "final chicane", "last chicane"],
 }
 
 # I numeri di curva di Imola come li usano le guide su ACC raccolte il 10/11 (Yorkie065,
-# Tobias Pfeffer, SimRacingSetups, Luke Morris): la 2 è la prima frenata, la 7 il
-# tornante a sinistra, dopo la 9 l'Acque Minerali. Deciso dal pilota il 10/11. Solo le
-# curve dove quelle guide concordano: le pieghe 1, 8, 10, 13, 16 e 19 restano fuori,
-# perché le fonti esterne le numerano in modi diversi.
+# Tobias Pfeffer, ItsMopy, MrBeldin): la 2 è la prima frenata, la 7 il tornante a
+# sinistra, dopo la 9 l'Acque Minerali. Deciso dal pilota il 10/11. Le pieghe 1, 8, 10,
+# 13, 16 e 19 restano fuori. Il controllo dell'11/11 ha trovato chi conta diverso: Luke
+# Morris e Yas Heat chiamano «turn one» la staccata del Tamburello; SimRacingSetups e
+# wongispicklejar mettono la Piratella all'8 e la Rivazza al 14.
 TURNS: dict[str, dict[str, tuple[int, ...]]] = {
     "imola": {
         "Tamburello": (2, 3, 4),
@@ -142,17 +142,18 @@ TURNS: dict[str, dict[str, tuple[int, ...]]] = {
         "Rivazza": (17, 18),
     },
     # Silverstone su ACC parte dalla vecchia zona box: la curva 1 è Copse, non Abbey come
-    # in F1 (Scuderia Fantozzi lo dice in chiaro, e così ScallionForward2838 e
-    # FatherJack_Hackett). Sul resto le fonti del 10/11 numerano in modi diversi
-    # (Yorkie065: Loop 14; ScallionForward2838: Luffield 14), quindi resta solo Copse.
+    # in F1 (Yorkie065 «turn one cops corner», Givemeajackson «t1 (copse)»). Sul resto
+    # le fonti del 10/11 numerano in modi diversi (Yorkie065: Loop 14; Givemeajackson:
+    # Luffield 14), quindi resta solo Copse.
     "silverstone": {
         "Copse": (1,),
     },
-    # Mount Panorama: la 1 è la prima staccata dopo il traguardo per Yorkie065, Track
-    # Titan, Yas Heat, Luke Morris e Salt_Slip_9038; la 2 è Griffins Bend per Yorkie065 e SideMax Motorworks; Skyline 11
-    # (Track Titan), The Dipper 14 e Forrest's Elbow 18 (Yorkie065) li dice una guida
-    # sola, in chiaro, e nessuna fonte del 10/11 li contraddice. The Chase e Murray's no:
-    # lì le guide contano le pieghe in modi diversi.
+    # Mount Panorama: la 1 è la prima staccata dopo il traguardo per Yorkie065, Luke
+    # Morris, Yas Heat e SideMax («out of hell's corner… corner 2»); la 2 è Griffins Bend
+    # per Yorkie065 e SideMax. The Dipper 14 e Forrest's Elbow 18 li dice in chiaro solo
+    # Yorkie065, Skyline 11 solo Track Titan (che il DB non segna come ACC): una fonte
+    # sola, ma nessuna li contraddice. The Chase e Murray's no: lì le guide contano le
+    # pieghe in modi diversi.
     "mountpanorama": {
         "Hell Corner": (1,),
         "Griffins Bend": (2,),
@@ -160,9 +161,10 @@ TURNS: dict[str, dict[str, tuple[int, ...]]] = {
         "The Dipper": (14,),
         "Forrest's Elbow": (18,),
     },
-    # Brands Hatch: Surtees 4 (Yorkie065, djperijey), Sheene 7 (djperijey, Vida8943);
-    # Hawthorn 5, Stirling's 8 e Clark 9 da djperijey, Westfield 6 da una fonte Reddit,
-    # in chiaro, senza contraddizioni.
+    # Brands Hatch: Surtees 4 (Yorkie065, reshp2), Sheene 7 (Yorkie065, reshp2,
+    # stephen27898); Hawthorn 5, Westfield 6, Stirling's 8 e Clark 9 solo da reshp2, in
+    # chiaro. Contro: GoodE19 conta una curva in più (la sua 5 è Surtees, la sua 7
+    # Westfield).
     "brandshatch": {
         "Surtees": (4,),
         "Hawthorn Bend": (5,),
@@ -171,12 +173,8 @@ TURNS: dict[str, dict[str, tuple[int, ...]]] = {
         "Stirling's": (8,),
         "Clark Curve": (9,),
     },
-    # Barcellona: Michael Romagnoli Esport chiama tornante la 5 e «the hairpin» la 10, cioè
-    # Seat e La Caixa. Gli altri numeri delle guide non si legano a un nome con un dato.
-    "catalunya": {
-        "Seat": (5,),
-        "La Caixa": (10,),
-    },
+    # Barcellona: nessun numero. Nessun testo del 10/11 dice «Seat» o «La Caixa»: legare
+    # la 5 e la 10 ai nomi era conoscenza del circuito, non un dato delle fonti.
 }
 # I nomi della pista: una fonte è di quella pista solo se il titolo ne dice uno. Una
 # ricerca «ACC Imola» riporta anche guide di Spa, e un «turn 7» di Spa non è la Tosa.
@@ -188,7 +186,7 @@ TRACK_NAMES: dict[str, tuple[str, ...]] = {
     "suzuka": ("suzuka",),
     "mountpanorama": ("bathurst", "mount panorama", "mt panorama"),
     "zandvoort": ("zandvoort",),
-    "brandshatch": ("brands hatch", "brands"),
+    "brandshatch": ("brands hatch", "brands-hatch", "brandshatch"),
     "catalunya": ("barcelona", "barcellona", "catalunya", "catalonia", "montmelo"),
     "austin": ("cota", "circuit of the americas", "austin"),
     "redbullring": ("red bull ring", "redbull ring", "spielberg"),
@@ -203,8 +201,8 @@ _WORDS = {1: "one", 2: "two", 3: "three", 4: "four", 5: "five", 6: "six", 7: "se
 
 # Alias di una pista sola: sulle piste numerate «Corner 7» è il nome di curve diverse.
 _EXTRA_TRACK: dict[str, dict[str, list[str]]] = {
-    # Nürburgring: i nomi delle curve come li lega ai numeri barthale000, senza
-    # contraddizioni. «Ford» no (è anche una marca), Schumacher S no (sono due curve).
+    # Nürburgring: i nomi delle curve come li lega ai numeri ItsMopy. Contro: Ohne Speed
+    # conta una curva in più, e la sua 15 è la Coca-Cola. «Ford» no (è anche una marca), Schumacher S no (sono due curve).
     "nurburgring": {
         "Corner 7": ["dunlop", "dunlop hairpin", "dunlop kehre"],
         "Corner 11": ["warsteiner"],
@@ -233,9 +231,10 @@ def turn_aliases(track: str) -> dict[str, list[str]]:
     """Per ogni curva gli alias numerici: «turn 7», «turn seven», «t7», «curva 7»."""
     out = {}
     for name, nums in TURNS.get(track, {}).items():
-        out[name] = sorted({a for n in nums for a in (f"turn {n}", f"turn {_WORDS[n]}", f"t{n}",
-                                                      f"curva {n}", f"corner {n}",
-                                                      f"corner {_WORDS[n]}")})
+        words = [_WORDS[n] for n in nums if n in _WORDS]  # oltre il 20 solo le cifre
+        out[name] = sorted({*(a for n in nums for a in (f"turn {n}", f"t{n}", f"curva {n}",
+                                                        f"corner {n}")),
+                            *(a for w in words for a in (f"turn {w}", f"corner {w}"))})
     return out
 
 
@@ -255,13 +254,22 @@ NUMBER_ALIASES: dict[str, set[str]] = {
 }
 
 
+# Da coprire prima di cercare i cartelli: i numeri di curva e ogni nome con una cifra
+# dentro («130R», «Lesmo 2», «Degner 1»), che altrimenti sembra un cartello.
+_MASKED: dict[str, set[str]] = {
+    track: NUMBER_ALIASES.get(track, set())
+    | {a for aliases in CORNERS[track].values() for a in aliases if re.search(r"[0-9]", a)}
+    for track in CORNERS
+}
+
+
 def mask_numbers(track: str, text: str) -> str:
     """Il testo con gli alias numerici delle curve coperti da «_», stessa lunghezza.
 
     «turn 17, brake at the 100» ha un numero solo, quello del cartello: il 17 è il nome
     della curva. Le posizioni non cambiano, quindi gli offset restano buoni.
     """
-    for a in sorted(NUMBER_ALIASES.get(track, ()), key=len, reverse=True):
+    for a in sorted(_MASKED.get(track, ()), key=len, reverse=True):
         text = alias_regex(a).sub(lambda m: "_" * len(m.group()), text)
     return text
 
@@ -629,11 +637,25 @@ NAME_LEADS = ("i'm", "i am", "my name is", "sono", "mi chiamo")
 
 # Parole del vocabolario dei fatti: un nome o un'auto fatti di queste non sono un nome
 # né un'auto, ma un pezzo di consiglio copiato nel campo sbagliato.
-VOCAB_TERMS: tuple[str, ...] = tuple(sorted(
-    {a for corners in CORNERS.values() for aliases in corners.values() for a in aliases}
-    | {p for phrases in OBJECTS.values() for p in phrases}
+_GENERIC_TERMS: frozenset[str] = frozenset(
+    {p for phrases in OBJECTS.values() for p in phrases}
     | {w for words in _ORD.values() for w in words}
     | {"gear", "gears", "marcia", "marce", "board", "boards", "marker", "markers",
        "apex", "apexes", "apice", "apici", "early", "middle", "mid", "late", "later",
        "kerb", "kerbs", "curb", "curbs", "cordolo", "cordoli", "entry", "exit",
-       "ingresso", "uscita", "brake", "braking", "frenata", "staccata"}))
+       "ingresso", "uscita", "brake", "braking", "frenata", "staccata"})
+VOCAB_TERMS: tuple[str, ...] = tuple(sorted(
+    {a for corners in CORNERS.values() for aliases in corners.values() for a in aliases}
+    | _GENERIC_TERMS))
+
+
+def vocab_terms(track: str | None) -> tuple[str, ...]:
+    """Le parole dei fatti di una pista: le sue curve e il vocabolario comune.
+
+    Le curve delle altre piste no: Clark, Sheene o Murray sono anche cognomi, e un
+    autore che si chiama Jim Clark non parla di Brands Hatch se il testo è di Imola.
+    """
+    if track not in CORNERS:
+        return VOCAB_TERMS
+    return tuple(sorted({a for aliases in CORNERS[track].values() for a in aliases}
+                        | _GENERIC_TERMS))

@@ -1,38 +1,7 @@
 {
  "disputed": [],
  "facts": [],
- "single": [
-  {
-   "car_class": "gt3_presunta",
-   "corner": "La Caixa",
-   "n": 1,
-   "sources": [
-    {
-     "quote": "There is a 100 m board there to reference on the right-hand side of the",
-     "start_s": 423.4,
-     "url": "https://www.youtube.com/watch?v=eeswpnmCcuM"
-    }
-   ],
-   "state": "singolo",
-   "type": "brake",
-   "value": "board:100"
-  },
-  {
-   "car_class": "gt3_presunta",
-   "corner": "La Caixa",
-   "n": 1,
-   "sources": [
-    {
-     "quote": "We're going to be shifting all the way down into first gear and turning the",
-     "start_s": 427.24,
-     "url": "https://www.youtube.com/watch?v=eeswpnmCcuM"
-    }
-   ],
-   "state": "singolo",
-   "type": "gear",
-   "value": "1"
-  }
- ],
+ "single": [],
  "track": "catalunya",
  "version": 3
 }
