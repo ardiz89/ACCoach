@@ -38,9 +38,11 @@ const line = (re) => src.split("\n").find((l) => re.test(l));
 const asVar = (code) => code.replace(/^const /, "var ");
 eval(asVar(line(/^const MAPBG_LEVELS = /)));
 eval(asVar(line(/^const MAP_MAX_PX_PER_M = /)));
+for (const c of ["MAPBG_RETRY_MS", "MAPBG_RETRIES", "MAPBG_SETTLE_MS"])
+  eval(asVar(line(new RegExp("^const " + c + " = "))));
 for (const f of ["affCompose", "affApply", "mapBgAffine", "mapBgLevel",
                  "lineWidthOnPhoto", "mapLineWidth", "mapView", "mapXY",
-                 "mapZoomAt", "mapWheelFactor"]) eval(grab(f));
+                 "mapZoomAt", "mapWheelFactor", "mapBgRetryAt", "mapBgSettle"]) eval(grab(f));
 const job = JSON.parse(fs.readFileSync(0, "utf8"));
 const out = {};
 out.level = job.level.map((a) => mapBgLevel(a[0], a[1]));
@@ -65,6 +67,10 @@ out.zoom = job.zoom.map((c) => {
   return { k: v1.k, s: v1.s, s0: v1.s0, before: [xy0.X(x), xy0.Y(z)], after: [xy1.X(x), xy1.Y(z)] };
 });
 out.wheel = job.wheel.map((a) => mapWheelFactor(a[0], a[1]));
+out.retry = job.retry.map((a) => mapBgRetryAt(a[0], a[1]));
+out.settle = [];
+let st = null;
+for (const [key, now] of job.settle) { st = mapBgSettle(st, key, now); out.settle.push(st.ask); }
 console.log(JSON.stringify(out));
 """
 
@@ -79,7 +85,8 @@ def _run(tmp_path, job):
 
 
 def _job(**kw):
-    job = {"level": [], "photo": [], "today": [], "points": [], "zoom": [], "wheel": []}
+    job = {"level": [], "photo": [], "today": [], "points": [], "zoom": [], "wheel": [],
+           "retry": [], "settle": []}
     job.update(kw)
     return job
 
@@ -208,3 +215,22 @@ def test_the_legend_names_the_background_in_both_languages():
     assert "Lo sfondo è la pista vista dall'alto, presa dai file di Assetto Corsa." in block
     assert "The background is the track seen from above, taken from Assetto Corsa's files." in block
     assert 'line.leg.photo' in _JS
+
+
+@needs_node
+def test_un_tassello_fallito_si_richiede_tre_volte_poi_basta(tmp_path):
+    got = _run(tmp_path, _job(retry=[[1, 0], [2, 0], [3, 0], [4, 0]]))["retry"]
+    assert got == [2000, 4000, 8000, None]
+
+
+@needs_node
+def test_i_tasselli_si_chiedono_a_vista_ferma(tmp_path):
+    # Lo zoom cambia vista ogni 40 ms: non si chiede niente. Poi si ferma.
+    settle = [["a", 0], ["b", 40], ["c", 80], ["c", 120], ["c", 230], ["c", 400]]
+    assert _run(tmp_path, _job(settle=settle))["settle"] == [
+        False, False, False, False, True, True]
+
+
+def test_un_tassello_vuoto_non_si_richiede_mai():
+    body = _JS[_JS.index("function mapBgTile("):][:2500]
+    assert "r.status === 204" in body and "entry.ok = false; return;" in body

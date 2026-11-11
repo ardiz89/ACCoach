@@ -1455,10 +1455,23 @@ const MAP_MAX_PX_PER_M = 10;
 const MAPBG_FILTER = "saturate(0.55) brightness(0.62)";
 const MAP_HALO = "rgba(0,0,0,0.65)";
 
+//: Un tassello fallito (rete, errore del server) si richiede dopo 2, 4 e 8 s,
+//: poi basta. Uno vuoto (204) non si richiede mai: li' non c'e' niente.
+const MAPBG_RETRY_MS = 2000;
+const MAPBG_RETRIES = 3;
+//: Durante uno zoom veloce si chiedono i tasselli solo quando la vista sta
+//: ferma da tanto: prima si posano quelli piu' larghi gia' arrivati. Senza, ogni
+//: scatto della rotella chiedeva un livello intero che lo scatto dopo buttava,
+//: e il server li fa uno alla volta.
+const MAPBG_SETTLE_MS = 150;
+
 let MAPBG = null;          // la risposta di /api/mapbg del giro corrente, o null
-let MAPBG_TILES = new Map();   // "key/L/tx/tz" -> {img, ok}; ok null = in arrivo
+// "key/L/tx/tz" -> {img, ok, tries, retryAt}; ok null = in arrivo
+let MAPBG_TILES = new Map();
 let MAPBG_TILES_KEY = null;
 let MAPBG_RAF = 0;
+let MAPBG_VIEW = { key: null, since: 0 };   // la vista dei tasselli, e da quando
+let MAPBG_SETTLE_T = 0;
 // Lo zoom della mappa grande: k = 1 e' il giro intero, (cx, cz) il centro in
 // coordinate del giro. Ogni giro nuovo riparte dal giro intero.
 let MAP_VIEW = { k: 1, cx: 0, cz: 0 };
@@ -1580,19 +1593,53 @@ async function loadMapBg() {
   mapBgRedrawSoon();
 }
 
+// Quando richiedere un tassello fallito per la `tries`-esima volta: null se
+// non si richiede piu'.
+function mapBgRetryAt(tries, now) {
+  if (tries > MAPBG_RETRIES) return null;
+  return now + MAPBG_RETRY_MS * Math.pow(2, tries - 1);
+}
+
+// La vista dei tasselli e' ferma? `key` dice livello e riquadro: quando cambia
+// si riparte a contare. `ask` e' vero da MAPBG_SETTLE_MS in poi.
+function mapBgSettle(prev, key, now) {
+  const since = prev && prev.key === key ? prev.since : now;
+  return { key, since, ask: now - since >= MAPBG_SETTLE_MS };
+}
+
 // Un tassello: l'immagine se e' arrivata, altrimenti null. `ask` decide se
-// chiederlo; uno vuoto (204) o fallito resta segnato e non si richiede piu'.
+// chiederlo. Uno vuoto (204) resta segnato e non si richiede piu'; uno fallito
+// si richiede piu' tardi (`mapBgRetryAt`), solo se serve ancora.
 function mapBgTile(bg, L, tx, tz, ask) {
   const id = bg.key + "/" + L + "/" + tx + "/" + tz;
   const got = MAPBG_TILES.get(id);
-  if (got) return got.ok ? got.img : null;
+  if (got && (got.ok !== false || got.retryAt == null || Date.now() < got.retryAt)) {
+    return got.ok ? got.img : null;
+  }
   if (!ask) return null;
-  const img = new Image();
-  const entry = { img, ok: null };
-  img.onload = () => { entry.ok = true; mapBgRedrawSoon(); };
-  img.onerror = () => { entry.ok = false; };
+  const entry = { img: null, ok: null, tries: got ? got.tries : 0, retryAt: null };
   MAPBG_TILES.set(id, entry);
-  img.src = "/api/mapbg/tile/" + id;
+  const failed = () => {
+    entry.ok = false;
+    entry.tries += 1;
+    entry.retryAt = mapBgRetryAt(entry.tries, Date.now());
+    // Il ridisegno dopo l'attesa lo richiede, se il tassello e' ancora in vista.
+    if (entry.retryAt != null) setTimeout(mapBgRedrawSoon, entry.retryAt - Date.now() + 10);
+  };
+  fetch("/api/mapbg/tile/" + id).then((r) => {
+    if (r.status === 204) { entry.ok = false; return; }      // vuoto: per sempre
+    if (!r.ok) { failed(); return; }
+    return r.blob().then((b) => {
+      const img = new Image();
+      const url = URL.createObjectURL(b);
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        entry.img = img; entry.ok = true; mapBgRedrawSoon();
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); failed(); };
+      img.src = url;
+    });
+  }).catch(failed);
   return null;
 }
 
@@ -1634,6 +1681,17 @@ function mapBgDraw(ctx, bg, A, w, h) {
     x0 = Math.min(x0, p[0]); x1 = Math.max(x1, p[0]);
     z0 = Math.min(z0, p[1]); z1 = Math.max(z1, p[1]);
   }
+  // Si chiede solo a vista ferma; intanto si ridisegna quando lo diventa.
+  {
+    const side = P * levels[want];
+    const key = [bg.key, want, Math.floor(x0 / side), Math.floor(x1 / side),
+                 Math.floor(z0 / side), Math.floor(z1 / side)].join("/");
+    MAPBG_VIEW = mapBgSettle(MAPBG_VIEW, key, Date.now());
+    if (!MAPBG_VIEW.ask) {
+      clearTimeout(MAPBG_SETTLE_T);
+      MAPBG_SETTLE_T = setTimeout(mapBgRedrawSoon, MAPBG_SETTLE_MS + 10);
+    }
+  }
   let drawn = false;
   ctx.save();
   ctx.filter = MAPBG_FILTER;
@@ -1647,7 +1705,7 @@ function mapBgDraw(ctx, bg, A, w, h) {
     const seam = Math.min(2, 1 / (pxPerM * mpp));
     for (let tx = t0; tx <= t1; tx++) {
       for (let tz = u0; tz <= u1; tz++) {
-        const img = mapBgTile(bg, L, tx, tz, L === want);
+        const img = mapBgTile(bg, L, tx, tz, L === want && MAPBG_VIEW.ask);
         if (!img) continue;
         ctx.save();
         ctx.transform(T[0], T[1], T[2], T[3], T[4], T[5]);
