@@ -1038,6 +1038,36 @@ def _direction_ok(track: str, name: str | int, direction: str) -> bool:
     return not want or not direction or want == direction
 
 
+def _curated_pass(track: str, corners, named: list) -> None:
+    """Hands each curated entry to the nearest free corner turning its way."""
+    table = _CORNERS.get(_key(track))
+    if not table:
+        return
+    for label, pos in table:
+        best, best_d = None, _NAME_TOL
+        for i, c in enumerate(corners):
+            if named[i] is not None:
+                continue
+            if not _direction_ok(track, label, getattr(c, "direction", "")):
+                continue
+            d = abs(c.apex_pos - pos)
+            if d <= best_d:
+                best, best_d = i, d
+        if best is not None:
+            named[best] = label
+
+
+def catalog_labels(track: str, corners) -> list[str | int | None]:
+    """The curated entry of each corner, or None where the table names none.
+
+    Not a display name: on a numbered circuit an unmatched corner would read
+    "Corner 5" from the detector's own count, and that is another corner's number.
+    """
+    named: list[str | int | None] = [None] * len(corners)
+    _curated_pass(track, corners, named)
+    return named
+
+
 def name_corners(track: str, corners, lang: str | None = None,
                  learned=None, custom=None) -> list[str]:
     """Names for a list of detected corners (objects with ``index``/``apex_pos``).
@@ -1077,20 +1107,7 @@ def name_corners(track: str, corners, lang: str | None = None,
             if best is not None:
                 named[best] = label
 
-    table = _CORNERS.get(_key(track))
-    if table:
-        for label, pos in table:
-            best, best_d = None, _NAME_TOL
-            for i, c in enumerate(corners):
-                if named[i] is not None:
-                    continue
-                if not _direction_ok(track, label, getattr(c, "direction", "")):
-                    continue
-                d = abs(c.apex_pos - pos)
-                if d <= best_d:
-                    best, best_d = i, d
-            if best is not None:
-                named[best] = label
+    _curated_pass(track, corners, named)
 
     # What is left keeps a number, and *which* number is the point. The
     # detector's own index is the count of what it found on this lap, and that

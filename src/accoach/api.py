@@ -65,7 +65,7 @@ from .telemetry.snapshot import format_lap_time
 from .textfmt import fmt_num
 from .track import detect_corners
 from .trackedges import crop as crop_edges, edges_and_fit, edges_for
-from .trackdata import name_corners
+from .trackdata import catalog_labels, name_corners, render
 from .trackmesh import road_shapes
 from .trajectory import (
     LinePoint,
@@ -1903,11 +1903,13 @@ def create_api(
                      zip(corners, name_corners(track, corners, lg,
                                                _corner_map(car, track),
                                                _typed(track)))}
-            # La chiave delle fonti non cambia con la lingua: sulle piste numerate
-            # il catalogo dà «Curva 3» in italiano, e i fatti dicono «Corner 3».
-            catalog_names = {c.index: n for c, n in
-                             zip(corners, name_corners(track, corners, "en",
-                                                       None, None))}
+            # La chiave delle fonti è la voce del catalogo, in inglese in ogni
+            # lingua: sulle piste numerate i fatti dicono «Corner 3». Una curva che
+            # il catalogo non riconosce non ha chiave: col numero del rilevatore
+            # prenderebbe le fonti di un'altra curva.
+            catalog_names = {c.index: render(label, "en") for c, label in
+                             zip(corners, catalog_labels(track, corners))
+                             if label is not None}
         except Exception:  # noqa: BLE001 - a degenerate lap shouldn't 500 the UI
             raise HTTPException(422, "lap could not be analysed")
         # Dove continui a uscire, niente «frena più tardi», come /api/analysis:
@@ -1962,9 +1964,9 @@ def create_api(
         apex = {c.index: round(c.apex_pos, 4) for c in corners}
         out = []
         for summary in aggregate_corners(per_lap):
-            catalog_name = catalog_names.get(summary.index,
-                                             f"Corner {summary.index + 1}")
-            sources = trackfacts.for_corner(facts, catalog_name)
+            catalog_name = catalog_names.get(summary.index)
+            sources = trackfacts.for_corner(facts if catalog_name else None,
+                                            catalog_name or "")
             out.append({
                 **_rounded_summary(summary),
                 "name": names.get(summary.index, f"Corner {summary.index + 1}"),

@@ -105,7 +105,8 @@ def test_senza_fatti_niente_fonti(tmp_path, monkeypatch):
 
 def test_fonti_abbinate_per_posizione(tmp_path, monkeypatch):
     c = _three(tmp_path)
-    first = min(_get(c).json()["corners"], key=lambda x: x["apex"])
+    first = min((x for x in _get(c).json()["corners"] if x["catalog_name"]),
+                key=lambda x: x["apex"])
     catalog = first["catalog_name"]
     facts = {"version": 3, "track": TRACK, "facts": [], "disputed": [],
              "single": [{"corner": catalog, "type": "gear", "value": "1",
@@ -125,20 +126,68 @@ def test_fonti_abbinate_per_posizione(tmp_path, monkeypatch):
     assert all(not x["sources"]["single"] for x in others)
 
 
-def test_pista_numerata_fonti_in_ogni_lingua(tmp_path, monkeypatch):
-    # Sulle piste numerate il nome di catalogo è «Turn N» in ogni lingua: è la chiave
-    # dei fatti, e in italiano la pagina non deve perdere le fonti.
+def _numbered_session(tmp_path, track):
     d = _laps_dir(tmp_path)
     for when in ("2026-07-20T18:00:00+00:00", "2026-07-20T18:03:00+00:00"):
         lap = synth.build_lap()
-        lap.track, lap.recorded_utc, lap.valid, lap.clean = "austin", when, True, True
+        lap.track, lap.recorded_utc, lap.valid, lap.clean = track, when, True, True
         save_lap(lap, d)
-    c = TestClient(create_api(d))
-    params = {"car": CAR, "track": "austin"}
-    it = c.get("/api/corners", params={**params, "lang": "it"}).json()["corners"]
-    en = c.get("/api/corners", params={**params, "lang": "en"}).json()["corners"]
-    assert it and [x["catalog_name"] for x in it] == [x["catalog_name"] for x in en]
-    assert all(x["catalog_name"].startswith("Corner ") for x in it)
+    return TestClient(create_api(d))
+
+
+def _facts_everywhere(monkeypatch, track):
+    # Un fatto per ogni curva del catalogo, chiamata come nei file: «Corner N».
+    from accoach.trackdata import _CORNERS
+    single = [{"corner": f"Corner {n}", "type": "gear", "value": "2", "source": "s"}
+              for n, _pos in _CORNERS[track]]
+    facts = {"version": 3, "track": track, "facts": [], "disputed": [], "single": single}
+    monkeypatch.setattr("accoach.trackfacts.load", lambda t, root=None: facts)
+
+
+@pytest.mark.parametrize("track", ["austin", "redbullring", "nurburgring"])
+def test_pista_numerata_fonti_solo_sulle_curve_del_catalogo(tmp_path, monkeypatch, track):
+    from accoach.trackdata import _CORNERS, _NAME_TOL
+    # In italiano le curve si leggono «Curva N», ma la chiave dei fatti è «Corner N»:
+    # la curva che il catalogo riconosce ha le sue fonti in ogni lingua. Una che non
+    # riconosce non ne ha, perché il numero del rilevatore è quello di un'altra curva.
+    _facts_everywhere(monkeypatch, track)
+    c = _numbered_session(tmp_path, track)
+    for lang in ("it", "en"):
+        corners = c.get("/api/corners", params={"car": CAR, "track": track,
+                                                "lang": lang}).json()["corners"]
+        assert corners
+        for x in corners:
+            if x["catalog_name"] is None:
+                assert not any(x["sources"].values()) and x["gear_compare"] is None
+            else:
+                # «Corner N» sta sulla curva N del catalogo, non su quella che il
+                # rilevatore conta per N-esima.
+                n = int(x["catalog_name"].removeprefix("Corner "))
+                assert abs(x["apex"] - dict(_CORNERS[track])[n]) <= _NAME_TOL
+                assert x["sources"]["single"][0]["corner"] == x["catalog_name"]
+
+
+def test_curva_fuori_catalogo_niente_fonti(tmp_path, monkeypatch):
+    # Se il catalogo non riconosce nessuna curva, nessuna prende fonti: prima il
+    # numero del rilevatore («Corner 1») pescava i fatti della curva 1 vera.
+    _facts_everywhere(monkeypatch, "redbullring")
+    monkeypatch.setattr(api_mod, "catalog_labels", lambda track, corners: [None] * len(corners))
+    c = _numbered_session(tmp_path, "redbullring")
+    corners = c.get("/api/corners", params={"car": CAR, "track": "redbullring",
+                                            "lang": "it"}).json()["corners"]
+    assert corners
+    for x in corners:
+        assert x["catalog_name"] is None
+        assert not any(x["sources"].values()) and x["gear_compare"] is None
+
+
+def test_curva_fuori_catalogo_non_prende_le_fonti_di_un_altra(monkeypatch):
+    # Red Bull Ring: una sinistra a 0,31 non è la T3 (destra) e la T2 è lontana.
+    # Il rilevatore la chiama per prima, ma non è la curva 1 del catalogo.
+    from types import SimpleNamespace
+    from accoach.trackdata import catalog_labels
+    corners = [SimpleNamespace(index=0, apex_pos=0.31, direction="left")]
+    assert catalog_labels("red_bull_ring", corners) == [None]
 
 
 def test_un_giro_guasto_si_salta(tmp_path, monkeypatch):
