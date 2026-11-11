@@ -516,6 +516,12 @@ on average each lap against your reference lap, and where it piles up. It
 compares that with the previous session, same car on the same track. If there's
 no previous session, it says so.
 
+A lap with the car standing still for more than 5 seconds counts towards neither
+the averages nor the defects. The game marks it valid, but that time is a stop,
+not driving. Its errors still count, because they happened. The same goes for
+the Session tab, for Corner by corner and for the consistency in Progress. On
+the Session tab, under the title, you read how many laps were left out.
+
 Then come four blocks, in this order.
 
 - **Your main faults.** Driving habits that repeat across several corners, like
@@ -643,6 +649,9 @@ The tabs come in three groups, in the order you usually read them.
   for ACC laps on the same track too. If AC doesn't have the track, the map is
   the usual one. The first time the background gets prepared, then it stays
   ready. Up close the scenery is blurry, because the game keeps it that way.
+  Over the track your line always keeps the same width, and you read the gap
+  from the colour alone. Without the background the line is also thicker where
+  you lose.
   Use the **mouse wheel** to zoom in around the pointer, and drag to move. A
   **double-click** takes you back to the whole lap. On the tablet and on other
   devices the map stays without a background.
@@ -829,13 +838,20 @@ corner.
 ### Corner by corner
 
 This tab looks at every valid lap of a session, not at one lap. Each corner is a
-row, and the one where you lost the most is at the top. The picker at the top
+row. The number on the right is how much you lose there on a typical lap, that
+is the median of your laps. The corner where you usually lose the most is at the
+top. One lap with a big mistake doesn't move the order. The picker at the top
 chooses the session, as on the Report card.
+
+A lap with the car standing still for more than 5 seconds doesn't count, as on
+the Report card. At the top of the tab you read how many laps were left out. A
+spin you recover from straight away does count.
 
 Open a row and you get four blocks.
 
-- **How much and where you lose.** The time lost over the whole session, net of
-  the laps where you gain there, and on how many laps you lose. Every lap counts,
+- **How much and where you lose.** The time lost on a typical lap, then over the
+  whole session net of the laps where you gain there, and on how many laps you
+  lose. Every lap counts,
   the fast ones too. The median loss per phase and the cause that comes back most
   often come only from the laps where you lose. It's measured against your own best attempt at that corner, when there is one,
   and otherwise against the reference. At the top the page says which lap is the
@@ -853,6 +869,9 @@ Open a row and you get four blocks.
   confirm, even when more than one author says it. Next to it you read how many
   authors say it. It's not a reference. **The sources disagree** puts the
   different values side by side.
+- Gears and braking come only from sources on GT3 cars. Lines and mistakes come
+  from every source on ACC. If a source is about another car, next to it you
+  read "On a GT4", "On another class of car" or "Car class unclear".
 
 The sources never become a target. The page never tells you which board to brake
 at, because we don't know where the board sits on the map. It compares only the
