@@ -19,8 +19,11 @@ httpx>=0.27       # required by fastapi TestClient (used in tests)
 PySide6>=6.6,<6.12  # on-screen overlay + GUI launcher (frontend)
 segno>=1.6        # QR codes for opening the pages on a phone/tablet (LAN access)
 
+# La mappa del report vista dall'alto (trackart, kn5visual): i modelli del gioco
+# in array e i tasselli JPEG.
+numpy>=1.26       # track models as arrays
+Pillow>=10.0      # background tiles (JPEG) and textures
+
 # Build-only (not needed to run from source)
 # pyinstaller     # to build ACCoach.exe (see build_exe.bat)
 
-# (added in later phases)
-# numpy           # telemetry analysis

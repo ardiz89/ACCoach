@@ -88,3 +88,45 @@ def test_la_release_non_ha_altri_pip_install_senza_impronte():
     for riga in installi:
         assert "--require-hashes" in riga and "-r requirements.lock" in riga, riga
         assert "--only-binary :all:" in riga, riga
+
+
+# Le librerie che si chiamano in un modo e si installano in un altro.
+_PYPI = {"pil": "pillow", "yaml": "pyyaml"}
+# Importate solo dentro un try, con un ripiego se mancano.
+_FACOLTATIVE = {"psutil"}
+# Arrivano con fastapi: non si elencano da sole.
+_TRANSITIVE = {"starlette", "pydantic"}
+
+
+def _importate() -> dict:
+    """libreria di terze parti -> file di src/accoach che la importano."""
+    import ast
+    import sys
+    std = set(sys.stdlib_module_names)
+    out: dict = {}
+    for p in (ROOT / "src" / "accoach").rglob("*.py"):
+        albero = ast.parse(p.read_text(encoding="utf-8-sig"))
+        for n in ast.walk(albero):
+            if isinstance(n, ast.Import):
+                nomi = [a.name for a in n.names]
+            elif isinstance(n, ast.ImportFrom) and n.level == 0 and n.module:
+                nomi = [n.module]
+            else:
+                continue
+            for nome in nomi:
+                top = nome.split(".")[0]
+                if top not in std and top != "accoach":
+                    out.setdefault(top, set()).add(p.name)
+    return out
+
+
+def test_ogni_libreria_importata_e_in_requirements_txt():
+    """Il 06/11 la mappa vista dall'alto ha portato numpy e Pillow senza
+    scriverli: i test passavano qui, dove ci sono, e l'installazione e l'EXE
+    restavano senza sfondo. Se ne accorse l'11/11 l'installazione."""
+    nomi = set(_req_names())
+    for lib, file in sorted(_importate().items()):
+        if lib in _FACOLTATIVE or lib in _TRANSITIVE:
+            continue
+        assert _norm(_PYPI.get(lib.lower(), lib)) in nomi, \
+            f"{lib} (in {sorted(file)[:3]}) manca da requirements.txt"
