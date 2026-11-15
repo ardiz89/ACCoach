@@ -57,6 +57,9 @@ will contain, grouped by what you'll notice.
   every view links to the next useful one. [#115]
 - The tablet shows the fuel and the laps it lasts, and asks again for the list
   of setups while it is empty.
+- The tablet reads the pedals like the overlay: bars with the reference mark,
+  the gap, TRAIL and coasting. Below them, the track with the car moving on it,
+  with zoom to see the car against the edges.
 
 ### After you drive
 

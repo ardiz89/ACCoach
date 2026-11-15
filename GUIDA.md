@@ -953,6 +953,18 @@ dell'ingegnere».
   la strada e la fase su cui lavora l'ingegnere. Una modifica da fare dal
   volante compare in un riquadro. Il bottone *L'ho cambiato* c'è solo dove
   HONE non legge la manopola, come spiegato in «I consigli di setup».
+- **Pedali come sull'overlay.** Sopra la striscia ci sono le barre di freno,
+  gas e sterzo di adesso. La tacca azzurra è quanto premeva il giro di
+  riferimento in quel punto. Accanto leggi il distacco, e TRAIL quando freni
+  col volante girato. Mentre non premi nessun pedale leggi VELEGGIO con i
+  secondi. Sotto la striscia una fascia ambra segna il trail braking, una
+  grigia il veleggio.
+- **La pista.** A destra, o sotto col tablet in verticale, c'è la pista con
+  l'auto in azzurro e la punta che dice dove va. *Pista intera* la mostra
+  tutta. *400 m* e *120 m* seguono l'auto, e a 120 m vedi l'auto rispetto ai
+  bordi. I bordi ci sono solo sulle piste che hai anche su Assetto Corsa. Sulle
+  altre la linea grigia è il tuo giro di riferimento, e la pagina te lo dice.
+  La pista arriva con il primo giro valido su quella pista.
 - **Avviso di rientro.** Quando l'ingegnere ha una modifica da fare ai box, in
   alto compare l'invito a rientrare a fine giro. La telemetria resta sotto. Per
   una modifica respinta l'avviso è simile e ti dice di rimettere l'ultima

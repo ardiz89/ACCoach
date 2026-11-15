@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import dataclasses
 import logging
+import math
 import re
 import statistics
 import sys
@@ -82,6 +83,10 @@ _log = logging.getLogger(__name__)
 
 PORT = 8778
 _MAX_POINTS = 600   # downsample traces for the browser
+# Un punto ogni 4 m: Imola resta sotto i 1300 punti, e l'iPad 3 li ridisegna a
+# ogni frame della mappa del tablet senza perdere il passo.
+_LIVEMAP_STEP_M = 4.0
+_LIVEMAP_EDGE_MAX = 1500
 
 # Below this, a corner didn't really move between two sessions. Same reasoning
 # as the guided flow's floor: it is inside the spread of one driver's own laps,
@@ -1490,6 +1495,40 @@ def create_api(
             return Response(status_code=204)
         return Response(content=data, media_type="image/jpeg",
                         headers={"Cache-Control": "private, max-age=86400"})
+
+    @app.get("/api/livemap")
+    def livemap(car: str = Query(...), track: str = Query(...)) -> dict:
+        """La pista per la mappa del tablet, una volta per pista (15/11).
+
+        La linea del giro di riferimento, diradata a un punto ogni
+        `_LIVEMAP_STEP_M`: l'iPad 3 la ridisegna a ogni frame. E, se la pista
+        installata e' proprio questa, i due bordi dell'asfalto, posati sul
+        giro come nella Traiettoria. Senza bordi la vista lo dice: la linea e'
+        il tuo giro, non la strada.
+        """
+        _rev, base, _rp, _bp = _two_laps(car, track, None, None)
+        pts = line_points(base)
+        line: list[list[float]] = []
+        for p in pts:
+            if line and math.hypot(p.x - line[-1][0], p.z - line[-1][1]) < _LIVEMAP_STEP_M:
+                continue
+            line.append([round(p.x, 1), round(p.z, 1)])
+        if len(line) < 2:
+            raise HTTPException(404, "lap has no coordinates")
+        edges = None
+        got, _fit = edges_and_fit(track, pts)
+        if got is not None:
+            left, right = got.edge_points()
+            # Diradati come la linea: tenuto un punto ogni `k`, un buco fra due
+            # punti tenuti resta un buco (`TrackEdges.breaks`).
+            k = max(1, math.ceil(len(left) / _LIVEMAP_EDGE_MAX))
+            keep = list(range(0, len(left), k))
+            breaks = [j for j in range(1, len(keep))
+                      if any(keep[j - 1] < b <= keep[j] for b in got.breaks)]
+            edges = {"left": [[round(left[i][0], 1), round(left[i][1], 1)] for i in keep],
+                     "right": [[round(right[i][0], 1), round(right[i][1], 1)] for i in keep],
+                     "breaks": breaks}
+        return {"line": line, "edges": edges}
 
     @app.get("/api/trajectory")
     def trajectory(

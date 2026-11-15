@@ -1000,6 +1000,18 @@ road".
   from the last 8 s. Below it are the road and the phase the engineer is on.
   A change to make from the wheel appears in a box. The *I've changed it* button
   is there only where HONE can't read the dial, as explained in "Setup advice".
+- **Pedals as on the overlay.** Above the strip are the brake, throttle and
+  steering bars as they are now. The blue mark is how hard the reference lap
+  pressed at that point. Beside them you read the gap, and TRAIL while you
+  brake with the wheel turned. While you press neither pedal you read COASTING
+  with the seconds. Under the strip an amber band marks trail braking, a grey
+  one coasting.
+- **The track.** On the right, or below with the tablet upright, is the track
+  with the car in blue and a tip showing where it's heading. *Whole track*
+  shows all of it. *400 m* and *120 m* follow the car, and at 120 m you see the
+  car against the edges. The edges are there only on tracks you also have in
+  Assetto Corsa. On the others the grey line is your reference lap, and the
+  page says so. The track arrives with your first valid lap on it.
 - **Return-to-pits call.** When the engineer has a change to make in the pits,
   the call to come in at the end of the lap appears at the top. The telemetry
   stays below. For a rejected change the call is similar and tells you to put

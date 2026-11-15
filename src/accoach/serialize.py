@@ -35,6 +35,11 @@ def snapshot_to_dict(s: TelemetrySnapshot) -> dict:
         "in_pit": s.in_pit,
         "at_box": stopped_in_box(s),
         "lap_position": round(s.lap_position, 4),
+        # Dove sta l'auto, nelle coordinate dei giri salvati: la mappa del
+        # tablet ci disegna il punto. 0,0 e' «il gioco non la manda», non un
+        # punto della pista.
+        "pos": ([round(s.car_x, 1), round(s.car_z, 1)]
+                if (s.car_x or s.car_z) else None),
         "aids": {
             "tc": s.tc_level,            # current selected level, -1 if unknown
             "abs": s.abs_level,
