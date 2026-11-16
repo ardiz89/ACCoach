@@ -742,12 +742,25 @@ _DECISION_MSG = {
     # ({changed}, {diff}, {unsaved_diff}, {psi_doubt}) arrivano gia' in parole
     # («TC 6 invece di 3»). Niente due punti davanti all'elenco: e' una regola
     # del tono (`tests/tono.py`), quindi l'elenco sta in una frase sua.
-    # R1: cambiato senza che HONE abbia scritto niente.
+    # R1: cambiato senza che HONE abbia scritto niente. La prima frase e' la
+    # stessa con e senza una prova aperta, e sta in una chiave sua: due chiavi
+    # con la stessa frase sono un doppione per il controllo del tono.
+    "setup_changed_lead": {
+        "en": "You changed the setup since the last stint.",
+        "it": "Hai cambiato assetto rispetto allo stint di prima.",
+    },
     "setup_changed": {
-        "en": "You changed the setup since the last stint. You now have "
-              "{changed}. I'm starting the baseline again.",
-        "it": "Hai cambiato assetto rispetto allo stint di prima. Ora hai "
-              "{changed}. Rifaccio la base.",
+        "en": "You now have {changed}. I'm starting the baseline again.",
+        "it": "Ora hai {changed}. Rifaccio la base.",
+    },
+    # …a prova aperta: la prova non si giudica e si chiede il file (`_hold_base`).
+    "setup_changed_test": {
+        "en": "Now you have {changed}. I won't judge or log the test in "
+              "progress. In the pits, tell me which setup you loaded, then "
+              "I'll redo the baseline.",
+        "it": "Ora hai {changed}. La prova in corso non la giudico e non la "
+              "registro. Ai box dimmi quale assetto hai caricato, poi rifaccio "
+              "la base.",
     },
     # R2: all'uscita dopo una scrittura, il file non e' quello scritto.
     "setup_wrong": {
@@ -1819,9 +1832,18 @@ class RaceEngineer:
 
     # -- l'assetto in macchina, riconosciuto ai box ----------------------------
     def carry_clicks(self) -> dict[str, int]:
-        """I click delle modifiche al volo tenute, per leva: {"brakeBias": 1}."""
+        """I click al volante che sono in macchina e in nessun file, per leva:
+        {"brakeBias": 1}.
+
+        Le modifiche al volo tenute (`carry`) e quella in prova: girata sulla
+        manopola e non ancora giudicata, ma in macchina c'e'. Senza, una sosta
+        durante la prova di un TC +1 leggerebbe «assetto non salvato».
+        """
         out: dict[str, int] = {}
-        for c in self.carry:
+        live = (list(self.active.change.changes)
+                if self.active is not None and self.active.change.tag == "AV"
+                else [])
+        for c in self.carry + live:
             out[c.param] = out.get(c.param, 0) + c.delta_clicks
         return {k: v for k, v in out.items() if v}
 
@@ -1972,9 +1994,11 @@ class RaceEngineer:
         if self._held_base is not None:
             return self._held_base        # la domanda e' gia' fatta
         lang = current_language()
-        said = _msg("setup_changed", lang, changed=changed)
+        lead = _msg("setup_changed_lead", lang) + " "
         if self.active is not None:
-            return self._hold_base(said + " " + _msg("base_ask", lang))
+            return self._hold_base(
+                lead + _msg("setup_changed_test", lang, changed=changed))
+        said = lead + _msg("setup_changed", lang, changed=changed)
         self.window = []
         self._offs = []
         self._skipped = None

@@ -139,8 +139,10 @@ def test_a_change_during_a_test_is_not_judged():
                                expected_diff="TC 6 invece di 3"), at_exit=True)
     assert d.kind is DecisionKind.STAND_DOWN
     assert d.confirm_base is True
-    assert "TC 3 invece di 6" in d.message
-    assert "non la giudico e non la registro" in d.message
+    assert d.message == (
+        "Hai cambiato assetto rispetto allo stint di prima. Ora hai TC 3 invece "
+        "di 6. La prova in corso non la giudico e non la registro. Ai box dimmi "
+        "quale assetto hai caricato, poi rifaccio la base.")
     assert eng.active is None
     assert eng.observe(_lap()) is d          # tenuta finche' il pilota risponde
 
@@ -315,15 +317,30 @@ def test_an_accepted_wheel_change_is_carried_until_the_next_box_write():
     _until(eng, lambda: _lap(scores={ENTRY_OVER: 0.6}))
     assert eng.carry_clicks() == {}
     eng.mark_applied()
-    assert eng.carry_clicks() == {}          # in prova, non ancora tenuta
     _until(eng, lambda: _lap(scores={ENTRY_OVER: 0.05}), DecisionKind.ACCEPTED)
-    assert eng.carry_clicks() == {"brakeBias": +1}
+    assert eng.carry_clicks() == {"brakeBias": +1}   # tenuta, e una volta sola
     eng._pending = ProposedChange(
         changes=tuple(AtomicChange("tyrePressure", s, 2) for s in FRONT),
         rationale="Pressione anteriore.", phase_label="Pressioni", tag="BOX")
     eng.mark_applied()
     assert eng.carry_clicks() == {}
     assert eng.carry == []
+
+
+def test_a_wheel_change_under_test_is_already_in_the_car():
+    """Girata sulla manopola e non ancora giudicata: una sosta adesso non deve
+    leggere «assetto non salvato»."""
+    eng = _eng()
+    eng.phase_idx = 3
+    _until(eng, lambda: _lap(scores={ENTRY_OVER: 0.6}))
+    eng.mark_applied()
+    assert eng.active is not None and eng.active.change.tag == "AV"
+    assert eng.carry_clicks() == {"brakeBias": +1}
+    assert eng.carry == []                   # tenuta non e' ancora
+    # Una prova ai box non e' in macchina finche' non si carica il file.
+    eng = _eng()
+    _pressure_test(eng)
+    assert eng.carry_clicks() == {}
 
 
 # --- la taratura del ripartitore ---------------------------------------------
