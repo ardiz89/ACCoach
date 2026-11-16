@@ -433,6 +433,17 @@ class WorkPhase:
         """
         return ""
 
+    def unfixed(self, window: list[LapStats]) -> tuple[str, int, int] | None:
+        """Cosa ha chiuso il cancello quando non c'e' un sintomo da curare:
+        (contatore, giri in cui ricorre, giri guardati), o None.
+
+        Per le fasi che guardano un contatore di tratti (``"spin"``, ``"lock"``,
+        vedi `profiles._common.SegmentPhase`). Serve alla frase: il 24/09 la
+        fase Elettronica diceva «non ho trovato nulla da correggere» dopo aver
+        visto pattinamento in uscita in 2 giri su 6.
+        """
+        return None
+
 
 #: «Quest'auto non ha una finestra pressioni che conosciamo», detto al motore.
 #: Non e' ``None``: ``None`` vuol dire «tieni quella del profilo», ed e' cosi'
@@ -527,9 +538,26 @@ _DECISION_MSG = {
         "en": " The setup is complete.",
         "it": " Il setup è completo.",
     },
-    "phase_nothing": {
-        "en": "I found nothing to correct in the “{label}” phase.",
-        "it": "Nella fase «{label}» non ho trovato nulla da correggere.",
+    # Il cancello non e' passato e non c'e' un sintomo da curare. Fino al 16/11
+    # la frase era «non ho trovato nulla da correggere»: il contrario di quello
+    # che era successo (Imola 24/09: pattinamento in 2 giri su 6, nessuna leva).
+    "phase_unfixed_spin": {
+        "en": "In the “{label}” phase I saw wheelspin on exit in {n} laps out "
+              "of {tot}, but I have no change to suggest for it.{tail}",
+        "it": "Nella fase «{label}» ho visto pattinamento in uscita in {n} giri "
+              "su {tot}, ma non ho una modifica da proporti per questo.{tail}",
+    },
+    "phase_unfixed_lock": {
+        "en": "In the “{label}” phase I saw lock-ups under braking in {n} laps "
+              "out of {tot}, but I have no change to suggest for it.{tail}",
+        "it": "Nella fase «{label}» ho visto bloccaggi in frenata in {n} giri "
+              "su {tot}, ma non ho una modifica da proporti per questo.{tail}",
+    },
+    "phase_unfixed": {
+        "en": "In the “{label}” phase something doesn't add up, but I have no "
+              "change to suggest.{tail}",
+        "it": "Nella fase «{label}» qualcosa non torna, ma non ho una modifica "
+              "da proporti.{tail}",
     },
     "remedies_exhausted": {
         "en": "I've run out of setup remedies for the {sym}. It's probably a "
@@ -1774,11 +1802,23 @@ class RaceEngineer:
             if by_hand:
                 return Decision(DecisionKind.STAND_DOWN, by_hand)
             # Nothing actionable here; move on to avoid a stall. Il cancello pero'
-            # non e' passato: per la strada e' saltata, non fatta.
+            # non e' passato: per la strada e' saltata, non fatta, e la frase
+            # dice cosa l'ha chiuso.
+            seen = phase.unfixed(self.window)
             self.skipped_phases.add(self.phase_idx)
             self.phase_idx += 1
+            nxt = self.phase
+            tail = (_msg("phase_tail_next", lang, nxt=tr(nxt.label))
+                    if nxt else "")
+            if seen is not None:
+                what, n, tot = seen
+                return Decision(DecisionKind.PHASE_DONE,
+                                _msg(f"phase_unfixed_{what}", lang,
+                                     label=tr(phase.label), n=n, tot=tot,
+                                     tail=tail))
             return Decision(DecisionKind.PHASE_DONE,
-                            _msg("phase_nothing", lang, label=tr(phase.label)))
+                            _msg("phase_unfixed", lang, label=tr(phase.label),
+                                 tail=tail))
 
         change = self._remedy_for(symptom, phase)
         if change is None and self._blocked is not None:

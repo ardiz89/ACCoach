@@ -187,7 +187,7 @@ def test_a_blind_phase_is_reported_skipped_not_done():
 
 def _gate_shut(eng, i):
     # Il cancello che non passa, su una fase senza sintomi da curare: e' il
-    # caso «non ho trovato nulla da correggere». Su una copia: la fase puo'
+    # caso senza rimedio (test_engineer_senza_rimedio.py). Su una copia: la fase puo'
     # essere quella del profilo condiviso (`reconfigure` rende se stessa).
     import copy
     ph = copy.copy(eng.phases[i])

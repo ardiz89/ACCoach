@@ -229,6 +229,28 @@ def none_present(window: list[LapStats], owns) -> bool:
     return True
 
 
+class SegmentPhase(WorkPhase):
+    """Una fase il cui cancello guarda, oltre ai sintomi, un contatore di tratti.
+
+    ``segments`` e' ``"spin"`` (pattinamento) o ``"lock"`` (bloccaggi). Il
+    cancello e la frase leggono lo stesso campo: erano sei copie della stessa
+    riga nei tre profili, e la frase non sapeva quale contatore l'avesse chiuso.
+    """
+
+    segments: str = ""
+
+    def _recurring(self, window: list[LapStats]) -> int:
+        return sum(getattr(s, f"{self.segments}_segments") >= _SEG_LIMIT
+                   for s in window)
+
+    def gate(self, window: list[LapStats]) -> bool:
+        return none_present(window, self.owns) and not self._recurring(window)
+
+    def unfixed(self, window: list[LapStats]) -> tuple[str, int, int] | None:
+        n = self._recurring(window)
+        return (self.segments, n, len(window)) if n else None
+
+
 #: Quello che separa il sintomo dall'azione in una frase di rimedio.
 _THEN = (", quindi ", ", so ")
 

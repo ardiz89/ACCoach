@@ -25,7 +25,7 @@ from ._common import (
     O,
     U,
     PressurePhase,
-    _SEG_LIMIT,
+    SegmentPhase,
     none_present,
     remedy,
 )
@@ -112,28 +112,22 @@ class _MechanicalPhase(WorkPhase):
         return none_present(window, self.owns)
 
 
-class _DiffPhase(WorkPhase):
+class _DiffPhase(SegmentPhase):
     """Owns power/traction at corner exit (the differential's domain)."""
+
+    segments = "spin"
 
     def owns(self, symptom: Symptom) -> bool:
         return symptom.speed == LO and symptom.phase == EX
 
-    def gate(self, window: list[LapStats]) -> bool:
-        if not none_present(window, self.owns):
-            return False
-        return all(s.spin_segments < _SEG_LIMIT for s in window)
 
-
-class _BrakeBiasPhase(WorkPhase):
+class _BrakeBiasPhase(SegmentPhase):
     """No ABS: locking and entry oversteer are bias + brake migration + driving."""
+
+    segments = "lock"
 
     def owns(self, symptom: Symptom) -> bool:
         return symptom.balance == O and symptom.phase == EN
-
-    def gate(self, window: list[LapStats]) -> bool:
-        if not none_present(window, self.owns):
-            return False
-        return all(s.lock_segments < _SEG_LIMIT for s in window)
 
 
 FORMULA_PROFILE = Profile(
