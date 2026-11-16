@@ -44,12 +44,16 @@ Ha una riga per giro (`lap`), una per ogni lettura ai box (`setup`), una per ogn
 modifica applicata (`applied`, `source` = `page` o `wheel`) e una per ogni risposta
 sulla pagina (`base`). I percorsi sono relativi alla cartella dei setup.
 
-Rigiocare la serata nell'Ingegnere (sola lettura, con casa finta):
+Rigiocare la serata nell'Ingegnere (sola lettura, con casa finta), dalla cartella
+d'installazione:
 
 ```
 set USERPROFILE=<cartella temporanea>
-.venv\Scripts\python.exe -m accoach replay-engineer imola AAAAMMGG --laps "<cartella vera dei giri>" --log "<registro della serata>"
+.venv\Scripts\python.exe accoach_main.py replay-engineer imola AAAAMMGG --laps "<cartella vera dei giri>" --log "<registro della serata>"
 ```
+
+(Non `-m accoach`: il pacchetto non è installato nel `.venv`, e il modulo non si
+trova. Corretto il 16/11, dopo il primo rigioco senza pista.)
 
 Le domande a cui il test deve rispondere:
 
@@ -61,8 +65,13 @@ Le domande a cui il test deve rispondere:
 2. **Il garage.** Caricando un file, TC, ABS, mappa e ripartitore cambiano subito
    nelle righe `setup` con `at` = `live`? L'uscita dal garage produce una riga
    `exit`?
-3. **Il ripartitore.** Lo scarto imparato (`bias_learned` nelle righe `base`) e il
-   passo di 0,2 % per click tornano sulla 720S?
+3. **Il ripartitore.** Per la 720S lo scarto (0,64) e il passo di 0,2 % per click
+   sono già misurati sull'archivio, senza guidare (16/11): click 0 → 0,64, click
+   15 → 0,67, click 55 → 0,75 (`MEASURED_BIAS_OFFSET` in `fingerprint.py`).
+   L'Ingegnere della 720S nasce con quello, come se il pilota avesse già
+   risposto una volta. Al test basta che `verify-setup` (passo ING-1) dica letto
+   = atteso per il file caricato, e che nessuna risposta sulla pagina lo smentisca
+   (una che non concorda lo butta: si vede come `bias_offset` nullo nello stato).
 4. **Le regole.** R1, R2 e R3 sono scattate quando il foglio lo aspettava, e mai
    altrove? Confrontare con il foglio compilato sul tablet.
 
