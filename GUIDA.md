@@ -1165,6 +1165,7 @@ Questi sono quelli che potrebbero servirti davvero.
 | `logs --zip` | Fa un solo file da allegare a una segnalazione, coi log, la versione, il commit, Python e il sistema, e le ultime auto e piste. Il file nasce anche se non ci sono log, e in quel caso lo dice. **I log entrano senza filtri, con una sola modifica.** La tua cartella di casa, dove sta il nome del tuo account Windows, diventa `%USERPROFILE%`. Il resto dei percorsi resta, compresa la cartella di rete se ne hai una. Hanno una riga con data e ora per ogni avvio di HONE, cioè il registro di quando ti sei seduto a guidare. Ci sono i tuoi tempi sul giro, piste, auto e nomi dei file aperti. Ci sono anche i crash report, con l'errore completo. È voluto, perché un log ripulito non serve a trovare un difetto. Il comando lo scrive dentro lo ZIP, e dal sorgente anche a schermo quando finisce. L'app impacchettata non ha una finestra di terminale, quindi lì a schermo non vedi niente. Aprilo e guardalo prima di mandarlo. |
 | `find-rain` | Trova i campi della pioggia di ACC misurandoli. Ti serve una sessione con meteo variabile. |
 | `verify-box` | Mostra litri e treno del menu box di ACC, tempo di sessione e usura. Cambia il menu e guarda se i numeri seguono. |
+| `verify-setup` | In garage, da fermo, mostra i valori letti dal gioco accanto a quelli di ogni assetto salvato. Cambia assetto nel menu e guarda le righe. |
 
 
 ### Il debrief nel terminale

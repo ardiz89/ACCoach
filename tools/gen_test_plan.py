@@ -16,9 +16,9 @@ ROOT = Path(__file__).resolve().parents[1]
 XLSX = ROOT / "HONE_Test_Plan_AC_ACC.xlsx"
 OUT = ROOT / "src" / "accoach" / "web" / "test_plan.json"
 
-CATEGORIES = ["GT3", "Formula", "Stradali", "Generale (una volta)"]
+CATEGORIES = ["GT3", "Formula", "Stradali", "Generale (una volta)", "Ingegnere"]
 CAT_ID = {"GT3": "GT3", "Formula": "Formula", "Stradali": "Stradali",
-          "Generale (una volta)": "Generale"}
+          "Generale (una volta)": "Generale", "Ingegnere": "ING"}
 
 
 def _cell(v) -> str:

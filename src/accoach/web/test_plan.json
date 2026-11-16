@@ -434,6 +434,83 @@
           "expected": "Rispondi: assillante / giusto / assente. Lo stesso consiglio non si ripete prima di 20 secondi, e quel numero non è mai stato misurato su nessuno — non esiste un modo di deciderlo che non sia questa risposta."
         }
       ]
+    },
+    {
+      "id": "ING",
+      "title": "HONE · Test di guida · Ingegnere",
+      "intro": "Una sola sessione ACC, GT3, sulla stessa pista, per provare il riconoscimento dell'assetto e la prova delle pressioni. Fai i passi in ordine e segna l'esito.",
+      "tests": [
+        {
+          "id": "ING-1",
+          "n": "1",
+          "what": "1) Il comando verify-setup in garage",
+          "how": "In garage, prima di uscire, da fermo: lancia `accoach verify-setup` e lascialo andare 30 secondi. Poi carica un altro assetto dal menu del gioco e guarda le righe cambiare.",
+          "expected": "Per ogni assetto salvato per quell'auto e pista vedi i valori del file accanto a quelli letti dal gioco (TC, ABS, mappa, ripartitore, pressioni). Le pressioni lette in garage sono quelle a freddo. Cambiando assetto le righe si aggiornano."
+        },
+        {
+          "id": "ING-2",
+          "n": "2",
+          "what": "2) Assetto non salvato",
+          "how": "Esci in pista con l'assetto predefinito del gioco, quello che non hai mai salvato. Guarda la pagina dell'Ingegnere ai box e appena fuori.",
+          "expected": "La pagina dice “Assetto non salvato”. L'Ingegnere dice a voce che l'assetto in macchina non è fra i file salvati e che, se è nuovo, va salvato in garage con un nome e caricato. Non scrive modifiche ai box."
+        },
+        {
+          "id": "ING-3",
+          "n": "3",
+          "what": "3) Salva e riconosci",
+          "how": "Rientra, salva quell'assetto in garage con un nome e caricalo. Esci di nuovo, senza fare un giro completo prima di guardare la pagina.",
+          "expected": "La pagina dice “In macchina c'è” e il nome che hai scelto, già all'uscita dai box, senza bisogno di un giro. L'Ingegnere dice che ora le modifiche ai box le può scrivere."
+        },
+        {
+          "id": "ING-4",
+          "n": "4",
+          "what": "4) Tre giri puliti e la proposta",
+          "how": "Fai tre giri puliti nello stesso stint, senza rientrare.",
+          "expected": "L'Ingegnere propone una modifica alle pressioni e, nel dirla, spiega la regola dei giri: il primo giro dopo la sosta scalda le gomme, poi servono tre giri puliti nello stesso stint, e se rientri prima il conto riparte."
+        },
+        {
+          "id": "ING-5",
+          "n": "5",
+          "what": "5) Scrivi, carica, esci",
+          "how": "Accetta la proposta: HONE scrive il file. Ai box carica quel file e riesci. Fai il giro di riscaldamento, poi guarda il conto dei giri.",
+          "expected": "Dopo la tua uscita la pagina riconosce il file scritto da HONE (dice che TC, ABS e mappa sono quelli del file e che le pressioni le controlla a fine prova). Il giro di riscaldamento non conta: il conto parte da 3 dal giro dopo."
+        },
+        {
+          "id": "ING-6",
+          "n": "6",
+          "what": "6) Rientro a metà prova",
+          "how": "Dopo uno o due giri della prova rientra ai box, poi esci di nuovo senza cambiare nulla.",
+          "expected": "Il conto dei giri riparte da capo e l'Ingegnere lo dice: sei rientrato prima della lettura, quindi ricomincia a contare da questo stint. La prova non viene giudicata a metà."
+        },
+        {
+          "id": "ING-7",
+          "n": "7",
+          "what": "7) Finisci la prova",
+          "how": "Fai i giri puliti che servono, per intero e senza rientrare, fino al verdetto.",
+          "expected": "L'Ingegnere dà il verdetto con la pressione raggiunta: se è dentro la finestra lo dice, se è diversa da quella attesa dice quanto è arrivata e che correggerà al prossimo rientro."
+        },
+        {
+          "id": "ING-8",
+          "n": "8",
+          "what": "8) File sbagliato caricato",
+          "how": "Ai box fatti scrivere un'altra modifica da HONE, ma nel gioco carica apposta il file vecchio. Poi esci.",
+          "expected": "All'uscita l'Ingegnere dice che l'assetto non è quello che ha scritto, quanto è diverso, e ti chiede di caricare il file giusto ai box. La prova si mette in pausa, non viene giudicata, e ti richiama ai box."
+        },
+        {
+          "id": "ING-9",
+          "n": "9",
+          "what": "9) TC cambiato ai box senza proposta",
+          "how": "Ai box, senza nessuna proposta in corso, gira il TC (anche un solo click) ed esci.",
+          "expected": "L'Ingegnere dice: “Hai cambiato assetto rispetto allo stint di prima”, dice cosa hai adesso (per esempio il TC nuovo) e che rifà la base. La pagina fa ripartire il conto da zero."
+        },
+        {
+          "id": "ING-10",
+          "n": "10",
+          "what": "10) Il registro della serata",
+          "how": "A fine sessione non devi fare niente in pista. Esci dal gioco, poi lancia `accoach logs` e cerca il file del giorno.",
+          "expected": "Nella cartella dei log c'è `ingegnere-AAAAMMGG.jsonl` con la data di oggi, con le righe delle uscite, delle prove e dei verdetti di questa sessione. Allegalo alle note."
+        }
+      ]
     }
   ],
   "glossary": [
