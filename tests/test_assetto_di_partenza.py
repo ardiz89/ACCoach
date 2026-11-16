@@ -479,7 +479,8 @@ var api = async (url, opts) => {
 var loadClass = async () => {}, loadRecord = () => {}, renderSetup = () => {},
     renderTray = () => {}, showToast = () => {}, dn = (s) => s;
 for (const f of ["onComboChange", "fillSetups", "esc", "askBaseText", "askBaseHTML", "onSetupChange", "askAgain",
-                 "confirmKey", "liveConfirmKey", "sendAnswer", "inPista", "writeLocked", "paintWriteLock"]) {
+                 "confirmKey", "liveConfirmKey", "sendAnswer", "inPista", "writeLocked", "paintWriteLock",
+                 "setupLabel", "loadedText", "loadedWarn", "paintLoaded"]) {
   eval(grab(f));
 }
 function snap() {

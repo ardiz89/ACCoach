@@ -117,6 +117,8 @@
       </div>
     </div>
 
+    <!-- L'assetto che il motore riconosce in macchina (engineer.loaded). -->
+    <div id="t-loaded" class="t-loaded" hidden></div>
     <div id="t-phase" class="t-phase" hidden></div>
 
     <!-- La schermata Assetto, sotto la fase, in pista e ai box: la modifica, il file su cui si
@@ -127,6 +129,7 @@
       <div id="t-change" class="t-change" hidden>
         <ul id="t-levers" class="t-levers"></ul>
         <div id="t-why" class="t-why"></div>
+        <div id="t-carry" class="t-carry" hidden></div>
         <div class="t-confrow">
           <span id="t-conf" class="t-conf" hidden></span>
           <span id="t-lowconf" class="t-lowconf" hidden></span>
@@ -139,6 +142,7 @@
         <div id="t-ask" class="t-ask" hidden data-i18n="tablet.askBase">Which setup did you load in the game?</div>
         <label for="t-base" class="t-label" data-i18n="tablet.base">Starting setup</label>
         <select id="t-base" class="t-select"></select>
+        <div id="t-warn" class="t-warn" hidden></div>
         <div id="t-nobase" class="t-nobase" hidden data-i18n="tablet.noBase">I can't find a setup for this car on this track. Save one from the game's garage.</div>
       </div>
 

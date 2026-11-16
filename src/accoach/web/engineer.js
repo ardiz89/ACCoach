@@ -425,9 +425,64 @@ function fillSetups(list, prefer) {
   const rows = list.slice().sort((a, b) => (b.mtime || 0) - (a.mtime || 0));
   for (const s of rows) {
     const o = document.createElement("option");
-    o.textContent = s.name; o.dataset.path = s.path;
+    o.textContent = setupLabel(s.name, state.askBase ? state.loaded : null);
+    o.dataset.path = s.path; o.dataset.name = s.name;
     sel.appendChild(o);
-    if (prefer && s.name === prefer) sel.value = o.value;
+    if (prefer && s.name === prefer) o.selected = true;
+  }
+}
+
+// ---- l'assetto che il motore riconosce in macchina (`engineer.loaded`) ----
+
+// La riga sotto la strada: l'esito dell'impronta ai box. Senza `loaded` niente.
+function loadedText(l) {
+  if (!l || !l.state) return null;
+  if (l.state === "match" && l.name) {
+    return tf(l.probable ? "eng.loaded.probable" : "eng.loaded.match", { name: l.name });
+  }
+  if (l.state === "unsaved") return t("eng.loaded.unsaved");
+  return t("eng.loaded.unknown");           // ambiguous, unknown
+}
+
+// Il file riconosciuto porta «· in macchina» nella tendina. La tendina resta
+// vuota: scegliere una voce e' la risposta, non la si sceglie al posto del pilota.
+function setupLabel(name, l) {
+  const same = l && l.state === "match" && l.name
+    && String(l.name).toLowerCase() === String(name).toLowerCase();
+  return same ? name + " · " + t("eng.loaded.tag") : name;
+}
+
+// Il file su cui lavora la pagina non e' quello in macchina: lo si dice prima
+// di scrivere. Non blocca niente.
+function loadedWarn(l, base) {
+  if (!l || l.state !== "match" || !l.name || !base) return null;
+  if (String(l.name).toLowerCase() === String(base).toLowerCase()) return null;
+  return tf("eng.loaded.differs", { loaded: l.name, base });
+}
+
+function paintLoaded() {
+  const l = state.loaded;
+  const el = $("es-loaded");
+  if (el) {
+    const txt = loadedText(l);
+    el.textContent = txt || "";
+    el.hidden = !txt;
+  }
+  const w = $("setup-warn");
+  if (w) {
+    const txt = loadedWarn(l, state.setupName);
+    w.textContent = txt || "";
+    w.hidden = !txt;
+  }
+  // Le voci della tendina si rietichettano senza rifarla: chi la sta aprendo
+  // non la perde.
+  const sel = $("setup");
+  if (sel && sel.options) {
+    for (const o of sel.options) {
+      if (o.dataset && o.dataset.name) {
+        o.textContent = setupLabel(o.dataset.name, state.askBase ? l : null);
+      }
+    }
   }
 }
 
@@ -532,6 +587,7 @@ async function onSetupChange() {
       // La domanda aperta: nessun file, niente da modificare, niente da scrivere.
       state.setupPath = null; state.setupName = null;
       state.params = []; state.pending = {}; state.base = {};
+      paintLoaded();
       $("setup-body").innerHTML = askBaseHTML();
       renderTray();
       paintWriteLock();
@@ -550,6 +606,7 @@ async function onSetupChange() {
   // Acceso solo con un backup da cui ripristinare.
   $("btn-undo").disabled = !data.has_backup;
   state.setupName = data.name;
+  paintLoaded();
   state.params = data.params;
   state.pending = {};
   state.base = {};
@@ -1003,8 +1060,11 @@ async function afterWrite(res) {
   // backend that's off doesn't raise an Uncaught (in promise).
   // JSON anche senza niente da dire: il guardiano rifiuta (415) ogni
   // scrittura che non lo dichiara.
+  // Col percorso del file scritto: il motore lo confronta con quello che
+  // trova in macchina all'uscita.
   fetch(liveUrl(`http://${location.hostname}:${WS_PORT}/engineer/applied`),
-        { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" })
+        { method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(res && res.path ? { path: res.path } : {}) })
     .then(liveRefused)
     .catch(() => { /* backend off — keeps proposing */ });
   // Il file appena scritto è quello che il messaggio ti dice di caricare, ed è
@@ -1413,7 +1473,8 @@ function sendAnswer() {
     body: JSON.stringify({ path }),
   }).catch((e) => showToast(e.message, true));
   fetch(liveUrl(`http://${location.hostname}:${WS_PORT}/engineer/base`),
-        { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" })
+        { method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ path }) })
     .then(liveRefused)
     .catch(() => { /* motore spento: non c'e' niente da sciogliere */ });
 }
@@ -1466,6 +1527,16 @@ function renderEngineer(st) {
   done.onclick = boxRestore ? confirmRestored : null;
 
   renderRoad(eng);
+  state.loaded = (eng && eng.loaded) || null;
+  const lk = JSON.stringify(state.loaded);
+  if (lk !== state.loadedKey) { state.loadedKey = lk; paintLoaded(); }
+  // Le modifiche al volo tenute che entrano nel file, dette sotto la proposta.
+  const carry = $("es-carry");
+  if (carry) {
+    const has = !!(boxProposal && Array.isArray(eng.carry) && eng.carry.length);
+    carry.textContent = has ? t("eng.carry") : "";
+    carry.hidden = !has;
+  }
 
   // Persistent "what to do in this phase" line: the decision message alone
   // ("phase done → moving to X") never says what the driver should now do.

@@ -1111,6 +1111,17 @@ Salva un setup nel gioco, poi ricarica questa pagina.` },
     // nel messaggio del motore; qui solo il fatto, vero per tutti i casi.
     "eng.road.standDown": { en: `For now I'm not writing any change.`,
                             it: `Per ora non scrivo modifiche.` },
+    // L'assetto che il motore riconosce in macchina (`engineer.loaded`, letto
+    // dall'impronta ai box). Frasi senza due punti: il tono della superficie.
+    "eng.loaded.match":    { en: `The car has {name}.`, it: `In macchina c'è {name}.` },
+    "eng.loaded.probable": { en: `The car probably has {name}.`, it: `In macchina c'è probabilmente {name}.` },
+    "eng.loaded.unsaved":  { en: `Setup not saved`, it: `Assetto non salvato` },
+    "eng.loaded.unknown":  { en: `Not recognised`, it: `Non riconosciuto` },
+    "eng.loaded.tag":      { en: `in the car`, it: `in macchina` },
+    "eng.loaded.differs":  { en: `The car has {loaded}, you are editing {base}.`,
+                             it: `In macchina c'è {loaded}, stai modificando {base}.` },
+    "eng.carry":           { en: `I also put in the file the changes you made at the wheel and kept.`,
+                             it: `Nel file metto anche le modifiche già tenute fatte dal volante.` },
     "eng.pit":         { en: `You're in the pits. In the MFD open <b>Setup</b>, load <b>{name}</b> and head out to apply it.`,
                          it: `Sei ai box. Nell'MFD apri <b>Setup</b>, carica <b>{name}</b> ed esci per applicarlo.` },
     // Shown while stopped in the box with a garage change still unwritten —

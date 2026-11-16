@@ -93,10 +93,11 @@ def test_engineer_applied_posts_send_json():
     for at in chiamate:
         tratto = src[at:at + 200]
         assert '"Content-Type": "application/json"' in tratto, tratto
-        assert 'body: "{}"' in tratto, tratto
+        # Con un file scritto il corpo porta il percorso, ma e' sempre JSON.
+        assert 'body: "{}"' in tratto or "body: JSON.stringify(" in tratto, tratto
     tab = (_WEB / "tablet.js").read_text(encoding="utf-8")
     # Il corpo `{}` e' anche quello che fa mettere a `xhr` il Content-Type.
-    assert re.search(r'xhr\("POST", liveUrl\([^\n]*/engineer/applied"\), \{\}, appliedRefused\)', tab)
+    assert re.search(r'xhr\("POST", liveUrl\([^\n]*/engineer/applied"\),\s*path \? \{ path: path \} : \{\}, appliedRefused\)', tab)
 
 
 def test_no_write_without_json_in_pages():

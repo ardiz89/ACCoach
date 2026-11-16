@@ -499,6 +499,9 @@ body {
 .t-msg { font-size: 22px; line-height: 1.35; margin-bottom: 12px; }
 
 .t-base-row { margin-bottom: 12px; }
+.t-loaded { font-size: 20px; opacity: 0.8; margin: 4px 0; }
+.t-carry { font-size: 20px; opacity: 0.8; margin-top: 6px; }
+.t-warn { font-size: 20px; color: #FFB020; margin-top: 4px; }
 .t-ask { font-size: 22px; color: #FFB020; margin-bottom: 6px; }
 .t-select {
   display: block;

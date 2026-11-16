@@ -251,6 +251,31 @@ Rientrare col menu del gioco, con «torna ai box», non insegna niente, ed è
 voluto. L'auto sparisce a metà pista e ricompare in garage. Prendere per buono
 quel salto vorrebbe dire mettere l'ingresso box in mezzo a un rettilineo.
 
+### L'Ingegnere riconosce l'assetto ai box
+
+Quando esci dai box, HONE legge dal gioco le manopole che il file di un assetto
+fissa. Sono il controllo di trazione, l'ABS, la mappa motore, il ripartitore e
+le pressioni a freddo. Le confronta coi file della cartella di questa auto e
+pista. Sotto la strada dell'Ingegnere, nella pagina Ingegnere e sul tablet,
+trovi una riga sola con l'esito. Se non ha ancora niente da dire, la riga non
+c'è.
+
+- **«In macchina c'è HONE_8.»** Un file solo torna coi valori letti. Se non è
+  del tutto sicuro, dice «probabilmente». Nella tendina del file di partenza la
+  voce porta «· in macchina». HONE non la sceglie al posto tuo. La domanda
+  «Quale assetto hai caricato?» resta tua, e scegliere una voce è la risposta.
+- **«Assetto non salvato».** In macchina c'è qualcosa che non è uguale a nessun
+  file. Hai girato una manopola dopo aver caricato l'assetto, oppure non l'hai
+  salvato dal garage. Salvalo dal garage, poi scegli quel file come partenza.
+- **«Non riconosciuto».** I valori letti tornano con più file, oppure con
+  nessuno. Scegli tu il file di partenza dalla tendina, come hai sempre fatto.
+
+Se il file su cui stai lavorando non è quello riconosciuto, accanto al suo nome
+compare un avviso. Dice «In macchina c'è X, stai modificando Y». Non blocca la
+scrittura, ti avvisa prima di scrivere. Se hai tenuto qualche modifica fatta dal volante,
+c'è una riga in più sotto la proposta. Dice «Nel file metto anche le modifiche
+già tenute fatte dal volante».
+
 ### Come si registrano i giri
 
 Non devi fare niente di speciale. Avvia la sessione, prove, hotlap o gara, e

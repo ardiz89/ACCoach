@@ -303,6 +303,30 @@ Going back to the garage from the game menu teaches it nothing, on purpose. The
 car vanishes mid-track and reappears in the box. Taking that jump at face value
 would put the pit entry in the middle of a straight.
 
+### The engineer recognises the setup in the pits
+
+When you leave the pits, HONE reads from the game the knobs a setup file fixes.
+They are traction control, ABS, engine map, brake bias and cold tyre pressures.
+It compares them with the files in the folder for this car and track. Under the
+engineer's road, on the Engineer page and on the tablet, one line tells you the
+result. With nothing to say yet, the line isn't there.
+
+- **"The car has HONE_8."** One file matches the values read. If it isn't
+  completely sure it says "probably". In the starting setup list the entry
+  carries "· in the car". HONE doesn't pick it for you. The question "Which
+  setup did you load?" stays yours, and choosing an entry is the answer.
+- **"Setup not saved".** What is in the car matches no file. You turned a knob
+  after loading the setup, or never saved it from the garage. Save it from the
+  garage, then choose that file as the starting setup.
+- **"Not recognised".** The values match more than one file, or none. Choose
+  the starting setup from the list yourself, as you always did.
+
+If the file you are working on is not the recognised one, a warning appears next to
+its name. It says "The car has X, you are editing Y". It doesn't block the
+write, it warns you before you write. If you kept some changes made at the wheel,
+there is one more line under the proposal. It says "I also put in the file the
+changes you made at the wheel and kept"
+
 ### How lap recording works (and starting from the pits)
 
 You don't have to do anything special. Start the session, practice, hotlap or

@@ -126,6 +126,8 @@
             <span class="es-road-why" id="es-road-why" hidden></span>
           </div>
         </div>
+        <!-- L'assetto che il motore riconosce in macchina (engineer.loaded). -->
+        <div class="es-loaded" id="es-loaded" hidden></div>
         <div class="es-phase" id="es-phase" hidden></div>
         <div class="es-msg" id="es-msg">—</div>
         <div class="es-cat" id="es-cat"></div>
@@ -133,6 +135,7 @@
              Until now the loop took the car away for three laps and came back
              with a verdict the driver had no way to argue with, because they
              were never told what was being measured. -->
+        <div class="es-carry" id="es-carry" hidden></div>
         <div class="es-predict" id="es-predict" hidden></div>
         <!-- …and the verdict, with the numbers on both sides plus whatever moved
              that nobody was aiming at. -->
@@ -198,6 +201,8 @@
           <span class="muted" data-i18n="legend2.est">psi/% = estimate</span>
         </div>
       </div>
+      <!-- Il file su cui lavori non e' quello in macchina: avviso, non blocca. -->
+      <div class="setup-warn" id="setup-warn" hidden></div>
       <div id="setup-body" class="setup-body">
         <div class="empty2" data-i18n-html="setup.pick">Pick a car and track above. HONE reads setups from
           <code>Documents/Assetto Corsa Competizione/Setups/&lt;car&gt;/&lt;track&gt;/</code> (ACC)

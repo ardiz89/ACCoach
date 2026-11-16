@@ -524,6 +524,42 @@
     return { steps: steps, line: line, why: why };
   }
 
+  // L'assetto che il motore riconosce in macchina (`engineer.loaded`).
+  // Gemelle di `loadedText`, `setupLabel` e `loadedWarn` di engineer.js.
+  function loadedText(l) {
+    if (!l || !l.state) return null;
+    if (l.state === "match" && l.name) {
+      return tf(l.probable ? "eng.loaded.probable" : "eng.loaded.match", { name: l.name });
+    }
+    if (l.state === "unsaved") return t("eng.loaded.unsaved");
+    return t("eng.loaded.unknown");
+  }
+  function sameName(a, b) { return String(a).toLowerCase() === String(b).toLowerCase(); }
+  function setupLabel(name, l) {
+    var same = l && l.state === "match" && l.name && sameName(l.name, name);
+    return same ? name + " · " + t("eng.loaded.tag") : name;
+  }
+  function loadedWarn(l, base) {
+    if (!l || l.state !== "match" || !l.name || !base) return null;
+    if (sameName(l.name, base)) return null;
+    return tf("eng.loaded.differs", { loaded: l.name, base: base });
+  }
+  function nameOfPath(p) {
+    var s = (bx.base && bx.base.setups) || [];
+    for (var i = 0; i < s.length; i++) if (s[i].path === p) return s[i].name;
+    return null;
+  }
+  var loadedKey = null;
+  function renderLoaded(eng) {
+    var l = (eng && eng.loaded) || null;
+    var txt = loadedText(l);
+    setText($("t-loaded"), txt || "");
+    setHidden($("t-loaded"), !txt);
+    // Le voci della tendina cambiano etichetta solo quando cambia l'esito.
+    var k = JSON.stringify(l);
+    if (k !== loadedKey) { loadedKey = k; fillSelect(); }
+  }
+
   // La striscia si riscrive solo quando cambia: il frame arriva 15 volte al
   // secondo e quasi sempre dice la stessa cosa.
   var roadKey = null;
@@ -656,9 +692,11 @@
   function appliedRefused(err) {
     if (err && err.status === 401) { bx.err = err.detail; paintBox(); }
   }
-  function postApplied() {
+  function postApplied(path) {
     // Il corpo `{}` fa dichiarare JSON a `xhr`: senza, il guardiano dice 415.
-    xhr("POST", liveUrl("http://" + location.hostname + ":" + WS_PORT + "/engineer/applied"), {}, appliedRefused);
+    // Con il file scritto porta il suo percorso; «Fatto» dal volante non ne ha.
+    xhr("POST", liveUrl("http://" + location.hostname + ":" + WS_PORT + "/engineer/applied"),
+        path ? { path: path } : {}, appliedRefused);
   }
 
   // La risposta a «Quale assetto hai caricato nel gioco?». Il server la tiene
@@ -672,7 +710,7 @@
     xhr("POST", "/api/setup/base", { path: p }, function (err) {
       if (err) { bx.err = t("eng.loadErr") + err.detail; paintBox(); }
     });
-    xhr("POST", liveUrl("http://" + location.hostname + ":" + WS_PORT + "/engineer/base"), {}, appliedRefused);
+    xhr("POST", liveUrl("http://" + location.hostname + ":" + WS_PORT + "/engineer/base"), { path: p }, appliedRefused);
   }
 
   // ---- la schermata dei box -------------------------------------------------
@@ -789,11 +827,13 @@
     for (var i = 0; i < s.length; i++) {
       var o = document.createElement("option");
       o.value = s[i].path;
-      o.textContent = s[i].name;
+      o.textContent = setupLabel(s[i].name, bx.ask ? loadedNow() : null);
       if (s[i].path === cur) o.selected = true;
       sel.appendChild(o);
     }
   }
+
+  function loadedNow() { return (last && last.engineer && last.engineer.loaded) || null; }
 
   function loadPreview(path, changes, key) {
     var seq = ++bx.pvSeq;
@@ -980,6 +1020,12 @@
     setHidden($("t-ask"), !bx.ask || !setups.length);
     setHidden($("t-base"), !setups.length);
     setHidden($("t-nobase"), !bx.base || setups.length > 0);
+    var warn = loadedWarn(loadedNow(), nameOfPath(basePath()));
+    setText($("t-warn"), warn || "");
+    setHidden($("t-warn"), !warn);
+    var carryOn = has && Array.isArray(eng.carry) && eng.carry.length > 0;
+    setText($("t-carry"), carryOn ? t("eng.carry") : "");
+    setHidden($("t-carry"), !carryOn);
 
     var ready = !!(bx.preview && bx.preview.ok && basePath());
     var atBox = atBoxNow();
@@ -1061,7 +1107,7 @@
     // Il file appena scritto e' quello da caricare: la domanda e' chiusa.
     bx.chosen = null;
     bx.ask = false;
-    postApplied();
+    postApplied(res && res.path);
     loadBase();
     paintBox();
   }
@@ -1141,6 +1187,7 @@
     mapLoad(st);
     mapDraw(st);
     renderRoad(eng);
+    renderLoaded(eng);
     renderPhase(eng);
     renderAv(eng);
     renderCall(eng, m);
