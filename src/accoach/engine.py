@@ -52,6 +52,7 @@ from .logging_setup import get_logger
 from .comparison import DeltaState, LapComparator, Reference
 from .engineer import DecisionKind, RaceEngineer, classify, engineer_for
 from .engineer.fingerprint import PitWatch
+from .engineer.session_log import SessionLog
 from .recording import Lap, LapRecorder, find_reference_lap, laps_root, save_lap
 from .recording.recorder import StartLineWatcher
 from .recording.storage import reference_pool
@@ -441,6 +442,7 @@ class CoachEngine:
         acquire_hz: float | None = None,
         engineer_voice: bool = True,
         setup_roots=None,
+        logs_dir: Path | str | None = None,
     ) -> None:
         self.reader = reader if reader is not None else SharedMemoryReader()
         # Dove stanno i file di setup, per riconoscere quale e' in macchina:
@@ -457,6 +459,12 @@ class CoachEngine:
         # voice is governed by ``voice`` itself; this gates only the engineer).
         self.engineer_voice = engineer_voice
         self.laps_dir = Path(laps_dir) if laps_dir else laps_root()
+        # Il registro della sessione: una riga per giro e per evento dei box,
+        # per chi deve capire dopo cosa ha fatto l'Ingegnere. La cartella si
+        # crea alla prima riga; i test ne passano una loro.
+        from . import paths
+        self._session_log = SessionLog(logs_dir if logs_dir else paths.logs_dir())
+        self._setup_files: list[str] = []
         self.recorder = LapRecorder()   # used only on the legacy inline path
 
         # High-fidelity acquisition: a background thread reads + records at a
@@ -704,6 +712,40 @@ class CoachEngine:
         """Measured acquisition rate when a background feed is running, else None."""
         return self._feed.measured_hz if self._feed is not None else None
 
+    def _rel_setup(self, path) -> str | None:
+        """Il percorso di un setup com'e' scritto nel registro: relativo alla
+        radice dei setup, o il solo nome del file. Mai assoluto, cosi' la casa
+        dell'utente non finisce nel registro."""
+        if not path:
+            return None
+        try:
+            p = Path(path)
+            for root in self.setup_roots:
+                for r in (root, root.resolve()):
+                    try:
+                        return p.relative_to(r).as_posix()
+                    except ValueError:
+                        continue
+            return p.name
+        except Exception:  # noqa: BLE001
+            return None
+
+    def _log_lap(self, lap: Lap, stats, decision) -> None:
+        try:
+            eng = self._engineer
+            reading = eng._pressure_reading()
+            self._session_log.write(
+                "lap", car=lap.car_model, track=lap.track,
+                lap_ms=stats.lap_time_ms, stable=stats.stable,
+                warm=stats.warmed_up, stint=stats.stint,
+                settling=stats.settling,
+                decision=decision.kind.value if decision is not None else None,
+                message=decision.message if decision is not None else None,
+                progress=eng.progress(),
+                reading=dict(reading.pressures_hot) if reading else None)
+        except Exception:  # noqa: BLE001 - il registro non rompe un giro
+            _log.debug("session log (lap) failed", exc_info=True)
+
     def _observe_lap(self, lap: Lap) -> None:
         """Diagnose a completed lap: feed the engineer (setup) and the Focus
         coach (driving). Both run on the reference that was the target *during*
@@ -728,6 +770,7 @@ class CoachEngine:
             if self._engineer_decision is not previous:
                 self._log_engineer_outcome(lap, self._engineer_decision)
             self._save_engineer_state()
+            self._log_lap(lap, stats, self._engineer_decision)
 
         # The Focus coach needs a reference to know where time was lost.
         if self._focus is None or self._reference is None or not self._corners:
@@ -1421,6 +1464,7 @@ class CoachEngine:
         self._hone_touched = True
         if path is None:
             self._expected_path = None      # non sappiamo cosa ha caricato
+            self._session_log.write("base", path=None, expected=None)
             return eng.base_confirmed()
         try:
             from .engineer.fingerprint import file_values
@@ -1436,6 +1480,8 @@ class CoachEngine:
         written = self._written_path
         expected = None if written is None else self._same_file(path, written)
         self._expected_path = path
+        self._session_log.write("base", path=self._rel_setup(path),
+                                expected=expected)
         return eng.base_confirmed(expected=expected)
 
     def _setup_report(self, event: str):
@@ -1461,6 +1507,7 @@ class CoachEngine:
         files = [f for f in (file_values(p) for p in
                              store.find_setup_files(car, track, self.setup_roots))
                  if f is not None]
+        self._setup_files = [f.name for f in files]
         carry = eng.carry_clicks()
         offset = eng.bias_offset
         m = match(now, files, carry=carry, bias_offset=offset)
@@ -1519,6 +1566,14 @@ class CoachEngine:
             if built is None:
                 return
             report, self._loaded = built
+            w = self.pitwatch
+            now = w.exit if event == "exit" else w.live
+            self._session_log.write(
+                "setup", at=event, report=report.to_dict(),
+                reading=now.to_dict() if now is not None else None,
+                entry=w.entry.to_dict() if w.entry is not None else None,
+                files=list(self._setup_files),
+                expected=self._rel_setup(self._expected_path))
             decision = self._engineer.setup_seen(report, at_exit=event == "exit")
             if decision is not None:
                 self._engineer_decision = decision
@@ -1643,6 +1698,8 @@ class CoachEngine:
             # Da qui il file atteso in macchina e' quello scritto; senza un
             # percorso non lo sappiamo, e quello di prima non vale piu'.
             self._expected_path = self._written_path = self._setup_path(applied_path)
+            self._session_log.write(
+                "applied", path=self._rel_setup(self._written_path))
             # HONE ha cambiato l'assetto solo se ha preso una sua modifica: ai
             # box sempre, al volo solo se confermata in corsia («Fatto» in
             # pista e' gia' nella lettura d'entrata, come per le manopole).
