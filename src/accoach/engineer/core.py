@@ -1109,7 +1109,8 @@ class RaceEngineer:
 
     def __init__(self, profile: Profile, *, min_stable: int = _MIN_STABLE,
                  pressure_window: tuple[float, float] | None = None,
-                 steps: Steps | None = None) -> None:
+                 steps: Steps | None = None,
+                 bias_offset: float | None = None) -> None:
         self.profile = profile
         self.min_stable = min_stable
         #: Quanto vale un click su quest'auto. Costruito a mano, il motore
@@ -1194,10 +1195,12 @@ class RaceEngineer:
         #: disco: domani si riparte da un file caricato.
         self.carry: list[AtomicChange] = []
         #: Lo scarto del ripartitore fra la lettura del gioco e i click del
-        #: file, imparato solo dalle risposte del pilota (`learn_bias`); None
-        #: prima della prima risposta, e dopo una che non concordava finche'
+        #: file, imparato dalle risposte del pilota (`learn_bias`) o misurato
+        #: per auto sull'archivio (`fingerprint.MEASURED_BIAS_OFFSET`, passato
+        #: da `engineer_for`), che vale come una prima risposta; None senza
+        #: nessuna delle due, e dopo una risposta che non concordava finche'
         #: un'altra non la conferma. Va su disco con lo stato.
-        self.bias_offset: float | None = None
+        self.bias_offset: float | None = _finite(bias_offset)
         #: Una risposta che non concordava con quella di prima, in attesa di
         #: un'altra che la confermi.
         self.bias_pending: float | None = None
@@ -1299,10 +1302,14 @@ class RaceEngineer:
                     and not isinstance(k, bool)
                     and _HOT_PER_CLICK[0] <= k <= _HOT_PER_CLICK[1]):
                 self.hot_per_click[ax] = float(k)
-        for key in ("bias_offset", "bias_pending"):
-            val = _finite(state.get(key))
-            if val is not None:
-                setattr(self, key, val)
+        # Il ripartitore: se il disco ha una risposta del pilota (tenuta o in
+        # sospeso) vale quella, intera; se no resta lo scarto misurato con cui
+        # il motore e' nato. Una per una, una risposta che aveva smentito la
+        # misura (None + in sospeso) la faceva risorgere al riavvio.
+        off = _finite(state.get("bias_offset"))
+        pend = _finite(state.get("bias_pending"))
+        if off is not None or pend is not None:
+            self.bias_offset, self.bias_pending = off, pend
 
     # -- public API --------------------------------------------------------
     @property

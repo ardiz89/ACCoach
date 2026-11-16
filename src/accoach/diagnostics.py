@@ -762,8 +762,10 @@ def _emap(raw: int) -> str:
 def setup_lines(snap, files) -> list[str]:
     """Quello che il gioco espone, accanto ai valori di ogni file di setup (pura).
 
-    Il ripartitore del file e' in click e non si confronta: la lettura e' una
-    frazione e l'offset e' proprio cio' che il test in garage deve chiarire.
+    Il ripartitore del file e' in click e la lettura una frazione: si
+    confronta solo per le auto con lo scarto misurato
+    (`fingerprint.MEASURED_BIAS_OFFSET`, oggi la 720S), e la riga dice il
+    valore atteso. Per le altre l'offset e' cio' che il test deve chiarire.
     Le pressioni si leggono cosi' come sono: si lancia a macchina ferma ai box.
     «Ai box» e' la regola del motore (`stopped_in_box`): su ACC `in_pit` resta
     0 anche fermi in piazzola. La mappa e' grezza (0 = la prima, come nel file)
@@ -771,7 +773,9 @@ def setup_lines(snap, files) -> list[str]:
     se le pressioni lette sono a freddo.
     """
     from .coaching.pitcall import stopped_in_box
-    from .engineer.fingerprint import Reading, compare
+    from .engineer.fingerprint import (
+        BIAS_STEP, MEASURED_BIAS_OFFSET, Reading, compare,
+    )
 
     r = Reading.from_snapshot(snap, snap.tyre_pressure)
     psi = " ".join(f"{p:.1f}" for p in snap.tyre_pressure)
@@ -787,12 +791,16 @@ def setup_lines(snap, files) -> list[str]:
     if not files:
         out.append("nessun setup trovato per questa auto e pista")
         return out
+    offset = MEASURED_BIAS_OFFSET.get(snap.car_model)
     for f in files:
-        certain, pdiffs = compare(r, f, carry={}, bias_offset=None)
+        certain, pdiffs = compare(r, f, carry={}, bias_offset=offset)
+        want = ("" if offset is None else
+                f" = atteso {offset + BIAS_STEP * f.bias_clicks:.3f}")
         out.append(f"{f.name}: TC {f.tc} ABS {f.abs} {_emap(f.emap)} "
-                   f"ripartitore {f.bias_clicks} click (letto {r.bias:.3f})")
-        bad = ", ".join(f"{d.field.upper() if d.field != 'emap' else 'MAPPA'} letto {d.seen:g} file {d.want:g}"
-                        for d in certain if d.field != "bias")
+                   f"ripartitore {f.bias_clicks} click{want} (letto {r.bias:.3f})")
+        names = {"emap": "MAPPA", "bias": "RIPARTITORE"}
+        bad = ", ".join(f"{names.get(d.field, d.field.upper())} letto {d.seen:g} file {d.want:g}"
+                        for d in certain)
         out.append(f"   differenze certe: {bad or 'nessuna'}")
         by = {d.field: d for d in pdiffs}
         cells = []

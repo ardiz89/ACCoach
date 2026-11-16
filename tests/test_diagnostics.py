@@ -132,6 +132,31 @@ def test_setup_lines_see_the_acc_box_and_say_the_map_as_the_hud():
     assert "box=no" in "\n".join(setup_lines(moving, [f]))
 
 
+def test_setup_lines_check_the_bias_where_the_offset_is_measured():
+    """Per la 720S lo scarto del ripartitore e' misurato sull'archivio
+    (`MEASURED_BIAS_OFFSET`): in garage la riga dice il valore atteso e il
+    ripartitore entra fra le differenze certe. Il passo 1 del foglio Ingegnere
+    conferma cosi' la misura senza fare i conti a mano."""
+    from accoach.diagnostics import setup_lines
+    from accoach.engineer.fingerprint import FileValues
+
+    s = replace(
+        TelemetrySnapshot.disconnected(), connected=True, in_pit_lane=True,
+        speed_kmh=0.0, tc_level=3, abs_level=4, engine_map=0, brake_bias=0.64,
+        tyre_pressure=(26.3, 25.8, 24.7, 24.4), fuel=60.0, air_temp=21.0,
+        road_temp=27.0, car_model="mclaren_720s_gt3_evo", track="Imola")
+    imola = FileValues("HONE_7", "x/HONE_7.json", 3, 4, 0, 0,
+                       (26.3, 25.8, 24.7, 24.4), 60)
+    brands = FileValues("HONE_2", "x/HONE_2.json", 3, 4, 0, 15,
+                        (26.3, 25.8, 24.7, 24.4), 60)
+    text = "\n".join(setup_lines(s, [imola, brands]))
+    seven, two = text[:text.index("HONE_2")], text[text.index("HONE_2"):]
+    assert "atteso 0.640" in seven
+    assert "differenze certe: nessuna" in seven
+    assert "atteso 0.670" in two
+    assert "RIPARTITORE letto 0.64 file 0.67" in two
+
+
 def test_setup_lines_without_files_says_so():
     from accoach.diagnostics import setup_lines
 

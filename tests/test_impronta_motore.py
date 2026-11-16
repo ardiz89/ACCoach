@@ -366,6 +366,32 @@ def test_a_file_chosen_on_the_page_stays_chosen_through_the_stop(rig):
     assert rig.engineer._pending is None
 
 
+@pytest.fixture
+def senza_misura(monkeypatch):
+    """Il ripartitore della 720S e' misurato sull'archivio e l'Ingegnere nasce
+    con quello (`MEASURED_BIAS_OFFSET`). I test che provano l'apprendimento
+    dalla risposta lo tolgono: con 0,64 gia' in partenza un «ha imparato 0,64»
+    passava anche se la risposta non avesse insegnato niente."""
+    from accoach.engineer import fingerprint
+    monkeypatch.delitem(fingerprint.MEASURED_BIAS_OFFSET, CAR)
+
+
+def test_the_live_720s_is_born_with_the_measured_bias(rig):
+    rig.drive(_snap())
+    assert rig.engineer.bias_offset == pytest.approx(0.64)
+
+
+def test_an_answer_that_contradicts_the_measure_drops_it(rig):
+    """La misura vale come una prima risposta: una risposta col ripartitore
+    a 0,66 su HONE_8 (0 click) non concorda, e la butta."""
+    rig.drive(_snap(), _snap("lane"), _snap("box", bias=0.66, psi=HONE_8_COLD))
+    rig.eng.mark_base_confirmed(path=rig.path("HONE_8"))
+    rig.drive(_snap("box", bias=0.66, psi=HONE_8_COLD))
+    assert rig.engineer.bias_offset is None
+    assert rig.engineer.bias_pending == pytest.approx(0.66)
+
+
+@pytest.mark.usefixtures("senza_misura")
 def test_the_answer_teaches_the_brake_bias(rig):
     """Lo scarto del ripartitore: la lettura da fermo meno i click del file
     piu' quelli girati al volante e tenuti."""
@@ -377,6 +403,7 @@ def test_the_answer_teaches_the_brake_bias(rig):
     assert rig.engineer.bias_offset == pytest.approx(0.640)
 
 
+@pytest.mark.usefixtures("senza_misura")
 def test_the_answer_on_track_does_not_learn_from_the_last_stop(rig):
     """La lettura da fermo e' della sosta di prima: in pista il ripartitore
     puo' essere stato girato, e quello che si impara sarebbe sbagliato."""
@@ -392,6 +419,7 @@ def test_the_answer_on_track_does_not_learn_from_the_last_stop(rig):
     assert rig.engineer.bias_offset is None
 
 
+@pytest.mark.usefixtures("senza_misura")
 def test_an_answer_that_contradicts_the_dials_teaches_nothing(rig):
     """In macchina c'e' TC 6 e il pilota sceglie HONE_8 (TC 3): o la risposta
     o la lettura non e' quella giusta, e il ripartitore non si impara."""
@@ -401,6 +429,7 @@ def test_an_answer_that_contradicts_the_dials_teaches_nothing(rig):
     assert rig.engineer.bias_offset is None
 
 
+@pytest.mark.usefixtures("senza_misura")
 def test_the_answer_without_a_file_teaches_nothing(rig):
     rig.drive(_snap(), _snap("lane"), _snap("box", psi=HONE_8_COLD))
     rig.eng.mark_base_confirmed()
@@ -493,6 +522,7 @@ def test_a_write_with_nothing_proposed_is_not_hone_s_change(rig):
     assert rig.engineer.window == []
 
 
+@pytest.mark.usefixtures("senza_misura")
 @pytest.mark.parametrize("bad", ["nul", "fuori", "relativo", "unc"])
 @pytest.mark.parametrize("route", ["applied", "base"])
 def test_a_bad_path_from_a_page_is_no_path(rig, tmp_path, bad, route):

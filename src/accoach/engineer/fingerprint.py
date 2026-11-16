@@ -6,7 +6,8 @@ dei file di setup salvati. Modulo puro: niente I/O oltre la lettura dei file.
 
 Cosa decide e cosa no: TC, ABS e mappa sono certi (interi, letti uguali al
 file). Il ripartitore conta solo dopo la taratura (`bias_offset`, dalla risposta
-del pilota), le pressioni a freddo solo se `COLD_PSI_VERIFIED`: finché non è
+del pilota o dalla misura per auto `MEASURED_BIAS_OFFSET`), le pressioni a
+freddo solo se `COLD_PSI_VERIFIED`: finché non è
 provato che il gioco le espone come nel file, servono a scegliere fra file
 altrimenti identici (`probable`), mai a escluderne uno.
 """
@@ -25,6 +26,19 @@ COLD_PSI_VERIFIED: bool = False
 PSI_TOL = 0.3          # psi: scarto massimo fra lettura e file
 BIAS_STEP = 0.002      # frazione per click del ripartitore
 BIAS_TOL = 0.001       # mezzo click
+#: Lo scarto del ripartitore (lettura del gioco − ``BIAS_STEP`` × click del
+#: file) misurato sull'archivio, per auto di ACC. Vale come una prima risposta
+#: del pilota (`RaceEngineer.learn_bias`): una risposta che non concorda lo
+#: butta. Misurato il 16/11 senza guidare: i giri registrano il ripartitore
+#: letto, i file i click, e tre valori di click diversi stanno sulla stessa
+#: retta col passo di 0,2 % — click 0 → 0,64 (Imola: 720sEVO_Imola_0, HONE_7,
+#: HONE_8; 08/11 e 14/11), click 15 → 0,67 (Brands Hatch: setup_q_720evo,
+#: HONE_2; 23/08 e 25/10), click 55 → 0,75 (il predefinito del gioco, salvato
+#: come def.json e prova-base). Ogni stint con la stessa elettronica del file
+#: (TC, ABS, mappa). Un'auto qui assente aspetta la risposta del pilota.
+MEASURED_BIAS_OFFSET: dict[str, float] = {
+    "mclaren_720s_gt3_evo": 0.64,
+}
 #: Gomme «fredde» ai box: la media delle temperature interne entro tanti gradi
 #: dall'aria. Sopra, le pressioni lette sono quelle di una sosta a gomme calde
 #: e non la pressione a freddo del file. Da verificare al test (il registro
