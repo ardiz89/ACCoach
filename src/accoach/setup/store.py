@@ -70,6 +70,39 @@ def list_setups(
     return sorted(found)
 
 
+def find_setup_files(car: str, track: str, roots=DEFAULT_ROOTS) -> list[Path]:
+    """I setup ACC (solo ``.json``) di un'auto e una pista, in tutte le radici.
+
+    Auto e pista si confrontano coi nomi delle cartelle in minuscolo, come
+    `/api/setup/base`: il gioco non li scrive sempre allo stesso modo (nello
+    snapshot ``Imola``, sul disco puo' essere ``imola``). Solo i file della
+    cartella della pista, non le copie in ``.accoach_backup``. Una radice che
+    manca o non si legge si salta.
+    """
+    car_l, track_l = car.strip().lower(), track.strip().lower()
+    if not car_l or not track_l:
+        return []
+    if isinstance(roots, (str, Path)):
+        roots = (roots,)
+    found: list[Path] = []
+    for root in roots:
+        try:
+            root = Path(root)
+            if not root.is_dir():
+                continue
+            for c in sorted(p for p in root.iterdir() if p.is_dir()):
+                if c.name.lower() != car_l:
+                    continue
+                for t in sorted(p for p in c.iterdir() if p.is_dir()):
+                    if t.name.lower() == track_l:
+                        found += sorted(p for p in t.iterdir()
+                                        if p.suffix.lower() == ".json"
+                                        and p.is_file())
+        except OSError:
+            continue
+    return found
+
+
 def backup(path: Path | str) -> Path:
     """Copy ``path`` into a sibling ``.accoach_backup/`` folder; return the copy."""
     path = Path(path)

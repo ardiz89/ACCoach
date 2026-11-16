@@ -51,6 +51,7 @@ from .i18n import cue_text, current_language
 from .logging_setup import get_logger
 from .comparison import DeltaState, LapComparator, Reference
 from .engineer import DecisionKind, RaceEngineer, classify, engineer_for
+from .engineer.fingerprint import PitWatch
 from .recording import Lap, LapRecorder, find_reference_lap, laps_root, save_lap
 from .recording.recorder import StartLineWatcher
 from .recording.storage import reference_pool
@@ -439,8 +440,18 @@ class CoachEngine:
         feed: TelemetryFeed | None = None,
         acquire_hz: float | None = None,
         engineer_voice: bool = True,
+        setup_roots=None,
     ) -> None:
         self.reader = reader if reader is not None else SharedMemoryReader()
+        # Dove stanno i file di setup, per riconoscere quale e' in macchina:
+        # le stesse radici dell'app web (`setup/web_api.py`), in sola lettura.
+        # I test passano una cartella loro.
+        from .setup.store import DEFAULT_ROOTS
+        if setup_roots is None:
+            setup_roots = DEFAULT_ROOTS
+        elif isinstance(setup_roots, (str, Path)):
+            setup_roots = (setup_roots,)
+        self.setup_roots = tuple(Path(r) for r in setup_roots)
         self.voice = voice
         # Whether to speak the race engineer's proposals (the per-cue coaching
         # voice is governed by ``voice`` itself; this gates only the engineer).
@@ -542,6 +553,30 @@ class CoachEngine:
         # Il pilota ha detto ai box quale assetto ha caricato (POST
         # /engineer/base): scioglie la base tenuta da `_base_moved`.
         self._base_pending = False
+        # …e i file che viaggiano con i due segnali (il corpo `{"path": ...}`),
+        # None quando la pagina non lo manda.
+        self._applied_path: str | None = None
+        self._base_path: str | None = None
+
+        # L'impronta dell'assetto ai box (engineer/fingerprint.py): chi guarda
+        # la sosta frame per frame, e cosa ha riconosciuto per ultimo (il
+        # blocco `loaded` del frame). Si azzera con l'Ingegnere.
+        self.pitwatch = PitWatch()
+        self._loaded: dict | None = None
+        #: Il file che HONE si aspetta in macchina: l'ultimo arrivato da
+        #: `/engineer/applied` o `/engineer/base` per questa auto e pista.
+        self._expected_path: str | None = None
+        #: L'ultimo file scritto da HONE (`/engineer/applied`): la risposta
+        #: della pagina dice se il pilota ha caricato proprio quello.
+        self._written_path: str | None = None
+        #: HONE ha cambiato l'assetto in questa sosta (una scrittura ai box,
+        #: una manopola al volo girata in corsia, la risposta della pagina):
+        #: allora un cambio fra entrata e uscita non e' un cambio non chiesto.
+        #: Si azzera a ogni uscita dai box.
+        self._hone_touched = False
+        #: Il gioco dell'Ingegnere di adesso: su Assetto Corsa l'impronta tace
+        #: e le proposte non portano le manopole tenute.
+        self._acc = False
 
         # Il gesto migliore di ogni curva (coaching/corner_refs.py). Il bacino
         # si carica fuori dal tick. Misurato il 03/11 sulla copia dell'archivio
@@ -943,6 +978,10 @@ class CoachEngine:
         if self.wheelwatch.update(snap):
             self._engineer.mark_applied()
             self._engineer_done_sig = sig
+            # Girata ai box e' HONE che cambia l'assetto in questa sosta. In
+            # pista no: la lettura d'entrata in corsia la contiene gia'.
+            if snap.in_pit or snap.in_pit_lane:
+                self._hone_touched = True
             # Fra «applicata» e il giro dopo ci sta un intero spegnimento, ed e'
             # esattamente li' che il 14/08 si e' perso un ciclo.
             self._save_engineer_state()
@@ -1141,7 +1180,9 @@ class CoachEngine:
             ph = getattr(self._engineer, "phase", None)
             prog = getattr(self._engineer, "progress", None)
             return {"phase": {"key": ph.key, "label": tr(ph.label)} if ph else None,
-                    "progress": prog() if callable(prog) else None}
+                    "progress": prog() if callable(prog) else None,
+                    # Il file in macchina si vede gia' alla prima sosta.
+                    "loaded": self._loaded}
         sym = d.change.symptom if d.change else None
         corners = self._engineer.corners_for(sym) if self._engineer else []
         # Current phase (key + localized label) so the UI can tell the driver what
@@ -1151,6 +1192,10 @@ class CoachEngine:
         from .engineer.core import symptom_words
         ph = self._engineer.phase if self._engineer else None
         phase = {"key": ph.key, "label": tr(ph.label)} if ph else None
+        change = d.change.as_setup_payload() if d.change else None
+        carry = self._carry_payload(d)
+        if carry:
+            change = change + carry
         return {
             "kind": d.kind.value,
             "message": d.message,
@@ -1161,7 +1206,14 @@ class CoachEngine:
             "phase": phase,
             # La strada: fasi, quella in corso, giri raccolti. Calcolata dal motore.
             "progress": self._engineer.progress() if self._engineer else None,
-            "change": d.change.as_setup_payload() if d.change else None,
+            # Su una proposta ai box anche le manopole al volo tenute: il file
+            # nuovo e' una copia di quello di partenza, e senza queste voci
+            # caricarlo annullerebbe in silenzio un TC +1 gia' tenuto. `carry`
+            # le elenca a parte: si scrivono, ma non sono la modifica da
+            # provare (budget e registro le hanno contate quando sono state
+            # accettate).
+            "change": change,
+            "carry": carry,
             "rationale": d.change.rationale if d.change else None,
             "tag": d.change.tag if d.change else None,
             # Has this exact proposal already been written to the setup file?
@@ -1181,6 +1233,9 @@ class CoachEngine:
             "confirm_base": bool(getattr(d, "confirm_base", False)),
             # 1-based corner labels the proposal is anchored to ("Corners 7, 9").
             "corners": [i + 1 for i in corners],
+            # Quale assetto e' in macchina, riconosciuto ai box (None prima
+            # della prima sosta e su Assetto Corsa).
+            "loaded": self._loaded,
             # The bar the change will be judged against, so the driver reads it
             # *before* the re-test laps instead of only hearing the verdict.
             "prediction": (None if d.prediction is None else {
@@ -1270,19 +1325,197 @@ class CoachEngine:
             "level": corner_level(card.lost_ms),
         }
 
-    def mark_setup_applied(self) -> None:
+    def mark_setup_applied(self, path: str | None = None) -> None:
         """Request that the engineer mark its proposal applied. Thread-safe: only
         sets a flag here; the actual mutation runs on the tick thread (drained in
         :meth:`tick`), so it can't race :meth:`_observe_lap`, which also touches
-        the engineer."""
+        the engineer.
+
+        ``path`` e' il file scritto, quando la pagina lo manda: viaggia col
+        segnale fino al tick, e da li' e' il file atteso in macchina."""
         with self._cmd_lock:
             self._applied_pending = True
+            self._applied_path = path
 
-    def mark_base_confirmed(self) -> None:
+    def mark_base_confirmed(self, path: str | None = None) -> None:
         """Il pilota ha risposto «quale assetto hai caricato» ai box. Come
-        :meth:`mark_setup_applied`: qui solo il segnale, il lavoro nel tick."""
+        :meth:`mark_setup_applied`: qui solo il segnale (e il file scelto,
+        se la pagina lo manda), il lavoro nel tick."""
         with self._cmd_lock:
             self._base_pending = True
+            self._base_path = path
+
+    # -- l'assetto in macchina, riconosciuto ai box ----------------------------
+    def _setup_path(self, raw) -> str | None:
+        """Il percorso mandato da una pagina, se e' un file sotto le radici dei
+        setup; se no None, e il segnale vale come senza percorso.
+
+        Come `_safe` nell'app web: il motore legge quel file, e una pagina non
+        gli fa leggere altro.
+        """
+        if not isinstance(raw, str) or not raw.strip():
+            return None
+        try:
+            p = Path(raw).resolve()
+            for root in self.setup_roots:
+                try:
+                    p.relative_to(Path(root).resolve())
+                    return raw
+                except ValueError:
+                    continue
+        except (OSError, RuntimeError):
+            return None
+        return None
+
+    @staticmethod
+    def _same_file(a: str, b: str) -> bool:
+        import os
+        try:
+            return (os.path.normcase(str(Path(a).resolve()))
+                    == os.path.normcase(str(Path(b).resolve())))
+        except (OSError, RuntimeError):
+            return a == b
+
+    def _carry_payload(self, d) -> list[dict] | None:
+        """Le manopole al volo tenute, da scrivere insieme a una proposta ai
+        box, nella forma di `as_setup_payload`; None se non ce ne sono.
+
+        Solo su ACC, dove il file e' fatto di click e le chiavi delle manopole
+        sono quelle del file (`tC1`, `abs`, `eCUMap`, `brakeBias`).
+        """
+        if (not self._acc or d.kind is not DecisionKind.PROPOSE
+                or d.change is None or d.change.tag != "BOX"):
+            return None
+        clicks = getattr(self._engineer, "carry_clicks", None)
+        if not callable(clicks):
+            return None
+        try:
+            carry = clicks()
+        except Exception:  # noqa: BLE001 - la proposta si mostra lo stesso
+            return None
+        return [{"param": k, "slot": None, "delta_clicks": v}
+                for k, v in carry.items()] or None
+
+    def _answer_base(self, raw_path):
+        """La risposta della pagina a «quale assetto hai caricato», nel tick.
+
+        Col file scelto: lo scarto del ripartitore si impara da li' (la
+        lettura da fermo, o quella dell'uscita, contro i click del file piu'
+        quelli girati al volante e tenuti), e l'Ingegnere sa se e' il file che
+        HONE aveva scritto. Senza, come prima.
+        """
+        eng = self._engineer
+        path = self._setup_path(raw_path)
+        self._hone_touched = True
+        if path is None:
+            self._expected_path = None      # non sappiamo cosa ha caricato
+            return eng.base_confirmed()
+        try:
+            from .engineer.fingerprint import file_values
+            w = self.pitwatch
+            seen = next((r.bias for r in (w.live, w.exit)
+                         if r is not None and r.bias >= 0), None)
+            f = file_values(Path(path))
+            if seen is not None and f is not None:
+                clicks = f.bias_clicks + eng.carry_clicks().get("brakeBias", 0)
+                eng.learn_bias(seen, clicks)
+        except Exception:  # noqa: BLE001 - la taratura e' una comodita'
+            _log.debug("bias calibration failed", exc_info=True)
+        written = self._written_path
+        expected = None if written is None else self._same_file(path, written)
+        self._expected_path = path
+        return eng.base_confirmed(expected=expected)
+
+    def _setup_report(self, event: str):
+        """(SetupReport, blocco `loaded`) per l'evento dei box, o None.
+
+        I file sono quelli della cartella di quest'auto e pista; il confronto
+        e' col file piu' le manopole tenute (`carry_clicks`) e col ripartitore
+        solo se tarato. Se cosi' non torna nessun file ma senza le manopole si'
+        (``carry_lost``), il pilota ha ricaricato un file a mano.
+        """
+        from .engineer.core import SetupReport
+        from .engineer.fingerprint import (
+            changed, compare, describe, file_values, match,
+        )
+        from .setup import store
+
+        w = self.pitwatch
+        now = w.exit if event == "exit" else w.live
+        if now is None or self._engineer_key is None:
+            return None
+        eng = self._engineer
+        car, track = self._engineer_key
+        files = [f for f in (file_values(p) for p in
+                             store.find_setup_files(car, track, self.setup_roots))
+                 if f is not None]
+        carry = eng.carry_clicks()
+        offset = eng.bias_offset
+        m = match(now, files, carry=carry, bias_offset=offset)
+        carry_lost = False
+        if m.state == "unsaved" and carry:
+            bare = match(now, files, carry={}, bias_offset=offset)
+            if bare.state in ("match", "ambiguous"):
+                m, carry, carry_lost = bare, {}, True
+        lang = current_language()
+        unsaved_diff = ""
+        if m.state == "unsaved":
+            best = next((f for f in files if f.name == m.best), None)
+            if best is not None:
+                certain, _psi = compare(now, best, carry=carry, bias_offset=offset)
+                unsaved_diff = describe(certain, lang)
+        expected = expected_ok = None
+        expected_diff = psi_doubt = ""
+        if self._expected_path:
+            expected = Path(self._expected_path).stem
+            want = file_values(Path(self._expected_path))
+            if want is not None and -1 not in (now.tc, now.abs, now.emap):
+                certain, psi = compare(now, want, carry=carry, bias_offset=offset)
+                expected_ok = not certain
+                expected_diff = describe(certain, lang)
+                psi_doubt = describe(psi, lang)
+        moved = ""
+        if w.entry is not None and not self._hone_touched:
+            moved = describe(changed(w.entry, now), lang)
+        name = m.best if m.state == "match" else None
+        report = SetupReport(
+            state=m.state, name=name, probable=m.probable, changed=moved,
+            expected=expected, expected_ok=expected_ok,
+            expected_diff=expected_diff, psi_doubt=psi_doubt,
+            unsaved_diff=unsaved_diff, carry_lost=carry_lost)
+        loaded = {"state": m.state, "name": name, "names": list(m.names),
+                  "probable": m.probable, "at": event,
+                  "observed": now.to_dict()}
+        return report, loaded
+
+    def _watch_the_pits(self, snap: TelemetrySnapshot) -> None:
+        """Ai box: quale assetto c'e' in macchina, detto all'Ingegnere.
+
+        Dal vivo, fermo in piazzola, ogni volta che la lettura cambia; e
+        all'uscita dalla corsia box. Il «live» puo' tornare piu' volte in una
+        sosta lunga (le pressioni che scivolano su un decimo): la decisione
+        cambia solo quando l'Ingegnere ne da' una nuova. Best-effort come la
+        memoria: un file illeggibile o un errore qui non fermano mai un giro.
+        """
+        event = None
+        try:
+            event = self.pitwatch.update(snap)
+            if (event is None or self._engineer is None
+                    or not callable(getattr(self._engineer, "setup_seen", None))):
+                return
+            built = self._setup_report(event)
+            if built is None:
+                return
+            report, self._loaded = built
+            decision = self._engineer.setup_seen(report, at_exit=event == "exit")
+            if decision is not None:
+                self._engineer_decision = decision
+                self._save_engineer_state()
+        except Exception:  # noqa: BLE001 - mai un giro perso per l'impronta
+            _log.debug("setup fingerprint failed", exc_info=True)
+        finally:
+            if event == "exit":
+                self._hone_touched = False      # la prossima sosta riparte
 
     def tick(self, now: float) -> EngineState:
         if self._feed is not None:
@@ -1333,6 +1566,13 @@ class CoachEngine:
             self._engineer_done_sig = None
             self._armed_sig = None
             self.wheelwatch.disarm()
+            # L'impronta nasce con l'Ingegnere: la sosta, il file riconosciuto
+            # e quello atteso erano di un'altra auto o pista.
+            self.pitwatch.reset()
+            self._loaded = None
+            self._expected_path = self._written_path = None
+            self._hone_touched = False
+            self._acc = bool(snap.is_acc)
             # The pit calls: fresh latches, and this track's measured pit entry
             # (see coaching/pitcall.py — it's learned, so a track never visited
             # simply has no approach call until the first time you come in).
@@ -1367,17 +1607,17 @@ class CoachEngine:
 
         # Drain cross-thread commands on this (the engine's) thread.
         with self._cmd_lock:
-            apply_setup = self._applied_pending
-            self._applied_pending = False
-            base_answered = self._base_pending
-            self._base_pending = False
+            apply_setup, applied_path = self._applied_pending, self._applied_path
+            self._applied_pending, self._applied_path = False, None
+            base_answered, base_path = self._base_pending, self._base_path
+            self._base_pending, self._base_path = False, None
         if base_answered and self._engineer is not None:
             # La decisione tenuta portava `confirm_base` a ogni frame: dopo la
             # risposta non deve piu', o le pagine richiederebbero da capo.
-            freed = self._engineer.base_confirmed()
+            freed = self._answer_base(base_path)
             if freed is not None:
                 self._engineer_decision = freed
-                self._save_engineer_state()
+            self._save_engineer_state()
         if apply_setup and self._engineer is not None:
             self._engineer.mark_applied()
             # The change has been written: stop calling the driver in for it.
@@ -1385,6 +1625,10 @@ class CoachEngine:
             # until the next completed lap — would call them back to the box on
             # the out-lap they just left it on.
             self._engineer_done_sig = _decision_sig(self._engineer_decision)
+            # Da qui il file atteso in macchina e' quello scritto; senza un
+            # percorso non lo sappiamo, e quello di prima non vale piu'.
+            self._expected_path = self._written_path = self._setup_path(applied_path)
+            self._hone_touched = True
             # …e la modifica e' sulla macchina anche se il pilota chiude adesso.
             self._save_engineer_state()
 
@@ -1423,6 +1667,9 @@ class CoachEngine:
             self.scheduler.set_focus_corner(self._focus_zone())
 
         self._watch_at_wheel(snap)
+        # Dopo le manopole: una girata ai box in questo frame e' gia' una
+        # modifica di HONE, e gia' nel confronto (`carry_clicks`).
+        self._watch_the_pits(snap)
 
         delta = self._comparator.compare(snap) if self._comparator else None
         # On an abnormal lap (out of the pits, no comparison, or delta blown out)

@@ -129,7 +129,10 @@ def test_before_any_lap_the_block_is_the_road_and_nothing_else(tmp_path):
     eng = _bare_engine(tmp_path)
     eng._engineer = _eng()
     block = eng._engineer_block()
-    assert set(block) == {"phase", "progress"}
+    # `loaded` (il file riconosciuto ai box) non e' un verdetto: c'e' da subito,
+    # None finche' l'auto non passa dai box.
+    assert set(block) == {"phase", "progress", "loaded"}
+    assert block["loaded"] is None
     assert block["phase"]["key"] == "pressures"
     p = block["progress"]
     assert (p["stage"], p["have"], p["need"]) == ("baseline", 0, 3)
