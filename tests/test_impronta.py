@@ -130,3 +130,72 @@ def test_engine_map_is_worded_as_the_hud_shows_it_but_kept_raw():
     assert d == (FieldDiff("emap", 3, 2),)          # i valori restano grezzi
     assert describe(d, "it") == "mappa motore 4 invece di 3"
     assert describe(d, "en") == "engine map 4 instead of 3"
+
+
+# --- l'osservatore dei box ---------------------------------------------------
+import dataclasses
+
+from accoach.engineer.fingerprint import PitWatch
+from accoach.telemetry.snapshot import ACStatus, TelemetrySnapshot
+
+_COLD = (26.0, 25.5, 25.4, 25.1)
+
+
+def _snap(*, pit=False, lane=False, speed=0.0, psi=(0.0, 0.0, 0.0, 0.0), tc=3,
+          status=ACStatus.LIVE, acc=True, connected=True):
+    return dataclasses.replace(
+        TelemetrySnapshot.disconnected(), connected=connected, status=status,
+        is_acc=acc, in_pit=pit, in_pit_lane=lane, speed_kmh=speed,
+        tyre_pressure=psi, tc_level=tc, abs_level=4, engine_map=0,
+        brake_bias=0.75, fuel=48.0)
+
+
+def _run(w, snaps):
+    return [w.update(s) for s in snaps]
+
+
+def test_a_stop_in_the_box_gives_cold_pressures_and_an_exit():
+    w = PitWatch()
+    ev = _run(w, [
+        _snap(speed=150, tc=5), _snap(speed=150, tc=4),
+        _snap(lane=True, speed=60),
+        _snap(pit=True, lane=True, speed=0, psi=_COLD),
+        _snap(lane=True, speed=30), _snap(speed=100)])
+    assert ev == [None, None, None, "live", None, "exit"]
+    assert w.exit.cold_psi == _COLD
+    assert w.entry.tc == 4
+    assert w.live.cold_psi == _COLD
+
+
+def test_a_drive_through_exits_without_cold_pressures():
+    w = PitWatch()
+    ev = _run(w, [_snap(speed=100), _snap(lane=True, speed=60), _snap(speed=100)])
+    assert ev == [None, None, "exit"]
+    assert w.exit.cold_psi is None
+    assert w.exit.tc == 3
+
+
+def test_live_fires_only_when_something_changes():
+    w = PitWatch()
+    box = dict(pit=True, lane=True, speed=0, psi=_COLD)
+    ev = _run(w, [_snap(speed=100), _snap(**box), _snap(**box), _snap(**box),
+                  _snap(tc=6, **box)])
+    assert ev == [None, "live", None, None, "live"]
+
+
+def test_a_pause_in_the_pits_is_not_an_exit():
+    w = PitWatch()
+    ev = _run(w, [_snap(speed=100),
+                  _snap(pit=True, lane=True, speed=0, psi=_COLD),
+                  _snap(status=ACStatus.PAUSE),
+                  _snap(speed=100)])
+    assert "exit" not in ev
+
+
+def test_assetto_corsa_stays_silent():
+    w = PitWatch()
+    ev = _run(w, [_snap(acc=False, speed=100),
+                  _snap(acc=False, pit=True, lane=True, psi=_COLD),
+                  _snap(acc=False, speed=100)])
+    assert ev == [None, None, None]
+    assert w.live is None and w.exit is None

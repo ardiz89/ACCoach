@@ -17,6 +17,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from ..setup import acc_format
+from ..telemetry.snapshot import ACStatus
 from ..textfmt import fmt_num
 
 COLD_PSI_VERIFIED: bool = False
@@ -210,3 +211,62 @@ def describe(diffs, lang: str) -> str:
     word = "invece di" if lang == "it" else "instead of"
     return ", ".join(f"{labels[d.field]} {_val(d, d.seen, lang)} {word} "
                      f"{_val(d, d.want, lang)}" for d in diffs)
+
+
+class PitWatch:
+    """Guarda i box frame per frame: pressioni a freddo da fermo e lettura all'uscita.
+
+    `update` risponde "live" quando, fermo in piazzola, la lettura cambia;
+    "exit" al primo frame in pista dopo la corsia box. Un frame non LIVE, non
+    connesso o non ACC azzera la sosta in corso (niente uscita fantasma).
+    """
+
+    def __init__(self) -> None:
+        self.entry: Reading | None = None
+        self.live: Reading | None = None
+        self.exit: Reading | None = None
+        self._track: Reading | None = None      # ultima lettura in pista
+        self._in_stop = False
+        self._cold: tuple[float, float, float, float] | None = None
+        self._live_key: tuple | None = None
+
+    def reset(self) -> None:
+        self.entry = self.live = self.exit = self._track = None
+        self._reset_stop()
+
+    def _reset_stop(self) -> None:
+        self._in_stop = False
+        self._cold = None
+        self._live_key = None
+
+    @staticmethod
+    def _key(r: Reading) -> tuple:
+        # fuel e temperature si muovono da sole in sosta: non sono un cambio
+        return (r.tc, r.abs, r.emap, round(r.bias, 3), r.cold_psi)
+
+    def update(self, snap) -> str | None:
+        if not (snap.connected and snap.status == ACStatus.LIVE and snap.is_acc):
+            self._reset_stop()
+            return None
+        if not snap.in_pit and not snap.in_pit_lane:
+            if self._in_stop:
+                self.exit = Reading.from_snapshot(snap, self._cold)
+                self._reset_stop()
+                return "exit"
+            self._track = Reading.from_snapshot(snap, None)
+            return None
+        if not self._in_stop:
+            self._in_stop = True
+            self.entry = self._track
+            self.live = None
+        if snap.in_pit and snap.speed_kmh < 1:
+            psi = tuple(snap.tyre_pressure)
+            if len(psi) == 4 and all(p > 0 for p in psi):
+                self._cold = tuple(round(p, 1) for p in psi)
+            r = Reading.from_snapshot(snap, self._cold)
+            key = self._key(r)
+            self.live = r
+            if key != self._live_key:
+                self._live_key = key
+                return "live"
+        return None
