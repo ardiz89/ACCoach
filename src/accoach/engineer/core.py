@@ -639,11 +639,18 @@ _DECISION_MSG = {
               "non avevo abbastanza segnale, quindi non ti dico che è a posto.",
     },
     # Le pressioni si decidono sulla mediana dei giri a regime, non su un giro.
+    # Il conto e' quello vero (`_reading_need`): il 08/11, rigiocato, «un altro
+    # giro» restava a schermo per nove giri e tre rientri.
     "pressure_wait": {
-        "en": "The pressures are still settling. I need one more clean lap "
-              "before I judge them.",
-        "it": "Le pressioni si stanno ancora assestando. Mi serve un altro "
-              "giro pulito prima di giudicarle.",
+        "en": "The pressures are still settling. {laps}",
+        "it": "Le pressioni si stanno ancora assestando. {laps}",
+    },
+    # Un rientro ai box a meta' prova: la lettura riparte da questo stint.
+    "pressure_restart": {
+        "en": " You came in before I had my reading, so I'm counting again "
+              "from this stint.",
+        "it": " Sei rientrato prima che avessi la lettura, quindi ricomincio a "
+              "contare da questo stint.",
     },
     "pressure_ok": {
         "en": "{axis} pressure is now {b}, inside the window.",
@@ -656,10 +663,14 @@ _DECISION_MSG = {
               "correggo al prossimo rientro.",
     },
     "predict_pressure": {
-        "en": "After {n} clean laps at temperature I'll check that the "
-              "pressure landed where it should, and tell you what I read.",
-        "it": "Dopo {n} giri puliti a regime controllo se la pressione è "
-              "arrivata dove deve, e ti dico quanto leggo.",
+        "en": "After the stop the first lap warms the tyres up, then I need {n} "
+              "clean laps in the same stint. If you come in earlier, I start "
+              "counting again. Then I'll check that the pressure landed where "
+              "it should, and tell you what I read.",
+        "it": "Dopo la sosta il primo giro serve a scaldare le gomme, poi mi "
+              "servono {n} giri puliti nello stesso stint. Se rientri prima, "
+              "ricomincio a contare. Poi controllo se la pressione è arrivata "
+              "dove deve, e ti dico quanto leggo.",
     },
     "reason_noeffect": {
         "en": "The change had no measurable effect",
@@ -861,6 +872,10 @@ class _Active:
     #: tempo, e su queste si controlla che le gomme abbiano risposto
     #: (`_base_moved`).
     base_pressures: dict | None = None
+    #: Lo stint in corso quando la modifica e' stata applicata. Il primo giro
+    #: dopo una modifica ai box apre lo stint successivo; uno ancora dopo vuol
+    #: dire che il pilota e' rientrato a meta' prova.
+    stint_at_apply: int = 0
 
 
 _AXIS_WORDS = {"front": {"en": "Front", "it": "anteriore"},
@@ -962,6 +977,8 @@ class RaceEngineer:
         self._last_press: dict | None = None
         self._stint = 0
         self._stint_lap = 0
+        #: L'ultimo giro ha aperto uno stint (vedi `observe`).
+        self._last_settling = False
 
     # -- memoria fra sessioni ----------------------------------------------
     def state(self) -> dict:
@@ -1064,8 +1081,14 @@ class RaceEngineer:
         elif self._held_base is not None:
             pass        # la base si rifa' dopo la risposta: nessun contatore
         elif self.active is not None:
-            out.update(stage="test", have=self.active.laps_seen,
-                       need=self.min_stable)
+            # Una prova di pressione conta i giri della lettura, non tutti i
+            # giri buoni: lo stesso numero che dice il messaggio.
+            if self._is_pressure_test(self.active):
+                need = self._reading_size()
+                have = min(need, len(self._reading_laps()))
+            else:
+                have, need = self.active.laps_seen, self.min_stable
+            out.update(stage="test", have=have, need=need)
         elif self._pending is not None:
             out["stage"] = "change"
         elif self.phase is None:
@@ -1112,10 +1135,13 @@ class RaceEngineer:
             self._last_fuel = stats.fuel_l
         if stats.pressures_hot:
             prev = self._last_press or {}
-            restart = restart or any(
+            # Dopo il giro che apre uno stint le gomme salgono ancora: un salto
+            # li' e' il riscaldamento, non un altro rientro. Rigiocato il 08/11,
+            # +0,46 dietro al secondo giro dopo la sosta azzerava il conto.
+            restart = restart or (not self._last_settling and any(
                 abs(v - prev[ax]) >= _PRESSURE_JUMP_PSI
                 for ax, v in stats.pressures_hot.items()
-                if v is not None and prev.get(ax) is not None)
+                if v is not None and prev.get(ax) is not None))
             self._last_press = dict(stats.pressures_hot)
         if restart:
             self._stint += 1
@@ -1123,6 +1149,7 @@ class RaceEngineer:
         self._stint_lap += 1
         stats.stint = self._stint
         stats.settling = restart
+        self._last_settling = restart
 
         if stats.stable and stats.warmed_up:
             self.window.append(stats)
@@ -1200,6 +1227,7 @@ class RaceEngineer:
             # about one of them, the ledger is about all of them.
             base_scores=self._all_scores(),
             base_pressures=self._base_pressures(),
+            stint_at_apply=self._stint,
         )
         # Una modifica ai box e' uno stint nuovo anche se la benzina non sale.
         if self._pending.tag == "BOX":
@@ -1454,8 +1482,9 @@ class RaceEngineer:
                 and any(s.pressures_hot for s in self.window)):
             # Le letture ci sono ma non abbastanza a regime: si aspetta, non si
             # passa alle barre su gomme che nessuno ha ancora giudicato.
-            return Decision(DecisionKind.COLLECT, _msg("pressure_wait", lang),
-                            tail=_msg("pressure_wait", lang))
+            wait = _msg("pressure_wait", lang,
+                        laps=_laps_left(self._reading_need(), lang))
+            return Decision(DecisionKind.COLLECT, wait, tail=wait)
         blind = phase.blind()
         if blind:
             # Prima del cancello, non dopo: un cancello che non sa cosa guardare
@@ -1526,25 +1555,31 @@ class RaceEngineer:
     def _evaluate_active(self) -> Decision:
         a = self.active
         lang = current_language()
+        if self._is_pressure_test(a):
+            # Una prova di pressione aspetta la lettura, non «3 giri buoni»: il
+            # giro che apre lo stint e quelli di uno stint finito non ci
+            # entrano, e il conto lo deve dire. Rigiocato il 08/11 il motore
+            # ripeteva «serve ancora 1 giro» per nove giri e tre rientri.
+            reading = self._pressure_reading()
+            if reading is None:
+                tail = _skip_tail(self._skipped, lang)
+                if self._last_settling and self._stint > a.stint_at_apply + 1:
+                    tail += _msg("pressure_restart", lang)
+                return Decision(DecisionKind.EVALUATING,
+                                _msg("evaluating", lang,
+                                     laps=_laps_left(self._reading_need(), lang))
+                                + tail, tail=tail)
+            # Prima del verdetto: le gomme hanno risposto alla modifica?
+            moved = self._base_moved(a, lang, reading.pressures_hot)
+            if moved:
+                return self._hold_base(moved)
+            return self._judge_pressure(a, reading)
         if a.laps_seen < self.min_stable:
             need = self.min_stable - a.laps_seen
             tail = _skip_tail(self._skipped, lang)
             return Decision(DecisionKind.EVALUATING,
                             _msg("evaluating", lang, laps=_laps_left(need, lang))
                             + tail, tail=tail)
-
-        if (a.symptom is None and a.base_pressures is not None
-                and a.change.param == "tyrePressure"):
-            reading = self._pressure_reading()
-            if reading is None:
-                return Decision(DecisionKind.EVALUATING,
-                                _msg("evaluating", lang,
-                                     laps=_laps_left(1, lang)), tail="")
-            # Prima del verdetto: le gomme hanno risposto alla modifica?
-            moved = self._base_moved(a, lang, reading.pressures_hot)
-            if moved:
-                return self._hold_base(moved)
-            return self._judge_pressure(a, reading)
         return self._verdict(a, lang)
 
     def _hold_base(self, moved: str) -> Decision:
@@ -1861,10 +1896,8 @@ class RaceEngineer:
         Dentro uno stint la pressione sale di 0,3–0,5 psi dal primo giro caldo,
         cioe' meta' della finestra: un giro solo non e' una lettura.
         """
-        laps = [s for s in self.window
-                if s.pressures_hot and not s.settling
-                and s.stint == self._stint][-_PRESSURE_LAPS:]
-        if len(laps) < min(self.min_stable, 3):
+        laps = self._reading_laps()
+        if len(laps) < self._reading_size():
             return None
         hot = {}
         for ax in ("front", "rear"):
@@ -1873,6 +1906,26 @@ class RaceEngineer:
             if vals:
                 hot[ax] = statistics.median(vals)
         return LapStats(lap_time_ms=0, pressures_hot=hot) if hot else None
+
+    def _reading_laps(self) -> list[LapStats]:
+        """I giri che entrano nella lettura: buoni, dello stint in corso,
+        senza quello che lo apre, gli ultimi `_PRESSURE_LAPS`."""
+        return [s for s in self.window
+                if s.pressures_hot and not s.settling
+                and s.stint == self._stint][-_PRESSURE_LAPS:]
+
+    def _reading_size(self) -> int:
+        """Quanti giri servono per una lettura."""
+        return min(self.min_stable, 3)
+
+    def _reading_need(self) -> int:
+        """Quanti giri buoni mancano alla lettura, almeno uno."""
+        return max(1, self._reading_size() - len(self._reading_laps()))
+
+    def _is_pressure_test(self, a: "_Active") -> bool:
+        """La prova in corso e' una pressione con una lettura di partenza?"""
+        return (a.symptom is None and a.base_pressures is not None
+                and a.change.param == "tyrePressure")
 
     def _base_pressures(self) -> dict | None:
         reading = self._pressure_reading()

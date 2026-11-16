@@ -839,3 +839,52 @@ def test_a_result_far_from_the_promise_asks_to_check_the_loaded_setup():
     assert d.outcome is None
     assert eng.applied_clicks == {}
     assert "front" not in eng.hot_per_click, "da uno scarto cosi' non si impara un passo"
+
+
+def test_a_pressure_test_counts_the_laps_the_reading_needs():
+    """08/11 rigiocato: dopo la sosta il motore diceva «serve ancora 1 giro»
+    per nove giri e tre rientri. Il conto e' quello della lettura: il giro che
+    apre lo stint non entra, e un rientro a meta' prova lo azzera e lo dice."""
+    eng = _eng()
+    fuel = 50.0
+    for _ in range(4):
+        d = eng.observe(_fuel_lap(28.0, fuel=fuel))
+        fuel -= 2.8
+    assert d.kind is DecisionKind.PROPOSE
+    assert "same stint" in d.prediction.text
+    eng.mark_applied()
+    # Sosta: si riparte col pieno. Il primo giro scalda le gomme.
+    fuel = 45.0
+    d = eng.observe(_fuel_lap(27.2, fuel=fuel))
+    assert d.kind is DecisionKind.EVALUATING
+    assert "3 more clean laps" in d.message, d.message
+    assert eng.progress()["have"] == 0 and eng.progress()["need"] == 3
+    fuel -= 2.8
+    d = eng.observe(_fuel_lap(27.2, fuel=fuel))
+    assert "2 more clean laps" in d.message, d.message
+    assert eng.progress()["have"] == 1
+    # Rientra prima della lettura: il conto riparte, e lo dice.
+    d = eng.observe(_fuel_lap(27.2, fuel=45.0))
+    assert d.kind is DecisionKind.EVALUATING
+    assert "3 more clean laps" in d.message and "counting again" in d.message, d.message
+    assert eng.progress()["have"] == 0
+    fuel = 45.0
+    for _ in range(3):
+        fuel -= 2.8
+        d = eng.observe(_fuel_lap(27.25, fuel=fuel))
+    assert d.kind is DecisionKind.ACCEPTED, d.message
+
+
+def test_the_warm_up_after_the_opening_lap_is_not_another_stop():
+    """08/11 rigiocato: giro d'uscita col pieno, poi +0,46 dietro al giro dopo
+    con la benzina che scende. E' la gomma che si scalda, non un rientro."""
+    eng = _eng()
+    eng.observe(_fuel_lap(26.5, rear=26.98, fuel=45.8))
+    nxt = _fuel_lap(26.6, rear=27.44, fuel=42.9)
+    eng.observe(nxt)
+    assert nxt.settling is False and nxt.stint == eng._stint
+    # Un salto in mezzo allo stint invece apre lo stint dopo, anche senza
+    # benzina che sale (08/11: 49 → 46 L, +1,8 davanti).
+    third = _fuel_lap(28.4, rear=27.4, fuel=40.0)
+    eng.observe(third)
+    assert third.settling is True and third.stint == nxt.stint + 1
