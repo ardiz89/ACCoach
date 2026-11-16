@@ -527,6 +527,39 @@ def test_a_file_reloaded_by_hand_drops_the_wheel_changes(rig):
     assert loaded["state"] == "match" and loaded["name"] == "HONE_8"
 
 
+def test_a_wheel_change_saved_as_a_new_file_is_asked_not_picked(rig):
+    """Il TC +1 tenuto, poi salvato in garage come file nuovo (TC 4): «HONE_8
+    piu' la manopola» e «il file nuovo» dicono la stessa macchina. L'impronta
+    non sceglie in silenzio: e' ambiguo, coi due nomi."""
+    (rig.dir / "HONE_8_TC4.json").write_text(
+        json.dumps(_doc({**HONE_8, "tc": 4})), encoding="utf-8")
+    rig.drive(_snap(tc=4))
+    rig.engineer._record(_av("tC1"))                  # TC +1 tenuto: 3 + 1
+    rig.drive(_snap("lane", tc=4), _snap("box", tc=4, psi=HONE_8_COLD))
+    loaded = rig.block()["loaded"]
+    assert loaded["state"] == "ambiguous" and loaded["name"] is None
+    assert loaded["names"] == ["HONE_8", "HONE_8_TC4"]
+    assert rig.engineer.carry_clicks() == {"tC1": 1}  # niente si butta
+
+
+def test_an_exit_that_cannot_be_recognised_still_closes_the_check(rig, monkeypatch):
+    """Dopo una scrittura l'uscita deve controllare il file (R2). Se a
+    quell'uscita il riconoscimento non si fa (cartella illeggibile), il
+    controllo non resta aperto per la sosta dopo."""
+    rig.drive(_snap())
+    rig.propose(_box_change())
+    rig.eng.mark_setup_applied(path=rig.path("HONE_8"))
+    rig.drive(_snap("lane"))
+    assert rig.engineer._exit_check == "written"
+
+    def boom(*a, **k):
+        raise RuntimeError("disco")
+
+    monkeypatch.setattr(store, "find_setup_files", boom)
+    rig.drive(_snap("box", psi=HONE_8_COLD), _snap("lane"), _snap())
+    assert rig.engineer._exit_check == ""
+
+
 def test_a_box_proposal_carries_the_wheel_changes(rig):
     rig.drive(_snap())
     rig.engineer._record(_av("brakeBias"))            # AV ripartitore tenuto

@@ -2019,7 +2019,7 @@ class RaceEngineer:
             if report.changed and not self._held() and self.active is None:
                 # Le manopole rimesse come nel file: e' un file, ma non
                 # l'assetto su cui e' stata misurata la base.
-                return self._saved_rebase(report)
+                return self._saved_rebase(report, at_exit=at_exit)
             if self._base_ready():
                 return self._advance()
             if report.name and not self._held():
@@ -2028,8 +2028,14 @@ class RaceEngineer:
                 return Decision(kind, _msg("setup_saved", name=report.name))
         return None
 
-    def _saved_rebase(self, report: SetupReport) -> Decision:
-        """R3 sciolta su un assetto diverso da quello della base: si rifa'."""
+    def _saved_rebase(self, report: SetupReport, *, at_exit: bool) -> Decision:
+        """R3 sciolta su un assetto diverso da quello della base: si rifa'.
+
+        Dal vivo ai box la differenza e' detta qui: all'uscita la stessa
+        differenza dall'entrata non e' un altro cambio non chiesto (R1).
+        """
+        if not at_exit and self._exit_check not in _CHECK_WRITTEN:
+            self._exit_check = "known"
         self.window = []
         self._offs = []
         self._skipped = None
@@ -2040,6 +2046,14 @@ class RaceEngineer:
         said = (_msg("setup_saved", lang, name=report.name) + again
                 if report.name else again.strip())
         return Decision(DecisionKind.COLLECT, said)
+
+    def exit_unseen(self) -> None:
+        """Il motore ha visto un'uscita dai box ma non ha potuto riconoscere
+        l'assetto (niente `setup_seen`): quello che l'uscita doveva
+        controllare si chiude lo stesso, come in `setup_seen`, e non passa
+        alla sosta dopo. Una prova aperta resta: a fine prova c'e'
+        `_base_moved`."""
+        self._exit_check = ""
 
     def _held(self) -> bool:
         return (self._held_revert is not None or self._held_base is not None

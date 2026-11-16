@@ -67,6 +67,16 @@ _log = get_logger("coach")
 #: ai box di HONE non tocca mai.
 _DIALS = ("tc", "abs", "emap", "bias")
 
+
+def _found(m) -> set[str]:
+    """I file che un esito dell'impronta indica: quello riconosciuto, o i
+    candidati di un esito ambiguo; nessuno se non salvato o non so."""
+    if m.state == "match" and m.best:
+        return {m.best}
+    if m.state == "ambiguous":
+        return set(m.names)
+    return set()
+
 # When you're not on a representative flying lap — delta has ballooned because
 # you're crawling, recovering from an off, or parked — only acute safety cues
 # (lock-up, wheelspin, slides, fuel) are worth speaking. Technique and setup
@@ -1528,11 +1538,14 @@ class CoachEngine:
         I file sono quelli della cartella di quest'auto e pista; il confronto
         e' col file piu' le manopole tenute (`carry_clicks`) e col ripartitore
         solo se tarato. Se cosi' non torna nessun file ma senza le manopole si'
-        (``carry_lost``), il pilota ha ricaricato un file a mano.
+        (``carry_lost``), il pilota ha ricaricato un file a mano. Se tornano
+        tutti e due su file diversi (la modifica al volo salvata come file
+        nuovo: «X piu' la manopola» e «X2» sono la stessa macchina), l'esito
+        e' ambiguo coi nomi di entrambi: non si sceglie in silenzio.
         """
         from .engineer.core import SetupReport
         from .engineer.fingerprint import (
-            changed, compare, describe, file_values, match,
+            Match, changed, compare, describe, file_values, match,
         )
         from .setup import store
 
@@ -1550,10 +1563,15 @@ class CoachEngine:
         offset = eng.bias_offset
         m = match(now, files, carry=carry, bias_offset=offset)
         carry_lost = False
-        if m.state == "unsaved" and carry:
+        if carry:
             bare = match(now, files, carry={}, bias_offset=offset)
-            if bare.state in ("match", "ambiguous"):
+            found, found_bare = _found(m), _found(bare)
+            if m.state == "unsaved" and found_bare:
                 m, carry, carry_lost = bare, {}, True
+            elif found and found_bare and found != found_bare:
+                both = found | found_bare
+                m = Match("ambiguous", tuple(f.name for f in files if f.name in both),
+                          None, False, {**bare.diffs, **m.diffs})
         lang = current_language()
         unsaved_diff = ""
         if m.state == "unsaved":
@@ -1603,6 +1621,7 @@ class CoachEngine:
         memoria: un file illeggibile o un errore qui non fermano mai un giro.
         """
         event = None
+        seen = False
         try:
             event = self.pitwatch.update(snap)
             if (event is None or self._engineer is None
@@ -1624,6 +1643,7 @@ class CoachEngine:
                 # gomme fredde (`COLD_TYRE_MARGIN_C`) si verifica da qui.
                 box_psi=list(w.box_psi) if w.box_psi else None,
                 box_core_c=w.box_core_c)
+            seen = True
             decision = self._engineer.setup_seen(report, at_exit=event == "exit")
             if decision is not None:
                 self._engineer_decision = decision
@@ -1632,8 +1652,20 @@ class CoachEngine:
             _log.debug("setup fingerprint failed", exc_info=True)
         finally:
             if event == "exit":
+                if not seen:
+                    self._exit_unseen()
                 self._hone_touched = False      # la prossima sosta riparte
                 self._box_written = False
+
+    def _exit_unseen(self) -> None:
+        """Un'uscita senza riconoscimento (cartella illeggibile, un errore):
+        l'Ingegnere chiude lo stesso quello che l'uscita doveva controllare."""
+        closer = getattr(self._engineer, "exit_unseen", None)
+        if callable(closer):
+            try:
+                closer()
+            except Exception:  # noqa: BLE001 - mai un giro perso per l'impronta
+                _log.debug("exit_unseen failed", exc_info=True)
 
     def tick(self, now: float) -> EngineState:
         if self._feed is not None:

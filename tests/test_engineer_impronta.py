@@ -387,6 +387,39 @@ def test_knobs_put_back_as_in_the_file_restart_the_base():
     assert d.change.tag == "BOX"
 
 
+def test_knobs_put_back_in_the_pits_are_not_said_again_at_the_exit():
+    """La base rifatta dal vivo ai box: all'uscita la stessa differenza
+    dall'entrata e' gia' stata detta, e non e' un altro cambio non chiesto."""
+    eng = _eng()
+    eng.setup_seen(_report(state="unsaved", unsaved_diff="TC 6 invece di 3"),
+                   at_exit=True)
+    for _ in range(3):
+        eng.observe(_lap(LOW))
+    d = eng.setup_seen(_report(name="HONE_8", changed="TC 3 invece di 6"),
+                       at_exit=False)
+    assert d.kind is DecisionKind.COLLECT
+    assert eng.setup_seen(_report(name="HONE_8", changed="TC 3 invece di 6"),
+                          at_exit=True) is None
+    # Una sosta dopo, un cambio e' di nuovo R1.
+    for _ in range(3):
+        eng.observe(_lap())
+    d = eng.setup_seen(_report(name="HONE_8", changed="TC 4 invece di 3"),
+                       at_exit=True)
+    assert d.kind is DecisionKind.COLLECT and "Rifaccio la base" in d.message
+
+
+def test_an_exit_not_seen_closes_the_check_like_one_seen():
+    """Il motore non ha potuto riconoscere l'uscita (`exit_unseen`): quello
+    che l'uscita doveva controllare non passa alla sosta dopo."""
+    eng = _eng()
+    _pressure_test(eng)
+    assert eng._exit_check == "written"
+    eng.exit_unseen()
+    assert eng._exit_check == ""
+    assert eng.active is not None             # la prova resta: l'ultima rete
+    assert eng.exit_unseen() is None          # e' `_base_moved`
+
+
 def test_a_saved_file_found_before_the_base_says_so():
     eng = _eng()
     eng.setup_seen(_report(state="unsaved", unsaved_diff="TC 6 invece di 3"),
