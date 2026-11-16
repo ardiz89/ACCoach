@@ -754,29 +754,42 @@ def run_box(seconds: float | None = None) -> None:
     _warn_if_no_live(seen)
 
 
+def _emap(raw: int) -> str:
+    """La mappa motore grezza e come la mostra l'HUD di ACC (da 1)."""
+    return f"mappa {raw} (HUD {raw + 1})" if raw >= 0 else f"mappa {raw}"
+
+
 def setup_lines(snap, files) -> list[str]:
     """Quello che il gioco espone, accanto ai valori di ogni file di setup (pura).
 
     Il ripartitore del file e' in click e non si confronta: la lettura e' una
     frazione e l'offset e' proprio cio' che il test in garage deve chiarire.
     Le pressioni si leggono cosi' come sono: si lancia a macchina ferma ai box.
+    «Ai box» e' la regola del motore (`stopped_in_box`): su ACC `in_pit` resta
+    0 anche fermi in piazzola. La mappa e' grezza (0 = la prima, come nel file)
+    con accanto il numero dell'HUD; le temperature interne delle gomme dicono
+    se le pressioni lette sono a freddo.
     """
+    from .coaching.pitcall import stopped_in_box
     from .engineer.fingerprint import Reading, compare
 
     r = Reading.from_snapshot(snap, snap.tyre_pressure)
     psi = " ".join(f"{p:.1f}" for p in snap.tyre_pressure)
+    core = " ".join(f"{c:.1f}" for c in snap.tyre_core_temp)
     out = [
-        f"box={'si' if snap.in_pit else 'no'} velocita={snap.speed_kmh:.0f} km/h",
-        f"TC {r.tc}  ABS {r.abs}  mappa {r.emap}  ripartitore {r.bias:.3f}",
+        f"box={'si' if stopped_in_box(snap) else 'no'} "
+        f"velocita={snap.speed_kmh:.0f} km/h",
+        f"TC {r.tc}  ABS {r.abs}  {_emap(r.emap)}  ripartitore {r.bias:.3f}",
         f"pressioni (FL FR RL RR) {psi}  benzina {r.fuel:.0f}  "
         f"aria {r.air_temp:.0f}  pista {r.road_temp:.0f}",
+        f"gomme dentro (FL FR RL RR) {core} gradi",
     ]
     if not files:
         out.append("nessun setup trovato per questa auto e pista")
         return out
     for f in files:
         certain, pdiffs = compare(r, f, carry={}, bias_offset=None)
-        out.append(f"{f.name}: TC {f.tc} ABS {f.abs} mappa {f.emap} "
+        out.append(f"{f.name}: TC {f.tc} ABS {f.abs} {_emap(f.emap)} "
                    f"ripartitore {f.bias_clicks} click (letto {r.bias:.3f})")
         bad = ", ".join(f"{d.field.upper() if d.field != 'emap' else 'MAPPA'} letto {d.seen:g} file {d.want:g}"
                         for d in certain if d.field != "bias")

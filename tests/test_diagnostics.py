@@ -109,6 +109,29 @@ def test_setup_lines_show_each_file_against_the_car():
     assert "nessuna" in text[:text.index("HONE_7")]  # HONE_8 combacia
 
 
+def test_setup_lines_see_the_acc_box_and_say_the_map_as_the_hud():
+    """Su ACC fermo in piazzola `in_pit` e' 0: il box e' la corsia a velocita'
+    zero (`stopped_in_box`). La mappa grezza accanto a quella dell'HUD, e le
+    temperature interne delle gomme per sapere se le pressioni sono a freddo."""
+    from accoach.diagnostics import setup_lines
+    from accoach.engineer.fingerprint import FileValues
+
+    s = replace(
+        TelemetrySnapshot.disconnected(), connected=True, in_pit=False,
+        in_pit_lane=True, speed_kmh=0.0, tc_level=3, abs_level=2, engine_map=0,
+        brake_bias=0.58, tyre_pressure=(26.5, 26.5, 26.0, 26.0),
+        tyre_core_temp=(24.0, 24.5, 23.0, 23.5), fuel=40.0, air_temp=21.0,
+        road_temp=27.0, car_model="mclaren_720s_gt3", track="imola")
+    f = FileValues("HONE_8", "x/HONE_8.json", 3, 2, 0, 15,
+                   (26.5, 26.5, 26.0, 26.0), 40)
+    text = "\n".join(setup_lines(s, [f]))
+    assert "box=si" in text
+    assert "mappa 0 (HUD 1)" in text
+    assert "gomme dentro (FL FR RL RR) 24.0 24.5 23.0 23.5" in text
+    moving = replace(s, speed_kmh=40.0)
+    assert "box=no" in "\n".join(setup_lines(moving, [f]))
+
+
 def test_setup_lines_without_files_says_so():
     from accoach.diagnostics import setup_lines
 

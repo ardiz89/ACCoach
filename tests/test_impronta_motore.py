@@ -49,15 +49,19 @@ class _Reader:
 
 
 def _snap(where="track", *, tc=3, abs_=4, emap=0, bias=0.64,
-          psi=(0.0, 0.0, 0.0, 0.0), acc=True, track=TRACK):
-    """Un frame di ACC: in pista, in corsia box o fermo in piazzola."""
+          psi=(0.0, 0.0, 0.0, 0.0), acc=True, track=TRACK,
+          core=(0.0, 0.0, 0.0, 0.0), air=0.0):
+    """Un frame di ACC: in pista, in corsia box o fermo in piazzola.
+
+    Fermo in piazzola e' come lo pubblica ACC: `in_pit` spento anche li', la
+    corsia box accesa e la velocita' a zero (`pitcall.stopped_in_box`)."""
     box, lane = where == "box", where in ("box", "lane")
     return dataclasses.replace(
         TelemetrySnapshot.disconnected(), connected=True, status=ACStatus.LIVE,
-        is_acc=acc, car_model=CAR, track=track, in_pit=box, in_pit_lane=lane,
+        is_acc=acc, car_model=CAR, track=track, in_pit=False, in_pit_lane=lane,
         speed_kmh=0.0 if box else (60.0 if lane else 150.0),
         tyre_pressure=psi, tc_level=tc, abs_level=abs_, engine_map=emap,
-        brake_bias=bias, fuel=48.0)
+        brake_bias=bias, fuel=48.0, tyre_core_temp=core, air_temp=air)
 
 
 def _lap():
@@ -265,6 +269,22 @@ def test_a_write_then_the_right_file_lets_the_test_run(rig):
     assert rig.engineer.active is not None
     assert rig.engineer._held_wrong is None
     assert rig.block()["confirm_base"] is False
+
+
+def test_a_normal_stop_with_hot_tyres_does_not_doubt_the_written_file(rig):
+    """Una sosta a gomme calde dopo la scrittura: le pressioni lette non sono
+    quelle a freddo, e non fanno dubitare di HONE_8."""
+    rig.drive(_snap())
+    rig.propose(_box_change())
+    rig.eng.mark_setup_applied(path=rig.path("HONE_8"))
+    rig.drive(_snap("lane"),
+              _snap("box", psi=(27.6, 27.4, 27.1, 27.0), core=(85.0, 84.0, 80.0, 79.0),
+                    air=20.0),
+              _snap("lane"), _snap())
+    assert rig.engineer.active is not None
+    assert rig.engineer.active.psi_doubt == ""
+    loaded = rig.block()["loaded"]
+    assert loaded["at"] == "exit" and loaded["observed"]["cold_psi"] is None
 
 
 # --- la risposta della pagina ------------------------------------------------

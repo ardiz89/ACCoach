@@ -16,6 +16,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from ..coaching.pitcall import stopped_in_box
 from ..setup import acc_format
 from ..telemetry.snapshot import ACStatus
 from ..textfmt import fmt_num
@@ -24,6 +25,11 @@ COLD_PSI_VERIFIED: bool = False
 PSI_TOL = 0.3          # psi: scarto massimo fra lettura e file
 BIAS_STEP = 0.002      # frazione per click del ripartitore
 BIAS_TOL = 0.001       # mezzo click
+#: Gomme «fredde» ai box: la media delle temperature interne entro tanti gradi
+#: dall'aria. Sopra, le pressioni lette sono quelle di una sosta a gomme calde
+#: e non la pressione a freddo del file. Da verificare al test (il registro
+#: tiene pressioni e temperatura di ogni sosta, fredde o no).
+COLD_TYRE_MARGIN_C = 15.0
 
 _WHEELS = ("fl", "fr", "rl", "rr")
 _UNREAD = -1
@@ -216,15 +222,28 @@ def describe(diffs, lang: str) -> str:
 class PitWatch:
     """Guarda i box frame per frame: pressioni a freddo da fermo e lettura all'uscita.
 
-    `update` risponde "live" quando, fermo in piazzola, la lettura cambia;
-    "exit" al primo frame in pista dopo la corsia box. Un frame non LIVE, non
-    connesso o non ACC azzera la sosta in corso (niente uscita fantasma).
+    `update` risponde "live" quando, fermo ai box, la lettura cambia; "exit" al
+    primo frame in pista dopo la corsia box. Un frame non LIVE, non connesso o
+    non ACC azzera la sosta in corso (niente uscita fantasma).
+
+    «Fermo ai box» e' `coaching.pitcall.stopped_in_box`, la regola che vale
+    per tutto il progetto: su ACC `in_pit` resta 0 anche fermi in piazzola o in
+    garage, e quello che si accende e' la corsia box a velocita' zero.
+
+    Le pressioni lette da fermo valgono come «a freddo» solo con le gomme
+    fredde (`COLD_TYRE_MARGIN_C`); quelle lette comunque, e la temperatura
+    interna media, restano in `box_psi` e `box_core_c` fino alla sosta dopo,
+    per il registro.
     """
 
     def __init__(self) -> None:
         self.entry: Reading | None = None
         self.live: Reading | None = None
         self.exit: Reading | None = None
+        #: Le pressioni lette da fermo in questa sosta (o nell'ultima), fredde
+        #: o no, e la media delle temperature interne; None se non lette.
+        self.box_psi: tuple[float, float, float, float] | None = None
+        self.box_core_c: float | None = None
         self._track: Reading | None = None      # ultima lettura in pista
         self._in_stop = False
         self._cold: tuple[float, float, float, float] | None = None
@@ -232,6 +251,7 @@ class PitWatch:
 
     def reset(self) -> None:
         self.entry = self.live = self.exit = self._track = None
+        self.box_psi = self.box_core_c = None
         self._reset_stop()
 
     def _reset_stop(self) -> None:
@@ -243,6 +263,18 @@ class PitWatch:
     def _key(r: Reading) -> tuple:
         # fuel e temperature si muovono da sole in sosta: non sono un cambio
         return (r.tc, r.abs, r.emap, round(r.bias, 3), r.cold_psi)
+
+    @staticmethod
+    def _core_c(snap) -> float | None:
+        cores = [t for t in snap.tyre_core_temp if t > 0]
+        return round(sum(cores) / len(cores), 1) if cores else None
+
+    @staticmethod
+    def _cold_tyres(core_c: float | None, air: float) -> bool:
+        # Temperature non lette (tutte 0): come prima, le pressioni si tengono.
+        if core_c is None or not air > 0:
+            return True
+        return core_c <= air + COLD_TYRE_MARGIN_C
 
     def update(self, snap) -> str | None:
         if not (snap.connected and snap.status == ACStatus.LIVE and snap.is_acc):
@@ -259,14 +291,19 @@ class PitWatch:
             self._in_stop = True
             self.entry = self._track
             self.live = None
-        if snap.in_pit and snap.speed_kmh < 1:
-            psi = tuple(snap.tyre_pressure)
-            if len(psi) == 4 and all(p > 0 for p in psi):
-                self._cold = tuple(round(p, 1) for p in psi)
-            r = Reading.from_snapshot(snap, self._cold)
-            key = self._key(r)
-            self.live = r
-            if key != self._live_key:
-                self._live_key = key
-                return "live"
+            self.box_psi = self.box_core_c = None
+        if not stopped_in_box(snap):
+            return None
+        psi = tuple(snap.tyre_pressure)
+        if len(psi) == 4 and all(p > 0 for p in psi):
+            self.box_psi = tuple(round(p, 1) for p in psi)
+            self.box_core_c = self._core_c(snap)
+            if self._cold_tyres(self.box_core_c, snap.air_temp):
+                self._cold = self.box_psi
+        r = Reading.from_snapshot(snap, self._cold)
+        key = self._key(r)
+        self.live = r
+        if key != self._live_key:
+            self._live_key = key
+            return "live"
         return None

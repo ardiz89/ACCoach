@@ -67,6 +67,21 @@ def test_each_lap_and_each_pit_exit_leave_a_line(rig, tmp_path):
     assert ex["report"]["state"] and ex["reading"]["tc"] == 6
     assert "HONE_8" in ex["files"]
     assert ex["expected"].endswith("HONE_8.json")
+    # Le pressioni lette da fermo e la temperatura interna, fredde o no: il
+    # test dice dopo se la soglia delle gomme fredde regge.
+    assert ex["box_psi"] == list(HONE_8_COLD)
+    assert "box_core_c" in ex
+
+
+def test_a_stop_with_hot_tyres_logs_what_it_read(rig, tmp_path):
+    hot = (27.6, 27.4, 27.1, 27.0)
+    rig.drive(_snap(), _snap("lane"),
+              _snap("box", psi=hot, core=(85.0, 84.0, 80.0, 79.0), air=20.0),
+              _snap("lane"), _snap())
+    ex = next(r for r in _rows(tmp_path) if r["kind"] == "setup" and r["at"] == "exit")
+    assert ex["reading"]["cold_psi"] is None
+    assert ex["box_psi"] == list(hot)
+    assert ex["box_core_c"] == 82.0
 
 
 def test_an_unwritable_folder_never_breaks_a_lap(rig, tmp_path):

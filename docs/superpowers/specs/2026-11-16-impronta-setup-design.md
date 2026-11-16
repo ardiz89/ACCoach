@@ -87,9 +87,11 @@ Misurato il 16/11 sull'archivio (sola lettura):
 Un osservatore nel motore (`engineer/fingerprint.py`, puro, alimentato dai frame)
 segue la macchina ai box:
 
-- **da fermo nella piazzola o in garage** (`in_pit`, velocità < 1 km/h) tiene l'ultimo
+- **da fermo nella piazzola o in garage** (`coaching.pitcall.stopped_in_box`: su ACC
+  `in_pit` resta 0 anche lì, vale la corsia box a velocità zero) tiene l'ultimo
   valore delle quattro pressioni e le temperature aria e pista (le pressioni a
-  freddo), e **riconosce dal vivo**: ogni volta che TC, ABS, mappa, ripartitore o
+  freddo, solo a gomme fredde: temperatura interna media entro
+  `COLD_TYRE_MARGIN_C` dall'aria, da verificare al test), e **riconosce dal vivo**: ogni volta che TC, ABS, mappa, ripartitore o
   pressioni cambiano, rifà il confronto coi file. È un esito provvisorio, che va nel
   frame per le pagine e scioglie subito il blocco di R3 e l'attesa di R2: il pilota
   che ha appena caricato il file giusto in garage non deve fare un giro d'uscita per

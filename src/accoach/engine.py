@@ -1578,7 +1578,11 @@ class CoachEngine:
                 reading=now.to_dict() if now is not None else None,
                 entry=w.entry.to_dict() if w.entry is not None else None,
                 files=list(self._setup_files),
-                expected=self._rel_setup(self._expected_path))
+                expected=self._rel_setup(self._expected_path),
+                # Quello letto da fermo, a gomme fredde o no: la soglia delle
+                # gomme fredde (`COLD_TYRE_MARGIN_C`) si verifica da qui.
+                box_psi=list(w.box_psi) if w.box_psi else None,
+                box_core_c=w.box_core_c)
             decision = self._engineer.setup_seen(report, at_exit=event == "exit")
             if decision is not None:
                 self._engineer_decision = decision

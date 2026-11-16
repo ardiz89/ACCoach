@@ -139,15 +139,19 @@ from accoach.engineer.fingerprint import PitWatch
 from accoach.telemetry.snapshot import ACStatus, TelemetrySnapshot
 
 _COLD = (26.0, 25.5, 25.4, 25.1)
+# Fermo in piazzola su ACC: `in_pit` resta 0 anche li' (coaching/pitcall.py,
+# `stopped_in_box`), quindi la sosta e' corsia box a velocita' zero.
+_BOX = dict(lane=True, speed=0.0)
 
 
 def _snap(*, pit=False, lane=False, speed=0.0, psi=(0.0, 0.0, 0.0, 0.0), tc=3,
-          status=ACStatus.LIVE, acc=True, connected=True):
+          status=ACStatus.LIVE, acc=True, connected=True,
+          core=(0.0, 0.0, 0.0, 0.0), air=0.0):
     return dataclasses.replace(
         TelemetrySnapshot.disconnected(), connected=connected, status=status,
         is_acc=acc, in_pit=pit, in_pit_lane=lane, speed_kmh=speed,
         tyre_pressure=psi, tc_level=tc, abs_level=4, engine_map=0,
-        brake_bias=0.75, fuel=48.0)
+        brake_bias=0.75, fuel=48.0, tyre_core_temp=core, air_temp=air)
 
 
 def _run(w, snaps):
@@ -159,7 +163,7 @@ def test_a_stop_in_the_box_gives_cold_pressures_and_an_exit():
     ev = _run(w, [
         _snap(speed=150, tc=5), _snap(speed=150, tc=4),
         _snap(lane=True, speed=60),
-        _snap(pit=True, lane=True, speed=0, psi=_COLD),
+        _snap(psi=_COLD, **_BOX),
         _snap(lane=True, speed=30), _snap(speed=100)])
     assert ev == [None, None, None, "live", None, "exit"]
     assert w.exit.cold_psi == _COLD
@@ -167,17 +171,70 @@ def test_a_stop_in_the_box_gives_cold_pressures_and_an_exit():
     assert w.live.cold_psi == _COLD
 
 
-def test_a_drive_through_exits_without_cold_pressures():
+def test_in_pit_alone_still_counts_as_stopped():
+    """Come lo direbbe Assetto Corsa 1: `in_pit` acceso. La regola e' una sola
+    (`stopped_in_box`), e la sua prima meta' resta."""
     w = PitWatch()
-    ev = _run(w, [_snap(speed=100), _snap(lane=True, speed=60), _snap(speed=100)])
-    assert ev == [None, None, "exit"]
+    ev = _run(w, [_snap(speed=150), _snap(lane=True, speed=60),
+                  _snap(pit=True, lane=True, speed=0, psi=_COLD),
+                  _snap(lane=True, speed=30), _snap(speed=100)])
+    assert ev == [None, None, "live", None, "exit"]
+    assert w.exit.cold_psi == _COLD
+
+
+def test_moving_in_the_pit_lane_is_not_a_stop():
+    w = PitWatch()
+    ev = _run(w, [_snap(speed=150), _snap(lane=True, speed=60, psi=_COLD),
+                  _snap(lane=True, speed=5, psi=_COLD), _snap(speed=100)])
+    assert ev == [None, None, None, "exit"]
+    assert w.live is None
     assert w.exit.cold_psi is None
-    assert w.exit.tc == 3
+
+
+def test_a_start_from_the_garage_has_no_entry_and_cold_pressures():
+    """La sessione parte gia' ferma ai box: nessuna lettura in pista prima."""
+    w = PitWatch()
+    ev = _run(w, [_snap(psi=_COLD, **_BOX), _snap(psi=_COLD, **_BOX),
+                  _snap(lane=True, speed=40), _snap(speed=120)])
+    assert ev == ["live", None, None, "exit"]
+    assert w.entry is None
+    assert w.exit.cold_psi == _COLD
+
+
+def test_hot_tyres_in_the_box_are_not_cold_pressures():
+    """Una sosta normale a gomme calde: le pressioni lette non sono quelle a
+    freddo del file, e non contano. Restano nel registro per il test."""
+    w = PitWatch()
+    hot = (85.0, 84.0, 80.0, 79.0)
+    ev = _run(w, [_snap(speed=150), _snap(lane=True, speed=60),
+                  _snap(psi=(27.6, 27.4, 27.1, 27.0), core=hot, air=20.0, **_BOX),
+                  _snap(lane=True, speed=30), _snap(speed=100)])
+    assert ev == [None, None, "live", None, "exit"]
+    assert w.live.cold_psi is None and w.exit.cold_psi is None
+    assert w.box_psi == (27.6, 27.4, 27.1, 27.0)
+    assert w.box_core_c == 82.0
+
+
+def test_cold_tyres_are_read_against_the_air():
+    w = PitWatch()
+    cool = (30.0, 30.0, 29.0, 29.0)               # aria 20: entro 15 gradi
+    _run(w, [_snap(speed=150), _snap(psi=_COLD, core=cool, air=20.0, **_BOX)])
+    assert w.live.cold_psi == _COLD
+    assert w.box_core_c == 29.5
+    assert fp.COLD_TYRE_MARGIN_C == 15.0
+
+
+def test_the_box_values_start_again_at_each_stop():
+    w = PitWatch()
+    _run(w, [_snap(speed=150), _snap(psi=_COLD, **_BOX), _snap(speed=100)])
+    assert w.box_psi == _COLD
+    _run(w, [_snap(lane=True, speed=60)])
+    assert w.box_psi is None and w.box_core_c is None
 
 
 def test_live_fires_only_when_something_changes():
     w = PitWatch()
-    box = dict(pit=True, lane=True, speed=0, psi=_COLD)
+    box = dict(psi=_COLD, **_BOX)
     ev = _run(w, [_snap(speed=100), _snap(**box), _snap(**box), _snap(**box),
                   _snap(tc=6, **box)])
     assert ev == [None, "live", None, None, "live"]
@@ -186,7 +243,7 @@ def test_live_fires_only_when_something_changes():
 def test_a_pause_in_the_pits_is_not_an_exit():
     w = PitWatch()
     ev = _run(w, [_snap(speed=100),
-                  _snap(pit=True, lane=True, speed=0, psi=_COLD),
+                  _snap(psi=_COLD, **_BOX),
                   _snap(status=ACStatus.PAUSE),
                   _snap(speed=100)])
     assert "exit" not in ev
