@@ -30,8 +30,9 @@ It consumes :class:`LapStats` (the diagnosis) and never touches telemetry.
 
 from __future__ import annotations
 
+import math
 import statistics
-from dataclasses import dataclass, field, replace
+from dataclasses import asdict, dataclass, field, replace
 from enum import Enum
 
 from ..i18n import current_language
@@ -305,6 +306,61 @@ class Decision:
     confirm_base: bool = False
 
 
+@dataclass(frozen=True)
+class SetupReport:
+    """Quale assetto c'e' in macchina, come l'ha riconosciuto il motore ai box.
+
+    Lo costruisce il motore dall'impronta (`engineer/fingerprint.py`), dal vivo
+    in piazzola o all'uscita dalla corsia box. Le stringhe arrivano gia' in
+    parole (`fingerprint.describe`, «TC 6 invece di 3»): questo modulo non
+    importa `fingerprint` e non rifa' il confronto, decide soltanto.
+
+    ``state`` e' l'esito del riconoscimento (``match``, ``ambiguous``,
+    ``unsaved``, ``unknown``) e ``name`` il file riconosciuto. ``changed`` e'
+    cosa e' cambiato rispetto all'uscita prima, vuoto se niente o se HONE ha
+    scritto in quella sosta. ``expected`` e' il file che HONE ha scritto o che
+    il pilota ha scelto, ``expected_ok`` se l'impronta gli corrisponde sui campi
+    certi (None se non si sa), ``expected_diff`` dove non gli corrisponde e
+    ``psi_doubt`` dove non gli corrispondono le pressioni a freddo, che sono
+    solo un indizio. ``unsaved_diff`` e' la differenza dal file piu' vicino.
+    """
+
+    state: str
+    name: str | None = None
+    probable: bool = False
+    changed: str = ""
+    expected: str | None = None
+    expected_ok: bool | None = None
+    expected_diff: str = ""
+    psi_doubt: str = ""
+    unsaved_diff: str = ""
+
+    def to_dict(self) -> dict:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, d: dict | None) -> "SetupReport":
+        """Il contrario di `to_dict`; quello che non torna resta al suo default."""
+        d = d if isinstance(d, dict) else {}
+
+        def text(key: str) -> str:
+            v = d.get(key)
+            return v if isinstance(v, str) else ""
+
+        def name(key: str) -> str | None:
+            v = d.get(key)
+            return v if isinstance(v, str) and v else None
+
+        ok = d.get("expected_ok")
+        return cls(state=name("state") or "unknown", name=name("name"),
+                   probable=d.get("probable") is True, changed=text("changed"),
+                   expected=name("expected"),
+                   expected_ok=ok if isinstance(ok, bool) else None,
+                   expected_diff=text("expected_diff"),
+                   psi_doubt=text("psi_doubt"),
+                   unsaved_diff=text("unsaved_diff"))
+
+
 # --- the profile contract --------------------------------------------------
 
 class WorkPhase:
@@ -392,6 +448,12 @@ _TEMP_BIAS_C = 3.0
 #: hanno detto -0,5 e -0,6 per -0,8 previsti (risposta buona) e +2,2 per +0,5
 #: (13 click scritti al posto di 5, sopra il file sbagliato).
 _BASE_PSI = 0.8
+
+#: Il ripartitore: quanto vale un click del file (frazione, «circa 0,2 %») e
+#: mezzo click, la tolleranza fra due risposte. Copiati da `fingerprint` e non
+#: importati: questo modulo decide, il confronto coi file lo fa il motore.
+_BIAS_STEP = 0.002
+_BIAS_TOL = 0.001
 
 
 # Decision messages, per language; resolved with the active app language at the
@@ -676,6 +738,52 @@ _DECISION_MSG = {
         "en": "The change had no measurable effect",
         "it": "La modifica non ha avuto un effetto misurabile",
     },
+    # L'assetto in macchina, riconosciuto ai box (`setup_seen`). Le differenze
+    # ({changed}, {diff}, {unsaved_diff}, {psi_doubt}) arrivano gia' in parole
+    # («TC 6 invece di 3»). Niente due punti davanti all'elenco: e' una regola
+    # del tono (`tests/tono.py`), quindi l'elenco sta in una frase sua.
+    # R1: cambiato senza che HONE abbia scritto niente.
+    "setup_changed": {
+        "en": "You changed the setup since the last stint. You now have "
+              "{changed}. I'm starting the baseline again.",
+        "it": "Hai cambiato assetto rispetto allo stint di prima. Ora hai "
+              "{changed}. Rifaccio la base.",
+    },
+    # R2: all'uscita dopo una scrittura, il file non e' quello scritto.
+    "setup_wrong": {
+        "en": "At the pit exit the setup wasn't the one I wrote ({name}). You "
+              "have {diff}. In the pits, load {name}.",
+        "it": "All'uscita dai box l'assetto non è quello che ho scritto ({name}). "
+              "Hai {diff}. Ai box carica {name}.",
+    },
+    # …e poi lo e'. Dice il limite: i campi certi non separano due file HONE
+    # che differiscono solo nelle pressioni, e quelle restano a fine prova.
+    "setup_right": {
+        "en": "TC, ABS and engine map now match {name}. I'll check the "
+              "pressures at the end of the test.",
+        "it": "Ora TC, ABS e mappa sono quelli di {name}. Le pressioni le "
+              "controllo a fine prova.",
+    },
+    "setup_psi_doubt": {
+        "en": " The cold pressures don't look like those of {name} ({psi_doubt}).",
+        "it": " Le pressioni a freddo non sembrano quelle di {name} ({psi_doubt}).",
+    },
+    # R3: un assetto che non e' fra i file. Si misura, ai box non si scrive.
+    "setup_unsaved": {
+        "en": "The setup in the car isn't one of the saved files. You have "
+              "{unsaved_diff}. If you turned the knobs, put them back as in the "
+              "file. If it's a new setup, save it in the garage under a name "
+              "and load it.",
+        "it": "L'assetto in macchina non è fra i file salvati. Hai "
+              "{unsaved_diff}. Se hai girato le manopole, rimettile come nel "
+              "file; se è un assetto nuovo, in garage salvalo con un nome e "
+              "caricalo.",
+    },
+    "setup_saved": {
+        "en": "{name} is now in the car, so I can write the pit changes.",
+        "it": "In macchina ora c'è {name}, quindi le modifiche ai box le posso "
+              "scrivere.",
+    },
 }
 
 # Il ripristino nomina la modifica provata fra virgolette (`ProposedChange.named`).
@@ -850,6 +958,13 @@ def _signed_psi(v: float, lang: str) -> str:
     return text + " psi"
 
 
+def _finite(v) -> float | None:
+    """Un numero vero (non un booleano, non infinito), o None."""
+    if isinstance(v, bool) or not isinstance(v, (int, float)):
+        return None
+    return float(v) if math.isfinite(v) else None
+
+
 # --- the engine ------------------------------------------------------------
 
 @dataclass
@@ -876,6 +991,10 @@ class _Active:
     #: dopo una modifica ai box apre lo stint successivo; uno ancora dopo vuol
     #: dire che il pilota e' rientrato a meta' prova.
     stint_at_apply: int = 0
+    #: Le pressioni a freddo all'uscita non erano quelle del file scritto,
+    #: gia' in frase: un indizio, non un fermo. Va in coda al contatore fino
+    #: al verdetto, e con la prova se ne va.
+    psi_doubt: str = ""
 
 
 _AXIS_WORDS = {"front": {"en": "Front", "it": "anteriore"},
@@ -979,6 +1098,32 @@ class RaceEngineer:
         self._stint_lap = 0
         #: L'ultimo giro ha aperto uno stint (vedi `observe`).
         self._last_settling = False
+        #: Le modifiche al volo (``AV``) tenute dopo l'ultima scrittura ai box:
+        #: sono in macchina e in nessun file. Il motore le somma al file quando
+        #: lo confronta con l'impronta, e le scrive nel file dopo. Non va su
+        #: disco: domani si riparte da un file caricato.
+        self.carry: list[AtomicChange] = []
+        #: Lo scarto del ripartitore fra la lettura del gioco e i click del
+        #: file, imparato solo dalle risposte del pilota (`learn_bias`); None
+        #: prima della prima risposta, e dopo una che non concordava finche'
+        #: un'altra non la conferma. Va su disco con lo stato.
+        self.bias_offset: float | None = None
+        #: Una risposta che non concordava con quella di prima, in attesa di
+        #: un'altra che la confermi.
+        self.bias_pending: float | None = None
+        #: R2: all'uscita dopo una scrittura l'assetto non era il file scritto.
+        #: La prova resta aperta e la base buona; finche' il file giusto non
+        #: si vede (o il pilota non risponde) `observe` ripete questa.
+        self._held_wrong: Decision | None = None
+        self._wrong_name = ""
+        #: Cosa HONE ha scritto ai box dall'ultima uscita: "" niente,
+        #: "change" una modifica (da controllare all'uscita, R2), "restore" un
+        #: ripristino. Una scrittura vuol dire che il cambio all'uscita e'
+        #: quello scritto, non un cambio non chiesto (R1).
+        self._box_write = ""
+        #: R3: la differenza dal file piu' vicino quando l'assetto in macchina
+        #: non e' un file salvato, o None. Le modifiche ai box non si scrivono.
+        self._unsaved: str | None = None
 
     # -- memoria fra sessioni ----------------------------------------------
     def state(self) -> dict:
@@ -987,7 +1132,8 @@ class RaceEngineer:
         **Cosa c'e'**: a che fase eravamo, quale rimedio tocca per ogni sintomo,
         quali sintomi hanno esaurito i rimedi, e i click gia' spesi su ogni leva
         (che e' un budget: senza, l'assetto puo' scivolare via una sessione alla
-        volta). E il nome di una modifica applicata e mai giudicata.
+        volta). E il nome di una modifica applicata e mai giudicata, e lo
+        scarto del ripartitore imparato dalle risposte del pilota.
 
         **Cosa NON c'e', di proposito**: la finestra di giri. Sono misure, e due
         sessioni non sono confrontabili — asfalto, benzina e gomme sono altri.
@@ -1013,6 +1159,8 @@ class RaceEngineer:
             # La modifica per nome, che e' come la cita il messaggio di domani.
             "unjudged": pending.named if pending is not None else "",
             "hot_per_click": dict(self.hot_per_click),
+            "bias_offset": self.bias_offset,
+            "bias_pending": self.bias_pending,
         }
 
     def restore(self, state: dict | None) -> None:
@@ -1051,6 +1199,10 @@ class RaceEngineer:
                     and not isinstance(k, bool)
                     and _HOT_PER_CLICK[0] <= k <= _HOT_PER_CLICK[1]):
                 self.hot_per_click[ax] = float(k)
+        for key in ("bias_offset", "bias_pending"):
+            val = _finite(state.get(key))
+            if val is not None:
+                setattr(self, key, val)
 
     # -- public API --------------------------------------------------------
     @property
@@ -1078,8 +1230,8 @@ class RaceEngineer:
         if self._held_revert is not None or (
                 self._pending is not None and self._pending_is_revert):
             out["stage"] = "restore"
-        elif self._held_base is not None:
-            pass        # la base si rifa' dopo la risposta: nessun contatore
+        elif self._held_base is not None or self._held_wrong is not None:
+            pass        # si aspetta il file o la risposta: nessun contatore
         elif self.active is not None:
             # Una prova di pressione conta i giri della lettura, non tutti i
             # giri buoni: lo stesso numero che dice il messaggio.
@@ -1117,6 +1269,10 @@ class RaceEngineer:
         # assetto che non sappiamo quale sia, e non fa base.
         if self._held_base is not None:
             return self._held_base
+        # …e per il file sbagliato all'uscita (R2): la prova e' in pausa, e un
+        # giro guidato con l'assetto che non e' quello scritto non la giudica.
+        if self._held_wrong is not None:
+            return self._held_wrong
 
         # A dry↔wet switch invalidates everything measured either side of it: a
         # baseline driven on slicks and a re-test driven on wets are two
@@ -1206,6 +1362,8 @@ class RaceEngineer:
             # bank it: the bad change was never recorded, so undoing it must not
             # touch the click budget. Just resume collecting fresh laps so the next
             # remedy's baseline is measured on the restored setup, not the bad one.
+            if self._pending.tag == "BOX" and not self._box_write:
+                self._box_write = "restore"
             self.active = None
             self.window = []
             self._pending = None
@@ -1232,6 +1390,11 @@ class RaceEngineer:
         # Una modifica ai box e' uno stint nuovo anche se la benzina non sale.
         if self._pending.tag == "BOX":
             self._last_fuel = 0.0
+            # Il file nuovo porta anche le modifiche al volo tenute (le scrive
+            # chi scrive il file, dal blocco della proposta): da qui in poi
+            # sono nel file, e all'uscita si controlla che sia quello (R2).
+            self.carry = []
+            self._box_write = "change"
         # The reference shifts when the setup changes — restart the window so the
         # verdict is measured only on post-change laps.
         self.window = []
@@ -1342,6 +1505,15 @@ class RaceEngineer:
         sized = self._sized(change)
         if sized is None:
             return self._cannot_write(change)
+        # R3: un file scritto partendo da un file che non e' in macchina da'
+        # un assetto che nessuno ha guidato. Le leve al volante passano.
+        if change.tag == "BOX" and self._unsaved is not None:
+            # Niente in sospeso, nemmeno la proposta di prima: questa porta e'
+            # quella che la sostituisce, e a schermo resta il rifiuto.
+            if not self._pending_is_revert:
+                self._pending = None
+                self._pending_prediction = None
+            return self._unsaved_decision()
         change = sized
         self._pending = change
         self._pending_is_revert = False
@@ -1565,6 +1737,7 @@ class RaceEngineer:
                 tail = _skip_tail(self._skipped, lang)
                 if self._last_settling and self._stint > a.stint_at_apply + 1:
                     tail += _msg("pressure_restart", lang)
+                tail += a.psi_doubt
                 return Decision(DecisionKind.EVALUATING,
                                 _msg("evaluating", lang,
                                      laps=_laps_left(self._reading_need(), lang))
@@ -1576,7 +1749,7 @@ class RaceEngineer:
             return self._judge_pressure(a, reading)
         if a.laps_seen < self.min_stable:
             need = self.min_stable - a.laps_seen
-            tail = _skip_tail(self._skipped, lang)
+            tail = _skip_tail(self._skipped, lang) + a.psi_doubt
             return Decision(DecisionKind.EVALUATING,
                             _msg("evaluating", lang, laps=_laps_left(need, lang))
                             + tail, tail=tail)
@@ -1601,26 +1774,214 @@ class RaceEngineer:
         self._pending = None
         self._pending_is_revert = False
         self._pending_prediction = None
+        self._held_wrong = None
         self._held_base = Decision(DecisionKind.STAND_DOWN, moved,
                                    confirm_base=True)
         return self._held_base
 
-    def base_confirmed(self) -> Decision | None:
+    def base_confirmed(self, *, expected: bool | None = None) -> Decision | None:
         """Il pilota ha detto ai box quale assetto ha caricato.
 
-        Scioglie la decisione tenuta da `_base_moved` e rifa' la base da zero:
-        contano solo i giri dopo questa risposta. Il giro d'uscita dai box non
-        arriva qui, perche' il registratore non registra la corsia box (vedi
-        `recorder._recording_allowed`). Senza niente da sciogliere torna None.
+        Scioglie la decisione tenuta da `_base_moved` (o da un cambio non
+        chiesto a prova aperta) e rifa' la base da zero: contano solo i giri
+        dopo questa risposta. Il giro d'uscita dai box non arriva qui, perche'
+        il registratore non registra la corsia box (vedi
+        `recorder._recording_allowed`).
+
+        Con la prova in pausa per il file sbagliato (R2) ``expected`` dice se
+        il file scelto e' quello scritto: si', la prova riprende sulla base di
+        prima; no, o non si sa, la prova non si giudica e la base si rifa'.
+        Una scelta esplicita toglie sempre il blocco dell'assetto non salvato
+        (R3): il pilota ha detto su quale file scrivere. Senza niente da
+        sciogliere torna None.
         """
-        if self._held_base is None:
-            return None
-        self._held_base = None
+        was_unsaved = self._unsaved is not None
+        self._unsaved = None
+        if self._held_wrong is not None:
+            if expected is True and self.active is not None:
+                return self._resume_test(self._wrong_name, "")
+            self._held_wrong = None
+            self.active = None
+            return self._fresh_base()
+        if self._held_base is not None:
+            self._held_base = None
+            return self._fresh_base()
+        if was_unsaved and self._base_ready():
+            return self._advance()
+        return None
+
+    def _fresh_base(self) -> Decision:
         self.window = []
         self._offs = []
         self._skipped = None
         return Decision(DecisionKind.COLLECT,
                         _msg("collect", n=self.min_stable, have=0))
+
+    # -- l'assetto in macchina, riconosciuto ai box ----------------------------
+    def carry_clicks(self) -> dict[str, int]:
+        """I click delle modifiche al volo tenute, per leva: {"brakeBias": 1}."""
+        out: dict[str, int] = {}
+        for c in self.carry:
+            out[c.param] = out.get(c.param, 0) + c.delta_clicks
+        return {k: v for k, v in out.items() if v}
+
+    def learn_bias(self, observed: float, clicks: int) -> None:
+        """Il pilota ha detto quale file ha caricato: impara lo scarto del
+        ripartitore fra la lettura del gioco e i click di quel file.
+
+        Solo dalla risposta, mai da un file unico compatibile: alla prima
+        serata su una pista nuova un predefinito del gioco puo' coincidere su
+        TC, ABS e mappa con l'unico file della cartella. Una risposta che non
+        concorda (piu' di mezzo click) butta la taratura, e ne serve un'altra
+        che concordi con lei per riaverla.
+        """
+        got = _finite(observed)
+        if got is None or got < 0 or isinstance(clicks, bool) \
+                or not isinstance(clicks, int):
+            return                    # -1.0: il gioco non l'ha esposto
+        off = round(got - _BIAS_STEP * clicks, 6)
+        if self.bias_offset is not None:
+            if abs(off - self.bias_offset) <= _BIAS_TOL:
+                return
+            self.bias_offset, self.bias_pending = None, off
+            return
+        if self.bias_pending is None:
+            # La prima risposta: non c'e' niente con cui non concordare.
+            self.bias_offset = off
+        elif abs(off - self.bias_pending) <= _BIAS_TOL:
+            self.bias_offset, self.bias_pending = off, None
+        else:
+            self.bias_pending = off
+
+    def setup_seen(self, report: SetupReport, *, at_exit: bool) -> Decision | None:
+        """Il motore ha riconosciuto l'assetto in macchina: dal vivo, fermo ai
+        box (``at_exit`` falso), o all'uscita dalla corsia box.
+
+        Le regole che toccano la base agiscono solo all'uscita, quando
+        l'assetto e' quello con cui il pilota guidera'; dal vivo si scioglie
+        soltanto (il file giusto caricato in garage non aspetta un giro).
+
+        * R2: la prima uscita dopo una modifica scritta da HONE deve essere il
+          file scritto. Se no la prova si mette in pausa, coi giri azzerati e
+          la base di prima intatta, finche' il file giusto non si vede.
+        * R1: un assetto cambiato senza una scrittura di HONE in quella sosta
+          rifa' la base; a prova aperta la prova non si giudica.
+        * R3: un assetto che non e' un file blocca le modifiche ai box.
+
+        Torna la decisione nuova, o None se non cambia niente.
+        """
+        was_unsaved = self._unsaved is not None
+        unsaved = report.state == "unsaved"
+        self._unsaved = (report.unsaved_diff or "") if unsaved else None
+        wrote = self._box_write
+        if at_exit:
+            self._box_write = ""
+
+        if self._held_wrong is not None:
+            if report.expected_ok is True and self.active is not None:
+                return self._resume_test(report.expected or self._wrong_name,
+                                         report.psi_doubt)
+            if at_exit and report.expected_ok is False:
+                return self._pause_test(report)
+            return None
+        if at_exit and wrote == "change" and self.active is not None:
+            if report.expected_ok is False and report.expected:
+                return self._pause_test(report)
+            if report.expected_ok is True:
+                self.active.psi_doubt = self._psi_doubt(report.expected,
+                                                        report.psi_doubt)
+        elif at_exit and not wrote and report.changed:
+            return self._setup_changed(report.changed)
+
+        if (unsaved and not was_unsaved and self._pending is not None
+                and not self._pending_is_revert and self._pending.tag == "BOX"):
+            # Proposta prima di vedere l'assetto: non si scrive piu'.
+            self._pending = None
+            self._pending_prediction = None
+            return self._unsaved_decision()
+        if was_unsaved and not unsaved:
+            if self._base_ready():
+                return self._advance()
+            if report.name and not self._held():
+                kind = (DecisionKind.EVALUATING if self.active is not None
+                        else DecisionKind.COLLECT)
+                return Decision(kind, _msg("setup_saved", name=report.name))
+        return None
+
+    def _held(self) -> bool:
+        return (self._held_revert is not None or self._held_base is not None
+                or self._held_wrong is not None)
+
+    def _base_ready(self) -> bool:
+        """La base c'e' e niente e' in prova o in attesa: `_advance` puo' parlare."""
+        return (not self._held() and self.active is None
+                and len(self.window) >= self.min_stable
+                and self.window[-1].wet is not True)
+
+    def _psi_doubt(self, name: str | None, doubt: str) -> str:
+        if not doubt or not name:
+            return ""
+        return _msg("setup_psi_doubt", name=name, psi_doubt=doubt)
+
+    def _unsaved_decision(self) -> Decision:
+        return Decision(DecisionKind.STAND_DOWN,
+                        _msg("setup_unsaved", unsaved_diff=self._unsaved or ""))
+
+    def _pause_test(self, report: SetupReport) -> Decision:
+        """R2: la prova resta aperta, ma i giri col file sbagliato non contano.
+
+        Non e' `_hold_base`: la base e' stata misurata prima della modifica,
+        sull'assetto giusto, e resta buona. Si azzerano solo i giri di prova.
+        """
+        a = self.active
+        if a is None:
+            self._held_wrong = None
+            return self._fresh_base()
+        a.laps_seen = 0
+        a.psi_doubt = ""
+        self.window = []
+        self._offs = []
+        self._skipped = None
+        self._wrong_name = report.expected or self._wrong_name
+        self._held_wrong = Decision(
+            DecisionKind.STAND_DOWN,
+            _msg("setup_wrong", name=self._wrong_name, diff=report.expected_diff),
+            confirm_base=True)
+        return self._held_wrong
+
+    def _resume_test(self, name: str, psi_doubt: str) -> Decision:
+        """R2 sciolta: in macchina c'e' il file scritto, la prova riparte."""
+        a = self.active
+        self._held_wrong = None
+        self.window = []
+        self._offs = []
+        self._skipped = None
+        a.laps_seen = 0
+        # Il file e' stato caricato ai box: il giro dopo apre uno stint, anche
+        # se la benzina non sale, e non e' «sei rientrato a meta' prova».
+        self._last_fuel = 0.0
+        a.stint_at_apply = self._stint
+        a.psi_doubt = self._psi_doubt(name, psi_doubt)
+        return Decision(DecisionKind.EVALUATING,
+                        _msg("setup_right", name=name) + a.psi_doubt)
+
+    def _setup_changed(self, changed: str) -> Decision:
+        """R1: l'assetto e' cambiato e HONE non ha scritto niente."""
+        if self._held_revert is not None:
+            return self._held_revert      # il ripristino aspetta ancora il si'
+        if self._held_base is not None:
+            return self._held_base        # la domanda e' gia' fatta
+        lang = current_language()
+        said = _msg("setup_changed", lang, changed=changed)
+        if self.active is not None:
+            return self._hold_base(said + " " + _msg("base_ask", lang))
+        self.window = []
+        self._offs = []
+        self._skipped = None
+        # Una proposta misurata sull'assetto di prima non vale per questo.
+        self._pending = None
+        self._pending_prediction = None
+        return Decision(DecisionKind.COLLECT, said, tail=said)
 
     def _base_moved(self, a: "_Active", lang: str, after: dict) -> str:
         """Le gomme hanno risposto alla modifica di pressione come previsto?
@@ -1883,6 +2244,9 @@ class RaceEngineer:
         for c in change.changes:
             key = (c.param, c.slot)
             self.applied_clicks[key] = self.applied_clicks.get(key, 0) + c.delta_clicks
+        # Una manopola girata e tenuta e' in macchina e in nessun file.
+        if change.tag == "AV":
+            self.carry.extend(change.changes)
 
     def _has_signal(self, phase: WorkPhase) -> bool:
         """La misura ha visto almeno un sintomo di questa fase nella finestra?"""
