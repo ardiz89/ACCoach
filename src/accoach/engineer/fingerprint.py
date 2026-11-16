@@ -199,6 +199,8 @@ def _val(d: FieldDiff, x: float, lang: str) -> str:
         return fmt_num(x * 100, 1, lang, "%")
     if d.field.startswith("psi_"):
         return fmt_num(x, 1, lang, "psi")
+    if d.field == "emap":       # l'HUD di ACC mostra la mappa da 1: solo le parole
+        return str(int(x) + 1)
     return str(int(x))
 
 

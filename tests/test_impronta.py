@@ -123,3 +123,10 @@ def test_reading_round_trips_through_dict():
     r = _r(cold_psi=(25.5, 25.0, 24.7, 24.4))
     assert Reading.from_dict(json.loads(json.dumps(r.to_dict()))) == r
     assert FieldDiff("tc", 6, 3).field == "tc"
+
+
+def test_engine_map_is_worded_as_the_hud_shows_it_but_kept_raw():
+    d = changed(_r(emap=2), _r(emap=3))
+    assert d == (FieldDiff("emap", 3, 2),)          # i valori restano grezzi
+    assert describe(d, "it") == "mappa motore 4 invece di 3"
+    assert describe(d, "en") == "engine map 4 instead of 3"
