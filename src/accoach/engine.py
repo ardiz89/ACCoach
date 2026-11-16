@@ -63,6 +63,10 @@ from .track import Corner, detect_corners
 
 _log = get_logger("coach")
 
+#: Le manopole dell'impronta (`fingerprint.changed`): quello che una scrittura
+#: ai box di HONE non tocca mai.
+_DIALS = ("tc", "abs", "emap", "bias")
+
 # When you're not on a representative flying lap — delta has ballooned because
 # you're crawling, recovering from an off, or parked — only acute safety cues
 # (lock-up, wheelspin, slides, fuel) are worth speaking. Technique and setup
@@ -583,6 +587,10 @@ class CoachEngine:
         #: allora un cambio fra entrata e uscita non e' un cambio non chiesto.
         #: Si azzera a ogni uscita dai box.
         self._hone_touched = False
+        #: …e in particolare HONE ha scritto una modifica ai box in questa
+        #: sosta. Una scrittura ai box non gira le manopole: TC, ABS, mappa e
+        #: ripartitore diversi fra entrata e uscita restano un cambio.
+        self._box_written = False
         #: Il gioco dell'Ingegnere di adesso: su Assetto Corsa l'impronta tace
         #: e le proposte non portano le manopole tenute.
         self._acc = False
@@ -1564,8 +1572,15 @@ class CoachEngine:
                 expected_diff = describe(certain, lang)
                 psi_doubt = describe(psi, lang)
         moved = ""
-        if w.entry is not None and not self._hone_touched:
-            moved = describe(changed(w.entry, now), lang)
+        if w.entry is not None:
+            diffs = changed(w.entry, now)
+            if not self._hone_touched:
+                moved = describe(diffs, lang)
+            elif self._box_written:
+                # Le manopole soltanto: le tenute sono gia' sul volante, e il
+                # file scritto le porta. Diverse vuol dire base e prova su due
+                # elettroniche (l'08/11: base a TC 6, file scritto a TC 3).
+                moved = describe([d for d in diffs if d.field in _DIALS], lang)
         name = m.best if m.state == "match" else None
         report = SetupReport(
             state=m.state, name=name, probable=m.probable, changed=moved,
@@ -1618,6 +1633,7 @@ class CoachEngine:
         finally:
             if event == "exit":
                 self._hone_touched = False      # la prossima sosta riparte
+                self._box_written = False
 
     def tick(self, now: float) -> EngineState:
         if self._feed is not None:
@@ -1673,7 +1689,7 @@ class CoachEngine:
             self.pitwatch.reset()
             self._loaded = None
             self._expected_path = self._written_path = None
-            self._hone_touched = False
+            self._hone_touched = self._box_written = False
             self._acc = bool(snap.is_acc)
             # The pit calls: fresh latches, and this track's measured pit entry
             # (see coaching/pitcall.py — it's learned, so a track never visited
@@ -1743,6 +1759,8 @@ class CoachEngine:
             if pending is not None and (getattr(pending, "tag", "") == "BOX"
                                         or snap.in_pit or snap.in_pit_lane):
                 self._hone_touched = True
+            if pending is not None and getattr(pending, "tag", "") == "BOX":
+                self._box_written = True
             # …e la modifica e' sulla macchina anche se il pilota chiude adesso.
             self._save_engineer_state()
 

@@ -321,9 +321,11 @@ class SetupReport:
     ``changed`` e' la differenza fra la lettura all'entrata in corsia box
     (l'ultimo frame in pista prima della sosta) e quella di adesso: all'uscita
     la lettura dell'uscita, dal vivo quella da fermo. Il motore la lascia vuota
-    quando HONE ha applicato una modifica (ai box o al volo) in quella sosta.
-    Le modifiche al volo fatte in pista sono gia' nella lettura d'entrata, e
-    qui non compaiono mai.
+    quando HONE ha applicato una modifica (ai box o al volo) in quella sosta,
+    tranne in una sosta con una scrittura ai box: li' passa la differenza
+    delle sole manopole (TC, ABS, mappa, ripartitore), che una scrittura ai
+    box non tocca. Le modifiche al volo fatte in pista sono gia' nella lettura
+    d'entrata, e qui non compaiono mai.
 
     ``expected`` e' il file che HONE ha scritto o che il pilota ha scelto,
     ``expected_ok`` se l'impronta gli corrisponde sui campi certi (None se non
@@ -492,6 +494,8 @@ _BASE_PSI = 0.8
 #: importati: questo modulo decide, il confronto coi file lo fa il motore.
 _BIAS_STEP = 0.002
 _BIAS_TOL = 0.001
+#: I due `_exit_check` che all'uscita ricontrollano il file scritto (R2).
+_CHECK_WRITTEN = ("written", "resumed")
 
 
 # Decision messages, per language; resolved with the active app language at the
@@ -1176,10 +1180,14 @@ class RaceEngineer:
         self._wrong_name = ""
         #: Cosa si sa dell'assetto che si vedra' alla prossima uscita: ""
         #: niente, e un cambio e' un cambio non chiesto (R1); "written" HONE
-        #: ha scritto una modifica (o il pilota ha appena caricato il file
-        #: scritto), e all'uscita si controlla che sia quello (R2); "known"
-        #: l'assetto e' noto per un'altra via (un ripristino scritto da HONE,
-        #: la risposta del pilota sulla pagina), e un cambio non e' R1.
+        #: ha scritto una modifica ai box in questa sosta, e all'uscita si
+        #: controlla che sia quello (R2) e che le manopole siano quelle della
+        #: base; "resumed" la prova in pausa e' ripresa sul file scritto (il
+        #: pilota l'ha caricato, o l'ha detto sulla pagina), e all'uscita si
+        #: ricontrolla il file ma il cambio dallo stint col file sbagliato non
+        #: conta; "known" l'assetto e' noto per un'altra via (un ripristino
+        #: scritto da HONE, la risposta del pilota sulla pagina), e un cambio
+        #: non e' R1.
         self._exit_check = ""
         #: R3: la differenza dal file piu' vicino quando l'assetto in macchina
         #: non e' un file salvato, o None. Le modifiche ai box non si scrivono.
@@ -1426,7 +1434,8 @@ class RaceEngineer:
             # bank it: the bad change was never recorded, so undoing it must not
             # touch the click budget. Just resume collecting fresh laps so the next
             # remedy's baseline is measured on the restored setup, not the bad one.
-            if self._pending.tag == "BOX" and self._exit_check != "written":
+            if (self._pending.tag == "BOX"
+                    and self._exit_check not in _CHECK_WRITTEN):
                 self._exit_check = "known"
             self.active = None
             self.window = []
@@ -1869,11 +1878,11 @@ class RaceEngineer:
         # Il pilota ha detto cosa ha caricato: all'uscita un cambio non e' una
         # sorpresa (R1). Una scrittura ancora da controllare resta da
         # controllare, e cosi' la prova che riprende sul file scritto.
-        if self._exit_check != "written":
+        if self._exit_check not in _CHECK_WRITTEN:
             self._exit_check = "known"
         if self._held_wrong is not None:
             if expected is True and self.active is not None:
-                self._exit_check = "written"
+                self._exit_check = "resumed"
                 return self._resume_test(self._wrong_name, "")
             self._exit_check = "known"
             self._held_wrong = None
@@ -1979,14 +1988,21 @@ class RaceEngineer:
                     # Ripresa ai box: all'uscita l'assetto e' cambiato
                     # rispetto allo stint col file sbagliato, e quel cambio e'
                     # il file scritto (R2 lo ricontrolla), non R1.
-                    self._exit_check = "written"
+                    self._exit_check = "resumed"
                 return resumed
             if at_exit and report.expected_ok is False:
                 return self._pause_test(report)
             return None
-        if at_exit and check == "written" and self.active is not None:
+        if at_exit and check in _CHECK_WRITTEN and self.active is not None:
             if report.expected_ok is False and report.expected:
                 return self._pause_test(report)
+            if report.expected_ok is True and check == "written" and report.changed:
+                # Il file scritto c'e', ma una scrittura ai box non tocca le
+                # manopole: se il motore le vede cambiate fra entrata e uscita
+                # (passa solo quelle, in una sosta con la scrittura) la base
+                # e' stata misurata con un'altra elettronica. L'08/11: base
+                # sul predefinito a TC 6, file scritto e caricato a TC 3.
+                return self._setup_changed(report.changed)
             if report.expected_ok is True:
                 self.active.psi_doubt = self._psi_doubt(report.expected,
                                                         report.psi_doubt)

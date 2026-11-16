@@ -268,7 +268,30 @@ def test_a_write_then_the_right_file_lets_the_test_run(rig):
     rig.drive(_snap("lane"), _snap("box", psi=HONE_8_COLD), _snap("lane"), _snap())
     assert rig.engineer.active is not None
     assert rig.engineer._held_wrong is None
+    assert rig.engineer._held_base is None
     assert rig.block()["confirm_base"] is False
+
+
+def test_a_write_on_other_electronics_than_the_base_holds_the_test(rig):
+    """L'08/11: la base misurata sul predefinito (TC 6), il pilota sceglie un
+    file sulla pagina, HONE scrive la modifica su quello e il pilota carica il
+    file scritto (TC 3). Il file e' quello giusto, ma la prova girerebbe su
+    un'altra elettronica della base: non si giudica."""
+    rig.drive(_snap(**PRESET), _snap("lane", **PRESET),
+              _snap("box", psi=HONE_8_COLD, **PRESET))
+    rig.eng.mark_base_confirmed(path=rig.path("IMOLA_0"))
+    rig.drive(_snap("box", psi=HONE_8_COLD, **PRESET))
+    rig.propose(_box_change())
+    rig.eng.mark_setup_applied(path=rig.path("HONE_8"))
+    rig.drive(_snap("box", psi=HONE_8_COLD, **PRESET),
+              _snap("box", psi=HONE_8_COLD), _snap("lane"), _snap())
+    block = rig.block()
+    assert block["kind"] == "stand_down" and block["confirm_base"] is True
+    assert "Hai cambiato assetto" in block["message"]
+    assert "TC 3 invece di 6" in block["message"]
+    assert "La prova in corso non la giudico" in block["message"]
+    assert rig.engineer.active is None
+    assert rig.engineer._held_base is not None
 
 
 def test_a_normal_stop_with_hot_tyres_does_not_doubt_the_written_file(rig):

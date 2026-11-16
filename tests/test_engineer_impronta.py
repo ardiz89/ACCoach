@@ -166,11 +166,29 @@ def test_a_change_during_a_test_is_not_judged():
 
 
 def test_a_change_in_the_stop_where_hone_wrote_is_not_a_surprise():
-    """La sosta in cui HONE ha scritto: il cambio e' quello scritto."""
+    """La sosta in cui HONE ha scritto: il cambio e' quello scritto, e il
+    motore non lo passa (``changed`` vuoto sulle pressioni)."""
     eng = _eng()
     _pressure_test(eng)
-    assert eng.setup_seen(_right(changed="TC 3 invece di 6"), at_exit=True) is None
+    assert eng.setup_seen(_right(), at_exit=True) is None
     assert eng.active is not None
+
+
+def test_a_write_on_other_electronics_than_the_base_is_not_judged():
+    """Una scrittura ai box non tocca TC, ABS, mappa e ripartitore: se il
+    motore li vede diversi fra entrata e uscita (``changed``) la base e la
+    prova sono su due elettroniche diverse. L'08/11: base sul predefinito a
+    TC 6, file scritto e caricato a TC 3. La prova non si giudica."""
+    eng = _eng()
+    _pressure_test(eng)
+    d = eng.setup_seen(_right(changed="TC 3 invece di 6"), at_exit=True)
+    assert d.kind is DecisionKind.STAND_DOWN and d.confirm_base is True
+    assert d.message == (
+        "Hai cambiato assetto rispetto allo stint di prima. Ora hai TC 3 invece "
+        "di 6. La prova in corso non la giudico e non la registro. Ai box dimmi "
+        "quale assetto hai caricato, poi rifaccio la base.")
+    assert eng.active is None
+    assert eng.observe(_lap()) is d
 
 
 def test_a_proposal_waiting_on_the_old_setup_is_dropped():
