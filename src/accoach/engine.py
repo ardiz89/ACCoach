@@ -1351,19 +1351,31 @@ class CoachEngine:
         setup; se no None, e il segnale vale come senza percorso.
 
         Come `_safe` nell'app web: il motore legge quel file, e una pagina non
-        gli fa leggere altro.
+        gli fa leggere altro. Prima si guarda il testo (assoluto, niente NUL,
+        niente percorso di rete, dentro una radice), e solo allora si chiede
+        al disco: `resolve` su un `\\\\altro-pc\\...` andrebbe in rete, e su un
+        NUL puo' sollevare un ValueError che uscirebbe dal tick. La radice vale
+        com'e' scritta o risolta: l'app web manda percorsi risolti (`_safe`).
         """
-        if not isinstance(raw, str) or not raw.strip():
+        import os
+        if (not isinstance(raw, str) or not raw.strip() or "\x00" in raw
+                or raw.startswith(("\\\\", "//"))):
             return None
         try:
-            p = Path(raw).resolve()
+            p = Path(raw)
+            if not p.is_absolute():
+                return None
+            here = os.path.normcase(os.path.normpath(raw))
             for root in self.setup_roots:
-                try:
-                    p.relative_to(Path(root).resolve())
-                    return raw
-                except ValueError:
+                real = root.resolve()
+                if not any(here.startswith(os.path.join(
+                        os.path.normcase(os.path.normpath(str(r))), ""))
+                        for r in (root, real)):
                     continue
-        except (OSError, RuntimeError):
+                # …e i collegamenti: il file risolto resta dentro la radice.
+                p.resolve().relative_to(real)
+                return raw
+        except (OSError, RuntimeError, ValueError):
             return None
         return None
 
@@ -1373,7 +1385,7 @@ class CoachEngine:
         try:
             return (os.path.normcase(str(Path(a).resolve()))
                     == os.path.normcase(str(Path(b).resolve())))
-        except (OSError, RuntimeError):
+        except (OSError, RuntimeError, ValueError):
             return a == b
 
     def _carry_payload(self, d) -> list[dict] | None:
@@ -1619,6 +1631,9 @@ class CoachEngine:
                 self._engineer_decision = freed
             self._save_engineer_state()
         if apply_setup and self._engineer is not None:
+            # Quello che l'Ingegnere aveva in attesa, prima che `mark_applied`
+            # lo prenda: decide se la sosta e' di HONE (sotto).
+            pending = getattr(self._engineer, "_pending", None)
             self._engineer.mark_applied()
             # The change has been written: stop calling the driver in for it.
             # Without this the proposal — which the engineer keeps re-emitting
@@ -1628,7 +1643,13 @@ class CoachEngine:
             # Da qui il file atteso in macchina e' quello scritto; senza un
             # percorso non lo sappiamo, e quello di prima non vale piu'.
             self._expected_path = self._written_path = self._setup_path(applied_path)
-            self._hone_touched = True
+            # HONE ha cambiato l'assetto solo se ha preso una sua modifica: ai
+            # box sempre, al volo solo se confermata in corsia («Fatto» in
+            # pista e' gia' nella lettura d'entrata, come per le manopole).
+            # Una scrittura senza niente in attesa sono le modifiche del pilota.
+            if pending is not None and (getattr(pending, "tag", "") == "BOX"
+                                        or snap.in_pit or snap.in_pit_lane):
+                self._hone_touched = True
             # …e la modifica e' sulla macchina anche se il pilota chiude adesso.
             self._save_engineer_state()
 

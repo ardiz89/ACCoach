@@ -361,6 +361,68 @@ def test_a_dial_turned_on_track_does_not_cover_a_change_in_the_box(rig):
     assert "TC 5 invece di 4" in rig.block()["message"]
 
 
+def test_the_done_button_on_track_does_not_cover_a_change_in_the_box(rig):
+    """«Fatto» sulla pagina per un TC +1 girato in pista: la sosta dopo non e'
+    di HONE, e il TC girato a mano ai box e' R1."""
+    rig.drive(_snap())
+    rig.propose(_av("tC1"))
+    rig.eng.mark_setup_applied()
+    rig.drive(_snap(tc=4))                            # il segnale arriva in pista
+    assert rig.engineer.active is not None
+    rig.drive(_snap("lane", tc=4), _snap("box", tc=5, psi=HONE_8_COLD),
+              _snap("lane", tc=5), _snap(tc=5))
+    assert rig.engineer._held_base is not None
+    assert "TC 5 invece di 4" in rig.block()["message"]
+
+
+def test_the_done_button_in_the_box_is_hone_s_change(rig):
+    rig.drive(_snap())
+    av = _av("tC1")
+    rig.propose(av)
+    rig.drive(_snap("lane"), _snap("box", psi=HONE_8_COLD))
+    rig.eng.mark_setup_applied()
+    rig.drive(_snap("box", tc=4, psi=HONE_8_COLD), _snap("lane", tc=4), _snap(tc=4))
+    assert rig.engineer.active is not None and rig.engineer.active.change is av
+    assert rig.engineer._held_base is None
+
+
+def test_a_write_with_nothing_proposed_is_not_hone_s_change(rig):
+    """Il pilota scrive le sue modifiche dall'editor di HONE: la pagina avvisa
+    il server, ma l'Ingegnere non aveva proposto niente. Il TC da 3 a 5 e' un
+    cambio non chiesto."""
+    rig.drive(_snap())
+    rig.engineer.window = [_lap() for _ in range(3)]
+    rig.drive(_snap("lane"), _snap("box", psi=HONE_8_COLD))
+    rig.eng.mark_setup_applied(path=rig.path("HONE_8"))
+    rig.drive(_snap("box", tc=5, psi=HONE_8_COLD), _snap("lane", tc=5), _snap(tc=5))
+    block = rig.block()
+    assert block["kind"] == "collect"
+    assert "TC 5 invece di 3" in block["message"]
+    assert rig.engineer.window == []
+
+
+@pytest.mark.parametrize("bad", ["nul", "fuori", "relativo", "unc"])
+@pytest.mark.parametrize("route", ["applied", "base"])
+def test_a_bad_path_from_a_page_is_no_path(rig, tmp_path, bad, route):
+    """Un percorso con un NUL, fuori dalle radici, relativo o di rete: il
+    segnale vale come senza percorso, e il tick non salta."""
+    other = tmp_path / "altrove"
+    other.mkdir()
+    (other / "HONE_8.json").write_text(json.dumps(_doc(HONE_8)), encoding="utf-8")
+    raw = {"nul": str(rig.dir / "HONE\x008.json"),
+           "fuori": str(other / "HONE_8.json"),
+           "relativo": "HONE_8.json",
+           "unc": r"\\pc-altro\setups\HONE_8.json"}[bad]
+    rig.drive(_snap(), _snap("lane"), _snap("box", psi=HONE_8_COLD))
+    mark = (rig.eng.mark_setup_applied if route == "applied"
+            else rig.eng.mark_base_confirmed)
+    mark(path=raw)
+    rig.drive(_snap("box", psi=HONE_8_COLD))
+    assert rig.eng._expected_path is None
+    assert rig.eng._written_path is None
+    assert rig.engineer.bias_offset is None
+
+
 def test_a_file_reloaded_by_hand_drops_the_wheel_changes(rig):
     rig.drive(_snap(tc=4))
     rig.engineer._record(_av("tC1"))                  # TC +1 tenuto: 3 + 1
