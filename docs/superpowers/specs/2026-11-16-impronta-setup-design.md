@@ -196,8 +196,10 @@ Il blocco dell'Ingegnere nel frame porta `loaded`: esito, nome del file (o dei
 candidati), valori letti. La pagina Ingegnere e il tablet mostrano una riga sola
 («In macchina: HONE_8», «Assetto non salvato», «Non riconosciuto») e:
 
-- se la pagina non ha un file di partenza e l'impronta ne riconosce uno, quello è
-  preselezionato nella tendina della domanda che c'è già (il tasto conferma resta);
+- se la pagina non ha un file di partenza e l'impronta ne riconosce uno, nella
+  tendina della domanda che c'è già quel file porta «· in macchina». Non si
+  preseleziona: nella pagina di oggi scegliere una voce **è** la risposta, quindi una
+  preselezione risponderebbe al posto del pilota *[mia scelta, scrivendo il piano]*;
 - se il file di partenza della pagina e il file riconosciuto sono diversi, la pagina
   lo dice prima di scrivere.
 
