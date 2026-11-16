@@ -260,15 +260,19 @@ pista. Sotto la strada dell'Ingegnere, nella pagina Ingegnere e sul tablet,
 trovi una riga sola con l'esito. Se non ha ancora niente da dire, la riga non
 c'è.
 
-- **«In macchina c'è HONE_8.»** Un file solo torna coi valori letti. Se non è
-  del tutto sicuro, dice «probabilmente». Nella tendina del file di partenza la
+- **«In macchina c'è HONE_8.»** Un file torna coi valori letti. Se più
+  file sono compatibili e uno solo è vicino sulle pressioni, dice
+  «probabilmente». Nella tendina del file di partenza la
   voce porta «· in macchina». HONE non la sceglie al posto tuo. La domanda
   «Quale assetto hai caricato?» resta tua, e scegliere una voce è la risposta.
 - **«Assetto non salvato».** In macchina c'è qualcosa che non è uguale a nessun
   file. Hai girato una manopola dopo aver caricato l'assetto, oppure non l'hai
   salvato dal garage. Salvalo dal garage, poi scegli quel file come partenza.
-- **«Non riconosciuto».** I valori letti tornano con più file, oppure con
-  nessuno. Scegli tu il file di partenza dalla tendina, come hai sempre fatto.
+  Intanto l'Ingegnere continua a misurare, ma non propone modifiche ai box
+  finché non riconosce un file o non ne scegli uno nella pagina.
+- **«Non riconosciuto».** Più file tornano allo stesso modo, oppure non
+  c'è niente da confrontare, per esempio con la cartella vuota o in un gioco
+  senza questa lettura. Scegli tu il file di partenza dalla tendina, come hai sempre fatto.
 
 Se il file su cui stai lavorando non è quello riconosciuto, accanto al suo nome
 compare un avviso. Dice «In macchina c'è X, stai modificando Y». Non blocca la

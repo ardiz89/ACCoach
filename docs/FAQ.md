@@ -311,14 +311,19 @@ It compares them with the files in the folder for this car and track. Under the
 engineer's road, on the Engineer page and on the tablet, one line tells you the
 result. With nothing to say yet, the line isn't there.
 
-- **"The car has HONE_8."** One file matches the values read. If it isn't
-  completely sure it says "probably". In the starting setup list the entry
+- **"The car has HONE_8."** A file matches the values read. If several
+  files are compatible and only one is close on the pressures, it says
+  "probably". In the starting setup list the entry
   carries "· in the car". HONE doesn't pick it for you. The question "Which
   setup did you load?" stays yours, and choosing an entry is the answer.
 - **"Setup not saved".** What is in the car matches no file. You turned a knob
   after loading the setup, or never saved it from the garage. Save it from the
   garage, then choose that file as the starting setup.
-- **"Not recognised".** The values match more than one file, or none. Choose
+  Meanwhile the engineer keeps measuring, but proposes no pit changes until it
+  recognises a file or you choose one on the page.
+- **"Not recognised".** Several files match equally well, or there is
+  nothing to compare, for example an empty folder or a game without this
+  reading. Choose
   the starting setup from the list yourself, as you always did.
 
 If the file you are working on is not the recognised one, a warning appears next to

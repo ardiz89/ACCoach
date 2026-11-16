@@ -289,7 +289,8 @@ def test_guide_and_faq_explain_the_three_answers():
     # GUIDA.md e' la guida italiana, docs/FAQ.md quella inglese.
     for name, heading, needles in (
             ("GUIDA.md", "### L'Ingegnere riconosce l'assetto ai box",
-             ("In macchina c'è", "Assetto non salvato", "Non riconosciuto", "· in macchina")),
+             ("In macchina c'è", "Assetto non salvato", "Non riconosciuto", "· in macchina",
+              "pressioni", "non propone modifiche ai box", "niente da confrontare")),
             ("docs/FAQ.md", "### The engineer recognises the setup in the pits",
              ("The car has", "Setup not saved", "Not recognised", "· in the car"))):
         text = (_ROOT / name).read_text(encoding="utf-8")
