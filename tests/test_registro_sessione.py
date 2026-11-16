@@ -13,7 +13,7 @@ from accoach.engineer.session_log import SessionLog
 from accoach.recording import Lap
 from accoach.recording.lap import SessionType
 from test_impronta_motore import (  # noqa: F401 - la fixture e i frame
-    CAR, HONE_8_COLD, TRACK, _Rig, _box_change, _italiano, _snap,
+    CAR, HONE_8_COLD, TRACK, _Rig, _av, _box_change, _italiano, _snap,
 )
 
 
@@ -106,9 +106,22 @@ def test_the_log_has_no_personal_data(rig, tmp_path):
     assert str(tmp_path) not in text and str(tmp_path).replace("\\", "\\\\") not in text
     applied = next(r for r in rows if r["kind"] == "applied")
     assert applied["path"] == f"{CAR}/Imola/HONE_8.json"
+    assert applied["source"] == "page"
     base = next(r for r in rows if r["kind"] == "base")
     assert base["path"] == f"{CAR}/Imola/HONE_7.json"
     assert "expected" in base
+
+
+def test_a_change_turned_at_the_wheel_leaves_an_applied_line(rig, tmp_path):
+    """Il TC +1 proposto e girato sul volante: la modifica e' applicata quanto
+    una scritta dalla pagina, e il rigioco col registro deve vederla."""
+    rig.drive(_snap())
+    rig.propose(_av("tC1"))
+    rig.drive(_snap(), _snap(tc=4))
+    assert rig.engineer.active is not None
+    applied = [r for r in _rows(tmp_path) if r["kind"] == "applied"]
+    assert len(applied) == 1
+    assert applied[0]["source"] == "wheel" and applied[0]["path"] is None
 
 
 def test_the_base_row_says_whether_the_brake_bias_was_learned(rig, tmp_path):

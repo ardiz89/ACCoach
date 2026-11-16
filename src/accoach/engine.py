@@ -1026,6 +1026,9 @@ class CoachEngine:
         if self.wheelwatch.update(snap):
             self._engineer.mark_applied()
             self._engineer_done_sig = sig
+            # Applicata quanto una scritta dalla pagina: senza la riga, il
+            # rigioco col registro non la vedrebbe e la prova dopo slitta.
+            self._write_log("applied", path=None, source="wheel")
             # Girata ai box e' HONE che cambia l'assetto in questa sosta. In
             # pista no: la lettura d'entrata in corsia la contiene gia'.
             if snap.in_pit or snap.in_pit_lane:
@@ -1731,7 +1734,8 @@ class CoachEngine:
             # percorso non lo sappiamo, e quello di prima non vale piu'.
             self._expected_path = self._written_path = self._setup_path(applied_path)
             self._write_log(
-                "applied", path=self._rel_setup(self._written_path))
+                "applied", path=self._rel_setup(self._written_path),
+                source="page")
             # HONE ha cambiato l'assetto solo se ha preso una sua modifica: ai
             # box sempre, al volo solo se confermata in corsia («Fatto» in
             # pista e' gia' nella lettura d'entrata, come per le manopole).

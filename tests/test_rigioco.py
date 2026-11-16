@@ -98,6 +98,19 @@ def test_a_base_row_brings_the_dials_of_the_choice():
     assert eng._unsaved is None
 
 
+def test_an_applied_row_from_the_wheel_counts_like_one_from_the_page():
+    from accoach.engineer.core import AtomicChange, ProposedChange
+    from accoach.engineer.factory import engineer_for
+    from accoach.engineer.replay import _feed
+
+    for source in ("wheel", "page"):
+        eng = engineer_for(CAR, TRACK, is_acc=True)
+        eng._pending = ProposedChange(changes=(AtomicChange("tC1", None, 1),),
+                                      rationale="TC +1.", phase_label="x", tag="AV")
+        _feed(eng, {"kind": "applied", "path": None, "source": source})
+        assert eng.active is not None, source
+
+
 def test_the_command_is_in_the_help():
     import accoach.__main__ as cli
     assert "replay-engineer" in cli._HELP_TOOLS
