@@ -131,6 +131,10 @@ Validation — these read the live game, so the sim must be running:
   verify-box                 validate ACC's pit menu fields and tyre wear (live)
   verify-sectors             validate the sim's real sector data (live)
   verify-diag [car] [track]  offline FP-rate check of the lap diagnosis
+  replay-engineer <track> <YYYYMMDD> [car]
+                             replay an evening's recorded laps through the race
+                             engineer, one line per lap (read-only);
+                             --laps <dir> laps folder, --log <file> session log
 
   import-reference <file>    import a lap as a clean reference (cold-start seed)
   setup <list|show|bump|undo>  read and edit an ACC setup file, no game running
@@ -221,6 +225,9 @@ def main() -> None:
     elif cmd in ("verify-diag", "diag"):
         from .diagnostics import run_diag
         run_diag(rest)
+    elif cmd == "replay-engineer":
+        from .engineer.replay import main as run_replay
+        run_replay(rest)
     elif cmd in ("import-reference", "import-ref"):
         from .diagnostics import run_import_reference
         run_import_reference(rest)
