@@ -31,6 +31,26 @@ from datetime import datetime, timezone
 #: call, not a measurement — see the module docstring for which way it errs.
 SESSION_GAP_S = 20 * 60
 
+#: Sotto questa velocità l'auto è ferma.
+STOP_KMH = 5.0
+#: Un giro con l'auto ferma per più di così non misura la guida. Il gioco lo dà
+#: valido e senza uscite, ma il tempo è quello di una sosta. A Brands Hatch, il
+#: 25/10, un giro da 3:32 era fermo 106 s alla Druids; nessuno degli altri 14
+#: giri di quella sera stava fermo nemmeno un decimo. Una testacoda ripresa
+#: subito resta sotto la soglia: quella è guida.
+STOP_MAX_MS = 5000
+
+
+def stopped_ms(samples) -> int:
+    """Quanto tempo del giro l'auto sta sotto ``STOP_KMH``, in ms."""
+    return sum(b.t_ms - a.t_ms for a, b in zip(samples, samples[1:])
+               if a.speed_kmh < STOP_KMH and b.t_ms > a.t_ms)
+
+
+def stood_still(lap) -> bool:
+    """Il giro ha una sosta: non entra nei numeri della guida."""
+    return stopped_ms(lap.samples) > STOP_MAX_MS
+
 
 def parse_utc(text: str | None) -> datetime | None:
     """The recorder's timestamp, or ``None`` if it isn't one.

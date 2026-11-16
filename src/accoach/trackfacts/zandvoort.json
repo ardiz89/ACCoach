@@ -1,0 +1,52 @@
+{
+ "disputed": [],
+ "facts": [],
+ "single": [
+  {
+   "car_class": "gt3_presunta",
+   "corner": "Tarzanbocht",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "break at the 100 meter board",
+     "start_s": 50.8,
+     "url": "https://www.youtube.com/watch?v=s9CaabDN1G0"
+    }
+   ],
+   "state": "singolo",
+   "type": "brake",
+   "value": "board:100"
+  },
+  {
+   "car_class": "gt3_presunta",
+   "corner": "Tarzanbocht",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "shift down to second gear",
+     "start_s": 54.64,
+     "url": "https://www.youtube.com/watch?v=s9CaabDN1G0"
+    }
+   ],
+   "state": "singolo",
+   "type": "gear",
+   "value": "2"
+  },
+  {
+   "corner": "Hugenholtzbocht",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "for an early apex close to the curb",
+     "start_s": 122.88,
+     "url": "https://www.youtube.com/watch?v=s9CaabDN1G0"
+    }
+   ],
+   "state": "singolo",
+   "type": "apex",
+   "value": "early"
+  }
+ ],
+ "track": "zandvoort",
+ "version": 3
+}

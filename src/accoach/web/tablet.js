@@ -149,8 +149,9 @@
     $("tr-brk").textContent = pct(brk);
     // Positivo a sinistra (serialize.py). Quasi dritto: solo il numero.
     var v = pct(Math.abs(steer));
-    $("tr-steer").textContent = steer > 0.02 ? tf("trace.steerLeft", { v: v })
-                              : (steer < -0.02 ? tf("trace.steerRight", { v: v }) : v);
+    // positivo a destra, come lo da' il gioco (misurato sul verso delle curve)
+    $("tr-steer").textContent = steer > 0.02 ? tf("trace.steerRight", { v: v })
+                              : (steer < -0.02 ? tf("trace.steerLeft", { v: v }) : v);
     traceDraw(t0);
   }
 
@@ -166,7 +167,9 @@
     var ctx = cv.getContext("2d");
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, w, h);
-    var pad = 4, ph = h - 2 * pad;
+    // In fondo la fascia dell'overlay: ambra col trail braking, grigia nel
+    // veleggio. Sopra di lei la griglia e le tre linee.
+    var pad = 4, ribbon = 7, ph = h - 2 * pad - ribbon - 3;
     function y(v) { return pad + ph * (1 - Math.max(0, Math.min(1, v))); }
     // griglia 0 / 50 / 100 %; la riga di mezzo e' anche lo sterzo dritto
     ctx.strokeStyle = "#232B35";
@@ -181,6 +184,14 @@
     var end = t1 == null ? now() : t1;
     var k = 0.5 / trace.steerScale;
     function x(ts) { return w * (1 - (end - ts) / TRACE_WINDOW_MS); }
+    var ry = h - pad - ribbon;
+    for (var r = 0; r + 1 < hist.length; r++) {
+      var kind = pedalKind(hist[r][1], hist[r][2], hist[r][3]);
+      if (!kind) continue;
+      ctx.fillStyle = kind === "trail" ? "#FFB020" : "#5A6573";
+      var rx0 = x(hist[r][0]), rx1 = x(hist[r + 1][0]);
+      ctx.fillRect(rx0, ry, Math.max(1, rx1 - rx0 + 1), ribbon);
+    }
     function draw(pick, colour, width) {
       ctx.strokeStyle = colour; ctx.lineWidth = width;
       ctx.lineJoin = "round"; ctx.lineCap = "round";
@@ -192,9 +203,252 @@
       ctx.stroke();
     }
     // lo sterzo per primo, cosi' i pedali gli restano sopra
-    draw(function (s) { return 0.5 + s[3] * k; }, "#E8EDF2", 1.5);
+    draw(function (s) { return 0.5 - s[3] * k; }, "#E8EDF2", 1.5);   // sinistra in alto
     draw(function (s) { return s[2]; }, "#FF4D5E", 2.5);
     draw(function (s) { return s[1]; }, "#34E08A", 2.5);
+  }
+
+  // ---- come l'overlay: trail, veleggio, barre col riferimento ---------------
+  // Le soglie di overlay.py (`_PEDAL_EPS`, `_TRAIL_STEER`): un test le
+  // confronta, perche' il tablet e l'overlay dicano TRAIL nello stesso punto.
+  var PEDAL_EPS = 0.04;
+  var TRAIL_STEER = 0.10;
+
+  // "trail" col freno premuto e il volante girato, "coast" senza pedali, "".
+  function pedalKind(thr, brk, steer) {
+    if (brk > PEDAL_EPS && Math.abs(steer) >= TRAIL_STEER) return "trail";
+    if (thr <= PEDAL_EPS && brk <= PEDAL_EPS) return "coast";
+    return "";
+  }
+
+  // Lo stato adesso, come `_pedal_tag` dell'overlay: [tipo, secondi]. I
+  // secondi contano solo per il veleggio (da quanto dura), al decimo.
+  // `hist` = [[ms, gas, freno, sterzo], ...], dal piu' vecchio.
+  function pedalTag(hist, nowMs) {
+    if (!hist || !hist.length) return ["", 0];
+    var lastS = hist[hist.length - 1];
+    var kind = pedalKind(lastS[1], lastS[2], lastS[3]);
+    if (kind !== "coast") return [kind, 0];
+    var start = lastS[0];
+    for (var i = hist.length - 1; i >= 0; i--) {
+      if (hist[i][1] <= PEDAL_EPS && hist[i][2] <= PEDAL_EPS) start = hist[i][0];
+      else break;
+    }
+    return ["coast", Math.round((nowMs - start) / 100) / 10];
+  }
+
+  function renderTag() {
+    var el = $("tr-tag");
+    var tag = pedalTag(trace.hist, now());
+    if (tag[0] === "trail") {
+      el.textContent = t("tablet.trail");
+      el.className = "t-tag trail";
+    } else if (tag[0] === "coast") {
+      el.textContent = tf("tablet.coast", { s: fmtN(tag[1], 1, "s") });
+      el.className = "t-tag coast";
+    } else {
+      el.textContent = "";
+      el.className = "t-tag";
+    }
+  }
+
+  // Il distacco dal riferimento, come la prima riga dell'overlay.
+  function renderDelta(d) {
+    var el = $("tr-delta");
+    if (!d || d.text == null) { el.textContent = ""; el.className = "t-delta"; return; }
+    el.textContent = String(d.text).replace(".", window.HoneI18n && window.HoneI18n.lang === "it" ? "," : ".");
+    el.className = "t-delta " + (d.ahead ? "ahead" : "behind");
+  }
+
+  // Freno, gas e sterzo adesso, con la tacca ciano del giro di riferimento in
+  // questo punto: `_draw_pedal_bars` dell'overlay, su una tela.
+  function barsDraw(st) {
+    var cv = $("t-bars");
+    if (!cv || !cv.offsetWidth) return;
+    var dpr = window.devicePixelRatio || 1;
+    var w = cv.offsetWidth, h = cv.offsetHeight;
+    if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) {
+      cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+    }
+    var ctx = cv.getContext("2d");
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+    var hist = trace.hist;
+    var s = hist.length ? hist[hist.length - 1] : [0, 0, 0, 0];
+    var d = (st && st.delta) || {};
+    var rowH = Math.max(10, Math.floor((h - 16) / 3)), gap = 8, x0 = 2, tw = w - 4;
+    var k = (tw / 2) / trace.steerScale, cx = x0 + tw / 2;
+    var rows = [
+      ["#FF4D5E", x0, x0 + tw * Math.max(0, Math.min(1, s[2])), d.ref_brake],
+      ["#34E08A", x0, x0 + tw * Math.max(0, Math.min(1, s[1])), d.ref_throttle],
+      ["#E8EDF2", cx, cx + Math.max(-tw / 2, Math.min(tw / 2, s[3] * k)), null]
+    ];
+    for (var i = 0; i < rows.length; i++) {
+      var ry = i * (rowH + gap);
+      ctx.fillStyle = "#232B35";
+      ctx.fillRect(x0, ry, tw, rowH);
+      var f0 = Math.min(rows[i][1], rows[i][2]), f1 = Math.max(rows[i][1], rows[i][2]);
+      if (f1 - f0 >= 1) { ctx.fillStyle = rows[i][0]; ctx.fillRect(f0, ry, f1 - f0, rowH); }
+      if (num(rows[i][3])) {
+        var rx = x0 + tw * Math.max(0, Math.min(1, Number(rows[i][3])));
+        ctx.fillStyle = "#22D3CE";
+        ctx.fillRect(rx - 2, ry - 3, 4, rowH + 6);
+      }
+    }
+    // Lo sterzo dritto: la riga di mezzo.
+    ctx.fillStyle = "#5A6573";
+    ctx.fillRect(cx - 0.5, 2 * (rowH + gap), 1, rowH);
+  }
+
+  // ---- la mappa -------------------------------------------------------------
+  // La pista arriva una volta per auto e pista (/api/livemap); l'auto a ogni
+  // frame (`pos`). Tre zoom: la pista intera, e due che seguono l'auto, con il
+  // lato corto della mappa che copre 400 m o 120 m.
+  var ZOOM_M = { near: 400, close: 120 };
+  var map = { key: null, data: null, bounds: null, asked: null, zoom: "all",
+              lastPos: null, heading: null };
+
+  // Il riquadro di pista da mostrare: centro (cx, cz) e pixel per metro.
+  // `bounds` = [minX, minZ, maxX, maxZ], `car` = [x, z] o null.
+  function mapFrame(bounds, car, zoom, w, h) {
+    if (ZOOM_M[zoom] && car) {
+      return { cx: car[0], cz: car[1], scale: Math.min(w, h) / ZOOM_M[zoom] };
+    }
+    var bw = Math.max(1, bounds[2] - bounds[0]), bh = Math.max(1, bounds[3] - bounds[1]);
+    return { cx: (bounds[0] + bounds[2]) / 2, cz: (bounds[1] + bounds[3]) / 2,
+             scale: Math.min(w / bw, h / bh) * 0.92 };
+  }
+
+  function boundsOf(pts) {
+    var b = [Infinity, Infinity, -Infinity, -Infinity];
+    for (var i = 0; i < pts.length; i++) {
+      var p = pts[i];
+      if (p[0] < b[0]) b[0] = p[0];
+      if (p[1] < b[1]) b[1] = p[1];
+      if (p[0] > b[2]) b[2] = p[0];
+      if (p[1] > b[3]) b[3] = p[1];
+    }
+    return b;
+  }
+
+  function mapNote(key) {
+    var el = $("t-trackmap-note");
+    if (!key) { el.hidden = true; return; }
+    el.textContent = t(key);
+    el.hidden = false;
+  }
+
+  // Si chiede la pista quando cambiano auto o pista, e di nuovo a ogni giro
+  // finito finche' non c'e': il primo giro valido la crea.
+  function mapLoad(st) {
+    if (!st.car || !st.track) return;
+    var key = st.car + "|" + st.track;
+    var lap = st.lap && st.lap.completed;
+    if (key !== map.key) { map.key = key; map.data = null; map.bounds = null; map.asked = null; }
+    if (map.data || map.asked === lap) return;
+    map.asked = lap;
+    xhr("GET", "/api/livemap?car=" + encodeURIComponent(st.car)
+        + "&track=" + encodeURIComponent(st.track), null, function (err, data) {
+      if (key !== map.key) return;
+      if (err || !data || !data.line) { mapNote("tablet.map.none"); return; }
+      map.data = data;
+      map.bounds = boundsOf(data.edges ? data.edges.left.concat(data.edges.right) : data.line);
+      mapNote(data.edges ? null : "tablet.map.noEdges");
+    });
+  }
+
+  function mapDraw(st) {
+    var cv = $("t-trackmap");
+    if (!cv || !cv.offsetWidth) return;
+    var dpr = window.devicePixelRatio || 1;
+    var w = cv.offsetWidth, h = cv.offsetHeight;
+    if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) {
+      cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+    }
+    var ctx = cv.getContext("2d");
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+    if (!map.data) return;
+    var car = (st && st.pos && st.pos.length === 2) ? st.pos : null;
+    var f = mapFrame(map.bounds, car, map.zoom, w, h);
+    // Come la mappa del report (`mapXY`): le coordinate del gioco sono
+    // mancine, X si ribalta e +z va in alto, cosi' le curve girano dal verso
+    // che si vede dall'abitacolo.
+    function X(x) { return (f.cx - x) * f.scale + w / 2; }
+    function Y(z) { return h / 2 - (z - f.cz) * f.scale; }
+    function path(pts, from, to) {
+      ctx.beginPath();
+      for (var i = from; i < to; i++) {
+        if (i === from) ctx.moveTo(X(pts[i][0]), Y(pts[i][1]));
+        else ctx.lineTo(X(pts[i][0]), Y(pts[i][1]));
+      }
+    }
+    ctx.lineJoin = "round"; ctx.lineCap = "round";
+    var e = map.data.edges;
+    if (e) {
+      // L'asfalto, a tratti: un buco nei dati resta un buco (trackedges).
+      var cuts = [0].concat(e.breaks || []).concat([e.left.length]);
+      for (var c = 0; c + 1 < cuts.length; c++) {
+        var a = cuts[c], b = cuts[c + 1];
+        if (b - a < 2) continue;
+        ctx.beginPath();
+        for (var i = a; i < b; i++) {
+          if (i === a) ctx.moveTo(X(e.left[i][0]), Y(e.left[i][1]));
+          else ctx.lineTo(X(e.left[i][0]), Y(e.left[i][1]));
+        }
+        for (var j = b - 1; j >= a; j--) ctx.lineTo(X(e.right[j][0]), Y(e.right[j][1]));
+        ctx.closePath();
+        ctx.fillStyle = "#2A323D";
+        ctx.fill();
+        ctx.strokeStyle = "#8A95A3"; ctx.lineWidth = 1.5;
+        path(e.left, a, b); ctx.stroke();
+        path(e.right, a, b); ctx.stroke();
+      }
+      ctx.strokeStyle = "#3A4452"; ctx.lineWidth = 1;
+    } else {
+      // Senza bordi: il giro di riferimento, largo come una strada di 12 m
+      // quando lo zoom lo permette. La nota sotto dice che non e' la strada.
+      ctx.strokeStyle = "#2A323D"; ctx.lineWidth = Math.max(4, 12 * f.scale);
+      path(map.data.line, 0, map.data.line.length); ctx.stroke();
+      ctx.strokeStyle = "#5A6573"; ctx.lineWidth = 1.5;
+    }
+    path(map.data.line, 0, map.data.line.length); ctx.stroke();
+    if (!car) return;
+    // L'auto: il punto e la direzione in cui va, dalla posizione di prima.
+    if (map.lastPos) {
+      var dx = car[0] - map.lastPos[0], dz = car[1] - map.lastPos[1];
+      if (dx * dx + dz * dz > 0.25) { map.heading = [dx, dz]; map.lastPos = car; }
+    } else {
+      map.lastPos = car;
+    }
+    var px = X(car[0]), py = Y(car[1]);
+    if (map.heading) {
+      var hx = -map.heading[0], hy = -map.heading[1];   // X e Y ribaltati come sopra
+      var n = Math.sqrt(hx * hx + hy * hy) || 1;
+      hx /= n; hy /= n;
+      ctx.fillStyle = "#22D3CE";
+      ctx.beginPath();
+      ctx.moveTo(px + hx * 16, py + hy * 16);
+      ctx.lineTo(px - hy * 7, py + hx * 7);
+      ctx.lineTo(px + hy * 7, py - hx * 7);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.beginPath();
+    ctx.arc(px, py, 7, 0, 2 * Math.PI);
+    ctx.fillStyle = "#22D3CE"; ctx.fill();
+    ctx.strokeStyle = "#0B0E12"; ctx.lineWidth = 2; ctx.stroke();
+  }
+
+  function setZoom(z) {
+    map.zoom = z;
+    var ids = { all: "t-zoom-all", near: "t-zoom-near", close: "t-zoom-close" };
+    for (var k in ids) {
+      if (Object.prototype.hasOwnProperty.call(ids, k)) {
+        $(ids[k]).setAttribute("aria-pressed", k === z ? "true" : "false");
+      }
+    }
+    mapDraw(last);
   }
 
   // ---- l'ingegnere ----------------------------------------------------------
@@ -407,6 +661,20 @@
     xhr("POST", liveUrl("http://" + location.hostname + ":" + WS_PORT + "/engineer/applied"), {}, appliedRefused);
   }
 
+  // La risposta a «Quale assetto hai caricato nel gioco?». Il server la tiene
+  // come file di partenza per quell'auto e pista, cosi' un ricaricamento non
+  // ripropone il file di cui le gomme hanno detto di non fidarsi. Il motore
+  // scioglie la prova smentita e rifa' la base coi giri dopo l'uscita.
+  function sendAnswer() {
+    if (!bx.answer || !atBoxNow()) return;
+    var p = bx.answer;
+    bx.answer = null;
+    xhr("POST", "/api/setup/base", { path: p }, function (err) {
+      if (err) { bx.err = t("eng.loadErr") + err.detail; paintBox(); }
+    });
+    xhr("POST", liveUrl("http://" + location.hostname + ":" + WS_PORT + "/engineer/base"), {}, appliedRefused);
+  }
+
   // ---- la schermata dei box -------------------------------------------------
   // Il nome della via corta di engineer.js (`nextAutoName`): HONE_1, HONE_2…,
   // uno piu' del piu' alto gia' nella cartella. Ai box non si digita un nome.
@@ -434,10 +702,21 @@
   // chiedono solo quando cambia quello da cui dipendono, mai a ogni frame; i
   // numeri di sequenza scartano una risposta arrivata dopo una piu' nuova
   // (le leve di un file sotto il nome di un altro).
+  // Ogni quanto si richiede l'elenco degli assetti finche' e' vuoto.
+  var BASE_RETRY_MS = 3000;
   var bx = {
     car: "", track: "", combo: null,
-    baseSeq: 0, base: null, baseErr: "",
+    baseSeq: 0, base: null, baseErr: "", baseAt: 0,
     chosen: null,         // il file scelto dalla tendina; null = quello del server
+    // La domanda «Quale assetto hai caricato?» aperta: il server non sa su
+    // quale file lavorare (`confirm`), o le gomme non hanno risposto come la
+    // modifica prevedeva (`confirm_base`). Resta finche' il pilota non sceglie.
+    ask: false,
+    askedFor: null,       // il verdetto che ha gia' fatto la domanda una volta
+    // La risposta alla domanda, da dire al server e al motore. Parte solo da
+    // fermo ai box: e' li' che il file si ricarica, e il motore rifa' la base
+    // da quel momento (`sendAnswer`).
+    answer: null,
     pvKey: null, pvSeq: 0, pvChanges: null, preview: null, pvErr: "",
     confirm: null,        // {key, path, name, changes, av}: cio' che la conferma nomina
     writing: false,
@@ -466,6 +745,7 @@
 
   function basePath() {
     if (bx.chosen) return bx.chosen;
+    if (bx.ask) return null;
     return (bx.base && bx.base.base) || null;
   }
   function setupNames() {
@@ -476,6 +756,7 @@
 
   function loadBase() {
     var seq = ++bx.baseSeq;
+    bx.baseAt = now();
     xhr("GET", "/api/setup/base?car=" + encodeURIComponent(bx.car)
         + "&track=" + encodeURIComponent(bx.track), null, function (err, data) {
       if (seq !== bx.baseSeq) return;
@@ -485,6 +766,8 @@
       var still = false, s = (bx.base && bx.base.setups) || [];
       for (var i = 0; i < s.length; i++) if (s[i].path === bx.chosen) still = true;
       if (!still) bx.chosen = null;
+      // Il server non sa su che file lavorare: non si indovina, si chiede.
+      if (bx.base && bx.base.confirm && !bx.chosen) bx.ask = true;
       fillSelect();
       paintBox();
     });
@@ -495,6 +778,14 @@
   function fillSelect() {
     var sel = $("t-base"), s = (bx.base && bx.base.setups) || [], cur = basePath();
     sel.innerHTML = "";
+    // Con la domanda aperta la tendina parte vuota: una voce senza file, scelta.
+    if (!cur && bx.ask) {
+      var none = document.createElement("option");
+      none.value = "";
+      none.textContent = "";
+      none.selected = true;
+      sel.appendChild(none);
+    }
     for (var i = 0; i < s.length; i++) {
       var o = document.createElement("option");
       o.value = s[i].path;
@@ -575,11 +866,29 @@
     }
   }
 
+  // Un verdetto con `confirm_base`: le gomme non si sono mosse come previsto,
+  // forse il file di partenza non era quello in macchina. Si rifa' la domanda,
+  // una volta per verdetto: un ripristino torna uguale a ogni frame.
+  function askAgain(eng) {
+    if (!eng || !eng.confirm_base) return;
+    var k = String(eng.kind) + "|" + String(eng.message || "");
+    if (k === bx.askedFor) return;
+    bx.askedFor = k;
+    bx.ask = true;
+    bx.chosen = null;
+    fillSelect();
+  }
+
   // Le regole, a ogni frame: chiedere la base entrando in Assetto (o ai box) o
   // se cambiano auto e pista, l'anteprima se cambiano file o leve. Poi si
   // dipinge.
   function boxFrame(st, m, tab) {
     var atBox = m !== "off" && !!st.at_box;
+    // Prima di tutto il resto: il verdetto arriva a fine giro, in pista, e il
+    // frame dopo puo' non portarlo piu'. La domanda aspetta i box.
+    if (m !== "off") askAgain(st.engineer || null);
+    // Scelto in pista, si dice al primo frame fermo ai box.
+    if (m !== "off") sendAnswer();
     // Riparti dai box: il file scritto e l'errore erano di quella sosta.
     // Spento non conta come partenza ne' come sosta: box, spento, pista e'
     // ripartire lo stesso.
@@ -609,13 +918,20 @@
     var car = String(st.car || ""), track = String(st.track || "");
     var combo = car + "|" + track;
     if (combo !== bx.combo) {
+      // La domanda di un'altra auto o pista non vale qui: la rifa' il server.
+      if (bx.combo !== null) bx.ask = false;
       bx.combo = combo; bx.car = car; bx.track = track;
-      bx.chosen = null; bx.base = null;
+      bx.chosen = null; bx.base = null; bx.answer = null;
       // Il file scritto e l'errore erano di un'altra auto o pista.
       bx.done = null; bx.err = "";
       fillSelect();
       loadBase();
     } else if (entering) {
+      loadBase();
+    } else if (bx.base && !bx.base.setups.length && now() - bx.baseAt > BASE_RETRY_MS) {
+      // Su una pista nuova la cartella e' vuota finche' non salvi dal garage,
+      // e lo salvi proprio mentre sei qui (29/10, Zolder): l'elenco chiesto
+      // all'arrivo restava vuoto e la scritta non se ne andava piu'.
       loadBase();
     }
     var changes = boxChange(eng) ? changesFor(eng) : [];
@@ -657,7 +973,11 @@
     setHidden($("t-msg"), !msg);
 
     var setups = (bx.base && bx.base.setups) || [];
-    setHidden($("t-base-row"), !has);
+    // La domanda si vede anche senza una modifica: il file scelto ora e'
+    // quello su cui poggera' la prossima.
+    setHidden($("t-base-row"), !has && !bx.ask);
+    setText($("t-ask"), t("tablet.askBase"));
+    setHidden($("t-ask"), !bx.ask || !setups.length);
     setHidden($("t-base"), !setups.length);
     setHidden($("t-nobase"), !bx.base || setups.length > 0);
 
@@ -738,7 +1058,9 @@
     bx.confirm = null;
     bx.done = { name: (res && res.name) || "", hint: (res && res.reload_hint) || "",
                 key: c.av };
+    // Il file appena scritto e' quello da caricare: la domanda e' chiusa.
     bx.chosen = null;
+    bx.ask = false;
     postApplied();
     loadBase();
     paintBox();
@@ -769,6 +1091,17 @@
     setAttr($("t-tab-setup"), "data-mark", mark ? "1" : "0");
   }
 
+  // La benzina: la percentuale grande, sotto «≈ N giri». «–» quando il dato non c'e'.
+  function renderFuel(f) {
+    var pct = f && num(f.pct) ? fmtN(Math.round(f.pct), 0) : "–";
+    var laps = "–";
+    if (f && num(f.laps)) {
+      laps = tf(Number(f.laps) === 1 ? "tablet.fuelLap" : "tablet.fuelLaps", {n: String(f.laps)});
+    }
+    $("t-fuel").textContent = pct;
+    $("t-fuel-laps").textContent = laps;
+  }
+
   function render(st) {
     last = st;
     var m = mode(st);
@@ -794,6 +1127,7 @@
     var eng = st.engineer || null;
     $("t-speed").textContent = num(st.speed_kmh) ? fmtN(Math.round(st.speed_kmh), 0) : "–";
     $("t-gear").textContent = st.gear == null ? "–" : String(st.gear);
+    renderFuel(st.fuel);
     $("t-tc").textContent = aid(st.aids && st.aids.tc);
     $("t-abs").textContent = aid(st.aids && st.aids.abs);
     $("t-map").textContent = aid(st.aids && st.aids.engine_map);
@@ -801,6 +1135,11 @@
     // Il ridisegno di un tocco rifa' l'ultimo frame: un campione in piu' dei
     // pedali, con l'ora di adesso, sarebbe inventato.
     if (!tapping) tracePush(st);
+    renderTag();
+    renderDelta(st.delta);
+    barsDraw(st);
+    mapLoad(st);
+    mapDraw(st);
     renderRoad(eng);
     renderPhase(eng);
     renderAv(eng);
@@ -889,7 +1228,14 @@
     $("t-restored").onclick = confirmRestored;
     // Un altro file di partenza: l'anteprima si rifa' al frame dopo.
     $("t-base").onchange = function () {
+      var asking = bx.ask;
       bx.chosen = $("t-base").value || null;
+      if (bx.chosen) {
+        // Un file scelto con la domanda aperta e' la risposta.
+        if (asking) bx.answer = bx.chosen;
+        bx.ask = false;
+      }
+      sendAnswer();
       if (last) redraw();
     };
     // Cambio di lingua dalla pagina: i testi fissi li rifa' i18n.js, quelli
@@ -902,7 +1248,11 @@
     };
     if (window.HoneI18n) window.HoneI18n.applyStatic();
     if (!fullPageWorks()) $("t-full").hidden = true;
-    window.addEventListener("resize", function () { traceDraw(); });
+    $("t-zoom-all").onclick = function () { setZoom("all"); };
+    $("t-zoom-near").onclick = function () { setZoom("near"); };
+    $("t-zoom-close").onclick = function () { setZoom("close"); };
+    setZoom("all");
+    window.addEventListener("resize", function () { traceDraw(); barsDraw(last); mapDraw(last); });
     render(null);
     connect();
   }
@@ -912,7 +1262,8 @@
                         nextName: nextName, changesFor: changesFor,
                         offText: function (st) { return t(offKey(st)); },
                         leverText: leverText, fullPageWorks: fullPageWorks,
-                        stripText: stripText, msgText: msgText };
+                        stripText: stripText, msgText: msgText,
+                        pedalTag: pedalTag, mapFrame: mapFrame };
 
   // In node (i test) non c'e' la pagina: si carica solo `mode`.
   if (typeof document !== "undefined" && document && document.getElementById("tablet")) boot();

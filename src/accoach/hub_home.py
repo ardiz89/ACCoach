@@ -31,7 +31,7 @@ from .i18n import t
 from .logging_setup import get_logger
 from .telemetry.snapshot import format_lap_time
 from .textfmt import display_name, fmt_num
-from .theme import MONO
+from .theme import MONO, tip_text
 
 _log = get_logger("hub")
 
@@ -88,14 +88,19 @@ def load_home_data(laps_dir: Path | str | None = None,
     try:
         with LapCatalog(_catalog_path(laps_dir)) as cat:
             cat.sync(list_lap_files(laps_dir))
+            # L'ultima sessione e' l'ultima che hai guidato: un giro PRO appena
+            # importato portava la Home su un'auto e una pista mai provate.
             row = cat._conn.execute(
-                "SELECT car_model, track FROM lap ORDER BY recorded_utc DESC LIMIT 1"
+                "SELECT car_model, track FROM lap"
+                " WHERE COALESCE(source, 'own') <> 'pro'"
+                " ORDER BY recorded_utc DESC LIMIT 1"
             ).fetchone()
             if row is None:
                 return HomeData(status="empty")
             car, track = row["car_model"], row["track"]
 
-            laps = cat.laps_for(car, track)
+            laps = [r for r in cat.laps_for(car, track)
+                    if (r.get("source") or "own") != "pro"]
             valid_ms = [r["lap_time_ms"] for r in laps
                         if r["valid"] and r["lap_time_ms"] > 0]
             laps_count = len(valid_ms)
@@ -116,7 +121,19 @@ def load_home_data(laps_dir: Path | str | None = None,
 
             review_lap = load_lap(review_path)
             corners = detect_corners(reference_lap.samples)
-            debrief = build_lap_debrief(review_lap, reference, corners, lang)
+            # Gli stessi gesti migliori del report, o la Home e il report
+            # darebbero due classifiche diverse per lo stesso giro.
+            corner_refs = _corner_refs(cat, car, track, review_path, review_lap,
+                                       reference, corners, laps_dir)
+            try:
+                debrief = build_lap_debrief(review_lap, reference, corners, lang,
+                                            corner_refs=corner_refs)
+            except Exception:  # noqa: BLE001 - come il report: un bonus
+                if corner_refs is None:
+                    raise
+                _log.warning("home debrief with corner refs failed; main "
+                             "reference only", exc_info=True)
+                debrief = build_lap_debrief(review_lap, reference, corners, lang)
             # Friendly corner names — set on the losses exactly like the API
             # does, including the ones the driver typed: the Home saying
             # "Corner 7" where the report says "Sacramento" is the same app
@@ -154,6 +171,32 @@ def load_home_data(laps_dir: Path | str | None = None,
         # manda l'utente a guidare di più invece che a guardare i log.
         _log.warning("home data unavailable", exc_info=True)
         return HomeData(status="error")
+
+
+def _corner_refs(cat, car, track, review_path, review_lap, reference, corners,
+                 laps_dir):
+    """Il gesto migliore di ogni curva, con le guardie del report.
+
+    Solo se il riferimento della Home è quello che il report eleggerebbe per
+    questo giro, ed è tuo (`corner_pool.elected_own_reference`). Il percorso
+    del riferimento è quello che `find_reference_lap` ha appena caricato dal
+    catalogo. Un errore qui è None, cioè il solo principale: la Home non si
+    spegne per un bonus.
+    """
+    from .corner_pool import conditions_of, corner_bests_for, elected_own_reference
+    try:
+        rows = cat.laps_for(car, track)
+        review_row = next((r for r in rows if r["path"] == review_path), None)
+        if not elected_own_reference(cat, car, track, rows, review_row,
+                                     cat.best_reference_path(car, track)):
+            return None
+        return corner_bests_for(reference, corners, review_lap, car, track,
+                                laps_dir, conditions_of(review_row),
+                                review_path=review_path)
+    except Exception:  # noqa: BLE001 - senza gesto migliore vale il principale
+        _log.warning("home corner refs failed; main reference only",
+                     exc_info=True)
+        return None
 
 
 class _HomeWorker(QThread):
@@ -304,7 +347,7 @@ class HomePanel(QWidget):
 
         has_debrief = bool(data.debrief_text)
         self._cta_debrief.setEnabled(has_debrief)
-        self._cta_debrief.setToolTip("" if has_debrief else t("home.empty_body"))
+        self._cta_debrief.setToolTip("" if has_debrief else tip_text(t("home.empty_body")))
         # Senza giri, i bottoni sono quelli del primo passo.
         first = data.status == "empty"
         self._cta_drive.setVisible(first)

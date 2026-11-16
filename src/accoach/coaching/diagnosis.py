@@ -320,6 +320,7 @@ def build_lap_stats(lap: Lap, corners: list[Corner] | None = None,
         lock_segments=lock_segments,
         spin_segments=spin_segments,
         fuel_l=_mean_fuel(lap.samples),
+        road_temp=getattr(lap, "road_temp", 0.0) or 0.0,
         wet=_is_wet(lap),
     )
 

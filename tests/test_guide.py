@@ -209,3 +209,60 @@ def test_both_documents_are_shipped_in_the_exe(build):
         text = (_ROOT / delega.group(1)).read_text(encoding="utf-8")
     assert "GUIDA.md" in text
     assert "docs/FAQ.md" in text
+
+
+
+@pytest.mark.parametrize("lang,words", (
+    ("it", ("gesto", "migliore", "consiglio a voce", "delta")),
+    ("en", ("your best through", "voice advice", "delta")),
+))
+def test_the_overlay_section_says_what_the_live_coach_compares_with(lang, words):
+    """Dal vivo il consiglio e l'ultima curva usano il gesto migliore di ogni
+    curva, il delta no. La guida lo diceva solo per il report: chi guarda
+    l'overlay leggeva un numero d'ultima curva diverso dal delta senza sapere
+    perche'."""
+    doc = _DOCS[lang]
+    start = doc.index("## 4. ")
+    section = doc[start:doc.index("\n## ", start + 1)].lower()
+    for w in words:
+        assert w in section, f"manca «{w}» nella sezione dell'overlay ({lang})"
+
+
+# --- i gesti per curva e il grip per velocità (paragrafo del report) --------
+
+@pytest.mark.parametrize("lang,phrase", (
+    ("it", "Per ogni curva ne nomina una sola"),
+    ("en", "It names at most one gesture per corner"),
+))
+def test_the_guide_explains_the_corner_gestures(lang, phrase):
+    """La guida deve dire che il gesto è uno per curva e solo sopra il rumore."""
+    flat = " ".join(_DOCS[lang].split())
+    assert phrase in flat
+
+@pytest.mark.parametrize("lang,phrases", (
+    ("it", ("Per il gas conta anche il tratto subito dopo la curva",
+            "su quel giro l'ABS non si confronta",
+            "solo se da te sono di più")),
+    ("en", ("For the throttle the stretch just after the corner counts too",
+            "on that lap ABS isn't compared",
+            "only if you do more of them")),
+))
+def test_the_guide_says_the_after_stretch_the_stuck_abs_and_the_direction(lang, phrases):
+    """Il gas si misura anche dopo la curva, un canale ABS bloccato non si
+    confronta, e sterzo, gas e ABS si dicono in un verso solo."""
+    flat = " ".join(_DOCS[lang].split())
+    for p in phrases:
+        assert p in flat, p
+
+
+# --- lo sfondo della mappa (la pista vista dall'alto) -----------------------
+
+@pytest.mark.parametrize("lang,phrase", (
+    ("it", "vista dall'alto"),
+    ("en", "seen from above"),
+))
+def test_the_guide_says_the_map_has_the_track_seen_from_above(lang, phrase):
+    """Lo sfondo della mappa viene dai file di AC: la guida dice da dove, e che
+    sugli altri dispositivi la mappa resta senza."""
+    flat = " ".join(_DOCS[lang].split())
+    assert phrase in flat

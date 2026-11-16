@@ -263,7 +263,7 @@ def run_yaw(seconds: float | None = None) -> None:
     — the one assumption ``balance.py`` makes for oversteer detection (``_YAW_SIGN``).
 
     In a clean, grippy corner (off the brakes, no big slide) steering and yaw must
-    point the *same* way: turn left (steer > 0) and the car yaws left. If the data
+    point the *same* way: turn right (steer > 0) and the car yaws right. If the data
     shows them consistently opposite, ``_YAW_SIGN`` must be flipped to -1.
     """
     _utf8()
@@ -287,7 +287,7 @@ def run_yaw(seconds: float | None = None) -> None:
         if not clean_corner:
             return
         stats["agree" if s.steer_angle * s.yaw_rate > 0 else "disagree"] += 1
-        stats["left" if s.steer_angle > 0 else "right"] += 1
+        stats["right" if s.steer_angle > 0 else "left"] += 1
 
     seen = _sample_loop(on_sample, seconds, 0.02)
     _warn_if_no_live(seen)
@@ -485,33 +485,23 @@ def run_import_reference(argv: list[str] | None = None, laps_dir=None) -> None:
     _utf8()
     from pathlib import Path
 
-    from .recording import laps_root, load_lap, save_lap
+    from .i18n import t
+    from .recording import laps_root
+    from .recording.pro import describe, import_pro
 
     argv = sys.argv[1:] if argv is None else argv
     laps_dir = laps_dir or laps_root()
     if not argv:
-        print("Uso: python -m accoach import-reference <file.lap.json.gz>")
+        print("python -m accoach import-reference <file.lap.json.gz>")
         return
-    src = Path(argv[0])
-    if not src.exists():
-        print(f"File non trovato: {src}")
-        return
+    # La stessa regola e le stesse frasi del bottone dell'hub, nella lingua
+    # scelta: prima qui era tutto in italiano e senza dire l'esito.
     try:
-        lap = load_lap(src)
+        result = import_pro(Path(argv[0]), laps_dir)
     except Exception as e:   # noqa: BLE001
-        print(f"Giro illeggibile: {e}")
+        print(t("import.failed").format(err=e))
         return
-    if lap.lap_time_ms <= 0 or not lap.samples:
-        print("Giro non valido (tempo o campioni mancanti).")
-        return
-
-    lap.valid = True        # a reference must be a complete lap
-    lap.clean = True         # imported as a trusted clean reference
-    lap.source = "pro"       # a first-class benchmark level, not the driver's lap
-    lap.recorded_utc = ""    # let save_lap stamp it fresh
-    dest = save_lap(lap, laps_dir)
-    print(f"✓ Reference importato: {lap.car_model} / {lap.track} "
-          f"({format_lap_time(lap.lap_time_ms)}) → {dest.name}")
+    print(describe(result, t))
 
 
 def run_dryrun(seconds: float | None = None) -> None:
@@ -713,6 +703,55 @@ def _arg_value(argv: list[str], *names: str) -> str | None:
 
 if __name__ == "__main__":
     main()
+
+
+# --- ACC: il menu box ------------------------------------------------------
+
+# Offset ricavati dal manuale di ACC (v1.7.6) contando da `isValidLap`, l'unico
+# misurato (1408). Sono un calcolo: per questo si leggono solo qui, finche' il
+# comando `verify-box` non li ha visti muoversi col menu del gioco.
+_BOX_FIELDS = (
+    ("giri stimati", 1412, "f"), ("treno nel menu", 1532, "i"),
+    ("litri nel menu", 1536, "f"), ("psi AS", 1540, "f"), ("psi AD", 1544, "f"),
+    ("psi PS", 1548, "f"), ("psi PD", 1552, "f"), ("pioggia", 1560, "i"),
+    ("pioggia 10 min", 1564, "i"), ("pioggia 30 min", 1568, "i"),
+    ("treno montato", 1572, "i"), ("treno previsto", 1576, "i"),
+)
+
+
+def box_fields(raw: bytes) -> dict[str, float]:
+    """I campi del menu box dai byte grezzi della pagina grafica."""
+    import struct as _struct
+    return {name: round(_struct.unpack_from("<" + kind, raw, off)[0], 2)
+            for name, off, kind in _BOX_FIELDS if off + 4 <= len(raw)}
+
+
+def run_box(seconds: float | None = None) -> None:
+    """Controlla il menu box di ACC: cambia litri e treno e guarda se i numeri seguono.
+
+    Stampa una riga quando un valore cambia. Serve anche per l'usura delle gomme,
+    che il manuale elenca ma che non abbiamo mai visto, e per l'unita' del tempo
+    di sessione, su cui si basano i litri suggeriti.
+    """
+    _utf8()
+    print("Menu box. In pista, cambia litri e treno nel menu del gioco.")
+    print("Ctrl+C per fermare.\n")
+    state = {"last": None}
+
+    def on_sample(s, t) -> None:
+        raw = _acc_graphics_bytes(_BOX_FIELDS[-1][1] + 4)
+        if raw is None:
+            return
+        now = box_fields(raw)
+        if now == state["last"]:
+            return
+        state["last"] = now
+        wear = " ".join(f"{w:.2f}" for w in s.tyre_wear)
+        print(f"[{t:6.1f}s] {now}\n   tempo sessione={s.session_time_left_ms:.0f} "
+              f"serbatoio={s.max_fuel:.0f} usura={wear}", flush=True)
+
+    seen = _sample_loop(on_sample, seconds, 0.5)
+    _warn_if_no_live(seen)
 
 
 # --- ACC: trovare i campi della pioggia ------------------------------------

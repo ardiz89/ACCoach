@@ -55,6 +55,16 @@ _ACC_TRACK_LIMITS_UTC = datetime(2026, 7, 21, 15, 7, 43, tzinfo=timezone.utc)
 _ACC_COMPOUNDS = ("dry_compound", "wet_compound")
 
 
+def prefer_pro(own_ms: int | None, pro_ms: int) -> bool:
+    """Whether an imported PRO lap replaces your own reference.
+
+    Only when it is faster, or when you have no reference of your own yet:
+    the import hint promises exactly that, and a slower PRO lap would make
+    the coach measure you against a target you already beat. One rule for
+    the catalog and for the scan that stands in for it."""
+    return pro_ms > 0 and (own_ms is None or pro_ms < own_ms)
+
+
 def clean_verdict(clean: object, schema: int = 0, compound: str = "",
                   recorded_utc: str = "") -> int:
     """How much a stored ``clean`` flag is worth: -1 unknown / 0 dirty / 1 clean.
@@ -127,7 +137,7 @@ SAMPLE_FIELDS = (
     "speed_kmh",
     "throttle",      # 0..1
     "brake",         # 0..1
-    "steer_angle",   # -1..1 fraction of lock, +left
+    "steer_angle",   # -1..1 fraction of lock, +right (measured 03/11)
     "gear",          # "R" / "N" / "1".. as shown to the driver
     "rpm",
     "g_lat",         # lateral G

@@ -833,6 +833,9 @@ def test_a_result_far_from_the_promise_asks_to_check_the_loaded_setup():
     eng.mark_applied()
     for _ in range(4):
         d = eng.observe(_lap(press={"front": 27.98, "rear": 26.5}))
-    assert d.kind is DecisionKind.ACCEPTED
-    assert "setup" in d.message
+    # Non si giudica: si chiede ai box quale assetto e' in macchina
+    # (`_base_moved`), e la prova non entra ne' nel registro ne' nel budget.
+    assert d.kind is DecisionKind.STAND_DOWN and d.confirm_base is True
+    assert d.outcome is None
+    assert eng.applied_clicks == {}
     assert "front" not in eng.hot_per_click, "da uno scarto cosi' non si impara un passo"

@@ -1,0 +1,197 @@
+{
+ "disputed": [],
+ "facts": [
+  {
+   "car_class": "gt3_presunta",
+   "corner": "Corner 1",
+   "n": 2,
+   "sources": [
+    {
+     "quote": "shifting all the way down to first",
+     "start_s": 67.84,
+     "url": "https://www.youtube.com/watch?v=97GKxP0qIJQ"
+    },
+    {
+     "quote": "braking hard and then shifting all the way down into first gear",
+     "start_s": 124.64,
+     "url": "https://www.youtube.com/watch?v=PlJxrjJJd38"
+    }
+   ],
+   "type": "gear",
+   "value": "1"
+  }
+ ],
+ "single": [
+  {
+   "car_class": "gt3_presunta",
+   "corner": "Corner 1",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "That aligns with the 100 brake marker board as we come up towards this corner",
+     "start_s": 117.36,
+     "url": "https://www.youtube.com/watch?v=PlJxrjJJd38"
+    }
+   ],
+   "state": "singolo",
+   "type": "brake",
+   "value": "board:100"
+  },
+  {
+   "corner": "Corner 1",
+   "n": 1,
+   "sources": [
+    {
+     "car_class": "altra",
+     "quote": "be careful not to cut too much of the inside curb it can unsettle the",
+     "start_s": 121.36,
+     "url": "https://www.youtube.com/watch?v=T_pCJ4q_Z74"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "mistake",
+   "value": "be careful not to cut too much of the inside curb it can unsettle the"
+  },
+  {
+   "car_class": "gt3_presunta",
+   "corner": "Corner 4",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "shifting down to fourth",
+     "start_s": 129.2,
+     "url": "https://www.youtube.com/watch?v=97GKxP0qIJQ"
+    }
+   ],
+   "state": "singolo",
+   "type": "gear",
+   "value": "4"
+  },
+  {
+   "car_class": "gt3_presunta",
+   "corner": "Corner 5",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "We should be in third gear this time coming through this left-hander",
+     "start_s": 277.44,
+     "url": "https://www.youtube.com/watch?v=PlJxrjJJd38"
+    }
+   ],
+   "state": "singolo",
+   "type": "gear",
+   "value": "3"
+  },
+  {
+   "car_class": "gt3_presunta",
+   "corner": "Corner 6",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "in third gear using as much of the curb",
+     "start_s": 298.72,
+     "url": "https://www.youtube.com/watch?v=PlJxrjJJd38"
+    }
+   ],
+   "state": "singolo",
+   "type": "gear",
+   "value": "3"
+  },
+  {
+   "corner": "Corner 6",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "hook up an early apex here",
+     "start_s": 298.72,
+     "url": "https://www.youtube.com/watch?v=PlJxrjJJd38"
+    }
+   ],
+   "state": "singolo",
+   "type": "apex",
+   "value": "early"
+  },
+  {
+   "car_class": "gt3_presunta",
+   "corner": "Corner 11",
+   "n": 2,
+   "sources": [
+    {
+     "quote": "For T1 and T11 I use the 100m board",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/1ab5h3o/"
+    },
+    {
+     "quote": "Again, this aligns with the 100-m board just like it does in turn one",
+     "start_s": 501.84,
+     "url": "https://www.youtube.com/watch?v=PlJxrjJJd38"
+    }
+   ],
+   "state": "singolo",
+   "type": "brake",
+   "value": "board:100"
+  },
+  {
+   "car_class": "gt3_presunta",
+   "corner": "Corner 11",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "stay out wide shifting down to first",
+     "start_s": 300.24,
+     "url": "https://www.youtube.com/watch?v=97GKxP0qIJQ"
+    }
+   ],
+   "state": "singolo",
+   "type": "gear",
+   "value": "1"
+  },
+  {
+   "car_class": "gt3_presunta",
+   "corner": "Corner 13",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "change down to second haul the car in over the striped curb",
+     "start_s": 354.16,
+     "url": "https://www.youtube.com/watch?v=97GKxP0qIJQ"
+    }
+   ],
+   "state": "singolo",
+   "type": "gear",
+   "value": "2"
+  },
+  {
+   "car_class": "gt3_presunta",
+   "corner": "Corner 15",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "as we shift ourselves down into first gear",
+     "start_s": 694.4,
+     "url": "https://www.youtube.com/watch?v=PlJxrjJJd38"
+    }
+   ],
+   "state": "singolo",
+   "type": "gear",
+   "value": "1"
+  },
+  {
+   "car_class": "gt3_presunta",
+   "corner": "Corner 19",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "head towards the stripy curb in third gear",
+     "start_s": 472.08,
+     "url": "https://www.youtube.com/watch?v=97GKxP0qIJQ"
+    }
+   ],
+   "state": "singolo",
+   "type": "gear",
+   "value": "3"
+  }
+ ],
+ "track": "austin",
+ "version": 3
+}

@@ -1,0 +1,238 @@
+{
+ "disputed": [],
+ "facts": [],
+ "single": [
+  {
+   "corner": "Abbey",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "Use all of the entry kerb for Abbey",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/1d824q1/"
+    }
+   ],
+   "state": "singolo",
+   "type": "kerb",
+   "value": "entry"
+  },
+  {
+   "corner": "Abbey",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "I'm going to bring the car out to the left here onto this green bit",
+     "start_s": 728.72,
+     "url": "https://www.youtube.com/watch?v=rePGxOeKsb4"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "line",
+   "value": "I'm going to bring the car out to the left here onto this green bit"
+  },
+  {
+   "corner": "Abbey",
+   "n": 1,
+   "sources": [
+    {
+     "car_class": "ignota",
+     "quote": "make sure you turn in early",
+     "start_s": 470.319,
+     "url": "https://www.youtube.com/watch?v=4kG5QQitaV4"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "line",
+   "value": "make sure you turn in early"
+  },
+  {
+   "corner": "Abbey",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "you're braking too much and turning in too early",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/1ovknvn/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "mistake",
+   "value": "you're braking too much and turning in too early"
+  },
+  {
+   "car_class": "gt3_presunta",
+   "corner": "Village",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "shifting the card down into second gear",
+     "start_s": 671.39,
+     "url": "https://www.youtube.com/watch?v=0y64-VeuOJ0"
+    }
+   ],
+   "state": "singolo",
+   "type": "gear",
+   "value": "2"
+  },
+  {
+   "car_class": "gt3_presunta",
+   "corner": "The Loop",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "dropping down into first gear for the slowest corner on the track",
+     "start_s": 713.93,
+     "url": "https://www.youtube.com/watch?v=0y64-VeuOJ0"
+    }
+   ],
+   "state": "singolo",
+   "type": "gear",
+   "value": "1"
+  },
+  {
+   "car_class": "gt3_presunta",
+   "corner": "Brooklands",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "breaking hard and shifting down into second gear",
+     "start_s": 814.34,
+     "url": "https://www.youtube.com/watch?v=0y64-VeuOJ0"
+    }
+   ],
+   "state": "singolo",
+   "type": "gear",
+   "value": "2"
+  },
+  {
+   "corner": "Brooklands",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "try and hook up a late apex here on the curb",
+     "start_s": 822.35,
+     "url": "https://www.youtube.com/watch?v=0y64-VeuOJ0"
+    }
+   ],
+   "state": "singolo",
+   "type": "apex",
+   "value": "late"
+  },
+  {
+   "corner": "Brooklands",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "brake and turn much later in brooklands",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/1ovknvn/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "line",
+   "value": "brake and turn much later in brooklands"
+  },
+  {
+   "corner": "Copse",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "you can brake later, turn in a bit later, run out wider on exit",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/1ovknvn/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "line",
+   "value": "you can brake later, turn in a bit later, run out wider on exit"
+  },
+  {
+   "car_class": "gt3_presunta",
+   "corner": "Stowe",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "dropping the card down into third gear before turning it in",
+     "start_s": 404.12,
+     "url": "https://www.youtube.com/watch?v=0y64-VeuOJ0"
+    }
+   ],
+   "state": "singolo",
+   "type": "gear",
+   "value": "3"
+  },
+  {
+   "corner": "Stowe",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "looking for an apex quite late in the turn",
+     "start_s": 408.56,
+     "url": "https://www.youtube.com/watch?v=0y64-VeuOJ0"
+    }
+   ],
+   "state": "singolo",
+   "type": "apex",
+   "value": "late"
+  },
+  {
+   "corner": "Stowe",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "You also missed the apex of Stowe",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/1d824q1/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "mistake",
+   "value": "You also missed the apex of Stowe"
+  },
+  {
+   "car_class": "gt3_presunta",
+   "corner": "Vale",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "shifting all the way down into first gear",
+     "start_s": 451.73,
+     "url": "https://www.youtube.com/watch?v=0y64-VeuOJ0"
+    }
+   ],
+   "state": "singolo",
+   "type": "gear",
+   "value": "1"
+  },
+  {
+   "corner": "Vale",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "stay on the right for longer, turn in later.",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/1ovknvn/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "line",
+   "value": "stay on the right for longer, turn in later."
+  },
+  {
+   "corner": "Club",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "decent, you can be on the throttle even earlier",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/1ovknvn/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "line",
+   "value": "decent, you can be on the throttle even earlier"
+  }
+ ],
+ "track": "silverstone",
+ "version": 3
+}

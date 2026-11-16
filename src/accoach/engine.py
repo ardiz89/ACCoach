@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import re
 import threading
+from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -37,18 +38,22 @@ from .coaching import (
     Voice,
 )
 from .coaching.analyzer import corner_level
-from .coaching.cue import CueCategory, gates_voice, theme_key, trigger_text
+from .coaching.fuel import fuel_block
+from .coaching.cue import Cue, CueCategory, gates_voice, theme_key, trigger_text
 from .coaching.debrief import build_lap_debrief
 from .coaching.diagnosis import build_lap_stats
 from .coaching.atwheel import WheelWatch
+from .coaching.corner_refs import POOL_SIZE, CornerBests
 from .coaching.focus import FocusCoach, FocusKind, FocusReport
-from .coaching.pitcall import PitCall
+from .coaching.lapvalid import LapValidityCoach
+from .coaching.pitcall import HoldCall, PitCall
 from .i18n import cue_text, current_language
 from .logging_setup import get_logger
 from .comparison import DeltaState, LapComparator, Reference
 from .engineer import DecisionKind, RaceEngineer, classify, engineer_for
 from .recording import Lap, LapRecorder, find_reference_lap, laps_root, save_lap
 from .recording.recorder import StartLineWatcher
+from .recording.storage import reference_pool
 from .telemetry import SharedMemoryReader, TelemetrySnapshot
 from .telemetry.snapshot import ACStatus
 from .telemetry.feed import TelemetryFeed
@@ -75,6 +80,8 @@ _SAFETY_CATEGORIES = {
     # exactly the state `quiet == "pit"` describes, and gating it would make the
     # one cue that only makes sense there the one cue that never arrives.
     CueCategory.PIT_IN, CueCategory.PIT_APPROACH, CueCategory.PIT_BRIEFING,
+    # Spesso il giro cade proprio quando il delta e' saltato: va detto lo stesso.
+    CueCategory.LAP_INVALID,
 }
 
 
@@ -276,7 +283,7 @@ def _focus_log_line(report: FocusReport | None, *, counted: bool = True,
         riga = f"focus | nessuno | stato={stato}"
     else:
         riga = (f"focus | {focus.name} | tema={_focus_theme_key(report)} "
-                f"| perdi {focus.baseline_ms:.0f} ms")
+                f"| base {focus.baseline_ms:.0f} ms")
     if counted:
         return riga
     # Il resto della riga descrive il giro *precedente*, che sotto un focus
@@ -318,6 +325,7 @@ class EngineState:
     history: list[str]           # recent spoken cue messages, newest last
     engineer: dict | None = None  # latest race-engineer decision (setup advice)
     focus: dict | None = None     # latest Focus/Lesson report (driver coaching)
+    fuel: dict | None = None      # litres, pct, laps left (the tablet's third big number)
     # L'ultima curva chiusa: indice, nome, millisecondi persi, semaforo. Un
     # consuntivo muto — la voce resta invariata e arriva al giro dopo, che è
     # quando può ancora cambiare qualcosa. I due non si pestano i piedi: questo
@@ -348,6 +356,24 @@ def _load_reference(car: str, track: str, laps_dir: Path | str,
         return None
     ref = Reference(lap)
     return ref if ref.usable else None
+
+
+def _build_corner_bests(main: Reference, corners: list[Corner],
+                        car: str, track: str, laps_dir: Path,
+                        road_temp: float | None, grip: float | None,
+                        compound: str | None) -> CornerBests:
+    """Il gesto migliore di ogni curva, dal bacino. Gira sul thread del bacino.
+
+    Il ``CornerBests`` nasce qui e qui riceve i giri del bacino; al tick passa
+    finito, e da lì in poi lo tocca solo il tick (non è thread-safe). Auto,
+    pista e condizioni sono quelle che hanno eletto ``main`` in
+    `_load_reference`, così il bacino si rilassa come si è rilassato lui.
+    """
+    bests = CornerBests(main, corners)
+    for other in reference_pool(car, track, laps_dir,
+                                road_temp, grip, compound, POOL_SIZE):
+        bests.offer(other)
+    return bests
 
 
 def _corner_labels(car: str, track: str, corners: list[Corner],
@@ -385,6 +411,20 @@ def _corner_labels(car: str, track: str, corners: list[Corner],
     except Exception:
         return {}
     return dict(enumerate(names))
+
+
+def _name_the_corner(cue: Cue, text: str, corners, names: dict) -> str:
+    """Sullo schermo «Veleggi» dice dove, perche' vale per ogni curva.
+
+    Solo sullo schermo: a voce resta la frase registrata, e un WAV per ogni
+    curva di ogni pista non c'e'. Fuori da una curva non si nomina niente.
+    """
+    if cue.category not in (CueCategory.COASTING, CueCategory.LAP_INVALID):
+        return text
+    for c in corners:
+        if c.entry_pos <= cue.pos <= c.exit_pos and names.get(c.index):
+            return f"{names[c.index]}. {text}"
+    return text
 
 
 class CoachEngine:
@@ -428,10 +468,13 @@ class CoachEngine:
         self.braking = BrakingDetector()
         self.gears = GearDetector()
         self.fuel = FuelEngineer()
+        self.lapvalid = LapValidityCoach()
         self.advisor = SetupAdvisor()
         self.pressure = PressureAdvisor()
         self.tyretemp = TyreTempAdvisor()
         self.pitcall = PitCall()
+        # L'Ingegnere che aspetta la risposta sull'assetto (vedi coaching/pitcall.py).
+        self.holdcall = HoldCall()
         # Watches the dials so an "al volo" change can finish by being *done*
         # rather than by being clicked on a web page (see coaching/atwheel.py).
         self.wheelwatch = WheelWatch()
@@ -496,6 +539,77 @@ class CoachEngine:
         # they can't race _observe_lap, which also mutates the engineer.
         self._cmd_lock = threading.Lock()
         self._applied_pending = False
+        # Il pilota ha detto ai box quale assetto ha caricato (POST
+        # /engineer/base): scioglie la base tenuta da `_base_moved`.
+        self._base_pending = False
+
+        # Il gesto migliore di ogni curva (coaching/corner_refs.py). Il bacino
+        # si carica fuori dal tick. Misurato il 03/11 sulla copia dell'archivio
+        # (Monza, 720S): `load_lap` 6,5 ms a giro, 133 ms per 20 giri; il
+        # bacino intero 118-273 ms col catalogo, più 10 ms di confronti. Ogni
+        # giro sta sotto i 50 ms, la somma no: dentro un tick a 20 Hz sarebbero
+        # da 2 a 5 frame saltati a ogni nuovo riferimento, e crescerebbero con
+        # l'archivio. Un solo lavoratore, creato alla prima costruzione.
+        self._pool: ThreadPoolExecutor | None = None
+        #: La costruzione in volo e il riferimento per cui è partita.
+        self._bests_future: Future | None = None
+        self._bests_token: tuple | None = None
+        #: I giri salvati mentre la costruzione era in volo: il bacino può non
+        #: averli visti, e al passaggio di mano si offrono.
+        self._bests_waiting: list[Lap] = []
+        #: I gesti migliori consegnati all'analyzer; li tocca solo il tick.
+        self._bests: CornerBests | None = None
+
+    def _drop_corner_bests(self) -> None:
+        """Il riferimento è cambiato: i gesti di prima misuravano altre zone."""
+        self.analyzer.set_corner_refs(None)
+        self._bests = None
+        self._bests_waiting = []
+        self._bests_token = None
+        if self._bests_future is not None:
+            self._bests_future.cancel()      # se è già partita, la butta il token
+            self._bests_future = None
+
+    def _start_corner_bests(self, car: str, track: str) -> None:
+        """Parte la costruzione per il riferimento di adesso, se ha senso."""
+        ref = self._reference
+        if ref is None or ref.lap.source == "pro" or not self._corners:
+            return                           # Decisione 5: spento
+        if self._pool is None:
+            self._pool = ThreadPoolExecutor(max_workers=1,
+                                            thread_name_prefix="hone-bacino")
+        self._bests_token = _reference_token(ref)
+        # Le stesse curve date a `analyzer.set_corners`: le finestre del
+        # CornerBests devono essere le zone dell'analyzer, non un altro calcolo.
+        self._bests_future = self._pool.submit(
+            _build_corner_bests, ref, self._corners, car, track, self.laps_dir,
+            self._road_temp, self._grip, self._compound)
+
+    def _take_corner_bests(self) -> None:
+        """Nel tick: se la costruzione è finita, passa all'analyzer.
+
+        Non aspetta mai. Una costruzione per un riferimento che non è più quello
+        di adesso si butta; un errore del bacino lascia il principale e basta.
+        """
+        fut = self._bests_future
+        if fut is None or not fut.done():
+            return
+        self._bests_future = None
+        waiting, self._bests_waiting = self._bests_waiting, []
+        if fut.cancelled():
+            return
+        if self._bests_token != _reference_token(self._reference):
+            return
+        try:
+            bests = fut.result()
+        except Exception:
+            _log.warning("gesti migliori per curva non costruiti; resta il "
+                         "riferimento principale", exc_info=True)
+            return
+        for lap in waiting:
+            bests.offer(lap)
+        self._bests = bests
+        self.analyzer.set_corner_refs(bests)
 
     def _rebuild_reference(self, car: str, track: str) -> None:
         # Today's track temperature decides which past lap is a fair benchmark:
@@ -525,6 +639,10 @@ class CoachEngine:
         # accanto.
         self.analyzer.set_corners(corners)
         self.analyzer.reset()
+        # I gesti migliori di prima misuravano le zone del riferimento di
+        # prima: si spengono subito, e i nuovi arrivano dal thread del bacino.
+        self._drop_corner_bests()
+        self._start_corner_bests(car, track)
         # Il comparatore nuovo non sa quali staccate il pilota ha gia' imparato.
         self._update_wean()
 
@@ -543,6 +661,7 @@ class CoachEngine:
         self.pressure.reset()
         self.tyretemp.reset()
         self.fuel.reset()
+        self.lapvalid.reset()
         self.scheduler.reset()
         self._cold_spoken = False
 
@@ -973,7 +1092,7 @@ class CoachEngine:
         from datetime import datetime, timezone
 
         from .engineer.ledger import Record, append
-        change = decision.change
+        change = decision.change or out.tested
         # On a REVERTED the decision carries the *reversal*, so its clicks are
         # the opposite of the change that was actually tested.
         atom = change.changes[0] if (change and change.changes) else None
@@ -1000,6 +1119,9 @@ class CoachEngine:
                 fuel_before_l=out.fuel_before_l,
                 fuel_after_l=out.fuel_after_l,
                 time_confounded=out.time_confounded,
+                temp_confounded=out.temp_confounded,
+                road_temp_before=out.road_temp_before,
+                road_temp_after=out.road_temp_after,
                 side_effects={str(sym): d for sym, d in out.side_effects},
             ))
         except Exception:  # noqa: BLE001 - evidence for us, never a live failure
@@ -1054,6 +1176,9 @@ class CoachEngine:
             # can never be finished (AC reports every aid level as -1).
             "watched": self.wheelwatch.armed,
             "confidence": d.confidence,
+            # Le gomme non hanno risposto come la modifica prevedeva: il tablet
+            # e la pagina Ingegnere richiedono quale assetto hai caricato.
+            "confirm_base": bool(getattr(d, "confirm_base", False)),
             # 1-based corner labels the proposal is anchored to ("Corners 7, 9").
             "corners": [i + 1 for i in corners],
             # The bar the change will be judged against, so the driver reads it
@@ -1153,6 +1278,12 @@ class CoachEngine:
         with self._cmd_lock:
             self._applied_pending = True
 
+    def mark_base_confirmed(self) -> None:
+        """Il pilota ha risposto «quale assetto hai caricato» ai box. Come
+        :meth:`mark_setup_applied`: qui solo il segnale, il lavoro nel tick."""
+        with self._cmd_lock:
+            self._base_pending = True
+
     def tick(self, now: float) -> EngineState:
         if self._feed is not None:
             # Acquisition + recording happen on the feed thread; here we just
@@ -1206,6 +1337,7 @@ class CoachEngine:
             # (see coaching/pitcall.py — it's learned, so a track never visited
             # simply has no approach call until the first time you come in).
             self.pitcall.reset()
+            self.holdcall.reset()
             for pos in self._load_pit_entry(snap.track):
                 self.pitcall.note_pit_entry(pos)
             self.pitcall.mark_entry_saved()
@@ -1237,6 +1369,15 @@ class CoachEngine:
         with self._cmd_lock:
             apply_setup = self._applied_pending
             self._applied_pending = False
+            base_answered = self._base_pending
+            self._base_pending = False
+        if base_answered and self._engineer is not None:
+            # La decisione tenuta portava `confirm_base` a ogni frame: dopo la
+            # risposta non deve piu', o le pagine richiederebbero da capo.
+            freed = self._engineer.base_confirmed()
+            if freed is not None:
+                self._engineer_decision = freed
+                self._save_engineer_state()
         if apply_setup and self._engineer is not None:
             self._engineer.mark_applied()
             # The change has been written: stop calling the driver in for it.
@@ -1253,6 +1394,10 @@ class CoachEngine:
                 save_lap(lap, self.laps_dir)
                 saved = [lap]
 
+        # Prima dei giri salvati: un giro di questo tick si offre ai gesti
+        # appena arrivati, non si mette in coda per una costruzione già finita.
+        self._take_corner_bests()
+
         for lap in saved:
             self.saved_laps += 1
             # Use the LAP's own car/track, not snap's: between completing the lap
@@ -1261,6 +1406,15 @@ class CoachEngine:
             if lap.car_model and (lap.car_model, lap.track) != self._key:
                 continue                                            # not this session
             self._observe_lap(lap)
+            # Prima di `_rebuild_reference`, che quasi sempre esce subito perché
+            # il principale è lo stesso: il giro può aver preso una curva, e il
+            # bacino non si ricarica per un giro solo. Se invece diventa lui il
+            # principale, `_rebuild_reference` butta tutto e riparte comunque.
+            if self._bests is not None:
+                if self._bests.offer(lap):
+                    self.analyzer.set_corner_refs(self._bests)
+            elif self._bests_future is not None:
+                self._bests_waiting.append(lap)
             self._rebuild_reference(lap.car_model, lap.track)        # chase the new best
         if saved:
             # Dopo il riferimento, non dentro `_observe_lap`: la curva si dice
@@ -1287,9 +1441,18 @@ class CoachEngine:
         # anyway, so it needs no gate of its own here.
         unrepresentative = bool(quiet) and quiet != "no_reference"
 
+        # Sul giro di uscita dai box le gomme sono fredde e pattinare e' normale:
+        # l'08/11 «Pattini in uscita» dopo ogni uscita. Lo si toglie qui, dove si
+        # sa che giro e': il rilevatore non ha idea di cosa sia un giro, e lo
+        # scheduler riceverebbe una regola in piu' sul traguardo. Solo il
+        # pattinamento: un bloccaggio, o la benzina, restano veri anche li'.
+        on_out_lap = quiet in ("pit", "out_lap")
+
         def _submit(cues: list[Cue]) -> None:
             kept = cues if not unrepresentative else [
                 c for c in cues if c.category in _SAFETY_CATEGORIES]
+            if on_out_lap:
+                kept = [c for c in kept if c.category is not CueCategory.WHEELSPIN]
             self.scheduler.submit_all(kept, now)
 
         # Corner advice (needs a reference) + acute events (don't) + the aid
@@ -1326,8 +1489,17 @@ class CoachEngine:
             _submit(pressure_cues)
         _submit(self.tyretemp.update(snap, now))
         _submit(self.fuel.update(snap, now))
+        _submit(self.lapvalid.update(snap, self._flying_lap, now, self._corners,
+                                     self._reference))
         self.pitcall.set_pending(self._garage_change_pending())
         _submit(self.pitcall.update(snap, now))
+        # L'attesa di `confirm_base` non porta una modifica, quindi la
+        # chiamata sopra non la vede, e `_announce_engineer` nemmeno: senza
+        # questa chi guida a voce non saprebbe mai che l'Ingegnere aspetta.
+        d = self._engineer_decision
+        _submit(self.holdcall.update(
+            snap, self.engineer_voice and d is not None
+            and bool(getattr(d, "confirm_base", False))))
         if self.pitcall.entry_dirty and snap.track:
             self._save_pit_entry(snap.track)
         spoken = self.scheduler.poll(now)
@@ -1343,6 +1515,8 @@ class CoachEngine:
             spoken.message = cue_text(spoken.message)
             voice_text, screen_text = _spoken_forms(
                 spoken, self.scheduler.focus_theme, current_language())
+            screen_text = _name_the_corner(spoken, screen_text, self._corners,
+                                           self._corner_names)
             spoken.message = screen_text
             # La traccia di cio' che il coach ha DETTO, con accanto il tema che
             # stava filtrando. Esiste perche' il 10/08, in pista, due prove sono
@@ -1370,6 +1544,7 @@ class CoachEngine:
             history=list(self.history),
             engineer=self._engineer_block(),
             focus=self._focus_block(),
+            fuel=fuel_block(self.fuel, snap),
             corner=self._corner_block(),
             pit_due=self.pitcall.calling,
             quiet=quiet,
@@ -1400,6 +1575,8 @@ class CoachEngine:
             self._flying_lap = True
             # Ogni frase di tecnica si puo' ridire una volta: il giro e' questo.
             self.scheduler.new_lap()
+            self.lapvalid.new_lap()
+            self.holdcall.new_lap()
 
     def _quiet_reason(self, s: TelemetrySnapshot, delta: DeltaState | None) -> str:
         """Why the coach is holding back this tick, "" if it isn't.
@@ -1418,6 +1595,11 @@ class CoachEngine:
         return ""
 
     def close(self) -> None:
+        # Senza aspettare: una costruzione in volo finisce da sé, chi è in coda
+        # non parte. Il bacino è un vantaggio, non vale l'attesa di chi chiude.
+        if self._pool is not None:
+            self._pool.shutdown(wait=False, cancel_futures=True)
+            self._pool = None
         if self.voice is not None:
             self.voice.close()
         # Stop the feed before closing the reader it polls.

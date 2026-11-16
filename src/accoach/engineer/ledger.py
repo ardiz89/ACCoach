@@ -77,6 +77,9 @@ class Record:
     fuel_after_l: float = 0.0
     #: Whether the lap-time half of the verdict had to be thrown out.
     time_confounded: bool = False
+    temp_confounded: bool = False
+    road_temp_before: float = 0.0
+    road_temp_after: float = 0.0
     #: {symptom: score change} for symptoms the change was *not* aiming at.
     side_effects: dict = field(default_factory=dict)
 

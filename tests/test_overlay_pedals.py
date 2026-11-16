@@ -1,8 +1,9 @@
 """La striscia dei pedali: l'unica cosa VISIVA e in tempo reale sul trail braking.
 
-Traccia gas (verde) e freno (rosso) sotto l'HUD, con un nastro **ambra** finché i
-due pedali si sovrappongono — cioè finché stai trailando — e **grigio** quando
-non ne premi nessuno (tempo morto). In alto a destra la targhetta dello stato:
+Traccia gas (verde) e freno (rosso) sotto l'HUD, con un nastro **ambra** finché
+freni col volante girato — cioè finché stai trailando — e **grigio** quando non
+premi nessun pedale (tempo morto). Fino al 03/11 l'ambra si accendeva su freno e
+gas insieme, che non e' il trail braking. In alto a destra la targhetta dello stato:
 `TRAIL` o `COAST` col cronometro.
 
 Esisteva, funzionava, e non l'ha mai vista nessuno: spenta per impostazione
@@ -41,20 +42,29 @@ def _paint(app, pedals, frames, monkeypatch):
 
     monkeypatch.setattr(ov_mod, "t", spy)
     o = Overlay(pedals=pedals)
-    for thr, brk in frames:
+    for thr, brk, *steer in frames:
         o.apply_state({"connected": True, "speed_kmh": 120.0,
-                       "throttle": thr, "brake": brk})
+                       "throttle": thr, "brake": brk,
+                       "steer": steer[0] if steer else 0.0})
     o.render(QPixmap(o.size()))
     size = o.size()
     o.deleteLater()
     return asked, size
 
 
-def test_overlapping_pedals_are_called_trail(app, monkeypatch):
-    """Freno che decade mentre il gas sale: è il trail braking, e la targhetta
-    lo deve dire mentre sta succedendo, non a fine giro."""
-    asked, _ = _paint(app, True, [(0.0, 1.0), (0.2, 0.6), (0.5, 0.3)], monkeypatch)
+def test_braking_with_the_wheel_turned_is_called_trail(app, monkeypatch):
+    """Freno che cala mentre il volante gira: è il trail braking, e la
+    targhetta lo deve dire mentre sta succedendo, non a fine giro."""
+    asked, _ = _paint(app, True, [(0.0, 1.0, 0.0), (0.0, 0.6, 0.15),
+                                  (0.0, 0.3, -0.25)], monkeypatch)
     assert "overlay.trail" in asked
+
+
+def test_both_pedals_in_a_straight_line_are_not_trail(app, monkeypatch):
+    """Gas e freno insieme col volante dritto non e' trail braking: e'
+    quello che la striscia chiamava cosi' fino al 03/11."""
+    asked, _ = _paint(app, True, [(0.2, 0.6, 0.0), (0.5, 0.3, 0.02)], monkeypatch)
+    assert "overlay.trail" not in asked
 
 
 def test_no_pedal_at_all_is_called_coasting(app, monkeypatch):

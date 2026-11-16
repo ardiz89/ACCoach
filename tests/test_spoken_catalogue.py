@@ -26,7 +26,7 @@ _MANIFEST = _ROOT / "src" / "accoach" / "voice_cues" / "manifest.json"
 
 # Le sole frasi che possono dire un numero: un insieme chiuso, e il numero e' il
 # consiglio stesso (spec, «Scelte mie» 2).
-_NUMBERED = re.compile(r"^(Qui perdi \d+ decim[oi]|Benzina per circa \d gir[oi]\.)$")
+_NUMBERED = re.compile(r"^(Qui perdi \d+ decim[oi]|Benzina per circa \d gir[oi]\.|Aggiungi \d+ litri\.)$")
 
 # Le otto frasi generali del Task 1, scritte qui a mano: se il codice cambia
 # una frase, questo elenco e quello del catalogo devono cambiare insieme.
@@ -81,7 +81,7 @@ def test_the_engineer_is_in(catalogue):
 
 def test_no_digit_except_tenths_and_fuel(catalogue):
     assert [p for p in catalogue if re.search(r"\d", p) and not _NUMBERED.match(p)] == []
-    assert sum(bool(_NUMBERED.match(p)) for p in catalogue) == 25 + 3
+    assert sum(bool(_NUMBERED.match(p)) for p in catalogue) == 25 + 3 + 24
 
 
 def test_the_whole_list_keeps_the_voice_tone(catalogue):
@@ -119,7 +119,7 @@ def _time_loss(lost_ms):
     return classify_corner(CornerStats(
         lost_ms=lost_ms, throttle_live=1.0, throttle_ref=1.0, brake_live=0.0,
         brake_ref=0.0, min_speed_live=100.0, min_speed_ref=100.0,
-        braking_early=False, braking_late=False), 0, 0.3)
+        braking_early=False, braking_late=False, phase_ms=None), 0, 0.3)
 
 
 def _fuel_cues(levels):

@@ -1,7 +1,10 @@
 """`/api/setup/base`: il file a cui la vista tablet applica una modifica.
 
 Lo sceglie il processo web, non la pagina: l'ultimo file scritto da
-`/api/setup/apply` in questo processo, se no il piu' recente per data.
+`/api/setup/apply` in questo processo. Senza quello non si indovina: il
+08/11 il piu' recente per data era `HONE_2` (65/60 sugli anteriori), il pilota
+guidava `720sEVO_Imola_0` (57/52), e `HONE_3` ha alzato gli anteriori di 13
+click invece di 5. Allora `base` e' None, `confirm` e' True e la pagina chiede.
 """
 import json
 import os
@@ -40,12 +43,15 @@ def _apply(client, path):
     assert r.status_code == 200, r.text
 
 
-def test_base_is_the_most_recent_file(tmp_path):
+def test_without_last_written_the_first_file_is_asked_not_guessed(tmp_path):
     client, d, a, b = _setup(tmp_path)
     out = _base(client)
-    assert out["base"].endswith("b.json")
+    assert out["base"] is None
+    assert out["confirm"] is True
     assert out["last_written"] is None
     assert out["car"] == CAR and out["track"] == TRACK
+    # L'elenco dal piu' recente: in cima c'e' quello che hai salvato per ultimo.
+    assert [s["name"] for s in out["setups"]] == ["b", "a", "base"]
 
 
 def test_base_is_the_last_written_after_apply(tmp_path):
@@ -55,6 +61,7 @@ def test_base_is_the_last_written_after_apply(tmp_path):
     out = _base(client)
     assert out["base"].endswith("HONE_1.json")
     assert out["last_written"] == "HONE_1"
+    assert out["confirm"] is False
 
 
 def test_last_written_file_deleted_falls_back(tmp_path):
@@ -62,7 +69,7 @@ def test_last_written_file_deleted_falls_back(tmp_path):
     _apply(client, b)
     (d / "HONE_1.json").unlink()
     out = _base(client)
-    assert out["base"].endswith("b.json")
+    assert out["base"] is None and out["confirm"] is True
     assert out["last_written"] is None
 
 
@@ -71,14 +78,14 @@ def test_case_of_frame_names_does_not_matter(tmp_path):
     out = _base(client, car=CAR.upper(), track="imola")
     assert out["track"] == "Imola"
     assert out["car"] == CAR
-    assert out["base"] is not None
+    assert out["setups"] and out["confirm"] is True
 
 
 def test_unknown_combo(tmp_path):
     client, d, a, b = _setup(tmp_path)
     assert _base(client, car="nessuna_auto") == {
         "car": None, "track": None, "setups": [], "base": None,
-        "last_written": None}
+        "last_written": None, "confirm": False}
 
 
 def test_list_carries_mtime(tmp_path):
@@ -89,3 +96,34 @@ def test_list_carries_mtime(tmp_path):
     for r in rows:
         assert {"name", "path", "mtime"} <= set(r)
         assert isinstance(r["mtime"], (int, float))
+
+
+def test_the_pilots_answer_becomes_the_base(tmp_path):
+    """Revisione finale, 3b: la risposta alla domanda va al server. Da li'
+    la GET risponde con quel file, senza chiedere, anche dopo un ricaricamento."""
+    client, d, a, b = _setup(tmp_path)
+    r = client.post("/api/setup/base", json={"path": str(a)})
+    assert r.status_code == 200 and r.json()["name"] == "a"
+    out = _base(client)
+    assert out["base"] == str(a) and out["confirm"] is False
+
+
+def test_the_answer_replaces_the_suspect_last_written(tmp_path):
+    """Le gomme hanno smentito la prova scritta su `HONE_1`: il pilota dice
+    di avere `a` in macchina, e da li' si parte da `a`."""
+    client, d, a, b = _setup(tmp_path)
+    _apply(client, b)
+    assert _base(client)["last_written"] == "HONE_1"
+    client.post("/api/setup/base", json={"path": str(a)})
+    out = _base(client)
+    assert out["base"] == str(a) and out["confirm"] is False
+
+
+def test_the_answer_must_be_a_setup_under_the_root(tmp_path):
+    client, d, a, b = _setup(tmp_path)
+    assert client.post("/api/setup/base",
+                       json={"path": str(tmp_path / "x.json")}).status_code == 403
+    assert client.post("/api/setup/base",
+                       json={"path": str(d / "nope.json")}).status_code == 404
+    assert _base(client)["confirm"] is True
+

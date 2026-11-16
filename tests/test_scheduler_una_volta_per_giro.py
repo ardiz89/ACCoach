@@ -39,9 +39,9 @@ def test_la_stessa_frase_di_tecnica_non_si_ripete_nello_stesso_giro():
 
 def test_al_giro_dopo_si_puo_ridire():
     sch = CueScheduler()
-    assert _di(sch, CueCategory.COASTING, 3, 100.0) is not None
+    assert _di(sch, CueCategory.TRAIL_BRAKE, 3, 100.0) is not None
     sch.new_lap()
-    assert _di(sch, CueCategory.COASTING, 9, 140.0) is not None
+    assert _di(sch, CueCategory.TRAIL_BRAKE, 9, 140.0) is not None
 
 
 def test_una_frase_diversa_nello_stesso_giro_passa():
@@ -100,15 +100,16 @@ def _veleggia_due_volte(lap):
     return lap
 
 
-def test_dal_motore_il_veleggio_esce_una_volta_per_giro_e_torna_al_giro_dopo(tmp_path):
+def test_dal_motore_il_veleggio_esce_una_volta_e_torna_tre_giri_dopo(tmp_path):
     s = _SessioneCheParla(tmp_path)
     s.avvicinamento()
     lap = _veleggia_due_volte(synth.build_lap(clean=True))
-    s.giro(lap)
-    s.giro(lap)
+    for _ in range(4):
+        s.giro(lap)
     proposti = [g for g, c in s.proposti if c is CueCategory.COASTING]
     assert proposti.count(1) == 2 and proposti.count(2) == 2, (
         f"fixture: il veleggio doveva essere proposto due volte a giro: {proposti}")
     detti = [g for g, c in s.detti if c is CueCategory.COASTING]
-    assert detti == [1, 2], f"veleggio detto ai giri {detti}: una volta per giro"
+    # Dal 30/10: una volta ogni tre giri, se non e' il focus.
+    assert detti == [1, 4], f"veleggio detto ai giri {detti}"
     s.eng.close()

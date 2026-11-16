@@ -203,6 +203,16 @@ def create_app(engine: CoachEngine | None = None, hz: float = 15.0, *,
             return {"ok": True}
         return {"ok": False}
 
+    @app.post("/engineer/base")
+    async def engineer_base() -> dict:
+        """Ai box il pilota ha detto quale assetto ha caricato: l'ingegnere
+        scioglie la prova che le gomme hanno smentito e rifa' la base."""
+        eng = holder.get("engine")
+        if eng is not None and hasattr(eng, "mark_base_confirmed"):
+            eng.mark_base_confirmed()
+            return {"ok": True}
+        return {"ok": False}
+
     async def _locali() -> set[str]:
         """Gli indirizzi del PC, in cache: il resolver puo' essere lento (VPN,
         NetBIOS) e `/health` gira sullo stesso loop del broadcast, quindi non

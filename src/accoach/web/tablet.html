@@ -44,6 +44,11 @@
             <span id="t-gear" class="t-num">–</span>
             <span class="t-unit" data-i18n="g.gear">Gear</span>
           </div>
+          <div class="t-big t-fuel">
+            <span id="t-fuel" class="t-num">–</span>
+            <span class="t-unit"><span data-i18n="tablet.fuel">Fuel %</span></span>
+            <span id="t-fuel-laps" class="t-unit t-fuel-laps">–</span>
+          </div>
         </div>
         <div class="t-side">
           <div class="t-aids">
@@ -60,17 +65,37 @@
         </div>
       </div>
 
-      <!-- Gas, freno e sterzo degli ultimi 8 s, come la striscia della pagina
-           completa: dove i pedali si sovrappongono stai trailando. -->
-      <div class="t-strip">
-        <div class="t-legend">
-          <span class="tl thr"><span data-i18n="trace.thr">Throttle</span> <b id="tr-thr">–</b></span>
-          <span class="tl brk"><span data-i18n="trace.brk">Brake</span> <b id="tr-brk">–</b></span>
-          <span class="tl steer"><span data-i18n="trace.steer">Steering</span> <b id="tr-steer">–</b></span>
+      <!-- Come l'overlay (15/11): a sinistra pedali e sterzo, a destra la
+           pista con l'auto. In verticale uno sotto l'altro. -->
+      <div class="t-live">
+        <!-- Gas, freno e sterzo: le barre di adesso con la tacca del
+             riferimento, e sotto gli ultimi 8 s, con la fascia ambra del
+             trail braking e quella grigia del veleggio. -->
+        <div class="t-strip">
+          <div class="t-legend">
+            <span class="tl thr"><span data-i18n="trace.thr">Throttle</span> <b id="tr-thr">–</b></span>
+            <span class="tl brk"><span data-i18n="trace.brk">Brake</span> <b id="tr-brk">–</b></span>
+            <span class="tl steer"><span data-i18n="trace.steer">Steering</span> <b id="tr-steer">–</b></span>
+          </div>
+          <div class="t-legend t-legend2">
+            <span id="tr-delta" class="t-delta"></span>
+            <span id="tr-tag" class="t-tag"></span>
+            <span class="t-refmark" data-i18n="tablet.refMark">The mark is the reference</span>
+          </div>
+          <div class="t-bars-box"><canvas id="t-bars" class="t-bars"></canvas></div>
+          <!-- La tela riempie il riquadro, che si allunga e si accorcia con lo
+               spazio: un canvas senza altezza fissa crescerebbe a ogni disegno. -->
+          <div class="t-trace-box"><canvas id="t-trace" class="t-trace"></canvas></div>
         </div>
-        <!-- La tela riempie il riquadro, che si allunga e si accorcia con lo
-             spazio: un canvas senza altezza fissa crescerebbe a ogni disegno. -->
-        <div class="t-trace-box"><canvas id="t-trace" class="t-trace"></canvas></div>
+        <div class="t-mapcol">
+          <div class="t-zooms">
+            <button type="button" id="t-zoom-all" class="t-zoom" aria-pressed="true" data-i18n="tablet.zoom.all">Whole track</button>
+            <button type="button" id="t-zoom-near" class="t-zoom" aria-pressed="false">400 m</button>
+            <button type="button" id="t-zoom-close" class="t-zoom" aria-pressed="false">120 m</button>
+          </div>
+          <div class="t-map-box"><canvas id="t-trackmap" class="t-map"></canvas></div>
+          <div id="t-trackmap-note" class="t-map-note" hidden></div>
+        </div>
       </div>
 
       <div id="t-av" class="t-av" hidden>
@@ -110,6 +135,8 @@
       <div id="t-msg" class="t-msg" hidden></div>
 
       <div id="t-base-row" class="t-base-row" hidden>
+        <!-- Il primo file si sceglie, non si propone: tablet.js, `bx.ask`. -->
+        <div id="t-ask" class="t-ask" hidden data-i18n="tablet.askBase">Which setup did you load in the game?</div>
         <label for="t-base" class="t-label" data-i18n="tablet.base">Starting setup</label>
         <select id="t-base" class="t-select"></select>
         <div id="t-nobase" class="t-nobase" hidden data-i18n="tablet.noBase">I can't find a setup for this car on this track. Save one from the game's garage.</div>

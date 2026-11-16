@@ -146,7 +146,7 @@ def test_one_tenth_is_singular_in_both_languages():
 
     st = CornerStats(lost_ms=130.0, throttle_live=1.0, throttle_ref=1.0,
                      brake_live=0.0, brake_ref=0.0, min_speed_live=100.0,
-                     min_speed_ref=100.0, braking_early=False, braking_late=False)
+                     min_speed_ref=100.0, braking_early=False, braking_late=False, phase_ms=None)
     it = classify_corner(st, 0, 0.3).message
     assert it == "Qui perdi 1 decimo"
     assert i18n.cue_text(it, "en") == "Losing 1 tenth here"
@@ -157,7 +157,7 @@ def test_more_than_one_tenth_stays_plural():
 
     st = CornerStats(lost_ms=320.0, throttle_live=1.0, throttle_ref=1.0,
                      brake_live=0.0, brake_ref=0.0, min_speed_live=100.0,
-                     min_speed_ref=100.0, braking_early=False, braking_late=False)
+                     min_speed_ref=100.0, braking_early=False, braking_late=False, phase_ms=None)
     it = classify_corner(st, 0, 0.3).message
     assert it == "Qui perdi 3 decimi"
     assert i18n.cue_text(it, "en") == "Losing 3 tenths here"

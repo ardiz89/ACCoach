@@ -31,7 +31,7 @@ It consumes :class:`LapStats` (the diagnosis) and never touches telemetry.
 from __future__ import annotations
 
 import statistics
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from enum import Enum
 
 from ..i18n import current_language
@@ -103,6 +103,8 @@ class LapStats:
     #: How heavy the car was, which is why a lap time from before a setup change
     #: and one from after may not be comparable at all — see `_fuel_gap`.
     fuel_l: float = 0.0
+    #: Temperatura della pista nel giro, in gradi (0.0 = non registrata).
+    road_temp: float = 0.0
     #: Quando ``stable`` e' False, quale delle due meta' e' caduta: ``"invalid"``
     #: (il gioco non ha completato il giro) o ``"cut"`` (fuori pista). Vuoto su
     #: un giro che sta in piedi. Non duplica ``stable`` — lo spiega: il pilota in
@@ -256,6 +258,15 @@ class Outcome:
     #: {Symptom: score change} for symptoms this change was *not* aiming at, and
     #: which the verdict therefore never looked at. Measured, never predicted.
     side_effects: tuple = ()
+    #: La modifica provata. Un ACCEPTED non la porta in `Decision.change`, che
+    #: per chi legge vuol dire «da scrivere»: senza questa il registro non
+    #: sapeva cosa aveva tenuto.
+    tested: "ProposedChange | None" = None
+    #: Come per la benzina: la pista si e' mossa troppo per confrontare i tempi.
+    #: Fa scattare anche `time_confounded`, che dice solo se il tempo e' fuori.
+    temp_confounded: bool = False
+    road_temp_before: float = 0.0
+    road_temp_after: float = 0.0
 
 
 class DecisionKind(Enum):
@@ -288,6 +299,10 @@ class Decision:
     #: stesso numero due volte con due frasi diverse, o perdeva il perche'.
     #: None su tutto il resto: il messaggio va letto intero.
     tail: str | None = None
+    #: Su un verdetto: le gomme non si sono mosse come la modifica prevedeva,
+    #: quindi forse il file di partenza non era quello in macchina. Il tablet e
+    #: la pagina Ingegnere, letto questo, richiedono quale assetto hai caricato.
+    confirm_base: bool = False
 
 
 # --- the profile contract --------------------------------------------------
@@ -362,6 +377,21 @@ _CLICK_BUDGET = 6                # max net clicks a single parameter may accumul
 #: for: when the evidence isn't comparable, say so and lean on the evidence that
 #: is — the symptom score, which doesn't care what the car weighs.
 _FUEL_BIAS_L = 2.0
+
+#: Gradi di pista oltre i quali i tempi prima e dopo non si confrontano.
+#:
+#: Non e' una sensibilita' misurata, e dai giri non si puo' ricavare: in 16
+#: sessioni dell'archivio la pista si e' mossa al massimo di 1,7 gradi. Sta sopra
+#: quel massimo apposta, cosi' scatta solo su una sessione fuori dal normale e non
+#: toglie il giudizio sul tempo a una sessione qualunque.
+_TEMP_BIAS_C = 3.0
+
+#: Lo scarto minimo, in psi a caldo, fra lo spostamento misurato delle gomme e
+#: quello previsto (click per psi per click) oltre il quale si dubita del file
+#: di partenza. Si confronta con ``max(questo, |previsto|)``: il 08/11 i giri
+#: hanno detto -0,5 e -0,6 per -0,8 previsti (risposta buona) e +2,2 per +0,5
+#: (13 click scritti al posto di 5, sopra il file sbagliato).
+_BASE_PSI = 0.8
 
 
 # Decision messages, per language; resolved with the active app language at the
@@ -468,6 +498,30 @@ _DECISION_MSG = {
         "en": "The change made the lap time worse, so it comes off.",
         "it": "La modifica ha peggiorato il tempo sul giro, quindi va tolta.",
     },
+    # Le gomme si sono mosse lontano da quanto valeva la modifica: il file di
+    # partenza forse non era quello in macchina (`_base_moved`).
+    "base_moved_front": {
+        "en": "When hot, the front tyres moved by {moved}, and the change was "
+              "worth {worth}.",
+        "it": "A caldo le gomme anteriori si sono mosse di {moved}, e la "
+              "modifica valeva {worth}.",
+    },
+    "base_moved_rear": {
+        "en": "When hot, the rear tyres moved by {moved}, and the change was "
+              "worth {worth}.",
+        "it": "A caldo le gomme posteriori si sono mosse di {moved}, e la "
+              "modifica valeva {worth}.",
+    },
+    "base_ask": {
+        "en": "Maybe the starting file wasn't the one on your car, so I won't "
+              "judge this test or log it. In the pits, reload the setup you "
+              "were driving before the change. Then I'll start the baseline "
+              "again.",
+        "it": "Forse il file di partenza non era quello che hai in macchina, "
+              "quindi questa prova non la giudico e non la registro. Ai box "
+              "ricarica l'assetto che guidavi prima della modifica. Poi rifaccio "
+              "la base.",
+    },
     "accepted_resolved": {
         "en": "The {sym} is fixed. It was {a}, now it's {b}.",
         "it": "Il {sym} è risolto. Era {a}, ora è {b}.",
@@ -524,6 +578,18 @@ _DECISION_MSG = {
         "it": "Tengo la modifica, ma sul tempo non ho potuto giudicarla. Prima e "
               "dopo il serbatoio non pesava uguale, quindi decide l'obiettivo "
               "della fase e vado avanti.",
+    },
+    "accepted_unjudged_temp": {
+        "en": "The track temperature moved too much to compare lap times. The "
+              "change stays, the phase target decides and I'm moving on.",
+        "it": "La pista ha cambiato troppo temperatura per confrontare i tempi. "
+              "La modifica resta, decide l'obiettivo della fase e vado avanti.",
+    },
+    "temp_confounded": {
+        "en": " I left the lap time out of this, because the track went from "
+              "{a} to {b} degrees.",
+        "it": " Il tempo sul giro l'ho lasciato fuori, perché la pista è passata "
+              "da {a} a {b} gradi.",
     },
     "fuel_confounded": {
         "en": " I left the lap time out of this, because the tank had {a} L "
@@ -588,12 +654,6 @@ _DECISION_MSG = {
               "correct it next time in.",
         "it": "La pressione {axis} è arrivata a {b}, me ne aspettavo {e}. La "
               "correggo al prossimo rientro.",
-    },
-    "pressure_far": {
-        "en": " That gap is too big to be the clicks alone. Check that the "
-              "setup you loaded is the one I wrote.",
-        "it": " Lo scarto è troppo grande per essere solo i click. Controlla "
-              "di aver caricato il setup che ho scritto io.",
     },
     "predict_pressure": {
         "en": "After {n} clean laps at temperature I'll check that the "
@@ -724,6 +784,10 @@ def _fuel_tail(outcome: "Outcome", lang: str) -> str:
     """
     if not outcome.time_confounded:
         return ""
+    if outcome.temp_confounded:
+        return _msg("temp_confounded", lang,
+                    a=fmt_num(outcome.road_temp_before, 0, lang),
+                    b=fmt_num(outcome.road_temp_after, 0, lang))
     return _msg("fuel_confounded", lang,
                 a=fmt_num(outcome.fuel_before_l, 0, lang),
                 b=fmt_num(outcome.fuel_after_l, 0, lang))
@@ -756,10 +820,23 @@ def _median_score(window: list[LapStats], symptom: Symptom) -> float:
     return statistics.median([s.symptom_scores.get(symptom, 0.0) for s in window])
 
 
+def _median_temp(window: list[LapStats]) -> float:
+    vals = [s.road_temp for s in window if s.road_temp > 0]
+    return statistics.median(vals) if vals else 0.0
+
+
 def _median_fuel(window: list[LapStats]) -> float:
     """Typical tank load over a window; 0.0 when the laps predate v11."""
     vals = [s.fuel_l for s in window if s.fuel_l > 0]
     return statistics.median(vals) if vals else 0.0
+
+
+def _signed_psi(v: float, lang: str) -> str:
+    """Uno spostamento di pressione col segno: «+2,2 psi», «−0,8 psi»."""
+    text = fmt_num(v, 1, lang)
+    if not text.startswith("−") and text != fmt_num(0, 1, lang):
+        text = "+" + text
+    return text + " psi"
 
 
 # --- the engine ------------------------------------------------------------
@@ -774,12 +851,15 @@ class _Active:
     prediction: "Prediction | None" = None
     remedy_rank: int = 0
     base_fuel: float = 0.0
+    base_temp: float = 0.0
     #: Every symptom's score at the moment the change was applied, so the
     #: verdict can also report what moved that nobody was aiming at.
     base_scores: dict = field(default_factory=dict)
     #: Le pressioni a caldo per asse quando la modifica e' stata applicata
-    #: (mediana dei giri a regime), o None se non c'era una lettura. Una
-    #: modifica di pressione si giudica su queste, non sul tempo.
+    #: (mediana dei giri a regime, `_pressure_reading`), o None se non c'era
+    #: una lettura. Una modifica di pressione si giudica su queste, non sul
+    #: tempo, e su queste si controlla che le gomme abbiano risposto
+    #: (`_base_moved`).
     base_pressures: dict | None = None
 
 
@@ -791,9 +871,6 @@ _PRESSURE_LAPS = 4
 #: Fuori da questa fascia un «psi a caldo per click» misurato non e' un click:
 #: e' cambiato qualcos'altro (un altro file caricato, la pista), e non si impara.
 _HOT_PER_CLICK = (0.03, 0.3)
-#: Scarto fra pressione attesa e raggiunta oltre il quale si dice al pilota di
-#: controllare il setup caricato.
-_PRESSURE_FAR_PSI = 0.8
 #: Litri in piu' rispetto al giro prima che dicono «sei ripartito dai box».
 _REFUEL_L = 1.0
 #: Salto di pressione fra due giri di fila che dice «non e' lo stesso stint».
@@ -836,6 +913,11 @@ class RaceEngineer:
         #: ripristino e numeri) finche' `mark_applied` non dice che la macchina
         #: e' tornata com'era. E' quello che `observe` ripete a ogni giro.
         self._held_revert: Decision | None = None
+        #: Le gomme non hanno risposto come la modifica (`_base_moved`): la
+        #: prova non si giudica, e finche' il pilota non dice ai box quale
+        #: assetto ha caricato (`base_confirmed`) i giri non fanno base. E'
+        #: quello che `observe` ripete a ogni giro, con `confirm_base`.
+        self._held_base: Decision | None = None
         #: Symptoms whose remedies all failed — the engine's own "this is you,
         #: not the car" call. Recorded because it is a claim we make and have
         #: never checked (see ledger.py).
@@ -979,6 +1061,8 @@ class RaceEngineer:
         if self._held_revert is not None or (
                 self._pending is not None and self._pending_is_revert):
             out["stage"] = "restore"
+        elif self._held_base is not None:
+            pass        # la base si rifa' dopo la risposta: nessun contatore
         elif self.active is not None:
             out.update(stage="test", have=self.active.laps_seen,
                        need=self.min_stable)
@@ -1006,6 +1090,10 @@ class RaceEngineer:
         # metteva in attesa il rimedio successivo SOPRA quello bocciato.
         if self._held_revert is not None:
             return self._held_revert
+        # Lo stesso per la base da richiedere: il giro e' stato guidato con un
+        # assetto che non sappiamo quale sia, e non fa base.
+        if self._held_base is not None:
+            return self._held_base
 
         # A dry↔wet switch invalidates everything measured either side of it: a
         # baseline driven on slicks and a re-test driven on wets are two
@@ -1107,6 +1195,7 @@ class RaceEngineer:
             prediction=self._pending_prediction,
             remedy_rank=self.remedy_idx.get(sym, 0) if sym else 0,
             base_fuel=_median_fuel(self.window),
+            base_temp=_median_temp(self.window),
             # Every symptom on the books, not just the target: the verdict is
             # about one of them, the ledger is about all of them.
             base_scores=self._all_scores(),
@@ -1269,8 +1358,15 @@ class RaceEngineer:
         gap = after - a.base_fuel
         return round(gap, 2), abs(gap) >= _FUEL_BIAS_L
 
+    def _temp_moved(self, a: "_Active") -> bool:
+        """La pista si e' mossa troppo fra le due finestre? Non sapere non e' si'."""
+        after = _median_temp(self.window)
+        return (a.base_temp > 0 and after > 0
+                and abs(after - a.base_temp) >= _TEMP_BIAS_C)
+
     def _outcome(self, a: "_Active", *, kept: bool, score_after: float) -> Outcome:
         gap, confounded = self._fuel_gap(a)
+        temp_moved = self._temp_moved(a)
         return Outcome(
             prediction=a.prediction or self._predict(a.change),
             score_after=round(score_after, 3),
@@ -1280,8 +1376,12 @@ class RaceEngineer:
             fuel_before_l=round(a.base_fuel, 2),
             fuel_after_l=round(a.base_fuel + gap, 2) if gap else round(
                 _median_fuel(self.window), 2),
-            time_confounded=confounded,
+            time_confounded=confounded or temp_moved,
+            temp_confounded=temp_moved,
+            road_temp_before=round(a.base_temp, 1),
+            road_temp_after=round(_median_temp(self.window), 1),
             side_effects=self._side_effects(a),
+            tested=a.change,
         )
 
     def _revert(self, change: ProposedChange, message: str,
@@ -1440,8 +1540,91 @@ class RaceEngineer:
                 return Decision(DecisionKind.EVALUATING,
                                 _msg("evaluating", lang,
                                      laps=_laps_left(1, lang)), tail="")
+            # Prima del verdetto: le gomme hanno risposto alla modifica?
+            moved = self._base_moved(a, lang, reading.pressures_hot)
+            if moved:
+                return self._hold_base(moved)
             return self._judge_pressure(a, reading)
+        return self._verdict(a, lang)
 
+    def _hold_base(self, moved: str) -> Decision:
+        """Una prova smentita dalle gomme: niente verdetto, si chiede il file.
+
+        Le gomme non hanno risposto come la modifica: la prova non e' quella
+        che crediamo. L'08/11 valeva 5 click ed erano 13. Giudicarla
+        scriverebbe nel registro una prova mai fatta, e un ripristino di 5
+        click sopra il file scelto darebbe un assetto sbagliato in ogni caso.
+        Quindi niente verdetto, niente registro, niente da scrivere, e niente
+        psi per click imparati da una prova che non e' quella: il pilota
+        ricarica l'assetto di prima, lo dice ai box, e solo allora la base
+        riparte da giri nuovi. Fino ad allora la decisione resta questa, a ogni
+        giro: i giri in pista hanno ancora l'assetto sospetto.
+        """
+        self.window = []
+        self._offs = []
+        self.active = None
+        self._pending = None
+        self._pending_is_revert = False
+        self._pending_prediction = None
+        self._held_base = Decision(DecisionKind.STAND_DOWN, moved,
+                                   confirm_base=True)
+        return self._held_base
+
+    def base_confirmed(self) -> Decision | None:
+        """Il pilota ha detto ai box quale assetto ha caricato.
+
+        Scioglie la decisione tenuta da `_base_moved` e rifa' la base da zero:
+        contano solo i giri dopo questa risposta. Il giro d'uscita dai box non
+        arriva qui, perche' il registratore non registra la corsia box (vedi
+        `recorder._recording_allowed`). Senza niente da sciogliere torna None.
+        """
+        if self._held_base is None:
+            return None
+        self._held_base = None
+        self.window = []
+        self._offs = []
+        self._skipped = None
+        return Decision(DecisionKind.COLLECT,
+                        _msg("collect", n=self.min_stable, have=0))
+
+    def _base_moved(self, a: "_Active", lang: str, after: dict) -> str:
+        """Le gomme hanno risposto alla modifica di pressione come previsto?
+
+        Per ogni asse cambiato: lo spostamento misurato a caldo (la lettura a
+        regime dopo meno quella prima, `_pressure_reading`) contro quello
+        previsto (click per psi a caldo per click: quello imparato su
+        quest'auto se c'e', se no il passo del file). Oltre
+        ``max(_BASE_PSI, |previsto|)`` di scarto la risposta e' la frase che lo
+        dice e chiede il file vero; se no "".
+        Il 08/11 `HONE_3` doveva valere +0,5 psi e gli anteriori sono saliti di
+        2,2: la modifica era stata scritta sopra un file che non era in
+        macchina. Senza pressioni misurate, o senza il passo, non si dice niente.
+        """
+        base = a.base_pressures or {}
+        after = after or {}
+        out = []
+        for axle, axle_slots in (("front", FRONT), ("rear", REAR)):
+            mine = [c for c in a.change.changes
+                    if c.param == "tyrePressure" and c.slot in axle_slots]
+            clicks = {c.delta_clicks for c in mine}
+            if (len(clicks) != 1 or after.get(axle) is None
+                    or base.get(axle) is None):
+                continue
+            ppc = self.steps.psi_per_click(tuple(sorted(c.slot for c in mine)))
+            if not ppc:
+                continue
+            predicted = clicks.pop() * (self.hot_per_click.get(axle) or ppc)
+            measured = after[axle] - base[axle]
+            if abs(measured - predicted) > max(_BASE_PSI, abs(predicted)):
+                out.append(_msg(f"base_moved_{axle}", lang,
+                                moved=_signed_psi(measured, lang),
+                                worth=_signed_psi(predicted, lang)))
+        if not out:
+            return ""
+        return " ".join(out + [_msg("base_ask", lang)])
+
+    def _verdict(self, a: "_Active", lang: str) -> Decision:
+        """Il verdetto di una prova finita: tenuta o da rimettere."""
         new_time = _median_time(self.window)
         new_score = _median_score(self.window, a.symptom)
         d_time = new_time - a.base_time
@@ -1452,7 +1635,8 @@ class RaceEngineer:
         band_ok = d_time <= band
 
         _gap, fuel_confounded = self._fuel_gap(a)
-        if fuel_confounded:
+        temp_moved = self._temp_moved(a)
+        if fuel_confounded or temp_moved:
             # The two windows weren't driven at the same weight, so their times
             # aren't comparable. Suspending the veto rather than guessing at a
             # correction: converting litres to seconds needs a sensitivity we
@@ -1473,7 +1657,8 @@ class RaceEngineer:
             # remains the real authority, exactly as it is when the time is
             # usable. Reverting instead would put the gate straight back into
             # proposing the same change, forever.
-            key = ("accepted_unjudged" if fuel_confounded
+            key = ("accepted_unjudged_temp" if temp_moved
+                   else "accepted_unjudged" if fuel_confounded
                    else "accepted_structural")
             return Decision(DecisionKind.ACCEPTED, _msg(key, lang), outcome=out)
 
@@ -1708,7 +1893,6 @@ class RaceEngineer:
         pp = self._pressure_phase()
         nominal_of = getattr(pp, "steps", self.steps).psi_per_click
         parts: list[str] = []
-        far = False
         for ax, slots in (("front", FRONT), ("rear", REAR)):
             clicks = next((c.delta_clicks for c in a.change.changes
                            if c.slot in slots), 0)
@@ -1721,7 +1905,6 @@ class RaceEngineer:
             k = (after - before) / clicks
             if _HOT_PER_CLICK[0] <= k <= _HOT_PER_CLICK[1]:
                 self.hot_per_click[ax] = round(k, 3)
-            far = far or abs(after - expected) >= _PRESSURE_FAR_PSI
             inside = pp is None or next(pp._out({ax: after}), None) is None
             axis = _AXIS_WORDS[ax].get(lang) or _AXIS_WORDS[ax]["en"]
             parts.append(_msg("pressure_ok" if inside else "pressure_off", lang,
@@ -1730,8 +1913,6 @@ class RaceEngineer:
         out = self._outcome(a, kept=True, score_after=0.0)
         self._record(a.change)
         message = " ".join(parts) or _msg("accepted_structural", lang)
-        if far:
-            message += _msg("pressure_far", lang)
         return Decision(DecisionKind.ACCEPTED, message, outcome=out)
 
     def _pressure_remedy(self, phase: WorkPhase) -> ProposedChange | None:

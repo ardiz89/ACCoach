@@ -128,6 +128,7 @@ Validation — these read the live game, so the sim must be running:
   verify-yaw                 validate the yaw-rate sign (oversteer detection)
   verify-aids                validate the ACC aid-level mapping (live)
   find-rain                  find ACC's rain/grip fields by measuring them (live)
+  verify-box                 validate ACC's pit menu fields and tyre wear (live)
   verify-sectors             validate the sim's real sector data (live)
   verify-diag [car] [track]  offline FP-rate check of the lap diagnosis
 
@@ -211,6 +212,9 @@ def main() -> None:
     elif cmd in ("find-rain", "rain"):
         from .diagnostics import run_rain
         run_rain()
+    elif cmd in ("verify-box", "box"):
+        from .diagnostics import run_box
+        run_box()
     elif cmd in ("verify-sectors", "sectors"):
         from .diagnostics import run_sectors
         run_sectors()

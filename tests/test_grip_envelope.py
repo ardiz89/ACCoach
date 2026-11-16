@@ -121,7 +121,8 @@ def test_the_envelope_is_measured_from_the_reference_not_assumed():
     lap = synth.build_lap()
     env = _grip_envelope(lap, Reference(synth.build_lap()))
     peak = max(_combined_g(s.g_lat, s.g_long) for s in lap.samples)
-    assert 0.0 <= env <= peak + 1e-6
+    assert 0.0 <= env.whole <= peak + 1e-6
+    assert all(0.0 <= v <= peak + 1e-6 for v in env.bands.values())
 
 
 def test_one_kerb_strike_does_not_define_the_envelope():
@@ -132,7 +133,8 @@ def test_one_kerb_strike_does_not_define_the_envelope():
     spike = replace(ref_lap.samples[n // 2], g_lat=9.0, g_long=9.0)
     ref_lap.samples[n // 2] = spike
     env = _grip_envelope(synth.build_lap(), Reference(ref_lap))
-    assert env < _combined_g(9.0, 9.0), "il picco isolato non deve fare da limite"
+    assert env.whole < _combined_g(9.0, 9.0), "il picco isolato non deve fare da limite"
+    assert all(v < _combined_g(9.0, 9.0) for v in env.bands.values())
 
 
 def test_the_percentile_is_high_enough_to_mean_the_limit():

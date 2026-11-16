@@ -99,6 +99,27 @@ def window_icon():
     return QIcon(str(p)) if p else QIcon()
 
 
+def tip_text(text: str) -> str:
+    """Il testo di un suggerimento, che va a capo.
+
+    Qt manda a capo solo i suggerimenti in rich text: in testo semplice una
+    frase lunga resta su una riga, anche piu' larga dello schermo."""
+    import html
+
+    if not text:
+        return ""
+    body = html.escape(text)
+    # Da solo Qt lo stringe a 200 px, una colonna di quattro parole: una frase
+    # lunga prende una larghezza fissa, una corta resta su una riga.
+    if len(text) > _TIP_ONE_LINE:
+        return f"<table width='{_TIP_WIDTH_PX}'><tr><td style='font-size:14px'>{body}</td></tr></table>"
+    return f"<p style='white-space:pre'>{body}</p>"
+
+
+_TIP_ONE_LINE = 50
+_TIP_WIDTH_PX = 380
+
+
 def qss() -> str:
     """The application stylesheet, composed from the brand palette."""
     b = brand
@@ -111,10 +132,15 @@ def qss() -> str:
         color: {b.TEXT};
         font-size: 14px;
     }}
+    /* Il pilota non riusciva a leggerli (27/10): 11 px, nessun margine, e
+       una riga sola che usciva dallo schermo. Il testo va a capo con
+       `tip_text`; qui grandezza, margini e un bordo che lo stacca dal fondo. */
     QToolTip {{
         background: {b.SLATE};
         color: {b.TEXT};
-        border: 1px solid {b.LINE};
+        border: 1px solid {b.CYAN};
+        padding: 8px 10px;
+        font-size: 14px;
     }}
 
     /* --- sidebar navigation --- */

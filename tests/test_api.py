@@ -467,3 +467,14 @@ def test_demo_banner_on_the_test_page_speaks_its_language(tmp_path):
     css = (Path(__file__).resolve().parent.parent
            / "src" / "accoach" / "web" / "test.css").read_text(encoding="utf-8")
     assert ".demo-banner" in css
+
+
+def test_un_giro_con_la_sosta_non_fa_la_costanza_dell_andamento(tmp_path):
+    _seed(tmp_path)
+    lap = synth.stop_at(synth.build_lap(), 0.3, 106_000)
+    lap.recorded_utc = "2026-06-23T18:00:00+00:00"
+    save_lap(lap, tmp_path)
+    data = TestClient(create_api(tmp_path)).get(
+        "/api/progress", params={"car": CAR, "track": TRACK}).json()
+    assert data["consistency"]["n"] == 3
+    assert len(data["laps"]) == 4            # il giro resta nell'elenco

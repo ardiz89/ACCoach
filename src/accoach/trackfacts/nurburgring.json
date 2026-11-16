@@ -1,0 +1,336 @@
+{
+ "disputed": [],
+ "facts": [],
+ "single": [
+  {
+   "car_class": "gt3_presunta",
+   "corner": "Corner 1",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "Break down to first gear",
+     "start_s": 53.52,
+     "url": "https://www.youtube.com/watch?v=74GnHe1bwSU"
+    }
+   ],
+   "state": "singolo",
+   "type": "gear",
+   "value": "1"
+  },
+  {
+   "corner": "Corner 1",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "a good long trail brake into the apex, hugging as tight as possible",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/1c0a8ne/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "line",
+   "value": "a good long trail brake into the apex, hugging as tight as possible"
+  },
+  {
+   "corner": "Corner 1",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "For T1 you don't brake in a straight line which makes it so you have",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/1t7q2hh/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "mistake",
+   "value": "For T1 you don't brake in a straight line which makes it so you have"
+  },
+  {
+   "corner": "Corner 1",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "Stomp the brakes a bit harder",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/1c0a8ne/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "mistake",
+   "value": "Stomp the brakes a bit harder"
+  },
+  {
+   "corner": "Corner 2",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "T2, get on power earlier",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/1nrhqz6/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "line",
+   "value": "T2, get on power earlier"
+  },
+  {
+   "corner": "Corner 2",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "turn in, lift, wait until apex, get on the throttle",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/1c0a8ne/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "line",
+   "value": "turn in, lift, wait until apex, get on the throttle"
+  },
+  {
+   "corner": "Corner 2",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "Your attempt at trail braking is slowing you down even more",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/1c0a8ne/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "mistake",
+   "value": "Your attempt at trail braking is slowing you down even more"
+  },
+  {
+   "car_class": "gt3_presunta",
+   "corner": "Corner 3",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "haul the car in and shift to first",
+     "start_s": 91.439,
+     "url": "https://www.youtube.com/watch?v=C2JiwiLl9bg"
+    }
+   ],
+   "state": "singolo",
+   "type": "gear",
+   "value": "1"
+  },
+  {
+   "corner": "Corner 3",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "T3 try a later turn in under brakes",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/1nrhqz6/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "line",
+   "value": "T3 try a later turn in under brakes"
+  },
+  {
+   "corner": "Corner 3",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "Turn 3: You turn in too soon, you should stay on the green part until",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/17y7mcl/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "line",
+   "value": "Turn 3: You turn in too soon, you should stay on the green part until"
+  },
+  {
+   "corner": "Corner 3",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "especially entry turn 3 was way too shallow",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/17y7mcl/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "mistake",
+   "value": "especially entry turn 3 was way too shallow"
+  },
+  {
+   "car_class": "gt3_presunta",
+   "corner": "Corner 5",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "around about mid corner in third gear",
+     "start_s": 379.039,
+     "url": "https://www.youtube.com/watch?v=7CnBg9M8HU8"
+    }
+   ],
+   "state": "singolo",
+   "type": "gear",
+   "value": "3"
+  },
+  {
+   "corner": "Corner 5",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "If you would be still on that concrete and go on the brakes, you will",
+     "start_s": 503.36,
+     "url": "https://www.youtube.com/watch?v=vIP0JZD_PNI"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "mistake",
+   "value": "If you would be still on that concrete and go on the brakes, you will"
+  },
+  {
+   "corner": "Corner 6",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "Not sure why you 70% brake here",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/1c0a8ne/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "mistake",
+   "value": "Not sure why you 70% brake here"
+  },
+  {
+   "car_class": "gt3_presunta",
+   "corner": "Corner 7",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "Dunlop hairpin - 2nd gear corner",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/1l5dq37/"
+    }
+   ],
+   "state": "singolo",
+   "type": "gear",
+   "value": "2"
+  },
+  {
+   "corner": "Corner 7",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "run out in the exit so left side tyres are on the green concrete",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/1l5dq37/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "line",
+   "value": "run out in the exit so left side tyres are on the green concrete"
+  },
+  {
+   "corner": "Corner 7",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "you did the beginner thing of holding like 50-60% throttle",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/1c0a8ne/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "mistake",
+   "value": "you did the beginner thing of holding like 50-60% throttle"
+  },
+  {
+   "car_class": "gt3_presunta",
+   "corner": "Corner 10",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "break at the 100 meter board",
+     "start_s": 257.28,
+     "url": "https://www.youtube.com/watch?v=C2JiwiLl9bg"
+    }
+   ],
+   "state": "singolo",
+   "type": "brake",
+   "value": "board:100"
+  },
+  {
+   "car_class": "gt3_presunta",
+   "corner": "Corner 10",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "in third gear aim to put two wheels on the inside curb",
+     "start_s": 263.28,
+     "url": "https://www.youtube.com/watch?v=C2JiwiLl9bg"
+    }
+   ],
+   "state": "singolo",
+   "type": "gear",
+   "value": "3"
+  },
+  {
+   "corner": "Corner 10",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "Ideally you'll hit the inside curb a little and drift out again to the curb",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/1c0a8ne/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "line",
+   "value": "Ideally you'll hit the inside curb a little and drift out again to the curb"
+  },
+  {
+   "corner": "Corner 10",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "Definitely not a first gear corner",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/1c0a8ne/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "mistake",
+   "value": "Definitely not a first gear corner"
+  },
+  {
+   "corner": "Corner 11",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "Much too slow through here so carry more speed",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/1c0a8ne/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "mistake",
+   "value": "Much too slow through here so carry more speed"
+  },
+  {
+   "corner": "Corner 15",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "you can start trail braking into the apex of the corner",
+     "start_s": 1120.36,
+     "url": "https://www.youtube.com/watch?v=vIP0JZD_PNI"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "line",
+   "value": "you can start trail braking into the apex of the corner"
+  }
+ ],
+ "track": "nurburgring",
+ "version": 3
+}

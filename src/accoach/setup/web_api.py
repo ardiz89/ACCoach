@@ -58,6 +58,12 @@ class UndoBody(BaseModel):
     path: str
 
 
+class BaseBody(BaseModel):
+    """Il file che il pilota dice di aver caricato nel gioco."""
+
+    path: str
+
+
 class SeedBody(BaseModel):
     """Copy an existing setup of the same car into a track that has none."""
 
@@ -309,10 +315,15 @@ def register_setup_routes(app: FastAPI, root=DEFAULT_ROOTS) -> None:
 
         La pagina non deve indovinarlo: a un tablet fermo ai box l'unica
         domanda sensata e' «su quale assetto?», e la risposta onesta e' quello
-        che l'Ingegnere ha scritto per ultimo (la catena di prove parte da li),
-        se no il piu' recente per data (l'ultimo che il pilota ha salvato dal
-        garage). Auto e pista si cercano in minuscolo, come `sameName` in
-        `engineer.js`: il gioco non scrive i nomi sempre allo stesso modo.
+        che l'Ingegnere ha scritto per ultimo (la catena di prove parte da li).
+        Se non ne ha scritto nessuno non si indovina: ``base`` e' None,
+        ``confirm`` e' True e la pagina lo chiede al pilota. Il 08/11 il piu'
+        recente per data era `HONE_2`, il pilota guidava `720sEVO_Imola_0`, e
+        la modifica scritta sopra il file sbagliato ha mosso gli anteriori di
+        13 click invece di 5. L'elenco va dal piu' recente, che di solito e'
+        quello appena salvato dal garage. Auto e pista si cercano in minuscolo,
+        come `sameName` in `engineer.js`: il gioco non scrive i nomi sempre
+        allo stesso modo.
         """
         car_l, track_l = car.strip().lower(), track.strip().lower()
         car_dir = track_dir = None
@@ -331,16 +342,33 @@ def register_setup_routes(app: FastAPI, root=DEFAULT_ROOTS) -> None:
                               + sorted(t.glob("*.ini")) if p.is_file()]
         if not found:
             return {"car": None, "track": None, "setups": [], "base": None,
-                    "last_written": None}
+                    "last_written": None, "confirm": False}
         setups = [{"name": p.stem, "path": str(p), "mtime": p.stat().st_mtime}
                   for p in found]
+        setups.sort(key=lambda x: x["mtime"], reverse=True)
         written = last_written.get((car_l, track_l))
         if written is not None and written.is_file():
             return {"car": car_dir, "track": track_dir, "setups": setups,
-                    "base": str(written), "last_written": written.stem}
-        newest = max(setups, key=lambda x: x["mtime"])
+                    "base": str(written), "last_written": written.stem,
+                    "confirm": False}
         return {"car": car_dir, "track": track_dir, "setups": setups,
-                "base": newest["path"], "last_written": None}
+                "base": None, "last_written": None, "confirm": True}
+
+    @app.post("/api/setup/base")
+    def setup_base_set(body: BaseBody) -> dict:
+        """La risposta del pilota a «Quale assetto hai caricato nel gioco?».
+
+        Da qui e' quello il file di partenza per quell'auto e quella pista,
+        al posto dell'ultimo scritto: se le gomme hanno smentito la prova,
+        quel file e' proprio quello di cui non ci si fida piu'. Lo stesso
+        posto dove `setup_apply` segna il file scritto, quindi la GET sopra
+        risponde con questo e non chiede piu'.
+        """
+        p = _safe(body.path, roots)
+        if not p.is_file():
+            raise HTTPException(404, "setup not found")
+        last_written[(p.parent.parent.name.lower(), p.parent.name.lower())] = p
+        return {"ok": True, "path": str(p), "name": p.stem}
 
     @app.get("/api/setup/class")
     def setup_class(car: str = Query(...),

@@ -151,7 +151,9 @@ coach warns you when you do something that's wrong on any lap.
 - If the car **oversteers**, you hear "Oversteer, open the throttle gently on
   exit".
 - If you **coast**, with neither brake nor throttle pressed, you hear "You're
-  coasting, go straight from brake to throttle".
+  coasting, go straight from brake to throttle". You hear it once every three
+  laps at most, unless it's the theme you're working on. On screen the line also
+  names the corner.
 - If you let go of the brake too early, without **trail braking**, you hear
   "Releasing too early, trail the brake to turn-in".
 
@@ -357,7 +359,9 @@ plate is what keeps it readable over a bright sky.
     with the time.
 - **At the bottom, only in Full**, the **focus** sits on the left. It's the
   theme you're working on and its corner. **The last corner** you closed sits
-  on the right with its tenths. The coach moves to short words, as described
+  on the right with its tenths. Voice advice and the last corner measure each
+  corner against **your best through that corner**. The delta at the top stays
+  on the reference. The coach moves to short words, as described
   in "One theme at a time". From then on the focus also shows **the word you
   hear**, like "less brake".
 
@@ -372,11 +376,14 @@ Coach Live running too.
 The overlay ignores clicks, so it never steals your mouse while you drive. To
 move it, open **Settings** and press **Move the overlay**. A copy opens with a
 dashed border, and you drag it wherever you like. The mouse wheel changes the
-size. **Enter** saves, **Esc** closes without saving, **R** puts it back at the
-top centre. It works with Coach Live running too, and the real overlay moves
+size. Position and size are saved by themselves as soon as you let go of the
+mouse. **Enter** or **Esc** closes the copy, **R** puts it back at the top
+centre. It works with Coach Live running too, and the real overlay moves
 there by itself within a second. The game has to be in Borderless, as it does
 to show the overlay at all. **Back to the centre** does what R does without
-opening the copy.
+opening the copy. There is only one copy, so pressing the button again doesn't
+open another. While it's open, the size and mode you pick in Settings show up
+straight away, without pressing Save.
 
 ### The pedal trace
 
@@ -390,7 +397,7 @@ a ribbon that colours itself.
 
 | Ribbon | What you're doing |
 |---|---|
-| **amber** | You're pressing both pedals, so **you're trail braking**. |
+| **amber** | You're still braking with the wheel turned, so **you're trail braking**. |
 | **grey** | You're pressing neither pedal, and that's **time you're giving away**. |
 | nothing | A clean release. You let go of the brake and picked up the throttle with no gap. |
 
@@ -398,8 +405,15 @@ At the top right you get the same thing in one word, **TRAIL**, or **COAST** wit
 a timer for how long you've been coasting.
 
 The coach **tells** you about trail braking, but after the fact. Here you **see
-it while you do it**, and that's the only way to correct a release. Where the two
-traces overlap, that's your trail braking.
+it while you do it**, and that's the only way to correct a release. The white line
+is the steering, with left at the top.
+
+In **Settings**, under **How the pedals show**, you can pick **bars** instead of
+the trace. The bars show brake, throttle and steering right now, with the
+percentage inside. The cyan mark on brake and throttle is what your reference lap
+was pressing at that point of the track. Under braking, check whether you're above
+or below the mark. Into the corner, check whether your bar comes down with it or
+drops first. Without a reference there's no mark.
 
 > On road cars the spoken advice about trail braking is **off**. There, carrying
 > the brake into the turn rotates the car, and without aerodynamic downforce a
@@ -431,6 +445,11 @@ Three things look like faults and aren't.
   even as a dash. Without one of your complete laps there's nothing to measure
   against, and a made-up number would be worse than none. It also disappears in
   the pits, on the out-lap and on off-pace laps.
+
+The coach also never repeats the same kind of call within **five seconds**, even
+if you are in a different part of the track. On the out-lap it stays quiet about
+wheelspin, because with cold tyres it is normal. It speaks about it again from
+the first time you cross the line.
 
 The spoken advice **doesn't change**. It always comes at the entry of the same
 corner, on the next lap, where you can still do something about it. The number is
@@ -496,6 +515,12 @@ Under it is the verdict, in one or two sentences. It tells you how much you leav
 on average each lap against your reference lap, and where it piles up. It
 compares that with the previous session, same car on the same track. If there's
 no previous session, it says so.
+
+A lap with the car standing still for more than 5 seconds counts towards neither
+the averages nor the defects. The game marks it valid, but that time is a stop,
+not driving. Its errors still count, because they happened. The same goes for
+the Session tab, for Corner by corner and for the consistency in Progress. On
+the Session tab, under the title, you read how many laps were left out.
 
 Then come four blocks, in this order.
 
@@ -595,6 +620,8 @@ The tabs come in three groups, in the order you usually read them.
   it doesn't appear, because we don't know it, and that doesn't mean zero litres.
   It doesn't appear on laps where you refuelled either, because there's a refuel
   in the middle and not a consumption.
+- **Corner by corner** lines up the corners of a whole session, worst first.
+  It's described further down.
 - **Lap explained** shows you the lap one thing at a time, instead of five
   charts at once. It tells you what cost you most, why, and what to do, with the
   chart cropped to the stretch it's talking about. It's three steps at most. If
@@ -616,6 +643,18 @@ The tabs come in three groups, in the order you usually read them.
   **their names**, the same ones you find in the rest of the page. If you lost the
   lap, a red cross marks where you lost it. The map **stays put** while you scroll
   the charts. Hover over the delta and the same point lights up on the map.
+
+  Under the lines there's the **track seen from above**, taken from the Assetto
+  Corsa files on your PC. It needs AC installed with that track, and it works
+  for ACC laps on the same track too. If AC doesn't have the track, the map is
+  the usual one. The first time the background gets prepared, then it stays
+  ready. Up close the scenery is blurry, because the game keeps it that way.
+  Over the track your line always keeps the same width, and you read the gap
+  from the colour alone. Without the background the line is also thicker where
+  you lose.
+  Use the **mouse wheel** to zoom in around the pointer, and drag to move. A
+  **double-click** takes you back to the whole lap. On the tablet and on other
+  devices the map stays without a background.
 
   Under the map there's **Your braking points**, the panel with your braking
   points corner by corner. For each corner you read **the speed you brake at**, in which
@@ -796,6 +835,48 @@ corner.
   you should look at the wing and the gearing. If you're slower in the corners
   too, it's exit speed, and the setup has nothing to do with it.
 
+### Corner by corner
+
+This tab looks at every valid lap of a session, not at one lap. Each corner is a
+row. The number on the right is how much you lose there on a typical lap, that
+is the median of your laps. The corner where you usually lose the most is at the
+top. One lap with a big mistake doesn't move the order. The picker at the top
+chooses the session, as on the Report card.
+
+A lap with the car standing still for more than 5 seconds doesn't count, as on
+the Report card. At the top of the tab you read how many laps were left out. A
+spin you recover from straight away does count.
+
+Open a row and you get four blocks.
+
+- **How much and where you lose.** The time lost on a typical lap, then over the
+  whole session net of the laps where you gain there, and on how many laps you
+  lose. Every lap counts,
+  the fast ones too. The median loss per phase and the cause that comes back most
+  often come only from the laps where you lose. It's measured against your own best attempt at that corner, when there is one,
+  and otherwise against the reference. At the top the page says which lap is the
+  reference, and it can come from another session.
+- **Your braking.** Where you start braking relative to the slowest point, how
+  much that moves from lap to lap, the speed you brake at and your lowest gear.
+- **Your line.** The typical gap to the reference line on entry, at the apex and
+  on exit, inside or outside, and where your apex falls. Two buttons open your
+  best lap at that corner and your most typical lap in Compare.
+- **What the sources say.** On the twelve ACC tracks, what public guides and
+  videos say about that corner, with the short quote and a link to that moment
+  of the video. **Reference** is what at least two independent authors say and
+  a check against the sources confirmed. Today there are few of them. **One
+  source says** is what the check against the sources didn't
+  confirm, even when more than one author says it. Next to it you read how many
+  authors say it. It's not a reference. **The sources disagree** puts the
+  different values side by side.
+- Gears and braking come only from sources on GT3 cars. Lines and mistakes come
+  from every source on ACC. If a source is about another car, next to it you
+  read "On a GT4", "On another class of car" or "Car class unclear".
+
+The sources never become a target. The page never tells you which board to brake
+at, because we don't know where the board sits on the map. It compares only the
+gear, and says so like this, for example "You in third, one source in second."
+
 ### Corner by session
 
 Under the weak points, every **systematic** corner has its own chart. It shows
@@ -851,10 +932,47 @@ temperature of both. For example "Chosen for conditions" and "track at 12.0 °C,
 while your 1:39.000 was set at 32.0 °C". If you pick the comparison lap yourself
 from the dropdown, your choice holds and doesn't change.
 
+
+In the report's debrief each corner is measured against **your best through
+that corner**. It's the lap of yours that took it fastest, among your twenty
+quickest laps in the same conditions. It only counts if it beats the reference
+there by at least half a tenth. The detail says so with "Compared with your best
+through this corner", together with that lap's time. The on-screen delta stays
+on the reference, because it measures the whole lap and not one corner. That's
+why a corner's numbers can be higher than before. Before, you were measured
+against a lap that was slower there than your best. If you pick the comparison
+lap yourself from the dropdown, or it's a PRO lap, every corner uses that.
+
+The report can add one sentence to a corner about the gesture you do differently
+from that corner's reference. There are five measures. They are how long the brake
+release takes and how quickly you open the throttle. Then the gear at the apex,
+the time in ABS and steering corrections. It names at most one gesture per corner. It names it
+only if it sits where the time goes, meaning entry, apex or exit. For the throttle
+the stretch just after the corner counts too. It also names it
+only if it differs by more than two of your own laps usually differ there. Below
+that threshold the report stays silent. Steering, throttle and ABS are named only if
+you do more of them than the reference. Correcting less or opening the throttle faster doesn't
+explain lost time. Brake release and gear count both ways. ABS is compared only between laps with the
+same ABS level set. On AC the game doesn't report the level, so ABS isn't compared
+there. A lap with ABS on for more than half of it has a stuck channel, and on that
+lap ABS isn't compared. The grip of a corner is now compared, point by point, with the car's limit at that speed,
+measured on the reference. Before, there was a single limit for the whole lap. A band's limit never drops below a slower band's, but never exceeds the whole-lap limit. Grip can't be measured on a straight.
+
 If you're a long way off the pace, your own best lap is a target that keeps you
 where you are. In the **Analysis** section of the hub there's
-**Import a PRO reference lap**. You can import a faster lap, and from then on the
-coach measures you against it.
+**Import a PRO reference lap**. The file is a HONE lap, a `.lap.json.gz`, for
+the same car and the same track.
+
+- If it's faster than your best lap, from then on the coach measures you
+  against it, whatever today's track temperature.
+- If it's slower, your best lap stays the reference. You still find the PRO lap
+  among the report's comparison laps, marked [PRO].
+- After the import the hub tells you which of the two is the reference. The same
+  lap imported twice is saved only once.
+
+A PRO lap isn't one of your laps. It doesn't count in your best lap, the ideal
+lap, your sessions, the Home page or the Report card. In **Trends**, among the
+Levels, it has its own rung, which tells you how far off it you are.
 
 > Want to try HONE without the game? `python accoach_main.py web --demo` loads
 > sample laps.
@@ -874,22 +992,40 @@ enter or leave the pits. Setup shows a mark when there's a change to make in the
 pits. On both tabs, above the phase, is the road described in "The engineer's
 road".
 
-- **Telemetry.** You see speed, gear, TC, ABS and engine map, and the temperature
-  and pressure of the four tyres. A strip shows throttle, brake and steering
+- **Telemetry.** You see speed, gear and fuel. Fuel is the tank
+  percentage, with "≈ N laps" below it at your average burn. Below it you see
+  a dash until HONE has measured one lap's burn. Then there are TC, ABS and
+  engine map, and the temperature and pressure of the four tyres. A strip
+  shows throttle, brake and steering
   from the last 8 s. Below it are the road and the phase the engineer is on.
   A change to make from the wheel appears in a box. The *I've changed it* button
   is there only where HONE can't read the dial, as explained in "Setup advice".
+- **Pedals as on the overlay.** Above the strip are the brake, throttle and
+  steering bars as they are now. The blue mark is how hard the reference lap
+  pressed at that point. Beside them you read the gap, and TRAIL while you
+  brake with the wheel turned. While you press neither pedal you read COASTING
+  with the seconds. Under the strip an amber band marks trail braking, a grey
+  one coasting.
+- **The track.** On the right, or below with the tablet upright, is the track
+  with the car in blue and a tip showing where it's heading. *Whole track*
+  shows all of it. *400 m* and *120 m* follow the car, and at 120 m you see the
+  car against the edges. The edges are there only on tracks you also have in
+  Assetto Corsa. On the others the grey line is your reference lap, and the
+  page says so. The track arrives with your first valid lap on it.
 - **Return-to-pits call.** When the engineer has a change to make in the pits,
   the call to come in at the end of the lap appears at the top. The telemetry
   stays below. For a rejected change the call is similar and tells you to put
   the last change back as it was. Tapping the call takes you to Setup.
 - **Setup.** The page shows the phase and the levers to change, one per row,
   from the current value to the new one. Below are the reason and the
-  confidence. As the starting file, HONE offers the last setup it wrote for
+  confidence. As the starting file, HONE uses the last setup it wrote for
   that car and track since the web process started. If it hasn't written one,
-  it offers the most recently modified file. You can pick another from the
-  list. Press *Write the change* and confirm. HONE creates a new file and
-  leaves yours alone. The page then shows the file name in large type, to load
+  it doesn't guess. The page asks "Which setup did you load in the game?" and
+  the list starts empty. Until you pick the file, the write button stays off.
+  After HONE restarts the question comes back. You can always pick another
+  file from the list. Press *Write the change* and confirm. HONE creates a new
+  file and leaves yours alone. The page then shows the file name in large
+  type, to load
   from the game's garage. If it can't find a setup for that car on that track,
   it asks you to save one from the garage.
 - **On track, Setup is for reading.** You see the change, the starting file
@@ -901,10 +1037,24 @@ road".
   with the previous values. If you've already reloaded the previous file in the
   game's garage, press *I've already put it back*. This button too only works
   in the pits.
+- **The tyres double as a check.** When the test of a pressure change ends,
+  the engineer compares how far the hot tyres moved with what the change was
+  worth. If the gap is over 0.8 psi, or over the change itself when that is
+  bigger, it tells you both numbers. It means the starting file probably
+  wasn't the one on your car. Then the engineer doesn't judge the test or log
+  it, and there's nothing to write on the file. Until you answer, the laps
+  you drive don't count towards the baseline, because the doubtful setup is
+  still on the car. The engineer calls you in by voice, right away and again
+  at the next line. In the pits, reload the setup you were driving before the
+  change. The page asks again, even if you reload it, and you pick the setup
+  you actually loaded. HONE remembers it as the starting file for that car
+  and track. Then the engineer takes a new baseline from the laps after you
+  leave the pits.
 - **The full Engineer page follows the same rule.** Its writing buttons switch
   off when you're driving and not stopped in the pits, even paused on track.
   With the game off or in the menus you can still write, to prepare a setup
-  without driving.
+  without driving. There too you pick the first starting file, and the
+  question comes back when the tyres don't respond as expected.
 
 For anything else, such as the history of the trials, use the full engineer
 page. It stays at `/engineer`, and the *Full page* link at the bottom of the
@@ -1069,6 +1219,7 @@ These are the ones you might really need.
 | `logs` | Opens the folder with the logs and crash reports. |
 | `logs --zip` | Packs the logs and some context into one file to attach to a report. **The logs go in unfiltered, except for your home folder.** Read "What's in that zip" before you send it. |
 | `find-rain` | Finds the ACC rain fields by measuring them. You need a session with changing weather. |
+| `verify-box` | Shows litres and tyre set from the ACC pit menu, session time and wear. Change the menu and see if the numbers follow. |
 
 
 ### The debrief in the terminal

@@ -71,8 +71,7 @@ from .i18n import LANGUAGES, language_name, t
 from .guard import lan_key
 from .netinfo import device_urls, display_address, port_open, qr_png
 from .paths import base_dir
-from .telemetry.snapshot import format_lap_time
-from .theme import load_fonts, qss, window_icon
+from .theme import load_fonts, qss, tip_text, window_icon
 
 _SRC = Path(__file__).resolve().parents[1]   # .../src
 
@@ -85,6 +84,12 @@ _SRC = Path(__file__).resolve().parents[1]   # .../src
 # Commands that run a speaking coach. Only one may run at a time — two voice
 # engines talking together sound like an echo — so starting one stops the other.
 _VOICE_CMDS = {"live", "coach"}
+
+# Comandi di cui basta una finestra: un altro clic non ne apre una seconda.
+_ONE_AT_A_TIME = {tuple(_PLACE_OVERLAY)}
+
+# Quanto aspetta l'hub prima di scrivere grandezza, modalita' e colori.
+_LOOK_SAVE_MS = 300
 
 
 # --- first-run "getting started" wizard ------------------------------------
@@ -411,7 +416,7 @@ class SettingsPanel(QWidget):
             self._labels[key] = lbl
             mark = QLabel("?")
             mark.setProperty("role", "help")
-            mark.setToolTip(t(f"{key}.help"))
+            mark.setToolTip(tip_text(t(f"{key}.help")))
             mark.setCursor(Qt.WhatsThisCursor)
             self._helps[key] = mark
             box = QWidget()
@@ -453,6 +458,10 @@ class SettingsPanel(QWidget):
         self._scale.setValue(cfg.overlay.scale or 1.0)
         self._scale.setSuffix(" ×")
         row("set.scale", self._scale)
+        # La grandezza che la casella mostrava l'ultima volta che era uguale al
+        # file. La rotella della copia la cambia da un altro processo: se la
+        # casella non e' stata toccata, cambiare modalita' non la riscrive.
+        self._scale_synced = round(self._scale.value(), 2)
 
         # Essenziale o Completa, e i colori per daltonici (26/10): l'overlay li
         # rilegge da solo mentre gira, come posizione e grandezza.
@@ -466,6 +475,18 @@ class SettingsPanel(QWidget):
         self._cb.setChecked(cfg.overlay.cb)
         row("set.overlay_cb", self._cb)
 
+        # Grandezza, modalita' e colori si salvano da soli (27/10): il pilota li
+        # cambiava con la copia di «Sposta l'overlay» aperta e non vedeva
+        # niente finche' non premeva Salva. Il ritardo raccoglie i clic sulle
+        # frecce in una scrittura sola.
+        self._look_timer = QTimer(self)
+        self._look_timer.setSingleShot(True)
+        self._look_timer.setInterval(_LOOK_SAVE_MS)
+        self._look_timer.timeout.connect(self._save_look)
+        self._scale.valueChanged.connect(lambda _v: self._look_timer.start())
+        self._mode.currentIndexChanged.connect(lambda _i: self._look_timer.start())
+        self._cb.toggled.connect(lambda _c: self._look_timer.start())
+
         self._wean = QCheckBox()
         self._wean.setChecked(cfg.overlay.wean)
         row("set.wean", self._wean)
@@ -477,6 +498,15 @@ class SettingsPanel(QWidget):
         self._pedals = QCheckBox()
         self._pedals.setChecked(cfg.overlay.pedals)
         row("set.pedals", self._pedals)
+
+        # Traccia o barre (03/11): si rilegge mentre l'overlay gira, come la
+        # modalita', perche' non cambia l'altezza della finestra.
+        self._pedal_view = QComboBox()
+        self._pedal_view.addItem(t("set.pedal_view_trace"), "trace")
+        self._pedal_view.addItem(t("set.pedal_view_bars"), "bars")
+        self._pedal_view.setCurrentIndex(1 if cfg.overlay.pedal_view == "bars" else 0)
+        row("set.pedal_view", self._pedal_view)
+        self._pedal_view.currentIndexChanged.connect(lambda _i: self._look_timer.start())
 
         self._autorecord = QCheckBox()
         self._autorecord.setChecked(cfg.autorecord)
@@ -570,12 +600,37 @@ class SettingsPanel(QWidget):
         ok = save_config(cfg)
         self._place_hint.setText(t("set.centered" if ok else "set.save_failed"))
 
+    def _save_look(self) -> bool:
+        """Scrive subito grandezza, modalita' e colori: l'overlay e la copia
+        da spostare li rileggono entro un secondo. Si rilegge il file prima,
+        come in `_center_overlay`."""
+        cfg = load_config(reload=True)
+        scale = round(self._scale.value(), 2)
+        if scale != self._scale_synced:      # la casella l'hai toccata tu
+            cfg.overlay.scale = scale
+        cfg.overlay.mode = str(self._mode.currentData())
+        cfg.overlay.cb = self._cb.isChecked()
+        cfg.overlay.pedal_view = str(self._pedal_view.currentData())
+        ok = save_config(cfg)
+        if ok:
+            self._scale_synced = scale
+        return ok
+
     def showEvent(self, event) -> None:  # noqa: N802 - Qt naming
         """Rilegge la grandezza: «Sposta l'overlay» la cambia da un altro
-        processo, e la casella mostrerebbe quella di prima."""
+        processo, e la casella mostrerebbe quella di prima. I segnali tacciono:
+        rimettere il valore del file non e' una scelta del pilota."""
         super().showEvent(event)
         cfg = load_config(reload=True)
+        for w in (self._scale, self._mode, self._cb, self._pedal_view):
+            w.blockSignals(True)
         self._scale.setValue(cfg.overlay.scale or 1.0)
+        self._scale_synced = round(self._scale.value(), 2)
+        self._mode.setCurrentIndex(0 if cfg.overlay.mode == "essential" else 1)
+        self._cb.setChecked(cfg.overlay.cb)
+        self._pedal_view.setCurrentIndex(1 if cfg.overlay.pedal_view == "bars" else 0)
+        for w in (self._scale, self._mode, self._cb, self._pedal_view):
+            w.blockSignals(False)
 
     def _do_save(self) -> None:
         cfg = load_config()
@@ -584,13 +639,18 @@ class SettingsPanel(QWidget):
         cfg.voice.male = bool(self._male.currentData())
         cfg.voice.radio = self._radio.isChecked()
         cfg.voice.rate = self._rate.value()
-        cfg.overlay.scale = round(self._scale.value(), 2)
+        scale = round(self._scale.value(), 2)
+        if scale != self._scale_synced:      # come in `_save_look`
+            cfg.overlay.scale = scale
         cfg.overlay.wean = self._wean.isChecked()
         cfg.overlay.mode = str(self._mode.currentData())
         cfg.overlay.cb = self._cb.isChecked()
         cfg.overlay.pedals = self._pedals.isChecked()
+        cfg.overlay.pedal_view = str(self._pedal_view.currentData())
         cfg.autorecord = self._autorecord.isChecked()
         ok = save_config(cfg)
+        if ok:
+            self._scale_synced = scale
         # A page may have changed the language since the hub started: follow it
         # first, so the note is in the language the hub is showing.
         self._hub.follow_language()
@@ -605,12 +665,14 @@ class SettingsPanel(QWidget):
         for key, lbl in self._labels.items():
             lbl.setText(t(key))
         for key, mark in self._helps.items():
-            mark.setToolTip(t(f"{key}.help"))
+            mark.setToolTip(tip_text(t(f"{key}.help")))
         self._pedals_hint.setText(t("set.pedals_hint"))
         self._scale_hint.setText(t("set.scale_hint"))
         self._place_hint.setText(t("set.place_hint"))
         self._mode.setItemText(0, t("set.mode_essential"))
         self._mode.setItemText(1, t("set.mode_full"))
+        self._pedal_view.setItemText(0, t("set.pedal_view_trace"))
+        self._pedal_view.setItemText(1, t("set.pedal_view_bars"))
         self._male.setItemText(0, t("set.voice_male"))
         self._male.setItemText(1, t("set.voice_female"))
         self._rate.setSuffix(t("set.rate_unit"))
@@ -922,26 +984,20 @@ class MainWindow(QWidget):
             "HONE lap (*.lap.json.gz);;All files (*)")
         if not path:
             return
-        from .recording import load_lap, save_lap
+        from .recording.pro import describe, import_pro
 
         try:
-            lap = load_lap(Path(path))
-            if lap.lap_time_ms <= 0 or not lap.samples:
-                raise ValueError("no lap time or no samples")
+            # Anche il salvataggio sta qui dentro: prima un disco pieno o una
+            # cartella senza permessi chiudeva l'import con un'eccezione muta.
+            result = import_pro(Path(path))
         except Exception as exc:  # noqa: BLE001 - any bad file lands here
             # Say which file and why. An import that fails silently is how a
             # driver ends up wondering why the reference never changed.
             self._import_note.setText(t("import.failed").format(err=exc))
             return
-        lap.valid = True          # a reference must be a complete lap
-        lap.clean = True          # imported as a trusted clean benchmark
-        lap.source = "pro"        # its own level, not one of the driver's laps
-        lap.recorded_utc = ""     # let save_lap stamp it
-        save_lap(lap)
-        # Il tempo come lo scrive il gioco («1:47.427»), non in secondi.
-        self._import_note.setText(t("import.done").format(
-            car=lap.car_model, track=lap.track,
-            time=format_lap_time(lap.lap_time_ms)))
+        # Cosa e' successo, non solo che e' successo: il riferimento cambia
+        # solo se il giro PRO e' piu' veloce del tuo migliore.
+        self._import_note.setText(describe(result, t))
 
     def _build_setup_page(self) -> QWidget:
         page, lay = _section("nav.setup")
@@ -1070,6 +1126,12 @@ class MainWindow(QWidget):
                 if a and a[0] in _VOICE_CMDS and proc.poll() is None:
                     self._kill(proc)
             self._prune()
+        # Una copia sola di «Sposta l'overlay» (27/10): ogni clic ne apriva
+        # un'altra, e il pilota se ne e' trovate sei una sopra l'altra.
+        if tuple(args) in _ONE_AT_A_TIME:
+            self._prune()
+            if any(tuple(a) == tuple(args) for _p, a in self._children):
+                return
 
         flags = 0
         if new_console and sys.platform == "win32":
@@ -1119,12 +1181,12 @@ class MainWindow(QWidget):
             state = button_state(key, live=live, busy=busy)
             btn.setEnabled(state != BLOCKED)
             if state == BLOCKED:
-                btn.setToolTip(t("btn.busy_recording"))
+                btn.setToolTip(tip_text(t("btn.busy_recording")))
             elif state == EXPLAIN:
-                btn.setToolTip(t("swap.tooltip"))
+                btn.setToolTip(tip_text(t("swap.tooltip")))
             else:
                 tip = btn.property("tipKey")
-                btn.setToolTip(t(tip) if tip else "")
+                btn.setToolTip(tip_text(t(tip)) if tip else "")
             # "Stop Coach Live" is meaningless before there's one to stop, and a
             # disabled Stop sitting next to Start reads as "something is already
             # running" — the opposite of the truth. Hide it instead: the panel

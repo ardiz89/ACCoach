@@ -200,6 +200,82 @@ def find_reference_lap(
     return _find_reference_by_scan(car_model, track, laps_dir)
 
 
+def reference_pool_paths(
+    car_model: str,
+    track: str,
+    laps_dir: Path | str | None = None,
+    road_temp: float | None = None,
+    grip: float | None = None,
+    compound: str | None = None,
+    limit: int = 20,
+    sync: bool = True,
+) -> list[str]:
+    """I file del bacino di :func:`reference_pool`, senza caricarli.
+
+    Serve a chi tiene già in memoria i giri che ha caricato (il report): sa
+    quali file servono e carica solo quelli nuovi. ``[]`` se il catalogo non si
+    può usare, come per il bacino.
+
+    ``sync=False`` per chi ha appena sincronizzato il catalogo (il report e la
+    Home lo fanno a ogni richiesta): rifarlo voleva dire rileggere la cartella
+    una seconda volta per niente. Il motore tiene il default."""
+    laps_dir = Path(laps_dir) if laps_dir else laps_root()
+    try:
+        from .catalog import LapCatalog
+
+        with LapCatalog(_catalog_path(laps_dir)) as cat:
+            if sync:
+                cat.sync(list_lap_files(laps_dir))
+            return list(cat.reference_pool_paths(car_model, track, road_temp,
+                                                 grip, compound, limit))
+    except Exception:
+        _log.debug("catalog pool lookup failed; no pool", exc_info=True)
+        return []
+
+
+def pool_lap_ok(lap: Lap, car_model: str, track: str) -> bool:
+    """La conferma di un giro del bacino: il file vince sull'indice, come per
+    il riferimento principale."""
+    return (lap.valid and lap.lap_time_ms > 0 and lap.clean is not False
+            and lap.source != "pro"
+            and _slug(lap.car_model) == _slug(car_model)
+            and _slug(lap.track) == _slug(track))
+
+
+def reference_pool(
+    car_model: str,
+    track: str,
+    laps_dir: Path | str | None = None,
+    road_temp: float | None = None,
+    grip: float | None = None,
+    compound: str | None = None,
+    limit: int = 20,
+) -> list[Lap]:
+    """Your fastest trustworthy laps in the conditions of the main reference.
+
+    The pool the per-corner bests are picked from (:mod:`coaching.corner_refs`):
+    same catalog query and same relaxation as :func:`find_reference_lap`, but up
+    to ``limit`` laps instead of one. Loads every file, so call it from a worker
+    thread, never from the tick.
+
+    Catalog only: if the catalog can't be used the answer is ``[]``, with no
+    directory scan. A scan would load the whole archive on a thread the driver
+    is waiting on, to rebuild a *bonus*; without a pool the coach simply keeps
+    the main reference. A file that fails to load is skipped, never raised.
+    """
+    pool: list[Lap] = []
+    for path in reference_pool_paths(car_model, track, laps_dir, road_temp,
+                                     grip, compound, limit):
+        try:
+            lap = load_lap(path)
+        except Exception:
+            _log.debug("pool lap %s does not load; skipped", path, exc_info=True)
+            continue
+        if pool_lap_ok(lap, car_model, track):
+            pool.append(lap)
+    return pool
+
+
 def _find_reference_by_scan(
     car_model: str, track: str, laps_dir: Path,
 ) -> Lap | None:
@@ -211,11 +287,12 @@ def _find_reference_by_scan(
     locked or corrupt catalog silently put the lap that cut the Roggia back in
     charge, with nothing on screen to say so.
     """
-    from .lap import clean_verdict
+    from .lap import clean_verdict, prefer_pro
 
     want_car, want_track = _slug(car_model), _slug(track)
     best_clean: Lap | None = None      # judged clean
     best_unknown: Lap | None = None    # never judged (legacy/AC/pre-isValidLap)
+    best_pro: Lap | None = None        # imported, not one of yours
     for path in list_lap_files(laps_dir):
         if not path.name.startswith(f"{want_track}__{want_car}__"):
             continue
@@ -227,13 +304,20 @@ def _find_reference_by_scan(
             continue
         if _slug(lap.car_model) != want_car or _slug(lap.track) != want_track:
             continue
+        if lap.source == "pro":
+            if best_pro is None or lap.lap_time_ms < best_pro.lap_time_ms:
+                best_pro = lap
+            continue
         if clean_verdict(lap.clean, lap.schema_version, lap.tyre_compound,
                          lap.recorded_utc) == 1:
             if best_clean is None or lap.lap_time_ms < best_clean.lap_time_ms:
                 best_clean = lap
         elif best_unknown is None or lap.lap_time_ms < best_unknown.lap_time_ms:
             best_unknown = lap
-    return best_clean or best_unknown
+    own = best_clean or best_unknown
+    if best_pro and prefer_pro(own.lap_time_ms if own else None, best_pro.lap_time_ms):
+        return best_pro
+    return own
 
 
 def describe_lap(lap: Lap) -> str:

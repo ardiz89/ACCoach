@@ -113,7 +113,7 @@ def test_le_categorie_di_curva_sono_esattamente_quelle_di_classify_corner():
                                 throttle_ref=0.5, brake_live=0.2 + dbrk,
                                 brake_ref=0.2, min_speed_live=100.0 - dspd,
                                 min_speed_ref=100.0, braking_early=early,
-                                braking_late=late), 0, 0.5)
+                                braking_late=late, phase_ms=None), 0, 0.5)
                             if cue is not None:
                                 seen.add(cue.category)
     assert seen == set(CORNER_CATEGORIES)

@@ -1,6 +1,6 @@
 # 5 · Canali disponibili e cecità della diagnosi (McLaren 720S GT3 Evo, ACC)
 
-Data: 2026-11-15. Sola lettura sull'archivio `C:\Users\undrg\Documents\ACCoach\laps` (il db non è stato aperto). Repo al commit `bc721d7`, nessun file modificato.
+Data: 2026-11-15. Sola lettura sull'archivio `%USERPROFILE%\Documents\ACCoach\laps` (il db non è stato aperto). Repo al commit `bc721d7`, nessun file modificato.
 
 Convenzioni: **[M]** = misurato sui giri d'archivio con gli script di questa cartella; **[C]** = letto nel codice (file:riga); **[I]** = ipotesi o dato esterno non verificato qui.
 

@@ -54,7 +54,7 @@ from dataclasses import asdict, dataclass, field
 from ..telemetry.snapshot import format_lap_time
 from ..textfmt import fmt_num
 from .cue import CueCategory as _C
-from .debrief import LapDebrief
+from .debrief import RUNS_WIDE_MIN, LapDebrief
 from .plan import GoalProgress, TrainingPlan
 from .plan import _target as _take_back
 from .thresholds import SIGNIF_LOSS_MS
@@ -112,6 +112,8 @@ class CornerFacts:
     # drill that drops the whole line because one of two numbers is missing
     # throws away the half it does have.
     brake_spread_kmh: float = 0.0
+    # Le uscite di pista recenti in questa curva (`debrief.mark_runs_wide`).
+    runs_wide: int = 0
     landmark: str = ""               # something you can see, when we know one
     # Come sta la curva contro l'inviluppo di aderenza del riferimento, così
     # com'è misurato dal debrief (``debrief.GripState``). Non serve a stampare
@@ -1145,7 +1147,8 @@ def brake_later_is_blocked(grip) -> bool:
 
 
 def drill_key(category: str, phase: str, *, trail_brake: bool = True,
-              brake_later_blocked: bool = False) -> str:
+              brake_later_blocked: bool = False,
+              runs_wide: bool = False) -> str:
     """Which exercise this corner gets.
 
     Phase first, category second, and that order is the point: *where in the
@@ -1167,6 +1170,8 @@ def drill_key(category: str, phase: str, *, trail_brake: bool = True,
     if phase == "entry":
         if category in (_C.LESS_BRAKE.value, _C.BRAKE_EARLIER.value):
             return "brake_release" if trail_brake else "brake_straight"
+        if category == _C.BRAKE_LATER.value and runs_wide:
+            return "exit_throttle"
         # Con la gomma già impegnata, «frena più tardi» è l'unico dei tre
         # esercizi d'ingresso che chiede **più aderenza totale**: gli altri due
         # chiedono la stessa aderenza spesa meglio, che è l'unica leva che resta
@@ -1346,7 +1351,8 @@ def build_drill(category: str, phase: str, facts: CornerFacts,
                 lang: str = "it", *, trail_brake: bool = True) -> Drill:
     """The exercise for one corner, filled with that corner's own numbers."""
     key = drill_key(category, phase, trail_brake=trail_brake,
-                    brake_later_blocked=brake_later_is_blocked(facts.grip))
+                    brake_later_blocked=brake_later_is_blocked(facts.grip),
+                    runs_wide=facts.runs_wide >= RUNS_WIDE_MIN)
     return _BUILDERS[key](facts, _s(lang), lang)
 
 

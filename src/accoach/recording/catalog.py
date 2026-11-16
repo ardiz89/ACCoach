@@ -21,6 +21,8 @@ import zlib
 import sqlite3
 from pathlib import Path
 
+from .lap import prefer_pro
+
 # v2: added clean (-1 unknown / 0 dirty / 1 clean) + track-condition columns,
 # so the reference query can exclude dirty laps and prefer confirmed-clean ones.
 # v3: added `source` ("own"/"pro") so a PRO benchmark lap can be found cheaply.
@@ -450,11 +452,64 @@ class LapCatalog:
         evidenced first**: grip (no measured spread behind its band), then track
         temperature (10-20 m of braking point, a published comparison), and the
         tyre last of all.
+
+        An imported PRO lap is not one of the driver's laps and doesn't run in
+        this election (27/10). It used to, and it lost in two wrong ways: a
+        slower PRO lap, always ``clean = 1``, beat an unjudged faster lap of
+        yours, and a faster one lost to any lap of yours driven in today's
+        conditions, so "import a faster lap and the coach measures you against
+        it" was often false. Now your own reference is elected first, and the
+        PRO lap replaces it only when it is faster than your best lap, the
+        fastest of your trustworthy laps whatever the conditions
+        (:func:`prefer_pro`). Against your best and not against today's
+        elected lap: the import tells you whether the PRO lap is in charge,
+        and that answer must not change with the weather.
         """
-        base = """SELECT path FROM lap
+        own = self._own_reference(car_model, track, road_temp, grip, compound)
+        best = self._own_reference(car_model, track, None, None, None)
+        pro = self._conn.execute(
+            """SELECT path, lap_time_ms FROM lap
+               WHERE car_key = ? AND track_key = ? AND valid = 1
+                     AND lap_time_ms > 0 AND source = 'pro'
+               ORDER BY lap_time_ms ASC LIMIT 1""",
+            (self._slug(car_model), self._slug(track)),
+        ).fetchone()
+        if pro and prefer_pro(best["lap_time_ms"] if best else None, pro["lap_time_ms"]):
+            return pro["path"]
+        return own["path"] if own else None
+
+    def _own_reference(self, car_model: str, track: str,
+                       road_temp: float | None, grip: float | None,
+                       compound: str | None):
+        """The election of :meth:`best_reference_path` among your own laps."""
+        rows = self._own_rows(car_model, track, road_temp, grip, compound, 1)
+        return rows[0] if rows else None
+
+    def reference_pool_paths(self, car_model: str, track: str,
+                             road_temp: float | None = None,
+                             grip: float | None = None,
+                             compound: str | None = None,
+                             limit: int = 20) -> list[str]:
+        """Paths of your fastest trustworthy laps in the conditions that elected
+        the main reference: the pool the per-corner bests are picked from.
+
+        Same filter and same relaxation as :meth:`_own_reference` (it is the same
+        loop), so the pool is the set of laps the reference was chosen among. The
+        first step that finds anything wins, and its ``limit`` fastest laps come
+        back in the reference's own order (confirmed clean first, then time).
+        """
+        rows = self._own_rows(car_model, track, road_temp, grip, compound, limit)
+        return [r["path"] for r in rows]
+
+    def _own_rows(self, car_model: str, track: str,
+                  road_temp: float | None, grip: float | None,
+                  compound: str | None, limit: int) -> list:
+        """Up to ``limit`` own laps of the first relaxation step with any."""
+        base = """SELECT path, lap_time_ms FROM lap
                   WHERE car_key = ? AND track_key = ? AND valid = 1
-                        AND lap_time_ms > 0 AND clean <> 0"""
-        order = " ORDER BY (clean = 1) DESC, lap_time_ms ASC LIMIT 1"
+                        AND lap_time_ms > 0 AND clean <> 0
+                        AND COALESCE(source, 'own') <> 'pro'"""
+        order = " ORDER BY (clean = 1) DESC, lap_time_ms ASC LIMIT ?"
         keys = (self._slug(car_model), self._slug(track))
 
         # Only conditions we actually know about. A zero or an empty string is
@@ -477,13 +532,13 @@ class LapCatalog:
             if use in tried:
                 continue                     # same query as a stricter attempt
             tried.add(use)
-            row = self._conn.execute(
+            rows = self._conn.execute(
                 base + "".join(known[c][0] for c in use) + order,
-                (*keys, *(p for c in use for p in known[c][1])),
-            ).fetchone()
-            if row:
-                return row["path"]
-        return None
+                (*keys, *(p for c in use for p in known[c][1]), int(limit)),
+            ).fetchall()
+            if rows:
+                return rows
+        return []
 
     def fastest_pro_path(self, car_model: str, track: str) -> str | None:
         """Path of the fastest imported PRO benchmark lap, or ``None`` if none."""

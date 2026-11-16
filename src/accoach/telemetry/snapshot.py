@@ -59,7 +59,7 @@ class TelemetrySnapshot:
     # Non radianti, come diceva questa riga: sui giri veri la Formula si ferma a
     # 1.0 esatto e la GT3 sta fra 0.33 e 0.9, cioe' un comando normalizzato
     # (ACC lo documenta cosi'). Le scritte «34 %» lo leggono in questo senso.
-    steer_angle: float       # -1..1 (fraction of full lock), +left
+    steer_angle: float       # -1..1 (fraction of full lock), +right (measured 03/11)
     gear: str                # "R" / "N" / "1".."8"
 
     # --- engine / speed ---
@@ -130,6 +130,11 @@ class TelemetrySnapshot:
     # directly; None on AC, which doesn't have the notion and where track limits
     # are inferred from `tyres_out` instead. None means "unknown", never "valid".
     lap_valid: bool | None = None
+    # Quanto manca alla fine della sessione, in ms: 0 se non si sa. Il manuale
+    # di ACC non dice l'unita': `diagnostics box` serve anche a controllarla.
+    session_time_left_ms: float = 0.0
+    max_fuel: float = 0.0        # capacita' del serbatoio, litri
+    tyre_wear: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0)
 
     @staticmethod
     def disconnected() -> "TelemetrySnapshot":

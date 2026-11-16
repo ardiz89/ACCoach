@@ -137,13 +137,20 @@ class SetupAdvisor:
         # safety cost). Each remedy still surfaces on a later lap if it persists.
         prefer_lock = lock_bad and (not spin_bad or lock >= spin)
         if prefer_lock:
-            return self._lock_advice(s)
+            # Senza ABS il bloccaggio non ha un comando da girare: resta il TC,
+            # se anche il pattinamento c'e' dappertutto.
+            return self._lock_advice(s) or (self._spin_advice(s) if spin_bad else None)
         return self._spin_advice(s)
 
     # --- remedies ---------------------------------------------------------
     def _lock_advice(self, s: TelemetrySnapshot) -> Cue | None:
         # If ABS is maxed out, raising it won't help — shift brake bias rearward.
         # (abs_level is -1 when unknown, so this stays False and we suggest ABS.)
+        # A 0 e' un'auto senza ABS, o con l'ABS spento: «alzalo da 0 a 1» a una
+        # F1 e' un consiglio su un comando che non c'e' (la SF25 in archivio lo
+        # registra a 0). Si tace: i bloccaggi li dice gia' il coach in curva.
+        if s.abs_level == 0:
+            return None
         if s.abs_level >= _ABS_ALREADY_HIGH:
             return self._make(CueCategory.BRAKE_BIAS,
                               "ABS già alto, blocchi davanti in più curve. "
@@ -155,6 +162,8 @@ class SetupAdvisor:
             voice="Blocchi davanti in più curve. Alza l'ABS di uno.")
 
     def _spin_advice(self, s: TelemetrySnapshot) -> Cue | None:
+        if s.tc_level == 0:                  # niente TC, o spento: come l'ABS
+            return None
         return self._make(
             CueCategory.TC_UP,
             "Pattini in uscita in più punti. Prova ad alzare il TC"

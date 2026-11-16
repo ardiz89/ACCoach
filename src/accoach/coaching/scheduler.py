@@ -37,6 +37,15 @@ _DEFAULT_ACUTE_INTERVAL_S = 1.5      # acute cues may speak this soon after the 
 _DEFAULT_REPEAT_SUPPRESS_S = 20.0
 _DEFAULT_TECHNIQUE_STALE_S = 2.5     # technique/advisory cue older than this is dropped
 _ACUTE_STALE_MARGIN_S = 1.5          # acute window = min_interval + this (survives 1 carry)
+# Quanti giri passano fra una volta e l'altra. «Veleggi» capita in quasi ogni
+# giro: a Zolder (29/10) e' stato detto 12 volte in 13 giri, sopra tutto il resto.
+_REST_LAPS = {CueCategory.COASTING: 3}
+# La stessa categoria non si ridice entro questi secondi, QUALUNQUE sia il tratto.
+# Il limite per tratto (`repeat_suppress_s`) non basta: l'08/11 «Pattini in
+# uscita» e' stato detto a 1,5 e a 1,6 s di distanza, perche' in uscita di curva
+# l'auto cambia tratto e quindi `dedup_key`. 1,5 s e' proprio `acute_interval_s`.
+# Vale per tutte le categorie, anche le urgenti: sono quelle che si ripetevano.
+SAME_CATEGORY_S = 5.0
 
 
 class CueScheduler:
@@ -55,6 +64,7 @@ class CueScheduler:
         self._pending: list[tuple[Cue, float | None]] = []
         self._last_spoken_at: float = -1e9
         self._recent: dict[tuple, float] = {}  # dedup_key -> last spoken time
+        self._recent_category: dict[CueCategory, float] = {}  # category -> last spoken
         # The theme the session is working on, as an English key, or None while
         # no focus has been elected. See `set_focus`.
         self._focus_theme: str | None = None
@@ -63,6 +73,8 @@ class CueScheduler:
         self._focus_corner: int | None = None
         # Cosa e' gia' stato DETTO in questo giro, per categoria. Vedi `new_lap`.
         self._said_this_lap: set[CueCategory] = set()
+        self._lap_no = 0
+        self._last_said_lap: dict[CueCategory, int] = {}
 
     def new_lap(self) -> None:
         """Il pilota ha passato il traguardo: ogni frase si puo' ridire una volta.
@@ -78,6 +90,7 @@ class CueScheduler:
         Lo chiama il motore sul traguardo, con la stessa regola del registratore.
         """
         self._said_this_lap.clear()
+        self._lap_no += 1
 
     def set_focus(self, theme: str | None) -> None:
         """Limit on-track technique advice to one theme — the attention budget.
@@ -153,6 +166,15 @@ class CueScheduler:
         on_theme = theme_key(cue.category) == self._focus_theme
         return not (on_theme or self._at_focus_corner(cue))
 
+    def _resting(self, cue: Cue) -> bool:
+        """Un consiglio ricorrente detto da poco, e che non e' il focus."""
+        rest = _REST_LAPS.get(cue.category)
+        last = self._last_said_lap.get(cue.category)
+        if rest is None or last is None or self._lap_no - last >= rest:
+            return False
+        on_theme = theme_key(cue.category) == self._focus_theme
+        return not (on_theme or self._at_focus_corner(cue))
+
     def _off_theme(self, cue: Cue) -> bool:
         """True when this cue belongs to a theme the session isn't working on.
 
@@ -208,6 +230,10 @@ class CueScheduler:
     def _is_stale(self, cue: Cue, queued_at: float | None, now: float) -> bool:
         return queued_at is not None and (now - queued_at) > self._stale_limit(cue)
 
+    def _same_category_recent(self, cue: Cue, now: float) -> bool:
+        last_cat = self._recent_category.get(cue.category)
+        return last_cat is not None and now - last_cat < SAME_CATEGORY_S
+
     def poll(self, now: float) -> Cue | None:
         """Return the cue to speak right now, or ``None``."""
         # Drop stale cues every tick, independent of the speak gap, so the queue
@@ -229,16 +255,29 @@ class CueScheduler:
         # Most urgent first: tier dominates, priority breaks ties within a tier
         # (so a big corner time-loss can't jump ahead of an acute safety call).
         self._pending.sort(key=lambda ct: ct[0].rank(), reverse=True)
+        # Fermate dalla regola dei 5 s: si buttano, non si rimandano. Rimandata,
+        # un'urgente vive 5,5 s e la ripetizione usciva comunque, a 5,1 s, spesso
+        # nella curva dopo. Il riepilogo box resta: e' uno stato, non un evento.
+        self._pending = [
+            (c, t0) for (c, t0) in self._pending
+            if c.category == CueCategory.PIT_BRIEFING
+            or not self._same_category_recent(c, now)
+        ]
+        if not self._pending:
+            return None
+
         chosen: Cue | None = None
         for cue, _t0 in self._pending:
             if acute_only and cue.tier != CueTier.ACUTE:
                 continue
             if self._off_theme(cue):
                 continue
-            if self._repeat_this_lap(cue):
+            if self._repeat_this_lap(cue) or self._resting(cue):
                 continue
             last = self._recent.get(cue.dedup_key())
             if last is not None and now - last < self.repeat_suppress_s:
+                continue
+            if self._same_category_recent(cue, now):
                 continue
             chosen = cue
             break
@@ -257,7 +296,9 @@ class CueScheduler:
         ]
         self._last_spoken_at = now
         self._recent[chosen.dedup_key()] = now
+        self._recent_category[chosen.category] = now
         self._said_this_lap.add(chosen.category)
+        self._last_said_lap[chosen.category] = self._lap_no
         return chosen
 
     def reset(self) -> None:

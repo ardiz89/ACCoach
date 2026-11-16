@@ -54,6 +54,7 @@ def test_the_release_builds_from_the_spec_and_not_from_a_second_list():
     "src/accoach/tracks",         # le 26 linee centrali
     "src/accoach/voice_cues",     # i cue neurali femminili
     "src/accoach/voice_cues_male",  # …e quelli maschili, che mancavano
+    "src/accoach/trackfacts",     # i fatti per curva presi dalle fonti pubbliche
     "GUIDA.md",                   # la guida italiana
     "docs/FAQ.md",                # quella inglese, che mancava
 ])

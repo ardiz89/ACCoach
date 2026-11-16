@@ -101,8 +101,9 @@ def _messages():
     eng.mark_applied()
     out.append(_until(eng, lambda: _lap(time_ms=100437, press=PRESS_OK),
                       DecisionKind.ACCEPTED).message)
-    # La pressione che non arriva dove doveva, e quella lontanissima.
-    for after in (25.43, 28.91):
+    # La pressione che non arriva dove doveva (quella lontanissima non si
+    # giudica: la richiesta della base, piu' sotto).
+    for after in (25.43,):
         eng = RaceEngineer(GT3_PROFILE, min_stable=3)
         _until(eng, lambda: _lap(press={"front": 24.73, "rear": 26.5}))
         eng.mark_applied()
@@ -117,11 +118,20 @@ def _messages():
     for _ in range(3):
         d = eng.observe(_lap(fuel=41.3))
     out.append(d.message)
+    # Una prova di pressione col serbatoio diverso: il tempo non c'entra piu'.
+    low = {"front": 24.73, "rear": 26.5}
     eng = RaceEngineer(GT3_PROFILE, min_stable=3)
-    _until(eng, lambda: _lap(press={"front": 24.73, "rear": 26.5}, fuel=20.4))
+    _until(eng, lambda: _lap(press=low, fuel=20.4))
     eng.mark_applied()
-    out.append(_until(eng, lambda: _lap(time_ms=101950, fuel=58.7),
+    out.append(_until(eng, lambda: _lap(time_ms=101950, fuel=58.7, press=low),
                       DecisionKind.ACCEPTED).message)
+    # Le gomme si muovono lontano dalla modifica: niente verdetto, si richiede.
+    eng = RaceEngineer(GT3_PROFILE, min_stable=3)
+    _until(eng, lambda: _lap(press=low))
+    eng.mark_applied()
+    d = _until(eng, lambda: _lap(press=PRESS_OK), DecisionKind.STAND_DOWN)
+    assert d.confirm_base
+    out.append(d.message)
     # Le fasi che si chiudono, fino in fondo.
     eng = RaceEngineer(GT3_PROFILE, min_stable=3)
     for _ in range(12):

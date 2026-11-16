@@ -30,11 +30,17 @@ the difference is clearly outside noise, and otherwise falls back to a plain
 from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
+from typing import TYPE_CHECKING
 
 from ..comparison import DeltaState
 from ..telemetry.snapshot import TelemetrySnapshot
 from ..track import Corner
 from .cue import Cue, CueCategory
+from .diagnosis import _APEX_HALF
+
+if TYPE_CHECKING:
+    from ..comparison.reference import ReferencePoint
+    from .corner_refs import CornerBests, CornerRef
 
 # Tuning. Thresholds are intentionally above sensor/driving noise.
 _BRAKE_ON = 0.15            # brake pedal fraction that counts as "braking"
@@ -89,6 +95,24 @@ class CornerStats:
     # meta' che dimentica tace invece di sbagliare, ed e' il modo in cui una
     # regola sola torna a essere due.
     braking_late: bool
+    # Quanto e' costata ogni fase della curva (chiavi `phases.PHASES`), o None
+    # se non si sa. Senza default per lo stesso motivo di `braking_late`. Con le
+    # fasi la causa la sceglie il costo; senza, resta l'ordine fisso di prima.
+    phase_ms: dict[str, float] | None
+
+
+#: In quale tratto della curva si paga ogni causa. La frenata si paga prima
+#: dell'apex; arrivare lungo e frenare troppo si pagano anche all'apex, dove la
+#: velocita' persa si vede; la velocita' minima e' l'apex; il gas mancante si
+#: paga in uscita e sul rettilineo dopo (`after`, che esiste solo nel debrief:
+#: dal vivo la zona finisce a `exit_pos` e vale 0).
+CAUSE_PHASES: dict[CueCategory, tuple[str, ...]] = {
+    CueCategory.BRAKE_LATER: ("entry",),
+    CueCategory.BRAKE_EARLIER: ("entry", "apex"),
+    CueCategory.LESS_BRAKE: ("entry", "apex"),
+    CueCategory.CARRY_SPEED: ("apex",),
+    CueCategory.MORE_THROTTLE: ("exit", "after"),
+}
 
 
 @dataclass(slots=True)
@@ -139,17 +163,46 @@ def _braked_late(live_onset: float, ref_onset: float) -> bool:
 
 
 def classify_corner(st: CornerStats, index: int, pos: float) -> Cue | None:
-    """Pick the single most likely cause of a corner's time delta (or None)."""
+    """Pick the single most likely cause of a corner's time delta (or None).
+
+    With ``st.phase_ms`` the cause whose phases (:data:`CAUSE_PHASES`) cost the
+    most wins; without, the first true cause in the fixed order.
+    """
     lost = st.lost_ms
     if lost <= -_GAIN_MS:
         return Cue(CueCategory.GOOD, "Qui guadagni, rifalla così",
                    priority=abs(lost), segment=index, pos=pos)
     if lost < _LOSS_MS:
         return None
-    # Most actionable cause first.
+    # Le candidate sono le cause le cui condizioni sono vere, nell'ordine di
+    # sempre. Prima vinceva la prima: una frenata anticipata di pochi metri
+    # zittiva un'uscita senza gas che costava sei volte tanto, perche' veniva
+    # provata prima. Ora, quando le fasi ci sono, vince quella che costa di piu';
+    # a parita' resta l'ordine di sempre (`max` tiene il primo).
+    candidates = _candidates(st, lost, index, pos)
+    if st.phase_ms is None:
+        return candidates[0] if candidates else _time_loss(lost, index, pos)
+    phase_ms = st.phase_ms
+    priced = [(sum(phase_ms.get(p, 0.0) for p in CAUSE_PHASES[c.category]), c)
+              for c in candidates]
+    # Una causa il cui tratto ha guadagnato tempo non spiega la perdita: se
+    # nessuna paga, si dice solo quanto perdi.
+    paying = [pc for pc in priced if pc[0] > 0.0]
+    if not paying:
+        return _time_loss(lost, index, pos)
+    return max(paying, key=lambda pc: pc[0])[1]
+
+
+def _candidates(st: CornerStats, lost: float, index: int, pos: float) -> list[Cue]:
+    """Le cause vere per questa curva, nell'ordine in cui si provavano.
+
+    Restano chiamate a `Cue(...)` scritte per intero: `spoken.py` trova le
+    frasi da registrare leggendo il sorgente, e cerca proprio quelle.
+    """
+    out: list[Cue] = []
     if st.braking_early:
-        return Cue(CueCategory.BRAKE_LATER, "Qui hai margine, frena più tardi",
-                   priority=lost, segment=index, pos=pos)
+        out.append(Cue(CueCategory.BRAKE_LATER, "Qui hai margine, frena più tardi",
+                       priority=lost, segment=index, pos=pos))
     # …e il suo opposto, che fino a oggi non aveva nessuno che lo dicesse.
     # Frenare dopo il riferimento non e' un errore — e' come si guadagna, e su 3
     # delle 25 curve misurate in archivio quella staccata ha prodotto un
@@ -161,17 +214,22 @@ def classify_corner(st: CornerStats, index: int, pos: float) -> Cue | None:
     # velocita' d'ingresso, ha bisogno di prendersi il tempo per usarla.
     if (st.braking_late
             and st.min_speed_ref - st.min_speed_live >= _SPEED_MARGIN):
-        return Cue(CueCategory.BRAKE_EARLIER, "Arrivi lungo, frena prima",
-                   priority=lost, segment=index, pos=pos)
+        out.append(Cue(CueCategory.BRAKE_EARLIER, "Arrivi lungo, frena prima",
+                       priority=lost, segment=index, pos=pos))
     if st.throttle_ref - st.throttle_live >= _THROTTLE_MARGIN:
-        return Cue(CueCategory.MORE_THROTTLE, "Dai più gas qui",
-                   priority=lost, segment=index, pos=pos)
+        out.append(Cue(CueCategory.MORE_THROTTLE, "Dai più gas qui",
+                       priority=lost, segment=index, pos=pos))
     if st.brake_live - st.brake_ref >= _BRAKE_MARGIN:
-        return Cue(CueCategory.LESS_BRAKE, "Freni troppo qui, alleggerisci",
-                   priority=lost, segment=index, pos=pos)
+        out.append(Cue(CueCategory.LESS_BRAKE, "Freni troppo qui, alleggerisci",
+                       priority=lost, segment=index, pos=pos))
     if st.min_speed_ref - st.min_speed_live >= _SPEED_MARGIN:
-        return Cue(CueCategory.CARRY_SPEED, "Porta più velocità in curva",
-                   priority=lost, segment=index, pos=pos)
+        out.append(Cue(CueCategory.CARRY_SPEED, "Porta più velocità in curva",
+                       priority=lost, segment=index, pos=pos))
+    return out
+
+
+def _time_loss(lost: float, index: int, pos: float) -> Cue:
+    """Nessuna causa spiega la perdita: si dice quanto, e basta."""
     # La parola si decide sulla cifra STAMPATA, non sul numero: sono due
     # arrotondamenti diversi e prima o poi si separano. E non e' un caso di
     # bordo — il coach parla da 120 ms in su, quindi tutto fra 120 e 149 ms
@@ -229,6 +287,17 @@ class _Seg:
     live_brake_onset: float = -1.0
     ref_brake_at_onset: float = -1.0  # what the reference brake was where you first braked
     ref_brake_onset: float = -1.0     # …and WHERE the reference started braking
+    # I due tagli della finestra dell'apex (gli stessi ±_APEX_HALF di
+    # `phases.py`) e il delta al primo frame che li ha passati. None = mai
+    # passato: la fase che comincia li' vale 0, come il taglio stretto di
+    # `split_loss` quando l'apex cade oltre la fine della finestra.
+    mid: float = 0.0
+    delta_apex_in: float | None = None
+    delta_apex_out: float | None = None
+    # Il gesto migliore di questa curva (`corner_refs`), scelto all'ingresso e
+    # tenuto fino all'uscita. Con lui la zona misura il suo delta e i canali del
+    # riferimento su quel giro; senza, sul riferimento principale come sempre.
+    ref: CornerRef | None = None
 
 
 class CoachAnalyzer:
@@ -255,6 +324,9 @@ class CoachAnalyzer:
         # Su AC il campo è None e questo resta False: lì i limiti di pista si
         # deducono da `tyres_out`, e «non lo so» non è «hai tagliato».
         self._lap_cut = False
+        # Il gesto migliore di ogni curva, o None (Decisione 6: vale per il
+        # consiglio e il riquadro dell'ultima curva, non per il delta a schermo).
+        self._bests: CornerBests | None = None
         self._set_fixed_zones()
 
     def reset(self) -> None:
@@ -275,20 +347,22 @@ class CoachAnalyzer:
         addosso un numero di dieci minuti fa."""
         self.last_corner = None
 
+    def set_corner_refs(self, bests: CornerBests | None) -> None:
+        """Confronta ogni curva col suo gesto migliore (None = col principale).
+
+        Non tocca consigli, annunci, difetti, la carta né le zone: le curve sono
+        le stesse, cambia solo il metro delle prossime. Un consiglio misurato col
+        metro di prima resta vero per la curva in cui è stato misurato, e la zona
+        in corso tiene il riferimento con cui è cominciata — cambiarlo a metà
+        sottrarrebbe due orologi diversi.
+        """
+        self._bests = bests
+
     def set_corners(self, corners: list[Corner]) -> None:
         """Use detected corners as the zones (or fall back to fixed segments)."""
         previous = self._zones
         if corners:
-            zones = sorted(
-                (c.entry_pos, c.exit_pos, c.apex_pos) for c in corners
-            )
-            # Clip any overlap introduced by entry/exit extension.
-            for i in range(len(zones) - 1):
-                lo, hi, mid = zones[i]
-                next_lo = zones[i + 1][0]
-                if hi >= next_lo:
-                    zones[i] = (lo, max(lo, next_lo - 1e-4), mid)
-            self._zones = zones
+            self._zones = corner_zones(corners)
         else:
             self._set_fixed_zones()
         # Consigli e difetti sono indicizzati per zona, e un layout nuovo sposta
@@ -373,7 +447,7 @@ class CoachAnalyzer:
             self._seg = None
         # Entering a zone.
         if zone_idx >= 0 and self._seg is None:
-            self._seg = self._new_segment(zone_idx, delta)
+            self._seg = self._new_segment(zone_idx, s, delta)
         if self._seg is not None:
             self._accumulate(self._seg, s, delta)
 
@@ -432,13 +506,26 @@ class CoachAnalyzer:
                 # non usciva mai.
                 cues.append(replace(adv, pos=pos))
 
-    def _new_segment(self, index: int, delta: DeltaState) -> _Seg:
-        return _Seg(index=index, delta_start=delta.delta_ms, delta_last=delta.delta_ms)
+    def _new_segment(self, index: int, s: TelemetrySnapshot,
+                     delta: DeltaState) -> _Seg:
+        mid = self._zones[index][2]
+        ref = self._bests.at(mid) if self._bests is not None else None
+        seg = _Seg(index=index, mid=mid, ref=ref)
+        d, _rp = _seg_delta(seg, s, delta)
+        seg.delta_start = seg.delta_last = d
+        return seg
 
     def _accumulate(self, seg: _Seg, s: TelemetrySnapshot, delta: DeltaState) -> None:
         seg.n += 1
-        seg.delta_last = delta.delta_ms
-        rp = delta.reference_point
+        # Un delta solo per tutto: perdita, tagli di fase e canali leggono lo
+        # stesso riferimento, cosi' le fasi risommano proprio `lost_ms`.
+        d, rp = _seg_delta(seg, s, delta)
+        seg.delta_last = d
+        pos = s.lap_position
+        if seg.delta_apex_in is None and pos >= seg.mid - _APEX_HALF:
+            seg.delta_apex_in = d
+        if seg.delta_apex_out is None and pos >= seg.mid + _APEX_HALF:
+            seg.delta_apex_out = d
         seg.throttle_live += s.throttle
         seg.throttle_ref += rp.throttle
         seg.brake_live += s.brake
@@ -469,6 +556,11 @@ class CoachAnalyzer:
             braking_early=_braked_early(
                 seg.live_brake_onset, seg.ref_brake_onset, seg.ref_brake_at_onset),
             braking_late=_braked_late(seg.live_brake_onset, seg.ref_brake_onset),
+            # Le fasi solo dove la finestra dell'apex sta dentro la zona: se
+            # no un taglio cade fuori e la sua fase vale 0 per costruzione.
+            phase_ms=(_live_phases(seg)
+                      if phases_priceable(*self._zones[seg.index][:2], seg.mid)
+                      else None),
         )
         cue = classify_corner(st, seg.index, _seg_pos(seg, self))
         if self._lap_cut and cue is not None and cue.category is CueCategory.GOOD:
@@ -492,6 +584,67 @@ class CoachAnalyzer:
             return None
         self.last_corner = CornerCard(index=seg.index, lost_ms=st.lost_ms)
         return cue
+
+
+def corner_zones(corners: list[Corner]) -> list[tuple[float, float, float]]:
+    """Le zone delle curve, ``(lo, hi, apex)`` ordinate per ingresso.
+
+    Una zona va da ``entry_pos`` a ``min(exit_pos, ingresso della curva dopo)``:
+    l'estensione di ingresso e uscita puo' sovrapporre due curve, e un frame
+    deve stare in una zona sola. La usa anche il debrief per sapere se le fasi
+    di una curva si possono prezzare (:func:`phases_priceable`).
+    """
+    zones = sorted((c.entry_pos, c.exit_pos, c.apex_pos) for c in corners)
+    for i in range(len(zones) - 1):
+        lo, hi, mid = zones[i]
+        next_lo = zones[i + 1][0]
+        if hi >= next_lo:
+            zones[i] = (lo, max(lo, next_lo - 1e-4), mid)
+    return zones
+
+
+def phases_priceable(lo: float, hi: float, apex: float) -> bool:
+    """La finestra dell'apex (``apex ± _APEX_HALF``) sta tutta in ``[lo, hi]``?
+
+    Se no, le fasi di quella curva non dicono quale causa costa di piu': una
+    zona che finisce prima di ``apex + _APEX_HALF`` ha l'uscita a 0, e «dai piu'
+    gas» non puo' pagare mai. Sulla copia dell'archivio succedeva a 89 zone dal
+    vivo su 149 (finiscono prima) e a 56 (cominciano dopo ``apex - _APEX_HALF``):
+    «dai piu' gas» scendeva da 143 a 37 e «frena piu' tardi» da 16 a 4. Li' resta
+    l'ordine fisso di sempre. Una regola sola, chiamata dal vivo e dal debrief,
+    cosi' voce e report scelgono la stessa causa sulla stessa curva.
+    """
+    return lo <= apex - _APEX_HALF and apex + _APEX_HALF <= hi
+
+
+def _seg_delta(seg: _Seg, s: TelemetrySnapshot,
+               delta: DeltaState) -> tuple[float, ReferencePoint]:
+    """Il delta di questo frame e il punto del riferimento, per questa zona.
+
+    Con il gesto migliore della curva si leggono sul suo giro, con la stessa
+    sottrazione di `LapComparator.compare`; senza, quelli del principale che il
+    comparatore ha già calcolato.
+    """
+    if seg.ref is None:
+        return delta.delta_ms, delta.reference_point
+    pos = s.lap_position
+    ref = seg.ref.reference
+    return float(s.current_lap_ms) - ref.time_at(pos), ref.point_at(pos)
+
+
+def _live_phases(seg: _Seg) -> dict[str, float]:
+    """Le fasi di una zona dal vivo, tagliando il suo stesso delta.
+
+    Una scomposizione come quella di `phases.split_loss`: entry + apex + exit
+    risommano `lost_ms` esattamente. Un taglio mai passato prende il valore
+    finale, cosi' la fase che comincia li' vale 0. `after` dal vivo non c'e':
+    la zona finisce a `exit_pos`.
+    """
+    end = seg.delta_last
+    out_ = end if seg.delta_apex_out is None else seg.delta_apex_out
+    in_ = out_ if seg.delta_apex_in is None else seg.delta_apex_in
+    return {"entry": in_ - seg.delta_start, "apex": out_ - in_,
+            "exit": end - out_, "after": 0.0}
 
 
 def _seg_pos(seg: _Seg, analyzer: CoachAnalyzer) -> float:
