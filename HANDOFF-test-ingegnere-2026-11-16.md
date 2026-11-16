@@ -74,6 +74,16 @@ Le domande a cui il test deve rispondere:
    (una che non concorda lo butta: si vede come `bias_offset` nullo nello stato).
 4. **Le regole.** R1, R2 e R3 sono scattate quando il foglio lo aspettava, e mai
    altrove? Confrontare con il foglio compilato sul tablet.
+5. **Lo stacco a frequenza piena.** Dal 16/11 il registratore tiene il fotogramma
+   in cui il freno passa 0,15 e quello prima (prima teneva un campione ogni ~100 ms,
+   7 m in frenata). Dalla cartella d'installazione:
+   `.venv\Scripts\python.exe tools\costanza_archivio.py` — la riga «Stacchi a frequenza piena»
+   deve contare gli stacchi dei giri nuovi (sull'archivio fino al 14/11 è 0 su
+   676). Poi, con due o tre serate così, la dispersione dello stacco nelle finestre
+   da 3 giri è finalmente una misura del pilota: è il numero da cui scegliere la
+   soglia di costanza. Transizione: sui giri vecchi lo stacco cade in media 3-4 m
+   più tardi che sui nuovi (fino a un campione), quindi la scheda frenate che
+   mescola giri vecchi e nuovi lo sposta un poco.
 
 ## Casi lasciati aperti
 
@@ -91,9 +101,15 @@ Vanno cercati nel registro:
 
 ## Le tappe dopo
 
-- La costanza del pilota prima del verdetto (dispersione degli stacchi e delle
-  traiettorie). Il pilota l'ha chiesta il 16/11. Mattoni già nel codice:
-  `braking_points.py`, `trajectory.py`.
+- La costanza del pilota prima del verdetto. Il pilota l'ha chiesta il 16/11.
+  Misurata sull'archivio lo stesso giorno (`tools/costanza_archivio.py`): lo
+  stacco non si risolveva sotto un campione (corretto nel registratore, vedi la
+  domanda 5); la velocità minima per curva sì (scarto di un giro dalla mediana
+  dello stint 1,5 km/h sui puliti, 4,1 sui giri con un'uscita). Concordato col
+  pilota: (b) controllo di costanza sulla velocità minima, (c) confronto base /
+  prova curva per curva con le curve accoppiate per posizione (lo stacco lungo
+  sistematico la dispersione non lo vede). Da progettare insieme prima di
+  scriverli.
 - Dalla proposta del 15/11: il sintomo dichiarato dal pilota a fine run, il passo da
   2 click, i run da 4 + 3 + 3 + 3 giri, le pressioni per ruota, il comando
   «ricomincia».
