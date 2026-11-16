@@ -22,6 +22,7 @@ from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
 from . import __version__
+from . import paths
 from .engine import CoachEngine
 from .logging_setup import get_logger
 from .netinfo import local_addresses
@@ -144,7 +145,8 @@ def create_app(engine: CoachEngine | None = None, hz: float = 15.0, *,
     async def lifespan(_app: FastAPI):
         if holder["engine"] is None and not spettatore:
             from .config import load_config
-            holder["engine"] = CoachEngine(acquire_hz=load_config().acquire.hz)
+            holder["engine"] = CoachEngine(acquire_hz=load_config().acquire.hz,
+                                           logs_dir=paths.logs_dir())
         holder["task"] = asyncio.create_task(broadcast_loop())
         try:
             yield
@@ -356,7 +358,8 @@ def main(argv: list[str] | None = None) -> None:
     else:
         engine = CoachEngine(voice=_build_voice(cfg, enabled=voice_on),
                              acquire_hz=cfg.acquire.hz,
-                             engineer_voice=cfg.voice.engineer)
+                             engineer_voice=cfg.voice.engineer,
+                             logs_dir=paths.logs_dir())
 
     host = listen_host(cfg, argv)
     port = cfg.server.port

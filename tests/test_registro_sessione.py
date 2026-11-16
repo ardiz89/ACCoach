@@ -96,11 +96,33 @@ def test_the_log_has_no_personal_data(rig, tmp_path):
     assert "expected" in base
 
 
-def test_the_engine_points_the_log_at_the_logs_dir_by_default(tmp_path):
+def test_an_engine_without_a_logs_folder_writes_no_log(tmp_path, monkeypatch):
     from accoach import paths
-    eng = CoachEngine(reader=_Rig(tmp_path).reader, laps_dir=tmp_path / "laps",
-                      engineer_voice=False)
+    monkeypatch.setattr(paths, "logs_dir", lambda: tmp_path / "logs")
+    r = _Rig(tmp_path)
     try:
-        assert eng._session_log.folder == paths.logs_dir()
+        assert r.eng._session_log is None
+        r.drive(_snap())
+        r.eng._observe_lap(Lap(CAR, TRACK, SessionType.PRACTICE, 100000, True))
+        r.eng.mark_setup_applied(path=r.path("HONE_8"))
+        r.drive(_snap("lane"), _snap("box", tc=6, psi=HONE_8_COLD),
+                _snap("lane", tc=6), _snap(tc=6))
+    finally:
+        r.close()
+    assert not list(tmp_path.rglob("ingegnere-*.jsonl"))
+
+
+def test_the_demo_engine_has_no_log():
+    from accoach.demo import make_demo_engine
+    eng = make_demo_engine()
+    try:
+        assert eng._session_log is None
     finally:
         eng.close()
+
+
+def test_the_real_entry_points_pass_the_logs_folder():
+    import inspect
+    from accoach import app, coach_app, server
+    for mod in (app, coach_app, server):
+        assert "logs_dir=paths.logs_dir()" in inspect.getsource(mod)

@@ -461,9 +461,10 @@ class CoachEngine:
         self.laps_dir = Path(laps_dir) if laps_dir else laps_root()
         # Il registro della sessione: una riga per giro e per evento dei box,
         # per chi deve capire dopo cosa ha fatto l'Ingegnere. La cartella si
-        # crea alla prima riga; i test ne passano una loro.
-        from . import paths
-        self._session_log = SessionLog(logs_dir if logs_dir else paths.logs_dir())
+        # crea alla prima riga.
+        # Solo se gli si dice dove: chi guida il gioco vero passa
+        # `paths.logs_dir()`; la demo e i test no, e non scrivono nulla.
+        self._session_log = SessionLog(logs_dir) if logs_dir else None
         self._setup_files: list[str] = []
         self.recorder = LapRecorder()   # used only on the legacy inline path
 
@@ -730,11 +731,15 @@ class CoachEngine:
         except Exception:  # noqa: BLE001
             return None
 
+    def _write_log(self, kind: str, **fields) -> None:
+        if self._session_log is not None:
+            self._session_log.write(kind, **fields)
+
     def _log_lap(self, lap: Lap, stats, decision) -> None:
         try:
             eng = self._engineer
             reading = eng._pressure_reading()
-            self._session_log.write(
+            self._write_log(
                 "lap", car=lap.car_model, track=lap.track,
                 lap_ms=stats.lap_time_ms, stable=stats.stable,
                 warm=stats.warmed_up, stint=stats.stint,
@@ -1464,7 +1469,7 @@ class CoachEngine:
         self._hone_touched = True
         if path is None:
             self._expected_path = None      # non sappiamo cosa ha caricato
-            self._session_log.write("base", path=None, expected=None)
+            self._write_log("base", path=None, expected=None)
             return eng.base_confirmed()
         try:
             from .engineer.fingerprint import file_values
@@ -1480,7 +1485,7 @@ class CoachEngine:
         written = self._written_path
         expected = None if written is None else self._same_file(path, written)
         self._expected_path = path
-        self._session_log.write("base", path=self._rel_setup(path),
+        self._write_log("base", path=self._rel_setup(path),
                                 expected=expected)
         return eng.base_confirmed(expected=expected)
 
@@ -1568,7 +1573,7 @@ class CoachEngine:
             report, self._loaded = built
             w = self.pitwatch
             now = w.exit if event == "exit" else w.live
-            self._session_log.write(
+            self._write_log(
                 "setup", at=event, report=report.to_dict(),
                 reading=now.to_dict() if now is not None else None,
                 entry=w.entry.to_dict() if w.entry is not None else None,
@@ -1698,7 +1703,7 @@ class CoachEngine:
             # Da qui il file atteso in macchina e' quello scritto; senza un
             # percorso non lo sappiamo, e quello di prima non vale piu'.
             self._expected_path = self._written_path = self._setup_path(applied_path)
-            self._session_log.write(
+            self._write_log(
                 "applied", path=self._rel_setup(self._written_path))
             # HONE ha cambiato l'assetto solo se ha preso una sua modifica: ai
             # box sempre, al volo solo se confermata in corsia («Fatto» in

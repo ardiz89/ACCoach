@@ -22,6 +22,7 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
+from . import paths
 from .coaching import Voice
 from .comparison import DeltaState, format_delta
 from .engine import CoachEngine
@@ -134,7 +135,8 @@ def main(argv: list[str] | None = None) -> None:
                   rate=cfg.voice.rate, language=cfg.language,
                   male=cfg.voice.male, radio=cfg.voice.radio)
     engine = CoachEngine(voice=voice, acquire_hz=cfg.acquire.hz,
-                         engineer_voice=cfg.voice.engineer)
+                         engineer_voice=cfg.voice.engineer,
+                         logs_dir=paths.logs_dir())
 
     try:
         with Live(_render(TelemetrySnapshot.disconnected(), None, [], 0, voice.is_audio),
