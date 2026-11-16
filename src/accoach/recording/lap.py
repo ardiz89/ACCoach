@@ -31,6 +31,13 @@ from datetime import datetime, timezone
 
 from ..telemetry.snapshot import SessionType, TelemetrySnapshot
 
+#: Il pedale del freno da cui si «frena»: lo stacco della scheda frenate, del
+#: coach e del registratore (che tiene sempre quel fotogramma). Sta qui, nel
+#: modulo piu' basso, perche' il registratore non puo' importare il coach: il
+#: coach importa il registratore. `coaching.analyzer` lo riespone come
+#: `_BRAKE_ON`.
+BRAKE_ON = 0.15
+
 # --- how far to trust a stored `clean` flag --------------------------------
 #
 # On ACC, `clean` used to be decided by `numberOfTyresOut` — a field ACC

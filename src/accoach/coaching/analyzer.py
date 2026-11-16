@@ -33,6 +33,7 @@ from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING
 
 from ..comparison import DeltaState
+from ..recording.lap import BRAKE_ON
 from ..telemetry.snapshot import TelemetrySnapshot
 from ..track import Corner
 from .cue import Cue, CueCategory
@@ -43,7 +44,7 @@ if TYPE_CHECKING:
     from .corner_refs import CornerBests, CornerRef
 
 # Tuning. Thresholds are intentionally above sensor/driving noise.
-_BRAKE_ON = 0.15            # brake pedal fraction that counts as "braking"
+_BRAKE_ON = BRAKE_ON        # brake pedal fraction that counts as "braking"
 _LOSS_MS = 120.0           # min time lost in a segment before we say anything
 _SPOKEN_TENTHS = 25        # «Qui perdi N decimi» ha un WAV fino a qui (coaching/spoken.py)
 _GAIN_MS = 250.0           # gain this big earns a brief "good"
