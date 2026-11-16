@@ -674,16 +674,12 @@ def test_dopo_un_cambio_di_assetto_le_uscite_di_prima_non_contano_piu():
     off_press = {"front": 29.0, "rear": 26.5}
     eng.observe(_off(corner=2))
     eng.observe(_off(corner=5))
-    for _ in range(3):
+    for _ in range(4):                       # il primo dopo il salto non conta
         d = eng.observe(_lap(press=off_press))
     assert d.kind is DecisionKind.PROPOSE
-    eng.mark_applied()
-    for _ in range(3):
-        d = eng.observe(_lap(time_ms=103000, press=off_press))
-    assert d.kind is DecisionKind.REVERTED
-    eng.mark_applied()                       # assetto rimesso com'era
+    eng.mark_applied()                       # sulla macchina c'e' un altro assetto
     d = eng.observe(_off(corner=9))
-    assert d.kind is DecisionKind.COLLECT
+    assert d.kind is DecisionKind.EVALUATING
     assert "traction control" not in d.message
 
 
@@ -721,7 +717,10 @@ def test_a_pressure_that_drifts_out_later_is_proposed_again():
         d = eng.observe(_lap())
     assert eng.phase.key != "pressures", "il fixture deve aver chiuso le pressioni"
     low = {"front": 25.2, "rear": 26.5}
-    d = eng.observe(_lap(press=low))
+    # Un giro solo non basta piu': la lettura e' la mediana dei giri a regime.
+    assert eng.observe(_lap(press=low)).kind is not DecisionKind.PROPOSE
+    for _ in range(3):
+        d = eng.observe(_lap(press=low))
     assert d.kind is DecisionKind.PROPOSE, d
     assert {c.param for c in d.change.changes} == {"tyrePressure"}
     assert d.change.tag == "BOX", "si cambiano ai box: la chiamata la fa questo tag"
@@ -738,3 +737,102 @@ def test_pressures_in_the_window_do_not_hold_up_the_other_phases():
 def test_the_engineer_says_whether_it_can_judge_the_pressures():
     from accoach.engineer import engineer_for
     assert engineer_for("mclaren_720s_gt3_evo", is_acc=True).handles_pressures() is True
+
+
+# --- le pressioni, rifatte il 15/11 -----------------------------------------
+#
+# Misurato sui giri di Imola dell'8 e del 14/11: la decisione su un giro solo
+# faceva oscillare gli anteriori (+5, −8, −8 e poi +6, −8), un asse per sosta
+# lasciava il posteriore fuori tutta la sera, e il verdetto guardava il tempo.
+
+def _fuel_lap(front, rear=26.5, fuel=40.0):
+    st = _lap(press={"front": front, "rear": rear})
+    st.fuel_l = fuel
+    return st
+
+
+def test_one_odd_lap_does_not_move_the_pressures():
+    """14/11: stint stabile a 26,1, un giro a 25,87 dopo una pausa → +6 click."""
+    eng = _eng()
+    fuel = 52.0
+    for front in (25.85, 25.97, 26.10, 26.11, 25.87):
+        fuel -= 2.8
+        d = eng.observe(_fuel_lap(front, fuel=fuel))
+        assert d.kind is not DecisionKind.PROPOSE, (front, d.message)
+
+
+def test_the_first_lap_of_a_stint_does_not_count_for_pressures():
+    eng = _eng()
+    kinds = []
+    for i, front in enumerate((27.9, 27.9, 27.9, 27.9)):
+        kinds.append(eng.observe(_fuel_lap(front, fuel=50.0 - 2.8 * i)).kind)
+    assert kinds[2] is DecisionKind.COLLECT, "tre giri, ma uno e' il primo dello stint"
+    assert kinds[3] is DecisionKind.PROPOSE
+
+
+def test_both_axles_are_corrected_in_one_stop():
+    eng = _eng()
+    for _ in range(3):
+        d = eng.observe(_lap(press={"front": 25.6, "rear": 27.6}))
+    assert d.kind is DecisionKind.PROPOSE
+    by_slot = {c.slot: c.delta_clicks for c in d.change.changes}
+    assert set(by_slot) == {0, 1, 2, 3}
+    assert by_slot[0] > 0 and by_slot[1] > 0, "davanti sale"
+    assert by_slot[2] < 0 and by_slot[3] < 0, "dietro scende"
+
+
+def test_two_axles_are_spoken_with_the_two_phrases_already_recorded():
+    from accoach.engineer.voice_levers import all_voice_levers, voice_levers
+    eng = _eng()
+    for _ in range(3):
+        d = eng.observe(_lap(press={"front": 25.6, "rear": 27.6}))
+    said = voice_levers(d.change)
+    assert said is not None and len(said) == 2
+    assert set(said) <= set(all_voice_levers())
+
+
+def test_a_pressure_change_is_never_taken_off_for_lap_time():
+    eng = _eng()
+    for _ in range(3):
+        d = eng.observe(_lap(press={"front": 25.6, "rear": 26.5}))
+    eng.mark_applied()
+    for _ in range(4):
+        d = eng.observe(_lap(time_ms=103000, press={"front": 26.4, "rear": 26.5}))
+    assert d.kind is DecisionKind.ACCEPTED
+    assert "26" in d.message
+
+
+def test_the_engineer_learns_what_a_click_is_worth_hot():
+    """Sulla 720S un click vale ~0,07 psi a caldo, non 0,10: il passo dopo
+    usa quello misurato."""
+    eng = _eng()
+    for _ in range(3):
+        d = eng.observe(_lap(press={"front": 27.8, "rear": 26.5}))
+    clicks = d.change.changes[0].delta_clicks
+    assert clicks == -8
+    eng.mark_applied()
+    for _ in range(4):
+        d = eng.observe(_lap(press={"front": 27.8 + clicks * 0.07, "rear": 26.5}))
+    assert d.kind is DecisionKind.ACCEPTED
+    assert abs(eng.hot_per_click["front"] - 0.07) < 0.001
+    again = RaceEngineer(GT3_PROFILE, min_stable=3)
+    again.restore(eng.state())
+    assert again.hot_per_click == eng.hot_per_click, "resta fra una sessione e l'altra"
+    d = eng.observe(_lap(press={"front": 27.24, "rear": 26.5}))
+    assert d.kind is DecisionKind.PROPOSE
+    # −0,74 psi: col passo del file sarebbero −7 click, con quello misurato −11,
+    # che il tetto per sosta ferma a −8.
+    assert d.change.changes[0].delta_clicks == max(-8, round((26.5 - 27.24) / 0.07))
+
+
+def test_a_result_far_from_the_promise_asks_to_check_the_loaded_setup():
+    """8/11: +5 click e gli anteriori salgono di 1,9 psi. Non erano i click."""
+    eng = _eng()
+    for _ in range(3):
+        d = eng.observe(_lap(press={"front": 25.95, "rear": 26.5}))
+    eng.mark_applied()
+    for _ in range(4):
+        d = eng.observe(_lap(press={"front": 27.98, "rear": 26.5}))
+    assert d.kind is DecisionKind.ACCEPTED
+    assert "setup" in d.message
+    assert "front" not in eng.hot_per_click, "da uno scarto cosi' non si impara un passo"

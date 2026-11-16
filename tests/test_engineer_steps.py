@@ -320,7 +320,9 @@ def test_quando_la_pressione_torna_in_finestra_l_ingegnere_riparte(ac):
     eng = engineer_for(ac("f1_chiusa", packed=True, clear=False), "spa",
                        is_acc=False)
     _drive(eng, front=22.74, rear=22.0)
-    d = eng.observe(_lap(front=22.1, rear=22.0))
+    # La lettura e' la mediana dei giri a regime dello stint: il primo giro
+    # dopo il salto di pressione non conta, poi ne servono tre.
+    d = _drive(eng, n=4, front=22.1, rear=22.0)[-1]
     assert d.kind is DecisionKind.PHASE_DONE and eng.phase.key != "pressures"
 
 

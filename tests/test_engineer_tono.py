@@ -101,11 +101,22 @@ def _messages():
     eng.mark_applied()
     out.append(_until(eng, lambda: _lap(time_ms=100437, press=PRESS_OK),
                       DecisionKind.ACCEPTED).message)
+    # La pressione che non arriva dove doveva, e quella lontanissima.
+    for after in (25.43, 28.91):
+        eng = RaceEngineer(GT3_PROFILE, min_stable=3)
+        _until(eng, lambda: _lap(press={"front": 24.73, "rear": 26.5}))
+        eng.mark_applied()
+        out.append(_until(eng, lambda: _lap(press={"front": after, "rear": 26.5}),
+                          DecisionKind.ACCEPTED).message)
+    # Due assi fuori insieme: una sosta sola.
     eng = RaceEngineer(GT3_PROFILE, min_stable=3)
-    _until(eng, lambda: _lap(press={"front": 24.73, "rear": 26.5}))
-    eng.mark_applied()
-    d = _until(eng, lambda: _lap(time_ms=101950), DecisionKind.REVERTED)
-    out += [d.message, d.change.rationale]
+    d = _until(eng, lambda: _lap(press={"front": 24.73, "rear": 27.83}))
+    out += [d.change.rationale, d.change.named]
+    # Le pressioni che si stanno ancora assestando.
+    eng = RaceEngineer(GT3_PROFILE, min_stable=3)
+    for _ in range(3):
+        d = eng.observe(_lap(fuel=41.3))
+    out.append(d.message)
     eng = RaceEngineer(GT3_PROFILE, min_stable=3)
     _until(eng, lambda: _lap(press={"front": 24.73, "rear": 26.5}, fuel=20.4))
     eng.mark_applied()

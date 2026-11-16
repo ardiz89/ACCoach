@@ -937,7 +937,9 @@ class CoachEngine:
         if decision.kind is DecisionKind.REVERTED:
             action = _ENG_VOICE_REVERT.get(lang) or _ENG_VOICE_REVERT["en"]
         elif lang == "it":
-            action = _eng_voice_lever(decision.change)
+            from .engineer.voice_levers import voice_levers as _two
+            action = ("" if _two(decision.change) is not None
+                      else _eng_voice_lever(decision.change))
         else:
             action = _voice_clean(decision.change.named).rstrip(".") + "."
         if lang != "it":
@@ -947,7 +949,13 @@ class CoachEngine:
         # e la leva (una tabella chiusa). Le frasi intere sarebbero il
         # prodotto delle due, otto volte i caratteri da registrare.
         self.voice.say(prefix)
-        self.voice.say(action)
+        # Due assi in una sosta (le pressioni): le due frasi che esistono
+        # gia', in fila, invece di una terza da registrare.
+        from .engineer.voice_levers import voice_levers
+        parts = (None if decision.kind is DecisionKind.REVERTED
+                 else voice_levers(decision.change))
+        for phrase in (parts or [action]):
+            self.voice.say(phrase)
 
     def _log_engineer_outcome(self, lap, decision) -> None:
         """Write a finished test to the engineer's ledger.

@@ -89,6 +89,30 @@ def voice_lever(change: ProposedChange) -> str | None:
     return _LEVERS.get(key) if key is not None else None
 
 
+def voice_levers(change: ProposedChange) -> list[str] | None:
+    """Le frasi per una modifica, una per asse quando tocca due assi.
+
+    Le pressioni si correggono davanti e dietro nella stessa sosta, anche in
+    versi opposti: una frase sola non c'e' e non serve registrarla, si dicono
+    in fila le due che esistono gia'. None se manca anche solo una frase.
+    """
+    one = voice_lever(change)
+    if one is not None:
+        return [one]
+    out: list[str] = []
+    for slots in (FRONT, REAR):
+        atoms = tuple(a for a in change.changes if a.slot in slots)
+        if not atoms:
+            continue
+        part = voice_lever(ProposedChange(atoms, "", change.phase_label,
+                                          change.tag))
+        if part is None:
+            return None
+        out.append(part)
+    covered = sum(1 for a in change.changes if a.slot in FRONT + REAR)
+    return out if out and covered == len(change.changes) else None
+
+
 def all_voice_levers() -> list[str]:
     """Tutte le frasi della tabella, per il catalogo di quello che si registra."""
     return list(_LEVERS.values())

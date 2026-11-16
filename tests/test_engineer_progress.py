@@ -204,13 +204,43 @@ def test_a_phase_with_nothing_to_correct_is_reported_skipped():
 
 
 def test_a_phase_whose_gate_passes_is_done_not_skipped():
+    """Il sintomo c'e', sotto soglia: la misura ha visto, e ha detto «a posto»."""
+    from accoach.engineer.core import Balance, Phase, Speed
+    mild = Symptom(Balance.UNDERSTEER, Phase.APEX, Speed.LOW)
+    eng = _eng()
+    eng.phase_idx = 1
+    for _ in range(3):
+        lap = _lap()
+        lap.symptom_scores = {mild: 0.2}
+        lap.symptom_corners = {mild: 1}
+        d = eng.observe(lap)
+    assert d.kind is DecisionKind.PHASE_DONE
+    p = eng.progress()
+    assert p["index"] == 2 and p["skipped"] == []
+
+
+def test_a_phase_the_measure_never_saw_is_skipped_not_done():
+    """Nessun sintomo in nessun giro: il cancello passa, ma perche' la misura
+    tace. Sulla 720S succede in 123 giri puliti su 127: dirla «completata» era
+    dare per buono un silenzio."""
     eng = _eng()
     eng.phase_idx = 1
     for _ in range(3):
         d = eng.observe(_lap())
     assert d.kind is DecisionKind.PHASE_DONE
+    assert "complet" not in d.message.lower() and "done" not in d.message.lower()
     p = eng.progress()
-    assert p["index"] == 2 and p["skipped"] == []
+    assert p["index"] == 2 and p["skipped"] == [1]
+
+
+def test_the_end_does_not_claim_the_setup_is_sorted_when_phases_were_silent():
+    eng = _eng()
+    for _ in range(12):
+        d = eng.observe(_lap())
+        if d.kind is DecisionKind.DONE:
+            break
+    assert d.kind is DecisionKind.DONE
+    assert "buona base" not in d.message and "good baseline" not in d.message
 
 
 def test_skipped_phases_come_back_next_session():

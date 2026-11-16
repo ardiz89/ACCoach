@@ -127,6 +127,15 @@ class LapStats:
     #: so it is not a signal at all. The compound is the driver's own decision
     #: about the conditions, and it is measured.
     wet: bool | None = None
+    #: Il primo giro registrato di uno stint: la pressione sta ancora salendo
+    #: (+0,20 psi fra il primo e il secondo giro, +0,04 fra il secondo e il
+    #: terzo, misurato su 11 stint della 720S). Il giro conta per tutto il
+    #: resto, ma non per decidere le pressioni. Lo mette il motore, che e' chi
+    #: sa dove comincia uno stint (`RaceEngineer.observe`).
+    settling: bool = False
+    #: A quale stint appartiene il giro (lo numera il motore). Una lettura di
+    #: pressione mescola solo giri dello stesso stint.
+    stint: int = 0
 
 
 # --- recommendations -------------------------------------------------------
@@ -544,6 +553,54 @@ _DECISION_MSG = {
         "en": "{what} I won't write it myself, because {why}.",
         "it": "{what} Non la scrivo, perché {why}.",
     },
+    # Una fase il cui cancello passa solo perche' la misura non ha visto niente.
+    # Non e' «completata»: sulla 720S con gli aiuti 123 giri puliti su 127 non
+    # portano alcun sintomo, e dirla fatta era dare per buono un silenzio.
+    "phase_no_signal": {
+        "en": "In the “{label}” phase I measured neither understeer nor "
+              "oversteer on these laps. That doesn't mean the car is sorted, "
+              "because with the aids on my measurement sees very little. I'm "
+              "leaving it as it is.{tail}",
+        "it": "Nella fase «{label}» su questi giri non ho misurato né "
+              "sottosterzo né sovrasterzo. Non vuol dire che l'auto sia a "
+              "posto, perché con gli aiuti accesi la mia misura vede poco. La "
+              "lascio com'è.{tail}",
+    },
+    "done_no_signal": {
+        "en": "I've done what I can measure. For part of the setup I didn't "
+              "have enough signal, so I'm not telling you it's sorted.",
+        "it": "Ho finito quello che riesco a misurare. Per una parte del setup "
+              "non avevo abbastanza segnale, quindi non ti dico che è a posto.",
+    },
+    # Le pressioni si decidono sulla mediana dei giri a regime, non su un giro.
+    "pressure_wait": {
+        "en": "The pressures are still settling. I need one more clean lap "
+              "before I judge them.",
+        "it": "Le pressioni si stanno ancora assestando. Mi serve un altro "
+              "giro pulito prima di giudicarle.",
+    },
+    "pressure_ok": {
+        "en": "{axis} pressure is now {b}, inside the window.",
+        "it": "La pressione {axis} ora è {b}, dentro la finestra.",
+    },
+    "pressure_off": {
+        "en": "{axis} pressure ended up at {b}, and I expected {e}. I'll "
+              "correct it next time in.",
+        "it": "La pressione {axis} è arrivata a {b}, me ne aspettavo {e}. La "
+              "correggo al prossimo rientro.",
+    },
+    "pressure_far": {
+        "en": " That gap is too big to be the clicks alone. Check that the "
+              "setup you loaded is the one I wrote.",
+        "it": " Lo scarto è troppo grande per essere solo i click. Controlla "
+              "di aver caricato il setup che ho scritto io.",
+    },
+    "predict_pressure": {
+        "en": "After {n} clean laps at temperature I'll check that the "
+              "pressure landed where it should, and tell you what I read.",
+        "it": "Dopo {n} giri puliti a regime controllo se la pressione è "
+              "arrivata dove deve, e ti dico quanto leggo.",
+    },
     "reason_noeffect": {
         "en": "The change had no measurable effect",
         "it": "La modifica non ha avuto un effetto misurabile",
@@ -720,6 +777,30 @@ class _Active:
     #: Every symptom's score at the moment the change was applied, so the
     #: verdict can also report what moved that nobody was aiming at.
     base_scores: dict = field(default_factory=dict)
+    #: Le pressioni a caldo per asse quando la modifica e' stata applicata
+    #: (mediana dei giri a regime), o None se non c'era una lettura. Una
+    #: modifica di pressione si giudica su queste, non sul tempo.
+    base_pressures: dict | None = None
+
+
+_AXIS_WORDS = {"front": {"en": "Front", "it": "anteriore"},
+               "rear": {"en": "Rear", "it": "posteriore"}}
+
+#: Quanti giri a regime al massimo entrano nella lettura delle pressioni.
+_PRESSURE_LAPS = 4
+#: Fuori da questa fascia un «psi a caldo per click» misurato non e' un click:
+#: e' cambiato qualcos'altro (un altro file caricato, la pista), e non si impara.
+_HOT_PER_CLICK = (0.03, 0.3)
+#: Scarto fra pressione attesa e raggiunta oltre il quale si dice al pilota di
+#: controllare il setup caricato.
+_PRESSURE_FAR_PSI = 0.8
+#: Litri in piu' rispetto al giro prima che dicono «sei ripartito dai box».
+_REFUEL_L = 1.0
+#: Salto di pressione fra due giri di fila che dice «non e' lo stesso stint».
+#: Dentro uno stint il salto piu' grande misurato e' +0,20 (primo→secondo
+#: giro); l'8/11 fra uno stint e l'altro la benzina NON era salita (49 → 46 L,
+#: il file caricato ne aveva meno) e le pressioni avevano fatto +1,8.
+_PRESSURE_JUMP_PSI = 0.4
 
 
 class RaceEngineer:
@@ -785,6 +866,20 @@ class RaceEngineer:
         #: La strada non le spunta come fatte, perche' nessuno le ha
         #: controllate. Va su disco con `phase_idx`, che le ha gia' superate.
         self.skipped_phases: set[int] = set()
+        #: Quanti psi A CALDO vale un click di pressione su quest'auto, per
+        #: asse, misurato sulle modifiche gia' fatte. Vuoto finche' non se ne
+        #: e' giudicata una: allora vale il passo del file (0,1 su ACC, e sulla
+        #: 720S a Imola ne abbiamo misurati 0,07). Le fasi lo leggono da qui.
+        self.hot_per_click: dict[str, float] = {}
+        for p in self.phases:
+            if getattr(p, "pressure_remedy", None) is not None:
+                p.hot_per_click = self.hot_per_click
+        #: Dove comincia uno stint, letto dalla benzina: serve a non decidere
+        #: le pressioni sul primo giro, quando stanno ancora salendo.
+        self._last_fuel = 0.0
+        self._last_press: dict | None = None
+        self._stint = 0
+        self._stint_lap = 0
 
     # -- memoria fra sessioni ----------------------------------------------
     def state(self) -> dict:
@@ -818,6 +913,7 @@ class RaceEngineer:
                                for (p, slot), n in self.applied_clicks.items()],
             # La modifica per nome, che e' come la cita il messaggio di domani.
             "unjudged": pending.named if pending is not None else "",
+            "hot_per_click": dict(self.hot_per_click),
         }
 
     def restore(self, state: dict | None) -> None:
@@ -850,6 +946,12 @@ class RaceEngineer:
                 self.applied_clicks[(row[0], row[1])] = row[2]
         why = state.get("unjudged")
         self._unjudged = why if isinstance(why, str) else ""
+        learned = state.get("hot_per_click")
+        for ax, k in (learned.items() if isinstance(learned, dict) else ()):
+            if (ax in _AXIS_WORDS and isinstance(k, (int, float))
+                    and not isinstance(k, bool)
+                    and _HOT_PER_CLICK[0] <= k <= _HOT_PER_CLICK[1]):
+                self.hot_per_click[ax] = float(k)
 
     # -- public API --------------------------------------------------------
     @property
@@ -910,6 +1012,29 @@ class RaceEngineer:
         # different cars on two different circuits. Checked before the lap is
         # banked, so the abandoned test isn't judged on a mixed window.
         changed = self._conditions_changed(stats)
+
+        # Lo stint si legge dalla benzina: se sale, sei ripartito dai box. Senza
+        # benzina registrata non si sa dove comincia, e non si marca niente.
+        # …e anche da un salto di pressione fra due giri di fila, che la
+        # benzina non sempre vede.
+        restart = False
+        if stats.fuel_l > 0:
+            restart = (self._last_fuel <= 0
+                       or stats.fuel_l > self._last_fuel + _REFUEL_L)
+            self._last_fuel = stats.fuel_l
+        if stats.pressures_hot:
+            prev = self._last_press or {}
+            restart = restart or any(
+                abs(v - prev[ax]) >= _PRESSURE_JUMP_PSI
+                for ax, v in stats.pressures_hot.items()
+                if v is not None and prev.get(ax) is not None)
+            self._last_press = dict(stats.pressures_hot)
+        if restart:
+            self._stint += 1
+            self._stint_lap = 0
+        self._stint_lap += 1
+        stats.stint = self._stint
+        stats.settling = restart
 
         if stats.stable and stats.warmed_up:
             self.window.append(stats)
@@ -985,7 +1110,11 @@ class RaceEngineer:
             # Every symptom on the books, not just the target: the verdict is
             # about one of them, the ledger is about all of them.
             base_scores=self._all_scores(),
+            base_pressures=self._base_pressures(),
         )
+        # Una modifica ai box e' uno stint nuovo anche se la benzina non sale.
+        if self._pending.tag == "BOX":
+            self._last_fuel = 0.0
         # The reference shifts when the setup changes — restart the window so the
         # verdict is measured only on post-change laps.
         self.window = []
@@ -1036,6 +1165,10 @@ class RaceEngineer:
         sym = change.symptom
         base_time = _median_time(self.window)
         band = max(base_time * _TIME_BAND_FRAC, 1.0)
+        if sym is None and change.param == "tyrePressure":
+            return Prediction(
+                symptom=None, score_now=0.0, score_below=0.0, time_band_ms=band,
+                text=_msg("predict_pressure", lang, n=self.min_stable))
         if sym is None:
             return Prediction(
                 symptom=None, score_now=0.0, score_below=0.0, time_band_ms=band,
@@ -1204,13 +1337,25 @@ class RaceEngineer:
         # prima della fase in corso, e solo quando nessuna prova e' aperta
         # (`_advance` non gira mentre una modifica si valuta).
         pp = self._pressure_phase()
-        if (pp is not None and phase is not pp and not pp.blind()
-                and not pp.gate(self.window)):
+        judges = pp is not None and not pp.blind()
+        # La lettura e' la mediana dei giri a regime, non l'ultimo giro: il
+        # 14/11 un solo giro a 25,87 dopo una pausa (lo stint era stabile a
+        # 26,1, dentro) ha fatto partire +6 click, e il giro dopo −8.
+        reading = self._pressure_reading() if judges else None
+        if (judges and phase is not pp and reading is not None
+                and not pp.gate([reading])):
             change = self._pressure_remedy(pp)
             if change is not None:
                 return self._propose(change, "high")
         if phase is None:
-            return Decision(DecisionKind.DONE, _msg("done", lang))
+            key = "done_no_signal" if self.skipped_phases else "done"
+            return Decision(DecisionKind.DONE, _msg(key, lang))
+        if (judges and phase is pp and reading is None
+                and any(s.pressures_hot for s in self.window)):
+            # Le letture ci sono ma non abbastanza a regime: si aspetta, non si
+            # passa alle barre su gomme che nessuno ha ancora giudicato.
+            return Decision(DecisionKind.COLLECT, _msg("pressure_wait", lang),
+                            tail=_msg("pressure_wait", lang))
         blind = phase.blind()
         if blind:
             # Prima del cancello, non dopo: un cancello che non sa cosa guardare
@@ -1219,9 +1364,22 @@ class RaceEngineer:
             self.skipped_phases.add(self.phase_idx)
             self.phase_idx += 1
             return Decision(DecisionKind.STAND_DOWN, blind)
-        if phase.gate(self.window):
+        gate_on = ([reading] if (phase is pp and reading is not None)
+                   else self.window)
+        if phase.gate(gate_on):
+            # Un cancello che passa perche' la misura tace non e' una fase
+            # fatta: la strada la segna saltata e la frase lo dice.
+            silent = phase is not pp and not self._has_signal(phase)
+            if silent:
+                self.skipped_phases.add(self.phase_idx)
             self.phase_idx += 1
             nxt = self.phase
+            if silent:
+                tail = (_msg("phase_tail_next", lang, nxt=tr(nxt.label))
+                        if nxt else "")
+                return Decision(DecisionKind.PHASE_DONE,
+                                _msg("phase_no_signal", lang,
+                                     label=tr(phase.label), tail=tail))
             tail = (_msg("phase_tail_next", lang, nxt=tr(nxt.label)) if nxt
                     else _msg("phase_tail_complete", lang))
             return Decision(DecisionKind.PHASE_DONE,
@@ -1274,6 +1432,15 @@ class RaceEngineer:
             return Decision(DecisionKind.EVALUATING,
                             _msg("evaluating", lang, laps=_laps_left(need, lang))
                             + tail, tail=tail)
+
+        if (a.symptom is None and a.base_pressures is not None
+                and a.change.param == "tyrePressure"):
+            reading = self._pressure_reading()
+            if reading is None:
+                return Decision(DecisionKind.EVALUATING,
+                                _msg("evaluating", lang,
+                                     laps=_laps_left(1, lang)), tail="")
+            return self._judge_pressure(a, reading)
 
         new_time = _median_time(self.window)
         new_score = _median_score(self.window, a.symptom)
@@ -1497,16 +1664,86 @@ class RaceEngineer:
             key = (c.param, c.slot)
             self.applied_clicks[key] = self.applied_clicks.get(key, 0) + c.delta_clicks
 
+    def _has_signal(self, phase: WorkPhase) -> bool:
+        """La misura ha visto almeno un sintomo di questa fase nella finestra?"""
+        return any(phase.owns(sym)
+                   for s in self.window for sym in s.symptom_scores)
+
+    def _pressure_reading(self) -> LapStats | None:
+        """Le pressioni a caldo su cui si decide: la mediana per asse degli
+        ultimi giri a regime, o None se non ce ne sono abbastanza.
+
+        Dentro uno stint la pressione sale di 0,3–0,5 psi dal primo giro caldo,
+        cioe' meta' della finestra: un giro solo non e' una lettura.
+        """
+        laps = [s for s in self.window
+                if s.pressures_hot and not s.settling
+                and s.stint == self._stint][-_PRESSURE_LAPS:]
+        if len(laps) < min(self.min_stable, 3):
+            return None
+        hot = {}
+        for ax in ("front", "rear"):
+            vals = [s.pressures_hot[ax] for s in laps
+                    if s.pressures_hot.get(ax) is not None]
+            if vals:
+                hot[ax] = statistics.median(vals)
+        return LapStats(lap_time_ms=0, pressures_hot=hot) if hot else None
+
+    def _base_pressures(self) -> dict | None:
+        reading = self._pressure_reading()
+        return dict(reading.pressures_hot) if reading is not None else None
+
+    def _judge_pressure(self, a: "_Active", reading: LapStats) -> Decision:
+        """Il verdetto di una modifica di pressione: dove e' arrivata.
+
+        Fino al 15/11 si giudicava sul tempo sul giro, e con la benzina diversa
+        (6 prove su 8) nemmeno su quello: la modifica era tenuta comunque, anche
+        con la gomma finita fuori finestra. Il tempo qui non entra piu': dentro
+        uno stint balla di 0,6–0,9 s, e togliere una pressione per il tempo
+        rimandava il cancello a proporre la stessa. Si tiene, si dice quanto si
+        legge, e se non e' dove doveva il cancello corregge col passo imparato.
+        """
+        lang = current_language()
+        self.active = None
+        pp = self._pressure_phase()
+        nominal_of = getattr(pp, "steps", self.steps).psi_per_click
+        parts: list[str] = []
+        far = False
+        for ax, slots in (("front", FRONT), ("rear", REAR)):
+            clicks = next((c.delta_clicks for c in a.change.changes
+                           if c.slot in slots), 0)
+            before = a.base_pressures.get(ax)
+            after = reading.pressures_hot.get(ax)
+            if not clicks or before is None or after is None:
+                continue
+            used = self.hot_per_click.get(ax) or nominal_of(slots) or 0.0
+            expected = before + clicks * used
+            k = (after - before) / clicks
+            if _HOT_PER_CLICK[0] <= k <= _HOT_PER_CLICK[1]:
+                self.hot_per_click[ax] = round(k, 3)
+            far = far or abs(after - expected) >= _PRESSURE_FAR_PSI
+            inside = pp is None or next(pp._out({ax: after}), None) is None
+            axis = _AXIS_WORDS[ax].get(lang) or _AXIS_WORDS[ax]["en"]
+            parts.append(_msg("pressure_ok" if inside else "pressure_off", lang,
+                              axis=axis, b=fmt_num(after, 1, lang, "psi"),
+                              e=fmt_num(expected, 1, lang, "psi")))
+        out = self._outcome(a, kept=True, score_after=0.0)
+        self._record(a.change)
+        message = " ".join(parts) or _msg("accepted_structural", lang)
+        if far:
+            message += _msg("pressure_far", lang)
+        return Decision(DecisionKind.ACCEPTED, message, outcome=out)
+
     def _pressure_remedy(self, phase: WorkPhase) -> ProposedChange | None:
-        """If this phase gates on tyre pressure, nudge the off-target axle."""
+        """If this phase gates on tyre pressure, nudge the off-target axles."""
         builder = getattr(phase, "pressure_remedy", None)
         if builder is None or not self.window:
             return None
-        return builder(self.window[-1])
+        return builder(self._pressure_reading() or self.window[-1])
 
     def _pressure_by_hand(self, phase: WorkPhase) -> str:
         """La frase per una pressione fuori finestra che non sappiamo scrivere."""
         builder = getattr(phase, "pressure_by_hand", None)
         if builder is None or not self.window:
             return ""
-        return builder(self.window[-1])
+        return builder(self._pressure_reading() or self.window[-1])
