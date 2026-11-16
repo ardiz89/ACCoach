@@ -117,7 +117,10 @@ def _feed(eng, row: dict):
     if kind == "applied":
         eng.mark_applied()
         return None
-    return eng.base_confirmed(expected=row.get("expected"))
+    expected = row.get("expected")
+    return eng.base_confirmed(
+        expected=expected if isinstance(expected, bool) else None,
+        dials=row.get("dials"))
 
 
 def _row(kind: str, when: datetime | None, **kw) -> dict:

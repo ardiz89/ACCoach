@@ -106,6 +106,19 @@ def test_the_report_goes_through_a_dict_and_back():
     assert SetupReport.from_dict(None).state == "unknown"
 
 
+def test_the_report_carries_the_dials():
+    rep = SetupReport(state="unsaved", dials=(6, 6, 0, 0.75))
+    assert SetupReport.from_dict(rep.to_dict()) == rep
+    import json
+    assert SetupReport.from_dict(json.loads(json.dumps(rep.to_dict()))) == rep
+    # Un dizionario di prima delle manopole, o con manopole sporche: None.
+    old = rep.to_dict()
+    del old["dials"]
+    assert SetupReport.from_dict(old).dials is None
+    for bad in ([6, 6, 0], ["a", 6, 0, 0.7], [True, 6, 0, 0.7], 5):
+        assert SetupReport.from_dict({**old, "dials": bad}).dials is None
+
+
 # --- R1: un cambio che nessuno ha chiesto -----------------------------------
 
 def test_an_unrequested_change_restarts_the_base():
@@ -395,6 +408,63 @@ def test_choosing_a_file_on_the_page_lifts_the_block():
     d = eng.base_confirmed()
     assert d is not None and d.kind is DecisionKind.PROPOSE
     assert eng._pending is not None
+
+
+PRESET_DIALS = (6, 6, 0, 0.75)
+
+
+def _unsaved(dials=PRESET_DIALS, diff="TC 6 invece di 3, ABS 6 invece di 4"):
+    return _report(state="unsaved", unsaved_diff=diff, dials=dials)
+
+
+def test_a_file_chosen_on_the_page_holds_while_the_dials_stay():
+    """La scelta sulla pagina vale «lo so, scrivi su questo»: il report dopo,
+    con le stesse manopole, dice ancora «non salvato», e non deve rimettere il
+    blocco ne' buttare la proposta che la scelta ha fatto nascere."""
+    eng = _eng()
+    eng.setup_seen(_unsaved(), at_exit=True)
+    for _ in range(3):
+        eng.observe(_lap(LOW))
+    d = eng.base_confirmed(dials=PRESET_DIALS)
+    assert d.kind is DecisionKind.PROPOSE and d.change.tag == "BOX"
+    for _ in range(3):
+        assert eng.setup_seen(_unsaved(), at_exit=False) is None
+    assert eng.setup_seen(_unsaved(dials=(6, 6, 0, 0.7505)), at_exit=False) is None
+    assert eng.setup_seen(_unsaved(), at_exit=True) is None
+    assert eng._unsaved is None
+    assert eng._pending is not None and eng._pending.tag == "BOX"
+    # Un report senza manopole (un registro vecchio) non smentisce la scelta.
+    assert eng.setup_seen(_unsaved(dials=None), at_exit=False) is None
+    assert eng._pending is not None
+
+
+def test_a_file_chosen_on_the_page_lapses_when_a_dial_moves():
+    eng = _eng()
+    eng.setup_seen(_unsaved(), at_exit=True)
+    for _ in range(3):
+        eng.observe(_lap(LOW))
+    eng.base_confirmed(dials=PRESET_DIALS)
+    assert eng._pending is not None
+    d = eng.setup_seen(_unsaved(dials=(5, 6, 0, 0.75), diff="TC 5 invece di 3"),
+                       at_exit=False)
+    assert d.kind is DecisionKind.STAND_DOWN
+    assert "TC 5 invece di 3" in d.message
+    assert eng._pending is None and eng._unsaved == "TC 5 invece di 3"
+    # …e da li' il report non salvato blocca come prima, anche con le
+    # manopole della scelta.
+    eng.setup_seen(_unsaved(), at_exit=False)
+    assert eng._unsaved is not None
+
+
+def test_a_choice_without_dials_lifts_the_block_only_until_the_next_report():
+    """Come prima della scelta ricordata: senza lettura non c'e' niente da
+    tenere."""
+    eng = _eng()
+    eng.setup_seen(_unsaved(), at_exit=True)
+    eng.base_confirmed()
+    assert eng._unsaved is None
+    eng.setup_seen(_unsaved(), at_exit=False)
+    assert eng._unsaved is not None
 
 
 # --- le modifiche al volo ----------------------------------------------------

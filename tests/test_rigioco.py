@@ -81,6 +81,23 @@ def test_replay_uses_the_session_log_when_there_is_one(tmp_path):
     assert "accepted" not in [r["decision"] for r in rows]
 
 
+def test_a_base_row_brings_the_dials_of_the_choice():
+    """La scelta sulla pagina col registro: le manopole della riga ``base``
+    tengono tolto il blocco dell'assetto non salvato anche nel rigioco."""
+    from accoach.engineer.factory import engineer_for
+    from accoach.engineer.replay import _feed
+
+    eng = engineer_for(CAR, TRACK, is_acc=True)
+    unsaved = {"state": "unsaved", "unsaved_diff": "TC 6 invece di 3",
+               "dials": [6, 6, 0, 0.75]}
+    _feed(eng, {"kind": "setup", "at": "exit", "report": unsaved})
+    assert eng._unsaved
+    _feed(eng, {"kind": "base", "path": "x.json", "expected": None,
+                "dials": [6, 6, 0, 0.75]})
+    _feed(eng, {"kind": "setup", "at": "live", "report": unsaved})
+    assert eng._unsaved is None
+
+
 def test_the_command_is_in_the_help():
     import accoach.__main__ as cli
     assert "replay-engineer" in cli._HELP_TOOLS

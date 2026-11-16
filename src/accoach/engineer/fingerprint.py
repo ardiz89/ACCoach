@@ -245,12 +245,13 @@ class PitWatch:
         self.box_psi: tuple[float, float, float, float] | None = None
         self.box_core_c: float | None = None
         self._track: Reading | None = None      # ultima lettura in pista
+        self._last = None                       # l'ultimo frame LIVE di ACC
         self._in_stop = False
         self._cold: tuple[float, float, float, float] | None = None
         self._live_key: tuple | None = None
 
     def reset(self) -> None:
-        self.entry = self.live = self.exit = self._track = None
+        self.entry = self.live = self.exit = self._track = self._last = None
         self.box_psi = self.box_core_c = None
         self._reset_stop()
 
@@ -264,6 +265,15 @@ class PitWatch:
         """La lettura da fermo di questa sosta, finche' la macchina e' ai box;
         None in pista, dove quella di `live` e' della sosta di prima."""
         return self.live if self._in_stop else None
+
+    @property
+    def dials(self) -> tuple | None:
+        """(TC, ABS, mappa, ripartitore) dell'ultimo frame LIVE di ACC, in
+        pista, in corsia o fermo; None prima del primo."""
+        s = self._last
+        if s is None:
+            return None
+        return (s.tc_level, s.abs_level, s.engine_map, s.brake_bias)
 
     @staticmethod
     def _key(r: Reading) -> tuple:
@@ -286,6 +296,7 @@ class PitWatch:
         if not (snap.connected and snap.status == ACStatus.LIVE and snap.is_acc):
             self._reset_stop()
             return None
+        self._last = snap
         if not snap.in_pit and not snap.in_pit_lane:
             if self._in_stop:
                 self.exit = Reading.from_snapshot(snap, self._cold)

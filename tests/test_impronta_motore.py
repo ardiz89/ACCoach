@@ -318,6 +318,31 @@ def test_the_answer_with_another_file_restarts_the_base(rig):
     assert rig.eng._expected_path == rig.path("IMOLA_0")
 
 
+PRESET = dict(tc=6, abs_=6, bias=0.75)
+
+
+def test_a_file_chosen_on_the_page_stays_chosen_through_the_stop(rig):
+    """Sull'assetto non salvato il pilota sceglie un file sulla pagina. Le
+    letture dal vivo dopo (le pressioni che scivolano) dicono ancora «non
+    salvato» con le stesse manopole: il blocco resta tolto, e la proposta ai
+    box resta in piedi."""
+    rig.drive(_snap(**PRESET), _snap("lane", **PRESET),
+              _snap("box", psi=HONE_8_COLD, **PRESET))
+    assert rig.engineer._unsaved is not None
+    rig.eng.mark_base_confirmed(path=rig.path("IMOLA_0"))
+    rig.drive(_snap("box", psi=HONE_8_COLD, **PRESET))
+    assert rig.engineer._unsaved is None
+    rig.propose(_box_change())
+    for p in (25.6, 25.7, 25.8):
+        rig.drive(_snap("box", psi=(p, 25.0, 24.7, 24.4), **PRESET))
+    assert rig.engineer._unsaved is None
+    assert rig.engineer._pending is not None
+    # Una manopola girata dopo la scelta: il blocco torna.
+    rig.drive(_snap("box", psi=HONE_8_COLD, tc=5, abs_=6, bias=0.75))
+    assert rig.engineer._unsaved is not None
+    assert rig.engineer._pending is None
+
+
 def test_the_answer_teaches_the_brake_bias(rig):
     """Lo scarto del ripartitore: la lettura da fermo meno i click del file
     piu' quelli girati al volante e tenuti."""

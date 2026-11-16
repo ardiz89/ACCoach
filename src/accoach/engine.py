@@ -1467,18 +1467,22 @@ class CoachEngine:
         eng = self._engineer
         path = self._setup_path(raw_path)
         self._hone_touched = True
+        # Le manopole di adesso: finche' i report dicono le stesse, la scelta
+        # tiene tolto il blocco dell'assetto non salvato (R3).
+        dials = self.pitwatch.dials
+        logged = list(dials) if dials is not None else None
         if path is None:
             self._expected_path = None      # non sappiamo cosa ha caricato
             self._write_log("base", path=None, expected=None,
-                            bias_learned=False)
-            return eng.base_confirmed()
+                            bias_learned=False, dials=logged)
+            return eng.base_confirmed(dials=dials)
         learned = self._learn_bias_from(path)
         written = self._written_path
         expected = None if written is None else self._same_file(path, written)
         self._expected_path = path
         self._write_log("base", path=self._rel_setup(path),
-                        expected=expected, bias_learned=learned)
-        return eng.base_confirmed(expected=expected)
+                        expected=expected, bias_learned=learned, dials=logged)
+        return eng.base_confirmed(expected=expected, dials=dials)
 
     def _learn_bias_from(self, path: str) -> bool:
         """Il ripartitore dalla risposta, solo se la risposta e la lettura
@@ -1564,7 +1568,8 @@ class CoachEngine:
             state=m.state, name=name, probable=m.probable, changed=moved,
             expected=expected, expected_ok=expected_ok,
             expected_diff=expected_diff, psi_doubt=psi_doubt,
-            unsaved_diff=unsaved_diff, carry_lost=carry_lost)
+            unsaved_diff=unsaved_diff, carry_lost=carry_lost,
+            dials=(now.tc, now.abs, now.emap, now.bias))
         loaded = {"state": m.state, "name": name, "names": list(m.names),
                   "probable": m.probable, "at": event,
                   "observed": now.to_dict()}

@@ -332,6 +332,9 @@ class SetupReport:
     ``unsaved_diff`` e' la differenza dal file piu' vicino. ``carry_lost``:
     l'impronta trova un file solo senza le modifiche al volo tenute (il pilota
     ha ricaricato un file a mano, e le manopole sono tornate come nel file).
+    ``dials`` sono le manopole lette (TC, ABS, mappa grezza, ripartitore), o
+    None: dicono se l'assetto e' ancora quello di una scelta fatta sulla
+    pagina (`base_confirmed`).
     """
 
     state: str
@@ -344,9 +347,12 @@ class SetupReport:
     psi_doubt: str = ""
     unsaved_diff: str = ""
     carry_lost: bool = False
+    dials: tuple | None = None
 
     def to_dict(self) -> dict:
-        return asdict(self)
+        out = asdict(self)
+        out["dials"] = list(self.dials) if self.dials is not None else None
+        return out
 
     @classmethod
     def from_dict(cls, d: dict | None) -> "SetupReport":
@@ -369,7 +375,28 @@ class SetupReport:
                    expected_diff=text("expected_diff"),
                    psi_doubt=text("psi_doubt"),
                    unsaved_diff=text("unsaved_diff"),
-                   carry_lost=d.get("carry_lost") is True)
+                   carry_lost=d.get("carry_lost") is True,
+                   dials=_dials(d.get("dials")))
+
+
+def _dials(v) -> tuple | None:
+    """(TC, ABS, mappa, ripartitore) da una lista o tupla, o None se non torna."""
+    if not isinstance(v, (list, tuple)) or len(v) != 4:
+        return None
+    nums = [_finite(x) for x in v]
+    if any(x is None for x in nums):
+        return None
+    if any(x != int(x) for x in nums[:3]):
+        return None
+    return (int(nums[0]), int(nums[1]), int(nums[2]), nums[3])
+
+
+def _dials_moved(a: tuple, b: tuple) -> bool:
+    """Due letture delle manopole dicono un assetto diverso? -1 = non letto."""
+    for x, y in zip(a[:3], b[:3]):
+        if x != -1 and y != -1 and x != y:
+            return True
+    return a[3] >= 0 and b[3] >= 0 and abs(a[3] - b[3]) > _BIAS_TOL
 
 
 # --- the profile contract --------------------------------------------------
@@ -1157,6 +1184,10 @@ class RaceEngineer:
         #: R3: la differenza dal file piu' vicino quando l'assetto in macchina
         #: non e' un file salvato, o None. Le modifiche ai box non si scrivono.
         self._unsaved: str | None = None
+        #: Le manopole lette quando il pilota ha scelto un file sulla pagina
+        #: (`base_confirmed`): finche' i report dicono le stesse, «non
+        #: salvato» non rimette R3. La scelta vale «lo so, scrivi su questo».
+        self._chosen_dials: tuple | None = None
 
     # -- memoria fra sessioni ----------------------------------------------
     def state(self) -> dict:
@@ -1812,7 +1843,8 @@ class RaceEngineer:
                                    confirm_base=True)
         return self._held_base
 
-    def base_confirmed(self, *, expected: bool | None = None) -> Decision | None:
+    def base_confirmed(self, *, expected: bool | None = None,
+                       dials=None) -> Decision | None:
         """Il pilota ha detto ai box quale assetto ha caricato.
 
         Scioglie la decisione tenuta da `_base_moved` (o da un cambio non
@@ -1825,11 +1857,15 @@ class RaceEngineer:
         il file scelto e' quello scritto: si', la prova riprende sulla base di
         prima; no, o non si sa, la prova non si giudica e la base si rifa'.
         Una scelta esplicita toglie sempre il blocco dell'assetto non salvato
-        (R3): il pilota ha detto su quale file scrivere. Senza niente da
-        sciogliere torna None.
+        (R3): il pilota ha detto su quale file scrivere. ``dials`` sono le
+        manopole lette in quel momento (TC, ABS, mappa, ripartitore): finche'
+        i report dopo dicono le stesse il blocco resta tolto, anche se
+        l'impronta continua a dire «non salvato». Senza niente da sciogliere
+        torna None.
         """
         was_unsaved = self._unsaved is not None
         self._unsaved = None
+        self._chosen_dials = _dials(dials)
         # Il pilota ha detto cosa ha caricato: all'uscita un cambio non e' una
         # sorpresa (R1). Una scrittura ancora da controllare resta da
         # controllare, e cosi' la prova che riprende sul file scritto.
@@ -1924,7 +1960,12 @@ class RaceEngineer:
             # tornate come nel file, e il file non le ha.
             self.carry = []
         was_unsaved = self._unsaved is not None
-        unsaved = report.state == "unsaved"
+        chosen = self._chosen_dials
+        if (chosen is not None and report.dials is not None
+                and _dials_moved(chosen, report.dials)):
+            # Una manopola girata dopo la scelta: non e' piu' quell'assetto.
+            self._chosen_dials = chosen = None
+        unsaved = report.state == "unsaved" and chosen is None
         self._unsaved = (report.unsaved_diff or "") if unsaved else None
         check = self._exit_check
         if at_exit:
