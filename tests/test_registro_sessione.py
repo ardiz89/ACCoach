@@ -111,6 +111,19 @@ def test_the_log_has_no_personal_data(rig, tmp_path):
     assert "expected" in base
 
 
+def test_the_base_row_says_whether_the_brake_bias_was_learned(rig, tmp_path):
+    rig.drive(_snap(), _snap("lane"), _snap("box", bias=0.642, psi=HONE_8_COLD))
+    rig.eng.mark_base_confirmed(path=rig.path("HONE_8"))      # concorda
+    rig.drive(_snap("box", bias=0.642, psi=HONE_8_COLD),
+              _snap("box", tc=6, bias=0.642, psi=HONE_8_COLD))  # TC diverso
+    rig.eng.mark_base_confirmed(path=rig.path("HONE_8"))
+    rig.drive(_snap("box", tc=6, bias=0.642, psi=HONE_8_COLD))
+    rig.eng.mark_base_confirmed()                               # senza file
+    rig.drive(_snap("box", tc=6, bias=0.642, psi=HONE_8_COLD))
+    base = [r for r in _rows(tmp_path) if r["kind"] == "base"]
+    assert [b["bias_learned"] for b in base] == [True, False, False]
+
+
 def test_an_engine_without_a_logs_folder_writes_no_log(tmp_path, monkeypatch):
     from accoach import paths
     monkeypatch.setattr(paths, "logs_dir", lambda: tmp_path / "logs")

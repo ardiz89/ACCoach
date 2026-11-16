@@ -329,6 +329,30 @@ def test_the_answer_teaches_the_brake_bias(rig):
     assert rig.engineer.bias_offset == pytest.approx(0.640)
 
 
+def test_the_answer_on_track_does_not_learn_from_the_last_stop(rig):
+    """La lettura da fermo e' della sosta di prima: in pista il ripartitore
+    puo' essere stato girato, e quello che si impara sarebbe sbagliato."""
+    rig.drive(_snap(), _snap("lane"), _snap("box", bias=0.642, psi=HONE_8_COLD),
+              _snap("lane", bias=0.642), _snap(bias=0.642))
+    rig.eng.mark_base_confirmed(path=rig.path("HONE_8"))
+    rig.drive(_snap(bias=0.66))
+    assert rig.engineer.bias_offset is None
+    # …e nemmeno dall'uscita: e' sempre una sosta di prima.
+    rig.drive(_snap("lane", bias=0.66))
+    rig.eng.mark_base_confirmed(path=rig.path("HONE_8"))
+    rig.drive(_snap("lane", bias=0.66))
+    assert rig.engineer.bias_offset is None
+
+
+def test_an_answer_that_contradicts_the_dials_teaches_nothing(rig):
+    """In macchina c'e' TC 6 e il pilota sceglie HONE_8 (TC 3): o la risposta
+    o la lettura non e' quella giusta, e il ripartitore non si impara."""
+    rig.drive(_snap(), _snap("lane"), _snap("box", tc=6, bias=0.75, psi=HONE_8_COLD))
+    rig.eng.mark_base_confirmed(path=rig.path("HONE_8"))
+    rig.drive(_snap("box", tc=6, bias=0.75, psi=HONE_8_COLD))
+    assert rig.engineer.bias_offset is None
+
+
 def test_the_answer_without_a_file_teaches_nothing(rig):
     rig.drive(_snap(), _snap("lane"), _snap("box", psi=HONE_8_COLD))
     rig.eng.mark_base_confirmed()

@@ -1460,34 +1460,52 @@ class CoachEngine:
         """La risposta della pagina a «quale assetto hai caricato», nel tick.
 
         Col file scelto: lo scarto del ripartitore si impara da li' (la
-        lettura da fermo, o quella dell'uscita, contro i click del file piu'
-        quelli girati al volante e tenuti), e l'Ingegnere sa se e' il file che
-        HONE aveva scritto. Senza, come prima.
+        lettura da fermo, contro i click del file piu' quelli girati al
+        volante e tenuti), e l'Ingegnere sa se e' il file che HONE aveva
+        scritto. Senza, come prima.
         """
         eng = self._engineer
         path = self._setup_path(raw_path)
         self._hone_touched = True
         if path is None:
             self._expected_path = None      # non sappiamo cosa ha caricato
-            self._write_log("base", path=None, expected=None)
+            self._write_log("base", path=None, expected=None,
+                            bias_learned=False)
             return eng.base_confirmed()
-        try:
-            from .engineer.fingerprint import file_values
-            w = self.pitwatch
-            seen = next((r.bias for r in (w.live, w.exit)
-                         if r is not None and r.bias >= 0), None)
-            f = file_values(Path(path))
-            if seen is not None and f is not None:
-                clicks = f.bias_clicks + eng.carry_clicks().get("brakeBias", 0)
-                eng.learn_bias(seen, clicks)
-        except Exception:  # noqa: BLE001 - la taratura e' una comodita'
-            _log.debug("bias calibration failed", exc_info=True)
+        learned = self._learn_bias_from(path)
         written = self._written_path
         expected = None if written is None else self._same_file(path, written)
         self._expected_path = path
         self._write_log("base", path=self._rel_setup(path),
-                                expected=expected)
+                        expected=expected, bias_learned=learned)
         return eng.base_confirmed(expected=expected)
+
+    def _learn_bias_from(self, path: str) -> bool:
+        """Il ripartitore dalla risposta, solo se la risposta e la lettura
+        stanno insieme. True se la risposta e' servita a tararlo.
+
+        La lettura e' quella da fermo di **questa** sosta: in pista, o
+        all'uscita di una sosta di prima, il ripartitore puo' essere stato
+        girato, e si imparerebbe uno scarto falso che poi va su disco. E il
+        file scelto (piu' le manopole tenute) deve dire gli stessi TC, ABS e
+        mappa letti: se no o la risposta o la lettura non e' quella giusta.
+        """
+        try:
+            from .engineer.fingerprint import compare, file_values
+            eng = self._engineer
+            seen = self.pitwatch.stop_live
+            f = file_values(Path(path))
+            if seen is None or seen.bias < 0 or f is None:
+                return False
+            carry = eng.carry_clicks()
+            certain, _psi = compare(seen, f, carry=carry, bias_offset=None)
+            if any(d.field in ("tc", "abs", "emap") for d in certain):
+                return False
+            eng.learn_bias(seen.bias, f.bias_clicks + carry.get("brakeBias", 0))
+            return True
+        except Exception:  # noqa: BLE001 - la taratura e' una comodita'
+            _log.debug("bias calibration failed", exc_info=True)
+            return False
 
     def _setup_report(self, event: str):
         """(SetupReport, blocco `loaded`) per l'evento dei box, o None.

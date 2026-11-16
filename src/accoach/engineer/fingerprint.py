@@ -259,6 +259,12 @@ class PitWatch:
         self._cold = None
         self._live_key = None
 
+    @property
+    def stop_live(self) -> Reading | None:
+        """La lettura da fermo di questa sosta, finche' la macchina e' ai box;
+        None in pista, dove quella di `live` e' della sosta di prima."""
+        return self.live if self._in_stop else None
+
     @staticmethod
     def _key(r: Reading) -> tuple:
         # fuel e temperature si muovono da sole in sosta: non sono un cambio
