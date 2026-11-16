@@ -71,22 +71,41 @@ def _lap_files(laps_dir: Path, track: str, day: str, car: str | None) -> list[Pa
     return sorted(out, key=lambda p: p.name.split("__")[-1])
 
 
-def _read_events(log: Path | None) -> list[tuple[datetime, dict]]:
+def _read_events(log: Path | None,
+                 mine: set[tuple[str, str]] | None = None
+                 ) -> list[tuple[datetime, dict]]:
+    """Gli eventi dei box del registro che sono di *questa* sessione.
+
+    Il registro e' uno per giorno: puo' contenere anche una sessione su un'altra
+    pista o un'altra auto. Un evento appartiene alla sessione della prima riga
+    ``lap`` che lo segue nel tempo (o, se dopo non ce n'e', di quella che lo
+    precede) e si tiene solo se quella riga ha auto e pista dei giri rigiocati
+    (``mine``, in minuscolo). Senza righe ``lap`` non si puo' dire: si tengono.
+    """
     if log is None or not Path(log).is_file():
         return []
-    events: list[tuple[datetime, dict]] = []
+    rows: list[tuple[datetime, dict]] = []
     for line in Path(log).read_text(encoding="utf-8", errors="replace").splitlines():
         try:
             row = json.loads(line)
         except ValueError:
             continue
-        if not isinstance(row, dict) or row.get("kind") not in _EVENTS:
+        if not isinstance(row, dict) or row.get("kind") not in (*_EVENTS, "lap"):
             continue
         when = _local(str(row.get("t", "")))
         if when is not None:
-            events.append((when, row))
-    events.sort(key=lambda e: e[0])
-    return events
+            rows.append((when, row))
+    rows.sort(key=lambda e: e[0])
+    laps = [(w, r) for w, r in rows if r["kind"] == "lap"]
+
+    def keep(when: datetime) -> bool:
+        if mine is None or not laps:
+            return True
+        owner = next((r for w, r in laps if w >= when), laps[-1][1])
+        key = (str(owner.get("car", "")).lower(), str(owner.get("track", "")).lower())
+        return key in mine
+
+    return [(w, r) for w, r in rows if r["kind"] in _EVENTS and keep(w)]
 
 
 def _feed(eng, row: dict):
@@ -111,17 +130,28 @@ def _row(kind: str, when: datetime | None, **kw) -> dict:
 
 
 def replay(laps_dir: Path, track: str, day: str, car: str | None = None,
-           log: Path | None = None) -> list[dict]:
+           log: Path | None = None,
+           skipped: list[Path] | None = None) -> list[dict]:
     """Una riga per giro (e per evento del registro) della serata ``day``.
 
     Righe: ``{"t", "kind", "lap_ms", "fuel", "front", "rear", "stint",
     "settling", "ok", "decision", "message"}``; ``kind`` e' ``"lap"`` o il tipo
     di evento, ``decision`` il tipo di decisione (``DecisionKind.value``).
-    Sola lettura: apre i giri e il registro, non scrive niente.
+    Sola lettura: apre i giri e il registro, non scrive niente. Un giro che non
+    si legge si salta; se ``skipped`` e' una lista ci finisce il suo percorso.
     """
-    laps = [l for l in (load_lap(p) for p in _lap_files(Path(laps_dir), track, day, car))
-            if l.samples]
-    events = _read_events(log)
+    laps = []
+    for p in _lap_files(Path(laps_dir), track, day, car):
+        try:
+            lap = load_lap(p)
+        except Exception:  # noqa: BLE001 - file rotto: si salta e si conta
+            if skipped is not None:
+                skipped.append(p)
+            continue
+        if lap.samples:
+            laps.append(lap)
+    mine = {(l.car_model.lower(), l.track.lower()) for l in laps}
+    events = _read_events(log, mine)
     use_log = bool(events)
     rows: list[dict] = []
     eng = None
@@ -197,9 +227,19 @@ def main(args: list[str]) -> None:
     a = ap.parse_args(args)
     set_language("it")
     log = a.log or (logs_dir() / f"ingegnere-{a.day}.jsonl")
-    rows = replay(a.laps or laps_root(), a.track, a.day, a.car,
-                  log if log.is_file() else None)
+    folder = a.laps or laps_root()
+    if not Path(folder).is_dir():
+        print(f"Cartella dei giri non trovata: {folder}")
+        raise SystemExit(1)
+    skipped: list[Path] = []
+    rows = replay(folder, a.track, a.day, a.car,
+                  log if log.is_file() else None, skipped)
     n = sum(r["kind"] == "lap" for r in rows)
+    if skipped:
+        print(f"Attenzione: {len(skipped)} file di giri illeggibili saltati.")
+    if n == 0:
+        print(f"Nessun giro di {a.track} del {a.day} in {folder}.")
+        raise SystemExit(1)
     print(f"{n} giri ({'con' if log.is_file() else 'senza'} registro; "
           f"ore locali)\n")
     i = -1

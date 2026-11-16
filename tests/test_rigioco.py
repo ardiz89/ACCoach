@@ -84,3 +84,56 @@ def test_replay_uses_the_session_log_when_there_is_one(tmp_path):
 def test_the_command_is_in_the_help():
     import accoach.__main__ as cli
     assert "replay-engineer" in cli._HELP_TOOLS
+
+
+def test_events_of_another_session_in_the_same_day_log_are_not_fed(tmp_path):
+    _evening(tmp_path)
+    plain = replay(tmp_path, TRACK, DAY)
+    pi = next(i for i, r in enumerate(plain) if r["decision"] == "propose")
+    mine = (START + timedelta(minutes=2 * pi + 1)).astimezone()
+    other = (START - timedelta(hours=3)).astimezone()
+    stamp = lambda w, s: (w + timedelta(seconds=s)).replace(tzinfo=None).isoformat()
+    wrong = {"state": "match", "name": "sbagliato", "expected": "scritto",
+             "expected_ok": False, "expected_diff": "TC 6 invece di 3"}
+    lap_row = lambda w, car, track: {"t": stamp(w, 0), "kind": "lap",
+                                     "car": car, "track": track}
+    log = tmp_path / "ingegnere-20261108.jsonl"
+    log.write_text("\n".join(json.dumps(r) for r in [
+        {"t": stamp(other, -60), "kind": "applied", "path": "x.json"},
+        {"t": stamp(other, -30), "kind": "setup", "at": "exit", "report": wrong},
+        lap_row(other, "ferrari_296_gt3", "monza"),
+        {"t": stamp(mine, 0), "kind": "applied", "path": "scritto.json"},
+        lap_row(mine, CAR, "Imola"),
+    ]) + "\n", encoding="utf-8")
+    rows = replay(tmp_path, TRACK, DAY, log=log)
+    assert [r["kind"] for r in rows if r["kind"] != "lap"] == ["applied"]
+    assert "stand_down" not in [r["decision"] for r in rows]
+
+
+def test_a_corrupt_lap_file_is_skipped_and_counted(tmp_path):
+    _evening(tmp_path)
+    bad = tmp_path / f"{TRACK}__{CAR}__1m40s000__{DAY}T215959z0000.lap.json.gz"
+    bad.write_bytes(b"non e' un giro")
+    skipped = []
+    rows = replay(tmp_path, TRACK, DAY, skipped=skipped)
+    assert skipped == [bad]
+    assert sum(r["kind"] == "lap" for r in rows) == 15
+
+
+def test_the_command_says_when_the_folder_or_the_day_is_missing(tmp_path, capsys):
+    from accoach.engineer.replay import main
+    with pytest.raises(SystemExit) as e:
+        main([TRACK, DAY, "--laps", str(tmp_path / "non-esiste")])
+    assert e.value.code == 1 and "non trovata" in capsys.readouterr().out
+    with pytest.raises(SystemExit) as e:
+        main([TRACK, DAY, "--laps", str(tmp_path)])
+    assert e.value.code == 1 and "Nessun giro" in capsys.readouterr().out
+
+
+def test_the_command_counts_unreadable_laps(tmp_path, capsys):
+    from accoach.engineer.replay import main
+    _evening(tmp_path)
+    (tmp_path / f"{TRACK}__{CAR}__1m40s000__{DAY}T215959z0000.lap.json.gz"
+     ).write_bytes(b"rotto")
+    main([TRACK, DAY, "--laps", str(tmp_path)])
+    assert "1 file di giri illeggibili" in capsys.readouterr().out
