@@ -83,3 +83,34 @@ def test_il_self_test_parla_con_la_voce_del_config(monkeypatch, tmp_path):
     assert built["male"] is True
     assert built["radio"] is False
     assert built["rate"] == 150
+
+
+def test_setup_lines_show_each_file_against_the_car():
+    from accoach.diagnostics import setup_lines
+    from accoach.engineer.fingerprint import FileValues
+
+    s = replace(
+        TelemetrySnapshot.disconnected(), connected=True, in_pit=True,
+        speed_kmh=0.0, tc_level=3, abs_level=2, engine_map=1, brake_bias=0.58,
+        tyre_pressure=(26.5, 26.5, 26.0, 26.0), fuel=40.0, air_temp=21.0,
+        road_temp=27.0, car_model="mclaren_720s_gt3", track="imola")
+    hone8 = FileValues("HONE_8", "x/HONE_8.json", 3, 2, 1, 15,
+                       (26.5, 26.5, 26.0, 26.0), 40)
+    hone7 = FileValues("HONE_7", "x/HONE_7.json", 4, 2, 1, 15,
+                       (25.7, 25.7, 26.0, 26.0), 40)
+    lines = setup_lines(s, [hone8, hone7])
+    text = "\n".join(lines)
+    assert any("HONE_8" in ln for ln in lines)
+    assert any("HONE_7" in ln for ln in lines)
+    assert "+0.8" in text and "+0.0" in text      # anteriori contro HONE_7 / HONE_8
+    assert "TC" in text and "0.58" in text and "15" in text
+    seven = text[text.index("HONE_7"):]
+    assert "TC letto 3 file 4" in seven            # differenza certa sul TC
+    assert "nessuna" in text[:text.index("HONE_7")]  # HONE_8 combacia
+
+
+def test_setup_lines_without_files_says_so():
+    from accoach.diagnostics import setup_lines
+
+    lines = setup_lines(replace(TelemetrySnapshot.disconnected(), connected=True), [])
+    assert lines and any("nessun setup" in ln for ln in lines)

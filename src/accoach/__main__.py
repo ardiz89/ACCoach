@@ -129,6 +129,8 @@ Validation — these read the live game, so the sim must be running:
   verify-aids                validate the ACC aid-level mapping (live)
   find-rain                  find ACC's rain/grip fields by measuring them (live)
   verify-box                 validate ACC's pit menu fields and tyre wear (live)
+  verify-setup               compare the game's live TC/ABS/map/bias/pressures with each
+                             setup file of the car and track (live, in the garage)
   verify-sectors             validate the sim's real sector data (live)
   verify-diag [car] [track]  offline FP-rate check of the lap diagnosis
   replay-engineer <track> <YYYYMMDD> [car]
@@ -216,6 +218,9 @@ def main() -> None:
     elif cmd in ("find-rain", "rain"):
         from .diagnostics import run_rain
         run_rain()
+    elif cmd == "verify-setup":
+        from .diagnostics import run_setup
+        run_setup()
     elif cmd in ("verify-box", "box"):
         from .diagnostics import run_box
         run_box()
