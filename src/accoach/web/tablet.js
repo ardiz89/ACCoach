@@ -549,15 +549,23 @@
     for (var i = 0; i < s.length; i++) if (s[i].path === p) return s[i].name;
     return null;
   }
+  // L'esito del riconoscimento, senza le letture: `observed` e `at` cambiano a
+  // ogni «live» (un decimo di pressione) e non cambiano nessuna etichetta.
+  function loadedOutcome(l) {
+    if (!l) return "";
+    return JSON.stringify([l.state || null, l.name || null,
+                           Array.isArray(l.names) ? l.names : [], !!l.probable]);
+  }
   var loadedKey = null;
   function renderLoaded(eng) {
     var l = (eng && eng.loaded) || null;
     var txt = loadedText(l);
     setText($("t-loaded"), txt || "");
     setHidden($("t-loaded"), !txt);
-    // Le voci della tendina cambiano etichetta solo quando cambia l'esito.
-    var k = JSON.stringify(l);
-    if (k !== loadedKey) { loadedKey = k; fillSelect(); }
+    // Le voci della tendina cambiano etichetta solo quando cambia l'esito, e
+    // dove sono: rifarla chiuderebbe quella aperta sotto il dito.
+    var k = loadedOutcome(l);
+    if (k !== loadedKey) { loadedKey = k; relabelSelect(); }
   }
 
   // La striscia si riscrive solo quando cambia: il frame arriva 15 volte al
@@ -827,9 +835,20 @@
     for (var i = 0; i < s.length; i++) {
       var o = document.createElement("option");
       o.value = s[i].path;
+      o.setAttribute("data-name", s[i].name);
       o.textContent = setupLabel(s[i].name, bx.ask ? loadedNow() : null);
       if (s[i].path === cur) o.selected = true;
       sel.appendChild(o);
+    }
+  }
+
+  // Le etichette delle voci gia' in tendina, senza rifarla (come `paintLoaded`
+  // in engineer.js): la voce scelta e quella aperta restano dove sono.
+  function relabelSelect() {
+    var opts = $("t-base").children || [];
+    for (var i = 0; i < opts.length; i++) {
+      var name = opts[i].getAttribute ? opts[i].getAttribute("data-name") : null;
+      if (name != null) opts[i].textContent = setupLabel(name, bx.ask ? loadedNow() : null);
     }
   }
 

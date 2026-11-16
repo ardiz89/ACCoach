@@ -151,6 +151,38 @@ out.sent = find("/engineer/base").length;
 
 
 @needs_node
+def test_tablet_dropdown_is_not_rebuilt_by_a_live_reading():
+    """Il «live» torna a ogni decimo di pressione: rifare la tendina chiuderebbe
+    quella aperta sotto il dito. Le voci si rietichettano dove sono, e solo
+    quando cambia l'esito (stato, nome, candidati, «probabilmente»)."""
+    out = _tablet(r"""
+window.HoneTablet.render(frame);
+reply(find("/api/setup/base")[0], 200, %s);
+var f = JSON.parse(JSON.stringify(frame));
+f.engineer.loaded = {state: "match", name: "HONE_1", names: ["HONE_1"],
+  probable: false, at: "live", observed: {tc: 3, cold_psi: [25.5, 25, 24.7, 24.4]}};
+window.HoneTablet.render(f);
+var sel = $("t-base"), n = sel.children.length, lastOpt = sel.children[n - 1];
+out.before = sel.children.map(function (o) { return o.textContent; }).slice(-3);
+f.engineer.loaded.observed = {tc: 3, cold_psi: [25.6, 25, 24.7, 24.4]};
+f.engineer.loaded.at = "exit";
+window.HoneTablet.render(f);
+out.same = sel.children.length === n && sel.children[n - 1] === lastOpt;
+f.engineer.loaded = {state: "match", name: "base", names: ["base"], probable: true,
+  at: "live", observed: {}};
+window.HoneTablet.render(f);
+out.relabelled = sel.children.length === n && sel.children[n - 1] === lastOpt;
+out.after = sel.children.map(function (o) { return o.textContent; }).slice(-3);
+out.sel = sel.children.map(function (o) { return !!o.selected; }).slice(-3);
+""" % (_SETUPS % ("true", "null")))
+    assert out["before"] == ["", "base", "HONE_1 · in macchina"]
+    assert out["same"] is True
+    assert out["relabelled"] is True
+    assert out["after"] == ["", "base · in macchina", "HONE_1"]
+    assert out["sel"] == [True, False, False]
+
+
+@needs_node
 def test_tablet_warns_when_the_file_is_not_the_one_in_the_car():
     script = r"""
 window.HoneTablet.render(frame);
