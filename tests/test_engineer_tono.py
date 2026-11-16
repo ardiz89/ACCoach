@@ -173,6 +173,11 @@ def _messages():
     eng = RaceEngineer(GT3_PROFILE, min_stable=3)
     eng.setup_seen(SetupReport("unsaved", unsaved_diff=tc), at_exit=False)
     out.append(eng.setup_seen(SetupReport("match", "HONE_8"), at_exit=False).message)
+    # …il file, ma con le manopole rimesse: la base si rifa'.
+    eng = RaceEngineer(GT3_PROFILE, min_stable=3)
+    eng.setup_seen(SetupReport("unsaved", unsaved_diff=tc), at_exit=False)
+    out.append(eng.setup_seen(SetupReport("match", "HONE_8", changed=tc),
+                              at_exit=False).message)
     # Le fasi che si chiudono, fino in fondo.
     eng = RaceEngineer(GT3_PROFILE, min_stable=3)
     for _ in range(12):

@@ -91,8 +91,13 @@ def test_the_report_goes_through_a_dict_and_back():
     rep = SetupReport(state="unsaved", name="HONE_7", probable=True,
                       changed="TC 3 invece di 6", expected="HONE_8",
                       expected_ok=False, expected_diff="TC 6 invece di 3",
-                      psi_doubt="", unsaved_diff="TC 6 invece di 3")
+                      psi_doubt="", unsaved_diff="TC 6 invece di 3",
+                      carry_lost=True)
     assert SetupReport.from_dict(rep.to_dict()) == rep
+    # Un dizionario di prima di `carry_lost` si legge lo stesso.
+    old = rep.to_dict()
+    del old["carry_lost"]
+    assert SetupReport.from_dict(old).carry_lost is False
     # Un dizionario sporco non rompe niente: quello che non torna si lascia.
     odd = SetupReport.from_dict({"state": "match", "name": 3, "probable": "si",
                                  "expected_ok": "no", "extra": 1})
@@ -207,6 +212,68 @@ def test_the_pause_holds_through_another_wrong_exit():
     assert eng.observe(_lap()) is again
 
 
+def test_a_pause_lifted_in_the_pits_is_not_a_change_at_the_exit():
+    """Il file giusto caricato in garage scioglie la pausa dal vivo. All'uscita
+    l'assetto e' cambiato rispetto allo stint col file sbagliato: e' il file
+    scritto, non un cambio non chiesto, e la prova resta aperta."""
+    eng = _eng()
+    _pressure_test(eng)
+    eng.setup_seen(_wrong(), at_exit=True)
+    assert eng.setup_seen(_right(), at_exit=False).kind is DecisionKind.EVALUATING
+    d = eng.setup_seen(_right(changed="TC 3 invece di 6"), at_exit=True)
+    assert d is None
+    assert eng.active is not None
+    assert eng._held_base is None and eng._held_wrong is None
+    assert eng.observe(_lap(AFTER)).kind is DecisionKind.EVALUATING
+
+
+def test_a_pause_lifted_in_the_pits_is_checked_again_at_the_exit():
+    eng = _eng()
+    _pressure_test(eng)
+    eng.setup_seen(_wrong(), at_exit=True)
+    eng.setup_seen(_right(), at_exit=False)
+    # Ha ricaricato un altro file prima di uscire.
+    d = eng.setup_seen(_wrong(changed="TC 6 invece di 3"), at_exit=True)
+    assert d.kind is DecisionKind.STAND_DOWN and d.confirm_base
+    assert "Ai box carica HONE_8." in d.message
+    assert eng.active is not None
+
+
+def test_the_page_answer_is_not_a_change_at_the_exit():
+    # La prova in pausa ripresa dalla pagina.
+    eng = _eng()
+    _pressure_test(eng)
+    eng.setup_seen(_wrong(), at_exit=True)
+    assert eng.base_confirmed(expected=True).kind is DecisionKind.EVALUATING
+    assert eng.setup_seen(_right(changed="TC 3 invece di 6"), at_exit=True) is None
+    assert eng.active is not None
+    assert eng._held_base is None and eng._held_wrong is None
+    # …o buttata dalla pagina: la base riparte, e all'uscita non si ripete.
+    eng = _eng()
+    _pressure_test(eng)
+    eng.setup_seen(_wrong(), at_exit=True)
+    eng.base_confirmed(expected=False)
+    assert eng.setup_seen(_report(name="HONE_7", changed="TC 3 invece di 6"),
+                          at_exit=True) is None
+    # La base richiesta (un cambio a prova aperta), poi la risposta.
+    eng = _eng()
+    _pressure_test(eng)
+    eng.setup_seen(_right(), at_exit=True)
+    held = eng.setup_seen(_report(name="HONE_7", changed="TC 3 invece di 6"),
+                          at_exit=True)
+    assert held.confirm_base
+    assert eng.base_confirmed().kind is DecisionKind.COLLECT
+    d = eng.setup_seen(_report(name="HONE_7", changed="TC 3 invece di 6"),
+                       at_exit=True)
+    assert d is None or "Hai cambiato assetto" not in d.message
+    # Una sosta dopo, senza risposte, il cambio torna a essere R1.
+    for _ in range(3):
+        eng.observe(_lap())
+    d = eng.setup_seen(_report(name="HONE_8", changed="TC 6 invece di 3"),
+                       at_exit=True)
+    assert d.kind is DecisionKind.COLLECT and "Rifaccio la base" in d.message
+
+
 def test_the_answer_on_the_page_resumes_or_drops_the_paused_test():
     eng = _eng()
     _pressure_test(eng)
@@ -266,6 +333,27 @@ def test_an_unsaved_setup_measures_but_does_not_write():
     assert d.kind is DecisionKind.PROPOSE
     assert d.change.param == "tyrePressure"
     assert eng._pending is not None
+
+
+def test_knobs_put_back_as_in_the_file_restart_the_base():
+    """Il blocco si toglie su un file, ma l'elettronica non e' quella su cui
+    e' stata misurata la base: si rifa', invece di proporre su quella."""
+    eng = _eng()
+    eng.setup_seen(_report(state="unsaved", unsaved_diff="TC 6 invece di 3"),
+                   at_exit=True)
+    for _ in range(3):
+        eng.observe(_lap(LOW))
+    d = eng.setup_seen(_report(name="HONE_8", changed="TC 3 invece di 6"),
+                       at_exit=False)
+    assert d.kind is DecisionKind.COLLECT
+    assert d.message == (
+        "In macchina ora c'è HONE_8, quindi le modifiche ai box le posso "
+        "scrivere. Rispetto allo stint di prima hai TC 3 invece di 6, quindi "
+        "rifaccio la base.")
+    assert eng.window == [] and eng._pending is None
+    # Il blocco non c'e' piu': con la base nuova la modifica ai box si propone.
+    d = _until(eng, lambda: _lap(LOW))
+    assert d.change.tag == "BOX"
 
 
 def test_a_saved_file_found_before_the_base_says_so():
@@ -341,6 +429,34 @@ def test_a_wheel_change_under_test_is_already_in_the_car():
     eng = _eng()
     _pressure_test(eng)
     assert eng.carry_clicks() == {}
+
+
+def test_a_file_reloaded_by_hand_drops_the_wheel_changes():
+    """Le manopole tenute non sono nel file: ricaricandolo tornano come li'."""
+    eng = _eng()
+    eng.phase_idx = 3
+    _until(eng, lambda: _lap(scores={ENTRY_OVER: 0.6}))
+    eng.mark_applied()
+    _until(eng, lambda: _lap(scores={ENTRY_OVER: 0.05}), DecisionKind.ACCEPTED)
+    assert eng.carry_clicks() == {"brakeBias": +1}
+    # Un report senza `carry_lost` non tocca niente.
+    eng.setup_seen(_report(name="HONE_8"), at_exit=False)
+    assert eng.carry_clicks() == {"brakeBias": +1}
+    eng.setup_seen(_report(name="HONE_7", carry_lost=True), at_exit=False)
+    assert eng.carry == [] and eng.carry_clicks() == {}
+
+
+def test_a_lost_carry_keeps_the_wheel_change_under_test():
+    """Quella in prova la giudica R1 all'uscita, non `carry_lost`."""
+    eng = _eng()
+    eng.phase_idx = 3
+    eng.carry = [AtomicChange("tC1", None, 1)]
+    _until(eng, lambda: _lap(scores={ENTRY_OVER: 0.6}))
+    eng.mark_applied()
+    eng.setup_seen(_report(name="HONE_7", carry_lost=True), at_exit=False)
+    assert eng.carry == []
+    assert eng.carry_clicks() == {"brakeBias": +1}
+    assert eng.active is not None
 
 
 # --- la taratura del ripartitore ---------------------------------------------
