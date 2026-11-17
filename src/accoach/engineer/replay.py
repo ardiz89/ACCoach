@@ -30,6 +30,7 @@ from pathlib import Path
 
 from ..coaching.diagnosis import build_lap_stats
 from ..recording.storage import list_lap_files, load_lap
+from ..track import detect_corners
 from .core import DecisionKind, SetupReport
 from .factory import engineer_for
 
@@ -123,6 +124,22 @@ def _feed(eng, row: dict):
         dials=row.get("dials"))
 
 
+def _evening_corners(laps: list) -> list:
+    """Le curve su cui si leggono tutti i giri della serata.
+
+    Come il motore in pista, che passa a ogni giro le curve del riferimento:
+    rilevate una volta, sul giro piu' veloce valido e non tagliato (sul piu'
+    veloce, se nessuno lo e'). Rilevate giro per giro, il 17/11 a Imola la zona
+    della Rivazza veniva tagliata in modo diverso da un giro all'altro (l'apice
+    a 0,795 era un tratto a 225 km/h su alcuni giri e la curva a 90 su altri),
+    e accoppiate per posizione davano scarti finti di 125-140 km/h: 4 degli 8
+    giri tolti rigiocando l'archivio.
+    """
+    timed = [l for l in laps if l.lap_time_ms > 0] or laps
+    good = [l for l in timed if l.valid and l.clean is not False]
+    return detect_corners(min(good or timed, key=lambda l: l.lap_time_ms).samples)
+
+
 def _row(kind: str, when: datetime | None, **kw) -> dict:
     base = {"t": when.astimezone().isoformat(timespec="seconds") if when else "",
             "kind": kind, "lap_ms": None, "fuel": None, "front": None,
@@ -153,6 +170,7 @@ def replay(laps_dir: Path, track: str, day: str, car: str | None = None,
             continue
         if lap.samples:
             laps.append(lap)
+    corners = _evening_corners(laps) if laps else []
     mine = {(l.car_model.lower(), l.track.lower()) for l in laps}
     events = _read_events(log, mine)
     use_log = bool(events)
@@ -171,7 +189,7 @@ def replay(laps_dir: Path, track: str, day: str, car: str | None = None,
             rows.append(_row(row["kind"], at,
                              decision=d.kind.value if d is not None else None,
                              message=d.message if d is not None else None))
-        st = build_lap_stats(lap)
+        st = build_lap_stats(lap, corners)
         d = eng.observe(st)
         p = st.pressures_hot or {}
         rows.append(_row("lap", when, lap_ms=lap.lap_time_ms, fuel=st.fuel_l,
@@ -186,7 +204,7 @@ def replay(laps_dir: Path, track: str, day: str, car: str | None = None,
             pending_box = True
         nxt = laps[i + 1] if i + 1 < len(laps) else None
         if pending_box and nxt is not None:
-            ns = build_lap_stats(nxt)
+            ns = build_lap_stats(nxt, corners)
             np_ = ns.pressures_hot or {}
             jump = any(abs(np_[a] - p[a]) >= _JUMP_PSI
                        for a in ("front", "rear") if p.get(a) and np_.get(a))

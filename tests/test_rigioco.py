@@ -168,3 +168,52 @@ def test_the_command_counts_unreadable_laps(tmp_path, capsys):
      ).write_bytes(b"rotto")
     main([TRACK, DAY, "--laps", str(tmp_path)])
     assert "1 file di giri illeggibili" in capsys.readouterr().out
+
+
+def _flat(lap: Lap, lo: float, hi: float) -> Lap:
+    """Una curva che il giro non ha: pieno, dritto, senza freno fra lo e hi."""
+    for s in lap.samples:
+        if lo <= s.pos <= hi:
+            s.speed_kmh, s.brake, s.throttle, s.steer_angle = 255.0, 0.0, 1.0, 0.0
+    return lap
+
+
+def test_every_lap_of_the_evening_is_read_on_the_same_corners(tmp_path, monkeypatch):
+    """Come il motore in pista: le curve sono quelle di un giro solo.
+
+    Il 17/11, rigiocando Imola, ogni giro trovava curve sue: la zona della
+    Rivazza era tagliata in modo diverso da un giro all'altro, e accoppiate per
+    posizione davano scarti finti di 125-140 km/h. Le curve si prendono una
+    volta, dal giro piu' veloce pulito e valido della serata.
+    """
+    from synth import build_lap
+
+    from accoach.engineer import replay as rigioco
+    from accoach.recording.storage import load_lap
+    from accoach.track import detect_corners
+
+    # Il piu' veloce e' tagliato: non fa da riferimento.
+    dirty = _flat(build_lap(car=CAR, track=TRACK, clean=False), 0.15, 0.42)
+    ref = build_lap(car=CAR, track=TRACK, clean=True)
+    other = _flat(build_lap(car=CAR, track=TRACK, clean=True), 0.55, 0.82)
+    paths = []
+    for n, (lap, ms) in enumerate([(other, 101_000), (dirty, 98_000),
+                                   (ref, 99_000)]):
+        lap.lap_time_ms = ms
+        lap.recorded_utc = (START + timedelta(minutes=2 * n)).isoformat()
+        paths.append(save_lap(lap, tmp_path))
+    own = [[c.apex_pos for c in detect_corners(load_lap(p).samples)]
+           for p in paths]
+    assert own[0] != own[2] and own[1] != own[2]   # da soli, curve diverse
+    seen = []
+    real = rigioco.build_lap_stats
+
+    def spy(lap, corners=None, *a, **kw):
+        seen.append(corners)
+        return real(lap, corners, *a, **kw)
+
+    monkeypatch.setattr(rigioco, "build_lap_stats", spy)
+    replay(tmp_path, TRACK, DAY)
+    assert len(seen) >= 3 and seen[0] is not None
+    assert all(c is seen[0] for c in seen)
+    assert [c.apex_pos for c in seen[0]] == own[2]
