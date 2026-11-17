@@ -518,6 +518,13 @@ class CoachEngine:
         self._reference: Reference | None = None
         self._corners: list[Corner] = []
         self._corner_names: dict[int, str] = {}
+        # Le curve dell'Ingegnere e i loro nomi: fissate quando nasce
+        # l'Ingegnere della serata e mai rifatte fino al prossimo (vedi
+        # `_engineer_stats`). Quelle sopra il coach le rifà a ogni nuovo
+        # miglior giro, e il controllo di costanza confronta i giri curva per
+        # curva: con le curve che cambiano ricominciava da capo (17/11).
+        self._engineer_corners: list[Corner] = []
+        self._engineer_corner_names: dict[int, str] = {}
         self._key: tuple[str, str] = ("", "")
         self.saved_laps = 0
         self.history: list[str] = []
@@ -770,6 +777,24 @@ class CoachEngine:
         except Exception:  # noqa: BLE001 - il registro non rompe un giro
             _log.debug("session log (lap) failed", exc_info=True)
 
+    def _engineer_stats(self, lap: Lap):
+        """La diagnosi del giro per l'Ingegnere, sulle curve della serata.
+
+        Senza riferimento le curve si fissano dal primo giro pulito e valido:
+        da li' in poi tutti i giri si misurano su quelle. Un giro sporco o
+        incompleto non le fissa e si misura sulle sue (non si giudica); se sul
+        giro pulito non si trova nessuna curva, si riprova al giro dopo.
+        """
+        if (not self._engineer_corners and lap.valid
+                and lap.clean is not False):
+            corners = detect_corners(lap.samples)
+            if corners:
+                self._engineer_corners = corners
+                self._engineer_corner_names = _corner_labels(
+                    lap.car_model, lap.track, corners, self.laps_dir)
+        return build_lap_stats(lap, self._engineer_corners or None,
+                               corner_names=self._engineer_corner_names)
+
     def _observe_lap(self, lap: Lap) -> None:
         """Diagnose a completed lap: feed the engineer (setup) and the Focus
         coach (driving). Both run on the reference that was the target *during*
@@ -779,8 +804,7 @@ class CoachEngine:
             # pilota vede ovunque: passarli qui e' l'unico modo perche'
             # l'Ingegnere possa dire DOVE hai perso il giro senza ribattezzare
             # la curva per conto suo.
-            stats = build_lap_stats(lap, self._corners or None,
-                                    corner_names=self._corner_names)
+            stats = self._engineer_stats(lap)
             previous = self._engineer_decision
             self._engineer_decision = self._engineer.observe(stats)
             self._announce_engineer(self._engineer_decision)
@@ -1710,6 +1734,12 @@ class CoachEngine:
             self._engineer = engineer_for(snap.car_model, snap.track,
                                           is_acc=snap.is_acc)
             self._engineer_key = (snap.car_model, snap.track)
+            # Le curve dell'Ingegnere sono quelle del riferimento di adesso
+            # (appena ricostruito qui sopra), copiate: il coach le rifà a ogni
+            # nuovo miglior giro, l'Ingegnere no. Senza riferimento restano
+            # vuote e le fissa il primo giro pulito (`_engineer_stats`).
+            self._engineer_corners = list(self._corners)
+            self._engineer_corner_names = dict(self._corner_names)
             self._engineer.restore(
                 self._load_engineer_state(snap.car_model, snap.track))
             self._engineer_decision = None
