@@ -313,3 +313,90 @@ def test_every_lap_knows_its_place_in_the_stint():
     _drive(eng, laps)
     assert [(s.stint, s.stint_lap) for s in laps] == [(1, 1), (1, 2), (2, 1),
                                                       (2, 2)]
+
+
+# --- la frase, su qualunque decisione ---------------------------------------
+
+def _unnamed_lap(fuel, speeds):
+    return LapStats(lap_time_ms=100000, stable=True, warmed_up=True,
+                    pressures_hot=dict(PRESS_OK), fuel_l=fuel,
+                    corner_vmin=tuple(zip(APEX, speeds, [""] * len(NAMES))),
+                    dials=DIALS)
+
+
+def test_the_sentence_names_the_corners_it_the_last_lap():
+    config.set_language("it")
+    eng = _eng()
+    said = _drive(eng, [_lap(60), _lap(59), _lap(58), _lap(57),
+                        _lap(56, _v(-6, at=(2, 3, 5)))])
+    assert ("L'ultimo giro non conta. In Tosa, Piratella e Rivazza sei passato "
+            "più piano di oltre 5 km/h rispetto agli altri giri di questo "
+            "stint.") in said[-1].message
+
+
+def test_more_than_three_corners_say_how_many_more():
+    config.set_language("it")
+    eng = _eng()
+    said = _drive(eng, [_lap(60), _lap(59), _lap(58), _lap(57),
+                        _lap(56, _v(-6, at=(1, 2, 3, 4, 5)))])
+    assert "Villeneuve, Tosa, Piratella e altre 2 curve sei" in said[-1].message
+    said = _drive(_eng(), [_lap(60), _lap(59), _lap(58), _lap(57),
+                           _lap(56, _v(-6, at=(1, 2, 3, 4)))])
+    assert "Villeneuve, Tosa, Piratella e un'altra curva" in said[-1].message
+
+
+def test_an_unnamed_corner_gives_only_the_count():
+    config.set_language("it")
+    eng = _eng()
+    slow = _v(-6, at=(0, 1, 2, 3))
+    laps = [_unnamed_lap(60, _v()), _unnamed_lap(59, _v()),
+            _unnamed_lap(58, _v()), _unnamed_lap(57, _v()),
+            _unnamed_lap(56, slow)]
+    said = _drive(eng, laps)
+    assert "In 4 curve sei passato" in said[-1].message
+
+
+def test_the_sentence_rides_on_a_proposal():
+    config.set_language("it")
+    eng = _eng()
+    laps = [_lap(60, press=OFF), _lap(59, press=OFF), _lap(58, press=OFF),
+            _lap(57, press=OFF), _lap(56, _v(-6, at=(2, 3, 4)), press=OFF)]
+    said = _drive(eng, laps)
+    assert said[3].kind is DecisionKind.PROPOSE
+    assert "non conta" not in said[3].message
+    assert said[4].kind is DecisionKind.PROPOSE
+    assert "L'ultimo giro non conta" in said[4].message
+
+
+def test_a_collect_carries_it_in_the_tail_too():
+    config.set_language("it")
+    eng = _eng()
+    laps = [_lap(60), _lap(59), _lap(58, _v(-6, at=(0, 1, 2)))]
+    # Il 3° giro e' lento in 3 curve e viene tolto subito.
+    said = _drive(eng, laps + [_lap(57)])
+    d = said[3]
+    assert d.kind is DecisionKind.COLLECT
+    assert "Il 3° giro di questo stint non conta più" in d.message
+    assert d.tail is not None and "Il 3° giro di questo stint non conta più" in d.tail
+    assert "oltre 5 km/h rispetto agli altri giri." in d.message
+
+
+def test_the_sentence_in_english():
+    config.set_language("en")
+    eng = _eng()
+    said = _drive(eng, [_lap(60), _lap(59), _lap(58), _lap(57),
+                        _lap(56, _v(-6, at=(2, 3, 4, 5)))])
+    assert ("That last lap doesn't count. At Tosa, Piratella, Acque Minerali "
+            "and 1 more corner you were more than 5 km/h slower than on your "
+            "other laps this stint.") in said[-1].message
+    said = _drive(_eng(), [_unnamed_lap(60, _v()), _unnamed_lap(59, _v()),
+                           _unnamed_lap(58, _v()), _unnamed_lap(57, _v()),
+                           _unnamed_lap(56, _v(-6, at=(0, 1, 2)))])
+    assert "At 3 corners you were" in said[-1].message
+
+
+def test_a_held_decision_stays_the_same_object():
+    eng = _eng()
+    d = eng.observe(_lap(60))
+    eng._held_base = d
+    assert eng.observe(_lap(59)) is d

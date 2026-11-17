@@ -617,6 +617,24 @@ _DECISION_MSG = {
         "en": " That last lap didn't count because the game never completed it.",
         "it": " L'ultimo giro non conta perché il gioco non l'ha completato.",
     },
+    # Un giro pulito guidato diversamente dagli altri non entra in nessuna
+    # lettura: lo si dice dove e di quanto, o il pilota crede a un contatore rotto.
+    "drop_last": {
+        "en": " That last lap doesn't count. At {where} you were more than "
+              "{kmh} km/h slower than on your other laps this stint.",
+        "it": " L'ultimo giro non conta. In {where} sei passato più piano di "
+              "oltre {kmh} km/h rispetto agli altri giri di questo stint.",
+    },
+    "drop_earlier": {
+        "en": " Lap {n} of this stint no longer counts. At {where} it was "
+              "more than {kmh} km/h slower than the others.",
+        "it": " Il {n}° giro di questo stint non conta più. In {where} eri più "
+              "lento di oltre {kmh} km/h rispetto agli altri giri.",
+    },
+    "drop_more_one": {"en": "1 more corner", "it": "un'altra curva"},
+    "drop_more_many": {"en": "{k} more corners", "it": "altre {k} curve"},
+    "drop_unnamed": {"en": "{m} corners", "it": "{m} curve"},
+    "drop_and": {"en": " and ", "it": " e "},
     # Una modifica scritta sulla macchina e mai giudicata, perche' la sessione e'
     # finita in mezzo. Detta una volta sola, all'inizio della sessione dopo.
     "unjudged": {
@@ -988,6 +1006,38 @@ def _signed(v: float, lang: str) -> str:
 def _laps_left(n: int, lang: str) -> str:
     """«Serve ancora 1 giro pulito.» / «Servono ancora 2 giri puliti.»"""
     return _msg("laps_one", lang) if n == 1 else _msg("laps_many", lang, n=n)
+
+
+def _drop_where(corners: list, lang: str | None) -> str:
+    """Le curve di un giro tolto, dalla peggiore: tre nomi, poi «e altre k».
+
+    Una curva senza nome non si puo' dire: basta una e si danno solo i numeri,
+    altrimenti la frase elencherebbe un buco.
+    """
+    if any(not name for name, _ in corners):
+        return _msg("drop_unnamed", lang, m=len(corners))
+    names = [name for name, _ in corners]
+    join = _msg("drop_and", lang)
+    if len(names) <= 3:
+        return (", ".join(names[:-1]) + join + names[-1]) if len(names) > 1 \
+            else names[0]
+    k = len(names) - 3
+    more = _msg("drop_more_one", lang) if k == 1 else _msg("drop_more_many", lang, k=k)
+    return ", ".join(names[:3]) + join + more
+
+
+def _drop_tail(dropped: list, lang: str | None = None,
+               kmh: float | None = None) -> str:
+    """Le frasi sui giri tolti dal gruppo in questo giro (vuoto se nessuno)."""
+    out = []
+    # «5», non «5,0»: la soglia di default e' tonda.
+    digits = 0 if kmh is None or float(kmh) == int(kmh) else 1
+    for d in dropped:
+        where = _drop_where(d["corners"], lang)
+        out.append(_msg("drop_last" if d["last"] else "drop_earlier", lang,
+                        where=where, kmh=fmt_num(kmh or 0, digits, lang),
+                        n=d["stint_lap"]))
+    return "".join(out)
 
 
 def _skip_tail(stats: "LapStats | None", lang: str | None = None) -> str:
@@ -1410,6 +1460,19 @@ class RaceEngineer:
 
     def observe(self, stats: LapStats) -> Decision:
         """Feed one completed lap; return the next recommendation."""
+        d = self._observe(stats)
+        # Qualunque risposta, anche una proposta o l'attesa delle pressioni,
+        # dice quali giri sono usciti dal gruppo: altrimenti il pilota vede il
+        # contatore fermo e non sa perche'. Le risposte tenute in cima a
+        # `_observe` hanno `last_dropped` vuoto e restano lo STESSO oggetto.
+        if not self.last_dropped:
+            return d
+        add = _drop_tail(self.last_dropped, current_language(),
+                         self.consistency_kmh)
+        return replace(d, message=d.message + add,
+                       tail=None if d.tail is None else d.tail + add)
+
+    def _observe(self, stats: LapStats) -> Decision:
         # Prima di tutto: anche un giro che non entra non ha tolto niente.
         self.last_dropped = []
         # Un ripristino non ancora confermato viene prima di tutto, pioggia
