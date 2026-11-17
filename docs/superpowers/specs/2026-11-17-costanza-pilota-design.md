@@ -78,7 +78,8 @@ come dice oggi un'uscita di pista.
   GT3 (ACC e Assetto Corsa), dove è misurata sulla 720S. Restano come oggi Formula,
   stradali **e** GT4, GT2 e GTE: oggi `classmap` le manda tutte sul profilo GT3 (i pezzi
   `gt3`, `gt4`, `gt2`, `gte` del nome), ma 5 km/h su un'auto più lenta o più veloce non
-  sono la stessa cosa.
+  sono la stessa cosa. Restano fuori anche le monomarca Cup (`porsche_992_gt3_cup`):
+  `gt3` nel nome, ma non sono GT3 (il pezzo `cup`; il profilo non cambia).
 - Un punteggio di costanza da mostrare al pilota.
 
 ## Anti-obiettivi
@@ -137,7 +138,10 @@ cambio avrebbero curve diverse e sembrerebbero errori di guida. Quindi il gruppo
 confronto è: stesso stint **e** stessi TC, ABS, mappa e ripartitore letti sul giro
 (`Lap.tc_level`, `abs_level`, `engine_map`, `brake_bias`, da portare su `LapStats`). Un
 valore non letto (giri vecchi, −1 o assente) non spezza il gruppo. *[trovato dopo la
-revisione, mia scelta]*
+revisione, mia scelta]* In pista anche un cambio delle curve del riferimento (nuovo
+miglior giro) apre un gruppo nuovo, e un giro misurato sulle curve rilevate su se stesso
+(nessun riferimento) non si giudica e non fa da metro: stessa ragione del rigioco,
+curve diverse danno scarti finti (`LapStats.corners_key`, `corners_own`).
 
 **Il controllo, nell'Ingegnere.** In `RaceEngineer.observe`, dopo che il giro ha il suo
 stint ed è entrato nella finestra, e prima di qualunque decisione che legga la finestra:
@@ -154,8 +158,9 @@ stint ed è entrato nella finestra, e prima di qualunque decisione che legga la 
 - un giro tolto non rientra, anche se i giri dopo lo farebbero sembrare normale. *[mia
   scelta: semplice e prevedibile, e il pilota ha già sentito che non conta]*
 
-Le soglie stanno con le altre costanti dell'Ingegnere (`_CONSISTENCY_KMH = 5.0`,
-`_CONSISTENCY_CORNERS = 3`, `_CORNER_MATCH = 0.01`). L'interruttore non può stare sul
+Le soglie stanno con le altre costanti dell'Ingegnere (`_CONSISTENCY_CORNERS = 3`,
+`_CORNER_MATCH = 0.01`); i 5 km/h viaggiano con l'interruttore
+(`RaceEngineer.consistency_kmh`, da `consistency.KMH`). L'interruttore non può stare sul
 `Profile`, perché il profilo GT3 è condiviso con GT4, GT2 e GTE: lo passa `engineer_for`
 per auto, come già fa con lo scarto del ripartitore misurato (`bias_offset`), acceso solo
 per le auto GT3. Come riconoscerle con certezza (il pezzo `gt3` del nome non basta per

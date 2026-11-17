@@ -150,6 +150,14 @@ class LapStats:
     dials: tuple[int, int, int, float] = (-1, -1, -1, -1.0)
     #: Il numero d'ordine del giro nello stint (lo riempie il motore).
     stint_lap: int = 0
+    #: Su quali curve e' stata misurata `corner_vmin`: (ingresso, uscita) di
+    #: ognuna. In pista le curve cambiano col riferimento (nuovo miglior
+    #: giro): la stessa zona puo' cadere su un tratto veloce o sulla curva
+    #: lenta, e due giri si confrontano solo sulle stesse curve.
+    corners_key: tuple = ()
+    #: Le curve sono state rilevate sul giro stesso (nessun riferimento):
+    #: un giro cosi' non si confronta con nessun altro.
+    corners_own: bool = False
 
 
 # --- recommendations -------------------------------------------------------
@@ -520,12 +528,12 @@ _BIAS_TOL = 0.001
 _CHECK_WRITTEN = ("written", "resumed")
 
 #: La costanza del pilota (17/11): un giro pulito piu' lento degli altri giri
-#: del suo gruppo (stesso stint, stesse manopole) di oltre `_CONSISTENCY_KMH`
-#: km/h di velocita' minima in almeno `_CONSISTENCY_CORNERS` curve non entra in
-#: nessuna lettura. Misurate sulla 720S e tenute in `consistency`: qui sono le
-#: stesse. La soglia in km/h che il motore usa arriva per auto da
-#: `engineer_for` (`RaceEngineer.consistency_kmh`), e questa e' quella misurata.
-_CONSISTENCY_KMH = consistency.KMH
+#: del suo gruppo (stesso stint, stesse manopole, stesse curve) di oltre la
+#: soglia in km/h di velocita' minima in almeno `_CONSISTENCY_CORNERS` curve
+#: non entra in nessuna lettura. Misurate sulla 720S e tenute in
+#: `consistency`. La soglia in km/h arriva per auto da `engineer_for`
+#: (`RaceEngineer.consistency_kmh`, che vale anche da interruttore): qui non
+#: ce n'e' una seconda copia.
 _CONSISTENCY_CORNERS = consistency.CORNERS
 _CORNER_MATCH = consistency.MATCH
 #: Quanti giri giudicabili servono per giudicarne uno: con meno, a ciascuno
@@ -619,21 +627,30 @@ _DECISION_MSG = {
     },
     # Un giro pulito guidato diversamente dagli altri non entra in nessuna
     # lettura: lo si dice dove e di quanto, o il pilota crede a un contatore rotto.
+    # {where} porta la sua preposizione: «At Tosa» ma «In 3 corners».
     "drop_last": {
-        "en": " That last lap doesn't count. At {where} you were more than "
+        "en": " That last lap doesn't count. {where} you were more than "
               "{kmh} km/h slower than on your other laps this stint.",
-        "it": " L'ultimo giro non conta. In {where} sei passato più piano di "
+        "it": " L'ultimo giro non conta. {where} sei passato più piano di "
               "oltre {kmh} km/h rispetto agli altri giri di questo stint.",
     },
     "drop_earlier": {
-        "en": " Lap {n} of this stint no longer counts. At {where} it was "
+        "en": " Lap {n} of this stint no longer counts. {where} it was "
               "more than {kmh} km/h slower than the others.",
-        "it": " Il {n}° giro di questo stint non conta più. In {where} eri più "
+        "it": " Il {n}° giro di questo stint non conta più. {where} eri più "
               "lento di oltre {kmh} km/h rispetto agli altri giri.",
     },
+    # Piu' giri tolti insieme: una frase sola, non la stessa ripetuta.
+    "drop_earlier_many": {
+        "en": " Laps {n} of this stint no longer count. {where} they were "
+              "more than {kmh} km/h slower than your other laps.",
+        "it": " I giri {n} di questo stint non contano più. {where} eri più "
+              "lento di oltre {kmh} km/h rispetto ai tuoi altri giri.",
+    },
+    "drop_named": {"en": "At {names}", "it": "In {names}"},
     "drop_more_one": {"en": "1 more corner", "it": "un'altra curva"},
     "drop_more_many": {"en": "{k} more corners", "it": "altre {k} curve"},
-    "drop_unnamed": {"en": "{m} corners", "it": "{m} curve"},
+    "drop_unnamed": {"en": "In {m} corners", "it": "In {m} curve"},
     "drop_and": {"en": " and ", "it": " e "},
     # Una modifica scritta sulla macchina e mai giudicata, perche' la sessione e'
     # finita in mezzo. Detta una volta sola, all'inizio della sessione dopo.
@@ -1008,8 +1025,15 @@ def _laps_left(n: int, lang: str) -> str:
     return _msg("laps_one", lang) if n == 1 else _msg("laps_many", lang, n=n)
 
 
+def _listed(items: list[str], lang: str | None) -> str:
+    """«a», «a e b», «a, b e c»."""
+    join = _msg("drop_and", lang)
+    return (", ".join(items[:-1]) + join + items[-1]) if len(items) > 1 \
+        else items[0]
+
+
 def _drop_where(corners: list, lang: str | None) -> str:
-    """Le curve di un giro tolto, dalla peggiore: tre nomi, poi «e altre k».
+    """Dove, con la preposizione: dalla peggiore, tre nomi e poi «e altre k».
 
     Una curva senza nome non si puo' dire: basta una e si danno solo i numeri,
     altrimenti la frase elencherebbe un buco.
@@ -1017,26 +1041,54 @@ def _drop_where(corners: list, lang: str | None) -> str:
     if any(not name for name, _ in corners):
         return _msg("drop_unnamed", lang, m=len(corners))
     names = [name for name, _ in corners]
-    join = _msg("drop_and", lang)
-    if len(names) <= 3:
-        return (", ".join(names[:-1]) + join + names[-1]) if len(names) > 1 \
-            else names[0]
-    k = len(names) - 3
-    more = _msg("drop_more_one", lang) if k == 1 else _msg("drop_more_many", lang, k=k)
-    return ", ".join(names[:3]) + join + more
+    if len(names) > 3:
+        k = len(names) - 3
+        more = (_msg("drop_more_one", lang) if k == 1
+                else _msg("drop_more_many", lang, k=k))
+        names = names[:3] + [more]
+    return _msg("drop_named", lang, names=_listed(names, lang))
+
+
+def _merged_corners(dropped: list) -> list:
+    """Le curve di piu' giri tolti insieme, per una frase sola.
+
+    L'unione per nome, con lo scarto peggiore e dalla peggiore: ogni curva
+    detta e' una dove almeno uno di quei giri era lento. Senza nomi non si sa
+    quali coincidono, e vale il giro con piu' curve lente.
+    """
+    if any(not name for d in dropped for name, _ in d["corners"]):
+        return max((d["corners"] for d in dropped), key=len)
+    worst: dict[str, float] = {}
+    for d in dropped:
+        for name, gap in d["corners"]:
+            worst[name] = max(gap, worst.get(name, gap))
+    return sorted(worst.items(), key=lambda c: -c[1])
 
 
 def _drop_tail(dropped: list, lang: str | None = None,
-               kmh: float | None = None) -> str:
-    """Le frasi sui giri tolti dal gruppo in questo giro (vuoto se nessuno)."""
-    out = []
+               kmh: float | None = None, *, held: bool = False) -> str:
+    """Le frasi sui giri tolti dal gruppo in questo giro (vuoto se nessuno).
+
+    I giri di prima in una frase sola, l'ultimo giro nella sua. Su una
+    risposta tenuta (``held``) anche l'ultimo si dice col numero: la frase si
+    ripete ai giri dopo, quando quel giro non e' piu' l'ultimo.
+    """
     # «5», non «5,0»: la soglia di default e' tonda.
     digits = 0 if kmh is None or float(kmh) == int(kmh) else 1
+    k = fmt_num(kmh or 0, digits, lang)
+    earlier = [d for d in dropped if held or not d["last"]]
+    out = []
+    if len(earlier) == 1:
+        out.append(_msg("drop_earlier", lang, n=earlier[0]["stint_lap"], kmh=k,
+                        where=_drop_where(earlier[0]["corners"], lang)))
+    elif earlier:
+        laps = _listed([str(d["stint_lap"]) for d in earlier], lang)
+        out.append(_msg("drop_earlier_many", lang, n=laps, kmh=k,
+                        where=_drop_where(_merged_corners(earlier), lang)))
     for d in dropped:
-        where = _drop_where(d["corners"], lang)
-        out.append(_msg("drop_last" if d["last"] else "drop_earlier", lang,
-                        where=where, kmh=fmt_num(kmh or 0, digits, lang),
-                        n=d["stint_lap"]))
+        if d["last"] and not held:
+            out.append(_msg("drop_last", lang, kmh=k,
+                            where=_drop_where(d["corners"], lang)))
     return "".join(out)
 
 
@@ -1319,8 +1371,10 @@ class RaceEngineer:
         #: metro dei giri che arrivano, e quelli che un giro dopo puo' ancora
         #: togliere. Si confrontano per identita': due giri uguali sono `==`.
         self._group: list[LapStats] = []
-        #: Le manopole del giro prima: una manopola girata apre un gruppo.
+        #: Le manopole e le curve del giro prima: una manopola girata, o un
+        #: riferimento nuovo con altre curve, apre un gruppo.
         self._last_dials: tuple | None = None
+        self._last_corners: tuple | None = None
         #: I giri tolti a QUESTO giro, rifatta a ogni `observe`: la frase e il
         #: registro la leggono da qui. ``{"stint", "stint_lap", "last",
         #: "corners": [[nome, km/h piu' lento], ...]}``, ``last`` vero per il
@@ -1472,8 +1526,10 @@ class RaceEngineer:
         # `_observe` hanno `last_dropped` vuoto e restano lo STESSO oggetto.
         if not self.last_dropped:
             return d
+        held = any(getattr(self, slot) is d
+                   for slot in ("_held_revert", "_held_base", "_held_wrong"))
         add = _drop_tail(self.last_dropped, current_language(),
-                         self.consistency_kmh)
+                         self.consistency_kmh, held=held)
         out = replace(d, message=d.message + add,
                       tail=None if d.tail is None else d.tail + add)
         # Una risposta tenuta nata su questo giro deve restare UNA: il giro dopo
@@ -1545,14 +1601,16 @@ class RaceEngineer:
         self._last_settling = restart
         judging = self.consistency_kmh is not None
         if judging:
-            self._open_group(restart, stats.dials)
+            self._open_group(restart, stats)
 
         if stats.stable and stats.warmed_up:
             # Un giro in attesa di giudizio non e' un giro scartato.
             self._skipped = None
             # Il giro che apre lo stint ha le gomme ancora in salita: non si
-            # giudica e non fa da metro, ed entra come prima.
-            if judging and not stats.settling:
+            # giudica e non fa da metro, ed entra come prima. Lo stesso un giro
+            # misurato sulle curve rilevate su se stesso (nessun riferimento):
+            # non ha curve in comune di cui fidarsi con nessun altro.
+            if judging and not stats.settling and not stats.corners_own:
                 self._waiting.append(stats)
                 self._judge_group(stats)
             else:
@@ -1691,8 +1749,9 @@ class RaceEngineer:
         self._waiting = []
         self._group = []
 
-    def _open_group(self, restart: bool, dials: tuple) -> None:
-        """Un gruppo nuovo a ogni stint e a ogni manopola girata.
+    def _open_group(self, restart: bool, stats: LapStats) -> None:
+        """Un gruppo nuovo a ogni stint, a ogni manopola girata e a ogni
+        cambio delle curve su cui si misura.
 
         Il 14/11 il TC e' passato fra 3 e 4 dentro lo stesso stint: i giri dopo
         il cambio hanno altre velocita' in curva e sembrerebbero errori di
@@ -1701,10 +1760,17 @@ class RaceEngineer:
         vuol dire incostante. Fino al 17/11 si buttavano, e rigiocando il
         14/11 (TC 3 e 4 alternati giro per giro) la lettura delle pressioni
         ripartiva a ogni cambio e non arrivava mai.
+
+        Le curve: in pista sono quelle del riferimento, che cambia a ogni
+        nuovo miglior giro. La stessa zona puo' cadere su un tratto veloce o
+        sulla curva lenta (nel rigioco del 17/11, Rivazza a 225 o a 90 km/h),
+        e fra due insiemi diversi gli scarti non sono del pilota.
         """
-        prev, self._last_dials = self._last_dials, dials
+        prev, self._last_dials = self._last_dials, stats.dials
+        corners, self._last_corners = self._last_corners, stats.corners_key
         if restart or (prev is not None
-                       and not consistency.same_dials(prev, dials)):
+                       and not consistency.same_dials(prev, stats.dials)) or (
+                corners is not None and corners != stats.corners_key):
             for lap in self._waiting:
                 self._bank(lap)
             self._waiting = []

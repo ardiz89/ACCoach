@@ -134,14 +134,16 @@ def classify(car_model: str) -> CarClass:
     return known_class(car_model) or CarClass.ROAD
 
 
-# Le GT che condividono il profilo GT3 ma non sono GT3.
-_NOT_GT3_TOKENS = {"gt4", "gt2", "gte"}
+# Le GT che condividono il profilo GT3 ma non sono GT3, e le monomarca Cup
+# (porsche_992_gt3_cup): "gt3" nel nome, un'altra auto. Solo per la costanza:
+# il profilo dell'Ingegnere lo decide `known_class`, che qui non cambia.
+_NOT_GT3_TOKENS = {"gt4", "gt2", "gte", "cup"}
 
 
 def is_gt3(car_model: str) -> bool:
     """Una GT3 **vera**, dal nome. ``known_class`` da' GT3 anche a gt4/gt2/gte
-    (condividono il profilo); qui no: una soglia misurata su una GT3 non vale
-    per loro. Una GT3 che il nome non dice resta ``False``."""
+    e alle Cup (condividono il profilo); qui no: una soglia misurata su una
+    GT3 non vale per loro. Una GT3 che il nome non dice resta ``False``."""
     if known_class(car_model) is not CarClass.GT3:
         return False
     return not _NOT_GT3_TOKENS.intersection(_tokens((car_model or "").strip().lower()))

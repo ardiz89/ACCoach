@@ -25,11 +25,13 @@ def _v(delta=0.0, at=()):
     return tuple(BASE + (delta if i in at else 0.0) for i in range(len(NAMES)))
 
 
-def _lap(fuel, speeds=None, press=PRESS_OK, dials=DIALS):
+def _lap(fuel, speeds=None, press=PRESS_OK, dials=DIALS, apex=APEX, key=(),
+         own=False):
     speeds = _v() if speeds is None else speeds
     return LapStats(lap_time_ms=100000, stable=True, warmed_up=True,
                     pressures_hot=dict(press), fuel_l=fuel,
-                    corner_vmin=tuple(zip(APEX, speeds, NAMES)), dials=dials)
+                    corner_vmin=tuple(zip(apex, speeds, NAMES)), dials=dials,
+                    corners_key=key, corners_own=own)
 
 
 def _eng(kmh=5.0):
@@ -272,6 +274,49 @@ def test_a_balance_test_after_a_stop_counts_down():
     assert eng.active is None
 
 
+def test_a_new_corner_set_starts_a_group():
+    # In pista le curve cambiano col riferimento (un nuovo miglior giro). La
+    # zona della Rivazza puo' cadere su un tratto a 225 km/h o sulla curva a
+    # 90: fra due insiemi diversi lo scarto non e' del pilota. Il 5° giro e'
+    # piu' lento solo in 2 curve, e non va tolto per la terza che non esiste.
+    eng = _eng()
+    old_apex = APEX[:5] + (0.795,)
+    laps = [_lap(60 - n, (100,) * 5 + (225,), apex=old_apex, key=("prima",))
+            for n in range(4)]
+    new = _lap(56, (94, 94, 100, 100, 100, 90), key=("dopo",))
+    for lap in laps + [new]:
+        eng.observe(lap)
+        assert eng.last_dropped == []
+    assert [s.stint_lap for s in eng.window] == [1, 2, 3, 4]
+    # Un gruppo nuovo: il giro sulle curve nuove aspetta i suoi.
+    assert not _has(eng.window, new)
+
+
+def test_laps_on_their_own_corners_go_straight_in():
+    # Senza riferimento (la prima serata su un'auto e una pista) il giro si
+    # misura sulle curve rilevate su se stesso: non si giudica e non fa da
+    # metro, ed entra come prima.
+    eng = _eng()
+    own = [_lap(60, own=True, key=("k",)), _lap(59, own=True, key=("k",)),
+           _lap(58, own=True, key=("k",)),
+           _lap(57, _v(-6, at=(0, 1, 2)), own=True, key=("k",))]
+    for lap in own:
+        eng.observe(lap)
+        assert _has(eng.window, lap)
+        assert eng.last_dropped == []
+    # Il giro misurato sulle sue curve diventa il riferimento: i giri dopo
+    # hanno le sue stesse curve. Piu' veloce di 12 km/h in 3 curve, se facesse
+    # da metro farebbe sembrare lenti gli altri.
+    eng = _eng()
+    first = [_lap(60, key=("k",)), _lap(59, _v(+12, at=(0, 1, 2)), own=True,
+                                       key=("k",))]
+    for lap in first + [_lap(58, key=("k",)), _lap(57, key=("k",)),
+                        _lap(56, key=("k",))]:
+        eng.observe(lap)
+        assert eng.last_dropped == []
+    assert len(eng.window) == 5
+
+
 def test_a_short_stint_counts_unjudged():
     eng = _eng()
     # Apertura e due giri, uno piu' lento in 3 curve, poi la sosta: con due
@@ -450,7 +495,7 @@ def test_the_sentence_in_english():
     said = _drive(_eng(), [_unnamed_lap(60, _v()), _unnamed_lap(59, _v()),
                            _unnamed_lap(58, _v()), _unnamed_lap(57, _v()),
                            _unnamed_lap(56, _v(-6, at=(0, 1, 2)))])
-    assert "At 3 corners you were" in said[-1].message
+    assert "In 3 corners you were" in said[-1].message
 
 
 def test_a_held_decision_stays_the_same_object():
@@ -484,9 +529,70 @@ def test_a_held_decision_born_on_a_dropping_lap_is_the_same_object_next_lap(slot
 
     eng._observe = fake
     first = eng.observe(_lap(60))
-    assert "L'ultimo giro non conta" in first.message
+    # Ripetuta ai giri dopo, «l'ultimo giro» sarebbe falso: si dice il numero.
+    assert "Il 3° giro di questo stint non conta più" in first.message
+    assert "L'ultimo giro" not in first.message
     eng._observe = inner
     # Il giro dopo risponde con la stessa risposta tenuta, con la frase dentro.
     second = eng.observe(_lap(59))
     assert second is first
     assert getattr(eng, slot) is first
+
+
+def test_a_held_revert_born_on_a_drop_names_the_lap():
+    # Il ripristino nasce nel giro in cui il 4° giro dopo la sosta e' tolto, e
+    # si ripete identico finche' il pilota non rimette l'assetto: «l'ultimo
+    # giro» al giro dopo non sarebbe piu' vero.
+    config.set_language("it")
+    eng = _eng()
+    _drive(eng, [_lap(60), _lap(59), _lap(58), _lap(57)])
+    eng._pending = ProposedChange(
+        (AtomicChange("aRBFront", None, -1),), "Soften the front bar 1 click.",
+        "Mechanical", "BOX",
+        Symptom(Balance.UNDERSTEER, Phase.APEX, Speed.LOW))
+    eng.mark_applied()
+    d = _drive(eng, [_lap(70), _lap(69), _lap(68),
+                     _lap(67, _v(-6, at=(2, 3, 4)))])[-1]
+    assert d.kind is DecisionKind.REVERTED
+    assert [(x["stint_lap"], x["last"]) for x in eng.last_dropped] == [(4, True)]
+    assert "Il 4° giro di questo stint non conta più" in d.message
+    assert "L'ultimo giro" not in d.message
+    assert eng.observe(_lap(66)) is d
+
+
+def _three_go_at_once(lang):
+    config.set_language(lang)
+    eng = _eng()
+    fast = _v(+7, at=(0, 2, 4))
+    return _drive(eng, [_lap(60), _lap(59), _lap(58), _lap(57),
+                        _lap(56, fast), _lap(55, fast), _lap(54, fast)])[-1]
+
+
+def test_several_earlier_laps_share_one_sentence():
+    # I giri 2, 3 e 4 escono insieme al 7°: una frase, non tre uguali.
+    d = _three_go_at_once("it")
+    assert d.message.count("non cont") == 1
+    assert ("I giri 2, 3 e 4 di questo stint non contano più. In Tamburello, "
+            "Tosa e Acque Minerali") in d.message
+    d = _three_go_at_once("en")
+    assert d.message.count("count") == 1
+    assert ("Laps 2, 3 and 4 of this stint no longer count. At Tamburello, "
+            "Tosa and Acque Minerali") in d.message
+
+
+def test_an_earlier_and_the_last_lap_keep_their_own_sentences():
+    config.set_language("it")
+    eng = _eng()
+    _drive(eng, [_lap(60), _lap(59), _lap(58), _lap(57)])
+    eng._pending = ProposedChange(
+        (AtomicChange("tC1", None, 1),), "Add 1 click of traction control.",
+        "Electronics", "AV",
+        Symptom(Balance.OVERSTEER, Phase.EXIT, Speed.LOW))
+    eng.mark_applied()
+    tc4 = (4, 4, 0, 0.64)
+    _drive(eng, [_lap(56, (94, 94, 94, 100, 100, 100), dials=tc4),
+                 _lap(55, (94, 94, 100, 100, 100, 100), dials=tc4),
+                 _lap(54, (100, 100, 100, 94, 94, 94), dials=tc4)])
+    d = eng.observe(_lap(53, (106, 106, 100, 94, 94, 94), dials=tc4))
+    assert d.message.count("Il 5° giro di questo stint non conta più") == 1
+    assert d.message.count("L'ultimo giro non conta") == 1

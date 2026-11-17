@@ -27,3 +27,18 @@ def test_lap_stats_carry_the_dials():
     assert build_lap_stats(lap).dials == (-1, -1, -1, -1.0)
     lap.tc_level, lap.abs_level, lap.engine_map, lap.brake_bias = 3, 4, 0, 0.64
     assert build_lap_stats(lap).dials == (3, 4, 0, 0.64)
+
+
+def test_the_lap_says_which_corners_it_was_measured_on():
+    # In pista le curve cambiano col riferimento, e senza riferimento ogni giro
+    # se le rileva da se': due giri si confrontano solo sulle stesse curve.
+    lap = build_lap()
+    corners = detect_corners(lap.samples)
+    given = build_lap_stats(lap, corners)
+    assert given.corners_own is False
+    assert given.corners_key == tuple(
+        (round(c.entry_pos, 4), round(c.exit_pos, 4)) for c in corners)
+    own = build_lap_stats(lap)
+    assert own.corners_own is True
+    assert own.corners_key == given.corners_key
+    assert build_lap_stats(lap, corners[:1]).corners_key != given.corners_key

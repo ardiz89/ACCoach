@@ -282,7 +282,8 @@ def _off_symptom(lap: Lap, corners: list[Corner],
 def build_lap_stats(lap: Lap, corners: list[Corner] | None = None,
                     corner_names: dict[int, str] | None = None) -> LapStats:
     """Diagnose one recorded lap into a :class:`LapStats` for the engineer."""
-    if corners is None:
+    own = corners is None
+    if own:
         corners = detect_corners(lap.samples)
     tuning = tuning_for_car(lap.car_model)
 
@@ -324,6 +325,11 @@ def build_lap_stats(lap: Lap, corners: list[Corner] | None = None,
         wet=_is_wet(lap),
         corner_vmin=_corner_vmin(lap, corners, corner_names),
         dials=(lap.tc_level, lap.abs_level, lap.engine_map, lap.brake_bias),
+        # Su quali curve, per la costanza: solo giri misurati sulle stesse si
+        # confrontano, e uno misurato sulle sue curve non si confronta.
+        corners_key=tuple((round(c.entry_pos, 4), round(c.exit_pos, 4))
+                          for c in corners),
+        corners_own=own,
     )
 
 
