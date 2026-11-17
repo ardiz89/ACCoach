@@ -139,6 +139,16 @@ class LapStats:
     #: A quale stint appartiene il giro (lo numera il motore). Una lettura di
     #: pressione mescola solo giri dello stesso stint.
     stint: int = 0
+    #: Costanza del pilota (17/11): per ogni curva con campioni, (apice,
+    #: velocita' minima in km/h, nome). Un giro guidato piu' piano degli altri
+    #: dello stint non misura l'assetto, e per saperlo serve la minima curva
+    #: per curva dentro il giro.
+    corner_vmin: tuple[tuple[float, float, str], ...] = ()
+    #: Le manopole dell'auto nel giro: (TC, ABS, mappa motore, bilanciamento
+    #: freno). Coi default di `Lap` (-1, -1, -1, -1.0) per i giri vecchi.
+    dials: tuple[int, int, int, float] = (-1, -1, -1, -1.0)
+    #: Il numero d'ordine del giro nello stint (lo riempie il motore).
+    stint_lap: int = 0
 
 
 # --- recommendations -------------------------------------------------------

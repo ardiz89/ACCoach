@@ -322,7 +322,23 @@ def build_lap_stats(lap: Lap, corners: list[Corner] | None = None,
         fuel_l=_mean_fuel(lap.samples),
         road_temp=getattr(lap, "road_temp", 0.0) or 0.0,
         wet=_is_wet(lap),
+        corner_vmin=_corner_vmin(lap, corners, corner_names),
+        dials=(lap.tc_level, lap.abs_level, lap.engine_map, lap.brake_bias),
     )
+
+
+def _corner_vmin(lap: Lap, corners: list[Corner],
+                 corner_names: dict[int, str] | None
+                 ) -> tuple[tuple[float, float, str], ...]:
+    """Velocita' minima del giro in ogni curva, per misurarne la costanza."""
+    names = corner_names or {}
+    out = []
+    for c in corners:
+        speeds = [s.speed_kmh for s in lap.samples
+                  if c.entry_pos <= s.pos <= c.exit_pos]
+        if speeds:
+            out.append((c.apex_pos, min(speeds), names.get(c.index, "")))
+    return tuple(out)
 
 
 def _is_wet(lap) -> bool | None:
