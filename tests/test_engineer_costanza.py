@@ -400,3 +400,35 @@ def test_a_held_decision_stays_the_same_object():
     d = eng.observe(_lap(60))
     eng._held_base = d
     assert eng.observe(_lap(59)) is d
+
+
+import pytest
+from accoach.engineer import Decision
+
+
+@pytest.mark.parametrize("slot", ["_held_revert", "_held_base", "_held_wrong"])
+def test_a_held_decision_born_on_a_dropping_lap_is_the_same_object_next_lap(slot):
+    # Il motore a valle riconosce «te lo sto ripetendo» da `is`: se la risposta
+    # col giro tolto fosse una copia, il giro dopo uscirebbe l'originale e il
+    # registro scriverebbe due volte lo stesso esito. Si simula il giro in cui
+    # nasce la risposta tenuta E un giro viene tolto, senza costruire a mano
+    # un ripristino vero: qui conta solo il contratto del ripetitore.
+    config.set_language("it")
+    eng = _eng()
+    held = Decision(DecisionKind.REVERTED, "Rimetti l'assetto di prima.")
+    inner = eng._observe
+
+    def fake(stats):
+        eng.last_dropped = [{"stint": 1, "stint_lap": 3, "last": True,
+                             "corners": [["Tosa", 6.0]]}]
+        setattr(eng, slot, held)
+        return held
+
+    eng._observe = fake
+    first = eng.observe(_lap(60))
+    assert "L'ultimo giro non conta" in first.message
+    eng._observe = inner
+    # Il giro dopo risponde con la stessa risposta tenuta, con la frase dentro.
+    second = eng.observe(_lap(59))
+    assert second is first
+    assert getattr(eng, slot) is first

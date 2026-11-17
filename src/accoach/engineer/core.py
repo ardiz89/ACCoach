@@ -1469,8 +1469,16 @@ class RaceEngineer:
             return d
         add = _drop_tail(self.last_dropped, current_language(),
                          self.consistency_kmh)
-        return replace(d, message=d.message + add,
-                       tail=None if d.tail is None else d.tail + add)
+        out = replace(d, message=d.message + add,
+                      tail=None if d.tail is None else d.tail + add)
+        # Una risposta tenuta nata su questo giro deve restare UNA: il giro dopo
+        # `_observe` restituisce lo slot, e chi sta a valle (engine) la distingue
+        # da un verdetto nuovo con `is`. Con la copia in uscita e l'originale
+        # nello slot, lo stesso ripristino verrebbe registrato due volte.
+        for slot in ("_held_revert", "_held_base", "_held_wrong"):
+            if getattr(self, slot) is d:
+                setattr(self, slot, out)
+        return out
 
     def _observe(self, stats: LapStats) -> Decision:
         # Prima di tutto: anche un giro che non entra non ha tolto niente.
