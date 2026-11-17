@@ -37,6 +37,7 @@ from enum import Enum
 
 from ..i18n import current_language
 from ..textfmt import fmt_num
+from . import consistency
 from .steps import AccSteps, Steps
 
 
@@ -517,6 +518,19 @@ _BIAS_STEP = 0.002
 _BIAS_TOL = 0.001
 #: I due `_exit_check` che all'uscita ricontrollano il file scritto (R2).
 _CHECK_WRITTEN = ("written", "resumed")
+
+#: La costanza del pilota (17/11): un giro pulito piu' lento degli altri giri
+#: del suo gruppo (stesso stint, stesse manopole) di oltre `_CONSISTENCY_KMH`
+#: km/h di velocita' minima in almeno `_CONSISTENCY_CORNERS` curve non entra in
+#: nessuna lettura. Misurate sulla 720S e tenute in `consistency`: qui sono le
+#: stesse. La soglia in km/h che il motore usa arriva per auto da
+#: `engineer_for` (`RaceEngineer.consistency_kmh`), e questa e' quella misurata.
+_CONSISTENCY_KMH = consistency.KMH
+_CONSISTENCY_CORNERS = consistency.CORNERS
+_CORNER_MATCH = consistency.MATCH
+#: Quanti giri giudicabili servono per giudicarne uno: con meno, a ciascuno
+#: mancano due altri giri con cui fare la mediana.
+_CONSISTENCY_LAPS = 3
 
 
 # Decision messages, per language; resolved with the active app language at the
@@ -1243,6 +1257,24 @@ class RaceEngineer:
         #: (`base_confirmed`): finche' i report dicono le stesse, «non
         #: salvato» non rimette R3. La scelta vale «lo so, scrivi su questo».
         self._chosen_dials: tuple | None = None
+        #: Costanza del pilota (17/11), solo con `consistency_kmh`. I giri
+        #: puliti del gruppo in corso (stesso stint, stesse manopole) che
+        #: aspettano di potersi giudicare: finche' il gruppo non ne ha
+        #: `_CONSISTENCY_LAPS` non entrano nella finestra e nessuna decisione
+        #: li legge. Li contano i contatori, se no dopo una sosta il conto
+        #: resterebbe fermo e poi salterebbe (il difetto del 08/11).
+        self._waiting: list[LapStats] = []
+        #: I giri del gruppo in corso gia' giudicati ed entrati in finestra: il
+        #: metro dei giri che arrivano, e quelli che un giro dopo puo' ancora
+        #: togliere. Si confrontano per identita': due giri uguali sono `==`.
+        self._group: list[LapStats] = []
+        #: Le manopole del giro prima: una manopola girata apre un gruppo.
+        self._last_dials: tuple | None = None
+        #: I giri tolti a QUESTO giro, rifatta a ogni `observe`: la frase e il
+        #: registro la leggono da qui. ``{"stint", "stint_lap", "last",
+        #: "corners": [[nome, km/h piu' lento], ...]}``, ``last`` vero per il
+        #: giro appena chiuso.
+        self.last_dropped: list[dict] = []
 
     # -- memoria fra sessioni ----------------------------------------------
     def state(self) -> dict:
@@ -1357,24 +1389,29 @@ class RaceEngineer:
             pass        # si aspetta il file o la risposta: nessun contatore
         elif self.active is not None:
             # Una prova di pressione conta i giri della lettura, non tutti i
-            # giri buoni: lo stesso numero che dice il messaggio.
+            # giri buoni: lo stesso numero che dice il messaggio. I giri in
+            # attesa di giudizio contano anche qui (vedi `_need`).
             if self._is_pressure_test(self.active):
                 need = self._reading_size()
-                have = min(need, len(self._reading_laps()))
+                have = min(need, len(self._reading_laps()) + self._waiting_hot())
             else:
-                have, need = self.active.laps_seen, self.min_stable
-            out.update(stage="test", have=have, need=need)
+                have = self.active.laps_seen + len(self._waiting)
+                need = self.min_stable
+            out.update(stage="test", have=have, need=self._need(have, need))
         elif self._pending is not None:
             out["stage"] = "change"
         elif self.phase is None:
             out["stage"] = "done"
         elif len(self.window) < self.min_stable:
-            out.update(stage="baseline", have=len(self.window),
-                       need=self.min_stable)
+            have = len(self.window) + len(self._waiting)
+            out.update(stage="baseline", have=have,
+                       need=self._need(have, self.min_stable))
         return out
 
     def observe(self, stats: LapStats) -> Decision:
         """Feed one completed lap; return the next recommendation."""
+        # Prima di tutto: anche un giro che non entra non ha tolto niente.
+        self.last_dropped = []
         # Un ripristino non ancora confermato viene prima di tutto, pioggia
         # compresa: e' un fatto sulla macchina, non una misura. Finche' il
         # pilota non dice di aver rimesso l'assetto di prima, la modifica
@@ -1427,15 +1464,23 @@ class RaceEngineer:
             self._stint_lap = 0
         self._stint_lap += 1
         stats.stint = self._stint
+        stats.stint_lap = self._stint_lap
         stats.settling = restart
         self._last_settling = restart
+        judging = self.consistency_kmh is not None
+        if judging:
+            self._open_group(restart, stats.dials)
 
         if stats.stable and stats.warmed_up:
-            self.window.append(stats)
-            self.window = self.window[-_WINDOW:]
-            if self.active is not None:
-                self.active.laps_seen += 1
+            # Un giro in attesa di giudizio non e' un giro scartato.
             self._skipped = None
+            # Il giro che apre lo stint ha le gomme ancora in salita: non si
+            # giudica e non fa da metro, ed entra come prima.
+            if judging and not stats.settling:
+                self._waiting.append(stats)
+                self._judge_group(stats)
+            else:
+                self._bank(stats)
         else:
             self._skipped = stats
             # Fuori con le gomme fredde il sospettato e' la gomma: non conta.
@@ -1467,9 +1512,10 @@ class RaceEngineer:
 
         if len(self.window) < self.min_stable:
             tail = _skip_tail(self._skipped) + self._off_tail()
+            have = len(self.window) + len(self._waiting)
             return Decision(DecisionKind.COLLECT,
-                            _msg("collect", n=self.min_stable,
-                                 have=len(self.window)) + tail,
+                            _msg("collect", n=self._need(have, self.min_stable),
+                                 have=have) + tail,
                             tail=tail)
         return self._advance()
 
@@ -1489,7 +1535,7 @@ class RaceEngineer:
                     and self._exit_check not in _CHECK_WRITTEN):
                 self._exit_check = "known"
             self.active = None
-            self.window = []
+            self._clear_window()
             self._pending = None
             self._pending_is_revert = False
             self._held_revert = None
@@ -1521,7 +1567,7 @@ class RaceEngineer:
             self._exit_check = "written"
         # The reference shifts when the setup changes — restart the window so the
         # verdict is measured only on post-change laps.
-        self.window = []
+        self._clear_window()
         self._pending = None
         self._pending_prediction = None
 
@@ -1539,16 +1585,125 @@ class RaceEngineer:
         """
         if stats.wet is None:
             return False
-        known = [s.wet for s in self.window if s.wet is not None]
+        # Anche i giri in attesa di giudizio: sono in mano, e dopo entrano.
+        known = [s.wet for s in self.window + self._waiting if s.wet is not None]
         if not known or known[-1] == stats.wet:
             return False
-        self.window = []
+        self._clear_window()
         self._offs = []
         self.active = None
         self._pending = None
         self._pending_is_revert = False
         self._pending_prediction = None
         return True
+
+    # -- la costanza del pilota (17/11) -------------------------------------
+    def _bank(self, stats: LapStats) -> None:
+        """Il giro entra nella finestra, e nel conto della prova in corso."""
+        self.window.append(stats)
+        self.window = self.window[-_WINDOW:]
+        if self.active is not None:
+            self.active.laps_seen += 1
+
+    def _clear_window(self) -> None:
+        """Via i giri in mano: la finestra e quelli in attesa di giudizio.
+
+        Chi svuota la finestra dice «da qui un'altra macchina, o un'altra
+        base»: un giro in attesa guidato prima non deve entrarci dopo.
+        """
+        self.window = []
+        self._waiting = []
+        self._group = []
+
+    def _open_group(self, restart: bool, dials: tuple) -> None:
+        """Un gruppo nuovo a ogni stint e a ogni manopola girata.
+
+        Il 14/11 il TC e' passato fra 3 e 4 dentro lo stesso stint: i giri dopo
+        il cambio hanno altre velocita' in curva e sembrerebbero errori di
+        guida. I giri ancora in attesa del gruppo chiuso si buttano senza
+        dirlo: uno stint o una manopola troppo corti per giudicarli non sono
+        un errore del pilota.
+        """
+        prev, self._last_dials = self._last_dials, dials
+        if restart or (prev is not None
+                       and not consistency.same_dials(prev, dials)):
+            self._waiting = []
+            self._group = []
+
+    def _in_group(self) -> list[LapStats]:
+        """I giri giudicati del gruppo in corso ancora in finestra."""
+        here = {id(s) for s in self.window}
+        return [s for s in self._group if id(s) in here]
+
+    def _judge_group(self, stats: LapStats) -> None:
+        """Giudica il gruppo in corso e fa entrare in finestra chi e' a posto.
+
+        Tutti contro tutti in un passaggio (`consistency.inconsistent`), coi
+        giri gia' entrati e quelli in attesa. Un giro segnato in attesa non
+        entra; uno gia' in finestra esce, anche a posteriori, e non rientra.
+        Tranne con una proposta in attesa: la sua base e' calcolata su quei
+        giri, e toglierne uno la farebbe sparire dallo schermo (il difetto del
+        13/10) o lascerebbe la prova di pressione senza la lettura di partenza.
+        """
+        laps = self._in_group() + self._waiting
+        if len(laps) < _CONSISTENCY_LAPS:
+            return
+        marked = consistency.inconsistent(
+            laps, kmh=self.consistency_kmh, corners=_CONSISTENCY_CORNERS,
+            match=_CORNER_MATCH)
+        waiting = {id(s) for s in self._waiting}
+        out: set[int] = set()
+        for i, lap in enumerate(laps):
+            slow = marked.get(i)
+            if slow is None or (id(lap) not in waiting
+                                and self._pending is not None):
+                continue
+            out.add(id(lap))
+            self.last_dropped.append({
+                "stint": lap.stint, "stint_lap": lap.stint_lap,
+                "last": lap is stats,
+                "corners": [[name, round(gap, 1)] for name, gap in slow]})
+        # Prima escono, poi entrano: un giro che esce non deve spingere fuori
+        # dalla finestra quello piu' vecchio.
+        gone = sum(1 for s in self.window if id(s) in out)
+        if gone:
+            self.window = [s for s in self.window if id(s) not in out]
+            if self.active is not None:
+                # A prova aperta ogni giro in finestra e' stato contato:
+                # `mark_applied`, la pausa e la ripresa la svuotano.
+                self.active.laps_seen = max(0, self.active.laps_seen - gone)
+        for lap in self._waiting:
+            if id(lap) not in out:
+                self._bank(lap)
+        self._group = [s for s in laps if id(s) not in out]
+        self._waiting = []
+
+    def _group_short(self) -> int:
+        """Quanti giri buoni mancano perche' il gruppo in corso si possa
+        giudicare: 0 se si puo' gia', o col controllo spento."""
+        if self.consistency_kmh is None:
+            return 0
+        return max(0, _CONSISTENCY_LAPS - len(self._in_group())
+                   - len(self._waiting))
+
+    def _need(self, have: int, need: int) -> int:
+        """Il ``need`` di un contatore, coi giri che mancano al gruppo.
+
+        Dopo una sosta il giro d'apertura conta, ma i due dopo aspettano il
+        terzo: la base (o la prova) arriva un giro piu' tardi, e il conto lo
+        deve dire. Con ``need`` fermo la pagina scriveva «3 di 3» e poi
+        aspettava un altro giro. Senza giri mancanti resta quello di prima.
+        """
+        short = self._group_short()
+        return max(need, have + short) if short else need
+
+    def _waiting_hot(self) -> int:
+        """I giri in attesa che entreranno nella lettura delle pressioni.
+
+        Sono tutti dello stint in corso e nessuno lo apre: un gruppo non
+        attraversa una sosta, e il giro d'apertura non aspetta.
+        """
+        return sum(1 for s in self._waiting if s.pressures_hot)
 
     # -- the prediction ----------------------------------------------------
     def _all_scores(self) -> dict:
@@ -1722,7 +1877,7 @@ class RaceEngineer:
         self._pending_is_revert = True
         # The outcome has to be built by the caller, before this line: the window
         # it is measured from is cleared right here.
-        self.window = []
+        self._clear_window()
         self._held_revert = Decision(DecisionKind.REVERTED, message, rev,
                                      outcome=outcome)
         return self._held_revert
@@ -1884,7 +2039,9 @@ class RaceEngineer:
                 return self._hold_base(moved)
             return self._judge_pressure(a, reading)
         if a.laps_seen < self.min_stable:
-            need = self.min_stable - a.laps_seen
+            # Si decide sui giri contati; il conto dice anche quelli in attesa.
+            have = a.laps_seen + len(self._waiting)
+            need = self._need(have, self.min_stable) - have
             tail = _skip_tail(self._skipped, lang) + a.psi_doubt
             return Decision(DecisionKind.EVALUATING,
                             _msg("evaluating", lang, laps=_laps_left(need, lang))
@@ -1904,7 +2061,7 @@ class RaceEngineer:
         riparte da giri nuovi. Fino ad allora la decisione resta questa, a ogni
         giro: i giri in pista hanno ancora l'assetto sospetto.
         """
-        self.window = []
+        self._clear_window()
         self._offs = []
         self.active = None
         self._pending = None
@@ -1959,7 +2116,7 @@ class RaceEngineer:
         return None
 
     def _fresh_base(self) -> Decision:
-        self.window = []
+        self._clear_window()
         self._offs = []
         self._skipped = None
         return Decision(DecisionKind.COLLECT,
@@ -2099,7 +2256,7 @@ class RaceEngineer:
         """
         if not at_exit and self._exit_check not in _CHECK_WRITTEN:
             self._exit_check = "known"
-        self.window = []
+        self._clear_window()
         self._offs = []
         self._skipped = None
         self._pending = None
@@ -2149,7 +2306,7 @@ class RaceEngineer:
             return self._fresh_base()
         a.laps_seen = 0
         a.psi_doubt = ""
-        self.window = []
+        self._clear_window()
         self._offs = []
         self._skipped = None
         self._wrong_name = report.expected or self._wrong_name
@@ -2163,7 +2320,7 @@ class RaceEngineer:
         """R2 sciolta: in macchina c'e' il file scritto, la prova riparte."""
         a = self.active
         self._held_wrong = None
-        self.window = []
+        self._clear_window()
         self._offs = []
         self._skipped = None
         a.laps_seen = 0
@@ -2187,7 +2344,7 @@ class RaceEngineer:
             return self._hold_base(
                 lead + _msg("setup_changed_test", lang, changed=changed))
         said = lead + _msg("setup_changed", lang, changed=changed)
-        self.window = []
+        self._clear_window()
         self._offs = []
         self._skipped = None
         # Una proposta misurata sull'assetto di prima non vale per questo.
@@ -2495,8 +2652,13 @@ class RaceEngineer:
         return min(self.min_stable, 3)
 
     def _reading_need(self) -> int:
-        """Quanti giri buoni mancano alla lettura, almeno uno."""
-        return max(1, self._reading_size() - len(self._reading_laps()))
+        """Quanti giri buoni mancano alla lettura, almeno uno.
+
+        Contano anche i giri in attesa di giudizio, che nella lettura
+        entreranno, e quelli che mancano al gruppo per potersi giudicare.
+        """
+        have = len(self._reading_laps()) + self._waiting_hot()
+        return max(1, self._reading_size() - have, self._group_short())
 
     def _is_pressure_test(self, a: "_Active") -> bool:
         """La prova in corso e' una pressione con una lettura di partenza?"""
