@@ -115,15 +115,20 @@ la velocità minima di ogni curva che riceve: per curva, la posizione dell'apice
 (`Corner.apex_pos`), la velocità minima (`speed_kmh` minima fra i campioni con
 `entry_pos <= pos <= exit_pos`) e il nome, se il chiamante lo passa (`corner_names`). In
 pista le curve sono quelle del riferimento del motore, coi nomi; nel rigioco
-(`engineer/replay.py`, che chiama `build_lap_stats(lap)` senza curve) sono quelle
-rilevate sul giro stesso, senza nomi.
+(`engineer/replay.py`) sono le stesse per tutti i giri della serata, senza nomi.
+
+**Il rigioco usa le stesse curve per ogni giro della serata**, come il motore in pista
+col riferimento: rilevate una volta sul giro più veloce valido e non tagliato (sul più
+veloce, se nessuno lo è). *[17/11: rilevate giro per giro, a Imola la zona della Rivazza
+era tagliata in modo diverso da un giro all'altro, e accoppiate per posizione davano
+scarti finti di 125-140 km/h; 4 degli 8 giri tolti rigiocando l'archivio erano questi]*
 
 **Curve accoppiate per posizione, non per numero.** In pista le curve si ricalcolano
-quando cambia il riferimento (nuovo miglior giro, `engine._rebuild_reference`), e nel
-rigioco ogni giro ha le sue: i numeri non si corrispondono. Due curve sono la stessa se i
+quando cambia il riferimento (nuovo miglior giro, `engine._rebuild_reference`): i numeri
+non si corrispondono. Due curve sono la stessa se i
 loro apici distano al più 0,01 di giro, misurati sul cerchio (vicino al traguardo 0,995 e
 0,003 sono vicine). *[mia scelta: a Imola circa 50 m; con le curve del riferimento
-coincidono esattamente, nel rigioco assorbe le piccole differenze di rilevamento]*
+coincidono esattamente]*
 
 **Il gruppo: stesso stint e stesse manopole.** Dentro uno stint l'assetto può cambiare
 senza una sosta: una prova al volante dell'Ingegnere (TC +1), o il pilota che gira una
@@ -164,11 +169,14 @@ contano anche il giro che apre lo stint, e possono partire quando nel gruppo ci 
 2 giri giudicabili, cioè prima che il controllo abbia mai girato. Regola: una decisione
 che legge la finestra usa solo giri già giudicati, più il giro che apre lo stint (che non
 si giudica, come oggi conta). I giri di un gruppo che ha ancora meno di 3 giri
-giudicabili non contano finché il gruppo non arriva a 3; quelli di un gruppo chiuso così
-(uno stint corto) non contano. Effetto: dopo una sosta il verdetto di una prova sul
-bilanciamento arriva un giro più tardi; le prove al volante (nessuna sosta, nessun giro
-d'apertura) restano a 3 giri; le pressioni non cambiano. *[deriva dalla scelta B del
-pilota; il meccanismo resta al costruttore]*
+giudicabili aspettano finché il gruppo può ancora arrivare a 3; se il gruppo si chiude
+prima (una sosta, una manopola girata), contano senza giudizio, come prima di questa
+tappa: un giro che non si può giudicare non è un giro incostante. *[misurato il 17/11
+sulla serata del 14/11: il pilota alternava TC 3 e 4 giro per giro, e buttando quei giri
+la lettura delle pressioni ripartiva a ogni cambio e non arrivava mai]* Effetto: dopo
+una sosta il verdetto di una prova sul bilanciamento arriva un giro più tardi; le prove
+al volante (nessuna sosta, nessun giro d'apertura) restano a 3 giri; le pressioni non
+cambiano. *[deriva dalla scelta B del pilota; il meccanismo resta al costruttore]*
 
 **Una decisione data non si rimangia.** *[mia scelta]* Mentre una proposta aspetta di
 essere applicata, il controllo non toglie giri: la base su cui è stata calcolata resta

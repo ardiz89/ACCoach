@@ -177,7 +177,7 @@ def test_a_dial_turned_mid_stint_starts_a_group():
     assert [s.stint_lap for s in eng.window] == [2, 3, 4, 5, 6, 7]
 
 
-def test_a_dial_turned_early_leaves_its_laps_quietly():
+def test_a_dial_turned_early_banks_its_laps_unjudged():
     eng = _eng()
     tc4 = (4, 4, 0, 0.64)
     early = [_lap(60), _lap(59), _lap(58, _v(-6, at=(0, 1, 2)))]
@@ -185,9 +185,64 @@ def test_a_dial_turned_early_leaves_its_laps_quietly():
     for lap in early + later:
         eng.observe(lap)
         assert eng.last_dropped == []
-    # I due giri a TC 3 dopo l'apertura non si potevano giudicare: non entrano,
-    # e nessuno dice che non contano.
-    assert [s.stint_lap for s in eng.window] == [1, 4, 5, 6]
+        if lap is later[0]:
+            # R4: i due giri a TC 3 dopo l'apertura non si potevano giudicare.
+            # Non giudicabile non e' incostante: entrano senza giudizio, in
+            # ordine, anche il piu' lento.
+            assert [s.stint_lap for s in eng.window] == [1, 2, 3]
+    assert [s.stint_lap for s in eng.window] == [1, 2, 3, 4, 5, 6]
+
+
+def test_a_closed_group_counts_in_a_running_test():
+    eng = _eng()
+    _drive(eng, [_lap(60), _lap(59), _lap(58), _lap(57)])
+    eng._pending = ProposedChange(
+        (AtomicChange("tC1", None, 1),), "Add 1 click of traction control.",
+        "Electronics", "AV",
+        Symptom(Balance.OVERSTEER, Phase.EXIT, Speed.LOW))
+    eng.mark_applied()
+    tc4 = (4, 4, 0, 0.64)
+    _drive(eng, [_lap(56, dials=tc4), _lap(55, dials=tc4)])
+    assert eng.active.laps_seen == 0
+    # Il pilota rimette TC 3: i due giri a TC 4 entrano e la prova li conta.
+    d = eng.observe(_lap(54))
+    assert eng.active.laps_seen == 2
+    assert [s.stint_lap for s in eng.window] == [5, 6]
+    assert d.kind is DecisionKind.EVALUATING
+
+
+def test_dials_turned_every_lap_still_give_a_pressure_reading():
+    # Il 14/11: TC 3 e 4 alternati giro per giro nello stesso stint. Buttando i
+    # giri di ogni gruppo chiuso la lettura delle pressioni non arrivava mai.
+    eng = _eng()
+    tcs = (3, 4, 3, 4, 3)
+    laps = [_lap(60 - n, press=OFF, dials=(tc, 4, 0, 0.64))
+            for n, tc in enumerate(tcs)]
+    said = _drive(eng, laps)
+    assert eng.last_dropped == []
+    assert [s.stint_lap for s in eng._reading_laps()] == [2, 3, 4]
+    assert said[-1].kind is DecisionKind.PROPOSE
+    assert said[-1].change.param == "tyrePressure"
+
+
+def test_dials_turned_every_lap_count_the_pressure_reading_down():
+    # La prova di pressione dopo la sosta, con TC 3 e 4 alternati: il conto
+    # scende e non torna su, e la pagina dice lo stesso numero del messaggio.
+    config.set_language("it")
+    eng = _eng()
+    _drive(eng, [_lap(60 - n, press=OFF) for n in range(4)])
+    eng.mark_applied()
+    left, road = [], []
+    for n, tc in enumerate((3, 4, 3, 4)):
+        d = eng.observe(_lap(70 - n, dials=(tc, 4, 0, 0.64)))
+        assert d.kind is DecisionKind.EVALUATING
+        left.append(1 if "Serve ancora 1 giro" in d.message
+                    else int(d.message.split("Servono ancora ")[1].split()[0]))
+        p = eng.progress()
+        road.append((p["have"], p["need"]))
+    assert left == [3, 2, 1, 1]
+    assert road == [(0, 3), (1, 3), (2, 3), (2, 3)]
+    assert eng.observe(_lap(66)).kind is not DecisionKind.EVALUATING
 
 
 def test_a_balance_test_after_a_stop_counts_down():
@@ -217,15 +272,18 @@ def test_a_balance_test_after_a_stop_counts_down():
     assert eng.active is None
 
 
-def test_a_short_stint_leaves_quietly():
+def test_a_short_stint_counts_unjudged():
     eng = _eng()
-    short = [_lap(60), _lap(59), _lap(58)]
+    # Apertura e due giri, uno piu' lento in 3 curve, poi la sosta: con due
+    # giri non si giudica, e i due entrano senza giudizio (R4).
+    short = [_lap(60), _lap(59, _v(-6, at=(0, 1, 2))), _lap(58)]
     nxt = [_lap(70), _lap(69), _lap(68), _lap(67)]
     for lap in short + nxt:
         eng.observe(lap)
         assert eng.last_dropped == []
-    assert not _has(eng.window, short[1]) and not _has(eng.window, short[2])
-    assert _has(eng.window, short[0])
+        if lap is nxt[0]:
+            assert eng.window == short + [nxt[0]]
+            assert all(a is b for a, b in zip(eng.window, short + [nxt[0]]))
     assert all(_has(eng.window, s) for s in nxt)
 
 

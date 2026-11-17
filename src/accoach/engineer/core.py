@@ -1310,9 +1310,10 @@ class RaceEngineer:
         #: Costanza del pilota (17/11), solo con `consistency_kmh`. I giri
         #: puliti del gruppo in corso (stesso stint, stesse manopole) che
         #: aspettano di potersi giudicare: finche' il gruppo non ne ha
-        #: `_CONSISTENCY_LAPS` non entrano nella finestra e nessuna decisione
-        #: li legge. Li contano i contatori, se no dopo una sosta il conto
-        #: resterebbe fermo e poi salterebbe (il difetto del 08/11).
+        #: `_CONSISTENCY_LAPS` (o non si chiude prima: allora entrano senza
+        #: giudizio) non entrano nella finestra e nessuna decisione li legge.
+        #: Li contano i contatori, se no dopo una sosta il conto resterebbe
+        #: fermo e poi salterebbe (il difetto del 08/11).
         self._waiting: list[LapStats] = []
         #: I giri del gruppo in corso gia' giudicati ed entrati in finestra: il
         #: metro dei giri che arrivano, e quelli che un giro dopo puo' ancora
@@ -1440,14 +1441,18 @@ class RaceEngineer:
         elif self.active is not None:
             # Una prova di pressione conta i giri della lettura, non tutti i
             # giri buoni: lo stesso numero che dice il messaggio. I giri in
-            # attesa di giudizio contano anche qui (vedi `_need`).
+            # attesa di giudizio contano anche qui (`_reading_need`, `_need`).
             if self._is_pressure_test(self.active):
                 need = self._reading_size()
-                have = min(need, len(self._reading_laps()) + self._waiting_hot())
+                have = min(need, len(self._reading_laps()))
+                if self._waiting:
+                    # Lo stesso conto del messaggio: un giro in attesa nella
+                    # lettura entrera', ma finche' aspetta non c'e'.
+                    have = need - self._reading_need()
             else:
                 have = self.active.laps_seen + len(self._waiting)
-                need = self.min_stable
-            out.update(stage="test", have=have, need=self._need(have, need))
+                need = self._need(have, self.min_stable)
+            out.update(stage="test", have=have, need=need)
         elif self._pending is not None:
             out["stage"] = "change"
         elif self.phase is None:
@@ -1691,13 +1696,17 @@ class RaceEngineer:
 
         Il 14/11 il TC e' passato fra 3 e 4 dentro lo stesso stint: i giri dopo
         il cambio hanno altre velocita' in curva e sembrerebbero errori di
-        guida. I giri ancora in attesa del gruppo chiuso si buttano senza
-        dirlo: uno stint o una manopola troppo corti per giudicarli non sono
-        un errore del pilota.
+        guida. I giri ancora in attesa del gruppo chiuso entrano senza
+        giudizio, in ordine, come prima della costanza: non giudicabile non
+        vuol dire incostante. Fino al 17/11 si buttavano, e rigiocando il
+        14/11 (TC 3 e 4 alternati giro per giro) la lettura delle pressioni
+        ripartiva a ogni cambio e non arrivava mai.
         """
         prev, self._last_dials = self._last_dials, dials
         if restart or (prev is not None
                        and not consistency.same_dials(prev, dials)):
+            for lap in self._waiting:
+                self._bank(lap)
             self._waiting = []
             self._group = []
 
@@ -2725,11 +2734,14 @@ class RaceEngineer:
     def _reading_need(self) -> int:
         """Quanti giri buoni mancano alla lettura, almeno uno.
 
-        Contano anche i giri in attesa di giudizio, che nella lettura
-        entreranno, e quelli che mancano al gruppo per potersi giudicare.
+        Contano anche i giri in attesa di giudizio: nella lettura entrano
+        giudicati, o senza giudizio se il loro gruppo si chiude prima. Non si
+        aspetta che il gruppo arrivi a potersi giudicare (`_group_short`):
+        con TC 3 e 4 alternati giro per giro (14/11) il conto restava fermo a
+        2 per tre giri, e poi la lettura arrivava lo stesso.
         """
         have = len(self._reading_laps()) + self._waiting_hot()
-        return max(1, self._reading_size() - have, self._group_short())
+        return max(1, self._reading_size() - have)
 
     def _is_pressure_test(self, a: "_Active") -> bool:
         """La prova in corso e' una pressione con una lettura di partenza?"""
