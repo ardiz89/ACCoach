@@ -1120,8 +1120,14 @@ class RaceEngineer:
     def __init__(self, profile: Profile, *, min_stable: int = _MIN_STABLE,
                  pressure_window: tuple[float, float] | None = None,
                  steps: Steps | None = None,
-                 bias_offset: float | None = None) -> None:
+                 bias_offset: float | None = None,
+                 consistency_kmh: float | None = None) -> None:
         self.profile = profile
+        #: L'interruttore della costanza del pilota: porta con se' la soglia
+        #: (km/h) misurata su *quest'auto*. `None` = controllo spento, il
+        #: motore si comporta esattamente come prima. Lo accende solo
+        #: `engineer_for`, e solo per le GT3: la soglia e' stata misurata su una.
+        self.consistency_kmh: float | None = consistency_kmh
         self.min_stable = min_stable
         #: Quanto vale un click su quest'auto. Costruito a mano, il motore
         #: ragiona come ACC — i profili sono nati li' e i test lo usano cosi'.

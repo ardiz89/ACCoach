@@ -92,6 +92,11 @@ _PROFILES: dict[CarClass, Profile] = {
 }
 
 
+def _tokens(key: str) -> list[str]:
+    """I pezzi del nome (separati da ``_`` o ``-``)."""
+    return re.split(r"[_\-]+", key)
+
+
 def known_class(car_model: str) -> CarClass | None:
     """La classe, **solo se il nome la dice**. Altrimenti ``None``.
 
@@ -108,7 +113,7 @@ def known_class(car_model: str) -> CarClass | None:
     for prefix, car_class in _OVERRIDE_PREFIXES.items():
         if key.startswith(prefix):
             return car_class
-    tokens = re.split(r"[_\-]+", key)
+    tokens = _tokens(key)
     if (tokens[0] in _FORMULA_LEADING
             or _FORMULA_TOKENS.intersection(tokens)
             or any(m in key for m in _FORMULA_SUBSTRINGS)
@@ -127,6 +132,19 @@ def classify(car_model: str) -> CarClass:
     :func:`known_class`, che sa dire «non lo so».
     """
     return known_class(car_model) or CarClass.ROAD
+
+
+# Le GT che condividono il profilo GT3 ma non sono GT3.
+_NOT_GT3_TOKENS = {"gt4", "gt2", "gte"}
+
+
+def is_gt3(car_model: str) -> bool:
+    """Una GT3 **vera**, dal nome. ``known_class`` da' GT3 anche a gt4/gt2/gte
+    (condividono il profilo); qui no: una soglia misurata su una GT3 non vale
+    per loro. Una GT3 che il nome non dice resta ``False``."""
+    if known_class(car_model) is not CarClass.GT3:
+        return False
+    return not _NOT_GT3_TOKENS.intersection(_tokens((car_model or "").strip().lower()))
 
 
 def profile_for(car_class: CarClass) -> Profile:
