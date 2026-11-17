@@ -17,23 +17,32 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 from ..comparison.reference import Reference
 from ..engineer import Balance, Phase, Speed, Symptom
-from ..recording.lap import Lap
+from ..recording.lap import Lap, strip_leading_wrap
 from ..telemetry.snapshot import format_lap_time
 from ..track import Corner
 from ..cornernames import for_track, marks_for
 from ..trackdata import corner_name, landmark_at
 from .analyzer import (_BRAKE_ON, _LOSS_MS, CornerStats, _braked_early,
-                       _braked_late, classify_corner)
+                       _braked_late, classify_corner, corner_zones,
+                       phases_priceable)
 from .chain import link_corners
-from .phases import phase_note, split_loss
+from .phases import dominant_phase, phase_note, split_loss
 from .cue import CueCategory, theme_key
 from .diagnosis import corner_symptoms, dominant_symptom
+from .gestures import GestureNote, abs_trusted, compare, measure, without_abs
+from .thresholds import PEDAL_OFF
 from .tuning import tuning_for_car
 from ..i18n import current_language
 from ..textfmt import fmt_num
+
+if TYPE_CHECKING:
+    # Solo per il tipo: `corner_refs` importa `_next_entry` da qui, e a runtime
+    # basta che l'oggetto risponda a `.at()`.
+    from .corner_refs import CornerBests
 
 _C = CueCategory
 # Handling-cause vocabulary, per language. La curva apre la frase («In questa
@@ -175,6 +184,178 @@ def explain_loss(category: CueCategory, st: CornerStats,
     return detail.format(**kw), fix
 
 
+# La curva misurata col tuo gesto migliore lì e non col riferimento principale
+# (coaching/corner_refs.py). Va detto: i numeri della curva sono contro un altro
+# giro, e senza la frase il pilota li leggerebbe contro quello in cima alla pagina.
+_COMPARED = {
+    "en": " Compared with your best through this corner, from the {lap} lap.",
+    "it": " Confronto con la tua migliore in questa curva, dal giro in {lap}.",
+}
+
+
+def compared_text(lap_time_ms: int, lang: str) -> str:
+    """La frase del confronto, col tempo del giro nel formato della lingua."""
+    lap = format_lap_time(lap_time_ms)
+    if lang == "it":
+        lap = lap.replace(".", ",")
+    return _COMPARED.get(lang, _COMPARED["en"]).format(lap=lap)
+
+
+# Il gesto della curva diverso dal riferimento piu' del rumore
+# (coaching/gestures.py). Uno solo per curva, e solo nel report: la voce non
+# ne sa niente. I secondi con un decimale, come li legge chi guida.
+#
+# Un lato a zero ha la sua forma: «0 volte», «in 0,0 s» e «0,0 s di ABS» si
+# leggono come un errore del programma. Un tempo che a un decimale fa 0,0
+# diventa «di colpo»; il riferimento senza correzioni «nessuna», senza ABS
+# «mai». Col verso di ``compare`` il tuo lato di sterzo, gas e ABS e' sempre
+# il piu' grande, quindi lo zero li' e' solo del riferimento; il rilascio
+# conta nei due versi e puo' essere a zero da tutte e due le parti.
+_GESTURE = {
+    "en": {
+        "release": " You release the brake {live}, the reference {ref}.",
+        "pickup": " You open the throttle {live}, the reference {ref}.",
+        "gear": " At the apex you're in {live}, the reference in {ref}.",
+        "abs": " ABS is active for {live} s, in the reference {ref} s.",
+        "abs_never": " ABS works for {live} s, never in the reference.",
+        "steer": " You correct the steering {live} times, the reference {ref}.",
+        "steer_one": " You correct the steering once, the reference {ref}.",
+        "seconds": "in {x} s",
+        "at_once": "at once",
+        "none": "none",
+    },
+    "it": {
+        "release": " Rilasci il freno {live}, il riferimento {ref}.",
+        "pickup": " Apri il gas {live}, il riferimento {ref}.",
+        "gear": " All'apex sei in {live}ª, il riferimento in {ref}ª.",
+        "abs": " L'ABS lavora {live} s, nel riferimento {ref} s.",
+        "abs_never": " L'ABS lavora {live} s, nel riferimento mai.",
+        "steer": " Correggi lo sterzo {live} volte, il riferimento {ref}.",
+        "steer_one": " Correggi lo sterzo una volta, il riferimento {ref}.",
+        "seconds": "in {x} s",
+        "at_once": "di colpo",
+        "none": "nessuna",
+    },
+}
+
+
+def _ordinal_en(gear: str) -> str:
+    n = int(gear)
+    suffix = {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
+    if 10 <= n % 100 <= 20:
+        suffix = "th"
+    return f"{n}{suffix}"
+
+
+def gesture_text(note: GestureNote, lang: str) -> str:
+    """La frase del gesto, con lo spazio davanti come le altre del dettaglio."""
+    table = _GESTURE.get(lang, _GESTURE["en"])
+    kind = note.kind
+    if kind == "gear":
+        live, ref = str(note.live), str(note.ref)
+        if lang != "it":
+            live, ref = _ordinal_en(live), _ordinal_en(ref)
+    elif kind == "steer":
+        live, ref = str(int(note.live)), str(int(note.ref))
+        if int(note.ref) == 0:
+            ref = table["none"]
+        if int(note.live) == 1:
+            kind = "steer_one"
+    elif kind == "abs":
+        live = fmt_num(float(note.live), 1, lang)
+        ref = fmt_num(float(note.ref), 1, lang)
+        if ref == fmt_num(0.0, 1, lang):      # lo zero come si stampa
+            kind = "abs_never"
+    else:
+        def when(x: float) -> str:
+            text = fmt_num(x, 1, lang)
+            if text == fmt_num(0.0, 1, lang):    # lo zero come si stampa
+                return table["at_once"]
+            return table["seconds"].format(x=text)
+        live, ref = when(float(note.live)), when(float(note.ref))
+    return table[kind].format(live=live, ref=ref)
+
+
+def _corner_gesture(lap: Lap, cref: Reference, c: Corner,
+                    phase: str | None,
+                    trusted: dict | None = None) -> GestureNote | None:
+    """Il gesto di questa curva contro il giro del suo riferimento.
+
+    I campioni del riferimento vengono dal suo giro (``cref.lap``) fra
+    ``entry_pos`` ed ``exit_pos``: con ``corner_refs`` e' il gesto migliore
+    della curva, cosi' frase e perdita parlano dello stesso giro (Decisione 4).
+    Il tratto iniziale che riparte da ~1,0 si toglie da tutte e due le parti,
+    come fa ``Reference``: dentro una curva vicino al traguardo metterebbe
+    campioni con l'orologio a zero in mezzo a quelli veri.
+
+    ``phase`` e' il tratto che domina la perdita (``dominant_phase``): senza,
+    niente gesto, e con lui solo i gesti che agiscono li'.
+
+    ``trusted`` e' la memoria di ``abs_trusted`` per il debrief, per giro: il
+    canale bloccato e' un fatto del giro, non della curva, e cosi' si misura
+    una volta per il giro rivisto e una per ogni giro di riferimento.
+    """
+    if phase is None:
+        return None      # il tempo e' sparso: nessun posto dove mandarti
+
+    def span(samples):
+        return [s for s in strip_leading_wrap(samples)
+                if c.entry_pos <= s.pos <= c.exit_pos]
+
+    live, ref = span(lap.samples), span(cref.lap.samples)
+    if len(live) < 2 or len(ref) < 2:
+        return None      # un lato senza campioni misurerebbe zeri, non gesti
+    g_live, g_ref = measure(live), measure(ref)
+    # Un canale ABS bloccato su tutto il giro (due giri dell'archivio) non e'
+    # un gesto: su quel giro l'ABS non si confronta.
+    # E l'ABS si confronta solo fra due giri con lo stesso livello noto: con
+    # livelli diversi la frase misurerebbe l'assetto, non il piede (117 frasi
+    # ABS su 223 dell'archivio, con le soglie provate nel giro di correzioni).
+    cache = {} if trusted is None else trusted
+
+    def ok(l: Lap) -> bool:
+        if id(l) not in cache:
+            cache[id(l)] = abs_trusted(l.samples)
+        return cache[id(l)]
+
+    same_abs = lap.abs_level >= 0 and lap.abs_level == cref.lap.abs_level
+    if not same_abs or not ok(lap):
+        g_live = without_abs(g_live)
+    if not same_abs or not ok(cref.lap):
+        g_ref = without_abs(g_ref)
+    return compare(g_live, g_ref, phase)
+
+
+#: Quante uscite recenti nella stessa curva fanno uno schema e non un errore.
+RUNS_WIDE_MIN = 2
+
+_RUNS_WIDE = {
+    "en": ("Stay on track at the exit first",
+           " You went off at this corner {n} times in your recent laps.",
+           "Leave the braking point where it is for now. Open the throttle "
+           "only when you can straighten the wheel."),
+    "it": ("Prima resta in pista all'uscita",
+           " Sei uscito di pista in questa curva {n} volte negli ultimi giri.",
+           "Per ora non spostare il punto di frenata. Apri il gas solo quando "
+           "puoi raddrizzare lo sterzo."),
+}
+
+
+def mark_runs_wide(losses: list, wide: dict, lang: str | None = None) -> None:
+    """Niente «frena più tardi» dove continui a uscire di pista.
+
+    A Zolder (29/10) il report lo chiedeva a Curva 2, dove quattro giri erano
+    finiti fuori: entrare piu' veloce peggiora proprio quello. Il tempo perso
+    resta quello misurato, cambia solo cosa ti si chiede di fare.
+    """
+    msg, detail, fix = _RUNS_WIDE[_lang(lang)]
+    for x in losses:
+        n = wide.get(x.index, 0)
+        if x.category is CueCategory.BRAKE_LATER and n >= RUNS_WIDE_MIN:
+            x.message, x.fix = msg, fix
+            x.detail += detail.format(n=n)
+
+
 @dataclass(slots=True)
 class CornerLoss:
     """One corner's contribution to the lap's time loss."""
@@ -208,6 +389,12 @@ class CornerLoss:
     # stessa curva in cui il debrief aveva appena spiegato che la gomma è già
     # impegnata. Vedi `GripState` per perché sono tre numeri e non un booleano.
     grip: "GripState" = field(default_factory=lambda: GripState())
+    # Il tempo del giro con cui questa curva è stata confrontata, quando non è il
+    # riferimento principale ma il tuo gesto migliore lì. 0 = il principale.
+    compared_ms: int = 0
+    # L'unico gesto di questa curva diverso dal riferimento piu' del rumore
+    # (coaching/gestures.py). None quasi sempre: sotto soglia non si dice niente.
+    gesture: GestureNote | None = None
 
     @property
     def label(self) -> str:
@@ -417,7 +604,8 @@ _GRIP_MIN_G = 0.3         # below this the lap has no usable G data at all
 #
 # Secondo motivo, geografico: l'inviluppo è il 95° percentile del riferimento su
 # **tutto il giro** (vedi `_grip_envelope`), non in questa curva. Dire «qui» era
-# sbagliato anche a voler difendere il resto.
+# sbagliato anche a voler difendere il resto. Dal 2026-11-03 è per fascia di
+# velocità, ma resta su tutto il giro: i suoi picchi a quella velocità, ovunque.
 #
 # Quello che resta è ciò che la misura dimostra davvero: a parità di gomma, una
 # staccata più tarda dovrebbe uscire dall'aderenza che stai già spendendo.
@@ -570,22 +758,89 @@ def _percentile(vals: list[float], q: float) -> float:
     return ordered[min(len(ordered) - 1, int(len(ordered) * q))]
 
 
-def _grip_envelope(lap: Lap, reference: Reference) -> float:
+#: L'aderenza cresce con la velocità (carico aerodinamico), e un inviluppo unico
+#: lo fissano le curve veloci: una curva lenta presa al limite leggeva «58 %».
+#: Fasce di 40 km/h (Decisione 5 del piano del 2026-11-03), a partire da 0.
+_GRIP_BAND_KMH = 40.0
+#: Sotto questi campioni la fascia prende l'inviluppo del giro: con pochi punti
+#: il p95 è basso e direbbe «sei al limite» a chiunque passi di lì (Review
+#: Focus 4). Il 50 è della Decisione 5; sulla copia dell'archivio (13 auto+pista,
+#: riferimento il giro più veloce) le fasce sotto soglia sono quasi solo 40-80
+#: km/h (13-46 campioni: tornanti e chicane lente) e la ricaduta riguarda 13
+#: curve su 612. Con ogni campione misurato contro la fascia della velocità
+#: del riferimento in quel punto, contro l'inviluppo unico di prima 66 curve
+#: su 612 (10,8 %) cambiano stato: 44 diventano «al limite», 16 non lo sono
+#: più. Con la fascia della sola velocità mediana erano 96 (15,7 %).
+#: Poi la fascia più alta: quasi tutta rettilineo, dava 0,57 G sopra i 320
+#: km/h alla SF25 di Spa contro 4,43 sul giro. Una fascia non scende sotto le
+#: più lente, fino all'inviluppo del giro: rispetto alle fasce libere cambiano
+#: 22 curve su 612 (3,6 %), tutte via da «al limite», e 23 esercizi «frena
+#: più tardi» si sbloccano. Contro l'inviluppo unico cambiano 60 curve (9,8 %),
+#: e nessuna staccata diventa satura per colpa delle fasce. Senza il tetto
+#: del giro cambiavano 88 curve (14,4 %): una fascia lenta con p95 sopra il
+#: giro (M3 a Suzuka, 1,48 contro 1,37) alzava tutte quelle veloci.
+_GRIP_BAND_MIN_SAMPLES = 50
+
+
+@dataclass(frozen=True, slots=True)
+class GripEnvelope:
+    """Il limite di aderenza del riferimento, per fascia di velocità.
+
+    ``whole`` è l'inviluppo di sempre, su tutto il giro; ``bands`` ha solo le
+    fasce con abbastanza campioni. ``at`` sceglie, e ricade sul giro dove la
+    fascia non c'è o la velocità manca.
+    """
+
+    whole: float = 0.0
+    bands: dict[int, float] = field(default_factory=dict)   # fascia -> p95
+
+    def at(self, speed_kmh: float | None) -> float:
+        if speed_kmh is None:
+            return self.whole
+        return self.bands.get(int(max(0.0, speed_kmh) // _GRIP_BAND_KMH), self.whole)
+
+
+def _grip_envelope(lap: Lap, reference: Reference) -> GripEnvelope:
     """How much grip this car actually has, measured off the reference lap.
 
     The 95th percentile of combined G rather than the maximum: a kerb or a bump
     spikes |g| far past anything the tyre can hold through a corner, and one
     such sample would make every corner look like it had spare grip.
+
+    Same samples as always (the reference at each position of the reviewed
+    lap), binned by the *reference's* speed there: it is his limit at that
+    speed that the corner is measured against.
+
+    A band never sits below a slower one, up to the whole-lap envelope. Grip
+    does not fall with speed (the wings add load), and a fast band is mostly
+    straight, where the G only says the car went straight. The floor stops at
+    the whole lap because a slow band's p95 also catches kerbs and the end
+    of heavy braking, and without the cap it lifted every faster band above
+    the limit used before bands existed.
     """
-    return _percentile([_combined_g(reference.point_at(s.pos).g_lat,
-                                    reference.point_at(s.pos).g_long)
-                        for s in lap.samples], _GRIP_PCTL)
+    whole: list[float] = []
+    binned: dict[int, list[float]] = {}
+    for s in lap.samples:
+        r = reference.point_at(s.pos)
+        g = _combined_g(r.g_lat, r.g_long)
+        whole.append(g)
+        binned.setdefault(int(max(0.0, r.speed_kmh) // _GRIP_BAND_KMH), []).append(g)
+    whole_p = _percentile(whole, _GRIP_PCTL)
+    bands: dict[int, float] = {}
+    floor = 0.0
+    for b in sorted(binned):
+        if len(binned[b]) < _GRIP_BAND_MIN_SAMPLES:
+            continue
+        p = _percentile(binned[b], _GRIP_PCTL)
+        floor = max(floor, p)
+        bands[b] = max(p, min(floor, whole_p))
+    return GripEnvelope(whole=whole_p, bands=bands)
 
 
 #: Both pedals off for longer than this, before the brake, is a real coast and
 #: not the brake-to-throttle handover. Same numbers the live coach uses
 #: (``coaching/braking.py``) rather than a second opinion about the same thing.
-_PEDAL_OFF = 0.05
+_PEDAL_OFF = PEDAL_OFF
 _COAST_MIN_S = 0.2
 
 
@@ -619,34 +874,60 @@ class GripState:
         return self.ratio >= _GRIP_AT_LIMIT
 
 
-def _grip_state(inside: list, envelope: float) -> GripState:
-    """Measure the corner against the envelope. No wording, no decisions."""
-    if envelope < _GRIP_MIN_G or not inside:
+def _grip_state(inside: list, envelope: "GripEnvelope | float",
+                speed_kmh: "float | list | None" = None) -> GripState:
+    """Measure the corner against the envelope. No wording, no decisions.
+
+    ``speed_kmh`` is the main reference's speed at each sample of ``inside``
+    (one per sample): every sample's G is divided by the envelope's band at
+    that speed. A single number applies to every sample; a bare float
+    envelope is a limit already chosen (used by the tests).
+    """
+    if not inside:
         return GripState()
+    if isinstance(envelope, GripEnvelope):
+        if envelope.whole < _GRIP_MIN_G:
+            return GripState()
+        speeds = (speed_kmh if isinstance(speed_kmh, (list, tuple))
+                  else [speed_kmh] * len(inside))
+        # Una fascia senza G utili misurerebbe ogni campione contro quasi zero:
+        # prende il limite del giro, come una fascia che non c'e'.
+        limits = [lim if lim >= _GRIP_MIN_G else envelope.whole
+                  for lim in (envelope.at(v) for v in speeds)]
+    else:
+        if envelope < _GRIP_MIN_G:
+            return GripState()
+        limits = [envelope] * len(inside)
+    gs = [_combined_g(s.g_lat, s.g_long) for s in inside]
+    if max(gs) <= 0.0:
+        return GripState()             # lap recorded before the G channels
+    # Per campione e non per curva (2026-11-03). Con la fascia della velocita'
+    # mediana del riferimento, una curva lenta preceduta da una staccata veloce
+    # misurava il G della frenata ad alta velocita' contro il limite basso
+    # dell'apex, e finiva «al limite» per la frenata: sulla copia dell'archivio
+    # 59 curve nuove «al limite», 26 col picco in una fascia piu' alta. Ogni G
+    # si divide per il limite del riferimento a quella velocita', poi il p95.
     # The SAME percentile as the envelope, not the raw maximum. Comparing a peak
     # against a 95th percentile is comparing two different statistics: on real
     # laps it produced "you're at 120% of the grip", which is nonsense on its
     # face and would have cost the driver their trust in the whole line.
-    peak = _percentile([_combined_g(s.g_lat, s.g_long) for s in inside], _GRIP_PCTL)
-    if peak <= 0.0:
-        return GripState()             # lap recorded before the G channels
+    per = [g / lim for g, lim in zip(gs, limits)]
     # The envelope is an estimate, so a corner can still read slightly over it.
     # Clamp the number rather than print an impossible one: "at 104% of the grip"
     # invites a question whose honest answer is "the limit is approximate".
-    ratio = min(1.0, peak / envelope)
+    ratio = min(1.0, _percentile(per, _GRIP_PCTL))
 
-    braking = [s for s in inside if s.brake > _PEDAL_OFF]
+    braking = [i for i, s in enumerate(inside) if s.brake > _PEDAL_OFF]
     early = braking[:max(1, len(braking) // 3)]
-    early_peak = _percentile([_combined_g(s.g_lat, s.g_long) for s in early],
-                             _GRIP_PCTL) if early else 0.0
-    saturated_early = bool(early) and min(1.0, early_peak / envelope) >= _GRIP_AT_LIMIT
+    early_peak = _percentile([per[i] for i in early], _GRIP_PCTL) if early else 0.0
+    saturated_early = bool(early) and min(1.0, early_peak) >= _GRIP_AT_LIMIT
 
     # The coast is the one *before* the brake: a lift on the way out is a
     # different fault with a different drill, and counting it here would block
     # "brake later" on corners where the entry was fine.
     coast_s = 0.0
     if braking:
-        first_brake = inside.index(braking[0])
+        first_brake = braking[0]
         run_start = None
         for s in inside[:first_brake]:
             if s.throttle < _PEDAL_OFF and s.brake < _PEDAL_OFF:
@@ -762,9 +1043,62 @@ def _top_speed_note(lap: Lap, reference: Reference, corners: list[Corner],
     )
 
 
+def _corner_window(lap: Lap, reference: Reference, c: Corner,
+                   corners: list[Corner], corner_refs: CornerBests | None):
+    """La finestra di una curva e quanto ci hai perso: una regola sola.
+
+    ``(inside, window, ref_c, cref, lost)``, o ``None`` sotto i due campioni.
+    La usano il debrief e :func:`corner_deltas`, così i due numeri non possono
+    dirsi diversi.
+    """
+    inside = [s for s in lap.samples if c.entry_pos <= s.pos <= c.exit_pos]
+    if len(inside) < 2:
+        return None
+    # Il metro di questa curva: il tuo gesto migliore se c'è, se no il
+    # principale. Solo la curva: aderenza, catene e note restano sul
+    # principale (`reference`).
+    ref_c = corner_refs.at(c.apex_pos) if corner_refs is not None else None
+    cref = ref_c.reference if ref_c is not None else reference
+
+    # Loss is measured from this corner's entry to the NEXT corner's entry, so
+    # the following straight is credited here — a poor exit shows up as time
+    # bled down the straight, attributed to the corner that caused it. The
+    # input/balance analysis still uses only the corner region (inside).
+    end = _next_entry(c, corners)
+    window = [s for s in lap.samples if c.entry_pos <= s.pos < end] or inside
+    first, last = window[0], window[-1]
+    delta_entry = first.t_ms - cref.time_at(first.pos)
+    delta_exit = last.t_ms - cref.time_at(last.pos)
+    return inside, window, ref_c, cref, delta_exit - delta_entry
+
+
+def corner_deltas(lap: Lap, reference: Reference, corners: list[Corner],
+                  corner_refs: CornerBests | None = None) -> dict[int, float]:
+    """Per OGNI curva, i ms persi (positivi) o guadagnati (negativi).
+
+    Lo stesso numero del ``lost_ms`` del debrief, ma anche dove il debrief
+    tace: sotto la soglia o dove vai bene. Senza le curve con meno di due
+    campioni.
+    """
+    out: dict[int, float] = {}
+    for c in corners:
+        w = _corner_window(lap, reference, c, corners, corner_refs)
+        if w is not None:
+            out[c.index] = w[4]
+    return out
+
+
 def build_lap_debrief(lap: Lap, reference: Reference, corners: list[Corner],
-                      lang: str | None = None) -> LapDebrief:
-    """Break ``lap`` down against ``reference`` over the given ``corners``."""
+                      lang: str | None = None,
+                      corner_refs: CornerBests | None = None) -> LapDebrief:
+    """Break ``lap`` down against ``reference`` over the given ``corners``.
+
+    Con ``corner_refs`` ogni curva che ha un tuo gesto migliore si misura contro
+    quello: perdita, fasi, statistiche e frenata, e il dettaglio lo dice.
+    L'inviluppo di aderenza, le curve concatenate e le note sul giro restano sul
+    principale (Decisione 6 del piano del 2026-11-03). Solo il report del giro
+    rivisto lo passa; focus, tendenze e pagella no.
+    """
     lg = _lang(lang)
     # Read once for the whole debrief, not once per corner: the same JSON, and
     # this runs on every lap the live coach closes.
@@ -773,31 +1107,25 @@ def build_lap_debrief(lap: Lap, reference: Reference, corners: list[Corner],
     titles = _CATEGORY_TITLE.get(lg, _CATEGORY_TITLE["en"])
     tuning = tuning_for_car(lap.car_model)      # class-dependent symptom bands
     envelope = _grip_envelope(lap, reference)   # this car's grip, measured
+    abs_ok: dict = {}       # abs_trusted per giro, una volta (_corner_gesture)
     losses: list[CornerLoss] = []
+    # Le stesse zone del vivo: le fasi si prezzano solo dove la finestra
+    # dell'apex sta dentro la curva, con la regola del vivo.
+    zone_hi = {(lo, mid): hi for lo, hi, mid in corner_zones(corners)}
 
     for c in corners:
-        inside = [s for s in lap.samples if c.entry_pos <= s.pos <= c.exit_pos]
-        if len(inside) < 2:
+        w = _corner_window(lap, reference, c, corners, corner_refs)
+        if w is None:
             continue
-
-        # Loss is measured from this corner's entry to the NEXT corner's entry, so
-        # the following straight is credited here — a poor exit shows up as time
-        # bled down the straight, attributed to the corner that caused it. The
-        # input/balance analysis below still uses only the corner region (inside).
-        end = _next_entry(c, corners)
-        window = [s for s in lap.samples if c.entry_pos <= s.pos < end] or inside
-        first, last = window[0], window[-1]
-        delta_entry = first.t_ms - reference.time_at(first.pos)
-        delta_exit = last.t_ms - reference.time_at(last.pos)
-        lost = delta_exit - delta_entry
+        inside, window, ref_c, cref, lost = w
         # The same window, cut into the four stretches of the corner. Computed
         # here rather than later so it can only ever be a split of *this* number.
-        phases = split_loss(window, reference, c)
+        phases = split_loss(window, cref, c)
 
         thr_live = _mean([s.throttle for s in inside])
         brk_live = _mean([s.brake for s in inside])
         vmin_live = min(s.speed_kmh for s in inside)
-        refs = [reference.point_at(s.pos) for s in inside]
+        refs = [cref.point_at(s.pos) for s in inside]
         thr_ref = _mean([r.throttle for r in refs])
         brk_ref = _mean([r.brake for r in refs])
         vmin_ref = min(r.speed_kmh for r in refs)
@@ -805,11 +1133,11 @@ def build_lap_debrief(lap: Lap, reference: Reference, corners: list[Corner],
         # Did you brake meaningfully earlier than the reference? Same rule as the
         # live analyzer, on purpose: the two used to differ only by accident.
         live_onset = _onset(inside, lambda s: s.brake)
-        ref_onset = _onset(inside, lambda s: reference.point_at(s.pos).brake)
+        ref_onset = _onset(inside, lambda s: cref.point_at(s.pos).brake)
         braking_early = _braked_early(
             -1.0 if live_onset is None else live_onset,
             -1.0 if ref_onset is None else ref_onset,
-            reference.point_at(live_onset).brake if live_onset is not None else -1.0,
+            cref.point_at(live_onset).brake if live_onset is not None else -1.0,
         )
         braking_late = _braked_late(-1.0 if live_onset is None else live_onset,
                                     -1.0 if ref_onset is None else ref_onset)
@@ -819,6 +1147,14 @@ def build_lap_debrief(lap: Lap, reference: Reference, corners: list[Corner],
             brake_live=brk_live, brake_ref=brk_ref,
             min_speed_live=vmin_live, min_speed_ref=vmin_ref,
             braking_early=braking_early, braking_late=braking_late,
+            # Le stesse fasi che il report pubblica: la causa la sceglie il
+            # costo del suo tratto, con la regola del vivo.
+            # Dove la finestra dell'apex non sta nella curva, nessuna fase:
+            # l'ordine di sempre, come dal vivo (`phases_priceable`).
+            phase_ms=({p.phase: p.lost_ms for p in phases} or None)
+            if phases_priceable(c.entry_pos,
+                                zone_hi.get((c.entry_pos, c.apex_pos), c.exit_pos),
+                                c.apex_pos) else None,
         )
         cue = classify_corner(stats, c.index, c.apex_pos)
         if cue is None or cue.category == CueCategory.GOOD:
@@ -835,13 +1171,26 @@ def build_lap_debrief(lap: Lap, reference: Reference, corners: list[Corner],
             detail = f"{cause} {detail}"
 
         # Braking decomposition (earliness in metres + peak pressure).
-        detail += _braking_detail(lap, reference, inside, refs, cue.category,
+        detail += _braking_detail(lap, cref, inside, refs, cue.category,
                                   lg, typed_marks)
         # …and whether there was any grip left to do it with. Misurato una volta
         # sola: la stessa cosa scrive la frase e sceglie l'esercizio, così le due
         # metà dell'app non possono più dire il contrario l'una dell'altra.
-        grip = _grip_state(inside, envelope)
+        # Il limite a quella velocità, campione per campione: la fascia della
+        # velocità del riferimento PRINCIPALE in quel punto, la stessa con cui
+        # l'inviluppo è messo in fascia. Con la tua, chi passa più piano
+        # finirebbe misurato contro una fascia più bassa.
+        ref_speeds = [reference.point_at(s.pos).speed_kmh for s in inside]
+        grip = _grip_state(inside, envelope, ref_speeds)
         detail += _grip_detail(grip, cue.category, lg)
+        # Il gesto che fai diverso, contro lo stesso giro della perdita. Prima
+        # del confronto, che resta l'ultima frase: dice contro chi e' tutto.
+        gesture = _corner_gesture(lap, cref, c, dominant_phase(phases, lost),
+                                  abs_ok)
+        if gesture is not None:
+            detail += gesture_text(gesture, lg)
+        if ref_c is not None:
+            detail += compared_text(ref_c.lap_time_ms, lg)
 
         losses.append(CornerLoss(
             index=c.index, entry_pos=c.entry_pos, apex_pos=c.apex_pos,
@@ -860,6 +1209,8 @@ def build_lap_debrief(lap: Lap, reference: Reference, corners: list[Corner],
             name=corner_name(lap.track, c.index, c.apex_pos, lg, c.direction,
                              typed),
             grip=grip,
+            compared_ms=ref_c.lap_time_ms if ref_c is not None else 0,
+            gesture=gesture,
         ))
 
     losses.sort(key=lambda x: x.lost_ms, reverse=True)

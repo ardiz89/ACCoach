@@ -1,0 +1,417 @@
+{
+ "disputed": [],
+ "facts": [
+  {
+   "car_class": "gt3_presunta",
+   "corner": "Hell Corner",
+   "n": 2,
+   "sources": [
+    {
+     "quote": "get onto the brake down into second",
+     "start_s": 145.8,
+     "url": "https://www.youtube.com/watch?v=5MBrV0zLrG0"
+    },
+    {
+     "quote": "shift down to second and turn in",
+     "start_s": 53.28,
+     "url": "https://www.youtube.com/watch?v=asiaf1X0lCs"
+    }
+   ],
+   "type": "gear",
+   "value": "2"
+  }
+ ],
+ "single": [
+  {
+   "corner": "Hell Corner",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "aiming for a mid-corner apex",
+     "start_s": 53.28,
+     "url": "https://www.youtube.com/watch?v=asiaf1X0lCs"
+    }
+   ],
+   "state": "singolo",
+   "type": "apex",
+   "value": "middle"
+  },
+  {
+   "corner": "Hell Corner",
+   "n": 1,
+   "sources": [
+    {
+     "car_class": "ignota",
+     "quote": "turning quite early to utilize the corners camber",
+     "start_s": 209.599,
+     "url": "https://www.youtube.com/watch?v=qGQdqJtw8Cs"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "line",
+   "value": "turning quite early to utilize the corners camber"
+  },
+  {
+   "corner": "Hell Corner",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "T1 very late acceleration",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/1w46yo4/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "mistake",
+   "value": "T1 very late acceleration"
+  },
+  {
+   "corner": "Hell Corner",
+   "n": 1,
+   "sources": [
+    {
+     "car_class": "ignota",
+     "quote": "be careful not to drop a tire into the dirt",
+     "start_s": 215.599,
+     "url": "https://www.youtube.com/watch?v=qGQdqJtw8Cs"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "mistake",
+   "value": "be careful not to drop a tire into the dirt"
+  },
+  {
+   "corner": "Griffins Bend",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "carry a lot of sweet into turn two as it's cambered",
+     "start_s": 269.58,
+     "url": "https://www.youtube.com/watch?v=ip91pwDJgi8"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "line",
+   "value": "carry a lot of sweet into turn two as it's cambered"
+  },
+  {
+   "corner": "Griffins Bend",
+   "n": 1,
+   "sources": [
+    {
+     "car_class": "ignota",
+     "quote": "turn in early once again while trail blinking to rotate the car",
+     "start_s": 251.439,
+     "url": "https://www.youtube.com/watch?v=qGQdqJtw8Cs"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "line",
+   "value": "turn in early once again while trail blinking to rotate the car"
+  },
+  {
+   "corner": "Griffins Bend",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "turning and fairly early to hook up our apex on the inside",
+     "start_s": 203.68,
+     "url": "https://www.youtube.com/watch?v=xNnjoAV4TRA"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "line",
+   "value": "turning and fairly early to hook up our apex on the inside"
+  },
+  {
+   "corner": "Griffins Bend",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "you hit the inside kerb and need to be super careful",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/1w46yo4/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "mistake",
+   "value": "you hit the inside kerb and need to be super careful"
+  },
+  {
+   "corner": "The Cutting",
+   "n": 1,
+   "sources": [
+    {
+     "car_class": "ignota",
+     "quote": "trail braking hard to keep the car rotating",
+     "start_s": 274.8,
+     "url": "https://www.youtube.com/watch?v=qGQdqJtw8Cs"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "line",
+   "value": "trail braking hard to keep the car rotating"
+  },
+  {
+   "car_class": "gt3_presunta",
+   "corner": "Quarry Corner",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "change down to third and trail break into the corner",
+     "start_s": 82.96,
+     "url": "https://www.youtube.com/watch?v=asiaf1X0lCs"
+    }
+   ],
+   "state": "singolo",
+   "type": "gear",
+   "value": "3"
+  },
+  {
+   "corner": "Quarry Corner",
+   "n": 1,
+   "sources": [
+    {
+     "car_class": "ignota",
+     "quote": "wide open on the throttle through the quarry",
+     "start_s": 285.28,
+     "url": "https://www.youtube.com/watch?v=qGQdqJtw8Cs"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "line",
+   "value": "wide open on the throttle through the quarry"
+  },
+  {
+   "corner": "Reid Park",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "just position your car in the center of the track",
+     "start_s": 409.52,
+     "url": "https://www.youtube.com/watch?v=xNnjoAV4TRA"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "line",
+   "value": "just position your car in the center of the track"
+  },
+  {
+   "corner": "McPhillamy Park",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "aim to hook up our apex just off the inside curb here for mcfarlane park",
+     "start_s": 490.08,
+     "url": "https://www.youtube.com/watch?v=xNnjoAV4TRA"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "line",
+   "value": "aim to hook up our apex just off the inside curb here for mcfarlane park"
+  },
+  {
+   "car_class": "gt3_presunta",
+   "corner": "Skyline",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "change down to fourth keep your steering wheel as straight",
+     "start_s": 218.56,
+     "url": "https://www.youtube.com/watch?v=asiaf1X0lCs"
+    }
+   ],
+   "state": "singolo",
+   "type": "gear",
+   "value": "4"
+  },
+  {
+   "corner": "Skyline",
+   "n": 1,
+   "sources": [
+    {
+     "car_class": "ignota",
+     "quote": "we touch the brake to settle the car before turning in",
+     "start_s": 320.8,
+     "url": "https://www.youtube.com/watch?v=qGQdqJtw8Cs"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "line",
+   "value": "we touch the brake to settle the car before turning in"
+  },
+  {
+   "corner": "Skyline",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "do not be holding the brakes as you go over the crest",
+     "start_s": 541.279,
+     "url": "https://www.youtube.com/watch?v=xNnjoAV4TRA"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "mistake",
+   "value": "do not be holding the brakes as you go over the crest"
+  },
+  {
+   "corner": "The Dipper",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "we need to do our braking in a straight line here",
+     "start_s": 615.44,
+     "url": "https://www.youtube.com/watch?v=xNnjoAV4TRA"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "line",
+   "value": "we need to do our braking in a straight line here"
+  },
+  {
+   "corner": "The Dipper",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "you want to turn before you actually get the Dipper",
+     "start_s": 748.38,
+     "url": "https://www.youtube.com/watch?v=5MBrV0zLrG0"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "line",
+   "value": "you want to turn before you actually get the Dipper"
+  },
+  {
+   "corner": "The Dipper",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "it's very easy to get an awful lot of understeer here",
+     "start_s": 626.64,
+     "url": "https://www.youtube.com/watch?v=xNnjoAV4TRA"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "mistake",
+   "value": "it's very easy to get an awful lot of understeer here"
+  },
+  {
+   "corner": "Forrest's Elbow",
+   "n": 1,
+   "sources": [
+    {
+     "car_class": "ignota",
+     "quote": "turning quite early here to use the camber again",
+     "start_s": 349.759,
+     "url": "https://www.youtube.com/watch?v=qGQdqJtw8Cs"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "line",
+   "value": "turning quite early here to use the camber again"
+  },
+  {
+   "corner": "Forrest's Elbow",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "Forest Elbow is my nightmare i can easily find 5 tenths there",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/1ki73yy/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "mistake",
+   "value": "Forest Elbow is my nightmare i can easily find 5 tenths there"
+  },
+  {
+   "corner": "Forrest's Elbow",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "all the times I've binned it at Forest's Elbow",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/1aqvwyv/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "mistake",
+   "value": "all the times I've binned it at Forest's Elbow"
+  },
+  {
+   "car_class": "gt3_presunta",
+   "corner": "The Chase",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "changing down to second as you turn in",
+     "start_s": 361.44,
+     "url": "https://www.youtube.com/watch?v=asiaf1X0lCs"
+    }
+   ],
+   "state": "singolo",
+   "type": "gear",
+   "value": "2"
+  },
+  {
+   "corner": "The Chase",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "aiming for a mid corner apex",
+     "start_s": 365.6,
+     "url": "https://www.youtube.com/watch?v=asiaf1X0lCs"
+    }
+   ],
+   "state": "singolo",
+   "type": "apex",
+   "value": "middle"
+  },
+  {
+   "corner": "The Chase",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "you brake too early and your line is also weird",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/1w46yo4/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "mistake",
+   "value": "you brake too early and your line is also weird"
+  },
+  {
+   "corner": "Murray's Corner",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "rolling off the brake for another mid corner apex",
+     "start_s": 387.039,
+     "url": "https://www.youtube.com/watch?v=asiaf1X0lCs"
+    }
+   ],
+   "state": "singolo",
+   "type": "apex",
+   "value": "middle"
+  },
+  {
+   "corner": "Murray's Corner",
+   "n": 1,
+   "sources": [
+    {
+     "car_class": "ignota",
+     "quote": "we can once again use the apex curb here",
+     "start_s": 431.44,
+     "url": "https://www.youtube.com/watch?v=qGQdqJtw8Cs"
+    }
+   ],
+   "state": "singolo",
+   "type": "kerb",
+   "value": "apex"
+  }
+ ],
+ "track": "mountpanorama",
+ "version": 3
+}

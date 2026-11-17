@@ -12,6 +12,9 @@ new files, so it doesn't touch the live-coaching code.
 
 from __future__ import annotations
 
+import dataclasses
+import logging
+import math
 import re
 import statistics
 import sys
@@ -22,7 +25,7 @@ from fastapi import Body, FastAPI, HTTPException, Query, Request
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from .braking_points import build_sheet
+from .braking_points import brake_points_of_lap, build_sheet
 from .coaching import (
     CornerFacts,
     CueCategory,
@@ -42,10 +45,12 @@ from .coaching import (
     trail_brake_for,
 )
 from .coaching.phases import PHASES
+from .coaching.corner_session import LapCorners, aggregate as aggregate_corners
+from .coaching.debrief import corner_deltas, mark_runs_wide
 from .coaching.training import MIN_LAPS as _TRAIN_MIN_LAPS, assess as _assess_training
 from .coaching.trends import session_recap, session_series
 from .comparison import Reference
-from . import cornernames, pagella
+from . import cornernames, pagella, trackfacts
 from .cornermap import learn_from
 from .i18n import current_language
 from .i18n import t as tr_ui
@@ -53,14 +58,15 @@ from .recording import laps_root, load_lap
 from .recording.catalog import LapCatalog, _GRIP_BAND, _TEMP_BAND_C
 from .recording.lap import SAMPLE_FIELDS
 from .recording.storage import _catalog_path, _slug, list_lap_files
+from .corner_pool import conditions_of as _conditions_of, corner_bests_for
 from .sectors import ideal_lap, sector_spans, sector_times
-from .sessions import group_sessions, parse_utc
+from .sessions import group_sessions, parse_utc, stood_still
 from .stints import MIN_TREND_LAPS, pace_of, split_stints, tyre_trace
 from .telemetry.snapshot import format_lap_time
 from .textfmt import fmt_num
 from .track import detect_corners
 from .trackedges import crop as crop_edges, edges_and_fit, edges_for
-from .trackdata import name_corners
+from .trackdata import catalog_labels, name_corners, render
 from .trackmesh import road_shapes
 from .trajectory import (
     LinePoint,
@@ -73,8 +79,14 @@ from .trajectory import (
     tag_text,
 )
 
+_log = logging.getLogger(__name__)
+
 PORT = 8778
 _MAX_POINTS = 600   # downsample traces for the browser
+# Un punto ogni 4 m: Imola resta sotto i 1300 punti, e l'iPad 3 li ridisegna a
+# ogni frame della mappa del tablet senza perdere il passo.
+_LIVEMAP_STEP_M = 4.0
+_LIVEMAP_EDGE_MAX = 1500
 
 # Below this, a corner didn't really move between two sessions. Same reasoning
 # as the guided flow's floor: it is inside the spread of one driver's own laps,
@@ -378,6 +390,12 @@ _STINT_TEXT = {
 }
 
 
+def _gesture_value(v):
+    """Un lato del gesto per il JSON: un numero a tre decimali, la marcia
+    com'e' (una stringa, «3» o «N»: arrotondarla non avrebbe senso)."""
+    return v if isinstance(v, str) else round(float(v), 3)
+
+
 def _pace_notes(lg: str, litres: float | None, fuel_known: bool, trend,
                 counted: int, needed: int) -> list[str]:
     """Le note sul passo e sulla benzina, coi numeri nel formato della lingua."""
@@ -558,6 +576,36 @@ def _pick_known(requested: str | None, fallback: str | None, known: set[str]) ->
     return requested if requested in known else None
 
 
+def _own(rows: list[dict]) -> list[dict]:
+    """Your laps, without the imported PRO ones (27/10).
+
+    A PRO lap sat in every list as if you had driven it: after an import it
+    became "your best lap", built the ideal lap out of its sectors, joined
+    today's session and was the lap the report opened on. It is a benchmark,
+    so it stays pickable as the comparison and in the PRO rung, and nowhere
+    else."""
+    return [r for r in rows if (r.get("source") or "own") != "pro"]
+
+
+def _valid(rows: list[dict]) -> list[dict]:
+    return [r for r in rows if r["valid"] and r["lap_time_ms"] > 0]
+
+
+def _own_valid(rows: list[dict]) -> list[dict]:
+    """Your valid laps, or the PRO ones when you have none yet: a page with
+    only an imported lap still opens, on that lap."""
+    return _valid(_own(rows)) or _valid(rows)
+
+
+def _default_review(rows: list[dict]) -> str | None:
+    """The lap a page opens on: your latest, never a lap you imported."""
+    for pool in (_own(rows), rows):
+        path = next((r["path"] for r in pool if r["valid"]), None)
+        if path:
+            return path
+    return None
+
+
 def _setup_of(lap) -> dict | None:
     """The in-car setup a lap was driven on, or None if it wasn't recorded.
 
@@ -610,25 +658,80 @@ def _off_track(row: dict) -> bool:
     return row.get("clean") == 0
 
 
+def _on_track(rows: list[dict]) -> list[dict]:
+    """I giri che contano come misura di quanto vai forte e quanto sei costante.
+
+    Il gioco puo' dare valido un giro con un'uscita. A Zolder un taglio di
+    chicane valeva 1,5 s nel settore, e faceva un ideale mai guidato; un giro da
+    1:51 con la fermata faceva una costanza di 17 s. Nemmeno un giro con una
+    sosta (`sessions.stood_still`) misura la guida, anche se il gioco lo dà
+    pulito: a Brands Hatch 106 s fermo alla Druids.
+    """
+    return [r for r in rows if not _off_track(r) and not _stood_still_row(r)]
+
+
+_STOOD: dict[tuple[str, float], bool] = {}
+
+
+def _stood_still_row(row: dict) -> bool:
+    """Il giro del catalogo ha una sosta (`sessions.stood_still`)?
+
+    Il catalogo non lo sa: si legge il file, una volta per versione del file.
+    Un file che non si legge non è una sosta: decide chi lo carica dopo.
+    """
+    path = row["path"]
+    try:
+        key = (path, Path(path).stat().st_mtime)
+    except OSError:
+        return False
+    if key not in _STOOD:
+        try:
+            _STOOD[key] = stood_still(load_lap(path))
+        except Exception:  # noqa: BLE001 - un file guasto non è una sosta
+            return False
+    return _STOOD[key]
+
+
+def _wide_corners(rows: list[dict], corners, laps: dict | None = None) -> dict[int, int]:
+    """Quante delle uscite recenti sono finite in ogni curva."""
+    recent = sorted(rows, key=lambda r: r["recorded_utc"] or "")[-_RECENT_LAPS:]
+    out: dict[int, int] = {}
+    for r in recent:
+        if not _off_track(r):
+            continue
+        try:
+            lap = (laps or {}).get(r["path"]) or load_lap(r["path"])
+        except (OSError, ValueError):
+            continue
+        for c in corners:
+            if lap.lost_at is not None and c.entry_pos <= lap.lost_at <= c.exit_pos:
+                out[c.index] = out.get(c.index, 0) + 1
+                break
+    return out
+
+
+def _rounded_summary(summary) -> dict:
+    """Una curva della sessione per la pagina: ms a un decimale, metri e km/h
+    a due, come le altre risposte."""
+    d = dataclasses.asdict(summary)
+
+    def r(v, n):
+        return None if v is None else round(v, n)
+
+    d["lost_total_ms"] = r(d["lost_total_ms"], 1)
+    d["lost_median_ms"] = r(d["lost_median_ms"], 1)
+    d["phases_ms"] = {k: r(v, 1) for k, v in d["phases_ms"].items()}
+    for k in ("brake_m", "brake_spread_m", "brake_kmh", "apex_shift_m"):
+        d[k] = r(d[k], 2)
+    if d["line_m"] is not None:
+        d["line_m"] = {k: r(v, 2) for k, v in d["line_m"].items()}
+    return d
+
+
 def _fastest_clean(valid: list[dict]) -> dict | None:
     """The quickest lap that could be a reference at all, conditions aside."""
     usable = [r for r in valid if not _off_track(r)]
     return min(usable, key=lambda r: r["lap_time_ms"]) if usable else None
-
-
-def _conditions_of(row: dict | None) -> dict:
-    """The conditions a lap was driven in, with "never recorded" as absence.
-
-    A zero temperature, a zero grip and an empty compound all mean the same
-    thing — the field wasn't there when this lap was saved — and every rule
-    downstream treats unknown as "can't be called similar".
-    """
-    row = row or {}
-    return {
-        "road_temp": row.get("road_temp") or None,
-        "grip": row.get("grip") or None,
-        "compound": row.get("tyre_compound") or None,
-    }
 
 
 def _elected_path(cat, car: str, track: str, valid: list[dict],
@@ -771,6 +874,7 @@ class _History:
     fastest: str = ""
     best_ms: int = 0
     corners: list = field(default_factory=list)
+    wide: dict = field(default_factory=dict)   # uscite recenti per curva
     names: dict = field(default_factory=dict)
     #: The corner map these laps agree on, built here because this is the one
     #: place that already has every lap in memory. The caller persists it so the
@@ -795,7 +899,9 @@ def _history(valid: list[dict], chrono: list[dict], track: str,
     worth a 500: the answer degrades to "no trends" rather than taking the page
     down with it, which is what the Trends tab already did.
     """
-    fastest_row = min(valid, key=lambda r: r["lap_time_ms"])
+    # Il tuo migliore e' un giro in pista, come l'ideale con cui si confronta.
+    fastest_row = (_fastest_clean(valid)
+                   or min(valid, key=lambda r: r["lap_time_ms"]))
     h = _History(fastest=fastest_row["path"], best_ms=fastest_row["lap_time_ms"])
 
     # Every valid lap, loaded once — shared by the debriefs, the tyre trend and
@@ -816,6 +922,7 @@ def _history(valid: list[dict], chrono: list[dict], track: str,
         h.names = {c.index: n for c, n in
                    zip(h.corners, name_corners(track, h.corners, lg, h.corner_map,
                                                cornernames.for_track(track)))}
+        h.wide = _wide_corners(valid, h.corners, h.lap_objs)
         tally: dict[str, dict] = {}
         recent = {r["path"] for r in chrono[-_RECENT_LAPS:]}
         for r in chrono[-_SERIES_LAPS:]:
@@ -825,6 +932,7 @@ def _history(valid: list[dict], chrono: list[dict], track: str,
             if lp is None:
                 continue
             deb = build_lap_debrief(lp, reference, h.corners, lg)
+            mark_runs_wide(deb.losses, h.wide, lg)
             h.session_dated.append((r["recorded_utc"] or "", deb))
             if r["path"] not in recent:
                 continue          # sotto: solo la finestra dei trend, invariata
@@ -1099,13 +1207,12 @@ def create_api(
         lg = lang or current_language()
         with _catalog() as cat:
             all_laps = cat.laps_for(car, track)
-            valid = [r for r in all_laps if r["valid"] and r["lap_time_ms"] > 0]
+            valid = _own_valid(all_laps)
             known = {r["path"] for r in all_laps}
             # The reviewed lap is resolved first because the reference is elected
             # *for it*: its track temperature is the only "current conditions"
             # this page has.
-            review_path = _pick_known(
-                lap, next((r["path"] for r in all_laps if r["valid"]), None), known)
+            review_path = _pick_known(lap, _default_review(all_laps), known)
             review_row = next((r for r in all_laps if r["path"] == review_path), None)
             mine = _conditions_of(review_row)
             review_temp = mine["road_temp"]
@@ -1120,8 +1227,11 @@ def create_api(
         # Only when the page is actually showing the elected lap: with a baseline
         # the user picked by hand, a note about the election explains a choice
         # nobody made.
+        # Un giro PRO non e' stato scelto per le condizioni: vince perche' e'
+        # piu' veloce del tuo, e una nota sulle condizioni spiegherebbe male.
+        is_pro = (elected_row or {}).get("source") == "pro"
         conditions = (_conditions_note(elected_row, fastest_row, mine)
-                      if baseline_path == elected else None)
+                      if baseline_path == elected and not is_pro else None)
 
         try:
             baseline_lap = load_lap(baseline_path)
@@ -1139,8 +1249,29 @@ def create_api(
                      zip(corners, name_corners(track, corners, lg,
                                                _corner_map(car, track),
                                                _typed(track)))}
-            debrief = build_lap_debrief(review, reference, corners, lg)
-            consistency = lap_time_consistency([r["lap_time_ms"] for r in valid])
+            # Il gesto migliore per curva solo contro il riferimento eletto: un
+            # giro scelto a mano si confronta così com'è, e un PRO non si
+            # mescola coi tuoi giri.
+            corner_refs = (corner_bests_for(reference, corners, review, car,
+                                            track, laps_dir, mine,
+                                            review_path=review_path)
+                           if baseline_path == elected and not is_pro else None)
+            try:
+                debrief = build_lap_debrief(review, reference, corners, lg,
+                                            corner_refs=corner_refs)
+            except Exception:  # noqa: BLE001 - il gesto migliore è un bonus
+                if corner_refs is None:
+                    raise
+                # Un difetto dei riferimenti per curva non deve costare il
+                # report: si rifà col solo principale, come senza bacino. E
+                # sparisce anche per le velocità minime più sotto.
+                _log.warning("debrief with corner refs failed; main reference "
+                             "only", exc_info=True)
+                corner_refs = None
+                debrief = build_lap_debrief(review, reference, corners, lg)
+            mark_runs_wide(debrief.losses, _wide_corners(valid, corners), lg)
+            consistency = lap_time_consistency(
+                [r["lap_time_ms"] for r in _on_track(valid)])
         except Exception:  # noqa: BLE001 - a degenerate lap shouldn't 500 the UI
             raise HTTPException(422, "lap could not be analysed")
 
@@ -1152,7 +1283,12 @@ def create_api(
             if not inside:
                 continue
             vmin_live = min(s.speed_kmh for s in inside)
-            vmin_ref = min(reference.point_at(s.pos).speed_kmh for s in inside)
+            # Lo stesso metro della scheda della curva: se il debrief l'ha
+            # confrontata col tuo gesto migliore, anche la colonna «Rif.» lo usa,
+            # o la pagina darebbe due velocità di riferimento per una curva.
+            held = corner_refs.at(c.apex_pos) if corner_refs is not None else None
+            cref = held.reference if held is not None else reference
+            vmin_ref = min(cref.point_at(s.pos).speed_kmh for s in inside)
             corner_speeds.append({
                 "index": c.index,
                 "name": names.get(c.index, f"Corner {c.index + 1}"),
@@ -1226,6 +1362,15 @@ def create_api(
                 "phases": [{"phase": p.phase, "lost_s": round(p.lost_ms / 1000.0, 3)}
                            for p in x.phases],
                 "phase_note": x.phase_note,
+                # Il gesto che la frase nel `detail` dice, come dato
+                # (coaching/gestures.py). None quasi sempre. Secondi e
+                # correzioni a tre decimali come le fasi; la marcia resta una
+                # stringa («3», «N»), come la misura la scrive.
+                "gesture": None if x.gesture is None else {
+                    "kind": x.gesture.kind,
+                    "live": _gesture_value(x.gesture.live),
+                    "ref": _gesture_value(x.gesture.ref),
+                    "score": round(x.gesture.score, 2)},
                 "vmin_live": round(x.min_speed_live, 0),
                 "vmin_ref": round(x.min_speed_ref, 0),
                 "apex": x.apex_pos,
@@ -1273,18 +1418,117 @@ def create_api(
         """
         with _catalog() as cat:
             all_laps = cat.laps_for(car, track)
-            valid = [r for r in all_laps if r["valid"] and r["lap_time_ms"] > 0]
+            valid = _own_valid(all_laps)
             elected = _elected_path(cat, car, track, valid)
         known = {r["path"] for r in all_laps}
         base_path = _pick_known(baseline, elected, known)
-        rev_path = _pick_known(
-            lap, next((r["path"] for r in all_laps if r["valid"]), None), known)
+        rev_path = _pick_known(lap, _default_review(all_laps), known)
         if base_path is None or rev_path is None:
             raise HTTPException(404, "no valid lap for this car+track")
         try:
             return load_lap(rev_path), load_lap(base_path), rev_path, base_path
         except (OSError, ValueError):
             raise HTTPException(404, "lap file unreadable")
+
+    @app.get("/api/mapbg")
+    def mapbg(
+        request: Request,
+        car: str = Query(...),
+        track: str = Query(...),
+        lap: str | None = Query(None),
+    ) -> dict:
+        """Se per questo giro c'e' uno sfondo dal gioco, e come posarlo.
+
+        Solo per chi sta su questo PC: i tasselli vengono dai file di AC e non
+        escono dalla macchina. Ogni rifiuto ha il suo motivo, la pagina in tutti
+        i casi tiene la mappa di sempre.
+        """
+        from . import trackart, trackedges
+        from .guard import is_local_client
+        if not is_local_client(request.client.host if request.client else None):
+            return {"ok": False, "reason": "remote"}
+        if trackedges.tracks_dir() is None:
+            return {"ok": False, "reason": "no_ac"}
+        with _catalog() as cat:
+            all_laps = cat.laps_for(car, track)
+            known = {r["path"] for r in all_laps}
+            review_path = _pick_known(lap, _default_review(all_laps), known)
+        if review_path is None:
+            raise HTTPException(404, "no valid lap for this car+track")
+        try:
+            review = load_lap(review_path)
+        except (OSError, ValueError):
+            raise HTTPException(404, "lap file unreadable")
+        if not _has_map(review):
+            return {"ok": False, "reason": "no_fit"}
+        got = trackedges.ac_fit(line_points(review))
+        if got is None:
+            return {"ok": False, "reason": "no_fit"}
+        spline, fit = got
+        if fit.p95_m > trackart.BG_FIT_P95_M:
+            return {"ok": False, "reason": "no_fit"}     # l'auto andrebbe fuori strada
+        key = trackart.art_key(spline)
+        if key is None:
+            return {"ok": False, "reason": "no_model"}
+        return {
+            "ok": True, "key": key,
+            "fit": {"scale": fit.scale, "cos": fit.cos, "sin": fit.sin,
+                    "dx": fit.dx, "dz": fit.dz, "mirror": bool(fit.mirror)},
+            "levels": list(trackart.LEVELS_M), "tile_px": trackart.TILE_PX,
+        }
+
+    @app.get("/api/mapbg/tile/{key}/{level}/{tx}/{tz}")
+    def mapbg_tile(request: Request, key: str, level: int, tx: int, tz: int):
+        """Un tassello JPEG dello sfondo; 204 se li' non c'e' niente da disegnare."""
+        from . import trackart
+        from .guard import is_local_client
+        if not is_local_client(request.client.host if request.client else None):
+            raise HTTPException(403, "local only")
+        if (not re.fullmatch(r"[0-9a-f]{16}", key)
+                or not 0 <= level < len(trackart.LEVELS_M)):
+            raise HTTPException(404, "unknown tile")
+        try:
+            data = trackart.tile(key, level, tx, tz)
+        except (KeyError, ValueError):
+            raise HTTPException(404, "unknown tile")
+        if not data:
+            return Response(status_code=204)
+        return Response(content=data, media_type="image/jpeg",
+                        headers={"Cache-Control": "private, max-age=86400"})
+
+    @app.get("/api/livemap")
+    def livemap(car: str = Query(...), track: str = Query(...)) -> dict:
+        """La pista per la mappa del tablet, una volta per pista (15/11).
+
+        La linea del giro di riferimento, diradata a un punto ogni
+        `_LIVEMAP_STEP_M`: l'iPad 3 la ridisegna a ogni frame. E, se la pista
+        installata e' proprio questa, i due bordi dell'asfalto, posati sul
+        giro come nella Traiettoria. Senza bordi la vista lo dice: la linea e'
+        il tuo giro, non la strada.
+        """
+        _rev, base, _rp, _bp = _two_laps(car, track, None, None)
+        pts = line_points(base)
+        line: list[list[float]] = []
+        for p in pts:
+            if line and math.hypot(p.x - line[-1][0], p.z - line[-1][1]) < _LIVEMAP_STEP_M:
+                continue
+            line.append([round(p.x, 1), round(p.z, 1)])
+        if len(line) < 2:
+            raise HTTPException(404, "lap has no coordinates")
+        edges = None
+        got, _fit = edges_and_fit(track, pts)
+        if got is not None:
+            left, right = got.edge_points()
+            # Diradati come la linea: tenuto un punto ogni `k`, un buco fra due
+            # punti tenuti resta un buco (`TrackEdges.breaks`).
+            k = max(1, math.ceil(len(left) / _LIVEMAP_EDGE_MAX))
+            keep = list(range(0, len(left), k))
+            breaks = [j for j in range(1, len(keep))
+                      if any(keep[j - 1] < b <= keep[j] for b in got.breaks)]
+            edges = {"left": [[round(left[i][0], 1), round(left[i][1], 1)] for i in keep],
+                     "right": [[round(right[i][0], 1), round(right[i][1], 1)] for i in keep],
+                     "breaks": breaks}
+        return {"line": line, "edges": edges}
 
     @app.get("/api/trajectory")
     def trajectory(
@@ -1446,8 +1690,9 @@ def create_api(
         lg = lang or current_language()
         with _catalog() as cat:
             all_laps = cat.laps_for(car, track)
-            valid = [r for r in all_laps
-                     if r["valid"] and r["lap_time_ms"] > 0 and not _off_track(r)]
+            # Le frenate sono le tue: un giro PRO nel mucchio spostava la
+            # dispersione e il punto medio di qualcun altro dentro la tua scheda.
+            valid = [r for r in _own_valid(all_laps) if not _off_track(r)]
             elected = _elected_path(cat, car, track, valid)
         if not valid or elected is None:
             raise HTTPException(404, "no valid lap for this car+track")
@@ -1466,8 +1711,8 @@ def create_api(
         if not objs:
             raise HTTPException(404, "lap file unreadable")
         try:
-            ref_lap = next((o for o in objs if o.lap_time_ms), objs[0])
-            corners = detect_corners(load_lap(elected).samples)
+            ref_lap = load_lap(elected)
+            corners = detect_corners(ref_lap.samples)
             typed_marks = cornernames.marks_for(track)
             names = {c.index: n
                      for c, n in zip(corners, name_corners(track, corners, lg,
@@ -1625,9 +1870,13 @@ def create_api(
         lap_objs = []
         for row in others:
             try:
-                lap_objs.append(load_lap(row["path"]))
+                lap = load_lap(row["path"])
             except Exception:  # noqa: BLE001 - one bad lap should not sink the run
                 continue
+            # Una sosta non è guida: in media faceva 36 s da guadagnare a giro.
+            if stood_still(lap):
+                continue
+            lap_objs.append(lap)
             kept.append(row)
         if not lap_objs:
             return None, False
@@ -1668,6 +1917,148 @@ def create_api(
             } for r in recap.laps],
         }, False
 
+    @app.get("/api/corners")
+    def corners_of_session(
+        car: str = Query(...),
+        track: str = Query(...),
+        index: int = Query(0),               # 0 = the most recent run
+        lang: str | None = Query(None),
+    ) -> dict:
+        """La sessione, curva per curva, con quello che dicono le fonti.
+
+        La sessione e' quella di /api/sessions (stesso raggruppamento, stesso
+        indice), i giri sono i suoi giri validi, e il riferimento e' quello che
+        /api/analysis eleggerebbe per il giro migliore della sessione. Le fonti
+        si abbinano al nome del catalogo per posizione, mai al nome scritto dal
+        pilota: rinominare una curva non le stacca i fatti.
+        """
+        lg = lang or current_language()
+
+        def _empty(at: int | None) -> dict:
+            # Le stesse chiavi della risposta piena: la pagina non indovina.
+            return {"index": at, "laps": 0, "skipped": 0, "stopped": 0,
+                    "reference": None, "corners": [], "has_sources": False}
+
+        with _catalog() as cat:
+            all_laps = cat.laps_for(car, track)
+            runs = group_sessions(_own(all_laps))
+            if not runs:
+                return _empty(None)
+            index = max(0, min(index, len(runs) - 1))
+            cur = runs[index]
+            best = cur.best
+            if best is None:
+                return _empty(index)
+            valid = _own_valid(all_laps)
+            cond = _conditions_of(best)
+            elected = _elected_path(cat, car, track, valid, cond["road_temp"],
+                                    cond["grip"], cond["compound"])
+        if elected is None:
+            return _empty(index)
+        elected_row = next((r for r in all_laps if r["path"] == elected), None)
+        is_pro = (elected_row or {}).get("source") == "pro"
+
+        try:
+            baseline_lap = load_lap(elected)
+        except (OSError, ValueError):
+            raise HTTPException(404, "lap file unreadable")
+        reference = Reference(baseline_lap)
+        if not reference.usable:
+            raise HTTPException(422, "comparison lap has too few samples")
+        try:
+            corners = detect_corners(baseline_lap.samples)
+            names = {c.index: n for c, n in
+                     zip(corners, name_corners(track, corners, lg,
+                                               _corner_map(car, track),
+                                               _typed(track)))}
+            # La chiave delle fonti è la voce del catalogo, in inglese in ogni
+            # lingua: sulle piste numerate i fatti dicono «Corner 3». Una curva che
+            # il catalogo non riconosce non ha chiave: col numero del rilevatore
+            # prenderebbe le fonti di un'altra curva.
+            catalog_names = {c.index: render(label, "en") for c, label in
+                             zip(corners, catalog_labels(track, corners))
+                             if label is not None}
+        except Exception:  # noqa: BLE001 - a degenerate lap shouldn't 500 the UI
+            raise HTTPException(422, "lap could not be analysed")
+        # Dove continui a uscire, niente «frena più tardi», come /api/analysis:
+        # contato su tutto l'archivio, perché i giri sporchi non sono giri
+        # validi della sessione e qui non si vedrebbero mai.
+        wide = _wide_corners(valid, corners)
+
+        per_lap: list[LapCorners] = []
+        skipped = 0
+        stopped = 0
+        for row in cur.valid_laps:
+            try:
+                lap = load_lap(row["path"])
+                # Una sosta non è guida: 106 s fermo alla Druids facevano di
+                # quella curva la peggiore della sera.
+                if stood_still(lap):
+                    stopped += 1
+                    continue
+                corner_refs = None
+                if not is_pro:
+                    try:
+                        corner_refs = corner_bests_for(
+                            reference, corners, lap, car, track, laps_dir,
+                            _conditions_of(row), review_path=row["path"])
+                    except Exception:  # noqa: BLE001 - il gesto migliore è un bonus
+                        _log.warning("corner refs failed; main reference only",
+                                     exc_info=True)
+                        corner_refs = None
+                # Perdite e delta con lo stesso metro: il gesto migliore se
+                # c'è, il principale da solo se col gesto il debrief cade.
+                try:
+                    debrief = build_lap_debrief(lap, reference, corners, lg,
+                                                corner_refs=corner_refs)
+                    deltas = corner_deltas(lap, reference, corners,
+                                           corner_refs)
+                except Exception:  # noqa: BLE001 - come /api/analysis
+                    if corner_refs is None:
+                        raise
+                    _log.warning("debrief with corner refs failed; main "
+                                 "reference only", exc_info=True)
+                    debrief = build_lap_debrief(lap, reference, corners, lg)
+                    deltas = corner_deltas(lap, reference, corners)
+                mark_runs_wide(debrief.losses, wide, lg)
+                per_lap.append(LapCorners(
+                    path=row["path"],
+                    losses=debrief.losses,
+                    brakes=brake_points_of_lap(lap, corners),
+                    lines=build_line_report(lap, baseline_lap, corners,
+                                            names).corners,
+                    deltas=deltas,
+                ))
+            except Exception:  # noqa: BLE001 - un giro guasto non costa la pagina
+                _log.warning("lap %s skipped in /api/corners", row.get("path"),
+                             exc_info=True)
+                skipped += 1
+
+        facts = trackfacts.load(track)
+        apex = {c.index: round(c.apex_pos, 4) for c in corners}
+        out = []
+        for summary in aggregate_corners(per_lap):
+            catalog_name = catalog_names.get(summary.index)
+            sources = trackfacts.for_corner(facts if catalog_name else None,
+                                            catalog_name or "")
+            out.append({
+                **_rounded_summary(summary),
+                "name": names.get(summary.index, f"Corner {summary.index + 1}"),
+                "catalog_name": catalog_name,
+                "apex": apex.get(summary.index),
+                "sources": sources,
+                "gear_compare": trackfacts.gear_compare(summary.gear_min, sources),
+            })
+        return {
+            "index": index,
+            "laps": len(per_lap),
+            "skipped": skipped,
+            "stopped": stopped,
+            "reference": {"path": elected, "lap_time_ms": reference.lap_time_ms},
+            "corners": out,
+            "has_sources": facts is not None,
+        }
+
     @app.get("/api/sessions")
     def sessions(
         car: str = Query(...),
@@ -1683,7 +2074,7 @@ def create_api(
         """
         lg = lang or current_language()
         with _catalog() as cat:
-            rows = cat.laps_for(car, track)
+            rows = _own(cat.laps_for(car, track))   # le sessioni sono le tue
         runs = group_sessions(rows)
         if not runs:
             return {"sessions": [], "current": None}
@@ -1692,7 +2083,9 @@ def create_api(
         cur = runs[index]
         best = cur.best
         temps = cur.road_temps
-        valid_ms = [l["lap_time_ms"] for l in cur.valid_laps]
+        # La costanza è della guida: un giro con una sosta non la misura.
+        moving = [l for l in cur.valid_laps if not _stood_still_row(l)]
+        valid_ms = [l["lap_time_ms"] for l in moving]
 
         prev = runs[index + 1] if index + 1 < len(runs) else None
         prev_best = prev.best if prev else None
@@ -1722,6 +2115,7 @@ def create_api(
                 "road_temp_from": min(temps) if temps else None,
                 "road_temp_to": max(temps) if temps else None,
                 "consistency": lap_time_consistency(valid_ms),
+                "stopped": len(cur.valid_laps) - len(moving),
                 "recap": recap,
                 # Why there is no recap — but only when the answer is verified.
                 # True means the run's own best lap has a clock that doesn't
@@ -1773,7 +2167,7 @@ def create_api(
         """
         lg = lang or current_language()
         with _catalog() as cat:
-            rows = cat.laps_for(car, track)
+            rows = _own(cat.laps_for(car, track))
         # group_sessions hands sessions back newest-first with laps in driving
         # order, so the stints inside one session come out oldest-first: flip
         # just those, so the whole list reads newest-first like every other picker.
@@ -1800,15 +2194,14 @@ def create_api(
         """Per-sector breakdown of review vs baseline, plus the ideal lap."""
         with _catalog() as cat:
             all_laps = cat.laps_for(car, track)
-            valid = [r for r in all_laps if r["valid"] and r["lap_time_ms"] > 0]
+            valid = _own_valid(all_laps)       # il giro ideale e' fatto dei tuoi
             if not valid:
                 raise HTTPException(404, "no valid lap for this car+track")
             known = {r["path"] for r in all_laps}
             # Same election as /api/analysis, for the same reason and with the
             # same input: two tabs of one page must not disagree about which lap
             # is the benchmark.
-            review_path = _pick_known(
-                lap, next((r["path"] for r in all_laps if r["valid"]), None), known)
+            review_path = _pick_known(lap, _default_review(all_laps), known)
             review_row = next((r for r in all_laps if r["path"] == review_path), None)
             mine = _conditions_of(review_row)
             elected = _elected_path(cat, car, track, valid, mine["road_temp"],
@@ -1837,7 +2230,10 @@ def create_api(
         objs: list = []
         try:
             objs = [load_lap(r["path"]) for r in valid]
-            ideal = ideal_lap(objs, [r["path"] for r in valid], spans)
+            on_track = [(o, r["path"]) for o, r in zip(objs, valid)
+                        if not _off_track(r)]
+            ideal = ideal_lap([o for o, _ in on_track],
+                              [p for _, p in on_track], spans)
         except (OSError, ValueError):
             objs, ideal = [], None
 
@@ -1882,7 +2278,7 @@ def create_api(
                      for r in all_laps],
         }
         if ideal:
-            your_best = min(valid, key=lambda r: r["lap_time_ms"])["lap_time_ms"]
+            your_best = _fastest_clean(valid)["lap_time_ms"]
             out["ideal"] = {
                 "best_ms": ideal.best_ms,
                 "best_from": ideal.best_from,
@@ -1900,7 +2296,9 @@ def create_api(
         with _catalog() as cat:
             all_laps = cat.laps_for(car, track)
             pro_path = cat.fastest_pro_path(car, track)
-        valid = [r for r in all_laps if r["valid"] and r["lap_time_ms"] > 0]
+        # Solo i tuoi: il giro PRO ha il suo gradino, e contato qui diventava
+        # «il tuo miglior giro» e il gradino PRO risultava «raggiunto».
+        valid = _valid(_own(all_laps))
         if not valid:
             # Same shape as the full answer, empty: a caller that has to check
             # whether a key exists before reading it is a caller that will
@@ -2021,7 +2419,7 @@ def create_api(
         # Benchmark ladder: rolling best → ideal (consistency) → PRO (skill ceiling).
         ideal_ms = pro_ms = None
         try:
-            paths = [r["path"] for r in valid if r["path"] in lap_objs]
+            paths = [r["path"] for r in _on_track(valid) if r["path"] in lap_objs]
             objs = [lap_objs[p] for p in paths]
             spans, _ = sector_spans(lap_objs.get(fastest) or load_lap(fastest))
             il = ideal_lap(objs, paths, spans)
@@ -2042,7 +2440,8 @@ def create_api(
         return {
             "car": car, "track": track,
             "laps": laps, "pb_trend": pb_trend,
-            "consistency": lap_time_consistency([r["lap_time_ms"] for r in valid]),
+            "consistency": lap_time_consistency(
+                [r["lap_time_ms"] for r in _on_track(valid)]),
             "levels": levels,
             "trends": trends,
             "recurring": recurring,
@@ -2145,7 +2544,7 @@ def create_api(
         with _catalog() as cat:
             all_laps = cat.laps_for(car, track)
             pro_path = cat.fastest_pro_path(car, track)
-            valid = [r for r in all_laps if r["valid"] and r["lap_time_ms"] > 0]
+            valid = _valid(_own(all_laps))
             # The braking sheet has always been measured on clean laps only; a
             # drill quoting a braking point set on a lap that went off would be
             # quoting a mistake.
@@ -2185,7 +2584,7 @@ def create_api(
         gap = None
         try:
             best_lap = h.lap_objs.get(h.fastest)
-            paths = [r["path"] for r in valid if r["path"] in h.lap_objs]
+            paths = [r["path"] for r in _on_track(valid) if r["path"] in h.lap_objs]
             objs = [h.lap_objs[p] for p in paths]
             if best_lap is not None and objs:
                 spans, _ = sector_spans(best_lap)
@@ -2227,7 +2626,7 @@ def create_api(
         """
         if not indices:
             return {}
-        out = {i: CornerFacts() for i in indices}
+        out = {i: CornerFacts(runs_wide=h.wide.get(i, 0)) for i in indices}
 
         for i in indices:
             live = [x.min_speed_live for d in h.debriefs for x in d.losses

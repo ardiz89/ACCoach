@@ -165,6 +165,9 @@ body {
   align-items: center;
   margin-right: 24px;
 }
+/* L'ultima cifra non ha niente accanto: i suoi 24 px servono alla benzina.
+   A 1024 punti velocita', marcia e "100" stanno a pochi px dal bordo. */
+.t-big:last-child { margin-right: 0; }
 /* Cifre tutte larghe uguali: Safari di iOS 9 non conosce
    font-variant-numeric, e la velocita' ballerebbe a ogni frame. */
 .t-num {
@@ -176,6 +179,10 @@ body {
   font-feature-settings: "tnum";
 }
 .t-gear .t-num { color: #22D3CE; }
+/* La terza cifra: 96 px perche' velocita', marcia e benzina ("100") stiano
+   in 1024 punti accanto alle gomme; "≈ N giri" sta sotto, piu' piccolo. */
+.t-fuel .t-num { font-size: 96px; color: #F5B83D; }
+.t-fuel .t-fuel-laps { font-size: 22px; color: #E6EAF0; margin-top: 0; }
 .t-unit { font-size: 20px; color: #8A95A3; margin-top: 4px; }
 
 /* 440 px: la gomma porta temperatura e pressione con l'unita', «84 °C
@@ -238,17 +245,83 @@ body {
 .tp.low, .tp.high { color: #FFB020; }
 
 .t-row { -webkit-flex: 0 0 auto; flex: 0 0 auto; }
-.t-strip {
+/* Pedali a sinistra, pista a destra; prendono lo spazio che resta. */
+.t-live {
   margin-top: 10px;
   display: -webkit-flex;
   display: flex;
-  -webkit-flex-direction: column;
-  flex-direction: column;
   -webkit-flex: 1 1 auto;
   flex: 1 1 auto;
   min-height: 0;
 }
+.t-strip {
+  margin-right: 12px;
+  -webkit-flex: 1 1 0px;
+  flex: 1 1 0px;
+  min-width: 0;
+  display: -webkit-flex;
+  display: flex;
+  -webkit-flex-direction: column;
+  flex-direction: column;
+  min-height: 0;
+}
 .t-legend { font-size: 18px; color: #8A95A3; margin-bottom: 4px; }
+/* La seconda riga: distacco, stato dei pedali, cosa e' la tacca. */
+.t-legend2 { font-size: 16px; }
+.t-delta { font-weight: 700; margin-right: 16px; }
+.t-delta.ahead { color: #34E08A; }
+.t-delta.behind { color: #FF4D5E; }
+.t-tag { font-weight: 700; margin-right: 16px; }
+.t-tag.trail { color: #FFB020; }
+.t-tag.coast { color: #8A95A3; }
+.t-refmark { color: #22D3CE; }
+.t-bars-box {
+  position: relative;
+  -webkit-flex: 0 0 84px;
+  flex: 0 0 84px;
+  margin-bottom: 8px;
+}
+.t-bars, .t-map {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.t-mapcol {
+  -webkit-flex: 1 1 0px;
+  flex: 1 1 0px;
+  min-width: 0;
+  display: -webkit-flex;
+  display: flex;
+  -webkit-flex-direction: column;
+  flex-direction: column;
+  min-height: 0;
+}
+.t-zooms { -webkit-flex: 0 0 auto; flex: 0 0 auto; margin-bottom: 6px; }
+.t-zoom {
+  min-height: 44px;
+  padding: 4px 14px;
+  margin-right: 8px;
+  font-size: 17px;
+  color: #E8EDF2;
+  background: #151A21;
+  border: 1px solid #232B35;
+  border-radius: 8px;
+}
+.t-zoom[aria-pressed="true"] { background: #22D3CE; color: #0B0E12; border-color: #22D3CE; }
+.t-map-box {
+  position: relative;
+  -webkit-flex: 1 1 200px;
+  flex: 1 1 200px;
+  min-height: 140px;
+  background: #151A21;
+  border: 1px solid #232B35;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.t-map-note { -webkit-flex: 0 0 auto; flex: 0 0 auto; font-size: 15px; color: #8A95A3; margin-top: 4px; }
 .t-legend .tl { margin-right: 22px; }
 /* Il colore della linea accanto al suo nome: la striscia non aveva legenda,
    solo i valori colorati (24/10). */
@@ -426,6 +499,10 @@ body {
 .t-msg { font-size: 22px; line-height: 1.35; margin-bottom: 12px; }
 
 .t-base-row { margin-bottom: 12px; }
+.t-loaded { font-size: 20px; opacity: 0.8; margin: 4px 0; }
+.t-carry { font-size: 20px; opacity: 0.8; margin-top: 6px; }
+.t-warn { font-size: 20px; color: #FFB020; margin-top: 4px; }
+.t-ask { font-size: 22px; color: #FFB020; margin-bottom: 6px; }
 .t-select {
   display: block;
   box-sizing: border-box;
@@ -486,6 +563,8 @@ body {
 
 /* In verticale tutto in colonna: velocita' e marcia sopra, gomme sotto. */
 @media (orientation: portrait) {
+  .t-live { -webkit-flex-direction: column; flex-direction: column; }
+  .t-strip { margin-right: 0; margin-bottom: 8px; }
   .t-row {
     -webkit-flex-direction: column;
     flex-direction: column;
@@ -509,7 +588,9 @@ body {
   .t-aid .v { font-size: 28px; }
   .t-aids { margin-bottom: 8px; }
   .t-tyre { padding: 4px 10px; margin-bottom: 6px; }
-  .t-strip { margin-top: 6px; }
+  .t-live { margin-top: 6px; }
+  .t-bars-box { -webkit-flex: 0 0 66px; flex: 0 0 66px; margin-bottom: 4px; }
+  .t-zoom { min-height: 40px; }
   .t-av { margin-top: 6px; padding: 6px 12px; }
   .t-av-msg { font-size: 20px; }
   .t-phase { margin-top: 6px; padding: 6px 12px; font-size: 18px; line-height: 1.3; }

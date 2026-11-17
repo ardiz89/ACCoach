@@ -29,12 +29,17 @@ def snapshot_to_dict(s: TelemetrySnapshot) -> dict:
         "throttle": round(s.throttle, 3),
         "brake": round(s.brake, 3),
         # Il volante: -1..1 sui giri veri (la Formula arriva al bordo), positivo
-        # a sinistra. Lo disegnano la striscia dei pedali dell'overlay e il
+        # a destra (misurato il 03/11 sul verso delle curve). Lo disegnano la striscia dei pedali dell'overlay e il
         # grafico della pagina Ingegnere, sotto gas e freno.
         "steer": round(s.steer_angle, 3),
         "in_pit": s.in_pit,
         "at_box": stopped_in_box(s),
         "lap_position": round(s.lap_position, 4),
+        # Dove sta l'auto, nelle coordinate dei giri salvati: la mappa del
+        # tablet ci disegna il punto. 0,0 e' «il gioco non la manda», non un
+        # punto della pista.
+        "pos": ([round(s.car_x, 1), round(s.car_z, 1)]
+                if (s.car_x or s.car_z) else None),
         "aids": {
             "tc": s.tc_level,            # current selected level, -1 if unknown
             "abs": s.abs_level,
@@ -70,6 +75,11 @@ def delta_to_dict(d: DeltaState | None) -> dict | None:
         "local_s": round(d.local_delta_ms / 1000.0, 3),
         "local_losing": d.local_losing,
         "brake_in_m": d.brake_in_m,                  # metres to ref's next braking point
+        # Quanto premeva il riferimento in questo punto: la tacca delle barre.
+        "ref_brake": (round(d.reference_point.brake, 3)
+                      if d.reference_point is not None else None),
+        "ref_throttle": (round(d.reference_point.throttle, 3)
+                         if d.reference_point is not None else None),
         "predicted_ms": int(d.predicted_lap_ms),
         "predicted": format_lap_time(int(d.predicted_lap_ms)),
         "reference_ms": d.reference_lap_ms,
@@ -99,6 +109,7 @@ def state_to_dict(st: EngineState) -> dict:
         "history": st.history,
         "engineer": st.engineer,
         "focus": st.focus,
+        "fuel": st.fuel,
         "corner": st.corner,
         "pit_due": st.pit_due,
         "quiet": st.quiet,

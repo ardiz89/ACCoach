@@ -92,6 +92,17 @@ def build_lap(slow_corner: int | None = None, amt: int = 0,
                samples=samples, clean=clean, tyre_compound=compound)
 
 
+def stop_at(lap: Lap, pos: float, ms: int) -> Lap:
+    """L'auto si ferma per ``ms`` dove il giro passa ``pos``: un campione a
+    0 km/h, e l'orologio dei campioni dopo va avanti di ``ms``."""
+    i = next(k for k, s in enumerate(lap.samples) if s.pos >= pos)
+    lap.samples[i].speed_kmh = 0.0
+    for s in lap.samples[i + 1:]:
+        s.t_ms += ms
+    lap.lap_time_ms += ms
+    return lap
+
+
 def skew_clock(lap: Lap, ms: int) -> Lap:
     """Make the sample clock span ``ms`` more (or less) than the lap it covers.
 

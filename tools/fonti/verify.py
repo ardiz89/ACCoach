@@ -1,0 +1,306 @@
+"""Verificatore: un fatto entra solo se la citazione è nel testo e sostiene il valore.
+
+È il cancello di sicurezza. Accettare per sbaglio è il guasto grave, rifiutare per
+sbaglio no: nel dubbio si rifiuta. Qui si controlla l'aggancio al testo; il senso
+(ironia, negazioni lontane) lo controllano dopo gli autori indipendenti e il factcheck.
+"""
+
+from __future__ import annotations
+
+import bisect
+import re
+
+from tools.fonti import vocab
+
+CONTEXT_CHARS = 300  # quanti caratteri grezzi prima della citazione si guardano per la curva
+OFFSET_SLACK = 5     # di quanto l'offset dichiarato può mancare l'inizio vero della citazione
+NEAR_WORDS = 5       # parole prima e dopo la citazione in cui una negazione conta
+MIN_WORDS = 4
+_TERMINATORS = ".!?…"
+_LINE_BREAKS = "\n\r\v\f\x85  "
+
+
+def norm_text(s: str) -> str:
+    return vocab.fold(s)
+
+
+def _quote_regex(quote: str) -> re.Pattern:
+    pre = r"(?<!\w)" if re.match(r"\w", quote) else ""
+    post = r"(?!\w)" if re.search(r"\w$", quote) else ""
+    return re.compile(pre + re.escape(quote) + post)
+
+
+# Sottotitoli con almeno un punto ogni tanti caratteri: hanno la punteggiatura, e la
+# fine della riga è solo un a capo. Senza, le righe sono l'unico confine che c'è.
+PUNCTUATED_CHARS = 400
+# Nei sottotitoli senza punteggiatura una citazione può stare su due righe di fila.
+SOFT_SEGMENTS = 2
+
+
+def _terminators(body: str) -> list[int]:
+    return [i for i, c in enumerate(body)
+            if c in _LINE_BREAKS + "!?…" or (c == "." and not (0 < i < len(body) - 1
+                                                             and body[i - 1].isdigit() and body[i + 1].isdigit()))]
+
+
+def _punctuated(body: str) -> bool:
+    stops = sum(1 for i in _terminators(body) if body[i] not in _LINE_BREAKS)
+    return stops * PUNCTUATED_CHARS >= len(body)
+
+
+def _soft(body: str, segments) -> bool:
+    """Le righe dei sottotitoli sono confini «morbidi»: il testo non ha punteggiatura."""
+    return bool(segments) and not _punctuated(body)
+
+
+def _boundaries(body: str, segments) -> list[int] | None:
+    """Indici grezzi dove una frase finisce; None se i segmenti non tornano col testo.
+
+    La frase finisce a «.», «!», «?», «…» o a un a capo di qualunque tipo (il punto fra
+    due cifre no). Sottotitoli con la punteggiatura: le righe vanno a capo a metà frase,
+    quindi contano solo i punti. Sottotitoli senza: la fine di ogni riga chiude la frase,
+    e `check_fact` lascia passare una citazione su SOFT_SEGMENTS righe di fila.
+    """
+    ends = _terminators(body)
+    if not segments:
+        return ends
+    cursor = 0
+    for seg in segments:
+        text = seg.get("text") if isinstance(seg, dict) else None
+        if not isinstance(text, str):
+            return None
+        at = body.find(text, cursor)
+        if at < 0:
+            return None
+        cursor = at + len(text)
+        if not _punctuated(body):
+            ends.append(cursor)
+    return sorted(set(ends))
+
+
+def _last_corner(track: str, text: str, start: int, end: int) -> str | None:
+    """La curva nominata per ultima in text[start:end]; None se nessuna o se è ambiguo."""
+    best: tuple[int, int] | None = None
+    names: set[str] = set()
+    for name, aliases in vocab.CORNERS.get(track, {}).items():
+        for a in aliases:
+            for m in vocab.alias_regex(a).finditer(text, start, end):
+                key = (m.end(), -m.start())
+                if best is None or key > best:
+                    best, names = key, {name}
+                elif key == best:
+                    names.add(name)
+    return next(iter(names)) if len(names) == 1 else None
+
+
+_FOLLOW = re.compile(r" (?:into|at|for|in|through|alla|alle|al|per) (?:the )?")
+
+
+def _corners_in(track: str, text: str, start: int, end: int) -> set[str]:
+    return {name for name, aliases in vocab.CORNERS.get(track, {}).items()
+            if any(vocab.alias_regex(a).search(text, start, end) for a in aliases)}
+
+
+def _corner_after(track: str, text: str, start: int, end: int) -> str | None:
+    """La curva detta subito dopo il valore: «... into tosa», «... alla tosa».
+
+    Fra il valore e la curva c'è solo la preposizione (e «the»): nessuna virgola, nessun
+    «then». Se due curve combaciano nello stesso punto è ambiguo.
+    """
+    m = _FOLLOW.match(text, start, end)
+    if not m:
+        return None
+    names = {name for name, aliases in vocab.CORNERS.get(track, {}).items()
+             for a in aliases
+             if vocab.alias_regex(a).match(text, m.end(), end)}
+    return next(iter(names)) if len(names) == 1 else None
+
+
+def _other_gear(track: str, text: str, window: int, ns: int, ne: int,
+                mark: int, corner: str | None, masked: str | None = None) -> bool:
+    """Un'altra marcia nella frase che non è chiaramente di un'altra curva.
+
+    Due marce si separano solo se fra loro è nominata una curva e la curva di ciascuna
+    (l'ultima nominata prima) esiste ed è diversa: «tosa second gear, piratella in third».
+    """
+    for p in vocab.gear_positions((masked or text)[ns:ne]):
+        other = ns + p
+        if other == mark:
+            continue
+        a, b = sorted((mark, other))
+        ca = corner if a == mark else _last_corner(track, text, window, a)
+        cb = corner if b == mark else _last_corner(track, text, window, b)
+        if not (_corners_in(track, text, a, b) and ca and cb and ca != cb):
+            return True
+    return False
+
+
+def check_fact(track: str, fact: dict, body: str, segments: list | None = None) -> str | None:
+    type_ = fact.get("type")
+    if type_ not in vocab.TYPES:
+        return "tipo_ignoto"
+    body = str(body)
+    quote = norm_text(str(fact.get("quote", "")))
+    nbody, idx = vocab.norm_map(body)
+    starts = [m.start() for m in _quote_regex(quote).finditer(nbody)] if quote else []
+    if not starts:
+        return "citazione_assente"
+    if len(quote.split()) < MIN_WORDS:
+        return "citazione_corta"
+
+    offset = fact.get("offset")
+    if (not isinstance(offset, int) or isinstance(offset, bool)
+            or not 0 <= offset <= len(body)):
+        return "offset_errato"
+    near = [j for j in starts if abs(idx[j] - offset) <= OFFSET_SLACK]
+    if not near:
+        return "offset_errato"
+    j = min(near, key=lambda k: abs(idx[k] - offset))
+    q_end = j + len(quote)
+
+    # La citazione sta in una frase sola; i controlli di senso guardano la frase intera.
+    ends = _boundaries(body, segments)
+    if ends is None:
+        return "citazione_oltre_frase"
+    core = len(quote.rstrip(_TERMINATORS + " "))
+    first, last = idx[j], idx[j + max(core, 1) - 1]
+    k = bisect.bisect_left(ends, first)
+    inside = bisect.bisect_right(ends, last) - k
+    allowed = SOFT_SEGMENTS - 1 if _soft(body, segments) else 0
+    if inside > allowed:
+        return "citazione_oltre_frase"
+    s_raw = ends[k - 1] + 1 if k > 0 else 0
+    k_end = k + inside   # la frase arriva alla prima fine dopo la citazione
+    e_raw = ends[k_end] if k_end < len(ends) else len(body)
+    ns, ne = bisect.bisect_left(idx, s_raw), bisect.bisect_left(idx, e_raw)
+    sentence = nbody[ns:ne]
+
+    # I numeri di curva («turn 17») sono nomi, non valori: coperti per leggere il valore.
+    # La curva si cerca sempre nel testo vero.
+    mquote = vocab.mask_numbers(track, quote)
+    msentence = vocab.mask_numbers(track, sentence)
+    value = str(fact.get("value", ""))
+    if type_ != "gear":  # le marce si dicono anche a parole
+        cited = set(re.findall(r"(?<![0-9])[0-9]+(?![0-9])", mquote))
+        if any(n not in cited for n in re.findall(r"[0-9]+", vocab.mask_numbers(track, norm_text(value)))):
+            return "numero_non_citato"
+
+    # Un errore si descrive proprio con le negazioni: per `mistake` non contano.
+    before = " ".join(nbody[:j].split()[-NEAR_WORDS:])
+    after = " ".join(nbody[q_end:].split()[:NEAR_WORDS])
+    around = f"{before} {quote} {after}"
+    if type_ != "mistake":
+        if vocab.NEGATION.search(around) or vocab.NEGATION.search(sentence):
+            return "negazione"
+        if type_ in ("apex", "kerb") and (vocab.NEGATIVE_SENSE.search(around)
+                                         or vocab.NEGATIVE_SENSE.search(sentence)):
+            return "negazione"
+
+    # Il segno del valore: da lì all'indietro, la prima curva nominata è quella del fatto.
+    # Oppure, nella stessa frase, la curva subito dopo il valore con una preposizione.
+    got = vocab.locate(type_, mquote) if type_ not in ("line", "mistake") else None
+    mark = j + got[1] if got else q_end
+    window = bisect.bisect_left(idx, idx[j] - CONTEXT_CHARS)  # idx cresce: primo carattere nella finestra
+    corner = _last_corner(track, nbody, window, mark)
+    if got:
+        follow = _corner_after(track, nbody, j + got[2], ne)
+        if follow is not None:
+            # Un'altra curva prima del valore, nella stessa frase, la rende ambigua.
+            corner = follow if _corners_in(track, nbody, ns, mark) <= {follow} else None
+    if corner != fact.get("corner"):
+        return "curva_non_trovata"
+    # Un consiglio descrittivo non ha un segno: se la frase fino alla fine della citazione
+    # nomina due curve, non si sa a quale va.
+    if type_ in ("line", "mistake") and len(_corners_in(track, nbody, min(ns, j), q_end)) > 1:
+        return "curva_non_trovata"
+    if type_ == "gear" and got and _other_gear(track, nbody, min(window, ns), ns, ne, mark, corner,
+                                              vocab.mask_numbers(track, nbody)):
+        return "valore_non_normalizzabile"
+
+    if type_ in ("line", "mistake"):
+        return None if norm_text(value) == quote else "valore_diverso"
+    if got is None:
+        return "valore_non_normalizzabile"
+    reason = vocab.sentence_reason(type_, msentence, mark - ns)
+    if reason:
+        return reason
+    return None if got[0] == value else "valore_diverso"
+
+
+
+def counted_otherwise(track: str, author_id: str, fact: dict, body: str) -> bool:
+    """Il fatto è di chi conta le curve in un altro modo, e la curva la dice solo il numero.
+
+    Vale per gli autori di `vocab.OTHER_COUNT`, sulle curve il cui numero arriva dove la
+    loro numerazione diverge. Si guarda la citazione e i CONTEXT_CHARS caratteri prima:
+    se lì nessun nome della curva è un nome vero, la curva l'ha data il numero.
+    """
+    start_at = vocab.OTHER_COUNT.get(track, {}).get(author_id)
+    nums = vocab.TURNS.get(track, {}).get(fact.get("corner"))
+    if start_at is None or not nums or max(nums) < start_at:
+        return False
+    _, at, end = quote_span(fact.get("quote"), body, fact.get("offset"))
+    if at is None:
+        return False
+    text = vocab.fold(str(body)[max(0, at - CONTEXT_CHARS):end])
+    numbers = vocab.NUMBER_ALIASES.get(track, set())
+    names = [a for a in vocab.CORNERS.get(track, {}).get(fact["corner"], []) if a not in numbers]
+    return not any(vocab.alias_regex(a).search(text) for a in names)
+
+
+def quote_span(quote: str, body: str, offset: int | None = None
+               ) -> tuple[str | None, int | None, int | None]:
+    """Dove sta la citazione nel testo grezzo: `(motivo, inizio, fine)`.
+
+    Normalizzata e a confini di parola come in `check_fact`, almeno 4 parole. Con
+    `offset`, conta solo l'occorrenza entro OFFSET_SLACK caratteri, la più vicina.
+    `body[inizio:fine]` è il pezzo del testo che la citazione copia.
+    """
+    q = norm_text(str(quote or ""))
+    body = str(body)
+    nbody, idx = vocab.norm_map(body)
+    starts = [m.start() for m in _quote_regex(q).finditer(nbody)] if q else []
+    if not starts:
+        return "citazione_assente", None, None
+    if len(q.split()) < MIN_WORDS:
+        return "citazione_corta", None, None
+    if offset is None:
+        j = starts[0]
+    elif not isinstance(offset, int) or isinstance(offset, bool):
+        return "offset_errato", None, None
+    else:
+        near = [k for k in starts if abs(idx[k] - offset) <= OFFSET_SLACK]
+        if not near:
+            return "offset_errato", None, None
+        j = min(near, key=lambda k: abs(idx[k] - offset))
+    return None, idx[j], idx[j + len(q) - 1] + 1
+
+
+def locate_quote(quote: str, body: str, offset: int | None = None) -> tuple[str | None, int | None]:
+    """`(motivo, inizio)` di `quote_span`."""
+    reason, start, _ = quote_span(quote, body, offset)
+    return reason, start
+
+
+def sentences(body: str) -> list[tuple[int, int]]:
+    """Le frasi del testo grezzo come `(inizio, fine)`, con le regole di `check_fact`.
+
+    Una frase fatta solo di spazi non conta.
+    """
+    out, start = [], 0
+    for end in [*(_boundaries(body, None) or []), len(body) - 1]:
+        if end + 1 > start and body[start:end + 1].strip():
+            out.append((start, end + 1))
+        start = max(start, end + 1)
+    return out
+
+
+def check_quote(quote: str, body: str, offset: int | None = None) -> str | None:
+    """Solo l'aggancio al testo: presenza, 4 parole e, se dato, l'offset."""
+    return locate_quote(quote, body, offset)[0]
+
+
+def contains(quote: str, phrase: str) -> bool:
+    """La frase (un nome, un tempo, un'auto) sta nella citazione, a confini di parola."""
+    p = norm_text(str(phrase or ""))
+    return bool(p) and _quote_regex(p).search(norm_text(str(quote or ""))) is not None

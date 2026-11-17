@@ -930,7 +930,7 @@ def test_rail_views_is_exactly_the_views_about_one_lap():
     assert set(names) == {"flow", "compare", "line", "sectors", "dynamics"}, names
     # Insiemistica a parte: le due metà devono partizionare le schede vere, così
     # una scheda nuova non può restare fuori da entrambe senza che si veda.
-    assert set(names) | {"pagella", "session", "stint", "progress"} == set(_TABS)
+    assert set(names) | {"pagella", "session", "corners", "stint", "progress"} == set(_TABS)
 
 
 def test_switching_tab_says_whether_this_one_has_a_rail():
@@ -2527,12 +2527,19 @@ def test_every_loader_is_accounted_for():
     # `loadAdvice` e' l'undicesimo: il consiglio in corso, per car+track ma
     # senza argomenti (legge CURRENT), quindi lo rilancia `loadCombo` — che sale
     # a ogni cambio di giro, di riferimento e di lingua — e non `reloadViewData`.
+    # `loadMapBg` e' il dodicesimo: lo sfondo della mappa, per giro e senza
+    # argomenti come la Traiettoria. Lo rilancia `loadCombo` a ogni giro nuovo;
+    # buttato, la mappa resta quella di sempre fino al giro dopo.
+    # `loadCorners` e' il tredicesimo: Curva per curva, per car+track e uscita
+    # come la Sessione, e la rilancia `reloadViewData` quando e' aperta.
     assert set(_LOADERS) == {"loadBraking", "loadCombo", "loadLine", "loadProgress",
                              "loadSectors", "loadSession", "loadStint", "loadPagella",
-                             "loadHowto", "loadDefectHistory", "loadAdvice"}
+                             "loadHowto", "loadDefectHistory", "loadAdvice", "loadMapBg",
+                             "loadCorners"}
     assert set(_PER_COMBO) == {"loadProgress", "loadSession", "loadStint", "loadPagella",
-                               "loadHowto", "loadDefectHistory"}
-    assert set(_PER_LAP) == {"loadBraking", "loadLine", "loadSectors", "loadAdvice"}
+                               "loadHowto", "loadDefectHistory", "loadCorners"}
+    assert set(_PER_LAP) == {"loadBraking", "loadLine", "loadSectors", "loadAdvice",
+                             "loadMapBg"}
 
 
 def test_every_async_function_that_waits_is_accounted_for():
@@ -2735,3 +2742,11 @@ def test_the_stint_tyre_drift_is_written_with_catalogue_sentences():
         entry = _I18NJS[_I18NJS.index(f'"{key}"'):]
         entry = entry[:entry.index("},")]
         assert "en:" in entry and "it:" in entry and "{f}" in entry and "{r}" in entry
+
+
+def test_il_selettore_delle_sessioni_dice_un_giro_al_singolare():
+    """«1 laps» e «1 giri» nella tendina delle sessioni (11/11)."""
+    i18n = (WEB / "i18n.js").read_text(encoding="utf-8")
+    assert '"lbl.nlaps":       { en: `{n} {n|lap|laps}`, it: `{n} {n|giro|giri}` }' in i18n
+    body = _APPJS[_APPJS.index("function sessionOptions("):][:400]
+    assert 'tf("lbl.nlaps"' in body and 't("lbl.laps")' not in body

@@ -129,7 +129,10 @@ def test_before_any_lap_the_block_is_the_road_and_nothing_else(tmp_path):
     eng = _bare_engine(tmp_path)
     eng._engineer = _eng()
     block = eng._engineer_block()
-    assert set(block) == {"phase", "progress"}
+    # `loaded` (il file riconosciuto ai box) non e' un verdetto: c'e' da subito,
+    # None finche' l'auto non passa dai box.
+    assert set(block) == {"phase", "progress", "loaded"}
+    assert block["loaded"] is None
     assert block["phase"]["key"] == "pressures"
     p = block["progress"]
     assert (p["stage"], p["have"], p["need"]) == ("baseline", 0, 3)
@@ -184,7 +187,7 @@ def test_a_blind_phase_is_reported_skipped_not_done():
 
 def _gate_shut(eng, i):
     # Il cancello che non passa, su una fase senza sintomi da curare: e' il
-    # caso «non ho trovato nulla da correggere». Su una copia: la fase puo'
+    # caso senza rimedio (test_engineer_senza_rimedio.py). Su una copia: la fase puo'
     # essere quella del profilo condiviso (`reconfigure` rende se stessa).
     import copy
     ph = copy.copy(eng.phases[i])
@@ -204,13 +207,43 @@ def test_a_phase_with_nothing_to_correct_is_reported_skipped():
 
 
 def test_a_phase_whose_gate_passes_is_done_not_skipped():
+    """Il sintomo c'e', sotto soglia: la misura ha visto, e ha detto «a posto»."""
+    from accoach.engineer.core import Balance, Phase, Speed
+    mild = Symptom(Balance.UNDERSTEER, Phase.APEX, Speed.LOW)
+    eng = _eng()
+    eng.phase_idx = 1
+    for _ in range(3):
+        lap = _lap()
+        lap.symptom_scores = {mild: 0.2}
+        lap.symptom_corners = {mild: 1}
+        d = eng.observe(lap)
+    assert d.kind is DecisionKind.PHASE_DONE
+    p = eng.progress()
+    assert p["index"] == 2 and p["skipped"] == []
+
+
+def test_a_phase_the_measure_never_saw_is_skipped_not_done():
+    """Nessun sintomo in nessun giro: il cancello passa, ma perche' la misura
+    tace. Sulla 720S succede in 123 giri puliti su 127: dirla «completata» era
+    dare per buono un silenzio."""
     eng = _eng()
     eng.phase_idx = 1
     for _ in range(3):
         d = eng.observe(_lap())
     assert d.kind is DecisionKind.PHASE_DONE
+    assert "complet" not in d.message.lower() and "done" not in d.message.lower()
     p = eng.progress()
-    assert p["index"] == 2 and p["skipped"] == []
+    assert p["index"] == 2 and p["skipped"] == [1]
+
+
+def test_the_end_does_not_claim_the_setup_is_sorted_when_phases_were_silent():
+    eng = _eng()
+    for _ in range(12):
+        d = eng.observe(_lap())
+        if d.kind is DecisionKind.DONE:
+            break
+    assert d.kind is DecisionKind.DONE
+    assert "buona base" not in d.message and "good baseline" not in d.message
 
 
 def test_skipped_phases_come_back_next_session():

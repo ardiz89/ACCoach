@@ -128,8 +128,15 @@ Validation — these read the live game, so the sim must be running:
   verify-yaw                 validate the yaw-rate sign (oversteer detection)
   verify-aids                validate the ACC aid-level mapping (live)
   find-rain                  find ACC's rain/grip fields by measuring them (live)
+  verify-box                 validate ACC's pit menu fields and tyre wear (live)
+  verify-setup               compare the game's live TC/ABS/map/bias/pressures with each
+                             setup file of the car and track (live, in the garage)
   verify-sectors             validate the sim's real sector data (live)
   verify-diag [car] [track]  offline FP-rate check of the lap diagnosis
+  replay-engineer <track> <YYYYMMDD> [car]
+                             replay an evening's recorded laps through the race
+                             engineer, one line per lap (read-only);
+                             --laps <dir> laps folder, --log <file> session log
 
   import-reference <file>    import a lap as a clean reference (cold-start seed)
   setup <list|show|bump|undo>  read and edit an ACC setup file, no game running
@@ -211,12 +218,21 @@ def main() -> None:
     elif cmd in ("find-rain", "rain"):
         from .diagnostics import run_rain
         run_rain()
+    elif cmd == "verify-setup":
+        from .diagnostics import run_setup
+        run_setup()
+    elif cmd in ("verify-box", "box"):
+        from .diagnostics import run_box
+        run_box()
     elif cmd in ("verify-sectors", "sectors"):
         from .diagnostics import run_sectors
         run_sectors()
     elif cmd in ("verify-diag", "diag"):
         from .diagnostics import run_diag
         run_diag(rest)
+    elif cmd == "replay-engineer":
+        from .engineer.replay import main as run_replay
+        run_replay(rest)
     elif cmd in ("import-reference", "import-ref"):
         from .diagnostics import run_import_reference
         run_import_reference(rest)

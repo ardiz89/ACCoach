@@ -21,8 +21,10 @@ from accoach.engineer import (
     Speed,
     Symptom,
 )
-from accoach.engineer.core import NO_WINDOW, _skip_tail
+from accoach.engineer.core import NO_WINDOW, SetupReport, _skip_tail
+from accoach.engineer.fingerprint import FieldDiff, describe
 from accoach.engineer.profiles import GT3_PROFILE, ROAD_PROFILE
+from accoach.i18n import current_language
 from accoach.engineer.profiles._common import PressurePhase
 from accoach.engineer.steps import UnknownSteps
 from accoach.setup import labels
@@ -101,16 +103,81 @@ def _messages():
     eng.mark_applied()
     out.append(_until(eng, lambda: _lap(time_ms=100437, press=PRESS_OK),
                       DecisionKind.ACCEPTED).message)
+    # La pressione che non arriva dove doveva (quella lontanissima non si
+    # giudica: la richiesta della base, piu' sotto).
+    for after in (25.43,):
+        eng = RaceEngineer(GT3_PROFILE, min_stable=3)
+        _until(eng, lambda: _lap(press={"front": 24.73, "rear": 26.5}))
+        eng.mark_applied()
+        out.append(_until(eng, lambda: _lap(press={"front": after, "rear": 26.5}),
+                          DecisionKind.ACCEPTED).message)
+    # Due assi fuori insieme: una sosta sola.
     eng = RaceEngineer(GT3_PROFILE, min_stable=3)
-    _until(eng, lambda: _lap(press={"front": 24.73, "rear": 26.5}))
-    eng.mark_applied()
-    d = _until(eng, lambda: _lap(time_ms=101950), DecisionKind.REVERTED)
-    out += [d.message, d.change.rationale]
+    d = _until(eng, lambda: _lap(press={"front": 24.73, "rear": 27.83}))
+    out += [d.change.rationale, d.change.named]
+    # Le pressioni che si stanno ancora assestando.
     eng = RaceEngineer(GT3_PROFILE, min_stable=3)
-    _until(eng, lambda: _lap(press={"front": 24.73, "rear": 26.5}, fuel=20.4))
+    for _ in range(3):
+        d = eng.observe(_lap(fuel=41.3))
+    out.append(d.message)
+    # Una prova di pressione col serbatoio diverso: il tempo non c'entra piu'.
+    low = {"front": 24.73, "rear": 26.5}
+    eng = RaceEngineer(GT3_PROFILE, min_stable=3)
+    _until(eng, lambda: _lap(press=low, fuel=20.4))
     eng.mark_applied()
-    out.append(_until(eng, lambda: _lap(time_ms=101950, fuel=58.7),
+    out.append(_until(eng, lambda: _lap(time_ms=101950, fuel=58.7, press=low),
                       DecisionKind.ACCEPTED).message)
+    # Le gomme si muovono lontano dalla modifica: niente verdetto, si richiede.
+    eng = RaceEngineer(GT3_PROFILE, min_stable=3)
+    _until(eng, lambda: _lap(press=low))
+    eng.mark_applied()
+    d = _until(eng, lambda: _lap(press=PRESS_OK), DecisionKind.STAND_DOWN)
+    assert d.confirm_base
+    out.append(d.message)
+    # L'assetto riconosciuto ai box, con le differenze dette come le dice il
+    # motore (`fingerprint.describe`, nella lingua attiva).
+    lg = current_language()
+    tc = describe((FieldDiff("tc", 6, 3), FieldDiff("bias", 0.652, 0.64)), lg)
+    psi = describe((FieldDiff("psi_fl", 26.13, 25.6),), lg)
+    # Cambiato senza che HONE abbia scritto: la base si rifa', o la prova
+    # aperta non si giudica.
+    eng = RaceEngineer(GT3_PROFILE, min_stable=3)
+    for _ in range(3):
+        eng.observe(_lap())
+    out.append(eng.setup_seen(SetupReport("match", "HONE_8", changed=tc),
+                              at_exit=True).message)
+    eng = RaceEngineer(GT3_PROFILE, min_stable=3)
+    _until(eng, lambda: _lap(press=low))
+    eng.mark_applied()
+    eng.setup_seen(SetupReport("match", "HONE_8", expected="HONE_8",
+                               expected_ok=True), at_exit=True)
+    d = eng.setup_seen(SetupReport("match", "HONE_7", changed=tc), at_exit=True)
+    assert d.confirm_base
+    out.append(d.message)
+    # Il file sbagliato dopo una scrittura, poi quello giusto con le pressioni
+    # a freddo che non tornano, e il contatore che se lo porta dietro.
+    eng = RaceEngineer(GT3_PROFILE, min_stable=3)
+    _until(eng, lambda: _lap(press=low))
+    eng.mark_applied()
+    wrong = SetupReport("match", "HONE_7", expected="HONE_8", expected_ok=False,
+                        expected_diff=tc)
+    out.append(eng.setup_seen(wrong, at_exit=True).message)
+    right = SetupReport("match", "HONE_8", expected="HONE_8", expected_ok=True,
+                        psi_doubt=psi)
+    out.append(eng.setup_seen(right, at_exit=False).message)
+    out.append(eng.observe(_lap(press={"front": 25.43, "rear": 26.5})).message)
+    # Un assetto che non e' un file, e poi il file.
+    eng = RaceEngineer(GT3_PROFILE, min_stable=3)
+    eng.setup_seen(SetupReport("unsaved", unsaved_diff=tc), at_exit=True)
+    out.append(_until(eng, lambda: _lap(press=low), DecisionKind.STAND_DOWN).message)
+    eng = RaceEngineer(GT3_PROFILE, min_stable=3)
+    eng.setup_seen(SetupReport("unsaved", unsaved_diff=tc), at_exit=False)
+    out.append(eng.setup_seen(SetupReport("match", "HONE_8"), at_exit=False).message)
+    # …il file, ma con le manopole rimesse: la base si rifa'.
+    eng = RaceEngineer(GT3_PROFILE, min_stable=3)
+    eng.setup_seen(SetupReport("unsaved", unsaved_diff=tc), at_exit=False)
+    out.append(eng.setup_seen(SetupReport("match", "HONE_8", changed=tc),
+                              at_exit=False).message)
     # Le fasi che si chiudono, fino in fondo.
     eng = RaceEngineer(GT3_PROFILE, min_stable=3)
     for _ in range(12):

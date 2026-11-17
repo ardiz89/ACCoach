@@ -43,6 +43,7 @@
     <div class="tab-group" role="group" data-i18n-label="tabgroup.today" data-label="How today went">
       <button class="tab active" data-view="pagella" data-i18n="tab.pagella">Report card</button>
       <button class="tab" data-view="session" data-i18n="tab.session">Session</button>
+      <button class="tab" data-view="corners" data-i18n="tab.corners">Corner by corner</button>
       <button class="tab" data-view="flow" data-i18n="tab.flow">Lap explained</button>
     </div>
     <div class="tab-group" role="group" data-i18n-label="tabgroup.why" data-label="Why, in detail">
@@ -162,6 +163,23 @@
       <section id="ses-numbers" class="summary"></section>
       <section id="ses-laps" class="session-laps"></section>
       <section id="ses-changed" class="session-changed"></section>
+    </div>
+  </div>
+
+  <!-- Curva per curva: la sessione intera, una riga per curva, la peggiore in
+       cima. Tutto lo scrive renderCorners da /api/corners; il selettore è lo
+       stesso delle uscite della Pagella e della Sessione (`SESSION_I`). -->
+  <div id="view-corners" class="hidden">
+    <div class="pag-shell cpc-shell">
+      <header class="pag-head">
+        <p id="cpc-sub" class="pag-sub"></p>
+        <label class="session-pick">
+          <span data-i18n="ses.which">Session</span>
+          <select id="cpc-select"></select>
+        </label>
+      </header>
+      <p id="cpc-ref" class="pag-ref"></p>
+      <div id="cpc-body" class="cpc-body"></div>
     </div>
   </div>
 
@@ -285,7 +303,7 @@
                   <span class="grad" aria-hidden="true"></span>
                   <span class="cap slow" data-i18n="map.grad.slow">slower</span>
                 </span>
-                <small data-i18n="map.grad.note">the line is thicker where the speed gap is bigger</small>
+                <small id="map-grad-note" data-i18n="map.grad.note">the line is thicker where the speed gap is bigger</small>
               </span>
               <span class="swatch"><span class="marker">▽</span> <span data-i18n="map.leg.you">your braking</span></span>
               <span class="swatch"><span class="marker ring">○</span> <span data-i18n="map.leg.ref">reference braking</span></span>

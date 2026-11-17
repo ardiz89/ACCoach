@@ -292,10 +292,10 @@ def test_laps_with_no_fuel_reading_are_unknown_not_matched():
     assert out.kind is DecisionKind.REVERTED, "no reading → behave as before"
 
 
-def test_a_structural_change_that_cannot_be_judged_is_said_to_be_unjudged():
-    """Pressures have no symptom to fall back on. Keeping it silently would
-    claim a verdict we didn't reach; reverting would put the phase gate straight
-    back into proposing the same change, forever."""
+def test_a_pressure_change_is_judged_on_the_pressure_it_reached():
+    """Not on lap time: inside a stint the time moves by 0.6-0.9 s, and with a
+    different tank (6 tests out of 8) it was thrown away and the change kept
+    whatever the tyre read. Now the verdict says where the pressure landed."""
     eng = _eng()
     cold = {"front": 24.0, "rear": 24.0}
     d = None
@@ -307,13 +307,15 @@ def test_a_structural_change_that_cannot_be_judged_is_said_to_be_unjudged():
             break
     assert d.kind is DecisionKind.PROPOSE and d.change.symptom is None
     eng.mark_applied()
-    for _ in range(3):
+    for _ in range(4):                        # il primo dello stint non conta
         s = _lap(103000, {}, press=cold)      # 3 s slower, but on 60 L
         s.fuel_l = 60.0
         out = eng.observe(s)
     assert out.kind is DecisionKind.ACCEPTED
     assert out.outcome.time_confounded is True
-    assert "serbatoio" in out.message or "tank" in out.message
+    assert "serbatoio" not in out.message and "tank" not in out.message
+    assert "24" in out.message, "dice la pressione che ha letto"
+    assert "aspettavo" in out.message or "expected" in out.message
 
 
 def test_the_fuel_reading_comes_from_the_lap_itself():

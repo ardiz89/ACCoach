@@ -24,7 +24,7 @@ def test_debrief_content_translates_to_italian():
     st = CornerStats(lost_ms=300, throttle_live=0.5, throttle_ref=0.5,
                      brake_live=0.0, brake_ref=0.0, min_speed_live=120.0,
                      min_speed_ref=128.0, braking_early=False,
-                     braking_late=False)
+                     braking_late=False, phase_ms=None)
     detail_it, _ = explain_loss(CueCategory.CARRY_SPEED, st, "it")
     assert "All'apex la tua velocità minima è 120 km/h" in detail_it
     detail_en, _ = explain_loss(CueCategory.CARRY_SPEED, st, "en")
@@ -50,7 +50,7 @@ def test_debrief_ranks_the_slow_corner_first():
 def _stats(**kw):
     base = dict(lost_ms=200.0, throttle_live=0.6, throttle_ref=0.9, brake_live=0.5,
                 brake_ref=0.2, min_speed_live=90.0, min_speed_ref=110.0,
-                braking_early=False, braking_late=False)
+                braking_early=False, braking_late=False, phase_ms=None)
     base.update(kw)
     return CornerStats(**base)
 
@@ -215,3 +215,22 @@ def test_one_tenth_is_singular_in_the_debrief_too():
                 min_speed_live=100.0, min_speed_ref=100.0)
     assert "3 decimi " in explain_loss(CueCategory.TIME_LOSS, st, "it")[0]
     assert "3 tenths " in explain_loss(CueCategory.TIME_LOSS, st, "en")[0]
+
+
+def test_a_lap_without_gesture_channels_gives_todays_debrief(monkeypatch):
+    """Review Focus 1: senza ABS, G e marcia (campi a 0 o «N») e con gli
+    stessi pedali del riferimento, nessun gesto: il debrief e' quello di
+    prima, campo per campo, come se il confronto dei gesti non ci fosse."""
+    import accoach.coaching.debrief as debrief_mod
+    ref_lap = synth.build_lap()
+    review = synth.build_lap(slow_corner=0, amt=30)
+    for s in ref_lap.samples + review.samples:
+        s.gear, s.abs_active, s.g_lat, s.g_long = "N", 0.0, 0.0, 0.0
+    reference = Reference(ref_lap)
+    corners = detect_corners(ref_lap.samples)
+    now = build_lap_debrief(review, reference, corners, "it")
+    assert now.losses, "the review lap must lose somewhere"
+    assert all(x.gesture is None for x in now.losses)
+    monkeypatch.setattr(debrief_mod, "compare", lambda *a: None)
+    today = build_lap_debrief(review, reference, corners, "it")
+    assert now == today

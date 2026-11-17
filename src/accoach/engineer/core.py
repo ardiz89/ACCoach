@@ -30,12 +30,14 @@ It consumes :class:`LapStats` (the diagnosis) and never touches telemetry.
 
 from __future__ import annotations
 
+import math
 import statistics
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from enum import Enum
 
 from ..i18n import current_language
 from ..textfmt import fmt_num
+from . import consistency
 from .steps import AccSteps, Steps
 
 
@@ -103,6 +105,8 @@ class LapStats:
     #: How heavy the car was, which is why a lap time from before a setup change
     #: and one from after may not be comparable at all — see `_fuel_gap`.
     fuel_l: float = 0.0
+    #: Temperatura della pista nel giro, in gradi (0.0 = non registrata).
+    road_temp: float = 0.0
     #: Quando ``stable`` e' False, quale delle due meta' e' caduta: ``"invalid"``
     #: (il gioco non ha completato il giro) o ``"cut"`` (fuori pista). Vuoto su
     #: un giro che sta in piedi. Non duplica ``stable`` — lo spiega: il pilota in
@@ -127,6 +131,33 @@ class LapStats:
     #: so it is not a signal at all. The compound is the driver's own decision
     #: about the conditions, and it is measured.
     wet: bool | None = None
+    #: Il primo giro registrato di uno stint: la pressione sta ancora salendo
+    #: (+0,20 psi fra il primo e il secondo giro, +0,04 fra il secondo e il
+    #: terzo, misurato su 11 stint della 720S). Il giro conta per tutto il
+    #: resto, ma non per decidere le pressioni. Lo mette il motore, che e' chi
+    #: sa dove comincia uno stint (`RaceEngineer.observe`).
+    settling: bool = False
+    #: A quale stint appartiene il giro (lo numera il motore). Una lettura di
+    #: pressione mescola solo giri dello stesso stint.
+    stint: int = 0
+    #: Costanza del pilota (17/11): per ogni curva con campioni, (apice,
+    #: velocita' minima in km/h, nome). Un giro guidato piu' piano degli altri
+    #: dello stint non misura l'assetto, e per saperlo serve la minima curva
+    #: per curva dentro il giro.
+    corner_vmin: tuple[tuple[float, float, str], ...] = ()
+    #: Le manopole dell'auto nel giro: (TC, ABS, mappa motore, bilanciamento
+    #: freno). Coi default di `Lap` (-1, -1, -1, -1.0) per i giri vecchi.
+    dials: tuple[int, int, int, float] = (-1, -1, -1, -1.0)
+    #: Il numero d'ordine del giro nello stint (lo riempie il motore).
+    stint_lap: int = 0
+    #: Su quali curve e' stata misurata `corner_vmin`: (ingresso, uscita) di
+    #: ognuna. In pista le curve cambiano col riferimento (nuovo miglior
+    #: giro): la stessa zona puo' cadere su un tratto veloce o sulla curva
+    #: lenta, e due giri si confrontano solo sulle stesse curve.
+    corners_key: tuple = ()
+    #: Le curve sono state rilevate sul giro stesso (nessun riferimento):
+    #: un giro cosi' non si confronta con nessun altro.
+    corners_own: bool = False
 
 
 # --- recommendations -------------------------------------------------------
@@ -247,6 +278,15 @@ class Outcome:
     #: {Symptom: score change} for symptoms this change was *not* aiming at, and
     #: which the verdict therefore never looked at. Measured, never predicted.
     side_effects: tuple = ()
+    #: La modifica provata. Un ACCEPTED non la porta in `Decision.change`, che
+    #: per chi legge vuol dire «da scrivere»: senza questa il registro non
+    #: sapeva cosa aveva tenuto.
+    tested: "ProposedChange | None" = None
+    #: Come per la benzina: la pista si e' mossa troppo per confrontare i tempi.
+    #: Fa scattare anche `time_confounded`, che dice solo se il tempo e' fuori.
+    temp_confounded: bool = False
+    road_temp_before: float = 0.0
+    road_temp_after: float = 0.0
 
 
 class DecisionKind(Enum):
@@ -279,6 +319,105 @@ class Decision:
     #: stesso numero due volte con due frasi diverse, o perdeva il perche'.
     #: None su tutto il resto: il messaggio va letto intero.
     tail: str | None = None
+    #: Su un verdetto: le gomme non si sono mosse come la modifica prevedeva,
+    #: quindi forse il file di partenza non era quello in macchina. Il tablet e
+    #: la pagina Ingegnere, letto questo, richiedono quale assetto hai caricato.
+    confirm_base: bool = False
+
+
+@dataclass(frozen=True)
+class SetupReport:
+    """Quale assetto c'e' in macchina, come l'ha riconosciuto il motore ai box.
+
+    Lo costruisce il motore dall'impronta (`engineer/fingerprint.py`), dal vivo
+    in piazzola o all'uscita dalla corsia box. Le stringhe arrivano gia' in
+    parole (`fingerprint.describe`, «TC 6 invece di 3»): questo modulo non
+    importa `fingerprint` e non rifa' il confronto, decide soltanto.
+
+    ``state`` e' l'esito del riconoscimento (``match``, ``ambiguous``,
+    ``unsaved``, ``unknown``) e ``name`` il file riconosciuto.
+
+    ``changed`` e' la differenza fra la lettura all'entrata in corsia box
+    (l'ultimo frame in pista prima della sosta) e quella di adesso: all'uscita
+    la lettura dell'uscita, dal vivo quella da fermo. Il motore la lascia vuota
+    quando HONE ha applicato una modifica (ai box o al volo) in quella sosta,
+    tranne in una sosta con una scrittura ai box: li' passa la differenza
+    delle sole manopole (TC, ABS, mappa, ripartitore), che una scrittura ai
+    box non tocca. Le modifiche al volo fatte in pista sono gia' nella lettura
+    d'entrata, e qui non compaiono mai.
+
+    ``expected`` e' il file che HONE ha scritto o che il pilota ha scelto,
+    ``expected_ok`` se l'impronta gli corrisponde sui campi certi (None se non
+    si sa), ``expected_diff`` dove non gli corrisponde e ``psi_doubt`` dove non
+    gli corrispondono le pressioni a freddo, che sono solo un indizio.
+    ``unsaved_diff`` e' la differenza dal file piu' vicino. ``carry_lost``:
+    l'impronta trova un file solo senza le modifiche al volo tenute (il pilota
+    ha ricaricato un file a mano, e le manopole sono tornate come nel file).
+    ``dials`` sono le manopole lette (TC, ABS, mappa grezza, ripartitore), o
+    None: dicono se l'assetto e' ancora quello di una scelta fatta sulla
+    pagina (`base_confirmed`).
+    """
+
+    state: str
+    name: str | None = None
+    probable: bool = False
+    changed: str = ""
+    expected: str | None = None
+    expected_ok: bool | None = None
+    expected_diff: str = ""
+    psi_doubt: str = ""
+    unsaved_diff: str = ""
+    carry_lost: bool = False
+    dials: tuple | None = None
+
+    def to_dict(self) -> dict:
+        out = asdict(self)
+        out["dials"] = list(self.dials) if self.dials is not None else None
+        return out
+
+    @classmethod
+    def from_dict(cls, d: dict | None) -> "SetupReport":
+        """Il contrario di `to_dict`; quello che non torna resta al suo default."""
+        d = d if isinstance(d, dict) else {}
+
+        def text(key: str) -> str:
+            v = d.get(key)
+            return v if isinstance(v, str) else ""
+
+        def name(key: str) -> str | None:
+            v = d.get(key)
+            return v if isinstance(v, str) and v else None
+
+        ok = d.get("expected_ok")
+        return cls(state=name("state") or "unknown", name=name("name"),
+                   probable=d.get("probable") is True, changed=text("changed"),
+                   expected=name("expected"),
+                   expected_ok=ok if isinstance(ok, bool) else None,
+                   expected_diff=text("expected_diff"),
+                   psi_doubt=text("psi_doubt"),
+                   unsaved_diff=text("unsaved_diff"),
+                   carry_lost=d.get("carry_lost") is True,
+                   dials=_dials(d.get("dials")))
+
+
+def _dials(v) -> tuple | None:
+    """(TC, ABS, mappa, ripartitore) da una lista o tupla, o None se non torna."""
+    if not isinstance(v, (list, tuple)) or len(v) != 4:
+        return None
+    nums = [_finite(x) for x in v]
+    if any(x is None for x in nums):
+        return None
+    if any(x != int(x) for x in nums[:3]):
+        return None
+    return (int(nums[0]), int(nums[1]), int(nums[2]), nums[3])
+
+
+def _dials_moved(a: tuple, b: tuple) -> bool:
+    """Due letture delle manopole dicono un assetto diverso? -1 = non letto."""
+    for x, y in zip(a[:3], b[:3]):
+        if x != -1 and y != -1 and x != y:
+            return True
+    return a[3] >= 0 and b[3] >= 0 and abs(a[3] - b[3]) > _BIAS_TOL
 
 
 # --- the profile contract --------------------------------------------------
@@ -312,6 +451,17 @@ class WorkPhase:
         dice con le sue parole invece di scrivere «completata».
         """
         return ""
+
+    def unfixed(self, window: list[LapStats]) -> tuple[str, int, int] | None:
+        """Cosa ha chiuso il cancello quando non c'e' un sintomo da curare:
+        (contatore, giri in cui ricorre, giri guardati), o None.
+
+        Per le fasi che guardano un contatore di tratti (``"spin"``, ``"lock"``,
+        vedi `profiles._common.SegmentPhase`). Serve alla frase: il 24/09 la
+        fase Elettronica diceva «non ho trovato nulla da correggere» dopo aver
+        visto pattinamento in uscita in 2 giri su 6.
+        """
+        return None
 
 
 #: «Quest'auto non ha una finestra pressioni che conosciamo», detto al motore.
@@ -354,6 +504,42 @@ _CLICK_BUDGET = 6                # max net clicks a single parameter may accumul
 #: is — the symptom score, which doesn't care what the car weighs.
 _FUEL_BIAS_L = 2.0
 
+#: Gradi di pista oltre i quali i tempi prima e dopo non si confrontano.
+#:
+#: Non e' una sensibilita' misurata, e dai giri non si puo' ricavare: in 16
+#: sessioni dell'archivio la pista si e' mossa al massimo di 1,7 gradi. Sta sopra
+#: quel massimo apposta, cosi' scatta solo su una sessione fuori dal normale e non
+#: toglie il giudizio sul tempo a una sessione qualunque.
+_TEMP_BIAS_C = 3.0
+
+#: Lo scarto minimo, in psi a caldo, fra lo spostamento misurato delle gomme e
+#: quello previsto (click per psi per click) oltre il quale si dubita del file
+#: di partenza. Si confronta con ``max(questo, |previsto|)``: il 08/11 i giri
+#: hanno detto -0,5 e -0,6 per -0,8 previsti (risposta buona) e +2,2 per +0,5
+#: (13 click scritti al posto di 5, sopra il file sbagliato).
+_BASE_PSI = 0.8
+
+#: Il ripartitore: quanto vale un click del file (frazione, «circa 0,2 %») e
+#: mezzo click, la tolleranza fra due risposte. Copiati da `fingerprint` e non
+#: importati: questo modulo decide, il confronto coi file lo fa il motore.
+_BIAS_STEP = 0.002
+_BIAS_TOL = 0.001
+#: I due `_exit_check` che all'uscita ricontrollano il file scritto (R2).
+_CHECK_WRITTEN = ("written", "resumed")
+
+#: La costanza del pilota (17/11): un giro pulito piu' lento degli altri giri
+#: del suo gruppo (stesso stint, stesse manopole, stesse curve) di oltre la
+#: soglia in km/h di velocita' minima in almeno `_CONSISTENCY_CORNERS` curve
+#: non entra in nessuna lettura. Misurate sulla 720S e tenute in
+#: `consistency`. La soglia in km/h arriva per auto da `engineer_for`
+#: (`RaceEngineer.consistency_kmh`, che vale anche da interruttore): qui non
+#: ce n'e' una seconda copia.
+_CONSISTENCY_CORNERS = consistency.CORNERS
+_CORNER_MATCH = consistency.MATCH
+#: Quanti giri giudicabili servono per giudicarne uno: con meno, a ciascuno
+#: mancano due altri giri con cui fare la mediana.
+_CONSISTENCY_LAPS = 3
+
 
 # Decision messages, per language; resolved with the active app language at the
 # moment a Decision is built (the engine runs in the engine = config.language).
@@ -384,9 +570,26 @@ _DECISION_MSG = {
         "en": " The setup is complete.",
         "it": " Il setup è completo.",
     },
-    "phase_nothing": {
-        "en": "I found nothing to correct in the “{label}” phase.",
-        "it": "Nella fase «{label}» non ho trovato nulla da correggere.",
+    # Il cancello non e' passato e non c'e' un sintomo da curare. Fino al 16/11
+    # la frase era «non ho trovato nulla da correggere»: il contrario di quello
+    # che era successo (Imola 24/09: pattinamento in 2 giri su 6, nessuna leva).
+    "phase_unfixed_spin": {
+        "en": "In the “{label}” phase I saw wheelspin on exit in {n} laps out "
+              "of {tot}, but I have no change to suggest for it.{tail}",
+        "it": "Nella fase «{label}» ho visto pattinamento in uscita in {n} giri "
+              "su {tot}, ma non ho una modifica da proporti per questo.{tail}",
+    },
+    "phase_unfixed_lock": {
+        "en": "In the “{label}” phase I saw lock-ups under braking in {n} laps "
+              "out of {tot}, but I have no change to suggest for it.{tail}",
+        "it": "Nella fase «{label}» ho visto bloccaggi in frenata in {n} giri "
+              "su {tot}, ma non ho una modifica da proporti per questo.{tail}",
+    },
+    "phase_unfixed": {
+        "en": "In the “{label}” phase something doesn't add up, but I have no "
+              "change to suggest.{tail}",
+        "it": "Nella fase «{label}» qualcosa non torna, ma non ho una modifica "
+              "da proporti.{tail}",
     },
     "remedies_exhausted": {
         "en": "I've run out of setup remedies for the {sym}. It's probably a "
@@ -422,6 +625,33 @@ _DECISION_MSG = {
         "en": " That last lap didn't count because the game never completed it.",
         "it": " L'ultimo giro non conta perché il gioco non l'ha completato.",
     },
+    # Un giro pulito guidato diversamente dagli altri non entra in nessuna
+    # lettura: lo si dice dove e di quanto, o il pilota crede a un contatore rotto.
+    # {where} porta la sua preposizione: «At Tosa» ma «In 3 corners».
+    "drop_last": {
+        "en": " That last lap doesn't count. {where} you were more than "
+              "{kmh} km/h slower than on your other laps this stint.",
+        "it": " L'ultimo giro non conta. {where} sei passato più piano di "
+              "oltre {kmh} km/h rispetto agli altri giri di questo stint.",
+    },
+    "drop_earlier": {
+        "en": " Lap {n} of this stint no longer counts. {where} it was "
+              "more than {kmh} km/h slower than the others.",
+        "it": " Il {n}° giro di questo stint non conta più. {where} eri più "
+              "lento di oltre {kmh} km/h rispetto agli altri giri.",
+    },
+    # Piu' giri tolti insieme: una frase sola, non la stessa ripetuta.
+    "drop_earlier_many": {
+        "en": " Laps {n} of this stint no longer count. {where} they were "
+              "more than {kmh} km/h slower than your other laps.",
+        "it": " I giri {n} di questo stint non contano più. {where} eri più "
+              "lento di oltre {kmh} km/h rispetto ai tuoi altri giri.",
+    },
+    "drop_named": {"en": "At {names}", "it": "In {names}"},
+    "drop_more_one": {"en": "1 more corner", "it": "un'altra curva"},
+    "drop_more_many": {"en": "{k} more corners", "it": "altre {k} curve"},
+    "drop_unnamed": {"en": "In {m} corners", "it": "In {m} curve"},
+    "drop_and": {"en": " and ", "it": " e "},
     # Una modifica scritta sulla macchina e mai giudicata, perche' la sessione e'
     # finita in mezzo. Detta una volta sola, all'inizio della sessione dopo.
     "unjudged": {
@@ -458,6 +688,30 @@ _DECISION_MSG = {
     "revert_structural": {
         "en": "The change made the lap time worse, so it comes off.",
         "it": "La modifica ha peggiorato il tempo sul giro, quindi va tolta.",
+    },
+    # Le gomme si sono mosse lontano da quanto valeva la modifica: il file di
+    # partenza forse non era quello in macchina (`_base_moved`).
+    "base_moved_front": {
+        "en": "When hot, the front tyres moved by {moved}, and the change was "
+              "worth {worth}.",
+        "it": "A caldo le gomme anteriori si sono mosse di {moved}, e la "
+              "modifica valeva {worth}.",
+    },
+    "base_moved_rear": {
+        "en": "When hot, the rear tyres moved by {moved}, and the change was "
+              "worth {worth}.",
+        "it": "A caldo le gomme posteriori si sono mosse di {moved}, e la "
+              "modifica valeva {worth}.",
+    },
+    "base_ask": {
+        "en": "Maybe the starting file wasn't the one on your car, so I won't "
+              "judge this test or log it. In the pits, reload the setup you "
+              "were driving before the change. Then I'll start the baseline "
+              "again.",
+        "it": "Forse il file di partenza non era quello che hai in macchina, "
+              "quindi questa prova non la giudico e non la registro. Ai box "
+              "ricarica l'assetto che guidavi prima della modifica. Poi rifaccio "
+              "la base.",
     },
     "accepted_resolved": {
         "en": "The {sym} is fixed. It was {a}, now it's {b}.",
@@ -516,6 +770,18 @@ _DECISION_MSG = {
               "dopo il serbatoio non pesava uguale, quindi decide l'obiettivo "
               "della fase e vado avanti.",
     },
+    "accepted_unjudged_temp": {
+        "en": "The track temperature moved too much to compare lap times. The "
+              "change stays, the phase target decides and I'm moving on.",
+        "it": "La pista ha cambiato troppo temperatura per confrontare i tempi. "
+              "La modifica resta, decide l'obiettivo della fase e vado avanti.",
+    },
+    "temp_confounded": {
+        "en": " I left the lap time out of this, because the track went from "
+              "{a} to {b} degrees.",
+        "it": " Il tempo sul giro l'ho lasciato fuori, perché la pista è passata "
+              "da {a} a {b} gradi.",
+    },
     "fuel_confounded": {
         "en": " I left the lap time out of this, because the tank had {a} L "
               "before and {b} L after. That's not the same car.",
@@ -544,9 +810,128 @@ _DECISION_MSG = {
         "en": "{what} I won't write it myself, because {why}.",
         "it": "{what} Non la scrivo, perché {why}.",
     },
+    # Una fase il cui cancello passa solo perche' la misura non ha visto niente.
+    # Non e' «completata»: sulla 720S con gli aiuti 123 giri puliti su 127 non
+    # portano alcun sintomo, e dirla fatta era dare per buono un silenzio.
+    "phase_no_signal": {
+        "en": "In the “{label}” phase I measured neither understeer nor "
+              "oversteer on these laps. That doesn't mean the car is sorted, "
+              "because with the aids on my measurement sees very little. I'm "
+              "leaving it as it is.{tail}",
+        "it": "Nella fase «{label}» su questi giri non ho misurato né "
+              "sottosterzo né sovrasterzo. Non vuol dire che l'auto sia a "
+              "posto, perché con gli aiuti accesi la mia misura vede poco. La "
+              "lascio com'è.{tail}",
+    },
+    "done_no_signal": {
+        "en": "I've done what I can measure. For part of the setup I didn't "
+              "have enough signal, so I'm not telling you it's sorted.",
+        "it": "Ho finito quello che riesco a misurare. Per una parte del setup "
+              "non avevo abbastanza segnale, quindi non ti dico che è a posto.",
+    },
+    # Le pressioni si decidono sulla mediana dei giri a regime, non su un giro.
+    # Il conto e' quello vero (`_reading_need`): il 08/11, rigiocato, «un altro
+    # giro» restava a schermo per nove giri e tre rientri.
+    "pressure_wait": {
+        "en": "The pressures are still settling. {laps}",
+        "it": "Le pressioni si stanno ancora assestando. {laps}",
+    },
+    # Un rientro ai box a meta' prova: la lettura riparte da questo stint.
+    "pressure_restart": {
+        "en": " You came in before I had my reading, so I'm counting again "
+              "from this stint.",
+        "it": " Sei rientrato prima che avessi la lettura, quindi ricomincio a "
+              "contare da questo stint.",
+    },
+    "pressure_ok": {
+        "en": "{axis} pressure is now {b}, inside the window.",
+        "it": "La pressione {axis} ora è {b}, dentro la finestra.",
+    },
+    "pressure_off": {
+        "en": "{axis} pressure ended up at {b}, and I expected {e}. I'll "
+              "correct it next time in.",
+        "it": "La pressione {axis} è arrivata a {b}, me ne aspettavo {e}. La "
+              "correggo al prossimo rientro.",
+    },
+    "predict_pressure": {
+        "en": "After the stop the first lap warms the tyres up, then I need {n} "
+              "clean laps in the same stint. If you come in earlier, I start "
+              "counting again. Then I'll check that the pressure landed where "
+              "it should, and tell you what I read.",
+        "it": "Dopo la sosta il primo giro serve a scaldare le gomme, poi mi "
+              "servono {n} giri puliti nello stesso stint. Se rientri prima, "
+              "ricomincio a contare. Poi controllo se la pressione è arrivata "
+              "dove deve, e ti dico quanto leggo.",
+    },
     "reason_noeffect": {
         "en": "The change had no measurable effect",
         "it": "La modifica non ha avuto un effetto misurabile",
+    },
+    # L'assetto in macchina, riconosciuto ai box (`setup_seen`). Le differenze
+    # ({changed}, {diff}, {unsaved_diff}, {psi_doubt}) arrivano gia' in parole
+    # («TC 6 invece di 3»). Niente due punti davanti all'elenco: e' una regola
+    # del tono (`tests/tono.py`), quindi l'elenco sta in una frase sua.
+    # R1: cambiato senza che HONE abbia scritto niente. La prima frase e' la
+    # stessa con e senza una prova aperta, e sta in una chiave sua: due chiavi
+    # con la stessa frase sono un doppione per il controllo del tono.
+    "setup_changed_lead": {
+        "en": "You changed the setup since the last stint.",
+        "it": "Hai cambiato assetto rispetto allo stint di prima.",
+    },
+    "setup_changed": {
+        "en": "You now have {changed}. I'm starting the baseline again.",
+        "it": "Ora hai {changed}. Rifaccio la base.",
+    },
+    # …a prova aperta: la prova non si giudica e si chiede il file (`_hold_base`).
+    "setup_changed_test": {
+        "en": "Now you have {changed}. I won't judge or log the test in "
+              "progress. In the pits, tell me which setup you loaded, then "
+              "I'll redo the baseline.",
+        "it": "Ora hai {changed}. La prova in corso non la giudico e non la "
+              "registro. Ai box dimmi quale assetto hai caricato, poi rifaccio "
+              "la base.",
+    },
+    # R2: all'uscita dopo una scrittura, il file non e' quello scritto.
+    "setup_wrong": {
+        "en": "At the pit exit the setup wasn't the one I wrote ({name}). You "
+              "have {diff}. In the pits, load {name}.",
+        "it": "All'uscita dai box l'assetto non è quello che ho scritto ({name}). "
+              "Hai {diff}. Ai box carica {name}.",
+    },
+    # …e poi lo e'. Dice il limite: i campi certi non separano due file HONE
+    # che differiscono solo nelle pressioni, e quelle restano a fine prova.
+    "setup_right": {
+        "en": "TC, ABS and engine map now match {name}. I'll check the "
+              "pressures at the end of the test.",
+        "it": "Ora TC, ABS e mappa sono quelli di {name}. Le pressioni le "
+              "controllo a fine prova.",
+    },
+    "setup_psi_doubt": {
+        "en": " The cold pressures don't look like those of {name} ({psi_doubt}).",
+        "it": " Le pressioni a freddo non sembrano quelle di {name} ({psi_doubt}).",
+    },
+    # R3: un assetto che non e' fra i file. Si misura, ai box non si scrive.
+    "setup_unsaved": {
+        "en": "The setup in the car isn't one of the saved files. You have "
+              "{unsaved_diff}. If you turned the knobs, put them back as in the "
+              "file. If it's a new setup, save it in the garage under a name "
+              "and load it.",
+        "it": "L'assetto in macchina non è fra i file salvati. Hai "
+              "{unsaved_diff}. Se hai girato le manopole, rimettile come nel "
+              "file; se è un assetto nuovo, in garage salvalo con un nome e "
+              "caricalo.",
+    },
+    "setup_saved": {
+        "en": "{name} is now in the car, so I can write the pit changes.",
+        "it": "In macchina ora c'è {name}, quindi le modifiche ai box le posso "
+              "scrivere.",
+    },
+    # …ma non e' l'assetto della base (le manopole rimesse come nel file).
+    "setup_saved_rebase": {
+        "en": " Compared with the last stint you have {changed}, so I'm "
+              "redoing the baseline.",
+        "it": " Rispetto allo stint di prima hai {changed}, quindi rifaccio la "
+              "base.",
     },
 }
 
@@ -640,6 +1025,73 @@ def _laps_left(n: int, lang: str) -> str:
     return _msg("laps_one", lang) if n == 1 else _msg("laps_many", lang, n=n)
 
 
+def _listed(items: list[str], lang: str | None) -> str:
+    """«a», «a e b», «a, b e c»."""
+    join = _msg("drop_and", lang)
+    return (", ".join(items[:-1]) + join + items[-1]) if len(items) > 1 \
+        else items[0]
+
+
+def _drop_where(corners: list, lang: str | None) -> str:
+    """Dove, con la preposizione: dalla peggiore, tre nomi e poi «e altre k».
+
+    Una curva senza nome non si puo' dire: basta una e si danno solo i numeri,
+    altrimenti la frase elencherebbe un buco.
+    """
+    if any(not name for name, _ in corners):
+        return _msg("drop_unnamed", lang, m=len(corners))
+    names = [name for name, _ in corners]
+    if len(names) > 3:
+        k = len(names) - 3
+        more = (_msg("drop_more_one", lang) if k == 1
+                else _msg("drop_more_many", lang, k=k))
+        names = names[:3] + [more]
+    return _msg("drop_named", lang, names=_listed(names, lang))
+
+
+def _merged_corners(dropped: list) -> list:
+    """Le curve di piu' giri tolti insieme, per una frase sola.
+
+    L'unione per nome, con lo scarto peggiore e dalla peggiore: ogni curva
+    detta e' una dove almeno uno di quei giri era lento. Senza nomi non si sa
+    quali coincidono, e vale il giro con piu' curve lente.
+    """
+    if any(not name for d in dropped for name, _ in d["corners"]):
+        return max((d["corners"] for d in dropped), key=len)
+    worst: dict[str, float] = {}
+    for d in dropped:
+        for name, gap in d["corners"]:
+            worst[name] = max(gap, worst.get(name, gap))
+    return sorted(worst.items(), key=lambda c: -c[1])
+
+
+def _drop_tail(dropped: list, lang: str | None = None,
+               kmh: float | None = None, *, held: bool = False) -> str:
+    """Le frasi sui giri tolti dal gruppo in questo giro (vuoto se nessuno).
+
+    I giri di prima in una frase sola, l'ultimo giro nella sua. Su una
+    risposta tenuta (``held``) anche l'ultimo si dice col numero: la frase si
+    ripete ai giri dopo, quando quel giro non e' piu' l'ultimo.
+    """
+    # «5», non «5,0»: la soglia di default e' tonda.
+    digits = 0 if kmh is None or float(kmh) == int(kmh) else 1
+    k = fmt_num(kmh or 0, digits, lang)
+    earlier = [d for d in dropped if held or not d["last"]]
+    out = []
+    if len(earlier) == 1:
+        out.append(_msg("drop_earlier", lang, n=earlier[0]["stint_lap"], kmh=k,
+                        where=_drop_where(earlier[0]["corners"], lang)))
+    elif earlier:
+        laps = _listed([str(d["stint_lap"]) for d in earlier], lang)
+        out.append(_msg("drop_earlier_many", lang, n=laps, kmh=k,
+                        where=_drop_where(_merged_corners(earlier), lang)))
+    for d in dropped:
+        if d["last"] and not held:
+            out.append(_msg("drop_last", lang, kmh=k,
+                            where=_drop_where(d["corners"], lang)))
+    return "".join(out)
+
+
 def _skip_tail(stats: "LapStats | None", lang: str | None = None) -> str:
     """Perche' l'ultimo giro non e' entrato nel conto, o "" se e' entrato.
 
@@ -667,6 +1119,10 @@ def _fuel_tail(outcome: "Outcome", lang: str) -> str:
     """
     if not outcome.time_confounded:
         return ""
+    if outcome.temp_confounded:
+        return _msg("temp_confounded", lang,
+                    a=fmt_num(outcome.road_temp_before, 0, lang),
+                    b=fmt_num(outcome.road_temp_after, 0, lang))
     return _msg("fuel_confounded", lang,
                 a=fmt_num(outcome.fuel_before_l, 0, lang),
                 b=fmt_num(outcome.fuel_after_l, 0, lang))
@@ -699,10 +1155,30 @@ def _median_score(window: list[LapStats], symptom: Symptom) -> float:
     return statistics.median([s.symptom_scores.get(symptom, 0.0) for s in window])
 
 
+def _median_temp(window: list[LapStats]) -> float:
+    vals = [s.road_temp for s in window if s.road_temp > 0]
+    return statistics.median(vals) if vals else 0.0
+
+
 def _median_fuel(window: list[LapStats]) -> float:
     """Typical tank load over a window; 0.0 when the laps predate v11."""
     vals = [s.fuel_l for s in window if s.fuel_l > 0]
     return statistics.median(vals) if vals else 0.0
+
+
+def _signed_psi(v: float, lang: str) -> str:
+    """Uno spostamento di pressione col segno: «+2,2 psi», «−0,8 psi»."""
+    text = fmt_num(v, 1, lang)
+    if not text.startswith("−") and text != fmt_num(0, 1, lang):
+        text = "+" + text
+    return text + " psi"
+
+
+def _finite(v) -> float | None:
+    """Un numero vero (non un booleano, non infinito), o None."""
+    if isinstance(v, bool) or not isinstance(v, (int, float)):
+        return None
+    return float(v) if math.isfinite(v) else None
 
 
 # --- the engine ------------------------------------------------------------
@@ -717,9 +1193,41 @@ class _Active:
     prediction: "Prediction | None" = None
     remedy_rank: int = 0
     base_fuel: float = 0.0
+    base_temp: float = 0.0
     #: Every symptom's score at the moment the change was applied, so the
     #: verdict can also report what moved that nobody was aiming at.
     base_scores: dict = field(default_factory=dict)
+    #: Le pressioni a caldo per asse quando la modifica e' stata applicata
+    #: (mediana dei giri a regime, `_pressure_reading`), o None se non c'era
+    #: una lettura. Una modifica di pressione si giudica su queste, non sul
+    #: tempo, e su queste si controlla che le gomme abbiano risposto
+    #: (`_base_moved`).
+    base_pressures: dict | None = None
+    #: Lo stint in corso quando la modifica e' stata applicata. Il primo giro
+    #: dopo una modifica ai box apre lo stint successivo; uno ancora dopo vuol
+    #: dire che il pilota e' rientrato a meta' prova.
+    stint_at_apply: int = 0
+    #: Le pressioni a freddo all'uscita non erano quelle del file scritto,
+    #: gia' in frase: un indizio, non un fermo. Va in coda al contatore fino
+    #: al verdetto, e con la prova se ne va.
+    psi_doubt: str = ""
+
+
+_AXIS_WORDS = {"front": {"en": "Front", "it": "anteriore"},
+               "rear": {"en": "Rear", "it": "posteriore"}}
+
+#: Quanti giri a regime al massimo entrano nella lettura delle pressioni.
+_PRESSURE_LAPS = 4
+#: Fuori da questa fascia un «psi a caldo per click» misurato non e' un click:
+#: e' cambiato qualcos'altro (un altro file caricato, la pista), e non si impara.
+_HOT_PER_CLICK = (0.03, 0.3)
+#: Litri in piu' rispetto al giro prima che dicono «sei ripartito dai box».
+_REFUEL_L = 1.0
+#: Salto di pressione fra due giri di fila che dice «non e' lo stesso stint».
+#: Dentro uno stint il salto piu' grande misurato e' +0,20 (primo→secondo
+#: giro); l'8/11 fra uno stint e l'altro la benzina NON era salita (49 → 46 L,
+#: il file caricato ne aveva meno) e le pressioni avevano fatto +1,8.
+_PRESSURE_JUMP_PSI = 0.4
 
 
 class RaceEngineer:
@@ -727,8 +1235,15 @@ class RaceEngineer:
 
     def __init__(self, profile: Profile, *, min_stable: int = _MIN_STABLE,
                  pressure_window: tuple[float, float] | None = None,
-                 steps: Steps | None = None) -> None:
+                 steps: Steps | None = None,
+                 bias_offset: float | None = None,
+                 consistency_kmh: float | None = None) -> None:
         self.profile = profile
+        #: L'interruttore della costanza del pilota: porta con se' la soglia
+        #: (km/h) misurata su *quest'auto*. `None` = controllo spento, il
+        #: motore si comporta esattamente come prima. Lo accende solo
+        #: `engineer_for`, e solo per le GT3: la soglia e' stata misurata su una.
+        self.consistency_kmh: float | None = consistency_kmh
         self.min_stable = min_stable
         #: Quanto vale un click su quest'auto. Costruito a mano, il motore
         #: ragiona come ACC — i profili sono nati li' e i test lo usano cosi'.
@@ -755,6 +1270,11 @@ class RaceEngineer:
         #: ripristino e numeri) finche' `mark_applied` non dice che la macchina
         #: e' tornata com'era. E' quello che `observe` ripete a ogni giro.
         self._held_revert: Decision | None = None
+        #: Le gomme non hanno risposto come la modifica (`_base_moved`): la
+        #: prova non si giudica, e finche' il pilota non dice ai box quale
+        #: assetto ha caricato (`base_confirmed`) i giri non fanno base. E'
+        #: quello che `observe` ripete a ogni giro, con `confirm_base`.
+        self._held_base: Decision | None = None
         #: Symptoms whose remedies all failed — the engine's own "this is you,
         #: not the car" call. Recorded because it is a claim we make and have
         #: never checked (see ledger.py).
@@ -785,6 +1305,81 @@ class RaceEngineer:
         #: La strada non le spunta come fatte, perche' nessuno le ha
         #: controllate. Va su disco con `phase_idx`, che le ha gia' superate.
         self.skipped_phases: set[int] = set()
+        #: Quanti psi A CALDO vale un click di pressione su quest'auto, per
+        #: asse, misurato sulle modifiche gia' fatte. Vuoto finche' non se ne
+        #: e' giudicata una: allora vale il passo del file (0,1 su ACC, e sulla
+        #: 720S a Imola ne abbiamo misurati 0,07). Le fasi lo leggono da qui.
+        self.hot_per_click: dict[str, float] = {}
+        for p in self.phases:
+            if getattr(p, "pressure_remedy", None) is not None:
+                p.hot_per_click = self.hot_per_click
+        #: Dove comincia uno stint, letto dalla benzina: serve a non decidere
+        #: le pressioni sul primo giro, quando stanno ancora salendo.
+        self._last_fuel = 0.0
+        self._last_press: dict | None = None
+        self._stint = 0
+        self._stint_lap = 0
+        #: L'ultimo giro ha aperto uno stint (vedi `observe`).
+        self._last_settling = False
+        #: Le modifiche al volo (``AV``) tenute dopo l'ultima scrittura ai box:
+        #: sono in macchina e in nessun file. Il motore le somma al file quando
+        #: lo confronta con l'impronta, e le scrive nel file dopo. Non va su
+        #: disco: domani si riparte da un file caricato.
+        self.carry: list[AtomicChange] = []
+        #: Lo scarto del ripartitore fra la lettura del gioco e i click del
+        #: file, imparato dalle risposte del pilota (`learn_bias`) o misurato
+        #: per auto sull'archivio (`fingerprint.MEASURED_BIAS_OFFSET`, passato
+        #: da `engineer_for`), che vale come una prima risposta; None senza
+        #: nessuna delle due, e dopo una risposta che non concordava finche'
+        #: un'altra non la conferma. Va su disco con lo stato.
+        self.bias_offset: float | None = _finite(bias_offset)
+        #: Una risposta che non concordava con quella di prima, in attesa di
+        #: un'altra che la confermi.
+        self.bias_pending: float | None = None
+        #: R2: all'uscita dopo una scrittura l'assetto non era il file scritto.
+        #: La prova resta aperta e la base buona; finche' il file giusto non
+        #: si vede (o il pilota non risponde) `observe` ripete questa.
+        self._held_wrong: Decision | None = None
+        self._wrong_name = ""
+        #: Cosa si sa dell'assetto che si vedra' alla prossima uscita: ""
+        #: niente, e un cambio e' un cambio non chiesto (R1); "written" HONE
+        #: ha scritto una modifica ai box in questa sosta, e all'uscita si
+        #: controlla che sia quello (R2) e che le manopole siano quelle della
+        #: base; "resumed" la prova in pausa e' ripresa sul file scritto (il
+        #: pilota l'ha caricato, o l'ha detto sulla pagina), e all'uscita si
+        #: ricontrolla il file ma il cambio dallo stint col file sbagliato non
+        #: conta; "known" l'assetto e' noto per un'altra via (un ripristino
+        #: scritto da HONE, la risposta del pilota sulla pagina), e un cambio
+        #: non e' R1.
+        self._exit_check = ""
+        #: R3: la differenza dal file piu' vicino quando l'assetto in macchina
+        #: non e' un file salvato, o None. Le modifiche ai box non si scrivono.
+        self._unsaved: str | None = None
+        #: Le manopole lette quando il pilota ha scelto un file sulla pagina
+        #: (`base_confirmed`): finche' i report dicono le stesse, «non
+        #: salvato» non rimette R3. La scelta vale «lo so, scrivi su questo».
+        self._chosen_dials: tuple | None = None
+        #: Costanza del pilota (17/11), solo con `consistency_kmh`. I giri
+        #: puliti del gruppo in corso (stesso stint, stesse manopole) che
+        #: aspettano di potersi giudicare: finche' il gruppo non ne ha
+        #: `_CONSISTENCY_LAPS` (o non si chiude prima: allora entrano senza
+        #: giudizio) non entrano nella finestra e nessuna decisione li legge.
+        #: Li contano i contatori, se no dopo una sosta il conto resterebbe
+        #: fermo e poi salterebbe (il difetto del 08/11).
+        self._waiting: list[LapStats] = []
+        #: I giri del gruppo in corso gia' giudicati ed entrati in finestra: il
+        #: metro dei giri che arrivano, e quelli che un giro dopo puo' ancora
+        #: togliere. Si confrontano per identita': due giri uguali sono `==`.
+        self._group: list[LapStats] = []
+        #: Le manopole e le curve del giro prima: una manopola girata, o un
+        #: riferimento nuovo con altre curve, apre un gruppo.
+        self._last_dials: tuple | None = None
+        self._last_corners: tuple | None = None
+        #: I giri tolti a QUESTO giro, rifatta a ogni `observe`: la frase e il
+        #: registro la leggono da qui. ``{"stint", "stint_lap", "last",
+        #: "corners": [[nome, km/h piu' lento], ...]}``, ``last`` vero per il
+        #: giro appena chiuso.
+        self.last_dropped: list[dict] = []
 
     # -- memoria fra sessioni ----------------------------------------------
     def state(self) -> dict:
@@ -793,7 +1388,8 @@ class RaceEngineer:
         **Cosa c'e'**: a che fase eravamo, quale rimedio tocca per ogni sintomo,
         quali sintomi hanno esaurito i rimedi, e i click gia' spesi su ogni leva
         (che e' un budget: senza, l'assetto puo' scivolare via una sessione alla
-        volta). E il nome di una modifica applicata e mai giudicata.
+        volta). E il nome di una modifica applicata e mai giudicata, e lo
+        scarto del ripartitore imparato dalle risposte del pilota.
 
         **Cosa NON c'e', di proposito**: la finestra di giri. Sono misure, e due
         sessioni non sono confrontabili — asfalto, benzina e gomme sono altri.
@@ -818,6 +1414,9 @@ class RaceEngineer:
                                for (p, slot), n in self.applied_clicks.items()],
             # La modifica per nome, che e' come la cita il messaggio di domani.
             "unjudged": pending.named if pending is not None else "",
+            "hot_per_click": dict(self.hot_per_click),
+            "bias_offset": self.bias_offset,
+            "bias_pending": self.bias_pending,
         }
 
     def restore(self, state: dict | None) -> None:
@@ -850,6 +1449,20 @@ class RaceEngineer:
                 self.applied_clicks[(row[0], row[1])] = row[2]
         why = state.get("unjudged")
         self._unjudged = why if isinstance(why, str) else ""
+        learned = state.get("hot_per_click")
+        for ax, k in (learned.items() if isinstance(learned, dict) else ()):
+            if (ax in _AXIS_WORDS and isinstance(k, (int, float))
+                    and not isinstance(k, bool)
+                    and _HOT_PER_CLICK[0] <= k <= _HOT_PER_CLICK[1]):
+                self.hot_per_click[ax] = float(k)
+        # Il ripartitore: se il disco ha una risposta del pilota (tenuta o in
+        # sospeso) vale quella, intera; se no resta lo scarto misurato con cui
+        # il motore e' nato. Una per una, una risposta che aveva smentito la
+        # misura (None + in sospeso) la faceva risorgere al riavvio.
+        off = _finite(state.get("bias_offset"))
+        pend = _finite(state.get("bias_pending"))
+        if off is not None or pend is not None:
+            self.bias_offset, self.bias_pending = off, pend
 
     # -- public API --------------------------------------------------------
     @property
@@ -877,20 +1490,60 @@ class RaceEngineer:
         if self._held_revert is not None or (
                 self._pending is not None and self._pending_is_revert):
             out["stage"] = "restore"
+        elif self._held_base is not None or self._held_wrong is not None:
+            pass        # si aspetta il file o la risposta: nessun contatore
         elif self.active is not None:
-            out.update(stage="test", have=self.active.laps_seen,
-                       need=self.min_stable)
+            # Una prova di pressione conta i giri della lettura, non tutti i
+            # giri buoni: lo stesso numero che dice il messaggio. I giri in
+            # attesa di giudizio contano anche qui (`_reading_need`, `_need`).
+            if self._is_pressure_test(self.active):
+                need = self._reading_size()
+                have = min(need, len(self._reading_laps()))
+                if self._waiting:
+                    # Lo stesso conto del messaggio: un giro in attesa nella
+                    # lettura entrera', ma finche' aspetta non c'e'.
+                    have = need - self._reading_need()
+            else:
+                have = self.active.laps_seen + len(self._waiting)
+                need = self._need(have, self.min_stable)
+            out.update(stage="test", have=have, need=need)
         elif self._pending is not None:
             out["stage"] = "change"
         elif self.phase is None:
             out["stage"] = "done"
         elif len(self.window) < self.min_stable:
-            out.update(stage="baseline", have=len(self.window),
-                       need=self.min_stable)
+            have = len(self.window) + len(self._waiting)
+            out.update(stage="baseline", have=have,
+                       need=self._need(have, self.min_stable))
         return out
 
     def observe(self, stats: LapStats) -> Decision:
         """Feed one completed lap; return the next recommendation."""
+        d = self._observe(stats)
+        # Qualunque risposta, anche una proposta o l'attesa delle pressioni,
+        # dice quali giri sono usciti dal gruppo: altrimenti il pilota vede il
+        # contatore fermo e non sa perche'. Le risposte tenute in cima a
+        # `_observe` hanno `last_dropped` vuoto e restano lo STESSO oggetto.
+        if not self.last_dropped:
+            return d
+        held = any(getattr(self, slot) is d
+                   for slot in ("_held_revert", "_held_base", "_held_wrong"))
+        add = _drop_tail(self.last_dropped, current_language(),
+                         self.consistency_kmh, held=held)
+        out = replace(d, message=d.message + add,
+                      tail=None if d.tail is None else d.tail + add)
+        # Una risposta tenuta nata su questo giro deve restare UNA: il giro dopo
+        # `_observe` restituisce lo slot, e chi sta a valle (engine) la distingue
+        # da un verdetto nuovo con `is`. Con la copia in uscita e l'originale
+        # nello slot, lo stesso ripristino verrebbe registrato due volte.
+        for slot in ("_held_revert", "_held_base", "_held_wrong"):
+            if getattr(self, slot) is d:
+                setattr(self, slot, out)
+        return out
+
+    def _observe(self, stats: LapStats) -> Decision:
+        # Prima di tutto: anche un giro che non entra non ha tolto niente.
+        self.last_dropped = []
         # Un ripristino non ancora confermato viene prima di tutto, pioggia
         # compresa: e' un fatto sulla macchina, non una misura. Finche' il
         # pilota non dice di aver rimesso l'assetto di prima, la modifica
@@ -904,6 +1557,14 @@ class RaceEngineer:
         # metteva in attesa il rimedio successivo SOPRA quello bocciato.
         if self._held_revert is not None:
             return self._held_revert
+        # Lo stesso per la base da richiedere: il giro e' stato guidato con un
+        # assetto che non sappiamo quale sia, e non fa base.
+        if self._held_base is not None:
+            return self._held_base
+        # …e per il file sbagliato all'uscita (R2): la prova e' in pausa, e un
+        # giro guidato con l'assetto che non e' quello scritto non la giudica.
+        if self._held_wrong is not None:
+            return self._held_wrong
 
         # A dry↔wet switch invalidates everything measured either side of it: a
         # baseline driven on slicks and a re-test driven on wets are two
@@ -911,12 +1572,49 @@ class RaceEngineer:
         # banked, so the abandoned test isn't judged on a mixed window.
         changed = self._conditions_changed(stats)
 
+        # Lo stint si legge dalla benzina: se sale, sei ripartito dai box. Senza
+        # benzina registrata non si sa dove comincia, e non si marca niente.
+        # …e anche da un salto di pressione fra due giri di fila, che la
+        # benzina non sempre vede.
+        restart = False
+        if stats.fuel_l > 0:
+            restart = (self._last_fuel <= 0
+                       or stats.fuel_l > self._last_fuel + _REFUEL_L)
+            self._last_fuel = stats.fuel_l
+        if stats.pressures_hot:
+            prev = self._last_press or {}
+            # Dopo il giro che apre uno stint le gomme salgono ancora: un salto
+            # li' e' il riscaldamento, non un altro rientro. Rigiocato il 08/11,
+            # +0,46 dietro al secondo giro dopo la sosta azzerava il conto.
+            restart = restart or (not self._last_settling and any(
+                abs(v - prev[ax]) >= _PRESSURE_JUMP_PSI
+                for ax, v in stats.pressures_hot.items()
+                if v is not None and prev.get(ax) is not None))
+            self._last_press = dict(stats.pressures_hot)
+        if restart:
+            self._stint += 1
+            self._stint_lap = 0
+        self._stint_lap += 1
+        stats.stint = self._stint
+        stats.stint_lap = self._stint_lap
+        stats.settling = restart
+        self._last_settling = restart
+        judging = self.consistency_kmh is not None
+        if judging:
+            self._open_group(restart, stats)
+
         if stats.stable and stats.warmed_up:
-            self.window.append(stats)
-            self.window = self.window[-_WINDOW:]
-            if self.active is not None:
-                self.active.laps_seen += 1
+            # Un giro in attesa di giudizio non e' un giro scartato.
             self._skipped = None
+            # Il giro che apre lo stint ha le gomme ancora in salita: non si
+            # giudica e non fa da metro, ed entra come prima. Lo stesso un giro
+            # misurato sulle curve rilevate su se stesso (nessun riferimento):
+            # non ha curve in comune di cui fidarsi con nessun altro.
+            if judging and not stats.settling and not stats.corners_own:
+                self._waiting.append(stats)
+                self._judge_group(stats)
+            else:
+                self._bank(stats)
         else:
             self._skipped = stats
             # Fuori con le gomme fredde il sospettato e' la gomma: non conta.
@@ -948,9 +1646,10 @@ class RaceEngineer:
 
         if len(self.window) < self.min_stable:
             tail = _skip_tail(self._skipped) + self._off_tail()
+            have = len(self.window) + len(self._waiting)
             return Decision(DecisionKind.COLLECT,
-                            _msg("collect", n=self.min_stable,
-                                 have=len(self.window)) + tail,
+                            _msg("collect", n=self._need(have, self.min_stable),
+                                 have=have) + tail,
                             tail=tail)
         return self._advance()
 
@@ -966,8 +1665,11 @@ class RaceEngineer:
             # bank it: the bad change was never recorded, so undoing it must not
             # touch the click budget. Just resume collecting fresh laps so the next
             # remedy's baseline is measured on the restored setup, not the bad one.
+            if (self._pending.tag == "BOX"
+                    and self._exit_check not in _CHECK_WRITTEN):
+                self._exit_check = "known"
             self.active = None
-            self.window = []
+            self._clear_window()
             self._pending = None
             self._pending_is_revert = False
             self._held_revert = None
@@ -982,13 +1684,24 @@ class RaceEngineer:
             prediction=self._pending_prediction,
             remedy_rank=self.remedy_idx.get(sym, 0) if sym else 0,
             base_fuel=_median_fuel(self.window),
+            base_temp=_median_temp(self.window),
             # Every symptom on the books, not just the target: the verdict is
             # about one of them, the ledger is about all of them.
             base_scores=self._all_scores(),
+            base_pressures=self._base_pressures(),
+            stint_at_apply=self._stint,
         )
+        # Una modifica ai box e' uno stint nuovo anche se la benzina non sale.
+        if self._pending.tag == "BOX":
+            self._last_fuel = 0.0
+            # Il file nuovo porta anche le modifiche al volo tenute (le scrive
+            # chi scrive il file, dal blocco della proposta): da qui in poi
+            # sono nel file, e all'uscita si controlla che sia quello (R2).
+            self.carry = []
+            self._exit_check = "written"
         # The reference shifts when the setup changes — restart the window so the
         # verdict is measured only on post-change laps.
-        self.window = []
+        self._clear_window()
         self._pending = None
         self._pending_prediction = None
 
@@ -1006,16 +1719,139 @@ class RaceEngineer:
         """
         if stats.wet is None:
             return False
-        known = [s.wet for s in self.window if s.wet is not None]
+        # Anche i giri in attesa di giudizio: sono in mano, e dopo entrano.
+        known = [s.wet for s in self.window + self._waiting if s.wet is not None]
         if not known or known[-1] == stats.wet:
             return False
-        self.window = []
+        self._clear_window()
         self._offs = []
         self.active = None
         self._pending = None
         self._pending_is_revert = False
         self._pending_prediction = None
         return True
+
+    # -- la costanza del pilota (17/11) -------------------------------------
+    def _bank(self, stats: LapStats) -> None:
+        """Il giro entra nella finestra, e nel conto della prova in corso."""
+        self.window.append(stats)
+        self.window = self.window[-_WINDOW:]
+        if self.active is not None:
+            self.active.laps_seen += 1
+
+    def _clear_window(self) -> None:
+        """Via i giri in mano: la finestra e quelli in attesa di giudizio.
+
+        Chi svuota la finestra dice «da qui un'altra macchina, o un'altra
+        base»: un giro in attesa guidato prima non deve entrarci dopo.
+        """
+        self.window = []
+        self._waiting = []
+        self._group = []
+
+    def _open_group(self, restart: bool, stats: LapStats) -> None:
+        """Un gruppo nuovo a ogni stint, a ogni manopola girata e a ogni
+        cambio delle curve su cui si misura.
+
+        Il 14/11 il TC e' passato fra 3 e 4 dentro lo stesso stint: i giri dopo
+        il cambio hanno altre velocita' in curva e sembrerebbero errori di
+        guida. I giri ancora in attesa del gruppo chiuso entrano senza
+        giudizio, in ordine, come prima della costanza: non giudicabile non
+        vuol dire incostante. Fino al 17/11 si buttavano, e rigiocando il
+        14/11 (TC 3 e 4 alternati giro per giro) la lettura delle pressioni
+        ripartiva a ogni cambio e non arrivava mai.
+
+        Le curve: in pista sono quelle della serata, fissate quando nasce
+        l'Ingegnere (`engine._engineer_stats`), e non cambiano piu'; la chiave
+        cambia solo sui giri misurati sulle proprie curve, prima che la serata
+        abbia le sue. La stessa zona rilevata due volte puo' cadere su un
+        tratto veloce o sulla curva lenta (nel rigioco del 17/11, Rivazza a 225
+        o a 90 km/h), e fra due insiemi diversi gli scarti non sono del pilota.
+        """
+        prev, self._last_dials = self._last_dials, stats.dials
+        corners, self._last_corners = self._last_corners, stats.corners_key
+        if restart or (prev is not None
+                       and not consistency.same_dials(prev, stats.dials)) or (
+                corners is not None and corners != stats.corners_key):
+            for lap in self._waiting:
+                self._bank(lap)
+            self._waiting = []
+            self._group = []
+
+    def _in_group(self) -> list[LapStats]:
+        """I giri giudicati del gruppo in corso ancora in finestra."""
+        here = {id(s) for s in self.window}
+        return [s for s in self._group if id(s) in here]
+
+    def _judge_group(self, stats: LapStats) -> None:
+        """Giudica il gruppo in corso e fa entrare in finestra chi e' a posto.
+
+        Tutti contro tutti in un passaggio (`consistency.inconsistent`), coi
+        giri gia' entrati e quelli in attesa. Un giro segnato in attesa non
+        entra; uno gia' in finestra esce, anche a posteriori, e non rientra.
+        Tranne con una proposta in attesa: la sua base e' calcolata su quei
+        giri, e toglierne uno la farebbe sparire dallo schermo (il difetto del
+        13/10) o lascerebbe la prova di pressione senza la lettura di partenza.
+        """
+        laps = self._in_group() + self._waiting
+        if len(laps) < _CONSISTENCY_LAPS:
+            return
+        marked = consistency.inconsistent(
+            laps, kmh=self.consistency_kmh, corners=_CONSISTENCY_CORNERS,
+            match=_CORNER_MATCH)
+        waiting = {id(s) for s in self._waiting}
+        out: set[int] = set()
+        for i, lap in enumerate(laps):
+            slow = marked.get(i)
+            if slow is None or (id(lap) not in waiting
+                                and self._pending is not None):
+                continue
+            out.add(id(lap))
+            self.last_dropped.append({
+                "stint": lap.stint, "stint_lap": lap.stint_lap,
+                "last": lap is stats,
+                "corners": [[name, round(gap, 1)] for name, gap in slow]})
+        # Prima escono, poi entrano: un giro che esce non deve spingere fuori
+        # dalla finestra quello piu' vecchio.
+        gone = sum(1 for s in self.window if id(s) in out)
+        if gone:
+            self.window = [s for s in self.window if id(s) not in out]
+            if self.active is not None:
+                # A prova aperta ogni giro in finestra e' stato contato:
+                # `mark_applied`, la pausa e la ripresa la svuotano.
+                self.active.laps_seen = max(0, self.active.laps_seen - gone)
+        for lap in self._waiting:
+            if id(lap) not in out:
+                self._bank(lap)
+        self._group = [s for s in laps if id(s) not in out]
+        self._waiting = []
+
+    def _group_short(self) -> int:
+        """Quanti giri buoni mancano perche' il gruppo in corso si possa
+        giudicare: 0 se si puo' gia', o col controllo spento."""
+        if self.consistency_kmh is None:
+            return 0
+        return max(0, _CONSISTENCY_LAPS - len(self._in_group())
+                   - len(self._waiting))
+
+    def _need(self, have: int, need: int) -> int:
+        """Il ``need`` di un contatore, coi giri che mancano al gruppo.
+
+        Dopo una sosta il giro d'apertura conta, ma i due dopo aspettano il
+        terzo: la base (o la prova) arriva un giro piu' tardi, e il conto lo
+        deve dire. Con ``need`` fermo la pagina scriveva «3 di 3» e poi
+        aspettava un altro giro. Senza giri mancanti resta quello di prima.
+        """
+        short = self._group_short()
+        return max(need, have + short) if short else need
+
+    def _waiting_hot(self) -> int:
+        """I giri in attesa che entreranno nella lettura delle pressioni.
+
+        Sono tutti dello stint in corso e nessuno lo apre: un gruppo non
+        attraversa una sosta, e il giro d'apertura non aspetta.
+        """
+        return sum(1 for s in self._waiting if s.pressures_hot)
 
     # -- the prediction ----------------------------------------------------
     def _all_scores(self) -> dict:
@@ -1036,6 +1872,10 @@ class RaceEngineer:
         sym = change.symptom
         base_time = _median_time(self.window)
         band = max(base_time * _TIME_BAND_FRAC, 1.0)
+        if sym is None and change.param == "tyrePressure":
+            return Prediction(
+                symptom=None, score_now=0.0, score_below=0.0, time_band_ms=band,
+                text=_msg("predict_pressure", lang, n=self.min_stable))
         if sym is None:
             return Prediction(
                 symptom=None, score_now=0.0, score_below=0.0, time_band_ms=band,
@@ -1092,6 +1932,15 @@ class RaceEngineer:
         sized = self._sized(change)
         if sized is None:
             return self._cannot_write(change)
+        # R3: un file scritto partendo da un file che non e' in macchina da'
+        # un assetto che nessuno ha guidato. Le leve al volante passano.
+        if change.tag == "BOX" and self._unsaved is not None:
+            # Niente in sospeso, nemmeno la proposta di prima: questa porta e'
+            # quella che la sostituisce, e a schermo resta il rifiuto.
+            if not self._pending_is_revert:
+                self._pending = None
+                self._pending_prediction = None
+            return self._unsaved_decision()
         change = sized
         self._pending = change
         self._pending_is_revert = False
@@ -1136,8 +1985,15 @@ class RaceEngineer:
         gap = after - a.base_fuel
         return round(gap, 2), abs(gap) >= _FUEL_BIAS_L
 
+    def _temp_moved(self, a: "_Active") -> bool:
+        """La pista si e' mossa troppo fra le due finestre? Non sapere non e' si'."""
+        after = _median_temp(self.window)
+        return (a.base_temp > 0 and after > 0
+                and abs(after - a.base_temp) >= _TEMP_BIAS_C)
+
     def _outcome(self, a: "_Active", *, kept: bool, score_after: float) -> Outcome:
         gap, confounded = self._fuel_gap(a)
+        temp_moved = self._temp_moved(a)
         return Outcome(
             prediction=a.prediction or self._predict(a.change),
             score_after=round(score_after, 3),
@@ -1147,8 +2003,12 @@ class RaceEngineer:
             fuel_before_l=round(a.base_fuel, 2),
             fuel_after_l=round(a.base_fuel + gap, 2) if gap else round(
                 _median_fuel(self.window), 2),
-            time_confounded=confounded,
+            time_confounded=confounded or temp_moved,
+            temp_confounded=temp_moved,
+            road_temp_before=round(a.base_temp, 1),
+            road_temp_after=round(_median_temp(self.window), 1),
             side_effects=self._side_effects(a),
+            tested=a.change,
         )
 
     def _revert(self, change: ProposedChange, message: str,
@@ -1165,7 +2025,7 @@ class RaceEngineer:
         self._pending_is_revert = True
         # The outcome has to be built by the caller, before this line: the window
         # it is measured from is cleared right here.
-        self.window = []
+        self._clear_window()
         self._held_revert = Decision(DecisionKind.REVERTED, message, rev,
                                      outcome=outcome)
         return self._held_revert
@@ -1204,13 +2064,26 @@ class RaceEngineer:
         # prima della fase in corso, e solo quando nessuna prova e' aperta
         # (`_advance` non gira mentre una modifica si valuta).
         pp = self._pressure_phase()
-        if (pp is not None and phase is not pp and not pp.blind()
-                and not pp.gate(self.window)):
+        judges = pp is not None and not pp.blind()
+        # La lettura e' la mediana dei giri a regime, non l'ultimo giro: il
+        # 14/11 un solo giro a 25,87 dopo una pausa (lo stint era stabile a
+        # 26,1, dentro) ha fatto partire +6 click, e il giro dopo −8.
+        reading = self._pressure_reading() if judges else None
+        if (judges and phase is not pp and reading is not None
+                and not pp.gate([reading])):
             change = self._pressure_remedy(pp)
             if change is not None:
                 return self._propose(change, "high")
         if phase is None:
-            return Decision(DecisionKind.DONE, _msg("done", lang))
+            key = "done_no_signal" if self.skipped_phases else "done"
+            return Decision(DecisionKind.DONE, _msg(key, lang))
+        if (judges and phase is pp and reading is None
+                and any(s.pressures_hot for s in self.window)):
+            # Le letture ci sono ma non abbastanza a regime: si aspetta, non si
+            # passa alle barre su gomme che nessuno ha ancora giudicato.
+            wait = _msg("pressure_wait", lang,
+                        laps=_laps_left(self._reading_need(), lang))
+            return Decision(DecisionKind.COLLECT, wait, tail=wait)
         blind = phase.blind()
         if blind:
             # Prima del cancello, non dopo: un cancello che non sa cosa guardare
@@ -1219,9 +2092,22 @@ class RaceEngineer:
             self.skipped_phases.add(self.phase_idx)
             self.phase_idx += 1
             return Decision(DecisionKind.STAND_DOWN, blind)
-        if phase.gate(self.window):
+        gate_on = ([reading] if (phase is pp and reading is not None)
+                   else self.window)
+        if phase.gate(gate_on):
+            # Un cancello che passa perche' la misura tace non e' una fase
+            # fatta: la strada la segna saltata e la frase lo dice.
+            silent = phase is not pp and not self._has_signal(phase)
+            if silent:
+                self.skipped_phases.add(self.phase_idx)
             self.phase_idx += 1
             nxt = self.phase
+            if silent:
+                tail = (_msg("phase_tail_next", lang, nxt=tr(nxt.label))
+                        if nxt else "")
+                return Decision(DecisionKind.PHASE_DONE,
+                                _msg("phase_no_signal", lang,
+                                     label=tr(phase.label), tail=tail))
             tail = (_msg("phase_tail_next", lang, nxt=tr(nxt.label)) if nxt
                     else _msg("phase_tail_complete", lang))
             return Decision(DecisionKind.PHASE_DONE,
@@ -1242,11 +2128,23 @@ class RaceEngineer:
             if by_hand:
                 return Decision(DecisionKind.STAND_DOWN, by_hand)
             # Nothing actionable here; move on to avoid a stall. Il cancello pero'
-            # non e' passato: per la strada e' saltata, non fatta.
+            # non e' passato: per la strada e' saltata, non fatta, e la frase
+            # dice cosa l'ha chiuso.
+            seen = phase.unfixed(self.window)
             self.skipped_phases.add(self.phase_idx)
             self.phase_idx += 1
+            nxt = self.phase
+            tail = (_msg("phase_tail_next", lang, nxt=tr(nxt.label))
+                    if nxt else "")
+            if seen is not None:
+                what, n, tot = seen
+                return Decision(DecisionKind.PHASE_DONE,
+                                _msg(f"phase_unfixed_{what}", lang,
+                                     label=tr(phase.label), n=n, tot=tot,
+                                     tail=tail))
             return Decision(DecisionKind.PHASE_DONE,
-                            _msg("phase_nothing", lang, label=tr(phase.label)))
+                            _msg("phase_unfixed", lang, label=tr(phase.label),
+                                 tail=tail))
 
         change = self._remedy_for(symptom, phase)
         if change is None and self._blocked is not None:
@@ -1268,13 +2166,378 @@ class RaceEngineer:
     def _evaluate_active(self) -> Decision:
         a = self.active
         lang = current_language()
+        if self._is_pressure_test(a):
+            # Una prova di pressione aspetta la lettura, non «3 giri buoni»: il
+            # giro che apre lo stint e quelli di uno stint finito non ci
+            # entrano, e il conto lo deve dire. Rigiocato il 08/11 il motore
+            # ripeteva «serve ancora 1 giro» per nove giri e tre rientri.
+            reading = self._pressure_reading()
+            if reading is None:
+                tail = _skip_tail(self._skipped, lang)
+                if self._last_settling and self._stint > a.stint_at_apply + 1:
+                    tail += _msg("pressure_restart", lang)
+                tail += a.psi_doubt
+                return Decision(DecisionKind.EVALUATING,
+                                _msg("evaluating", lang,
+                                     laps=_laps_left(self._reading_need(), lang))
+                                + tail, tail=tail)
+            # Prima del verdetto: le gomme hanno risposto alla modifica?
+            moved = self._base_moved(a, lang, reading.pressures_hot)
+            if moved:
+                return self._hold_base(moved)
+            return self._judge_pressure(a, reading)
         if a.laps_seen < self.min_stable:
-            need = self.min_stable - a.laps_seen
-            tail = _skip_tail(self._skipped, lang)
+            # Si decide sui giri contati; il conto dice anche quelli in attesa.
+            have = a.laps_seen + len(self._waiting)
+            need = self._need(have, self.min_stable) - have
+            tail = _skip_tail(self._skipped, lang) + a.psi_doubt
             return Decision(DecisionKind.EVALUATING,
                             _msg("evaluating", lang, laps=_laps_left(need, lang))
                             + tail, tail=tail)
+        return self._verdict(a, lang)
 
+    def _hold_base(self, moved: str) -> Decision:
+        """Una prova smentita dalle gomme: niente verdetto, si chiede il file.
+
+        Le gomme non hanno risposto come la modifica: la prova non e' quella
+        che crediamo. L'08/11 valeva 5 click ed erano 13. Giudicarla
+        scriverebbe nel registro una prova mai fatta, e un ripristino di 5
+        click sopra il file scelto darebbe un assetto sbagliato in ogni caso.
+        Quindi niente verdetto, niente registro, niente da scrivere, e niente
+        psi per click imparati da una prova che non e' quella: il pilota
+        ricarica l'assetto di prima, lo dice ai box, e solo allora la base
+        riparte da giri nuovi. Fino ad allora la decisione resta questa, a ogni
+        giro: i giri in pista hanno ancora l'assetto sospetto.
+        """
+        self._clear_window()
+        self._offs = []
+        self.active = None
+        self._pending = None
+        self._pending_is_revert = False
+        self._pending_prediction = None
+        self._held_wrong = None
+        self._held_base = Decision(DecisionKind.STAND_DOWN, moved,
+                                   confirm_base=True)
+        return self._held_base
+
+    def base_confirmed(self, *, expected: bool | None = None,
+                       dials=None) -> Decision | None:
+        """Il pilota ha detto ai box quale assetto ha caricato.
+
+        Scioglie la decisione tenuta da `_base_moved` (o da un cambio non
+        chiesto a prova aperta) e rifa' la base da zero: contano solo i giri
+        dopo questa risposta. Il giro d'uscita dai box non arriva qui, perche'
+        il registratore non registra la corsia box (vedi
+        `recorder._recording_allowed`).
+
+        Con la prova in pausa per il file sbagliato (R2) ``expected`` dice se
+        il file scelto e' quello scritto: si', la prova riprende sulla base di
+        prima; no, o non si sa, la prova non si giudica e la base si rifa'.
+        Una scelta esplicita toglie sempre il blocco dell'assetto non salvato
+        (R3): il pilota ha detto su quale file scrivere. ``dials`` sono le
+        manopole lette in quel momento (TC, ABS, mappa, ripartitore): finche'
+        i report dopo dicono le stesse il blocco resta tolto, anche se
+        l'impronta continua a dire «non salvato». Senza niente da sciogliere
+        torna None.
+        """
+        was_unsaved = self._unsaved is not None
+        self._unsaved = None
+        self._chosen_dials = _dials(dials)
+        # Il pilota ha detto cosa ha caricato: all'uscita un cambio non e' una
+        # sorpresa (R1). Una scrittura ancora da controllare resta da
+        # controllare, e cosi' la prova che riprende sul file scritto.
+        if self._exit_check not in _CHECK_WRITTEN:
+            self._exit_check = "known"
+        if self._held_wrong is not None:
+            if expected is True and self.active is not None:
+                self._exit_check = "resumed"
+                return self._resume_test(self._wrong_name, "")
+            self._exit_check = "known"
+            self._held_wrong = None
+            self.active = None
+            return self._fresh_base()
+        if self._held_base is not None:
+            self._held_base = None
+            return self._fresh_base()
+        if was_unsaved and self._base_ready():
+            return self._advance()
+        return None
+
+    def _fresh_base(self) -> Decision:
+        self._clear_window()
+        self._offs = []
+        self._skipped = None
+        return Decision(DecisionKind.COLLECT,
+                        _msg("collect", n=self.min_stable, have=0))
+
+    # -- l'assetto in macchina, riconosciuto ai box ----------------------------
+    def carry_clicks(self) -> dict[str, int]:
+        """I click al volante che sono in macchina e in nessun file, per leva:
+        {"brakeBias": 1}.
+
+        Le modifiche al volo tenute (`carry`) e quella in prova: girata sulla
+        manopola e non ancora giudicata, ma in macchina c'e'. Senza, una sosta
+        durante la prova di un TC +1 leggerebbe «assetto non salvato».
+        """
+        out: dict[str, int] = {}
+        live = (list(self.active.change.changes)
+                if self.active is not None and self.active.change.tag == "AV"
+                else [])
+        for c in self.carry + live:
+            out[c.param] = out.get(c.param, 0) + c.delta_clicks
+        return {k: v for k, v in out.items() if v}
+
+    def learn_bias(self, observed: float, clicks: int) -> None:
+        """Il pilota ha detto quale file ha caricato: impara lo scarto del
+        ripartitore fra la lettura del gioco e i click di quel file.
+
+        Solo dalla risposta, mai da un file unico compatibile: alla prima
+        serata su una pista nuova un predefinito del gioco puo' coincidere su
+        TC, ABS e mappa con l'unico file della cartella. Una risposta che non
+        concorda (piu' di mezzo click) butta la taratura, e ne serve un'altra
+        che concordi con lei per riaverla.
+        """
+        got = _finite(observed)
+        if got is None or got < 0 or isinstance(clicks, bool) \
+                or not isinstance(clicks, int):
+            return                    # -1.0: il gioco non l'ha esposto
+        off = round(got - _BIAS_STEP * clicks, 6)
+        if self.bias_offset is not None:
+            if abs(off - self.bias_offset) <= _BIAS_TOL:
+                return
+            self.bias_offset, self.bias_pending = None, off
+            return
+        if self.bias_pending is None:
+            # La prima risposta: non c'e' niente con cui non concordare.
+            self.bias_offset = off
+        elif abs(off - self.bias_pending) <= _BIAS_TOL:
+            self.bias_offset, self.bias_pending = off, None
+        else:
+            self.bias_pending = off
+
+    def setup_seen(self, report: SetupReport, *, at_exit: bool) -> Decision | None:
+        """Il motore ha riconosciuto l'assetto in macchina: dal vivo, fermo ai
+        box (``at_exit`` falso), o all'uscita dalla corsia box.
+
+        Le regole che toccano la base agiscono solo all'uscita, quando
+        l'assetto e' quello con cui il pilota guidera'; dal vivo si scioglie
+        soltanto (il file giusto caricato in garage non aspetta un giro).
+
+        * R2: la prima uscita dopo una modifica scritta da HONE deve essere il
+          file scritto. Se no la prova si mette in pausa, coi giri azzerati e
+          la base di prima intatta, finche' il file giusto non si vede.
+        * R1: un assetto cambiato senza una scrittura di HONE in quella sosta
+          rifa' la base; a prova aperta la prova non si giudica.
+        * R3: un assetto che non e' un file blocca le modifiche ai box.
+
+        Torna la decisione nuova, o None se non cambia niente.
+        """
+        if report.carry_lost:
+            # Il file e' stato ricaricato a mano: le manopole tenute sono
+            # tornate come nel file, e il file non le ha.
+            self.carry = []
+        was_unsaved = self._unsaved is not None
+        chosen = self._chosen_dials
+        if (chosen is not None and report.dials is not None
+                and _dials_moved(chosen, report.dials)):
+            # Una manopola girata dopo la scelta: non e' piu' quell'assetto.
+            self._chosen_dials = chosen = None
+        unsaved = report.state == "unsaved" and chosen is None
+        self._unsaved = (report.unsaved_diff or "") if unsaved else None
+        check = self._exit_check
+        if at_exit:
+            self._exit_check = ""
+
+        if self._held_wrong is not None:
+            if report.expected_ok is True and self.active is not None:
+                resumed = self._resume_test(report.expected or self._wrong_name,
+                                            report.psi_doubt)
+                if not at_exit:
+                    # Ripresa ai box: all'uscita l'assetto e' cambiato
+                    # rispetto allo stint col file sbagliato, e quel cambio e'
+                    # il file scritto (R2 lo ricontrolla), non R1.
+                    self._exit_check = "resumed"
+                return resumed
+            if at_exit and report.expected_ok is False:
+                return self._pause_test(report)
+            return None
+        if at_exit and check in _CHECK_WRITTEN and self.active is not None:
+            if report.expected_ok is False and report.expected:
+                return self._pause_test(report)
+            if report.expected_ok is True and check == "written" and report.changed:
+                # Il file scritto c'e', ma una scrittura ai box non tocca le
+                # manopole: se il motore le vede cambiate fra entrata e uscita
+                # (passa solo quelle, in una sosta con la scrittura) la base
+                # e' stata misurata con un'altra elettronica. L'08/11: base
+                # sul predefinito a TC 6, file scritto e caricato a TC 3.
+                return self._setup_changed(report.changed)
+            if report.expected_ok is True:
+                self.active.psi_doubt = self._psi_doubt(report.expected,
+                                                        report.psi_doubt)
+        elif at_exit and not check and report.changed:
+            return self._setup_changed(report.changed)
+
+        if (unsaved and not was_unsaved and self._pending is not None
+                and not self._pending_is_revert and self._pending.tag == "BOX"):
+            # Proposta prima di vedere l'assetto: non si scrive piu'.
+            self._pending = None
+            self._pending_prediction = None
+            return self._unsaved_decision()
+        if was_unsaved and not unsaved:
+            if report.changed and not self._held() and self.active is None:
+                # Le manopole rimesse come nel file: e' un file, ma non
+                # l'assetto su cui e' stata misurata la base.
+                return self._saved_rebase(report, at_exit=at_exit)
+            if self._base_ready():
+                return self._advance()
+            if report.name and not self._held():
+                kind = (DecisionKind.EVALUATING if self.active is not None
+                        else DecisionKind.COLLECT)
+                return Decision(kind, _msg("setup_saved", name=report.name))
+        return None
+
+    def _saved_rebase(self, report: SetupReport, *, at_exit: bool) -> Decision:
+        """R3 sciolta su un assetto diverso da quello della base: si rifa'.
+
+        Dal vivo ai box la differenza e' detta qui: all'uscita la stessa
+        differenza dall'entrata non e' un altro cambio non chiesto (R1).
+        """
+        if not at_exit and self._exit_check not in _CHECK_WRITTEN:
+            self._exit_check = "known"
+        self._clear_window()
+        self._offs = []
+        self._skipped = None
+        self._pending = None
+        self._pending_prediction = None
+        lang = current_language()
+        again = _msg("setup_saved_rebase", lang, changed=report.changed)
+        said = (_msg("setup_saved", lang, name=report.name) + again
+                if report.name else again.strip())
+        return Decision(DecisionKind.COLLECT, said)
+
+    def exit_unseen(self) -> None:
+        """Il motore ha visto un'uscita dai box ma non ha potuto riconoscere
+        l'assetto (niente `setup_seen`): quello che l'uscita doveva
+        controllare si chiude lo stesso, come in `setup_seen`, e non passa
+        alla sosta dopo. Una prova aperta resta: a fine prova c'e'
+        `_base_moved`."""
+        self._exit_check = ""
+
+    def _held(self) -> bool:
+        return (self._held_revert is not None or self._held_base is not None
+                or self._held_wrong is not None)
+
+    def _base_ready(self) -> bool:
+        """La base c'e' e niente e' in prova o in attesa: `_advance` puo' parlare."""
+        return (not self._held() and self.active is None
+                and len(self.window) >= self.min_stable
+                and self.window[-1].wet is not True)
+
+    def _psi_doubt(self, name: str | None, doubt: str) -> str:
+        if not doubt or not name:
+            return ""
+        return _msg("setup_psi_doubt", name=name, psi_doubt=doubt)
+
+    def _unsaved_decision(self) -> Decision:
+        return Decision(DecisionKind.STAND_DOWN,
+                        _msg("setup_unsaved", unsaved_diff=self._unsaved or ""))
+
+    def _pause_test(self, report: SetupReport) -> Decision:
+        """R2: la prova resta aperta, ma i giri col file sbagliato non contano.
+
+        Non e' `_hold_base`: la base e' stata misurata prima della modifica,
+        sull'assetto giusto, e resta buona. Si azzerano solo i giri di prova.
+        """
+        a = self.active
+        if a is None:
+            self._held_wrong = None
+            return self._fresh_base()
+        a.laps_seen = 0
+        a.psi_doubt = ""
+        self._clear_window()
+        self._offs = []
+        self._skipped = None
+        self._wrong_name = report.expected or self._wrong_name
+        self._held_wrong = Decision(
+            DecisionKind.STAND_DOWN,
+            _msg("setup_wrong", name=self._wrong_name, diff=report.expected_diff),
+            confirm_base=True)
+        return self._held_wrong
+
+    def _resume_test(self, name: str, psi_doubt: str) -> Decision:
+        """R2 sciolta: in macchina c'e' il file scritto, la prova riparte."""
+        a = self.active
+        self._held_wrong = None
+        self._clear_window()
+        self._offs = []
+        self._skipped = None
+        a.laps_seen = 0
+        # Il file e' stato caricato ai box: il giro dopo apre uno stint, anche
+        # se la benzina non sale, e non e' «sei rientrato a meta' prova».
+        self._last_fuel = 0.0
+        a.stint_at_apply = self._stint
+        a.psi_doubt = self._psi_doubt(name, psi_doubt)
+        return Decision(DecisionKind.EVALUATING,
+                        _msg("setup_right", name=name) + a.psi_doubt)
+
+    def _setup_changed(self, changed: str) -> Decision:
+        """R1: l'assetto e' cambiato e HONE non ha scritto niente."""
+        if self._held_revert is not None:
+            return self._held_revert      # il ripristino aspetta ancora il si'
+        if self._held_base is not None:
+            return self._held_base        # la domanda e' gia' fatta
+        lang = current_language()
+        lead = _msg("setup_changed_lead", lang) + " "
+        if self.active is not None:
+            return self._hold_base(
+                lead + _msg("setup_changed_test", lang, changed=changed))
+        said = lead + _msg("setup_changed", lang, changed=changed)
+        self._clear_window()
+        self._offs = []
+        self._skipped = None
+        # Una proposta misurata sull'assetto di prima non vale per questo.
+        self._pending = None
+        self._pending_prediction = None
+        return Decision(DecisionKind.COLLECT, said, tail=said)
+
+    def _base_moved(self, a: "_Active", lang: str, after: dict) -> str:
+        """Le gomme hanno risposto alla modifica di pressione come previsto?
+
+        Per ogni asse cambiato: lo spostamento misurato a caldo (la lettura a
+        regime dopo meno quella prima, `_pressure_reading`) contro quello
+        previsto (click per psi a caldo per click: quello imparato su
+        quest'auto se c'e', se no il passo del file). Oltre
+        ``max(_BASE_PSI, |previsto|)`` di scarto la risposta e' la frase che lo
+        dice e chiede il file vero; se no "".
+        Il 08/11 `HONE_3` doveva valere +0,5 psi e gli anteriori sono saliti di
+        2,2: la modifica era stata scritta sopra un file che non era in
+        macchina. Senza pressioni misurate, o senza il passo, non si dice niente.
+        """
+        base = a.base_pressures or {}
+        after = after or {}
+        out = []
+        for axle, axle_slots in (("front", FRONT), ("rear", REAR)):
+            mine = [c for c in a.change.changes
+                    if c.param == "tyrePressure" and c.slot in axle_slots]
+            clicks = {c.delta_clicks for c in mine}
+            if (len(clicks) != 1 or after.get(axle) is None
+                    or base.get(axle) is None):
+                continue
+            ppc = self.steps.psi_per_click(tuple(sorted(c.slot for c in mine)))
+            if not ppc:
+                continue
+            predicted = clicks.pop() * (self.hot_per_click.get(axle) or ppc)
+            measured = after[axle] - base[axle]
+            if abs(measured - predicted) > max(_BASE_PSI, abs(predicted)):
+                out.append(_msg(f"base_moved_{axle}", lang,
+                                moved=_signed_psi(measured, lang),
+                                worth=_signed_psi(predicted, lang)))
+        if not out:
+            return ""
+        return " ".join(out + [_msg("base_ask", lang)])
+
+    def _verdict(self, a: "_Active", lang: str) -> Decision:
+        """Il verdetto di una prova finita: tenuta o da rimettere."""
         new_time = _median_time(self.window)
         new_score = _median_score(self.window, a.symptom)
         d_time = new_time - a.base_time
@@ -1285,7 +2548,8 @@ class RaceEngineer:
         band_ok = d_time <= band
 
         _gap, fuel_confounded = self._fuel_gap(a)
-        if fuel_confounded:
+        temp_moved = self._temp_moved(a)
+        if fuel_confounded or temp_moved:
             # The two windows weren't driven at the same weight, so their times
             # aren't comparable. Suspending the veto rather than guessing at a
             # correction: converting litres to seconds needs a sensitivity we
@@ -1306,7 +2570,8 @@ class RaceEngineer:
             # remains the real authority, exactly as it is when the time is
             # usable. Reverting instead would put the gate straight back into
             # proposing the same change, forever.
-            key = ("accepted_unjudged" if fuel_confounded
+            key = ("accepted_unjudged_temp" if temp_moved
+                   else "accepted_unjudged" if fuel_confounded
                    else "accepted_structural")
             return Decision(DecisionKind.ACCEPTED, _msg(key, lang), outcome=out)
 
@@ -1496,17 +2761,112 @@ class RaceEngineer:
         for c in change.changes:
             key = (c.param, c.slot)
             self.applied_clicks[key] = self.applied_clicks.get(key, 0) + c.delta_clicks
+        # Una manopola girata e tenuta e' in macchina e in nessun file.
+        if change.tag == "AV":
+            self.carry.extend(change.changes)
+
+    def _has_signal(self, phase: WorkPhase) -> bool:
+        """La misura ha visto almeno un sintomo di questa fase nella finestra?"""
+        return any(phase.owns(sym)
+                   for s in self.window for sym in s.symptom_scores)
+
+    def _pressure_reading(self) -> LapStats | None:
+        """Le pressioni a caldo su cui si decide: la mediana per asse degli
+        ultimi giri a regime, o None se non ce ne sono abbastanza.
+
+        Dentro uno stint la pressione sale di 0,3–0,5 psi dal primo giro caldo,
+        cioe' meta' della finestra: un giro solo non e' una lettura.
+        """
+        laps = self._reading_laps()
+        if len(laps) < self._reading_size():
+            return None
+        hot = {}
+        for ax in ("front", "rear"):
+            vals = [s.pressures_hot[ax] for s in laps
+                    if s.pressures_hot.get(ax) is not None]
+            if vals:
+                hot[ax] = statistics.median(vals)
+        return LapStats(lap_time_ms=0, pressures_hot=hot) if hot else None
+
+    def _reading_laps(self) -> list[LapStats]:
+        """I giri che entrano nella lettura: buoni, dello stint in corso,
+        senza quello che lo apre, gli ultimi `_PRESSURE_LAPS`."""
+        return [s for s in self.window
+                if s.pressures_hot and not s.settling
+                and s.stint == self._stint][-_PRESSURE_LAPS:]
+
+    def _reading_size(self) -> int:
+        """Quanti giri servono per una lettura."""
+        return min(self.min_stable, 3)
+
+    def _reading_need(self) -> int:
+        """Quanti giri buoni mancano alla lettura, almeno uno.
+
+        Contano anche i giri in attesa di giudizio: nella lettura entrano
+        giudicati, o senza giudizio se il loro gruppo si chiude prima. Non si
+        aspetta che il gruppo arrivi a potersi giudicare (`_group_short`):
+        con TC 3 e 4 alternati giro per giro (14/11) il conto restava fermo a
+        2 per tre giri, e poi la lettura arrivava lo stesso.
+        """
+        have = len(self._reading_laps()) + self._waiting_hot()
+        return max(1, self._reading_size() - have)
+
+    def _is_pressure_test(self, a: "_Active") -> bool:
+        """La prova in corso e' una pressione con una lettura di partenza?"""
+        return (a.symptom is None and a.base_pressures is not None
+                and a.change.param == "tyrePressure")
+
+    def _base_pressures(self) -> dict | None:
+        reading = self._pressure_reading()
+        return dict(reading.pressures_hot) if reading is not None else None
+
+    def _judge_pressure(self, a: "_Active", reading: LapStats) -> Decision:
+        """Il verdetto di una modifica di pressione: dove e' arrivata.
+
+        Fino al 15/11 si giudicava sul tempo sul giro, e con la benzina diversa
+        (6 prove su 8) nemmeno su quello: la modifica era tenuta comunque, anche
+        con la gomma finita fuori finestra. Il tempo qui non entra piu': dentro
+        uno stint balla di 0,6–0,9 s, e togliere una pressione per il tempo
+        rimandava il cancello a proporre la stessa. Si tiene, si dice quanto si
+        legge, e se non e' dove doveva il cancello corregge col passo imparato.
+        """
+        lang = current_language()
+        self.active = None
+        pp = self._pressure_phase()
+        nominal_of = getattr(pp, "steps", self.steps).psi_per_click
+        parts: list[str] = []
+        for ax, slots in (("front", FRONT), ("rear", REAR)):
+            clicks = next((c.delta_clicks for c in a.change.changes
+                           if c.slot in slots), 0)
+            before = a.base_pressures.get(ax)
+            after = reading.pressures_hot.get(ax)
+            if not clicks or before is None or after is None:
+                continue
+            used = self.hot_per_click.get(ax) or nominal_of(slots) or 0.0
+            expected = before + clicks * used
+            k = (after - before) / clicks
+            if _HOT_PER_CLICK[0] <= k <= _HOT_PER_CLICK[1]:
+                self.hot_per_click[ax] = round(k, 3)
+            inside = pp is None or next(pp._out({ax: after}), None) is None
+            axis = _AXIS_WORDS[ax].get(lang) or _AXIS_WORDS[ax]["en"]
+            parts.append(_msg("pressure_ok" if inside else "pressure_off", lang,
+                              axis=axis, b=fmt_num(after, 1, lang, "psi"),
+                              e=fmt_num(expected, 1, lang, "psi")))
+        out = self._outcome(a, kept=True, score_after=0.0)
+        self._record(a.change)
+        message = " ".join(parts) or _msg("accepted_structural", lang)
+        return Decision(DecisionKind.ACCEPTED, message, outcome=out)
 
     def _pressure_remedy(self, phase: WorkPhase) -> ProposedChange | None:
-        """If this phase gates on tyre pressure, nudge the off-target axle."""
+        """If this phase gates on tyre pressure, nudge the off-target axles."""
         builder = getattr(phase, "pressure_remedy", None)
         if builder is None or not self.window:
             return None
-        return builder(self.window[-1])
+        return builder(self._pressure_reading() or self.window[-1])
 
     def _pressure_by_hand(self, phase: WorkPhase) -> str:
         """La frase per una pressione fuori finestra che non sappiamo scrivere."""
         builder = getattr(phase, "pressure_by_hand", None)
         if builder is None or not self.window:
             return ""
-        return builder(self.window[-1])
+        return builder(self._pressure_reading() or self.window[-1])

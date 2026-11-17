@@ -7,7 +7,7 @@ callers (live engine or debrief).
 
 from __future__ import annotations
 
-from .classmap import profile_for_car
+from .classmap import is_gt3, profile_for_car
 from .core import NO_WINDOW, RaceEngineer
 from .pressures import pressure_window
 from .steps import steps_for
@@ -24,6 +24,17 @@ def engineer_for(car_model: str, track: str | None = None, *,
     non uno che indovina.
     """
     kw.setdefault("steps", steps_for(car_model, is_acc))
+    # Lo scarto del ripartitore misurato sull'archivio: sono click di un file
+    # di ACC, quindi solo se il gioco e' detto, ed e' ACC. Importato qui:
+    # `fingerprint` tira dentro i box e i setup, che importano l'Ingegnere.
+    if is_acc is True:
+        from .fingerprint import MEASURED_BIAS_OFFSET
+        kw.setdefault("bias_offset", MEASURED_BIAS_OFFSET.get(car_model))
+    # La costanza del pilota: la soglia e' misurata su una GT3, quindi solo li'.
+    # Importato qui come sopra, per non allungare il giro degli import.
+    if is_gt3(car_model):
+        from .consistency import KMH
+        kw.setdefault("consistency_kmh", KMH)
     # Senza finestra — un'auto che non sappiamo classificare — la fase pressioni
     # non prende quella del profilo: lo dice e passa oltre. `None` al motore
     # vorrebbe dire «tieni quella del profilo», che e' il contrario.

@@ -24,6 +24,7 @@ def test_every_technique_category_has_a_trigger_in_both_languages():
         c.name for c in CueCategory
         if tier_of(c) == CueTier.TECHNIQUE
         and c is not CueCategory.GOOD
+        and c is not CueCategory.TIME_LOSS     # dice la frase intera, col numero
         and not (TRIGGER.get(c, {}).get("it") and TRIGGER.get(c, {}).get("en"))
     ]
     assert not missing, f"categorie di tecnica senza innesco in due lingue: {missing}"

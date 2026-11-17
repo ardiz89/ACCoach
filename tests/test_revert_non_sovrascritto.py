@@ -287,6 +287,7 @@ const state = { lastLive: null };
 eval(grab("inPista")); eval(grab("writeLocked"));
 eval(grab("msgText"));
 eval(grab("liveRefused")); eval(grab("confirmRestored"));
+for (const f of ["setupLabel", "loadedText", "loadedWarn", "paintLoaded"]) eval(grab(f));
 eval(grab("renderEngineer"));
 const out = [];
 for (const eng of JSON.parse(fs.readFileSync(0, "utf8"))) {

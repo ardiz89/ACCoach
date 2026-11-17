@@ -114,6 +114,20 @@ def split_loss(window, reference, corner) -> list[PhaseLoss]:
     return out
 
 
+def dominant_phase(phases: list[PhaseLoss], lost_ms: float) -> str | None:
+    """Il tratto che tiene almeno ``_DOMINANT_SHARE`` della perdita, o None.
+
+    La stessa regola della frase di ``phase_note``, in un posto solo: anche il
+    gesto del report (coaching/debrief.py) si dice solo se agisce qui.
+    """
+    if not phases or lost_ms < SIGNIF_LOSS_MS:
+        return None
+    worst = max(phases, key=lambda p: p.lost_ms)
+    if worst.lost_ms <= 0 or worst.lost_ms < _DOMINANT_SHARE * lost_ms:
+        return None
+    return worst.phase
+
+
 def phase_note(phases: list[PhaseLoss], lost_ms: float,
                lang: str = "it") -> str:
     """One sentence naming where in the corner the time actually went.
@@ -123,12 +137,10 @@ def phase_note(phases: list[PhaseLoss], lost_ms: float,
     whose answer is "everywhere", and dressing that up as a location would be a
     confident wrong answer.
     """
-    if not phases or lost_ms < SIGNIF_LOSS_MS:
+    if dominant_phase(phases, lost_ms) is None:
         return ""
     w = _WORDS.get(lang, _WORDS["en"])
     worst = max(phases, key=lambda p: p.lost_ms)
-    if worst.lost_ms <= 0 or worst.lost_ms < _DOMINANT_SHARE * lost_ms:
-        return ""
     text = w["most"].format(s=fmt_num(worst.lost_ms / 1000.0, 2, lang), phase=w[worst.phase])
 
     best = min(phases, key=lambda p: p.lost_ms)

@@ -112,3 +112,26 @@ def test_road_temps_skip_the_laps_that_never_recorded_one():
     s = group_sessions([_lap(0, road_temp=37.8), _lap(2, road_temp=None),
                         _lap(4, road_temp=0.0), _lap(6, road_temp=41.0)])[0]
     assert s.road_temps == [37.8, 41.0]
+
+
+# --- i giri con una sosta ----------------------------------------------------
+
+from accoach.sessions import STOP_MAX_MS, stood_still, stopped_ms  # noqa: E402
+
+import synth  # noqa: E402
+
+
+def test_un_giro_che_non_si_ferma_non_ha_sosta():
+    lap = synth.build_lap()
+    assert stopped_ms(lap.samples) == 0 and not stood_still(lap)
+
+
+def test_una_sosta_lunga_toglie_il_giro():
+    lap = synth.stop_at(synth.build_lap(), 0.3, 106_000)
+    assert stopped_ms(lap.samples) >= 106_000
+    assert stood_still(lap)
+
+
+def test_una_testacoda_ripresa_subito_resta_guida():
+    lap = synth.stop_at(synth.build_lap(), 0.3, STOP_MAX_MS - 1000)
+    assert not stood_still(lap)

@@ -56,19 +56,22 @@ def test_box_write_end_to_end(tmp_path):
 
     # Il gioco scrive auto e pista come vuole: la pagina le manda come arrivano.
     base = c.get("/api/setup/base", params={"car": CAR.upper(), "track": TRACK.lower()}).json()
-    assert base["base"] and base["last_written"] is None
+    # Il primo file non si indovina: lo sceglie il pilota dalla tendina.
+    assert base["base"] is None and base["confirm"] is True
+    assert base["last_written"] is None
+    chosen = base["setups"][0]["path"]
 
     eng = {"kind": "propose", "tag": "BOX",
            "change": [{"param": "tyrePressure", "slot": None, "delta_clicks": 2}]}
     changes = _call("changesFor", [[eng]])[0]
     prev = c.post("/api/setup/preview", params={"lang": "it"},
-                  json={"path": base["base"], "changes": changes}).json()
+                  json={"path": chosen, "changes": changes}).json()
     assert prev["ok"], prev
     assert prev["diff"][0]["new_click"] == prev["diff"][0]["old_click"] + 2
 
     name = _call("nextName", [[[s["name"] for s in base["setups"]]]])[0]
     r = c.post("/api/setup/apply", params={"lang": "it"},
-               json={"path": base["base"], "as_name": name, "confirm": True,
+               json={"path": chosen, "as_name": name, "confirm": True,
                      "changes": changes})
     assert r.status_code == 200, r.text
     assert r.json()["name"] == "HONE_1" and r.json()["reload_hint"]
@@ -77,7 +80,7 @@ def test_box_write_end_to_end(tmp_path):
     assert written["basicSetup"]["tyres"]["tyrePressure"][0] == 59
 
     after = c.get("/api/setup/base", params={"car": CAR, "track": TRACK}).json()
-    assert after["last_written"] == "HONE_1"
+    assert after["last_written"] == "HONE_1" and after["confirm"] is False
     assert Path(after["base"]).name == "HONE_1.json"
     # Il prossimo nome e' il successivo: la pagina non riscrive sopra HONE_1.
     assert _call("nextName", [[[s["name"] for s in after["setups"]]]])[0] == "HONE_2"
@@ -319,3 +322,42 @@ def test_a_websocket_refused_for_the_key_says_open_from_the_qr(answer, expected)
     assert r.returncode == 0, r.stderr
     out = json.loads(r.stdout)
     assert out == dict(expected, probes=1)
+
+
+# --- un assetto salvato dal garage mentre sei ai box ---------------------------
+# Il 29/10 a Zolder: la cartella era vuota all'arrivo ai box, il pilota ha
+# salvato un assetto dal garage e la scritta «Non trovo un assetto» restava.
+
+@needs_node
+def test_an_empty_setup_list_is_asked_again_until_the_garage_saves_one():
+    harness = _BOX_HARNESS.split("window.HoneTablet.render(frame);\nreply(")[0] + r"""
+var clock = 1000;
+Date.now = function () { return clock; };
+window.HoneTablet.render(frame);
+reply(find("/api/setup/base")[0], 200, {car: null, track: null, setups: [],
+                                        base: null, last_written: null});
+window.HoneTablet.render(frame);
+out.emptySays = !$("t-nobase").hidden;
+clock += 1000;
+window.HoneTablet.render(frame);
+out.tooSoon = find("/api/setup/base").length;
+clock += 3000;
+window.HoneTablet.render(frame);
+window.HoneTablet.render(frame);
+out.askedAgain = find("/api/setup/base").length;
+reply(find("/api/setup/base")[1], 200, {car: "mclaren", track: "Zolder",
+  setups: [{name: "def", path: "S/def.json", mtime: 1}],
+  base: "S/def.json", last_written: null});
+window.HoneTablet.render(frame);
+out.goneAfterSave = $("t-nobase").hidden;
+clock += 10000;
+window.HoneTablet.render(frame);
+out.thenQuiet = find("/api/setup/base").length;
+process.stdout.write(JSON.stringify(out));
+"""
+    r = subprocess.run([_NODE, "-e", harness, str(_WEB / "i18n.js"), str(_WEB / "tablet.js")],
+                       capture_output=True, text=True, encoding="utf-8")
+    assert r.returncode == 0, r.stderr
+    out = json.loads(r.stdout)
+    assert out == {"emptySays": True, "tooSoon": 1, "askedAgain": 2,
+                   "goneAfterSave": True, "thenQuiet": 2}

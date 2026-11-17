@@ -1,0 +1,14 @@
+{
+ "sha256": "14e4db59c664c6f43d72556bf6e4f095c20d390798b78e7ec75758b0075e8d2c",
+ "kind": "rate",
+ "prompt_version": "1",
+ "track": "imola",
+ "speaker": {"name": "Coach Uno", "role": "coach"},
+ "lap_time": "1:41.2",
+ "car": "Ferrari 296 GT3",
+ "reasons": [
+  {"field": "role", "claim": "says they coach drivers", "quote": "I coach drivers in ACC", "offset": 0},
+  {"field": "lap_time", "claim": "states their best lap", "quote": "my best is 1:41.2", "offset": 36},
+  {"field": "car", "claim": "states the car", "quote": "with the Ferrari 296 GT3", "offset": 54}
+ ]
+}

@@ -20,6 +20,7 @@ import signal
 import sys
 import time
 
+from . import paths
 from .coaching import Voice
 from .config import load_config
 from .engine import CoachEngine
@@ -137,7 +138,8 @@ def main(argv: list[str] | None = None) -> None:
         engine = CoachEngine(
             voice=Voice(enabled=voice_on, rate=cfg.voice.rate, language=lang,
                         male=cfg.voice.male, radio=cfg.voice.radio),
-            acquire_hz=cfg.acquire.hz, engineer_voice=cfg.voice.engineer)
+            acquire_hz=cfg.acquire.hz, engineer_voice=cfg.voice.engineer,
+            logs_dir=paths.logs_dir())
 
     app = QApplication(sys.argv)
     load_fonts()                     # the overlay paints in the brand face too

@@ -16,9 +16,10 @@ Requirements / caveats
   pass ``--interactive`` to make it clickable/movable, or just close the terminal
   that launched it (Ctrl+C) to quit.
 * ``--pedals`` (or ``overlay.pedals = true`` in the config) adds a live
-  throttle/brake trace strip under the HUD — a calibration aid that makes
-  trail-braking (the two traces overlapping) and coasting / "tempo morto" (both
-  at zero) readable at a glance.
+  throttle/brake panel under the HUD — a calibration aid that makes
+  trail-braking (brake still on with the wheel turned) and coasting / "tempo
+  morto" (both pedals at zero) readable at a glance. ``overlay.pedal_view``
+  picks a rolling trace or bars with the reference lap's mark.
 
 The drawing uses ``QWebSocket`` so the socket lives on Qt's event loop — no extra
 threads — and reconnects automatically if the backend isn't up yet.
@@ -93,14 +94,22 @@ _MODES = ("essential", "full")
 
 # --- live pedal trace (opt-in: --pedals / config overlay.pedals) --------------
 # A rolling throttle/brake strip drawn under the HUD. It's a calibration aid:
-# trail-braking shows as the two traces overlapping (brake decaying while
-# throttle rises), and "tempo morto" (coasting) shows as a gap where both sit at
-# zero — the ribbon under the plot colours those states so they read at a glance.
+# trail-braking shows as brake still on while the wheel is turned, and "tempo
+# morto" (coasting) shows as a gap where both pedals sit at zero — the ribbon
+# under the plot colours those states so they read at a glance.
 _PEDAL_PANEL_H = 128          # extra window height (base coords) when pedals on
 _PEDAL_WINDOW_S = 6.0         # seconds of history the strip shows
 _PEDAL_EPS = 0.04             # below this a pedal counts as released (coasting)
+# Trail braking e' freno CON il volante girato, non freno e gas insieme: fino al
+# 03/11 il nastro ambra e TRAIL si accendevano sulla sovrapposizione dei pedali.
+# La soglia e' quella che segna l'inserimento in coaching/braking.py.
+_TRAIL_STEER = 0.10
+_PEDAL_VIEWS = ("trace", "bars")
+# Le barre: tre righe (freno, gas, sterzo) sotto l'intestazione del pannello.
+_BAR_TOP, _BAR_H, _BAR_GAP = 30, 22, 5
 # Lo sterzo sta nella stessa striscia, centrato: dritto a meta' altezza, sinistra
-# in alto (come nel Confronto del report). La scala e' il volante piu' girato
+# in alto (come nel Confronto del report). Il segno del gioco e' positivo a
+# DESTRA: misurato il 03/11 sui giri veri, 92 % delle curve concordi. La scala e' il volante piu' girato
 # visto finora in sessione, mai sotto questo pavimento: sui giri veri la GT3 sta
 # fra 0.33 e 0.9, la Formula arriva a 1.0, e una scala fissa a +-1 schiaccerebbe
 # una curva veloce in una riga piatta. Cresce e basta, cosi' la linea non cambia
@@ -292,11 +301,30 @@ def _pedal_readouts(thr: float, brk: float, steer: float) -> tuple[str, str, str
     def pct(f: float) -> str:
         return f"{fmt_num(round(f * 100), 0, lang):>3} %"
 
-    side = (t("overlay.steer_left") if steer > 0.02
-            else t("overlay.steer_right") if steer < -0.02 else "")
+    side = (t("overlay.steer_right") if steer > 0.02
+            else t("overlay.steer_left") if steer < -0.02 else "")
     return (f"{t('overlay.throttle_pedal')} {pct(thr)}",
             f"{t('overlay.brake_pedal')} {pct(brk)}",
             f"{t('overlay.steer')} {pct(abs(steer))} {side}".rstrip())
+
+
+def _trailing(brk: float, steer: float) -> bool:
+    """Freno ancora premuto col volante girato: il trail braking."""
+    return brk > _PEDAL_EPS and abs(steer) >= _TRAIL_STEER
+
+
+def _bar_text_spot(fill_x0: float, fill_x1: float, text_w: int,
+                   lo: float, hi: float) -> tuple[float, bool]:
+    """Dove scrivere la percentuale di una barra: (x, dentro il riempimento).
+
+    Dentro il riempimento se ci sta, in scuro; altrimenti subito dopo la sua
+    punta, nel colore della barra. Il riempimento puo' crescere verso sinistra
+    (lo sterzo), e il testo non esce mai dalla traccia."""
+    left, right = min(fill_x0, fill_x1), max(fill_x0, fill_x1)
+    if right - left >= text_w + 12:
+        return (left + 6 if fill_x1 >= fill_x0 else right - 6 - text_w), True
+    x = fill_x1 + 6 if fill_x1 >= fill_x0 else fill_x1 - 6 - text_w
+    return max(lo + 2, min(hi - 2 - text_w, x)), False
 
 
 def _pedal_header_boxes(fm: QFontMetrics, x0: int) -> list[tuple[int, int, int]]:
@@ -493,11 +521,10 @@ class Overlay(QWidget):
     def _apply_look(self, ov) -> None:
         """Modalità e tavolozza dal config (all'avvio e quando cambiano)."""
         self._mode = ov.mode if ov.mode in _MODES else "full"
+        view = getattr(ov, "pedal_view", "trace")
+        self._pedal_view = view if view in _PEDAL_VIEWS else "trace"
         self._faster = _CB_FASTER if ov.cb else _GREEN
         self._slower = _CB_SLOWER if ov.cb else _RED
-
-    def _follow_timer_stop(self) -> None:
-        self._follow.stop()
 
     def _follow_config(self) -> None:
         """Rilegge posizione e grandezza dal file; se sono cambiate, le applica."""
@@ -981,23 +1008,104 @@ class Overlay(QWidget):
 
     # --- live pedal trace --------------------------------------------------
     def _draw_pedals(self, p: QPainter, w: int) -> None:
+        """Il pannello dei pedali: la traccia o le barre, come da impostazione."""
+        top = _BASE_H
+        p.setPen(Qt.NoPen)
+        p.setBrush(_DARK)
+        p.drawRoundedRect(12, top + 2, w - 24, _PEDAL_PANEL_H - 10, 8, 8)
+        if self._pedal_view == "bars":
+            self._draw_pedal_bars(p, w)
+        else:
+            self._draw_pedal_trace(p, w)
+
+    def _draw_pedal_bars(self, p: QPainter, w: int) -> None:
+        """Freno, gas e sterzo adesso, ognuno con la sua percentuale dentro.
+
+        La barra da sola dice quanto premi, non se e' giusto: la tacca ciano e'
+        quanto premeva il giro di riferimento in questo punto della pista. In
+        frenata guardi se stai sopra o sotto la tacca, in ingresso se la tua barra
+        scende con lei o crolla prima. Lo sterzo parte dal centro e va dalla parte
+        in cui giri; senza riferimento (giro senza delta) la tacca non c'e'."""
+        top = _BASE_H
+        px, pw = 28, w - 56
+        hist = self._pedal_hist
+        thr = brk = steer = 0.0
+        if hist:
+            _, thr, brk, steer = hist[-1]
+        delta = self._state.get("delta") or {}
+        ref_brk, ref_thr = delta.get("ref_brake"), delta.get("ref_throttle")
+
+        self._set_font(p, 11, bold=True, mono=True)
+        fm = p.fontMetrics()
+        labels = (t("overlay.brake_pedal"), t("overlay.throttle_pedal"),
+                  t("overlay.steer"))
+        label_w = max(fm.horizontalAdvance(x) for x in labels) + 10
+        x0, x1 = px + label_w, px + pw
+        track_w = x1 - x0
+        row_h, gap, y = _BAR_H, _BAR_GAP, top + _BAR_TOP
+        lang = current_language()
+
+        def pct(f: float) -> str:
+            return f"{fmt_num(round(f * 100), 0, lang)} %"
+
+        side = (t("overlay.steer_right") if steer > 0.02
+                else t("overlay.steer_left") if steer < -0.02 else "")
+        k = (track_w / 2) / self._steer_scale
+        cx = x0 + track_w / 2
+        rows = (
+            (labels[0], _RED, x0, x0 + track_w * max(0.0, min(1.0, brk)),
+             pct(brk), ref_brk),
+            (labels[1], _GREEN, x0, x0 + track_w * max(0.0, min(1.0, thr)),
+             pct(thr), ref_thr),
+            (labels[2], _WHITE, cx, cx + max(-track_w / 2, min(track_w / 2, steer * k)),
+             f"{pct(abs(steer))} {side}".rstrip(), None),
+        )
+        for i, (label, col, f0, f1, txt, ref) in enumerate(rows):
+            ry = y + i * (row_h + gap)
+            p.setPen(col)
+            p.drawText(px, ry, label_w, row_h, Qt.AlignVCenter, label)
+            p.setPen(Qt.NoPen)
+            p.setBrush(_TRACK)
+            p.drawRoundedRect(QRectF(x0, ry, track_w, row_h), 4, 4)
+            if abs(f1 - f0) >= 1:
+                p.setBrush(col)
+                p.drawRoundedRect(QRectF(min(f0, f1), ry, abs(f1 - f0), row_h), 4, 4)
+            if ref is not None:
+                rx = x0 + track_w * max(0.0, min(1.0, float(ref)))
+                p.setBrush(_CYAN)
+                p.drawRect(QRectF(rx - 1.5, ry - 3, 3, row_h + 6))
+            tw = fm.horizontalAdvance(txt)
+            tx, inside = _bar_text_spot(f0, f1, tw, x0, x1)
+            p.setPen(_PLATE if inside else col)
+            p.drawText(int(tx), ry, tw + 2, row_h, Qt.AlignVCenter, txt)
+
+        if ref_brk is not None or ref_thr is not None:
+            p.setPen(Qt.NoPen)
+            p.setBrush(_CYAN)
+            p.drawRect(px, top + 9, 3, 10)
+            p.setPen(_CYAN)
+            self._set_font(p, 11, bold=True)
+            p.drawText(px + 9, top + 6, pw // 2, 16, Qt.AlignVCenter,
+                       t("overlay.ref_mark"))
+        tag, tag_col = self._pedal_tag(time.monotonic())
+        if tag:
+            p.setPen(tag_col)
+            self._set_font(p, 11, bold=True)
+            p.drawText(px, top + 6, pw, 16, Qt.AlignRight | Qt.AlignVCenter, tag)
+
+    def _draw_pedal_trace(self, p: QPainter, w: int) -> None:
         """Rolling throttle (green) / brake (red) / steering (white) strip.
 
-        Reads the trail-brake overlap and the coasting gaps ("tempo morto") at a
-        glance: the ribbon below the plot is amber while both pedals are pressed
-        (trailing) and grey while neither is (coasting). The steering line is
-        centred (straight = middle, left = up) so you see where the pedals move
-        against the wheel: gas going in with the lock still on, braking while
-        already turning."""
+        Reads trail braking and the coasting gaps ("tempo morto") at a glance:
+        the ribbon below the plot is amber while the brake is still on with the
+        wheel turned (trailing) and grey while neither pedal is pressed
+        (coasting). The steering line is centred (straight = middle, left = up)
+        so you see where the pedals move against the wheel: gas going in with
+        the lock still on, braking while already turning."""
         top = _BASE_H
         px, pw = 28, w - 56
         plot_top, plot_h = top + 30, 64
         ribbon_y, ribbon_h = plot_top + plot_h + 4, 6
-
-        # backing pill
-        p.setPen(Qt.NoPen)
-        p.setBrush(_DARK)
-        p.drawRoundedRect(12, top + 2, w - 24, _PEDAL_PANEL_H - 10, 8, 8)
 
         # grid: 0 / 50 / 100 %
         grid = QColor(_LINE)
@@ -1017,12 +1125,12 @@ class Overlay(QWidget):
 
         # ribbon: colour each time-span by pedal state (uses the left sample)
         for i in range(len(hist) - 1):
-            t0, thr, brk, _ = hist[i]
+            t0, thr, brk, st = hist[i]
             x0 = xy(t0, 0.0).x()
             x1 = xy(hist[i + 1][0], 0.0).x()
             col = None
-            if thr > _PEDAL_EPS and brk > _PEDAL_EPS:
-                col = _AMBER                       # trail-braking overlap
+            if _trailing(brk, st):
+                col = _AMBER                       # trail braking
             elif thr <= _PEDAL_EPS and brk <= _PEDAL_EPS:
                 col = _GREY                        # coasting / tempo morto
             if col is not None:
@@ -1033,7 +1141,8 @@ class Overlay(QWidget):
         # traces — the steering first, so the pedals stay on top of it
         if len(hist) >= 2:
             k = 0.5 / self._steer_scale
-            steer_line = QPolygonF([xy(t0, 0.5 + st * k) for t0, _, _, st in hist])
+            # positivo a destra: meno, perche' la sinistra sta in alto
+            steer_line = QPolygonF([xy(t0, 0.5 - st * k) for t0, _, _, st in hist])
             pen = QPen(_WHITE, 1.5)
             pen.setJoinStyle(Qt.RoundJoin)
             pen.setCapStyle(Qt.RoundCap)
@@ -1076,13 +1185,13 @@ class Overlay(QWidget):
             p.drawText(px, top + 6, pw, 16, Qt.AlignRight | Qt.AlignVCenter, tag)
 
     def _pedal_tag(self, now: float) -> tuple[str, QColor]:
-        """Current-state chip: TRAIL while overlapping, COAST + how long while
-        coasting, else nothing."""
+        """Current-state chip: TRAIL while braking with the wheel turned,
+        COAST + how long while coasting, else nothing."""
         hist = self._pedal_hist
         if not hist:
             return "", _GREY
-        _, thr, brk, _ = hist[-1]
-        if thr > _PEDAL_EPS and brk > _PEDAL_EPS:
+        _, thr, brk, steer = hist[-1]
+        if _trailing(brk, steer):
             return t("overlay.trail"), _AMBER
         if thr <= _PEDAL_EPS and brk <= _PEDAL_EPS:
             start = hist[-1][0]

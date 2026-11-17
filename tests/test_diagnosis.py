@@ -357,10 +357,14 @@ def test_the_engine_hands_the_engineer_the_corner_names_it_already_has(tmp_path)
     lap.lost_at = 0.71
     eng = CoachEngine(reader=_Dead(), laps_dir=tmp_path)
     eng._engineer = RaceEngineer(GT3_PROFILE, min_stable=3)
-    eng._corners = detect_corners(lap.samples)
-    eng._corner_names = {c.index: "Variante Ascari" for c in eng._corners
-                         if c.entry_pos <= 0.71 <= c.exit_pos}
-    assert eng._corner_names, "il fixture deve avere una curva attorno a 0.71"
+    # Dal 17/11 l'Ingegnere ha le sue curve e i suoi nomi, copiati quando nasce
+    # (`engine._engineer_corners`): qui l'Ingegnere e' creato a mano, quindi
+    # la copia si fa a mano.
+    eng._engineer_corners = detect_corners(lap.samples)
+    eng._engineer_corner_names = {c.index: "Variante Ascari"
+                                  for c in eng._engineer_corners
+                                  if c.entry_pos <= 0.71 <= c.exit_pos}
+    assert eng._engineer_corner_names, "il fixture deve avere una curva attorno a 0.71"
     eng._observe_lap(lap)
     assert "Variante Ascari" in eng._engineer_decision.message
     eng.close()

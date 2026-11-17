@@ -72,5 +72,17 @@ def test_bundled_test_plan_is_valid(tmp_path):
     plan = c.get("/static/test_plan.json").json()
     ids = [t["id"] for cat in plan["categories"] for t in cat["tests"]]
     assert len(ids) == len(set(ids)) and len(ids) >= 40    # unique, non-trivial
-    assert {cat["id"] for cat in plan["categories"]} == {"GT3", "Formula", "Stradali", "Generale"}
+    assert {cat["id"] for cat in plan["categories"]} == {"GT3", "Formula", "Stradali", "Generale", "ING"}
     assert plan["glossary"]
+
+
+def test_bundled_test_plan_has_the_engineer_session(tmp_path):
+    """La prova finale dell'Ingegnere: dieci passi, ognuno con cosa fare e cosa
+    deve succedere (foglio «Ingegnere» del piano, categoria ING)."""
+    c = TestClient(create_api(tmp_path))
+    plan = c.get("/static/test_plan.json").json()
+    cat = next(x for x in plan["categories"] if x["id"] == "ING")
+    assert len(cat["tests"]) == 10
+    for t in cat["tests"]:
+        assert t["id"].startswith("ING-") and t["what"], t
+        assert t["how"] and t["expected"], t

@@ -79,6 +79,7 @@ _UI: dict[str, dict[str, str]] = {
     "overlay.steer_right": {"en": "R", "it": "DX"},
     "overlay.trail": {"en": "TRAIL", "it": "TRAIL"},
     "overlay.coast": {"en": "COAST", "it": "COAST"},
+    "overlay.ref_mark": {"en": "REFERENCE", "it": "RIFERIMENTO"},
     # terminal coach
     "coach.title": {"en": "voice coach", "it": "coach vocale"},
     "coach.listening": {"en": "Listening. Drive and I'll coach you.",
@@ -183,6 +184,26 @@ _UI: dict[str, dict[str, str]] = {
               "uno più veloce, il coach ti misura su quello."},
     "import.done": {"en": "Imported the {car} lap at {track}, {time}.",
                     "it": "Ho importato il giro di {car} a {track}, {time}."},
+    # Cosa succede dopo l'import (27/10): prima non lo diceva nessuno, e un
+    # giro PRO piu' lento del tuo si salvava senza cambiare niente.
+    "import.reference": {
+        "en": "It's faster than your best, {own}, so from now on the coach "
+              "measures you against it.",
+        "it": "È più veloce del tuo migliore, {own}, quindi da ora il coach ti "
+              "misura su questo."},
+    "import.first": {
+        "en": "You have no laps of your own with this car here yet, so the "
+              "coach measures you against this one.",
+        "it": "Non hai ancora giri tuoi con quest'auto su questa pista, quindi "
+              "il coach ti misura su questo."},
+    "import.slower": {
+        "en": "Your best, {own}, is faster, so it stays the reference. You'll "
+              "find the PRO lap in the report's comparison list.",
+        "it": "Il tuo migliore, {own}, è più veloce, quindi resta lui il "
+              "riferimento. Il giro PRO lo trovi fra i confronti del report."},
+    "import.duplicate": {
+        "en": "That PRO lap is already imported, so I didn't add it again.",
+        "it": "Questo giro PRO c'era già, quindi non l'ho aggiunto di nuovo."},
     "import.failed": {"en": "I can't read that lap. {err}",
                       "it": "Non riesco a leggere questo giro. {err}"},
     "btn.guide": {"en": "User guide", "it": "Guida all'uso"},
@@ -467,18 +488,30 @@ _UI: dict[str, dict[str, str]] = {
               "insieme a Coach Live, e per fare lo scambio in un passo."},
     "set.pedals": {"en": "Show the pedal trace", "it": "Mostra la traccia dei pedali"},
     "set.pedals.help": {
-        "en": "A strip under the overlay shows your throttle (green) and brake "
-              "(red) as you use them. The ribbon under it turns amber while both "
-              "pedals are down, which is trail braking. It turns grey while "
-              "neither is, and that's time you're giving away. It's the only "
-              "place where you watch your brake release as you do it, instead "
-              "of being told about it afterwards.",
-        "it": "Una striscia sotto l'overlay mostra il gas (verde) e il freno "
-              "(rosso) mentre li usi. Il nastro sotto diventa ambra quando premi "
-              "tutti e due i pedali, cioè quando fai trail braking. Diventa "
-              "grigio quando non ne premi nessuno, e quello è tempo regalato. È "
+        "en": "A panel under the overlay shows your throttle (green), brake "
+              "(red) and steering as you use them. It turns amber while you're "
+              "still braking with the wheel turned, which is trail braking. It "
+              "turns grey while you press neither pedal, and that's time you're "
+              "giving away. It's the only place where you watch your brake "
+              "release as you do it, instead of being told about it afterwards.",
+        "it": "Un pannello sotto l'overlay mostra gas (verde), freno (rosso) e "
+              "sterzo mentre li usi. Diventa ambra quando freni ancora col "
+              "volante girato, cioè quando fai trail braking. Diventa grigio "
+              "quando non premi nessun pedale, e quello è tempo regalato. È "
               "l'unico posto dove vedi il rilascio del freno mentre lo fai, "
               "invece di sentirtelo raccontare dopo."},
+    "set.pedal_view": {"en": "How the pedals show", "it": "Come si vedono i pedali"},
+    "set.pedal_view_trace": {"en": "Trace", "it": "Traccia"},
+    "set.pedal_view_bars": {"en": "Bars", "it": "Barre"},
+    "set.pedal_view.help": {
+        "en": "The trace draws the last few seconds, so you see the shape of "
+              "your release on the next straight. The bars show this instant, "
+              "with the percentage inside. The cyan mark is what your reference "
+              "lap was pressing at this point of the track.",
+        "it": "La traccia disegna gli ultimi secondi, così sul rettilineo dopo "
+              "vedi la forma del rilascio. Le barre mostrano questo istante, con "
+              "la percentuale dentro. La tacca ciano è quanto premeva il tuo giro "
+              "di riferimento in questo punto della pista."},
     "set.pedals_hint": {
         "en": "The pedal trace makes the overlay taller.",
         "it": "La traccia dei pedali allunga l'overlay."},
@@ -490,10 +523,10 @@ _UI: dict[str, dict[str, str]] = {
               "progetto. Alzala su un monitor 4K o se stai lontano dallo schermo, "
               "abbassala se ti copre troppa pista."},
     "set.scale_hint": {
-        "en": "The pedal trace and the overlay size apply from the next Coach "
-              "Live start.",
-        "it": "Traccia dei pedali e grandezza dell'overlay valgono dal prossimo "
-              "avvio di Coach Live."},
+        "en": "Size, what the overlay shows and the colours apply right away, "
+              "without Save. The pedal trace applies from the next Coach Live start.",
+        "it": "Grandezza, cosa mostra l'overlay e colori valgono subito, senza "
+              "Salva. La traccia dei pedali vale dal prossimo avvio di Coach Live."},
     # «Sposta l'overlay» (overlay_place.py) e il suo ritorno al centro.
     "btn.place_overlay": {"en": "Move the overlay", "it": "Sposta l'overlay"},
     "btn.center_overlay": {"en": "Back to the centre", "it": "Rimetti al centro"},
@@ -503,18 +536,20 @@ _UI: dict[str, dict[str, str]] = {
         "it": "Apre una copia dell'overlay da trascinare. Funziona col gioco in "
               "Borderless, anche con Coach Live acceso."},
     "set.place_hint": {
-        "en": "Drag the copy where you want it and press Enter. The Coach Live "
-              "overlay moves there by itself.",
-        "it": "Trascina la copia dove vuoi e premi Invio. L'overlay di Coach Live "
-              "si sposta da solo."},
+        "en": "Drag the copy where you want it. The position is saved when you "
+              "let go, and the Coach Live overlay moves there by itself.",
+        "it": "Trascina la copia dove vuoi. La posizione si salva quando lasci il "
+              "mouse, e l'overlay di Coach Live si sposta da solo."},
     "set.centered": {"en": "The overlay is back at the top centre.",
                      "it": "L'overlay è tornato in alto al centro."},
     "place.title": {"en": "Move the overlay · size {scale}",
                     "it": "Sposta l'overlay · grandezza {scale}"},
-    "place.keys": {"en": "Drag with the mouse. Wheel for the size. Enter saves, "
-                         "Esc cancels, R puts it back at the centre.",
-                   "it": "Trascina col mouse. Rotella per la grandezza. Invio "
-                         "salva, Esc annulla, R lo rimette al centro."},
+    "place.keys": {"en": "Drag with the mouse and wheel for the size, both "
+                         "saved by themselves. Enter or Esc closes, R puts it "
+                         "back at the centre.",
+                   "it": "Trascina col mouse e usa la rotella per la grandezza, "
+                         "si salvano da sole. Invio o Esc chiude, R lo rimette al "
+                         "centro."},
     "place.theme": {"en": "Braking", "it": "Frenata"},
     "btn.save": {"en": "Save", "it": "Salva"},
     "set.saved": {"en": "Saved.", "it": "Salvato."},
@@ -711,10 +746,21 @@ _CUE_EN: dict[str, str] = {
     "Porta più velocità in curva": "Carry more speed through the corner",
     # fuel.py
     "Ultimo giro di benzina, rientra ai box": "Last lap of fuel, box now",
+    "Benzina sufficiente fino a fine sessione.": "Enough fuel to the end of the session.",
+    # lapvalid.py
+    "Giro invalidato, sei uscito largo. Al prossimo giro la tieni dentro.":
+        "Lap invalidated, you ran wide. Keep it inside next lap.",
+    "Giro invalidato, hai tagliato la curva. Il prossimo lo chiudi pulito.":
+        "Lap invalidated, you cut the corner. Make the next one clean.",
+    "Giro invalidato, limiti di pista. Ora ne fai uno pulito.":
+        "Lap invalidated, track limits. Now drive a clean one.",
+    "Giro invalidato, stesso errore di prima. Qui puoi fare meglio.":
+        "Lap invalidated, same mistake as before. You can do better here.",
     # pitcall.py
     "Modifica pronta, rientra ai box a fine giro":
         "Setup change ready, box this lap",
     "Ingresso box qui davanti, rientra": "Pit entry just ahead, come in",
+    "Rientra ai box, scegli l'assetto.": "Come into the pits, choose the setup.",
     "Sei ai box. Apri la pagina Ingegnere nel browser. "
     "Prepara la modifica e applicala. "
     "Ricarica il setup dal garage prima di uscire.":
@@ -742,6 +788,7 @@ _CUE_EN_PATTERNS: list[tuple[re.Pattern, object]] = [
     # quindi «1 giro» restava in italiano e «1 decimi» diventava «1 tenths».
     (re.compile(r"^Qui perdi (\d+) decim[oi]$"),
      lambda m: f"Losing {m.group(1)} tenth{'' if m.group(1) == '1' else 's'} here"),
+    (re.compile(r"^Aggiungi (\d+) litri\.$"), r"Add \1 litres."),
     (re.compile(r"^Benzina per circa (\d+) gir[oi]\.$"),
      lambda m: f"Fuel for about {m.group(1)} lap{'' if m.group(1) == '1' else 's'}."),
     # advisor.py — ABS / TC, with or without the "dal N al N+1" detail

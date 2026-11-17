@@ -25,7 +25,7 @@ from ._common import (
     O,
     U,
     PressurePhase,
-    _SEG_LIMIT,
+    SegmentPhase,
     none_present,
     remedy,
 )
@@ -114,24 +114,18 @@ class _MechanicalPhase(WorkPhase):
         return none_present(window, self.owns)
 
 
-class _BrakeBiasPhase(WorkPhase):
+class _BrakeBiasPhase(SegmentPhase):
+    segments = "lock"
+
     def owns(self, symptom: Symptom) -> bool:
         return symptom.balance == O and symptom.phase == EN
 
-    def gate(self, window: list[LapStats]) -> bool:
-        if not none_present(window, self.owns):
-            return False
-        return all(s.lock_segments < _SEG_LIMIT for s in window)
 
+class _ElectronicsPhase(SegmentPhase):
+    segments = "spin"
 
-class _ElectronicsPhase(WorkPhase):
     def owns(self, symptom: Symptom) -> bool:
         return symptom.balance == O and symptom.phase == EX
-
-    def gate(self, window: list[LapStats]) -> bool:
-        if not none_present(window, self.owns):
-            return False
-        return all(s.spin_segments < _SEG_LIMIT for s in window)
 
 
 GT3_PROFILE = Profile(

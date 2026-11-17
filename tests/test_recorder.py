@@ -136,6 +136,51 @@ def test_decimation_thins_dense_samples():
     assert len(rec._buf.samples) <= 2
 
 
+# --- lo stacco alla frequenza piena ------------------------------------------
+#
+# Il registratore tiene un campione ogni ~100 ms: a 250 km/h sono 7 m, e il
+# pedale va da zero a pieno in meno di un campione. Misurato sull'archivio il
+# 16/11: la dispersione dello stacco in tre giri puliti era sempre un campione
+# (mediana 6,9 m), cioe' il campionamento e non il pilota. Il fotogramma in cui
+# il freno passa la soglia, e quello prima, si tengono sempre.
+
+_FRAME_MS = 16                      # ~60 Hz
+_DPOS = 69.4 * _FRAME_MS / 1000 / 5000   # 250 km/h su 5 km
+
+
+def _brake_run(brakes, start=0.30):
+    """Fotogrammi a 60 Hz con il freno dato; ritorna i campioni tenuti."""
+    rec = LapRecorder()
+    for i, b in enumerate(brakes):
+        rec.update(synth.snap(pos=start + i * _DPOS, completed_laps=0,
+                              current_lap_ms=10_000 + i * _FRAME_MS,
+                              speed_kmh=250.0, brake=b))
+    return rec._buf.samples
+
+
+def test_the_frame_where_braking_starts_is_kept_with_the_one_before():
+    # Il freno passa 0,15 fra il fotogramma 9 (0,05) e il 10 (0,40): con la
+    # decimazione a 100 ms nessuno dei due verrebbe tenuto.
+    brakes = [0.0] * 9 + [0.05, 0.40, 1.0] + [1.0] * 8
+    kept = {s.t_ms: s.brake for s in _brake_run(brakes)}
+    before, onset = 10_000 + 9 * _FRAME_MS, 10_000 + 10 * _FRAME_MS
+    assert kept.get(before) == 0.05
+    assert kept.get(onset) == 0.40
+
+
+def test_holding_the_brake_does_not_bring_back_every_frame():
+    held = _brake_run([1.0] * 60)
+    free = _brake_run([0.0] * 60)
+    assert len(held) == len(free)
+
+
+def test_kept_samples_stay_in_order():
+    brakes = ([0.0] * 9 + [0.05, 0.40] + [1.0] * 10 + [0.0] * 10
+              + [0.10, 0.90] + [1.0] * 5)
+    ts = [s.t_ms for s in _brake_run(brakes)]
+    assert ts == sorted(ts) and len(ts) == len(set(ts))
+
+
 # --- l'orologio del giro, misurato invece che dedotto -----------------------
 #
 # Al traguardo `last_lap_ms` puo' ancora essere il tempo del giro prima, e il

@@ -229,6 +229,28 @@ def none_present(window: list[LapStats], owns) -> bool:
     return True
 
 
+class SegmentPhase(WorkPhase):
+    """Una fase il cui cancello guarda, oltre ai sintomi, un contatore di tratti.
+
+    ``segments`` e' ``"spin"`` (pattinamento) o ``"lock"`` (bloccaggi). Il
+    cancello e la frase leggono lo stesso campo: erano sei copie della stessa
+    riga nei tre profili, e la frase non sapeva quale contatore l'avesse chiuso.
+    """
+
+    segments: str = ""
+
+    def _recurring(self, window: list[LapStats]) -> int:
+        return sum(getattr(s, f"{self.segments}_segments") >= _SEG_LIMIT
+                   for s in window)
+
+    def gate(self, window: list[LapStats]) -> bool:
+        return none_present(window, self.owns) and not self._recurring(window)
+
+    def unfixed(self, window: list[LapStats]) -> tuple[str, int, int] | None:
+        n = self._recurring(window)
+        return (self.segments, n, len(window)) if n else None
+
+
 #: Quello che separa il sintomo dall'azione in una frase di rimedio.
 _THEN = (", quindi ", ", so ")
 
@@ -283,6 +305,10 @@ class PressurePhase(WorkPhase):
         #: lo sa — e non propone: i profili la costruiscono cosi', e' il motore
         #: che gliela da' (`RaceEngineer.__init__`).
         self.steps: Steps = steps if steps is not None else UnknownSteps()
+        #: Psi a caldo per click misurati su quest'auto, per asse. Il motore
+        #: ci mette il suo dizionario (`RaceEngineer.hot_per_click`); vuoto,
+        #: vale il passo del file.
+        self.hot_per_click: dict[str, float] = {}
 
     def reconfigure(self, **kw) -> "PressurePhase":
         pw = kw.get("pressure_window") or (self.target, self.tol)
@@ -366,41 +392,45 @@ class PressurePhase(WorkPhase):
         return ""
 
     def pressure_remedy(self, stats: LapStats) -> ProposedChange | None:
+        """La modifica per TUTTI gli assi fuori finestra, in una sosta sola.
+
+        Fino al 15/11 tornava il primo asse fuori (davanti), e il dietro
+        aspettava la sosta dopo e altri tre giri: l'8/11 il posteriore e'
+        rimasto a 27,2–27,4 per tutta la sera.
+        """
         if not stats.pressures_hot:
             return None
+        lang = current_language()
+        atomics: list[AtomicChange] = []
+        whys: list[str] = []
+        levers: list[str] = []
+        short = False
         for ax, slots, cur, ppc in self._out(stats.pressures_hot):
             if ppc is None:
                 continue                      # vedi `pressure_by_hand`
-            # Fuori finestra vuol dire piu' di mezzo click dal bersaglio, quindi
-            # `wanted` non e' mai zero.
-            wanted = round((self.target - cur) / ppc)
+            # Quanto si muove la pressione A CALDO per un click, se l'abbiamo
+            # gia' misurato su quest'auto; altrimenti il passo del file.
+            hot = self.hot_per_click.get(ax) or ppc
+            wanted = round((self.target - cur) / hot) or (
+                1 if self.target > cur else -1)
             cap = max(1, int(_MAX_PSI_PER_STOP / ppc))
             clicks = max(-cap, min(cap, wanted))
-            atomics = tuple(AtomicChange("tyrePressure", s, clicks) for s in slots)
+            atomics += [AtomicChange("tyrePressure", s, clicks) for s in slots]
             # Dove arriva QUESTO passo, che non e' dove vorremmo arrivare appena
-            # il taglio morde: a 24.7 psi con finestra 27.5 il passo vale 25.5,
-            # e la frase prometteva 27.5. Il pilota che ricarica il setup e
-            # rimisura non aveva modo di capire se era andata come doveva.
-            reached = cur + clicks * ppc
-            short = clicks != wanted
-            lang = current_language()
+            # il taglio morde: il pilota che ricarica il setup e rimisura deve
+            # poter capire se e' andata come doveva.
+            reached = cur + clicks * hot
+            short = short or clicks != wanted
             n = fmt_num(abs(clicks), 0, lang)
             now, to = _psi(cur, lang), _psi(reached, lang)
             window = _psi(self.target, lang)
             up = clicks > 0
             if lang == "it":
-                # …e in italiano l'asse ha un nome italiano: la frase diceva
-                # "Pressione front", meta' tradotta, nell'unico punto dell'app
-                # dove il pilota legge un numero e poi va a girare una manopola.
                 axis = "anteriore" if ax == "front" else "posteriore"
                 act = (f"aggiungi {n} click e sali a {to}" if up
                        else f"togli {n} click e scendi a {to}")
                 why = (f"La pressione {axis} è {now}, fuori dalla finestra di "
                        f"circa {window}, quindi {act}.")
-                if short:
-                    why += " È il massimo per una sosta, il resto al prossimo rientro."
-                # La leva è quella che la voce dell'Ingegnere dice in pista: un
-                # imperativo, come le leve degli altri rimedi.
                 lever = (f"Aggiungi {n} click alla pressione {axis}" if up
                          else f"Togli {n} click dalla pressione {axis}")
             else:
@@ -409,9 +439,22 @@ class PressurePhase(WorkPhase):
                        else f"take {n} {word} off to bring it down to {to}")
                 why = (f"{ax.capitalize()} pressure is {now}, outside the window "
                        f"of about {window}, so {act}.")
-                if short:
-                    why += " That's the most for one stop, the rest next time in."
                 lever = (f"Add {n} {word} to the {ax} pressure" if up
                          else f"Take {n} {word} off the {ax} pressure")
-            return ProposedChange(atomics, why, tr(self.label), "BOX", lever=lever)
-        return None
+            whys.append(why)
+            levers.append(lever)
+        if not atomics:
+            return None
+        why = " ".join(whys)
+        if lang == "it":
+            if short:
+                why += " È il massimo per una sosta, il resto al prossimo rientro."
+            joiner = " e "
+        else:
+            if short:
+                why += " That's the most for one stop, the rest next time in."
+            joiner = " and "
+        lever = joiner.join([levers[0]] + [x[:1].lower() + x[1:]
+                                           for x in levers[1:]])
+        return ProposedChange(tuple(atomics), why, tr(self.label), "BOX",
+                              lever=lever)

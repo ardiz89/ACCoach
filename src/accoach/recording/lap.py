@@ -31,6 +31,13 @@ from datetime import datetime, timezone
 
 from ..telemetry.snapshot import SessionType, TelemetrySnapshot
 
+#: Il pedale del freno da cui si «frena»: lo stacco della scheda frenate, del
+#: coach e del registratore (che tiene sempre quel fotogramma). Sta qui, nel
+#: modulo piu' basso, perche' il registratore non puo' importare il coach: il
+#: coach importa il registratore. `coaching.analyzer` lo riespone come
+#: `_BRAKE_ON`.
+BRAKE_ON = 0.15
+
 # --- how far to trust a stored `clean` flag --------------------------------
 #
 # On ACC, `clean` used to be decided by `numberOfTyresOut` — a field ACC
@@ -53,6 +60,16 @@ _ACC_TRACK_LIMITS_UTC = datetime(2026, 7, 21, 15, 7, 43, tzinfo=timezone.utc)
 # answer "which game recorded this lap", because the lap file doesn't say. On AC
 # the old rule worked — validated live at Spa — so AC laps keep their verdict.
 _ACC_COMPOUNDS = ("dry_compound", "wet_compound")
+
+
+def prefer_pro(own_ms: int | None, pro_ms: int) -> bool:
+    """Whether an imported PRO lap replaces your own reference.
+
+    Only when it is faster, or when you have no reference of your own yet:
+    the import hint promises exactly that, and a slower PRO lap would make
+    the coach measure you against a target you already beat. One rule for
+    the catalog and for the scan that stands in for it."""
+    return pro_ms > 0 and (own_ms is None or pro_ms < own_ms)
 
 
 def clean_verdict(clean: object, schema: int = 0, compound: str = "",
@@ -127,7 +144,7 @@ SAMPLE_FIELDS = (
     "speed_kmh",
     "throttle",      # 0..1
     "brake",         # 0..1
-    "steer_angle",   # -1..1 fraction of lock, +left
+    "steer_angle",   # -1..1 fraction of lock, +right (measured 03/11)
     "gear",          # "R" / "N" / "1".. as shown to the driver
     "rpm",
     "g_lat",         # lateral G

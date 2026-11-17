@@ -33,7 +33,7 @@ from .coaching.howto import (
     reached as reached_text, verdict)
 from .comparison import Reference
 from .recording import load_lap
-from .sessions import Session, group_sessions, parse_utc
+from .sessions import Session, group_sessions, parse_utc, stood_still
 from .telemetry.snapshot import format_lap_time
 from .track import detect_corners
 from .trackdata import name_corners
@@ -141,6 +141,10 @@ def replay(session: Session, reference_row: dict, corners, ref: Reference,
             # Anche il «no» va in cache: il verdetto sull'orologio non cambia,
             # e rileggere il file a ogni apertura costerebbe quanto il debrief.
             hit = None
+            # Un giro con una sosta non misura i difetti né lo scarto: gli
+            # errori invece sono successi lo stesso, come nei giri tagliati.
+            if stood_still(lap):
+                measured = False
             if clock_covers_lap(lap):
                 lap.clean = {0: False, 1: True}.get(row.get("clean"))
                 try:
@@ -285,7 +289,10 @@ class _Context:
 
 
 def _context(cat, car: str, track: str, index: int, lang: str) -> _Context:
-    rows = cat.laps_for(car, track)
+    # Le sessioni sono le tue: un giro PRO importato oggi finiva dentro la
+    # sessione di oggi.
+    rows = [r for r in cat.laps_for(car, track)
+            if (r.get("source") or "own") != "pro"]
     runs = group_sessions(rows)
     ctx = _Context(runs=runs)
     if index < 0 or (index > 0 and index >= len(runs)):

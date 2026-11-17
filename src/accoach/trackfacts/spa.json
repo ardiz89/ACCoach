@@ -1,0 +1,238 @@
+{
+ "disputed": [
+  {
+   "corner": "Bus Stop",
+   "reason": "shift all the way down to first",
+   "type": "gear",
+   "values": [
+    {
+     "n": 2,
+     "sources": [
+      {
+       "quote": "break as hard as possible second gear",
+       "start_s": 396.16,
+       "url": "https://www.youtube.com/watch?v=4YX-55DKnso"
+      },
+      {
+       "quote": "shifting down into second gear",
+       "start_s": 424.36,
+       "url": "https://www.youtube.com/watch?v=V6xhn7XqxHA"
+      }
+     ],
+     "value": "2"
+    }
+   ],
+   "why": "respinto"
+  }
+ ],
+ "facts": [],
+ "single": [
+  {
+   "car_class": "gt3_presunta",
+   "corner": "La Source",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "Switch all the way down to first gear",
+     "start_s": 49.28,
+     "url": "https://www.youtube.com/watch?v=f6cnKQI0V34"
+    }
+   ],
+   "state": "singolo",
+   "type": "gear",
+   "value": "1"
+  },
+  {
+   "corner": "Raidillon",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "I end up cutting the final left part of it",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/1rfmnxs/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "mistake",
+   "value": "I end up cutting the final left part of it"
+  },
+  {
+   "corner": "Raidillon",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "Not doing Raidillon flatout",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/1rfmnxs/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "mistake",
+   "value": "Not doing Raidillon flatout"
+  },
+  {
+   "corner": "Raidillon",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "and especially not when going through Eau Rouge & Raidillon",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/1r82adp/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "mistake",
+   "value": "and especially not when going through Eau Rouge & Raidillon"
+  },
+  {
+   "car_class": "gt3_presunta",
+   "corner": "Les Combes",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "braking at the 100-m board",
+     "start_s": 319.28,
+     "url": "https://www.youtube.com/watch?v=V6xhn7XqxHA"
+    }
+   ],
+   "state": "singolo",
+   "type": "brake",
+   "value": "board:100"
+  },
+  {
+   "corner": "Les Combes",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "Keep it tight for a second more into the first part of Les Combes",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/1veakdo/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "line",
+   "value": "Keep it tight for a second more into the first part of Les Combes"
+  },
+  {
+   "corner": "Les Combes",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "you want to mount the kerbs on the left in the second corner with your",
+     "start_s": null,
+     "url": "https://www.reddit.com/comments/1rfmnxs/"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "line",
+   "value": "you want to mount the kerbs on the left in the second corner with your"
+  },
+  {
+   "car_class": "gt3_presunta",
+   "corner": "Rivage",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "start braking at the start of the curb",
+     "start_s": 165.12,
+     "url": "https://www.youtube.com/watch?v=8mv7HYAcSms"
+    }
+   ],
+   "state": "singolo",
+   "type": "brake",
+   "value": "object:kerb_start"
+  },
+  {
+   "corner": "Rivage",
+   "n": 1,
+   "sources": [
+    {
+     "car_class": "ignota",
+     "quote": "you need to trailbrake especially into rivage",
+     "start_s": 360.08,
+     "url": "https://www.youtube.com/watch?v=_ExkV2PDiUE"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "line",
+   "value": "you need to trailbrake especially into rivage"
+  },
+  {
+   "car_class": "gt3_presunta",
+   "corner": "Pouhon",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "change down to fourth gear while straight",
+     "start_s": 217.599,
+     "url": "https://www.youtube.com/watch?v=8mv7HYAcSms"
+    }
+   ],
+   "state": "singolo",
+   "type": "gear",
+   "value": "4"
+  },
+  {
+   "car_class": "gt3_presunta",
+   "corner": "Fagnes",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "shift down to second as you begin turning into the corner",
+     "start_s": 259.359,
+     "url": "https://www.youtube.com/watch?v=8mv7HYAcSms"
+    }
+   ],
+   "state": "singolo",
+   "type": "gear",
+   "value": "2"
+  },
+  {
+   "car_class": "gt3_presunta",
+   "corner": "Stavelot",
+   "n": 1,
+   "sources": [
+    {
+     "quote": "change down to second and turn in as the curb ends",
+     "start_s": 289.68,
+     "url": "https://www.youtube.com/watch?v=8mv7HYAcSms"
+    }
+   ],
+   "state": "singolo",
+   "type": "gear",
+   "value": "2"
+  },
+  {
+   "corner": "Stavelot",
+   "n": 1,
+   "sources": [
+    {
+     "car_class": "ignota",
+     "quote": "we go over the curb at stavalo",
+     "start_s": 664.72,
+     "url": "https://www.youtube.com/watch?v=_ExkV2PDiUE"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "line",
+   "value": "we go over the curb at stavalo"
+  },
+  {
+   "corner": "Bus Stop",
+   "n": 1,
+   "sources": [
+    {
+     "car_class": "ignota",
+     "quote": "braking nice and early for the bus stop",
+     "start_s": 888.16,
+     "url": "https://www.youtube.com/watch?v=_ExkV2PDiUE"
+    }
+   ],
+   "state": "descrittivo",
+   "type": "line",
+   "value": "braking nice and early for the bus stop"
+  }
+ ],
+ "track": "spa",
+ "version": 3
+}

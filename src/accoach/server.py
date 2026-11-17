@@ -18,10 +18,11 @@ import json
 import time
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
 from . import __version__
+from . import paths
 from .engine import CoachEngine
 from .logging_setup import get_logger
 from .netinfo import local_addresses
@@ -144,7 +145,8 @@ def create_app(engine: CoachEngine | None = None, hz: float = 15.0, *,
     async def lifespan(_app: FastAPI):
         if holder["engine"] is None and not spettatore:
             from .config import load_config
-            holder["engine"] = CoachEngine(acquire_hz=load_config().acquire.hz)
+            holder["engine"] = CoachEngine(acquire_hz=load_config().acquire.hz,
+                                           logs_dir=paths.logs_dir())
         holder["task"] = asyncio.create_task(broadcast_loop())
         try:
             yield
@@ -194,12 +196,49 @@ def create_app(engine: CoachEngine | None = None, hz: float = 15.0, *,
     # estraneo non arriva nemmeno a farsi rispondere dal CORS.
     app.add_middleware(GuardMiddleware, page_port=page_port)
 
+    async def _path_from(request: Request) -> str | None:
+        """Il file che la pagina manda nel corpo (``{"path": ...}``), o None.
+
+        Il corpo e' facoltativo: le pagine di prima mandano ``{}``, e un corpo
+        vuoto, che non e' un oggetto o che non si legge vale come allora.
+        """
+        try:
+            body = json.loads(await request.body() or b"null")
+        except (ValueError, UnicodeDecodeError):
+            return None
+        path = body.get("path") if isinstance(body, dict) else None
+        return path if isinstance(path, str) and path.strip() else None
+
     @app.post("/engineer/applied")
-    async def engineer_applied() -> dict:
-        """The driver wrote the proposed setup: advance the engineer's re-test."""
+    async def engineer_applied(request: Request) -> dict:
+        """The driver wrote the proposed setup: advance the engineer's re-test.
+
+        Con ``{"path": ...}`` il motore sa quale file e' stato scritto, e
+        all'uscita dai box controlla che sia quello in macchina."""
         eng = holder.get("engine")
         if eng is not None and hasattr(eng, "mark_setup_applied"):
-            eng.mark_setup_applied()
+            path = await _path_from(request)
+            if path is None:
+                eng.mark_setup_applied()
+            else:
+                eng.mark_setup_applied(path=path)
+            return {"ok": True}
+        return {"ok": False}
+
+    @app.post("/engineer/base")
+    async def engineer_base(request: Request) -> dict:
+        """Ai box il pilota ha detto quale assetto ha caricato: l'ingegnere
+        scioglie la prova che le gomme hanno smentito e rifa' la base.
+
+        Con ``{"path": ...}`` il file scelto: da li' il motore impara lo
+        scarto del ripartitore e sa se e' quello che HONE aveva scritto."""
+        eng = holder.get("engine")
+        if eng is not None and hasattr(eng, "mark_base_confirmed"):
+            path = await _path_from(request)
+            if path is None:
+                eng.mark_base_confirmed()
+            else:
+                eng.mark_base_confirmed(path=path)
             return {"ok": True}
         return {"ok": False}
 
@@ -319,7 +358,8 @@ def main(argv: list[str] | None = None) -> None:
     else:
         engine = CoachEngine(voice=_build_voice(cfg, enabled=voice_on),
                              acquire_hz=cfg.acquire.hz,
-                             engineer_voice=cfg.voice.engineer)
+                             engineer_voice=cfg.voice.engineer,
+                             logs_dir=paths.logs_dir())
 
     host = listen_host(cfg, argv)
     port = cfg.server.port

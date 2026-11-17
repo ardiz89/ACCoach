@@ -271,3 +271,15 @@ def test_the_off_comes_from_the_catalog_verdict(tmp_path):
     r = replay(session, ref_row, detect_corners(ref_lap.samples),
                Reference(ref_lap), {})
     assert sum(e["off"] for e in r.errors) == 0
+
+
+def test_un_giro_con_la_sosta_conta_gli_errori_ma_non_i_difetti(tmp_path):
+    rows, ref_row, ref, corners = _setup(tmp_path)
+    lap = synth.stop_at(synth.build_lap(clean=True), 0.3, 106_000)
+    lap.recorded_utc = "2026-10-20T10:40:00+00:00"
+    save_lap(lap, tmp_path)
+    newest = group_sessions(_rows(tmp_path))[0]
+    r = replay(newest, ref_row, corners, ref, {})
+    assert len(newest.valid_laps) == 4
+    assert len(r.laps) == 2 and len(r.errors) == 4
+    assert r.mean_gap_ms == pytest.approx((3000 + 4000) / 2)

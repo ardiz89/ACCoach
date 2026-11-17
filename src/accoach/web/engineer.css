@@ -75,6 +75,9 @@
 /* Low-confidence proposal: flag the whole box (not just the pill) and show a
    cautionary note, so a tentative call gets a second look before writing. */
 .engineer-says[data-conf="low"] { border-left-color: var(--red); border-left-style: dashed; }
+.es-loaded { color: var(--muted, #9aa4b2); font-size: 0.857rem; margin: 2px 0 6px; }
+.es-carry { color: var(--muted, #9aa4b2); font-size: 0.857rem; margin: 4px 0; }
+.setup-warn { color: var(--amber); font-size: 0.893rem; margin: 4px 0 8px; }
 .es-hint { color: var(--amber); font-size: 0.857rem; margin: 2px 0 4px; }
 
 /* The acceptance bar, before the laps. Quiet on purpose: it is the small print

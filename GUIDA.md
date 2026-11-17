@@ -90,7 +90,8 @@ giro il coach ti avvisa quando sbagli in assoluto.
 - Se l'auto **sottosterza** senti «L'anteriore scivola, entra più piano».
 - Se l'auto **sovrasterza** senti «Sovrasterzo, in uscita apri il gas piano».
 - Se **veleggi**, cioè non premi né freno né gas, senti «Veleggi, passa subito
-  dal freno al gas».
+  dal freno al gas». Lo senti al massimo una volta ogni tre giri, salvo che sia
+  il tema su cui stai lavorando. Sullo schermo la frase dice anche la curva.
 - Se molli il freno troppo presto, senza **trail braking**, senti «Molli presto
   il freno, tienine un filo all'inserimento».
 
@@ -112,6 +113,11 @@ riferimento**, il tuo più veloce fra quelli validi.
 > Quando non sei su un giro buono, come al rientro dai box, dopo un testacoda o
 > un'uscita di pista, il coach **tace** sui consigli tecnici. Restano solo gli
 > avvisi di sicurezza.
+
+Il coach non ti ripete la stessa frase a raffica. La stessa categoria di
+avviso non torna prima di **cinque secondi**, anche in un altro punto della
+pista. Nel giro di uscita dai box tace sul pattinamento, perché con le gomme
+fredde è normale. Ne riparla dal primo passaggio sulla linea.
 
 ### Un tema alla volta
 
@@ -245,6 +251,35 @@ Rientrare col menu del gioco, con «torna ai box», non insegna niente, ed è
 voluto. L'auto sparisce a metà pista e ricompare in garage. Prendere per buono
 quel salto vorrebbe dire mettere l'ingresso box in mezzo a un rettilineo.
 
+### L'Ingegnere riconosce l'assetto ai box
+
+Quando esci dai box, HONE legge dal gioco le manopole che il file di un assetto
+fissa. Sono il controllo di trazione, l'ABS, la mappa motore, il ripartitore e
+le pressioni a freddo. Le confronta coi file della cartella di questa auto e
+pista. Sotto la strada dell'Ingegnere, nella pagina Ingegnere e sul tablet,
+trovi una riga sola con l'esito. Se non ha ancora niente da dire, la riga non
+c'è.
+
+- **«In macchina c'è HONE_8.»** Un file torna coi valori letti. Se più
+  file sono compatibili e uno solo è vicino sulle pressioni, dice
+  «probabilmente». Nella tendina del file di partenza la
+  voce porta «· in macchina». HONE non la sceglie al posto tuo. La domanda
+  «Quale assetto hai caricato?» resta tua, e scegliere una voce è la risposta.
+- **«Assetto non salvato».** In macchina c'è qualcosa che non è uguale a nessun
+  file. Hai girato una manopola dopo aver caricato l'assetto, oppure non l'hai
+  salvato dal garage. Salvalo dal garage, poi scegli quel file come partenza.
+  Intanto l'Ingegnere continua a misurare, ma non propone modifiche ai box
+  finché non riconosce un file o non ne scegli uno nella pagina.
+- **«Non riconosciuto».** Più file tornano allo stesso modo, oppure non
+  c'è niente da confrontare, per esempio con la cartella vuota o in un gioco
+  senza questa lettura. Scegli tu il file di partenza dalla tendina, come hai sempre fatto.
+
+Se il file su cui stai lavorando non è quello riconosciuto, accanto al suo nome
+compare un avviso. Dice «In macchina c'è X, stai modificando Y». Non blocca la
+scrittura, ti avvisa prima di scrivere. Se hai tenuto qualche modifica fatta dal volante,
+c'è una riga in più sotto la proposta. Dice «Nel file metto anche le modifiche
+già tenute fatte dal volante».
+
 ### Come si registrano i giri
 
 Non devi fare niente di speciale. Avvia la sessione, prove, hotlap o gara, e
@@ -300,6 +335,8 @@ piastra serve a leggerlo anche sopra il cielo chiaro.
     riferimento** col tempo.
 - **In basso, solo in Completa**, a sinistra c'è il **focus**, cioè il tema su
   cui lavori e la sua curva. A destra c'è **l'ultima curva** chiusa coi decimi.
+  Il consiglio a voce e l'ultima curva misurano ogni curva col **tuo gesto
+  migliore** in quella curva. Il delta in alto resta sul riferimento.
   Quando il coach è passato alle parole brevi, descritte in «Un tema alla
   volta», nel focus trovi anche **la parola che senti**, come «meno freno».
 
@@ -314,10 +351,13 @@ Coach Live acceso.
 L'overlay non prende i click, così non ti ruba il mouse mentre guidi. Per
 spostarlo apri **Impostazioni** e premi **Sposta l'overlay**. Si apre una copia
 con un bordo tratteggiato, che trascini dove vuoi. La rotella cambia la
-grandezza. **Invio** salva, **Esc** chiude senza salvare, **R** lo rimette in
-alto al centro. Funziona anche con Coach Live acceso, e l'overlay vero si sposta
+grandezza. Posizione e grandezza si salvano da sole, appena lasci il mouse.
+**Invio** o **Esc** chiude la copia, **R** lo rimette in alto al centro. Funziona anche con Coach Live acceso, e l'overlay vero si sposta
 da solo entro un secondo. Il gioco deve essere in Borderless, come per vedere
 l'overlay. **Rimetti al centro** fa la stessa cosa di R senza aprire la copia.
+La copia è una sola, e se premi di nuovo il bottone non se ne apre un'altra.
+Mentre è aperta, grandezza e modalità scelte in Impostazioni si vedono subito,
+senza premere Salva.
 
 ### La traccia dei pedali
 
@@ -331,7 +371,7 @@ che si colora da solo.
 
 | Nastro | Cosa stai facendo |
 |---|---|
-| **ambra** | Premi tutti e due i pedali, quindi **stai facendo trail braking**. |
+| **ambra** | Freni ancora col volante girato, quindi **stai facendo trail braking**. |
 | **grigio** | Non premi nessun pedale, ed è **tempo regalato**. |
 | niente | Rilascio pulito. Hai mollato il freno e ripreso il gas senza vuoti. |
 
@@ -339,7 +379,14 @@ In alto a destra trovi la stessa cosa in una parola, **TRAIL**, oppure
 **COAST** col cronometro di quanto stai veleggiando.
 
 Il coach il trail braking te lo **dice**, ma a cose fatte. Qui lo **vedi mentre lo fai**, ed è l'unico modo di correggere un
-rilascio. Dove le due tracce si sovrappongono c'è il tuo trail braking.
+rilascio. La linea bianca è lo sterzo, con la sinistra in alto.
+
+In **Impostazioni**, alla voce **Come si vedono i pedali**, puoi scegliere le
+**barre** al posto della traccia. Le barre mostrano freno, gas e sterzo in questo
+istante, con la percentuale dentro. La tacca ciano su freno e gas è quanto
+premeva il tuo giro di riferimento in quel punto della pista. In frenata guardi
+se stai sopra o sotto la tacca. In ingresso curva guardi se la tua barra scende
+con lei o crolla prima. Senza un riferimento la tacca non c'è.
 
 > Sulle auto stradali il consiglio a voce sul trail braking è **spento**. Lì
 > portare il freno fino all'inserimento fa girare l'auto, e senza carico
@@ -393,6 +440,17 @@ motivo**.
 | *Giro fuori ritmo. Riprendo dal traguardo.* | Qui il delta **resta**, perché il giro è cominciato dal traguardo. |
 | *Giro lanciato* | Si accende per un momento quando il coach ricomincia a lavorare. |
 
+Entrando in corsia box, in gara, l'ingegnere ti dice quanti litri mettere nel
+menu del gioco. Il conto usa consumo e tempo sul giro misurati, il tempo rimasto e
+un giro di scorta. In prova lo dice solo con benzina per tre giri o meno, perché
+uno stop per l'assetto non deve riempire il serbatoio. Il menu resta a te.
+
+Quando un giro viene invalidato, il coach te lo dice una volta, a curva finita.
+Il gioco non spiega il motivo. HONE guarda se eri più largo o più dentro del tuo
+riferimento. In una chicane, senza riferimento o
+vicino alla linea dice solo «limiti di pista». Se ripeti lo stesso errore nella
+stessa curva, te lo fa notare.
+
 Su un **giro invalidato il coach continua a parlarti**, e sparisce solo il
 delta. Un giro annullato è un giro gratis. Frenate, bloccaggi, gomme e assetto
 si leggono lo stesso, e rientrare ai box sarebbe tempo buttato.
@@ -437,6 +495,12 @@ Sotto c'è il verdetto, in una o due frasi. Ti dice quanto lasci in media a ogni
 giro rispetto al tuo giro di riferimento, e dove si concentra. Lo confronta con
 la sessione prima, con la stessa auto sulla stessa pista. Se una sessione prima
 non c'è, lo scrive.
+
+Un giro con l'auto ferma per più di 5 secondi non fa media né difetti. Il gioco
+lo dà valido, ma quel tempo è una sosta e non guida. Gli errori di quel giro
+invece li conta, perché sono successi. Vale anche per la scheda Sessione, per
+Curva per curva e per la costanza dell'Andamento. Nella scheda Sessione leggi
+sotto il titolo quanti giri sono rimasti fuori.
 
 Poi trovi quattro blocchi, in quest'ordine.
 
@@ -534,6 +598,8 @@ Le schede stanno in tre gruppi, nell'ordine in cui di solito le leggi.
   che HONE leggesse il serbatoio non compare, perché non lo sappiamo, e non
   vuol dire zero litri. Non compare nemmeno sui giri in cui hai rifornito,
   perché in mezzo c'è un rifornimento e non un consumo.
+- **Curva per curva** mette in fila le curve di una sessione intera, dalla
+  peggiore alla migliore. È spiegata più sotto.
 - **Il giro spiegato** ti mostra il giro una cosa alla volta, invece di cinque
   grafici insieme. Ti dice cosa ti è costato di più, perché, e cosa fare, col
   grafico ritagliato sul tratto di cui parla. Sono al massimo tre passi. Se sei
@@ -555,6 +621,17 @@ Le schede stanno in tre gruppi, nell'ordine in cui di solito le leggi.
   il giro, una croce rossa segna il punto in cui l'hai perso. La mappa **resta
   ferma** mentre scorri i grafici. Se passi il mouse sul delta, lo stesso punto
   si accende anche sulla mappa.
+
+  Sotto le linee c'è la **pista vista dall'alto**, presa dai file di Assetto
+  Corsa che hai sul PC. Serve AC installato con quella pista, e vale anche per
+  i giri di ACC sulla stessa pista. Se AC non ha la pista, la mappa è quella di
+  sempre. La prima volta lo sfondo si prepara, poi resta pronto per le volte
+  dopo. Da vicino il paesaggio è sfocato, perché il gioco lo tiene così. Sopra
+  la pista la tua linea ha sempre lo stesso spessore, e il distacco lo leggi
+  solo dal colore. Senza sfondo la linea è anche più spessa dove perdi. Con la
+  **rotella** ingrandisci intorno al mouse, e trascinando sposti la vista. Con
+  un **doppio clic** torni al giro intero. Sul tablet e sugli altri dispositivi
+  la mappa resta senza sfondo.
 
   Sotto la mappa trovi **Le tue frenate**, il riquadro dei tuoi punti di frenata
   curva per curva. Per ogni curva leggi **a che velocità freni**, in che marcia,
@@ -737,6 +814,48 @@ curva.
   guardare ala e rapporti. Se sei più lento anche in curva, è velocità
   d'uscita e l'assetto non c'entra.
 
+### Curva per curva
+
+La scheda guarda tutti i giri validi di una sessione, non un giro solo. Ogni
+curva è una riga. Il numero a destra è quanto perdi lì in un giro tipico, cioè
+la mediana dei tuoi giri. In cima c'è la curva dove di solito perdi di più. Un
+giro con un errore grosso non sposta la classifica. Il selettore in alto sceglie
+la sessione, come nella Pagella.
+
+Un giro con l'auto ferma per più di 5 secondi non conta, come nella Pagella. In
+cima alla scheda leggi quanti giri sono rimasti fuori. Una testacoda ripresa
+subito invece conta.
+
+Aprendo una riga trovi quattro blocchi.
+
+- **Quanto e dove perdi.** Il tempo perso in un giro tipico, poi in tutta la
+  sessione al netto dei giri in cui lì guadagni, e in quanti giri perdi. Contano tutti i giri, anche
+  quelli in cui vai forte. La perdita mediana per fase e la causa che torna più
+  spesso vengono solo dai giri in cui perdi. Si misura contro
+  il tuo gesto migliore in quella curva, se c'è, altrimenti contro il
+  riferimento. In alto la pagina dice qual è il giro di riferimento, che può
+  venire da un'altra sessione.
+- **La tua frenata.** Dove attacchi il freno rispetto al punto più lento, quanto
+  cambia da un giro all'altro, la velocità di stacco e la marcia più bassa.
+- **La tua traiettoria.** Lo scarto tipico dalla linea del riferimento in
+  ingresso, all'apex e in uscita, dentro o fuori, e dove cade il tuo apice. Due
+  bottoni aprono nel Confronto il tuo giro migliore in quella curva e il giro più
+  tipico.
+- **Cosa dicono le fonti.** Sulle dodici piste di ACC, quello che dicono guide e
+  video pubblici su quella curva, con la citazione breve e il link al punto del
+  video. **Riferimento** è quello che dicono almeno due autori indipendenti e che
+  un controllo sulle fonti ha confermato. Oggi sono pochi. **Una fonte dice** è
+  quello che il controllo sulle fonti non ha confermato, anche quando lo dice più
+  di un autore. Accanto leggi quanti autori lo dicono. Non è un riferimento. **Le
+  fonti non concordano** mette accanto i valori diversi.
+- Marce e frenate vengono solo da fonti sulle GT3. Traiettoria ed errori vengono
+  da tutte le fonti su ACC. Se una fonte parla di un'altra auto, accanto leggi
+  «Su una GT4», «Su un'altra classe d'auto» o «Classe d'auto non chiara».
+
+Le fonti non diventano mai un obiettivo. La pagina non ti dice a che cartello
+frenare, perché non sappiamo dove sta il cartello sulla mappa. Confronta solo la
+marcia, e lo dice così, per esempio «Tu in terza, una fonte in seconda.»
+
 ### Curva per sessione
 
 Sotto i punti deboli, ogni curva **sistematica** ha il suo grafico. Mostra la
@@ -795,10 +914,47 @@ esempio «Scelto per le condizioni» e «asfalto a 12,0 °C, mentre il tuo
 1:39.000 era a 32,0 °C». Se il giro di confronto lo scegli tu dalla tendina,
 vale la tua scelta e non cambia più.
 
+
+Nel debrief del report ogni curva si misura col **tuo gesto migliore** in quella
+curva. È il tuo giro che l'ha fatta più in fretta, fra i tuoi venti più veloci
+nelle stesse condizioni. Vale solo se batte il riferimento di almeno mezzo
+decimo in quella curva. Il dettaglio lo dice con «Confronto con la tua migliore
+in questa curva», insieme al tempo di quel giro. Il delta a schermo resta sul
+riferimento, perché misura il giro intero e non una curva sola. Per questo i
+numeri di una curva possono essere più alti di prima. Prima la curva si misurava
+contro il riferimento, che lì era più lento del tuo meglio. Se il giro di
+confronto lo scegli tu dalla tendina, o è un giro PRO, ogni curva usa quello.
+
+Il report può aggiungere a una curva una frase sul gesto che fai diverso dal
+riferimento di quella curva. Le misure sono cinque. Sono quanto dura il rilascio del
+freno e quanto in fretta apri il gas. Poi la marcia al punto di corda, il tempo in
+ABS e le correzioni di sterzo. Per ogni curva ne nomina una sola. La nomina solo se cade
+dove va il tempo, cioè ingresso, punto di corda o uscita. Per il gas conta anche il
+tratto subito dopo la curva. La nomina inoltre solo se
+differisce più di quanto due tuoi giri differiscono di solito in quel punto. Sotto
+quella soglia il report tace. Sterzo, gas e ABS li nomina solo se da te sono di più.
+Correggere meno o aprire il gas più in fretta non spiega un tempo perso. Il rilascio e la marcia
+contano nei due versi. L'ABS si confronta solo fra giri con lo stesso livello
+di ABS impostato. Su AC il gioco non dice il livello, quindi lì l'ABS non si
+confronta. Un giro con l'ABS acceso per più di metà del giro ha il canale bloccato,
+e su quel giro l'ABS non si confronta. L'aderenza di una curva si confronta ora, punto per punto, col limite dell'auto a quella
+velocità, misurato sul riferimento. Prima c'era un solo limite per tutto il giro. Il limite di una fascia non scende sotto quello delle più lente, ma non supera quello del giro. Sui rettilinei il grip non si misura.
+
 Se sei lontano dal passo, il tuo giro migliore è un bersaglio che ti tiene dove
 sei. Nella sezione **Analisi** dell'hub c'è **Importa un giro di riferimento
-PRO**. Puoi importare un giro più veloce, e da lì in poi il coach ti misura su
-quello.
+PRO**. Il file è un giro di HONE, un `.lap.json.gz`, per la stessa auto e la
+stessa pista.
+
+- Se è più veloce del tuo giro migliore, da lì in poi il coach ti misura su
+  quello, qualunque sia la temperatura della pista di oggi.
+- Se è più lento, resta il tuo giro migliore. Il giro PRO lo trovi comunque fra
+  i giri di confronto del report, con la scritta [PRO].
+- Dopo l'import l'hub ti dice quale dei due è il riferimento. Lo stesso giro
+  importato due volte si salva una volta sola.
+
+Il giro PRO non è uno dei tuoi giri. Non conta nel tuo miglior giro, nel giro
+ideale, nelle sessioni, nella Home e nella Pagella. In **Andamento**, fra i
+Livelli, ha il suo gradino, che ti dice quanto ti manca per arrivarci.
 
 > Vuoi provare HONE senza il gioco? `python accoach_main.py web --demo` carica giri
 > di esempio.
@@ -818,25 +974,42 @@ dai box. Su Assetto compare un segno quando c'è una modifica da fare ai box. In
 tutte e due, sopra la fase, c'è la strada descritta in «La strada
 dell'ingegnere».
 
-- **Telemetria.** Vedi velocità, marcia, TC, ABS e mappa motore, temperatura e
-  pressione delle quattro gomme, e la striscia di gas, freno e sterzo degli
-  ultimi 8 s. Sotto ci sono la strada e la fase su cui lavora l'ingegnere. Una
-  modifica da fare dal volante compare in un riquadro. Il bottone *L'ho
-  cambiato* c'è solo dove HONE non legge la manopola, come spiegato in «I
-  consigli di setup».
+- **Telemetria.** Vedi velocità, marcia e benzina. La benzina è la
+  percentuale del serbatoio, con sotto «≈ N giri» al consumo medio. Sotto vedi
+  un trattino finché HONE non ha misurato il consumo di un giro. Poi ci sono
+  TC, ABS e mappa motore. Vedi anche temperatura e pressione delle quattro
+  gomme, e la striscia di gas, freno e sterzo degli ultimi 8 s. Sotto ci sono
+  la strada e la fase su cui lavora l'ingegnere. Una modifica da fare dal
+  volante compare in un riquadro. Il bottone *L'ho cambiato* c'è solo dove
+  HONE non legge la manopola, come spiegato in «I consigli di setup».
+- **Pedali come sull'overlay.** Sopra la striscia ci sono le barre di freno,
+  gas e sterzo di adesso. La tacca azzurra è quanto premeva il giro di
+  riferimento in quel punto. Accanto leggi il distacco, e TRAIL quando freni
+  col volante girato. Mentre non premi nessun pedale leggi VELEGGIO con i
+  secondi. Sotto la striscia una fascia ambra segna il trail braking, una
+  grigia il veleggio.
+- **La pista.** A destra, o sotto col tablet in verticale, c'è la pista con
+  l'auto in azzurro e la punta che dice dove va. *Pista intera* la mostra
+  tutta. *400 m* e *120 m* seguono l'auto, e a 120 m vedi l'auto rispetto ai
+  bordi. I bordi ci sono solo sulle piste che hai anche su Assetto Corsa. Sulle
+  altre la linea grigia è il tuo giro di riferimento, e la pagina te lo dice.
+  La pista arriva con il primo giro valido su quella pista.
 - **Avviso di rientro.** Quando l'ingegnere ha una modifica da fare ai box, in
   alto compare l'invito a rientrare a fine giro. La telemetria resta sotto. Per
   una modifica respinta l'avviso è simile e ti dice di rimettere l'ultima
   modifica com'era. Se tocchi l'avviso passi ad Assetto.
 - **Assetto.** La pagina mostra la fase e le leve da cambiare, una per riga,
   dal valore di adesso a quello nuovo. Sotto trovi il perché e il grado di
-  fiducia. Come file di partenza HONE propone l'ultimo assetto che ha scritto
-  per quell'auto e quella pista da quando è partito il processo web. Se non ne
-  ha scritto nessuno, propone il file modificato più di recente. Dalla lista
-  puoi sceglierne un altro. Premi *Scrivi la modifica* e conferma. HONE crea
-  un file nuovo e non tocca il tuo. Poi la pagina ti mostra in grande il nome
-  del file, da caricare dal garage del gioco. Se non trova un assetto per
-  quell'auto su quella pista, ti chiede di salvarne uno dal garage.
+  fiducia. Come file di partenza HONE usa l'ultimo assetto che ha scritto per
+  quell'auto e quella pista da quando è partito il processo web. Se non ne ha
+  scritto nessuno non tira a indovinare. La pagina ti chiede «Quale assetto hai
+  caricato nel gioco?» e la lista parte vuota. Finché non scegli il file, il
+  bottone per scrivere resta spento. Dopo un riavvio di HONE la domanda torna.
+  Dalla lista puoi sempre sceglierne un altro. Premi *Scrivi la modifica* e
+  conferma. HONE crea un file nuovo e non tocca il tuo. Poi la pagina ti
+  mostra in grande il nome del file, da caricare dal garage del gioco. Se non
+  trova un assetto per quell'auto su quella pista, ti chiede di salvarne uno
+  dal garage.
 - **In pista Assetto si legge.** La modifica, il file di partenza e le leve li
   vedi anche mentre giri, ma i bottoni si accendono solo quando sei fermo ai
   box. Quando scrivi il file, l'ingegnere comincia a contare i giri di prova.
@@ -846,11 +1019,25 @@ dell'ingegnere».
   scrive un file che rimette i valori di prima. Se hai già ricaricato nel
   garage del gioco il file di prima, premi *L'ho già rimesso com'era*. Anche
   questo bottone funziona solo ai box.
+- **Le gomme fanno da controllo.** Quando finisce la prova di una pressione,
+  l'ingegnere confronta quanto si sono mosse le gomme a caldo con quanto
+  valeva la modifica. Se lo scarto supera 0,8 psi, o la modifica stessa quando
+  è più grande, te lo dice coi due numeri. Vuol dire che forse il file di
+  partenza non era quello in macchina. Allora la prova non la giudica e non la
+  scrive nel registro, e non c'è niente da scrivere sul file. Finché non
+  rispondi, i giri che fai non contano per la base, perché in macchina c'è
+  ancora l'assetto dubbio. L'ingegnere ti chiama ai box a voce, subito e al
+  traguardo dopo. Ai box ricarica l'assetto che guidavi prima della
+  modifica. La pagina ti rifà la domanda, anche se la ricarichi, e tu scegli
+  l'assetto che hai caricato davvero. HONE se lo ricorda come file di
+  partenza per quell'auto e quella pista. Poi l'ingegnere rifà la base coi
+  giri dopo l'uscita dai box.
 
 La pagina completa dell'ingegnere segue la stessa regola. I bottoni che
 scrivono si spengono quando stai guidando e non sei fermo ai box, anche in
 pausa in pista. Col gioco spento o nei menu puoi scrivere lo stesso, per
-preparare un assetto senza guidare.
+preparare un assetto senza guidare. Anche lì il primo file di partenza lo
+scegli tu, e la domanda torna quando le gomme non rispondono come previsto.
 
 Per il resto, ad esempio per lo storico delle prove, usa la pagina completa
 dell'ingegnere. Resta su `/engineer`, e il collegamento *Pagina completa* in
@@ -977,6 +1164,8 @@ Questi sono quelli che potrebbero servirti davvero.
 | `logs` | Apre la cartella dei log e dei crash report. |
 | `logs --zip` | Fa un solo file da allegare a una segnalazione, coi log, la versione, il commit, Python e il sistema, e le ultime auto e piste. Il file nasce anche se non ci sono log, e in quel caso lo dice. **I log entrano senza filtri, con una sola modifica.** La tua cartella di casa, dove sta il nome del tuo account Windows, diventa `%USERPROFILE%`. Il resto dei percorsi resta, compresa la cartella di rete se ne hai una. Hanno una riga con data e ora per ogni avvio di HONE, cioè il registro di quando ti sei seduto a guidare. Ci sono i tuoi tempi sul giro, piste, auto e nomi dei file aperti. Ci sono anche i crash report, con l'errore completo. È voluto, perché un log ripulito non serve a trovare un difetto. Il comando lo scrive dentro lo ZIP, e dal sorgente anche a schermo quando finisce. L'app impacchettata non ha una finestra di terminale, quindi lì a schermo non vedi niente. Aprilo e guardalo prima di mandarlo. |
 | `find-rain` | Trova i campi della pioggia di ACC misurandoli. Ti serve una sessione con meteo variabile. |
+| `verify-box` | Mostra litri e treno del menu box di ACC, tempo di sessione e usura. Cambia il menu e guarda se i numeri seguono. |
+| `verify-setup` | In garage, da fermo, mostra i valori letti dal gioco accanto a quelli di ogni assetto salvato. Cambia assetto nel menu e guarda le righe. |
 
 
 ### Il debrief nel terminale

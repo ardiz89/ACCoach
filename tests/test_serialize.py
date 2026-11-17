@@ -97,3 +97,13 @@ def test_pit_due_reaches_the_frontends():
 
 def test_pit_due_defaults_to_false():
     assert state_to_dict(_state())["pit_due"] is False
+
+
+def test_fuel_block_reaches_the_frontends():
+    blk = {"litres": 24.5, "pct": 41, "laps": 6}
+    d = json.loads(json.dumps(state_to_dict(_state(fuel=blk))))
+    assert d["fuel"] == blk
+
+
+def test_no_fuel_block_is_null():
+    assert state_to_dict(_state())["fuel"] is None

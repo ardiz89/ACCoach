@@ -50,6 +50,9 @@ from pathlib import Path
 # nodi. Vertice = posizione(12) + normale(12) + uv(8) + tangente(12).
 _MAGIC = b"sc6969"
 _VERTEX = 44
+#: Vertice di una mesh con le ossa: i 44 byte, più 4 pesi e 4 indici delle ossa
+#: (misurato in `kn5visual` su driver.kn5). Una mesh così non è strada: si salta.
+_SKIN_VERTEX = 76
 
 #: Le chiavi di `surfaces.ini` raggruppate per come si disegnano. I nomi veri
 #: portano prefissi numerici e suffissi (``07GRASS001``), quindi il confronto e'
@@ -208,9 +211,10 @@ def _walk(path: Path, collect: bool):
                 if ntype == 3:
                     for _ in range(r.need(r.i(), 68)):
                         r.s(); f.read(64)
-                nv = r.need(r.i(), _VERTEX)
+                size = _SKIN_VERTEX if ntype == 3 else _VERTEX
+                nv = r.need(r.i(), size)
                 total += 1
-                cls = _class_of(name)
+                cls = _class_of(name) if ntype == 2 else None
                 if cls:
                     named += 1
                 if collect and cls:
@@ -227,7 +231,7 @@ def _walk(path: Path, collect: bool):
                         for k in (idx[a], idx[a + 1], idx[a + 2]):
                             dst.append(vs[k][0]); dst.append(vs[k][2])
                 else:
-                    f.seek(nv * _VERTEX, 1)
+                    f.seek(nv * size, 1)
                     ni = r.need(r.i(), 2)
                     f.seek(ni * 2, 1)
                 r.i(); f.read(12)

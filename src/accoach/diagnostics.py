@@ -263,7 +263,7 @@ def run_yaw(seconds: float | None = None) -> None:
     — the one assumption ``balance.py`` makes for oversteer detection (``_YAW_SIGN``).
 
     In a clean, grippy corner (off the brakes, no big slide) steering and yaw must
-    point the *same* way: turn left (steer > 0) and the car yaws left. If the data
+    point the *same* way: turn right (steer > 0) and the car yaws right. If the data
     shows them consistently opposite, ``_YAW_SIGN`` must be flipped to -1.
     """
     _utf8()
@@ -287,7 +287,7 @@ def run_yaw(seconds: float | None = None) -> None:
         if not clean_corner:
             return
         stats["agree" if s.steer_angle * s.yaw_rate > 0 else "disagree"] += 1
-        stats["left" if s.steer_angle > 0 else "right"] += 1
+        stats["right" if s.steer_angle > 0 else "left"] += 1
 
     seen = _sample_loop(on_sample, seconds, 0.02)
     _warn_if_no_live(seen)
@@ -485,33 +485,23 @@ def run_import_reference(argv: list[str] | None = None, laps_dir=None) -> None:
     _utf8()
     from pathlib import Path
 
-    from .recording import laps_root, load_lap, save_lap
+    from .i18n import t
+    from .recording import laps_root
+    from .recording.pro import describe, import_pro
 
     argv = sys.argv[1:] if argv is None else argv
     laps_dir = laps_dir or laps_root()
     if not argv:
-        print("Uso: python -m accoach import-reference <file.lap.json.gz>")
+        print("python -m accoach import-reference <file.lap.json.gz>")
         return
-    src = Path(argv[0])
-    if not src.exists():
-        print(f"File non trovato: {src}")
-        return
+    # La stessa regola e le stesse frasi del bottone dell'hub, nella lingua
+    # scelta: prima qui era tutto in italiano e senza dire l'esito.
     try:
-        lap = load_lap(src)
+        result = import_pro(Path(argv[0]), laps_dir)
     except Exception as e:   # noqa: BLE001
-        print(f"Giro illeggibile: {e}")
+        print(t("import.failed").format(err=e))
         return
-    if lap.lap_time_ms <= 0 or not lap.samples:
-        print("Giro non valido (tempo o campioni mancanti).")
-        return
-
-    lap.valid = True        # a reference must be a complete lap
-    lap.clean = True         # imported as a trusted clean reference
-    lap.source = "pro"       # a first-class benchmark level, not the driver's lap
-    lap.recorded_utc = ""    # let save_lap stamp it fresh
-    dest = save_lap(lap, laps_dir)
-    print(f"✓ Reference importato: {lap.car_model} / {lap.track} "
-          f"({format_lap_time(lap.lap_time_ms)}) → {dest.name}")
+    print(describe(result, t))
 
 
 def run_dryrun(seconds: float | None = None) -> None:
@@ -713,6 +703,140 @@ def _arg_value(argv: list[str], *names: str) -> str | None:
 
 if __name__ == "__main__":
     main()
+
+
+# --- ACC: il menu box ------------------------------------------------------
+
+# Offset ricavati dal manuale di ACC (v1.7.6) contando da `isValidLap`, l'unico
+# misurato (1408). Sono un calcolo: per questo si leggono solo qui, finche' il
+# comando `verify-box` non li ha visti muoversi col menu del gioco.
+_BOX_FIELDS = (
+    ("giri stimati", 1412, "f"), ("treno nel menu", 1532, "i"),
+    ("litri nel menu", 1536, "f"), ("psi AS", 1540, "f"), ("psi AD", 1544, "f"),
+    ("psi PS", 1548, "f"), ("psi PD", 1552, "f"), ("pioggia", 1560, "i"),
+    ("pioggia 10 min", 1564, "i"), ("pioggia 30 min", 1568, "i"),
+    ("treno montato", 1572, "i"), ("treno previsto", 1576, "i"),
+)
+
+
+def box_fields(raw: bytes) -> dict[str, float]:
+    """I campi del menu box dai byte grezzi della pagina grafica."""
+    import struct as _struct
+    return {name: round(_struct.unpack_from("<" + kind, raw, off)[0], 2)
+            for name, off, kind in _BOX_FIELDS if off + 4 <= len(raw)}
+
+
+def run_box(seconds: float | None = None) -> None:
+    """Controlla il menu box di ACC: cambia litri e treno e guarda se i numeri seguono.
+
+    Stampa una riga quando un valore cambia. Serve anche per l'usura delle gomme,
+    che il manuale elenca ma che non abbiamo mai visto, e per l'unita' del tempo
+    di sessione, su cui si basano i litri suggeriti.
+    """
+    _utf8()
+    print("Menu box. In pista, cambia litri e treno nel menu del gioco.")
+    print("Ctrl+C per fermare.\n")
+    state = {"last": None}
+
+    def on_sample(s, t) -> None:
+        raw = _acc_graphics_bytes(_BOX_FIELDS[-1][1] + 4)
+        if raw is None:
+            return
+        now = box_fields(raw)
+        if now == state["last"]:
+            return
+        state["last"] = now
+        wear = " ".join(f"{w:.2f}" for w in s.tyre_wear)
+        print(f"[{t:6.1f}s] {now}\n   tempo sessione={s.session_time_left_ms:.0f} "
+              f"serbatoio={s.max_fuel:.0f} usura={wear}", flush=True)
+
+    seen = _sample_loop(on_sample, seconds, 0.5)
+    _warn_if_no_live(seen)
+
+
+def _emap(raw: int) -> str:
+    """La mappa motore grezza e come la mostra l'HUD di ACC (da 1)."""
+    return f"mappa {raw} (HUD {raw + 1})" if raw >= 0 else f"mappa {raw}"
+
+
+def setup_lines(snap, files) -> list[str]:
+    """Quello che il gioco espone, accanto ai valori di ogni file di setup (pura).
+
+    Il ripartitore del file e' in click e la lettura una frazione: si
+    confronta solo per le auto con lo scarto misurato
+    (`fingerprint.MEASURED_BIAS_OFFSET`, oggi la 720S), e la riga dice il
+    valore atteso. Per le altre l'offset e' cio' che il test deve chiarire.
+    Le pressioni si leggono cosi' come sono: si lancia a macchina ferma ai box.
+    «Ai box» e' la regola del motore (`stopped_in_box`): su ACC `in_pit` resta
+    0 anche fermi in piazzola. La mappa e' grezza (0 = la prima, come nel file)
+    con accanto il numero dell'HUD; le temperature interne delle gomme dicono
+    se le pressioni lette sono a freddo.
+    """
+    from .coaching.pitcall import stopped_in_box
+    from .engineer.fingerprint import (
+        BIAS_STEP, MEASURED_BIAS_OFFSET, Reading, compare,
+    )
+
+    r = Reading.from_snapshot(snap, snap.tyre_pressure)
+    psi = " ".join(f"{p:.1f}" for p in snap.tyre_pressure)
+    core = " ".join(f"{c:.1f}" for c in snap.tyre_core_temp)
+    out = [
+        f"box={'si' if stopped_in_box(snap) else 'no'} "
+        f"velocita={snap.speed_kmh:.0f} km/h",
+        f"TC {r.tc}  ABS {r.abs}  {_emap(r.emap)}  ripartitore {r.bias:.3f}",
+        f"pressioni (FL FR RL RR) {psi}  benzina {r.fuel:.0f}  "
+        f"aria {r.air_temp:.0f}  pista {r.road_temp:.0f}",
+        f"gomme dentro (FL FR RL RR) {core} gradi",
+    ]
+    if not files:
+        out.append("nessun setup trovato per questa auto e pista")
+        return out
+    offset = MEASURED_BIAS_OFFSET.get(snap.car_model)
+    for f in files:
+        certain, pdiffs = compare(r, f, carry={}, bias_offset=offset)
+        want = ("" if offset is None else
+                f" = atteso {offset + BIAS_STEP * f.bias_clicks:.3f}")
+        out.append(f"{f.name}: TC {f.tc} ABS {f.abs} {_emap(f.emap)} "
+                   f"ripartitore {f.bias_clicks} click{want} (letto {r.bias:.3f})")
+        names = {"emap": "MAPPA", "bias": "RIPARTITORE"}
+        bad = ", ".join(f"{names.get(d.field, d.field.upper())} letto {d.seen:g} file {d.want:g}"
+                        for d in certain)
+        out.append(f"   differenze certe: {bad or 'nessuna'}")
+        by = {d.field: d for d in pdiffs}
+        cells = []
+        for w, seen, want in zip(("fl", "fr", "rl", "rr"), snap.tyre_pressure,
+                                 f.cold_psi):
+            cells.append(f"{w.upper()} {seen - want:+.1f}")
+        out.append("   pressioni letto-file (psi): " + "  ".join(cells)
+                   + ("  [fuori tolleranza]" if by else ""))
+    return out
+
+
+def run_setup(seconds: float | None = None) -> None:
+    """In garage: i valori letti dal gioco accanto a ogni setup dell'auto e pista."""
+    _utf8()
+    from .engineer.fingerprint import file_values
+    from .setup.store import find_setup_files
+
+    print("Verifica setup. Da fermo ai box, a macchina in garage: le pressioni")
+    print("lette sono quelle a freddo. Cambia assetto nel menu e guarda le righe.")
+    print("Ctrl+C per fermare.\n")
+    state = {"last": None, "key": None, "files": []}
+
+    def on_sample(s, t) -> None:
+        key = (s.car_model, s.track)
+        if key != state["key"]:
+            state["key"] = key
+            paths = find_setup_files(s.car_model, s.track) if s.car_model else []
+            state["files"] = [fv for fv in map(file_values, paths) if fv]
+        lines = setup_lines(s, state["files"])
+        if lines == state["last"]:
+            return
+        state["last"] = lines
+        print(f"[{t:6.1f}s] " + "\n".join(lines), flush=True)
+
+    seen = _sample_loop(on_sample, seconds, 0.5)
+    _warn_if_no_live(seen)
 
 
 # --- ACC: trovare i campi della pioggia ------------------------------------

@@ -226,6 +226,9 @@ class SharedMemoryReader:
             in_pit_lane=SharedMemoryReader._in_pit_lane(g),
             is_acc=SharedMemoryReader._is_acc(g),
             lap_valid=SharedMemoryReader._lap_valid(g, graphics_padded),
+            session_time_left_ms=max(0.0, g.sessionTimeLeft),
+            max_fuel=s.maxFuel,
+            tyre_wear=tuple(p.tyreWear),
             **SharedMemoryReader._car_xz(g),
         )
 

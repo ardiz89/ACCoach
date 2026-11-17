@@ -33,7 +33,7 @@ from dataclasses import dataclass
 
 from ..logging_setup import get_logger
 from ..telemetry.snapshot import ACStatus, TelemetrySnapshot
-from .lap import (_OPEN_CLOCK_MAX_MS, Lap, LapSample, sim_answer_pending,
+from .lap import (BRAKE_ON, _OPEN_CLOCK_MAX_MS, Lap, LapSample, sim_answer_pending,
                   sim_repeats_itself,
                   trusted_lap_ms)
 
@@ -44,6 +44,13 @@ _log = get_logger("recorder")
 # for braking-point comparison, sparse enough to gzip a lap to a few KB.
 _MIN_POS_DELTA = 0.002
 _MIN_DT_MS = 100
+# …tranne dove comincia una frenata: il fotogramma in cui il freno passa la
+# soglia dello stacco (`lap.BRAKE_ON`, la stessa della scheda frenate e della
+# diagnosi) e quello subito prima si tengono sempre. A 100 ms in frenata passano
+# 7 m, e il pedale va da zero a pieno in meno di un campione: misurato
+# sull'archivio il 16/11, la dispersione dello stacco in tre giri puliti era
+# sempre un campione, cioe' il campionamento e non il pilota. Due fotogrammi in
+# piu' per frenata; tenere il freno premuto non ne aggiunge altri.
 
 
 # A lap is dirty once this many wheels leave the track (a real excursion). 1-2
@@ -196,6 +203,9 @@ class _Buffer:
     last_pos: float
     last_t_ms: int
     max_tyres_out: int = 0  # worst off-track excursion seen during the lap
+    # L'ultimo fotogramma passato dai controlli d'apertura, tenuto o no: e' il
+    # «subito prima» di uno stacco (vedi `_MIN_DT_MS`).
+    prev: TelemetrySnapshot | None = None
     saw_invalid: bool = False   # the sim dropped its lap-valid flag at some point
     saw_valid_flag: bool = False  # …and it was telling us about it at all
     # Where the lap stopped counting, 0..1, or None if it never did. The FIRST
@@ -428,13 +438,22 @@ class LapRecorder:
                 and int(s.current_lap_ms) > _OPEN_CLOCK_MAX_MS):
             return
         t = int(s.current_lap_ms)
+        prev, buf.prev = buf.prev, s
+        onset = prev is not None and prev.brake < BRAKE_ON <= s.brake
+        if (onset and buf.samples and int(prev.current_lap_ms) > buf.last_t_ms
+                and prev.lap_position > buf.last_pos):
+            self._keep(buf, prev)
         moved = abs(s.lap_position - buf.last_pos) >= _MIN_POS_DELTA
         waited = (t - buf.last_t_ms) >= _MIN_DT_MS
-        if buf.samples and not (moved or waited):
+        if buf.samples and not (moved or waited or onset):
             return
+        self._keep(buf, s)
+
+    @staticmethod
+    def _keep(buf: _Buffer, s: TelemetrySnapshot) -> None:
         buf.samples.append(LapSample.from_snapshot(s))
         buf.last_pos = s.lap_position
-        buf.last_t_ms = t
+        buf.last_t_ms = int(s.current_lap_ms)
 
     def _watch_settle(self, s: TelemetrySnapshot) -> None:
         """Say in the log what the sim answers AFTER the line, and how late.
