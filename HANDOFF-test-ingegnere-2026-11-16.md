@@ -84,6 +84,14 @@ Le domande a cui il test deve rispondere:
    soglia di costanza. Transizione: sui giri vecchi lo stacco cade in media 3-4 m
    più tardi che sui nuovi (fino a un campione), quindi la scheda frenate che
    mescola giri vecchi e nuovi lo sposta un poco.
+6. **La costanza.** Nelle righe `lap` del registro il campo `dropped` dice quali giri
+   l'Ingegnere ha tolto e in quali curve erano più lenti. Contare quanti sono: sull'archivio
+   fino al 14/11, rigiocato il 17/11, erano 13 su 82, uno su sei. Poi chiedere al pilota
+   se li riconosce come giri con un errore. Due cose da sapere leggendo la serata: il
+   contatore della base parte da 4 («Servono 4 giri puliti»: il giro d'apertura più tre
+   giri da giudicare), e dopo un giro tolto una lettura o un verdetto arriva un giro più
+   tardi, in uno stint corto magari non prima della sosta. Una manopola girata durante lo
+   stint non butta via i giri: contano, senza giudizio.
 
 ## Casi lasciati aperti
 
@@ -101,15 +109,11 @@ Vanno cercati nel registro:
 
 ## Le tappe dopo
 
-- La costanza del pilota prima del verdetto. Il pilota l'ha chiesta il 16/11.
-  Misurata sull'archivio lo stesso giorno (`tools/costanza_archivio.py`): lo
-  stacco non si risolveva sotto un campione (corretto nel registratore, vedi la
-  domanda 5); la velocità minima per curva sì (scarto di un giro dalla mediana
-  dello stint 1,5 km/h sui puliti, 4,1 sui giri con un'uscita). Concordato col
-  pilota: (b) controllo di costanza sulla velocità minima, (c) confronto base /
-  prova curva per curva con le curve accoppiate per posizione (lo stacco lungo
-  sistematico la dispersione non lo vede). Da progettare insieme prima di
-  scriverli.
+- Fatta sul ramo (17/11): la costanza del pilota prima del verdetto. Un giro pulito più
+  lento di oltre 5 km/h di velocità minima in almeno 3 curve, rispetto agli altri giri
+  dello stesso stint e con le stesse manopole, non conta; solo per le GT3. Rigiocando
+  l'archivio ne toglie 13 su 82. Prossima: (c), il confronto base / prova curva per curva,
+  con le curve accoppiate per posizione. Da progettare insieme prima di scriverla.
 - Dalla proposta del 15/11: il sintomo dichiarato dal pilota a fine run, il passo da
   2 click, i run da 4 + 3 + 3 + 3 giri, le pressioni per ruota, il comando
   «ricomincia».
