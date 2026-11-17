@@ -1761,10 +1761,12 @@ class RaceEngineer:
         14/11 (TC 3 e 4 alternati giro per giro) la lettura delle pressioni
         ripartiva a ogni cambio e non arrivava mai.
 
-        Le curve: in pista sono quelle del riferimento, che cambia a ogni
-        nuovo miglior giro. La stessa zona puo' cadere su un tratto veloce o
-        sulla curva lenta (nel rigioco del 17/11, Rivazza a 225 o a 90 km/h),
-        e fra due insiemi diversi gli scarti non sono del pilota.
+        Le curve: in pista sono quelle della serata, fissate quando nasce
+        l'Ingegnere (`engine._engineer_stats`), e non cambiano piu'; la chiave
+        cambia solo sui giri misurati sulle proprie curve, prima che la serata
+        abbia le sue. La stessa zona rilevata due volte puo' cadere su un
+        tratto veloce o sulla curva lenta (nel rigioco del 17/11, Rivazza a 225
+        o a 90 km/h), e fra due insiemi diversi gli scarti non sono del pilota.
         """
         prev, self._last_dials = self._last_dials, stats.dials
         corners, self._last_corners = self._last_corners, stats.corners_key

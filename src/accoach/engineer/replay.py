@@ -127,9 +127,12 @@ def _feed(eng, row: dict):
 def _evening_corners(laps: list) -> list:
     """Le curve su cui si leggono tutti i giri della serata.
 
-    Come il motore in pista, che passa a ogni giro le curve del riferimento:
-    rilevate una volta, sul giro piu' veloce valido e non tagliato (sul piu'
-    veloce, se nessuno lo e'). Rilevate giro per giro, il 17/11 a Imola la zona
+    Rilevate una volta, sul giro piu' veloce valido e non tagliato (sul piu'
+    veloce, se nessuno lo e'). Volutamente diverso dal motore in pista, che usa
+    le curve del riferimento di quando nasce l'Ingegnere (o del primo giro
+    pulito): il rigioco non ha quel riferimento, e il giro piu' veloce della
+    serata e' il piu' vicino che ha. Quindi il rigioco approssima la pista, non
+    la ripete. Rilevate giro per giro, il 17/11 a Imola la zona
     della Rivazza veniva tagliata in modo diverso da un giro all'altro (l'apice
     a 0,795 era un tratto a 225 km/h su alcuni giri e la curva a 90 su altri),
     e accoppiate per posizione davano scarti finti di 125-140 km/h: 4 degli 8

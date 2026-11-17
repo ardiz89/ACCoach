@@ -66,6 +66,19 @@ Tutto in `src/accoach/engine.py`:
   incompleto non fissa niente e si misura come oggi (curve proprie, non giudicato);
 - le curve dell'Ingegnere si azzerano soltanto quando l'Ingegnere rinasce.
 
+Aggiunto dopo la revisione finale (17/11, su richiesta del pilota di sistemare le note
+minori):
+
+- il primo giro pulito e valido controlla anche le curve prese dal riferimento: se meno
+  della metà delle sue curve ha un apice entro `consistency.MATCH` da una di quelle, la
+  serata si misura sulle sue. Su Assetto Corsa la pista non dice il layout, e il
+  riferimento può essere un giro di un altro layout dello stesso circuito (Brands Hatch GP
+  mentre si gira sull'Indy): prima un nuovo miglior giro lo sostituiva, con le curve fisse
+  sarebbe rimasto tutta la sera;
+- i nomi si rileggono a ogni giro (`_corner_labels` sulle curve della serata): le curve
+  restano, ma un nome scritto dal pilota a metà serata o un cambio di lingua arrivano al
+  giro dopo.
+
 ## Verifica
 
 Test del motore:
@@ -74,7 +87,8 @@ Test del motore:
 - senza riferimento: il primo giro pulito e valido fissa le curve, i giri dopo hanno la sua
   chiave e non sono `corners_own`; un giro sporco prima di lui non fissa niente;
 - cambio di auto o pista: le curve si fissano di nuovo;
-- i nomi detti dall'Ingegnere sono quelli del momento in cui le curve sono state fissate.
+- i nomi seguono il catalogo a ogni giro, sulle curve della serata;
+- un riferimento di un altro layout cede al primo giro pulito, uno dello stesso resta.
 
 Più la suite intera con la casa finta.
 

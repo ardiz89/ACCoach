@@ -50,7 +50,7 @@ from .coaching.pitcall import HoldCall, PitCall
 from .i18n import cue_text, current_language
 from .logging_setup import get_logger
 from .comparison import DeltaState, LapComparator, Reference
-from .engineer import DecisionKind, RaceEngineer, classify, engineer_for
+from .engineer import DecisionKind, LapStats, RaceEngineer, classify, engineer_for
 from .engineer.fingerprint import PitWatch
 from .engineer.session_log import SessionLog
 from .recording import Lap, LapRecorder, find_reference_lap, laps_root, save_lap
@@ -392,6 +392,26 @@ def _build_corner_bests(main: Reference, corners: list[Corner],
     return bests
 
 
+def _corners_fit(fixed: list[Corner], own: list[Corner]) -> bool:
+    """Le curve di un giro stanno su quelle fissate? Almeno meta' delle sue con
+    un apice entro `consistency.MATCH` (distanza sul cerchio) da uno fissato.
+
+    Meta' e non tutte: lo stesso layout rilevato su due giri puo' tagliare una
+    zona in modo diverso (la Rivazza del 17/11). Un altro layout non ne fa
+    combaciare quasi nessuna.
+    """
+    if not fixed:
+        return False
+    from .engineer.consistency import MATCH
+
+    def near(a: float, b: float) -> bool:
+        d = abs(a - b) % 1.0
+        return min(d, 1.0 - d) <= MATCH
+
+    hits = sum(any(near(o.apex_pos, f.apex_pos) for f in fixed) for o in own)
+    return hits * 2 >= len(own)
+
+
 def _corner_labels(car: str, track: str, corners: list[Corner],
                    laps_dir: Path | str) -> dict[int, str]:
     """Nome di ogni **zona** dell'analyzer, nell'ordine in cui l'analyzer le indicizza.
@@ -525,6 +545,8 @@ class CoachEngine:
         # curva: con le curve che cambiano ricominciava da capo (17/11).
         self._engineer_corners: list[Corner] = []
         self._engineer_corner_names: dict[int, str] = {}
+        # Il primo giro pulito della serata ha gia' controllato le curve?
+        self._engineer_checked = False
         self._key: tuple[str, str] = ("", "")
         self.saved_laps = 0
         self.history: list[str] = []
@@ -777,33 +799,44 @@ class CoachEngine:
         except Exception:  # noqa: BLE001 - il registro non rompe un giro
             _log.debug("session log (lap) failed", exc_info=True)
 
-    def _engineer_stats(self, lap: Lap):
+    def _engineer_stats(self, lap: Lap) -> LapStats:
         """La diagnosi del giro per l'Ingegnere, sulle curve della serata.
 
-        Senza riferimento le curve si fissano dal primo giro pulito e valido:
-        da li' in poi tutti i giri si misurano su quelle. Un giro sporco o
-        incompleto non le fissa e si misura sulle sue (non si giudica); se sul
-        giro pulito non si trova nessuna curva, si riprova al giro dopo.
+        Il primo giro pulito e valido della serata le controlla: senza
+        riferimento le fissa lui; col riferimento le tiene se le sue curve ci
+        stanno sopra, se no (su Assetto Corsa la pista non dice il layout, e il
+        riferimento puo' essere un giro del GP mentre si gira sull'Indy) la
+        serata si misura sulle sue. Da li' in poi le curve non cambiano. Un giro
+        sporco o incompleto non controlla niente; se sul giro pulito non si
+        trova nessuna curva, si riprova al giro dopo.
+
+        I nomi invece si rileggono a ogni giro: un nome scritto dal pilota a
+        meta' serata, o un cambio di lingua, arrivano al giro dopo.
         """
-        if (not self._engineer_corners and lap.valid
+        if (not self._engineer_checked and lap.valid
                 and lap.clean is not False):
-            corners = detect_corners(lap.samples)
-            if corners:
-                self._engineer_corners = corners
-                self._engineer_corner_names = _corner_labels(
-                    lap.car_model, lap.track, corners, self.laps_dir)
+            own = detect_corners(lap.samples)
+            if own:
+                self._engineer_checked = True
+                if not _corners_fit(self._engineer_corners, own):
+                    self._engineer_corners = own
+        if self._engineer_corners:
+            self._engineer_corner_names = _corner_labels(
+                lap.car_model, lap.track, self._engineer_corners, self.laps_dir)
         return build_lap_stats(lap, self._engineer_corners or None,
                                corner_names=self._engineer_corner_names)
 
     def _observe_lap(self, lap: Lap) -> None:
         """Diagnose a completed lap: feed the engineer (setup) and the Focus
-        coach (driving). Both run on the reference that was the target *during*
-        this lap — the rebuild to chase a new best happens after, in tick()."""
+        coach (driving). The Focus coach runs on the reference that was the
+        target *during* this lap — the rebuild to chase a new best happens
+        after, in tick(). L'Ingegnere invece misura sulle curve della serata,
+        fissate quando e' nato (`_engineer_stats`)."""
         if self._engineer is not None:
-            # I nomi delle curve li ha gia' il motore, e sono gli stessi che il
-            # pilota vede ovunque: passarli qui e' l'unico modo perche'
-            # l'Ingegnere possa dire DOVE hai perso il giro senza ribattezzare
-            # la curva per conto suo.
+            # I nomi delle curve li fa il motore con la stessa funzione del
+            # coach (`_corner_labels`), sulle curve dell'Ingegnere: cosi'
+            # l'Ingegnere dice DOVE hai perso il giro senza ribattezzare la
+            # curva per conto suo.
             stats = self._engineer_stats(lap)
             previous = self._engineer_decision
             self._engineer_decision = self._engineer.observe(stats)
@@ -1737,9 +1770,11 @@ class CoachEngine:
             # Le curve dell'Ingegnere sono quelle del riferimento di adesso
             # (appena ricostruito qui sopra), copiate: il coach le rifà a ogni
             # nuovo miglior giro, l'Ingegnere no. Senza riferimento restano
-            # vuote e le fissa il primo giro pulito (`_engineer_stats`).
+            # vuote; il primo giro pulito le fissa o le controlla
+            # (`_engineer_stats`).
             self._engineer_corners = list(self._corners)
             self._engineer_corner_names = dict(self._corner_names)
+            self._engineer_checked = False
             self._engineer.restore(
                 self._load_engineer_state(snap.car_model, snap.track))
             self._engineer_decision = None

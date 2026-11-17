@@ -113,9 +113,12 @@ def test_without_a_reference_the_first_clean_lap_fixes_the_corners(bench):
     first = bench.lap(clean=True)
     assert first.corners_own is False
     assert bench.eng._engineer_corners
-    third = bench.lap(clean=True)
+    # Un giro che, cercandole da solo, troverebbe l'apice della seconda curva
+    # altrove (0,7025 invece di 0,71): misurato sulle curve della serata.
+    third = bench.lap(clean=True, slow_corner=1, amt=40)
     assert third.corners_key == first.corners_key
     assert third.corners_own is False
+    assert [a for a, _, _ in third.corner_vmin] == [a for a, _, _ in first.corner_vmin]
 
 
 def test_an_incomplete_lap_does_not_fix_the_corners(bench):
@@ -142,11 +145,60 @@ def test_a_new_track_fixes_the_corners_again(bench):
     assert bench.eng._engineer_corners == c
 
 
-def test_the_engineer_names_come_from_when_the_corners_were_fixed(bench):
+def test_a_new_track_without_a_reference_starts_empty(bench):
+    bench.arrive("monza")
+    bench.lap(clean=True)
+    assert bench.eng._engineer_corners
+    bench.arrive("imola")
+    assert bench.eng._engineer_corners == []
+
+
+def test_a_reference_from_another_layout_gives_way_to_the_first_clean_lap(bench):
+    """Su Assetto Corsa la pista non dice il layout: il riferimento puo' essere
+    un giro del GP mentre si gira sull'Indy. Se le curve del primo giro pulito
+    non stanno su quelle del riferimento, la serata si misura sulle sue."""
+    a = _corners_a()
+    bench.ref_corners = _shifted(a, 0.2)       # nessun apice in comune
+    bench.arrive()
+    first = bench.lap(clean=True)
+    assert first.corners_key == _key(a)
+    later = bench.lap(clean=True)
+    assert later.corners_key == _key(a)
+
+
+def test_a_reference_that_fits_the_first_clean_lap_is_kept(bench):
+    a = _corners_a()
+    near = _shifted(a, 0.004)                  # stesse curve, rilevate un poco diverse
+    bench.ref_corners = near
+    bench.arrive()
+    first = bench.lap(clean=True)
+    assert first.corners_key == _key(near)
+
+
+def test_names_follow_the_catalog_for_the_evening_corners(bench, monkeypatch):
+    """Le curve restano quelle della serata, i nomi no: un nome scritto dal
+    pilota a meta' serata, o un cambio di lingua, arrivano al giro dopo."""
+    import accoach.engine as engine_mod
+    catalog = {"names": ("Tosa", "Rivazza")}
+    monkeypatch.setattr(engine_mod, "_corner_labels",
+                        lambda car, track, corners, laps_dir: {
+                            c.index: n for c, n in zip(corners, catalog["names"])})
     a = _corners_a()
     bench.ref_corners = a
-    bench.ref_names = {c.index: n for c, n in zip(a, ("Tosa", "Rivazza"))}
     bench.arrive()
-    bench.eng._corner_names = {c.index: "Altra" for c in a}
+    stats = bench.lap(clean=True)
+    assert {name for _, _, name in stats.corner_vmin} == {"Tosa", "Rivazza"}
+    catalog["names"] = ("Tosa", "Piratella")
+    stats = bench.lap(clean=True)
+    assert {name for _, _, name in stats.corner_vmin} == {"Tosa", "Piratella"}
+    assert stats.corners_key == _key(a)
+
+
+def test_corners_fixed_from_a_lap_take_their_names_from_the_catalog(bench, monkeypatch):
+    import accoach.engine as engine_mod
+    monkeypatch.setattr(engine_mod, "_corner_labels",
+                        lambda car, track, corners, laps_dir: {
+                            c.index: n for c, n in zip(corners, ("Tosa", "Rivazza"))})
+    bench.arrive()
     stats = bench.lap(clean=True)
     assert {name for _, _, name in stats.corner_vmin} == {"Tosa", "Rivazza"}
