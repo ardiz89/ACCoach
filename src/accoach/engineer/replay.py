@@ -127,7 +127,7 @@ def _row(kind: str, when: datetime | None, **kw) -> dict:
     base = {"t": when.astimezone().isoformat(timespec="seconds") if when else "",
             "kind": kind, "lap_ms": None, "fuel": None, "front": None,
             "rear": None, "stint": None, "settling": None, "ok": None,
-            "decision": None, "message": None}
+            "decision": None, "message": None, "dropped": 0}
     base.update(kw)
     return base
 
@@ -138,7 +138,7 @@ def replay(laps_dir: Path, track: str, day: str, car: str | None = None,
     """Una riga per giro (e per evento del registro) della serata ``day``.
 
     Righe: ``{"t", "kind", "lap_ms", "fuel", "front", "rear", "stint",
-    "settling", "ok", "decision", "message"}``; ``kind`` e' ``"lap"`` o il tipo
+    "settling", "ok", "decision", "message", "dropped"}``; ``kind`` e' ``"lap"`` o il tipo
     di evento, ``decision`` il tipo di decisione (``DecisionKind.value``).
     Sola lettura: apre i giri e il registro, non scrive niente. Un giro che non
     si legge si salta; se ``skipped`` e' una lista ci finisce il suo percorso.
@@ -178,7 +178,8 @@ def replay(laps_dir: Path, track: str, day: str, car: str | None = None,
                          front=p.get("front"), rear=p.get("rear"),
                          stint=st.stint, settling=st.settling,
                          ok=bool(st.stable and st.warmed_up),
-                         decision=d.kind.value, message=d.message))
+                         decision=d.kind.value, message=d.message,
+                         dropped=len(eng.last_dropped)))
         if use_log:
             continue
         if d.kind is DecisionKind.PROPOSE and d.change and d.change.tag == "BOX":
@@ -202,9 +203,10 @@ def _format(i: int, r: dict) -> str:
         said = f" | {r['decision']:10s} {(r['message'] or '')[:150]}" if r["decision"] else ""
         return f"      -- {r['kind']} {r['t'][11:16]}{said}"
     flags = ("A" if r["settling"] else " ") + ("ok" if r["ok"] else "--")
+    cut = f" -{r['dropped']}" if r.get("dropped") else ""
     return (f"{i:2d} {r['t'][11:16]} {r['lap_ms'] / 1000:7.3f}s "
             f"fuel {r['fuel'] or 0:4.1f} F {r['front'] or 0:5.2f} "
-            f"R {r['rear'] or 0:5.2f} stint {r['stint']} {flags} "
+            f"R {r['rear'] or 0:5.2f} stint {r['stint']} {flags}{cut} "
             f"| {r['decision']:10s} {(r['message'] or '')[:150]}")
 
 

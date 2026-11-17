@@ -55,7 +55,8 @@ def test_replay_reaches_the_verdict_on_a_synthetic_evening(tmp_path):
     assert decisions.index("propose") < decisions.index("accepted")
     first = rows[0]
     assert set(first) == {"t", "kind", "lap_ms", "fuel", "front", "rear",
-                          "stint", "settling", "ok", "decision", "message"}
+                          "stint", "settling", "ok", "decision", "message",
+                          "dropped"}
     assert first["lap_ms"] == 100_000 and first["front"] == pytest.approx(28.0)
 
 

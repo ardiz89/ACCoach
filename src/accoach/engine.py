@@ -765,7 +765,8 @@ class CoachEngine:
                 decision=decision.kind.value if decision is not None else None,
                 message=decision.message if decision is not None else None,
                 progress=eng.progress(),
-                reading=dict(reading.pressures_hot) if reading else None)
+                reading=dict(reading.pressures_hot) if reading else None,
+                dropped=list(eng.last_dropped))
         except Exception:  # noqa: BLE001 - il registro non rompe un giro
             _log.debug("session log (lap) failed", exc_info=True)
 
